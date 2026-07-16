@@ -8,6 +8,23 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-167`](RUNTIME-167-privatize-engine-frameloop-surface.md) — the Engine
+frame-loop module surface retired on 2026-07-16 at `Operational`.
+Implementation commit `25e3e7c5` replaces the one-consumer
+`Extrinsic.Runtime.Engine:FrameLoop` partition with include-only private glue
+consumed solely by `Runtime.Engine.cpp`. The 408-line helper namespace body and
+Engine namespace body remain byte-identical; the inventory drops from 391 to
+390 modules and the combined direct-import count from 124 to 93. The dedicated
+`contract;runtime` guard proves the old module/CMake/inventory entries remain
+absent and the header has exactly one production consumer. The privacy guard
+passed 1/1, duplicated frame-loop contracts 18/18, focused CPU selection 54/54,
+explicit resize coverage 1/1, unaffected opt-in layering assertions 23/23, and
+the default CPU-supported gate 3,781/3,781 in 407.53 seconds. Strict structural
+and clean-workshop checks passed, and three independent reviews found no
+blockers. The recorded single-host timing remains diagnostic only; no compile
+speedup is claimed. `BUG-090` separately owns the pre-existing stale async-work
+shutdown assertion exposed by the opt-in layering binary.
+
 [`RUNTIME-170`](RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md) —
 the object-space normal bake GPU queue surface retired on 2026-07-16 at
 `CPUContracted`. Implementation commit `ca17b9b9` folds the one-consumer GPU

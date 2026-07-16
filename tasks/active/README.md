@@ -11,11 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [RUNTIME-167 — Privatize the Engine frame-loop surface](RUNTIME-167-privatize-engine-frameloop-surface.md)
-  (`in-progress`; owner: Codex; branch: `codex/arch-006-completion`). The
-  one-consumer frame-loop partition is being replaced with private Engine
-  implementation glue without changing frame behavior; next gate is the
-  focused runtime contract/integration build.
+- No tasks are currently active.
 
 ## History
 

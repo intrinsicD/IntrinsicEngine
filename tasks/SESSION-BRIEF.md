@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-167` — Privatize the Engine frame-loop surface (tasks/active/RUNTIME-167-privatize-engine-frameloop-surface.md)
+- none
 
 ## Theme B — Rendering modernization
 

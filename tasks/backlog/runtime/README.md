@@ -188,9 +188,6 @@ compile cost. They preserve behavior and ownership; they are not feature tasks.
 `ARCH-006` owns the top Sandbox editor/app hot path, and `RUNTIME-166` owns the
 main `Runtime.RenderExtraction` module slimming.
 
-- [`RUNTIME-167`](../../active/RUNTIME-167-privatize-engine-frameloop-surface.md) —
-  privatize the `Runtime.Engine:FrameLoop` partition after `RUNTIME-150`;
-  active on `codex/arch-006-completion`.
 - [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md) —
   privatize the Sandbox default policy module after `RUNTIME-144`.
 - [`RUNTIME-169`](RUNTIME-169-privatize-render-extraction-service-surface.md) —
@@ -209,6 +206,10 @@ main `Runtime.RenderExtraction` module slimming.
 
 ### Retired module-surface diet work
 
+- [`RUNTIME-167`](../../done/RUNTIME-167-privatize-engine-frameloop-surface.md)
+  retired the one-consumer `Runtime.Engine:FrameLoop` partition into
+  include-only Engine implementation glue at `Operational`, preserving the
+  frame-loop body byte-for-byte while removing one module/BMI surface.
 - [`RUNTIME-170`](../../done/RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md)
   retired the one-consumer object-space normal bake GPU queue module into
   service-owned private state at `CPUContracted`; production Vulkan wiring

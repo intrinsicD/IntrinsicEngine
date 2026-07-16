@@ -10,16 +10,16 @@ maturity_target: Operational
 
 ## Status
 
-- In progress on 2026-07-16; owner: Codex; branch:
-  `codex/arch-006-completion`.
-- Implementation and verification are complete: the default-lane privacy guard
+- Completed on 2026-07-16 at `Operational`.
+- Implementation commit: `25e3e7c5`.
+- Verification: the default-lane privacy guard
   passed 1/1, the duplicated frame-loop behavior contracts passed 18/18, the
   focused CPU selection passed 54/54, explicit resize coverage passed 1/1, and
   the unaffected opt-in layering selection passed 23/23. The final default
   CPU-supported gate passed 3,781/3,781 in 407.53 seconds, including the new
   `contract;runtime` privacy guard. The strict structural/review bundle is
   green; the one stale pre-existing async-work assertion is tracked separately
-  as `BUG-090`. Next gate: self-review and technical commit.
+  as `BUG-090`.
 
 ## Goal
 - Remove the exported `Extrinsic.Runtime.Engine:FrameLoop` module partition as a
