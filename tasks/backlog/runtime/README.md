@@ -193,6 +193,13 @@ main `Runtime.RenderExtraction` module slimming.
 - [`RUNTIME-172`](RUNTIME-172-privatize-scene-document-surface.md) —
   reduce or retire the exported scene document orchestration surface after
   `RUNTIME-148`.
+
+### Kernel convergence remediation
+
+- [`RUNTIME-178`](RUNTIME-178-restore-engine-convergence-budget.md) — after
+  `HARDEN-085`, restore the fixed 43 / 23 Engine import snapshot and remove the
+  `GRAPHICS-122` getter debt without resurrecting retired service BMIs.
+
 ### Retired module-surface diet work
 
 - [`RUNTIME-173`](../../done/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md)

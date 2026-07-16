@@ -11,7 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-No tasks are currently active.
+- [HARDEN-085 — Enforce the Runtime.Engine kernel-convergence ratchet](HARDEN-085-enforce-runtime-engine-kernel-convergence-ratchet.md)
+  (`in-progress`; owner: Codex; branch: `codex/arch-006-completion`). The
+  bounded tooling slice records current convergence debt explicitly and wires
+  a no-backsliding guard plus synthetic failures into `pr-fast`.
 
 ## History
 
