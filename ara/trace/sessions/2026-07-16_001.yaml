@@ -1,0 +1,106 @@
+session:
+  id: "2026-07-16_001"
+  date: "2026-07-16"
+  started: "2026-07-16T00:42+02:00"
+  last_turn: "2026-07-16T07:56+02:00"
+  turn_count: 1
+  summary: "Completed Runtime.Engine convergence and six reproducible workflow/runtime/platform/Vulkan bug closures, with full CPU and live GPU evidence, and prepared the verified branch for publication."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: "N223"
+    routing: direct
+    provenance: user
+    summary: "Authorized an unattended agentic loop over architecture, runtime, graphics, and bug tasks with per-task commits, final repair, and publication."
+  - turn: 1
+    type: experiment
+    id: "N224"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired eight Runtime.Engine convergence and private-surface slices with focused, full CPU, Vulkan, and structural proof."
+  - turn: 1
+    type: experiment
+    id: "N225"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired four deterministic workflow/runtime harness bugs covering empty validation, root hygiene, stale ownership assertions, and async wait budgets."
+  - turn: 1
+    type: experiment
+    id: "N226"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired BUG-082 with a standalone GLFW teardown process and an exact unrelated-leak negative control."
+  - turn: 1
+    type: dead_end
+    id: "N227"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected general propagation, a module-wide DBus suppression, and an overbroad per-frame operational claim from the first BUG-083 closure."
+  - turn: 1
+    type: experiment
+    id: "N228"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired BUG-083 with exact native-driver accounting, runner-local suppressions, a leak negative control, and non-skipped NVIDIA/lavapipe proof."
+
+ai_actions:
+  - turn: 1
+    action: "Promoted, right-sized, implemented, independently reviewed, and retired six runtime private-surface tasks plus the convergence ratchet and budget-restoration tasks."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/done/RUNTIME-167-privatize-engine-frameloop-surface.md"
+      - "tasks/done/RUNTIME-169-privatize-render-extraction-service-surface.md"
+      - "tasks/done/RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md"
+      - "tasks/done/RUNTIME-171-privatize-asset-residency-service-surface.md"
+      - "tasks/done/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md"
+      - "tasks/done/RUNTIME-174-privatize-imgui-editor-bridge-surface.md"
+      - "tasks/done/HARDEN-085-enforce-runtime-engine-kernel-convergence-ratchet.md"
+      - "tasks/done/RUNTIME-178-restore-engine-convergence-budget.md"
+  - turn: 1
+    action: "Diagnosed and retired BUG-087, BUG-089, BUG-090, and BUG-092 with deterministic focused regressions and synchronized task documentation."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/done/BUG-087-task-validator-documented-root-silent-noop.md"
+      - "tasks/done/BUG-089-root-hygiene-rejects-canonical-and-ignored-state.md"
+      - "tasks/done/BUG-090-async-work-layering-test-stale-shutdown-owner.md"
+      - "tasks/done/BUG-092-scene-lifecycle-async-wait-frame-budget.md"
+  - turn: 1
+    action: "Implemented and retired BUG-082 with an isolated GLFW/X11 sanitizer lifecycle process, an exact-once terminate contract, and a synthetic-leak negative control."
+    provenance: ai-executed
+    files_changed:
+      - "tests/process/Test.GlfwX11SanitizerProcess.cpp"
+      - "tasks/done/BUG-082-glfw-x11-input-method-lsan-leak.md"
+  - turn: 1
+    action: "Reproduced BUG-083 on current NVIDIA hardware, reconciled every retained allocation, narrowed the policy after independent review, and retired it with native and lavapipe no-skip process evidence."
+    provenance: ai-executed
+    files_changed:
+      - "lsan.supp"
+      - "tests/support/Test_SanitizerConfig.cpp"
+      - "tests/process/Run.VulkanSandboxShutdownSanitizer.cmake"
+      - "tasks/done/BUG-083-vulkan-sandbox-shutdown-lsan-leaks.md"
+  - turn: 1
+    action: "Committed each promotion, technical slice, and retirement separately; passed the final 3,788-test CPU-supported gate plus native/lavapipe GPU and strict structural verification."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/SESSION-BRIEF.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "User authorized unattended work until morning, prioritized architecture/runtime/graphics/bugs, required appropriate commits, and requested a final tested push."
+
+open_threads:
+  - "Select the next bounded architecture/runtime slice; RUNTIME-168 is the smallest reviewed private-surface candidate, while ARCH-014 remains the umbrella that gates REVIEW-003."
+  - "BUG-091, BUG-088, and BUG-081 remain open because their cold-discovery and hosted-runner timing evidence was not safely reproducible within this task loop."
+  - "Resolve whether model training means GEOM-058 or a new neural/LLM workflow."
+  - "Adjudicate O38 by narrowing Progressive Poisson's README or collecting a non-skipped actual-Vulkan dispatch/readback and CPU-reference parity artifact."
+  - "Keep every Issue 445 candidate ineligible until REVIEW-003 passes; only then select among the tasks using their explicit start/kill evidence."
+
+ai_suggestions_pending:
+  - "Use RUNTIME-168 as the next small convergence slice before larger RUNTIME-166 or ARCH-015 work."
+  - "Collect BUG-091/088/081 timing populations in their reported cold or contended hosted environments rather than relaxing local timeouts."
+  - "Treat GEOM-058 Gaussian-mixture fitting as the provisional repository-native model-training target unless the user specifies a neural or LLM model."
+  - "Keep Progressive Poisson at Scaffolded until actual-backend dispatch, readback, and CPU-reference parity evidence exists."

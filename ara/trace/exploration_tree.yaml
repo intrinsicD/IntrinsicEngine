@@ -5218,3 +5218,129 @@ tree:
       - "tasks/backlog/README.md"
       - "tasks/SESSION-BRIEF.md"
     status: resolved
+  - id: N223
+    type: decision
+    title: "Run the architecture/runtime/graphics/bug backlog unattended through morning"
+    provenance: user
+    timestamp: "2026-07-16T00:42+02:00"
+    choice: >
+      Repeatedly select the highest-priority bounded architecture, runtime,
+      graphics, and reproducible bug slices; use the repository agentic task
+      workflow, commit every completed task separately, repair verification
+      failures, and publish the final verified branch.
+    alternatives:
+      - "Stop after one additional task."
+      - "Leave the overnight work as one uncommitted batch."
+      - "Prioritize unrelated method or feature work ahead of convergence and bugs."
+    evidence:
+      - "User instruction in session 2026-07-16_001"
+      - "tasks/SESSION-BRIEF.md"
+      - "commits 998f0e77 through c985ec6e"
+    status: resolved
+  - id: N224
+    type: experiment
+    title: "Runtime.Engine convergence and private-surface closure"
+    provenance: ai-executed
+    timestamp: "2026-07-16T06:38+02:00"
+    also_depends_on: [N223]
+    evidence:
+      - "tasks/done/RUNTIME-167-privatize-engine-frameloop-surface.md"
+      - "tasks/done/RUNTIME-169-privatize-render-extraction-service-surface.md"
+      - "tasks/done/RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md"
+      - "tasks/done/RUNTIME-171-privatize-asset-residency-service-surface.md"
+      - "tasks/done/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md"
+      - "tasks/done/RUNTIME-174-privatize-imgui-editor-bridge-surface.md"
+      - "tasks/done/HARDEN-085-enforce-runtime-engine-kernel-convergence-ratchet.md"
+      - "tasks/done/RUNTIME-178-restore-engine-convergence-budget.md"
+      - "commits 2af73603 through 992205e4"
+    result: >
+      Eight bounded convergence slices retired after privatizing six runtime
+      implementation surfaces, restoring the Runtime.Engine budget, and adding
+      a fail-closed ratchet. The final inventory measured 42 plain imports, 21
+      domain imports, two re-exports, and 31 getter names with no convergence
+      debt. Focused runtime coverage, the 3,785-test CPU-supported gate, two
+      required non-skipped Vulkan tests, and strict structural checks passed.
+    status: resolved
+  - id: N225
+    type: experiment
+    title: "Deterministic workflow and runtime harness defect closures"
+    provenance: ai-executed
+    timestamp: "2026-07-16T07:23+02:00"
+    also_depends_on: [N223]
+    evidence:
+      - "tasks/done/BUG-087-task-validator-documented-root-silent-noop.md"
+      - "tasks/done/BUG-089-root-hygiene-rejects-canonical-and-ignored-state.md"
+      - "tasks/done/BUG-090-async-work-layering-test-stale-shutdown-owner.md"
+      - "tasks/done/BUG-092-scene-lifecycle-async-wait-frame-budget.md"
+      - "commits 998f0e77, 7671576b, 406b44d0, and 627641fa"
+    result: >
+      BUG-087 made empty task validation fail closed, BUG-089 unified strict
+      root-hygiene policy with the canonical tree, BUG-090 replaced a stale
+      shutdown-owner assertion, and BUG-092 bounded asynchronous scene waits by
+      wall-clock time instead of a fragile frame count. Each task passed its
+      focused regression and applicable strict structural checks before
+      retirement.
+    status: resolved
+  - id: N226
+    type: experiment
+    title: "GLFW X11 teardown sanitizer contract"
+    provenance: ai-executed
+    timestamp: "2026-07-16T07:23+02:00"
+    also_depends_on: [N223]
+    evidence:
+      - "tasks/done/BUG-082-glfw-x11-input-method-lsan-leak.md"
+      - "tests/process/Test.GlfwX11SanitizerProcess.cpp"
+      - "commits a9832477, fb549c96, and 398f1fd6"
+      - "/tmp/bug083-final-full-cpu.log"
+    result: >
+      A standalone Linux/GLFW sanitizer process now proves that clean teardown
+      calls glfwTerminate exactly once and that an unrelated named 4,096-byte
+      leak still exits with the expected failure code. The focused process test
+      and original runtime close-path selection passed without suppression, and
+      the final CPU-supported gate passed 3,788/3,788.
+    status: resolved
+  - id: N227
+    type: dead_end
+    title: "Reject globally propagated Vulkan shutdown leak suppressions"
+    provenance: ai-executed
+    timestamp: "2026-07-16T07:45+02:00"
+    also_depends_on: [N223]
+    hypothesis: >
+      Reusing the initial BUG-083 suppression defaults across general test
+      binaries, including a module-wide DBus entry, would remain sufficiently
+      narrow while validating Sandbox shutdown.
+    failure: >
+      Final review found that compiled defaults propagated the exception to all
+      GoogleTest processes, the DBus module key exceeded the measured call path,
+      and the report claimed per-frame operational state although the probe
+      recorded completed renderer samples plus one final device state.
+    lesson: >
+      External-retention exceptions belong only to the explicit process runner,
+      must name the measured functions or call paths exactly, and must retain a
+      negative control that proves unrelated leaks remain detectable.
+    status: resolved
+  - id: N228
+    type: experiment
+    title: "Vulkan shutdown external-retention sanitizer contract"
+    provenance: ai-executed
+    timestamp: "2026-07-16T07:53+02:00"
+    also_depends_on: [N223, N227]
+    evidence:
+      - "tasks/done/BUG-083-vulkan-sandbox-shutdown-lsan-leaks.md"
+      - "tests/support/Test_SanitizerConfig.cpp"
+      - "tests/process/Run.VulkanSandboxShutdownSanitizer.cmake"
+      - "lsan.supp"
+      - "commits 2272019d, 3cb91b98, and c985ec6e"
+      - "/tmp/bug083-current-unsuppressed.log"
+      - "/tmp/bug083-final-full-cpu.log"
+    result: >
+      Exact-head NVIDIA evidence accounted for all 116,425 leaked bytes across
+      the command-context push-constant path, VMA buffer binding, and one DBus
+      request path after engine shutdown completed. The final no-skip runner
+      applies exactly those three entries only to Sandbox, proves a synthetic
+      4,096-byte leak remains visible, requires five completed renderer samples
+      and a final operational device, and passed on native NVIDIA and lavapipe.
+      The 3,788-test CPU gate and strict task, docs, layering, layout, inventory,
+      workflow, root-hygiene, and PR-contract checks passed without production
+      runtime or Vulkan lifetime changes.
+    status: resolved
