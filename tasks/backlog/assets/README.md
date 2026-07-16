@@ -6,6 +6,11 @@ GPU-agnostic; GPU residency lives under `src/graphics/assets` and is wired by
 
 ## Tasks
 
+- [ASSETIO-011 — Semantic Sandbox File / Import workflow matrix](ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md):
+  app-linked real-widget coverage for every checked-in model route, including
+  exact disabled reasons, explicit PLY payloads, queued completion, entity
+  selection/focus, and generated substitutes for local XYZ/OBJ route classes.
+  Blocked by `ASSETIO-010`, `BUG-098`, `BUG-099`, and `BUG-100`.
 - [ASSETIO-010 — Async model companion preflight](ASSETIO-010-async-model-companion-preflight.md):
   generation-keyed background preview for primary model sources and external
   glTF dependencies, with required buffers gated, optional images reported as

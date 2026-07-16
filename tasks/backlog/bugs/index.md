@@ -5,6 +5,22 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-101` — Fast-staged UV edge grouping is quadratic](BUG-101-fast-staged-uv-edge-grouping-quadratic.md):
+  fast-staged atlas generation linearly scans all prior edge groups for every
+  triangle incidence and rebuilds the same groups for seam recording, leaving
+  dense direct-mesh enrichment CPU-hot and shutdown waiting for minutes.
+- [`BUG-100` — Manual geometry import blocks the Sandbox frame loop](BUG-100-manual-geometry-import-blocks-frame-loop.md):
+  File / Import queues model/texture payloads but calls the synchronous API for
+  Mesh/Graph/PointCloud, freezing ImGui during large reads/decodes despite an
+  existing deferred dropped-geometry path.
+- [`BUG-099` — Binary PLY point-cloud import rejects face-list elements](BUG-099-binary-ply-pointcloud-skips-face-lists.md):
+  both checked-in endian fixtures succeed as Mesh but fail as PointCloud
+  because the binary point-cloud reader rejects list properties on unrelated
+  non-vertex elements instead of consuming them safely.
+- [`BUG-098` — Frame clock samples an incomplete frame delta](BUG-098-frame-clock-samples-incomplete-frame-delta.md):
+  runtime samples `now - BeginFrame` before meaningful frame work, starving
+  simulation/UI time and preventing production-delay disabled tooltips from
+  appearing even under a stable multi-second hover.
 - [`BUG-097` — Progressive model-scene UV job publishes a zero atlas](BUG-097-progressive-model-scene-zero-uv-atlas.md):
   the default-off progressive enrichment path labels an all-zero authoritative
   `v:texcoord` property as an atlas and can publish it after newer UV/topology
