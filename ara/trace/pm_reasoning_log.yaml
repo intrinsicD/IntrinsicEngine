@@ -855,3 +855,10 @@ entries:
       - "Closed the prior BUG-082/BUG-083 evidence thread; BUG-091, BUG-088, and BUG-081 remain open because their cold or hosted timing conditions were not safely reproduced."
       - "Kept O38 and the model-training and Issue 445 readiness threads open and non-stale; this turn supplied no Progressive Poisson parity artifact, model-target clarification, or REVIEW-003 completion."
       - "Routed the successful non-force branch publication as experiment N229 because the remote receipt and upstream tracking resolve the user's explicit final-push requirement."
+  - turn: "2026-07-16_001#2"
+    notes:
+      - "Routed the user's explicit merge-and-push instruction as decision N230 and the fresh build/test/clean-workshop plus fast-forward publication receipt as experiment N231."
+      - "Recorded the fast-forward rather than inventing a merge commit because origin/main was the exact ancestor of the completion branch, with zero divergent commits and 84 commits to advance."
+      - "Did not stage a new interpretive observation: graph ancestry, test totals, and remote updates are bounded journey facts rather than generalized research claims."
+      - "Left six unrelated local branches and their unique commits untouched; they were outside the requested completion-branch merge."
+      - "Kept O08, O09, O13, and O38 non-stale and unpromoted because this same-day publication turn supplied no closure or contradiction signal for their topics."

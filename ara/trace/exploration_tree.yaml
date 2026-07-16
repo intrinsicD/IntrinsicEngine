@@ -5360,3 +5360,47 @@ tree:
       ref after the final code, GPU, CPU, task, documentation, root-hygiene, and
       PR-contract gates passed.
     status: resolved
+  - id: N230
+    type: decision
+    title: "Integrate the verified completion series directly into main"
+    provenance: user
+    timestamp: "2026-07-16T10:04+02:00"
+    also_depends_on: [N229]
+    choice: >
+      Commit any remaining intended changes, merge the completed branch into
+      main, and push main to the remote. Because origin/main was the exact
+      ancestor of the completed branch, preserve the existing task commits with
+      a conflict-impossible fast-forward instead of manufacturing a merge
+      commit.
+    alternatives:
+      - "Leave the verified work only on the completion branch."
+      - "Open a draft pull request without updating main."
+      - "Create a no-ff merge commit despite a linear branch graph."
+    evidence:
+      - "User instruction in session 2026-07-16_001 turn 2"
+      - "origin/main at b199ee15"
+      - "codex/arch-006-completion at 94e76ec0"
+      - "Independent main_merge_audit: main 0 ahead and 84 behind"
+    status: resolved
+  - id: N231
+    type: experiment
+    title: "Verify and fast-forward the completion series into remote main"
+    provenance: ai-executed
+    timestamp: "2026-07-16T10:04+02:00"
+    also_depends_on: [N230]
+    evidence:
+      - "cmake --preset ci"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "/tmp/main-premerge-cpu.log"
+      - "tools/ci/run_clean_workshop_review.sh . --strict"
+      - "git merge --ff-only codex/arch-006-completion"
+      - "git push origin main:main"
+    result: >
+      The worktree contained no uncommitted changes. Clang 23 configuration and
+      the IntrinsicTests build passed; the CPU-supported gate passed 3,788/3,788
+      in 419.89 seconds; and the clean-workshop bundle found zero layering,
+      allowlist, task-policy, or documentation-link defects. Local main
+      fast-forwarded from b199ee15 to 94e76ec0 without conflicts, and the normal
+      non-force push advanced origin/main to the same verified tip.
+    status: resolved
