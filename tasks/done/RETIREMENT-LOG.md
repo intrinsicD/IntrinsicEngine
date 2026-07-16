@@ -8,6 +8,24 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-169`](RUNTIME-169-privatize-render-extraction-service-surface.md) —
+the Engine-only render extraction service module surface retired on 2026-07-16
+at `Operational`. Implementation commit `7c9ad87b` replaces the standalone
+`Extrinsic.Runtime.RenderExtractionService` BMI with an include-only declaration
+attached to `Extrinsic.Runtime.Engine`; the existing implementation unit is
+reattached to Engine with its method bodies unchanged. The service remains a
+by-value member in the same position, preserving its borrowed cache address,
+pool ownership, statistics/frame-index state, and cache-before-renderer teardown
+order. Runtime modules drop from 82 to 81 and repository modules from 389 to
+388; the dedicated `contract;runtime` guard proves the old module/CMake/
+inventory entries remain absent, the private declaration has one include owner,
+and raw extraction state does not return to Engine. Focused CPU coverage passed
+74/74, runtime layering passed 22/22, and the default CPU-supported gate passed
+3,783/3,783 in 395.85 seconds after a successful full build. Strict structural
+and clean-workshop checks passed, and three independent reviews found no
+blockers. Compile timings are retained as diagnostics only; no overall speedup
+is claimed.
+
 [`RUNTIME-174`](RUNTIME-174-privatize-imgui-editor-bridge-surface.md) — the
 Engine-only ImGui editor bridge module surface retired on 2026-07-16 at
 `Operational`. Implementation commit `724a7489` replaces the standalone

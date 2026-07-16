@@ -10,10 +10,11 @@ maturity_target: Operational
 
 ## Status
 
-- Implementation and verification complete on 2026-07-16; owner: Codex; branch:
-  `codex/arch-006-completion`.
-- Next gate: commit the verified implementation and retire this task at
-  `Operational`.
+- Completed on 2026-07-16 at `Operational`.
+- Implementation commit: `7c9ad87b`.
+- Verification: focused CPU coverage passed `74/74`, runtime layering passed
+  `22/22`, and the final default CPU-supported gate passed `3783/3783` after a
+  successful `IntrinsicTests` build. Strict structural/review gates passed.
 
 ## Goal
 - Remove `Extrinsic.Runtime.RenderExtractionService` as a standalone exported

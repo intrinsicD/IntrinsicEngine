@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-169` — Privatize the RenderExtractionService surface (tasks/active/RUNTIME-169-privatize-render-extraction-service-surface.md)
+- none
 
 ## Theme B — Rendering modernization
 
