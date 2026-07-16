@@ -11,10 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`BUG-105` — Runtime module reader races ECS structural mutation](BUG-105-runtime-module-ecs-structural-hazard.md):
-  diagnose and close the ASan-proven EnTT storage-map race with the existing
-  FrameGraph structural hazard token; local clean sanitizer and full CPU gates
-  pass, and the remaining closure gate is repaired exact-head `pr-fast`.
+No active tasks.
 
 ## History
 

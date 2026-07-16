@@ -5,10 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-105` — Runtime module reader races ECS structural mutation](../../active/BUG-105-runtime-module-ecs-structural-hazard.md):
-  an exact-head sanitizer run caught a module `WorldMatrix` reader racing the
-  first `DirtyTransform` storage insertion; use the existing structural hazard
-  token at the runtime/ECS composition boundary and pin execution-layer order.
 - [`BUG-097` — Progressive model-scene UV job publishes a zero atlas](BUG-097-progressive-model-scene-zero-uv-atlas.md):
   the default-off progressive enrichment path labels an all-zero authoritative
   `v:texcoord` property as an atlas and can publish it after newer UV/topology
@@ -33,6 +29,14 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   evidence-backed PR-fast split or slow-lane classification without weakening
   strict result validation.
 ## Verified / Closed
+
+- Closed 2026-07-16: [`BUG-105` — Runtime module reader races ECS structural mutation](../../done/BUG-105-runtime-module-ecs-structural-hazard.md).
+  Runtime module systems now conservatively declare structural reads because
+  their context exposes the live world, while all promoted baseline ECS passes
+  that add or remove components declare structural writes through the existing
+  FrameGraph token. Deterministic layer-order regressions, the original harness
+  repeated 100/100 under sanitizers, the 3,791-test CPU gate, and repaired
+  exact-head `pr-fast` all passed.
 
 - Closed 2026-07-16: [`BUG-104` — Kernel-convergence regression asserts a retired snapshot](../../done/BUG-104-kernel-convergence-regression-stale-snapshot.md).
   The repository-snapshot regression now asserts the policy's live `42/21`,

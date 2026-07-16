@@ -8,6 +8,18 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-105`](BUG-105-runtime-module-ecs-structural-hazard.md) — the runtime
+module/ECS structural hazard retired on 2026-07-16. Commit `f0ea3987` gives
+every module sim system an implicit structural read because its context exposes
+the live world, and marks the three promoted baseline ECS passes that add or
+remove components as structural writers through the existing FrameGraph token.
+The regression independently pins every baseline writer against an immediate
+module reader; the focused selection passed 9/9, the original sanitizer
+harness passed 100/100 repetitions, the clean default CPU gate passed
+3,791/3,791, and repaired exact-head `pr-fast` run `29531364667` passed in
+15m31s. No global lock, serial scheduler mode, new hazard abstraction, or
+layering exception was added.
+
 [`BUG-104`](BUG-104-kernel-convergence-regression-stale-snapshot.md) — the
 kernel-convergence repository-snapshot regression retired on 2026-07-16.
 Commit `fb582056` replaces only the stale `49/28` and `RUNTIME-178` output

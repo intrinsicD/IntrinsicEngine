@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-105` — Runtime module reader races ECS structural mutation (tasks/active/BUG-105-runtime-module-ecs-structural-hazard.md)
+- none
 
 ## Theme B — Rendering modernization
 

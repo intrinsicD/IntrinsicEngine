@@ -7,11 +7,13 @@ depends_on: []
 
 ## Status
 
-- In progress on 2026-07-16; owner: Codex; branch:
-  `agent/sandbox-model-workflow-completion`; PR:
+- Completed on 2026-07-16; owner: Codex; implementation commit: `f0ea3987`;
+  branch: `agent/sandbox-model-workflow-completion`; PR:
   [`#1024`](https://github.com/intrinsicD/IntrinsicEngine/pull/1024).
-- Observed while publishing the final BUG-104 retirement head. The merge is
-  blocked until a repaired exact-head `pr-fast` run passes.
+- Repaired exact-head
+  [`pr-fast` run 29531364667](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29531364667)
+  completed successfully in 15m31s, including the unit/contract test stage
+  that exposed the original sanitizer failure.
 
 ## Goal
 
@@ -75,8 +77,8 @@ depends_on: []
 
 - [x] Document the implicit module structural-read contract and the explicit
       structural-write requirement for systems that add/remove components.
-- [x] Synchronize the active task indexes and session brief; add retirement
-      records after the repaired exact-head hosted gate passes.
+- [x] Synchronize the done-task indexes, retirement log, and session brief
+      after the repaired exact-head hosted gate passed.
 
 ## Acceptance criteria
 
@@ -84,7 +86,7 @@ depends_on: []
       structure token without a global lock or broad scheduler fallback.
 - [x] Deterministic execution-layer coverage fails when either side of the
       structural hazard is removed and passes with the fix.
-- [ ] A repaired exact-head `pr-fast` workflow passes.
+- [x] A repaired exact-head `pr-fast` workflow passes.
 - [x] Layering, task policy, and documentation checks remain green.
 
 ## Verification
@@ -118,6 +120,7 @@ Local results on 2026-07-16:
 - default CPU-supported gate: 3791/3791 passed in 700.55 seconds;
 - strict layering, task-policy, task-state-link, test-layout, root-hygiene,
   and documentation-link checks: passed.
+- repaired exact-head `pr-fast` run `29531364667`: passed in 15m31s.
 
 ## Forbidden changes
 
