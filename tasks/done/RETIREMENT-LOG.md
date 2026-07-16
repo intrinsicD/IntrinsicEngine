@@ -8,6 +8,17 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-090`](BUG-090-async-work-layering-test-stale-shutdown-owner.md) — the
+stale async-work shutdown source assertion retired on 2026-07-16 at
+`CPUContracted`. Implementation commit `406b44d0` updates only the two expected
+call spellings to the current `ShutdownHooks::AsyncWork` delegation; Engine
+still passes its owned `m_AsyncWorkService` into that hook, and every surrounding
+positive and negative ownership check remains unchanged. The exact pre-fix
+reproduction failed only those two expectations, then passed 1/1; the complete
+opt-in `RuntimeEngineLayering` selection passed 24/24. Strict task, state-link,
+documentation-link, test-layout, and diff checks passed, and independent review
+found no blockers. No production source or test label changed.
+
 [`RUNTIME-167`](RUNTIME-167-privatize-engine-frameloop-surface.md) — the Engine
 frame-loop module surface retired on 2026-07-16 at `Operational`.
 Implementation commit `25e3e7c5` replaces the one-consumer

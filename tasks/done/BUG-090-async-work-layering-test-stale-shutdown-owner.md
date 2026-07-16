@@ -9,12 +9,12 @@ maturity_target: CPUContracted
 
 ## Status
 
-- In progress on 2026-07-16; owner: Codex; branch:
-  `codex/arch-006-completion`.
-- Fix and verification complete: the exact test was reproduced with only the
+- Completed on 2026-07-16 at `CPUContracted`.
+- Implementation commit: `406b44d0`.
+- Verification: the exact test was reproduced with only the
   two documented missing spellings, then passed 1/1 after the correction; the
-  complete source-layering selection passed 24/24. Next gate: self-review and
-  technical commit.
+  complete source-layering selection passed 24/24. Strict task/state/docs/diff
+  checks passed, and independent review found no blockers.
 
 ## Goal
 - Restore the `RuntimeEngineLayering` source contract by asserting the current

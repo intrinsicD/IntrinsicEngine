@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-090` — Async-work layering test asserts stale shutdown call spelling (tasks/active/BUG-090-async-work-layering-test-stale-shutdown-owner.md)
+- none
 
 ## Theme B — Rendering modernization
 

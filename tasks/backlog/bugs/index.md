@@ -5,12 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-090` — Async-work layering test asserts stale shutdown call spelling](../../active/BUG-090-async-work-layering-test-stale-shutdown-owner.md):
-  the direct source-layering selection still searches Engine for pre-hook
-  `m_AsyncWorkService` shutdown/reset call spellings, even though the current
-  lifecycle delegates through `ShutdownHooks::AsyncWork`; update only those two
-  assertions and rerun all 24 layering contracts without changing production;
-  active on `codex/arch-006-completion`.
 - [`BUG-088` — Benchmark smoke hard timeout flakes under host contention](BUG-088-benchmark-smoke-hard-timeout-host-contention.md):
   the required default CPU gate timed out the monolithic 21-result smoke at its
   hard 30-second limit under concurrent load, while the same pair passed in
@@ -29,6 +23,12 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   headroom while preserving fail-closed semantics.
 
 ## Verified / Closed
+
+- Closed 2026-07-16: [`BUG-090` — Async-work layering test asserts stale shutdown call spelling](../../done/BUG-090-async-work-layering-test-stale-shutdown-owner.md).
+  The source contract now recognizes `ShutdownHooks::AsyncWork` delegation
+  without changing production shutdown behavior or weakening Engine/service
+  ownership checks. The exact regression passed 1/1 and all 24 layering
+  contracts passed.
 
 - Closed 2026-07-16: [`BUG-089` — Root-hygiene strict mode rejects canonical and ignored state](../../done/BUG-089-root-hygiene-rejects-canonical-and-ignored-state.md).
   Root ownership now comes from one repository policy shared by both checker
