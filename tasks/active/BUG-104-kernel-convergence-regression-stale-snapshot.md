@@ -10,9 +10,11 @@ depends_on: []
 - In progress on 2026-07-16; owner: Codex; branch:
   `agent/sandbox-model-workflow-completion`; PR:
   [`#1024`](https://github.com/intrinsicD/IntrinsicEngine/pull/1024).
-- Next verification: synchronize the repository-snapshot assertion with the
-  live policy, pass all 19 checker regressions and the strict live checker,
-  then require the repaired `pr-fast` job to pass.
+- Next verification: push the repaired head and require its `pr-fast` job to
+  pass the synchronized regression plus the unchanged strict live checker.
+- Local fix complete: only the stale repository-snapshot literals changed;
+  all 19 regressions and the independent strict live checker pass. Repaired
+  `pr-fast` verification remains pending.
 
 ## Goal
 
@@ -43,15 +45,15 @@ depends_on: []
 
 ## Required changes
 
-- [ ] Update only the current-repository output assertions to the exact live
+- [x] Update only the current-repository output assertions to the exact live
   snapshot and debt-free diagnostic.
-- [ ] Preserve every synthetic checker regression and production policy value.
+- [x] Preserve every synthetic checker regression and production policy value.
 
 ## Tests
 
-- [ ] Reproduce the single deterministic pre-fix failure locally.
-- [ ] Pass all 19 kernel-convergence regression tests after the correction.
-- [ ] Pass the strict live checker independently.
+- [x] Reproduce the single deterministic pre-fix failure locally.
+- [x] Pass all 19 kernel-convergence regression tests after the correction.
+- [x] Pass the strict live checker independently.
 
 ## Docs
 
@@ -61,7 +63,7 @@ depends_on: []
 
 ## Acceptance criteria
 
-- [ ] The repository-snapshot test asserts `42/21`, 31 public getters, and no
+- [x] The repository-snapshot test asserts `42/21`, 31 public getters, and no
   temporary debt while the strict checker continues to pass.
 - [ ] A repaired exact-head `pr-fast` workflow passes.
 
@@ -74,6 +76,16 @@ python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/agents/check_task_state_links.py --root . --strict
 git diff --check
 ```
+
+Local results on 2026-07-16:
+
+- Pre-fix: 18/19 passed; only
+  `test_current_repository_snapshot_passes` failed on the retired `49/28` and
+  `RUNTIME-178` expectations.
+- Post-fix: 19/19 passed.
+- Strict live checker passed at `42` plain imports, `21` domain imports, two
+  export imports, 31 public getter names, and no temporary debt.
+- Strict task policy/state and diff checks passed.
 
 ## Forbidden changes
 
