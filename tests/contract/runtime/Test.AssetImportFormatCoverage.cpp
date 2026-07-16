@@ -12,6 +12,7 @@
 #include <iterator>
 #include <memory>
 #include <optional>
+#include <sstream>
 #include <span>
 #include <string>
 #include <string_view>
@@ -326,6 +327,37 @@ namespace
             out.push_back(static_cast<std::byte>(byte));
         }
         return out;
+    }
+
+    [[nodiscard]] std::string GridObjText(const std::uint32_t side)
+    {
+        std::ostringstream out;
+        for (std::uint32_t y = 0u; y <= side; ++y)
+        {
+            for (std::uint32_t x = 0u; x <= side; ++x)
+            {
+                out << "v " << x << ' ' << y << " 0\n";
+            }
+        }
+
+        const auto vertex = [side](const std::uint32_t x,
+                                   const std::uint32_t y)
+        {
+            return y * (side + 1u) + x + 1u;
+        };
+        for (std::uint32_t y = 0u; y < side; ++y)
+        {
+            for (std::uint32_t x = 0u; x < side; ++x)
+            {
+                const std::uint32_t v00 = vertex(x, y);
+                const std::uint32_t v10 = vertex(x + 1u, y);
+                const std::uint32_t v01 = vertex(x, y + 1u);
+                const std::uint32_t v11 = vertex(x + 1u, y + 1u);
+                out << "f " << v00 << ' ' << v10 << ' ' << v11 << '\n';
+                out << "f " << v00 << ' ' << v11 << ' ' << v01 << '\n';
+            }
+        }
+        return out.str();
     }
 
     template <class T>
@@ -1009,6 +1041,85 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
     ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(engine, *meshEntity);
 
     engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsGeneratedGridAndCompletesDeterministically)
+{
+    constexpr std::uint32_t side = 32u;
+    constexpr std::size_t expectedVertexCount =
+        static_cast<std::size_t>(side + 1u) *
+        static_cast<std::size_t>(side + 1u);
+    constexpr std::size_t expectedFaceCount =
+        static_cast<std::size_t>(side) * static_cast<std::size_t>(side) * 2u;
+    TempAssetFile meshFile(
+        "bug101_direct_mesh_grid.obj",
+        GridObjText(side));
+
+    {
+        Runtime::Engine closingEngine(
+            HeadlessConfig(),
+            std::make_unique<OneFrameApplication>());
+        closingEngine.Initialize();
+        InstallSandboxDefaultRuntimePolicies(closingEngine);
+
+        auto imported =
+            closingEngine.GetAssetImportPipeline().ImportAssetFromPath(
+                Runtime::RuntimeAssetImportRequest{
+                    .Path = meshFile.Path.string(),
+                    .PayloadKind = Assets::AssetPayloadKind::Mesh,
+                });
+        ASSERT_TRUE(imported.has_value())
+            << static_cast<int>(imported.error());
+        const std::optional<ECS::EntityHandle> meshEntity =
+            FindFirstEntityWithDomain(
+                closingEngine.GetScene(), GS::Domain::Mesh);
+        ASSERT_TRUE(meshEntity.has_value());
+        ExpectMeshLacksVertexProperty(
+            closingEngine.GetScene(), *meshEntity, "v:texcoord");
+
+        ASSERT_FALSE(closingEngine.GetWindow().ShouldClose());
+        closingEngine.Run();
+        closingEngine.Shutdown();
+    }
+
+    std::optional<ECS::EntityHandle> completedEntity{};
+    Runtime::Engine completedEngine(
+        HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(
+            [&completedEntity](Runtime::Engine& runningEngine)
+            {
+                return completedEntity.has_value() &&
+                    DirectMeshPostProcessReady(
+                        runningEngine, *completedEntity);
+            },
+            4096u));
+    completedEngine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(completedEngine);
+
+    auto imported =
+        completedEngine.GetAssetImportPipeline().ImportAssetFromPath(
+            Runtime::RuntimeAssetImportRequest{
+                .Path = meshFile.Path.string(),
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+            });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+    completedEntity = FindFirstEntityWithDomain(
+        completedEngine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(completedEntity.has_value());
+
+    completedEngine.Run();
+
+    ASSERT_TRUE(DirectMeshPostProcessReady(
+        completedEngine, *completedEntity));
+    const GS::ConstSourceView completed = GS::BuildConstView(
+        completedEngine.GetScene().Raw(), *completedEntity);
+    ASSERT_TRUE(completed.Valid());
+    EXPECT_EQ(completed.ActiveDomain, GS::Domain::Mesh);
+    EXPECT_EQ(completed.VerticesAlive(), expectedVertexCount);
+    EXPECT_EQ(completed.FacesAlive(), expectedFaceCount);
+    ExpectMeshVertexTexcoordsFinite(
+        completedEngine.GetScene(), *completedEntity);
+    completedEngine.Shutdown();
 }
 
 TEST(RuntimeAssetImportFormatCoverage, DirectObjImportDefaultsToMaterialDrivenShading)

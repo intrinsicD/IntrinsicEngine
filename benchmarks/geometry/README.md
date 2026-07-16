@@ -78,6 +78,16 @@ stalls from changing the strict 1.0 mean / 1.25 per-fixture decision without
 hiding sustained regressions (`BUG-080`).
 Keeping the constants in the headers is the binding mechanism.
 
+`kUvAtlasEdgeGroupingScalingBenchmarkId` binds
+`geometry.uv_atlas.fast_staged_edge_grouping.scaling`, the BUG-101 generated
+16x16/32x32 planar-grid scaling measurement. It warms one pair, measures five
+alternating pairs, reports median small/large runtimes and their face-normalized
+scaling factor, and verifies finite UVs, face preservation, no fallback, and
+deterministic public atlas output. Its checked-in `8ca52438` baseline and
+[`BUG-101 result report`](../reports/BUG-101-uv-atlas-edge-grouping-scaling.md)
+support only the documented same-host, same-toolchain before/after comparison;
+the smoke test has no flaky timing-ratio gate or broader speedup claim.
+
 ## Fixture policy
 
 Smoke benchmarks must:

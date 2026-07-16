@@ -4,12 +4,14 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <numbers>
+#include <numeric>
 #include <span>
 #include <string>
 #include <utility>
@@ -71,6 +73,15 @@ struct PairedTimedRun {
   double FastMedianRuntimeMilliseconds{0.0};
   double XAtlasMedianRuntimeMilliseconds{0.0};
   double MedianRuntimeRatio{0.0};
+};
+
+struct EdgeGroupingScalingTimedRun {
+  TickResult LargeLast{};
+  std::array<double, kUvAtlasEdgeGroupingMeasuredPairs>
+      SmallRuntimeSamplesMilliseconds{};
+  std::array<double, kUvAtlasEdgeGroupingMeasuredPairs>
+      LargeRuntimeSamplesMilliseconds{};
+  bool DeterministicTopology{true};
 };
 
 [[nodiscard]] IndexedMesh MakeSquareGridFixture(const std::uint32_t columns,
@@ -372,6 +383,61 @@ MeasurePromotionRuntime(const IndexedMesh &mesh) {
                      IsFiniteNormalizedUv);
 }
 
+void MixSignature(std::uint64_t &signature, const std::uint64_t value) noexcept {
+  signature ^= value;
+  signature *= 1099511628211ull;
+}
+
+[[nodiscard]] std::uint64_t
+AtlasTopologySignature(const UvAtlasResult &result) noexcept {
+  std::uint64_t signature = 1469598103934665603ull;
+  MixSignature(signature, static_cast<std::uint64_t>(result.Status));
+  MixSignature(signature, static_cast<std::uint64_t>(result.Provenance));
+  MixSignature(signature, result.OutputMesh.VertexCount());
+  MixSignature(signature, result.OutputMesh.FaceCount());
+  for (const std::uint32_t value : result.SourceVertexForOutputVertex) {
+    MixSignature(signature, value);
+  }
+  for (const std::uint32_t value : result.SourceFaceForOutputFace) {
+    MixSignature(signature, value);
+  }
+  for (const std::uint32_t value : result.OutputFaceChart) {
+    MixSignature(signature, value);
+  }
+  for (const ::Geometry::UvAtlas::UvAtlasChartRecord &chart : result.Charts) {
+    MixSignature(signature, chart.ChartId);
+    MixSignature(signature, chart.SourceFaceStart);
+    MixSignature(signature, chart.SourceFaceCount);
+    MixSignature(signature, chart.OutputFaceStart);
+    MixSignature(signature, chart.OutputFaceCount);
+    MixSignature(signature, chart.OutputVertexStart);
+    MixSignature(signature, chart.OutputVertexCount);
+    MixSignature(signature, std::bit_cast<std::uint32_t>(chart.UvMin.x));
+    MixSignature(signature, std::bit_cast<std::uint32_t>(chart.UvMin.y));
+    MixSignature(signature, std::bit_cast<std::uint32_t>(chart.UvMax.x));
+    MixSignature(signature, std::bit_cast<std::uint32_t>(chart.UvMax.y));
+  }
+  for (const ::Geometry::UvAtlas::UvAtlasSeamCutRecord &seam :
+       result.SeamCuts) {
+    MixSignature(signature, seam.SourceVertexA);
+    MixSignature(signature, seam.SourceVertexB);
+    MixSignature(signature, seam.SourceFaceA);
+    MixSignature(signature, seam.SourceFaceB);
+    MixSignature(signature, seam.ChartA);
+    MixSignature(signature, seam.ChartB);
+    MixSignature(signature, seam.Boundary ? 1u : 0u);
+  }
+  const auto outputUvs =
+      result.OutputMesh.GetVertexProperty<glm::vec2>("v:texcoord");
+  if (outputUvs.IsValid()) {
+    for (const glm::vec2 uv : outputUvs.Vector()) {
+      MixSignature(signature, std::bit_cast<std::uint32_t>(uv.x));
+      MixSignature(signature, std::bit_cast<std::uint32_t>(uv.y));
+    }
+  }
+  return signature;
+}
+
 [[nodiscard]] bool ChartBoundsOverlapInterior(
     const ::Geometry::UvAtlas::UvAtlasChartRecord &a,
     const ::Geometry::UvAtlas::UvAtlasChartRecord &b) noexcept {
@@ -524,6 +590,42 @@ RunPromotionFixture(const Fixture &fixture) {
       metrics.ConformalRegression == 0.0 && metrics.StretchRegression == 0.0;
   return metrics;
 }
+
+[[nodiscard]] EdgeGroupingScalingTimedRun MeasureEdgeGroupingScaling(
+    const IndexedMesh &small, const IndexedMesh &large) {
+  EdgeGroupingScalingTimedRun timing{};
+  std::uint64_t expectedLargeSignature = 0u;
+  bool hasExpectedLargeSignature = false;
+  for (std::size_t pairIndex = 0u;
+       pairIndex < kUvAtlasEdgeGroupingMeasuredPairs; ++pairIndex) {
+    TimedTick smallTick{};
+    TimedTick largeTick{};
+    if ((pairIndex % 2u) == 0u) {
+      smallTick = TimeTick(small, UvAtlasMethod::FastStaged);
+      largeTick = TimeTick(large, UvAtlasMethod::FastStaged);
+    } else {
+      largeTick = TimeTick(large, UvAtlasMethod::FastStaged);
+      smallTick = TimeTick(small, UvAtlasMethod::FastStaged);
+    }
+
+    timing.SmallRuntimeSamplesMilliseconds[pairIndex] =
+        smallTick.RuntimeMilliseconds;
+    timing.LargeRuntimeSamplesMilliseconds[pairIndex] =
+        largeTick.RuntimeMilliseconds;
+    const std::uint64_t largeSignature =
+        AtlasTopologySignature(largeTick.Result.Result);
+    if (!hasExpectedLargeSignature) {
+      expectedLargeSignature = largeSignature;
+      hasExpectedLargeSignature = true;
+    } else {
+      timing.DeterministicTopology =
+          timing.DeterministicTopology &&
+          largeSignature == expectedLargeSignature;
+    }
+    timing.LargeLast = std::move(largeTick.Result);
+  }
+  return timing;
+}
 } // namespace
 
 UvAtlasSmokeMetrics RunUvAtlasSmoke() { return RunCubeSmokeComparison(); }
@@ -585,6 +687,133 @@ UvAtlasPromotionMetrics RunUvAtlasPromotionSmoke() {
       metrics.FastFlippedElementCountTotal == 0u &&
       metrics.FastChartOverlapCountTotal == 0u &&
       metrics.QualityErrorLinf == 0.0;
+  return metrics;
+}
+
+UvAtlasEdgeGroupingScalingMetrics RunUvAtlasEdgeGroupingScaling() {
+  const IndexedMesh small = MakeSquareGridFixture(
+      kUvAtlasEdgeGroupingSmallGridSide, kUvAtlasEdgeGroupingSmallGridSide,
+      2.0f, 2.0f);
+  const IndexedMesh large = MakeSquareGridFixture(
+      kUvAtlasEdgeGroupingLargeGridSide, kUvAtlasEdgeGroupingLargeGridSide,
+      2.0f, 2.0f);
+  for (std::size_t i = 0u; i < kUvAtlasEdgeGroupingWarmupPairs; ++i) {
+    (void)Tick(small, UvAtlasMethod::FastStaged);
+    (void)Tick(large, UvAtlasMethod::FastStaged);
+  }
+
+  const EdgeGroupingScalingTimedRun timing =
+      MeasureEdgeGroupingScaling(small, large);
+  UvAtlasEdgeGroupingScalingMetrics metrics{};
+  metrics.SmallRuntimeSamplesMilliseconds =
+      timing.SmallRuntimeSamplesMilliseconds;
+  metrics.LargeRuntimeSamplesMilliseconds =
+      timing.LargeRuntimeSamplesMilliseconds;
+  metrics.SmallMedianRuntimeMilliseconds =
+      MedianOfFive(timing.SmallRuntimeSamplesMilliseconds);
+  metrics.LargeMedianRuntimeMilliseconds =
+      MedianOfFive(timing.LargeRuntimeSamplesMilliseconds);
+  metrics.RuntimeMilliseconds = metrics.LargeMedianRuntimeMilliseconds;
+  metrics.SmallVertexCount = small.VertexCount();
+  metrics.SmallFaceCount = small.FaceCount();
+  metrics.LargeVertexCount = large.VertexCount();
+  metrics.LargeFaceCount = large.FaceCount();
+  metrics.LargeOutputVertexCount =
+      timing.LargeLast.Result.OutputMesh.VertexCount();
+  metrics.LargeOutputFaceCount =
+      timing.LargeLast.Result.OutputMesh.FaceCount();
+  metrics.LargeChartCount = timing.LargeLast.Diagnostics.ChartCount;
+  metrics.LargeSeamCount = timing.LargeLast.Diagnostics.SeamCutCount;
+  metrics.LargeBoundarySeamCount =
+      timing.LargeLast.Diagnostics.BoundarySeamCount;
+  metrics.LargeUvMinX = timing.LargeLast.Diagnostics.NormalizedUvMin.x;
+  metrics.LargeUvMinY = timing.LargeLast.Diagnostics.NormalizedUvMin.y;
+  metrics.LargeUvMaxX = timing.LargeLast.Diagnostics.NormalizedUvMax.x;
+  metrics.LargeUvMaxY = timing.LargeLast.Diagnostics.NormalizedUvMax.y;
+  metrics.LargeMeanConformalDistortion =
+      timing.LargeLast.Diagnostics.Quality.MeanConformalDistortion;
+  metrics.LargeMaxStretch =
+      timing.LargeLast.Diagnostics.Quality.MaxStretch;
+  metrics.LargeFlippedElementCount =
+      timing.LargeLast.Diagnostics.Quality.FlippedElementCount;
+  metrics.LargeOutputSignature =
+      AtlasTopologySignature(timing.LargeLast.Result);
+  metrics.FaceCountRatio =
+      metrics.SmallFaceCount > 0u
+          ? static_cast<double>(metrics.LargeFaceCount) /
+                static_cast<double>(metrics.SmallFaceCount)
+          : 0.0;
+  metrics.RuntimeScalingRatio =
+      metrics.SmallMedianRuntimeMilliseconds > 0.0
+          ? metrics.LargeMedianRuntimeMilliseconds /
+                metrics.SmallMedianRuntimeMilliseconds
+          : std::numeric_limits<double>::infinity();
+  metrics.NormalizedRuntimeScalingFactor =
+      metrics.FaceCountRatio > 0.0
+          ? metrics.RuntimeScalingRatio / metrics.FaceCountRatio
+          : std::numeric_limits<double>::infinity();
+  metrics.ThroughputFacesPerSecond =
+      metrics.LargeMedianRuntimeMilliseconds > 0.0
+          ? static_cast<double>(metrics.LargeFaceCount) /
+                (metrics.LargeMedianRuntimeMilliseconds * 1.0e-3)
+          : 0.0;
+  metrics.LargeSucceeded =
+      timing.LargeLast.Succeeded &&
+      timing.LargeLast.Diagnostics.ActualMethod == UvAtlasMethod::FastStaged;
+  metrics.LargeFiniteNormalized =
+      AllOutputUvsFiniteNormalized(timing.LargeLast.Result) &&
+      IsFiniteNormalizedUv(timing.LargeLast.Diagnostics.NormalizedUvMin) &&
+      IsFiniteNormalizedUv(timing.LargeLast.Diagnostics.NormalizedUvMax);
+  metrics.LargeUsedFallback = timing.LargeLast.Diagnostics.UsedFallback;
+  metrics.DeterministicTopology = timing.DeterministicTopology;
+  const auto relativeDelta = [](const double observed,
+                                const double baseline) noexcept {
+    return (observed - baseline) / std::max(std::abs(baseline), 1.0);
+  };
+  metrics.QualityVectorDelta = {
+      relativeDelta(
+          static_cast<double>(metrics.LargeOutputVertexCount),
+          static_cast<double>(
+              kUvAtlasEdgeGroupingBaselineOutputVertexCount)),
+      relativeDelta(
+          static_cast<double>(metrics.LargeOutputFaceCount),
+          static_cast<double>(kUvAtlasEdgeGroupingBaselineOutputFaceCount)),
+      relativeDelta(static_cast<double>(metrics.LargeChartCount),
+                    static_cast<double>(
+                        kUvAtlasEdgeGroupingBaselineChartCount)),
+      static_cast<double>(metrics.LargeSeamCount) -
+          static_cast<double>(kUvAtlasEdgeGroupingBaselineSeamCount),
+      relativeDelta(
+          static_cast<double>(metrics.LargeBoundarySeamCount),
+          static_cast<double>(
+              kUvAtlasEdgeGroupingBaselineBoundarySeamCount)),
+      metrics.LargeUvMinX - kUvAtlasEdgeGroupingBaselineUvMinX,
+      metrics.LargeUvMinY - kUvAtlasEdgeGroupingBaselineUvMinY,
+      metrics.LargeUvMaxX - kUvAtlasEdgeGroupingBaselineUvMaxX,
+      metrics.LargeUvMaxY - kUvAtlasEdgeGroupingBaselineUvMaxY,
+      relativeDelta(
+          metrics.LargeMeanConformalDistortion,
+          kUvAtlasEdgeGroupingBaselineMeanConformalDistortion),
+      relativeDelta(metrics.LargeMaxStretch,
+                    kUvAtlasEdgeGroupingBaselineMaxStretch),
+      static_cast<double>(metrics.LargeFlippedElementCount) -
+          static_cast<double>(
+              kUvAtlasEdgeGroupingBaselineFlippedElementCount),
+  };
+  metrics.QualityErrorL2 = std::sqrt(std::inner_product(
+      metrics.QualityVectorDelta.begin(), metrics.QualityVectorDelta.end(),
+      metrics.QualityVectorDelta.begin(), 0.0));
+  metrics.MatchesBaselineOutputSignature =
+      metrics.LargeOutputSignature ==
+      kUvAtlasEdgeGroupingBaselineOutputSignature;
+  metrics.Passed =
+      metrics.LargeSucceeded && metrics.LargeFiniteNormalized &&
+      !metrics.LargeUsedFallback && metrics.DeterministicTopology &&
+      metrics.LargeOutputFaceCount == metrics.LargeFaceCount &&
+      metrics.LargeChartCount > 0u &&
+      std::isfinite(metrics.NormalizedRuntimeScalingFactor) &&
+      metrics.QualityErrorL2 <= 1.0e-12 &&
+      metrics.MatchesBaselineOutputSignature;
   return metrics;
 }
 } // namespace Intrinsic::Bench::Geometry

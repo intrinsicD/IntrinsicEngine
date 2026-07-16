@@ -632,7 +632,14 @@ deterministic shelf packer with texel padding and optional right-angle chart
 rotation instead of the earlier uniform grid lower bound. The path emits
 finite, non-overlapping generated UVs, chart/seam-cut metadata, whole-atlas
 quality diagnostics, a cube smoke benchmark comparison against xatlas, and a
-multi-fixture promotion benchmark that gates default adoption. If a
+multi-fixture promotion benchmark that gates default adoption.
+
+Within `FastStaged`, source-edge incidence groups use normalized vertex pairs
+packed into 64-bit lookup keys while a first-seen vector remains the output
+ordering authority; the same groups feed adjacency and seam recording, with
+scaling evidence declared by the
+[`geometry.uv_atlas.fast_staged_edge_grouping.scaling`](../../benchmarks/geometry/manifests/geometry_uv_atlas_fast_staged_edge_grouping_scaling.yaml)
+benchmark. If a
 caller-supplied fast backend fails and
 `AllowXAtlasFallback` is enabled, diagnostics report
 `RequestedMethod = FastStaged`, `ActualMethod = XAtlas`, and
