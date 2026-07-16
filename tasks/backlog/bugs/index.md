@@ -5,6 +5,10 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-083` — Vulkan Sandbox shutdown reports driver and DBus leaks under LeakSanitizer](../../active/BUG-083-vulkan-sandbox-shutdown-lsan-leaks.md):
+  the exact five-frame Vulkan Sandbox run completes operational renderer work
+  then exits 86 for externally retained driver, VMA, and DBus allocations;
+  adopt only the evidenced narrow policy with a synthetic engine-leak control.
 - [`BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start](BUG-091-gtest-pretest-discovery-cold-timeout.md):
   CMake's implicit five-second PRE_TEST discovery limit can abort CTest while
   an unrelated cold sanitizer binary enumerates tests, before the selected

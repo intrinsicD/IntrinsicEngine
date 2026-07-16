@@ -1,14 +1,24 @@
 ---
 id: BUG-083
 theme: G
-depends_on: []
+depends_on: [BUG-082]
 ---
 # BUG-083 — Vulkan Sandbox shutdown reports driver and DBus leaks under LeakSanitizer
 
+## Status
+- In progress on 2026-07-16; owner: Codex; branch:
+  `codex/arch-006-completion`.
+- A fresh sanitizer-enabled `ci-vulkan` rebuild reproduced the issue on the
+  exact current head: the five-frame NVIDIA process remained operational and
+  wrote five completed samples, then exited 86 for 116,425 leaked bytes in 35
+  allocations. The symbolized stacks retain the previously diagnosed Vulkan
+  push-constant driver, VMA buffer-bind, and DBus paths.
+
 ## Goal
 - Make the bounded Vulkan `ExtrinsicSandbox` smoke exit cleanly under the
-  sanitizer-enabled `ci` preset, or establish precise external ownership and a
-  narrow suppression policy that preserves detection of engine-owned leaks.
+  sanitizer-enabled `ci-vulkan` preset, or establish precise external ownership
+  and a narrow suppression policy that preserves detection of engine-owned
+  leaks.
 
 ## Non-goals
 - No global `detect_leaks=0`, broad third-party suppression, or sanitizer-gate
@@ -65,13 +75,14 @@ depends_on: []
 
 ## Verification
 ```bash
-cmake --preset ci
-cmake --build --preset ci --target ExtrinsicSandbox
-build/ci/bin/ExtrinsicSandbox \
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicGlfwLifecycleLsanProcess
+build/ci-vulkan/bin/ExtrinsicSandbox \
   --frame-pacing-report /tmp/bug-083-sandbox-smoke.json \
   --frame-pacing-frames 5
-ctest --test-dir build/ci --output-on-failure \
-  -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+ctest --test-dir build/ci-vulkan -V --output-on-failure \
+  -R '^ExtrinsicSandbox\.VulkanShutdownLsanContract$' \
+  -L gpu -L vulkan --no-tests=error --timeout 180
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
 

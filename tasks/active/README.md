@@ -11,7 +11,11 @@ Each active task should include:
 
 ## Currently active
 
-No tasks are currently active.
+- [BUG-083 — Vulkan Sandbox shutdown reports driver and DBus leaks under LeakSanitizer](BUG-083-vulkan-sandbox-shutdown-lsan-leaks.md)
+  (`in-progress`; owner: Codex; branch: `codex/arch-006-completion`). Fresh
+  exact-head NVIDIA evidence reproduces the three diagnosed external-retention
+  paths; next gate is the narrow-policy process contract and synthetic engine
+  leak control.
 
 ## History
 
