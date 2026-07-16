@@ -10,10 +10,11 @@ maturity_target: Operational
 
 ## Status
 
-- Implementation and verification completed on 2026-07-16; owner: Codex;
-  branch: `codex/arch-006-completion`.
-- Next gate: commit the verified technical slice, then retire this task at
-  `Operational` with the implementation commit recorded.
+- Completed on 2026-07-16 at `Operational`.
+- Implementation commit: `1384228f`.
+- Verification: focused CPU coverage passed `79/79`, runtime layering passed
+  `21/21`, and the final default CPU-supported gate passed `3784/3784` after a
+  successful `IntrinsicTests` build. Strict structural/review gates passed.
 
 ## Goal
 - Keep `AssetResidencyService` as an Engine-owned implementation service while

@@ -8,6 +8,24 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-171`](RUNTIME-171-privatize-asset-residency-service-surface.md) — the
+Engine-only asset residency service module surface retired on 2026-07-16 at
+`Operational`. Implementation commit `1384228f` replaces the standalone
+`Extrinsic.Runtime.AssetResidencyService` BMI with an include-only declaration
+attached to `Extrinsic.Runtime.Engine`; the existing implementation unit is
+reattached to Engine with its method bodies unchanged. The service remains a
+by-value member in the same position, preserving GPU cache/listener/model-
+handoff ownership, maintenance behavior, and scene-borrower -> texture-handoff
+-> listener -> cache teardown order. Runtime modules drop from 81 to 80 and
+repository modules from 388 to 387; the dedicated `contract;runtime` guard
+proves the old module/CMake/inventory entries remain absent, the private
+declaration has one include owner, and raw residency state does not return to
+Engine. Focused CPU coverage passed 79/79, runtime layering passed 21/21, and
+the default CPU-supported gate passed 3,784/3,784 in 398.08 seconds after a
+successful full build. Strict structural and clean-workshop checks passed, and
+three independent reviews found no blockers. Compile timings are retained as
+diagnostics only; no overall speedup is claimed.
+
 [`RUNTIME-169`](RUNTIME-169-privatize-render-extraction-service-surface.md) —
 the Engine-only render extraction service module surface retired on 2026-07-16
 at `Operational`. Implementation commit `7c9ad87b` replaces the standalone

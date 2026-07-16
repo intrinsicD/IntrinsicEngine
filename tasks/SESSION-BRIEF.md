@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-171` — Privatize the AssetResidencyService surface (tasks/active/RUNTIME-171-privatize-asset-residency-service-surface.md)
+- none
 
 ## Theme B — Rendering modernization
 
