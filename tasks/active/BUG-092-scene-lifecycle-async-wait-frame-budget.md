@@ -5,6 +5,14 @@ depends_on: []
 ---
 # BUG-092 — Scene lifecycle async wait exhausts its frame budget under delayed I/O
 
+## Status
+
+- In progress on 2026-07-16; owner: Codex; branch:
+  `codex/arch-006-completion`.
+- Root cause and controlled-delay reproduction are complete. The selected
+  repair is test-only: a ten-second steady-clock deadline, a one-millisecond
+  unsuccessful-poll yield, and explicit satisfied/timed-out state.
+
 ## Goal
 - Make the queued scene-save/load lifecycle contracts deterministic under
   bounded worker and filesystem delays without weakening their end-to-end

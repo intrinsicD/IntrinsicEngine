@@ -5,7 +5,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-092` — Scene lifecycle async wait exhausts its frame budget under delayed I/O](BUG-092-scene-lifecycle-async-wait-frame-budget.md):
+- [`BUG-092` — Scene lifecycle async wait exhausts its frame budget under delayed I/O](../../active/BUG-092-scene-lifecycle-async-wait-frame-budget.md):
   the end-to-end queued scene-save contract can consume 256 rapid Null-backend
   frames before a valid delayed worker completion is applied, then report a
   missing event even though shutdown draining completes the save; replace the
