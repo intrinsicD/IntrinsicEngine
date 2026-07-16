@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `BUG-088` — Benchmark smoke hard timeout flakes under host contention (tasks/active/BUG-088-benchmark-smoke-hard-timeout-host-contention.md)
 
 ## Theme B — Rendering modernization
 
@@ -48,7 +48,6 @@ the authoritative open/unblocked view.
 
 ## Theme G — Active bugs
 
-- unblocked: `BUG-088` — Benchmark smoke hard timeout flakes under host contention (tasks/backlog/bugs/BUG-088-benchmark-smoke-hard-timeout-host-contention.md)
 - unblocked: `BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start (tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md)
 - unblocked: `BUG-095` — Direct-mesh postprocess can overwrite newer editor geometry (tasks/backlog/bugs/BUG-095-direct-mesh-postprocess-stale-overwrite.md)
 - unblocked: `BUG-096` — ICP point-to-plane ignores target normals (tasks/backlog/bugs/BUG-096-icp-point-to-plane-target-normals.md)

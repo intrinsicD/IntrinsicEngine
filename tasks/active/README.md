@@ -11,7 +11,9 @@ Each active task should include:
 
 ## Currently active
 
-No active tasks.
+- [`BUG-088` — Benchmark smoke hard timeout flakes under host contention](BUG-088-benchmark-smoke-hard-timeout-host-contention.md):
+  classify the 22-result smoke from a seven-run hosted timing population while
+  preserving its dedicated fail-closed runner and strict result validation.
 
 ## History
 

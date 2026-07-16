@@ -22,12 +22,11 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   an unrelated cold sanitizer binary enumerates tests, before the selected
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
-- [`BUG-088` — Benchmark smoke hard timeout flakes under host contention](BUG-088-benchmark-smoke-hard-timeout-host-contention.md):
-  the required default CPU gate timed out the monolithic 21-result smoke at its
-  hard 30-second limit under concurrent load, while the same pair passed in
-  14.71 seconds in isolation; collect a timing population and choose an
-  evidence-backed PR-fast split or slow-lane classification without weakening
-  strict result validation.
+- [`BUG-088` — Benchmark smoke hard timeout flakes under host contention](../../active/BUG-088-benchmark-smoke-hard-timeout-host-contention.md):
+  seven same-branch hosted smoke-lane samples have a 37.203-second median and
+  38.167-second p95, so six of seven exceed the CTest pair's hard 30-second
+  limit even before full-suite contention; select the evidence-backed lane
+  without weakening dedicated strict result validation.
 ## Verified / Closed
 
 - Closed 2026-07-16: [`BUG-105` — Runtime module reader races ECS structural mutation](../../done/BUG-105-runtime-module-ecs-structural-hazard.md).

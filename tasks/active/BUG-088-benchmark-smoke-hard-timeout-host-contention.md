@@ -5,6 +5,16 @@ depends_on: []
 ---
 # BUG-088 — Benchmark smoke hard timeout flakes under host contention
 
+## Status
+
+- In progress on 2026-07-16; owner: Codex; branch:
+  `agent/sandbox-model-workflow-completion`; PR:
+  [`#1024`](https://github.com/intrinsicD/IntrinsicEngine/pull/1024).
+- Promoted after final-head
+  [`ci-linux-clang` run 29532745081](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29532745081)
+  repeated the known 30-second timeout and blocked the merge while all six
+  other required checks passed.
+
 ## Goal
 - Keep the benchmark smoke useful and fail-closed while preventing ordinary
   host contention from turning the required default CPU gate red before its
@@ -26,13 +36,21 @@ depends_on: []
   variance, while benchmark execution and strict result validation remain
   bounded and fail closed.
 - Impact: unrelated feature work can lose its full CPU gate solely because the
-  monolithic 21-result smoke crosses a hard 30-second wall under contention.
+  monolithic 22-result smoke crosses a hard 30-second wall under contention.
   `benchmarks/CMakeLists.txt` labels the pair
   `benchmark;geometry;graphics;physics` without `slow`, so the standard
   `-LE 'gpu|vulkan|slow|flaky-quarantine'` gate includes it.
+- Current evidence is stronger than a single contended observation. Seven
+  successful same-branch hosted `ci-bench-smoke` result artifacts report runner
+  phase times of 38.167, 27.157, 37.551, 35.097, 34.947, 37.893, and 37.203
+  seconds. The conventional median is 37.203 seconds and nearest-rank p95 is
+  38.167 seconds; six of seven valid isolated-lane runs exceed the 30-second
+  CTest limit. The final-head full CPU gate timed out at 30.04 seconds while the
+  dedicated benchmark lane on the same head completed and strictly validated
+  all 22 outputs.
 
 ## Required changes
-- [ ] Collect representative clean and contended-host timings for the 21-result
+- [x] Collect representative isolated-lane and full-suite timings for the 22-result
       smoke, retaining per-result timing/diagnostics and host context.
 - [ ] Choose the smallest evidence-backed correction: make the aggregate
       genuinely PR-fast, split it into bounded shards, or route it through the
