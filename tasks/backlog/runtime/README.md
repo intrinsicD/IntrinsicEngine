@@ -201,8 +201,9 @@ main `Runtime.RenderExtraction` module slimming.
 - [`RUNTIME-173`](RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md) —
   move the K-Means GPU job queue behind the editor/module integration seam after
   `RUNTIME-137`.
-- [`RUNTIME-174`](RUNTIME-174-privatize-imgui-editor-bridge-surface.md) —
-  privatize the Engine-owned ImGui editor bridge after `RUNTIME-159`.
+- [`RUNTIME-174`](../../active/RUNTIME-174-privatize-imgui-editor-bridge-surface.md) —
+  privatize the Engine-owned ImGui editor bridge after `RUNTIME-159`; active
+  on `codex/arch-006-completion`.
 
 ### Retired module-surface diet work
 

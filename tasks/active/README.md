@@ -11,7 +11,11 @@ Each active task should include:
 
 ## Currently active
 
-- No tasks are currently active.
+- [RUNTIME-174 — Privatize the ImGui editor bridge surface](RUNTIME-174-privatize-imgui-editor-bridge-surface.md)
+  (`in-progress`; owner: Codex; branch: `codex/arch-006-completion`). The
+  Engine-only bridge is moving from a standalone exported module to private
+  Engine module glue without changing overlay, callback, capture, or lifecycle
+  behavior; next gate is the focused runtime contract/integration build.
 
 ## History
 

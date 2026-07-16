@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `RUNTIME-174` — Privatize the ImGuiEditorBridge surface (tasks/active/RUNTIME-174-privatize-imgui-editor-bridge-surface.md)
 
 ## Theme B — Rendering modernization
 
@@ -44,7 +44,6 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-171` — Privatize the AssetResidencyService surface (tasks/backlog/runtime/RUNTIME-171-privatize-asset-residency-service-surface.md)
 - unblocked: `RUNTIME-172` — Privatize the SceneDocument surface (tasks/backlog/runtime/RUNTIME-172-privatize-scene-document-surface.md)
 - unblocked: `RUNTIME-173` — Privatize the K-Means GPU job queue surface (tasks/backlog/runtime/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md)
-- unblocked: `RUNTIME-174` — Privatize the ImGuiEditorBridge surface (tasks/backlog/runtime/RUNTIME-174-privatize-imgui-editor-bridge-surface.md)
 
 ## Theme G — Active bugs
 

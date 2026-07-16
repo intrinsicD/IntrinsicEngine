@@ -8,6 +8,14 @@ maturity_target: Operational
 ---
 # RUNTIME-174 — Privatize the ImGuiEditorBridge surface
 
+## Status
+
+- In progress on 2026-07-16; owner: Codex; branch:
+  `codex/arch-006-completion`.
+- Next gate: replace the standalone module with an Engine-private declaration
+  attached to `Extrinsic.Runtime.Engine`, then build the focused runtime
+  contract and integration targets.
+
 ## Goal
 - Keep `ImGuiEditorBridge` as an Engine-owned implementation service while
   removing its low-fanout exported module surface and preserving editor overlay,
@@ -25,6 +33,12 @@ maturity_target: Operational
   17.877s with only Engine-side production consumers.
 - `RUNTIME-159` extracted this bridge; this follow-up keeps that service
   boundary but makes it private if no public module value remains.
+- Current consumer inventory: only `Runtime.Engine.cppm` and
+  `Runtime.Engine.cpp` import the bridge in production; no test imports the
+  module directly.
+- Right-sized shape: keep the value member and separate implementation unit,
+  but attach the declaration and implementation to `Runtime.Engine` rather
+  than introducing a pimpl allocation or a replacement public module.
 
 ## Required changes
 - [ ] Confirm all production consumers are Engine implementation/interface
