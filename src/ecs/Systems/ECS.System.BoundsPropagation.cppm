@@ -44,12 +44,14 @@ export namespace Extrinsic::ECS::Systems::BoundsPropagation
     // for every entity that the transform hierarchy stamped with
     // Components::Transform::WorldUpdatedTag this frame. The world OBB inherits
     // the rotation embedded in the world matrix and scales its extents per
-    // matrix column. When a valid local AABB is available, the world sphere
-    // conservatively encloses its transformed corners, including affine shear
-    // produced by composed non-uniform scale and rotation. Sphere-only inputs
-    // use the largest column magnitude as their scale fallback. World bounds
-    // are written via emplace_or_replace so first-frame entities and entities
-    // whose local bounds were freshly authored receive an initial world value.
+    // matrix column. Ordinary orthogonal TRS bases preserve the tight local
+    // sphere using the largest column magnitude. When composed non-uniform
+    // scale and rotation produce material affine shear, a valid local AABB
+    // instead yields a world sphere enclosing its transformed corners;
+    // sphere-only and near-orthogonal inputs use an operator-norm upper bound
+    // that remains conservative under small shear. World bounds are written
+    // via emplace_or_replace so first-frame entities and entities whose local
+    // bounds were freshly authored receive an initial world value.
     //
     // The WorldUpdatedTag is NOT cleared here; render-sync owns that hand-off.
     void OnUpdate(entt::registry& registry);

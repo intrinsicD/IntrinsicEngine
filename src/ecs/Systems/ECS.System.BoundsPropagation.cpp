@@ -75,7 +75,38 @@ namespace Extrinsic::ECS::Systems::BoundsPropagation
             };
             world.WorldBoundingOBB.Rotation = glm::normalize(glm::quat_cast(rotationBasis));
 
-            if (local.LocalBoundingAABB.IsValid())
+            const auto axesAreNonOrthogonal = [=](
+                const glm::vec3& lhs,
+                const float lhsLength,
+                const glm::vec3& rhs,
+                const float rhsLength) noexcept
+            {
+                if (lhsLength <= kAxisEpsilon || rhsLength <= kAxisEpsilon)
+                {
+                    return false;
+                }
+                constexpr float kOrthogonalityTolerance = 1.0e-5f;
+                const float cosine =
+                    glm::dot(lhs, rhs) / (lhsLength * rhsLength);
+                return std::abs(cosine) > kOrthogonalityTolerance;
+            };
+            const bool hasAffineShear =
+                axesAreNonOrthogonal(col0, lenX, col1, lenY)
+                || axesAreNonOrthogonal(col0, lenX, col2, lenZ)
+                || axesAreNonOrthogonal(col1, lenY, col2, lenZ);
+
+            const float dot01 = glm::dot(col0, col1);
+            const float dot02 = glm::dot(col0, col2);
+            const float dot12 = glm::dot(col1, col2);
+            const float sphereScaleSquared = std::max({
+                lenX * lenX + std::abs(dot01) + std::abs(dot02),
+                lenY * lenY + std::abs(dot01) + std::abs(dot12),
+                lenZ * lenZ + std::abs(dot02) + std::abs(dot12),
+            });
+            const float conservativeSphereScale =
+                std::sqrt(std::max(0.0f, sphereScaleSquared));
+
+            if (local.LocalBoundingAABB.IsValid() && hasAffineShear)
             {
                 // A non-uniformly scaled parent composed with a rotated child
                 // can produce shear even though every authored local transform
@@ -90,14 +121,15 @@ namespace Extrinsic::ECS::Systems::BoundsPropagation
             }
             else
             {
-                // Preserve the legacy sphere-only path for callers that have
-                // no usable local AABB.
-                const float maxScale = std::max({lenX, lenY, lenZ});
+                // The absolute row-sum bound of A^T A bounds the squared
+                // operator norm for every linear basis. For an exactly
+                // orthogonal TRS basis it reduces to the legacy max-column
+                // scale, while tiny below-threshold shear remains conservative.
                 world.WorldBoundingSphere.Center = glm::vec3{
                     worldMatrix
                     * glm::vec4{local.LocalBoundingSphere.Center, 1.0f}};
                 world.WorldBoundingSphere.Radius =
-                    local.LocalBoundingSphere.Radius * maxScale;
+                    local.LocalBoundingSphere.Radius * conservativeSphereScale;
             }
 
             return world;

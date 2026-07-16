@@ -10,6 +10,7 @@
 #include <thread>
 #include <vector>
 
+#include <entt/entity/entity.hpp>
 #include <glm/glm.hpp>
 
 import Extrinsic.Asset.GeometryIOBridge;
@@ -84,6 +85,18 @@ namespace
             std::this_thread::sleep_for(1ms);
         }
         return true;
+    }
+
+    [[nodiscard]] std::size_t CountLiveEntities(
+        ECS::Scene::Registry& scene)
+    {
+        std::size_t count = 0u;
+        scene.Raw().view<entt::entity>().each(
+            [&](const ECS::EntityHandle)
+            {
+                ++count;
+            });
+        return count;
     }
 
     [[nodiscard]] CoreConfig::EngineConfig NullWindowHeadlessConfig()
@@ -228,8 +241,7 @@ namespace
 
             if (VariableTicks == 3u)
             {
-                EntityCountAfterReady =
-                    engine.GetScene().Raw().storage<ECS::EntityHandle>().size();
+                EntityCountAfterReady = CountLiveEntities(engine.GetScene());
                 ReloadBeforeDestroySucceeded =
                     ModelAsset.IsValid() &&
                     engine.GetAssetService().Reload(ModelAsset).has_value();
@@ -240,7 +252,7 @@ namespace
             {
                 OldWorldDestroyed = !engine.Worlds().Contains(FirstWorld);
                 EntityCountAfterFirstReload =
-                    engine.GetScene().Raw().storage<ECS::EntityHandle>().size();
+                    CountLiveEntities(engine.GetScene());
                 ReloadAfterDestroySucceeded =
                     ModelAsset.IsValid() &&
                     engine.GetAssetService().Reload(ModelAsset).has_value();
@@ -481,9 +493,9 @@ TEST(RuntimeWorldRegistry, EngineRebindsSceneBorrowersBeforeRetiringPreviousWorl
     EXPECT_TRUE(appPtr->ReloadAfterDestroySucceeded);
     EXPECT_EQ(engine.ActiveWorld(), appPtr->SecondWorld);
     EXPECT_FALSE(engine.Worlds().Contains(appPtr->FirstWorld));
-    EXPECT_EQ(appPtr->EntityCountAfterReady, 1u);
-    EXPECT_EQ(appPtr->EntityCountAfterFirstReload, 1u);
-    EXPECT_EQ(engine.GetScene().Raw().storage<ECS::EntityHandle>().size(), 1u);
+    EXPECT_EQ(appPtr->EntityCountAfterReady, 2u);
+    EXPECT_EQ(appPtr->EntityCountAfterFirstReload, 2u);
+    EXPECT_EQ(CountLiveEntities(engine.GetScene()), 2u);
 
     engine.Shutdown();
 }

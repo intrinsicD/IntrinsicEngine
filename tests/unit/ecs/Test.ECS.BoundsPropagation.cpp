@@ -74,7 +74,7 @@ TEST(ECSBoundsPropagation, TranslatedRootProducesWorldBounds)
     EXPECT_NEAR(world.WorldBoundingSphere.Center.x, 5.0f, 1e-5f);
     EXPECT_NEAR(world.WorldBoundingSphere.Center.y, -2.0f, 1e-5f);
     EXPECT_NEAR(world.WorldBoundingSphere.Center.z, 7.0f, 1e-5f);
-    EXPECT_NEAR(world.WorldBoundingSphere.Radius, std::sqrt(3.0f), 1e-5f);
+    EXPECT_NEAR(world.WorldBoundingSphere.Radius, 1.0f, 1e-5f);
 }
 
 TEST(ECSBoundsPropagation, NonUniformScaleStretchesExtentsPerAxis)
@@ -95,8 +95,8 @@ TEST(ECSBoundsPropagation, NonUniformScaleStretchesExtentsPerAxis)
     EXPECT_NEAR(world.WorldBoundingOBB.Extents.x, 2.0f, 1e-5f);
     EXPECT_NEAR(world.WorldBoundingOBB.Extents.y, 3.0f, 1e-5f);
     EXPECT_NEAR(world.WorldBoundingOBB.Extents.z, 4.0f, 1e-5f);
-    // The sphere circumscribes the transformed local AABB.
-    EXPECT_NEAR(world.WorldBoundingSphere.Radius, std::sqrt(29.0f), 1e-5f);
+    // An orthogonal TRS basis keeps the tight local sphere with max-axis scale.
+    EXPECT_NEAR(world.WorldBoundingSphere.Radius, 4.0f, 1e-5f);
 }
 
 TEST(ECSBoundsPropagation, ShearedWorldMatrixUsesTransformedAabbSphereInPureAndSystemPaths)
