@@ -561,16 +561,25 @@ TEST(RuntimeEngineLayering, DeviceBootstrapKeepsBackendAndFallbackPolicyOutOfEng
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
     const auto bootstrap =
         ReadFile(RepoRoot() / "src/runtime/Runtime.DeviceBootstrap.cpp");
-    const auto residency =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetResidencyService.cpp");
+    const auto residency = SliceBetween(
+        engineImpl,
+        "void AssetResidencyService::InitializeGpuCache(",
+        "void AssetResidencyService::InitializeSceneHandoffs(");
+    const auto engineInitialize = SliceBetween(
+        engineImpl,
+        "void Engine::Initialize()",
+        "void Engine::Shutdown()");
 
     EXPECT_NE(engineImpl.find("import Extrinsic.Runtime.DeviceBootstrap"),
               std::string::npos);
     EXPECT_NE(engineImpl.find("CreateRuntimeDevice(m_Config.Render)"),
               std::string::npos);
-    EXPECT_EQ(engineImpl.find("InitializeRuntimeGpuAssetFallbackTexture("),
+    EXPECT_EQ(engineInitialize.find("InitializeRuntimeGpuAssetFallbackTexture("),
               std::string::npos);
     EXPECT_NE(residency.find("InitializeRuntimeGpuAssetFallbackTexture("),
+              std::string::npos);
+    EXPECT_NE(engineInitialize.find(
+                  "m_AssetResidencyService->InitializeGpuCache("),
               std::string::npos);
 
     EXPECT_EQ(engineInterface.find("RuntimeDeviceSelection"), std::string::npos);

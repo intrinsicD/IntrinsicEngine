@@ -271,16 +271,19 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
         const Runtime::SandboxEditorFileImportCommand&)>
         staleImportCommand{};
     Runtime::SandboxEditorKMeansGpuCommandSurface staleGpuCommands{};
+    Runtime::SandboxEditorParameterizationUvViewCommandSurface staleUvCommands{};
     ASSERT_TRUE(session.VisitPreparedFrame(
         [&](Runtime::SandboxEditorPreparedFrameView frame)
         {
             staleResultSink = frame.Context.MethodResultSinks.KMeans;
             staleImportCommand = frame.Context.AssetImportCommands.Import;
             staleGpuCommands = frame.Context.KMeansGpuCommands;
+            staleUvCommands = frame.Context.ParameterizationUvViewCommands;
         }));
     ASSERT_TRUE(staleResultSink);
     ASSERT_TRUE(staleImportCommand);
     ASSERT_TRUE(staleGpuCommands.Available());
+    ASSERT_TRUE(staleUvCommands.Available());
     const Runtime::SandboxEditorFileImportResult activeImport =
         staleImportCommand(Runtime::SandboxEditorFileImportCommand{
             .Path = "/tmp/intrinsic-session-active-command.obj",
@@ -324,6 +327,32 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
     EXPECT_EQ(staleGpuSubmission.Status,
               Runtime::RuntimeKMeansGpuJobStatus::GpuUnavailable);
     EXPECT_FALSE(staleGpuCommands.ConsumeCompleted().has_value());
+    const Runtime::SandboxEditorParameterizationUvViewState staleUvState =
+        staleUvCommands.Submit(
+            Runtime::SandboxEditorParameterizationUvViewRequest{
+                .Enabled = true,
+                .RequestToken = 91u,
+                .StableEntityId = 7u,
+                .Width = 320u,
+                .Height = 180u,
+                .View = Core::Config::ParameterizationViewConfig{
+                    .RenderMode =
+                        Core::Config::ParameterizationUvRenderMode::GpuShaded,
+                    .BackgroundMode =
+                        Core::Config::ParameterizationUvBackgroundMode::Texture,
+                },
+            });
+    EXPECT_EQ(
+        staleUvState.Status,
+        Runtime::SandboxEditorParameterizationUvViewStatus::CpuFallbackNonOperational);
+    EXPECT_EQ(staleUvState.ActiveMode,
+              Core::Config::ParameterizationUvRenderMode::CpuLayout);
+    EXPECT_EQ(staleUvState.ActiveBackground,
+              Core::Config::ParameterizationUvBackgroundMode::Checker);
+    EXPECT_EQ(staleUvState.RequestToken, 91u);
+    EXPECT_FALSE(staleUvState.GpuReady);
+    EXPECT_NE(staleUvState.Message.find("attachment expired"),
+              std::string::npos);
 
     ASSERT_TRUE(session.PrepareFrame(MakeNoSandboxEditorModelBuildRequest()));
     ASSERT_TRUE(session.VisitPreparedFrame(

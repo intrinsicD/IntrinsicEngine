@@ -70,20 +70,14 @@
   "current_snapshot": {
     "date": "2026-07-16",
     "metric": "exact_allowlist_complement_v1",
-    "plain_import_count": 49,
-    "domain_import_count": 28,
+    "plain_import_count": 42,
+    "domain_import_count": 21,
     "domain_imports": [
-      "Extrinsic.Asset.EventBus",
       "Extrinsic.Asset.Service",
       "Extrinsic.ECS.Component.StableId",
       "Extrinsic.Graphics.CameraSnapshots",
       "Extrinsic.Graphics.GpuAssetCache",
-      "Extrinsic.Graphics.GpuWorld",
-      "Extrinsic.Graphics.ImGuiOverlaySystem",
-      "Extrinsic.Graphics.Material",
       "Extrinsic.Runtime.AssetImportPipeline",
-      "Extrinsic.Runtime.AssetModelSceneHandoff",
-      "Extrinsic.Runtime.AssetModelTextureHandoff",
       "Extrinsic.Runtime.AsyncWorkService",
       "Extrinsic.Runtime.CameraControllers",
       "Extrinsic.Runtime.EditorCommandHistory",
@@ -91,7 +85,6 @@
       "Extrinsic.Runtime.GizmoFrameService",
       "Extrinsic.Runtime.ImGuiAdapter",
       "Extrinsic.Runtime.MeshPrimitiveViewPacker",
-      "Extrinsic.Runtime.ObjectSpaceNormalBakeQueue",
       "Extrinsic.Runtime.ObjectSpaceNormalBakeService",
       "Extrinsic.Runtime.PrimitiveSelectionRefinement",
       "Extrinsic.Runtime.ReferenceScene",
@@ -107,7 +100,7 @@
       "Extrinsic.Runtime.FramePacingDiagnostics",
       "Extrinsic.Runtime.InputActions"
     ],
-    "public_getter_count": 33,
+    "public_getter_count": 31,
     "public_getter_names": [
       "GetAssetImportPipeline",
       "GetAssetService",
@@ -126,8 +119,6 @@
       "GetLastRefinedPrimitiveSelection",
       "GetLastRefinedPrimitiveSelectionGeneration",
       "GetLastRenderExtractionStats",
-      "GetMaterialTextureAssetBindings",
-      "GetMaterialTextureAssetBindingsForTest",
       "GetMeshPrimitiveViewSettings",
       "GetObjectSpaceNormalBakeQueueDiagnosticsForTest",
       "GetPendingObjectSpaceNormalBakeCountForTest",
@@ -144,12 +135,5 @@
       "GetWindow"
     ]
   },
-  "temporary_debt": {
-    "plain_imports": 6,
-    "domain_imports": 5,
-    "getter_names": [
-      "GetMaterialTextureAssetBindings"
-    ],
-    "owner": "RUNTIME-178"
-  }
+  "temporary_debt": null
 }

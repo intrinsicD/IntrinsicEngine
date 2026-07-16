@@ -90,7 +90,6 @@ target_sources(${target_name}
         PRIVATE
         Runtime.AsyncWorkService.cpp
         Runtime.AsyncBufferReadback.cpp
-        Runtime.AssetResidencyService.cpp
         Runtime.AssetImportPipeline.cpp
         Runtime.AssetGeometryIO.cpp
         Runtime.AssetIngestStateMachine.cpp
@@ -126,7 +125,6 @@ target_sources(${target_name}
         Runtime.EngineConfigBoot.cpp
         Runtime.EngineConfigControl.cpp
         Runtime.FramePacingDiagnostics.cpp
-        Runtime.ImGuiEditorBridge.cpp
         Runtime.InputActions.cpp
         Runtime.KernelEvents.cpp
         Runtime.ModuleSchedule.cpp

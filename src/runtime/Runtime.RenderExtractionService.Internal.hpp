@@ -59,8 +59,6 @@ namespace Extrinsic::Runtime
         void Shutdown(Graphics::IRenderer& renderer);
 
         void ClearMeshPrimitiveViewSettings(std::uint32_t stableEntityId) noexcept;
-        [[nodiscard]] std::optional<Graphics::MaterialTextureAssetBindings>
-            GetMaterialTextureAssetBindingsForTest(std::uint32_t stableEntityId) const noexcept;
 
         void SetVisualizationAdapterBinding(
             std::uint32_t stableEntityId,

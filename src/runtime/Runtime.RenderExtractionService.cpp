@@ -78,13 +78,6 @@ namespace Extrinsic::Runtime
         m_Cache.ClearMeshPrimitiveViewSettings(stableEntityId);
     }
 
-    std::optional<Graphics::MaterialTextureAssetBindings>
-    RenderExtractionService::GetMaterialTextureAssetBindingsForTest(
-        const std::uint32_t stableEntityId) const noexcept
-    {
-        return m_Cache.GetMaterialTextureAssetBindings(stableEntityId);
-    }
-
     void RenderExtractionService::SetVisualizationAdapterBinding(
         const std::uint32_t stableEntityId,
         RenderExtractionCache::VisualizationAdapterBinding binding)

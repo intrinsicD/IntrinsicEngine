@@ -82,6 +82,7 @@ import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
+import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
@@ -2972,8 +2973,11 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProce
 
     engine.Run();
 
+    const Runtime::RenderExtractionCache* extraction =
+        engine.Services().Find<Runtime::RenderExtractionCache>();
+    ASSERT_NE(extraction, nullptr);
     const std::optional<Graphics::MaterialTextureAssetBindings> bindings =
-        engine.GetMaterialTextureAssetBindingsForTest(*stableId);
+        extraction->GetMaterialTextureAssetBindings(*stableId);
     if (bindings.has_value())
     {
         EXPECT_FALSE(bindings->Normal.IsValid());

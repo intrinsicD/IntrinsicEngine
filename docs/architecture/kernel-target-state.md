@@ -54,10 +54,10 @@ legacy-interim reference snapshot is 43 plain imports and 23 domain imports.
 Its unanchored interim regex admitted the then-present
 `Runtime.RenderExtractionService` through the `Runtime.RenderExtraction`
 prefix; the exact v1 classifier intentionally does not rewrite that historical
-record. The checked 2026-07-16 exact-policy snapshot is 49 / 28 with 33
-distinct public `Engine::GetX()` names and two existing re-exports. The
-`+6 / +5 / +1 getter` budget delta is explicit temporary debt owned by
-`RUNTIME-178`; it does not replace the reference.
+record. After `RUNTIME-178`, the checked 2026-07-16 exact-policy snapshot is
+42 / 21 with 31 distinct public `Engine::GetX()` names and two existing
+re-exports. The fixed reference remains historical comparison evidence; the
+current snapshot is below each reference budget and carries no temporary debt.
 
 ### Kernel seams exist (ADR-0024 D5–D11)
 
@@ -94,10 +94,10 @@ distinct public `Engine::GetX()` names and two existing re-exports. The
 
 - [ ] `Runtime.Engine.cppm` import count ≤ 12 substrate modules
       (**baseline 45; 2026-07-13 reference 43; 2026-07-16 checked snapshot
-      49, including 6 temporary-debt imports owned by `RUNTIME-178`**)
+      42**)
 - [ ] Domain (non-substrate) imports in `Runtime.Engine.cppm` = 0
-      (**baseline 27; 2026-07-13 reference 23; 2026-07-16 checked snapshot 28,
-      including 5 temporary-debt imports owned by `RUNTIME-178`**). Measure by
+      (**baseline 27; 2026-07-13 reference 23; 2026-07-16 checked snapshot 21**).
+      Measure by
       **allowlist**, not
       a blocklist of names:
       count every `import` that is *not* kernel substrate (see the metric
@@ -106,8 +106,7 @@ distinct public `Engine::GetX()` names and two existing re-exports. The
       `Geometry.HalfedgeMesh.IO`); the allowlist cannot.
 - [ ] `Engine::GetX()` domain-facade accessors = 0 (kernel-service
       accessors only) (**baseline estimate 13 domain facades; 2026-07-16 guard
-      snapshots all 33 public getter names, including one temporary-debt name
-      owned by `RUNTIME-178`**)
+      snapshots all 31 public getter names**)
 - [ ] No `entt::dispatcher::trigger` or direct dispatcher use in module code
 - [ ] No `Engine&` passed through any handler/module/setup surface (D13)
 - [ ] `IApplication::OnSimTick` / `OnVariableTick` removed (**baseline: present**)
@@ -155,7 +154,6 @@ distinct public `Engine::GetX()` names and two existing re-exports. The
   invariant (new domain-noun import, new `Engine::GetX()`, new direct
   dispatcher use, new `Engine&` pass-through).
 - **Picking work?** The additive seams `ARCH-007`..`ARCH-011`, the
-  `ARCH-012` ClusteringModule proof, retired `UI-034`, and the `ARCH-006`
-  Sandbox-content relocation are complete. `RUNTIME-178` first restores the
-  checked Engine convergence budget; remaining domain rows then proceed
-  through scoped extraction tasks.
+  `ARCH-012` ClusteringModule proof, retired `UI-034`, the `ARCH-006`
+  Sandbox-content relocation, and the `RUNTIME-178` budget restoration are
+  complete. Remaining domain rows proceed through scoped extraction tasks.

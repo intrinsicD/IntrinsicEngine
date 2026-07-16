@@ -28,6 +28,7 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ModuleSchedule;
+import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
@@ -557,6 +558,26 @@ namespace
         EXPECT_NE(engine.Services().Find<Runtime::KernelEventBus>(), nullptr);
         EXPECT_NE(engine.Services().Find<Runtime::JobService>(), nullptr);
         EXPECT_NE(engine.Services().Find<Runtime::WorldRegistry>(), nullptr);
+        Runtime::RenderExtractionCache* renderExtraction =
+            engine.Services().Find<Runtime::RenderExtractionCache>();
+        EXPECT_NE(renderExtraction, nullptr);
+        if (renderExtraction != nullptr)
+        {
+            constexpr std::uint32_t stableId = 0xA11CEu;
+            const std::uint64_t revisionBefore =
+                engine.GetVisualizationAdapterBindingRevision();
+            renderExtraction->SetVisualizationAdapterBinding(
+                stableId,
+                Runtime::RenderExtractionCache::VisualizationAdapterBinding{
+                    .AdapterKey = 0xCAFEu,
+                    .BufferBDA = 0xBEEFu,
+                });
+            EXPECT_EQ(engine.GetVisualizationAdapterBindingRevision(),
+                      revisionBefore + 1u);
+            EXPECT_TRUE(
+                engine.GetVisualizationAdapterBinding(stableId).has_value());
+            engine.ClearVisualizationAdapterBinding(stableId);
+        }
         engine.Run();
         engine.Shutdown();
         return state;

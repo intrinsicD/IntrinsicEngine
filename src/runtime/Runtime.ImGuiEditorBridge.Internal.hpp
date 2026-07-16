@@ -1,7 +1,8 @@
 #pragma once
 
-// Include-only Engine module glue. Include after the required graphics,
-// platform, and runtime module imports in Runtime.Engine.cppm.
+// Include-only Engine module glue. Runtime.Engine.cpp is the sole include
+// owner; include this only after its required graphics, platform, and runtime
+// module imports.
 
 namespace Extrinsic::Runtime
 {

@@ -48,6 +48,7 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.HalfedgeMesh.IO;
 
@@ -461,8 +462,15 @@ namespace
     {
         const std::uint32_t stableId =
             Runtime::StableEntityLookup::ToRenderId(entity);
+        const Runtime::RenderExtractionCache* extraction =
+            engine.Services().Find<Runtime::RenderExtractionCache>();
+        EXPECT_NE(extraction, nullptr);
+        if (extraction == nullptr)
+        {
+            return false;
+        }
         const auto binding =
-            engine.GetMaterialTextureAssetBindingsForTest(stableId);
+            extraction->GetMaterialTextureAssetBindings(stableId);
         return binding.has_value() && binding->Normal.IsValid();
     }
 

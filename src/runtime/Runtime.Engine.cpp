@@ -46,8 +46,6 @@ import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.TransferQueue;
-import Extrinsic.Graphics.Material;
-import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
@@ -57,6 +55,8 @@ import Extrinsic.Runtime.AsyncWorkService;
 import Extrinsic.Runtime.AssetGeometryIO;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetMeshNormals;
+import Extrinsic.Runtime.AssetModelSceneHandoff;
+import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.AssetModelTextureIO;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraFocusCommand;
@@ -72,6 +72,7 @@ import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ModuleSchedule;
 import Extrinsic.Runtime.MeshPrimitiveViewControls;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
+import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeService;
 import Extrinsic.Core.FrameLoop;
 import Extrinsic.Runtime.EcsSystemBundle;
@@ -85,12 +86,15 @@ import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
+import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.GeometryIOBridge;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTextureIOBridge;
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
+import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.ECS.Component.Collider;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.Hierarchy;
@@ -120,6 +124,8 @@ import Geometry.PointCloud.IO;
 import Geometry.Properties;
 import Geometry.Sphere;
 
+#include "Runtime.AssetResidencyService.Internal.hpp"
+#include "Runtime.ImGuiEditorBridge.Internal.hpp"
 #include "Runtime.Engine.FrameLoop.Internal.hpp"
 
 namespace Extrinsic::Runtime
@@ -130,10 +136,244 @@ namespace Extrinsic::Runtime
 
     // ── Construction / destruction ────────────────────────────────────────
 
+    // RUNTIME-178: these low-fanout helpers are defined and implemented in
+    // this single named-module implementation unit. Textually defining either
+    // class in multiple Engine implementation units would not qualify for the
+    // ordinary header ODR exception because the definitions are attached to a
+    // named module.
+
+    ImGuiEditorBridge::~ImGuiEditorBridge() = default;
+
+    void ImGuiEditorBridge::Initialize(
+        Platform::IWindow& window,
+        Graphics::IRenderer& renderer)
+    {
+        if (m_Adapter)
+            return;
+
+        m_Adapter = std::make_unique<ImGuiAdapter>(window, m_Overlay);
+        m_Adapter->Initialize();
+        m_Adapter->SetEditorVisible(m_EditorVisible);
+        if (m_EditorCallback)
+            m_Adapter->SetEditorCallback(m_EditorCallback);
+        renderer.SetImGuiOverlaySystem(&m_Overlay);
+    }
+
+    void ImGuiEditorBridge::Shutdown(Graphics::IRenderer* renderer) noexcept
+    {
+        if (renderer)
+            renderer->SetImGuiOverlaySystem(nullptr);
+        m_Adapter.reset();
+    }
+
+    void ImGuiEditorBridge::SetEditorCallback(
+        std::function<void()> callback)
+    {
+        m_EditorCallback = std::move(callback);
+        if (m_Adapter)
+            m_Adapter->SetEditorCallback(m_EditorCallback);
+    }
+
+    void ImGuiEditorBridge::SetEditorVisible(const bool visible) noexcept
+    {
+        m_EditorVisible = visible;
+        if (m_Adapter)
+            m_Adapter->SetEditorVisible(visible);
+    }
+
+    void ImGuiEditorBridge::BeginFrame(const double deltaSeconds)
+    {
+        if (m_Adapter)
+            m_Adapter->BeginFrame(deltaSeconds);
+    }
+
+    void ImGuiEditorBridge::EndFrame()
+    {
+        if (m_Adapter)
+            m_Adapter->EndFrame();
+    }
+
+    bool ImGuiEditorBridge::IsInitialized() const noexcept
+    {
+        return m_Adapter != nullptr && m_Adapter->IsInitialized();
+    }
+
+    EditorInputCaptureSnapshot
+    ImGuiEditorBridge::CaptureSnapshot() const noexcept
+    {
+        return m_Adapter != nullptr
+            ? m_Adapter->CaptureSnapshot()
+            : EditorInputCaptureSnapshot{};
+    }
+
+    const ImGuiAdapterDiagnostics*
+    ImGuiEditorBridge::Diagnostics() const noexcept
+    {
+        if (!m_Adapter)
+            return nullptr;
+        return &m_Adapter->GetDiagnostics();
+    }
+
+    const ImGuiAdapter& ImGuiEditorBridge::Adapter() const noexcept
+    {
+        return *m_Adapter;
+    }
+
+    AssetResidencyService::~AssetResidencyService() = default;
+
+    void AssetResidencyService::InitializeGpuCache(
+        Assets::AssetService& assets,
+        Graphics::IRenderer& renderer,
+        RHI::IDevice& device)
+    {
+        m_GpuAssetCache = std::make_unique<Graphics::GpuAssetCache>(
+            renderer.GetBufferManager(),
+            renderer.GetTextureManager(),
+            renderer.GetSamplerManager(),
+            device.GetTransferQueue());
+
+        if (Core::Result fallback =
+                InitializeRuntimeGpuAssetFallbackTexture(*m_GpuAssetCache,
+                                                         device);
+            !fallback.has_value())
+        {
+            Core::Log::Warn(
+                "[Runtime] GpuAssetCache fallback texture bootstrap failed: error={}; material code will use factor-only fallback.",
+                static_cast<int>(fallback.error()));
+        }
+
+        m_GpuAssetCacheListener = assets.SubscribeAll(
+            [cache = m_GpuAssetCache.get()](Assets::AssetId id,
+                                            Assets::AssetEvent ev)
+            {
+                switch (ev)
+                {
+                case Assets::AssetEvent::Failed:
+                    cache->NotifyFailed(id);
+                    break;
+                case Assets::AssetEvent::Reloaded:
+                    cache->NotifyReloaded(id);
+                    break;
+                case Assets::AssetEvent::Destroyed:
+                    cache->NotifyDestroyed(id);
+                    break;
+                case Assets::AssetEvent::Ready:
+                    // Type-specific handoffs drive RequestUpload.
+                    break;
+                }
+            });
+    }
+
+    void AssetResidencyService::InitializeSceneHandoffs(
+        Assets::AssetService& assets,
+        ECS::Scene::Registry& scene,
+        Graphics::IRenderer& renderer,
+        AssetResidencySceneHandoffOptions options)
+    {
+        m_AssetModelTextureHandoff =
+            std::make_unique<AssetModelTextureHandoff>(assets, Cache());
+
+        AssetModelSceneHandoffOptions modelSceneOptions{};
+        modelSceneOptions.ObjectSpaceNormalBakeQueue =
+            options.ObjectSpaceNormalBakeQueue;
+        modelSceneOptions.ObjectSpaceNormalBakeGraphicsBackendOperational =
+            options.ObjectSpaceNormalBakeGraphicsBackendOperational;
+
+        m_AssetModelSceneHandoff =
+            std::make_unique<AssetModelSceneHandoff>(
+                assets,
+                Cache(),
+                scene,
+                renderer,
+                std::move(modelSceneOptions));
+    }
+
+    Graphics::GpuAssetCache& AssetResidencyService::Cache() noexcept
+    {
+        return *m_GpuAssetCache;
+    }
+
+    const Graphics::GpuAssetCache&
+    AssetResidencyService::Cache() const noexcept
+    {
+        return *m_GpuAssetCache;
+    }
+
+    Graphics::GpuAssetCache* AssetResidencyService::CachePtr() noexcept
+    {
+        return m_GpuAssetCache.get();
+    }
+
+    const Graphics::GpuAssetCache*
+    AssetResidencyService::CachePtr() const noexcept
+    {
+        return m_GpuAssetCache.get();
+    }
+
+    AssetModelTextureHandoff*
+    AssetResidencyService::ModelTextureHandoff() noexcept
+    {
+        return m_AssetModelTextureHandoff.get();
+    }
+
+    const AssetModelTextureHandoff*
+    AssetResidencyService::ModelTextureHandoff() const noexcept
+    {
+        return m_AssetModelTextureHandoff.get();
+    }
+
+    AssetModelSceneHandoff*
+    AssetResidencyService::ModelSceneHandoff() noexcept
+    {
+        return m_AssetModelSceneHandoff.get();
+    }
+
+    const AssetModelSceneHandoff*
+    AssetResidencyService::ModelSceneHandoff() const noexcept
+    {
+        return m_AssetModelSceneHandoff.get();
+    }
+
+    void AssetResidencyService::TickAssets(
+        Assets::AssetService& assets,
+        const std::uint64_t currentFrame,
+        const std::uint32_t framesInFlight)
+    {
+        assets.Tick();
+        if (m_GpuAssetCache)
+            m_GpuAssetCache->Tick(currentFrame, framesInFlight);
+        if (m_AssetModelSceneHandoff)
+        {
+            static_cast<void>(
+                m_AssetModelSceneHandoff
+                    ->ResolvePendingMaterialTextureBindings());
+        }
+    }
+
+    void AssetResidencyService::DestroySceneBorrowers()
+    {
+        m_AssetModelSceneHandoff.reset();
+    }
+
+    void AssetResidencyService::DestroyAssets(Assets::AssetService* assets)
+    {
+        DestroySceneBorrowers();
+        m_AssetModelTextureHandoff.reset();
+        if (assets != nullptr &&
+            m_GpuAssetCacheListener != Assets::AssetEventBus::InvalidToken)
+        {
+            assets->UnsubscribeAll(m_GpuAssetCacheListener);
+            m_GpuAssetCacheListener = Assets::AssetEventBus::InvalidToken;
+        }
+        m_GpuAssetCache.reset();
+    }
+
     Engine::Engine(Core::Config::EngineConfig config,
                    std::unique_ptr<IApplication> application)
         : m_Config(std::move(config))
         , m_Application(std::move(application))
+        , m_ImGuiEditorBridge(std::make_unique<ImGuiEditorBridge>())
+        , m_AssetResidencyService(std::make_unique<AssetResidencyService>())
     {
         if (!m_Application)
             std::terminate();
@@ -233,6 +473,9 @@ namespace Extrinsic::Runtime
         requireProvide(m_ServiceRegistry.Provide<WorldRegistry>(
                            m_WorldRegistry, "Engine"),
                        "WorldRegistry");
+        requireProvide(m_ServiceRegistry.Provide<RenderExtractionCache>(
+                           m_RenderExtractionService.Cache(), "Engine"),
+                       "RenderExtractionCache");
 
         for (const std::unique_ptr<IRuntimeModule>& module : m_RuntimeModules)
         {
@@ -450,12 +693,12 @@ namespace Extrinsic::Runtime
     {
         if (m_Scene == nullptr)
         {
-            m_AssetResidencyService.DestroySceneBorrowers();
+            m_AssetResidencyService->DestroySceneBorrowers();
             m_SelectionController.SetStableEntityLookup(nullptr);
         }
         else
         {
-            m_AssetResidencyService.InitializeSceneHandoffs(
+            m_AssetResidencyService->InitializeSceneHandoffs(
                 *m_AssetService,
                 *m_Scene,
                 *m_Renderer,
@@ -473,11 +716,11 @@ namespace Extrinsic::Runtime
                 .Config = &m_Config,
                 .Streaming = m_AsyncWorkService.Streaming(),
                 .AssetService = m_AssetService.get(),
-                .GpuAssetCache = m_AssetResidencyService.CachePtr(),
+                .GpuAssetCache = m_AssetResidencyService->CachePtr(),
                 .ModelTextureHandoff =
-                    m_AssetResidencyService.ModelTextureHandoff(),
+                    m_AssetResidencyService->ModelTextureHandoff(),
                 .ModelSceneHandoff =
-                    m_AssetResidencyService.ModelSceneHandoff(),
+                    m_AssetResidencyService->ModelSceneHandoff(),
                 .RenderExtraction = &m_RenderExtractionService.Cache(),
                 .Scene = m_Scene,
                 .CameraControllers = &m_CameraControllers,
@@ -572,7 +815,7 @@ namespace Extrinsic::Runtime
 
         // RUNTIME-159: Dear ImGui overlay/adapter ownership lives behind the
         // bridge; Engine keeps only composition order and frame phase calls.
-        m_ImGuiEditorBridge.Initialize(*m_Window, *m_Renderer);
+        m_ImGuiEditorBridge->Initialize(*m_Window, *m_Renderer);
 
         // ── 2d. Render-world pool (GRAPHICS-036C) ─────────────────────────
         // Size the runtime-owned slot pool from the render config: one logical
@@ -594,14 +837,14 @@ namespace Extrinsic::Runtime
         m_AssetService = std::make_unique<Assets::AssetService>();
 
         // ── 5b. GPU asset residency ───────────────────────────────────────
-        m_AssetResidencyService.InitializeGpuCache(
+        m_AssetResidencyService->InitializeGpuCache(
             *m_AssetService,
             *m_Renderer,
             *m_Device);
 
         m_ObjectSpaceNormalBakeService.SetDependencies(
             ObjectSpaceNormalBakeServiceDependencies{
-                .GpuAssets = m_AssetResidencyService.CachePtr(),
+                .GpuAssets = m_AssetResidencyService->CachePtr(),
                 .RenderExtraction = &m_RenderExtractionService.Cache(),
                 .Device = m_Device.get(),
             });
@@ -671,7 +914,7 @@ namespace Extrinsic::Runtime
         if (m_Window)
             m_Window->Listen({});
 
-        m_ImGuiEditorBridge.Shutdown(m_Renderer.get());
+        m_ImGuiEditorBridge->Shutdown(m_Renderer.get());
         (void)m_JobServiceGpuQueueBridge.ShutdownParticipants(
             m_Renderer.get(),
             m_JobService,
@@ -810,7 +1053,7 @@ namespace Extrinsic::Runtime
                             m_FrameGraph,
                             m_AsyncWorkService,
                             m_AssetService,
-                            m_AssetResidencyService,
+                            *m_AssetResidencyService,
                             m_WorldRegistry,
                             m_Scene,
                             m_ReferenceSceneControl,
@@ -866,7 +1109,7 @@ namespace Extrinsic::Runtime
         const auto publishPacingSample = [&]()
         {
             if (const ImGuiAdapterDiagnostics* imguiDiagnostics =
-                    m_ImGuiEditorBridge.Diagnostics())
+                    m_ImGuiEditorBridge->Diagnostics())
             {
                 MirrorImGuiFramePacingDiagnostics(pacing, *imguiDiagnostics);
             }
@@ -997,7 +1240,7 @@ namespace Extrinsic::Runtime
         // before this point, so a NewFrame is never left without a matching
         // Render() in EndFrame.
         const auto imguiBegin = std::chrono::steady_clock::now();
-        m_ImGuiEditorBridge.BeginFrame(frameDt);
+        m_ImGuiEditorBridge->BeginFrame(frameDt);
         pacing.ImGuiBeginMicros = ElapsedMicros(imguiBegin);
 
         // ── Phase 3: Variable tick ────────────────────────────────────────
@@ -1018,14 +1261,14 @@ namespace Extrinsic::Runtime
         // draw upload + recorded Pass.ImGui execution remain later GRAPHICS-079
         // slices.
         const auto imguiEnd = std::chrono::steady_clock::now();
-        m_ImGuiEditorBridge.EndFrame();
+        m_ImGuiEditorBridge->EndFrame();
         pacing.ImGuiEndMicros = ElapsedMicros(imguiEnd);
         preRenderTransformFlushNeeded =
             preRenderTransformFlushNeeded ||
             HasPendingPreRenderTransformFlush(*m_Scene);
 
         const EditorInputCaptureSnapshot editorCapture =
-            m_ImGuiEditorBridge.CaptureSnapshot();
+            m_ImGuiEditorBridge->CaptureSnapshot();
         const bool imguiCapturesMouse =
             editorCapture.CapturedMouse || editorCapture.WidgetsActive;
         const bool imguiCapturesKeyboard =
@@ -1144,7 +1387,7 @@ namespace Extrinsic::Runtime
         RuntimeRenderFrameHooks renderHooks(*m_Renderer,
                                             *m_Scene,
                                             m_RenderExtractionService.Cache(),
-                                            m_AssetResidencyService.CachePtr(),
+                                            m_AssetResidencyService->CachePtr(),
                                             m_SelectionController,
                                             m_RenderExtractionService.Pool(),
                                             m_Config.Render.SynchronousExtraction,
@@ -1182,7 +1425,7 @@ namespace Extrinsic::Runtime
         TransferHooks transferHooks(*m_Device);
         StreamingHooks streamingHooks(m_AsyncWorkService);
         AssetHooks assetHooks(*m_AssetService,
-                              m_AssetResidencyService,
+                              *m_AssetResidencyService,
                               *m_Device,
                               m_RenderExtractionService.Cache(),
                               *m_Renderer);
@@ -1288,7 +1531,7 @@ namespace Extrinsic::Runtime
     Assets::AssetService& Engine::GetAssetService()  noexcept { return *m_AssetService;  }
     Graphics::GpuAssetCache& Engine::GetGpuAssetCache() noexcept
     {
-        return m_AssetResidencyService.Cache();
+        return m_AssetResidencyService->Cache();
     }
     AssetImportPipeline& Engine::GetAssetImportPipeline() noexcept
     {
@@ -1351,40 +1594,10 @@ namespace Extrinsic::Runtime
         return m_RenderExtractionService.LastStats();
     }
 
-    std::optional<Graphics::GpuGeometryHandle>
-    Engine::FindSurfaceGpuGeometry(
-        const std::uint32_t stableEntityId) const noexcept
-    {
-        const auto availability =
-            m_RenderExtractionService.Cache().FindGpuRenderableAvailability(
-                stableEntityId);
-        if (!availability.has_value() ||
-            !availability->Surface.HasGeometry)
-        {
-            return std::nullopt;
-        }
-        return availability->Surface.Geometry;
-    }
-
-    std::optional<Graphics::MaterialTextureAssetBindings>
-    Engine::GetMaterialTextureAssetBindings(
-        const std::uint32_t stableEntityId) const noexcept
-    {
-        return m_RenderExtractionService.Cache()
-            .GetMaterialTextureAssetBindings(stableEntityId);
-    }
-
     const RuntimeFramePacingDiagnostics&
     Engine::GetLastFramePacingDiagnostics() const noexcept
     {
         return m_LastFramePacingDiagnostics;
-    }
-
-    std::optional<Graphics::MaterialTextureAssetBindings>
-    Engine::GetMaterialTextureAssetBindingsForTest(
-        const std::uint32_t stableEntityId) const noexcept
-    {
-        return GetMaterialTextureAssetBindings(stableEntityId);
     }
 
     RuntimeInputActionHandle Engine::RegisterInputAction(
@@ -1558,16 +1771,16 @@ namespace Extrinsic::Runtime
 
     void Engine::SetImGuiEditorCallback(std::function<void()> callback)
     {
-        m_ImGuiEditorBridge.SetEditorCallback(std::move(callback));
+        m_ImGuiEditorBridge->SetEditorCallback(std::move(callback));
     }
 
     void Engine::SetImGuiEditorVisible(const bool visible) noexcept
     {
-        m_ImGuiEditorBridge.SetEditorVisible(visible);
+        m_ImGuiEditorBridge->SetEditorVisible(visible);
     }
 
     const ImGuiAdapter& Engine::GetImGuiAdapter() const noexcept
     {
-        return m_ImGuiEditorBridge.Adapter();
+        return m_ImGuiEditorBridge->Adapter();
     }
 }

@@ -31,7 +31,7 @@
 - **Decision**: `Runtime.Engine` keeps asset lifecycle/frame ordering and public asset/GPU-cache compatibility facades, while GPU asset cache construction/listener ownership, fallback bootstrap delegation, model texture/model scene handoff ownership, maintenance ticks, and teardown ordering live in the Engine-private `AssetResidencyService` implementation glue.
 - **Provenance**: ai-suggested
 - **Crystallized via**: artifact-commitment
-- **Evidence**: [src/runtime/Runtime.AssetResidencyService.Internal.hpp], [src/runtime/Runtime.AssetResidencyService.cpp], [tasks/archive/RUNTIME-164-extract-asset-residency-service.md], [tasks/done/RUNTIME-171-privatize-asset-residency-service-surface.md]
+- **Evidence**: [src/runtime/Runtime.AssetResidencyService.Internal.hpp], [src/runtime/Runtime.Engine.cpp], [tasks/archive/RUNTIME-164-extract-asset-residency-service.md], [tasks/done/RUNTIME-171-privatize-asset-residency-service-surface.md]
 - **From staging**: O07
 
 ## A06: App-Owned Sandbox Method Presentation Over Runtime Facades

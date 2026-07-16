@@ -20,20 +20,14 @@ import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.Core.Geometry2D;
-import Extrinsic.Asset.EventBus;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.GpuAssetCache;
-import Extrinsic.Graphics.GpuWorld;
-import Extrinsic.Graphics.ImGuiOverlaySystem;
-import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.AsyncWorkService;
-import Extrinsic.Runtime.AssetModelSceneHandoff;
-import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.AssetImportPipeline;
@@ -47,7 +41,6 @@ import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ModuleSchedule;
-import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeService;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ReferenceScene;
@@ -65,12 +58,13 @@ import Extrinsic.Asset.Service;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Scene.Registry;
 
-#include "Runtime.ImGuiEditorBridge.Internal.hpp"
-#include "Runtime.AssetResidencyService.Internal.hpp"
 #include "Runtime.RenderExtractionService.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {
+    class AssetResidencyService;
+    class ImGuiEditorBridge;
+
     export class Engine;
 
     // ============================================================
@@ -300,14 +294,6 @@ namespace Extrinsic::Runtime
         // Zero-initialized until the first frame extracts.
         [[nodiscard]] const RuntimeRenderExtractionStats&
             GetLastRenderExtractionStats() const noexcept;
-        [[nodiscard]] std::optional<Graphics::GpuGeometryHandle>
-            FindSurfaceGpuGeometry(std::uint32_t stableEntityId) const noexcept;
-        [[nodiscard]] std::optional<Graphics::MaterialTextureAssetBindings>
-            GetMaterialTextureAssetBindings(
-                std::uint32_t stableEntityId) const noexcept;
-        [[nodiscard]] std::optional<Graphics::MaterialTextureAssetBindings>
-            GetMaterialTextureAssetBindingsForTest(std::uint32_t stableEntityId) const noexcept;
-
         // ── Reference scene seam (GRAPHICS-029A/B) ────────────────────────
         // Accessible before Initialize() so tests and downstream impl
         // children register providers prior to subsystem wiring. After
@@ -382,7 +368,7 @@ namespace Extrinsic::Runtime
         // RUNTIME-159 — runtime-side Dear ImGui overlay/adapter/callback
         // bridge. Declared after m_Renderer / before render extraction so the
         // borrowed renderer overlay attachment is cleared before teardown.
-        ImGuiEditorBridge                    m_ImGuiEditorBridge{};
+        std::unique_ptr<ImGuiEditorBridge>   m_ImGuiEditorBridge;
         // RUNTIME-163 — render extraction owner state and compatibility facades.
         // Engine keeps frame ordering and dependent-subsystem wiring; the service
         // owns the cache, pool, last stats, and frame-index counter.
@@ -421,7 +407,7 @@ namespace Extrinsic::Runtime
         // RUNTIME-164 — GPU-side asset residency owner state. Engine keeps
         // lifecycle/frame ordering and public facades; the service owns the
         // cache, asset-event listener, model handoffs, and cache/handoff ticks.
-        AssetResidencyService                    m_AssetResidencyService{};
+        std::unique_ptr<AssetResidencyService>   m_AssetResidencyService;
         ObjectSpaceNormalBakeService             m_ObjectSpaceNormalBakeService{};
         std::unique_ptr<AssetImportPipeline>      m_AssetImportPipeline;
         std::unique_ptr<SceneDocument>            m_SceneDocument;

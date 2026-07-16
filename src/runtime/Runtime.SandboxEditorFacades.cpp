@@ -10394,6 +10394,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] SandboxEditorParameterizationUvViewState
         SubmitEngineParameterizationUvView(
             Engine& engine,
+            const RenderExtractionCache* renderExtraction,
             SandboxEditorParameterizationUvViewRequest request)
         {
             using ConfigBackground =
@@ -10432,8 +10433,18 @@ namespace Extrinsic::Runtime
                 return state;
             }
 
-            const std::optional<Graphics::GpuGeometryHandle> geometry =
-                engine.FindSurfaceGpuGeometry(request.StableEntityId);
+            std::optional<Graphics::GpuGeometryHandle> geometry{};
+            if (renderExtraction != nullptr)
+            {
+                const auto availability =
+                    renderExtraction->FindGpuRenderableAvailability(
+                        request.StableEntityId);
+                if (availability.has_value() &&
+                    availability->Surface.HasGeometry)
+                {
+                    geometry = availability->Surface.Geometry;
+                }
+            }
             if (geometry.has_value())
             {
                 MixSandboxUvViewToken(state.RequestToken, geometry->Index);
@@ -10447,10 +10458,12 @@ namespace Extrinsic::Runtime
             RHI::BindlessIndex backgroundTexture =
                 RHI::kInvalidBindlessIndex;
             std::uint64_t backgroundTextureGeneration = 0u;
-            if (request.View.BackgroundMode == ConfigBackground::Texture)
+            if (renderExtraction != nullptr &&
+                request.View.BackgroundMode == ConfigBackground::Texture)
             {
-                const auto bindings = engine.GetMaterialTextureAssetBindings(
-                    request.StableEntityId);
+                const auto bindings =
+                    renderExtraction->GetMaterialTextureAssetBindings(
+                        request.StableEntityId);
                 if (bindings.has_value() && bindings->Albedo.IsValid())
                 {
                     const auto view =
@@ -10562,6 +10575,8 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] SandboxEditorContext BuildContextFromEngine(Engine& engine)
         {
+            const RenderExtractionCache* renderExtraction =
+                engine.Services().Find<RenderExtractionCache>();
             return SandboxEditorContext{
                 .Scene = &engine.GetScene(),
                 .Selection = &engine.GetSelectionController(),
@@ -10772,11 +10787,12 @@ namespace Extrinsic::Runtime
                 .ParameterizationUvViewCommands =
                     SandboxEditorParameterizationUvViewCommandSurface{
                         .Submit =
-                            [&engine](
+                            [&engine, renderExtraction](
                                 SandboxEditorParameterizationUvViewRequest request)
                             {
                                 return SubmitEngineParameterizationUvView(
                                     engine,
+                                    renderExtraction,
                                     std::move(request));
                             },
                     },

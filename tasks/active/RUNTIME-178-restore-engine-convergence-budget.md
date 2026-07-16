@@ -9,10 +9,16 @@ maturity_target: Operational
 
 ## Status
 
-- In progress on 2026-07-16; owner: Codex; branch:
+- Completed on 2026-07-16 at maturity `Operational`; owner: Codex; branch:
   `codex/arch-006-completion`.
-- Design audit complete; next gate: implement the two opaque Engine members,
-  registered render-extraction cache query, and exact policy ratchet.
+- The exact convergence snapshot is 42 plain imports / 21 domain imports /
+  31 getter names with two re-exports and no temporary debt. Focused runtime
+  coverage passed 165/165, the default CPU-supported gate passed 3,785/3,785,
+  and both required promoted-Vulkan UV tests executed without skips and passed.
+- The first loaded CPU-gate attempt exposed two unrelated harness defects:
+  existing `BUG-088` owns the benchmark timeout, and `BUG-092` owns the
+  frame-count-only asynchronous scene-save wait. Both failed checks passed in
+  isolation, and the clean uncontended full gate passed.
 
 ## Goal
 
@@ -47,6 +53,13 @@ maturity_target: Operational
   members at their existing Engine member positions; `RenderExtractionService`
   stays by value because its `RenderExtraction` and `RenderWorldPool` imports
   are independently required by public Engine APIs.
+- A named-module ODR audit rejected textually including either private class
+  definition in multiple Engine implementation units: the ordinary identical-
+  header exception does not apply to definitions attached to a named module.
+  Their low-fanout member implementations therefore co-locate in the single
+  `Runtime.Engine.cpp` include owner, and the two standalone private-service
+  `.cpp` files leave CMake. This avoids both an ill-formed-no-diagnostic-
+  required shape and a new private BMI.
 - Register the existing Engine-owned `RenderExtractionCache` instance in the
   existing `ServiceRegistry`. `SandboxEditorFacades` can resolve that stable
   cache once per prepared context for the UV command instead of adding a new
@@ -63,8 +76,10 @@ maturity_target: Operational
 ## Right-sizing
 
 - Two focused opaque members remove five otherwise-private declaration imports
-  while preserving each member's position and teardown order. Pimpling
-  `RenderExtractionService` buys no import reduction and is rejected.
+  while preserving each member's position and teardown order. Their small
+  implementations co-locate in the existing Engine implementation unit to keep
+  each named-module class definition unique. Pimpling `RenderExtractionService`
+  buys no import reduction and is rejected.
 - Reuse the existing `ServiceRegistry` and existing `RenderExtractionCache`;
   do not add a UV callback, dependency record, wrapper service, registry, BMI,
   or aggregate Engine pimpl.
@@ -74,41 +89,41 @@ maturity_target: Operational
 - [x] Audit the direct dependencies needed for the three private Engine
       declaration headers and the `GRAPHICS-122` UV-view material-binding
       query, including lifetime and facade consumers.
-- [ ] Make `ImGuiEditorBridge` and `AssetResidencyService` opaque Engine-owned
+- [x] Make `ImGuiEditorBridge` and `AssetResidencyService` opaque Engine-owned
       `unique_ptr` members at their existing positions; construct and destroy
       them out of line without changing lifecycle order.
-- [ ] Register the existing `RenderExtractionCache` instance as a borrowed
+- [x] Register the existing `RenderExtractionCache` instance as a borrowed
       service and route the UV facade query through it; remove both production
       UV Engine methods and the test-only material-binding getter.
-- [ ] Reduce `Runtime.Engine.cppm` to `<=42` plain imports, `<=21` domain
+- [x] Reduce `Runtime.Engine.cppm` to `<=42` plain imports, `<=21` domain
       imports, and `<=31` public getter names without restoring retired module
       surfaces.
-- [ ] Ratchet `kernel_convergence_policy.json` and the dated architecture
+- [x] Ratchet `kernel_convergence_policy.json` and the dated architecture
       snapshot in the same change.
 
 ## Tests
 
-- [ ] Focused Engine-private-glue, asset residency, render extraction, ImGui,
+- [x] Focused Engine-private-glue, asset residency, render extraction, ImGui,
       Sandbox parameterization, and UV-view CPU contracts pass.
-- [ ] ServiceRegistry coverage proves the registered cache identity; removed
+- [x] ServiceRegistry coverage proves the registered cache identity; removed
       getter tests query that owner directly; copied UV commands still fail
       closed across detach/reattach.
-- [ ] The delivered `GRAPHICS-122` opt-in Vulkan UV-view smoke passes on an
+- [x] The delivered `GRAPHICS-122` opt-in Vulkan UV-view smoke passes on an
       operational promoted-Vulkan host.
-- [ ] The kernel-convergence checker and default CPU-supported gate pass.
+- [x] The kernel-convergence checker and default CPU-supported gate pass.
 
 ## Docs
 
-- [ ] Update the kernel target-state snapshot and runtime ownership docs for
+- [x] Update the kernel target-state snapshot and runtime ownership docs for
       the selected dependency/lifetime shape.
-- [ ] Regenerate the module inventory if any module surface changes.
+- [x] Regenerate the module inventory if any module surface changes.
 
 ## Acceptance criteria
 
-- [ ] Plain imports are `<=42`, domain imports are `<=21`, public getter names
+- [x] Plain imports are `<=42`, domain imports are `<=21`, public getter names
       are `<=31`, and `temporary_debt` is null under the authoritative checker.
-- [ ] No retired service BMI or compatibility re-export returns.
-- [ ] Existing runtime teardown order and the operational GPU UV-view path are
+- [x] No retired service BMI or compatibility re-export returns.
+- [x] Existing runtime teardown order and the operational GPU UV-view path are
       preserved.
 
 ## Verification

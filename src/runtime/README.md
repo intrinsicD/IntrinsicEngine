@@ -1254,6 +1254,22 @@ owns the live cache instance, pool, last stats, and frame-index counter that
 `Engine` composes into the frame loop; it does not change the extraction
 algorithms or renderer-owned resource policy.
 
+`RUNTIME-178` keeps the private-service declaration cost out of the Engine
+interface without changing lifecycle order. `ImGuiEditorBridge` and
+`AssetResidencyService` remain at their established Engine member positions,
+but are held as opaque `std::unique_ptr` values whose private headers are
+included only by `Runtime.Engine.cpp`; their low-fanout member implementations
+are co-located there so each class definition is attached to the named module
+exactly once without adding a private BMI. `RenderExtractionService` stays
+by value because the Engine API independently requires its public extraction
+and render-world-pool types. During module-service registration, Engine
+provides that service's existing `RenderExtractionCache` instance as a borrowed
+`ServiceRegistry` entry. Sandbox UV-view composition resolves the stable cache
+once when it builds an attached editor context and queries geometry/material
+availability directly; copied command surfaces remain bounded by the existing
+attachment-epoch guard, and a missing cache fails closed to the CPU-layout
+fallback. No service BMI, wrapper, or additional Engine facade is introduced.
+
 For direct mesh imports that stay on the runtime-authored `GeometrySources`
 residency lane, extraction also accepts data-only
 `Graphics::MaterialTextureAssetBindings` keyed by stable render id. The engine's
