@@ -6,6 +6,28 @@ maturity_target: Operational
 ---
 # BUG-100 — Manual geometry import blocks the Sandbox frame loop
 
+## Status
+
+- In progress on 2026-07-16; owner: Codex runtime worker; branch:
+  `agent/sandbox-model-workflow-completion`.
+- Next gate: a real Null-window manual geometry command returns `Pending`,
+  advances frames while decode is blocked, then applies exactly once.
+
+## Right-sizing note
+
+- Element: the existing dropped-geometry streaming helper and the manual
+  geometry synchronous branch currently duplicate one behavioral route.
+- Simpler alternative: generalize the existing runtime helper with the source
+  and explicit payload hint it already needs; add no executor, queue, service,
+  facade, or app-owned worker. The current executor stays because the real
+  cross-thread lifetime boundary is load-bearing.
+- Blast radius: runtime import composition/facade wiring, its public queued
+  result only if strictly necessary, focused runtime/Sandbox tests, and the two
+  consumer docs; layering remains `runtime`-owned.
+- Reintroduction trigger: a second queue is justified only if a future active
+  task requires materially different execution, cancellation, or apply-thread
+  semantics that the shared lane cannot represent.
+
 ## Goal
 
 - Route Sandbox manual Mesh, Graph, and PointCloud file imports through the

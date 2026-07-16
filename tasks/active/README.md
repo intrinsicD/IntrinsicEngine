@@ -23,6 +23,10 @@ Each active task should include:
   (`in-progress`; owner: Codex geometry worker; branch:
   `agent/sandbox-model-workflow-completion`). The next gate is deterministic
   near-linear grouping plus declared, baseline-compared scaling evidence.
+- [BUG-100 — Manual geometry import blocks the Sandbox frame loop](BUG-100-manual-geometry-import-blocks-frame-loop.md)
+  (`in-progress`; owner: Codex runtime worker; branch:
+  `agent/sandbox-model-workflow-completion`). The next gate is a real
+  Null-window queued import that advances frames across a blocked decode.
 
 ## History
 

@@ -10,6 +10,7 @@ the authoritative open/unblocked view.
 
 - `BUG-098` — Frame clock samples an incomplete frame delta (tasks/active/BUG-098-frame-clock-samples-incomplete-frame-delta.md)
 - `BUG-099` — Binary PLY point-cloud import rejects face-list elements (tasks/active/BUG-099-binary-ply-pointcloud-skips-face-lists.md)
+- `BUG-100` — Manual geometry import blocks the Sandbox frame loop (tasks/active/BUG-100-manual-geometry-import-blocks-frame-loop.md)
 - `BUG-101` — Fast-staged UV edge grouping is quadratic (tasks/active/BUG-101-fast-staged-uv-edge-grouping-quadratic.md)
 
 ## Theme B — Rendering modernization
@@ -56,7 +57,6 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-095` — Direct-mesh postprocess can overwrite newer editor geometry (tasks/backlog/bugs/BUG-095-direct-mesh-postprocess-stale-overwrite.md)
 - unblocked: `BUG-096` — ICP point-to-plane ignores target normals (tasks/backlog/bugs/BUG-096-icp-point-to-plane-target-normals.md)
 - unblocked: `BUG-097` — Progressive model-scene UV job publishes a zero atlas (tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md)
-- unblocked: `BUG-100` — Manual geometry import blocks the Sandbox frame loop (tasks/backlog/bugs/BUG-100-manual-geometry-import-blocks-frame-loop.md)
 
 ## Theme H — Agentic workflow hardening
 

@@ -9,7 +9,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   fast-staged atlas generation linearly scans all prior edge groups for every
   triangle incidence and rebuilds the same groups for seam recording, leaving
   dense direct-mesh enrichment CPU-hot and shutdown waiting for minutes.
-- [`BUG-100` — Manual geometry import blocks the Sandbox frame loop](BUG-100-manual-geometry-import-blocks-frame-loop.md):
+- [`BUG-100` — Manual geometry import blocks the Sandbox frame loop](../../active/BUG-100-manual-geometry-import-blocks-frame-loop.md):
   File / Import queues model/texture payloads but calls the synchronous API for
   Mesh/Graph/PointCloud, freezing ImGui during large reads/decodes despite an
   existing deferred dropped-geometry path.
