@@ -10,10 +10,11 @@ maturity_target: CPUContracted
 
 ## Status
 
-- Implementation and verification completed on 2026-07-16; owner: Codex;
-  branch: `codex/arch-006-completion`.
-- Next gate: commit the verified implementation, then retire the task at
-  `CPUContracted`.
+- Completed on 2026-07-16 at `CPUContracted`.
+- Implementation commit: `e8033e11`.
+- Verification: focused queue/facade/lifetime coverage passed `31/31`, and the
+  final default CPU-supported gate passed `3785/3785` after a successful
+  `IntrinsicTests` build. Strict structural/review gates passed.
 
 ## Goal
 - Remove `Extrinsic.Runtime.KMeansGpuJobQueue` as a broadly importable runtime

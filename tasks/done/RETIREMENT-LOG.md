@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-173`](RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md) — the
+Sandbox-session-only K-Means GPU job queue surface retired on 2026-07-16 at
+`CPUContracted`. Implementation commit `e8033e11` moves the unchanged queue
+declaration into module-private Sandbox facade glue and reattaches its unchanged
+implementation to `Extrinsic.Runtime.SandboxEditorFacades`; the genuine public
+request/submission/result/status records remain on that facade. Named-module
+importers drop from nine to zero, runtime modules from 80 to 79, and repository
+modules from 387 to 386. The dedicated privacy guard and stale-copied-surface
+regression preserve ownership and attachment-epoch fail-closed behavior;
+focused coverage passed 31/31 and the default CPU-supported gate passed
+3,785/3,785 in 399.36 seconds after a successful full build. Strict structural
+and clean-workshop checks passed, and independent design, lifetime,
+mechanical-equivalence, and right-sizing reviews found no blockers. Compile
+timings remain diagnostic only; no aggregate speedup or new Vulkan operational
+claim is made.
+
 [`RUNTIME-171`](RUNTIME-171-privatize-asset-residency-service-surface.md) — the
 Engine-only asset residency service module surface retired on 2026-07-16 at
 `Operational`. Implementation commit `1384228f` replaces the standalone

@@ -11,11 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [RUNTIME-173 — Privatize the K-Means GPU job queue surface](RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md)
-  (`in-progress`; owner: Codex; branch: `codex/arch-006-completion`). The
-  Sandbox-session-only queue class is moving behind the existing Sandbox editor
-  facade while its request/result DTO contract remains public; next gate is the
-  focused Sandbox, K-Means, and JobService build.
+No tasks are currently active.
 
 ## History
 

@@ -193,12 +193,12 @@ main `Runtime.RenderExtraction` module slimming.
 - [`RUNTIME-172`](RUNTIME-172-privatize-scene-document-surface.md) —
   reduce or retire the exported scene document orchestration surface after
   `RUNTIME-148`.
-- [`RUNTIME-173`](../../active/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md) —
-  move the K-Means GPU job queue behind the editor/module integration seam after
-  `RUNTIME-137`; active on `codex/arch-006-completion`.
-
 ### Retired module-surface diet work
 
+- [`RUNTIME-173`](../../done/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md)
+  retired the Sandbox-session-only K-Means GPU queue into private facade-module
+  glue at `CPUContracted`, retaining the request/submission/result DTO contract
+  on `SandboxEditorFacades` while removing one standalone module/BMI surface.
 - [`RUNTIME-171`](../../done/RUNTIME-171-privatize-asset-residency-service-surface.md)
   retired the Engine-only asset residency service into private Engine module
   glue at `Operational`, preserving cache/listener/model-handoff ownership,

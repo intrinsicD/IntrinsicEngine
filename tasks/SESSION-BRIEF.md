@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-173` — Privatize the K-Means GPU job queue surface (tasks/active/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md)
+- none
 
 ## Theme B — Rendering modernization
 
