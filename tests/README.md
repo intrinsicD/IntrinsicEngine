@@ -53,6 +53,15 @@ regularly exceed one second of wall-clock time on the reference Linux-clang
 runner. Do not add `slow` to pure CPU unit or contract suites merely because
 they contain many cheap cases.
 
+The 22-result `IntrinsicBenchmarkSmoke.Run` → `.Validate` fixture pair is an
+explicit example: it remains in the complete aggregate with a 120-second runner
+bound, but is `benchmark;slow` and therefore outside the default CPU-supported
+gate. The required `ci-bench-smoke` pull-request workflow still runs the full
+aggregate under its own two-minute runner-step bound, strictly validates every
+emitted JSON, and retains the complete result directory. The hosted timing
+population and ownership rationale are recorded in the
+[benchmark CI policy](../docs/benchmarking/ci-policy.md#monolithic-smoke-ownership-and-budget).
+
 Use `flaky-quarantine` only as a temporary quarantine. Any test or executable
 with this label must have a linked task ID, a reason, and a removal condition in
 the relevant source or task record.

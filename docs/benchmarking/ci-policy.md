@@ -8,6 +8,46 @@ Benchmark execution is split by cost so CI remains fast while still guarding qua
 - Enforce strict runtime budget.
 - Validate benchmark result JSON schema.
 
+### Monolithic smoke ownership and budget
+
+The required `ci-bench-smoke` pull-request workflow owns execution of the
+22-result `IntrinsicBenchmarkSmoke` aggregate. It builds and runs the
+`IntrinsicBenchmarks` target, then invokes strict result validation before
+uploading the complete result directory. Its runner step has a two-minute
+bound. The matching CTest `Run` → `Validate` fixture pair remains available
+for explicit local/nightly selection, but carries the
+`benchmark;geometry;graphics;physics;slow` labels. The opt-in CTest runner uses
+the same 120-second slow-test limit; the CTest schema validator retains its
+focused 30-second limit. Consequently, the default CPU-supported `-LE slow`
+gate does not execute the same monolithic workload concurrently with thousands
+of correctness tests.
+
+`BUG-088` classified the pair from seven same-branch `ubuntu-24.04`, Clang 20,
+`ci`-preset gate-timing artifacts rather than a passing retry. The measured
+`IntrinsicBenchmarks` workflow execution phases (including build-tool
+orchestration) were:
+
+| Workflow run | Workflow execution phase |
+| --- | ---: |
+| [`29519782520`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29519782520) | 38.167 s |
+| [`29521730126`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29521730126) | 27.157 s |
+| [`29522214318`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29522214318) | 37.551 s |
+| [`29524873009`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29524873009) | 35.097 s |
+| [`29526309315`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29526309315) | 34.947 s |
+| [`29531364487`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29531364487) | 37.893 s |
+| [`29532745089`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29532745089) | 37.203 s |
+
+The conventional median is 37.203 seconds and nearest-rank p95 is the observed
+38.167-second maximum. Six of seven valid workflow phases took longer than 30
+seconds, corroborating that duplicate execution does not belong in the fast
+default lane; these aggregate phase measurements are not direct CTest-process
+timings. On the same final source, required CPU
+[`run 29532745081`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29532745081)
+timed out the duplicate at 30.04 seconds while the dedicated benchmark lane
+completed and strictly validated all 22 results. These numbers justify lane
+classification only; they are not a kernel-performance comparison or speedup
+claim.
+
 ## Nightly/deep expectations
 
 - Run deeper correctness/performance suites.

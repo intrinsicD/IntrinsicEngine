@@ -22,7 +22,8 @@ depends_on: []
 
 ## Non-goals
 - No retry-until-green behavior.
-- No warning-only benchmark validation or removal from aggregate builds.
+- No warning-only benchmark validation or removal from the complete
+  `IntrinsicTests` build aggregate or dedicated benchmark workflow.
 - No performance claim or benchmark-kernel tuning without baseline evidence.
 - No timeout increase based on this single loaded-host observation alone.
 
@@ -41,49 +42,83 @@ depends_on: []
   `benchmark;geometry;graphics;physics` without `slow`, so the standard
   `-LE 'gpu|vulkan|slow|flaky-quarantine'` gate includes it.
 - Current evidence is stronger than a single contended observation. Seven
-  successful same-branch hosted `ci-bench-smoke` result artifacts report runner
-  phase times of 38.167, 27.157, 37.551, 35.097, 34.947, 37.893, and 37.203
-  seconds. The conventional median is 37.203 seconds and nearest-rank p95 is
-  38.167 seconds; six of seven valid isolated-lane runs exceed the 30-second
-  CTest limit. The final-head full CPU gate timed out at 30.04 seconds while the
+  successful same-branch hosted `ci-bench-smoke` gate-timing artifacts record
+  `IntrinsicBenchmarks` workflow execution phases of 38.167, 27.157, 37.551,
+  35.097, 34.947, 37.893, and 37.203 seconds. The conventional median is 37.203
+  seconds and nearest-rank p95 is 38.167 seconds. These phases include
+  build-tool orchestration and are not direct CTest-process timings; they show
+  that duplicate aggregate execution does not belong in the fast default lane.
+  The final-head full CPU gate directly timed out at 30.04 seconds while the
   dedicated benchmark lane on the same head completed and strictly validated
   all 22 outputs.
 
 ## Required changes
 - [x] Collect representative isolated-lane and full-suite timings for the 22-result
       smoke, retaining per-result timing/diagnostics and host context.
-- [ ] Choose the smallest evidence-backed correction: make the aggregate
+- [x] Choose the smallest evidence-backed correction: make the aggregate
       genuinely PR-fast, split it into bounded shards, or route it through the
       documented slow/heavy lane with an appropriate timeout.
-- [ ] Preserve the Run→Validate fixture dependency so missing or partial result
-      sets cannot produce a green validation step.
+- [x] Preserve the Run→Validate fixture dependency so a failed producer cannot
+      produce a green validation step; retain strict validation of every JSON
+      emitted by a successful producer.
 
 ## Tests
-- [ ] Add registration-policy coverage for the selected labels, timeout, and
+- [x] Add registration-policy coverage for the selected labels, timeout, and
       Run→Validate fixture relationship.
-- [ ] Demonstrate repeated clean and loaded-host runs stay inside the selected
-      lane's declared budget and still fail nonzero for invalid result JSON.
+- [x] Demonstrate repeated dedicated-lane and local opt-in runs stay inside the
+      selected lane's declared budget and still fail nonzero for invalid result
+      JSON.
 
 ## Docs
-- [ ] Record the PR-fast versus slow/nightly classification and timing evidence
+- [x] Record the PR-fast versus slow/nightly classification and timing evidence
       in the benchmark/testing policy docs.
 - [ ] Update this bug index and retirement log when the correction is verified.
 
 ## Acceptance criteria
-- [ ] A representative timing population, not one retry, justifies the final
+- [x] A representative timing population, not one retry, justifies the final
       route and timeout.
-- [ ] The default CPU gate no longer flakes from ordinary contention, or the
+- [x] The default CPU gate no longer flakes from ordinary contention, or the
       smoke is explicitly and correctly classified outside that PR-fast lane.
-- [ ] Strict validation still runs after every successful smoke and rejects
-      missing, malformed, or schema-invalid results.
+- [x] Strict validation still runs after every successful smoke and rejects a
+      missing result root plus malformed or schema-invalid emitted results.
+- [ ] Exact implementation-head `ci-linux-clang`, `ci-bench-smoke`, and
+      `ci-docs`/`docs-validation` checks pass before retirement.
 
 ## Verification
 ```bash
-cmake --build --preset ci --target IntrinsicBenchmarkSmoke
-ctest --test-dir build/ci --output-on-failure -V -R '^IntrinsicBenchmarkSmoke\.(Run|Validate)$'
+python3 tests/regression/tooling/Test.CiTiming.py
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -L benchmark -L slow \
+  -R '^IntrinsicBenchmarkSmoke\.(Run|Validate)$' --timeout 120
+ctest --test-dir build/ci --output-on-failure \
+  -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/benchmark/validate_benchmark_results.py --root build/ci/benchmark-ctest/IntrinsicBenchmarkSmokeTest --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+Local verification on 2026-07-16:
+
+- The new registration-policy regression failed before the CMake correction
+  because `slow` was absent, then passed with the complete tooling suite
+  (14/14).
+- Fresh `ci` configuration generated `slow` on the target and both fixture
+  tests, a 120-second runner timeout, the retained 30-second validator timeout,
+  and the original setup/required fixture relationship. `IntrinsicTests` still
+  contains the executable while `IntrinsicCpuTests` and the default CPU test
+  selector exclude it.
+- A clean `IntrinsicTests` build completed, and the default CPU-supported gate
+  passed all 3,789 selected tests in 412.89 seconds without selecting the slow
+  benchmark fixture pair.
+- The opt-in fixture pair passed (runner 19.40 seconds; strict validator 0.02
+  seconds), and independent strict validation accepted all 22 emitted results.
+- The benchmark result-validator regression remains fail closed for a missing
+  result root and for malformed or schema-invalid emitted results. Producer
+  failures remain fail closed through the CTest fixture and workflow command
+  exit status; the generic validator does not assert a runner-specific ID set.
+- Final hosted exact-head `ci-linux-clang`, `ci-bench-smoke`, and
+  `ci-docs`/`docs-validation` results remain required before retirement; the
+  latter owns the new result-validator regression cases.
 
 ## Forbidden changes
 - Silently excluding the smoke from all CI lanes.
