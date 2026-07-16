@@ -6,6 +6,13 @@ maturity_target: Operational
 ---
 # BUG-101 — Fast-staged UV edge grouping is quadratic
 
+## Status
+
+- In progress on 2026-07-16; owner: Codex geometry worker; branch:
+  `agent/sandbox-model-workflow-completion`.
+- Next gate: deterministic near-linear edge grouping, reuse in seam recording,
+  and declared scaling evidence against a comparable baseline.
+
 ## Goal
 
 - Make fast-staged UV source-edge grouping scale near-linearly with triangle

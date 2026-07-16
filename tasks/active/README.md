@@ -19,6 +19,10 @@ Each active task should include:
   (`in-progress`; owner: Codex geometry worker; branch:
   `agent/sandbox-model-workflow-completion`). The next gate is endian-safe
   non-vertex list consumption plus malformed binary PLY regressions.
+- [BUG-101 — Fast-staged UV edge grouping is quadratic](BUG-101-fast-staged-uv-edge-grouping-quadratic.md)
+  (`in-progress`; owner: Codex geometry worker; branch:
+  `agent/sandbox-model-workflow-completion`). The next gate is deterministic
+  near-linear grouping plus declared, baseline-compared scaling evidence.
 
 ## History
 

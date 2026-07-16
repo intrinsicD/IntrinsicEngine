@@ -5,7 +5,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-101` — Fast-staged UV edge grouping is quadratic](BUG-101-fast-staged-uv-edge-grouping-quadratic.md):
+- [`BUG-101` — Fast-staged UV edge grouping is quadratic](../../active/BUG-101-fast-staged-uv-edge-grouping-quadratic.md):
   fast-staged atlas generation linearly scans all prior edge groups for every
   triangle incidence and rebuilds the same groups for seam recording, leaving
   dense direct-mesh enrichment CPU-hot and shutdown waiting for minutes.
