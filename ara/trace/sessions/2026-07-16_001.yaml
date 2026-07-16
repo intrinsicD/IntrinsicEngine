@@ -2,9 +2,9 @@ session:
   id: "2026-07-16_001"
   date: "2026-07-16"
   started: "2026-07-16T00:42+02:00"
-  last_turn: "2026-07-16T11:49+02:00"
-  turn_count: 4
-  summary: "Completed Runtime.Engine convergence and six prior bug closures, audited Sandbox model workflows into eight scoped tasks, published both verified series to remote main, and kept two unprovenanced local model datasets out of Git history."
+  last_turn: "2026-07-16T16:07+02:00"
+  turn_count: 5
+  summary: "Completed Runtime.Engine convergence and six prior bug closures, audited and repaired the first Sandbox model-workflow defects, published the verified series to remote main, and excluded unprovenanced datasets plus incomplete stale task refs."
 
 events_logged:
   - turn: 1
@@ -85,6 +85,12 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Passed the 3,788-test CPU gate and strict landing review, then fast-forwarded and pushed the task batch to origin/main."
+  - turn: 5
+    type: experiment
+    id: "N236"
+    routing: direct
+    provenance: ai-executed
+    summary: "Confirmed the requested branch and remote main were already aligned at e832f4b7 and excluded six stale, incomplete, conflict-heavy task refs from publication."
 
 ai_actions:
   - turn: 1
@@ -160,6 +166,14 @@ ai_actions:
     action: "Applied independent task-review corrections, passed Clang 23 build plus 3,788 CPU-supported tests and strict structural gates, committed 5aa0aa91, fast-forwarded main, and pushed origin/main."
     provenance: ai-executed
     files_changed: []
+  - turn: 5
+    action: "Fetched and audited the complete local/remote branch graph, obtained three independent readiness reviews for the six unmerged task refs, and preserved only committed, current-head evidence as merge-eligible."
+    provenance: ai-executed
+    files_changed: []
+  - turn: 5
+    action: "Switched to main, ran the requested strict fast-forward and normal push as verified no-ops, confirmed local and remote main at e832f4b7, and stopped the nested Sandbox/Xephyr audit processes."
+    provenance: ai-executed
+    files_changed: []
 
 claims_touched: []
 
@@ -172,6 +186,8 @@ key_context:
     excerpt: "Appropriate publication excluded pre-existing local datasets whose attribution and redistribution rights could not be established."
   - turn: 4
     excerpt: "User requested that all intended audit changes be committed appropriately, merged into main, and pushed to the remote."
+  - turn: 5
+    excerpt: "User again requested that every appropriate change be committed, merged into main, and pushed to the remote."
 
 open_threads:
   - "Select the next bounded architecture/runtime slice; RUNTIME-168 is the smallest reviewed private-surface candidate, while ARCH-014 remains the umbrella that gates REVIEW-003."

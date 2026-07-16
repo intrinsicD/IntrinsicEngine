@@ -5507,3 +5507,32 @@ tree:
       from 86ddb7f5 to 5aa0aa91, origin/main accepted the same non-force update,
       and the two unprovenanced local model datasets remained untouched.
     status: resolved
+  - id: N236
+    type: experiment
+    title: "Reconcile current-main publication and stale local task refs"
+    provenance: ai-executed
+    timestamp: "2026-07-16T16:07+02:00"
+    also_depends_on: [N232, N235]
+    evidence:
+      - "git fetch origin --prune"
+      - "git merge --ff-only agent/sandbox-model-ui-audit: Already up to date"
+      - "git push origin main: Everything up-to-date"
+      - "git ls-remote origin refs/heads/main"
+      - "Independent reviews of codex/arch-006-finish, codex/core005, codex/core006, codex/core007, codex/core009, and codex/runtime138"
+      - "tasks/backlog/architecture/CORE-005-nonblocking-taskgraph-submit-api.md"
+      - "tasks/backlog/architecture/CORE-006-domain-free-core-task-vocabulary.md"
+      - "tasks/backlog/architecture/CORE-007-scheduler-priority-wait-wake-hardening.md"
+      - "tasks/backlog/architecture/CORE-009-app-owned-config-sections.md"
+      - "tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md"
+    result: >
+      The tracked and staged diffs were empty; only M16.xyz and child.obj
+      remained untracked. Local main, origin/main, and the requested audit
+      branch already named e832f4b7, so the strict fast-forward and normal push
+      were no-ops. Six additional local task refs were 113 commits behind
+      current main, their temporary worktrees were prunable, and independent
+      review found incomplete backlog state, missing current-head verification,
+      extensive merge conflicts, and a historical BUG-084 ID collision. They
+      were therefore excluded from this publication rather than merged as
+      finished work. The nested Sandbox and Xephyr processes launched for the
+      audit were terminated without touching the user's desktop session.
+    status: resolved
