@@ -70,3 +70,19 @@
 - **Code ref**: [tasks/backlog/geometry/GEOM-067-memory-aware-bvh-merged-node-evidence.md,
   tasks/backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md]
 - **From staging**: O41
+
+## H06: Establish test truth before optimizing CI gate shape
+- **Rationale**: Mechanically reconcile unique GoogleTest cases, source
+  ownership, capability labels, build aggregates, and clean-configure target
+  identity before touched-scope routing, slow-lane splitting, coverage
+  comparison, or grouped execution. Otherwise a faster selector can preserve or
+  enlarge an existing coverage hole while reporting success.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Sensitivity**: high
+- **Code ref**: [tasks/backlog/bugs/BUG-106-test-gate-capability-routing-drift.md,
+  tasks/backlog/bugs/BUG-107-backend-target-graph-configure-history.md,
+  tasks/backlog/process/CI-005-real-touched-scope-pr-fast-gate.md,
+  tasks/backlog/process/CI-010-cpu-source-coverage-refactor-parity.md, N237,
+  N238, N239]
+- **From staging**: O48

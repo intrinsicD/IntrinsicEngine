@@ -5536,3 +5536,123 @@ tree:
       finished work. The nested Sandbox and Xephyr processes launched for the
       audit were terminated without touching the user's desktop session.
     status: resolved
+  - id: N237
+    type: experiment
+    title: "Audit the current CI and test strategy against a stale optimization proposal"
+    provenance: ai-executed
+    timestamp: "2026-07-16T22:07+02:00"
+    also_depends_on: [N224]
+    evidence:
+      - "benchmarks/baselines/ci_gate_latency_github_ubuntu_24_04_v1.json"
+      - "CMakePresets.json"
+      - "CMakeLists.txt"
+      - "cmake/IntrinsicTest.cmake"
+      - "tests/CMakeLists.txt"
+      - ".github/workflows/pr-fast.yml"
+      - ".github/workflows/ci-linux-clang.yml"
+      - ".github/workflows/ci-sanitizers.yml"
+      - ".github/workflows/nightly-deep.yml"
+      - "tasks/backlog/process/CI-005-real-touched-scope-pr-fast-gate.md"
+      - "tasks/backlog/process/CI-006-sanitizer-topology-and-test-parallelism.md"
+      - "tasks/backlog/process/CI-008-grouped-ctest-and-worker-oversubscription.md"
+      - "tasks/backlog/process/CI-009-heavy-gate-routing-and-runner-evaluation.md"
+      - "tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md"
+      - "Official CMake, Clang/LLVM, ccache, and GitHub Actions documentation"
+    result: >
+      The formal cold baseline confirms compilation dominates configure and
+      test time, but the supplied diagnosis was materially stale: current CI is
+      Debug with combined ASan/UBSan, src_new and the legacy tree are gone,
+      IntrinsicTests is already a custom aggregate, target and CTest selection
+      are already separate, cancellation is enabled, and the guarded ccache
+      pilot has measured value. The audit also found correctness risks that
+      precede latency work: one mixed slow gpu/vulkan target is the only owner
+      of 212 CPU-oriented cases, nine RuntimeFrameLoop cases are duplicated,
+      twenty MockDevice unit cases are mislabeled gpu/vulkan, and renderer
+      backend selection reads EXTRINSIC_BACKEND before the platform layer
+      establishes its default. The recommended sequence is therefore truthful
+      test classification and deterministic target inventory first, then
+      CI-005 touched scope, CI-006 sanitizer isolation, coverage baselining,
+      measured grouping/worker budgets, compile-hotspot repair, and CI-009
+      lifecycle routing.
+    status: resolved
+  - id: N238
+    type: decision
+    title: "Materialize the audited CI/test sequence as backlog work"
+    provenance: user
+    timestamp: "2026-07-16T22:59+02:00"
+    also_depends_on: [N237]
+    choice: >
+      Create the missing concrete tasks in the backlog and integrate the work
+      into existing CI/test owners rather than leaving the audit advisory or
+      opening duplicate umbrella tasks.
+    alternatives:
+      - "Leave the audited recommendations as narrative guidance only"
+      - "Create one new task for every recommendation regardless of existing ownership"
+    evidence:
+      - "N237"
+      - "O48"
+      - "User instruction: please create these tasks and add them to the backlog"
+    status: resolved
+  - id: N239
+    type: experiment
+    title: "Author and validate the CI/testing backlog dependency graph"
+    provenance: ai-executed
+    timestamp: "2026-07-16T22:59+02:00"
+    also_depends_on: [N237, N238]
+    evidence:
+      - "tasks/backlog/bugs/BUG-106-test-gate-capability-routing-drift.md"
+      - "tasks/backlog/bugs/BUG-107-backend-target-graph-configure-history.md"
+      - "tasks/backlog/process/CI-010-cpu-source-coverage-refactor-parity.md"
+      - "tasks/backlog/process/CI-011-measured-slow-test-cohort.md"
+      - "tasks/backlog/process/BUILD-004-source-complete-compile-hotspot-evidence.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/agents/check_task_state_links.py --root . --strict"
+      - "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main --strict"
+      - "Independent final task-design review"
+    result: >
+      Authored five missing tasks, tightened six existing ownership records,
+      updated the bug/process/runtime indexes and test-strategy note, and
+      regenerated the session brief. The final graph makes BUG-106/107 precede
+      authoritative routing and coverage, keeps BUG-091 independent, makes
+      BUILD-004 the evidence prerequisite for RUNTIME-166, and leaves CI-009
+      last. Strict validation covered 118 task files with zero findings; state
+      links, documentation links/sync, root hygiene, PR contract, session-brief
+      freshness, and diff checks passed. Independent review found no cycle or
+      missing index and its ownership/evidence corrections were applied.
+    status: resolved
+  - id: N240
+    type: experiment
+    title: "Audit historical geometry and engine repositories for selective adaptation"
+    provenance: ai-executed
+    timestamp: "2026-07-16T23:05+02:00"
+    evidence:
+      - "/home/alex/Documents/bcg_geometry_processing@3ced2834"
+      - "/home/alex/Documents/Engine24@fc16dc3"
+      - "/home/alex/Documents/Engine25@origin/main:a3ed360"
+      - "/home/alex/Documents/framework@8e8f9c2"
+      - "/home/alex/Documents/Geometry@a8c8da3"
+      - "/home/alex/Documents/RD_Engine@ec77dc1"
+      - "/home/alex/Documents/Test@96ae165"
+      - "src/geometry/Geometry.Sphere.Sampling.cpp"
+      - "src/geometry/Geometry.PointCloud.Utils.cpp"
+      - "src/geometry/Geometry.Graph.ShortestPath.cppm"
+      - "src/graphics/rhi/RHI.Profiler.cppm"
+      - "tasks/backlog/geometry/GEOM-058-gaussian-mixture-em-anderson-acceleration.md"
+      - "tasks/backlog/geometry/GEOM-061-grid-downsampling-reduction-strategies.md"
+      - "tasks/archive/GRAPHICS-041-slang-shader-pipeline-and-hot-reload.md"
+    result: >
+      Updated every pullable repository without overwriting local work, fetched
+      Engine25's current remote tip despite its dirty working tree, and recorded
+      that Geometry has no remote while Engine26 and UnsungEngine are not Git
+      roots. The comparison rejected wholesale legacy ports because
+      IntrinsicEngine is stronger in every overlapping architecture. It found
+      two immediate correctness defects in Fibonacci sphere sampling and voxel
+      downsampling, plus selective value in weighted shortest paths/A*, sparse
+      constrained solves, native GPU-profiler completion, reusable mesh-feature
+      classification with Catmull-Clark creases, guarded hierarchy traversal,
+      and watcher lifecycle semantics when live reload is activated. Existing
+      GEOM-058..062 and METHOD-015..020 already own the useful framework-family
+      research gaps, so no duplicate backlog artifacts were created.
+    status: resolved

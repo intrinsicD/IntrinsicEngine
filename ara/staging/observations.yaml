@@ -567,3 +567,80 @@ observations:
     promoted_to: "logic/solution/architecture.md:A13"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O48
+    timestamp: "2026-07-16T22:07+02:00"
+    provenance: ai-suggested
+    content: >
+      A CI speed refactor should begin with a mechanically checked inventory of
+      unique test cases, source ownership, labels, and clean-configure target
+      identity. Optimizing touched-scope routing or process grouping before
+      correcting classification drift can make a faster gate while silently
+      preserving or enlarging coverage holes.
+    context: >
+      Current IntrinsicEngine audit found 212 CPU-oriented cases hidden behind
+      slow gpu/vulkan labels, nine duplicated cases, twenty pure MockDevice
+      cases excluded from the CPU gate, and configure-order-dependent backend
+      target selection.
+    potential_type: heuristic
+    bound_to: [N237]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H06"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O49
+    timestamp: "2026-07-16T23:05+02:00"
+    provenance: ai-suggested
+    content: >
+      Historical engine repositories should be treated as sources of behavior,
+      formulas, and integration intent rather than implementation donors when
+      the target already has stronger ownership, diagnostics, deterministic
+      containers, and tests. Adapt the narrow capability into IntrinsicEngine's
+      native seams and rederive unsafe numerical code instead of porting whole
+      subsystems.
+    context: >
+      Cross-repository comparison found useful isolated concepts in bcg,
+      Engine24, Engine25, framework, and Test, while their surrounding
+      architecture and failure contracts were weaker than IntrinsicEngine.
+    potential_type: heuristic
+    bound_to: [N240]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O50
+    timestamp: "2026-07-16T23:05+02:00"
+    provenance: ai-executed
+    content: >
+      Fibonacci sphere sampling and centroid voxel downsampling need correctness
+      repairs before related feature expansion: the former misplaces and
+      overwrites an explicit pole and is unsafe for small counts, while the
+      latter violates its recorded deterministic and non-finite-input contract.
+    context: >
+      Direct target-versus-reference inspection during N240 identified behavior
+      that contradicts public sampling semantics and retired GEOM-016 acceptance.
+    potential_type: constraint
+    bound_to: [N240]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O51
+    timestamp: "2026-07-16T23:05+02:00"
+    provenance: ai-suggested
+    content: >
+      The highest-value selective additions are a validated weighted-edge cost
+      seam plus A*, rectangular/constrained sparse solves adopted by LSCM and
+      boundary smoothing, completion of native Vulkan timestamp profiling,
+      reusable mesh-feature classification with Catmull-Clark crease
+      propagation, and guarded ECS hierarchy traversal. Filesystem watcher
+      lifecycle work belongs inside the planned live-reload slice rather than a
+      standalone unused abstraction.
+    context: >
+      Ranked audit of concrete target gaps and present consumers across the nine
+      historical repositories requested by the user.
+    potential_type: architecture
+    bound_to: [N240]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

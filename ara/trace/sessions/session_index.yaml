@@ -113,8 +113,8 @@ sessions:
     open_threads: 7
   - id: "2026-07-16_001"
     date: "2026-07-16"
-    summary: "Completed Runtime.Engine convergence and six prior bug closures, audited and repaired the first Sandbox model-workflow defects, published the verified series to remote main, and excluded unprovenanced datasets plus incomplete stale task refs."
-    turn_count: 5
-    events_count: 14
+    summary: "Completed Runtime.Engine convergence and six prior bug closures, audited and repaired the first Sandbox model-workflow defects, published the verified series to remote main, excluded unprovenanced datasets plus incomplete stale task refs, materialized the CI/test audit as a validated dependency-ordered backlog, and compared nine historical repositories into a selective IntrinsicEngine adaptation roadmap."
+    turn_count: 8
+    events_count: 18
     claims_touched: []
-    open_threads: 8
+    open_threads: 13
