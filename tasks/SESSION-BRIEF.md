@@ -52,6 +52,7 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-082` — GLFW X11 input-method initialization leaks under LeakSanitizer (tasks/backlog/bugs/BUG-082-glfw-x11-input-method-lsan-leak.md)
 - unblocked: `BUG-083` — Vulkan Sandbox shutdown reports driver and DBus leaks under LeakSanitizer (tasks/backlog/bugs/BUG-083-vulkan-sandbox-shutdown-lsan-leaks.md)
 - unblocked: `BUG-088` — Benchmark smoke hard timeout flakes under host contention (tasks/backlog/bugs/BUG-088-benchmark-smoke-hard-timeout-host-contention.md)
+- unblocked: `BUG-090` — Async-work layering test asserts stale shutdown call spelling (tasks/backlog/bugs/BUG-090-async-work-layering-test-stale-shutdown-owner.md)
 
 ## Theme H — Agentic workflow hardening
 
