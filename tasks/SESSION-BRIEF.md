@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-088` — Benchmark smoke hard timeout flakes under host contention (tasks/active/BUG-088-benchmark-smoke-hard-timeout-host-contention.md)
+- none
 
 ## Theme B — Rendering modernization
 

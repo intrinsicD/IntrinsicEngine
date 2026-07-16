@@ -8,6 +8,19 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-088`](BUG-088-benchmark-smoke-hard-timeout-host-contention.md) — the
+benchmark smoke lane-classification defect retired on 2026-07-16. Commit
+`6856768a` labels the complete CTest fixture pair `slow`, gives its opt-in
+runner a 120-second bound, and preserves the Run→Validate dependency. The
+dedicated PR workflow now has the matching two-minute runner-step budget,
+strictly validates every emitted JSON, and retains the complete result
+directory. Seven hosted execution-phase samples justify classification only,
+not a performance claim. Exact implementation-head benchmark run `29538352251`
+completed the runner in 34.924 seconds, validated and uploaded all 22 results;
+CPU run `29538352281` passed 3,789/3,789 without selecting the fixture; docs run
+`29538352271` exercised all new policy and negative-validator regressions; and
+pr-fast, Vulkan, ASan, and UBSan passed on the same SHA.
+
 [`BUG-105`](BUG-105-runtime-module-ecs-structural-hazard.md) — the runtime
 module/ECS structural hazard retired on 2026-07-16. Commit `f0ea3987` gives
 every module sim system an implicit structural read because its context exposes

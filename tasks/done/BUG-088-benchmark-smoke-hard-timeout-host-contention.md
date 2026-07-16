@@ -7,13 +7,16 @@ depends_on: []
 
 ## Status
 
-- In progress on 2026-07-16; owner: Codex; branch:
+- Completed on 2026-07-16; owner: Codex; implementation commit: `6856768a`;
+  branch:
   `agent/sandbox-model-workflow-completion`; PR:
   [`#1024`](https://github.com/intrinsicD/IntrinsicEngine/pull/1024).
-- Promoted after final-head
-  [`ci-linux-clang` run 29532745081](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29532745081)
-  repeated the known 30-second timeout and blocked the merge while all six
-  other required checks passed.
+- Exact implementation-head
+  [`ci-linux-clang` run 29538352281](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29538352281),
+  [`ci-bench-smoke` run 29538352251](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29538352251),
+  and
+  [`ci-docs` run 29538352271](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29538352271)
+  passed; the other four normal PR contexts passed on the same SHA.
 
 ## Goal
 - Keep the benchmark smoke useful and fail-closed while preventing ordinary
@@ -72,7 +75,7 @@ depends_on: []
 ## Docs
 - [x] Record the PR-fast versus slow/nightly classification and timing evidence
       in the benchmark/testing policy docs.
-- [ ] Update this bug index and retirement log when the correction is verified.
+- [x] Update this bug index and retirement log when the correction is verified.
 
 ## Acceptance criteria
 - [x] A representative timing population, not one retry, justifies the final
@@ -81,7 +84,7 @@ depends_on: []
       smoke is explicitly and correctly classified outside that PR-fast lane.
 - [x] Strict validation still runs after every successful smoke and rejects a
       missing result root plus malformed or schema-invalid emitted results.
-- [ ] Exact implementation-head `ci-linux-clang`, `ci-bench-smoke`, and
+- [x] Exact implementation-head `ci-linux-clang`, `ci-bench-smoke`, and
       `ci-docs`/`docs-validation` checks pass before retirement.
 
 ## Verification
@@ -116,9 +119,14 @@ Local verification on 2026-07-16:
   result root and for malformed or schema-invalid emitted results. Producer
   failures remain fail closed through the CTest fixture and workflow command
   exit status; the generic validator does not assert a runner-specific ID set.
-- Final hosted exact-head `ci-linux-clang`, `ci-bench-smoke`, and
-  `ci-docs`/`docs-validation` results remain required before retirement; the
-  latter owns the new result-validator regression cases.
+- Exact implementation-head `ci-linux-clang` passed all 3,789 selected tests
+  in 266.91 seconds without selecting either benchmark fixture test.
+- Exact implementation-head `ci-bench-smoke` completed its bounded runner in
+  34.924 seconds, strictly validated all 22 JSON files, and uploaded all 22 as
+  artifact `8391579386` (14,908 bytes).
+- Exact implementation-head `ci-docs` passed the 14 policy regressions and all
+  three result-validator cases. `pr-fast`, `ci-vulkan`, ASan, and UBSan also
+  passed on implementation SHA `6856768a`.
 
 ## Forbidden changes
 - Silently excluding the smoke from all CI lanes.

@@ -22,12 +22,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   an unrelated cold sanitizer binary enumerates tests, before the selected
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
-- [`BUG-088` — Benchmark smoke hard timeout flakes under host contention](../../active/BUG-088-benchmark-smoke-hard-timeout-host-contention.md):
-  seven same-branch hosted smoke-lane samples have a 37.203-second median and
-  38.167-second p95, so six of seven exceed the CTest pair's hard 30-second
-  limit even before full-suite contention; select the evidence-backed lane
-  without weakening dedicated strict result validation.
 ## Verified / Closed
+
+- Closed 2026-07-16: [`BUG-088` — Benchmark smoke hard timeout flakes under host contention](../../done/BUG-088-benchmark-smoke-hard-timeout-host-contention.md).
+  The 22-result fixture pair is now explicitly `slow` with a 120-second opt-in
+  bound, while the dedicated PR workflow owns a two-minute runner step, strict
+  validation, and complete artifact retention. Exact implementation-head docs,
+  benchmark, CPU, pr-fast, Vulkan, ASan, and UBSan checks all passed.
 
 - Closed 2026-07-16: [`BUG-105` — Runtime module reader races ECS structural mutation](../../done/BUG-105-runtime-module-ecs-structural-hazard.md).
   Runtime module systems now conservatively declare structural reads because
