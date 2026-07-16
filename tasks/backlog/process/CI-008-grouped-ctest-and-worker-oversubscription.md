@@ -4,6 +4,9 @@ theme: H
 depends_on:
   - CI-003
   - CI-004
+  - CI-006
+  - CI-010
+  - CI-011
 ---
 # CI-008 — Reduce CTest process overhead without oversubscribing workers
 
@@ -36,14 +39,38 @@ depends_on:
   parallel CTest can therefore oversubscribe a hosted runner. `PROCESSORS`,
   explicit test worker configuration, and CTest `-j` must be evaluated
   together.
+- `CI-006` first fixes the retained unsanitized/ASan/UBSan variant topology;
+  `CI-010` supplies source-region parity; and `CI-011` supplies the truthful
+  fast/slow cohort. Worker A/B results before those inputs settle would compare
+  different workloads.
+- Runtime already exposes `SimulationConfig::WorkerThreadCount`, and direct
+  scheduler fixtures already choose a worker count. This task should use those
+  seams rather than add `IExecutor`, a test-only environment variable, or a
+  second scheduler-control surface.
+
+## Slice plan
+- Slice A — group only dependency-pure Core/Geometry/contract families. Compare
+  a separate CI configure that uses existing `NO_DISCOVER` plus grouped
+  registration against any same-tree filtering design; prefer the separate
+  configure when it preserves exact case/XML parity with less policy machinery.
+  The normal `ci` configuration retains individual discovery for local
+  diagnosis.
+- Slice B — after the grouped cohort is fixed, measure CTest process count and
+  explicit in-process worker budgets across the retained unsanitized, ASan, and
+  UBSan variants, then encode only the winning supported-runner settings.
 
 ## Required changes
 - [ ] Inventory candidate suites and start with pure core, geometry, and
       contract executables that have no mutable process-global state or
       backend/device lifetime.
-- [ ] Restore grouped execution through `intrinsic_grouped_test()` or a
-      successor while preserving individual discovered cases for local
-      diagnosis and `ctest -R`.
+- [ ] Restore grouped execution through the existing
+      `intrinsic_grouped_test()`/`NO_DISCOVER` helpers unless evidence proves a
+      smaller extension is required; do not build a parallel registration
+      framework.
+- [ ] Preserve individual discovered cases in the normal local/`ci`
+      configuration for diagnosis and `ctest -R`; use a separately configured
+      CI grouped plan if same-tree registration would require fragile label or
+      duplicate-suppression machinery.
 - [ ] Generate a CI execution plan that runs every selected GoogleTest case
       exactly once: grouped suites must replace, not duplicate, their individual
       processes in CI, with mechanical enumeration parity.
@@ -52,9 +79,9 @@ depends_on:
       runtime state.
 - [ ] Measure process count and wall time for ungrouped versus grouped plans at
       CTest `-j1`, `-j2`, and `-j4`.
-- [ ] Add explicit scheduler worker control for runtime-bearing test processes
-      where needed, and set CTest `PROCESSORS` for tests that reserve multiple
-      workers.
+- [ ] Use `SimulationConfig::WorkerThreadCount` or direct scheduler
+      initialization for runtime-bearing fixtures, and set CTest `PROCESSORS`
+      for tests that reserve multiple workers; add no new worker-control API.
 - [ ] Choose grouped scope, CTest concurrency, and worker budgets from at least
       five comparable samples; retain individual failure names/results in
       uploaded GTest/CTest diagnostics.
@@ -62,10 +89,14 @@ depends_on:
 ## Tests
 - [ ] Add parity tooling that compares `--gtest_list_tests` with grouped plus
       ungrouped CI selections and fails on missing or duplicate cases.
+- [ ] Compare exact GoogleTest case identities and GTest XML pass/skip/fail
+      records; a lower CTest process count is expected and is not case loss.
 - [ ] Add process-global reset regressions for every non-pure suite proposed for
       grouping.
 - [ ] Run the default CPU selector through both individual and grouped plans and
       compare pass/skip/fail case counts exactly.
+- [ ] Use `CI-010` to prove unchanged covered production line/branch/region sets
+      for the test-registration-only grouping change.
 - [ ] Record process count, selected case count, and median/p95 test duration
       against `CI-003`.
 
@@ -89,8 +120,10 @@ depends_on:
 ```bash
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicCpuTests
-python3 tests/regression/tooling/Test.GroupedCTestParity.py --build-dir build/ci
-ctest --test-dir build/ci --output-on-failure -L ci-grouped --timeout 60 -j<measured-value>
+cmake --preset ci-grouped
+cmake --build --preset ci-grouped --target IntrinsicCpuTests
+python3 tests/regression/tooling/Test.GroupedCTestParity.py --individual-build-dir build/ci --grouped-build-dir build/ci-grouped
+ctest --test-dir build/ci-grouped --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j<measured-value>
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j<measured-value>
 python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict
@@ -101,3 +134,5 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Grouping runtime, GPU, filesystem, or global-state suites without reset proof.
 - Hiding individual test failures behind one opaque grouped result.
 - Changing assertions or coverage to improve process count.
+- Adding a new executor/scheduler interface or environment-only worker override
+  when the existing config/direct initialization seam suffices.

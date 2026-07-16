@@ -3,6 +3,7 @@ id: RUNTIME-166
 theme: F
 depends_on:
   - CI-003
+  - BUILD-004
 maturity_target: Operational
 ---
 # RUNTIME-166 — Slim and partition the RenderExtraction module
@@ -39,6 +40,10 @@ maturity_target: Operational
   `tools/analysis/build_time_baseline_2026-04-05.md` shows implementation-only
   touches rebuilding in 16s while module-interface touches cascaded for
   3m23s–4m19s. Before/after claims use `CI-003` telemetry, not one local build.
+- `BUILD-004` owns normalization of multi-output module compile edges and
+  source-complete hotspot reporting. This task consumes that repaired evidence
+  so its before/after claim is not based on duplicated `.pcm`/`.o` rows or a
+  source-incomplete baseline.
 
 ## Required changes
 - [ ] Inventory interface declarations/imports into public contract, required

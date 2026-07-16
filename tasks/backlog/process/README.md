@@ -16,9 +16,12 @@ map.
 ## Tasks
 
 - [CI-005 — Make PR-fast a real touched-scope feedback gate](CI-005-real-touched-scope-pr-fast-gate.md)
-- [CI-006 — Remove duplicate sanitizer work and calibrate test parallelism](CI-006-sanitizer-topology-and-test-parallelism.md)
+- [CI-006 — Remove duplicate sanitizer work and isolate variants](CI-006-sanitizer-topology-and-test-parallelism.md)
 - [CI-008 — Reduce CTest process overhead without oversubscribing workers](CI-008-grouped-ctest-and-worker-oversubscription.md)
 - [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
+- [CI-010 — Establish CPU source-coverage refactor parity](CI-010-cpu-source-coverage-refactor-parity.md)
+- [CI-011 — Calibrate the slow-test cohort and retain fast sentinels](CI-011-measured-slow-test-cohort.md)
+- [BUILD-004 — Make compile-hotspot evidence source-complete](BUILD-004-source-complete-compile-hotspot-evidence.md)
 - [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](PROC-025-port-research-ideation-skill-to-other-repos.md)
   (portable playbook; run from a session scoped to the target repo).
 - [PROC-027 — Audit the validator/tool fleet for rent-paying gates](PROC-027-validator-rent-audit.md)
@@ -34,14 +37,18 @@ retirement log.
 - CI latency order: retired `CI-003` establishes telemetry/cancellation and
   retired `CI-004` establishes label-derived test build aggregates; retired
   `CI-007` establishes the bounded module-safe `pr-fast` ccache policy;
-  source-hotspot tasks remain independent; `CI-005` consumes `CI-004`;
-  `CI-006` consumes the unsanitized fast-preset
-  decision from `CI-005`; `CI-008` consumes the aggregate metadata from
-  `CI-004`; and `CI-009` evaluates lifecycle/runner changes only after
-  `CI-003..008` have removed avoidable software duplication.
-- Compile-hotspot source ownership is intentionally outside the process queue:
-  `ARCH-006` owns Sandbox editor/UI and `Sandbox.cppm`, `RUNTIME-146..151` own
-  `Runtime.Engine`, and `RUNTIME-166` owns `Runtime.RenderExtraction`.
+  `BUG-106` first restores truthful test ownership and `BUG-107` makes the
+  configured target graph deterministic. `CI-010` then establishes coverage
+  parity; `CI-005` consumes the corrected registry/graph; `CI-006` isolates the
+  retained sanitizer variants; `CI-011` measures the fast/slow cohort; and
+  `CI-008` groups safe families and sets worker budgets only after those inputs
+  settle. `BUILD-004` independently repairs compile-hotspot evidence and gates
+  `RUNTIME-166`. `CI-009` evaluates lifecycle/runner changes last, after the
+  software duplication and evidence defects are removed.
+- Compile-hotspot analyzer ownership is `BUILD-004`; source optimization stays
+  outside the process queue. `ARCH-006` retired the Sandbox editor/UI hotspot,
+  `RUNTIME-146..151` own the historical `Runtime.Engine` decomposition, and
+  `RUNTIME-166` owns `Runtime.RenderExtraction` after `BUILD-004`.
 - Dependency order: `PROC-001` first (every other task edits docs that are
   mirrored into skills), then `PROC-005`, `PROC-002`, and `PROC-007`
   (independent of each other), then `PROC-003`, then `PROC-004`, then

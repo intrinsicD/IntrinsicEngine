@@ -57,6 +57,9 @@ depends_on: []
   individual PRE_TEST registrations, but it is not a prerequisite: grouping
   selected test execution does not remove enumeration of those executables,
   and this fail-closed discovery-budget defect can be diagnosed independently.
+- `CI-011` is related because it owns the measured slow-test cohort, but it is
+  likewise not a prerequisite and does not own GoogleTest enumeration. A slow
+  discovery path is a harness defect, not a reason to relabel assertions.
 
 ## Required changes
 - [ ] Add a deterministic harness that forces PRE_TEST rediscovery and records

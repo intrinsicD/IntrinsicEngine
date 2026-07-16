@@ -8,6 +8,9 @@ depends_on:
   - CI-006
   - CI-007
   - CI-008
+  - CI-010
+  - CI-011
+  - BUILD-004
 ---
 # CI-009 — Route heavy gates by lifecycle and evaluate runner scaling
 
@@ -34,21 +37,43 @@ depends_on:
   `ci-vulkan` likewise pays a full promoted build for about 60 selected tests.
 - Stale-run cancellation (`CI-003`), gate aggregates (`CI-004`), touched-scope
   PR feedback (`CI-005`), sanitizer rationalization (`CI-006`), ccache
-  (`CI-007`), and grouped tests (`CI-008`) must land before hardware or trigger
-  changes are judged. Otherwise runner scaling can mask avoidable software
-  duplication.
+  (`CI-007`), grouped tests (`CI-008`), CPU coverage (`CI-010`), the measured
+  slow cohort (`CI-011`), and source-complete hotspot evidence (`BUILD-004`)
+  must land before hardware or trigger changes are judged. Otherwise runner
+  scaling can mask avoidable software duplication or route an incomplete gate.
 - Candidate lifecycle points are PR synchronize/open, ready-for-review,
   `merge_group`, and default-branch push. Required checks must report a terminal
   success/failure/skipped-via-success status for every applicable event.
+
+## Slice plan
+- Slice A — inventory required checks and implement always-reporting lifecycle
+  wrappers, keeping cheap structural validation and touched-scope feedback at
+  the front of every PR update.
+- Slice B — place the complete CPU source-coverage lane and an explicit
+  optimized Release build/smoke at default-branch, merge-candidate, scheduled,
+  or manual lifecycle points without making normal correctness builds pay their
+  instrumentation/optimization cost.
+- Slice C — run the standard-versus-larger runner A/B only when a comparable
+  runner is available. Runner unavailability does not block routing: record a
+  quantified queue/latency/cost threshold that reopens the experiment.
 
 ## Required changes
 - [ ] Inventory branch-protection/merge-queue required check names and model
       how each candidate workflow resolves for draft, ready, synchronize,
       reopened, `merge_group`, and default-branch events.
 - [ ] Keep docs/structural and touched-scope quick feedback on every PR update.
+- [ ] Order cheap structural checks before expensive compilation wherever job
+      dependencies permit, while preserving an always-reporting required-check
+      result.
 - [ ] Evaluate running full CPU/ASan/UBSan/Vulkan/benchmark gates on
       ready-for-review and `merge_group` while retaining an explicit manual/full
       path for pre-review diagnosis.
+- [ ] Place `CI-010`'s complete coverage job in a default-branch/scheduled or
+      merge-candidate lane and retain its artifacts without instrumenting every
+      ordinary build matrix entry.
+- [ ] Add an explicit optimized Release build and small smoke at the chosen
+      merge/default-branch lifecycle; performance/SLO evidence must consume that
+      identity rather than a sanitizer or `-O0` correctness tree.
 - [ ] Make benchmark smoke path-aware only if an always-reporting check wrapper
       preserves required-check semantics; benchmark/method/toolchain/CMake
       changes must always run it.
@@ -60,20 +85,25 @@ depends_on:
       merged PR, and operational maintenance burden.
 - [ ] Record a decision: retain standard runners, adopt a larger runner for
       named gates, or defer with a quantified threshold that reopens the choice.
+- [ ] Preserve `BUILD-004`'s established after-correctness/independent-reporting
+      contract when rerouting lifecycle events; this task does not redefine the
+      analyzer or its ordering policy.
 - [ ] Add workflow-contract regressions for event/required-check resolution.
 
 ## Tests
 - [ ] Exercise workflow logic fixtures for every event/lifecycle combination
       and changed-path class.
 - [ ] Prove full merge confidence still includes CPU, ASan, UBSan, Vulkan, and
-      benchmark checks with the intended skip semantics.
+      benchmark checks plus the chosen coverage and optimized-Release lanes
+      with the intended skip semantics.
 - [ ] Compare at least five standard-runner samples and, when available, five
       larger-runner samples using `CI-003` telemetry.
 - [ ] Validate benchmark manifests/results and required-check contracts.
 
 ## Docs
 - [ ] Document the final quick-feedback versus merge-confidence topology,
-      manual rerun path, and required-check names.
+      manual rerun path, and required-check names in
+      `docs/benchmarking/ci-policy.md`.
 - [ ] Record the runner cost/performance decision and assumptions in the CI
       performance report.
 - [ ] Update benchmark CI policy for any lifecycle/path routing change.
@@ -81,13 +111,20 @@ depends_on:
 
 ## Acceptance criteria
 - [ ] Every PR update gets a fast terminal feedback signal, and every merge
-      candidate receives the full required confidence set.
+      candidate receives the full required confidence set selected by the
+      documented lifecycle model.
 - [ ] Required checks cannot remain pending because a path/event filter omitted
       the workflow.
-- [ ] Heavy-gate timing and runner decisions use post-`CI-003..008` comparable
-      data rather than the unoptimized topology alone.
+- [ ] Coverage and optimized Release confidence run in a named default-branch,
+      scheduled, or merge-candidate lane and are not accidentally produced by a
+      debug/sanitizer tree.
+- [ ] Heavy-gate timing and runner decisions use post-`CI-003..008`, `CI-010`,
+      `CI-011`, and `BUILD-004` comparable data rather than the unoptimized
+      topology alone.
 - [ ] Any larger-runner adoption includes a quantified cost/latency benefit and
       rollback path.
+- [ ] If no comparable larger runner is available, routing still closes with a
+      documented threshold for reopening the runner experiment.
 
 ## Verification
 ```bash
@@ -104,3 +141,5 @@ python3 tools/agents/check_task_policy.py --root . --strict
   result.
 - Comparing runner sizes with different presets, commits, or test selectors.
 - Uploading/restoring CMake build directories or BMIs as cross-job artifacts.
+- Blocking the lifecycle/routing correction indefinitely on unavailable runner
+  capacity.

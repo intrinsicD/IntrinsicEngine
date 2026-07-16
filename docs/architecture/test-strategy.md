@@ -103,4 +103,8 @@ Operational expectations:
 - Reclassified tests must update both file location and labels in the same change.
 - Any temporary category mismatch must be tracked in a current task under `tasks/active/` with a removal condition.
 - HARDEN-041B registers relocated wrapper sources under taxonomy-owned targets (`IntrinsicAssetUnitTests`, `IntrinsicCoreWrapperUnitTests`, `IntrinsicGraphicsUnitTests`, `IntrinsicGraphicsContractTests`, `IntrinsicRuntimeIntegrationTests`) instead of subsystem wrapper directories.
-- Graphics/runtime relocated wrapper suites are currently labeled `gpu`/`vulkan` because they include backend-facing coverage; CPU-only relabeling/splits remain follow-up work under HARDEN-042.
+- Graphics/runtime relocated wrapper suites currently mix backend-facing and
+  CPU/mock coverage under executable-wide `gpu`/`vulkan` labels. The open
+  [`BUG-106`](../../tasks/backlog/bugs/BUG-106-test-gate-capability-routing-drift.md)
+  task owns the capability-truthful split/relabel and duplicate-registration
+  correction.

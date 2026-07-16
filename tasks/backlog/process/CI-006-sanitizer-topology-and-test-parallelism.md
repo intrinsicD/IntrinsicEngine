@@ -5,17 +5,18 @@ depends_on:
   - CI-003
   - CI-005
 ---
-# CI-006 — Remove duplicate sanitizer work and calibrate test parallelism
+# CI-006 — Remove duplicate sanitizer work and isolate variants
 
 ## Goal
-- Define one explicit sanitizer topology and measured CTest concurrency per
-  sanitizer so CI does not pay for overlapping combined/dedicated variants or
-  oversubscribe hosted runners.
+- Define one explicit, isolated sanitizer topology so CI does not pay for
+  overlapping combined/dedicated variants or accidentally run performance
+  gates in a reused sanitizer build tree.
 
 ## Non-goals
 - No reduction in ASan or UBSan test coverage.
 - No object, build-tree, or BMI sharing across sanitizer variants.
-- No parallelism increase based only on `nproc`.
+- No final CTest/process/Scheduler concurrency policy; `CI-008` owns measured
+  worker budgets after the retained variants are known.
 
 ## Context
 - Owner: CMake presets and `.github/workflows/ci-sanitizers.yml` plus the full
@@ -25,47 +26,50 @@ depends_on:
   jobs disable that option and inject separate compiler/linker flags, rebuilding
   both variants from scratch.
 - Representative `CI-003` data: UBSan configured in 7.306s, built in ~14m40s,
-  tested 3,592 cases serially in 110.62s, and completed in 17m16s. The combined
-  `ci` gate tested in ~217.53s with `-j$(nproc)`, but the configurations differ,
-  so this is a hypothesis about oversubscription, not evidence that serial is
-  universally faster.
-- Runtime-bearing tests can initialize `Core::Tasks::Scheduler` with
-  `hardware_concurrency - 1` workers when configured with zero. Running many
-  such processes under CTest `-j$(nproc)` can multiply runnable workers beyond
-  the runner allocation.
+  tested 3,592 cases in 110.62s, and completed in 17m16s. The combined `ci`
+  configuration differs, so the measurements cannot justify keeping both.
+- `nightly-deep.yml` repeatedly reconfigures the same `build/ci` directory from
+  the project-default combined sanitizer setup to ASan and then UBSan, before
+  running benchmark/SLO work from that last configured tree. Variant identity
+  and the intended unsanitized performance semantics are therefore ambiguous.
 - `ci-fast` from `CI-005` is explicitly unsanitized. This task decides whether
   full `ci-linux-clang` should also be unsanitized after proving the dedicated
   jobs select equivalent CPU coverage.
 
 ## Required changes
 - [ ] Add explicit, named presets for unsanitized full CPU, ASan, and UBSan
-      configurations; stop overriding one `build/ci` preset/tree with ad-hoc
-      sanitizer flags.
+      configurations with distinct binary and vcpkg install directories; stop
+      overriding one `build/ci` tree with ad-hoc sanitizer flags in every
+      workflow, including `nightly-deep`.
 - [ ] Inventory test selection across the current combined gate and dedicated
       ASan/UBSan gates; make any intended exclusions explicit and machine-
       checked.
-- [ ] Measure CTest `-j1`, `-j2`, and `-j4` for ASan and UBSan on comparable
-      hosted runners, recording wall time, failures, timeouts, peak resource
-      diagnostics available from the runner, and selected test count.
-- [ ] Choose and document sanitizer-specific concurrency from median/p95 data.
 - [ ] If dedicated ASan+UBSan jobs provide the intended required coverage,
       make the general full CPU preset unsanitized and remove the redundant
       combined sanitizer compile; otherwise retain the combined gate and
       document the unique defect class/coverage it owns.
 - [ ] Keep every sanitizer in an isolated build/install directory and telemetry
       identity.
+- [ ] Run benchmark/SLO/performance work only from an explicit unsanitized
+      non-sanitizer tree, never whichever sanitizer last reconfigured a shared
+      tree. `CI-009` owns the final optimized Release preset and lifecycle.
+- [ ] Make selectors, selected-case inventories, preset identity, sanitizer
+      flags, and timing metadata mechanically agree for every retained variant.
 
 ## Tests
 - [ ] Add preset/workflow regression coverage proving sanitizer identity,
       flags, build directory, and test selectors cannot alias.
 - [ ] Add a test-selection parity report for unsanitized, ASan, and UBSan jobs.
 - [ ] Run the full selected suite in each retained sanitizer configuration.
-- [ ] Compare build/test/total median and p95 against `CI-003`; do not compare
-      serial UBSan directly with a different combined-sanitizer configuration.
+- [ ] Prove nightly benchmark/SLO steps consume a named non-sanitizer tree and
+      cannot inherit ASan/UBSan flags from a preceding step.
+- [ ] Compare build/test/total median and p95 against `CI-003` using identical
+      selectors; leave concurrency A/B work to `CI-008`.
 
 ## Docs
-- [ ] Document the required sanitizer matrix, exclusions, concurrency evidence,
-      and local reproduction commands in the CI/build documentation.
+- [ ] Document the required sanitizer matrix, exclusions, isolated directories,
+      performance-build identity, and local reproduction commands in the
+      `docs/benchmarking/ci-policy.md` CI/build policy.
 - [ ] Update `AGENTS.md` if the canonical `ci` preset's sanitizer semantics
       change.
 - [ ] Regenerate `tasks/SESSION-BRIEF.md` on retirement.
@@ -75,8 +79,8 @@ depends_on:
       tree, and non-overlapping reason to exist.
 - [ ] ASan and UBSan coverage is preserved and mechanically compared to the
       intended CPU selector.
-- [ ] CTest concurrency is backed by comparable A/B measurements rather than
-      host core count alone.
+- [ ] Benchmark/SLO work is isolated from sanitizer trees; `CI-009`, not this
+      task, owns its final optimized Release configuration and lifecycle.
 - [ ] Any removal of combined sanitizers is justified by dedicated-gate parity,
       not by a weakened selector.
 
@@ -84,10 +88,10 @@ depends_on:
 ```bash
 cmake --preset ci-asan
 cmake --build --preset ci-asan --target IntrinsicCpuTests
-ctest --test-dir build/ci-asan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j<measured-value>
+ctest --test-dir build/ci-asan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 cmake --preset ci-ubsan
 cmake --build --preset ci-ubsan --target IntrinsicCpuTests
-ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j<measured-value>
+ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tests/regression/tooling/Test.SanitizerPresets.py
 python3 tools/repo/check_pr_contract.py --root .
 python3 tools/agents/check_task_policy.py --root . --strict
@@ -96,5 +100,5 @@ python3 tools/agents/check_task_policy.py --root . --strict
 ## Forbidden changes
 - Dropping ASan or UBSan from required CI to improve wall time.
 - Reusing objects or BMIs across unsanitized/ASan/UBSan configurations.
-- Selecting concurrency from incomparable configurations or one run.
+- Running benchmark/SLO work from a tree last configured for a sanitizer.
 - Hiding sanitizer findings through broad exclusions or quarantine.

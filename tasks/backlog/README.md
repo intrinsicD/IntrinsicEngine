@@ -332,11 +332,16 @@ telemetry, a claim-grade aggregate baseline, and stale-run cancellation.
 `CI-004` is retired after routing specialized gates through label-derived test
 build aggregates. `CI-007` is retired after retaining a module-safe,
 `pr-fast`-only ccache store with hosted cold/warm and interface-invalidation
-evidence. `CI-005`, `CI-006`, and `CI-008` address real touched-scope PR
-feedback, sanitizer duplication, and CTest/process oversubscription.
-`CI-009` is deliberately last: heavy-gate lifecycle and larger-runner decisions
-must use post-optimization median/p95 evidence rather than masking avoidable
-cold-build work with hardware.
+evidence. Open bugs `BUG-106` and `BUG-107` first repair capability-truthful
+test ownership and configure-history-independent target inventories. `CI-010`
+then establishes complete CPU source-coverage parity; `CI-005` makes PR-fast a
+fail-closed touched-scope gate; `CI-006` isolates sanitizer variants; `CI-011`
+uses comparable measurements to split only genuinely slow cases; and `CI-008`
+groups safe suites and calibrates nested worker budgets. `BUILD-004` repairs
+source-complete compile-hotspot evidence and is a prerequisite of
+`RUNTIME-166`. `CI-009` is deliberately last: heavy-gate lifecycle and larger-
+runner decisions must use the corrected post-optimization evidence rather than
+masking avoidable cold-build work with hardware.
 
 `DOCS-005` is retired; the feature-module playbook now has the minimal-feature
 floor and config/command artifact.
