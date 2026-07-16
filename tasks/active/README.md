@@ -11,7 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-No tasks are currently active.
+- [`BUG-104` — Kernel-convergence regression asserts a retired snapshot](BUG-104-kernel-convergence-regression-stale-snapshot.md)
+  is synchronizing the deterministic `pr-fast` repository-snapshot assertion
+  with the already-ratcheted live policy; next pass all 19 regressions and the
+  strict checker, then require repaired-head `pr-fast` to pass.
 
 ## History
 
