@@ -113,6 +113,19 @@ export namespace Extrinsic::Assets
         std::uint32_t IndexCount{0};
     };
 
+    struct AssetModelNodePayload
+    {
+        std::string Name{};
+        std::uint32_t ParentNodeIndex{kInvalidAssetModelIndex};
+        std::array<float, 16> LocalTransform{
+            1.0f, 0.0f, 0.0f, 0.0f,
+            0.0f, 1.0f, 0.0f, 0.0f,
+            0.0f, 0.0f, 1.0f, 0.0f,
+            0.0f, 0.0f, 0.0f, 1.0f};
+        std::vector<std::uint32_t> ChildNodeIndices{};
+        std::vector<std::uint32_t> PrimitiveIndices{};
+    };
+
     struct AssetModelExternalResourceDiagnostic
     {
         AssetModelResourceKind ResourceKind{AssetModelResourceKind::Unknown};
@@ -125,6 +138,8 @@ export namespace Extrinsic::Assets
     struct AssetModelScenePayload
     {
         std::string SourcePath{};
+        std::vector<std::uint32_t> RootNodeIndices{};
+        std::vector<AssetModelNodePayload> Nodes{};
         std::vector<AssetGeometryPayload> GeometryPayloads{};
         std::vector<AssetModelPrimitivePayload> Primitives{};
         std::vector<AssetTexture2DPayload> EmbeddedImages{};

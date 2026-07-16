@@ -107,6 +107,9 @@ namespace
 
     [[nodiscard]] Assets::AssetModelScenePayload MakeModelScenePayload()
     {
+        // Intentionally invalid as a materialization payload: this contract
+        // exercises Ready-event type routing only, so it leaves scene roots,
+        // nodes, geometry, and primitives empty.
         Assets::AssetModelScenePayload payload{};
         payload.SourcePath = "/models/scene.gltf";
         return payload;

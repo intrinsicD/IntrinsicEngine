@@ -1,9 +1,12 @@
 module;
 
+#include <nlohmann/json.hpp>
 #include <stb_image.h>
 #include <tiny_gltf.h>
 
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -317,6 +320,51 @@ namespace Extrinsic::Runtime
             std::uint32_t magic = 0u;
             std::memcpy(&magic, request.SourceBytes.data(), sizeof(magic));
             return magic == 0x46546C67u;
+        }
+
+        [[nodiscard]] std::uint32_t ReadLittleEndianU32(
+            const std::span<const std::byte> bytes,
+            const std::size_t offset) noexcept
+        {
+            return std::to_integer<std::uint32_t>(bytes[offset])
+                | (std::to_integer<std::uint32_t>(bytes[offset + 1u]) << 8u)
+                | (std::to_integer<std::uint32_t>(bytes[offset + 2u]) << 16u)
+                | (std::to_integer<std::uint32_t>(bytes[offset + 3u]) << 24u);
+        }
+
+        [[nodiscard]] Core::Expected<nlohmann::json> ParseSourceJsonDocument(
+            const Assets::AssetModelTextureIORequest& request)
+        {
+            std::span<const std::byte> jsonBytes = request.SourceBytes;
+            if (SourceLooksLikeGlb(request))
+            {
+                constexpr std::uint32_t jsonChunkType = 0x4E4F534Au;
+                if (jsonBytes.size() < 20u
+                    || ReadLittleEndianU32(jsonBytes, 16u) != jsonChunkType)
+                {
+                    return Core::Err<nlohmann::json>(Core::ErrorCode::AssetInvalidData);
+                }
+
+                const std::size_t jsonByteCount = ReadLittleEndianU32(jsonBytes, 12u);
+                if (jsonByteCount > jsonBytes.size() - 20u)
+                {
+                    return Core::Err<nlohmann::json>(Core::ErrorCode::AssetInvalidData);
+                }
+                jsonBytes = jsonBytes.subspan(20u, jsonByteCount);
+            }
+
+            const std::string jsonText{
+                reinterpret_cast<const char*>(jsonBytes.data()),
+                jsonBytes.size()};
+            nlohmann::json document = nlohmann::json::parse(
+                jsonText,
+                nullptr,
+                false);
+            if (document.is_discarded() || !document.is_object())
+            {
+                return Core::Err<nlohmann::json>(Core::ErrorCode::AssetInvalidData);
+            }
+            return document;
         }
 
         [[nodiscard]] Core::Expected<tinygltf::Model> LoadGltfModel(
@@ -884,6 +932,491 @@ namespace Extrinsic::Runtime
             return payload;
         }
 
+        [[nodiscard]] bool ToFiniteFloat(const double value, float& converted) noexcept
+        {
+            constexpr double floatLimit = static_cast<double>(
+                std::numeric_limits<float>::max());
+            if (!std::isfinite(value) || value < -floatLimit || value > floatLimit)
+            {
+                return false;
+            }
+            converted = static_cast<float>(value);
+            return std::isfinite(converted);
+        }
+
+        [[nodiscard]] Core::Expected<int> ReadRawNonnegativeInteger(
+            const nlohmann::json& value)
+        {
+            if (value.is_number_unsigned())
+            {
+                const std::uint64_t integer = value.get<std::uint64_t>();
+                if (integer > static_cast<std::uint64_t>(
+                        std::numeric_limits<int>::max()))
+                {
+                    return Core::Err<int>(Core::ErrorCode::OutOfRange);
+                }
+                return static_cast<int>(integer);
+            }
+            if (!value.is_number_integer())
+            {
+                return Core::Err<int>(Core::ErrorCode::AssetInvalidData);
+            }
+
+            const std::int64_t integer = value.get<std::int64_t>();
+            if (integer < 0
+                || integer > static_cast<std::int64_t>(std::numeric_limits<int>::max()))
+            {
+                return Core::Err<int>(Core::ErrorCode::OutOfRange);
+            }
+            return static_cast<int>(integer);
+        }
+
+        [[nodiscard]] Core::Expected<std::vector<int>> ReadRawIndexArray(
+            const nlohmann::json& value)
+        {
+            if (!value.is_array())
+            {
+                return Core::Err<std::vector<int>>(Core::ErrorCode::AssetInvalidData);
+            }
+
+            std::vector<int> indices{};
+            indices.reserve(value.size());
+            for (const nlohmann::json& rawIndex : value)
+            {
+                auto index = ReadRawNonnegativeInteger(rawIndex);
+                if (!index.has_value())
+                {
+                    return Core::Err<std::vector<int>>(index.error());
+                }
+                indices.push_back(*index);
+            }
+            return indices;
+        }
+
+        [[nodiscard]] Core::Result ValidateRawNumericArray(
+            const nlohmann::json& rawNode,
+            const char* const name,
+            const std::size_t expectedSize)
+        {
+            const auto valueIt = rawNode.find(name);
+            if (valueIt == rawNode.end())
+            {
+                return Core::Ok();
+            }
+            if (!valueIt->is_array() || valueIt->size() != expectedSize)
+            {
+                return Core::Err(Core::ErrorCode::AssetInvalidData);
+            }
+
+            float converted = 0.0f;
+            for (const nlohmann::json& rawValue : *valueIt)
+            {
+                if (!rawValue.is_number()
+                    || !ToFiniteFloat(rawValue.get<double>(), converted))
+                {
+                    return Core::Err(Core::ErrorCode::AssetInvalidData);
+                }
+            }
+            return Core::Ok();
+        }
+
+        struct RawActiveSceneContract
+        {
+            std::size_t SceneIndex{0u};
+            std::vector<int> RootNodeIndices{};
+        };
+
+        [[nodiscard]] Core::Expected<RawActiveSceneContract> ReadRawActiveSceneContract(
+            const nlohmann::json& sourceDocument)
+        {
+            const auto scenesIt = sourceDocument.find("scenes");
+            if (scenesIt == sourceDocument.end() || !scenesIt->is_array()
+                || scenesIt->empty())
+            {
+                return Core::Err<RawActiveSceneContract>(
+                    Core::ErrorCode::AssetInvalidData);
+            }
+
+            std::size_t sceneIndex = 0u;
+            const auto defaultSceneIt = sourceDocument.find("scene");
+            if (defaultSceneIt != sourceDocument.end())
+            {
+                auto declaredSceneIndex = ReadRawNonnegativeInteger(*defaultSceneIt);
+                if (!declaredSceneIndex.has_value())
+                {
+                    return Core::Err<RawActiveSceneContract>(
+                        declaredSceneIndex.error());
+                }
+                sceneIndex = static_cast<std::size_t>(*declaredSceneIndex);
+            }
+            if (sceneIndex >= scenesIt->size())
+            {
+                return Core::Err<RawActiveSceneContract>(Core::ErrorCode::OutOfRange);
+            }
+
+            const nlohmann::json& rawScene = (*scenesIt)[sceneIndex];
+            if (!rawScene.is_object())
+            {
+                return Core::Err<RawActiveSceneContract>(
+                    Core::ErrorCode::AssetInvalidData);
+            }
+
+            std::vector<int> rootNodeIndices{};
+            const auto rootsIt = rawScene.find("nodes");
+            if (rootsIt != rawScene.end())
+            {
+                auto roots = ReadRawIndexArray(*rootsIt);
+                if (!roots.has_value())
+                {
+                    return Core::Err<RawActiveSceneContract>(roots.error());
+                }
+                rootNodeIndices = std::move(*roots);
+            }
+            return RawActiveSceneContract{
+                .SceneIndex = sceneIndex,
+                .RootNodeIndices = std::move(rootNodeIndices),
+            };
+        }
+
+        struct RawNodeContract
+        {
+            int MeshIndex{-1};
+            std::vector<int> ChildNodeIndices{};
+        };
+
+        [[nodiscard]] Core::Expected<RawNodeContract> ReadRawNodeContract(
+            const nlohmann::json& sourceDocument,
+            const std::size_t nodeIndex)
+        {
+            const auto nodesIt = sourceDocument.find("nodes");
+            if (nodesIt == sourceDocument.end() || !nodesIt->is_array()
+                || nodeIndex >= nodesIt->size())
+            {
+                return Core::Err<RawNodeContract>(Core::ErrorCode::AssetInvalidData);
+            }
+
+            const nlohmann::json& rawNode = (*nodesIt)[nodeIndex];
+            if (!rawNode.is_object())
+            {
+                return Core::Err<RawNodeContract>(Core::ErrorCode::AssetInvalidData);
+            }
+            if (rawNode.contains("matrix")
+                && (rawNode.contains("translation")
+                    || rawNode.contains("rotation")
+                    || rawNode.contains("scale")))
+            {
+                return Core::Err<RawNodeContract>(Core::ErrorCode::AssetInvalidData);
+            }
+
+            Core::Result transformResult = ValidateRawNumericArray(rawNode, "matrix", 16u);
+            transformResult = Combine(
+                std::move(transformResult),
+                ValidateRawNumericArray(rawNode, "translation", 3u));
+            transformResult = Combine(
+                std::move(transformResult),
+                ValidateRawNumericArray(rawNode, "rotation", 4u));
+            transformResult = Combine(
+                std::move(transformResult),
+                ValidateRawNumericArray(rawNode, "scale", 3u));
+            if (!transformResult.has_value())
+            {
+                return Core::Err<RawNodeContract>(transformResult.error());
+            }
+
+            RawNodeContract contract{};
+            const auto meshIt = rawNode.find("mesh");
+            if (meshIt != rawNode.end())
+            {
+                auto meshIndex = ReadRawNonnegativeInteger(*meshIt);
+                if (!meshIndex.has_value())
+                {
+                    return Core::Err<RawNodeContract>(meshIndex.error());
+                }
+                contract.MeshIndex = *meshIndex;
+            }
+
+            const auto childrenIt = rawNode.find("children");
+            if (childrenIt != rawNode.end())
+            {
+                auto children = ReadRawIndexArray(*childrenIt);
+                if (!children.has_value())
+                {
+                    return Core::Err<RawNodeContract>(children.error());
+                }
+                contract.ChildNodeIndices = std::move(*children);
+            }
+            return contract;
+        }
+
+        [[nodiscard]] Core::Expected<std::array<float, 16>> BuildNodeLocalTransform(
+            const tinygltf::Node& node)
+        {
+            using LocalTransform = std::array<float, 16>;
+
+            if (!node.matrix.empty())
+            {
+                if (node.matrix.size() != 16u)
+                {
+                    return Core::Err<LocalTransform>(Core::ErrorCode::AssetInvalidData);
+                }
+
+                LocalTransform transform{};
+                for (std::size_t i = 0u; i < transform.size(); ++i)
+                {
+                    if (!ToFiniteFloat(node.matrix[i], transform[i]))
+                    {
+                        return Core::Err<LocalTransform>(Core::ErrorCode::AssetInvalidData);
+                    }
+                }
+                return transform;
+            }
+
+            if ((!node.translation.empty() && node.translation.size() != 3u)
+                || (!node.rotation.empty() && node.rotation.size() != 4u)
+                || (!node.scale.empty() && node.scale.size() != 3u))
+            {
+                return Core::Err<LocalTransform>(Core::ErrorCode::AssetInvalidData);
+            }
+
+            std::array<double, 3> translation{0.0, 0.0, 0.0};
+            std::array<double, 3> scale{1.0, 1.0, 1.0};
+            std::array<double, 4> rotation{0.0, 0.0, 0.0, 1.0};
+            if (!node.translation.empty())
+            {
+                std::copy(node.translation.begin(), node.translation.end(), translation.begin());
+            }
+            if (!node.scale.empty())
+            {
+                std::copy(node.scale.begin(), node.scale.end(), scale.begin());
+            }
+            if (!node.rotation.empty())
+            {
+                std::copy(node.rotation.begin(), node.rotation.end(), rotation.begin());
+            }
+
+            float finiteValue = 0.0f;
+            for (const double value : translation)
+            {
+                if (!ToFiniteFloat(value, finiteValue))
+                {
+                    return Core::Err<LocalTransform>(Core::ErrorCode::AssetInvalidData);
+                }
+            }
+            for (const double value : scale)
+            {
+                if (!ToFiniteFloat(value, finiteValue))
+                {
+                    return Core::Err<LocalTransform>(Core::ErrorCode::AssetInvalidData);
+                }
+            }
+            for (const double value : rotation)
+            {
+                if (!ToFiniteFloat(value, finiteValue))
+                {
+                    return Core::Err<LocalTransform>(Core::ErrorCode::AssetInvalidData);
+                }
+            }
+
+            const double quaternionNormSquared = rotation[0] * rotation[0]
+                + rotation[1] * rotation[1]
+                + rotation[2] * rotation[2]
+                + rotation[3] * rotation[3];
+            if (!std::isfinite(quaternionNormSquared)
+                || quaternionNormSquared <= std::numeric_limits<double>::epsilon())
+            {
+                return Core::Err<LocalTransform>(Core::ErrorCode::AssetInvalidData);
+            }
+
+            const double quaternionNorm = std::sqrt(quaternionNormSquared);
+            if (std::abs(quaternionNorm - 1.0) > 1.0e-3)
+            {
+                return Core::Err<LocalTransform>(Core::ErrorCode::AssetInvalidData);
+            }
+
+            const double x = rotation[0] / quaternionNorm;
+            const double y = rotation[1] / quaternionNorm;
+            const double z = rotation[2] / quaternionNorm;
+            const double w = rotation[3] / quaternionNorm;
+            const double xx = x * x;
+            const double yy = y * y;
+            const double zz = z * z;
+            const double xy = x * y;
+            const double xz = x * z;
+            const double yz = y * z;
+            const double xw = x * w;
+            const double yw = y * w;
+            const double zw = z * w;
+
+            const std::array<double, 16> transformDouble{
+                (1.0 - 2.0 * (yy + zz)) * scale[0],
+                (2.0 * (xy + zw)) * scale[0],
+                (2.0 * (xz - yw)) * scale[0],
+                0.0,
+                (2.0 * (xy - zw)) * scale[1],
+                (1.0 - 2.0 * (xx + zz)) * scale[1],
+                (2.0 * (yz + xw)) * scale[1],
+                0.0,
+                (2.0 * (xz + yw)) * scale[2],
+                (2.0 * (yz - xw)) * scale[2],
+                (1.0 - 2.0 * (xx + yy)) * scale[2],
+                0.0,
+                translation[0],
+                translation[1],
+                translation[2],
+                1.0,
+            };
+
+            LocalTransform transform{};
+            for (std::size_t i = 0u; i < transform.size(); ++i)
+            {
+                if (!ToFiniteFloat(transformDouble[i], transform[i]))
+                {
+                    return Core::Err<LocalTransform>(Core::ErrorCode::AssetInvalidData);
+                }
+            }
+            return transform;
+        }
+
+        enum class PrimitiveCacheState : std::uint8_t
+        {
+            Unvisited,
+            Skipped,
+            Ready,
+        };
+
+        struct PrimitiveCacheEntry
+        {
+            PrimitiveCacheState State{PrimitiveCacheState::Unvisited};
+            std::uint32_t PayloadIndex{Assets::kInvalidAssetModelIndex};
+        };
+
+        [[nodiscard]] Core::Expected<std::vector<std::uint32_t>> ResolveMeshPrimitives(
+            const tinygltf::Model& model,
+            const std::size_t meshIndex,
+            const Assets::AssetModelTextureIORequest& request,
+            std::vector<std::vector<PrimitiveCacheEntry>>& primitiveCache,
+            Assets::AssetModelScenePayload& payload)
+        {
+            if (meshIndex >= model.meshes.size())
+            {
+                return Core::Err<std::vector<std::uint32_t>>(
+                    Core::ErrorCode::OutOfRange);
+            }
+
+            const tinygltf::Mesh& mesh = model.meshes[meshIndex];
+            std::vector<std::uint32_t> references{};
+            references.reserve(mesh.primitives.size());
+            for (std::size_t primitiveIndex = 0u;
+                 primitiveIndex < mesh.primitives.size();
+                 ++primitiveIndex)
+            {
+                PrimitiveCacheEntry& cached = primitiveCache[meshIndex][primitiveIndex];
+                if (cached.State == PrimitiveCacheState::Skipped)
+                {
+                    continue;
+                }
+                if (cached.State == PrimitiveCacheState::Ready)
+                {
+                    references.push_back(cached.PayloadIndex);
+                    continue;
+                }
+
+                const tinygltf::Primitive& primitive = mesh.primitives[primitiveIndex];
+                if (primitive.material < -1
+                    || (primitive.material >= 0
+                        && static_cast<std::size_t>(primitive.material)
+                            >= model.materials.size()))
+                {
+                    return Core::Err<std::vector<std::uint32_t>>(
+                        Core::ErrorCode::OutOfRange);
+                }
+
+                auto meshPayload = BuildMeshPayload(
+                    model,
+                    primitive,
+                    request.Path,
+                    request.BasePath);
+                if (!meshPayload.has_value())
+                {
+                    if (meshPayload.error() == Core::ErrorCode::AssetUnsupportedFormat)
+                    {
+                        cached.State = PrimitiveCacheState::Skipped;
+                        continue;
+                    }
+                    return Core::Err<std::vector<std::uint32_t>>(meshPayload.error());
+                }
+
+                if (payload.GeometryPayloads.size() >= Assets::kInvalidAssetModelIndex
+                    || payload.Primitives.size() >= Assets::kInvalidAssetModelIndex
+                    || meshPayload->Vertices.Size()
+                        > static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()))
+                {
+                    return Core::Err<std::vector<std::uint32_t>>(
+                        Core::ErrorCode::OutOfRange);
+                }
+
+                std::uint32_t indexCount = 0u;
+                const auto faceVertices = meshPayload->Faces.Get<std::vector<std::uint32_t>>(
+                    "f:vertices");
+                if (faceVertices)
+                {
+                    for (const std::vector<std::uint32_t>& face : faceVertices.Vector())
+                    {
+                        if (face.size()
+                            > static_cast<std::size_t>(
+                                std::numeric_limits<std::uint32_t>::max() - indexCount))
+                        {
+                            return Core::Err<std::vector<std::uint32_t>>(
+                                Core::ErrorCode::OutOfRange);
+                        }
+                        indexCount += static_cast<std::uint32_t>(face.size());
+                    }
+                }
+
+                const std::uint32_t geometryIndex = static_cast<std::uint32_t>(
+                    payload.GeometryPayloads.size());
+                const std::uint32_t prototypeIndex = static_cast<std::uint32_t>(
+                    payload.Primitives.size());
+                const std::size_t vertexCount = meshPayload->Vertices.Size();
+                payload.GeometryPayloads.push_back(Assets::AssetGeometryPayload::Make(
+                    Assets::AssetPayloadKind::Mesh,
+                    std::move(*meshPayload),
+                    "Geometry::MeshIO::MeshIOResult"));
+                payload.Primitives.push_back(Assets::AssetModelPrimitivePayload{
+                    .Name = mesh.name.empty()
+                        ? "mesh-" + std::to_string(meshIndex) + "-primitive-"
+                            + std::to_string(primitiveIndex)
+                        : mesh.name,
+                    .GeometryKind = Assets::AssetPayloadKind::Mesh,
+                    .GeometryPayloadIndex = geometryIndex,
+                    .MaterialIndex = primitive.material >= 0
+                        ? static_cast<std::uint32_t>(primitive.material)
+                        : Assets::kInvalidAssetModelIndex,
+                    .VertexCount = static_cast<std::uint32_t>(vertexCount),
+                    .IndexCount = indexCount,
+                });
+
+                cached.State = PrimitiveCacheState::Ready;
+                cached.PayloadIndex = prototypeIndex;
+                references.push_back(prototypeIndex);
+            }
+            return references;
+        }
+
+        enum class NodeVisitState : std::uint8_t
+        {
+            Unvisited,
+            Visiting,
+            Complete,
+        };
+
+        struct NodeTraversalFrame
+        {
+            std::size_t SourceNodeIndex{0u};
+            std::uint32_t PayloadNodeIndex{Assets::kInvalidAssetModelIndex};
+            std::size_t NextChildIndex{0u};
+        };
+
         [[nodiscard]] Core::Expected<Assets::AssetModelScenePayload> BuildScenePayload(
             tinygltf::Model model,
             const Assets::AssetModelTextureIORequest& request,
@@ -892,6 +1425,17 @@ namespace Extrinsic::Runtime
             Assets::AssetModelScenePayload payload{};
             payload.SourcePath = request.Path;
             payload.ExternalResourceDiagnostics = std::move(diagnostics);
+
+            auto sourceDocument = ParseSourceJsonDocument(request);
+            if (!sourceDocument.has_value())
+            {
+                return Core::Err<Assets::AssetModelScenePayload>(sourceDocument.error());
+            }
+            auto rawActiveScene = ReadRawActiveSceneContract(*sourceDocument);
+            if (!rawActiveScene.has_value())
+            {
+                return Core::Err<Assets::AssetModelScenePayload>(rawActiveScene.error());
+            }
 
             std::vector<std::uint32_t> imageToPayload(
                 model.images.size(),
@@ -916,57 +1460,185 @@ namespace Extrinsic::Runtime
                 payload.Materials.push_back(BuildMaterialPayload(model, material, imageToPayload));
             }
 
-            for (std::size_t meshIndex = 0u; meshIndex < model.meshes.size(); ++meshIndex)
+            if (model.scenes.empty())
             {
-                const tinygltf::Mesh& mesh = model.meshes[meshIndex];
-                for (std::size_t primitiveIndex = 0u;
-                     primitiveIndex < mesh.primitives.size();
-                     ++primitiveIndex)
+                return Core::Err<Assets::AssetModelScenePayload>(
+                    Core::ErrorCode::AssetInvalidData);
+            }
+            const std::size_t activeSceneIndex = rawActiveScene->SceneIndex;
+            if (activeSceneIndex >= model.scenes.size())
+            {
+                return Core::Err<Assets::AssetModelScenePayload>(
+                    Core::ErrorCode::OutOfRange);
+            }
+            const auto declaredSceneIt = sourceDocument->find("scene");
+            if ((declaredSceneIt == sourceDocument->end() && model.defaultScene != -1)
+                || (declaredSceneIt != sourceDocument->end()
+                    && (model.defaultScene < 0
+                        || static_cast<std::size_t>(model.defaultScene)
+                            != activeSceneIndex))
+                || model.scenes[activeSceneIndex].nodes
+                    != rawActiveScene->RootNodeIndices)
+            {
+                return Core::Err<Assets::AssetModelScenePayload>(
+                    Core::ErrorCode::AssetInvalidData);
+            }
+
+            std::vector<std::vector<PrimitiveCacheEntry>> primitiveCache{};
+            primitiveCache.reserve(model.meshes.size());
+            for (const tinygltf::Mesh& mesh : model.meshes)
+            {
+                primitiveCache.emplace_back(mesh.primitives.size());
+            }
+
+            std::vector<NodeVisitState> nodeStates(
+                model.nodes.size(),
+                NodeVisitState::Unvisited);
+
+            const auto appendNode =
+                [&](const std::size_t sourceNodeIndex,
+                    const std::uint32_t parentNodeIndex)
+                    -> Core::Expected<std::uint32_t>
+            {
+                if (sourceNodeIndex >= model.nodes.size()
+                    || payload.Nodes.size() >= Assets::kInvalidAssetModelIndex)
                 {
-                    const tinygltf::Primitive& primitive = mesh.primitives[primitiveIndex];
-                    auto meshPayload = BuildMeshPayload(
+                    return Core::Err<std::uint32_t>(Core::ErrorCode::OutOfRange);
+                }
+
+                auto rawNode = ReadRawNodeContract(
+                    *sourceDocument,
+                    sourceNodeIndex);
+                if (!rawNode.has_value())
+                {
+                    return Core::Err<std::uint32_t>(rawNode.error());
+                }
+
+                const tinygltf::Node& sourceNode = model.nodes[sourceNodeIndex];
+                if (sourceNode.mesh != rawNode->MeshIndex
+                    || sourceNode.children != rawNode->ChildNodeIndices)
+                {
+                    return Core::Err<std::uint32_t>(
+                        Core::ErrorCode::AssetInvalidData);
+                }
+                auto localTransform = BuildNodeLocalTransform(sourceNode);
+                if (!localTransform.has_value())
+                {
+                    return Core::Err<std::uint32_t>(localTransform.error());
+                }
+
+                if (sourceNode.mesh < -1)
+                {
+                    return Core::Err<std::uint32_t>(Core::ErrorCode::OutOfRange);
+                }
+                std::vector<std::uint32_t> primitiveReferences{};
+                if (sourceNode.mesh >= 0)
+                {
+                    const std::size_t meshIndex = static_cast<std::size_t>(sourceNode.mesh);
+                    if (meshIndex >= model.meshes.size())
+                    {
+                        return Core::Err<std::uint32_t>(Core::ErrorCode::OutOfRange);
+                    }
+                    auto resolvedPrimitives = ResolveMeshPrimitives(
                         model,
-                        primitive,
-                        request.Path,
-                        request.BasePath);
-                    if (!meshPayload.has_value())
+                        meshIndex,
+                        request,
+                        primitiveCache,
+                        payload);
+                    if (!resolvedPrimitives.has_value())
                     {
-                        if (meshPayload.error() == Core::ErrorCode::AssetUnsupportedFormat)
-                        {
-                            continue;
-                        }
-                        return Core::Err<Assets::AssetModelScenePayload>(meshPayload.error());
+                        return Core::Err<std::uint32_t>(resolvedPrimitives.error());
+                    }
+                    primitiveReferences = std::move(*resolvedPrimitives);
+                }
+
+                const std::uint32_t payloadNodeIndex = static_cast<std::uint32_t>(
+                    payload.Nodes.size());
+                payload.Nodes.push_back(Assets::AssetModelNodePayload{
+                    .Name = sourceNode.name,
+                    .ParentNodeIndex = parentNodeIndex,
+                    .LocalTransform = *localTransform,
+                    .ChildNodeIndices = {},
+                    .PrimitiveIndices = std::move(primitiveReferences),
+                });
+                return payloadNodeIndex;
+            };
+
+            for (const int rootSourceIndexSigned : rawActiveScene->RootNodeIndices)
+            {
+                if (rootSourceIndexSigned < 0
+                    || static_cast<std::size_t>(rootSourceIndexSigned)
+                        >= model.nodes.size())
+                {
+                    return Core::Err<Assets::AssetModelScenePayload>(
+                        Core::ErrorCode::OutOfRange);
+                }
+                const std::size_t rootSourceIndex = static_cast<std::size_t>(
+                    rootSourceIndexSigned);
+                if (nodeStates[rootSourceIndex] != NodeVisitState::Unvisited)
+                {
+                    return Core::Err<Assets::AssetModelScenePayload>(
+                        Core::ErrorCode::AssetInvalidData);
+                }
+
+                auto rootPayloadIndex = appendNode(
+                    rootSourceIndex,
+                    Assets::kInvalidAssetModelIndex);
+                if (!rootPayloadIndex.has_value())
+                {
+                    return Core::Err<Assets::AssetModelScenePayload>(
+                        rootPayloadIndex.error());
+                }
+                nodeStates[rootSourceIndex] = NodeVisitState::Visiting;
+                payload.RootNodeIndices.push_back(*rootPayloadIndex);
+
+                std::vector<NodeTraversalFrame> traversalStack{};
+                traversalStack.push_back(NodeTraversalFrame{
+                    .SourceNodeIndex = rootSourceIndex,
+                    .PayloadNodeIndex = *rootPayloadIndex,
+                });
+                while (!traversalStack.empty())
+                {
+                    NodeTraversalFrame& frame = traversalStack.back();
+                    const tinygltf::Node& sourceNode = model.nodes[frame.SourceNodeIndex];
+                    if (frame.NextChildIndex >= sourceNode.children.size())
+                    {
+                        nodeStates[frame.SourceNodeIndex] = NodeVisitState::Complete;
+                        traversalStack.pop_back();
+                        continue;
                     }
 
-                    const std::uint32_t geometryIndex = static_cast<std::uint32_t>(
-                        payload.GeometryPayloads.size());
-                    const std::size_t vertexCount = meshPayload->Vertices.Size();
-                    const auto faceVertices = meshPayload->Faces.Get<std::vector<std::uint32_t>>(
-                        "f:vertices");
-                    std::uint32_t indexCount = 0u;
-                    if (faceVertices)
+                    const int childSourceIndexSigned =
+                        sourceNode.children[frame.NextChildIndex++];
+                    if (childSourceIndexSigned < 0
+                        || static_cast<std::size_t>(childSourceIndexSigned)
+                            >= model.nodes.size())
                     {
-                        for (const std::vector<std::uint32_t>& face : faceVertices.Vector())
-                        {
-                            indexCount += static_cast<std::uint32_t>(face.size());
-                        }
+                        return Core::Err<Assets::AssetModelScenePayload>(
+                            Core::ErrorCode::OutOfRange);
+                    }
+                    const std::size_t childSourceIndex = static_cast<std::size_t>(
+                        childSourceIndexSigned);
+                    if (nodeStates[childSourceIndex] != NodeVisitState::Unvisited)
+                    {
+                        return Core::Err<Assets::AssetModelScenePayload>(
+                            Core::ErrorCode::AssetInvalidData);
                     }
 
-                    payload.GeometryPayloads.push_back(Assets::AssetGeometryPayload::Make(
-                        Assets::AssetPayloadKind::Mesh,
-                        std::move(*meshPayload),
-                        "Geometry::MeshIO::MeshIOResult"));
-                    payload.Primitives.push_back(Assets::AssetModelPrimitivePayload{
-                        .Name = mesh.name.empty()
-                            ? "mesh-" + std::to_string(meshIndex) + "-primitive-" + std::to_string(primitiveIndex)
-                            : mesh.name,
-                        .GeometryKind = Assets::AssetPayloadKind::Mesh,
-                        .GeometryPayloadIndex = geometryIndex,
-                        .MaterialIndex = primitive.material >= 0
-                            ? static_cast<std::uint32_t>(primitive.material)
-                            : Assets::kInvalidAssetModelIndex,
-                        .VertexCount = static_cast<std::uint32_t>(vertexCount),
-                        .IndexCount = indexCount,
+                    auto childPayloadIndex = appendNode(
+                        childSourceIndex,
+                        frame.PayloadNodeIndex);
+                    if (!childPayloadIndex.has_value())
+                    {
+                        return Core::Err<Assets::AssetModelScenePayload>(
+                            childPayloadIndex.error());
+                    }
+                    nodeStates[childSourceIndex] = NodeVisitState::Visiting;
+                    payload.Nodes[frame.PayloadNodeIndex].ChildNodeIndices.push_back(
+                        *childPayloadIndex);
+                    traversalStack.push_back(NodeTraversalFrame{
+                        .SourceNodeIndex = childSourceIndex,
+                        .PayloadNodeIndex = *childPayloadIndex,
                     });
                 }
             }

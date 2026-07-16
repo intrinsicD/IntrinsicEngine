@@ -1,5 +1,6 @@
 module;
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -92,6 +93,143 @@ namespace Extrinsic::Assets
             return diagnostic.Error == Core::ErrorCode::Success
                 ? Core::Err(Core::ErrorCode::InvalidArgument)
                 : Core::Ok();
+        }
+
+        [[nodiscard]] Core::Result ValidateNodeTopology(
+            const std::span<const AssetModelNodePayload> nodes,
+            const std::span<const std::uint32_t> rootNodeIndices,
+            const std::size_t primitiveCount)
+        {
+            if (nodes.empty() || rootNodeIndices.empty() || primitiveCount == 0u)
+            {
+                return Core::Err(Core::ErrorCode::AssetInvalidData);
+            }
+
+            std::vector<std::uint8_t> rootMembership(nodes.size(), 0u);
+            for (const std::uint32_t rootNodeIndex : rootNodeIndices)
+            {
+                if (rootNodeIndex >= nodes.size())
+                {
+                    return Core::Err(Core::ErrorCode::OutOfRange);
+                }
+                if (rootMembership[rootNodeIndex] != 0u)
+                {
+                    return Core::Err(Core::ErrorCode::AssetInvalidData);
+                }
+                rootMembership[rootNodeIndex] = 1u;
+            }
+
+            std::vector<std::uint8_t> primitiveReferenced(primitiveCount, 0u);
+            for (std::size_t nodeIndex = 0u; nodeIndex < nodes.size(); ++nodeIndex)
+            {
+                const AssetModelNodePayload& node = nodes[nodeIndex];
+                for (const float component : node.LocalTransform)
+                {
+                    if (!std::isfinite(component))
+                    {
+                        return Core::Err(Core::ErrorCode::AssetInvalidData);
+                    }
+                }
+
+                if (node.ParentNodeIndex != kInvalidAssetModelIndex
+                    && node.ParentNodeIndex >= nodes.size())
+                {
+                    return Core::Err(Core::ErrorCode::OutOfRange);
+                }
+
+                for (const std::uint32_t childNodeIndex : node.ChildNodeIndices)
+                {
+                    if (childNodeIndex >= nodes.size())
+                    {
+                        return Core::Err(Core::ErrorCode::OutOfRange);
+                    }
+                }
+
+                for (const std::uint32_t primitiveIndex : node.PrimitiveIndices)
+                {
+                    if (primitiveIndex >= primitiveCount)
+                    {
+                        return Core::Err(Core::ErrorCode::OutOfRange);
+                    }
+                    primitiveReferenced[primitiveIndex] = 1u;
+                }
+            }
+
+            std::vector<std::uint8_t> childReferenceCount(nodes.size(), 0u);
+            for (std::size_t nodeIndex = 0u; nodeIndex < nodes.size(); ++nodeIndex)
+            {
+                for (const std::uint32_t childNodeIndex :
+                     nodes[nodeIndex].ChildNodeIndices)
+                {
+                    if (childReferenceCount[childNodeIndex] != 0u)
+                    {
+                        return Core::Err(Core::ErrorCode::AssetInvalidData);
+                    }
+                    childReferenceCount[childNodeIndex] = 1u;
+                    if (nodes[childNodeIndex].ParentNodeIndex != nodeIndex)
+                    {
+                        return Core::Err(Core::ErrorCode::AssetInvalidData);
+                    }
+                }
+            }
+
+            for (std::size_t nodeIndex = 0u; nodeIndex < nodes.size(); ++nodeIndex)
+            {
+                const AssetModelNodePayload& node = nodes[nodeIndex];
+                if (rootMembership[nodeIndex] != 0u)
+                {
+                    if (node.ParentNodeIndex != kInvalidAssetModelIndex
+                        || childReferenceCount[nodeIndex] != 0u)
+                    {
+                        return Core::Err(Core::ErrorCode::AssetInvalidData);
+                    }
+                }
+                else if (node.ParentNodeIndex == kInvalidAssetModelIndex
+                    || childReferenceCount[nodeIndex] != 1u)
+                {
+                    return Core::Err(Core::ErrorCode::AssetInvalidData);
+                }
+            }
+
+            for (const std::uint8_t referenced : primitiveReferenced)
+            {
+                if (referenced == 0u)
+                {
+                    return Core::Err(Core::ErrorCode::AssetInvalidData);
+                }
+            }
+
+            std::vector<std::uint8_t> reachable(nodes.size(), 0u);
+            std::vector<std::size_t> pendingNodes{};
+            pendingNodes.reserve(nodes.size());
+            for (const std::uint32_t rootNodeIndex : rootNodeIndices)
+            {
+                pendingNodes.push_back(rootNodeIndex);
+            }
+            while (!pendingNodes.empty())
+            {
+                const std::size_t nodeIndex = pendingNodes.back();
+                pendingNodes.pop_back();
+                if (reachable[nodeIndex] != 0u)
+                {
+                    return Core::Err(Core::ErrorCode::AssetInvalidData);
+                }
+                reachable[nodeIndex] = 1u;
+                for (const std::uint32_t childNodeIndex :
+                     nodes[nodeIndex].ChildNodeIndices)
+                {
+                    pendingNodes.push_back(childNodeIndex);
+                }
+            }
+
+            for (const std::uint8_t isReachable : reachable)
+            {
+                if (isReachable == 0u)
+                {
+                    return Core::Err(Core::ErrorCode::AssetInvalidData);
+                }
+            }
+            return Core::Ok();
         }
 
         [[nodiscard]] bool TextureByteCountFits(
@@ -218,7 +356,9 @@ namespace Extrinsic::Assets
 
     Core::Result ValidateAssetModelScenePayload(const AssetModelScenePayload& payload)
     {
-        if (payload.Primitives.empty())
+        if (payload.RootNodeIndices.empty()
+            || payload.Nodes.empty()
+            || payload.Primitives.empty())
         {
             return Core::Err(Core::ErrorCode::AssetInvalidData);
         }
@@ -262,6 +402,15 @@ namespace Extrinsic::Assets
             {
                 return validPrimitive;
             }
+        }
+
+        if (Core::Result validNodeTopology = ValidateNodeTopology(
+                payload.Nodes,
+                payload.RootNodeIndices,
+                payload.Primitives.size());
+            !validNodeTopology.has_value())
+        {
+            return validNodeTopology;
         }
 
         for (const AssetModelExternalResourceDiagnostic& diagnostic :

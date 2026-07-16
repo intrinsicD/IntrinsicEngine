@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -71,6 +73,10 @@ namespace
             .MaterialIndex = 0u,
             .VertexCount = 3u,
             .IndexCount = 3u});
+        payload.RootNodeIndices.push_back(0u);
+        payload.Nodes.push_back(AssetModelNodePayload{
+            .Name = "root",
+            .PrimitiveIndices = {0u}});
         payload.ExternalResourceDiagnostics.push_back(
             AssetModelExternalResourceDiagnostic{
                 .ResourceKind = AssetModelResourceKind::Buffer,
@@ -78,6 +84,16 @@ namespace
                 .Error = ErrorCode::Success,
                 .Uri = "scene.bin"});
         return payload;
+    }
+
+    void AddHierarchyOnlyChild(AssetModelScenePayload& payload)
+    {
+        const auto childNodeIndex =
+            static_cast<std::uint32_t>(payload.Nodes.size());
+        payload.Nodes[0].ChildNodeIndices.push_back(childNodeIndex);
+        payload.Nodes.push_back(AssetModelNodePayload{
+            .Name = "group",
+            .ParentNodeIndex = 0u});
     }
 
     struct TmpFile
@@ -149,6 +165,11 @@ TEST(AssetModelTexturePayload, TexturePayloadValidationRejectsBadMetadata)
 TEST(AssetModelTexturePayload, ModelScenePayloadValidatesPrimitiveMaterialAndImageRefs)
 {
     const AssetModelScenePayload payload = MakeModelPayload();
+    constexpr std::array<float, 16> identity{
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f};
 
     EXPECT_TRUE(ValidateAssetModelScenePayload(payload).has_value());
     EXPECT_TRUE(IsSupportedModelSceneImportFormat(AssetFileFormat::GLB));
@@ -156,6 +177,11 @@ TEST(AssetModelTexturePayload, ModelScenePayloadValidatesPrimitiveMaterialAndIma
     ASSERT_EQ(payload.GeometryPayloads.size(), 1u);
     EXPECT_EQ(payload.GeometryPayloads[0].PayloadKind, AssetPayloadKind::Mesh);
     EXPECT_TRUE(payload.GeometryPayloads[0].Read<FakeGeometryPayload>().has_value());
+    ASSERT_EQ(payload.RootNodeIndices.size(), 1u);
+    ASSERT_EQ(payload.Nodes.size(), 1u);
+    EXPECT_EQ(payload.Nodes[0].ParentNodeIndex, kInvalidAssetModelIndex);
+    EXPECT_EQ(payload.Nodes[0].LocalTransform, identity);
+    EXPECT_EQ(payload.Nodes[0].PrimitiveIndices, std::vector<std::uint32_t>{0u});
     EXPECT_STREQ(
         DebugNameForAssetModelResourceStatus(
             payload.ExternalResourceDiagnostics[0].Status),
@@ -194,6 +220,144 @@ TEST(AssetModelTexturePayload, ModelScenePayloadRejectsInvalidReferences)
     EXPECT_EQ(
         ValidateAssetModelScenePayload(badMaterialReference).error(),
         ErrorCode::OutOfRange);
+}
+
+TEST(AssetModelTexturePayload, ModelScenePayloadRequiresCompleteReferencedTopology)
+{
+    AssetModelScenePayload emptyRoots = MakeModelPayload();
+    emptyRoots.RootNodeIndices.clear();
+    EXPECT_EQ(
+        ValidateAssetModelScenePayload(emptyRoots).error(),
+        ErrorCode::AssetInvalidData);
+
+    AssetModelScenePayload emptyNodes = MakeModelPayload();
+    emptyNodes.Nodes.clear();
+    EXPECT_EQ(
+        ValidateAssetModelScenePayload(emptyNodes).error(),
+        ErrorCode::AssetInvalidData);
+
+    AssetModelScenePayload unreferencedPrototype = MakeModelPayload();
+    unreferencedPrototype.Primitives.push_back(
+        unreferencedPrototype.Primitives.front());
+    EXPECT_EQ(
+        ValidateAssetModelScenePayload(unreferencedPrototype).error(),
+        ErrorCode::AssetInvalidData);
+
+    AssetModelScenePayload hierarchyOnlyNode = MakeModelPayload();
+    AddHierarchyOnlyChild(hierarchyOnlyNode);
+    EXPECT_TRUE(ValidateAssetModelScenePayload(hierarchyOnlyNode).has_value());
+
+    AssetModelScenePayload sharedPrototype = MakeModelPayload();
+    AddHierarchyOnlyChild(sharedPrototype);
+    sharedPrototype.Nodes[1].PrimitiveIndices.push_back(0u);
+    EXPECT_TRUE(ValidateAssetModelScenePayload(sharedPrototype).has_value());
+}
+
+TEST(AssetModelTexturePayload, ModelScenePayloadRejectsOutOfRangeNodeReferences)
+{
+    AssetModelScenePayload badRoot = MakeModelPayload();
+    badRoot.RootNodeIndices[0] = 99u;
+    EXPECT_EQ(
+        ValidateAssetModelScenePayload(badRoot).error(),
+        ErrorCode::OutOfRange);
+
+    AssetModelScenePayload badParent = MakeModelPayload();
+    AddHierarchyOnlyChild(badParent);
+    badParent.Nodes[1].ParentNodeIndex = 99u;
+    EXPECT_EQ(
+        ValidateAssetModelScenePayload(badParent).error(),
+        ErrorCode::OutOfRange);
+
+    AssetModelScenePayload badChild = MakeModelPayload();
+    badChild.Nodes[0].ChildNodeIndices.push_back(99u);
+    EXPECT_EQ(
+        ValidateAssetModelScenePayload(badChild).error(),
+        ErrorCode::OutOfRange);
+
+    AssetModelScenePayload badPrimitive = MakeModelPayload();
+    badPrimitive.Nodes[0].PrimitiveIndices[0] = 99u;
+    EXPECT_EQ(
+        ValidateAssetModelScenePayload(badPrimitive).error(),
+        ErrorCode::OutOfRange);
+}
+
+TEST(AssetModelTexturePayload, ModelScenePayloadRejectsNonFiniteNodeTransforms)
+{
+    AssetModelScenePayload infiniteTransform = MakeModelPayload();
+    infiniteTransform.Nodes[0].LocalTransform[5] =
+        std::numeric_limits<float>::infinity();
+    EXPECT_EQ(
+        ValidateAssetModelScenePayload(infiniteTransform).error(),
+        ErrorCode::AssetInvalidData);
+
+    AssetModelScenePayload nanTransform = MakeModelPayload();
+    nanTransform.Nodes[0].LocalTransform[12] =
+        std::numeric_limits<float>::quiet_NaN();
+    EXPECT_EQ(
+        ValidateAssetModelScenePayload(nanTransform).error(),
+        ErrorCode::AssetInvalidData);
+}
+
+TEST(AssetModelTexturePayload, ModelScenePayloadRejectsInconsistentOrDuplicateParentage)
+{
+    AssetModelScenePayload inconsistentParent = MakeModelPayload();
+    AddHierarchyOnlyChild(inconsistentParent);
+    inconsistentParent.Nodes[1].ParentNodeIndex = 1u;
+    EXPECT_EQ(
+        ValidateAssetModelScenePayload(inconsistentParent).error(),
+        ErrorCode::AssetInvalidData);
+
+    AssetModelScenePayload missingParentEdge = MakeModelPayload();
+    AddHierarchyOnlyChild(missingParentEdge);
+    missingParentEdge.Nodes[0].ChildNodeIndices.clear();
+    EXPECT_EQ(
+        ValidateAssetModelScenePayload(missingParentEdge).error(),
+        ErrorCode::AssetInvalidData);
+
+    AssetModelScenePayload duplicateChild = MakeModelPayload();
+    AddHierarchyOnlyChild(duplicateChild);
+    duplicateChild.Nodes[0].ChildNodeIndices.push_back(1u);
+    EXPECT_EQ(
+        ValidateAssetModelScenePayload(duplicateChild).error(),
+        ErrorCode::AssetInvalidData);
+
+    AssetModelScenePayload duplicateRoot = MakeModelPayload();
+    duplicateRoot.RootNodeIndices.push_back(0u);
+    EXPECT_EQ(
+        ValidateAssetModelScenePayload(duplicateRoot).error(),
+        ErrorCode::AssetInvalidData);
+
+    AssetModelScenePayload duplicateParent = MakeModelPayload();
+    AddHierarchyOnlyChild(duplicateParent);
+    duplicateParent.RootNodeIndices.push_back(2u);
+    duplicateParent.Nodes.push_back(AssetModelNodePayload{
+        .Name = "second-root",
+        .ChildNodeIndices = {1u}});
+    EXPECT_EQ(
+        ValidateAssetModelScenePayload(duplicateParent).error(),
+        ErrorCode::AssetInvalidData);
+}
+
+TEST(AssetModelTexturePayload, ModelScenePayloadRejectsCyclesAndUnreachableNodes)
+{
+    AssetModelScenePayload cycle = MakeModelPayload();
+    cycle.Nodes.push_back(AssetModelNodePayload{
+        .Name = "cycle-a",
+        .ParentNodeIndex = 2u,
+        .ChildNodeIndices = {2u}});
+    cycle.Nodes.push_back(AssetModelNodePayload{
+        .Name = "cycle-b",
+        .ParentNodeIndex = 1u,
+        .ChildNodeIndices = {1u}});
+    EXPECT_EQ(
+        ValidateAssetModelScenePayload(cycle).error(),
+        ErrorCode::AssetInvalidData);
+
+    AssetModelScenePayload unreachable = MakeModelPayload();
+    unreachable.Nodes.push_back(AssetModelNodePayload{.Name = "orphan"});
+    EXPECT_EQ(
+        ValidateAssetModelScenePayload(unreachable).error(),
+        ErrorCode::AssetInvalidData);
 }
 
 TEST(AssetModelTexturePayload, ExternalResourceDiagnosticsRequireConsistentErrors)

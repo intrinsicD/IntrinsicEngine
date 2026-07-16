@@ -130,6 +130,11 @@ namespace
             .VertexCount = 3u,
             .IndexCount = 3u,
         });
+        payload.RootNodeIndices.push_back(0u);
+        payload.Nodes.push_back(Assets::AssetModelNodePayload{
+            .Name = "WorldSwitchRoot",
+            .PrimitiveIndices = {0u},
+        });
         return payload;
     }
 

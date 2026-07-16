@@ -202,6 +202,16 @@ scene-replacement lifecycle from the same main-thread apply drain. The apply
 step is the only place that mutates `AssetService`, ECS scene state,
 texture/model-scene handoffs, selection/focus state, stable entity lookup, or
 editor document history.
+
+The assets-owned model-scene payload consumed at this boundary is CPU-only. It
+identifies the active-scene roots, stores reachable nodes in deterministic
+pre-order with column-major local transforms, and lets those nodes reference
+shared primitive prototypes. The current model-scene handoff still consumes the
+payload through its existing flat primitive materialization path; materializing
+the retained hierarchy and routing the completed model through the standard
+selection and aggregate-focus policy are BUG-094 Slice B work, not current
+runtime behavior.
+
 After a geometry payload creates an entity, runtime invokes ordered
 import-authoring policies, populates the decoded geometry, then invokes ordered
 post-import processors with the decoded payload context. Processors may enqueue

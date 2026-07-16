@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -68,6 +69,16 @@ namespace
         out.insert(out.end(), bytes, bytes + sizeof(T));
     }
 
+    void AppendLittleEndianU32(
+        std::vector<std::byte>& out,
+        const std::uint32_t value)
+    {
+        out.push_back(static_cast<std::byte>(value & 0xFFu));
+        out.push_back(static_cast<std::byte>((value >> 8u) & 0xFFu));
+        out.push_back(static_cast<std::byte>((value >> 16u) & 0xFFu));
+        out.push_back(static_cast<std::byte>((value >> 24u) & 0xFFu));
+    }
+
     [[nodiscard]] std::vector<std::byte> TriangleBufferBytes()
     {
         std::vector<std::byte> out;
@@ -126,6 +137,89 @@ namespace
 })json");
     }
 
+    [[nodiscard]] std::vector<std::byte> TriangleGlbBytes()
+    {
+        std::string json = R"json({
+  "asset": {"version": "2.0"},
+  "buffers": [{"byteLength": 44}],
+  "bufferViews": [
+    {"buffer": 0, "byteOffset": 0, "byteLength": 36, "target": 34962},
+    {"buffer": 0, "byteOffset": 36, "byteLength": 6, "target": 34963}
+  ],
+  "accessors": [
+    {"bufferView": 0, "byteOffset": 0, "componentType": 5126, "count": 3, "type": "VEC3"},
+    {"bufferView": 1, "byteOffset": 0, "componentType": 5123, "count": 3, "type": "SCALAR"}
+  ],
+  "meshes": [{"name": "GlbTriangle", "primitives": [{"attributes": {"POSITION": 0}, "indices": 1}]}],
+  "nodes": [{"name": "GlbRoot", "mesh": 0, "scale": [0.25, 0.5, 0.75]}],
+  "scenes": [{"nodes": [0]}],
+  "scene": 0
+})json";
+        while (json.size() % 4u != 0u)
+        {
+            json.push_back(' ');
+        }
+
+        std::vector<std::byte> binary = TriangleBufferBytes();
+        while (binary.size() % 4u != 0u)
+        {
+            binary.push_back(std::byte{0});
+        }
+
+        constexpr std::uint32_t glbMagic = 0x46546C67u;
+        constexpr std::uint32_t glbVersion = 2u;
+        constexpr std::uint32_t jsonChunkType = 0x4E4F534Au;
+        constexpr std::uint32_t binaryChunkType = 0x004E4942u;
+        const auto totalLength = static_cast<std::uint32_t>(
+            12u + 8u + json.size() + 8u + binary.size());
+
+        std::vector<std::byte> bytes{};
+        bytes.reserve(totalLength);
+        AppendLittleEndianU32(bytes, glbMagic);
+        AppendLittleEndianU32(bytes, glbVersion);
+        AppendLittleEndianU32(bytes, totalLength);
+        AppendLittleEndianU32(bytes, static_cast<std::uint32_t>(json.size()));
+        AppendLittleEndianU32(bytes, jsonChunkType);
+        for (const char value : json)
+        {
+            bytes.push_back(
+                static_cast<std::byte>(static_cast<unsigned char>(value)));
+        }
+        AppendLittleEndianU32(bytes, static_cast<std::uint32_t>(binary.size()));
+        AppendLittleEndianU32(bytes, binaryChunkType);
+        bytes.insert(bytes.end(), binary.begin(), binary.end());
+        return bytes;
+    }
+
+    [[nodiscard]] std::string SceneGraphGltfJson(
+        const std::string_view nodes,
+        const std::string_view scenes,
+        const std::string_view defaultSceneMember)
+    {
+        return std::string(R"json({
+  "asset": {"version": "2.0"},
+  "buffers": [{"uri": "triangle.bin", "byteLength": 44}],
+  "bufferViews": [
+    {"buffer": 0, "byteOffset": 0, "byteLength": 36, "target": 34962},
+    {"buffer": 0, "byteOffset": 36, "byteLength": 6, "target": 34963}
+  ],
+  "accessors": [
+    {"bufferView": 0, "byteOffset": 0, "componentType": 5126, "count": 3, "type": "VEC3"},
+    {"bufferView": 1, "byteOffset": 0, "componentType": 5123, "count": 3, "type": "SCALAR"}
+  ],
+  "meshes": [
+    {"name": "SharedMesh", "primitives": [{"attributes": {"POSITION": 0}, "indices": 1}]},
+    {"name": "UnreachableMesh", "primitives": [{"attributes": {"POSITION": 0}, "indices": 1}]}
+  ],
+  "nodes": )json")
+            + std::string(nodes)
+            + std::string(R"json(,
+  "scenes": )json")
+            + std::string(scenes)
+            + std::string(defaultSceneMember)
+            + std::string("\n}");
+    }
+
     class FakeIOBackend final : public CoreIO::IIOBackend
     {
     public:
@@ -179,6 +273,23 @@ namespace
     private:
         std::unordered_map<std::string, std::vector<std::byte>> Files{};
     };
+
+    [[nodiscard]] Expected<AssetModelScenePayload> DecodeSceneGraph(
+        const std::string_view json)
+    {
+        FakeIOBackend backend;
+        backend.AddText("/scene/graph.gltf", json);
+        backend.Add("/scene/triangle.bin", TriangleBufferBytes());
+
+        AssetModelTextureIOBridge bridge;
+        const Core::Result registration =
+            Extrinsic::Runtime::RegisterPromotedModelTextureIOCallbacks(bridge);
+        if (!registration.has_value())
+        {
+            return Core::Err<AssetModelScenePayload>(registration.error());
+        }
+        return bridge.ImportModelScene("/scene/graph.gltf", backend);
+    }
 }
 
 TEST(RuntimeAssetModelTextureIO, RegistersConcretePromotedModelAndTextureDecoders)
@@ -243,8 +354,24 @@ TEST(RuntimeAssetModelTextureIO, DecodesGltfSceneGeometryImagesAndMaterials)
     ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
     ASSERT_EQ(model->GeometryPayloads.size(), 1u);
     ASSERT_EQ(model->Primitives.size(), 1u);
+    ASSERT_EQ(model->RootNodeIndices.size(), 1u);
+    ASSERT_EQ(model->Nodes.size(), 1u);
     ASSERT_EQ(model->EmbeddedImages.size(), 1u);
     ASSERT_EQ(model->Materials.size(), 1u);
+
+    EXPECT_EQ(model->RootNodeIndices[0], 0u);
+    const AssetModelNodePayload& rootNode = model->Nodes[0];
+    EXPECT_EQ(rootNode.ParentNodeIndex, kInvalidAssetModelIndex);
+    EXPECT_TRUE(rootNode.ChildNodeIndices.empty());
+    ASSERT_EQ(rootNode.PrimitiveIndices.size(), 1u);
+    EXPECT_EQ(rootNode.PrimitiveIndices[0], 0u);
+    constexpr std::array<float, 16> identityTransform{
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f,
+    };
+    EXPECT_EQ(rootNode.LocalTransform, identityTransform);
 
     const AssetModelPrimitivePayload& primitive = model->Primitives[0];
     EXPECT_EQ(primitive.GeometryKind, AssetPayloadKind::Mesh);
@@ -286,6 +413,340 @@ TEST(RuntimeAssetModelTextureIO, DecodesGltfSceneGeometryImagesAndMaterials)
         }
     }
     EXPECT_TRUE(sawExternalBuffer);
+}
+
+TEST(RuntimeAssetModelTextureIO, DecodesGlbSceneRootsAndTransforms)
+{
+    FakeIOBackend backend;
+    backend.Add("/scene/triangle.glb", TriangleGlbBytes());
+
+    AssetModelTextureIOBridge bridge;
+    ASSERT_TRUE(
+        Extrinsic::Runtime::RegisterPromotedModelTextureIOCallbacks(bridge)
+            .has_value());
+
+    auto model = bridge.ImportModelScene("/scene/triangle.glb", backend);
+    ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
+    ASSERT_EQ(model->RootNodeIndices.size(), 1u);
+    ASSERT_EQ(model->Nodes.size(), 1u);
+    ASSERT_EQ(model->Primitives.size(), 1u);
+    EXPECT_EQ(model->RootNodeIndices[0], 0u);
+    EXPECT_EQ(model->Nodes[0].Name, "GlbRoot");
+    EXPECT_EQ(model->Nodes[0].PrimitiveIndices, std::vector<std::uint32_t>{0u});
+    EXPECT_FLOAT_EQ(model->Nodes[0].LocalTransform[0], 0.25f);
+    EXPECT_FLOAT_EQ(model->Nodes[0].LocalTransform[5], 0.5f);
+    EXPECT_FLOAT_EQ(model->Nodes[0].LocalTransform[10], 0.75f);
+    EXPECT_EQ(model->Primitives[0].Name, "GlbTriangle");
+}
+
+TEST(RuntimeAssetModelTextureIO, PreservesActiveSceneNodeTransformsAndMeshInstances)
+{
+    const std::string json = SceneGraphGltfJson(
+        R"json([
+    {"name": "Unused", "mesh": 1},
+    {"name": "Root", "translation": [1, 2, 3], "children": [2, 3]},
+    {
+      "name": "Nested",
+      "mesh": 0,
+      "translation": [4, 5, 6],
+      "rotation": [0, 0, 0.7071067811865475, 0.7071067811865476],
+      "scale": [2, 3, 4]
+    },
+    {
+      "name": "MatrixInstance",
+      "mesh": 0,
+      "matrix": [
+        0.5, 0, 0, 0,
+        0, 0.5, 0, 0,
+        0, 0, 0.5, 0,
+        -1, 0, 0, 1
+      ]
+    }
+  ])json",
+        R"json([
+    {"nodes": [0]},
+    {"nodes": [1]}
+  ])json",
+        R"json(,
+  "scene": 1)json");
+
+    auto model = DecodeSceneGraph(json);
+    ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
+    ASSERT_EQ(model->RootNodeIndices.size(), 1u);
+    ASSERT_EQ(model->Nodes.size(), 3u);
+    ASSERT_EQ(model->GeometryPayloads.size(), 1u);
+    ASSERT_EQ(model->Primitives.size(), 1u);
+
+    EXPECT_EQ(model->RootNodeIndices[0], 0u);
+    const AssetModelNodePayload& root = model->Nodes[0];
+    EXPECT_EQ(root.Name, "Root");
+    EXPECT_EQ(root.ParentNodeIndex, kInvalidAssetModelIndex);
+    ASSERT_EQ(root.ChildNodeIndices.size(), 2u);
+    EXPECT_EQ(root.ChildNodeIndices[0], 1u);
+    EXPECT_EQ(root.ChildNodeIndices[1], 2u);
+    EXPECT_TRUE(root.PrimitiveIndices.empty());
+    EXPECT_FLOAT_EQ(root.LocalTransform[12], 1.0f);
+    EXPECT_FLOAT_EQ(root.LocalTransform[13], 2.0f);
+    EXPECT_FLOAT_EQ(root.LocalTransform[14], 3.0f);
+
+    const AssetModelNodePayload& nested = model->Nodes[1];
+    EXPECT_EQ(nested.Name, "Nested");
+    EXPECT_EQ(nested.ParentNodeIndex, 0u);
+    EXPECT_TRUE(nested.ChildNodeIndices.empty());
+    ASSERT_EQ(nested.PrimitiveIndices.size(), 1u);
+    EXPECT_EQ(nested.PrimitiveIndices[0], 0u);
+    EXPECT_NEAR(nested.LocalTransform[0], 0.0f, 1.0e-6f);
+    EXPECT_NEAR(nested.LocalTransform[1], 2.0f, 1.0e-6f);
+    EXPECT_NEAR(nested.LocalTransform[4], -3.0f, 1.0e-6f);
+    EXPECT_NEAR(nested.LocalTransform[5], 0.0f, 1.0e-6f);
+    EXPECT_FLOAT_EQ(nested.LocalTransform[10], 4.0f);
+    EXPECT_FLOAT_EQ(nested.LocalTransform[12], 4.0f);
+    EXPECT_FLOAT_EQ(nested.LocalTransform[13], 5.0f);
+    EXPECT_FLOAT_EQ(nested.LocalTransform[14], 6.0f);
+
+    const AssetModelNodePayload& matrixInstance = model->Nodes[2];
+    EXPECT_EQ(matrixInstance.Name, "MatrixInstance");
+    EXPECT_EQ(matrixInstance.ParentNodeIndex, 0u);
+    ASSERT_EQ(matrixInstance.PrimitiveIndices.size(), 1u);
+    EXPECT_EQ(matrixInstance.PrimitiveIndices[0], nested.PrimitiveIndices[0]);
+    EXPECT_FLOAT_EQ(matrixInstance.LocalTransform[0], 0.5f);
+    EXPECT_FLOAT_EQ(matrixInstance.LocalTransform[5], 0.5f);
+    EXPECT_FLOAT_EQ(matrixInstance.LocalTransform[10], 0.5f);
+    EXPECT_FLOAT_EQ(matrixInstance.LocalTransform[12], -1.0f);
+    EXPECT_EQ(model->Primitives[0].Name, "SharedMesh");
+}
+
+TEST(RuntimeAssetModelTextureIO, FallsBackToSceneZeroWhenDefaultSceneIsOmitted)
+{
+    const std::string json = SceneGraphGltfJson(
+        R"json([
+    {"name": "FallbackRoot", "mesh": 0},
+    {
+      "name": "MalformedInactiveNode",
+      "mesh": 1,
+      "matrix": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      "translation": [9, 9, 9]
+    }
+  ])json",
+        R"json([
+    {"nodes": [0]},
+    {"nodes": [1]}
+  ])json",
+        "");
+
+    auto model = DecodeSceneGraph(json);
+    ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
+    ASSERT_EQ(model->RootNodeIndices.size(), 1u);
+    ASSERT_EQ(model->Nodes.size(), 1u);
+    ASSERT_EQ(model->Primitives.size(), 1u);
+    EXPECT_EQ(model->RootNodeIndices[0], 0u);
+    EXPECT_EQ(model->Nodes[0].Name, "FallbackRoot");
+    EXPECT_EQ(model->Primitives[0].Name, "SharedMesh");
+}
+
+TEST(RuntimeAssetModelTextureIO, RejectsInvalidActiveSceneReferences)
+{
+    const std::vector<std::pair<std::string, std::string>> cases{
+        {
+            "invalid default scene",
+            SceneGraphGltfJson(
+                R"json([{"mesh": 0}])json",
+                R"json([{"nodes": [0]}])json",
+                R"json(, "scene": 3)json"),
+        },
+        {
+            "invalid root",
+            SceneGraphGltfJson(
+                R"json([{"mesh": 0}])json",
+                R"json([{"nodes": [7]}])json",
+                R"json(, "scene": 0)json"),
+        },
+        {
+            "invalid reachable child",
+            SceneGraphGltfJson(
+                R"json([{"mesh": 0, "children": [7]}])json",
+                R"json([{"nodes": [0]}])json",
+                R"json(, "scene": 0)json"),
+        },
+        {
+            "invalid reachable mesh",
+            SceneGraphGltfJson(
+                R"json([{"mesh": 7}])json",
+                R"json([{"nodes": [0]}])json",
+                R"json(, "scene": 0)json"),
+        },
+    };
+
+    for (const auto& [name, json] : cases)
+    {
+        SCOPED_TRACE(name);
+        auto model = DecodeSceneGraph(json);
+        ASSERT_FALSE(model.has_value());
+        EXPECT_EQ(model.error(), ErrorCode::OutOfRange);
+    }
+}
+
+TEST(RuntimeAssetModelTextureIO, RejectsEmptySceneListAsInvalidData)
+{
+    auto model = DecodeSceneGraph(SceneGraphGltfJson(
+        R"json([{"mesh": 0}])json",
+        R"json([])json",
+        ""));
+
+    ASSERT_FALSE(model.has_value());
+    EXPECT_EQ(model.error(), ErrorCode::AssetInvalidData);
+}
+
+TEST(RuntimeAssetModelTextureIO, RejectsWrongTypedAndPartiallyParsedSceneFields)
+{
+    const std::vector<std::pair<std::string, std::string>> cases{
+        {
+            "wrong declared scene type",
+            SceneGraphGltfJson(
+                R"json([{"mesh": 0}])json",
+                R"json([{"nodes": [0]}])json",
+                R"json(, "scene": "0")json"),
+        },
+        {
+            "wrong selected roots type",
+            SceneGraphGltfJson(
+                R"json([{"mesh": 0}])json",
+                R"json([{"nodes": "0"}])json",
+                R"json(, "scene": 0)json"),
+        },
+        {
+            "partially numeric selected roots",
+            SceneGraphGltfJson(
+                R"json([{"mesh": 0}, {"mesh": 0}])json",
+                R"json([{"nodes": [0, "1"]}])json",
+                R"json(, "scene": 0)json"),
+        },
+        {
+            "wrong mesh type",
+            SceneGraphGltfJson(
+                R"json([{"mesh": "0"}])json",
+                R"json([{"nodes": [0]}])json",
+                R"json(, "scene": 0)json"),
+        },
+        {
+            "partially numeric children",
+            SceneGraphGltfJson(
+                R"json([{"children": [1, "1"]}, {"mesh": 0}])json",
+                R"json([{"nodes": [0]}])json",
+                R"json(, "scene": 0)json"),
+        },
+        {
+            "partially numeric translation",
+            SceneGraphGltfJson(
+                R"json([{"mesh": 0, "translation": [1, 2, "3"]}])json",
+                R"json([{"nodes": [0]}])json",
+                R"json(, "scene": 0)json"),
+        },
+        {
+            "wrong matrix type",
+            SceneGraphGltfJson(
+                R"json([{"mesh": 0, "matrix": "identity"}])json",
+                R"json([{"nodes": [0]}])json",
+                R"json(, "scene": 0)json"),
+        },
+    };
+
+    for (const auto& [name, json] : cases)
+    {
+        SCOPED_TRACE(name);
+        auto model = DecodeSceneGraph(json);
+        ASSERT_FALSE(model.has_value());
+        EXPECT_EQ(model.error(), ErrorCode::AssetInvalidData);
+    }
+}
+
+TEST(RuntimeAssetModelTextureIO, RejectsCyclesAndMultipleParentage)
+{
+    const std::vector<std::pair<std::string, std::string>> cases{
+        {
+            "cycle",
+            SceneGraphGltfJson(
+                R"json([
+    {"mesh": 0, "children": [1]},
+    {"children": [0]}
+  ])json",
+                R"json([{"nodes": [0]}])json",
+                R"json(, "scene": 0)json"),
+        },
+        {
+            "multiple parentage",
+            SceneGraphGltfJson(
+                R"json([
+    {"children": [2]},
+    {"children": [2]},
+    {"mesh": 0}
+  ])json",
+                R"json([{"nodes": [0, 1]}])json",
+                R"json(, "scene": 0)json"),
+        },
+    };
+
+    for (const auto& [name, json] : cases)
+    {
+        SCOPED_TRACE(name);
+        auto model = DecodeSceneGraph(json);
+        ASSERT_FALSE(model.has_value());
+        EXPECT_EQ(model.error(), ErrorCode::AssetInvalidData);
+    }
+}
+
+TEST(RuntimeAssetModelTextureIO, RejectsMalformedActiveNodeTransforms)
+{
+    const std::vector<std::pair<std::string, std::string_view>> cases{
+        {
+            "matrix and TRS conflict",
+            R"json({"mesh": 0, "matrix": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], "translation": [1, 2, 3]})json",
+        },
+        {
+            "malformed matrix length",
+            R"json({"mesh": 0, "matrix": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1]})json",
+        },
+        {
+            "malformed translation length",
+            R"json({"mesh": 0, "translation": [1, 2]})json",
+        },
+        {
+            "malformed scale length",
+            R"json({"mesh": 0, "scale": [1, 2, 3, 4]})json",
+        },
+        {
+            "malformed rotation length",
+            R"json({"mesh": 0, "rotation": [0, 0, 1]})json",
+        },
+        {
+            "zero quaternion",
+            R"json({"mesh": 0, "rotation": [0, 0, 0, 0]})json",
+        },
+        {
+            "non-unit quaternion",
+            R"json({"mesh": 0, "rotation": [0, 0, 0, 2]})json",
+        },
+        {
+            "translation overflows float",
+            R"json({"mesh": 0, "translation": [1e39, 0, 0]})json",
+        },
+        {
+            "matrix overflows float",
+            R"json({"mesh": 0, "matrix": [1e39, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]})json",
+        },
+    };
+
+    for (const auto& [name, node] : cases)
+    {
+        SCOPED_TRACE(name);
+        const std::string nodes = "[" + std::string(node) + "]";
+        auto model = DecodeSceneGraph(SceneGraphGltfJson(
+            nodes,
+            R"json([{"nodes": [0]}])json",
+            R"json(, "scene": 0)json"));
+        ASSERT_FALSE(model.has_value());
+        EXPECT_EQ(model.error(), ErrorCode::AssetInvalidData);
+    }
 }
 
 TEST(RuntimeAssetModelTextureIO, PropagatesGltfDecodeFailuresAsPromotedCoreErrors)

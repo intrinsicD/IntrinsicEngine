@@ -128,6 +128,10 @@ namespace
             .MaterialIndex = kInvalidAssetModelIndex,
             .VertexCount = 3u,
             .IndexCount = 3u});
+        payload.RootNodeIndices.push_back(0u);
+        payload.Nodes.push_back(AssetModelNodePayload{
+            .Name = "root",
+            .PrimitiveIndices = {0u}});
         payload.ExternalResourceDiagnostics = std::move(diagnostics);
         return payload;
     }
@@ -348,6 +352,7 @@ TEST(AssetModelTextureIOBridge, RejectsDecodedPayloadsThatFailValidation)
 {
     FakeIOBackend backend;
     backend.Add("/assets/invalid.png", "png");
+    backend.Add("/scene/invalid.gltf", "gltf-json");
 
     AssetModelTextureIOBridge bridge;
     ASSERT_TRUE(bridge.RegisterTextureImporter(
@@ -361,4 +366,18 @@ TEST(AssetModelTextureIOBridge, RejectsDecodedPayloadsThatFailValidation)
     auto invalid = bridge.ImportTexture2D("/assets/invalid.png", backend);
     ASSERT_FALSE(invalid.has_value());
     EXPECT_EQ(invalid.error(), ErrorCode::AssetInvalidData);
+
+    ASSERT_TRUE(bridge.RegisterModelSceneImporter(
+        AssetFileFormat::GLTF,
+        [](const AssetModelTextureIORequest&)
+            -> Expected<AssetModelScenePayload>
+        {
+            AssetModelScenePayload payload = MakeModelPayload("unused");
+            payload.RootNodeIndices.clear();
+            return payload;
+        }).has_value());
+
+    auto invalidModel = bridge.ImportModelScene("/scene/invalid.gltf", backend);
+    ASSERT_FALSE(invalidModel.has_value());
+    EXPECT_EQ(invalidModel.error(), ErrorCode::AssetInvalidData);
 }

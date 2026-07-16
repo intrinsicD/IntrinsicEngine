@@ -10,9 +10,11 @@ maturity_target: Operational
 
 - In progress on 2026-07-16; owner: Codex; branch:
   `agent/bug-094-model-scene-semantics`.
-- Slice A starts regression-first with the CPU scene payload and active-scene
-  traversal contract. Runtime hierarchy/completion and capable-host Vulkan
-  proof remain required before retirement at `Operational`.
+- Slice A is implemented and focused verification is green: the CPU payload
+  retains active-scene roots, pre-order hierarchy, local transforms, and
+  shared primitive prototypes for GLTF and GLB. Runtime hierarchy/completion
+  (Slice B) and capable-host Vulkan proof (Slice C) remain required; the task
+  is not yet `CPUContracted` or `Operational`.
 
 ## Goal
 - Make a successful glTF model-scene import preserve active-scene membership,
@@ -35,15 +37,28 @@ maturity_target: Operational
   in `runtime`, and the existing runtime-to-renderer snapshot seam. `assets`
   remains CPU-only; runtime owns ECS hierarchy, world transforms, import
   policies, completion, selection, and focus.
-- `AssetModelScenePayload` is currently a flat list of geometry payloads and
-  primitives. `BuildScenePayload()` iterates `tinygltf::Model::meshes` directly
-  and never traverses `scenes` or `nodes`; it therefore ignores the default
-  scene, unreachable meshes, parent/child relationships, node matrix/TRS
-  transforms, and multiple nodes that instance one mesh.
+- Slice interpretation: "shared geometry" means that repeated glTF nodes
+  reference one decoded primitive/geometry prototype in the CPU asset payload.
+  Current ECS `GeometrySources` remains entity-owned; introducing a geometry
+  registry or shared ECS storage is outside this bug.
+- Active-scene selection uses the declared default scene. When glTF omits that
+  declaration (`defaultScene == -1`), scene 0 is the deterministic fallback;
+  an absent scene or an invalid declared scene/root/reachable reference fails
+  closed. Malformed data wholly outside the selected scene is not imported.
+- Slice B must compare component parity against the existing direct-mesh
+  authoring policy, including stable identity if that policy installs it; it
+  must not infer the mouse-pick contract from `SelectableTag` alone.
+- Before Slice A, `AssetModelScenePayload` was a flat list of geometry payloads
+  and primitives, and `BuildScenePayload()` iterated
+  `tinygltf::Model::meshes` directly without traversing `scenes` or `nodes`.
+  Slice A replaces that behavior with fail-closed selected-scene traversal;
+  Slice B still needs to consume the retained hierarchy during ECS
+  materialization.
 - The checked-in `assets/models/Duck.gltf` exposes the defect: its root node
   carries a `0.01` matrix scale while the mesh accessor is in roughly
-  hundred-unit coordinates. The flat decoder imports the raw mesh scale rather
-  than the authored scene scale.
+  hundred-unit coordinates. Before Slice A the decoder discarded that matrix;
+  it now retains the authored local transform, but the still-flat Slice B
+  handoff does not yet apply it during ECS materialization.
 - `Runtime.AssetModelSceneHandoff` materializes one flat entity per primitive
   with `RenderSurface` and `GeometrySources`. It does not establish node
   hierarchy or apply node-local transforms, and it omits `SelectableTag` and
@@ -55,10 +70,11 @@ maturity_target: Operational
   model-scene routes bypass both lanes, so successful model imports do not
   select the first primitive or focus the camera on their aggregate world-space
   bounds.
-- Regression provenance is covered today only by an identity-node glTF fixture
-  and a handoff assertion for geometry/material upload. Neither test can detect
-  active-scene, transform, instancing, authoring-component, focus, or pick
-  regressions.
+- Before Slice A, regression coverage consisted only of an identity-node glTF
+  fixture and a handoff assertion for geometry/material upload. The new GLTF,
+  GLB, payload-topology, and malformed-scene contracts now pin active-scene,
+  transform, and shared-instance semantics; Slice B/C still need hierarchy,
+  authoring-component, focus, visibility, and mouse-pick coverage.
 
 ## Slice plan
 - **Slice A — CPU scene contract.** Extend the assets payload and decoder with
@@ -71,11 +87,11 @@ maturity_target: Operational
   click-pickable smoke; do not claim `Operational` from Slices A/B alone.
 
 ## Required changes
-- [ ] Add a minimal CPU payload representation for scene roots, node parentage,
+- [x] Add a minimal CPU payload representation for scene roots, node parentage,
       node-local transforms, and primitive instances that reference shared
       geometry/material payloads without introducing a live scene service into
       `assets`.
-- [ ] Traverse the glTF default scene, or the deterministic documented fallback
+- [x] Traverse the glTF default scene, or the deterministic documented fallback
       when no default is declared, and retain only reachable node instances.
       Preserve child order and repeated references to one mesh; reject invalid
       node/mesh indices, cycles, and non-finite matrix/TRS data with actionable
@@ -95,7 +111,7 @@ maturity_target: Operational
       types or `Vk*` types through asset, ECS, RHI, or renderer APIs.
 
 ## Tests
-- [ ] Regression first: extend
+- [x] Regression first: extend
       `tests/contract/runtime/Test.AssetModelTextureIO.cpp` with
       `RuntimeAssetModelTextureIO.PreservesActiveSceneNodeTransformsAndMeshInstances`.
       Its in-memory glTF must contain a nested transformed node, two nodes
@@ -103,7 +119,7 @@ maturity_target: Operational
       non-default scene. Assert retained roots, parentage, local transforms,
       deterministic instance order, shared geometry reference, and exclusion
       of unreachable meshes.
-- [ ] Add malformed-payload cases for cyclic node references, out-of-range
+- [x] Add malformed-payload cases for cyclic node references, out-of-range
       scene/node/mesh indices, and non-finite transforms; each must fail closed
       with a diagnostic instead of partially materializing a scene.
 - [ ] Extend `tests/contract/runtime/Test.AssetModelSceneHandoff.cpp` with
@@ -126,7 +142,7 @@ maturity_target: Operational
       fail on wrong pixels or selection.
 
 ## Docs
-- [ ] Document the model payload's scene/node/instance semantics and the
+- [x] Document the model payload's scene/node/instance semantics and the
       assets-to-runtime ownership boundary in the relevant asset/runtime
       architecture documentation.
 - [ ] Update the runtime import documentation to state that model-scene
@@ -137,7 +153,7 @@ maturity_target: Operational
       retirement records when the implementation is verified.
 
 ## Acceptance criteria
-- [ ] The regression fixture produces exactly the reachable active-scene
+- [x] The regression fixture produces exactly the reachable active-scene
       instances, including two distinct transformed instances of one shared
       mesh, and imports no unreachable mesh.
 - [ ] Nested matrix/TRS transforms produce the expected finite world transforms;
@@ -177,6 +193,20 @@ python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+Slice A verification on 2026-07-16:
+
+- `IntrinsicAssetUnitTests` and `IntrinsicRuntimeContractTests` built
+  successfully after the exported payload change.
+- The integrated payload/bridge/decoder/handoff/world-registry selection passed
+  62/62. The complete decoder subset, including the in-memory GLB
+  JSON/BIN-chunk path, passed 13/13.
+- The aggregate `IntrinsicTests` target built successfully and the default
+  CPU-supported gate passed 3,805/3,805 in 436.32 seconds.
+- Strict task, state-link, layering, allowlist, test-layout, documentation-link,
+  root-hygiene, skill-sync, clean-workshop automated, and diff checks passed.
+  Regenerating the public module inventory produced no diff and retained 386
+  modules.
 
 ## Forbidden changes
 - Treating all `model.meshes` entries as scene instances or silently applying

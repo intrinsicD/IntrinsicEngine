@@ -43,12 +43,17 @@ store, load pipeline, event bus, and path index behind a single façade.
   records, validation helpers, material texture references, and external
   resource diagnostics for GLTF/GLB and image ingest. Model primitives point at
   typed `AssetGeometryPayload` records so decoded geometry can remain CPU-owned
-  without importing geometry into `src/assets`. It stores bytes and metadata
-  only; runtime registers the concrete tinygltf/stb decoder callbacks and
-  separately owns texture Ready-event upload requests into `GpuAssetCache` and
-  model-scene ECS/material handoff. Embedded images remain CPU payload records
-  in the model scene until runtime mints deterministic child texture assets for
-  GPU residency.
+  without importing geometry into `src/assets`. The model-scene payload retains
+  the active scene's root indices and a deterministic pre-order node array.
+  Each node carries its parent/child indices, a column-major local transform,
+  and indices into shared primitive prototypes; multiple nodes can therefore
+  instance one decoded geometry/material prototype without duplicating CPU
+  geometry. It stores bytes, indices, transforms, and metadata only; runtime
+  registers the concrete tinygltf/stb decoder callbacks and separately owns
+  texture Ready-event upload requests into `GpuAssetCache` and model-scene
+  ECS/material handoff. Embedded images remain CPU payload records in the model
+  scene until runtime mints deterministic child texture assets for GPU
+  residency.
 - KTX/KTX2 extensions are recognized by `Asset.ImportRouter` only so import
   attempts fail with deterministic `AssetUnsupportedFormat` diagnostics.
   Current promoted workflows have no checked-in KTX assets or compressed/mip
