@@ -11,7 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-No tasks are currently active.
+- [BUG-098 — Frame clock samples an incomplete frame delta](BUG-098-frame-clock-samples-incomplete-frame-delta.md)
+  (`in-progress`; owner: Codex; branch:
+  `agent/sandbox-model-workflow-completion`). The next gate is the
+  completed-frame clock regression plus production-delay real-control hover.
 
 ## History
 

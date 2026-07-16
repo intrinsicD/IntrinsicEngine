@@ -17,7 +17,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   both checked-in endian fixtures succeed as Mesh but fail as PointCloud
   because the binary point-cloud reader rejects list properties on unrelated
   non-vertex elements instead of consuming them safely.
-- [`BUG-098` — Frame clock samples an incomplete frame delta](BUG-098-frame-clock-samples-incomplete-frame-delta.md):
+- [`BUG-098` — Frame clock samples an incomplete frame delta](../../active/BUG-098-frame-clock-samples-incomplete-frame-delta.md):
   runtime samples `now - BeginFrame` before meaningful frame work, starving
   simulation/UI time and preventing production-delay disabled tooltips from
   appearing even under a stable multi-second hover.

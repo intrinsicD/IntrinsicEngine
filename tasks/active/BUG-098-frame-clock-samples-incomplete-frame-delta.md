@@ -6,6 +6,13 @@ maturity_target: Operational
 ---
 # BUG-098 — Frame clock samples an incomplete frame delta
 
+## Status
+
+- In progress on 2026-07-16; owner: Codex; branch:
+  `agent/sandbox-model-workflow-completion`.
+- Next gate: completed-frame clock regression plus the production-delay real
+  File / Import hover integration.
+
 ## Goal
 
 - Drive simulation, runtime hooks, camera motion, and Dear ImGui timers with
