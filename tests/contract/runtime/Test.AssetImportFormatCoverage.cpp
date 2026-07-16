@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <chrono>
@@ -28,12 +29,16 @@ import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.Core.IOBackend;
 import Extrinsic.Core.Tasks;
+import Extrinsic.ECS.Component.Culling.Local;
+import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.GpuAssetCache;
@@ -50,11 +55,13 @@ import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StableEntityLookup;
+import Extrinsic.Platform.Input;
 import Geometry.HalfedgeMesh.IO;
 
 namespace Assets = Extrinsic::Assets;
 namespace Core = Extrinsic::Core;
 namespace ECS = Extrinsic::ECS;
+namespace Culling = Extrinsic::ECS::Components::Culling;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 namespace Sel = Extrinsic::ECS::Components::Selection;
 namespace G = Extrinsic::Graphics::Components;
@@ -105,6 +112,38 @@ namespace
         std::function<bool(Runtime::Engine&)> m_Ready{};
         std::uint32_t m_MaxFrames{1u};
         std::uint32_t m_ObservedFrames{0u};
+    };
+
+    class RecordingImportCameraController final : public Runtime::ICameraController
+    {
+    public:
+        void Seed(const Graphics::CameraViewInput&) noexcept override {}
+
+        void Focus(const Runtime::CameraFocusTarget target) noexcept override
+        {
+            LastFocus = target;
+            ++FocusCalls;
+        }
+
+        void Update(const Extrinsic::Platform::Input::Context&,
+                    double) noexcept override
+        {
+        }
+
+        [[nodiscard]] Graphics::CameraViewInput GetView(
+            Core::Extent2D) const noexcept override
+        {
+            return Runtime::DefaultCameraControllerSeed();
+        }
+
+        [[nodiscard]] Core::Config::CameraControllerKind Kind()
+            const noexcept override
+        {
+            return Core::Config::CameraControllerKind::Orbit;
+        }
+
+        std::optional<Runtime::CameraFocusTarget> LastFocus{};
+        std::uint32_t FocusCalls{0u};
     };
 
     [[nodiscard]] Core::Config::EngineConfig HeadlessConfig()
@@ -356,6 +395,36 @@ namespace
 })json");
     }
 
+    [[nodiscard]] std::string InstancedTriangleGltfJson(
+        const std::string_view bufferUri)
+    {
+        return std::string(R"json({
+  "asset": {"version": "2.0"},
+  "buffers": [{"uri": ")json")
+            + std::string(bufferUri)
+            + std::string(R"json(", "byteLength": 44}],
+  "bufferViews": [
+    {"buffer": 0, "byteOffset": 0, "byteLength": 36, "target": 34962},
+    {"buffer": 0, "byteOffset": 36, "byteLength": 6, "target": 34963}
+  ],
+  "accessors": [
+    {"bufferView": 0, "byteOffset": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0, 0, 0], "max": [1, 1, 0]},
+    {"bufferView": 1, "byteOffset": 0, "componentType": 5123, "count": 3, "type": "SCALAR"}
+  ],
+  "meshes": [{
+    "name": "SharedTriangle",
+    "primitives": [{"attributes": {"POSITION": 0}, "indices": 1}]
+  }],
+  "nodes": [
+    {"name": "ScaledRoot", "translation": [10, 0, 0], "scale": [2, 2, 2], "children": [1, 2]},
+    {"name": "FirstInstance", "translation": [0, 2, 0], "mesh": 0},
+    {"name": "SecondInstance", "translation": [3, 0, 0], "mesh": 0}
+  ],
+  "scenes": [{"nodes": [0]}],
+  "scene": 0
+})json");
+    }
+
     [[nodiscard]] std::size_t CountEntitiesWithDomain(
         ECS::Scene::Registry& registry,
         const GS::Domain domain)
@@ -563,6 +632,315 @@ namespace
     void InstallSandboxDefaultRuntimePolicies(Runtime::Engine& engine)
     {
         (void)Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
+    }
+
+    struct ModelSceneRouteProbe
+    {
+        std::vector<ECS::EntityHandle> AuthoredEntities{};
+        std::vector<ECS::EntityHandle> CompletedEntities{};
+        std::optional<Runtime::CameraFocusTarget> FocusTarget{};
+        std::uint32_t CompletionCalls{0u};
+        std::size_t AuthoringCountAtCompletion{0u};
+        bool CompletionObservedReadyEntities{false};
+    };
+
+    void ExpectModelSceneCompletionRoute(const bool queued)
+    {
+        SCOPED_TRACE(queued ? "queued model-scene import"
+                           : "synchronous model-scene import");
+
+        const std::vector<std::byte> binBytes = TriangleBufferBytes();
+        const std::string stem = queued
+            ? "bug094_model_scene_completion_queued"
+            : "bug094_model_scene_completion_sync";
+        const std::string binName = stem + ".bin";
+        TempAssetFile modelBin(
+            binName,
+            std::span<const std::byte>(binBytes.data(), binBytes.size()));
+        TempAssetFile modelFile(
+            stem + ".gltf",
+            InstancedTriangleGltfJson(binName));
+
+        // Declared before Engine so callbacks captured by the pipeline remain
+        // valid through destructor-driven shutdown after a fatal assertion.
+        ModelSceneRouteProbe probe{};
+        std::unique_ptr<Runtime::IApplication> application{};
+        if (queued)
+        {
+            application = std::make_unique<WaitForConditionApplication>(
+                [](Runtime::Engine& runningEngine)
+                {
+                    const Runtime::RuntimeAssetImportQueueSnapshot queue =
+                        runningEngine.GetAssetImportPipeline()
+                            .GetAssetImportQueueSnapshot();
+                    return queue.Entries.size() == 1u
+                        && queue.ActiveCount == 0u
+                        && queue.TerminalCount == 1u;
+                },
+                256u);
+        }
+        else
+        {
+            application = std::make_unique<OneFrameApplication>();
+        }
+
+        Core::Config::EngineConfig config = HeadlessConfig();
+        config.Camera.Enabled = true;
+        Runtime::Engine engine(config, std::move(application));
+        engine.Initialize();
+        InstallSandboxDefaultRuntimePolicies(engine);
+
+        auto recordingController =
+            std::make_unique<RecordingImportCameraController>();
+        RecordingImportCameraController* recorder = recordingController.get();
+        engine.GetCameraControllerRegistry().Replace(
+            Runtime::CameraControllerSlot::Main,
+            std::move(recordingController));
+
+        Runtime::AssetImportPipeline& pipeline = engine.GetAssetImportPipeline();
+        const Runtime::RuntimeImportEntityAuthoringPolicyHandle authoringHandle =
+            pipeline.RegisterImportEntityAuthoringPolicy(
+                Runtime::RuntimeImportEntityAuthoringPolicyDesc{
+                    .DebugName = "BUG-094 model-scene mesh authoring probe",
+                    .PayloadKind = Assets::AssetPayloadKind::Mesh,
+                    .Apply =
+                        [&probe](
+                            const Runtime::RuntimeImportEntityAuthoringPolicyContext&
+                                context,
+                            Runtime::RuntimeImportEntityAuthoringPolicyServices&
+                                services)
+                        {
+                            if (services.Scene == nullptr
+                                || !services.Scene->IsValid(context.Entity))
+                            {
+                                return Core::Err(Core::ErrorCode::InvalidState);
+                            }
+                            probe.AuthoredEntities.push_back(context.Entity);
+                            return Core::Ok();
+                        },
+                });
+        ASSERT_TRUE(authoringHandle.IsValid());
+
+        const Runtime::RuntimeImportCompletedHandlerHandle completionHandle =
+            pipeline.RegisterImportCompletedHandler(
+                Runtime::RuntimeImportCompletedHandlerDesc{
+                    .DebugName = "BUG-094 model-scene completion probe",
+                    .PayloadKind = Assets::AssetPayloadKind::ModelScene,
+                    .Handle =
+                        [&probe](
+                            const Runtime::RuntimeImportCompletedContext& context,
+                            Runtime::RuntimeImportCompletedServices& services)
+                        {
+                            ++probe.CompletionCalls;
+                            probe.AuthoringCountAtCompletion =
+                                probe.AuthoredEntities.size();
+                            probe.CompletedEntities.assign(
+                                context.CreatedEntities.begin(),
+                                context.CreatedEntities.end());
+                            probe.FocusTarget = context.FocusTarget;
+
+                            probe.CompletionObservedReadyEntities =
+                                services.Scene != nullptr
+                                && context.CreatedEntities.size() == 2u;
+                            if (services.Scene != nullptr)
+                            {
+                                auto& raw = services.Scene->Raw();
+                                for (const ECS::EntityHandle entity :
+                                     context.CreatedEntities)
+                                {
+                                    const GS::ConstSourceView source =
+                                        GS::BuildConstView(raw, entity);
+                                    probe.CompletionObservedReadyEntities =
+                                        probe.CompletionObservedReadyEntities
+                                        && services.Scene->IsValid(entity)
+                                        && source.Valid()
+                                        && raw.all_of<
+                                            G::RenderSurface,
+                                            Sel::SelectableTag,
+                                            G::VisualizationConfig,
+                                            Culling::Local::Bounds,
+                                            Culling::World::Bounds>(entity);
+                                }
+                            }
+                            return Core::Ok();
+                        },
+                });
+        ASSERT_TRUE(completionHandle.IsValid());
+
+        std::optional<Runtime::RuntimeAssetImportResult> importResult{};
+        if (queued)
+        {
+            auto queuedImport = pipeline.QueueModelTextureImport(
+                Runtime::RuntimeAssetImportRequest{
+                    .Path = modelFile.Path.string(),
+                    .PayloadKind = Assets::AssetPayloadKind::ModelScene,
+                });
+            ASSERT_TRUE(queuedImport.has_value())
+                << static_cast<int>(queuedImport.error());
+
+            engine.Run();
+
+            const std::vector<Runtime::RuntimeAssetIngestRecord> records =
+                pipeline.GetAssetIngestRecordsForTest();
+            const auto record = std::find_if(
+                records.begin(),
+                records.end(),
+                [&](const Runtime::RuntimeAssetIngestRecord& candidate)
+                {
+                    return candidate.Handle == queuedImport->Operation;
+                });
+            ASSERT_NE(record, records.end());
+            EXPECT_EQ(record->Phase, Runtime::RuntimeAssetIngestPhase::Complete);
+            EXPECT_EQ(record->Diagnostic,
+                      Runtime::RuntimeAssetIngestDiagnostic::None);
+            ASSERT_TRUE(record->Result.has_value());
+            const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+                pipeline.GetLastAssetImportEvent();
+            ASSERT_TRUE(lastEvent.has_value());
+            ASSERT_TRUE(lastEvent->Succeeded());
+            ASSERT_TRUE(lastEvent->Result.has_value());
+            importResult = lastEvent->Result;
+        }
+        else
+        {
+            auto imported = pipeline.ImportAssetFromPath(
+                Runtime::RuntimeAssetImportRequest{
+                    .Path = modelFile.Path.string(),
+                    .PayloadKind = Assets::AssetPayloadKind::ModelScene,
+                });
+            ASSERT_TRUE(imported.has_value())
+                << static_cast<int>(imported.error());
+            importResult = *imported;
+        }
+
+        ASSERT_TRUE(importResult.has_value());
+        EXPECT_EQ(importResult->PayloadKind,
+                  Assets::AssetPayloadKind::ModelScene);
+        EXPECT_TRUE(importResult->MaterializedModelScene);
+        EXPECT_EQ(importResult->PrimitiveEntitiesCreated, 2u);
+
+        ASSERT_EQ(probe.AuthoredEntities.size(), 2u);
+        EXPECT_EQ(probe.CompletionCalls, 1u);
+        EXPECT_EQ(probe.AuthoringCountAtCompletion, 2u);
+        ASSERT_EQ(probe.CompletedEntities.size(), 2u);
+        EXPECT_EQ(probe.AuthoredEntities, probe.CompletedEntities);
+        EXPECT_TRUE(probe.CompletionObservedReadyEntities);
+        EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh),
+                  2u);
+
+        auto& raw = engine.GetScene().Raw();
+        constexpr glm::vec3 expectedWorldCenters[]{
+            {11.0f, 5.0f, 0.0f},
+            {17.0f, 1.0f, 0.0f},
+        };
+        for (std::size_t index = 0u;
+             index < probe.CompletedEntities.size();
+             ++index)
+        {
+            const ECS::EntityHandle entity = probe.CompletedEntities[index];
+            ASSERT_TRUE(engine.GetScene().IsValid(entity));
+
+            const GS::ConstSourceView source = GS::BuildConstView(raw, entity);
+            ASSERT_TRUE(source.Valid());
+            EXPECT_EQ(source.ActiveDomain, GS::Domain::Mesh);
+            EXPECT_EQ(source.VerticesAlive(), 3u);
+            EXPECT_EQ(source.FacesAlive(), 1u);
+
+            ASSERT_TRUE(raw.all_of<G::RenderSurface>(entity));
+            EXPECT_EQ(raw.get<G::RenderSurface>(entity).Domain,
+                      G::RenderSurface::SourceDomain::Vertex);
+            EXPECT_TRUE(raw.all_of<Sel::SelectableTag>(entity));
+            ASSERT_TRUE(raw.all_of<G::VisualizationConfig>(entity));
+            EXPECT_EQ(raw.get<G::VisualizationConfig>(entity).Source,
+                      G::VisualizationConfig::ColorSource::Material);
+
+            ASSERT_TRUE((raw.all_of<Culling::Local::Bounds,
+                                    Culling::World::Bounds>(entity)));
+            const Culling::Local::Bounds& local =
+                raw.get<Culling::Local::Bounds>(entity);
+            EXPECT_TRUE(local.LocalBoundingAABB.IsValid());
+            EXPECT_TRUE(std::isfinite(local.LocalBoundingSphere.Center.x));
+            EXPECT_TRUE(std::isfinite(local.LocalBoundingSphere.Center.y));
+            EXPECT_TRUE(std::isfinite(local.LocalBoundingSphere.Center.z));
+            EXPECT_TRUE(std::isfinite(local.LocalBoundingSphere.Radius));
+            EXPECT_GT(local.LocalBoundingSphere.Radius, 0.0f);
+
+            const Culling::World::Bounds& world =
+                raw.get<Culling::World::Bounds>(entity);
+            EXPECT_NEAR(world.WorldBoundingSphere.Center.x,
+                        expectedWorldCenters[index].x,
+                        1.0e-5f);
+            EXPECT_NEAR(world.WorldBoundingSphere.Center.y,
+                        expectedWorldCenters[index].y,
+                        1.0e-5f);
+            EXPECT_NEAR(world.WorldBoundingSphere.Center.z,
+                        expectedWorldCenters[index].z,
+                        1.0e-5f);
+            EXPECT_TRUE(std::isfinite(world.WorldBoundingSphere.Radius));
+            EXPECT_GT(world.WorldBoundingSphere.Radius, 0.0f);
+        }
+
+        EXPECT_EQ(engine.GetSelectionController().SelectedCount(), 1u);
+        EXPECT_TRUE(engine.GetSelectionController().IsSelected(
+            probe.CompletedEntities[0]));
+        EXPECT_FALSE(engine.GetSelectionController().IsSelected(
+            probe.CompletedEntities[1]));
+
+        EXPECT_EQ(recorder->FocusCalls, 1u);
+        ASSERT_TRUE(recorder->LastFocus.has_value());
+        ASSERT_TRUE(probe.FocusTarget.has_value());
+        EXPECT_NEAR(recorder->LastFocus->Center.x,
+                    probe.FocusTarget->Center.x,
+                    1.0e-5f);
+        EXPECT_NEAR(recorder->LastFocus->Center.y,
+                    probe.FocusTarget->Center.y,
+                    1.0e-5f);
+        EXPECT_NEAR(recorder->LastFocus->Center.z,
+                    probe.FocusTarget->Center.z,
+                    1.0e-5f);
+        EXPECT_NEAR(recorder->LastFocus->Radius,
+                    probe.FocusTarget->Radius,
+                    1.0e-5f);
+        EXPECT_TRUE(std::isfinite(probe.FocusTarget->Center.x));
+        EXPECT_TRUE(std::isfinite(probe.FocusTarget->Center.y));
+        EXPECT_TRUE(std::isfinite(probe.FocusTarget->Center.z));
+        EXPECT_TRUE(std::isfinite(probe.FocusTarget->Radius));
+        EXPECT_GT(probe.FocusTarget->Radius, 0.0f);
+
+        for (const ECS::EntityHandle entity : probe.CompletedEntities)
+        {
+            const auto& sphere = raw.get<Culling::World::Bounds>(entity)
+                .WorldBoundingSphere;
+            const float reach =
+                glm::length(sphere.Center - probe.FocusTarget->Center)
+                + sphere.Radius;
+            EXPECT_LE(reach, probe.FocusTarget->Radius + 1.0e-4f);
+        }
+
+        if (!queued)
+        {
+            const std::vector<ECS::EntityHandle> originalEntities =
+                probe.CompletedEntities;
+            auto repeated = pipeline.ImportAssetFromPath(
+                Runtime::RuntimeAssetImportRequest{
+                    .Path = modelFile.Path.string(),
+                    .PayloadKind = Assets::AssetPayloadKind::ModelScene,
+                });
+            ASSERT_TRUE(repeated.has_value())
+                << static_cast<int>(repeated.error());
+            EXPECT_FALSE(repeated->MaterializedModelScene);
+            EXPECT_EQ(repeated->PrimitiveEntitiesCreated, 0u);
+            EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh),
+                      2u);
+            EXPECT_EQ(probe.CompletionCalls, 2u);
+            EXPECT_EQ(probe.AuthoredEntities.size(), 4u);
+            EXPECT_EQ(probe.CompletedEntities, originalEntities);
+            EXPECT_EQ(recorder->FocusCalls, 2u);
+        }
+
+        pipeline.UnregisterImportCompletedHandler(completionHandle);
+        pipeline.UnregisterImportEntityAuthoringPolicy(authoringHandle);
+        engine.Shutdown();
     }
 
 }
@@ -1526,6 +1904,12 @@ TEST(RuntimeAssetImportFormatCoverage, RepresentativePromotedFormatsMaterializeD
     EXPECT_EQ(lastEvent->Result->PayloadKind, Assets::AssetPayloadKind::Texture2D);
 
     engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, ModelSceneCompletionSelectsAndFramesCreatedPrimitives)
+{
+    ExpectModelSceneCompletionRoute(false);
+    ExpectModelSceneCompletionRoute(true);
 }
 
 TEST(RuntimeAssetImportFormatCoverage, DroppedModelSceneAndTextureImportThroughStreamingQueue)

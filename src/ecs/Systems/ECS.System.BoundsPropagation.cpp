@@ -75,10 +75,30 @@ namespace Extrinsic::ECS::Systems::BoundsPropagation
             };
             world.WorldBoundingOBB.Rotation = glm::normalize(glm::quat_cast(rotationBasis));
 
-            const float maxScale = std::max({lenX, lenY, lenZ});
-            const glm::vec3 worldSphereCenter = glm::vec3{worldMatrix * glm::vec4{local.LocalBoundingSphere.Center, 1.0f}};
-            world.WorldBoundingSphere.Center = worldSphereCenter;
-            world.WorldBoundingSphere.Radius = local.LocalBoundingSphere.Radius * maxScale;
+            if (local.LocalBoundingAABB.IsValid())
+            {
+                // A non-uniformly scaled parent composed with a rotated child
+                // can produce shear even though every authored local transform
+                // is TRS. A max-column scale applied to the local sphere does
+                // not necessarily enclose that affine result. Transforming the
+                // local AABB corners and circumscribing their world AABB does.
+                const Geometry::AABB worldAabb =
+                    Geometry::TransformAABB(local.LocalBoundingAABB, worldMatrix);
+                world.WorldBoundingSphere.Center = worldAabb.GetCenter();
+                world.WorldBoundingSphere.Radius =
+                    glm::length(worldAabb.GetExtents());
+            }
+            else
+            {
+                // Preserve the legacy sphere-only path for callers that have
+                // no usable local AABB.
+                const float maxScale = std::max({lenX, lenY, lenZ});
+                world.WorldBoundingSphere.Center = glm::vec3{
+                    worldMatrix
+                    * glm::vec4{local.LocalBoundingSphere.Center, 1.0f}};
+                world.WorldBoundingSphere.Radius =
+                    local.LocalBoundingSphere.Radius * maxScale;
+            }
 
             return world;
         }
@@ -91,6 +111,21 @@ namespace Extrinsic::ECS::Systems::BoundsPropagation
                 && IsFinite(world.WorldBoundingSphere.Center)
                 && std::isfinite(world.WorldBoundingSphere.Radius);
         }
+    }
+
+    bool TryComputeWorldBounds(
+        const Components::Culling::Local::Bounds& local,
+        const glm::mat4& worldMatrix,
+        Components::Culling::World::Bounds& outWorld) noexcept
+    {
+        const Components::Culling::World::Bounds computed =
+            ComputeWorldBounds(local, worldMatrix);
+        if (!IsFinite(computed))
+        {
+            return false;
+        }
+        outWorld = computed;
+        return true;
     }
 
     void OnUpdate(entt::registry& registry)
@@ -118,8 +153,8 @@ namespace Extrinsic::ECS::Systems::BoundsPropagation
                 continue;
             }
 
-            const Components::Culling::World::Bounds computed = ComputeWorldBounds(*local, worldMatrix->Matrix);
-            if (!IsFinite(computed))
+            Components::Culling::World::Bounds computed{};
+            if (!TryComputeWorldBounds(*local, worldMatrix->Matrix, computed))
             {
                 ++stats.NonFiniteResults;
                 continue;

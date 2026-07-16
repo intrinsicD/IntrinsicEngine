@@ -4,7 +4,8 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <algorithm>
-#include <functional>
+#include <array>
+#include <cmath>
 #include <limits>
 #include <memory>
 #include <string>
@@ -23,6 +24,9 @@ import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
 import Extrinsic.Core.Error;
+import Extrinsic.ECS.Component.Culling.Local;
+import Extrinsic.ECS.Component.Culling.World;
+import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
@@ -31,6 +35,9 @@ import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Scene.Bootstrap;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.ECS.Hierarchy.Mutation;
+import Extrinsic.ECS.Hierarchy.Structure;
+import Extrinsic.ECS.System.BoundsPropagation;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
@@ -60,9 +67,23 @@ namespace Extrinsic::Runtime
             std::uint32_t IndexCount{0u};
             std::string Name{};
             Geometry::HalfedgeMesh::Mesh Mesh{};
+            ECS::Components::Culling::Local::Bounds LocalBounds{};
             bool HasResolvedTexcoords{false};
             RuntimeMeshResolvedUvProvenance TexcoordProvenance{
                 RuntimeMeshResolvedUvProvenance::None};
+        };
+
+        struct PreparedNode
+        {
+            ECS::Components::Transform::Component LocalTransform{};
+            glm::mat4 WorldMatrix{1.0f};
+        };
+
+        struct PreparedPrimitiveInstance
+        {
+            std::uint32_t NodeIndex{Assets::kInvalidAssetModelIndex};
+            std::uint32_t PrimitiveIndex{Assets::kInvalidAssetModelIndex};
+            ECS::Components::Culling::World::Bounds WorldBounds{};
         };
 
         struct GeneratedMaterialTextureAssets
@@ -181,6 +202,298 @@ namespace Extrinsic::Runtime
             diagnostics->LastUvAtlasHeight = uvDiagnostics.AtlasHeight;
         }
 
+        [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
+        {
+            return std::isfinite(value.x)
+                && std::isfinite(value.y)
+                && std::isfinite(value.z);
+        }
+
+        [[nodiscard]] bool IsFinite(const glm::quat value) noexcept
+        {
+            return std::isfinite(value.w)
+                && std::isfinite(value.x)
+                && std::isfinite(value.y)
+                && std::isfinite(value.z);
+        }
+
+        [[nodiscard]] bool IsFinite(const glm::mat4& matrix) noexcept
+        {
+            for (std::size_t column = 0u; column < 4u; ++column)
+            {
+                for (std::size_t row = 0u; row < 4u; ++row)
+                {
+                    if (!std::isfinite(matrix[column][row]))
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] glm::mat4 ToColumnMajorMatrix(
+            const std::array<float, 16>& values) noexcept
+        {
+            glm::mat4 matrix{1.0f};
+            for (std::size_t column = 0u; column < 4u; ++column)
+            {
+                for (std::size_t row = 0u; row < 4u; ++row)
+                {
+                    matrix[column][row] = values[column * 4u + row];
+                }
+            }
+            return matrix;
+        }
+
+        [[nodiscard]] bool MatricesApproximatelyEqual(
+            const glm::mat4& lhs,
+            const glm::mat4& rhs) noexcept
+        {
+            constexpr float kAbsoluteTolerance = 1.0e-5f;
+            constexpr float kRelativeTolerance = 1.0e-4f;
+            for (std::size_t column = 0u; column < 4u; ++column)
+            {
+                for (std::size_t row = 0u; row < 4u; ++row)
+                {
+                    const float scale = std::max(
+                        {1.0f, std::abs(lhs[column][row]), std::abs(rhs[column][row])});
+                    if (std::abs(lhs[column][row] - rhs[column][row])
+                        > kAbsoluteTolerance + kRelativeTolerance * scale)
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] Core::Expected<ECS::Components::Culling::Local::Bounds>
+        ComputeLocalBounds(const Geometry::HalfedgeMesh::Mesh& mesh)
+        {
+            glm::vec3 minimum{0.0f};
+            glm::vec3 maximum{0.0f};
+            bool hasVertex = false;
+            for (std::size_t index = 0u; index < mesh.VerticesSize(); ++index)
+            {
+                const Geometry::VertexHandle vertex{
+                    static_cast<Geometry::PropertyIndex>(index)};
+                if (!mesh.IsValid(vertex) || mesh.IsDeleted(vertex))
+                {
+                    continue;
+                }
+
+                const glm::vec3 position = mesh.Position(vertex);
+                if (!IsFinite(position))
+                {
+                    return Core::Err<ECS::Components::Culling::Local::Bounds>(
+                        Core::ErrorCode::AssetInvalidData);
+                }
+                if (!hasVertex)
+                {
+                    minimum = position;
+                    maximum = position;
+                    hasVertex = true;
+                }
+                else
+                {
+                    minimum = glm::min(minimum, position);
+                    maximum = glm::max(maximum, position);
+                }
+            }
+            if (!hasVertex)
+            {
+                return Core::Err<ECS::Components::Culling::Local::Bounds>(
+                    Core::ErrorCode::AssetInvalidData);
+            }
+
+            ECS::Components::Culling::Local::Bounds bounds{};
+            bounds.LocalBoundingAABB.Min = minimum;
+            bounds.LocalBoundingAABB.Max = maximum;
+            bounds.LocalBoundingSphere.Center = 0.5f * (minimum + maximum);
+            bounds.LocalBoundingSphere.Radius =
+                0.5f * glm::length(maximum - minimum);
+            if (!std::isfinite(bounds.LocalBoundingSphere.Radius))
+            {
+                return Core::Err<ECS::Components::Culling::Local::Bounds>(
+                    Core::ErrorCode::AssetInvalidData);
+            }
+            return bounds;
+        }
+
+        [[nodiscard]] Core::Expected<ECS::Components::Culling::World::Bounds>
+        ComputeWorldBounds(
+            const ECS::Components::Culling::Local::Bounds& local,
+            const glm::mat4& worldMatrix)
+        {
+            ECS::Components::Culling::World::Bounds world{};
+            if (!ECS::Systems::BoundsPropagation::TryComputeWorldBounds(
+                    local,
+                    worldMatrix,
+                    world))
+            {
+                return Core::Err<ECS::Components::Culling::World::Bounds>(
+                    Core::ErrorCode::AssetInvalidData);
+            }
+
+            return world;
+        }
+
+        [[nodiscard]] Core::Expected<std::vector<PreparedNode>> PrepareNodes(
+            const Assets::AssetModelScenePayload& model)
+        {
+            std::vector<PreparedNode> prepared(model.Nodes.size());
+            std::vector<glm::mat4> localMatrices(model.Nodes.size());
+            std::vector<std::uint8_t> state(model.Nodes.size(), 0u);
+
+            for (std::size_t nodeIndex = 0u;
+                 nodeIndex < model.Nodes.size();
+                 ++nodeIndex)
+            {
+                const Assets::AssetModelNodePayload& node = model.Nodes[nodeIndex];
+                const glm::mat4 localMatrix =
+                    ToColumnMajorMatrix(node.LocalTransform);
+                constexpr float kAffineTolerance = 1.0e-5f;
+                if (!IsFinite(localMatrix)
+                    || std::abs(localMatrix[0][3]) > kAffineTolerance
+                    || std::abs(localMatrix[1][3]) > kAffineTolerance
+                    || std::abs(localMatrix[2][3]) > kAffineTolerance
+                    || std::abs(localMatrix[3][3] - 1.0f) > kAffineTolerance)
+                {
+                    return Core::Err<std::vector<PreparedNode>>(
+                        Core::ErrorCode::AssetInvalidData);
+                }
+
+                ECS::Components::Transform::Component localTransform{};
+                if (!ECS::Components::Transform::TryDecomposeMatrix(
+                        localMatrix,
+                        localTransform)
+                    || !IsFinite(localTransform.Position)
+                    || !IsFinite(localTransform.Rotation)
+                    || !IsFinite(localTransform.Scale))
+                {
+                    return Core::Err<std::vector<PreparedNode>>(
+                        Core::ErrorCode::AssetInvalidData);
+                }
+
+                const glm::mat4 reconstructed =
+                    ECS::Components::Transform::GetMatrix(localTransform);
+                if (!IsFinite(reconstructed)
+                    || !MatricesApproximatelyEqual(localMatrix, reconstructed))
+                {
+                    return Core::Err<std::vector<PreparedNode>>(
+                        Core::ErrorCode::AssetInvalidData);
+                }
+                prepared[nodeIndex].LocalTransform = localTransform;
+                localMatrices[nodeIndex] = reconstructed;
+            }
+
+            // Follow parent chains with an explicit work stack. Model payloads
+            // are untrusted and can contain arbitrarily deep hierarchies, so a
+            // recursive walk would make valid input depth consume call-stack
+            // space and turn malformed cycles into a stack-overflow hazard.
+            std::vector<std::uint32_t> chain{};
+            chain.reserve(model.Nodes.size());
+            for (std::size_t startIndex = 0u;
+                 startIndex < model.Nodes.size();
+                 ++startIndex)
+            {
+                if (state[startIndex] == 2u)
+                {
+                    continue;
+                }
+
+                chain.clear();
+                std::uint32_t nodeIndex = static_cast<std::uint32_t>(startIndex);
+                while (nodeIndex != Assets::kInvalidAssetModelIndex)
+                {
+                    if (nodeIndex >= model.Nodes.size())
+                    {
+                        return Core::Err<std::vector<PreparedNode>>(
+                            Core::ErrorCode::OutOfRange);
+                    }
+                    if (state[nodeIndex] == 2u)
+                    {
+                        break;
+                    }
+                    if (state[nodeIndex] == 1u)
+                    {
+                        return Core::Err<std::vector<PreparedNode>>(
+                            Core::ErrorCode::AssetInvalidData);
+                    }
+
+                    state[nodeIndex] = 1u;
+                    chain.push_back(nodeIndex);
+                    nodeIndex = model.Nodes[nodeIndex].ParentNodeIndex;
+                }
+
+                glm::mat4 parentWorld =
+                    nodeIndex == Assets::kInvalidAssetModelIndex
+                    ? glm::mat4{1.0f}
+                    : prepared[nodeIndex].WorldMatrix;
+                while (!chain.empty())
+                {
+                    const std::uint32_t current = chain.back();
+                    chain.pop_back();
+
+                    const glm::mat4 worldMatrix =
+                        parentWorld * localMatrices[current];
+                    if (!IsFinite(worldMatrix))
+                    {
+                        return Core::Err<std::vector<PreparedNode>>(
+                            Core::ErrorCode::AssetInvalidData);
+                    }
+                    prepared[current].WorldMatrix = worldMatrix;
+                    state[current] = 2u;
+                    parentWorld = worldMatrix;
+                }
+            }
+            return prepared;
+        }
+
+        [[nodiscard]] Core::Expected<std::vector<PreparedPrimitiveInstance>>
+        PreparePrimitiveInstances(
+            const Assets::AssetModelScenePayload& model,
+            const std::vector<PreparedPrimitive>& primitives,
+            const std::vector<PreparedNode>& nodes)
+        {
+            std::size_t instanceCount = 0u;
+            for (const Assets::AssetModelNodePayload& node : model.Nodes)
+            {
+                instanceCount += node.PrimitiveIndices.size();
+            }
+
+            std::vector<PreparedPrimitiveInstance> instances{};
+            instances.reserve(instanceCount);
+            for (std::size_t nodeIndex = 0u; nodeIndex < model.Nodes.size(); ++nodeIndex)
+            {
+                for (const std::uint32_t primitiveIndex :
+                     model.Nodes[nodeIndex].PrimitiveIndices)
+                {
+                    if (primitiveIndex >= primitives.size()
+                        || nodeIndex >= nodes.size())
+                    {
+                        return Core::Err<std::vector<PreparedPrimitiveInstance>>(
+                            Core::ErrorCode::OutOfRange);
+                    }
+                    auto worldBounds = ComputeWorldBounds(
+                        primitives[primitiveIndex].LocalBounds,
+                        nodes[nodeIndex].WorldMatrix);
+                    if (!worldBounds.has_value())
+                    {
+                        return Core::Err<std::vector<PreparedPrimitiveInstance>>(
+                            worldBounds.error());
+                    }
+                    instances.push_back(PreparedPrimitiveInstance{
+                        .NodeIndex = static_cast<std::uint32_t>(nodeIndex),
+                        .PrimitiveIndex = primitiveIndex,
+                        .WorldBounds = *worldBounds,
+                    });
+                }
+            }
+            return instances;
+        }
+
         [[nodiscard]] Core::Expected<std::vector<PreparedPrimitive>> PreparePrimitives(
             const Assets::AssetModelScenePayload& model,
             AssetModelSceneHandoffDiagnostics* diagnostics,
@@ -219,6 +532,12 @@ namespace Extrinsic::Runtime
                     {
                         return Core::Err<std::vector<PreparedPrimitive>>(mesh.error());
                     }
+                    auto localBounds = ComputeLocalBounds(*mesh);
+                    if (!localBounds.has_value())
+                    {
+                        return Core::Err<std::vector<PreparedPrimitive>>(
+                            localBounds.error());
+                    }
 
                     const bool hasAuthoredTexcoords = MeshPayloadHasValidVertexTexcoords(**meshPayload);
                     prepared.push_back(PreparedPrimitive{
@@ -231,6 +550,7 @@ namespace Extrinsic::Runtime
                             ? "model-primitive-" + std::to_string(primitiveIndex)
                             : primitive.Name,
                         .Mesh = std::move(*mesh),
+                        .LocalBounds = *localBounds,
                         .HasResolvedTexcoords = hasAuthoredTexcoords,
                         .TexcoordProvenance = hasAuthoredTexcoords
                             ? RuntimeMeshResolvedUvProvenance::AuthoredPreserved
@@ -251,6 +571,12 @@ namespace Extrinsic::Runtime
                 RecordUvMaterializationDiagnostics(
                     diagnostics,
                     materialized->Diagnostics);
+                auto localBounds = ComputeLocalBounds(materialized->Mesh);
+                if (!localBounds.has_value())
+                {
+                    return Core::Err<std::vector<PreparedPrimitive>>(
+                        localBounds.error());
+                }
 
                 prepared.push_back(PreparedPrimitive{
                     .PrimitiveIndex = static_cast<std::uint32_t>(primitiveIndex),
@@ -262,6 +588,7 @@ namespace Extrinsic::Runtime
                         ? "model-primitive-" + std::to_string(primitiveIndex)
                         : primitive.Name,
                     .Mesh = std::move(materialized->Mesh),
+                    .LocalBounds = *localBounds,
                     .HasResolvedTexcoords =
                         materialized->Diagnostics.ResolvedTexcoordsValid,
                     .TexcoordProvenance =
@@ -899,9 +1226,51 @@ namespace Extrinsic::Runtime
             ECS::Scene::Registry& scene,
             const AssetModelSceneHandoffRecord& record)
         {
+            auto& raw = scene.Raw();
+            const auto detachAllEdges = [&raw](const ECS::EntityHandle entity)
+            {
+                auto* hierarchy =
+                    raw.try_get<ECS::Components::Hierarchy::Component>(entity);
+                while (hierarchy != nullptr
+                       && raw.valid(hierarchy->FirstChild))
+                {
+                    ECS::Hierarchy::Detach(raw, hierarchy->FirstChild);
+                }
+                ECS::Hierarchy::Detach(raw, entity);
+            };
+
+            // Detach every incident edge while every referenced hierarchy
+            // component is still alive. This also preserves any externally
+            // owned entity that was parented under a model node. Node record
+            // order is payload order, not a guaranteed post-order.
             for (const AssetModelScenePrimitiveRecord& primitive : record.Primitives)
             {
-                scene.Destroy(primitive.Entity);
+                if (scene.IsValid(primitive.Entity))
+                {
+                    detachAllEdges(primitive.Entity);
+                }
+            }
+            for (const AssetModelSceneNodeRecord& node : record.Nodes)
+            {
+                if (scene.IsValid(node.Entity))
+                {
+                    detachAllEdges(node.Entity);
+                }
+            }
+
+            for (const AssetModelScenePrimitiveRecord& primitive : record.Primitives)
+            {
+                if (scene.IsValid(primitive.Entity))
+                {
+                    scene.Destroy(primitive.Entity);
+                }
+            }
+            for (const AssetModelSceneNodeRecord& node : record.Nodes)
+            {
+                if (scene.IsValid(node.Entity))
+                {
+                    scene.Destroy(node.Entity);
+                }
             }
         }
 
@@ -1784,6 +2153,22 @@ namespace Extrinsic::Runtime
             RecordFailure(diagnostics, modelAsset, prepared.error());
             return Core::Err<AssetModelSceneHandoffState>(prepared.error());
         }
+        auto preparedNodes = PrepareNodes(model);
+        if (!preparedNodes.has_value())
+        {
+            RecordFailure(diagnostics, modelAsset, preparedNodes.error());
+            return Core::Err<AssetModelSceneHandoffState>(preparedNodes.error());
+        }
+        auto preparedInstances = PreparePrimitiveInstances(
+            model,
+            *prepared,
+            *preparedNodes);
+        if (!preparedInstances.has_value())
+        {
+            RecordFailure(diagnostics, modelAsset, preparedInstances.error());
+            return Core::Err<AssetModelSceneHandoffState>(
+                preparedInstances.error());
+        }
 
         std::string modelPath = model.SourcePath;
         if (auto servicePath = service.GetPath(modelAsset); servicePath.has_value())
@@ -1848,12 +2233,49 @@ namespace Extrinsic::Runtime
             return Core::Err<AssetModelSceneHandoffState>(materialRecords.error());
         }
 
-        state.Record.Primitives.reserve(prepared->size());
-        for (PreparedPrimitive& primitive : *prepared)
+        auto& raw = scene.Raw();
+        state.Record.Nodes.reserve(model.Nodes.size());
+        std::vector<ECS::EntityHandle> nodeEntities(model.Nodes.size());
+        for (std::size_t nodeIndex = 0u; nodeIndex < model.Nodes.size(); ++nodeIndex)
         {
-            const ECS::EntityHandle entity = ECS::Scene::CreateDefault(scene, primitive.Name);
-            auto& raw = scene.Raw();
+            const Assets::AssetModelNodePayload& node = model.Nodes[nodeIndex];
+            const ECS::EntityHandle entity = ECS::Scene::CreateDefault(
+                scene,
+                node.Name.empty()
+                    ? "model-node-" + std::to_string(nodeIndex)
+                    : node.Name);
+            raw.get<ECS::Components::Transform::Component>(entity) =
+                (*preparedNodes)[nodeIndex].LocalTransform;
+            raw.get<ECS::Components::Transform::WorldMatrix>(entity).Matrix =
+                (*preparedNodes)[nodeIndex].WorldMatrix;
+            nodeEntities[nodeIndex] = entity;
+            state.Record.Nodes.push_back(AssetModelSceneNodeRecord{
+                .Entity = entity,
+                .NodeIndex = static_cast<std::uint32_t>(nodeIndex),
+            });
+            if (diagnostics != nullptr)
+            {
+                ++diagnostics->NodeEntitiesCreated;
+            }
+        }
+
+        state.Record.Primitives.reserve(preparedInstances->size());
+        std::vector<std::vector<ECS::EntityHandle>> primitiveEntitiesByNode(
+            model.Nodes.size());
+        for (const PreparedPrimitiveInstance& instance : *preparedInstances)
+        {
+            PreparedPrimitive& primitive = (*prepared)[instance.PrimitiveIndex];
+            const ECS::EntityHandle entity =
+                ECS::Scene::CreateDefault(scene, primitive.Name);
+            raw.get<ECS::Components::Transform::WorldMatrix>(entity).Matrix =
+                (*preparedNodes)[instance.NodeIndex].WorldMatrix;
             raw.emplace_or_replace<Graphics::Components::RenderSurface>(entity);
+            raw.emplace_or_replace<ECS::Components::Culling::Local::Bounds>(
+                entity,
+                primitive.LocalBounds);
+            raw.emplace_or_replace<ECS::Components::Culling::World::Bounds>(
+                entity,
+                instance.WorldBounds);
             ECS::Components::GeometrySources::PopulateFromMesh(
                 raw,
                 entity,
@@ -1903,12 +2325,14 @@ namespace Extrinsic::Runtime
 
             state.Record.Primitives.push_back(AssetModelScenePrimitiveRecord{
                 .Entity = entity,
+                .NodeIndex = instance.NodeIndex,
                 .PrimitiveIndex = primitive.PrimitiveIndex,
                 .GeometryPayloadIndex = primitive.GeometryPayloadIndex,
                 .MaterialIndex = primitive.MaterialIndex,
                 .MaterialSlot = materialSlot,
                 .HasMaterialSlot = hasMaterialSlot,
             });
+            primitiveEntitiesByNode[instance.NodeIndex].push_back(entity);
             if (diagnostics != nullptr)
             {
                 ++diagnostics->PrimitiveEntitiesCreated;
@@ -1916,6 +2340,46 @@ namespace Extrinsic::Runtime
                 {
                     ++diagnostics->ProgressiveRawPrimitiveEntitiesPublished;
                 }
+            }
+        }
+
+        // Attach in reverse because Structure::AttachToParent head-inserts.
+        // The resulting sibling order is authored child nodes followed by the
+        // node's primitive instances, each group retaining payload order.
+        for (std::size_t nodeIndex = 0u; nodeIndex < model.Nodes.size(); ++nodeIndex)
+        {
+            auto& parentHierarchy =
+                raw.get<ECS::Components::Hierarchy::Component>(
+                    nodeEntities[nodeIndex]);
+            const auto& primitiveChildren = primitiveEntitiesByNode[nodeIndex];
+            for (auto primitive = primitiveChildren.rbegin();
+                 primitive != primitiveChildren.rend();
+                 ++primitive)
+            {
+                auto& childHierarchy =
+                    raw.get<ECS::Components::Hierarchy::Component>(*primitive);
+                ECS::Hierarchy::Structure::AttachToParent(
+                    raw,
+                    *primitive,
+                    childHierarchy,
+                    nodeEntities[nodeIndex],
+                    parentHierarchy);
+            }
+
+            const auto& childNodes = model.Nodes[nodeIndex].ChildNodeIndices;
+            for (auto child = childNodes.rbegin();
+                 child != childNodes.rend();
+                 ++child)
+            {
+                auto& childHierarchy =
+                    raw.get<ECS::Components::Hierarchy::Component>(
+                        nodeEntities[*child]);
+                ECS::Hierarchy::Structure::AttachToParent(
+                    raw,
+                    nodeEntities[*child],
+                    childHierarchy,
+                    nodeEntities[nodeIndex],
+                    parentHierarchy);
             }
         }
 
@@ -1973,12 +2437,6 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] Core::Result MaterializeReadyModelScene(const Assets::AssetId id)
         {
-            if (auto it = Records.find(id); it != Records.end())
-            {
-                DestroyEntities(Scene, it->second.State.Record);
-                Records.erase(it);
-            }
-
             auto state = MaterializeModelSceneAsset(
                 Service,
                 Cache,
@@ -1992,7 +2450,17 @@ namespace Extrinsic::Runtime
                 return Core::Err(state.error());
             }
 
-            Records.emplace(id, RuntimeModelSceneRecord{.State = std::move(*state)});
+            RuntimeModelSceneRecord replacement{.State = std::move(*state)};
+            if (auto it = Records.find(id); it != Records.end())
+            {
+                RuntimeModelSceneRecord previous = std::move(it->second);
+                it->second = std::move(replacement);
+                DestroyEntities(Scene, previous.State.Record);
+            }
+            else
+            {
+                Records.emplace(id, std::move(replacement));
+            }
             return Core::Ok();
         }
 
@@ -2061,6 +2529,22 @@ namespace Extrinsic::Runtime
             }
             else if (event == Assets::AssetEvent::Reloaded)
             {
+                auto model = Service.Read<Assets::AssetModelScenePayload>(id);
+                if (!model.has_value())
+                {
+                    InvalidateMaterialTextureBindingsForAsset(id);
+                }
+                // Reloaded announces invalidation/queued work. The paired
+                // Ready event is the only point at which a model replacement
+                // is complete and may be materialized transactionally.
+            }
+            else if (event == Assets::AssetEvent::Destroyed)
+            {
+                if (auto it = Records.find(id); it != Records.end())
+                {
+                    DestroyEntities(Scene, it->second.State.Record);
+                    Records.erase(it);
+                }
                 InvalidateMaterialTextureBindingsForAsset(id);
             }
         }

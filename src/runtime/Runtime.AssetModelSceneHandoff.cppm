@@ -49,6 +49,7 @@ export namespace Extrinsic::Runtime
         std::uint64_t ModelSceneMaterializeRequests{0};
         std::uint64_t ModelSceneMaterializeSuccesses{0};
         std::uint64_t ModelSceneMaterializeFailures{0};
+        std::uint64_t NodeEntitiesCreated{0};
         std::uint64_t PrimitiveEntitiesCreated{0};
         std::uint64_t EmbeddedTextureAssetsCreated{0};
         std::uint64_t EmbeddedTextureUploadRequests{0};
@@ -101,11 +102,18 @@ export namespace Extrinsic::Runtime
     struct AssetModelScenePrimitiveRecord
     {
         ECS::EntityHandle Entity{};
+        std::uint32_t NodeIndex{Assets::kInvalidAssetModelIndex};
         std::uint32_t PrimitiveIndex{Assets::kInvalidAssetModelIndex};
         std::uint32_t GeometryPayloadIndex{Assets::kInvalidAssetModelIndex};
         std::uint32_t MaterialIndex{Assets::kInvalidAssetModelIndex};
         std::uint32_t MaterialSlot{Graphics::kDefaultMaterialSlotIndex};
         bool HasMaterialSlot{false};
+    };
+
+    struct AssetModelSceneNodeRecord
+    {
+        ECS::EntityHandle Entity{};
+        std::uint32_t NodeIndex{Assets::kInvalidAssetModelIndex};
     };
 
     struct AssetModelSceneHandoffRecord
@@ -114,6 +122,7 @@ export namespace Extrinsic::Runtime
         std::vector<Assets::AssetId> EmbeddedTextureAssets{};
         std::vector<Assets::AssetId> GeneratedTextureAssets{};
         std::vector<AssetModelSceneMaterialRecord> Materials{};
+        std::vector<AssetModelSceneNodeRecord> Nodes{};
         std::vector<AssetModelScenePrimitiveRecord> Primitives{};
     };
 

@@ -10,11 +10,13 @@ maturity_target: Operational
 
 - In progress on 2026-07-16; owner: Codex; branch:
   `agent/bug-094-model-scene-semantics`.
-- Slice A is implemented and focused verification is green: the CPU payload
-  retains active-scene roots, pre-order hierarchy, local transforms, and
-  shared primitive prototypes for GLTF and GLB. Runtime hierarchy/completion
-  (Slice B) and capable-host Vulkan proof (Slice C) remain required; the task
-  is not yet `CPUContracted` or `Operational`.
+- Slices A and B are implemented and focused verification is green. The CPU
+  payload retains active-scene roots, pre-order hierarchy, local transforms,
+  and shared primitive prototypes for GLTF and GLB; runtime materializes that
+  hierarchy, applies the standard mesh authoring policy, and completes once
+  with aggregate focus for synchronous and queued imports. The task is
+  `CPUContracted`; capable-host Vulkan proof (Slice C) remains required before
+  it can become `Operational`.
 
 ## Goal
 - Make a successful glTF model-scene import preserve active-scene membership,
@@ -45,36 +47,36 @@ maturity_target: Operational
   declaration (`defaultScene == -1`), scene 0 is the deterministic fallback;
   an absent scene or an invalid declared scene/root/reachable reference fails
   closed. Malformed data wholly outside the selected scene is not imported.
-- Slice B must compare component parity against the existing direct-mesh
-  authoring policy, including stable identity if that policy installs it; it
-  must not infer the mouse-pick contract from `SelectableTag` alone.
+- Slice B compares component parity against the existing direct-mesh authoring
+  policy. That policy installs no durable ECS stable-id component; GPU pick
+  identity continues to use the existing entity-to-render-id lookup and Slice C
+  proves the complete mouse-readback contract rather than inferring it from
+  `SelectableTag` alone.
 - Before Slice A, `AssetModelScenePayload` was a flat list of geometry payloads
   and primitives, and `BuildScenePayload()` iterated
   `tinygltf::Model::meshes` directly without traversing `scenes` or `nodes`.
-  Slice A replaces that behavior with fail-closed selected-scene traversal;
-  Slice B still needs to consume the retained hierarchy during ECS
-  materialization.
+  Slice A replaced that behavior with fail-closed selected-scene traversal;
+  Slice B now consumes the retained hierarchy during ECS materialization.
 - The checked-in `assets/models/Duck.gltf` exposes the defect: its root node
   carries a `0.01` matrix scale while the mesh accessor is in roughly
-  hundred-unit coordinates. Before Slice A the decoder discarded that matrix;
-  it now retains the authored local transform, but the still-flat Slice B
-  handoff does not yet apply it during ECS materialization.
-- `Runtime.AssetModelSceneHandoff` materializes one flat entity per primitive
-  with `RenderSurface` and `GeometrySources`. It does not establish node
-  hierarchy or apply node-local transforms, and it omits `SelectableTag` and
-  `VisualizationConfig`. Mouse readback intentionally rejects entities without
-  `SelectableTag`, while a hierarchy row can still force a programmatic
-  selection, producing inconsistent selection behavior.
-- Standard direct mesh, graph, and point-cloud imports install authoring
-  policies and invoke import-completed handlers. The queued and synchronous
-  model-scene routes bypass both lanes, so successful model imports do not
-  select the first primitive or focus the camera on their aggregate world-space
-  bounds.
+  hundred-unit coordinates. The decoder retains that authored transform and
+  the handoff now applies it through explicit node and primitive-leaf entities;
+  Slice C verifies the resulting promoted-backend pixels.
+- `Runtime.AssetModelSceneHandoff` now materializes explicit node entities and
+  one primitive leaf per node primitive reference, preserving authored local
+  transforms and hierarchy. The import pipeline passes those leaves through
+  the canonical direct-mesh authoring lane, which installs `RenderSurface`,
+  `SelectableTag`, and `VisualizationConfig` alongside handoff-owned
+  `GeometrySources`.
+- Queued and synchronous model-scene routes converge on one finalizer. It runs
+  mesh authoring for every primitive in scene order and invokes model-scene
+  completion once with only the primitive leaves and their aggregate finite
+  world-space focus target.
 - Before Slice A, regression coverage consisted only of an identity-node glTF
   fixture and a handoff assertion for geometry/material upload. The new GLTF,
-  GLB, payload-topology, and malformed-scene contracts now pin active-scene,
-  transform, and shared-instance semantics; Slice B/C still need hierarchy,
-  authoring-component, focus, visibility, and mouse-pick coverage.
+  GLB, payload-topology, malformed-scene, hierarchy, authoring-component,
+  reload, completion, selection, and focus contracts pin the CPU behavior;
+  Slice C still needs visible-pixel and mouse-pick coverage.
 
 ## Slice plan
 - **Slice A — CPU scene contract.** Extend the assets payload and decoder with
@@ -96,18 +98,18 @@ maturity_target: Operational
       Preserve child order and repeated references to one mesh; reject invalid
       node/mesh indices, cycles, and non-finite matrix/TRS data with actionable
       diagnostics.
-- [ ] Materialize node and primitive entities under runtime ownership with the
+- [x] Materialize node and primitive entities under runtime ownership with the
       authored hierarchy and local transforms. Reuse shared CPU geometry for
       repeated mesh instances and ensure their world matrices differ according
       to their node paths.
-- [ ] Route each renderable primitive through the same default authoring policy
+- [x] Route each renderable primitive through the same default authoring policy
       contract as a direct mesh import, including `GeometrySources`,
       `RenderSurface`, `SelectableTag`, and `VisualizationConfig`, without
       creating a parallel model-only policy implementation.
-- [ ] Invoke model-scene completion once after the complete materialization:
+- [x] Invoke model-scene completion once after the complete materialization:
       select the deterministic first created primitive and focus the camera on
       the finite aggregate world-space bounds of all created primitives.
-- [ ] Keep graphics consumers snapshot/view based. Do not expose glTF node
+- [x] Keep graphics consumers snapshot/view based. Do not expose glTF node
       types or `Vk*` types through asset, ECS, RHI, or renderer APIs.
 
 ## Tests
@@ -122,11 +124,11 @@ maturity_target: Operational
 - [x] Add malformed-payload cases for cyclic node references, out-of-range
       scene/node/mesh indices, and non-finite transforms; each must fail closed
       with a diagnostic instead of partially materializing a scene.
-- [ ] Extend `tests/contract/runtime/Test.AssetModelSceneHandoff.cpp` with
+- [x] Extend `tests/contract/runtime/Test.AssetModelSceneHandoff.cpp` with
       `RuntimeAssetModelSceneHandoff.MaterializesHierarchyTransformsAndSelectablePrimitiveInstances`.
       Assert entity count, hierarchy, local/world transforms, shared geometry,
       and component parity with a reference direct-mesh import.
-- [ ] Add real `Engine` import coverage in
+- [x] Add real `Engine` import coverage in
       `tests/contract/runtime/Test.AssetImportFormatCoverage.cpp` named
       `RuntimeAssetImportFormatCoverage.ModelSceneCompletionSelectsAndFramesCreatedPrimitives`.
       Exercise both synchronous and queued routes and assert one completion,
@@ -145,10 +147,10 @@ maturity_target: Operational
 - [x] Document the model payload's scene/node/instance semantics and the
       assets-to-runtime ownership boundary in the relevant asset/runtime
       architecture documentation.
-- [ ] Update the runtime import documentation to state that model-scene
+- [x] Update the runtime import documentation to state that model-scene
       completion uses the standard authoring, selection, and aggregate-focus
       contract.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` if the exported model
+- [x] Regenerate `docs/api/generated/module_inventory.md` if the exported model
       payload surface changes, then update task indexes, session brief, and
       retirement records when the implementation is verified.
 
@@ -156,17 +158,17 @@ maturity_target: Operational
 - [x] The regression fixture produces exactly the reachable active-scene
       instances, including two distinct transformed instances of one shared
       mesh, and imports no unreachable mesh.
-- [ ] Nested matrix/TRS transforms produce the expected finite world transforms;
+- [x] Nested matrix/TRS transforms produce the expected finite world transforms;
       the Duck fixture is no longer rendered at raw accessor scale.
-- [ ] Every materialized primitive has the standard render-critical and
+- [x] Every materialized primitive has the standard render-critical and
       selection-critical components and can be selected consistently from both
       the hierarchy and mouse readback.
-- [ ] Both synchronous and queued model-scene imports run completion exactly
+- [x] Both synchronous and queued model-scene imports run completion exactly
       once, select the deterministic first primitive, and frame aggregate
       world-space bounds.
 - [ ] The CPU contracts pass under the Null backend and the opt-in Vulkan smoke
       proves the promoted path visible and click-pickable on a capable host.
-- [ ] Layering remains compliant: assets holds CPU data, runtime owns ECS
+- [x] Layering remains compliant: assets holds CPU data, runtime owns ECS
       composition, and graphics sees only snapshots/views and asset IDs.
 
 ## Verification
@@ -207,6 +209,21 @@ Slice A verification on 2026-07-16:
   root-hygiene, skill-sync, clean-workshop automated, and diff checks passed.
   Regenerating the public module inventory produced no diff and retained 386
   modules.
+
+Slice B verification on 2026-07-16:
+
+- `IntrinsicRuntimeContractTests` and `IntrinsicECSTests` built successfully
+  after the exported bounds-computation seam and model-scene handoff changes.
+- The hierarchy, fail-closed transform, reload-once, real Engine completion,
+  and conservative-shear regressions passed 5/5. The complete affected
+  `RuntimeAssetModelSceneHandoff`, `RuntimeAssetImportFormatCoverage`, and
+  `ECSBoundsPropagation` suites passed 44/44.
+- Strict task, task-state-link, layering, allowlist, test-layout,
+  documentation-link, root-hygiene, skill-sync, clean-workshop automated, and
+  diff checks passed. Regenerating the public module inventory produced no diff
+  and retained 386 modules.
+- The default CPU-supported aggregate gate and Slice C capable-host Vulkan
+  smoke are still pending in this checkpoint.
 
 ## Forbidden changes
 - Treating all `model.meshes` entries as scene instances or silently applying

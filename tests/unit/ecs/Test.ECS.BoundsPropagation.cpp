@@ -74,7 +74,7 @@ TEST(ECSBoundsPropagation, TranslatedRootProducesWorldBounds)
     EXPECT_NEAR(world.WorldBoundingSphere.Center.x, 5.0f, 1e-5f);
     EXPECT_NEAR(world.WorldBoundingSphere.Center.y, -2.0f, 1e-5f);
     EXPECT_NEAR(world.WorldBoundingSphere.Center.z, 7.0f, 1e-5f);
-    EXPECT_NEAR(world.WorldBoundingSphere.Radius, 1.0f, 1e-5f);
+    EXPECT_NEAR(world.WorldBoundingSphere.Radius, std::sqrt(3.0f), 1e-5f);
 }
 
 TEST(ECSBoundsPropagation, NonUniformScaleStretchesExtentsPerAxis)
@@ -95,8 +95,60 @@ TEST(ECSBoundsPropagation, NonUniformScaleStretchesExtentsPerAxis)
     EXPECT_NEAR(world.WorldBoundingOBB.Extents.x, 2.0f, 1e-5f);
     EXPECT_NEAR(world.WorldBoundingOBB.Extents.y, 3.0f, 1e-5f);
     EXPECT_NEAR(world.WorldBoundingOBB.Extents.z, 4.0f, 1e-5f);
-    // Sphere radius is the conservative max-scale envelope.
-    EXPECT_NEAR(world.WorldBoundingSphere.Radius, 4.0f, 1e-5f);
+    // The sphere circumscribes the transformed local AABB.
+    EXPECT_NEAR(world.WorldBoundingSphere.Radius, std::sqrt(29.0f), 1e-5f);
+}
+
+TEST(ECSBoundsPropagation, ShearedWorldMatrixUsesTransformedAabbSphereInPureAndSystemPaths)
+{
+    Components::Culling::Local::Bounds local = MakeUnitLocalBounds();
+    constexpr float kPi = 3.14159265358979323846f;
+    const glm::mat4 worldMatrix =
+        glm::scale(glm::mat4{1.0f}, glm::vec3{4.0f, 1.0f, 1.0f})
+        * glm::rotate(
+            glm::mat4{1.0f},
+            kPi * 0.25f,
+            glm::vec3{0.0f, 0.0f, 1.0f});
+
+    Components::Culling::World::Bounds pure{};
+    ASSERT_TRUE(BoundsSystem::TryComputeWorldBounds(local, worldMatrix, pure));
+
+    glm::vec3 expectedMinimum{std::numeric_limits<float>::max()};
+    glm::vec3 expectedMaximum{std::numeric_limits<float>::lowest()};
+    for (std::uint32_t corner = 0u; corner < 8u; ++corner)
+    {
+        const glm::vec3 localCorner{
+            (corner & 1u) != 0u ? local.LocalBoundingAABB.Max.x : local.LocalBoundingAABB.Min.x,
+            (corner & 2u) != 0u ? local.LocalBoundingAABB.Max.y : local.LocalBoundingAABB.Min.y,
+            (corner & 4u) != 0u ? local.LocalBoundingAABB.Max.z : local.LocalBoundingAABB.Min.z,
+        };
+        const glm::vec3 worldCorner{
+            worldMatrix * glm::vec4{localCorner, 1.0f}};
+        expectedMinimum = glm::min(expectedMinimum, worldCorner);
+        expectedMaximum = glm::max(expectedMaximum, worldCorner);
+    }
+    const glm::vec3 expectedCenter = 0.5f * (expectedMinimum + expectedMaximum);
+    const float expectedRadius = 0.5f * glm::length(expectedMaximum - expectedMinimum);
+
+    EXPECT_NEAR(pure.WorldBoundingSphere.Center.x, expectedCenter.x, 1e-5f);
+    EXPECT_NEAR(pure.WorldBoundingSphere.Center.y, expectedCenter.y, 1e-5f);
+    EXPECT_NEAR(pure.WorldBoundingSphere.Center.z, expectedCenter.z, 1e-5f);
+    EXPECT_NEAR(pure.WorldBoundingSphere.Radius, expectedRadius, 1e-5f);
+
+    Registry r;
+    auto& raw = r.Raw();
+    const auto entity = raw.create();
+    raw.emplace<Components::Transform::WorldUpdatedTag>(entity);
+    raw.emplace<Components::Transform::WorldMatrix>(
+        entity,
+        Components::Transform::WorldMatrix{.Matrix = worldMatrix});
+    raw.emplace<Components::Culling::Local::Bounds>(entity, local);
+
+    BoundsSystem::OnUpdate(raw);
+
+    const auto& system = raw.get<Components::Culling::World::Bounds>(entity);
+    EXPECT_EQ(system.WorldBoundingSphere.Center, pure.WorldBoundingSphere.Center);
+    EXPECT_FLOAT_EQ(system.WorldBoundingSphere.Radius, pure.WorldBoundingSphere.Radius);
 }
 
 TEST(ECSBoundsPropagation, RotationIsEmbeddedInWorldObb)

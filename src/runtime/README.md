@@ -144,6 +144,16 @@ no registrations, geometry still materializes but receives no
 render/selection/visualization defaults, no focus/selection mutation, and no
 generated-normal post-process.
 
+Model-scene materialization creates explicit ECS node entities and primitive
+leaves from the selected-scene payload. Node entities retain authored local TRS
+and hierarchy; repeated primitive references create distinct leaf entities with
+distinct world transforms while sourcing the same decoded CPU prototype.
+Synchronous and queued model-scene routes then apply the mesh authoring policies
+to each primitive leaf in scene order and publish one `ModelScene` completion
+whose entity span excludes the structural nodes. Its finite focus target
+encloses all primitive world bounds, so the sandbox defaults select the first
+primitive and focus once only after every renderable/selectable leaf exists.
+
 ### Sandbox Editor Async Method Jobs
 
 Editor buttons that run heavyweight geometry or method work must submit copied

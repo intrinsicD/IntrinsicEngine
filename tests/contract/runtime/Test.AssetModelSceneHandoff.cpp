@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include <entt/entity/entity.hpp>
 #include <glm/glm.hpp>
 
 import Extrinsic.Asset.EventBus;
@@ -22,7 +23,13 @@ import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Tasks;
+import Extrinsic.ECS.Component.Culling.Local;
+import Extrinsic.ECS.Component.Culling.World;
+import Extrinsic.ECS.Component.Hierarchy;
+import Extrinsic.ECS.Component.Transform;
+import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Hierarchy.Structure;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.GpuAssetCache;
@@ -196,6 +203,55 @@ namespace
         return payload;
     }
 
+    [[nodiscard]] std::array<float, 16> TranslationScaleMatrix(
+        const float x,
+        const float y,
+        const float z,
+        const float scaleX = 1.0f,
+        const float scaleY = 1.0f,
+        const float scaleZ = 1.0f)
+    {
+        return {
+            scaleX, 0.0f, 0.0f, 0.0f,
+            0.0f, scaleY, 0.0f, 0.0f,
+            0.0f, 0.0f, scaleZ, 0.0f,
+            x, y, z, 1.0f,
+        };
+    }
+
+    [[nodiscard]] glm::mat4 TranslationScaleGlmMatrix(
+        const float x,
+        const float y,
+        const float z,
+        const float scaleX = 1.0f,
+        const float scaleY = 1.0f,
+        const float scaleZ = 1.0f)
+    {
+        glm::mat4 matrix{1.0f};
+        matrix[0][0] = scaleX;
+        matrix[1][1] = scaleY;
+        matrix[2][2] = scaleZ;
+        matrix[3][0] = x;
+        matrix[3][1] = y;
+        matrix[3][2] = z;
+        return matrix;
+    }
+
+    void ExpectMatrixNear(
+        const glm::mat4& actual,
+        const glm::mat4& expected,
+        const float tolerance = 1.0e-5f)
+    {
+        for (std::size_t column = 0u; column < 4u; ++column)
+        {
+            for (std::size_t row = 0u; row < 4u; ++row)
+            {
+                EXPECT_NEAR(actual[column][row], expected[column][row], tolerance)
+                    << "column=" << column << " row=" << row;
+            }
+        }
+    }
+
     [[nodiscard]] Core::Expected<Assets::AssetId> LoadModel(
         Assets::AssetService& service,
         std::string_view path,
@@ -328,6 +384,244 @@ TEST(RuntimeAssetModelSceneHandoff, MaterializeModelSceneCreatesMeshEntityAndUpl
     EXPECT_EQ(diagnostics.MaterialInstancesCreated, 1u);
     EXPECT_EQ(diagnostics.MaterialTextureBindingUploadDeferrals, 1u);
     EXPECT_EQ(diagnostics.MaterialTextureBindingFailures, 0u);
+}
+
+TEST(RuntimeAssetModelSceneHandoff, MaterializesHierarchyTransformsAndSelectablePrimitiveInstances)
+{
+    SceneHandoffFixture fx;
+    TmpFile modelFile("asset_model_scene_handoff_hierarchy.gltf");
+
+    Assets::AssetModelScenePayload payload = MakeModelScenePayload();
+    payload.Nodes.clear();
+    payload.Nodes.push_back(Assets::AssetModelNodePayload{
+        .Name = "Root",
+        .ParentNodeIndex = Assets::kInvalidAssetModelIndex,
+        .LocalTransform = TranslationScaleMatrix(10.0f, 0.0f, 0.0f),
+        .ChildNodeIndices = {1u, 2u},
+        .PrimitiveIndices = {0u},
+    });
+    payload.Nodes.push_back(Assets::AssetModelNodePayload{
+        .Name = "UpperInstance",
+        .ParentNodeIndex = 0u,
+        .LocalTransform = TranslationScaleMatrix(0.0f, 2.0f, 0.0f),
+        .ChildNodeIndices = {},
+        .PrimitiveIndices = {0u},
+    });
+    payload.Nodes.push_back(Assets::AssetModelNodePayload{
+        .Name = "LowerScaledInstance",
+        .ParentNodeIndex = 0u,
+        .LocalTransform = TranslationScaleMatrix(
+            0.0f,
+            -3.0f,
+            0.0f,
+            2.0f,
+            2.0f,
+            2.0f),
+        .ChildNodeIndices = {},
+        .PrimitiveIndices = {0u},
+    });
+
+    auto model = LoadModel(fx.Service, modelFile.Path.string(), std::move(payload));
+    ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
+
+    Runtime::AssetModelSceneHandoffDiagnostics diagnostics{};
+    auto state = Runtime::MaterializeModelSceneAsset(
+        fx.Service,
+        fx.Cache,
+        fx.Scene,
+        fx.Materials,
+        *model,
+        {},
+        &diagnostics);
+    ASSERT_TRUE(state.has_value()) << static_cast<int>(state.error());
+    ASSERT_EQ(state->Record.Nodes.size(), 3u);
+    ASSERT_EQ(state->Record.Primitives.size(), 3u);
+    EXPECT_EQ(fx.Scene.Raw().storage<entt::entity>().size(), 6u);
+    EXPECT_EQ(diagnostics.NodeEntitiesCreated, 3u);
+    EXPECT_EQ(diagnostics.PrimitiveEntitiesCreated, 3u);
+
+    auto& raw = fx.Scene.Raw();
+    const ECS::EntityHandle root = state->Record.Nodes[0].Entity;
+    const ECS::EntityHandle upper = state->Record.Nodes[1].Entity;
+    const ECS::EntityHandle lower = state->Record.Nodes[2].Entity;
+    const ECS::EntityHandle rootPrimitive = state->Record.Primitives[0].Entity;
+    const ECS::EntityHandle upperPrimitive = state->Record.Primitives[1].Entity;
+    const ECS::EntityHandle lowerPrimitive = state->Record.Primitives[2].Entity;
+
+    EXPECT_NE(rootPrimitive, upperPrimitive);
+    EXPECT_NE(rootPrimitive, lowerPrimitive);
+    EXPECT_NE(upperPrimitive, lowerPrimitive);
+    for (std::size_t nodeIndex = 0u; nodeIndex < state->Record.Nodes.size(); ++nodeIndex)
+    {
+        EXPECT_EQ(state->Record.Nodes[nodeIndex].NodeIndex, nodeIndex);
+        EXPECT_TRUE(fx.Scene.IsValid(state->Record.Nodes[nodeIndex].Entity));
+    }
+
+    const auto& rootHierarchy =
+        raw.get<ECS::Components::Hierarchy::Component>(root);
+    const auto& upperHierarchy =
+        raw.get<ECS::Components::Hierarchy::Component>(upper);
+    const auto& lowerHierarchy =
+        raw.get<ECS::Components::Hierarchy::Component>(lower);
+    const auto& rootPrimitiveHierarchy =
+        raw.get<ECS::Components::Hierarchy::Component>(rootPrimitive);
+    const auto& upperPrimitiveHierarchy =
+        raw.get<ECS::Components::Hierarchy::Component>(upperPrimitive);
+    const auto& lowerPrimitiveHierarchy =
+        raw.get<ECS::Components::Hierarchy::Component>(lowerPrimitive);
+
+    EXPECT_EQ(rootHierarchy.Parent, ECS::InvalidEntityHandle);
+    EXPECT_EQ(rootHierarchy.FirstChild, upper);
+    EXPECT_EQ(rootHierarchy.ChildCount, 3u);
+    EXPECT_EQ(upperHierarchy.Parent, root);
+    EXPECT_EQ(upperHierarchy.NextSibling, lower);
+    EXPECT_EQ(lowerHierarchy.Parent, root);
+    EXPECT_EQ(lowerHierarchy.NextSibling, rootPrimitive);
+    EXPECT_EQ(rootPrimitiveHierarchy.Parent, root);
+    EXPECT_EQ(rootPrimitiveHierarchy.NextSibling, ECS::InvalidEntityHandle);
+    EXPECT_EQ(upperHierarchy.FirstChild, upperPrimitive);
+    EXPECT_EQ(upperHierarchy.ChildCount, 1u);
+    EXPECT_EQ(upperPrimitiveHierarchy.Parent, upper);
+    EXPECT_EQ(lowerHierarchy.FirstChild, lowerPrimitive);
+    EXPECT_EQ(lowerHierarchy.ChildCount, 1u);
+    EXPECT_EQ(lowerPrimitiveHierarchy.Parent, lower);
+
+    for (const ECS::EntityHandle entity :
+         {root, upper, lower, rootPrimitive, upperPrimitive, lowerPrimitive})
+    {
+        EXPECT_TRUE(ECS::Hierarchy::Structure::ValidateInvariants(raw, entity));
+    }
+
+    const auto& rootLocal =
+        raw.get<ECS::Components::Transform::Component>(root);
+    const auto& upperLocal =
+        raw.get<ECS::Components::Transform::Component>(upper);
+    const auto& lowerLocal =
+        raw.get<ECS::Components::Transform::Component>(lower);
+    EXPECT_EQ(rootLocal.Position, glm::vec3(10.0f, 0.0f, 0.0f));
+    EXPECT_EQ(upperLocal.Position, glm::vec3(0.0f, 2.0f, 0.0f));
+    EXPECT_EQ(lowerLocal.Position, glm::vec3(0.0f, -3.0f, 0.0f));
+    EXPECT_EQ(lowerLocal.Scale, glm::vec3(2.0f));
+
+    const std::array<glm::mat4, 3> expectedWorlds{
+        TranslationScaleGlmMatrix(10.0f, 0.0f, 0.0f),
+        TranslationScaleGlmMatrix(10.0f, 2.0f, 0.0f),
+        TranslationScaleGlmMatrix(10.0f, -3.0f, 0.0f, 2.0f, 2.0f, 2.0f),
+    };
+    ExpectMatrixNear(
+        raw.get<ECS::Components::Transform::WorldMatrix>(root).Matrix,
+        expectedWorlds[0]);
+    ExpectMatrixNear(
+        raw.get<ECS::Components::Transform::WorldMatrix>(upper).Matrix,
+        expectedWorlds[1]);
+    ExpectMatrixNear(
+        raw.get<ECS::Components::Transform::WorldMatrix>(lower).Matrix,
+        expectedWorlds[2]);
+
+    const std::array<ECS::EntityHandle, 3> expectedParents{root, upper, lower};
+    const std::array<glm::vec3, 3> expectedBoundsCenters{
+        glm::vec3{10.5f, 0.5f, 0.0f},
+        glm::vec3{10.5f, 2.5f, 0.0f},
+        glm::vec3{11.0f, -2.0f, 0.0f},
+    };
+    const std::array<float, 3> expectedBoundsRadii{
+        std::sqrt(0.5f),
+        std::sqrt(0.5f),
+        std::sqrt(2.0f),
+    };
+
+    for (std::size_t instanceIndex = 0u;
+         instanceIndex < state->Record.Primitives.size();
+         ++instanceIndex)
+    {
+        const Runtime::AssetModelScenePrimitiveRecord& record =
+            state->Record.Primitives[instanceIndex];
+        EXPECT_EQ(record.NodeIndex, instanceIndex);
+        EXPECT_EQ(record.PrimitiveIndex, 0u);
+        EXPECT_EQ(record.GeometryPayloadIndex, 0u);
+        EXPECT_TRUE(fx.Scene.IsValid(record.Entity));
+        EXPECT_TRUE(raw.all_of<Graphics::Components::RenderSurface>(record.Entity));
+        EXPECT_EQ(
+            raw.get<ECS::Components::Hierarchy::Component>(record.Entity).Parent,
+            expectedParents[instanceIndex]);
+
+        const auto source =
+            ECS::Components::GeometrySources::BuildConstView(raw, record.Entity);
+        ASSERT_TRUE(source.Valid());
+        EXPECT_EQ(
+            source.ActiveDomain,
+            ECS::Components::GeometrySources::Domain::Mesh);
+        EXPECT_EQ(source.VerticesAlive(), 3u);
+        EXPECT_EQ(source.FacesAlive(), 1u);
+
+        const auto& localBounds =
+            raw.get<ECS::Components::Culling::Local::Bounds>(record.Entity);
+        EXPECT_EQ(localBounds.LocalBoundingAABB.Min, glm::vec3(0.0f));
+        EXPECT_EQ(localBounds.LocalBoundingAABB.Max, glm::vec3(1.0f, 1.0f, 0.0f));
+        EXPECT_EQ(localBounds.LocalBoundingSphere.Center, glm::vec3(0.5f, 0.5f, 0.0f));
+        EXPECT_NEAR(localBounds.LocalBoundingSphere.Radius, std::sqrt(0.5f), 1.0e-5f);
+
+        const auto& worldBounds =
+            raw.get<ECS::Components::Culling::World::Bounds>(record.Entity);
+        EXPECT_TRUE(std::isfinite(worldBounds.WorldBoundingSphere.Center.x));
+        EXPECT_TRUE(std::isfinite(worldBounds.WorldBoundingSphere.Center.y));
+        EXPECT_TRUE(std::isfinite(worldBounds.WorldBoundingSphere.Center.z));
+        EXPECT_TRUE(std::isfinite(worldBounds.WorldBoundingSphere.Radius));
+        EXPECT_EQ(
+            worldBounds.WorldBoundingSphere.Center,
+            expectedBoundsCenters[instanceIndex]);
+        EXPECT_NEAR(
+            worldBounds.WorldBoundingSphere.Radius,
+            expectedBoundsRadii[instanceIndex],
+            1.0e-5f);
+
+        const auto& primitiveLocal =
+            raw.get<ECS::Components::Transform::Component>(record.Entity);
+        EXPECT_EQ(primitiveLocal.Position, glm::vec3(0.0f));
+        EXPECT_EQ(primitiveLocal.Scale, glm::vec3(1.0f));
+        ExpectMatrixNear(
+            raw.get<ECS::Components::Transform::WorldMatrix>(record.Entity).Matrix,
+            expectedWorlds[instanceIndex]);
+    }
+
+    // The raw handoff intentionally has no policy registry. Canonical
+    // SelectableTag/VisualizationConfig parity and one-shot completion are
+    // exercised through the Engine import route, which owns those policies.
+}
+
+TEST(RuntimeAssetModelSceneHandoff, FiniteShearTransformFailsClosedBeforeCreatingEntities)
+{
+    SceneHandoffFixture fx;
+    TmpFile modelFile("asset_model_scene_handoff_finite_shear.gltf");
+    Assets::AssetModelScenePayload payload = MakeModelScenePayload();
+    payload.Nodes[0].LocalTransform = {
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.5f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f,
+    };
+
+    auto model = LoadModel(fx.Service, modelFile.Path.string(), std::move(payload));
+    ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
+
+    Runtime::AssetModelSceneHandoffDiagnostics diagnostics{};
+    auto state = Runtime::MaterializeModelSceneAsset(
+        fx.Service,
+        fx.Cache,
+        fx.Scene,
+        fx.Materials,
+        *model,
+        {},
+        &diagnostics);
+
+    ASSERT_FALSE(state.has_value());
+    EXPECT_EQ(state.error(), Core::ErrorCode::AssetInvalidData);
+    EXPECT_EQ(diagnostics.ModelSceneMaterializeRequests, 1u);
+    EXPECT_EQ(diagnostics.ModelSceneMaterializeSuccesses, 0u);
+    EXPECT_EQ(diagnostics.ModelSceneMaterializeFailures, 1u);
+    EXPECT_EQ(diagnostics.NodeEntitiesCreated, 0u);
+    EXPECT_EQ(diagnostics.PrimitiveEntitiesCreated, 0u);
+    EXPECT_EQ(fx.Scene.Raw().storage<entt::entity>().size(), 0u);
 }
 
 TEST(RuntimeAssetModelSceneHandoff, MaterialLessPrimitiveBindsNeutralLitDefaultMaterial)
@@ -755,8 +1049,9 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstDoesNotCpuFallbac
 TEST(RuntimeAssetModelSceneHandoff, ReadyModelSceneEventMaterializesRecordAndOwnsGeneratedEntities)
 {
     SceneHandoffFixture fx;
-    ECS::EntityHandle generated{};
+    std::vector<ECS::EntityHandle> generatedEntities{};
     Assets::AssetId modelAsset{};
+    ECS::EntityHandle externalChild{ECS::InvalidEntityHandle};
 
     {
         std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
@@ -779,10 +1074,31 @@ TEST(RuntimeAssetModelSceneHandoff, ReadyModelSceneEventMaterializesRecordAndOwn
                   Graphics::GpuAssetState::GpuUploading);
         EXPECT_EQ(fx.Cache.GetState(record->GeneratedTextureAssets[0]),
                   Graphics::GpuAssetState::GpuUploading);
+        ASSERT_EQ(record->Nodes.size(), 1u);
         ASSERT_EQ(record->Primitives.size(), 1u);
-        generated = record->Primitives[0].Entity;
-        EXPECT_TRUE(fx.Scene.IsValid(generated));
-        EXPECT_TRUE(fx.Scene.Raw().all_of<Graphics::Components::RenderSurface>(generated));
+        generatedEntities.push_back(record->Nodes[0].Entity);
+        generatedEntities.push_back(record->Primitives[0].Entity);
+        for (const ECS::EntityHandle generated : generatedEntities)
+        {
+            EXPECT_TRUE(fx.Scene.IsValid(generated));
+        }
+        EXPECT_TRUE(fx.Scene.Raw().all_of<Graphics::Components::RenderSurface>(
+            record->Primitives[0].Entity));
+
+        externalChild = fx.Scene.Create();
+        auto& externalHierarchy =
+            fx.Scene.Raw().emplace<ECS::Components::Hierarchy::Component>(
+                externalChild);
+        auto& nodeHierarchy =
+            fx.Scene.Raw().get<ECS::Components::Hierarchy::Component>(
+                record->Nodes[0].Entity);
+        ECS::Hierarchy::Structure::AttachToParent(
+            fx.Scene.Raw(),
+            externalChild,
+            externalHierarchy,
+            record->Nodes[0].Entity,
+            nodeHierarchy);
+        EXPECT_EQ(externalHierarchy.Parent, record->Nodes[0].Entity);
 
         const auto diagnostics = handoff.GetDiagnostics();
         EXPECT_EQ(diagnostics.ReadyEventsObserved, 3u);
@@ -794,7 +1110,98 @@ TEST(RuntimeAssetModelSceneHandoff, ReadyModelSceneEventMaterializesRecordAndOwn
     }
 
     EXPECT_TRUE(modelAsset.IsValid());
-    EXPECT_FALSE(fx.Scene.IsValid(generated));
+    ASSERT_EQ(generatedEntities.size(), 2u);
+    for (const ECS::EntityHandle generated : generatedEntities)
+    {
+        EXPECT_FALSE(fx.Scene.IsValid(generated));
+    }
+    ASSERT_TRUE(fx.Scene.IsValid(externalChild));
+    EXPECT_EQ(
+        fx.Scene.Raw()
+            .get<ECS::Components::Hierarchy::Component>(externalChild)
+            .Parent,
+        ECS::InvalidEntityHandle);
+    EXPECT_TRUE(ECS::Hierarchy::Structure::ValidateInvariants(
+        fx.Scene.Raw(),
+        externalChild));
+    fx.Scene.Destroy(externalChild);
+}
+
+TEST(RuntimeAssetModelSceneHandoff, ReloadedModelSceneRematerializesOnceOnPairedReady)
+{
+    SceneHandoffFixture fx;
+    TmpFile modelFile("asset_model_scene_handoff_model_reload.gltf");
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(fx.Device);
+    Runtime::AssetModelSceneHandoff handoff(
+        fx.Service,
+        fx.Cache,
+        fx.Scene,
+        *renderer);
+
+    auto model = LoadModel(
+        fx.Service,
+        modelFile.Path.string(),
+        MakeModelScenePayload());
+    ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
+    FlushAssetEvents(fx.Service);
+    FlushAssetEvents(fx.Service);
+
+    const Runtime::AssetModelSceneHandoffRecord* record =
+        handoff.FindRecord(*model);
+    ASSERT_NE(record, nullptr);
+    ASSERT_EQ(record->Nodes.size(), 1u);
+    ASSERT_EQ(record->Primitives.size(), 1u);
+    const ECS::EntityHandle oldNode = record->Nodes[0].Entity;
+    const ECS::EntityHandle oldPrimitive = record->Primitives[0].Entity;
+    const Runtime::AssetModelSceneHandoffDiagnostics before =
+        handoff.GetDiagnostics();
+
+    Assets::AssetModelScenePayload replacement = MakeModelScenePayload();
+    replacement.Nodes[0].LocalTransform =
+        TranslationScaleMatrix(7.0f, 3.0f, -2.0f);
+    ASSERT_TRUE(fx.Service.Reload<Assets::AssetModelScenePayload>(
+        *model,
+        [replacement = std::move(replacement)](
+            std::string_view,
+            Assets::AssetId) -> Core::Expected<Assets::AssetModelScenePayload>
+        {
+            return replacement;
+        }).has_value());
+
+    FlushAssetEvents(fx.Service);
+
+    record = handoff.FindRecord(*model);
+    ASSERT_NE(record, nullptr);
+    ASSERT_EQ(record->Nodes.size(), 1u);
+    ASSERT_EQ(record->Primitives.size(), 1u);
+    EXPECT_NE(record->Nodes[0].Entity, oldNode);
+    EXPECT_NE(record->Primitives[0].Entity, oldPrimitive);
+    EXPECT_FALSE(fx.Scene.IsValid(oldNode));
+    EXPECT_FALSE(fx.Scene.IsValid(oldPrimitive));
+    EXPECT_TRUE(fx.Scene.IsValid(record->Nodes[0].Entity));
+    EXPECT_TRUE(fx.Scene.IsValid(record->Primitives[0].Entity));
+    EXPECT_EQ(
+        fx.Scene.Raw()
+            .get<ECS::Components::Transform::Component>(record->Nodes[0].Entity)
+            .Position,
+        glm::vec3(7.0f, 3.0f, -2.0f));
+
+    const Runtime::AssetModelSceneHandoffDiagnostics after =
+        handoff.GetDiagnostics();
+    EXPECT_EQ(
+        after.ModelSceneMaterializeRequests
+            - before.ModelSceneMaterializeRequests,
+        1u);
+    EXPECT_EQ(
+        after.ModelSceneMaterializeSuccesses
+            - before.ModelSceneMaterializeSuccesses,
+        1u);
+    EXPECT_EQ(after.NodeEntitiesCreated - before.NodeEntitiesCreated, 1u);
+    EXPECT_EQ(
+        after.PrimitiveEntitiesCreated - before.PrimitiveEntitiesCreated,
+        1u);
+    EXPECT_EQ(after.ModelSceneReadyEvents - before.ModelSceneReadyEvents, 1u);
 }
 
 TEST(RuntimeAssetModelSceneHandoff, MaterialBindingsResolveWhenChildTextureAlreadyResident)

@@ -206,11 +206,13 @@ editor document history.
 The assets-owned model-scene payload consumed at this boundary is CPU-only. It
 identifies the active-scene roots, stores reachable nodes in deterministic
 pre-order with column-major local transforms, and lets those nodes reference
-shared primitive prototypes. The current model-scene handoff still consumes the
-payload through its existing flat primitive materialization path; materializing
-the retained hierarchy and routing the completed model through the standard
-selection and aggregate-focus policy are BUG-094 Slice B work, not current
-runtime behavior.
+shared primitive prototypes. The model-scene handoff materializes one ECS node
+entity per reachable node and one primitive leaf per node primitive reference,
+preserving authored child order, local transforms, and distinct world-space
+instances while reusing the decoded CPU prototype as the source for each
+entity-owned `GeometrySources` record. Runtime rejects node matrices that are
+non-finite, non-affine, or cannot round-trip through the ECS TRS representation
+before creating any scene entities.
 
 After a geometry payload creates an entity, runtime invokes ordered
 import-authoring policies, populates the decoded geometry, then invokes ordered
@@ -223,6 +225,12 @@ current direct-mesh generated-normal processor, import authoring defaults,
 focus-on-import handler, and auto-select behavior through
 `Extrinsic.Runtime.SandboxDefaultPolicies`; a bare `Engine` with no
 registrations still materializes geometry without those policies.
+Model-scene imports use the same contract: every primitive leaf is authored as
+a mesh in deterministic scene order, then exactly one model-scene completion
+receives only those leaves and an aggregate focus target enclosing their finite
+world-space bounds. With the sandbox defaults installed, this makes every leaf
+renderable and mouse-pick eligible, selects the first leaf, and focuses the
+camera once after the complete hierarchy is ready.
 
 Runtime uses two tiers for CPU work. The fixed-step `FrameGraph` is the
 per-frame ECS/system DAG: it runs inside the simulation phase and may read/write

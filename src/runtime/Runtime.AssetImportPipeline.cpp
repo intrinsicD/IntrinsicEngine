@@ -44,6 +44,7 @@ import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.AssetModelTextureIO;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SelectionController;
@@ -419,6 +420,88 @@ namespace Extrinsic::Runtime
             }
         }
 
+        [[nodiscard]] Core::Expected<RuntimeAssetImportResult>
+        FinalizeModelSceneImport(
+            AssetModelSceneHandoff& handoff,
+            ECS::Scene::Registry& scene,
+            const std::span<const RuntimeImportEntityAuthoringPolicyRecord>
+                importEntityPolicies,
+            const std::span<const RuntimeImportCompletedHandlerRecord>
+                completedHandlers,
+            CameraControllerRegistry* cameraControllers,
+            SelectionController* selection,
+            const Core::Config::EngineConfig* config,
+            const std::string_view path,
+            RuntimeAssetImportResult result)
+        {
+            const AssetModelSceneHandoffRecord* record =
+                handoff.FindRecord(result.Asset);
+            if (record == nullptr || record->Primitives.empty())
+            {
+                return Core::Err<RuntimeAssetImportResult>(
+                    Core::ErrorCode::InvalidState);
+            }
+
+            std::vector<ECS::EntityHandle> primitiveEntities{};
+            primitiveEntities.reserve(record->Primitives.size());
+            for (const AssetModelScenePrimitiveRecord& primitive :
+                 record->Primitives)
+            {
+                primitiveEntities.push_back(primitive.Entity);
+            }
+
+            RuntimeImportEntityAuthoringPolicyServices authoringServices{
+                .Scene = &scene,
+            };
+            // Authoring callbacks can trigger arbitrary runtime work, including
+            // asset lifecycle events that replace the handoff record. Never
+            // retain or iterate record-owned storage across a callback.
+            for (const ECS::EntityHandle primitiveEntity : primitiveEntities)
+            {
+                if (!scene.IsValid(primitiveEntity))
+                {
+                    return Core::Err<RuntimeAssetImportResult>(
+                        Core::ErrorCode::InvalidState);
+                }
+                RunImportEntityAuthoringPolicies(
+                    importEntityPolicies,
+                    RuntimeImportEntityAuthoringPolicyContext{
+                        .Path = path,
+                        // Reuse the canonical direct-mesh policy contract for
+                        // each renderable model primitive. Completion still
+                        // reports ModelScene once for the full import.
+                        .PayloadKind = Assets::AssetPayloadKind::Mesh,
+                        .Entity = primitiveEntity,
+                    },
+                    authoringServices);
+                if (!scene.IsValid(primitiveEntity))
+                {
+                    return Core::Err<RuntimeAssetImportResult>(
+                        Core::ErrorCode::InvalidState);
+                }
+            }
+
+            RuntimeImportCompletedServices completedServices{
+                .Scene = &scene,
+                .CameraControllers = cameraControllers,
+                .Selection = selection,
+                .Config = config,
+            };
+            RunImportCompletedHandlers(
+                completedHandlers,
+                RuntimeImportCompletedContext{
+                    .Path = path,
+                    .PayloadKind = Assets::AssetPayloadKind::ModelScene,
+                    .CreatedEntities = std::span<const ECS::EntityHandle>{
+                        primitiveEntities},
+                    .FocusTarget = ComputeFocusTargetForEntities(
+                        scene,
+                        primitiveEntities),
+                },
+                completedServices);
+            return result;
+        }
+
         [[nodiscard]] bool IsModelTextureImportPayload(
             const Assets::AssetPayloadKind payloadKind) noexcept
         {
@@ -430,6 +513,14 @@ namespace Extrinsic::Runtime
         MaterializeDecodedModelSceneImport(
             Assets::AssetService& assetService,
             AssetModelSceneHandoff& handoff,
+            ECS::Scene::Registry& scene,
+            const std::span<const RuntimeImportEntityAuthoringPolicyRecord>
+                importEntityPolicies,
+            const std::span<const RuntimeImportCompletedHandlerRecord>
+                completedHandlers,
+            CameraControllerRegistry* cameraControllers,
+            SelectionController* selection,
+            const Core::Config::EngineConfig* config,
             const RuntimeAssetImportRequest& request,
             const Assets::AssetId existingAsset,
             Assets::AssetModelScenePayload decoded)
@@ -473,7 +564,7 @@ namespace Extrinsic::Runtime
                         NormalizeImportError(after.LastError));
                 }
 
-                return RuntimeAssetImportResult{
+                RuntimeAssetImportResult result{
                     .Asset = existingAsset,
                     .PayloadKind = Assets::AssetPayloadKind::ModelScene,
                     .PrimitiveEntitiesCreated =
@@ -497,6 +588,16 @@ namespace Extrinsic::Runtime
                         after.ModelSceneMaterializeSuccesses >
                             before.ModelSceneMaterializeSuccesses,
                 };
+                return FinalizeModelSceneImport(
+                    handoff,
+                    scene,
+                    importEntityPolicies,
+                    completedHandlers,
+                    cameraControllers,
+                    selection,
+                    config,
+                    request.Path,
+                    std::move(result));
             }
 
             auto asset = assetService.Load<Assets::AssetModelScenePayload>(
@@ -539,7 +640,7 @@ namespace Extrinsic::Runtime
                     NormalizeImportError(after.LastError));
             }
 
-            return RuntimeAssetImportResult{
+            RuntimeAssetImportResult result{
                 .Asset = *asset,
                 .PayloadKind = Assets::AssetPayloadKind::ModelScene,
                 .PrimitiveEntitiesCreated =
@@ -563,6 +664,16 @@ namespace Extrinsic::Runtime
                     after.ModelSceneMaterializeSuccesses >
                         before.ModelSceneMaterializeSuccesses,
             };
+            return FinalizeModelSceneImport(
+                handoff,
+                scene,
+                importEntityPolicies,
+                completedHandlers,
+                cameraControllers,
+                selection,
+                config,
+                request.Path,
+                std::move(result));
         }
 
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult>
@@ -2359,6 +2470,12 @@ namespace Extrinsic::Runtime
                         result = MaterializeDecodedModelSceneImport(
                             *m_AssetService,
                             *m_AssetModelSceneHandoff,
+                            *m_Scene,
+                            m_ImportEntityAuthoringPolicies,
+                            m_ImportCompletedHandlers,
+                            m_CameraControllers.get(),
+                            m_SelectionController.get(),
+                            m_Config.get(),
                             state->Request,
                             existingAsset,
                             std::move(std::get<Assets::AssetModelScenePayload>(
@@ -2740,7 +2857,8 @@ namespace Extrinsic::Runtime
             !m_AssetService ||
             !m_GpuAssetCache ||
             !m_AssetModelTextureHandoff ||
-            !m_AssetModelSceneHandoff)
+            !m_AssetModelSceneHandoff ||
+            !m_Scene)
         {
             return Core::Err<RuntimeAssetImportResult>(Core::ErrorCode::InvalidState);
         }
@@ -2839,6 +2957,12 @@ namespace Extrinsic::Runtime
             return MaterializeDecodedModelSceneImport(
                 *m_AssetService,
                 *m_AssetModelSceneHandoff,
+                *m_Scene,
+                m_ImportEntityAuthoringPolicies,
+                m_ImportCompletedHandlers,
+                m_CameraControllers.get(),
+                m_SelectionController.get(),
+                m_Config.get(),
                 request,
                 existingAsset,
                 std::move(*decoded));

@@ -3,10 +3,13 @@ module;
 #include <cstdint>
 
 #include <entt/fwd.hpp>
+#include <glm/glm.hpp>
 
 export module Extrinsic.ECS.System.BoundsPropagation;
 
 import Extrinsic.Core.FrameGraph;
+import Extrinsic.ECS.Component.Culling.Local;
+import Extrinsic.ECS.Component.Culling.World;
 
 export namespace Extrinsic::ECS::Systems::BoundsPropagation
 {
@@ -27,15 +30,26 @@ export namespace Extrinsic::ECS::Systems::BoundsPropagation
         std::uint32_t NonFiniteResults = 0;
     };
 
+    // Pure initialisation seam for runtime-owned composition paths that must
+    // publish usable world bounds before the next frame-graph traversal (for
+    // example import completion and camera framing). Returns false and leaves
+    // `outWorld` unchanged when the transform would produce non-finite bounds.
+    [[nodiscard]] bool TryComputeWorldBounds(
+        const Components::Culling::Local::Bounds& local,
+        const glm::mat4& worldMatrix,
+        Components::Culling::World::Bounds& outWorld) noexcept;
+
     // Recompute Components::Culling::World::Bounds from
     // Components::Culling::Local::Bounds and Components::Transform::WorldMatrix
     // for every entity that the transform hierarchy stamped with
     // Components::Transform::WorldUpdatedTag this frame. The world OBB inherits
-    // the rotation embedded in the world matrix; world AABB extents are scaled
-    // per-column; the world sphere uses the largest column magnitude as a
-    // conservative scale factor. World bounds are written via
-    // emplace_or_replace so first-frame entities and entities whose local
-    // bounds were freshly authored receive an initial world value.
+    // the rotation embedded in the world matrix and scales its extents per
+    // matrix column. When a valid local AABB is available, the world sphere
+    // conservatively encloses its transformed corners, including affine shear
+    // produced by composed non-uniform scale and rotation. Sphere-only inputs
+    // use the largest column magnitude as their scale fallback. World bounds
+    // are written via emplace_or_replace so first-frame entities and entities
+    // whose local bounds were freshly authored receive an initial world value.
     //
     // The WorldUpdatedTag is NOT cleared here; render-sync owns that hand-off.
     void OnUpdate(entt::registry& registry);
