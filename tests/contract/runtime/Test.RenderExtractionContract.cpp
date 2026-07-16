@@ -3,7 +3,7 @@
 // ECS storage. Domain-specific residency behavior lives in
 // Test.{Mesh,Graph,PointCloud,Procedural}GeometryExtraction.cpp; this file
 // covers the cross-domain boundary guarantees documented on
-// `RenderExtractionService`.
+// the Engine-owned render-extraction service.
 
 #include <cstdint>
 #include <limits>

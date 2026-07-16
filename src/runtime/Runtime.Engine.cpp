@@ -80,7 +80,6 @@ import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.ReferenceSceneControl;
-import Extrinsic.Runtime.RenderExtractionService;
 import Extrinsic.Runtime.SceneDocument;
 import Extrinsic.Runtime.SelectionReadback;
 import Extrinsic.Runtime.ServiceRegistry;

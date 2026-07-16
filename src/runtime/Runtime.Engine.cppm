@@ -48,11 +48,12 @@ import Extrinsic.Runtime.ObjectSpaceNormalBakeService;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.ReferenceSceneControl;
+import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SceneDocument;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StableEntityLookup;
-import Extrinsic.Runtime.RenderExtractionService;
+import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.SelectionReadback;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
@@ -61,6 +62,7 @@ import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Scene.Registry;
 
 #include "Runtime.ImGuiEditorBridge.Internal.hpp"
+#include "Runtime.RenderExtractionService.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {

@@ -1,15 +1,7 @@
-module;
+#pragma once
 
-#include <cstdint>
-#include <memory>
-#include <optional>
-
-export module Extrinsic.Runtime.RenderExtractionService;
-
-import Extrinsic.Graphics.Material;
-import Extrinsic.Graphics.Renderer;
-export import Extrinsic.Runtime.RenderExtraction;
-export import Extrinsic.Runtime.RenderWorldPool;
+// Include-only Engine module glue. Include after the required graphics and
+// runtime module imports in Runtime.Engine.cppm.
 
 namespace Extrinsic::Runtime
 {
@@ -41,7 +33,7 @@ namespace Extrinsic::Runtime
     //     PublishFront → AcquireFront/AcquirePreviousFront →
     //     ExtractRenderWorld → PrepareFrame → ExecuteFrame) is owned by the
     //     Engine frame loop, not by this service.
-    export class RenderExtractionService
+    class RenderExtractionService
     {
     public:
         RenderExtractionService() = default;

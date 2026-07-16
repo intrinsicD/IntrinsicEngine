@@ -5,7 +5,7 @@ module;
 #include <optional>
 #include <utility>
 
-module Extrinsic.Runtime.RenderExtractionService;
+module Extrinsic.Runtime.Engine;
 
 namespace Extrinsic::Runtime
 {

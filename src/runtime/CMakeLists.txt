@@ -78,7 +78,6 @@ target_sources(${target_name}
         Runtime.ReferenceScene.cppm
         Runtime.ReferenceSceneControl.cppm
         Runtime.RenderExtraction.cppm
-        Runtime.RenderExtractionService.cppm
         Runtime.RenderWorldPool.cppm
         Runtime.SelectionReadback.cppm
         Runtime.SelectionController.cppm

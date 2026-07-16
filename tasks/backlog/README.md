@@ -241,7 +241,7 @@ participant registration, diagnostics access, shutdown dependency clearing,
 transform-gizmo frame state, selected-entity scratch, gizmo/selection pointer
 interlock, and transform-gizmo packet production now live outside
 `Runtime.Engine.cpp`; render-extraction cache/pool/stats/frame-index ownership
-now lives behind `Extrinsic.Runtime.RenderExtractionService`, and GPU asset
+now lives in an Engine-private `RenderExtractionService`, and GPU asset
 cache/model-handoff residency ownership now lives behind
 `Extrinsic.Runtime.AssetResidencyService`; persistent streaming executor,
 derived-job registry, maintenance drains, and derived-job facade delegation now

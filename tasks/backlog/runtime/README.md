@@ -131,7 +131,7 @@ behind `Extrinsic.Runtime.GizmoFrameService` while preserving the public Engine
 gizmo accessors.
 `RUNTIME-163` is retired; `RenderExtractionCache`, render-world pool, last
 extraction stats, frame-index ownership, and render-extraction facade delegation
-now live behind `Extrinsic.Runtime.RenderExtractionService`.
+now live in an Engine-private `RenderExtractionService`.
 `RUNTIME-164` is retired; `Graphics::GpuAssetCache`, the cache's
 `AssetEventBus` listener token, `AssetModelTextureHandoff`,
 `AssetModelSceneHandoff`, fallback bootstrap delegation, pending material
@@ -161,8 +161,8 @@ derived-job facade delegation now live behind
   compatibility facades.
 - [RUNTIME-163 — Extract render extraction service out of Engine](../../archive/RUNTIME-163-extract-render-extraction-service.md)
   (done, 2026-07-09, `Operational`): live render-extraction cache, render-world
-  pool, last extraction stats, and frame-index ownership now live in
-  `Extrinsic.Runtime.RenderExtractionService`. `Engine` keeps render-frame phase
+  pool, last extraction stats, and frame-index ownership now live in an
+  Engine-private `RenderExtractionService`. `Engine` keeps render-frame phase
   ordering plus public render-extraction compatibility facades.
 
 ### Compile-hotspot decomposition (seeded 2026-07-09)

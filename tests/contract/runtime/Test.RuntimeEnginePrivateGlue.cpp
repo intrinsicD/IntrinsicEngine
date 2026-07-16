@@ -165,3 +165,144 @@ TEST(RuntimeEnginePrivateGlue, ImGuiEditorBridgeIsEnginePrivateImplementation)
     EXPECT_EQ(moduleInventory.find("Extrinsic.Runtime.ImGuiEditorBridge"),
               std::string::npos);
 }
+
+TEST(RuntimeEnginePrivateGlue, RenderExtractionServiceIsEnginePrivateImplementation)
+{
+    const auto root = RepoRoot();
+    const auto engineInterface = ReadFile(root / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl = ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+    const auto privateHeader = ReadFile(
+        root / "src/runtime/Runtime.RenderExtractionService.Internal.hpp");
+    const auto serviceImpl = ReadFile(
+        root / "src/runtime/Runtime.RenderExtractionService.cpp");
+    const auto runtimeCMake = ReadFile(root / "src/runtime/CMakeLists.txt");
+    const auto moduleInventory = ReadFile(
+        root / "docs/api/generated/module_inventory.md");
+    constexpr std::string_view includeDirective =
+        "#include \"Runtime.RenderExtractionService.Internal.hpp\"";
+
+    std::vector<std::filesystem::path> includeOwners;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(
+             root / "src/runtime"))
+    {
+        if (!entry.is_regular_file())
+            continue;
+        const auto extension = entry.path().extension();
+        if (extension != ".cpp" && extension != ".cppm" &&
+            extension != ".hpp" && extension != ".h")
+            continue;
+        if (ReadFile(entry.path()).find(includeDirective) != std::string::npos)
+            includeOwners.push_back(entry.path());
+    }
+
+    EXPECT_FALSE(std::filesystem::exists(
+        root / "src/runtime/Runtime.RenderExtractionService.cppm"));
+    ASSERT_EQ(includeOwners.size(), 1u);
+    EXPECT_EQ(includeOwners.front().filename(), "Runtime.Engine.cppm");
+    EXPECT_NE(engineInterface.find(includeDirective), std::string::npos);
+    EXPECT_EQ(engineInterface.find(
+                  "import Extrinsic.Runtime.RenderExtractionService"),
+              std::string::npos);
+    EXPECT_FALSE(ContainsModuleDirective(privateHeader));
+    EXPECT_NE(privateHeader.find("class RenderExtractionService"),
+              std::string::npos);
+    EXPECT_NE(privateHeader.find("RenderExtractionCache m_Cache"),
+              std::string::npos);
+    EXPECT_NE(privateHeader.find("std::unique_ptr<RenderWorldPool> m_Pool"),
+              std::string::npos);
+    EXPECT_NE(privateHeader.find("RuntimeRenderExtractionStats m_LastStats"),
+              std::string::npos);
+    EXPECT_NE(privateHeader.find("std::uint64_t m_FrameIndex"),
+              std::string::npos);
+    EXPECT_NE(engineInterface.find(
+                  "RenderExtractionService               m_RenderExtractionService"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find(
+                  "RenderExtractionCache                 m_RenderExtraction"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find(
+                  "std::unique_ptr<RenderWorldPool>      m_RenderWorldPool"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find(
+                  "RuntimeRenderExtractionStats          m_LastExtractionStats"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find(
+                  "std::uint64_t                         m_FrameIndex"),
+              std::string::npos);
+
+    EXPECT_NE(engineInterface.find(
+                  "import Extrinsic.Runtime.RenderExtraction;"),
+              std::string::npos);
+    EXPECT_NE(engineInterface.find(
+                  "import Extrinsic.Runtime.RenderWorldPool;"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find(
+                  "export import Extrinsic.Runtime.RenderExtraction;"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find(
+                  "export import Extrinsic.Runtime.RenderWorldPool;"),
+              std::string::npos);
+    EXPECT_TRUE(std::filesystem::exists(
+        root / "src/runtime/Runtime.RenderExtraction.cppm"));
+    EXPECT_TRUE(std::filesystem::exists(
+        root / "src/runtime/Runtime.RenderWorldPool.cppm"));
+
+    EXPECT_NE(serviceImpl.find("module Extrinsic.Runtime.Engine;"),
+              std::string::npos);
+    EXPECT_EQ(serviceImpl.find(
+                  "module Extrinsic.Runtime.RenderExtractionService;"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_RenderExtractionService.ConfigurePool("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_RenderExtractionService.Cache()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_RenderExtractionService.Pool()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_RenderExtractionService.ConsumeFrameIndex()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_RenderExtractionService.PublishLastStats("),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("m_RenderExtractionService.ReleaseFrontSlot("),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_RenderExtraction.Shutdown("),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find(
+                  "m_RenderExtraction.GetMaterialTextureAssetBindings("),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find(
+                  "m_RenderExtraction.SetVisualizationAdapterBinding("),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find(
+                  "m_RenderExtraction.ClearVisualizationAdapterBinding("),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find(
+                  "m_RenderExtraction.GetVisualizationAdapterBinding("),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_RenderWorldPool->ReleaseFront("),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_LastExtractionStats ="),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_FrameIndex++"), std::string::npos);
+    EXPECT_NE(serviceImpl.find("m_Cache.Shutdown(renderer)"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("m_Cache.SetVisualizationAdapterBinding("),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("RenderWorldPool::kDefaultBuffers"),
+              std::string::npos);
+    EXPECT_NE(serviceImpl.find("m_Pool->ReleaseFront(slot)"),
+              std::string::npos);
+
+    EXPECT_EQ(runtimeCMake.find("Runtime.RenderExtractionService.cppm"),
+              std::string::npos);
+    EXPECT_NE(runtimeCMake.find("Runtime.RenderExtraction.cppm"),
+              std::string::npos);
+    EXPECT_NE(runtimeCMake.find("Runtime.RenderWorldPool.cppm"),
+              std::string::npos);
+    EXPECT_EQ(moduleInventory.find(
+                  "Extrinsic.Runtime.RenderExtractionService"),
+              std::string::npos);
+    EXPECT_NE(moduleInventory.find("Extrinsic.Runtime.RenderExtraction`"),
+              std::string::npos);
+    EXPECT_NE(moduleInventory.find("Extrinsic.Runtime.RenderWorldPool`"),
+              std::string::npos);
+}
