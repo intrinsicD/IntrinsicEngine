@@ -10,11 +10,10 @@ maturity_target: Operational
 
 ## Status
 
-- In progress on 2026-07-16; owner: Codex; branch:
+- Implementation complete on 2026-07-16; owner: Codex; branch:
   `codex/arch-006-completion`.
-- Next gate: replace the standalone module with an Engine-private declaration
-  attached to `Extrinsic.Runtime.Engine`, then build the focused runtime
-  contract and integration targets.
+- Next gate: commit the reviewed technical slice, then retire this task at its
+  `Operational` target.
 
 ## Goal
 - Keep `ImGuiEditorBridge` as an Engine-owned implementation service while
@@ -39,39 +38,64 @@ maturity_target: Operational
 - Right-sized shape: keep the value member and separate implementation unit,
   but attach the declaration and implementation to `Runtime.Engine` rather
   than introducing a pimpl allocation or a replacement public module.
+- Reintroduce a standalone bridge module only when a tracked non-Engine
+  production consumer lands.
 
 ## Required changes
-- [ ] Confirm all production consumers are Engine implementation/interface
+- [x] Confirm all production consumers are Engine implementation/interface
       details.
-- [ ] Move the bridge declaration to private runtime header/source glue or fold
+- [x] Move the bridge declaration to private runtime header/source glue or fold
       it into the Engine implementation seam.
-- [ ] Preserve diagnostics and mouse/keyboard capture queries.
-- [ ] Update source-scan tests that assert module presence to assert ownership
+- [x] Preserve diagnostics and mouse/keyboard capture queries.
+- [x] Update source-scan tests that assert module presence to assert ownership
       and behavior instead.
-- [ ] Remove the `.cppm` from module file sets if retired and record metrics.
+- [x] Remove the `.cppm` from module file sets if retired and record metrics.
 
 ## Tests
-- [ ] Run runtime engine layering, Sandbox editor, ImGui/editor bridge, and
+- [x] Run runtime engine layering, Sandbox editor, ImGui/editor bridge, and
       sandbox acceptance tests.
-- [ ] Run strict layering and the default CPU-supported CTest gate.
+- [x] Run strict layering and the default CPU-supported CTest gate.
 
 ## Docs
-- [ ] Update runtime/editor docs if `ImGuiEditorBridge` stops being a named
+- [x] Update runtime/editor docs if `ImGuiEditorBridge` stops being a named
       module.
-- [ ] Regenerate `docs/api/generated/module_inventory.md`.
+- [x] Regenerate `docs/api/generated/module_inventory.md`.
 
 ## Acceptance criteria
-- [ ] Engine still owns Begin/End bracketing, capture queries, diagnostics, and
+- [x] Engine still owns Begin/End bracketing, capture queries, diagnostics, and
       renderer overlay attachment.
-- [ ] The bridge no longer exposes a public module surface unless an explicit
+- [x] The bridge no longer exposes a public module surface unless an explicit
       consumer inventory justifies it.
-- [ ] Sandbox editor behavior is unchanged under focused tests.
+- [x] Sandbox editor behavior is unchanged under focused tests.
+
+## Evidence
+
+- Consumer inventory: two named-module production imports, both in Engine,
+  became zero; no app or test imported the bridge module.
+- Surface metrics: runtime modules `83 -> 82`, repository modules `390 -> 389`,
+  runtime public `.cppm` entries `83 -> 82`, and explicit import directives
+  across the affected Engine/bridge units `143 -> 138`. The replacement is a
+  38-line include-only declaration with no module directive.
+- Compile diagnostics: a local `CCACHE_DISABLE=1` rebuild of the old standalone
+  BMI recorded a 13.006s compiler edge (16.58s command wall time). After the
+  change that edge and BMI do not exist; the current ninja log records the
+  bridge implementation edge at 4.143s and the Engine interface edge at
+  68.753s versus its previous 67.883s entry. These are structural diagnostics,
+  not an overall build-speed claim.
+- Focused CPU coverage passed `52/52`; the directly invoked
+  `RuntimeEngineLayering.*` suite passed `23/23`; the default CPU-supported
+  gate passed `4178/4178` after a successful `IntrinsicTests` build.
+- Strict layering, test layout, task policy, doc links, root hygiene, PR
+  contract, skill-mirror sync, and the clean-workshop validator bundle passed.
+  Three independent reviews found no implementation, architecture, scope, or
+  test blocker.
 
 ## Verification
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicRuntimeIntegrationTests
-ctest --test-dir build/ci --output-on-failure -R 'ImGuiEditorBridge|SandboxEditorUi|RuntimeEngineLayering|RuntimeSandboxAcceptance' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicRuntimeGraphicsCpuTests IntrinsicRuntimeIntegrationTests
+ctest --test-dir build/ci --output-on-failure -R 'RuntimeEnginePrivateGlue|ImGuiAdapter|EditorUiHost|SandboxEditorPresentation|RuntimeSandboxAcceptance' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+build/ci/bin/IntrinsicRuntimeIntegrationTests --gtest_filter='RuntimeEngineLayering.*'
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/repo/check_layering.py --root src --strict

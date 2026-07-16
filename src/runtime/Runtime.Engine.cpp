@@ -67,7 +67,6 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.GizmoFrameService;
 import Extrinsic.Runtime.ImGuiAdapter;
-import Extrinsic.Runtime.ImGuiEditorBridge;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobServiceGpuQueueBridge;
 import Extrinsic.Runtime.Module;

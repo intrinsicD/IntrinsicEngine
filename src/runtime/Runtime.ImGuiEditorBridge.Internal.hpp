@@ -1,16 +1,9 @@
-module;
+#pragma once
 
-#include <functional>
-#include <memory>
+// Include-only Engine module glue. Include after the required graphics,
+// platform, and runtime module imports in Runtime.Engine.cppm.
 
-export module Extrinsic.Runtime.ImGuiEditorBridge;
-
-import Extrinsic.Graphics.ImGuiOverlaySystem;
-import Extrinsic.Graphics.Renderer;
-import Extrinsic.Platform.Window;
-import Extrinsic.Runtime.ImGuiAdapter;
-
-export namespace Extrinsic::Runtime
+namespace Extrinsic::Runtime
 {
     class ImGuiEditorBridge
     {
@@ -38,8 +31,8 @@ export namespace Extrinsic::Runtime
 
     private:
         Graphics::ImGuiOverlaySystem m_Overlay{};
-        std::function<void()>        m_EditorCallback{};
+        std::function<void()> m_EditorCallback{};
         std::unique_ptr<ImGuiAdapter> m_Adapter{};
-        bool                         m_EditorVisible{true};
+        bool m_EditorVisible{true};
     };
 }

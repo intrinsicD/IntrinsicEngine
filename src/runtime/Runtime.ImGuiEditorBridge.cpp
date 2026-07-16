@@ -4,7 +4,7 @@ module;
 #include <memory>
 #include <utility>
 
-module Extrinsic.Runtime.ImGuiEditorBridge;
+module Extrinsic.Runtime.Engine;
 
 namespace Extrinsic::Runtime
 {

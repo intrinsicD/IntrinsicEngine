@@ -46,7 +46,6 @@ target_sources(${target_name}
         Runtime.EngineConfigBoot.cppm
         Runtime.EngineConfigControl.cppm
         Runtime.FramePacingDiagnostics.cppm
-        Runtime.ImGuiEditorBridge.cppm
         Runtime.InputActions.cppm
         Runtime.KernelEvents.cppm
         Runtime.Module.cppm

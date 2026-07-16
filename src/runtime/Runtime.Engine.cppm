@@ -25,6 +25,7 @@ import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
@@ -37,7 +38,6 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GizmoFrameService;
 import Extrinsic.Runtime.ImGuiAdapter;
-import Extrinsic.Runtime.ImGuiEditorBridge;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.JobServiceGpuQueueBridge;
 import Extrinsic.Runtime.KernelEvents;
@@ -59,6 +59,8 @@ import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Asset.Service;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Scene.Registry;
+
+#include "Runtime.ImGuiEditorBridge.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {

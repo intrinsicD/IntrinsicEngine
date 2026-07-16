@@ -115,8 +115,8 @@ ImGui/render-graph counter-copy policy now live behind
 `Extrinsic.Runtime.FramePacingDiagnostics`.
 `RUNTIME-159` is retired; runtime-side Dear ImGui overlay/adapter/callback
 ownership, per-frame Begin/End bracketing, capture reads, diagnostics access,
-and renderer overlay attachment now live behind
-`Extrinsic.Runtime.ImGuiEditorBridge`.
+and renderer overlay attachment now live in Engine-private
+`ImGuiEditorBridge` implementation glue.
 `RUNTIME-160` is retired; the renderer frame-command hook token,
 `JobService::RecordGpuQueueFrameCommands(...)` delegation, and GPU-participant
 shutdown sequencing now live behind `Extrinsic.Runtime.JobServiceGpuQueueBridge`.
@@ -463,8 +463,8 @@ split; narratives live in the retirement log.
 - [RUNTIME-159 — Extract ImGui editor bridge out of Engine](../../archive/RUNTIME-159-extract-imgui-editor-bridge.md)
   (done, 2026-07-09, `Operational`): runtime Dear ImGui adapter, overlay
   system ownership, editor callbacks, renderer overlay attachment, per-frame
-  Begin/End bracketing, capture reads, and diagnostics access now live in
-  `Extrinsic.Runtime.ImGuiEditorBridge`.
+  Begin/End bracketing, capture reads, and diagnostics access now live in an
+  Engine-private `ImGuiEditorBridge` implementation service.
 - [RUNTIME-160 — Extract JobService GPU queue bridge out of Engine](../../archive/RUNTIME-160-extract-jobservice-gpu-queue-bridge.md)
   (done, 2026-07-09, `Operational`): renderer runtime-frame hook ownership,
   JobService GPU-queue command recording, and participant shutdown sequencing
