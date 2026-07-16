@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `BUG-093` — File / Import prerequisite gating and disabled-reason tooltips (tasks/active/BUG-093-file-import-prerequisite-gating-tooltips.md)
 
 ## Theme B — Rendering modernization
 
@@ -50,7 +50,6 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-081` — Warm-configure CI budget still flakes on hosted-runner variance (tasks/backlog/bugs/BUG-081-warm-configure-budget-runner-variance.md)
 - unblocked: `BUG-088` — Benchmark smoke hard timeout flakes under host contention (tasks/backlog/bugs/BUG-088-benchmark-smoke-hard-timeout-host-contention.md)
 - unblocked: `BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start (tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md)
-- unblocked: `BUG-093` — File / Import prerequisite gating and disabled-reason tooltips (tasks/backlog/bugs/BUG-093-file-import-prerequisite-gating-tooltips.md)
 - unblocked: `BUG-094` — Model-scene import drops node semantics and standard selection behavior (tasks/backlog/bugs/BUG-094-model-scene-node-semantics-selection.md)
 - unblocked: `BUG-095` — Direct-mesh postprocess can overwrite newer editor geometry (tasks/backlog/bugs/BUG-095-direct-mesh-postprocess-stale-overwrite.md)
 - unblocked: `BUG-096` — ICP point-to-plane ignores target normals (tasks/backlog/bugs/BUG-096-icp-point-to-plane-target-normals.md)

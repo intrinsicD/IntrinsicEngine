@@ -6,6 +6,14 @@ maturity_target: Operational
 ---
 # BUG-093 — File / Import prerequisite gating and disabled-reason tooltips
 
+## Status
+
+- In progress on 2026-07-16; owner: Codex; branch:
+  `agent/bug-093-file-import-prerequisites`.
+- Live Sandbox evidence already pins empty-path and companion-only fail-late
+  behavior. The next verification step is the focused runtime model/dispatch
+  regression before app presentation changes.
+
 ## Goal
 
 - Make the Sandbox `File / Import` workflow fail closed on invalid route,

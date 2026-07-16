@@ -21,7 +21,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   glTF decode flattens meshes without active-scene traversal, hierarchy,
   transforms, or instancing, and model primitives bypass standard selectable,
   completion, selection, and focus authoring.
-- [`BUG-093` — File / Import prerequisite gating and disabled-reason tooltips](BUG-093-file-import-prerequisite-gating-tooltips.md):
+- [`BUG-093` — File / Import prerequisite gating and disabled-reason tooltips](../../active/BUG-093-file-import-prerequisite-gating-tooltips.md):
   the editor enables `Import asset` from command-surface availability alone,
   allowing empty, unsupported, ambiguous, or incompatible path/hint requests
   to fail late without a disabled-control explanation.
