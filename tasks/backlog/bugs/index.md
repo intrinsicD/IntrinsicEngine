@@ -5,6 +5,10 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-105` — Runtime module reader races ECS structural mutation](../../active/BUG-105-runtime-module-ecs-structural-hazard.md):
+  an exact-head sanitizer run caught a module `WorldMatrix` reader racing the
+  first `DirtyTransform` storage insertion; use the existing structural hazard
+  token at the runtime/ECS composition boundary and pin execution-layer order.
 - [`BUG-097` — Progressive model-scene UV job publishes a zero atlas](BUG-097-progressive-model-scene-zero-uv-atlas.md):
   the default-off progressive enrichment path labels an all-zero authoritative
   `v:texcoord` property as an atlas and can publish it after newer UV/topology

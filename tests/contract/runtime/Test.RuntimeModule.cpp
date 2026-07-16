@@ -873,6 +873,74 @@ TEST(RuntimeModuleSchedule, DeclarativeSignalsCreatePerTickEdgeForParallelSystem
     EXPECT_TRUE(consumerObservedProducer);
 }
 
+// BUG-105: every module sim-system receives ActiveWorld in its execution
+// context, so the runtime schedule must declare a structural read even when
+// the module's optional setup callback only names component hazards (or is
+// absent). This makes an earlier registry-structure writer a deterministic
+// predecessor instead of allowing EnTT storage-map mutation to overlap the
+// module callback.
+TEST(RuntimeModuleSchedule, ActiveWorldAccessDeclaresStructuralRead)
+{
+    bool structuralWriterRan = false;
+    bool moduleReaderObservedWriter = false;
+
+    Runtime::RuntimeModuleSchedule schedule;
+    schedule.RegisterSimSystem(
+        "Module",
+        Runtime::SimSystemDesc{
+            .Name = "ActiveWorldReader",
+            .Execute = [&](Runtime::SimSystemContext&)
+            {
+                moduleReaderObservedWriter = structuralWriterRan;
+            },
+        });
+    ASSERT_TRUE(schedule.FinalizeForBoot({}).has_value());
+
+    Core::FrameGraph graph;
+    graph.AddPass(
+        "Baseline.StructuralWriter",
+        [](Core::FrameGraphBuilder& builder)
+        {
+            builder.StructuralWrite();
+        },
+        [&]()
+        {
+            structuralWriterRan = true;
+        });
+
+    Extrinsic::ECS::Scene::Registry activeWorld;
+    Runtime::CommandBus commands;
+    Runtime::KernelEventBus events;
+    Runtime::JobService jobs;
+    Runtime::WorldRegistry worlds;
+    Runtime::ServiceRegistry services;
+    schedule.RegisterSimSystemsForTick(
+        Runtime::RuntimeModuleSimSystemScheduleContext{
+            .Graph = graph,
+            .ActiveWorld = activeWorld,
+            .ActiveWorldHandle = Runtime::DefaultWorldHandle,
+            .Commands = commands,
+            .Events = events,
+            .Jobs = jobs,
+            .Worlds = worlds,
+            .Services = services,
+            .FrameIndex = 7,
+            .FixedDeltaSeconds = 1.0 / 60.0,
+        });
+
+    ASSERT_TRUE(graph.Compile().has_value());
+    ASSERT_EQ(graph.PassCount(), 2u);
+    const auto& layers = graph.GetExecutionLayers();
+    ASSERT_EQ(layers.size(), 2u);
+    ASSERT_EQ(layers[0].size(), 1u);
+    ASSERT_EQ(layers[1].size(), 1u);
+    EXPECT_EQ(graph.PassName(layers[0][0]), "Baseline.StructuralWriter");
+    EXPECT_EQ(graph.PassName(layers[1][0]), "Module.ActiveWorldReader");
+
+    ASSERT_TRUE(graph.Execute().has_value());
+    EXPECT_TRUE(moduleReaderObservedWriter);
+}
+
 TEST(RuntimeModuleSchedule, WaitOnExternalBaselineSignalIsSatisfied)
 {
     // BUG-069/BUG-072: a module may wait on a signal emitted by the baseline ECS

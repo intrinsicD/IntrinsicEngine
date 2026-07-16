@@ -120,7 +120,12 @@ module sim systems. That bundle provides `TransformUpdate`, so a module that
 consumes the current substep's `Transform::WorldMatrix` declares
 `WaitForSignals = {"TransformUpdate"}` and the matching `Read<WorldMatrix>`
 hazard; it must not rely on module registration order or synthesize a duplicate
-baseline signal.
+baseline signal. Runtime also gives every module sim system an implicit
+`StructuralRead()` because `SimSystemContext` always exposes the live active
+world. A pass that adds or removes ECS components must declare
+`StructuralWrite()` in its setup callback; component-specific `Read<T>` /
+`Write<T>` declarations do not protect EnTT's registry-wide storage map from
+first-use pool creation.
 
 This surface is not required for a one-caller, synchronous probe that still fits
 the floor. Add it when a second caller, a backend split, scheduled work,

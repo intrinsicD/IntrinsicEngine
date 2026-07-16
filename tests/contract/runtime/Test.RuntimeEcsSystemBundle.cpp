@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <string_view>
+
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -15,6 +19,9 @@ import Extrinsic.ECS.Hierarchy.Mutation;
 import Extrinsic.ECS.Scene.Bootstrap;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.ECS.System.BoundsPropagation;
+import Extrinsic.ECS.System.RenderSync;
+import Extrinsic.ECS.System.TransformHierarchy;
 import Extrinsic.Runtime.EcsSystemBundle;
 import Geometry.AABB;
 
@@ -28,6 +35,9 @@ using Extrinsic::Runtime::PreRenderTransformFlushStats;
 using Extrinsic::Runtime::PromotedEcsSystemBundleStats;
 using Extrinsic::Runtime::RegisterPromotedEcsSystemBundle;
 namespace Components = Extrinsic::ECS::Components;
+namespace BoundsSystem = Extrinsic::ECS::Systems::BoundsPropagation;
+namespace RenderSyncSystem = Extrinsic::ECS::Systems::RenderSync;
+namespace TransformSystem = Extrinsic::ECS::Systems::TransformHierarchy;
 
 namespace
 {
@@ -53,6 +63,66 @@ TEST(RuntimeEcsSystemBundle, RegisterAddsTransformBoundsAndRenderSyncPasses)
     EXPECT_TRUE(stats.BoundsPropagationRegistered);
     EXPECT_TRUE(stats.RenderSyncRegistered);
     EXPECT_EQ(graph.PassCount(), 3u);
+}
+
+// BUG-105: each promoted baseline pass may add or remove components. Insert a
+// reader directly after each pass so every StructuralWrite declaration is
+// independently required to keep first-time EnTT storage creation off another
+// reader's worker.
+TEST(RuntimeEcsSystemBundle, EachBaselineStructuralWriterOrdersImmediateReader)
+{
+    Registry scene;
+    FrameGraph graph;
+
+    const auto addStructuralReader = [&](const std::string_view name)
+    {
+        graph.AddPass(
+            name,
+            [](Extrinsic::Core::FrameGraphBuilder& builder)
+            {
+                builder.StructuralRead();
+            },
+            []() {});
+    };
+
+    TransformSystem::RegisterSystem(graph, scene.Raw());
+    addStructuralReader("Reader.AfterTransform");
+    BoundsSystem::RegisterSystem(graph, scene.Raw());
+    addStructuralReader("Reader.AfterBounds");
+    RenderSyncSystem::RegisterSystem(graph, scene.Raw());
+    addStructuralReader("Reader.AfterRenderSync");
+
+    ASSERT_TRUE(graph.Compile().has_value());
+    const auto& layers = graph.GetExecutionLayers();
+    const auto findLayer = [&](const std::string_view expectedName)
+    {
+        for (std::size_t layer = 0; layer < layers.size(); ++layer)
+        {
+            for (const std::uint32_t pass : layers[layer])
+            {
+                if (graph.PassName(pass) == expectedName)
+                    return layer;
+            }
+        }
+        return layers.size();
+    };
+
+    const std::size_t transformLayer = findLayer(TransformSystem::PassName);
+    const std::size_t transformReaderLayer = findLayer("Reader.AfterTransform");
+    const std::size_t boundsLayer = findLayer(BoundsSystem::PassName);
+    const std::size_t boundsReaderLayer = findLayer("Reader.AfterBounds");
+    const std::size_t renderSyncLayer = findLayer(RenderSyncSystem::PassName);
+    const std::size_t renderSyncReaderLayer = findLayer("Reader.AfterRenderSync");
+
+    ASSERT_LT(transformLayer, layers.size());
+    ASSERT_LT(transformReaderLayer, layers.size());
+    ASSERT_LT(boundsLayer, layers.size());
+    ASSERT_LT(boundsReaderLayer, layers.size());
+    ASSERT_LT(renderSyncLayer, layers.size());
+    ASSERT_LT(renderSyncReaderLayer, layers.size());
+    EXPECT_LT(transformLayer, transformReaderLayer);
+    EXPECT_LT(boundsLayer, boundsReaderLayer);
+    EXPECT_LT(renderSyncLayer, renderSyncReaderLayer);
 }
 
 TEST(RuntimeEcsSystemBundle, BundleExecutionPropagatesDirtyChildWorldMatrix)
@@ -233,4 +303,3 @@ TEST(RuntimeEcsSystemBundle, PreRenderFlushIsNoOpOnCleanScene)
     EXPECT_EQ(stats.DirtyTransformStamped, 0u);
     EXPECT_EQ(stats.WorldUpdatedCleared, 0u);
 }
-
