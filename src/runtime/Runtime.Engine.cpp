@@ -21,12 +21,12 @@ module;
 #include <variant>
 #include <vector>
 
+#include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
 module Extrinsic.Runtime.Engine;
 
-import :FrameLoop;
 #if defined(EXTRINSIC_RUNTIME_HAS_PROMOTED_VULKAN)
 import Extrinsic.Backends.Vulkan;
 #endif
@@ -45,6 +45,7 @@ import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.SamplerManager;
+import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Renderer;
@@ -121,6 +122,8 @@ import Geometry.PointCloud;
 import Geometry.PointCloud.IO;
 import Geometry.Properties;
 import Geometry.Sphere;
+
+#include "Runtime.Engine.FrameLoop.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {

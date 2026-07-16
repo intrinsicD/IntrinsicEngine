@@ -12,8 +12,14 @@ maturity_target: Operational
 
 - In progress on 2026-07-16; owner: Codex; branch:
   `codex/arch-006-completion`.
-- Next gate: replace the one-consumer module partition with textual private
-  header glue, then build the focused runtime contract/integration targets.
+- Implementation and verification are complete: the default-lane privacy guard
+  passed 1/1, the duplicated frame-loop behavior contracts passed 18/18, the
+  focused CPU selection passed 54/54, explicit resize coverage passed 1/1, and
+  the unaffected opt-in layering selection passed 23/23. The final default
+  CPU-supported gate passed 3,781/3,781 in 407.53 seconds, including the new
+  `contract;runtime` privacy guard. The strict structural/review bundle is
+  green; the one stale pre-existing async-work assertion is tracked separately
+  as `BUG-090`. Next gate: self-review and technical commit.
 
 ## Goal
 - Remove the exported `Extrinsic.Runtime.Engine:FrameLoop` module partition as a
@@ -56,43 +62,72 @@ maturity_target: Operational
   second `Runtime.Engine` implementation unit needs these helpers and comparative
   measurements justify a shared BMI.
 
+## Implementation evidence
+
+- All 12 declarations from the former partition remain implementation detail:
+  `kIdleSleepSeconds`, `ElapsedMicros`, `RuntimeFrameContext`, the six platform/
+  operational/render/transfer/streaming/asset hook adapters,
+  `HasPendingPreRenderTransformFlush`, `RunFixedStepSimulationTicks`, and
+  `PopulateMainCameraForFrame`. They now reside in one include-only header whose
+  sole production consumer is `Runtime.Engine.cpp`.
+- After removing the 44-line module/import prologue, the 408-line helper
+  namespace body is byte-identical (SHA-256 prefix `56f35b7e`) to the retired
+  partition. The `Runtime.Engine.cpp` namespace body is also byte-identical;
+  only the prologue replaces `import :FrameLoop` with the private include and
+  directly imports `Extrinsic.RHI.TransferQueue`.
+- The module surface changes from 452 interface lines and 31 direct imports to
+  zero interface lines/imports. The textual helper is 413 lines with no module
+  directives or imports, while `Runtime.Engine.cpp` remains at 93 imports; the
+  combined direct-import count therefore drops from 124 to 93. Generated module
+  inventory decreases from 391 to 390.
+- A post-change no-ccache exact `Runtime.Engine.cpp.o` rebuild completed in
+  17.91 s wall time (`.ninja_log` compile edge: 14.565 s), against the recorded
+  138.098 s pre-change partition sample (a later contention-sensitive sample
+  was 142.139 s). These different build-graph samples are diagnostic only; no
+  compile-time speedup is claimed. The demonstrated result is removal of one
+  module/BMI surface and 31 partition imports.
+
 ## Required changes
-- [ ] Inventory every declaration in `Runtime.Engine.FrameLoop.cppm` as either
+- [x] Inventory every declaration in `Runtime.Engine.FrameLoop.cppm` as either
       frame-loop implementation detail or required by `Runtime.Engine.cpp`.
-- [ ] Replace the exported partition with a private header/source seam included
+- [x] Replace the exported partition with a private header/source seam included
       only by `Runtime.Engine.cpp` after its required module imports, or fold
       the declarations directly into the implementation unit if that is cleaner.
-- [ ] Remove the partition from `src/runtime/CMakeLists.txt` module file sets
+- [x] Remove the partition from `src/runtime/CMakeLists.txt` module file sets
       and update imports from `import :FrameLoop` to the chosen private seam.
-- [ ] Preserve exact frame-loop call order, diagnostics, and shutdown behavior.
-- [ ] Record before/after interface count, import count, and local `.ninja_log`
+- [x] Preserve exact frame-loop call order, diagnostics, and shutdown behavior.
+- [x] Record before/after interface count, import count, and local `.ninja_log`
       compile timing against the `CI-003` baseline.
 
 ## Tests
-- [ ] Run focused runtime frame-loop, engine lifecycle, and sandbox acceptance
+- [x] Run focused runtime frame-loop, engine lifecycle, and sandbox acceptance
       tests covering fixed-step, minimized/resize, render extraction, and
       shutdown paths.
-- [ ] Run strict layering and test-layout checks.
-- [ ] Run the default CPU-supported CTest gate.
+- [x] Run strict layering and test-layout checks.
+- [x] Run the default CPU-supported CTest gate.
 
 ## Docs
-- [ ] Update `src/runtime/README.md` and runtime architecture docs if they name
+- [x] Update `src/runtime/README.md` and runtime architecture docs if they name
       the frame-loop module partition.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` after removing the
+- [x] Regenerate `docs/api/generated/module_inventory.md` after removing the
       module surface.
 
 ## Acceptance criteria
-- [ ] `Extrinsic.Runtime.Engine:FrameLoop` is no longer an exported module
+- [x] `Extrinsic.Runtime.Engine:FrameLoop` is no longer an exported module
       surface or CMake module file-set entry.
-- [ ] `Runtime.Engine.cpp` remains the only owner of frame-loop helper code.
-- [ ] Focused and default CPU gates prove behavior parity.
-- [ ] Build-timing evidence is recorded without claiming a speedup from one run.
+- [x] `Runtime.Engine.cpp` remains the only owner of frame-loop helper code.
+- [x] Focused and default CPU gates prove behavior parity.
+- [x] Build-timing evidence is recorded without claiming a speedup from one run.
 
 ## Verification
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicRuntimeIntegrationTests
-ctest --test-dir build/ci --output-on-failure -R 'RuntimeEngine|RuntimeSandboxAcceptance|FrameLoop|RenderExtraction' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicRuntimeGraphicsCpuTests IntrinsicRuntimeIntegrationTests
+ctest --test-dir build/ci --output-on-failure -R '^RuntimeEnginePrivateGlue.FrameLoopHelpersArePrivateTextualGlue$' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+ctest --test-dir build/ci --output-on-failure -R '^RuntimeFrameLoopContract\.' --timeout 120
+ctest --test-dir build/ci --output-on-failure -R 'RuntimeEngine|RuntimeSandboxAcceptance|FrameLoop|RenderExtraction' -E '^RuntimeEnginePrivateGlue.FrameLoopHelpersArePrivateTextualGlue$' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+ctest --test-dir build/ci --output-on-failure -R 'ImGuiAdapter.PumpsInputAndResizeReportsFramebufferPixelsWithoutDoubleScaling' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+ctest --test-dir build/ci --output-on-failure -R '^RuntimeEngineLayering\.' -E '^RuntimeEngineLayering.AsyncWorkServiceKeepsStreamingAndDerivedJobOwnershipOutOfEngine$' --timeout 120
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/repo/check_layering.py --root src --strict

@@ -43,7 +43,6 @@ target_sources(${target_name}
         Editor/Runtime.EditorUiHost.cppm
         Editor/Runtime.EditorWindowRegistry.cppm
         Runtime.Engine.cppm
-        Runtime.Engine.FrameLoop.cppm
         Runtime.EngineConfigBoot.cppm
         Runtime.EngineConfigControl.cppm
         Runtime.FramePacingDiagnostics.cppm

@@ -99,7 +99,7 @@ TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroa
 TEST(RuntimeEngineLayering, StreamingHookAppliesMainThreadResultsWithFrameBudget)
 {
     const auto content =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
 
     EXPECT_NE(content.find("static constexpr std::uint32_t kApplyBudgetPerFrame = 8u;"),
               std::string::npos);
@@ -282,7 +282,7 @@ TEST(RuntimeEngineLayering, AssetResidencyServiceKeepsGpuCacheAndModelHandoffsOu
     const auto engineImpl =
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
     const auto frameLoop =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
     const auto serviceInterface =
         ReadFile(RepoRoot() / "src/runtime/Runtime.AssetResidencyService.cppm");
     const auto serviceImpl =
@@ -366,7 +366,7 @@ TEST(RuntimeEngineLayering, GizmoFrameServiceKeepsInteractionStateOutOfEngine)
     const auto engineImpl =
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
     const auto frameLoop =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
     const auto serviceInterface =
         ReadFile(RepoRoot() / "src/runtime/Gizmos/Runtime.GizmoFrameService.cppm");
     const auto serviceImpl =
@@ -518,7 +518,7 @@ TEST(RuntimeEngineLayering, RunFrameCarriesDataOnlyFrameContext)
 {
     const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
     const auto frameLoop =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
 
     EXPECT_NE(frameLoop.find("struct RuntimeFrameContext"), std::string::npos);
     EXPECT_NE(frameLoop.find("double FrameDeltaSeconds"), std::string::npos);
@@ -580,13 +580,16 @@ TEST(RuntimeEngineLayering, PromotedFrameLoopContractPreservesRendererAndMainten
 TEST(RuntimeEngineLayering, RunFrameRegistersPromotedEcsSystemBundleBetweenSimTickAndCompile)
 {
     const auto content =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
+    const auto engineImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
 
     const auto simTick = content.find("application.OnSimTick(engine, fixedDt);");
     const auto bundleRegistration = content.find(
         "RegisterPromotedEcsSystemBundle(frameGraph, scene)");
     const auto compile = content.find("frameGraph.Compile()");
-    const auto bundleImport = content.find("import Extrinsic.Runtime.EcsSystemBundle");
+    const auto bundleImport =
+        engineImpl.find("import Extrinsic.Runtime.EcsSystemBundle");
 
     ASSERT_NE(simTick, std::string::npos);
     ASSERT_NE(bundleRegistration, std::string::npos);
@@ -616,7 +619,7 @@ TEST(RuntimeEngineLayering, AsyncWorkServiceKeepsStreamingAndDerivedJobOwnership
     const auto engineImpl =
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
     const auto frameLoop =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
     const auto serviceInterface =
         ReadFile(RepoRoot() / "src/runtime/Runtime.AsyncWorkService.cppm");
     const auto serviceImpl =
@@ -640,7 +643,7 @@ TEST(RuntimeEngineLayering, AsyncWorkServiceKeepsStreamingAndDerivedJobOwnership
               std::string::npos);
     EXPECT_NE(engineImpl.find("m_AsyncWorkService.SnapshotDerivedJobs()"),
               std::string::npos);
-    EXPECT_NE(frameLoop.find("import Extrinsic.Runtime.AsyncWorkService"),
+    EXPECT_NE(engineImpl.find("import Extrinsic.Runtime.AsyncWorkService"),
               std::string::npos);
     EXPECT_NE(frameLoop.find("AsyncWork.DrainCompletions()"),
               std::string::npos);
@@ -827,7 +830,7 @@ TEST(RuntimeEngineLayering, InputActionsKeepRegistryAndDispatchOutOfEngine)
     const auto engineImpl =
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
     const auto frameLoop =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
     const auto inputInterface =
         ReadFile(RepoRoot() / "src/runtime/Runtime.InputActions.cppm");
     const auto inputImpl =
@@ -941,7 +944,7 @@ TEST(RuntimeEngineLayering, SelectionReadbackKeepsPickCorrelationCacheOutOfEngin
     const auto engineImpl =
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
     const auto frameLoop =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
     const auto sceneDocumentInterface =
         ReadFile(RepoRoot() / "src/runtime/Runtime.SceneDocument.cppm");
     const auto sceneDocumentImpl =
@@ -1018,7 +1021,7 @@ TEST(RuntimeEngineLayering, FramePacingDiagnosticsKeepsCounterMirroringOutOfEngi
     const auto engineImpl =
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
     const auto frameLoop =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.cppm");
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
     const auto diagnosticsInterface =
         ReadFile(RepoRoot() / "src/runtime/Runtime.FramePacingDiagnostics.cppm");
     const auto diagnosticsImpl =
@@ -1026,7 +1029,7 @@ TEST(RuntimeEngineLayering, FramePacingDiagnosticsKeepsCounterMirroringOutOfEngi
 
     EXPECT_NE(engineInterface.find("export import Extrinsic.Runtime.FramePacingDiagnostics"),
               std::string::npos);
-    EXPECT_NE(frameLoop.find("import Extrinsic.Runtime.FramePacingDiagnostics"),
+    EXPECT_NE(engineImpl.find("import Extrinsic.Runtime.FramePacingDiagnostics"),
               std::string::npos);
     EXPECT_NE(engineImpl.find("MirrorImGuiFramePacingDiagnostics("),
               std::string::npos);

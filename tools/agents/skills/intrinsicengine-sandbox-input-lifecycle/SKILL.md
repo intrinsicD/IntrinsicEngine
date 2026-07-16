@@ -10,7 +10,8 @@ repeatedly in `ExtrinsicSandbox`: input capture, window lifecycle, edit-flush
 ordering, and camera/cursor conventions. It adds no new behavior — every item
 below is an invariant a retired bug already established, cited inline.
 
-Owner layer: `runtime` (`Runtime.Engine.cpp`, `Runtime.Engine.FrameLoop.cppm`).
+Owner layer: `runtime` (`Runtime.Engine.cpp`,
+`Runtime.Engine.FrameLoop.Internal.hpp`).
 This skill owns **input/lifecycle wiring**. Wrong/black **frame content** on the
 Vulkan path is `intrinsicengine-vulkan-frame-triage`; making an import *visible*
 is `intrinsicengine-import-visibility-contract` (`PROC-018`).

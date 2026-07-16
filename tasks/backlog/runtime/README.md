@@ -88,9 +88,10 @@ retired; asset import now lives in `Extrinsic.Runtime.AssetImportPipeline`.
 `RUNTIME-148` is retired; scene persistence now lives in
 `Extrinsic.Runtime.SceneDocument`. `RUNTIME-149` is retired; render-recipe
 activation and hot-config control now live in
-`Extrinsic.Runtime.EngineConfigControl`. `RUNTIME-150` is retired; the
-frame-loop hook adapters and per-frame helpers now live in the private
-`Extrinsic.Runtime.Engine:FrameLoop` partition. `RUNTIME-151` is retired;
+`Extrinsic.Runtime.EngineConfigControl`. `RUNTIME-150` is retired, and
+`RUNTIME-167` replaced its one-consumer partition; the frame-loop hook adapters
+and per-frame helpers now live in the include-only
+`Runtime.Engine.FrameLoop.Internal.hpp` helper. `RUNTIME-151` is retired;
 StableId signal tracking is owned by `StableEntityLookupSceneBinding`, and
 `Runtime.Engine.cppm` no longer exposes EnTT.
 `RUNTIME-152` is retired; device bootstrap policy now lives in
@@ -400,10 +401,11 @@ split; narratives live in the retirement log.
   config-control tests call the subsystem directly.
 - [RUNTIME-150 — Split the frame-loop hook adapters out of Runtime.Engine.cpp](../../archive/RUNTIME-150-split-engine-frame-loop-implementation-unit.md)
   (done, 2026-07-08, `Operational`): runtime frame-loop hook adapters and
-  per-frame helpers now live in the private
-  `Extrinsic.Runtime.Engine:FrameLoop` partition. `Engine::RunFrame()` remains
-  on `Engine`, imports the partition, and preserves frame shape and ordering;
-  the partition exports no declarations.
+  per-frame helpers were first moved into the private
+  `Extrinsic.Runtime.Engine:FrameLoop` partition. `RUNTIME-167` subsequently
+  replaced that one-consumer module surface with include-only private header
+  glue; `Engine::RunFrame()` remains on `Engine` and preserves frame shape and
+  ordering.
 - [RUNTIME-151 — Slim the Engine module interface and remove the entt leak](../../archive/RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md)
   (done, 2026-07-08, `Operational`): StableId signal tracking now lives behind
   `StableEntityLookupSceneBinding` in `Extrinsic.Runtime.StableEntityLookup`;

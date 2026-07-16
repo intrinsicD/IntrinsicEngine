@@ -1,46 +1,7 @@
-module;
+#pragma once
 
-#include <chrono>
-#include <cstddef>
-#include <cstdint>
-#include <optional>
-#include <span>
-
-#include <entt/entity/registry.hpp>
-
-export module Extrinsic.Runtime.Engine:FrameLoop;
-
-import Extrinsic.Runtime.Engine;
-import Extrinsic.Asset.Service;
-import Extrinsic.Core.Config.Engine;
-import Extrinsic.Core.Error;
-import Extrinsic.Core.FrameGraph;
-import Extrinsic.Core.FrameLoop;
-import Extrinsic.Core.Geometry2D;
-import Extrinsic.Core.Logging;
-import Extrinsic.ECS.Component.DirtyTags;
-import Extrinsic.ECS.Component.Transform;
-import Extrinsic.ECS.Scene.Handle;
-import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.Graphics.CameraSnapshots;
-import Extrinsic.Graphics.GpuAssetCache;
-import Extrinsic.Graphics.RenderFrameInput;
-import Extrinsic.Graphics.Renderer;
-import Extrinsic.Graphics.RenderWorld;
-import Extrinsic.Platform.Window;
-import Extrinsic.RHI.Device;
-import Extrinsic.RHI.FrameHandle;
-import Extrinsic.RHI.TransferQueue;
-import Extrinsic.Runtime.AsyncWorkService;
-import Extrinsic.Runtime.AssetResidencyService;
-import Extrinsic.Runtime.CameraControllers;
-import Extrinsic.Runtime.EcsSystemBundle;
-import Extrinsic.Runtime.FramePacingDiagnostics;
-import Extrinsic.Runtime.ReferenceScene;
-import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.RenderWorldPool;
-import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.WorldHandle;
+// Include-only Engine frame-loop helpers. Include after module imports in
+// Runtime.Engine.cpp so these declarations remain implementation-local.
 
 namespace Extrinsic::Runtime
 {

@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 84 |
+| `runtime` | 83 |
 
 ## Modules
 
@@ -357,7 +357,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.DeviceBootstrap` | `src/runtime/Runtime.DeviceBootstrap.cppm` | `runtime` |
 | `Extrinsic.Runtime.EcsSystemBundle` | `src/runtime/Runtime.EcsSystemBundle.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorCommandHistory` | `src/runtime/Runtime.EditorCommandHistory.cppm` | `runtime` |
-| `Extrinsic.Runtime.Engine:FrameLoop` | `src/runtime/Runtime.Engine.FrameLoop.cppm` | `runtime` |
 | `Extrinsic.Runtime.Engine` | `src/runtime/Runtime.Engine.cppm` | `runtime` |
 | `Extrinsic.Runtime.EngineConfigBoot` | `src/runtime/Runtime.EngineConfigBoot.cppm` | `runtime` |
 | `Extrinsic.Runtime.EngineConfigControl` | `src/runtime/Runtime.EngineConfigControl.cppm` | `runtime` |
@@ -418,4 +417,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **391**
+Total modules: **390**

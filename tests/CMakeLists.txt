@@ -269,6 +269,7 @@ if(TARGET ExtrinsicRuntime)
         Test.RuntimeCameraControllers.cpp
         Test.RuntimeConfigControlFacade.cpp
         Test.RuntimeEngineConfigBoot.cpp
+        Test.RuntimeEnginePrivateGlue.cpp
         Test.RuntimeInputActions.cpp
         Test.RuntimeRenderRecipeActivation.cpp
         Test.RuntimeCameraFocusCommand.cpp

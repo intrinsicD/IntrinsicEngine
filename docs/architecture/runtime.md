@@ -39,6 +39,10 @@ reported without mutating the live engine.
 `Engine::RunFrame()` is the promoted runtime lifecycle pipeline. Runtime owns the
 cross-layer composition, while reusable phase contracts live in
 `Extrinsic.Core.FrameLoop` so `core` stays dependency-free.
+The runtime-side hook adapters and per-frame helpers are implementation-local
+textual glue in `Runtime.Engine.FrameLoop.Internal.hpp`, included only by
+`Runtime.Engine.cpp`; they are not a module surface or an independently owned
+subsystem.
 
 Runtime modules compose through `Engine::AddModule(...)` before
 `Engine::Initialize()`. Boot sorts modules by stable name, invokes every
