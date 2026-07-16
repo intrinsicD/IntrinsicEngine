@@ -6,20 +6,19 @@ depends_on: []
 # BUG-081 — Warm-configure CI budget still flakes on hosted-runner variance
 
 ## Status
-- In progress on 2026-07-16; owner: Codex; branch:
-  `agent/sandbox-model-workflow-completion`; PR:
+- Completed on 2026-07-16; owner: Codex; implementation commit: `d3017621`;
+  branch: `agent/sandbox-model-workflow-completion`; PR:
   [`#1024`](https://github.com/intrinsicD/IntrinsicEngine/pull/1024).
 - Immediate evidence: the exact vcpkg cache hit in
   [`ci-sanitizers` run 29519782498](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29519782498)
   completed CMake configure/generate successfully, but the ASan matrix context
   took `30.368 s` against the `20.000 s` budget and stopped before compilation.
-- Next verification: push the repaired head, confirm every executing PR
-  context reaches compilation under the calibrated guard, then require every
-  PR #1024 check to pass.
-- Local implementation complete: seven guarded call sites now use the finite
+- Hosted verification on repaired head `d3017621` confirmed every executing PR
+  context passed Configure and reached compilation under the calibrated guard.
+  The retirement head still requires the complete all-green PR merge gate.
+- Seven guarded call sites now use the finite
   `40 s` fleet budget derived from `ceil-to-5-seconds(1.25 × 30.368 s)`;
-  workflow-policy and fail-closed regressions pass. Hosted verification is
-  pending on the repaired PR head.
+  workflow-policy and fail-closed regressions pass.
 
 ## Goal
 - Recalibrate the exact-vcpkg-hit configure budget from a comparable hosted
@@ -68,7 +67,7 @@ depends_on: []
 ## Docs
 - [x] Record the sample population, statistic, headroom rule, and affected
       workflows in the canonical CI timing policy.
-- [ ] Update this bug index and retirement log when the fix is verified.
+- [x] Update this bug index and retirement log when the fix is verified.
 
 ## Acceptance criteria
 - [x] The calibration uses at least five comparable exact-hit samples per
@@ -77,7 +76,7 @@ depends_on: []
       require five direct samples before any lower context-specific limit.
 - [x] The chosen budget exceeds the observed hosted-context p95 by declared
       headroom without becoming an unbounded or warning-only guard.
-- [ ] Hosted verification reaches compilation across the sampled workflows,
+- [x] Hosted verification reaches compilation across the sampled workflows,
       and the synthetic over-budget regression still fails closed.
 
 ## Evidence
@@ -98,6 +97,13 @@ depends_on: []
   it.
 - The declared rule is `ceil-to-5-seconds(1.25 × max context p95)`, yielding
   `40 s`; `time_command.py` and its JSON schema are unchanged.
+- Repaired-head hosted Configure steps passed and reached compilation in
+  [`pr-fast` run 29521730095](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29521730095),
+  [`ci-linux-clang` run 29521730145](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29521730145),
+  both sanitizer contexts in
+  [run 29521730062](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29521730062),
+  [`ci-vulkan` run 29521730079](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29521730079),
+  and [`ci-bench-smoke` run 29521730126](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29521730126).
 
 ## Verification
 ```bash
@@ -115,7 +121,8 @@ Local results on 2026-07-16:
 - Strict workflow naming, task policy/state, documentation-link, root-hygiene,
   PR-contract, skill-sync, and diff checks passed.
 - `rg` reports exactly seven `--max-warm-seconds 40` call sites across the six
-  declared workflows. Hosted repaired-head evidence remains pending.
+  declared workflows. Every executing repaired-head PR context passed its
+  Configure step and entered the build on the run IDs above.
 
 ## Forbidden changes
 - Deleting the guard, its telemetry, or its hard-fail behavior.

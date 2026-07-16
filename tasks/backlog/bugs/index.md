@@ -30,6 +30,14 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   strict result validation.
 ## Verified / Closed
 
+- Closed 2026-07-16: [`BUG-081` — Warm-configure CI budget still flakes on hosted-runner variance](../../done/BUG-081-warm-configure-budget-runner-variance.md).
+  Seven configure guards now share the finite 40-second budget derived from
+  the slowest contemporary hosted-context p95 plus a declared 25% margin and
+  five-second rounding. Exact cache keys, images, raw samples, and inactive
+  self-hosted transfer policy remain auditable; the wrapper still hard-fails
+  synthetic exact-hit overruns, and every repaired-head PR context reached
+  compilation.
+
 - Closed 2026-07-16: [`BUG-103` — Render-graph lifetime test culls its history chain](../../done/BUG-103-rendergraph-lifetime-test-culls-history-chain.md).
   The history read is now connected to the live present root through the
   existing dependency contract, preserving current execution-rank lifetimes

@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-081` — Warm-configure CI budget still flakes on hosted-runner variance (tasks/active/BUG-081-warm-configure-budget-runner-variance.md)
+- none
 
 ## Theme B — Rendering modernization
 

@@ -8,6 +8,19 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-081`](BUG-081-warm-configure-budget-runner-variance.md) — the
+warm-configure hosted-tail guard defect retired on 2026-07-16. Commit
+`d3017621` applies one finite 40-second exact-vcpkg-hit limit across all seven
+workflow call sites, derived as the slowest contemporary hosted-context p95
+(`30.368 s`) plus a 25% margin and five-second rounding. The canonical policy
+retains the raw run URLs, exact cache identities, image mapping, conventional
+medians, nearest-rank p95s, and the conservative transfer policy for the
+inactive self-hosted GPU context. `time_command.py` and its timing JSON remain
+unchanged; the synthetic exact-hit overrun still returns failure, timing and
+workflow-policy regressions passed 18/18, and all five repaired-head workflow
+runs (including both sanitizer matrix contexts) passed Configure and reached
+compilation.
+
 [`BUG-103`](BUG-103-rendergraph-lifetime-test-culls-history-chain.md) — the
 render-graph lifetime fixture drift retired on 2026-07-16 at `CPUContracted`.
 Commit `566424a5` connects `HistoryRead` to the live `Present` root through the

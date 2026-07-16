@@ -11,10 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`BUG-081` — Warm-configure CI budget still flakes on hosted-runner variance](BUG-081-warm-configure-budget-runner-variance.md)
-  is collecting same-context hosted exact-cache-hit populations after PR #1024
-  reproduced the failure at `30.368 s`; next apply the documented
-  population-plus-headroom rule and re-run every PR gate.
+No tasks are currently active.
 
 ## History
 
