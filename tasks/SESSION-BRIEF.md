@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-104` — Kernel-convergence regression asserts a retired snapshot (tasks/active/BUG-104-kernel-convergence-regression-stale-snapshot.md)
+- none
 
 ## Theme B — Rendering modernization
 

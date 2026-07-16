@@ -30,6 +30,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   strict result validation.
 ## Verified / Closed
 
+- Closed 2026-07-16: [`BUG-104` — Kernel-convergence regression asserts a retired snapshot](../../done/BUG-104-kernel-convergence-regression-stale-snapshot.md).
+  The repository-snapshot regression now asserts the policy's live `42/21`,
+  two export imports, 31 getter names, and debt-free diagnostic. Production
+  checker/policy code and all synthetic fail-closed cases are unchanged; 19/19
+  regressions, the strict live checker, and repaired exact-head `pr-fast`
+  passed.
+
 - Closed 2026-07-16: [`BUG-081` — Warm-configure CI budget still flakes on hosted-runner variance](../../done/BUG-081-warm-configure-budget-runner-variance.md).
   Seven configure guards now share the finite 40-second budget derived from
   the slowest contemporary hosted-context p95 plus a declared 25% margin and

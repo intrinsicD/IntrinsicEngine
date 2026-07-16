@@ -7,14 +7,13 @@ depends_on: []
 
 ## Status
 
-- In progress on 2026-07-16; owner: Codex; branch:
-  `agent/sandbox-model-workflow-completion`; PR:
+- Completed on 2026-07-16; owner: Codex; implementation commit: `fb582056`;
+  branch: `agent/sandbox-model-workflow-completion`; PR:
   [`#1024`](https://github.com/intrinsicD/IntrinsicEngine/pull/1024).
-- Next verification: push the repaired head and require its `pr-fast` job to
-  pass the synchronized regression plus the unchanged strict live checker.
-- Local fix complete: only the stale repository-snapshot literals changed;
-  all 19 regressions and the independent strict live checker pass. Repaired
-  `pr-fast` verification remains pending.
+- Only the stale repository-snapshot literals changed; all 19 regressions and
+  the independent strict live checker pass. Repaired exact-head
+  [`pr-fast` run 29524872998](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29524872998)
+  completed successfully in 17m05s.
 
 ## Goal
 
@@ -57,7 +56,7 @@ depends_on: []
 
 ## Docs
 
-- [ ] Record root cause and verification in this task, the active/done task
+- [x] Record root cause and verification in this task, the active/done task
   indexes, and the retirement log; no architecture doc changes are required
   because production policy does not change.
 
@@ -65,7 +64,7 @@ depends_on: []
 
 - [x] The repository-snapshot test asserts `42/21`, 31 public getters, and no
   temporary debt while the strict checker continues to pass.
-- [ ] A repaired exact-head `pr-fast` workflow passes.
+- [x] A repaired exact-head `pr-fast` workflow passes.
 
 ## Verification
 
@@ -86,6 +85,7 @@ Local results on 2026-07-16:
 - Strict live checker passed at `42` plain imports, `21` domain imports, two
   export imports, 31 public getter names, and no temporary debt.
 - Strict task policy/state and diff checks passed.
+- Repaired exact-head `pr-fast` run `29524872998` passed in 17m05s.
 
 ## Forbidden changes
 

@@ -8,6 +8,16 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-104`](BUG-104-kernel-convergence-regression-stale-snapshot.md) — the
+kernel-convergence repository-snapshot regression retired on 2026-07-16.
+Commit `fb582056` replaces only the stale `49/28` and `RUNTIME-178` output
+assertions with the already-enforced `42/21`, two export imports, 31 public
+getter names, and debt-free diagnostic. The Engine interface, checker, policy,
+and all 18 synthetic/fail-closed cases are unchanged. The pre-fix suite failed
+only the repository snapshot, then passed 19/19 after the correction; the
+strict live checker passed independently, and repaired exact-head `pr-fast`
+run `29524872998` completed successfully in 17m05s.
+
 [`BUG-081`](BUG-081-warm-configure-budget-runner-variance.md) — the
 warm-configure hosted-tail guard defect retired on 2026-07-16. Commit
 `d3017621` applies one finite 40-second exact-vcpkg-hit limit across all seven
