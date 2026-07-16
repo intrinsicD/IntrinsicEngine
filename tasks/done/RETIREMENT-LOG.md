@@ -8,6 +8,24 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-092`](BUG-092-scene-lifecycle-async-wait-frame-budget.md) — the
+frame-count-only asynchronous scene lifecycle wait retired on 2026-07-16 at
+`CPUContracted`. Implementation commit `627641fa` replaces the 256-frame stop
+with a ten-second steady-clock deadline, a one-millisecond unsuccessful-poll
+pause, and explicit satisfied/timed-out diagnostics in the test-local helper.
+The checked-in regression reaches predicate call 257 and requires at least
+200 ms elapsed; the direct timeout regression and all three end-to-end queued
+scene-file contracts preserve success, error, snapshot, event-correlation,
+history, and main-thread application assertions. All five cases passed 20
+repetitions each, the scene-file trio passed 100 repetitions each, and a real
+worker write delayed five seconds with `strace` passed in 5.151 seconds where
+the old helper failed. The aggregate build and default CPU gate passed
+3,787/3,787 in 402.05 seconds; strict task, state-link, test-layout,
+documentation, layering, and diff checks passed. Independent review found no
+remaining determinism, lifetime, timeout-semantics, or right-sizing blocker.
+No production source, module surface, CMake policy, or runtime documentation
+changed.
+
 [`RUNTIME-178`](RUNTIME-178-restore-engine-convergence-budget.md) — the bounded
 Engine convergence remediation retired on 2026-07-16 at `Operational`.
 Implementation commit `109af4bd` makes the Engine-owned ImGui editor bridge and

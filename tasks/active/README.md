@@ -11,10 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [BUG-092 — Scene lifecycle async wait exhausts its frame budget under delayed I/O](BUG-092-scene-lifecycle-async-wait-frame-budget.md)
-  (`in-progress`; owner: Codex; branch: `codex/arch-006-completion`). Root cause
-  is confirmed in the runtime contract harness; next gate is the bounded
-  steady-clock/yield repair and repeated queued scene-file coverage.
+No tasks are currently active.
 
 ## History
 

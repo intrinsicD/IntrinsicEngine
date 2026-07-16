@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-092` — Scene lifecycle async wait exhausts its frame budget under delayed I/O (tasks/active/BUG-092-scene-lifecycle-async-wait-frame-budget.md)
+- none
 
 ## Theme B — Rendering modernization
 

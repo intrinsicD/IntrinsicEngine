@@ -5,11 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-092` — Scene lifecycle async wait exhausts its frame budget under delayed I/O](../../active/BUG-092-scene-lifecycle-async-wait-frame-budget.md):
-  the end-to-end queued scene-save contract can consume 256 rapid Null-backend
-  frames before a valid delayed worker completion is applied, then report a
-  missing event even though shutdown draining completes the save; replace the
-  test-only frame budget with a bounded elapsed-time/yield contract.
 - [`BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start](BUG-091-gtest-pretest-discovery-cold-timeout.md):
   CMake's implicit five-second PRE_TEST discovery limit can abort CTest while
   an unrelated cold sanitizer binary enumerates tests, before the selected
@@ -33,6 +28,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   headroom while preserving fail-closed semantics.
 
 ## Verified / Closed
+
+- Closed 2026-07-16: [`BUG-092` — Scene lifecycle async wait exhausts its frame budget under delayed I/O](../../done/BUG-092-scene-lifecycle-async-wait-frame-budget.md).
+  The test-local helper now uses a ten-second steady-clock budget, yields one
+  millisecond after unsuccessful polls, and reports explicit success/timeout
+  state. A 257-call regression pins the retired frame ceiling; repeated scene
+  I/O and a five-second injected worker-write delay pass without production
+  runtime changes.
 
 - Closed 2026-07-16: [`BUG-090` — Async-work layering test asserts stale shutdown call spelling](../../done/BUG-090-async-work-layering-test-stale-shutdown-owner.md).
   The source contract now recognizes `ShutdownHooks::AsyncWork` delegation

@@ -8,7 +8,7 @@ depends_on: []
 ## Status
 
 - Completed on 2026-07-16 at maturity `CPUContracted`; owner: Codex; branch:
-  `codex/arch-006-completion`.
+  `codex/arch-006-completion`; implementation commit: `627641fa`.
 - Root cause and controlled-delay reproduction are complete. The selected
   repair is test-only: a ten-second steady-clock deadline, a one-millisecond
   unsuccessful-poll yield, and explicit satisfied/timed-out state.
