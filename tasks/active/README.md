@@ -15,6 +15,10 @@ Each active task should include:
   (`in-progress`; owner: Codex; branch:
   `agent/sandbox-model-workflow-completion`). The next gate is the
   completed-frame clock regression plus production-delay real-control hover.
+- [BUG-099 — Binary PLY point-cloud import rejects face-list elements](BUG-099-binary-ply-pointcloud-skips-face-lists.md)
+  (`in-progress`; owner: Codex geometry worker; branch:
+  `agent/sandbox-model-workflow-completion`). The next gate is endian-safe
+  non-vertex list consumption plus malformed binary PLY regressions.
 
 ## History
 

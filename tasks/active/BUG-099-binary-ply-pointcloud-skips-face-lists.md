@@ -6,6 +6,13 @@ maturity_target: CPUContracted
 ---
 # BUG-099 — Binary PLY point-cloud import rejects face-list elements
 
+## Status
+
+- In progress on 2026-07-16; owner: Codex geometry worker; branch:
+  `agent/sandbox-model-workflow-completion`.
+- Next gate: endian-safe non-vertex list consumption plus malformed binary
+  PLY regression coverage.
+
 ## Goal
 
 - Let the promoted binary PLY point-cloud reader decode vertex data while

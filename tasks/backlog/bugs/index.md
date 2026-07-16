@@ -13,7 +13,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   File / Import queues model/texture payloads but calls the synchronous API for
   Mesh/Graph/PointCloud, freezing ImGui during large reads/decodes despite an
   existing deferred dropped-geometry path.
-- [`BUG-099` — Binary PLY point-cloud import rejects face-list elements](BUG-099-binary-ply-pointcloud-skips-face-lists.md):
+- [`BUG-099` — Binary PLY point-cloud import rejects face-list elements](../../active/BUG-099-binary-ply-pointcloud-skips-face-lists.md):
   both checked-in endian fixtures succeed as Mesh but fail as PointCloud
   because the binary point-cloud reader rejects list properties on unrelated
   non-vertex elements instead of consuming them safely.
