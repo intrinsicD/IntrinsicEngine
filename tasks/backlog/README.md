@@ -170,6 +170,12 @@ Progressive Poisson mesh conversion. The four reproducible Theme G defects
 list consumption, queued manual geometry import, and near-linear UV edge
 grouping now satisfy their recorded maturity targets.
 
+The same final opt-in Vulkan/GPU gate exposed two pre-existing test-contract
+drifts, now retired as `BUG-102` and `BUG-103`: the object-space bake layering
+test recognizes the RUNTIME-178 import-placement ratchet, and the render-graph
+lifetime fixture keeps its measured history chain live under execution-rank
+semantics. Neither correction changes production behavior.
+
 `RUNTIME-131` is retired to `tasks/done`: runtime exposes the agent/CLI
 config-control facade for render-recipe preview/activation and the current
 engine-config hot subset (`render.default_recipe_config_path`), with the

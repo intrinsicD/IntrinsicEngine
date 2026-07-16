@@ -8,6 +8,26 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-103`](BUG-103-rendergraph-lifetime-test-culls-history-chain.md) — the
+render-graph lifetime fixture drift retired on 2026-07-16 at `CPUContracted`.
+Commit `566424a5` connects `HistoryRead` to the live `Present` root through the
+existing `DependsOn()` contract and pins topological order `{0, 1, 2}`; the
+compiler continues to cull disconnected passes and measure lifetimes in live
+execution-rank space. The pre-fix test and compiler matched `origin/main`,
+ccache-disabled rebuilds reproduced the failure, the corrected exact case
+passed 20/20 in both `ci` and `ci-vulkan`, both `GraphicsRenderGraph` selections
+passed 57/57, and the repaired promoted Vulkan/GPU label gate passed 286/286.
+
+[`BUG-102`](BUG-102-object-space-normal-bake-layering-test-import-placement.md)
+— the object-space bake source-layering test drift retired on 2026-07-16 at
+`CPUContracted`. Commit `b17a8bde` updates only the two stale public CPU
+request-queue import-placement predicates to match RUNTIME-178's intentional
+Engine interface-to-implementation move. Every negative GPU queue ownership,
+composition, dependency, and ready-frame-policy assertion remains unchanged,
+and the 42-import interface convergence ratchet holds. The exact case passed
+3/3 in both presets, `RuntimeEngineLayering` passed 21/21, and the repaired
+promoted Vulkan/GPU label gate passed 286/286.
+
 [`BUG-101`](BUG-101-fast-staged-uv-edge-grouping-quadratic.md) — fast-staged UV
 edge grouping retired on 2026-07-16 at `Operational`. Commit `25d27068`
 replaces the per-incidence vector-wide search with reserved normalized edge-key

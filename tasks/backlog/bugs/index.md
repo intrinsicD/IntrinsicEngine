@@ -5,14 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-103` — Render-graph lifetime test culls its history chain](../../active/BUG-103-rendergraph-lifetime-test-culls-history-chain.md):
-  the fixture leaves its history write/read chain disconnected from the live
-  present root, so current execution-rank lifetime semantics correctly cull
-  those declarations while the stale assertions expect three live passes.
-- [`BUG-102` — Object-space bake layering test asserts pre-ratchet import placement](../../active/BUG-102-object-space-normal-bake-layering-test-import-placement.md):
-  two source-reading assertions still expect the CPU request-queue import in
-  the Engine interface instead of its RUNTIME-178 implementation-unit home,
-  even though every GPU queue ownership exclusion remains current.
 - [`BUG-097` — Progressive model-scene UV job publishes a zero atlas](BUG-097-progressive-model-scene-zero-uv-atlas.md):
   the default-off progressive enrichment path labels an all-zero authoritative
   `v:texcoord` property as an atlas and can publish it after newer UV/topology
@@ -43,6 +35,16 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   headroom while preserving fail-closed semantics.
 
 ## Verified / Closed
+
+- Closed 2026-07-16: [`BUG-103` — Render-graph lifetime test culls its history chain](../../done/BUG-103-rendergraph-lifetime-test-culls-history-chain.md).
+  The history read is now connected to the live present root through the
+  existing dependency contract, preserving current execution-rank lifetimes
+  and pass culling while pinning deterministic order `{0, 1, 2}`.
+
+- Closed 2026-07-16: [`BUG-102` — Object-space bake layering test asserts pre-ratchet import placement](../../done/BUG-102-object-space-normal-bake-layering-test-import-placement.md).
+  The source-layering contract now recognizes RUNTIME-178's implementation-unit
+  CPU queue import while preserving every Engine-side GPU queue exclusion and
+  the interface convergence ratchet.
 
 - Closed 2026-07-16: [`BUG-101` — Fast-staged UV edge grouping is quadratic](../../done/BUG-101-fast-staged-uv-edge-grouping-quadratic.md).
   Normalized edge-key lookup now preserves deterministic first-seen ordering

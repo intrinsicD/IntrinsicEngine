@@ -9,14 +9,15 @@ maturity_target: CPUContracted
 
 ## Status
 
-- Implementation and focused verification completed on 2026-07-16; owner:
-  Codex; branch: `agent/sandbox-model-workflow-completion`; awaiting commit and
-  task retirement by the owning workflow.
+- Completed on 2026-07-16 at `CPUContracted`; owner: Codex; branch:
+  `agent/sandbox-model-workflow-completion`; implementation commit:
+  `b17a8bde`.
 - Before the correction, the exact test failed identically in `build/ci` and
   `build/ci-vulkan`; the tested import-placement and assertion lines matched
   `origin/main`.
-- After the correction, the exact test passed 3/3 in each preset and the full
-  `RuntimeEngineLayering` selection passed 21/21.
+- After the correction, the exact test passed 3/3 in each preset, the full
+  `RuntimeEngineLayering` selection passed 21/21, and the repaired promoted
+  Vulkan/GPU label gate passed 286/286.
 
 ## Goal
 - Restore the object-space normal-bake source-layering contract by recognizing
@@ -122,5 +123,5 @@ git diff --check
 - Folding unrelated runtime or graphics changes into this bug fix.
 
 ## Maturity
-- Target: `CPUContracted`; this is a backend-neutral source-ownership contract,
+- Achieved: `CPUContracted`; this is a backend-neutral source-ownership contract,
   and no `Operational` follow-up is owed.

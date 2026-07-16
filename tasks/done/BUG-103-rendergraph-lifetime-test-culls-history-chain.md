@@ -8,12 +8,13 @@ maturity_target: CPUContracted
 
 ## Status
 
-- Implementation complete on 2026-07-16 at `CPUContracted`; uncommitted for
-  parent-agent integration.
+- Completed on 2026-07-16 at `CPUContracted`; implementation commit:
+  `566424a5`.
 - The pre-fix test failed identically in `build/ci` and `build/ci-vulkan`.
   Ccache-disabled rebuilds confirmed current-source behavior. After the
   test-only correction, the exact regression passed 20 consecutive runs in
-  each tree and both 57-test `GraphicsRenderGraph` suites passed.
+  each tree, both 57-test `GraphicsRenderGraph` suites passed, and the repaired
+  promoted Vulkan/GPU label gate passed 286/286.
 
 ## Goal
 
