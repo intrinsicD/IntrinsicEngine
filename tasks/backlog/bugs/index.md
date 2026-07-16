@@ -28,12 +28,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   14.71 seconds in isolation; collect a timing population and choose an
   evidence-backed PR-fast split or slow-lane classification without weakening
   strict result validation.
-- [`BUG-081` — Warm-configure CI budget still flakes on hosted-runner variance](BUG-081-warm-configure-budget-runner-variance.md):
-  an exact-vcpkg-hit configure took 22.002 s against the recalibrated 20 s
-  budget and stopped the job before ccache restore or compilation; collect a
-  comparable hosted population and set an evidence-backed budget with explicit
-  headroom while preserving fail-closed semantics.
-
 ## Verified / Closed
 
 - Closed 2026-07-16: [`BUG-103` — Render-graph lifetime test culls its history chain](../../done/BUG-103-rendergraph-lifetime-test-culls-history-chain.md).

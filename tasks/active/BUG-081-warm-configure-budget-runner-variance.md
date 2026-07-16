@@ -5,6 +5,18 @@ depends_on: []
 ---
 # BUG-081 — Warm-configure CI budget still flakes on hosted-runner variance
 
+## Status
+- In progress on 2026-07-16; owner: Codex; branch:
+  `agent/sandbox-model-workflow-completion`; PR:
+  [`#1024`](https://github.com/intrinsicD/IntrinsicEngine/pull/1024).
+- Immediate evidence: the exact vcpkg cache hit in
+  [`ci-sanitizers` run 29519782498](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29519782498)
+  completed CMake configure/generate successfully, but the ASan matrix context
+  took `30.368 s` against the `20.000 s` budget and stopped before compilation.
+- Next verification: collect and analyze at least five comparable exact-hit
+  samples for every guarded workflow context, apply the evidence-backed rule,
+  then require every PR #1024 check to pass on the repaired head.
+
 ## Goal
 - Recalibrate the exact-vcpkg-hit configure budget from a comparable hosted
   population so ordinary runner variance cannot stop CI before compilation,
