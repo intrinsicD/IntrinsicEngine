@@ -8,6 +8,23 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-178`](RUNTIME-178-restore-engine-convergence-budget.md) — the bounded
+Engine convergence remediation retired on 2026-07-16 at `Operational`.
+Implementation commit `109af4bd` makes the Engine-owned ImGui editor bridge and
+asset residency service opaque without changing their lifetime order,
+registers the existing render-extraction cache for direct Sandbox UV queries,
+and removes three redundant geometry/material query facades. The authoritative
+ratchet improves from the temporary 49 / 28 / 33 snapshot to 42 plain imports /
+21 domain imports / 31 getter names, with two re-exports and no temporary debt.
+Focused runtime coverage passed 165/165, the default CPU-supported gate passed
+3,785/3,785 in 395.20 seconds, and both required promoted-Vulkan UV tests
+executed without skips and passed. Strict convergence, layering, test-layout,
+task, state-link, documentation, root, PR-contract, skill-sync, inventory, and
+diff checks passed. Independent module-law, lifetime, right-sizing, and final
+reviews found no blockers. Existing `BUG-088` owns a contention-only benchmark
+timeout observed on the first loaded gate; `BUG-092` separately owns the
+frame-count-only asynchronous scene-save test wait exposed in that run.
+
 [`HARDEN-085`](HARDEN-085-enforce-runtime-engine-kernel-convergence-ratchet.md)
 — the `Runtime.Engine` convergence ratchet retired on 2026-07-16 at
 `CPUContracted`. Implementation commit `ea3b403e` adds a stdlib-only exact

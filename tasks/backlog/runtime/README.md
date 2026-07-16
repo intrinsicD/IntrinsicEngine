@@ -194,15 +194,12 @@ main `Runtime.RenderExtraction` module slimming.
   reduce or retire the exported scene document orchestration surface after
   `RUNTIME-148`.
 
-### Kernel convergence remediation
-
-- [`RUNTIME-178`](../../active/RUNTIME-178-restore-engine-convergence-budget.md) — after
-  retired `HARDEN-085`, restore the fixed 43 / 23 Engine import snapshot and
-  remove the `GRAPHICS-122` getter debt without resurrecting retired service
-  BMIs; active on `codex/arch-006-completion`.
-
 ### Retired module-surface diet work
 
+- [`RUNTIME-178`](../../done/RUNTIME-178-restore-engine-convergence-budget.md)
+  restored and improved the fixed Engine convergence budget to 42 plain
+  imports / 21 domain imports / 31 getter names with no temporary debt while
+  preserving the operational UV-view and private-service behavior.
 - [`RUNTIME-173`](../../done/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md)
   retired the Sandbox-session-only K-Means GPU queue into private facade-module
   glue at `CPUContracted`, retaining the request/submission/result DTO contract

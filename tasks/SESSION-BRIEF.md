@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-178` — Restore the pre-ratchet Runtime.Engine convergence budget (tasks/active/RUNTIME-178-restore-engine-convergence-budget.md)
+- none
 
 ## Theme B — Rendering modernization
 

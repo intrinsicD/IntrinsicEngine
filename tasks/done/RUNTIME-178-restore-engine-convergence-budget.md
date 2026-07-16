@@ -10,7 +10,7 @@ maturity_target: Operational
 ## Status
 
 - Completed on 2026-07-16 at maturity `Operational`; owner: Codex; branch:
-  `codex/arch-006-completion`.
+  `codex/arch-006-completion`; implementation commit: `109af4bd`.
 - The exact convergence snapshot is 42 plain imports / 21 domain imports /
   31 getter names with two re-exports and no temporary debt. Focused runtime
   coverage passed 165/165, the default CPU-supported gate passed 3,785/3,785,

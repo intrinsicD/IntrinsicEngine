@@ -265,7 +265,6 @@ its owners.
 
 Open members (kernel-seam priority set first):
 - [`architecture/ARCH-014-kernel-convergence-tracking.md`](architecture/ARCH-014-kernel-convergence-tracking.md) (umbrella north-star; not a slice).
-- [`RUNTIME-178`](../active/RUNTIME-178-restore-engine-convergence-budget.md) (active; restores the fixed Engine convergence budget without resurrecting retired BMIs).
 - [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) (one-shot post-convergence admission gate; blocked until known architecture/right-sizing/tool-rent work retires).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).
