@@ -9,8 +9,9 @@ maturity_target: Operational
 
 ## Goal
 
-- Restore `Runtime.Engine.cppm` to at most the 2026-07-13 convergence snapshot
-  of 43 plain imports / 23 domain imports and remove the temporary
+- Restore `Runtime.Engine.cppm` to at most the fixed 2026-07-13
+  legacy-interim convergence budget of 43 plain imports / 23 domain imports
+  under the exact v1 checker and remove the temporary
   `GetMaterialTextureAssetBindings` Engine getter without reversing the
   compile-surface reductions that exposed the debt.
 
@@ -25,9 +26,11 @@ maturity_target: Operational
 
 - Owner/layer: runtime composition under ADR-0024 and the `ARCH-014` kernel
   convergence umbrella.
-- Current branch debt relative to the fixed 2026-07-13 snapshot is `+6` plain
-  imports, `+5` allowlist-complement domain imports, and one public getter
-  name. `HARDEN-085` records and prevents growth from that state.
+- Current branch debt relative to the fixed 2026-07-13 budget is `+6` plain
+  imports, `+5` exact allowlist-complement domain imports, and one public
+  getter name. The historical 23 used an unanchored interim classifier; the
+  exact v1 checker preserves 23 as a budget rather than retroactively changing
+  history. `HARDEN-085` records and prevents growth from the current state.
 - The import delta arose while retiring low-fanout service BMIs into private
   Engine module glue; the getter delta arose from the `GRAPHICS-122` UV-view
   material-binding query. The fix must preserve both delivered behaviors and

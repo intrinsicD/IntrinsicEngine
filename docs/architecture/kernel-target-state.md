@@ -49,9 +49,15 @@ design, not a gap.
 Each row is a greppable invariant. `ARCH-014` owns keeping this current;
 flip a box when the invariant holds on `main`. Baseline column is the
 2026-07-08 measurement (post-ARCH-007) and remains fixed for comparison;
-dated current snapshots are refreshed separately. The 2026-07-13 snapshot is
-43 total imports and 23 domain imports by the interim allowlist-complement
-metric below.
+dated current snapshots are refreshed separately. The fixed 2026-07-13
+legacy-interim reference snapshot is 43 plain imports and 23 domain imports.
+Its unanchored interim regex admitted the then-present
+`Runtime.RenderExtractionService` through the `Runtime.RenderExtraction`
+prefix; the exact v1 classifier intentionally does not rewrite that historical
+record. The checked 2026-07-16 exact-policy snapshot is 49 / 28 with 33
+distinct public `Engine::GetX()` names and two existing re-exports. The
+`+6 / +5 / +1 getter` budget delta is explicit temporary debt owned by
+`RUNTIME-178`; it does not replace the reference.
 
 ### Kernel seams exist (ADR-0024 D5–D11)
 
@@ -68,36 +74,40 @@ metric below.
 
 ### Kernel is slim (measurable)
 
-> **Domain-import metric (allowlist).** The kernel's *permitted substrate*
-> import prefixes are small and enumerable; everything else in
-> `Runtime.Engine.cppm` is a domain import. Keep the allowlist in sync as
-> seams land (add `Runtime.KernelEvents`/`JobService`/`WorldRegistry`/
-> `Module`/`ServiceRegistry` as `ARCH-008`..`ARCH-011` create them):
+> **Domain-import metric (allowlist complement).** The kernel's permitted
+> substrate prefixes and exact modules are small and enumerable; every plain
+> import outside that set is a domain import. The authoritative metric and
+> snapshot live in `tools/repo/check_kernel_convergence.py` and
+> `tools/repo/kernel_convergence_policy.json`:
 >
 > ```bash
-> SUB='^import (Extrinsic\.Core\.|Extrinsic\.ECS\.Scene\.(Registry|Handle)|Extrinsic\.RHI\.|Extrinsic\.Platform\.|Extrinsic\.Graphics\.(Renderer|RenderFrameInput|FrameRecipe|RenderWorld)|Extrinsic\.Runtime\.(CommandBus|KernelEvents|JobService|WorldRegistry|Module|ServiceRegistry|RenderExtraction|RenderWorldPool))'
-> grep -E '^import ' src/runtime/Runtime.Engine.cppm | grep -vcE "$SUB"   # target 0; baseline 27; 2026-07-13: 23
+> python3 tools/repo/check_kernel_convergence.py --root . --strict
 > ```
 >
-> This inline grep is the **interim** metric. The authoritative, maintained
-> counter is the `ARCH-014` ratchet checker
-> (`tools/repo/check_kernel_convergence.py`, seeded there); wire the invariant
-> flip and the `pr-fast` guard to that, not to the grep.
+> The checker treats plain imports and re-exports separately, uses exact
+> runtime substrate names so `JobServiceGpuQueueBridge`/`ModuleSchedule` are
+> intentional rather than regex accidents, strips comments before finding the
+> public Engine getter set, and fails on both new and stale snapshot entries.
+> A reduction therefore must lower the policy in the same change, preventing
+> the old cap from becoming room for later regrowth.
 
 
 - [ ] `Runtime.Engine.cppm` import count ≤ 12 substrate modules
-      (**baseline 45; 2026-07-13 snapshot 43**)
+      (**baseline 45; 2026-07-13 reference 43; 2026-07-16 checked snapshot
+      49, including 6 temporary-debt imports owned by `RUNTIME-178`**)
 - [ ] Domain (non-substrate) imports in `Runtime.Engine.cppm` = 0
-      (**baseline 27; 2026-07-13 snapshot 23**). Measure by **allowlist**, not
+      (**baseline 27; 2026-07-13 reference 23; 2026-07-16 checked snapshot 28,
+      including 5 temporary-debt imports owned by `RUNTIME-178`**). Measure by
+      **allowlist**, not
       a blocklist of names:
       count every `import` that is *not* kernel substrate (see the metric
-      below). A name blocklist silently undercounts as new domain imports
+      above). A name blocklist silently undercounts as new domain imports
       appear (e.g. `AssetIngestStateMachine`, `Asset.Service`,
-      `Geometry.HalfedgeMesh.IO`); the allowlist cannot. Authoritative count
-      is the `ARCH-014` ratchet checker once it lands; do not flip this row to
-      0 on the interim grep alone.
+      `Geometry.HalfedgeMesh.IO`); the allowlist cannot.
 - [ ] `Engine::GetX()` domain-facade accessors = 0 (kernel-service
-      accessors only) (**baseline 13**)
+      accessors only) (**baseline estimate 13 domain facades; 2026-07-16 guard
+      snapshots all 33 public getter names, including one temporary-debt name
+      owned by `RUNTIME-178`**)
 - [ ] No `entt::dispatcher::trigger` or direct dispatcher use in module code
 - [ ] No `Engine&` passed through any handler/module/setup surface (D13)
 - [ ] `IApplication::OnSimTick` / `OnVariableTick` removed (**baseline: present**)
@@ -109,8 +119,8 @@ metric below.
       contain no `KMeans` or `Runtime.ClusteringModule` tokens)
 - [ ] EditorUi (ImGui adapter, dockspace, panel registry, `Pass.ImGui`) —
       retired `UI-034` supplies the generic registration/capture/widget seam;
-      active `ARCH-006` owns the editor-shell split and Sandbox-content
-      relocation
+      retired `ARCH-006` moved Sandbox content and presentation into the app;
+      remaining runtime ImGui adapter/bridge residue still prevents closure
 - [ ] AssetImport pipeline — `RUNTIME-147`
 - [ ] SceneDocument (save/load/new/close) — `RUNTIME-148`
 - [ ] ConfigControl (recipe activation, hot-config apply) — `RUNTIME-149`
@@ -145,7 +155,7 @@ metric below.
   invariant (new domain-noun import, new `Engine::GetX()`, new direct
   dispatcher use, new `Engine&` pass-through).
 - **Picking work?** The additive seams `ARCH-007`..`ARCH-011`, the
-  `ARCH-012` ClusteringModule proof, and the retired `UI-034` generic editor
-  seam are complete. Work from the remaining unchecked rows: active `ARCH-006`
-  owns Sandbox-content relocation, and the other domain rows follow through
-  their extraction tasks.
+  `ARCH-012` ClusteringModule proof, retired `UI-034`, and the `ARCH-006`
+  Sandbox-content relocation are complete. `RUNTIME-178` first restores the
+  checked Engine convergence budget; remaining domain rows then proceed
+  through scoped extraction tasks.

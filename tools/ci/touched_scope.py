@@ -18,6 +18,13 @@ from pathlib import Path
 
 DEFAULT_EXCLUDE_LABELS = "gpu|vulkan|slow|flaky-quarantine"
 
+KERNEL_CONVERGENCE_TRACKED_PATHS = {
+    "src/runtime/Runtime.Engine.cppm",
+    "tools/repo/check_kernel_convergence.py",
+    "tools/repo/kernel_convergence_policy.json",
+    "tests/regression/tooling/Test.CheckKernelConvergence.py",
+}
+
 
 @dataclass(frozen=True)
 class Command:
@@ -97,6 +104,15 @@ def run_git_diff_name_only(root: Path, base_ref: str) -> list[str]:
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
+def normalize_changed_path(path: str) -> str:
+    """Normalize an optional ``./`` prefix without stripping hidden-path dots."""
+
+    normalized = path.strip()
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized
+
+
 def is_target_declared(build_dir: Path, target: str) -> bool:
     ninja_file = build_dir / "build.ninja"
     if not ninja_file.is_file():
@@ -124,6 +140,13 @@ def analyze_changed_files(changed_files: list[str]) -> Plan:
     for path in changed_files:
         matched = False
 
+        if path in KERNEL_CONVERGENCE_TRACKED_PATHS:
+            plan.structural_checks.add("kernel_convergence")
+            plan.reasons.append(
+                f"{path}: kernel-convergence contract changed; selected live checker and checker regression tests"
+            )
+            matched = True
+
         if path in {"CMakeLists.txt", "CMakePresets.json"} or path.startswith("cmake/") or path == "tests/CMakeLists.txt":
             plan.broad_cpu_gate = True
             plan.structural_checks.add("test_layout")
@@ -131,7 +154,7 @@ def analyze_changed_files(changed_files: list[str]) -> Plan:
             continue
 
         if path.startswith(".github/workflows/"):
-            plan.structural_checks.update({"docs", "task_policy"})
+            plan.structural_checks.update({"docs", "task_policy", "workflow_regression_tests"})
             plan.reasons.append(f"{path}: workflow changed; selected policy/docs checks")
             matched = True
 
@@ -166,6 +189,11 @@ def analyze_changed_files(changed_files: list[str]) -> Plan:
             plan.structural_checks.update({"layering", "layering_regression_tests", "test_layout"})
             plan.reasons.append(f"{path}: layering checker changed; selected layering contract + regression tests")
             matched = True
+        elif path in KERNEL_CONVERGENCE_TRACKED_PATHS:
+            # The exact kernel-convergence paths select their dedicated live
+            # checker and synthetic regressions above. Do not widen checker or
+            # policy edits into unrelated repository structural checks.
+            pass
         elif path.startswith("tools/repo/"):
             plan.structural_checks.update({"layering", "test_layout"})
             plan.reasons.append(f"{path}: repo checker changed; selected structural checks")
@@ -197,7 +225,17 @@ def analyze_changed_files(changed_files: list[str]) -> Plan:
             plan.reasons.append(f"{path}: source path has no narrow mapping; selected broad CPU gate")
             continue
 
-        if path.startswith("tests/"):
+        if path == "tests/regression/tooling/Test.CheckKernelConvergence.py":
+            # This Python-only checker contract has its own dedicated command
+            # pair; it does not change the compiled CTest layout.
+            pass
+        elif path == "tests/regression/tooling/Test.WorkflowConcurrency.py":
+            plan.structural_checks.add("workflow_regression_tests")
+            plan.reasons.append(
+                f"{path}: workflow policy regression changed; selected workflow regression tests"
+            )
+            matched = True
+        elif path.startswith("tests/"):
             plan.structural_checks.add("test_layout")
             for prefix, targets, labels in TEST_SCOPE_MAP:
                 if path.startswith(prefix):
@@ -241,6 +279,26 @@ def structural_commands(root_arg: str, checks: set[str]) -> list[Command]:
         commands.append(Command(("python3", "tests/regression/tooling/Test.TouchedScope.py"), "tooling regression tests"))
     if "layering_regression_tests" in checks:
         commands.append(Command(("python3", "tests/regression/tooling/Test.CheckLayering.py"), "layering checker regression tests"))
+    if "kernel_convergence" in checks:
+        commands.append(
+            Command(
+                ("python3", "tests/regression/tooling/Test.CheckKernelConvergence.py"),
+                "kernel-convergence checker regression tests",
+            )
+        )
+        commands.append(
+            Command(
+                ("python3", "tools/repo/check_kernel_convergence.py", "--root", root_arg, "--strict"),
+                "kernel-convergence contract",
+            )
+        )
+    if "workflow_regression_tests" in checks:
+        commands.append(
+            Command(
+                ("python3", "tests/regression/tooling/Test.WorkflowConcurrency.py"),
+                "workflow policy regression tests",
+            )
+        )
     if "tool_smoke" in checks:
         commands.append(Command(("python3", "tools/repo/check_pr_contract.py", "--root", root_arg, "--mode", "local"), "generic tool smoke"))
     if "layering" in checks:
@@ -339,7 +397,9 @@ def main() -> int:
     args = parse_args()
     root = Path(args.root).resolve()
     changed_files = args.changed_file or run_git_diff_name_only(root, args.base_ref)
-    changed_files = sorted(dict.fromkeys(path.strip().lstrip("./") for path in changed_files if path.strip()))
+    changed_files = sorted(
+        dict.fromkeys(normalize_changed_path(path) for path in changed_files if path.strip())
+    )
     plan = analyze_changed_files(changed_files)
     commands = commands_for_plan(plan, args)
 

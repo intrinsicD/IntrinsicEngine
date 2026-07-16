@@ -15,7 +15,7 @@ depends_on: []
 ## Non-goals
 - No implementation of the seams or extractions here — child tasks own that
   work. Retired children remain convergence evidence; open children such as
-  `ARCH-006` and `RUNTIME-129` own their implementation. This task
+  `HARDEN-085`, `RUNTIME-129`, and `RUNTIME-178` own their implementation. This task
   tracks and enforces; it does not do their work.
 - No re-litigation of ADR-0024 decisions (that is an ADR amendment, not this
   task).
@@ -33,15 +33,22 @@ depends_on: []
   complement in Verification, not a name blocklist), ~13 `Engine::GetX()`
   domain-facade accessors; `OnSimTick`/`OnVariableTick` still present.
   Keep this historical baseline fixed for comparison.
-- Current snapshot 2026-07-13: `Runtime.Engine.cppm` has 43 imports and 23
-  domain imports by the same interim allowlist-complement metric. `ARCH-012`
+- Fixed legacy-interim reference snapshot 2026-07-13:
+  `Runtime.Engine.cppm` had 43 plain imports and 23 domain imports under the
+  then-unanchored classifier (which admitted `RenderExtractionService` through
+  the `RenderExtraction` prefix). The checked exact-v1 2026-07-16 snapshot is 49 / 28
+  with 33 distinct public getter names and two re-exports; the `+6 / +5 / +1`
+  delta is explicit temporary debt owned by `RUNTIME-178`, not a rewritten
+  reference. `HARDEN-085` owns the authoritative exact-policy ratchet.
+  `ARCH-012`
   retired on 2026-07-08 at `Operational`: Sandbox composes
   `Runtime::ClusteringModule`, and `Runtime.Engine.cppm` / `.cpp` contain no
   `KMeans` or `Runtime.ClusteringModule` tokens. The Clustering scorecard row
   is therefore complete. `UI-034` retired on 2026-07-13 at `CPUContracted`;
   the generic editor registry, lazy callback lifecycle, one capture snapshot,
-  global visibility command, and property widgets now exist. `ARCH-006` is
-  active to move the remaining Sandbox presentation out of runtime.
+  global visibility command, and property widgets now exist. `ARCH-006`
+  retired after moving Sandbox presentation into the app; remaining runtime
+  ImGui residue stays visible in the convergence snapshot.
 - This task is the umbrella `RORG-031`-style: it references children, keeps
   the scorecard honest, and provides the review guardrail so the kernel does
   not regrow while the migration is in flight.
@@ -51,16 +58,15 @@ depends_on: []
       scorecard (flip the invariant boxes that now hold on `main`) and
       add or refresh a dated current metric snapshot without rewriting the
       historical 2026-07-08 baseline.
-- [ ] Seed a ratchet guard as a child `HARDEN` task: a
+- [x] Seed a ratchet guard as a child `HARDEN` task: a
       `tools/repo/check_kernel_convergence.py` (or an extension of an
       existing structural check) that computes the domain-import count as the
       **allowlist complement** (every `Runtime.Engine.cppm` import that is not
       kernel substrate — never a hardcoded name blocklist, which silently
       undercounts) and fails when it *increases* or a *new* `Engine::GetX()`
       domain accessor appears — a monotone "no backsliding" gate wired into
-      `pr-fast`. This checker is the authoritative metric; the inline grep in
-      the target-state doc is only an interim approximation. Until it exists,
-      the review guardrail below is enforced by reviewers.
+      `pr-fast`. This checker is the authoritative metric and requires exact
+      policy updates on improvements so a stale cap cannot permit regrowth.
 - [ ] Keep the child-task inventory in the target-state doc in sync with the
       backlog: add extractions discovered during seam work, retain completed
       rows as checked evidence, and remove retired tasks from open-work
@@ -74,10 +80,10 @@ depends_on: []
       here rather than assigning the open work back to retired `ARCH-010`.
 
 ## Tests
-- [ ] `python3 tools/agents/check_task_policy.py --root . --strict` passes.
-- [ ] `python3 tools/docs/check_doc_links.py --root .` reports no broken
+- [x] `python3 tools/agents/check_task_policy.py --root . --strict` passes.
+- [x] `python3 tools/docs/check_doc_links.py --root .` reports no broken
       links.
-- [ ] (When the ratchet child lands) the convergence guard runs in `pr-fast`
+- [x] (When the ratchet child lands) the convergence guard runs in `pr-fast`
       and fails a synthetic new-domain-import regression.
 
 ## Docs
@@ -98,16 +104,12 @@ This umbrella closes only when ALL of the following hold on `main`:
       removed.
 - [ ] Every "Domains are modules" row is an extracted `Runtime.*Module`.
 - [ ] The `InlineModule` research lane ships.
-- [ ] The ratchet guard is green in `pr-fast` and prevents new kernel
+- [x] The ratchet guard is green in `pr-fast` and prevents new kernel
       backsliding.
 
 ## Verification
 ```bash
-# Live scorecard metrics (agents run these to check current state):
-grep -cE '^import ' src/runtime/Runtime.Engine.cppm   # total imports (target <= 12)
-# Domain imports = allowlist complement (target 0). Keep SUB in sync as seams land:
-SUB='^import (Extrinsic\.Core\.|Extrinsic\.ECS\.Scene\.(Registry|Handle)|Extrinsic\.RHI\.|Extrinsic\.Platform\.|Extrinsic\.Graphics\.(Renderer|RenderFrameInput|FrameRecipe|RenderWorld)|Extrinsic\.Runtime\.(CommandBus|KernelEvents|JobService|WorldRegistry|Module|ServiceRegistry|RenderExtraction|RenderWorldPool))'
-grep -E '^import ' src/runtime/Runtime.Engine.cppm | grep -vcE "$SUB"   # target 0; 2026-07-13 snapshot 23
+python3 tools/repo/check_kernel_convergence.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 python3 tools/agents/generate_session_brief.py

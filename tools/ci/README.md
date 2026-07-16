@@ -11,7 +11,11 @@ CI helper scripts and workflow validation tools.
 - `validate_gate_timing_baseline.py`: validates the CI-003 historical gate-latency baseline and statistics payloads. Exercised by `tests/regression/tooling/Test.CiTiming.py`; see `benchmarks/ci/README.md`.
 - `ccache_ci.py`: validates the retained CI ccache policy (configured launcher/mode/digest identity) and exports ccache statistics. Part of the CI-007 `pr-fast.yml` policy.
 - `ccache_module_invalidation_probe.py`: exercises ccache reuse across a hermetic C++23 module-interface change to prove exported-interface edits invalidate importers. Part of the retained CI-007 `pr-fast.yml` policy.
-- `touched_scope.py`: plans (or runs) conservative build/test/structural verification commands for the touched repository scope. Local iteration aid; not yet a workflow gate (CI-005 tracks promoting it).
+- `touched_scope.py`: plans (or runs) conservative build/test/structural
+  verification commands for the touched repository scope. Kernel-checker,
+  policy, regression, and `Runtime.Engine.cppm` changes select the live
+  convergence guard plus its synthetic regression. Local iteration aid; not
+  yet a workflow gate (CI-005 tracks promoting it).
 - `run_repo_hygiene_checks.sh`: warning-mode wrapper running the canonical
   `check_root_hygiene.py` policy check once, followed by `check_doc_links.py`.
   Local convenience; not wired into a workflow.

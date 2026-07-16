@@ -30,6 +30,27 @@ def make_args(build_dir: str) -> SimpleNamespace:
 
 
 class TouchedScopeTests(unittest.TestCase):
+    def test_changed_path_normalization_preserves_hidden_directory_dot(self) -> None:
+        self.assertEqual(
+            touched_scope.normalize_changed_path(".github/workflows/pr-fast.yml"),
+            ".github/workflows/pr-fast.yml",
+        )
+        self.assertEqual(
+            touched_scope.normalize_changed_path("./.github/workflows/pr-fast.yml"),
+            ".github/workflows/pr-fast.yml",
+        )
+
+    def assert_kernel_convergence_commands(self, changed_file: str) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            plan = touched_scope.analyze_changed_files([changed_file])
+            commands = touched_scope.commands_for_plan(plan, make_args(tmp))
+            command_text = "\n".join(command.shell_text() for command in commands)
+
+        self.assertFalse(plan.broad_cpu_gate)
+        self.assertIn("python3 tests/regression/tooling/Test.CheckKernelConvergence.py", command_text)
+        self.assertIn("python3 tools/repo/check_kernel_convergence.py --root . --strict", command_text)
+        self.assertNotIn("cmake --preset", command_text)
+
     def test_geometry_source_selects_geometry_build_and_label(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             plan = touched_scope.analyze_changed_files(["src/geometry/Geometry.PointCloud.IO.cpp"])
@@ -79,6 +100,44 @@ class TouchedScopeTests(unittest.TestCase):
         self.assertIn("IntrinsicGraphicsRhiCpuUnitTests", command_text)
         self.assertNotIn("IntrinsicGraphicsContractTests", command_text)
         self.assertIn("-L graphics", command_text)
+
+    def test_kernel_convergence_checker_selects_only_dedicated_checker_contract(self) -> None:
+        self.assert_kernel_convergence_commands("tools/repo/check_kernel_convergence.py")
+        plan = touched_scope.analyze_changed_files(["tools/repo/check_kernel_convergence.py"])
+        self.assertNotIn("layering", plan.structural_checks)
+        self.assertNotIn("test_layout", plan.structural_checks)
+
+    def test_kernel_convergence_policy_selects_dedicated_checker_contract(self) -> None:
+        self.assert_kernel_convergence_commands("tools/repo/kernel_convergence_policy.json")
+
+    def test_kernel_convergence_regression_selects_dedicated_checker_contract(self) -> None:
+        self.assert_kernel_convergence_commands("tests/regression/tooling/Test.CheckKernelConvergence.py")
+        plan = touched_scope.analyze_changed_files(["tests/regression/tooling/Test.CheckKernelConvergence.py"])
+        self.assertNotIn("test_layout", plan.structural_checks)
+        self.assertNotIn("touched_scope_tests", plan.structural_checks)
+
+    def test_runtime_engine_selects_runtime_scope_and_kernel_convergence_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            plan = touched_scope.analyze_changed_files(["src/runtime/Runtime.Engine.cppm"])
+            commands = touched_scope.commands_for_plan(plan, make_args(tmp))
+            command_text = "\n".join(command.shell_text() for command in commands)
+
+        self.assertFalse(plan.broad_cpu_gate)
+        self.assertIn("IntrinsicRuntimeContractTests", command_text)
+        self.assertIn("-L runtime", command_text)
+        self.assertIn("check_layering.py", command_text)
+        self.assertIn("Test.CheckKernelConvergence.py", command_text)
+        self.assertIn("check_kernel_convergence.py --root . --strict", command_text)
+
+    def test_pr_fast_workflow_selects_independent_workflow_regression(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            plan = touched_scope.analyze_changed_files([".github/workflows/pr-fast.yml"])
+            commands = touched_scope.commands_for_plan(plan, make_args(tmp))
+            command_text = "\n".join(command.shell_text() for command in commands)
+
+        self.assertIn("Test.WorkflowConcurrency.py", command_text)
+        self.assertIn("check_task_policy.py", command_text)
+        self.assertIn("check_doc_links.py", command_text)
 
 
 if __name__ == "__main__":

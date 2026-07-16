@@ -36,6 +36,21 @@ def _load_workflow(name: str) -> tuple[dict[str, object], str]:
 
 
 class WorkflowConcurrencyTests(unittest.TestCase):
+    def test_pr_fast_keeps_kernel_convergence_guards(self) -> None:
+        _, pr_fast = _load_workflow("pr-fast.yml")
+        self.assertEqual(
+            pr_fast.count(
+                "python3 tests/regression/tooling/Test.CheckKernelConvergence.py"
+            ),
+            1,
+        )
+        self.assertEqual(
+            pr_fast.count(
+                "python3 tools/repo/check_kernel_convergence.py --root . --strict"
+            ),
+            1,
+        )
+
     def test_specialized_workflows_build_only_selected_aggregates(self) -> None:
         _, pr_fast = _load_workflow("pr-fast.yml")
         self.assertIn(

@@ -18,6 +18,12 @@ Repository structure and policy scripts.
   ``--exclude PATTERN`` to skip fixture or generated paths. Fixture cases
   live under ``tests/contract/repo/layering_fixtures/`` and are exercised
   by ``tests/regression/tooling/Test.CheckLayering.py``.
+- `check_kernel_convergence.py`: enforces the `ARCH-014` no-backsliding
+  snapshot for `Runtime.Engine.cppm`. It counts domain imports as the explicit
+  substrate-allowlist complement, tracks re-exports and public `GetX` names,
+  and fails on both new and stale policy entries so improvements ratchet in the
+  same change. Synthetic regressions live in
+  `tests/regression/tooling/Test.CheckKernelConvergence.py`.
 - `check_ui_contract_guard.sh`: UI boundary guard script (canonical path).
 - `check_layering_allowlist_quality.py`: validates layering allowlist entry hygiene (required metadata, duplicate keys, broad legacy wildcard bans, and open task-owner references).
 - `check_test_layout.py`: enforces taxonomy-owned test source layout and forbids legacy wrapper test directories.
@@ -67,6 +73,9 @@ the method adapter already consumes.
   patterns for disposable local build/dependency/editor/tool state consumed by
   both root checkers. The scripts do not consult developer-global Git ignore
   configuration, so it cannot hide an unowned source root.
+- `kernel_convergence_policy.json`: versioned exact snapshot, substrate
+  classification, and temporary-debt ownership consumed by
+  `check_kernel_convergence.py`. `RUNTIME-178` owns the recorded debt.
 
 ## Compatibility entrypoints
 
