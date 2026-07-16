@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `RUNTIME-169` — Privatize the RenderExtractionService surface (tasks/active/RUNTIME-169-privatize-render-extraction-service-surface.md)
 
 ## Theme B — Rendering modernization
 
@@ -40,7 +40,6 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
 - unblocked: `RUNTIME-166` — Slim and partition the RenderExtraction module (tasks/backlog/runtime/RUNTIME-166-slim-render-extraction-module.md)
 - unblocked: `RUNTIME-168` — Privatize the Sandbox default policies surface (tasks/backlog/runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
-- unblocked: `RUNTIME-169` — Privatize the RenderExtractionService surface (tasks/backlog/runtime/RUNTIME-169-privatize-render-extraction-service-surface.md)
 - unblocked: `RUNTIME-171` — Privatize the AssetResidencyService surface (tasks/backlog/runtime/RUNTIME-171-privatize-asset-residency-service-surface.md)
 - unblocked: `RUNTIME-172` — Privatize the SceneDocument surface (tasks/backlog/runtime/RUNTIME-172-privatize-scene-document-surface.md)
 - unblocked: `RUNTIME-173` — Privatize the K-Means GPU job queue surface (tasks/backlog/runtime/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md)

@@ -8,6 +8,14 @@ maturity_target: Operational
 ---
 # RUNTIME-169 — Privatize the RenderExtractionService surface
 
+## Status
+
+- In progress on 2026-07-16; owner: Codex; branch:
+  `codex/arch-006-completion`.
+- Next gate: replace the standalone module with an Engine-private declaration
+  attached to `Extrinsic.Runtime.Engine`, then build the focused extraction,
+  pool, and runtime contract targets.
+
 ## Goal
 - Remove `Extrinsic.Runtime.RenderExtractionService` as a standalone exported
   module surface and keep it as Engine-private service glue, without changing
@@ -25,6 +33,15 @@ maturity_target: Operational
   to 42.444s with only Engine-side production consumers.
 - `RUNTIME-163` extracted this service to reduce `Engine` size; this follow-up
   keeps the ownership split while avoiding a low-value exported module surface.
+- Current consumer inventory: only `Runtime.Engine.cppm` and
+  `Runtime.Engine.cpp` import the service in production; no app or test imports
+  or instantiates it directly.
+- Right-sized shape: keep the value member and separate implementation unit,
+  attach both to `Runtime.Engine`, and import the public `RenderExtraction` and
+  `RenderWorldPool` contracts directly without re-exporting them. Do not add a
+  pimpl allocation, replacement partition, or compatibility module.
+- Reintroduce a standalone service module only when a tracked non-Engine
+  production consumer lands.
 
 ## Required changes
 - [ ] Confirm `RenderExtractionService` has no intended non-Engine production
@@ -56,8 +73,9 @@ maturity_target: Operational
 ## Verification
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicRuntimeGraphicsCpuTests
-ctest --test-dir build/ci --output-on-failure -R 'RuntimeEngineLayering|RenderExtraction|RenderWorldPool|RuntimeSandboxAcceptance' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicRuntimeGraphicsCpuTests IntrinsicRuntimeIntegrationTests
+ctest --test-dir build/ci --output-on-failure -R 'RuntimeEnginePrivateGlue|RenderExtraction|RenderWorldPool|RuntimeSandboxAcceptance|ImGuiAdapterEngineWiring.FramePacingDiagnosticsPopulateOnNullBackend' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+build/ci/bin/IntrinsicRuntimeIntegrationTests --gtest_filter='RuntimeEngineLayering.*'
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/repo/check_layering.py --root src --strict

@@ -11,7 +11,11 @@ Each active task should include:
 
 ## Currently active
 
-- No tasks are currently active.
+- [RUNTIME-169 — Privatize the RenderExtractionService surface](RUNTIME-169-privatize-render-extraction-service-surface.md)
+  (`in-progress`; owner: Codex; branch: `codex/arch-006-completion`). The
+  Engine-only extraction service is moving from a standalone exported module
+  to private Engine module glue without changing cache, pool, statistics,
+  frame-index, or teardown behavior; next gate is the focused runtime build.
 
 ## History
 

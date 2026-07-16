@@ -190,9 +190,9 @@ main `Runtime.RenderExtraction` module slimming.
 
 - [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md) —
   privatize the Sandbox default policy module after `RUNTIME-144`.
-- [`RUNTIME-169`](RUNTIME-169-privatize-render-extraction-service-surface.md) —
+- [`RUNTIME-169`](../../active/RUNTIME-169-privatize-render-extraction-service-surface.md) —
   keep `RenderExtractionService` Engine-owned but remove its standalone module
-  surface after `RUNTIME-163`.
+  surface after `RUNTIME-163`; active on `codex/arch-006-completion`.
 - [`RUNTIME-171`](RUNTIME-171-privatize-asset-residency-service-surface.md) —
   privatize the Engine-owned asset residency service after `RUNTIME-164`.
 - [`RUNTIME-172`](RUNTIME-172-privatize-scene-document-surface.md) —
