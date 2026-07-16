@@ -7,11 +7,11 @@ depends_on: []
 
 ## Status
 
-- In progress on 2026-07-16; owner: Codex; branch:
-  `codex/arch-006-completion`.
-- A prior completed implementation was audited against this head. Only its
-  four-file technical slice will be integrated; task/index history and all
-  verification evidence will be regenerated locally.
+- Completed on 2026-07-16 at maturity `Operational`; owner: Codex; branch:
+  `codex/arch-006-completion`; implementation commit: `fb549c96`.
+- The current-head diagnosis preserved the proven-clean production lifetime,
+  added a standalone fail-closed sanitizer contract, and introduced no XIM or
+  engine-allocation suppression.
 - Current-head verification on 2026-07-16 is green: the dedicated live X11
   sanitizer contract passed `1/1` without a capability skip, the GLFW platform
   intersection passed `2/2`, and the default CPU-supported gate passed
@@ -85,7 +85,7 @@ depends_on: []
 ## Docs
 - [x] Record the ownership diagnosis and no-suppression decision in
       the platform testing notes.
-- [ ] Update this index and the retirement log when verified.
+- [x] Update this index and the retirement log when verified.
 
 ## Acceptance criteria
 - [x] The exact focused process exits zero under the sanitizer-enabled `ci`

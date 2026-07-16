@@ -8,6 +8,25 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-082`](BUG-082-glfw-x11-input-method-lsan-leak.md) — the GLFW/X11
+input-method LeakSanitizer investigation retired on 2026-07-16 at
+`Operational`. Implementation commit `fb549c96` preserves the unchanged
+production lifetime after debugger evidence confirmed the GLFW 3.4/libX11
+1.8.7 teardown reaches `glfwTerminate()`, input-method callback unregister,
+and `XCloseIM()` before normal exit. A standalone sanitizer process now wraps
+the terminate call and fails unless process-static teardown invokes it exactly
+once; its negative control first requires an unsuppressed, named 4,096-byte
+engine leak to produce a direct-leak report and exit 86. The dedicated contract
+executed on live X11 without a capability skip and passed 1/1, the GLFW
+platform intersection passed 2/2, and the original close-before-first-frame
+runtime process passed 10/10 with leak detection enabled and no
+environment-provided suppression file. The default CPU-supported gate passed
+3,788/3,788 in 398.51 seconds. Strict task, test-layout, layering,
+documentation, state-link, and diff checks passed, and independent review
+found no remaining teardown-order, registration, fail-closed, or right-sizing
+blocker. No production source, backend selection, module surface, XIM
+suppression, or global sanitizer policy changed.
+
 [`BUG-092`](BUG-092-scene-lifecycle-async-wait-frame-budget.md) — the
 frame-count-only asynchronous scene lifecycle wait retired on 2026-07-16 at
 `CPUContracted`. Implementation commit `627641fa` replaces the 256-frame stop

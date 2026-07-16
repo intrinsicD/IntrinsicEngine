@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-082` — GLFW X11 input-method initialization leaks under LeakSanitizer (tasks/active/BUG-082-glfw-x11-input-method-lsan-leak.md)
+- none
 
 ## Theme B — Rendering modernization
 

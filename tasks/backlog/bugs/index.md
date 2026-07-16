@@ -16,11 +16,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   14.71 seconds in isolation; collect a timing population and choose an
   evidence-backed PR-fast split or slow-lane classification without weakening
   strict result validation.
-- [`BUG-082` — GLFW X11 input-method initialization leaks under LeakSanitizer](../../active/BUG-082-glfw-x11-input-method-lsan-leak.md):
-  a GLFW-backed runtime contract passes its assertions but the process exits
-  nonzero for a 408-byte `_XimOpenIM` allocation after engine shutdown; isolate
-  terminate ordering versus an upstream retained global without weakening
-  engine leak detection.
 - [`BUG-081` — Warm-configure CI budget still flakes on hosted-runner variance](BUG-081-warm-configure-budget-runner-variance.md):
   an exact-vcpkg-hit configure took 22.002 s against the recalibrated 20 s
   budget and stopped the job before ccache restore or compilation; collect a
@@ -28,6 +23,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   headroom while preserving fail-closed semantics.
 
 ## Verified / Closed
+
+- Closed 2026-07-16: [`BUG-082` — GLFW X11 input-method initialization leaks under LeakSanitizer](../../done/BUG-082-glfw-x11-input-method-lsan-leak.md).
+  The unchanged GLFW 3.4/Xlib shutdown path reaches input-method unregister and
+  close before normal exit. A standalone, unsuppressed live-X11 process now
+  proves process-static teardown calls `glfwTerminate()` exactly once and
+  detects a named 4,096-byte synthetic leak, without production lifetime or
+  sanitizer-suppression changes.
 
 - Closed 2026-07-16: [`BUG-092` — Scene lifecycle async wait exhausts its frame budget under delayed I/O](../../done/BUG-092-scene-lifecycle-async-wait-frame-budget.md).
   The test-local helper now uses a ten-second steady-clock budget, yields one
