@@ -801,11 +801,12 @@ no higher-layer imports; `Runtime.Engine` supplies runtime-specific hook
 implementations during composition.
 
 `Engine::RunFrame()` keeps per-frame lifecycle state in an internal
-`RuntimeFrameContext` record: clamped frame delta, fixed-step interpolation
-alpha, monotonic render frame index, `RenderFrameInput`, extraction stats, and
-the acquired `RenderWorldPool` front slot. This keeps the stage data explicit
-without exporting a runtime API or reviving legacy `Runtime.FrameLoop`,
-`Runtime.RenderOrchestrator`, or `Runtime.ResourceMaintenance` modules.
+`RuntimeFrameContext` record: clamped prior completed-frame delta, fixed-step
+interpolation alpha, monotonic render frame index, `RenderFrameInput`,
+extraction stats, and the acquired `RenderWorldPool` front slot. This keeps the
+stage data explicit without exporting a runtime API or reviving legacy
+`Runtime.FrameLoop`, `Runtime.RenderOrchestrator`, or
+`Runtime.ResourceMaintenance` modules.
 Single-use frame-hook adapters, fixed-step/camera/input helpers, pick-context
 capture, and pick-readback refinement live as private `Runtime.Engine.cpp`
 helpers so `RunFrame` stays an ordered phase list while preserving the same
@@ -1054,9 +1055,14 @@ execution should request `Core::Config::WindowBackend::Null` explicitly.
     reclaimable next frame.
 16. Frame clock finalize.
 
-`Engine::RunFrame()` consumes `Extrinsic.Core.FrameClock` for wall-clock frame
-delta sampling and post-sleep resampling; runtime owns the phase orchestration,
-not the reusable clock value type.
+`Engine::RunFrame()` consumes `Extrinsic.Core.FrameClock` by sampling the stored
+prior completed-frame duration for simulation, runtime hooks, camera controls,
+and Dear ImGui timers. `EndFrame()` records the current frame for consumption by
+the next frame, while post-sleep resampling keeps deliberate minimized/idle
+sleep out of that record. Runtime owns the phase orchestration, not the reusable
+clock value type. Before any frame has completed, the clock query
+deterministically returns zero; the ImGui adapter retains its existing
+non-positive-delta fallback for that first frame.
 
 `UI-030` adds `Engine::GetLastFramePacingDiagnostics()` as a copied runtime
 frame-pacing sample for the most recent `RunFrame()` attempt; `RUNTIME-158`

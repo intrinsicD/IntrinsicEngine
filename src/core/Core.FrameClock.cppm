@@ -18,6 +18,7 @@ export module Extrinsic.Core.FrameClock;
 // Usage pattern (one instance owned by a frame-loop coordinator):
 //
 //   clock.BeginFrame();
+//   const double delta = clock.FrameDeltaClamped(); // previous completed frame
 //   // ... optional deliberate sleep ...
 //   clock.Resample();        // call only after a sleep, not every frame
 //   // ... simulation, render ...
@@ -46,7 +47,8 @@ namespace Extrinsic::Core
             m_FrameStart = Clock::now();
         }
 
-        /// Mark the end of a frame and record the raw delta for telemetry.
+        /// Mark the end of a frame and record its raw duration for the next
+        /// frame's time consumers and for telemetry.
         void EndFrame() noexcept
         {
             const auto now = Clock::now();
@@ -54,19 +56,20 @@ namespace Extrinsic::Core
             m_LastRawDelta = raw.count();
         }
 
-        /// Delta clamped to [0, maxDeltaSeconds].
-        /// Use this to drive the fixed-step simulation accumulator.
+        /// Previous completed-frame delta clamped to
+        /// [0, max(0, maxDeltaSeconds)]. Use this to drive the fixed-step
+        /// simulation accumulator and other frame-time consumers.
         /// The clamp prevents a single huge frame from making the
         /// simulation spiral out of control.
         [[nodiscard]] double FrameDeltaClamped(double maxDeltaSeconds = 0.25) const noexcept
         {
-            const auto now = Clock::now();
-            const std::chrono::duration<double> raw = now - m_FrameStart;
-            return std::min(raw.count(), maxDeltaSeconds);
+            const double upperBound = std::max(0.0, maxDeltaSeconds);
+            return std::clamp(m_LastRawDelta, 0.0, upperBound);
         }
 
         /// Raw (unclamped) delta of the previous completed frame.
-        /// Use for telemetry and display — not for simulation.
+        /// FrameDeltaClamped() derives the simulation/UI delta from this same
+        /// completed-frame record.
         [[nodiscard]] double LastRawDelta() const noexcept { return m_LastRawDelta; }
 
     private:
@@ -74,4 +77,3 @@ namespace Extrinsic::Core
         double    m_LastRawDelta{0.0};
     };
 }
-
