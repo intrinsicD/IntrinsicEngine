@@ -8,7 +8,8 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `BUG-102` — Object-space bake layering test asserts pre-ratchet import placement (tasks/active/BUG-102-object-space-normal-bake-layering-test-import-placement.md)
+- `BUG-103` — Render-graph lifetime test culls its history chain (tasks/active/BUG-103-rendergraph-lifetime-test-culls-history-chain.md)
 
 ## Theme B — Rendering modernization
 

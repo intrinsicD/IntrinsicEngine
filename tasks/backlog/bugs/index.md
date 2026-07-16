@@ -5,6 +5,14 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-103` — Render-graph lifetime test culls its history chain](../../active/BUG-103-rendergraph-lifetime-test-culls-history-chain.md):
+  the fixture leaves its history write/read chain disconnected from the live
+  present root, so current execution-rank lifetime semantics correctly cull
+  those declarations while the stale assertions expect three live passes.
+- [`BUG-102` — Object-space bake layering test asserts pre-ratchet import placement](../../active/BUG-102-object-space-normal-bake-layering-test-import-placement.md):
+  two source-reading assertions still expect the CPU request-queue import in
+  the Engine interface instead of its RUNTIME-178 implementation-unit home,
+  even though every GPU queue ownership exclusion remains current.
 - [`BUG-097` — Progressive model-scene UV job publishes a zero atlas](BUG-097-progressive-model-scene-zero-uv-atlas.md):
   the default-off progressive enrichment path labels an all-zero authoritative
   `v:texcoord` property as an atlas and can publish it after newer UV/topology
