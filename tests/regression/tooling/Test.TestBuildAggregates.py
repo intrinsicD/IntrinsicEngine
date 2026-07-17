@@ -387,6 +387,46 @@ class TestBuildAggregateTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0, msg=result.stdout)
                 self.assertIn("CMake Error", result.stdout)
 
+    def test_empty_aggregate_requires_explicit_omission(self) -> None:
+        required_body = """
+            add_executable(TestTarget main.cpp)
+            intrinsic_register_test_executable(
+                TARGET TestTarget LABELS unit core)
+            intrinsic_add_test_aggregate(
+                NAME RequiredSlow INCLUDE_ALL slow)
+        """
+        optional_body = """
+            add_executable(TestTarget main.cpp)
+            intrinsic_register_test_executable(
+                TARGET TestTarget LABELS unit core)
+            intrinsic_add_test_aggregate(
+                NAME OptionalSlow OMIT_IF_EMPTY INCLUDE_ALL slow)
+        """
+
+        with tempfile.TemporaryDirectory() as tmp:
+            result = _configure_fixture(Path(tmp), required_body)
+            self.assertNotEqual(result.returncode, 0, msg=result.stdout)
+            self.assertIn(
+                "Test aggregate 'RequiredSlow' selected no executable targets",
+                result.stdout,
+            )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = _configure_fixture(root, optional_body)
+            self.assertEqual(result.returncode, 0, msg=result.stdout)
+            self.assertFalse(
+                (root / "build/test-inventories/OptionalSlow.txt").exists()
+            )
+            query = subprocess.run(
+                ["ninja", "-C", str(root / "build"), "-t", "query", "OptionalSlow"],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            self.assertNotEqual(query.returncode, 0, msg=query.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

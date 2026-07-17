@@ -45,8 +45,10 @@ Repeated `-L` CTest arguments are intersections, so `IntrinsicGpuVulkanTests`
 and `IntrinsicPrSmokeTests` use `INCLUDE_ALL`; the PR-fast
 `-L 'unit|contract'` regex is an `INCLUDE_ANY` union. Configuration fails for
 undeclared/duplicate labels, duplicate registrations, non-executable producers,
-or empty aggregates. `IntrinsicTests` remains the complete local/default
-correctness target.
+or empty required aggregates. `IntrinsicCpuSlowTests` uses the explicit
+`OMIT_IF_EMPTY` policy so a pre-classification tree has no misleading empty
+target or inventory; scheduled workflows require it after ordinary-slow cases
+exist. `IntrinsicTests` remains the complete local/default correctness target.
 
 Backend-inapplicable aggregates are omitted rather than emitted empty. A
 Null/headless configure therefore has no `IntrinsicGpuVulkanTests` target or
