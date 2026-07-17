@@ -330,17 +330,29 @@ class WorkflowConcurrencyTests(unittest.TestCase):
 
     def test_nightly_partitions_fast_slow_slo_and_benchmark_owners(self) -> None:
         payload, _ = _load_workflow("nightly-deep.yml")
+        triggers = payload.get("on", payload.get(True, {}))
+        slow_evidence = triggers["workflow_dispatch"]["inputs"][
+            "slow_evidence_only"
+        ]
+        self.assertEqual(slow_evidence["type"], "boolean")
+        self.assertFalse(slow_evidence["default"])
         steps = payload["jobs"]["nightly-cpu-deep"]["steps"]
         named_steps = {step["name"]: step for step in steps}
         build_partitions = " ".join(
             named_steps["Build nightly CPU target partitions"]["run"].split()
         )
-        self.assertEqual(
+        self.assertIn(
+            "targets=(IntrinsicCpuTests IntrinsicCpuSlowTests "
+            "IntrinsicBenchmarkTests)",
             build_partitions,
-            (
-                "cmake --build --preset ci --target IntrinsicCpuTests "
-                "IntrinsicCpuSlowTests IntrinsicBenchmarkTests"
-            ),
+        )
+        self.assertIn(
+            "targets=(IntrinsicCpuSlowTests)",
+            build_partitions,
+        )
+        self.assertIn(
+            'cmake --build --preset ci --target "${targets[@]}"',
+            build_partitions,
         )
         self.assertNotIn("Build full CPU targets", named_steps)
         self.assertNotIn("Build scheduled CPU slow cohort", named_steps)
@@ -358,6 +370,23 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         benchmark_step = named_steps[
             "Run benchmark smoke and selected deep benchmarks"
         ]
+        full_partition_condition = (
+            "${{ github.event_name != 'workflow_dispatch' || "
+            "!inputs.slow_evidence_only }}"
+        )
+        for step_name in (
+            "Run full CPU test suite",
+            "Run SLO/performance diagnostic (CI-009)",
+            "Compile hotspot report",
+            "Module fanout report",
+            "Build benchmark smoke target",
+            "Run benchmark smoke and selected deep benchmarks",
+        ):
+            with self.subTest(step=step_name):
+                self.assertEqual(
+                    named_steps[step_name]["if"],
+                    full_partition_condition,
+                )
         self.assertIn(
             '-LE "gpu|vulkan|slow|flaky-quarantine"',
             fast,
@@ -373,7 +402,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             slow,
         )
         self.assertIn(
-            "--output-junit build/ci/reports/cpu-slow.junit.xml",
+            "--output-junit reports/cpu-slow.junit.xml",
             slow,
         )
         self.assertIn("--no-tests=error", slow)
@@ -384,6 +413,10 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             )
         )
         self.assertIn('-L "^slo$"', slo)
+        self.assertIn(
+            "--output-junit reports/architecture-slo.junit.xml",
+            slo,
+        )
         self.assertTrue(slo_step["continue-on-error"])
         self.assertFalse(benchmark_step.get("continue-on-error", False))
         self.assertLess(
@@ -402,6 +435,10 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         self.assertEqual(
             named_steps["Upload nightly reports"]["if"],
             "always()",
+        )
+        self.assertEqual(
+            named_steps["Upload nightly reports"]["with"]["if-no-files-found"],
+            "error",
         )
         self.assertIn(
             "build/ci/reports/cpu-slow.junit.xml",

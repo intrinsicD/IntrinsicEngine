@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "0 5 * * *"
   workflow_dispatch:
+    inputs:
+      slow_evidence_only:
+        description: Build and run only the scheduled ordinary-slow correctness lane
+        type: boolean
+        default: false
 
 jobs:
   nightly-cpu-deep:
@@ -61,9 +66,12 @@ jobs:
             -- cmake --preset ci --fresh
 
       - name: Build nightly CPU target partitions
-        run: >-
-          cmake --build --preset ci
-          --target IntrinsicCpuTests IntrinsicCpuSlowTests IntrinsicBenchmarkTests
+        run: |
+          targets=(IntrinsicCpuTests IntrinsicCpuSlowTests IntrinsicBenchmarkTests)
+          if [ '${{ inputs.slow_evidence_only }}' = 'true' ]; then
+            targets=(IntrinsicCpuSlowTests)
+          fi
+          cmake --build --preset ci --target "${targets[@]}"
 
       - name: Reconcile scheduled CPU slow cohort
         run: |
@@ -72,6 +80,7 @@ jobs:
             --aggregate IntrinsicCpuSlowTests
 
       - name: Run full CPU test suite
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.slow_evidence_only }}
         run: |
           python3 tools/ci/check_prerequisites.py test-binaries \
             --build-dir build/ci \
@@ -104,10 +113,11 @@ jobs:
             -LE "^(benchmark|gpu|slo|vulkan|flaky-quarantine)$" \
             --no-tests=error \
             --timeout 120 \
-            --output-junit build/ci/reports/cpu-slow.junit.xml \
+            --output-junit reports/cpu-slow.junit.xml \
             -j$(nproc)
 
       - name: Run SLO/performance diagnostic (CI-009)
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.slow_evidence_only }}
         continue-on-error: true
         run: |
           python3 tools/ci/check_prerequisites.py test-binaries \
@@ -119,9 +129,10 @@ jobs:
             -LE "^(gpu|vulkan|flaky-quarantine)$" \
             --no-tests=error \
             --timeout 120 \
-            --output-junit build/ci/reports/architecture-slo.junit.xml
+            --output-junit reports/architecture-slo.junit.xml
 
       - name: Compile hotspot report
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.slow_evidence_only }}
         run: |
           python3 tools/analysis/compile_hotspots.py \
             --build-dir build/ci \
@@ -130,15 +141,18 @@ jobs:
             --baseline-json tools/analysis/compile_hotspot_baseline.json
 
       - name: Module fanout report
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.slow_evidence_only }}
         run: |
           python3 tools/analysis/module_fanout.py \
             --root src \
             --out build/ci/reports/module_fanout_report.md
 
       - name: Build benchmark smoke target
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.slow_evidence_only }}
         run: cmake --build --preset ci --target IntrinsicBenchmarkSmoke
 
       - name: Run benchmark smoke and selected deep benchmarks
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.slow_evidence_only }}
         env:
           GIT_COMMIT: ${{ github.sha }}
         run: |
@@ -168,6 +182,7 @@ jobs:
             build/ci/reports/cpu-slow.junit.xml
             build/ci/reports/architecture-slo.junit.xml
             build/ci/benchmark/nightly/smoke_result.json
+          if-no-files-found: error
 
   nightly-gpu-optional:
     if: ${{ vars.INTRINSIC_ENABLE_GPU_NIGHTLY == 'true' }}

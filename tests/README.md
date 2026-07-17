@@ -190,7 +190,7 @@ ctest --test-dir build/ci --output-on-failure \
   -L '^slow$' \
   -LE '^(benchmark|slo|gpu|vulkan|flaky-quarantine)$' \
   --no-tests=error --timeout 120 \
-  --output-junit build/ci/reports/cpu-slow.junit.xml \
+  --output-junit reports/cpu-slow.junit.xml \
   -j$(nproc)
 ```
 
