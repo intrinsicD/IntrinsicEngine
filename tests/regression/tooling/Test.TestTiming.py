@@ -42,7 +42,28 @@ def _test_record(
     }
 
 
-def _write_build(build_dir: Path, *, aggregate: tuple[str, ...] | None = None) -> None:
+def _grouped_test_record(build_dir: Path) -> dict[str, object]:
+    return {
+        "command": [
+            str(build_dir / "bin" / "AlphaTests"),
+            "--gtest_filter=*",
+            "--gtest_also_run_disabled_tests",
+            (
+                "--gtest_output=xml:"
+                f"{build_dir}/reports/grouped-ctest/gtest/AlphaTests.xml"
+            ),
+        ],
+        "name": "AlphaTests.Grouped",
+        "properties": _properties(REGISTERED["AlphaTests"]),
+    }
+
+
+def _write_build(
+    build_dir: Path,
+    *,
+    aggregate: tuple[str, ...] | None = None,
+    grouped: bool = False,
+) -> None:
     (build_dir / "bin").mkdir(parents=True)
     inventory = build_dir / "test-inventories"
     inventory.mkdir()
@@ -62,17 +83,27 @@ def _write_build(build_dir: Path, *, aggregate: tuple[str, ...] | None = None) -
         "SlowTests\n",
         encoding="utf-8",
     )
+    alpha_tests = (
+        [_grouped_test_record(build_dir)]
+        if grouped
+        else [
+            _test_record(
+                build_dir,
+                "Alpha.Fast",
+                "AlphaTests",
+                REGISTERED["AlphaTests"],
+            ),
+            _test_record(
+                build_dir,
+                "Alpha.Disabled",
+                "AlphaTests",
+                REGISTERED["AlphaTests"],
+                disabled=True,
+            ),
+        ]
+    )
     tests = [
-        _test_record(
-            build_dir, "Alpha.Fast", "AlphaTests", REGISTERED["AlphaTests"]
-        ),
-        _test_record(
-            build_dir,
-            "Alpha.Disabled",
-            "AlphaTests",
-            REGISTERED["AlphaTests"],
-            disabled=True,
-        ),
+        *alpha_tests,
         _test_record(
             build_dir, "Beta.Contract", "BetaTests", REGISTERED["BetaTests"]
         ),
@@ -84,6 +115,8 @@ def _write_build(build_dir: Path, *, aggregate: tuple[str, ...] | None = None) -
         json.dumps({"kind": "ctestInfo", "tests": tests}),
         encoding="utf-8",
     )
+    if grouped:
+        (build_dir / "grouped").touch()
 
 
 def _write_fake_ctest(path: Path) -> None:
@@ -126,6 +159,21 @@ if "-L" in arguments and re.search(
 ):
     cases = [] if re.search(exclude, "slow") else [
         ("Slow.Stress", "geometry;slow", "run", 3000 + sample, ""),
+    ]
+elif (build / "grouped").exists():
+    grouped_xml = build / "reports" / "grouped-ctest" / "gtest" / "AlphaTests.xml"
+    grouped_xml.parent.mkdir(parents=True, exist_ok=True)
+    grouped_xml.write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\\n'
+        '<testsuite name="Alpha">\\n'
+        '<testcase name="Fast" classname="Alpha" status="run"/>\\n'
+        '<testcase name="Disabled" classname="Alpha" status="run"/>\\n'
+        '</testsuite>\\n',
+        encoding="utf-8",
+    )
+    cases = [
+        ("AlphaTests.Grouped", "core;unit", "run", 4000 + sample, ""),
+        ("Beta.Contract", "contract;runtime", "run", 2000 + sample, ""),
     ]
 else:
     cases = [
@@ -186,8 +234,8 @@ class TestTimingTests(unittest.TestCase):
                 str(TOOL),
                 "--build-dir",
                 str(build),
-            "--cohort",
-            cohort,
+                "--cohort",
+                cohort,
                 "--samples",
                 str(samples),
                 "--parallel",
@@ -262,6 +310,7 @@ class TestTimingTests(unittest.TestCase):
             self.assertTrue(
                 (output / "samples" / f"sample-{index:02d}.log").is_file()
             )
+            self.assertEqual(report["samples"][index - 1]["gtest_xml"], [])
 
         commands = [
             json.loads(line)
@@ -297,6 +346,39 @@ class TestTimingTests(unittest.TestCase):
             command[command.index("-LE") + 1],
             "^(benchmark|flaky-quarantine|gpu|slo|vulkan)$",
         )
+
+    def test_grouped_xml_is_reset_and_retained_per_sample(self) -> None:
+        build = self.root / "build"
+        output = self.root / "timing"
+        _write_build(build, grouped=True)
+        canonical = (
+            build
+            / "reports"
+            / "grouped-ctest"
+            / "gtest"
+            / "AlphaTests.xml"
+        )
+        canonical.parent.mkdir(parents=True, exist_ok=True)
+        canonical.write_text("stale\n", encoding="utf-8")
+
+        result = self._run(build, output, samples=2)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        report = json.loads((output / "report.json").read_text(encoding="utf-8"))
+        self.assertEqual(report["summary"]["selected_test_count"], 2)
+        for index in range(1, 3):
+            relative = (
+                f"samples/sample-{index:02d}.gtest/AlphaTests.xml"
+            )
+            self.assertEqual(
+                report["samples"][index - 1]["gtest_xml"],
+                [relative],
+            )
+            retained = output / relative
+            self.assertTrue(retained.is_file())
+            self.assertNotIn(
+                "stale",
+                retained.read_text(encoding="utf-8"),
+            )
 
     def test_failed_sample_writes_actionable_report_and_returns_blocked(self) -> None:
         build = self.root / "build"

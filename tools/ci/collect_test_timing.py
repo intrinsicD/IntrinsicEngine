@@ -10,6 +10,7 @@ import math
 import os
 import platform
 import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -121,7 +122,11 @@ def _command_for_test(test: Mapping[str, object]) -> list[str]:
 
 def _capture_inventory(
     build_dir: Path, cohort: Cohort
-) -> tuple[list[dict[str, object]], dict[str, tuple[str, ...]]]:
+) -> tuple[
+    list[dict[str, object]],
+    dict[str, tuple[str, ...]],
+    tuple[Path, ...],
+]:
     inventory_dir = build_dir / "test-inventories"
     try:
         registered = cpu_test_selection._read_tsv(  # noqa: SLF001
@@ -167,6 +172,8 @@ def _capture_inventory(
     selected: list[dict[str, object]] = []
     seen_names: set[str] = set()
     producer_counts = Counter[str]()
+    grouped_xml_paths: set[Path] = set()
+    grouped_xml_root = (build_dir / "reports" / "grouped-ctest" / "gtest").resolve()
     for raw_test in document["tests"]:
         if not isinstance(raw_test, dict):
             raise TimingError("CTest JSON contains a malformed test record")
@@ -208,9 +215,38 @@ def _capture_inventory(
                 f"selected CTest test {name!r} maps outside "
                 f"{cohort.aggregate}: {producer!r}"
             )
+        gtest_outputs = [
+            argument.removeprefix("--gtest_output=xml:")
+            for argument in command
+            if argument.startswith("--gtest_output=xml:")
+        ]
+        grouped_xml: Path | None = None
+        if gtest_outputs:
+            grouped_xml = Path(gtest_outputs[0]).resolve()
+            expected_xml = grouped_xml_root / f"{producer}.xml"
+            if (
+                len(gtest_outputs) != 1
+                or name != f"{producer}.Grouped"
+                or "--gtest_filter=*" not in command
+                or command.count("--gtest_also_run_disabled_tests") != 1
+                or grouped_xml != expected_xml
+            ):
+                raise TimingError(
+                    f"selected CTest test {name!r} is not a canonical grouped "
+                    f"GoogleTest wrapper for {producer!r}"
+                )
+            if grouped_xml in grouped_xml_paths:
+                raise TimingError(
+                    f"selected CTest tests repeat grouped GoogleTest XML "
+                    f"output {grouped_xml}"
+                )
+            grouped_xml_paths.add(grouped_xml)
         selected.append(
             {
                 "disabled": disabled,
+                "grouped_gtest_xml": (
+                    str(grouped_xml) if grouped_xml is not None else None
+                ),
                 "labels": list(labels),
                 "name": name,
                 "producer": producer,
@@ -227,7 +263,7 @@ def _capture_inventory(
             f"{producers_without_cases!r}"
         )
     selected.sort(key=lambda record: str(record["name"]))
-    return selected, registered
+    return selected, registered, tuple(sorted(grouped_xml_paths))
 
 
 def _load_average() -> dict[str, object]:
@@ -464,10 +500,19 @@ def _run_sample(
     index: int,
     output: Path,
     parallel: int,
+    grouped_xml_paths: Sequence[Path],
 ) -> tuple[dict[str, object], list[dict[str, object]]]:
     prefix = f"sample-{index:02d}"
     junit_path = output / "samples" / f"{prefix}.junit.xml"
     log_path = output / "samples" / f"{prefix}.log"
+    for path in grouped_xml_paths:
+        try:
+            path.unlink(missing_ok=True)
+            path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            raise TimingError(
+                f"cannot reset grouped GoogleTest XML output {path}: {error}"
+            ) from error
     command = _ctest_command(build_dir, cohort, parallel, junit_path)
     started_at = _timestamp_utc()
     load_before = _load_average()
@@ -489,11 +534,43 @@ def _run_sample(
         log_path.write_text(completed.stdout, encoding="utf-8")
     except OSError as error:
         raise TimingError(f"cannot write CTest log {log_path}: {error}") from error
+    retained_gtest_xml: list[str] = []
+    if grouped_xml_paths:
+        retained_dir = output / "samples" / f"{prefix}.gtest"
+        try:
+            retained_dir.mkdir()
+        except OSError as error:
+            raise TimingError(
+                f"cannot create grouped GoogleTest XML archive {retained_dir}: {error}"
+            ) from error
+        for source in grouped_xml_paths:
+            try:
+                is_nonempty_file = source.is_file() and source.stat().st_size > 0
+            except OSError as error:
+                raise TimingError(
+                    f"cannot inspect grouped GoogleTest XML {source}: {error}"
+                ) from error
+            if not is_nonempty_file:
+                raise TimingError(
+                    f"CTest sample {index} did not create nonempty grouped "
+                    f"GoogleTest XML {source}"
+                )
+            destination = retained_dir / source.name
+            try:
+                shutil.copy2(source, destination)
+            except OSError as error:
+                raise TimingError(
+                    f"cannot retain grouped GoogleTest XML {source}: {error}"
+                ) from error
+            retained_gtest_xml.append(
+                f"samples/{retained_dir.name}/{destination.name}"
+            )
     results = _parse_junit(junit_path, expected)
     return (
         {
             "ctest_returncode": completed.returncode,
             "finished_at_utc": finished_at,
+            "gtest_xml": retained_gtest_xml,
             "index": index,
             "junit": f"samples/{junit_path.name}",
             "load_after": load_after,
@@ -599,7 +676,7 @@ def _collect(
     if not build_dir.is_dir():
         raise TimingError(f"configured build directory is missing: {build_dir}")
     cohort = COHORTS[cohort_name]
-    expected, _registered = _capture_inventory(build_dir, cohort)
+    expected, _registered, grouped_xml_paths = _capture_inventory(build_dir, cohort)
     output = _prepare_output(output)
 
     cost_path = _cost_data_path(build_dir)
@@ -618,13 +695,20 @@ def _collect(
                 index=index,
                 output=output,
                 parallel=parallel,
+                grouped_xml_paths=grouped_xml_paths,
             )
             sample_records.append(sample_record)
             for result in results:
                 case_samples[str(result["name"])].append(result)
-        final_inventory, _registered = _capture_inventory(build_dir, cohort)
+        final_inventory, _registered, final_grouped_xml_paths = _capture_inventory(
+            build_dir, cohort
+        )
         if final_inventory != expected:
             raise TimingError("CTest inventory drifted during timing collection")
+        if final_grouped_xml_paths != grouped_xml_paths:
+            raise TimingError(
+                "grouped GoogleTest XML outputs drifted during timing collection"
+            )
     finally:
         _restore_cost_data(cost_path, original_cost_data)
 
