@@ -73,6 +73,35 @@ CPU_ENGINE_CONFIG_ROOTS = (
     ("tests/integration/runtime/Test.SandboxEditorPresentation.cpp", "HeadlessConfig"),
     ("tests/integration/runtime/Test.SandboxParameterizationPanel.cpp", "HeadlessConfig"),
 )
+CPU_MULTIWORKER_SOURCE_TARGETS = {
+    "tests/unit/core/Test.CoreTasks.cpp": "IntrinsicCoreWrapperUnitTests",
+    "tests/unit/core/Test.CoreFrameGraph.cpp": "IntrinsicCoreWrapperUnitTests",
+    "tests/unit/core/Test.Core.TaskGraphLegacy.cpp": "IntrinsicCoreWrapperUnitTests",
+    "tests/unit/core/Test.Core.TaskGraphCompletionLifetime.cpp": (
+        "IntrinsicCoreWrapperUnitTests"
+    ),
+    "tests/integration/runtime/Test.CoreFrameGraphParallel.cpp": (
+        "IntrinsicRuntimeIntegrationTests"
+    ),
+    "tests/integration/runtime/Test.CoreGraphStress.cpp": (
+        "IntrinsicRuntimeIntegrationTests"
+    ),
+    "tests/contract/runtime/Test.RuntimeJobService.cpp": (
+        "IntrinsicRuntimeContractTests"
+    ),
+    "tests/contract/runtime/Test.RuntimeWorldRegistry.cpp": (
+        "IntrinsicRuntimeContractTests"
+    ),
+    "tests/contract/runtime/Test.ClusteringModule.cpp": (
+        "IntrinsicRuntimeContractTests"
+    ),
+    "tests/contract/graphics/Test.RenderGraphParallelRecording.cpp": (
+        "IntrinsicGraphicsContractCpuTests"
+    ),
+    "tests/contract/graphics/Test.RendererFrameLifecycle.cpp": (
+        "IntrinsicGraphicsContractCpuTests"
+    ),
+}
 
 
 def _load_workflow(name: str) -> tuple[dict[str, object], str]:
@@ -102,6 +131,84 @@ def _function_body(text: str, function_name: str) -> str:
             if depth == 0:
                 return text[opening_brace : offset + 1]
     raise AssertionError(f"unterminated function body: {function_name}")
+
+
+def _gtest_bodies(text: str) -> dict[str, str]:
+    declarations = list(
+        re.finditer(
+            r"\bTEST(?:_F|_P)?\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,\s*"
+            r"([A-Za-z_][A-Za-z0-9_]*)\s*\)",
+            text,
+        )
+    )
+    bodies: dict[str, str] = {}
+    for index, declaration in enumerate(declarations):
+        end = (
+            declarations[index + 1].start()
+            if index + 1 < len(declarations)
+            else len(text)
+        )
+        name = f"{declaration.group(1)}.{declaration.group(2)}"
+        bodies[name] = text[declaration.end() : end]
+    return bodies
+
+
+def _source_multiworker_budgets() -> set[tuple[str, str, int]]:
+    budgets: set[tuple[str, str, int]] = set()
+    literal_patterns = (
+        re.compile(
+            r"(?:[A-Za-z_][A-Za-z0-9_]*::)*Scheduler::Initialize"
+            r"\(\s*([0-9]+)u?\s*\)"
+        ),
+        re.compile(
+            r"(?:SchedulerScope|SchedulerFixture)\s+[A-Za-z_][A-Za-z0-9_]*"
+            r"\s*[\{\(]\s*([0-9]+)u?\s*[\}\)]"
+        ),
+    )
+
+    for relative_path, target in CPU_MULTIWORKER_SOURCE_TARGETS.items():
+        source = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+        for name, body in _gtest_bodies(source).items():
+            if "hardware_concurrency" in body:
+                raise AssertionError(
+                    f"host-derived scheduler pool in {relative_path}:{name}"
+                )
+
+            case_budgets = {
+                int(match.group(1))
+                for pattern in literal_patterns
+                for match in pattern.finditer(body)
+                if int(match.group(1)) > 1
+            }
+            for match in re.finditer(
+                r"(?:[A-Za-z_][A-Za-z0-9_]*::)*Scheduler::Initialize"
+                r"\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)",
+                body,
+            ):
+                symbol = match.group(1)
+                declaration = re.search(
+                    rf"\bconstexpr\s+(?:unsigned|int)\s+{re.escape(symbol)}"
+                    r"\s*=\s*([0-9]+)u?\s*;",
+                    body,
+                )
+                if declaration is not None and int(declaration.group(1)) > 1:
+                    case_budgets.add(int(declaration.group(1)))
+
+            if (
+                relative_path
+                == "tests/contract/runtime/Test.ClusteringModule.cpp"
+                and re.search(r"NullWindowHeadlessConfig\(\s*\)", body)
+            ):
+                case_budgets.add(2)
+
+            if len(case_budgets) > 1:
+                raise AssertionError(
+                    f"ambiguous worker budgets in {relative_path}:{name}: "
+                    f"{sorted(case_budgets)}"
+                )
+            for budget in case_budgets:
+                budgets.add((target, name, budget))
+    return budgets
 
 
 class WorkflowConcurrencyTests(unittest.TestCase):
@@ -136,6 +243,48 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         )
         self.assertEqual(source.count("NullWindowHeadlessConfig(),"), 2)
         self.assertEqual(source.count("NullWindowHeadlessConfig(1u),"), 1)
+
+    def test_exact_multiworker_ctest_budgets_match_cpu_sources(self) -> None:
+        cmake = (REPO_ROOT / "tests/CMakeLists.txt").read_text(
+            encoding="utf-8"
+        )
+        budget_block = re.search(
+            r"set\(_intrinsic_multiworker_test_budgets\s*"
+            r"(?P<body>.*?)\n\)",
+            cmake,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(budget_block)
+        declared = {
+            (target, name, int(budget))
+            for target, name, budget in re.findall(
+                r'"([^"|]+)\|([^"|]+)\|([0-9]+)"',
+                budget_block.group("body"),
+            )
+        }
+        source_budgets = _source_multiworker_budgets()
+
+        self.assertEqual(declared, source_budgets)
+        self.assertEqual(len(declared), 41)
+        self.assertEqual(
+            {
+                budget: sum(
+                    declared_budget == budget
+                    for _, _, declared_budget in declared
+                )
+                for budget in (2, 4)
+            },
+            {2: 22, 4: 19},
+        )
+        self.assertIn(
+            "Declared multi-worker test "
+            "'${_intrinsic_worker_budget_test}' was not discovered",
+            cmake,
+        )
+        self.assertNotRegex(
+            budget_block.group("body"),
+            r"\*|Intrinsic[A-Za-z]+Tests\|[^|]*\.\*",
+        )
 
     def test_ci_fast_preset_is_unsanitized_and_headless(self) -> None:
         payload = json.loads(PRESETS.read_text(encoding="utf-8"))

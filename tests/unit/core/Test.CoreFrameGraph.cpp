@@ -861,9 +861,8 @@ TEST(CoreFrameGraph, ReadyQueueNestedDispatchStressHighWorkerCount)
 {
     constexpr uint32_t kBranchCount = 96;
     constexpr uint32_t kIterations = 48;
-    const unsigned workerCount = std::min<unsigned>(16u, std::max(2u, std::thread::hardware_concurrency()));
     FrameGraph graph;
-    Tasks::Scheduler::Initialize(workerCount);
+    Tasks::Scheduler::Initialize(4);
 
     for (uint32_t iteration = 0; iteration < kIterations; ++iteration)
     {
@@ -911,4 +910,3 @@ TEST(CoreFrameGraph, ReadyQueueNestedDispatchStressHighWorkerCount)
 
     Tasks::Scheduler::Shutdown();
 }
-
