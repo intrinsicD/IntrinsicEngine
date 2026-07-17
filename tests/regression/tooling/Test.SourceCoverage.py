@@ -21,6 +21,9 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 RUN_COVERAGE = REPO_ROOT / "tools" / "ci" / "run_source_coverage.py"
 COMPARE_COVERAGE = REPO_ROOT / "tools" / "ci" / "compare_source_coverage.py"
 MINIMUM_LLVM_MAJOR = 20
+sys.path.insert(0, str(REPO_ROOT / "tools" / "ci"))
+
+from source_coverage import CoverageError, normalize_llvm_cov_export  # noqa: E402
 
 CMAKE_PROJECT = r"""
 cmake_minimum_required(VERSION 3.24)
@@ -42,6 +45,7 @@ set(INTRINSIC_ENABLE_CUDA OFF CACHE BOOL "")
 set(INTRINSIC_ENABLE_SOURCE_COVERAGE ON CACHE BOOL "")
 set(INTRINSIC_ENABLE_SANITIZERS OFF CACHE BOOL "")
 set(INTRINSIC_SANITIZER_IDENTITY none CACHE INTERNAL "")
+set(INTRINSIC_SOURCE_COVERAGE_PROFILE_UPDATE atomic CACHE INTERNAL "")
 set(INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN OFF CACHE BOOL "")
 option(INCLUDE_UNINSTRUMENTED "Include a deliberately invalid CPU producer" OFF)
 option(INCLUDE_NO_PROFILE "Include a producer that emits no raw profile" OFF)
@@ -57,6 +61,7 @@ function(add_coverage_test target production_source test_source case_name)
         "${target}"
         PRIVATE
         -fprofile-instr-generate
+        -fprofile-update=atomic
         -fcoverage-mapping
     )
     target_link_options("${target}" PRIVATE -fprofile-instr-generate)
@@ -109,6 +114,7 @@ target_compile_options(
     ManualTests
     PRIVATE
     -fprofile-instr-generate
+    -fprofile-update=atomic
     -fcoverage-mapping
 )
 target_link_options(ManualTests PRIVATE -fprofile-instr-generate)
@@ -153,6 +159,7 @@ if(INCLUDE_NO_PROFILE)
         NoProfileTests
         PRIVATE
         -fprofile-instr-generate
+        -fprofile-update=atomic
         -fcoverage-mapping
     )
     target_link_options(NoProfileTests PRIVATE -fprofile-instr-generate)
@@ -791,15 +798,19 @@ class SourceCoverageTests(unittest.TestCase):
         pattern: str,
         *,
         llvm_profdata: str | None = None,
+        reconciler: Path | None = None,
     ) -> str:
         output = self.root / name
         shutil.rmtree(output, ignore_errors=True)
+        command = self._coverage_command(
+            build_dir,
+            output,
+            llvm_profdata=llvm_profdata,
+        )
+        if reconciler is not None:
+            command[command.index("--reconciler") + 1] = str(reconciler)
         result = _run(
-            self._coverage_command(
-                build_dir,
-                output,
-                llvm_profdata=llvm_profdata,
-            ),
+            command,
             cwd=self.root,
             check=False,
             timeout=180,
@@ -1213,6 +1224,102 @@ class SourceCoverageTests(unittest.TestCase):
         self.assertEqual(execution["producer_jobs"], 1)
         self.assertEqual(diagnostics["producer_jobs"], 1)
         self.assertEqual(execution["test_inventory_digest"], inventory["digest"])
+        self.assertEqual(report["identity"]["build"]["profile_update"], "atomic")
+
+    def test_non_atomic_coverage_build_identity_fails_closed(self) -> None:
+        cache_path = self.build_a / "CMakeCache.txt"
+        original = cache_path.read_text(encoding="utf-8")
+        modified, replacements = re.subn(
+            r"(?m)^INTRINSIC_SOURCE_COVERAGE_PROFILE_UPDATE:[^=]*=atomic$",
+            "INTRINSIC_SOURCE_COVERAGE_PROFILE_UPDATE:INTERNAL=single",
+            original,
+        )
+        self.assertEqual(replacements, 1)
+        cache_path.write_text(modified, encoding="utf-8")
+        try:
+            self._assert_collection_fails(
+                self.build_a,
+                "failure-non-atomic-profile-update",
+                r"(?is)INTRINSIC_SOURCE_COVERAGE_PROFILE_UPDATE.*atomic.*single",
+            )
+        finally:
+            cache_path.write_text(original, encoding="utf-8")
+
+    def test_non_atomic_production_compile_command_fails_closed(self) -> None:
+        commands_path = self.build_a / "compile_commands.json"
+        original = commands_path.read_text(encoding="utf-8")
+        commands = json.loads(original)
+        record = next(
+            command
+            for command in commands
+            if str(command["file"]).endswith("src/alpha.cpp")
+        )
+        if "arguments" in record:
+            record["arguments"].remove("-fprofile-update=atomic")
+        else:
+            record["command"] = record["command"].replace(
+                " -fprofile-update=atomic",
+                "",
+                1,
+            )
+        commands_path.write_text(
+            json.dumps(commands, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        try:
+            self._assert_collection_fails(
+                self.build_a,
+                "failure-non-atomic-compile-command",
+                r"(?is)atomic profile updates.*src/alpha\.cpp",
+            )
+        finally:
+            commands_path.write_text(original, encoding="utf-8")
+
+    def test_conflicting_profile_update_override_fails_before_discovery(
+        self,
+    ) -> None:
+        commands_path = self.build_a / "compile_commands.json"
+        original = commands_path.read_text(encoding="utf-8")
+        commands = json.loads(original)
+        record = next(
+            command
+            for command in commands
+            if str(command["file"]).endswith("src/alpha.cpp")
+        )
+        if "arguments" in record:
+            record["arguments"].append("-fprofile-update=single")
+        else:
+            record["command"] += " -fprofile-update=single"
+        commands_path.write_text(
+            json.dumps(commands, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        output_name = "failure-conflicting-profile-update"
+        try:
+            self._assert_collection_fails(
+                self.build_a,
+                output_name,
+                r"(?is)only atomic profile updates.*alpha\.cpp.*atomic.*single",
+                reconciler=self.root / "missing-reconciler.py",
+            )
+            self.assertFalse((self.root / output_name).exists())
+        finally:
+            commands_path.write_text(original, encoding="utf-8")
+
+    def test_saturated_execution_counter_fails_closed(self) -> None:
+        raw_export = _load_json(self.report_a / "llvm-cov-export.json")
+        production_file = next(
+            raw_file
+            for raw_file in raw_export["data"][0]["files"]
+            if str(raw_file["filename"]).endswith("src/alpha.cpp")
+        )
+        self.assertTrue(production_file["branches"])
+        production_file["branches"][0][4] = (1 << 63) - 1
+        with self.assertRaisesRegex(
+            CoverageError,
+            r"(?is)saturated.*atomic profile",
+        ):
+            normalize_llvm_cov_export(raw_export, self.source_root)
 
     def test_reports_are_path_normalized_and_equal_across_build_directories(
         self,

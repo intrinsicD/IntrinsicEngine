@@ -20,6 +20,7 @@ from test_cohort_manifest import TestCohortTransition
 COVERAGE_SCHEMA = "intrinsic.cpu-source-coverage/v2"
 TEST_INVENTORY_SCHEMA = "intrinsic.cpu-test-inventory/v2"
 EXECUTION_IDENTITY_SCHEMA = "intrinsic.cpu-source-coverage-execution/v3"
+MAX_RELIABLE_EXECUTION_COUNTER = (1 << 63) - 2
 PRODUCTION_ROOTS = ("src", "methods")
 PRODUCTION_SUFFIXES = frozenset(
     {
@@ -922,6 +923,21 @@ def semantic_compile_command_digest(
                 f"production compile command has no coverage mapping: "
                 f"{normalized_source}"
             )
+        profile_update_modes = [
+            argument.removeprefix("-fprofile-update=")
+            for argument in arguments
+            if argument.startswith("-fprofile-update=")
+        ]
+        if (
+            not profile_update_modes
+            or profile_update_modes[-1] != "atomic"
+            or any(mode != "atomic" for mode in profile_update_modes)
+        ):
+            raise CoverageError(
+                f"production compile command does not use only atomic profile "
+                f"updates: {normalized_source}; observed modes "
+                f"{profile_update_modes!r}"
+            )
         instrumented_sources.add(normalized_source)
         records.append({"arguments": list(arguments), "source": normalized_source})
     records.sort(key=lambda record: _canonical_json(record))
@@ -940,6 +956,16 @@ def _require_number(value: object, context: str) -> int | float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise CoverageError(f"{context}: expected numeric coverage counter")
     return value
+
+
+def _require_execution_counter(value: object, context: str) -> int | float:
+    count = _require_number(value, context)
+    if count < 0 or count > MAX_RELIABLE_EXECUTION_COUNTER:
+        raise CoverageError(
+            f"{context}: saturated or negative LLVM execution counter; "
+            "coverage builds require atomic profile updates"
+        )
+    return count
 
 
 def _location_key(path: str, record: Sequence[object], suffix: str = "") -> str:
@@ -974,7 +1000,7 @@ def _covered_lines_from_segments(path: str, raw_segments: object) -> set[str]:
         line, column = segment[0], segment[1]
         if not isinstance(line, int) or not isinstance(column, int):
             raise CoverageError(f"{path}: malformed LLVM segment coordinate")
-        count = _require_number(segment[2], f"{path}: segment")
+        count = _require_execution_counter(segment[2], f"{path}: segment")
         has_count = segment[3]
         is_gap = segment[5]
         if not isinstance(has_count, bool) or not isinstance(is_gap, bool):
@@ -1038,8 +1064,12 @@ def normalize_llvm_cov_export(
         for branch in branches:
             if not isinstance(branch, list) or len(branch) < 9:
                 raise CoverageError(f"{normalized}: malformed branch record")
-            true_count = _require_number(branch[4], f"{normalized}: true branch")
-            false_count = _require_number(branch[5], f"{normalized}: false branch")
+            true_count = _require_execution_counter(
+                branch[4], f"{normalized}: true branch"
+            )
+            false_count = _require_execution_counter(
+                branch[5], f"{normalized}: false branch"
+            )
             base = _location_key(normalized, branch, suffix="branch")
             if true_count > 0:
                 covered_branch_arms.add(f"{base}:true")
@@ -1051,7 +1081,9 @@ def normalize_llvm_cov_export(
             raise CoverageError("llvm-cov export contains a malformed function")
         name = raw_function.get("name")
         filenames = raw_function.get("filenames")
-        count = _require_number(raw_function.get("count"), "llvm-cov function counter")
+        count = _require_execution_counter(
+            raw_function.get("count"), "llvm-cov function counter"
+        )
         if (
             not isinstance(name, str)
             or not isinstance(filenames, list)
@@ -1072,7 +1104,9 @@ def normalize_llvm_cov_export(
         for region in regions:
             if not isinstance(region, list) or len(region) < 8:
                 raise CoverageError(f"llvm-cov function {name!r} has a bad region")
-            execution_count = _require_number(region[4], f"{name}: region")
+            execution_count = _require_execution_counter(
+                region[4], f"{name}: region"
+            )
             file_id = region[5]
             if (
                 not isinstance(file_id, int)

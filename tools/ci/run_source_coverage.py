@@ -133,6 +133,7 @@ def _require_coverage_build(cache: Mapping[str, str]) -> dict[str, object]:
         "INTRINSIC_PLATFORM_BACKEND": "Glfw",
         "INTRINSIC_PLATFORM_BACKEND_SELECTED": "Glfw",
         "INTRINSIC_SANITIZER_IDENTITY": "none",
+        "INTRINSIC_SOURCE_COVERAGE_PROFILE_UPDATE": "atomic",
     }
     for key, expected_value in expected_strings.items():
         value = cache.get(key)
@@ -143,6 +144,9 @@ def _require_coverage_build(cache: Mapping[str, str]) -> dict[str, object]:
     return {
         "build_type": expected_strings["CMAKE_BUILD_TYPE"],
         "options": actual,
+        "profile_update": expected_strings[
+            "INTRINSIC_SOURCE_COVERAGE_PROFILE_UPDATE"
+        ],
     }
 
 
@@ -633,6 +637,14 @@ def collect(arguments: argparse.Namespace) -> dict[str, object]:
     build_dir = arguments.build_dir.resolve()
     if not build_dir.is_dir():
         raise CoverageError(f"coverage build directory does not exist: {build_dir}")
+
+    cache = read_cmake_cache(build_dir)
+    build_identity = _require_coverage_build(cache)
+    compiler, llvm_cov, llvm_profdata, tools = _compiler_and_tools(
+        cache, arguments.llvm_cov, arguments.llvm_profdata
+    )
+    compile_commands = semantic_compile_command_digest(build_dir, repo_root)
+
     output = _prepare_output(arguments.output)
     cohort = COVERAGE_COHORTS[arguments.cohort]
     for directory in (
@@ -646,11 +658,6 @@ def collect(arguments: argparse.Namespace) -> dict[str, object]:
     ):
         directory.mkdir(parents=True, exist_ok=True)
 
-    cache = read_cmake_cache(build_dir)
-    build_identity = _require_coverage_build(cache)
-    compiler, llvm_cov, llvm_profdata, tools = _compiler_and_tools(
-        cache, arguments.llvm_cov, arguments.llvm_profdata
-    )
     inventory = load_cpu_test_inventory(
         build_dir,
         repo_root=repo_root,
@@ -784,7 +791,6 @@ def collect(arguments: argparse.Namespace) -> dict[str, object]:
 
     production = production_source_digest(repo_root)
     production_build_inputs = production_build_input_digest(repo_root)
-    compile_commands = semantic_compile_command_digest(build_dir, repo_root)
     exclusions = exclusion_identity()
     backend = {
         "extrinsic_backend": cache.get("EXTRINSIC_BACKEND", "<unset>"),

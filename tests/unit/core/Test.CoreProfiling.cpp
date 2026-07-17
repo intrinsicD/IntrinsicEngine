@@ -47,11 +47,41 @@ TEST(Profiling_ScopedTimer, RecordsSampleToTelemetry)
         BusyWaitMs(1);
     }
 
+    // Capacity is a contract, not incidental suite-order coverage. Samples
+    // beyond the fixed frame buffer must still contribute to aggregate stats
+    // without writing past the buffer.
+    static constexpr uint32_t kCapacityHash = HashString("CapacityScope");
+    for (std::size_t index = 0;
+         index <= TelemetrySystem::kMaxSamplesPerFrame;
+         ++index)
+    {
+        telemetry.RecordSample(kCapacityHash, "CapacityScope", index + 1u);
+    }
+
     telemetry.EndFrame();
 
-    // The sample should have been recorded in the current frame.
     const auto& stats = telemetry.GetFrameStats(0);
-    EXPECT_GT(stats.SampleCount, 0u);
+    EXPECT_EQ(
+        stats.SampleCount,
+        TelemetrySystem::kMaxSamplesPerFrame + 2u
+    );
+
+    const TimingCategory* categories = telemetry.GetCategories();
+    const std::size_t categoryCount = telemetry.GetCategoryCount();
+    const TimingCategory* capacityCategory = nullptr;
+    for (std::size_t index = 0; index < categoryCount; ++index)
+    {
+        if (categories[index].NameHash == kCapacityHash)
+        {
+            capacityCategory = &categories[index];
+            break;
+        }
+    }
+    ASSERT_NE(capacityCategory, nullptr);
+    EXPECT_EQ(
+        capacityCategory->CallCount,
+        TelemetrySystem::kMaxSamplesPerFrame + 1u
+    );
 }
 
 // ---------------------------------------------------------------------------
