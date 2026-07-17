@@ -188,6 +188,11 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             "            --aggregate IntrinsicCpuTests",
             linux,
         )
+        self.assertIn(
+            "-- cmake --build --preset ci --target IntrinsicCpuTests",
+            linux,
+        )
+        self.assertNotIn("-- cmake --build --preset ci\n", linux)
 
         _, vulkan = _load_workflow("ci-vulkan.yml")
         self.assertIn(
@@ -221,8 +226,8 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             timing_input,
             {
                 "description": (
-                    "Collect five pr-fast and full-CPU timing samples instead "
-                    "of gates"
+                    "Collect five pr-fast, CPU, and CPU-slow timing samples "
+                    "instead of gates"
                 ),
                 "required": False,
                 "default": False,
@@ -263,6 +268,12 @@ class WorkflowConcurrencyTests(unittest.TestCase):
                     "preset": "ci",
                     "build_dir": "build/ci",
                     "aggregate": "IntrinsicCpuTests",
+                },
+                {
+                    "name": "cpu-slow",
+                    "preset": "ci",
+                    "build_dir": "build/ci",
+                    "aggregate": "IntrinsicCpuSlowTests",
                 },
             ],
         )
@@ -315,11 +326,18 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         payload, _ = _load_workflow("nightly-deep.yml")
         steps = payload["jobs"]["nightly-cpu-deep"]["steps"]
         named_steps = {step["name"]: step for step in steps}
-        build_slow = named_steps["Build scheduled CPU slow cohort"]["run"]
-        self.assertIn(
-            "--target IntrinsicCpuSlowTests",
-            build_slow,
+        build_partitions = " ".join(
+            named_steps["Build nightly CPU target partitions"]["run"].split()
         )
+        self.assertEqual(
+            build_partitions,
+            (
+                "cmake --build --preset ci --target IntrinsicCpuTests "
+                "IntrinsicCpuSlowTests IntrinsicBenchmarkTests"
+            ),
+        )
+        self.assertNotIn("Build full CPU targets", named_steps)
+        self.assertNotIn("Build scheduled CPU slow cohort", named_steps)
         reconcile_slow = named_steps[
             "Reconcile scheduled CPU slow cohort"
         ]["run"]
@@ -352,6 +370,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             "--output-junit build/ci/reports/cpu-slow.junit.xml",
             slow,
         )
+        self.assertIn("--no-tests=error", slow)
         self.assertFalse(
             named_steps["Run scheduled CPU slow correctness cohort"].get(
                 "continue-on-error",
@@ -374,6 +393,10 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             steps.index(slo_step),
         )
         upload_paths = named_steps["Upload nightly reports"]["with"]["path"]
+        self.assertEqual(
+            named_steps["Upload nightly reports"]["if"],
+            "always()",
+        )
         self.assertIn(
             "build/ci/reports/cpu-slow.junit.xml",
             upload_paths,

@@ -12,7 +12,7 @@ on:
         default: true
         type: boolean
       collect_test_timing:
-        description: Collect five pr-fast and full-CPU timing samples instead of gates
+        description: Collect five pr-fast, CPU, and CPU-slow timing samples instead of gates
         required: false
         default: false
         type: boolean
@@ -92,12 +92,12 @@ jobs:
             --json-out build/ci/ci-timing/phases/configure_backend_determinism.json \
             -- python3 tests/regression/tooling/Test.BackendConfigureDeterminism.py
 
-      - name: Build full CPU targets
+      - name: Build required CPU cohort
         run: |
           python3 tools/ci/time_command.py \
-            --label "Build full CPU targets" \
+            --label "Build required CPU cohort" \
             --json-out build/ci/ci-timing/phases/build.json \
-            -- cmake --build --preset ci
+            -- cmake --build --preset ci --target IntrinsicCpuTests
 
       - name: Compile hotspot benchmark gate
         run: |
@@ -204,6 +204,10 @@ jobs:
             preset: ci
             build_dir: build/ci
             aggregate: IntrinsicCpuTests
+          - name: cpu-slow
+            preset: ci
+            build_dir: build/ci
+            aggregate: IntrinsicCpuSlowTests
 
     steps:
       - name: Checkout

@@ -60,11 +60,10 @@ jobs:
             --max-warm-seconds 40 \
             -- cmake --preset ci --fresh
 
-      - name: Build full CPU targets
-        run: cmake --build --preset ci
-
-      - name: Build scheduled CPU slow cohort
-        run: cmake --build --preset ci --target IntrinsicCpuSlowTests
+      - name: Build nightly CPU target partitions
+        run: >-
+          cmake --build --preset ci
+          --target IntrinsicCpuTests IntrinsicCpuSlowTests IntrinsicBenchmarkTests
 
       - name: Reconcile scheduled CPU slow cohort
         run: |
@@ -103,6 +102,7 @@ jobs:
           ctest --test-dir build/ci --output-on-failure \
             -L "^slow$" \
             -LE "^(benchmark|gpu|slo|vulkan|flaky-quarantine)$" \
+            --no-tests=error \
             --timeout 120 \
             --output-junit build/ci/reports/cpu-slow.junit.xml \
             -j$(nproc)
@@ -158,6 +158,7 @@ jobs:
         run: python3 tools/agents/check_audit_cadence.py
 
       - name: Upload nightly reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: nightly-deep-reports

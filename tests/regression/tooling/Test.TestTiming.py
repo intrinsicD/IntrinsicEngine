@@ -58,6 +58,10 @@ def _write_build(build_dir: Path, *, aggregate: tuple[str, ...] | None = None) -
         "\n".join(aggregate or ("AlphaTests", "BetaTests")) + "\n",
         encoding="utf-8",
     )
+    (inventory / "IntrinsicCpuSlowTests.txt").write_text(
+        "SlowTests\n",
+        encoding="utf-8",
+    )
     tests = [
         _test_record(
             build_dir, "Alpha.Fast", "AlphaTests", REGISTERED["AlphaTests"]
@@ -88,6 +92,7 @@ def _write_fake_ctest(path: Path) -> None:
 import html
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -115,11 +120,19 @@ if (build / "drift").exists() and sample == 1:
 
 junit = Path(arguments[arguments.index("--output-junit") + 1])
 failed = (build / "fail").exists() and sample == 2
-cases = [
-    ("Alpha.Fast", "core;unit", "run", 1000 + sample, "failure" if failed else ""),
-    ("Alpha.Disabled", "core;unit", "disabled", 0, ""),
-    ("Beta.Contract", "contract;runtime", "run", 2000 + sample, "skipped" if sample == 3 else ""),
-]
+exclude = arguments[arguments.index("-LE") + 1]
+if "-L" in arguments and re.search(
+    arguments[arguments.index("-L") + 1], "slow"
+):
+    cases = [] if re.search(exclude, "slow") else [
+        ("Slow.Stress", "geometry;slow", "run", 3000 + sample, ""),
+    ]
+else:
+    cases = [
+        ("Alpha.Fast", "core;unit", "run", 1000 + sample, "failure" if failed else ""),
+        ("Alpha.Disabled", "core;unit", "disabled", 0, ""),
+        ("Beta.Contract", "contract;runtime", "run", 2000 + sample, "skipped" if sample == 3 else ""),
+    ]
 lines = ['<?xml version="1.0" encoding="UTF-8"?>', '<testsuite name="timing">']
 for name, labels, status, micros, outcome in cases:
     lines.append(
@@ -164,6 +177,7 @@ class TestTimingTests(unittest.TestCase):
         build: Path,
         output: Path,
         *,
+        cohort: str = "pr-fast",
         samples: int = 5,
     ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -172,8 +186,8 @@ class TestTimingTests(unittest.TestCase):
                 str(TOOL),
                 "--build-dir",
                 str(build),
-                "--cohort",
-                "pr-fast",
+            "--cohort",
+            cohort,
                 "--samples",
                 str(samples),
                 "--parallel",
@@ -259,6 +273,30 @@ class TestTimingTests(unittest.TestCase):
                 command[command.index("--parallel") + 1],
                 "4",
             )
+            self.assertEqual(command[command.index("-L") + 1], "^(contract|unit)$")
+            self.assertEqual(
+                command[command.index("-LE") + 1],
+                "^(flaky-quarantine|gpu|slow|vulkan)$",
+            )
+
+    def test_cpu_slow_selector_anchors_slo_exclusion(self) -> None:
+        build = self.root / "build"
+        output = self.root / "timing"
+        _write_build(build)
+
+        result = self._run(build, output, cohort="cpu-slow", samples=1)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        report = json.loads((output / "report.json").read_text(encoding="utf-8"))
+        self.assertEqual(report["summary"]["selected_test_count"], 1)
+        self.assertEqual(report["cases"][0]["name"], "Slow.Stress")
+        command = json.loads(
+            (build / "commands.jsonl").read_text(encoding="utf-8").strip()
+        )
+        self.assertEqual(command[command.index("-L") + 1], "^(slow)$")
+        self.assertEqual(
+            command[command.index("-LE") + 1],
+            "^(benchmark|flaky-quarantine|gpu|slo|vulkan)$",
+        )
 
     def test_failed_sample_writes_actionable_report_and_returns_blocked(self) -> None:
         build = self.root / "build"

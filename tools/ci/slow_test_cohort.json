@@ -1,0 +1,23 @@
+{
+  "added_fast_sentinels": [
+    "Dimensions/ProgressivePoissonReferenceDim.SmallDeterministicCloudHoldsAtEveryLevelBoundary/2",
+    "Dimensions/ProgressivePoissonReferenceDim.SmallDeterministicCloudHoldsAtEveryLevelBoundary/3",
+    "ProgressivePoissonReference.CoincidentPairAcceptsExactlyOne",
+    "RuntimeAssetImportFormatCoverage.DirectMeshEnrichmentCloseDrainsSmallGeneratedGrid",
+    "Simplification_QEM.ConfigurableQuadricsSmallMeshSentinel",
+    "Simplification_QEM.HausdorffErrorConstraintSmallMeshSentinel",
+    "Simplification_QEM.ProbabilisticQuadricsSmallMeshSentinel",
+    "Simplification_QEM.RepeatedWorkflowSmallMeshSentinel"
+  ],
+  "moved_to_slow": [
+    "Dimensions/ProgressivePoissonReferenceDim.PoissonGuaranteeHoldsAtEveryLevelBoundary/2",
+    "Dimensions/ProgressivePoissonReferenceDim.PoissonGuaranteeHoldsAtEveryLevelBoundary/3",
+    "ProgressivePoissonReference.CoincidentPointsAcceptExactlyOne",
+    "RuntimeAssetImportFormatCoverage.DirectMeshEnrichmentCloseDrainsGeneratedGridAndCompletesDeterministically",
+    "Simplification_QEM.ConfigurableQuadricsSupportAllTypesResidencesAndPlacements",
+    "Simplification_QEM.HausdorffErrorConstraintIsRespected",
+    "Simplification_QEM.ProbabilisticQuadricsSupportIsotropicAndCovarianceModes",
+    "Simplification_QEM.RepeatedWorkflowStyleSimplificationStaysValid"
+  ],
+  "schema": "intrinsic.test-cohort-transition/v1"
+}

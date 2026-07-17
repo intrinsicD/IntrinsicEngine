@@ -326,6 +326,16 @@ if(TARGET ExtrinsicRuntime)
             ${_runtime_contract_test_sources}
         DEPS ExtrinsicRuntime IntrinsicProgressivePoissonReference imgui_core_lib nlohmann_json::nlohmann_json
     )
+
+    intrinsic_resolve_test_sources(_runtime_contract_slow_test_sources
+        SEARCH_DIRS contract/runtime
+        FILES Test.AssetImportFormatCoverageSlow.cpp
+    )
+    intrinsic_test_object_lib(RuntimeContractSlowTestObjs
+        SOURCES
+            ${_runtime_contract_slow_test_sources}
+        DEPS ExtrinsicRuntime
+    )
 endif()
 
 # --- Sandbox editor app/runtime integration (ARCH-006) ---
@@ -523,6 +533,19 @@ target_compile_definitions(GeometryTestObjs PRIVATE
     INTRINSIC_TEST_SUPPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/support"
 )
 
+intrinsic_resolve_test_sources(_geometry_slow_test_sources
+    SEARCH_DIRS unit/geometry
+    FILES Test.MeshOperationsSlow.cpp
+)
+intrinsic_test_object_lib(GeometrySlowTestObjs
+    SOURCES
+        ${_geometry_slow_test_sources}
+    DEPS ExtrinsicCore IntrinsicGeometry
+)
+target_compile_definitions(GeometrySlowTestObjs PRIVATE
+    INTRINSIC_TEST_SUPPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/support"
+)
+
 # --- Geometry method reference tests (CPU-only; methods/ package, no runtime/ECS) ---
 # METHOD-012 geometry.progressive_poisson CPU reference. The method package is
 # hermetic standard C++, so the object lib compiles its source directly and does
@@ -537,6 +560,16 @@ intrinsic_resolve_test_sources(_geometry_method_test_sources
 intrinsic_test_object_lib(GeometryMethodTestObjs
     SOURCES
         ${_geometry_method_test_sources}
+    DEPS ExtrinsicCore IntrinsicProgressivePoissonReference
+)
+
+intrinsic_resolve_test_sources(_geometry_method_slow_test_sources
+    SEARCH_DIRS unit/geometry
+    FILES Test.ProgressivePoissonReferenceSlow.cpp
+)
+intrinsic_test_object_lib(GeometryMethodSlowTestObjs
+    SOURCES
+        ${_geometry_method_slow_test_sources}
     DEPS ExtrinsicCore IntrinsicProgressivePoissonReference
 )
 
@@ -1002,6 +1035,14 @@ if(TARGET RuntimeContractTestObjs)
     )
 endif()
 
+if(TARGET RuntimeContractSlowTestObjs)
+    intrinsic_test_executable(IntrinsicRuntimeContractSlowTests
+        OBJECTS RuntimeContractSlowTestObjs
+        LINK_LIBS ExtrinsicRuntime
+        LABELS contract runtime slow
+    )
+endif()
+
 if(TARGET SandboxEditorIntegrationTestObjs)
     intrinsic_test_executable(IntrinsicSandboxEditorIntegrationTests
         OBJECTS SandboxEditorIntegrationTestObjs
@@ -1031,6 +1072,12 @@ intrinsic_test_executable(IntrinsicGeometryMethodTests
     LABELS unit geometry
 )
 
+intrinsic_test_executable(IntrinsicGeometryMethodSlowTests
+    OBJECTS GeometryMethodSlowTestObjs
+    LINK_LIBS ExtrinsicCore IntrinsicProgressivePoissonReference
+    LABELS unit geometry slow
+)
+
 # --- Physics world tests (CPU-only) ---
 intrinsic_test_executable(IntrinsicPhysicsWorldTests
     OBJECTS PhysicsWorldTestObjs
@@ -1051,6 +1098,12 @@ intrinsic_test_executable(IntrinsicGeometryTests
     OBJECTS  GeometryTestObjs
     LINK_LIBS ExtrinsicCore IntrinsicGeometry
     LABELS unit geometry
+)
+
+intrinsic_test_executable(IntrinsicGeometrySlowTests
+    OBJECTS GeometrySlowTestObjs
+    LINK_LIBS ExtrinsicCore IntrinsicGeometry
+    LABELS unit geometry slow
 )
 
 intrinsic_test_executable(IntrinsicAssetUnitTests

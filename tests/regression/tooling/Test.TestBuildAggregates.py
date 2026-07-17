@@ -65,7 +65,7 @@ class TestBuildAggregateTests(unittest.TestCase):
             "VulkanOnly": {"vulkan", "graphics"},
             "GpuVulkan": {"gpu", "vulkan", "graphics"},
             "Quarantined": {"unit", "flaky-quarantine"},
-            "BenchmarkCpu": {"benchmark", "geometry"},
+            "BenchmarkCpu": {"benchmark", "geometry", "slow", "slo"},
         }
         registration_lines = []
         for target, labels in registrations.items():
@@ -93,7 +93,7 @@ class TestBuildAggregateTests(unittest.TestCase):
                 (
                     "intrinsic_add_test_aggregate(NAME IntrinsicCpuSlowTests "
                     "INCLUDE_ALL slow "
-                    "EXCLUDE_ANY gpu vulkan flaky-quarantine)"
+                    "EXCLUDE_ANY benchmark slo gpu vulkan flaky-quarantine)"
                 ),
                 (
                     "intrinsic_add_test_aggregate(NAME IntrinsicGpuVulkanTests "
@@ -133,7 +133,13 @@ class TestBuildAggregateTests(unittest.TestCase):
                     for target, labels in registrations.items()
                     if "slow" in labels
                     and not labels.intersection(
-                        {"gpu", "vulkan", "flaky-quarantine"}
+                        {
+                            "benchmark",
+                            "slo",
+                            "gpu",
+                            "vulkan",
+                            "flaky-quarantine",
+                        }
                     )
                 },
                 "IntrinsicGpuVulkanTests": {

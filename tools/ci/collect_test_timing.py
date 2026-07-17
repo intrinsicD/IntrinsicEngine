@@ -56,7 +56,7 @@ COHORTS = {
     "cpu-slow": Cohort(
         aggregate="IntrinsicCpuSlowTests",
         include_any=("slow",),
-        exclude_any=("flaky-quarantine", "gpu", "vulkan"),
+        exclude_any=("benchmark", "flaky-quarantine", "gpu", "slo", "vulkan"),
         timeout_seconds=120,
     ),
 }
@@ -439,11 +439,11 @@ def _ctest_command(
         "--output-on-failure",
     ]
     if cohort.include_any:
-        command.extend(("-L", "|".join(cohort.include_any)))
+        command.extend(("-L", f"^({'|'.join(cohort.include_any)})$"))
     command.extend(
         (
             "-LE",
-            "|".join(cohort.exclude_any),
+            f"^({'|'.join(cohort.exclude_any)})$",
             "--no-tests=error",
             "--timeout",
             str(cohort.timeout_seconds),
