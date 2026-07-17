@@ -78,7 +78,23 @@ add_coverage_test(
     "Beta.CoversBothArms"
 )
 
-set(cpu_targets AlphaTests BetaTests)
+add_executable(
+    ManualTests
+    "${CMAKE_SOURCE_DIR}/src/manual.cpp"
+    "${CMAKE_SOURCE_DIR}/tests/manual_test.cpp"
+)
+target_compile_features(ManualTests PRIVATE cxx_std_23)
+target_compile_options(
+    ManualTests
+    PRIVATE
+    -fprofile-instr-generate
+    -fcoverage-mapping
+)
+target_link_options(ManualTests PRIVATE -fprofile-instr-generate)
+add_test(NAME "Manual.Contract" COMMAND ManualTests)
+set_tests_properties("Manual.Contract" PROPERTIES LABELS "core;unit")
+
+set(cpu_targets AlphaTests BetaTests ManualTests)
 if(INCLUDE_UNINSTRUMENTED)
     add_executable(
         PlainTests
@@ -135,6 +151,7 @@ if(INCLUDE_XML_OMISSION)
     list(APPEND cpu_targets LiarTests)
 endif()
 
+list(SORT cpu_targets)
 add_custom_target(IntrinsicCpuTests DEPENDS ${cpu_targets})
 
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/test-inventories")
@@ -207,6 +224,20 @@ int main(int argc, char** argv) {
     }
     fake_gtest::write_xml(arguments, "Beta", "CoversBothArms");
     return beta_value(2) + beta_value(3);
+}
+"""
+
+MANUAL_SOURCE = r"""
+[[gnu::noinline]] int manual_value() {
+    return 0;
+}
+"""
+
+MANUAL_TEST = r"""
+int manual_value();
+
+int main() {
+    return manual_value();
 }
 """
 
@@ -531,6 +562,7 @@ class SourceCoverageTests(unittest.TestCase):
         _write(cls.source_root / "CMakeLists.txt", CMAKE_PROJECT)
         _write(cls.source_root / "src" / "alpha.cpp", ALPHA_SOURCE)
         _write(cls.source_root / "src" / "beta.cpp", BETA_SOURCE)
+        _write(cls.source_root / "src" / "manual.cpp", MANUAL_SOURCE)
         _write(cls.source_root / "src" / "plain.cpp", PLAIN_SOURCE)
         _write(cls.source_root / "src" / "no_profile.cpp", NO_PROFILE_SOURCE)
         _write(cls.source_root / "src" / "liar.cpp", LIAR_SOURCE)
@@ -541,6 +573,7 @@ class SourceCoverageTests(unittest.TestCase):
         )
         _write(cls.source_root / "tests" / "alpha_test.cpp", ALPHA_TEST)
         _write(cls.source_root / "tests" / "beta_test.cpp", BETA_TEST)
+        _write(cls.source_root / "tests" / "manual_test.cpp", MANUAL_TEST)
         _write(cls.source_root / "tests" / "plain_test.cpp", PLAIN_TEST)
         _write(
             cls.source_root / "tests" / "no_profile_test.cpp",
@@ -706,17 +739,20 @@ class SourceCoverageTests(unittest.TestCase):
         self.assertEqual(
             inventory["summary"],
             {
-                "ctest_test_count": 2,
+                "ctest_test_count": 3,
                 "enabled_gtest_case_count": 2,
                 "gtest_target_count": 2,
-                "manual_ctest_test_count": 0,
-                "manual_target_count": 0,
-                "target_count": 2,
+                "manual_ctest_test_count": 1,
+                "manual_target_count": 1,
+                "target_count": 3,
             },
         )
+        targets_by_name = {
+            target["name"]: target for target in inventory["targets"]
+        }
         self.assertEqual(
-            {target["name"] for target in inventory["targets"]},
-            {"AlphaTests", "BetaTests"},
+            set(targets_by_name),
+            {"AlphaTests", "BetaTests", "ManualTests"},
         )
         self.assertEqual(
             {
@@ -734,18 +770,28 @@ class SourceCoverageTests(unittest.TestCase):
             },
             {"Alpha.CoversBothArms", "Beta.CoversBothArms"},
         )
-        for target in inventory["targets"]:
+        for target in (
+            targets_by_name["AlphaTests"],
+            targets_by_name["BetaTests"],
+        ):
             self.assertEqual(target["labels"], ["core", "unit"])
             self.assertEqual(target["ctest_tests"], [])
             self.assertEqual(target["cases"][0]["labels"], ["core", "unit"])
             self.assertFalse(target["cases"][0]["disabled"])
+        manual = targets_by_name["ManualTests"]
+        self.assertEqual(manual["kind"], "manual")
+        self.assertEqual(manual["cases"], [])
+        self.assertEqual(
+            [test["ctest_name"] for test in manual["ctest_tests"]],
+            ["Manual.Contract"],
+        )
 
         objects = {Path(path).name for path in report["objects"]}
-        self.assertEqual(objects, {"AlphaTests", "BetaTests"})
+        self.assertEqual(objects, {"AlphaTests", "BetaTests", "ManualTests"})
         profiles = report["profiles"]
         self.assertEqual(
             {target["target"] for target in profiles["targets"]},
-            {"AlphaTests", "BetaTests"},
+            {"AlphaTests", "BetaTests", "ManualTests"},
         )
         execution_profiles: list[str] = []
         probe_profiles: list[str] = []
@@ -756,8 +802,8 @@ class SourceCoverageTests(unittest.TestCase):
             execution_profiles.extend(target["execution_raw_profiles"])
         self.assertEqual(len(probe_profiles), len(set(probe_profiles)))
         self.assertEqual(len(execution_profiles), len(set(execution_profiles)))
-        self.assertGreaterEqual(len(probe_profiles), 2)
-        self.assertGreaterEqual(len(execution_profiles), 2)
+        self.assertGreaterEqual(len(probe_profiles), 3)
+        self.assertGreaterEqual(len(execution_profiles), 3)
         self.assertEqual(
             profiles["execution_raw_profile_count"],
             len(execution_profiles),
@@ -790,6 +836,9 @@ class SourceCoverageTests(unittest.TestCase):
         )
         for target in profiles["targets"]:
             result_path = target["gtest_result_xml"]
+            if target["kind"] == "manual":
+                self.assertIsNone(result_path)
+                continue
             self.assertIsInstance(result_path, str)
             result = self.report_a / result_path
             self.assertTrue(result.is_file(), result)

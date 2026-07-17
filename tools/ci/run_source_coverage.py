@@ -482,7 +482,7 @@ def _execute_manual_target(
     ]
     if not names:
         raise CoverageError(f"{target['name']}: zero manual CTest registrations")
-    selector = "^(?:" + "|".join(re.escape(name) for name in names) + ")$"
+    selector = "^(" + "|".join(re.escape(name) for name in names) + ")$"
     raw_dir = output / "raw" / prefix
     raw_dir.mkdir(parents=True, exist_ok=True)
     environment = dict(common_environment)
