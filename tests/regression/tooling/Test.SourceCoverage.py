@@ -570,6 +570,7 @@ class SourceCoverageTests(unittest.TestCase):
     build_renamed_targets: Path
     report_a: Path
     report_b: Path
+    report_parallel: Path
     report_moved_manual_working_directory: Path
     report_moved_working_directory: Path
     report_renamed_targets: Path
@@ -650,19 +651,27 @@ class SourceCoverageTests(unittest.TestCase):
             cls.build_renamed_targets,
             rename_test_targets=True,
         )
-        cls.report_a = cls._collect(cls.build_a, "coverage-a")
-        cls.report_b = cls._collect(cls.build_b, "coverage-b")
+        cls.report_a = cls._collect(cls.build_a, "coverage-a", jobs=1)
+        cls.report_b = cls._collect(cls.build_b, "coverage-b", jobs=1)
+        cls.report_parallel = cls._collect(
+            cls.build_a,
+            "coverage-parallel",
+            jobs=2,
+        )
         cls.report_moved_manual_working_directory = cls._collect(
             cls.build_moved_manual_working_directory,
             "coverage-moved-manual-working-directory",
+            jobs=1,
         )
         cls.report_moved_working_directory = cls._collect(
             cls.build_moved_working_directory,
             "coverage-moved-working-directory",
+            jobs=1,
         )
         cls.report_renamed_targets = cls._collect(
             cls.build_renamed_targets,
             "coverage-renamed-targets",
+            jobs=1,
         )
 
     @classmethod
@@ -725,6 +734,7 @@ class SourceCoverageTests(unittest.TestCase):
         output: Path,
         *,
         cohort: str | None = None,
+        jobs: int = 1,
         llvm_profdata: str | None = None,
     ) -> list[str]:
         command = [
@@ -737,7 +747,7 @@ class SourceCoverageTests(unittest.TestCase):
             "--preset",
             "synthetic-coverage",
             "--jobs",
-            "2",
+            str(jobs),
             "--reconciler",
             str(cls.reconciler),
             "--llvm-cov",
@@ -758,11 +768,17 @@ class SourceCoverageTests(unittest.TestCase):
         name: str,
         *,
         cohort: str | None = None,
+        jobs: int = 1,
     ) -> Path:
         output = cls.root / name
         shutil.rmtree(output, ignore_errors=True)
         _run(
-            cls._coverage_command(build_dir, output, cohort=cohort),
+            cls._coverage_command(
+                build_dir,
+                output,
+                cohort=cohort,
+                jobs=jobs,
+            ),
             cwd=cls.root,
             timeout=180,
         )
@@ -875,6 +891,7 @@ class SourceCoverageTests(unittest.TestCase):
         ]
         execution["case_working_directory_digest"] = _json_digest(records)
         execution["case_working_directory_record_count"] = len(records)
+        execution["test_inventory_digest"] = inventory["digest"]
         execution["working_directory_digest"] = _json_digest(
             {
                 target["name"]: target["working_directory_identity"]
@@ -1013,11 +1030,13 @@ class SourceCoverageTests(unittest.TestCase):
         )
 
     def test_parallel_collection_merges_every_producer_and_exact_case(self) -> None:
-        report = _load_json(self.report_a / "coverage.json")
-        inventory = _load_json(self.report_a / "test-inventory.json")
+        output = self.report_parallel
+        report = _load_json(output / "coverage.json")
+        inventory = _load_json(output / "test-inventory.json")
 
         self.assertEqual(report["schema"], "intrinsic.cpu-source-coverage/v2")
         self.assertEqual(inventory["schema"], "intrinsic.cpu-test-inventory/v2")
+        self.assertEqual(report["identity"]["execution"]["producer_jobs"], 2)
         self.assertEqual(inventory["aggregate"], "IntrinsicCpuTests")
         self.assertEqual(inventory["common_environment"], [])
         self.assertEqual(
@@ -1035,6 +1054,8 @@ class SourceCoverageTests(unittest.TestCase):
             report["identity"]["execution"]["case_working_directory_record_count"],
             3,
         )
+        diagnostics = _load_json(output / "diagnostics.json")
+        self.assertEqual(diagnostics["producer_jobs"], 2)
 
     def test_named_cpu_coverage_cohort_binds_aggregate_and_label_identity(
         self,
@@ -1151,8 +1172,9 @@ class SourceCoverageTests(unittest.TestCase):
             report["artifacts"]["discovery_profiles"],
             "discovery-profiles",
         )
-        diagnostics = _load_json(self.report_a / "diagnostics.json")
+        diagnostics = _load_json(output / "diagnostics.json")
         self.assertEqual(diagnostics["gtest_result_xml_count"], 2)
+        self.assertEqual(diagnostics["producer_jobs"], 1)
         self.assertEqual(
             diagnostics["discovery_raw_profile_count"],
             len(discovery_profiles),
@@ -1163,7 +1185,7 @@ class SourceCoverageTests(unittest.TestCase):
                 self.assertIsNone(result_path)
                 continue
             self.assertIsInstance(result_path, str)
-            result = self.report_a / result_path
+            result = output / result_path
             self.assertTrue(result.is_file(), result)
             cases = {
                 f"{case.attrib['classname']}.{case.attrib['name']}"
@@ -1174,9 +1196,23 @@ class SourceCoverageTests(unittest.TestCase):
                 "BetaTests": "Beta.CoversBothArms",
             }
             self.assertEqual(cases, {expected[target["target"]]})
-        self.assertTrue((self.report_a / "merged" / "coverage.profdata").is_file())
-        self.assertTrue((self.report_a / "llvm-cov-export.json").is_file())
-        self.assertTrue((self.report_a / "diagnostics.json").is_file())
+        self.assertTrue((output / "merged" / "coverage.profdata").is_file())
+        self.assertTrue((output / "llvm-cov-export.json").is_file())
+        self.assertTrue((output / "diagnostics.json").is_file())
+
+    def test_serial_collection_binds_inventory_and_reports_protocol(self) -> None:
+        report = _load_json(self.report_a / "coverage.json")
+        inventory = _load_json(self.report_a / "test-inventory.json")
+        diagnostics = _load_json(self.report_a / "diagnostics.json")
+        execution = report["identity"]["execution"]
+
+        self.assertEqual(
+            execution["schema"],
+            "intrinsic.cpu-source-coverage-execution/v3",
+        )
+        self.assertEqual(execution["producer_jobs"], 1)
+        self.assertEqual(diagnostics["producer_jobs"], 1)
+        self.assertEqual(execution["test_inventory_digest"], inventory["digest"])
 
     def test_reports_are_path_normalized_and_equal_across_build_directories(
         self,
@@ -1188,7 +1224,19 @@ class SourceCoverageTests(unittest.TestCase):
             self.report_b / "coverage.json",
             check=True,
         )
-        self.assertEqual(baseline["identity"], candidate["identity"])
+        baseline_identity = copy.deepcopy(baseline["identity"])
+        candidate_identity = copy.deepcopy(candidate["identity"])
+        baseline_inventory_digest = baseline_identity["execution"].pop(
+            "test_inventory_digest"
+        )
+        candidate_inventory_digest = candidate_identity["execution"].pop(
+            "test_inventory_digest"
+        )
+        self.assertNotEqual(
+            baseline_inventory_digest,
+            candidate_inventory_digest,
+        )
+        self.assertEqual(baseline_identity, candidate_identity)
 
         for key in (
             "covered_lines",
@@ -1512,7 +1560,7 @@ class SourceCoverageTests(unittest.TestCase):
         )
 
     def test_test_cohort_transition_inventory_proof_fails_closed(self) -> None:
-        for scenario in ("digest", "report-binding"):
+        for scenario in ("digest", "ctest-name-binding", "report-binding"):
             with self.subTest(scenario=scenario):
                 baseline, candidate, manifest = self._transition_fixture(
                     f"cohort-inventory-{scenario}"
@@ -1521,6 +1569,17 @@ class SourceCoverageTests(unittest.TestCase):
                     inventory_path = candidate.parent / "test-inventory.json"
                     inventory = _load_json(inventory_path)
                     inventory["digest"] = "0" * 64
+                    inventory_path.write_text(
+                        json.dumps(inventory, indent=2, sort_keys=True) + "\n",
+                        encoding="utf-8",
+                    )
+                elif scenario == "ctest-name-binding":
+                    inventory_path = candidate.parent / "test-inventory.json"
+                    inventory = _load_json(inventory_path)
+                    inventory["targets"][0]["cases"][0]["ctest_name"] = (
+                        "Renamed.WithoutReportRebind"
+                    )
+                    self._refresh_inventory_digest(inventory)
                     inventory_path.write_text(
                         json.dumps(inventory, indent=2, sort_keys=True) + "\n",
                         encoding="utf-8",
@@ -1545,6 +1604,28 @@ class SourceCoverageTests(unittest.TestCase):
                     result.stdout,
                     r"(?is)(?:inventory|digest|binding|record_count|case count)",
                 )
+
+    def test_test_cohort_transition_rejects_parallel_producers(self) -> None:
+        baseline, candidate, manifest = self._transition_fixture(
+            "cohort-parallel-producers"
+        )
+        report = _load_json(candidate)
+        report["identity"]["execution"]["producer_jobs"] = 2
+        candidate.write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        result = self._compare_transition(
+            baseline,
+            candidate,
+            manifest,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertRegex(
+            result.stdout,
+            r"(?is)(?:serialize|producer_jobs=1|parallel)",
+        )
 
     def test_test_cohort_transition_rejects_common_working_directory_drift(
         self,
@@ -1598,6 +1679,14 @@ class SourceCoverageTests(unittest.TestCase):
                 self._refresh_inventory_digest(inventory)
                 inventory_path.write_text(
                     json.dumps(inventory, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+                report = _load_json(candidate)
+                report["identity"]["execution"]["test_inventory_digest"] = (
+                    inventory["digest"]
+                )
+                candidate.write_text(
+                    json.dumps(report, indent=2, sort_keys=True) + "\n",
                     encoding="utf-8",
                 )
                 result = self._compare_transition(
