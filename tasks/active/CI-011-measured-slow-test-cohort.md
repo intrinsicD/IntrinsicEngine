@@ -4,9 +4,16 @@ theme: H
 depends_on:
   - CI-003
   - CI-005
+  - CI-006
   - CI-010
 ---
 # CI-011 — Calibrate the slow-test cohort and retain fast sentinels
+
+## Status
+- In progress on 2026-07-17; owner: Codex; branch: `main`.
+- Next verification: add the fail-closed five-sample hosted timing collector,
+  capture comparable `pr-fast` and full-CPU populations, and classify only
+  candidates supported by that evidence.
 
 ## Goal
 - Move only repeatedly measured long-running or stress variants out of fast
