@@ -48,6 +48,89 @@ completed and strictly validated all 22 results. These numbers justify lane
 classification only; they are not a kernel-performance comparison or speedup
 claim.
 
+## CPU source-coverage policy
+
+The manually dispatched `ci-source-coverage` workflow owns the reproducible
+Clang CPU source-coverage baseline. It is intentionally absent from pull
+request and default-branch triggers until `CI-009` reviews heavy-gate lifecycle
+placement. The workflow uses the unsanitized `ci-coverage-cpu` preset and
+builds only `IntrinsicCpuTests`; the canonical Linux/Vulkan/Glfw identity is
+explicit so CPU-side Vulkan and GLFW contracts are not silently omitted.
+
+Coverage evidence has a narrower meaning than correctness evidence:
+
+| Evidence | What it proves | What it does not prove |
+| --- | --- | --- |
+| Exact test inventory | The intended executable/case/label set was selected. | That an assertion is meaningful or passed. |
+| Covered line/function/region/branch sets | Instrumented execution reached those mapped production locations. | That the reached behavior was checked correctly. |
+| Assertions and contract tests | The encoded invariant held for the exercised inputs. | That an untested backend or path operated. |
+| Non-skipped backend evidence | The named capability path executed on the recorded backend. | General source completeness or performance. |
+
+Consequently, a global percentage is diagnostic only. It is not a permanent
+threshold and equal or higher percentages do not establish no-loss parity.
+For a test-only refactor, the comparison first requires identical production
+source, production CMake/preset/dependency inputs, normalized production
+compile commands, compiler and LLVM tools, preset/backend identity, exclusion
+policy, and execution mode. It then fails when any previously covered
+production region or either outcome of a covered branch disappears. New
+coverage is allowed. Changed-production-line coverage is emitted separately as
+informational diff evidence; threshold policy waits for repeated baselines
+under `CI-009`.
+
+### Included and excluded sources
+
+The engine-owned production roots are C++ source and headers under `src/` and
+`methods/`. The deterministic exclusion policy removes tests, benchmarks,
+configured build/generated files, checked-in assets, vcpkg and other external
+or third-party code, and compiler/runtime sources. LLVM's full JSON export is
+retained beside the normalized report so filtering and summary calculations
+remain auditable.
+
+Every executable in the generated `IntrinsicCpuTests.txt` inventory must
+exist, match the CPU selection derived from `RegisteredTestTargets.tsv`, emit
+an instrumented profile, and appear in the one `llvm-cov` object set.
+GoogleTest producers run once with the exact enabled-case filter derived from
+CTest, and their machine-readable XML must name that exact executed set;
+manual producers run through CTest separately. This coverage-reporting-only
+batching reduces thousands of process/profile shards without changing the
+authoritative case-isolated correctness gate. Profile paths include the target
+plus `%m-%p`, and all execution shards merge with
+`llvm-profdata --failure-mode=any`; missing or corrupt inputs fail nonzero.
+CTest discovery uses a separate collision-safe profile namespace retained for
+diagnostics and never merged into execution evidence.
+
+### Artifacts and reproduction
+
+`coverage.json` records schema version, production source/build-input and
+compile-command digests, compiler/tool versions, preset/build/backend identity,
+the exclusion policy, profile diagnostics, per-file summaries, and normalized
+covered line, function, region, and true/false branch-outcome keys. The
+artifact also retains the exact case/label/executable inventory in
+`test-inventory.json`, per-target GoogleTest XML, raw `llvm-cov` JSON, raw
+profiles, the merged profile, per-executable logs, and failure diagnostics. The
+named hosted run and gate-timing artifact identify the commit. Absolute
+source/build paths are normalized out of comparable identities.
+
+Local reproduction is:
+
+```bash
+cmake --preset ci-coverage-cpu --fresh
+cmake --build --preset ci-coverage-cpu --target IntrinsicCpuTests
+python3 tools/ci/run_source_coverage.py \
+  --build-dir build/ci-coverage-cpu \
+  --output build/ci-coverage-cpu/coverage \
+  --preset ci-coverage-cpu \
+  --diff-base HEAD^
+python3 tools/ci/compare_source_coverage.py \
+  --baseline <baseline>/coverage.json \
+  --candidate build/ci-coverage-cpu/coverage/coverage.json \
+  --test-only-refactor
+```
+
+The output directory must be absent or empty so stale raw profiles cannot enter
+a new result. A claim-grade full baseline names the hosted workflow run and
+artifact rather than checking the potentially large profile set into Git.
+
 ## Nightly/deep expectations
 
 - Run deeper correctness/performance suites.

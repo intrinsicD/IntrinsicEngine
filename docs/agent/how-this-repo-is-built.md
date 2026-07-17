@@ -128,6 +128,7 @@ coverage, and expensive evidence visible as distinct jobs:
 | [`ci-sanitizers.yml`](../../.github/workflows/ci-sanitizers.yml) | Dedicated sanitizer variants. |
 | [`ci-vulkan.yml`](../../.github/workflows/ci-vulkan.yml) | Opt-in promoted Vulkan build and GPU/Vulkan-labeled operational tests. |
 | [`ci-bench-smoke.yml`](../../.github/workflows/ci-bench-smoke.yml) | Bounded benchmark smoke execution and strict result validation. |
+| [`ci-source-coverage.yml`](../../.github/workflows/ci-source-coverage.yml) | Manually dispatched, unsanitized Clang CPU source-coverage baseline and test-refactor region/branch parity evidence. |
 | [`nightly-deep.yml`](../../.github/workflows/nightly-deep.yml) | Scheduled deeper, slower, and diagnostic coverage. |
 
 The [benchmark CI policy](../benchmarking/ci-policy.md) owns benchmark-specific

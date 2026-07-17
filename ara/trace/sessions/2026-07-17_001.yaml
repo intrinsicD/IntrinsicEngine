@@ -2,9 +2,9 @@ session:
   id: "2026-07-17_001"
   date: "2026-07-17"
   started: "2026-07-17T00:22+02:00"
-  last_turn: "2026-07-17T09:03+02:00"
-  turn_count: 4
-  summary: "Materialized and committed the selective-adaptation backlog, reproduced BUG-107's configure-history drift, and implemented BUG-106's workflow/documentation routing lane."
+  last_turn: "2026-07-17T11:30+02:00"
+  turn_count: 9
+  summary: "Materialized and committed the selective-adaptation backlog, reproduced BUG-107's configure-history drift, implemented BUG-106 routing, and established plus adversarially validated CI-010's exact source-coverage lane."
 
 events_logged:
   - turn: 1
@@ -43,6 +43,36 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Wired aggregate reconciliation and retained non-skipped readback JUnit evidence into the required CPU/Vulkan CI workflows."
+  - turn: 5
+    type: experiment
+    id: "N249"
+    routing: direct
+    provenance: ai-executed
+    summary: "Added and locally validated CI-010's instrumented CPU coverage preset and manual hosted workflow lane."
+  - turn: 6
+    type: experiment
+    id: "N250"
+    routing: direct
+    provenance: ai-executed
+    summary: "Passed 11 LLVM 20 regressions for complete multi-producer coverage collection and fail-closed region/branch parity."
+  - turn: 7
+    type: experiment
+    id: "N251"
+    routing: direct
+    provenance: ai-executed
+    summary: "Reconciled the real 4,061-case CPU graph and hardened collection for exact CTest execution plus LLVM 20 portability."
+  - turn: 8
+    type: experiment
+    id: "N252"
+    routing: direct
+    provenance: ai-executed
+    summary: "Closed XML execution, discovery-profile isolation, and production-build-input identity gaps with 13 passing regressions."
+  - turn: 9
+    type: experiment
+    id: "N253"
+    routing: direct
+    provenance: ai-executed
+    summary: "Passed 13 LLVM 20 regressions including exact execution XML, discovery-profile isolation, and production-build-input parity."
 
 ai_actions:
   - turn: 1
@@ -108,6 +138,61 @@ ai_actions:
       - "ara/trace/pm_reasoning_log.yaml"
       - "ara/trace/sessions/2026-07-17_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
+  - turn: 5
+    action: "Implemented the CI-010 source-coverage CMake option, explicit preset, manual workflow, workflow policy regressions, and target-layout entry; validated generated instrumentation commands and focused CI contracts."
+    provenance: ai-executed
+    files_changed:
+      - "CMakeLists.txt"
+      - "CMakePresets.json"
+      - ".github/workflows/ci-source-coverage.yml"
+      - "tools/ci/check_workflow_names.py"
+      - "tests/regression/tooling/Test.CiTiming.py"
+      - "tests/regression/tooling/Test.WorkflowConcurrency.py"
+      - "docs/migration/target-repo-layout.md"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-07-17_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+  - turn: 6
+    action: "Implemented and ran the CI-010 synthetic source-coverage regression harness with two clean builds, two independently instrumented producers, exact inventory and shard assertions, and eleven fail-closed parity cases."
+    provenance: ai-executed
+    files_changed:
+      - "tests/regression/tooling/Test.SourceCoverage.py"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-07-17_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+  - turn: 7
+    action: "Implemented the CI-010 canonical collector, normalization and parity library, and comparison CLI; reconciled the real CPU inventory and reran all regressions with both default and explicitly forced LLVM 20 tools."
+    provenance: ai-executed
+    files_changed:
+      - "tools/ci/source_coverage.py"
+      - "tools/ci/run_source_coverage.py"
+      - "tools/ci/compare_source_coverage.py"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-07-17_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+  - turn: 8
+    action: "Added exact GoogleTest XML execution reconciliation, isolated and retained never-merged discovery profiles, and deterministic production-build-input parity identity; reran thirteen regressions with default and forced LLVM 20 tools."
+    provenance: ai-executed
+    files_changed:
+      - "tools/ci/source_coverage.py"
+      - "tools/ci/run_source_coverage.py"
+      - "tools/ci/compare_source_coverage.py"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-07-17_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+  - turn: 9
+    action: "Extended the CI-010 synthetic harness with strict GoogleTest XML producers, a zero-exit execution-omission adversary, isolated discovery-profile propagation, retained artifact assertions, and production-build-input parity drift."
+    provenance: ai-executed
+    files_changed:
+      - "tests/regression/tooling/Test.SourceCoverage.py"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-07-17_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
 
 claims_touched: []
 
@@ -120,6 +205,16 @@ key_context:
     excerpt: "BUG-107 was requested as a read-only readiness and exact-fix analysis because it must unlock CI-005 and CI-010."
   - turn: 4
     excerpt: "BUG-106 requires capability-truthful CPU/GPU aggregate reconciliation and retained non-skipped hosted readback evidence."
+  - turn: 5
+    excerpt: "CI-010 requires a reproducible unsanitized Clang CPU source-coverage baseline without adding redundant PR or default-branch execution."
+  - turn: 6
+    excerpt: "CI-010 synthetic evidence must prove every selected executable and profile shard participates, and parity must reject lost covered regions or branch arms regardless of aggregate percentages."
+  - turn: 7
+    excerpt: "CI-010 collection must preserve the canonical registry, labels, enabled cases, executables, CTest working directories, and exact compiler/backend/exclusion identity while remaining compatible with LLVM 20."
+  - turn: 8
+    excerpt: "CI-010 must prove the exact enabled cases actually executed, prevent discovery profiles from contaminating coverage, and reject production build-topology drift during test-only parity."
+  - turn: 9
+    excerpt: "A successful GoogleTest process and nonempty profile are insufficient execution proof when its retained XML omits a requested enabled case; discovery profiles must also remain isolated from the canonical merge."
 
 open_threads:
   - "Select the next bounded architecture/runtime slice; RUNTIME-168 is the smallest reviewed private-surface candidate, while ARCH-014 remains the umbrella that gates REVIEW-003."
@@ -138,6 +233,7 @@ open_threads:
   - "Keep Gaussian/GMM analytic derivatives deferred until a production method consumes them."
   - "Preserve the two unprovenanced local model files outside task, research, commit, and publication scope."
   - "Implement BUG-107 by defining global backend inputs before renderer consumption, pinning current CI identity, and comparing normalized clean/warm/fresh target and test inventories before starting CI-005 or CI-010."
+  - "Complete CI-010's integrated instrumented build, source-coverage collection, self-parity check, and named hosted baseline before retirement."
 
 ai_suggestions_pending:
   - "Use RUNTIME-168 as the next small convergence slice before larger RUNTIME-166 or ARCH-015 work."

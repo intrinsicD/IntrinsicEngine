@@ -37,6 +37,7 @@ WARM_CONFIGURE_CALL_COUNTS = {
     "ci-sanitizers.yml": 1,
     "ci-vulkan.yml": 1,
     "ci-bench-smoke.yml": 1,
+    "ci-source-coverage.yml": 1,
     "nightly-deep.yml": 2,
 }
 TIMING_WORKFLOW_BUILD_DIRS = {
@@ -45,6 +46,7 @@ TIMING_WORKFLOW_BUILD_DIRS = {
     "ci-vulkan.yml": "build/ci-vulkan",
     "ci-bench-smoke.yml": "build/ci",
     "ci-sanitizers.yml": "build/ci",
+    "ci-source-coverage.yml": "build/ci-coverage-cpu",
 }
 
 

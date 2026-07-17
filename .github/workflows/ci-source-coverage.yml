@@ -1,0 +1,147 @@
+name: ci-source-coverage
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cpu-source-coverage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            clang-20 \
+            clang-tools-20 \
+            llvm-20 \
+            python3 \
+            python3-yaml \
+            libx11-dev \
+            libxcursor-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxi-dev \
+            libxext-dev \
+            libxfixes-dev \
+            libwayland-dev \
+            libxkbcommon-dev \
+            libgl1-mesa-dev \
+            libvulkan-dev \
+            vulkan-tools \
+            spirv-tools
+
+      - name: Cache vcpkg binary packages
+        id: vcpkg-cache
+        uses: actions/cache@v4
+        with:
+          path: external/vcpkg-bincache
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'tools/vcpkg/**', 'tools/setup/bootstrap_vcpkg.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-
+
+      - name: Bootstrap vcpkg
+        run: tools/setup/bootstrap_vcpkg.sh
+
+      - name: Enable vcpkg binary cache
+        run: echo "VCPKG_BINARY_SOURCES=clear;files,${GITHUB_WORKSPACE}/external/vcpkg-bincache,readwrite" >> "$GITHUB_ENV"
+
+      - name: Validate source-coverage tooling regressions
+        run: python3 tests/regression/tooling/Test.SourceCoverage.py
+
+      - name: Configure (ci-coverage-cpu preset)
+        run: |
+          python3 tools/ci/time_command.py \
+            --label "Configure (ci-coverage-cpu preset)" \
+            --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
+            --max-warm-seconds 40 \
+            --json-out build/ci-coverage-cpu/ci-timing/phases/configure.json \
+            -- cmake --preset ci-coverage-cpu --fresh
+
+      - name: Build canonical CPU test cohort
+        run: |
+          python3 tools/ci/time_command.py \
+            --label "Build canonical CPU test cohort" \
+            --json-out build/ci-coverage-cpu/ci-timing/phases/build.json \
+            -- cmake --build --preset ci-coverage-cpu --target IntrinsicCpuTests
+
+      - name: Collect canonical CPU source coverage
+        run: |
+          python3 tools/ci/time_command.py \
+            --label "Collect canonical CPU source coverage" \
+            --json-out build/ci-coverage-cpu/ci-timing/phases/test.json \
+            -- python3 tools/ci/run_source_coverage.py \
+            --build-dir build/ci-coverage-cpu \
+            --output build/ci-coverage-cpu/coverage \
+            --preset ci-coverage-cpu \
+            --diff-base HEAD^ \
+            --jobs 2
+
+      - name: Validate source-coverage self parity
+        run: |
+          python3 tools/ci/compare_source_coverage.py \
+            --baseline build/ci-coverage-cpu/coverage/coverage.json \
+            --candidate build/ci-coverage-cpu/coverage/coverage.json \
+            --test-only-refactor
+
+      - name: Aggregate gate timing result
+        if: always()
+        run: |
+          context_args=()
+          if selected_tests="$(ctest --test-dir build/ci-coverage-cpu --show-only=json-v1 -LE "gpu|vulkan|slow|flaky-quarantine" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"; then
+            context_args+=(--selected-test-count "$selected_tests")
+          fi
+          if ninja_edges="$(ninja -C build/ci-coverage-cpu -t commands IntrinsicCpuTests | sed '/^[[:space:]]*$/d' | wc -l)"; then
+            context_args+=(--ninja-edge-count "$ninja_edges")
+          fi
+          python3 tools/ci/aggregate_gate_timing.py \
+            --configure-json build/ci-coverage-cpu/ci-timing/phases/configure.json \
+            --build-json build/ci-coverage-cpu/ci-timing/phases/build.json \
+            --test-json build/ci-coverage-cpu/ci-timing/phases/test.json \
+            --gate ci-source-coverage \
+            --preset ci-coverage-cpu \
+            --build-dir build/ci-coverage-cpu \
+            --compiler clang-20 \
+            --runner-image ubuntu-24.04 \
+            --commit '${{ github.sha }}' \
+            --cache-state cold \
+            --vcpkg-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
+            --job-url 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}' \
+            "${context_args[@]}" \
+            --output build/ci-coverage-cpu/ci-timing/result/result.json
+
+      - name: Validate gate timing result
+        if: always()
+        run: python3 tools/benchmark/validate_benchmark_results.py --root build/ci-coverage-cpu/ci-timing/result --strict
+
+      - name: Upload gate timing result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-gate-timing-ci-source-coverage
+          path: build/ci-coverage-cpu/ci-timing/result/result.json
+          if-no-files-found: error
+
+      - name: Upload CPU source-coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpu-source-coverage
+          path: build/ci-coverage-cpu/coverage/
+          if-no-files-found: warn

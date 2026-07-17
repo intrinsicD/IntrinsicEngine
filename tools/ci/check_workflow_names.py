@@ -14,6 +14,7 @@ ALLOWED_WORKFLOW_FILES = {
     "ci-sanitizers.yml",
     "ci-docs.yml",
     "ci-bench-smoke.yml",
+    "ci-source-coverage.yml",
     "ci-vulkan.yml",
     "nightly-deep.yml",
 }
@@ -24,6 +25,7 @@ REQUIRED_WORKFLOW_FILES = {
     "ci-sanitizers.yml",
     "ci-docs.yml",
     "ci-bench-smoke.yml",
+    "ci-source-coverage.yml",
 }
 
 NAME_PATTERN = re.compile(r"^name:\s*(.+?)\s*$")

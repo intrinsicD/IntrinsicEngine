@@ -6,8 +6,19 @@ CI helper scripts and workflow validation tools.
 
 - `check_workflow_names.py`: validates workflow file allowlist, `name` consistency, explicit `on` triggers, and readability (no one-line compressed YAML). Runs in `ci-docs.yml`.
 - `check_prerequisites.py`: fails fast when CI steps are blocked by missing build artifacts (test binaries, inventories) instead of surfacing a downstream error. Invoked by `pr-fast.yml`, `ci-linux-clang.yml`, `ci-vulkan.yml`, and `nightly-deep.yml`.
-- `time_command.py`: runs a command, streams its output, and writes an elapsed wall-clock phase report for gate-timing aggregation. Invoked by `pr-fast.yml`, `ci-linux-clang.yml`, `ci-vulkan.yml`, `ci-bench-smoke.yml`, `ci-sanitizers.yml`, and `nightly-deep.yml`.
-- `aggregate_gate_timing.py`: aggregates the per-phase configure/build/test reports emitted by `time_command.py` into one machine-readable CI gate result and records the complete configured backend/platform identity from `CMakeCache.txt`. Invoked by `pr-fast.yml`, `ci-linux-clang.yml`, `ci-vulkan.yml`, `ci-bench-smoke.yml`, and `ci-sanitizers.yml`.
+- `time_command.py`: runs a command, streams its output, and writes an elapsed wall-clock phase report for gate-timing aggregation. Invoked by `pr-fast.yml`, `ci-linux-clang.yml`, `ci-vulkan.yml`, `ci-bench-smoke.yml`, `ci-sanitizers.yml`, `ci-source-coverage.yml`, and `nightly-deep.yml`.
+- `aggregate_gate_timing.py`: aggregates the per-phase configure/build/test reports emitted by `time_command.py` into one machine-readable CI gate result and records the complete configured backend/platform identity from `CMakeCache.txt`. Invoked by `pr-fast.yml`, `ci-linux-clang.yml`, `ci-vulkan.yml`, `ci-bench-smoke.yml`, `ci-sanitizers.yml`, and `ci-source-coverage.yml`.
+- `source_coverage.py`: shared fail-closed Clang source-coverage collection,
+  normalization, identity, and parity primitives.
+- `run_source_coverage.py`: reconciles the canonical `IntrinsicCpuTests`
+  inventory, executes each selected GoogleTest producer once with its exact
+  enabled-case filter, reconciles exact execution from per-target XML, merges
+  collision-safe execution profiles, and writes the raw and normalized CPU
+  coverage artifacts. Discovery profiles are isolated and retained for
+  diagnostics but excluded from the merge.
+- `compare_source_coverage.py`: validates two normalized coverage reports and,
+  in `--test-only-refactor` mode, rejects identity drift or loss of any
+  previously covered production region or branch outcome.
 - `validate_gate_timing_baseline.py`: validates the CI-003 historical gate-latency baseline and statistics payloads. Exercised by `tests/regression/tooling/Test.CiTiming.py`; see `benchmarks/ci/README.md`.
 - `ccache_ci.py`: validates the retained CI ccache policy (configured launcher/mode/digest identity) and exports ccache statistics. Part of the CI-007 `pr-fast.yml` policy.
 - `ccache_module_invalidation_probe.py`: exercises ccache reuse across a hermetic C++23 module-interface change to prove exported-interface edits invalidate importers. Part of the retained CI-007 `pr-fast.yml` policy.
@@ -23,4 +34,20 @@ CI helper scripts and workflow validation tools.
 
 ## Notes
 
-- `check_workflow_names.py --strict` reserves enforcement for the full canonical workflow set, including `nightly-deep.yml`.
+- `check_workflow_names.py --strict` reserves enforcement for the full
+  canonical workflow set, including `ci-source-coverage.yml` and
+  `nightly-deep.yml`.
+- The reproducible local CPU source-coverage sequence is:
+
+  ```bash
+  cmake --preset ci-coverage-cpu --fresh
+  cmake --build --preset ci-coverage-cpu --target IntrinsicCpuTests
+  python3 tools/ci/run_source_coverage.py \
+    --build-dir build/ci-coverage-cpu \
+    --output build/ci-coverage-cpu/coverage \
+    --preset ci-coverage-cpu \
+    --diff-base HEAD^
+  ```
+
+  The output directory must be absent or empty. The collector retains raw
+  profiles and diagnostics rather than mixing them with a prior run.

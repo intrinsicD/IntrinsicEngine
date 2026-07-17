@@ -5829,3 +5829,140 @@ tree:
       CTest, or hosted operational run was performed in this delegated lane;
       integrated BUG-106 verification remains open.
     status: resolved
+  - id: N249
+    type: experiment
+    title: "Establish CI-010 instrumented build and manual workflow lane"
+    provenance: ai-executed
+    timestamp: "2026-07-17T10:59+02:00"
+    also_depends_on: [N237, N247]
+    evidence:
+      - "CMakeLists.txt"
+      - "CMakePresets.json"
+      - ".github/workflows/ci-source-coverage.yml"
+      - "tests/regression/tooling/Test.CiTiming.py"
+      - "tests/regression/tooling/Test.WorkflowConcurrency.py"
+      - "cmake --preset ci-coverage-cpu --fresh"
+      - "python3 tests/regression/tooling/Test.WorkflowConcurrency.py"
+      - "python3 tests/regression/tooling/Test.CiTiming.py"
+      - "python3 tools/ci/check_workflow_names.py --root .github/workflows --strict"
+    result: >
+      Added an unsanitized Clang source-coverage flag lane and explicit
+      Linux/Vulkan/GLFW ci-coverage-cpu configure/build presets. Added a
+      manual-only hosted workflow that builds IntrinsicCpuTests, runs the
+      synthetic coverage regression and canonical collector, self-compares
+      parity, and publishes timing plus coverage artifacts. A fresh configure
+      selected the required backend identity; all 1,046 project compile
+      commands carried profile and coverage-mapping flags, the sampled test
+      link carried profile generation, and all 26 focused workflow/timing
+      regressions passed. Complete instrumented build, coverage collection,
+      and hosted baseline evidence remain open for integrated CI-010
+      verification.
+    status: resolved
+  - id: N250
+    type: experiment
+    title: "Validate CI-010 fail-closed source-coverage collection"
+    provenance: ai-executed
+    timestamp: "2026-07-17T11:12+02:00"
+    also_depends_on: [N237, N249]
+    evidence:
+      - "tests/regression/tooling/Test.SourceCoverage.py"
+      - "tools/ci/source_coverage.py"
+      - "tools/ci/run_source_coverage.py"
+      - "tools/ci/compare_source_coverage.py"
+      - "python3 tests/regression/tooling/Test.SourceCoverage.py"
+      - "python3 -m py_compile tests/regression/tooling/Test.SourceCoverage.py"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+    result: >
+      A bounded temporary CMake/Ninja fixture compiled two independently
+      instrumented GoogleTest-compatible producers in two clean build
+      directories with the complete LLVM 20 toolchain. All 11 regressions
+      passed in 6.1 seconds: exact two-case inventory, parallel per-target
+      probe and execution shards, complete object/profile merge, normalized
+      cross-build parity, missing and uninstrumented executables, absent and
+      corrupt profiles, omitted aggregate membership, zero mapped cases,
+      production digest drift, and lost region plus true/false branch-arm
+      evidence. Inflated aggregate totals did not mask set loss. Strict test
+      layout, Python compilation, and diff checks also passed. Complete
+      repository-cohort and hosted baseline evidence remain open.
+    status: resolved
+  - id: N251
+    type: experiment
+    title: "Harden CI-010 collection against the real graph and LLVM 20"
+    provenance: ai-executed
+    timestamp: "2026-07-17T11:18+02:00"
+    also_depends_on: [N249, N250]
+    evidence:
+      - "tools/ci/source_coverage.py"
+      - "tools/ci/run_source_coverage.py"
+      - "tools/ci/compare_source_coverage.py"
+      - "build/ci/test-inventories/IntrinsicCpuTests.txt"
+      - "build/ci/test-inventories/RegisteredTestTargets.tsv"
+      - "ctest --test-dir build/ci --show-only=json-v1"
+      - "python3 tests/regression/tooling/Test.SourceCoverage.py"
+      - "forced /usr/bin/clang++-20, llvm-cov-20, and llvm-profdata-20 fixture run"
+      - "python3 -m py_compile tools/ci/source_coverage.py tools/ci/run_source_coverage.py tools/ci/compare_source_coverage.py"
+      - "ruff check tools/ci/source_coverage.py tools/ci/run_source_coverage.py tools/ci/compare_source_coverage.py"
+    result: >
+      The real configured CPU registry reconciled to 26 exact executables:
+      25 GoogleTest producers with 4,061 enabled cases and one manual CTest
+      producer. The collector now preserves each producer's canonical CTest
+      working directory, validates the full Linux/Vulkan/GLFW coverage-preset
+      identity, isolates raw shards per target, ignores nonselected NOT_BUILT
+      placeholders, and relies on fail-closed post-export normalization rather
+      than LLVM 20's nonexistent include-filename option. The complete
+      synthetic suite passed 11/11 both with the default LLVM tools and when
+      forced through Clang/LLVM 20. Complete instrumented repository-cohort
+      collection and hosted baseline evidence remain open.
+    status: resolved
+  - id: N252
+    type: experiment
+    title: "Close CI-010 execution-evidence identity gaps"
+    provenance: ai-executed
+    timestamp: "2026-07-17T11:30+02:00"
+    also_depends_on: [N250, N251]
+    evidence:
+      - "tools/ci/source_coverage.py"
+      - "tools/ci/run_source_coverage.py"
+      - "tools/ci/compare_source_coverage.py"
+      - "tests/regression/tooling/Test.SourceCoverage.py"
+      - "python3 tests/regression/tooling/Test.SourceCoverage.py"
+      - "forced /usr/bin/clang++-20, llvm-cov-20, and llvm-profdata-20 13-test fixture run"
+      - "python3 -m py_compile tools/ci/source_coverage.py tools/ci/run_source_coverage.py tools/ci/compare_source_coverage.py"
+      - "ruff check tools/ci/source_coverage.py tools/ci/run_source_coverage.py tools/ci/compare_source_coverage.py"
+      - "git diff --check"
+    result: >
+      Direct GoogleTest batches now retain machine-readable XML and fail unless
+      the executed classname/name identities exactly equal every enabled CTest
+      filter. Reconciler and CTest inventory discovery now write collision-safe
+      profiles only under a retained discovery artifact namespace that is
+      excluded from every merged execution profile. Test-only parity now also
+      requires an identical deterministic production-build-input digest while
+      excluding test-only CMake ownership. The expanded fixture passed 13/13
+      with both default tools and forced Clang/LLVM 20, including lying XML,
+      discovery-sentinel, and build-input-drift regressions. Complete
+      repository-cohort collection and hosted baseline evidence remain open.
+    status: resolved
+  - id: N253
+    type: experiment
+    title: "Validate CI-010 exact execution and discovery isolation"
+    provenance: ai-executed
+    timestamp: "2026-07-17T11:27+02:00"
+    also_depends_on: [N250, N252]
+    evidence:
+      - "tests/regression/tooling/Test.SourceCoverage.py"
+      - "tools/ci/source_coverage.py"
+      - "tools/ci/run_source_coverage.py"
+      - "python3 tests/regression/tooling/Test.SourceCoverage.py"
+      - "python3 -m py_compile tests/regression/tooling/Test.SourceCoverage.py"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+    result: >
+      Extended the two-build fixture with strict per-case GoogleTest XML and
+      an isolated discovery-profile sentinel generated from the propagated
+      absolute %m-%p template. A lying producer exited zero and emitted a
+      nonempty LLVM profile while omitting Liar.Requested from its retained
+      XML; collection failed with the exact missing-case diagnostic. The
+      reports retained both successful producer XML files and discovery shard
+      diagnostics, and production-build-input digest drift failed refactor
+      parity. All 13 regressions passed with Clang/LLVM 20 in 12.6 seconds;
+      Python compilation, diff, and strict test-layout checks also passed.
+    status: resolved

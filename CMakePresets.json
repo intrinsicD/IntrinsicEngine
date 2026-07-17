@@ -53,6 +53,28 @@
       }
     },
     {
+      "name": "ci-coverage-cpu",
+      "displayName": "Debug CPU source coverage",
+      "inherits": "ci",
+      "description": "Unsanitized Clang source-coverage configuration for the canonical CPU test cohort. Retains the Linux/Vulkan/GLFW contract graph while disabling Sandbox, benchmarks, CUDA, and promoted Vulkan execution.",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "BUILD_TESTING": "ON",
+        "EXTRINSIC_PLATFORM": "Linux",
+        "EXTRINSIC_BACKEND": "Vulkan",
+        "INTRINSIC_PLATFORM_BACKEND": "Glfw",
+        "INTRINSIC_HEADLESS_NO_GLFW": "OFF",
+        "INTRINSIC_BUILD_SANDBOX": "OFF",
+        "INTRINSIC_BUILD_TESTS": "ON",
+        "INTRINSIC_BUILD_BENCHMARKS": "OFF",
+        "INTRINSIC_ENABLE_CUDA": "OFF",
+        "INTRINSIC_ENABLE_SANITIZERS": "OFF",
+        "INTRINSIC_ENABLE_SOURCE_COVERAGE": "ON",
+        "INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN": "OFF"
+      }
+    },
+    {
       "name": "ci-vulkan",
       "displayName": "Debug tests + sandbox + promoted Vulkan (CUDA off)",
       "inherits": "ci",
@@ -75,6 +97,10 @@
     {
       "name": "ci",
       "configurePreset": "ci"
+    },
+    {
+      "name": "ci-coverage-cpu",
+      "configurePreset": "ci-coverage-cpu"
     },
     {
       "name": "ci-vulkan",

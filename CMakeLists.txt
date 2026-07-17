@@ -198,6 +198,24 @@ option(INTRINSIC_ENABLE_SANITIZERS
     "Enable AddressSanitizer + UBSan in Debug/RelWithDebInfo builds"
     ${INTRINSIC_ASAN_AVAILABLE}
 )
+option(INTRINSIC_ENABLE_SOURCE_COVERAGE
+    "Enable Clang source-based code coverage instrumentation"
+    OFF
+)
+
+if(INTRINSIC_ENABLE_SOURCE_COVERAGE AND INTRINSIC_ENABLE_SANITIZERS)
+    message(FATAL_ERROR
+        "INTRINSIC_ENABLE_SOURCE_COVERAGE and INTRINSIC_ENABLE_SANITIZERS "
+        "are mutually exclusive. Use the unsanitized ci-coverage-cpu preset "
+        "for source coverage.")
+endif()
+if(INTRINSIC_ENABLE_SOURCE_COVERAGE
+    AND (NOT CMAKE_C_COMPILER_ID STREQUAL "Clang"
+        OR NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang"))
+    message(FATAL_ERROR
+        "INTRINSIC_ENABLE_SOURCE_COVERAGE requires LLVM Clang source-based "
+        "coverage support.")
+endif()
 
 set(INTRINSIC_DEBUG_FLAGS "")
 if(INTRINSIC_ENABLE_SANITIZERS)
@@ -211,6 +229,22 @@ if(INTRINSIC_ENABLE_SANITIZERS)
 else()
     message(STATUS "Sanitizers DISABLED (libclang_rt.asan not found or manually turned off)")
 endif()
+
+set(INTRINSIC_COVERAGE_COMPILE_FLAGS "")
+set(INTRINSIC_COVERAGE_LINK_FLAGS "")
+if(INTRINSIC_ENABLE_SOURCE_COVERAGE)
+    set(INTRINSIC_COVERAGE_COMPILE_FLAGS
+        -fprofile-instr-generate
+        -fcoverage-mapping
+    )
+    set(INTRINSIC_COVERAGE_LINK_FLAGS
+        -fprofile-instr-generate
+    )
+    message(STATUS "Clang source coverage instrumentation ENABLED")
+else()
+    message(STATUS "Clang source coverage instrumentation DISABLED")
+endif()
+
 option(INTRINSIC_ENABLE_NATIVE_ARCH "Enable -march=native for local profiling builds" OFF)
 option(INTRINSIC_ENABLE_CUDA "Enable CUDA compute backend for GPU-accelerated geometry processing" OFF)
 option(INTRINSIC_BUILD_SANDBOX "Build Sandbox application target" ON)
@@ -236,10 +270,12 @@ endif()
 set(INTRINSIC_COMPILE_FLAGS
         ${INTRINSIC_BASE_FLAGS}
         ${INTRINSIC_DEBUG_FLAGS}
+        ${INTRINSIC_COVERAGE_COMPILE_FLAGS}
         ${INTRINSIC_RELEASE_FLAGS}
 )
 set(INTRINSIC_LINK_FLAGS
         ${INTRINSIC_DEBUG_FLAGS} # Sanitizers need to link too!
+        ${INTRINSIC_COVERAGE_LINK_FLAGS}
         # Link-time optimization (LTO) could go here in the future
 )
 

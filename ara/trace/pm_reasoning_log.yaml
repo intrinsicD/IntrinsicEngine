@@ -935,3 +935,33 @@ entries:
       - "Did not stage a new generalized observation: H06 already records the classification-first test-graph rule, and this turn implements that existing heuristic rather than introducing a new one."
       - "Recorded the invalid --skip-undeclared plus --inventory combination as a corrected integration detail inside N248, not as a dead end, because it was caught and removed before execution."
       - "Kept integrated configure/build/CTest and hosted non-skipped readback proof open; this delegated lane intentionally did not mutate either build tree."
+  - turn: "2026-07-17_001#5"
+    notes:
+      - "Routed the CI-010 build/workflow implementation and generated-command validation as experiment N249 because it produced concrete preset identity and instrumentation evidence."
+      - "Did not stage a generalized coverage claim: the complete instrumented cohort, merged profiles, and hosted baseline have not run yet."
+      - "Kept the workflow manual-only to avoid redundant PR/default-branch test cost while preserving canonical timing and artifact publication."
+      - "No existing staged observation received a closure or contradiction signal from this bounded CI integration slice."
+  - turn: "2026-07-17_001#6"
+    notes:
+      - "Routed the two-build LLVM 20 source-coverage fixture as experiment N250 because it produced concrete collector and comparator evidence rather than a generalized coverage claim."
+      - "Recorded independent probe/execution profile accounting, exact case inventory, normalized build-directory parity, and each fail-closed defect class as one bounded experiment."
+      - "Did not crystallize a coverage capability claim: the complete repository CPU cohort and named hosted baseline remain open CI-010 evidence."
+      - "No staged observation received a closure, contradiction, or stale signal from this tooling-regression slice."
+  - turn: "2026-07-17_001#7"
+    notes:
+      - "Routed the real-graph reconciliation and LLVM 20 hardening as experiment N251 because they produced concrete inventory and portability evidence beyond N250's initial fixture."
+      - "Recorded the exact 26-target/4,061-case registry, canonical CTest working-directory preservation, per-target raw-profile isolation, and removal of an LLVM 20-incompatible export option."
+      - "Did not crystallize a generalized source-coverage claim because the full instrumented repository cohort and hosted baseline have not completed."
+      - "No staged observation received a closure, contradiction, or stale signal from this bounded collector implementation."
+  - turn: "2026-07-17_001#8"
+    notes:
+      - "Routed exact XML execution, discovery-profile isolation, and production-build-input parity as experiment N252 because they close concrete evidence gaps identified by adversarial review."
+      - "Recorded retained XML equality, never-merged discovery shards, and the production-versus-test CMake identity boundary as bounded collector behavior."
+      - "Did not crystallize a generalized coverage claim because the complete instrumented repository cohort and hosted baseline remain open."
+      - "No staged observation received a closure, contradiction, or stale signal from this collector-hardening slice."
+  - turn: "2026-07-17_001#9"
+    notes:
+      - "Routed the exact-execution and discovery-isolation fixture as experiment N253 because it produced bounded adversarial evidence beyond the collector implementation reserved for N252."
+      - "Recorded the zero-exit/nonempty-profile XML omission, propagated collision-safe discovery template, retained XML and discovery diagnostics, and production-build-input identity mismatch."
+      - "Did not crystallize a generalized coverage claim because the complete instrumented repository cohort and named hosted baseline remain open."
+      - "No staged observation received a closure, contradiction, or stale signal from this regression-hardening slice."

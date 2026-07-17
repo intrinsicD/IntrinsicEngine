@@ -128,6 +128,40 @@ against simultaneous shrinkage of the live inventories. The required CI lanes
 run it for both `IntrinsicCpuTests` and `IntrinsicGpuVulkanTests` before CTest
 execution.
 
+## Source coverage evidence
+
+Source coverage is a separate reporting layer, not another test category or a
+replacement for correctness. The `ci-coverage-cpu` preset preserves the
+canonical Linux/Vulkan/Glfw CPU-contract graph while disabling sanitizers,
+Sandbox, benchmark scaffolds, CUDA, and promoted Vulkan operation. Its
+`IntrinsicCpuTests` inventory is reconciled before collection.
+
+The reporting lane executes each selected GoogleTest producer once with an
+exact filter containing its enabled canonical cases, then reconciles the
+machine-readable GoogleTest XML to that exact requested set. This reduces
+process and raw-profile overhead without changing CTest registration or the
+authoritative case-isolated CPU gate. Manual CTest producers are recorded and
+run separately. Every selected binary must emit a collision-safe
+`%m-%p.profraw` shard and appear in the `llvm-cov` object set; missing,
+uninstrumented, corrupt, or partially selected inputs fail closed. CTest
+discovery profiles use a separate retained namespace and never enter the
+execution merge.
+
+The normalized report covers engine-owned C++ under `src/` and `methods/`.
+Tests, benchmarks, generated build files, assets, vcpkg/external/third-party
+code, and compiler runtime sources are excluded deterministically. The retained
+artifact records the exact test inventory alongside production source and
+build-input digests, the normalized production compile-command digest,
+compiler and LLVM-tool versions, preset/backend identity, exclusion policy,
+and execution mode. A test-only comparison is valid only when those production
+identities match; it then rejects loss of any previously covered region or
+either branch outcome even when aggregate coverage is unchanged or higher.
+
+Coverage proves that execution reached mapped source. It does not prove that
+an assertion checked the right invariant, that an unexecuted path is wrong, or
+that Vulkan/GPU work occurred. Assertion-level correctness remains owned by
+tests, and backend operation remains owned by non-skipped capability evidence.
+
 ## Capability routing
 
 Labels apply to whole CTest executables, so every case in an executable must

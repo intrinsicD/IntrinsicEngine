@@ -25,6 +25,11 @@ WORKFLOWS = {
     ),
     "ci-vulkan.yml": ("ci-gate-timing-ci-vulkan", 2, True),
     "ci-bench-smoke.yml": ("ci-gate-timing-ci-bench-smoke", 1, True),
+    "ci-source-coverage.yml": (
+        "ci-gate-timing-ci-source-coverage",
+        1,
+        True,
+    ),
 }
 
 
@@ -38,6 +43,37 @@ def _load_workflow(name: str) -> tuple[dict[str, object], str]:
 
 
 class WorkflowConcurrencyTests(unittest.TestCase):
+    def test_source_coverage_workflow_is_manual_and_uses_canonical_cohort(
+        self,
+    ) -> None:
+        payload, coverage = _load_workflow("ci-source-coverage.yml")
+        triggers = payload.get("on", payload.get(True, {}))
+        self.assertEqual(set(triggers), {"workflow_dispatch"})
+        self.assertEqual(
+            coverage.count("-- cmake --preset ci-coverage-cpu --fresh"),
+            1,
+        )
+        self.assertIn(
+            "cmake --build --preset ci-coverage-cpu --target IntrinsicCpuTests",
+            coverage,
+        )
+        self.assertIn(
+            "run_source_coverage.py \\\n"
+            "            --build-dir build/ci-coverage-cpu \\\n"
+            "            --output build/ci-coverage-cpu/coverage \\\n"
+            "            --preset ci-coverage-cpu \\\n"
+            "            --diff-base HEAD^ \\\n"
+            "            --jobs 2",
+            coverage,
+        )
+        self.assertIn(
+            "compare_source_coverage.py \\\n"
+            "            --baseline build/ci-coverage-cpu/coverage/coverage.json \\\n"
+            "            --candidate build/ci-coverage-cpu/coverage/coverage.json \\\n"
+            "            --test-only-refactor",
+            coverage,
+        )
+
     def test_pr_fast_keeps_kernel_convergence_guards(self) -> None:
         _, pr_fast = _load_workflow("pr-fast.yml")
         self.assertEqual(
