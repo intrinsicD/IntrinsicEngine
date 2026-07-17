@@ -31,6 +31,13 @@ CI helper scripts and workflow validation tools.
   labels, producer/case inventories, command closure, fallback state, and
   per-batch timing. Missing or ambiguous input fails closed rather than
   producing an empty plan.
+- `cpu_test_selection.py`: captures the exact path-free `IntrinsicCpuTests`
+  producer and CTest-case inventory selected by the canonical
+  `-LE 'gpu|vulkan|slow|flaky-quarantine'` predicate, validates the configured
+  resolved sanitizer identity, and compares reports without treating isolated
+  build-directory paths as selection drift. Pull-request and manual
+  `ci-linux-clang` runs require the comparison over artifacts from the
+  unsanitized job and its reusable ASan/UBSan jobs.
 - `run_repo_hygiene_checks.sh`: warning-mode wrapper running the canonical
   `check_root_hygiene.py` policy check once, followed by `check_doc_links.py`.
   Local convenience; not wired into a workflow.
@@ -55,3 +62,24 @@ CI helper scripts and workflow validation tools.
 
   The output directory must be absent or empty. The collector retains raw
   profiles and diagnostics rather than mixing them with a prior run.
+
+- Capture and compare unsanitized, ASan, and UBSan CPU selections with:
+
+  ```bash
+  python3 tools/ci/cpu_test_selection.py capture \
+    --build-dir build/ci --preset ci --expected-sanitizer none \
+    --output build/ci/cpu-test-selection.json
+  python3 tools/ci/cpu_test_selection.py capture \
+    --build-dir build/ci-asan --preset ci-asan --expected-sanitizer asan \
+    --output build/ci-asan/cpu-test-selection.json
+  python3 tools/ci/cpu_test_selection.py capture \
+    --build-dir build/ci-ubsan --preset ci-ubsan --expected-sanitizer ubsan \
+    --output build/ci-ubsan/cpu-test-selection.json
+  python3 tools/ci/cpu_test_selection.py compare \
+    --report build/ci/cpu-test-selection.json \
+    --report build/ci-asan/cpu-test-selection.json \
+    --report build/ci-ubsan/cpu-test-selection.json \
+    --require-sanitizer none --require-sanitizer asan \
+    --require-sanitizer ubsan \
+    --output build/cpu-test-selection-parity.json
+  ```

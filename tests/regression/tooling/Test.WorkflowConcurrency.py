@@ -13,6 +13,10 @@ PRESETS = REPO_ROOT / "CMakePresets.json"
 EXPECTED_GROUP = (
     "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"
 )
+SANITIZER_GROUP = (
+    "${{ github.workflow }}-sanitizers-"
+    "${{ github.event.pull_request.number || github.ref }}"
+)
 WORKFLOWS = {
     "pr-fast.yml": ("ci-gate-timing-pr-fast", 1, True),
     "ci-linux-clang.yml": (
@@ -68,6 +72,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
                 "INTRINSIC_BUILD_BENCHMARKS": "OFF",
                 "INTRINSIC_ENABLE_CUDA": "OFF",
                 "INTRINSIC_ENABLE_SANITIZERS": "OFF",
+                "INTRINSIC_SANITIZER_MODE": "none",
                 "INTRINSIC_ENABLE_SOURCE_COVERAGE": "OFF",
                 "INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN": "OFF",
                 "VCPKG_MANIFEST_NO_DEFAULT_FEATURES": "ON",
@@ -265,11 +270,17 @@ class WorkflowConcurrencyTests(unittest.TestCase):
                 payload, _ = _load_workflow(name)
                 concurrency = payload.get("concurrency")
                 self.assertIsInstance(concurrency, dict)
-                self.assertEqual(concurrency.get("group"), EXPECTED_GROUP)
+                expected_group = (
+                    SANITIZER_GROUP
+                    if name == "ci-sanitizers.yml"
+                    else EXPECTED_GROUP
+                )
+                self.assertEqual(concurrency.get("group"), expected_group)
                 self.assertEqual(
                     concurrency.get("cancel-in-progress"),
                     expected_cancellation,
                 )
+        self.assertNotEqual(SANITIZER_GROUP, EXPECTED_GROUP)
 
     def test_compile_heavy_workflows_emit_one_validated_result_artifact(self) -> None:
         for name, (artifact_name, expected_test_reports, _) in WORKFLOWS.items():
@@ -277,7 +288,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
                 _, text = _load_workflow(name)
                 self.assertEqual(text.count("aggregate_gate_timing.py"), 1)
                 self.assertIn(
-                    "validate_benchmark_results.py --root build/",
+                    "validate_benchmark_results.py --root ",
                     text,
                 )
                 self.assertIn("actions/upload-artifact@v4", text)

@@ -224,7 +224,7 @@ class CcacheWorkflowTests(unittest.TestCase):
                 "CMAKE_CXX_COMPILER:FILEPATH=/opt/llvm/bin/clang++-23\n"
                 "CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS:FILEPATH="
                 "/opt/llvm/bin/clang-scan-deps-23\n"
-                "INTRINSIC_ENABLE_SANITIZERS:BOOL=ON\n",
+                "INTRINSIC_SANITIZER_IDENTITY:INTERNAL=asan-ubsan\n",
                 encoding="utf-8",
             )
             with mock.patch.object(
@@ -236,15 +236,38 @@ class CcacheWorkflowTests(unittest.TestCase):
                     "ccache version 4.9.1\n",
                 ),
             ):
-                identity = ccache_ci.configured_identity(
-                    build, "combined-project-default"
-                )
+                identity = ccache_ci.configured_identity(build, "asan-ubsan")
 
         self.assertEqual(identity.compiler, "clang-23")
         self.assertEqual(identity.compiler_key, "clang-23.0.1")
         self.assertEqual(identity.scan_deps_key, "clang-scan-deps-23.0.1")
         self.assertEqual(identity.ccache_key, "ccache-4.9.1")
-        self.assertEqual(identity.sanitizer, "combined-project-default")
+        self.assertEqual(identity.sanitizer, "asan-ubsan")
+
+    def test_configured_identity_rejects_missing_resolved_sanitizer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            build = Path(tmp)
+            (build / "CMakeCache.txt").write_text(
+                "CMAKE_CXX_COMPILER:FILEPATH=/opt/llvm/bin/clang++-23\n"
+                "CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS:FILEPATH="
+                "/opt/llvm/bin/clang-scan-deps-23\n"
+                "INTRINSIC_ENABLE_SANITIZERS:BOOL=OFF\n",
+                encoding="utf-8",
+            )
+            with mock.patch.object(
+                ccache_ci,
+                "_run_version",
+                side_effect=(
+                    "clang version 23.0.1\n",
+                    "LLVM version 23.0.1\n",
+                    "ccache version 4.9.1\n",
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "INTRINSIC_SANITIZER_IDENTITY",
+                ):
+                    ccache_ci.configured_identity(build, "none")
 
     def test_ccache_stat_summary_matches_official_error_counters(self) -> None:
         stats = ccache_ci.parse_print_stats(self._ccache_4_9_1_stats())

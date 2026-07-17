@@ -118,6 +118,7 @@ jobs:
             --preset ci-coverage-cpu \
             --build-dir build/ci-coverage-cpu \
             --compiler clang-20 \
+            --sanitizer none \
             --runner-image ubuntu-24.04 \
             --commit '${{ github.sha }}' \
             --cache-state cold \

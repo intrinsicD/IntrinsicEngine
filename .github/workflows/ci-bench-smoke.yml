@@ -50,7 +50,7 @@ jobs:
             --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
             --max-warm-seconds 40 \
             --json-out build/ci/ci-timing/phases/configure.json \
-            -- cmake --preset ci
+            -- cmake --preset ci --fresh
 
       - name: Validate benchmark manifests (strict)
         run: python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
@@ -97,6 +97,7 @@ jobs:
             --preset ci \
             --build-dir build/ci \
             --compiler clang-20 \
+            --sanitizer none \
             --runner-image ubuntu-24.04 \
             --commit '${{ github.sha }}' \
             --cache-state cold \

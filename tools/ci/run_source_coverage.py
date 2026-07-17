@@ -127,6 +127,7 @@ def _require_coverage_build(cache: Mapping[str, str]) -> dict[str, object]:
         "EXTRINSIC_PLATFORM": "Linux",
         "INTRINSIC_PLATFORM_BACKEND": "Glfw",
         "INTRINSIC_PLATFORM_BACKEND_SELECTED": "Glfw",
+        "INTRINSIC_SANITIZER_IDENTITY": "none",
     }
     for key, expected_value in expected_strings.items():
         value = cache.get(key)

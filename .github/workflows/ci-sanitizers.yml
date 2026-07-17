@@ -1,11 +1,10 @@
 name: ci-sanitizers
 
 on:
-  pull_request:
-  workflow_dispatch:
+  workflow_call:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-sanitizers-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -16,9 +15,11 @@ jobs:
       matrix:
         sanitizer:
           - name: asan
-            flag: address
+            preset: ci-asan
+            build_dir: build/ci-asan
           - name: ubsan
-            flag: undefined
+            preset: ci-ubsan
+            build_dir: build/ci-ubsan
 
     steps:
       - name: Checkout
@@ -32,7 +33,20 @@ jobs:
             ninja-build \
             clang-20 \
             clang-tools-20 \
-            python3
+            python3 \
+            libx11-dev \
+            libxcursor-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxi-dev \
+            libxext-dev \
+            libxfixes-dev \
+            libwayland-dev \
+            libxkbcommon-dev \
+            libgl1-mesa-dev \
+            libvulkan-dev \
+            vulkan-tools \
+            spirv-tools
 
       - name: Cache vcpkg binary packages
         id: vcpkg-cache
@@ -55,44 +69,56 @@ jobs:
             --label "Configure (${{ matrix.sanitizer.name }})" \
             --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
             --max-warm-seconds 40 \
-            --json-out build/ci/ci-timing/phases/configure.json \
-            -- cmake --preset ci \
-            -DINTRINSIC_ENABLE_SANITIZERS=OFF \
-            -DCMAKE_CXX_FLAGS_DEBUG="-fsanitize=${{ matrix.sanitizer.flag }} -fno-omit-frame-pointer" \
-            -DCMAKE_EXE_LINKER_FLAGS_DEBUG="-fsanitize=${{ matrix.sanitizer.flag }}" \
-            -DCMAKE_SHARED_LINKER_FLAGS_DEBUG="-fsanitize=${{ matrix.sanitizer.flag }}"
+            --json-out ${{ matrix.sanitizer.build_dir }}/ci-timing/phases/configure.json \
+            -- cmake --preset ${{ matrix.sanitizer.preset }} --fresh
 
-      - name: Build IntrinsicTests (${{ matrix.sanitizer.name }})
+      - name: Build IntrinsicCpuTests (${{ matrix.sanitizer.name }})
         run: |
           python3 tools/ci/time_command.py \
-            --label "Build IntrinsicTests (${{ matrix.sanitizer.name }})" \
-            --json-out build/ci/ci-timing/phases/build.json \
-            -- cmake --build --preset ci --target IntrinsicTests
+            --label "Build IntrinsicCpuTests (${{ matrix.sanitizer.name }})" \
+            --json-out ${{ matrix.sanitizer.build_dir }}/ci-timing/phases/build.json \
+            -- cmake --build --preset ${{ matrix.sanitizer.preset }} --target IntrinsicCpuTests
+
+      - name: Reconcile CPU test routing (${{ matrix.sanitizer.name }})
+        run: |
+          python3 tests/regression/tooling/Test.TestGateRouting.py \
+            --build-dir ${{ matrix.sanitizer.build_dir }} \
+            --aggregate IntrinsicCpuTests
+
+      - name: Capture CPU test selection (${{ matrix.sanitizer.name }})
+        id: cpu-selection
+        run: |
+          python3 tools/ci/cpu_test_selection.py capture \
+            --build-dir ${{ matrix.sanitizer.build_dir }} \
+            --preset ${{ matrix.sanitizer.preset }} \
+            --expected-sanitizer ${{ matrix.sanitizer.name }} \
+            --output ${{ matrix.sanitizer.build_dir }}/test-selection/selection.json
 
       - name: Run selected CPU tests (${{ matrix.sanitizer.name }})
         run: |
           python3 tools/ci/time_command.py \
             --label "Run selected CPU tests (${{ matrix.sanitizer.name }})" \
-            --json-out build/ci/ci-timing/phases/test.json \
-            -- ctest --test-dir build/ci --output-on-failure -L "unit|contract|integration" -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60
+            --json-out ${{ matrix.sanitizer.build_dir }}/ci-timing/phases/test.json \
+            -- ctest --test-dir ${{ matrix.sanitizer.build_dir }} --output-on-failure -LE "gpu|vulkan|slow|flaky-quarantine" --no-tests=error --timeout 60
 
       - name: Aggregate gate timing result (${{ matrix.sanitizer.name }})
         if: always()
         run: |
           context_args=()
-          if selected_tests="$(ctest --test-dir build/ci --show-only=json-v1 -L "unit|contract|integration" -LE "gpu|vulkan|slow|flaky-quarantine" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"; then
+          selected_tests='${{ steps.cpu-selection.outputs.selected-test-count }}'
+          if [[ "$selected_tests" =~ ^[0-9]+$ ]]; then
             context_args+=(--selected-test-count "$selected_tests")
           fi
-          if ninja_edges="$(ninja -C build/ci -t commands IntrinsicTests | sed '/^[[:space:]]*$/d' | wc -l)"; then
+          if ninja_edges="$(ninja -C ${{ matrix.sanitizer.build_dir }} -t commands IntrinsicCpuTests | sed '/^[[:space:]]*$/d' | wc -l)"; then
             context_args+=(--ninja-edge-count "$ninja_edges")
           fi
           python3 tools/ci/aggregate_gate_timing.py \
-            --configure-json build/ci/ci-timing/phases/configure.json \
-            --build-json build/ci/ci-timing/phases/build.json \
-            --test-json build/ci/ci-timing/phases/test.json \
+            --configure-json ${{ matrix.sanitizer.build_dir }}/ci-timing/phases/configure.json \
+            --build-json ${{ matrix.sanitizer.build_dir }}/ci-timing/phases/build.json \
+            --test-json ${{ matrix.sanitizer.build_dir }}/ci-timing/phases/test.json \
             --gate 'ci-sanitizers-${{ matrix.sanitizer.name }}' \
-            --preset ci \
-            --build-dir build/ci \
+            --preset ${{ matrix.sanitizer.preset }} \
+            --build-dir ${{ matrix.sanitizer.build_dir }} \
             --compiler clang-20 \
             --sanitizer '${{ matrix.sanitizer.name }}' \
             --runner-image ubuntu-24.04 \
@@ -101,18 +127,26 @@ jobs:
             --vcpkg-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
             --job-url 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}' \
             "${context_args[@]}" \
-            --output build/ci/ci-timing/result/result.json
+            --output ${{ matrix.sanitizer.build_dir }}/ci-timing/result/result.json
 
       - name: Validate gate timing result (${{ matrix.sanitizer.name }})
         if: always()
-        run: python3 tools/benchmark/validate_benchmark_results.py --root build/ci/ci-timing/result --strict
+        run: python3 tools/benchmark/validate_benchmark_results.py --root ${{ matrix.sanitizer.build_dir }}/ci-timing/result --strict
 
       - name: Upload gate timing result (${{ matrix.sanitizer.name }})
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ci-gate-timing-ci-sanitizers-${{ matrix.sanitizer.name }}
-          path: build/ci/ci-timing/result/result.json
+          path: ${{ matrix.sanitizer.build_dir }}/ci-timing/result/result.json
+          if-no-files-found: error
+
+      - name: Upload CPU test selection (${{ matrix.sanitizer.name }})
+        if: always() && steps.cpu-selection.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-cpu-test-selection-${{ matrix.sanitizer.name }}
+          path: ${{ matrix.sanitizer.build_dir }}/test-selection/selection.json
           if-no-files-found: error
 
       - name: Document skipped categories

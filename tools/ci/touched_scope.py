@@ -50,6 +50,10 @@ CI_TOOL_REGRESSION_SCRIPTS: dict[str, tuple[str, ...]] = {
     "check_prerequisites.py": ("Test_CiPrerequisiteGuards.py",),
     "check_workflow_names.py": ("Test.WorkflowConcurrency.py",),
     "compare_source_coverage.py": ("Test.SourceCoverage.py",),
+    "cpu_test_selection.py": (
+        "Test.CpuTestSelection.py",
+        "Test.SanitizerPresets.py",
+    ),
     "run_source_coverage.py": ("Test.SourceCoverage.py",),
     "source_coverage.py": ("Test.SourceCoverage.py",),
     "time_command.py": ("Test.CiTiming.py",),

@@ -45,7 +45,7 @@ TIMING_WORKFLOW_BUILD_DIRS = {
     "ci-linux-clang.yml": "build/ci",
     "ci-vulkan.yml": "build/ci-vulkan",
     "ci-bench-smoke.yml": "build/ci",
-    "ci-sanitizers.yml": "build/ci",
+    "ci-sanitizers.yml": "${{ matrix.sanitizer.build_dir }}",
     "ci-source-coverage.yml": "build/ci-coverage-cpu",
 }
 
@@ -94,6 +94,7 @@ def _write_build_configuration(
     intrinsic_platform_backend: str = "Auto",
     headless_no_glfw: str = "OFF",
     platform_backend_selected: str = "Glfw",
+    sanitizer_identity: str = "none",
 ) -> None:
     build_dir.mkdir(parents=True, exist_ok=True)
     (build_dir / "CMakeCache.txt").write_text(
@@ -105,6 +106,8 @@ def _write_build_configuration(
                 f"INTRINSIC_HEADLESS_NO_GLFW:BOOL={headless_no_glfw}",
                 "INTRINSIC_PLATFORM_BACKEND_SELECTED:INTERNAL="
                 f"{platform_backend_selected}",
+                "INTRINSIC_SANITIZER_IDENTITY:INTERNAL="
+                f"{sanitizer_identity}",
             )
         )
         + "\n",
@@ -307,7 +310,7 @@ class CiTimingTests(unittest.TestCase):
                 aggregator_steps = [
                     step
                     for job in workflow["jobs"].values()
-                    for step in job["steps"]
+                    for step in job.get("steps", [])
                     if "aggregate_gate_timing.py" in step.get("run", "")
                 ]
                 self.assertEqual(len(aggregator_steps), 1)
@@ -602,8 +605,34 @@ class CiTimingTests(unittest.TestCase):
             diagnostics["intrinsic_platform_backend_selected"],
             "Glfw",
         )
+        self.assertEqual(diagnostics["intrinsic_sanitizer_identity"], "none")
         self.assertTrue(diagnostics["build_configuration_available"])
         self.assertEqual(diagnostics["build_configuration_errors"], [])
+
+    def test_aggregator_rejects_reported_sanitizer_identity_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            build_dir = tmp_path / "build"
+            _write_build_configuration(build_dir, sanitizer_identity="asan")
+            result, payload = self._run_fixture_aggregator(
+                tmp_path,
+                [
+                    "--build-dir",
+                    str(build_dir),
+                    "--sanitizer",
+                    "ubsan",
+                ],
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(payload["status"], "error")
+        diagnostics = payload["diagnostics"]
+        self.assertEqual(diagnostics["intrinsic_sanitizer_identity"], "asan")
+        self.assertIn(
+            "configured sanitizer identity 'asan' does not match reported "
+            "identity 'ubsan'",
+            diagnostics["build_configuration_errors"],
+        )
 
     def test_aggregator_preserves_legacy_behavior_without_build_directory(
         self,
@@ -619,6 +648,7 @@ class CiTimingTests(unittest.TestCase):
         self.assertEqual(diagnostics["intrinsic_platform_backend"], "")
         self.assertEqual(diagnostics["intrinsic_headless_no_glfw"], "")
         self.assertEqual(diagnostics["intrinsic_platform_backend_selected"], "")
+        self.assertEqual(diagnostics["intrinsic_sanitizer_identity"], "")
         self.assertFalse(diagnostics["build_configuration_available"])
         self.assertEqual(diagnostics["build_configuration_errors"], [])
 
@@ -659,6 +689,7 @@ class CiTimingTests(unittest.TestCase):
                         "EXTRINSIC_BACKEND:STRING=Null",
                         "INTRINSIC_PLATFORM_BACKEND:STRING=Null",
                         "INTRINSIC_HEADLESS_NO_GLFW:BOOL=ON",
+                        "INTRINSIC_SANITIZER_IDENTITY:INTERNAL=none",
                     )
                 )
                 + "\n",

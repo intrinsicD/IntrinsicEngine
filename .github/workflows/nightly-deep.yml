@@ -58,7 +58,7 @@ jobs:
             --label "Configure (ci preset)" \
             --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
             --max-warm-seconds 40 \
-            -- cmake --preset ci
+            -- cmake --preset ci --fresh
 
       - name: Build full CPU targets
         run: cmake --build --preset ci
@@ -84,34 +84,6 @@ jobs:
               IntrinsicGraphicsContractCpuTests \
               IntrinsicRuntimeGraphicsCpuTests
           ctest --test-dir build/ci --output-on-failure -LE "gpu|vulkan|flaky-quarantine" --timeout 60 -j$(nproc)
-
-      - name: Run sanitizer-extended test pass (ASan)
-        run: |
-          cmake --preset ci \
-            -DINTRINSIC_ENABLE_SANITIZERS=OFF \
-            -DCMAKE_CXX_FLAGS_DEBUG="-fsanitize=address -fno-omit-frame-pointer" \
-            -DCMAKE_EXE_LINKER_FLAGS_DEBUG="-fsanitize=address" \
-            -DCMAKE_SHARED_LINKER_FLAGS_DEBUG="-fsanitize=address"
-          cmake --build --preset ci --target IntrinsicTests
-          python3 tools/ci/check_prerequisites.py test-binaries \
-            --build-dir build/ci \
-            --skip-undeclared \
-            --targets IntrinsicCoreTests IntrinsicECSTests IntrinsicGeometryTests IntrinsicContractBuildTests IntrinsicEcsContractTests
-          ctest --test-dir build/ci --output-on-failure -L "unit|contract|integration|regression" -LE "gpu|vulkan|slow|flaky-quarantine" -j$(nproc)
-
-      - name: Run sanitizer-extended test pass (UBSan)
-        run: |
-          cmake --preset ci \
-            -DINTRINSIC_ENABLE_SANITIZERS=OFF \
-            -DCMAKE_CXX_FLAGS_DEBUG="-fsanitize=undefined -fno-omit-frame-pointer" \
-            -DCMAKE_EXE_LINKER_FLAGS_DEBUG="-fsanitize=undefined" \
-            -DCMAKE_SHARED_LINKER_FLAGS_DEBUG="-fsanitize=undefined"
-          cmake --build --preset ci --target IntrinsicTests
-          python3 tools/ci/check_prerequisites.py test-binaries \
-            --build-dir build/ci \
-            --skip-undeclared \
-            --targets IntrinsicCoreTests IntrinsicECSTests IntrinsicGeometryTests IntrinsicContractBuildTests IntrinsicEcsContractTests
-          ctest --test-dir build/ci --output-on-failure -L "unit|contract|integration|regression" -LE "gpu|vulkan|slow|flaky-quarantine" -j$(nproc)
 
       - name: Run SLO/performance tests
         run: |
@@ -190,16 +162,16 @@ jobs:
       - name: Enable vcpkg binary cache
         run: echo "VCPKG_BINARY_SOURCES=clear;files,${GITHUB_WORKSPACE}/external/vcpkg-bincache,readwrite" >> "$GITHUB_ENV"
 
-      - name: Configure (ci preset)
+      - name: Configure (ci-vulkan preset)
         run: |
           python3 tools/ci/time_command.py \
-            --label "Configure (ci preset)" \
+            --label "Configure (ci-vulkan preset)" \
             --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
             --max-warm-seconds 40 \
-            -- cmake --preset ci
+            -- cmake --preset ci-vulkan --fresh
 
       - name: Build IntrinsicTests for GPU-labeled coverage
-        run: cmake --build --preset ci --target IntrinsicTests
+        run: cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicTests
 
       - name: Run optional GPU tests (self-hosted runner)
-        run: ctest --test-dir build/ci --output-on-failure -L "gpu|vulkan" --timeout 60
+        run: ctest --test-dir build/ci-vulkan --output-on-failure -L "gpu" -L "vulkan" --no-tests=error --timeout 120

@@ -76,6 +76,62 @@ python3 tests/regression/tooling/Test.TestGateRouting.py \
   --build-dir build/ci-vulkan --aggregate IntrinsicGpuVulkanTests
 ```
 
+## CPU and sanitizer gate identities
+
+The canonical `ci` preset is unsanitized. Required ASan and UBSan coverage uses
+the isolated `ci-asan` and `ci-ubsan` presets, builds only the exact
+`IntrinsicCpuTests` aggregate, and applies the same exclusion-only selector:
+
+```bash
+cmake --preset ci-asan --fresh
+cmake --build --preset ci-asan --target IntrinsicCpuTests
+ctest --test-dir build/ci-asan --output-on-failure \
+  -LE 'gpu|vulkan|slow|flaky-quarantine' \
+  --no-tests=error --timeout 60
+
+cmake --preset ci-ubsan --fresh
+cmake --build --preset ci-ubsan --target IntrinsicCpuTests
+ctest --test-dir build/ci-ubsan --output-on-failure \
+  -LE 'gpu|vulkan|slow|flaky-quarantine' \
+  --no-tests=error --timeout 60
+```
+
+There is intentionally no positive `-L` filter and no CTest `-j` flag in either
+sanitizer command. Regression-only CPU producers remain selected, and `CI-008`
+owns any later measured sanitizer worker budget. The two variants use distinct
+`build/ci-asan` and `build/ci-ubsan` trees and matching
+`external/vcpkg-installed/ci-asan` and
+`external/vcpkg-installed/ci-ubsan` package trees.
+
+After all three CPU variants have built `IntrinsicCpuTests`, capture and compare
+their exact normalized producer/case inventories:
+
+```bash
+python3 tools/ci/cpu_test_selection.py capture \
+  --build-dir build/ci --preset ci --expected-sanitizer none \
+  --output build/ci/cpu-test-selection.json
+python3 tools/ci/cpu_test_selection.py capture \
+  --build-dir build/ci-asan --preset ci-asan --expected-sanitizer asan \
+  --output build/ci-asan/cpu-test-selection.json
+python3 tools/ci/cpu_test_selection.py capture \
+  --build-dir build/ci-ubsan --preset ci-ubsan --expected-sanitizer ubsan \
+  --output build/ci-ubsan/cpu-test-selection.json
+python3 tools/ci/cpu_test_selection.py compare \
+  --report build/ci/cpu-test-selection.json \
+  --report build/ci-asan/cpu-test-selection.json \
+  --report build/ci-ubsan/cpu-test-selection.json \
+  --require-sanitizer none --require-sanitizer asan \
+  --require-sanitizer ubsan \
+  --output build/cpu-test-selection-parity.json
+```
+
+Among required CI gates, `ci-vulkan` alone retains combined ASan+UBSan
+instrumentation. Its address capability registers the BUG-083 Vulkan shutdown
+LeakSanitizer contract; the isolated UBSan CPU tree does not claim
+LeakSanitizer coverage. Pull-request and manual `ci-linux-clang` runs call the
+reusable sanitizer workflow and require the real three-artifact comparison;
+the parity gate does not rebuild or rerun the unsanitized cohort.
+
 Use `slow` for valid tests that should not run in fast PR or default local CPU
 correctness gates, including executables that boot the full headless engine,
 initialize Vulkan in a non-`gpu`-only path, run benchmark/SLO thresholds, or

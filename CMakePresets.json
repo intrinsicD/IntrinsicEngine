@@ -17,6 +17,7 @@
         "INTRINSIC_BUILD_SANDBOX": "ON",
         "INTRINSIC_BUILD_TESTS": "ON",
         "INTRINSIC_ENABLE_SANITIZERS": "ON",
+        "INTRINSIC_SANITIZER_MODE": "address,undefined",
         "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/cmake/IntrinsicClangToolchain.cmake",
         "VCPKG_INSTALLED_DIR": "${sourceDir}/external/vcpkg-installed/${presetName}",
         "VCPKG_MANIFEST_MODE": "ON"
@@ -42,14 +43,37 @@
     },
     {
       "name": "ci",
-      "displayName": "Debug CI without Sandbox (CUDA off)",
+      "displayName": "Unsanitized Debug CI without Sandbox (CUDA off)",
       "inherits": "base",
-      "description": "CI configure without Sandbox for focused test and benchmark runs. The pinned Linux/Vulkan identity resolves Auto to GLFW; use explicit Null/headless overrides for no-GLFW work.",
+      "description": "Unsanitized CI configure without Sandbox for full CPU test and benchmark runs. The pinned Linux/Vulkan identity resolves Auto to GLFW; use explicit Null/headless overrides for no-GLFW work.",
       "cacheVariables": {
         "EXTRINSIC_PLATFORM": "Linux",
         "EXTRINSIC_BACKEND": "Vulkan",
         "INTRINSIC_BUILD_SANDBOX": "OFF",
-        "INTRINSIC_ENABLE_CUDA": "OFF"
+        "INTRINSIC_ENABLE_CUDA": "OFF",
+        "INTRINSIC_ENABLE_SANITIZERS": "OFF",
+        "INTRINSIC_SANITIZER_MODE": "none",
+        "INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN": "OFF"
+      }
+    },
+    {
+      "name": "ci-asan",
+      "displayName": "AddressSanitizer CPU CI",
+      "inherits": "ci",
+      "description": "Isolated AddressSanitizer configuration for the canonical CPU test cohort.",
+      "cacheVariables": {
+        "INTRINSIC_ENABLE_SANITIZERS": "ON",
+        "INTRINSIC_SANITIZER_MODE": "address"
+      }
+    },
+    {
+      "name": "ci-ubsan",
+      "displayName": "UndefinedBehaviorSanitizer CPU CI",
+      "inherits": "ci",
+      "description": "Isolated UndefinedBehaviorSanitizer configuration for the canonical CPU test cohort.",
+      "cacheVariables": {
+        "INTRINSIC_ENABLE_SANITIZERS": "ON",
+        "INTRINSIC_SANITIZER_MODE": "undefined"
       }
     },
     {
@@ -68,6 +92,7 @@
         "INTRINSIC_BUILD_BENCHMARKS": "OFF",
         "INTRINSIC_ENABLE_CUDA": "OFF",
         "INTRINSIC_ENABLE_SANITIZERS": "OFF",
+        "INTRINSIC_SANITIZER_MODE": "none",
         "INTRINSIC_ENABLE_SOURCE_COVERAGE": "OFF",
         "INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN": "OFF",
         "VCPKG_MANIFEST_NO_DEFAULT_FEATURES": "ON"
@@ -91,6 +116,7 @@
         "INTRINSIC_BUILD_BENCHMARKS": "OFF",
         "INTRINSIC_ENABLE_CUDA": "OFF",
         "INTRINSIC_ENABLE_SANITIZERS": "OFF",
+        "INTRINSIC_SANITIZER_MODE": "none",
         "INTRINSIC_ENABLE_SOURCE_COVERAGE": "ON",
         "INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN": "OFF"
       }
@@ -102,6 +128,8 @@
       "description": "CI preset that opts in to the promoted Vulkan backend (INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON) and includes the Sandbox target for end-to-end visible-triangle smoke. Runtime still falls back to Null per the GRAPHICS-033 truth table when the operational gate is not satisfied; gpu;vulkan fixtures opt in via 'ctest -L gpu -L vulkan'.",
       "cacheVariables": {
         "INTRINSIC_BUILD_SANDBOX": "ON",
+        "INTRINSIC_ENABLE_SANITIZERS": "ON",
+        "INTRINSIC_SANITIZER_MODE": "address,undefined",
         "INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN": "ON"
       }
     }
@@ -118,6 +146,14 @@
     {
       "name": "ci",
       "configurePreset": "ci"
+    },
+    {
+      "name": "ci-asan",
+      "configurePreset": "ci-asan"
+    },
+    {
+      "name": "ci-ubsan",
+      "configurePreset": "ci-ubsan"
     },
     {
       "name": "ci-fast",

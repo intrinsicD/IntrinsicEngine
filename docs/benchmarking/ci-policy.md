@@ -261,11 +261,98 @@ The output directory must be absent or empty so stale raw profiles cannot enter
 a new result. A claim-grade full baseline names the hosted workflow run and
 artifact rather than checking the potentially large profile set into Git.
 
+## Sanitizer and performance build identities
+
+The required CPU and capability gates use explicit sanitizer identities. Each
+preset expands `${presetName}` into both its build directory and vcpkg installed
+directory, so sanitizer variants do not share project objects, C++ module BMIs,
+or installed package trees:
+
+| Preset | Resolved sanitizer | Build directory | vcpkg installed directory | Required owner |
+| --- | --- | --- | --- | --- |
+| `ci` | `none` | `build/ci` | `external/vcpkg-installed/ci` | Full CPU correctness, SLO, benchmark, and nightly CPU work |
+| `ci-asan` | `asan` | `build/ci-asan` | `external/vcpkg-installed/ci-asan` | Exact CPU cohort under AddressSanitizer |
+| `ci-ubsan` | `ubsan` | `build/ci-ubsan` | `external/vcpkg-installed/ci-ubsan` | Exact CPU cohort under UndefinedBehaviorSanitizer |
+| `ci-vulkan` | `asan-ubsan` | `build/ci-vulkan` | `external/vcpkg-installed/ci-vulkan` | Promoted Vulkan capability and process-level LeakSanitizer contracts |
+
+`INTRINSIC_ENABLE_SANITIZERS` remains a compatibility switch for raw CMake
+callers. Named presets additionally set `INTRINSIC_SANITIZER_MODE` to `none`,
+`address`, `undefined`, or `address,undefined`; configure rejects disagreement
+between the two inputs. The resolved cache identity is the telemetry authority.
+
+The dedicated ASan and UBSan jobs build `IntrinsicCpuTests` and use only the
+canonical exclusion predicate:
+
+```bash
+ctest --test-dir build/<sanitizer-preset> --output-on-failure \
+  -LE 'gpu|vulkan|slow|flaky-quarantine' \
+  --no-tests=error --timeout 60
+```
+
+They do not add a positive `-L` filter, because doing so can silently omit a
+valid regression-only producer. They also do not pass `-j`: sanitizer CTest
+parallelism remains serial until `CI-008` measures and owns a worker budget.
+The variants have distinct defect ownership rather than overlapping combined
+CPU compiles: ASan owns address/lifetime/leak findings and UBSan owns undefined
+behavior findings. `ci-vulkan` is the sole retained combined ASan+UBSan preset
+among required CI gates because `ExtrinsicSandbox.VulkanShutdownLsanContract`
+requires address instrumentation and a LeakSanitizer negative control on the
+promoted Vulkan path. Developer presets retain their existing local combined
+instrumentation semantics.
+
+Nightly CPU correctness, SLO, benchmark smoke, and performance diagnostics
+configure the unsanitized `ci` preset once and stay in `build/ci`. The nightly
+job does not reconfigure that tree with raw sanitizer flags; required sanitizer
+coverage remains in the isolated presets above. `CI-009` owns any later
+optimized Release performance identity.
+
+After configuring and building `IntrinsicCpuTests` in all three CPU trees,
+capture and compare the normalized producer/case selections with:
+
+```bash
+python3 tools/ci/cpu_test_selection.py capture \
+  --build-dir build/ci --preset ci --expected-sanitizer none \
+  --output build/ci/cpu-test-selection.json
+python3 tools/ci/cpu_test_selection.py capture \
+  --build-dir build/ci-asan --preset ci-asan --expected-sanitizer asan \
+  --output build/ci-asan/cpu-test-selection.json
+python3 tools/ci/cpu_test_selection.py capture \
+  --build-dir build/ci-ubsan --preset ci-ubsan --expected-sanitizer ubsan \
+  --output build/ci-ubsan/cpu-test-selection.json
+python3 tools/ci/cpu_test_selection.py compare \
+  --report build/ci/cpu-test-selection.json \
+  --report build/ci-asan/cpu-test-selection.json \
+  --report build/ci-ubsan/cpu-test-selection.json \
+  --require-sanitizer none --require-sanitizer asan \
+  --require-sanitizer ubsan \
+  --output build/cpu-test-selection-parity.json
+```
+
+The capture validates the resolved sanitizer mode, compatibility boolean,
+capability flags, aggregate producers, labels, and exact path-free CTest case
+inventory. Comparison fails if any variant selects a different normalized
+cohort. On pull requests and manual `ci-linux-clang` runs, that workflow invokes
+the reusable sanitizer jobs after starting the unsanitized job, downloads all
+three selection artifacts, and requires the same comparison before the workflow
+can pass. The sanitizer workflow is reusable rather than independently
+pull-request-triggered, so enforcing parity does not duplicate the unsanitized
+build or test pass.
+
+The retained `CI-003` baseline predates this topology. Its `ci`,
+`ci-vulkan`, and benchmark populations record the historical
+`combined-project-default` identity, while its dedicated sanitizer jobs used
+different selectors and configuration overrides. Those immutable records remain
+valid evidence for the old policy but are not identical-selector measurements
+of the new `none|asan|ubsan|asan-ubsan` topology. Do not attribute a timing
+difference to sanitizer isolation alone or rewrite the historical identities.
+
 ## Nightly/deep expectations
 
 - Run deeper correctness/performance suites.
 - Include broader datasets and optional GPU workloads.
 - Publish benchmark artifacts for trend tracking.
+- Keep CPU performance and benchmark work in the unsanitized `build/ci` tree;
+  sanitizer and promoted-Vulkan variants remain isolated in their named trees.
 
 ## Gate latency telemetry
 
@@ -361,6 +448,9 @@ compiles through; cacheable C++ consumers run with direct and depend modes off
 and hash a deterministic digest of every repository module interface through
 `CCACHE_EXTRAFILES`. No warm-compile population existed in the CI-003 baseline,
 and the baseline records that absence rather than combining cache states.
+As described in the sanitizer topology above, these samples retain their
+historical combined/default and ad hoc variant identities; they are not
+identical-selector measurements of the current isolated presets.
 
 Each CI-003 baseline population uses the same five pull-request commits. The
 retained run/job IDs were checked against all 30 jobs and 25 workflow runs

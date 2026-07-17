@@ -244,7 +244,24 @@ For each change:
   ```
 
   GPU/Vulkan, slow, and explicitly quarantined tests are opt-in and must be justified by label policy.
-- Promoted Vulkan opt-in verification uses the `ci-vulkan` preset plus GPU/Vulkan label intersection, for example:
+- The canonical `ci` preset is unsanitized. Required address and undefined-behavior sanitizer coverage uses the
+  isolated `ci-asan` and `ci-ubsan` presets, their matching `build/ci-asan` and `build/ci-ubsan` trees, and the same
+  exclusion-only CPU selector:
+
+  ```bash
+  cmake --preset ci-asan --fresh
+  cmake --build --preset ci-asan --target IntrinsicCpuTests
+  ctest --test-dir build/ci-asan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+  cmake --preset ci-ubsan --fresh
+  cmake --build --preset ci-ubsan --target IntrinsicCpuTests
+  ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+  ```
+
+  Sanitizer CTest execution remains serial until `CI-008` establishes a measured worker budget. Do not add `-j` to
+  these commands as an incidental optimization.
+- Promoted Vulkan opt-in verification uses the `ci-vulkan` preset plus GPU/Vulkan label intersection. Among required
+  CI gates, this is the only one that retains combined ASan+UBSan instrumentation because the Vulkan shutdown contract
+  owns explicit LeakSanitizer evidence:
 
   ```bash
   cmake --preset ci-vulkan

@@ -226,6 +226,20 @@ class TouchedScopeTests(unittest.TestCase):
         self.assertIn("Test.CcacheWorkflow.py", ccache_text)
         self.assertNotIn("Test.TouchedScope.py", ccache_text)
 
+        selection = touched_scope.analyze_change_records(
+            [record("tools/ci/cpu_test_selection.py")]
+        )
+        selection_text = "\n".join(
+            command.shell_text()
+            for command in touched_scope.structural_commands(
+                ".",
+                selection["structural_checks"],
+            )
+        )
+        self.assertIn("Test.CpuTestSelection.py", selection_text)
+        self.assertIn("Test.SanitizerPresets.py", selection_text)
+        self.assertNotIn("Test.TouchedScope.py", selection_text)
+
         timing = touched_scope.analyze_change_records(
             [record("tests/regression/tooling/Test.CiTiming.py")]
         )

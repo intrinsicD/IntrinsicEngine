@@ -192,14 +192,12 @@ def configured_identity(build_dir: Path, expected_sanitizer: str) -> ConfiguredI
         _run_version(["ccache", "--version"], "ccache"),
         "ccache",
     )
-    sanitizer_enabled = cache.get("INTRINSIC_ENABLE_SANITIZERS", "").upper() in {
-        "1",
-        "ON",
-        "TRUE",
-        "YES",
-        "Y",
-    }
-    sanitizer = "combined-project-default" if sanitizer_enabled else "none"
+    sanitizer = cache.get("INTRINSIC_SANITIZER_IDENTITY", "")
+    if sanitizer not in {"none", "asan", "ubsan", "asan-ubsan"}:
+        raise RuntimeError(
+            "configured CMake cache must name a valid "
+            "INTRINSIC_SANITIZER_IDENTITY"
+        )
     if sanitizer != expected_sanitizer:
         raise RuntimeError(
             f"configured sanitizer identity is {sanitizer!r}, "

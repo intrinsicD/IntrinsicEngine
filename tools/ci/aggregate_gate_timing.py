@@ -30,6 +30,7 @@ BUILD_CONFIGURATION_FIELDS = (
         "INTRINSIC_PLATFORM_BACKEND_SELECTED",
         "intrinsic_platform_backend_selected",
     ),
+    ("INTRINSIC_SANITIZER_IDENTITY", "intrinsic_sanitizer_identity"),
 )
 
 
@@ -202,7 +203,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--gate", required=True)
     parser.add_argument("--preset", required=True)
     parser.add_argument("--compiler", required=True)
-    parser.add_argument("--sanitizer", default="none")
+    parser.add_argument(
+        "--sanitizer",
+        choices=("none", "asan", "ubsan", "asan-ubsan"),
+        default="none",
+    )
     parser.add_argument("--runner-image", required=True)
     parser.add_argument("--commit", required=True)
     parser.add_argument("--cache-state", choices=("cold", "warm"), required=True)
@@ -274,6 +279,13 @@ def main() -> int:
         build_configuration, build_configuration_errors = _read_build_configuration(
             args.build_dir
         )
+        configured_sanitizer = build_configuration["intrinsic_sanitizer_identity"]
+        if configured_sanitizer and configured_sanitizer != args.sanitizer:
+            build_configuration_errors.append(
+                "configured sanitizer identity "
+                f"{configured_sanitizer!r} does not match reported identity "
+                f"{args.sanitizer!r}"
+            )
     build_configuration_available = (
         args.build_dir is not None and not build_configuration_errors
     )
@@ -321,6 +333,9 @@ def main() -> int:
         "intrinsic_headless_no_glfw": build_configuration["intrinsic_headless_no_glfw"],
         "intrinsic_platform_backend_selected": build_configuration[
             "intrinsic_platform_backend_selected"
+        ],
+        "intrinsic_sanitizer_identity": build_configuration[
+            "intrinsic_sanitizer_identity"
         ],
         "build_configuration_available": build_configuration_available,
         "build_configuration_errors": build_configuration_errors,

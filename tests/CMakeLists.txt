@@ -1183,7 +1183,7 @@ if(TARGET ExtrinsicSandbox
     # supplies an unsuppressed engine-owned negative control before the exact
     # five-frame Vulkan shutdown run.
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
-       AND INTRINSIC_ENABLE_SANITIZERS
+       AND INTRINSIC_SANITIZER_HAS_ADDRESS
        AND TARGET IntrinsicGlfwLifecycleLsanProcess)
         if(NOT INTRINSIC_LSAN_SYMBOLIZER)
             message(FATAL_ERROR

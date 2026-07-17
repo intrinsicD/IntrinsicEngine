@@ -185,29 +185,113 @@ set(INTRINSIC_BASE_FLAGS
         -fno-rtti
 )
 
-# Sanitizer support — gated behind INTRINSIC_ENABLE_SANITIZERS.
-# Auto-detects whether the Clang ASan runtime is available; disables gracefully
-# in container / CI environments that ship Clang but not compiler-rt.
+# Sanitizer support. INTRINSIC_ENABLE_SANITIZERS remains the compatibility
+# switch for raw callers; named presets also set the exact sanitizer mode.
 include(CheckCXXSourceCompiles)
 set(_SAVED_CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS}")
 set(CMAKE_REQUIRED_FLAGS "-fsanitize=address")
 check_cxx_source_compiles("int main(){return 0;}" INTRINSIC_ASAN_AVAILABLE)
+set(CMAKE_REQUIRED_FLAGS "-fsanitize=undefined")
+check_cxx_source_compiles("int main(){return 0;}" INTRINSIC_UBSAN_AVAILABLE)
 set(CMAKE_REQUIRED_FLAGS "${_SAVED_CMAKE_REQUIRED_FLAGS}")
 
 option(INTRINSIC_ENABLE_SANITIZERS
-    "Enable AddressSanitizer + UBSan in Debug/RelWithDebInfo builds"
+    "Enable sanitizer instrumentation in Debug/RelWithDebInfo builds"
     ${INTRINSIC_ASAN_AVAILABLE}
 )
+set(INTRINSIC_SANITIZER_MODE "" CACHE STRING
+    "Sanitizer mode; empty preserves INTRINSIC_ENABLE_SANITIZERS compatibility"
+)
+set_property(CACHE INTRINSIC_SANITIZER_MODE PROPERTY STRINGS
+    "" none address undefined "address,undefined"
+)
+
+set(_intrinsic_allowed_sanitizer_modes
+    none
+    address
+    undefined
+    "address,undefined"
+)
+if(INTRINSIC_SANITIZER_MODE STREQUAL "")
+    if(INTRINSIC_ENABLE_SANITIZERS)
+        set(_intrinsic_sanitizer_mode "address,undefined")
+    else()
+        set(_intrinsic_sanitizer_mode "none")
+    endif()
+else()
+    list(FIND _intrinsic_allowed_sanitizer_modes
+        "${INTRINSIC_SANITIZER_MODE}"
+        _intrinsic_sanitizer_mode_index
+    )
+    if(_intrinsic_sanitizer_mode_index EQUAL -1)
+        message(FATAL_ERROR
+            "Unsupported INTRINSIC_SANITIZER_MODE='${INTRINSIC_SANITIZER_MODE}'. "
+            "Expected none, address, undefined, or address,undefined.")
+    endif()
+    if(INTRINSIC_SANITIZER_MODE STREQUAL "none"
+       AND INTRINSIC_ENABLE_SANITIZERS)
+        message(FATAL_ERROR
+            "INTRINSIC_SANITIZER_MODE=none requires "
+            "INTRINSIC_ENABLE_SANITIZERS=OFF.")
+    elseif(NOT INTRINSIC_SANITIZER_MODE STREQUAL "none"
+           AND NOT INTRINSIC_ENABLE_SANITIZERS)
+        message(FATAL_ERROR
+            "INTRINSIC_SANITIZER_MODE=${INTRINSIC_SANITIZER_MODE} requires "
+            "INTRINSIC_ENABLE_SANITIZERS=ON.")
+    endif()
+    set(_intrinsic_sanitizer_mode "${INTRINSIC_SANITIZER_MODE}")
+endif()
+
+set(_intrinsic_sanitizer_identity "none")
+set(_intrinsic_sanitizer_has_address OFF)
+set(_intrinsic_sanitizer_has_undefined OFF)
+if(_intrinsic_sanitizer_mode STREQUAL "address")
+    set(_intrinsic_sanitizer_identity "asan")
+    set(_intrinsic_sanitizer_has_address ON)
+elseif(_intrinsic_sanitizer_mode STREQUAL "undefined")
+    set(_intrinsic_sanitizer_identity "ubsan")
+    set(_intrinsic_sanitizer_has_undefined ON)
+elseif(_intrinsic_sanitizer_mode STREQUAL "address,undefined")
+    set(_intrinsic_sanitizer_identity "asan-ubsan")
+    set(_intrinsic_sanitizer_has_address ON)
+    set(_intrinsic_sanitizer_has_undefined ON)
+endif()
+
+if(_intrinsic_sanitizer_has_address AND NOT INTRINSIC_ASAN_AVAILABLE)
+    message(FATAL_ERROR
+        "AddressSanitizer was requested, but the configured Clang ASan "
+        "runtime is unavailable.")
+endif()
+if(_intrinsic_sanitizer_has_undefined AND NOT INTRINSIC_UBSAN_AVAILABLE)
+    message(FATAL_ERROR
+        "UndefinedBehaviorSanitizer was requested, but the configured Clang "
+        "UBSan runtime is unavailable.")
+endif()
+
+set(INTRINSIC_SANITIZER_IDENTITY
+    "${_intrinsic_sanitizer_identity}"
+    CACHE INTERNAL "Resolved sanitizer telemetry identity" FORCE
+)
+set(INTRINSIC_SANITIZER_HAS_ADDRESS
+    "${_intrinsic_sanitizer_has_address}"
+    CACHE INTERNAL "Whether AddressSanitizer instrumentation is active" FORCE
+)
+set(INTRINSIC_SANITIZER_HAS_UNDEFINED
+    "${_intrinsic_sanitizer_has_undefined}"
+    CACHE INTERNAL "Whether UBSan instrumentation is active" FORCE
+)
+
 option(INTRINSIC_ENABLE_SOURCE_COVERAGE
     "Enable Clang source-based code coverage instrumentation"
     OFF
 )
 
-if(INTRINSIC_ENABLE_SOURCE_COVERAGE AND INTRINSIC_ENABLE_SANITIZERS)
+if(INTRINSIC_ENABLE_SOURCE_COVERAGE
+   AND NOT INTRINSIC_SANITIZER_IDENTITY STREQUAL "none")
     message(FATAL_ERROR
-        "INTRINSIC_ENABLE_SOURCE_COVERAGE and INTRINSIC_ENABLE_SANITIZERS "
-        "are mutually exclusive. Use the unsanitized ci-coverage-cpu preset "
-        "for source coverage.")
+        "INTRINSIC_ENABLE_SOURCE_COVERAGE and sanitizer instrumentation are "
+        "mutually exclusive. Use the unsanitized ci-coverage-cpu preset for "
+        "source coverage.")
 endif()
 if(INTRINSIC_ENABLE_SOURCE_COVERAGE
     AND (NOT CMAKE_C_COMPILER_ID STREQUAL "Clang"
@@ -218,16 +302,24 @@ if(INTRINSIC_ENABLE_SOURCE_COVERAGE
 endif()
 
 set(INTRINSIC_DEBUG_FLAGS "")
-if(INTRINSIC_ENABLE_SANITIZERS)
+if(NOT INTRINSIC_SANITIZER_IDENTITY STREQUAL "none")
     set(INTRINSIC_DEBUG_FLAGS
-        $<$<CONFIG:Debug>:-fsanitize=address,undefined>
+        $<$<CONFIG:Debug>:-fsanitize=${_intrinsic_sanitizer_mode}>
         $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
-        $<$<CONFIG:RelWithDebInfo>:-fsanitize=address,undefined>
+        $<$<CONFIG:RelWithDebInfo>:-fsanitize=${_intrinsic_sanitizer_mode}>
         $<$<CONFIG:RelWithDebInfo>:-fno-omit-frame-pointer>
     )
-    message(STATUS "Sanitizers ENABLED (ASan + UBSan) for Debug/RelWithDebInfo builds")
+    if(INTRINSIC_SANITIZER_HAS_UNDEFINED)
+        list(APPEND INTRINSIC_DEBUG_FLAGS
+            $<$<CONFIG:Debug>:-fno-sanitize-recover=undefined>
+            $<$<CONFIG:RelWithDebInfo>:-fno-sanitize-recover=undefined>
+        )
+    endif()
+    message(STATUS
+        "Sanitizers ENABLED (${INTRINSIC_SANITIZER_IDENTITY}; "
+        "${_intrinsic_sanitizer_mode}) for Debug/RelWithDebInfo builds")
 else()
-    message(STATUS "Sanitizers DISABLED (libclang_rt.asan not found or manually turned off)")
+    message(STATUS "Sanitizers DISABLED")
 endif()
 
 set(INTRINSIC_COVERAGE_COMPILE_FLAGS "")
