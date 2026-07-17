@@ -362,7 +362,8 @@ evidence. Retired `BUG-107` established configure-history-independent target
 inventories, and retired `BUG-106` established capability-truthful test
 ownership. Retired `CI-010` established complete CPU source-coverage parity;
 retired `CI-005` now makes PR-fast a
-fail-closed touched-scope gate; `CI-006` isolates sanitizer variants; `CI-011`
+fail-closed touched-scope gate; retired `CI-006` isolates sanitizer variants;
+`CI-011`
 uses comparable measurements to split only genuinely slow cases; and `CI-008`
 groups safe suites and calibrates nested worker budgets. `BUILD-004` repairs
 source-complete compile-hotspot evidence and is a prerequisite of

@@ -15,8 +15,6 @@ map.
 
 ## Tasks
 
-- [CI-006 — Remove duplicate sanitizer work and isolate variants](../../active/CI-006-sanitizer-topology-and-test-parallelism.md)
-  (currently active).
 - [CI-008 — Reduce CTest process overhead without oversubscribing workers](CI-008-grouped-ctest-and-worker-oversubscription.md)
 - [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
 - [CI-011 — Calibrate the slow-test cohort and retain fast sentinels](CI-011-measured-slow-test-cohort.md)
@@ -37,9 +35,8 @@ retirement log.
   retired `BUG-107` makes the configured target graph deterministic, and
   retired `BUG-106` restores truthful test ownership. Retired `CI-010`
   establishes coverage parity; retired `CI-005` consumes the corrected
-  registry/graph; `CI-006`
-  isolates the
-  retained sanitizer variants; `CI-011` measures the fast/slow cohort; and
+  registry/graph; retired `CI-006` isolates the retained sanitizer variants;
+  `CI-011` measures the fast/slow cohort; and
   `CI-008` groups safe families and sets worker budgets only after those inputs
   settle. `BUILD-004` independently repairs compile-hotspot evidence and gates
   `RUNTIME-166`. `CI-009` evaluates lifecycle/runner changes last, after the
@@ -82,6 +79,11 @@ this batch is the evidence-backed `check_pr_contract.py` retirement audited by
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [CI-006 — Remove duplicate sanitizer work and isolate variants](../../done/CI-006-sanitizer-topology-and-test-parallelism.md)
+  (done 2026-07-17): isolated unsanitized, ASan, UBSan, and promoted-Vulkan
+  identities, proved exact 4,062-case parity across the three CPU variants,
+  and retained the first five-sample identical-selector timing baseline
+  without making a causal speedup claim.
 - [CI-005 — Make PR-fast a real touched-scope feedback gate](../../done/CI-005-real-touched-scope-pr-fast-gate.md)
   (done 2026-07-17): added a fail-closed staged touched-scope planner and
   unsanitized `ci-fast` route, retained five-sample docs/focused/broad timing

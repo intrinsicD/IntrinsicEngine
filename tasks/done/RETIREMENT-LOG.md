@@ -8,6 +8,20 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`CI-006`](CI-006-sanitizer-topology-and-test-parallelism.md) — sanitizer
+topology isolation retired on 2026-07-17 at `Operational`. Unsanitized, ASan,
+UBSan, and promoted-Vulkan presets now use explicit identities and distinct
+build/install trees; required CPU jobs share one exact exclusion-only selector,
+while performance work stays unsanitized. Fifteen hosted selection reports,
+five per CPU identity, each reconciled 26 producers and 4,062 cases to digest
+`07c9f615629327c0502cd4aa73c411de41693b88ccc0ea80dbabb624cb6cf08b`.
+Five-sample total-time median/p95 seconds were `1771.333/1816.077` for
+unsanitized, `2232.778/2288.766` for ASan, and `1733.820/1923.281` for UBSan.
+The older `CI-003` populations remain formally non-comparable because their
+selectors and sanitizer identities differ, so no causal speedup claim is made.
+The Debug nanosecond SLO remains one explicit non-blocking nightly diagnostic
+owned by `CI-009`; concurrency calibration remains owned by `CI-008`.
+
 [`BUG-111`](BUG-111-github-artifact-finalization-403.md) — hosted artifact
 finalization incident retired on 2026-07-17 with an external-service
 disposition. ASan job `87915791947` passed 4,062/4,062 tests and validated its

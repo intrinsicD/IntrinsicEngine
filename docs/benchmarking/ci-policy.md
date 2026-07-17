@@ -372,6 +372,46 @@ when thresholds fail; this is a tracked warning-mode check, not a claim-grade
 performance result. `CI-009` owns the optimized Release identity, calibration,
 and promotion to a blocking SLO lifecycle.
 
+### CI-006 isolated-topology baseline
+
+`CI-006` retained five passing hosted samples for each isolated CPU identity.
+ASan and UBSan used runs
+[29589810741](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29589810741),
+[29589810850](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29589810850),
+[29589810886](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29589810886),
+[29589810898](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29589810898),
+and
+[29589811057](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29589811057)
+at implementation commit `a7ae8e7f`. The ASan sample in run `29589810886`
+comes from successful same-SHA attempt 2, job `87928232616`; the failed
+artifact-finalization attempt recorded by `BUG-111` is excluded. Unsanitized
+samples used runs
+[29592744115](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29592744115),
+[29592761257](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29592761257),
+[29592761260](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29592761260),
+[29592761292](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29592761292),
+and
+[29592761299](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29592761299)
+at `44da41e3`. The intervening commits changed workflows, policy docs, task
+records, and Python workflow regressions only; they did not change CMake,
+presets, C++, CTest registration, or selected CPU-test sources.
+
+Every one of the 15 selection reports resolved 26 producers and 4,062 cases to
+digest
+`07c9f615629327c0502cd4aa73c411de41693b88ccc0ea80dbabb624cb6cf08b`.
+The real three-report comparison passed with schema
+`intrinsic.cpu-test-selection-parity/v1`.
+
+| Identity | Configure median / p95 (s) | Build median / p95 (s) | Test median / p95 (s) | Total median / p95 (s) |
+| --- | ---: | ---: | ---: | ---: |
+| `none` | 34.722 / 37.876 | 1707.296 / 1746.903 | 32.292 / 33.472 | 1771.333 / 1816.077 |
+| `asan` | 10.855 / 14.579 | 1698.595 / 1748.666 | 523.328 / 526.892 | 2232.778 / 2288.766 |
+| `ubsan` | 10.546 / 13.459 | 1539.424 / 1730.877 | 178.098 / 183.850 | 1733.820 / 1923.281 |
+
+This table is the first isolated identical-selector baseline. It supports
+topology identity and current-cost claims only. It does not isolate a causal
+performance effect, and `CI-008` owns future concurrency A/B measurements.
+
 The retained `CI-003` baseline predates this topology. Its `ci`,
 `ci-vulkan`, and benchmark populations record the historical
 `combined-project-default` identity, while its dedicated sanitizer jobs used

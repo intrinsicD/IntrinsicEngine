@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `CI-006` — Remove duplicate sanitizer work and isolate variants (tasks/active/CI-006-sanitizer-topology-and-test-parallelism.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -61,8 +61,8 @@ the authoritative open/unblocked view.
 ## Theme H — Agentic workflow hardening
 
 - unblocked: `BUILD-004` — Make compile-hotspot evidence source-complete (tasks/backlog/process/BUILD-004-source-complete-compile-hotspot-evidence.md)
-- blocked by `CI-006`: `CI-008` — Reduce CTest process overhead without oversubscribing workers (tasks/backlog/process/CI-008-grouped-ctest-and-worker-oversubscription.md)
-- blocked by `CI-006`: `CI-009` — Route heavy gates by lifecycle and evaluate runner scaling (tasks/backlog/process/CI-009-heavy-gate-routing-and-runner-evaluation.md)
+- blocked by `CI-011`: `CI-008` — Reduce CTest process overhead without oversubscribing workers (tasks/backlog/process/CI-008-grouped-ctest-and-worker-oversubscription.md)
+- blocked by `CI-008`: `CI-009` — Route heavy gates by lifecycle and evaluate runner scaling (tasks/backlog/process/CI-009-heavy-gate-routing-and-runner-evaluation.md)
 - unblocked: `CI-011` — Calibrate the slow-test cohort and retain fast sentinels (tasks/backlog/process/CI-011-measured-slow-test-cohort.md)
 - unblocked: `PROC-025` — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality (tasks/backlog/process/PROC-025-port-research-ideation-skill-to-other-repos.md)
 
