@@ -11,9 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`CI-005`](CI-005-real-touched-scope-pr-fast-gate.md) — route structural-only
-  changes before C++ setup and use a registry-validated unsanitized `ci-fast`
-  lane for focused or bounded broad feedback.
+No tasks are currently active.
 
 ## History
 

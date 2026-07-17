@@ -48,15 +48,90 @@ population used commit `1098922a321ba51759ab9b489bfbd8c8af05c562`,
 The broad-route incremental smoke median is 19.395 seconds and nearest-rank
 p95 is 19.495 seconds. Its 0.598% incremental closure after the complete
 PR-fast aggregate and measured p95 pass the declared numerical limits, but
-that result does not establish the cost after a focused owner build. A
-configured-graph audit found 856 incremental commands after geometry owners
-(42.651% of PR-fast), 348 after graphics owners (17.339%), 1,200 after assets
-(59.791%), and 1,232 after platform (61.385%). Those closures exceed the 5%
-admission limit, so the smoke remains broad-only while it is right-sized.
-Cache-priming run
+that result does not establish the cost after a focused owner build:
+
+| Owner | Owner commands | Smoke increment | Owner-relative | PR-fast-relative |
+| --- | ---: | ---: | ---: | ---: |
+| assets | 201 | 1,200 | 597.015% | 59.791% |
+| core | 189 | 1,246 | 659.259% | 62.083% |
+| ecs | 1,401 | 12 | 0.857% | 0.598% |
+| geometry | 707 | 856 | 121.075% | 42.651% |
+| graphics | 1,189 | 348 | 29.268% | 17.339% |
+| physics | 1,397 | 12 | 0.859% | 0.598% |
+| platform | 155 | 1,232 | 794.839% | 61.385% |
+| runtime | 1,563 | 12 | 0.768% | 0.598% |
+
+The smoke target is 1,381 standalone commands and the monolithic
+`ExtrinsicRuntime` dependency alone is 1,366. Reducing the five test
+translation units to one case would still leave about 1,373 commands, so a
+test-only split cannot meet universal focused admission. Splitting production
+Runtime solely for CI would violate this task's right-sizing boundary. The
+candidate is therefore rejected for focused routes and remains broad-only;
+`CI-009` may reconsider only after product-driven target decomposition makes
+the configured increment meet the existing budget. Cache-priming run
 [`29580789612`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29580789612)
 is not in the counted population; its cold diagnostic was 12 incremental
 commands after PR-fast and 48.884 seconds.
+
+### CI-005 final routing evidence
+
+The final route comparison uses whole-job time for all three classes because
+structural-only jobs intentionally emit no configure/build/test timing result.
+For C++ routes it also reports the measured phase total. The named `CI-003`
+PR-fast baseline is 1,649/1,713 seconds median/p95 for whole-job time and
+1,626/1,670 seconds for measured phase total.
+
+Every population contains five successful `workflow_dispatch` jobs at one
+source identity. The docs population uses
+`b5df0942ba83ab40a2bcc136949dd7be14303bc6`; all C++ steps were skipped and
+the route artifact retained the two selected structural commands:
+
+| Run | Job | Job time |
+| --- | ---: | ---: |
+| [`29585138136`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29585138136) | `87900157817` | 8 s |
+| [`29585138198`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29585138198) | `87900151256` | 9 s |
+| [`29585138297`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29585138297) | `87900162595` | 10 s |
+| [`29585138413`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29585138413) | `87900153522` | 10 s |
+| [`29585138671`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29585138671) | `87900155652` | 9 s |
+
+The focused population uses
+`eaff576a806bb4a01739547836bbccd09bfd5304`, two reconciled geometry
+producers, 707 Ninja commands, 1,596 exact cases, and the same compatible warm
+cache in every run (198 hits, one expected miss for the changed implementation
+unit, zero errors):
+
+| Run | Job | Phase total | Job time |
+| --- | ---: | ---: | ---: |
+| [`29585138771`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29585138771) | `87900153207` | 160.272 s | 221 s |
+| [`29585138636`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29585138636) | `87900153873` | 149.092 s | 186 s |
+| [`29585138766`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29585138766) | `87900157946` | 149.457 s | 194 s |
+| [`29585138770`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29585138770) | `87900156931` | 170.219 s | 217 s |
+| [`29585138767`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29585138767) | `87900152871` | 166.081 s | 218 s |
+
+The broad fail-closed population is the same five-run
+`1098922a321ba51759ab9b489bfbd8c8af05c562` smoke-budget cohort. Every run
+selected 20 producers, 2,019 unique commands, 3,800 exact cases, and an exact
+warm cache with 606 hits and zero misses/errors:
+
+| Run | Job | Phase total | Job time |
+| --- | ---: | ---: | ---: |
+| [`29582459870`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29582459870) | `87891214200` | 663.938 s | 714 s |
+| [`29582459918`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29582459918) | `87891214737` | 615.927 s | 653 s |
+| [`29582459867`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29582459867) | `87891217187` | 617.695 s | 667 s |
+| [`29582459970`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29582459970) | `87891220710` | 596.108 s | 684 s |
+| [`29582459959`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29582459959) | `87891216269` | 653.089 s | 703 s |
+
+| Route | Job median / p95 | Job reduction vs CI-003 | Phase median / p95 | Phase reduction vs CI-003 |
+| --- | ---: | ---: | ---: | ---: |
+| Docs-only | 9 / 10 s | 99.45% / 99.42% | N/A | N/A |
+| Focused geometry | 217 / 221 s | 86.84% / 87.10% | 160.272 / 170.219 s | 90.14% / 89.81% |
+| Broad fail-closed | 684 / 714 s | 58.52% / 58.32% | 617.695 / 663.938 s | 62.01% / 60.24% |
+
+These are feedback-latency comparisons, not an isolated causal claim. The
+`CI-003` population was cold, sanitized, and used the old selector, while the
+new C++ populations are warm, unsanitized, and route-specific. The comparison
+therefore measures the delivered policy as a whole; it does not attribute the
+reduction to ccache, sanitizer removal, or touched-scope selection separately.
 
 ### Monolithic smoke ownership and budget
 

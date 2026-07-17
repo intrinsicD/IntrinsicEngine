@@ -10,14 +10,18 @@ depends_on:
 # CI-005 — Make PR-fast a real touched-scope feedback gate
 
 ## Status
-- In progress on 2026-07-17; owner: Codex; branch: `main`.
+- Completed on 2026-07-17; owner: Codex; branch: `main`.
+- Commit: `1098922a` (staged planner/workflow) and `e3ccef2a`
+  (hosted smoke-admission audit evidence).
 - The staged fail-closed planner and `ci-fast` workflow are live. The declared
   five-run broad-route smoke cohort passed its direct numerical checks, but a
   focused-owner graph audit showed that the measurement was not sufficient for
   admission.
-- Next verification: right-size the smoke so its focused-owner increment meets
-  the declared closure budget, then collect focused and docs-only route
-  populations. The five hosted runs remain the broad-fallback population.
+- The right-sized decision is to reject focused admission: production Runtime
+  decomposition solely to shrink a CI target is out of scope, and no test-only
+  split can meet the declared limit.
+- Five-sample docs-only, focused geometry, and broad fail-closed populations
+  passed and are retained in `docs/benchmarking/ci-policy.md`.
 
 ## Goal
 - Introduce an unsanitized `ci-fast` preset and wire the existing conservative
@@ -30,6 +34,8 @@ depends_on:
   dependency changes; those must fall back to the broad gate.
 - No CMake File-API dependency planner, generated reverse-dependency service,
   or new target-selection framework; repair the existing conservative map.
+- No production module/library split solely to reduce a CI smoke target's
+  closure.
 
 ## Context
 - Owner: CMake presets, `tools/ci/touched_scope.py`, PR workflow routing, and
@@ -81,12 +87,42 @@ cases:
 | `29582459959` | 12 / 2,007 (0.598%) | 19.495 s |
 
 Broad-route median is 19.395 seconds and nearest-rank p95 is 19.495 seconds.
-The 0.598% figure is the smoke increment after all PR-fast commands. The fresh
-configured graph shows materially larger increments after focused owners:
-geometry 856 commands (42.651%), graphics 348 (17.339%), assets 1,200
-(59.791%), and platform 1,232 (61.385%). The candidate therefore remains
-broad-only and must be right-sized before admission. Cold cache-prime run
-`29580789612` was excluded from the counted population.
+The 0.598% figure is the smoke increment after all PR-fast commands. The
+focused-owner audit is:
+
+| Owner | Owner commands | Smoke increment | Owner-relative | PR-fast-relative |
+| --- | ---: | ---: | ---: | ---: |
+| assets | 201 | 1,200 | 597.015% | 59.791% |
+| core | 189 | 1,246 | 659.259% | 62.083% |
+| ecs | 1,401 | 12 | 0.857% | 0.598% |
+| geometry | 707 | 856 | 121.075% | 42.651% |
+| graphics | 1,189 | 348 | 29.268% | 17.339% |
+| physics | 1,397 | 12 | 0.859% | 0.598% |
+| platform | 155 | 1,232 | 794.839% | 61.385% |
+| runtime | 1,563 | 12 | 0.768% | 0.598% |
+
+The current smoke is 1,381 standalone commands and `ExtrinsicRuntime` alone
+is 1,366. Even a one-case test-source split would remain about 1,373 commands,
+so it cannot satisfy universal focused admission without out-of-scope
+production decomposition. The evidence-backed right-size is owner-only
+focused feedback plus broad-only cross-layer smoke. `CI-009` may reconsider
+only if product-driven target decomposition first makes the configured
+increment meet this budget. Cold cache-prime run `29580789612` was excluded
+from the counted population.
+
+The final comparable route populations are:
+
+| Route | Source | Runs | Job median / p95 | Phase median / p95 |
+| --- | --- | --- | ---: | ---: |
+| Docs-only | `b5df0942` | `29585138136`, `29585138198`, `29585138297`, `29585138413`, `29585138671` | 9 / 10 s | N/A |
+| Focused geometry | `eaff576a` | `29585138771`, `29585138636`, `29585138766`, `29585138770`, `29585138767` | 217 / 221 s | 160.272 / 170.219 s |
+| Broad fail-closed | `1098922a` | `29582459870`, `29582459918`, `29582459867`, `29582459970`, `29582459959` | 684 / 714 s | 617.695 / 663.938 s |
+
+Against the named `CI-003` 1,649/1,713-second whole-job baseline, median/p95
+reductions are 99.45%/99.42% for docs, 86.84%/87.10% for focused geometry,
+and 58.52%/58.32% for broad fallback. The `CI-003` population was cold and
+sanitized while these C++ populations are warm and unsanitized, so this is a
+delivered-policy comparison rather than attribution to one optimization.
 
 ## Required changes
 - [x] Add `ci-fast` configure/build presets with Clang 20 module scanning,
@@ -109,15 +145,17 @@ broad-only and must be right-sized before admission. Cold cache-prime run
       target from the command plan.
 - [x] Execute the conservative plan in PR-fast. Broad-fallback scopes build the
       complete PR-fast aggregate rather than the default `all` target.
-- [ ] Measure the actual source/test closure and wall time of
+- [x] Measure the actual source/test closure and wall time of
       `IntrinsicPrSmokeTests` with comparable reference runs, evaluate them
       against the predeclared incremental p95 latency/compile-closure budget,
       and right-size the existing registry-derived aggregate if it exceeds that
-      budget.
-- [ ] Only after the candidate meets the declared budget, run the resulting
+      budget. The measured aggregate failed focused admission; retaining it
+      only in broad fallback is the right-sized outcome.
+- [x] Only after the candidate meets the declared budget, run the resulting
       bounded cross-layer smoke for source changes in addition to touched-owner
       tests. Until then, retain it in broad fallback rather than making every
-      narrow plan pay an unmeasured closure.
+      narrow plan pay an unmeasured closure. The candidate did not meet the
+      focused budget and was not admitted.
 - [x] Preserve required full CPU, ASan, UBSan, and opt-in Vulkan checks outside
       this feedback gate.
 - [x] Publish selected files, reasons, targets, labels, test count, and broad-
@@ -131,11 +169,11 @@ broad-only and must be right-sized before admission. Cold cache-prime run
 - [x] Add fail-closed cases for diff failure, zero changed files on a PR event,
       the stale runtime target, missing physics coverage, and an undeclared
       target in a configured registry.
-- [ ] Add workflow integration fixtures proving each planner result executes
+- [x] Add workflow integration fixtures proving each planner result executes
       the expected aggregate, CTest filter, and structural checks.
 - [x] Prove a planner error or missing base ref broad-falls back and cannot
       produce a success-shaped empty gate.
-- [ ] Compare at least five representative docs-only, focused-source, and
+- [x] Compare at least five representative docs-only, focused-source, and
       broad-fallback runs to the `CI-003` baseline by median/p95.
 
 ## Docs
@@ -143,19 +181,19 @@ broad-only and must be right-sized before admission. Cold cache-prime run
       local/PR-fast feedback from the required full merge confidence gate.
 - [x] Document `ci-fast`, the budgeted cross-layer smoke, broad-fallback
       triggers, and how developers reproduce the selected plan locally.
-- [ ] Regenerate `tasks/SESSION-BRIEF.md` on retirement.
+- [x] Regenerate `tasks/SESSION-BRIEF.md` on retirement.
 
 ## Acceptance criteria
-- [ ] Docs/task-only PRs complete structural validation without a C++ build.
-- [ ] Focused source PRs build touched aggregates plus the measured/right-sized
-      cross-layer smoke that meets the declared budget, while module/build-
-      system/unknown changes run the broad fallback.
+- [x] Docs/task-only PRs complete structural validation without a C++ build.
+- [x] Focused source PRs build reconciled owner aggregates without the rejected
+      cross-layer smoke, while module/build-system/unknown changes run the
+      broad fallback with PR-fast plus smoke.
 - [x] The fast preset is unsanitized, and dedicated sanitizer jobs remain
       required.
 - [x] No changed-file or planner failure mode can yield an empty success.
-- [ ] Every selected target exists in the configured canonical registry, and
+- [x] Every selected target exists in the configured canonical registry, and
       the measured PR-smoke closure is recorded rather than assumed small.
-- [ ] Median/p95 feedback latency is reported for all three routing classes
+- [x] Median/p95 feedback latency is reported for all three routing classes
       against the named `CI-003` baseline.
 
 ## Verification

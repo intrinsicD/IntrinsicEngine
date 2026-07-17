@@ -8,6 +8,21 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`CI-005`](CI-005-real-touched-scope-pr-fast-gate.md) — the real touched-scope
+PR-fast gate retired on 2026-07-17. The new unsanitized Null/headless
+`ci-fast` route classifies the merge-base diff before setup, skips C++ work for
+structural-only changes, reconciles focused owner producers against a fresh
+registry, and fails closed for module, build-system, dependency, unknown, or
+planner-error scopes. Five comparable samples per route measured whole-job
+median/p95 at 9/10 seconds for docs-only, 217/221 seconds for focused geometry,
+and 684/714 seconds for broad fallback. The declared cross-layer smoke passed
+its broad post-PR-fast budget at 19.395/19.495 seconds and 0.598% incremental
+closure, but the configured focused-owner audit ranged from 17.339% to 62.083%
+of the PR-fast graph for the affected owners. Focused admission was therefore
+rejected rather than splitting production Runtime solely for CI; the smoke
+remains broad-only, and full CPU, sanitizer, and capability gates remain
+required.
+
 [`CI-010`](CI-010-cpu-source-coverage-refactor-parity.md) — canonical CPU
 source-coverage parity retired on 2026-07-17. The dedicated Clang 20 preset and
 manual workflow derive all 26 CPU producers from the configured registry,

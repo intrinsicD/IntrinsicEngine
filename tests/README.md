@@ -210,9 +210,11 @@ python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEA
 The helper classifies before configure. Structural-only changes skip C++ setup;
 known implementation-unit changes use owner-labeled producers from the fresh
 `ci-fast` registry; module/header/build/dependency, missing-diff, and unknown
-changes fail closed to a bounded broad feedback route. The generated routing
-artifact records the exact selection. This lane does not replace final
-CPU/sanitizer/capability PR/merge verification.
+changes fail closed to a bounded broad feedback route that builds PR-fast
+before the cross-layer smoke. The smoke remains broad-only because its
+configured increment exceeds the declared focused-route budget. The generated
+routing artifact records the exact selection. This lane does not replace
+final CPU/sanitizer/capability PR/merge verification.
 
 `CMakePresets.json` currently defines configure/build presets but no CTest
 `testPresets`, so use the directory-based `ctest --test-dir build/ci ...`

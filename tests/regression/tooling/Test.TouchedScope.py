@@ -955,6 +955,119 @@ class TouchedScopeTests(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertEqual(executed["test"]["selected_test_count"], 1)
 
+    @unittest.skipUnless(
+        all(
+            subprocess.run(
+                [tool, "--version"],
+                check=False,
+                capture_output=True,
+            ).returncode
+            == 0
+            for tool in ("cmake", "ninja")
+        ),
+        "CMake and Ninja are required",
+    )
+    def test_broad_route_executes_fast_and_smoke_producers_separately(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source"
+            build = root / "build"
+            source.mkdir()
+            (source / "CMakeLists.txt").write_text(
+                textwrap.dedent(
+                    """\
+                    cmake_minimum_required(VERSION 3.20)
+                    project(BroadRouteFixture LANGUAGES CXX)
+                    enable_testing()
+                    include(GoogleTest)
+                    add_executable(Owner owner.cpp)
+                    add_executable(Smoke smoke.cpp)
+                    set_target_properties(Owner Smoke PROPERTIES
+                      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+                    gtest_discover_tests(Owner
+                      DISCOVERY_MODE PRE_TEST
+                      PROPERTIES LABELS unit-geometry)
+                    gtest_discover_tests(Smoke
+                      DISCOVERY_MODE PRE_TEST
+                      PROPERTIES LABELS integration-runtime-graphics)
+                    """
+                ),
+                encoding="utf-8",
+            )
+            for target, suite in (("owner", "Owner"), ("smoke", "Smoke")):
+                (source / f"{target}.cpp").write_text(
+                    textwrap.dedent(
+                        f"""\
+                        #include <iostream>
+                        #include <string_view>
+                        int main(int argc, char** argv) {{
+                          for (int i = 1; i < argc; ++i) {{
+                            if (std::string_view(argv[i]) == "--gtest_list_tests") {{
+                              std::cout << "{suite}.\\n  ExactCase\\n";
+                              return 0;
+                            }}
+                          }}
+                          return 0;
+                        }}
+                        """
+                    ),
+                    encoding="utf-8",
+                )
+            subprocess.run(
+                ["cmake", "-S", str(source), "-B", str(build), "-G", "Ninja"],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["cmake", "--build", str(build), "--target", "Owner", "Smoke"],
+                check=True,
+                capture_output=True,
+            )
+            route = {
+                "stage": "built",
+                "route": "broad",
+                "owner_labels": [],
+                "finalization": {
+                    "selected_targets": ["Owner", "Smoke"],
+                    "build_batches": [
+                        {
+                            "name": "pr-fast",
+                            "targets": ["Owner"],
+                            "producer_targets": ["Owner"],
+                        },
+                        {
+                            "name": "pr-smoke",
+                            "targets": ["Smoke"],
+                            "producer_targets": ["Smoke"],
+                        },
+                    ],
+                },
+            }
+            code, executed = touched_scope.execute_tests(
+                route,
+                root=root,
+                build_dir=build,
+                timeout=10,
+                jobs=1,
+            )
+            self.assertEqual(code, 0)
+            self.assertEqual(
+                [
+                    (batch["name"], batch["selected_test_count"])
+                    for batch in executed["test"]["batches"]
+                ],
+                [("pr-fast", 1), ("pr-smoke", 1)],
+            )
+            self.assertEqual(executed["test"]["selected_test_count"], 2)
+            self.assertEqual(
+                (build / "ci-routing" / "selected-ctest-tests.txt")
+                .read_text(encoding="utf-8")
+                .splitlines(),
+                ["Owner.ExactCase", "Smoke.ExactCase"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
