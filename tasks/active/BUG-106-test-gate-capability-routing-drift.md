@@ -21,6 +21,11 @@ depends_on:
   non-empty GPU aggregate. The follow-up conditionally omits that
   backend-inapplicable aggregate and retains the non-empty guard for Vulkan
   configurations.
+- Hosted Vulkan run `29563657994` built all requested targets, then the strict
+  reconciler exposed a CMake 3.31+ label-escaping incompatibility before either
+  test batch. Discovered-test labels now have one canonical writer in the
+  generated post-discovery fixup instead of also passing the legacy CMake 3.28
+  escape workaround through `gtest_discover_tests`.
 
 ## Goal
 - Restore one canonical, capability-truthful test graph in which CPU/mock

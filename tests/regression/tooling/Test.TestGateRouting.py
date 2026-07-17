@@ -17,6 +17,7 @@ from typing import Callable, Iterable, Mapping, Sequence
 
 
 CASE_BASELINE_PATH = Path(__file__).with_name("Test.TestGateRouting.baseline.tsv")
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 class ReconciliationError(RuntimeError):
@@ -1102,6 +1103,44 @@ OrdinarySuite.
                         "properties": [{"name": "LABELS", "value": labels}],
                     }
                 )
+
+    def test_hosted_compound_ctest_label_fails_closed(self) -> None:
+        with self.assertRaisesRegex(ReconciliationError, "unknown labels"):
+            _ctest_labels(
+                {
+                    "name": "Suite.Case",
+                    "properties": [
+                        {
+                            "name": "LABELS",
+                            "value": [
+                                "gpu",
+                                "graphics",
+                                "vulkan",
+                                r"gpu\\;vulkan\\;graphics",
+                            ],
+                        }
+                    ],
+                }
+            )
+
+    def test_gtest_discovery_has_one_canonical_label_writer(self) -> None:
+        cmake_source = (REPO_ROOT / "tests" / "CMakeLists.txt").read_text(
+            encoding="utf-8"
+        )
+        discovery = re.search(
+            r"gtest_discover_tests\(\$\{name\}(?P<body>.*?)"
+            r"DISCOVERY_MODE PRE_TEST\s*\)",
+            cmake_source,
+            flags=re.DOTALL,
+        )
+        self.assertIsNotNone(discovery)
+        assert discovery is not None
+        self.assertNotRegex(discovery.group("body"), r"(?m)^\s*LABELS(?:\s|$)")
+        self.assertIn(
+            "_intrinsic_label_target}_TESTS} PROPERTIES LABELS",
+            cmake_source,
+        )
+        self.assertIn("${_intrinsic_label_value}", cmake_source)
 
     def test_registered_target_without_sources_must_be_explicitly_manual(
         self,
