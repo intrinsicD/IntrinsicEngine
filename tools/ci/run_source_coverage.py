@@ -20,6 +20,7 @@ from source_coverage import (
     AGGREGATE,
     COVERAGE_SCHEMA,
     CoverageError,
+    EXECUTION_IDENTITY_SCHEMA,
     EXCLUDED_CPU_LABELS,
     changed_line_coverage,
     exclusion_identity,
@@ -799,14 +800,61 @@ def collect(arguments: argparse.Namespace) -> dict[str, object]:
             sort_keys=True,
         ).encode("utf-8")
     ).hexdigest()
+    case_working_directories: list[dict[str, str]] = []
+    for target in targets:
+        if target["kind"] == "gtest":
+            working_directory = target["working_directory_identity"]
+            if not isinstance(working_directory, str):
+                raise CoverageError(
+                    f"{target['name']}: missing GoogleTest working-directory identity"
+                )
+            for case in target["cases"]:
+                if not case["disabled"]:
+                    case_working_directories.append(
+                        {
+                            "kind": "gtest",
+                            "name": str(case["gtest_filter"]),
+                            "working_directory": working_directory,
+                        }
+                    )
+        else:
+            for test in target["ctest_tests"]:
+                working_directory = test.get("working_directory_identity")
+                if not isinstance(working_directory, str):
+                    raise CoverageError(
+                        f"{target['name']}: missing manual CTest "
+                        "working-directory identity"
+                    )
+                case_working_directories.append(
+                    {
+                        "kind": "manual",
+                        "name": str(test["ctest_name"]),
+                        "working_directory": working_directory,
+                    }
+                )
+    case_working_directories.sort(
+        key=lambda record: (record["kind"], record["name"])
+    )
+    if not case_working_directories:
+        raise CoverageError("execution identity selected zero test cases")
+    case_working_directory_digest = hashlib.sha256(
+        json.dumps(
+            case_working_directories,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
     execution_identity = {
         "aggregate": AGGREGATE,
+        "case_working_directory_digest": case_working_directory_digest,
+        "case_working_directory_record_count": len(case_working_directories),
         "common_ctest_environment_digest": environment_digest,
         "discovery_profile_pattern": "discovery-profiles/%m-%p.profraw",
         "excluded_labels": list(EXCLUDED_CPU_LABELS),
         "gtest_result_format": "xml",
         "mode": "per-executable-enabled-gtest-plus-manual-ctest",
         "profile_pattern": "target/%m-%p.profraw",
+        "schema": EXECUTION_IDENTITY_SCHEMA,
         "working_directory_digest": working_directory_digest,
     }
     report: dict[str, object] = {

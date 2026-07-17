@@ -44,6 +44,9 @@ set(INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN OFF CACHE BOOL "")
 option(INCLUDE_UNINSTRUMENTED "Include a deliberately invalid CPU producer" OFF)
 option(INCLUDE_NO_PROFILE "Include a producer that emits no raw profile" OFF)
 option(INCLUDE_XML_OMISSION "Include a producer with incomplete execution XML" OFF)
+option(RENAME_TEST_TARGETS "Rename only the GoogleTest producer targets" OFF)
+option(MOVE_TEST_WORKING_DIRECTORY "Move one case to another build subdirectory" OFF)
+option(MOVE_MANUAL_TEST_WORKING_DIRECTORY "Move the manual CTest producer" OFF)
 
 function(add_coverage_test target production_source test_source case_name)
     add_executable("${target}" "${production_source}" "${test_source}")
@@ -65,18 +68,34 @@ function(add_coverage_test target production_source test_source case_name)
     set_tests_properties("${case_name}" PROPERTIES LABELS "core;unit")
 endfunction()
 
+set(alpha_target AlphaTests)
+set(beta_target BetaTests)
+if(RENAME_TEST_TARGETS)
+    set(alpha_target AlphaSplitTests)
+    set(beta_target BetaSplitTests)
+endif()
+
 add_coverage_test(
-    AlphaTests
+    "${alpha_target}"
     "${CMAKE_SOURCE_DIR}/src/alpha.cpp"
     "${CMAKE_SOURCE_DIR}/tests/alpha_test.cpp"
     "Alpha.CoversBothArms"
 )
 add_coverage_test(
-    BetaTests
+    "${beta_target}"
     "${CMAKE_SOURCE_DIR}/src/beta.cpp"
     "${CMAKE_SOURCE_DIR}/tests/beta_test.cpp"
     "Beta.CoversBothArms"
 )
+
+if(MOVE_TEST_WORKING_DIRECTORY)
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/moved-working-directory")
+    set_tests_properties(
+        "Alpha.CoversBothArms"
+        PROPERTIES
+        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/moved-working-directory"
+    )
+endif()
 
 add_executable(
     ManualTests
@@ -93,8 +112,16 @@ target_compile_options(
 target_link_options(ManualTests PRIVATE -fprofile-instr-generate)
 add_test(NAME "Manual.Contract" COMMAND ManualTests)
 set_tests_properties("Manual.Contract" PROPERTIES LABELS "core;unit")
+if(MOVE_MANUAL_TEST_WORKING_DIRECTORY)
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/moved-manual-working-directory")
+    set_tests_properties(
+        "Manual.Contract"
+        PROPERTIES
+        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/moved-manual-working-directory"
+    )
+endif()
 
-set(cpu_targets AlphaTests BetaTests ManualTests)
+set(cpu_targets "${alpha_target}" "${beta_target}" ManualTests)
 if(INCLUDE_UNINSTRUMENTED)
     add_executable(
         PlainTests
@@ -525,8 +552,14 @@ class SourceCoverageTests(unittest.TestCase):
     source_root: Path
     build_a: Path
     build_b: Path
+    build_moved_manual_working_directory: Path
+    build_moved_working_directory: Path
+    build_renamed_targets: Path
     report_a: Path
     report_b: Path
+    report_moved_manual_working_directory: Path
+    report_moved_working_directory: Path
+    report_renamed_targets: Path
     compiler: str
     llvm_cov: str
     llvm_profdata: str
@@ -585,10 +618,39 @@ class SourceCoverageTests(unittest.TestCase):
 
         cls.build_a = cls.root / "build-a"
         cls.build_b = cls.root / "different" / "build-b"
+        cls.build_moved_manual_working_directory = (
+            cls.root / "build-moved-manual-working-directory"
+        )
+        cls.build_moved_working_directory = cls.root / "build-moved-working-directory"
+        cls.build_renamed_targets = cls.root / "build-renamed-targets"
         cls._configure_and_build(cls.build_a)
         cls._configure_and_build(cls.build_b)
+        cls._configure_and_build(
+            cls.build_moved_manual_working_directory,
+            move_manual_test_working_directory=True,
+        )
+        cls._configure_and_build(
+            cls.build_moved_working_directory,
+            move_test_working_directory=True,
+        )
+        cls._configure_and_build(
+            cls.build_renamed_targets,
+            rename_test_targets=True,
+        )
         cls.report_a = cls._collect(cls.build_a, "coverage-a")
         cls.report_b = cls._collect(cls.build_b, "coverage-b")
+        cls.report_moved_manual_working_directory = cls._collect(
+            cls.build_moved_manual_working_directory,
+            "coverage-moved-manual-working-directory",
+        )
+        cls.report_moved_working_directory = cls._collect(
+            cls.build_moved_working_directory,
+            "coverage-moved-working-directory",
+        )
+        cls.report_renamed_targets = cls._collect(
+            cls.build_renamed_targets,
+            "coverage-renamed-targets",
+        )
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -604,6 +666,9 @@ class SourceCoverageTests(unittest.TestCase):
         include_uninstrumented: bool = False,
         include_no_profile: bool = False,
         include_xml_omission: bool = False,
+        move_manual_test_working_directory: bool = False,
+        move_test_working_directory: bool = False,
+        rename_test_targets: bool = False,
     ) -> None:
         _run(
             [
@@ -619,6 +684,11 @@ class SourceCoverageTests(unittest.TestCase):
                 f"-DINCLUDE_UNINSTRUMENTED={'ON' if include_uninstrumented else 'OFF'}",
                 f"-DINCLUDE_NO_PROFILE={'ON' if include_no_profile else 'OFF'}",
                 f"-DINCLUDE_XML_OMISSION={'ON' if include_xml_omission else 'OFF'}",
+                "-DMOVE_MANUAL_TEST_WORKING_DIRECTORY="
+                f"{'ON' if move_manual_test_working_directory else 'OFF'}",
+                "-DMOVE_TEST_WORKING_DIRECTORY="
+                f"{'ON' if move_test_working_directory else 'OFF'}",
+                f"-DRENAME_TEST_TARGETS={'ON' if rename_test_targets else 'OFF'}",
             ],
             cwd=cls.root,
         )
@@ -732,8 +802,8 @@ class SourceCoverageTests(unittest.TestCase):
         report = _load_json(self.report_a / "coverage.json")
         inventory = _load_json(self.report_a / "test-inventory.json")
 
-        self.assertEqual(report["schema"], "intrinsic.cpu-source-coverage/v1")
-        self.assertEqual(inventory["schema"], "intrinsic.cpu-test-inventory/v1")
+        self.assertEqual(report["schema"], "intrinsic.cpu-source-coverage/v2")
+        self.assertEqual(inventory["schema"], "intrinsic.cpu-test-inventory/v2")
         self.assertEqual(inventory["aggregate"], "IntrinsicCpuTests")
         self.assertEqual(inventory["common_environment"], [])
         self.assertEqual(
@@ -746,6 +816,10 @@ class SourceCoverageTests(unittest.TestCase):
                 "manual_target_count": 1,
                 "target_count": 3,
             },
+        )
+        self.assertEqual(
+            report["identity"]["execution"]["case_working_directory_record_count"],
+            3,
         )
         targets_by_name = {
             target["name"]: target for target in inventory["targets"]
@@ -769,6 +843,15 @@ class SourceCoverageTests(unittest.TestCase):
                 for case in target["cases"]
             },
             {"Alpha.CoversBothArms", "Beta.CoversBothArms"},
+        )
+        manual_target = next(
+            target
+            for target in inventory["targets"]
+            if target["kind"] == "manual"
+        )
+        self.assertEqual(
+            manual_target["ctest_tests"][0]["working_directory_identity"],
+            "$BUILD",
         )
         for target in (
             targets_by_name["AlphaTests"],
@@ -1057,6 +1140,98 @@ class SourceCoverageTests(unittest.TestCase):
             result.stdout,
             r"(?is)test-only refactor identity mismatch.*"
             r"production_build_inputs.*digest",
+        )
+
+    def test_test_target_topology_drift_preserves_refactor_parity(self) -> None:
+        baseline = _load_json(self.report_a / "coverage.json")
+        candidate = _load_json(self.report_renamed_targets / "coverage.json")
+        baseline_inventory = _load_json(self.report_a / "test-inventory.json")
+        candidate_inventory = _load_json(
+            self.report_renamed_targets / "test-inventory.json"
+        )
+        baseline_targets = {
+            target["name"] for target in baseline_inventory["targets"]
+        }
+        candidate_targets = {
+            target["name"] for target in candidate_inventory["targets"]
+        }
+        self.assertNotEqual(baseline_targets, candidate_targets)
+        self.assertNotEqual(
+            baseline["identity"]["execution"]["working_directory_digest"],
+            candidate["identity"]["execution"]["working_directory_digest"],
+        )
+        self.assertEqual(
+            baseline["identity"]["execution"]["case_working_directory_digest"],
+            candidate["identity"]["execution"]["case_working_directory_digest"],
+        )
+        result = self._compare(
+            self.report_a / "coverage.json",
+            self.report_renamed_targets / "coverage.json",
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("lost_regions=0 lost_branch_arms=0", result.stdout)
+
+    def test_test_working_directory_drift_fails_refactor_parity(self) -> None:
+        result = self._compare(
+            self.report_a / "coverage.json",
+            self.report_moved_working_directory / "coverage.json",
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertRegex(
+            result.stdout,
+            r"(?is)test-only refactor identity mismatch.*"
+            r"execution.*case_working_directory_digest",
+        )
+
+    def test_manual_working_directory_drift_fails_refactor_parity(self) -> None:
+        result = self._compare(
+            self.report_a / "coverage.json",
+            self.report_moved_manual_working_directory / "coverage.json",
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertRegex(
+            result.stdout,
+            r"(?is)test-only refactor identity mismatch.*"
+            r"execution.*case_working_directory_digest",
+        )
+
+    def test_missing_case_working_directory_identity_fails_closed(self) -> None:
+        report = _load_json(self.report_b / "coverage.json")
+        del report["identity"]["execution"]["case_working_directory_digest"]
+        candidate = self._write_candidate(
+            "missing-case-working-directory-identity",
+            report,
+        )
+        result = self._compare(
+            self.report_a / "coverage.json",
+            candidate,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertRegex(
+            result.stdout,
+            r"(?is)execution identity omits.*case_working_directory_digest",
+        )
+
+    def test_execution_environment_drift_fails_refactor_parity(self) -> None:
+        report = _load_json(self.report_b / "coverage.json")
+        execution = report["identity"]["execution"]
+        self.assertIn("common_ctest_environment_digest", execution)
+        execution["common_ctest_environment_digest"] = "0" * 64
+        candidate = self._write_candidate("execution-environment-drift", report)
+        result = self._compare(
+            self.report_a / "coverage.json",
+            candidate,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertRegex(
+            result.stdout,
+            r"(?is)test-only refactor identity mismatch.*"
+            r"execution.*common_ctest_environment_digest",
         )
 
     def test_lost_covered_region_fails_despite_rising_total(self) -> None:

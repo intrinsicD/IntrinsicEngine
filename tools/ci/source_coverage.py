@@ -14,8 +14,9 @@ from pathlib import Path, PurePosixPath
 from typing import Iterable, Mapping, Sequence
 
 
-COVERAGE_SCHEMA = "intrinsic.cpu-source-coverage/v1"
-TEST_INVENTORY_SCHEMA = "intrinsic.cpu-test-inventory/v1"
+COVERAGE_SCHEMA = "intrinsic.cpu-source-coverage/v2"
+TEST_INVENTORY_SCHEMA = "intrinsic.cpu-test-inventory/v2"
+EXECUTION_IDENTITY_SCHEMA = "intrinsic.cpu-source-coverage-execution/v2"
 AGGREGATE = "IntrinsicCpuTests"
 PRODUCTION_ROOTS = ("src", "methods")
 PRODUCTION_SUFFIXES = frozenset(
@@ -58,6 +59,28 @@ IDENTITY_FIELDS = (
     "backend",
     "exclusions",
     "execution",
+)
+TEST_REFACTOR_MUTABLE_EXECUTION_FIELDS = frozenset(
+    {
+        # The v1 diagnostic is keyed by executable target name. The v2
+        # case_working_directory_digest below preserves the semantic check.
+        "working_directory_digest",
+    }
+)
+REQUIRED_EXECUTION_IDENTITY_FIELDS = frozenset(
+    {
+        "aggregate",
+        "case_working_directory_digest",
+        "case_working_directory_record_count",
+        "common_ctest_environment_digest",
+        "discovery_profile_pattern",
+        "excluded_labels",
+        "gtest_result_format",
+        "mode",
+        "profile_pattern",
+        "schema",
+        "working_directory_digest",
+    }
 )
 
 
@@ -576,6 +599,10 @@ def load_cpu_test_inventory(
                         "ctest_name": record["ctest_name"],
                         "executable": str(target_paths[target]),
                         "labels": record["labels"],
+                        "working_directory_identity": _working_directory_identity(
+                            Path(str(record["working_directory"])),
+                            build_dir,
+                        ),
                     }
                 )
         targets.append(
@@ -1062,6 +1089,41 @@ def validate_coverage_report(report: Mapping[str, object]) -> None:
     missing = [field for field in IDENTITY_FIELDS if field not in identity]
     if missing:
         raise CoverageError(f"coverage report identity omits {missing!r}")
+    execution = identity.get("execution")
+    if not isinstance(execution, dict):
+        raise CoverageError("coverage report execution identity must be an object")
+    missing_execution = sorted(
+        REQUIRED_EXECUTION_IDENTITY_FIELDS - execution.keys()
+    )
+    if missing_execution:
+        raise CoverageError(
+            f"coverage report execution identity omits {missing_execution!r}"
+        )
+    if execution.get("schema") != EXECUTION_IDENTITY_SCHEMA:
+        raise CoverageError(
+            "coverage report execution identity has unsupported schema "
+            f"{execution.get('schema')!r}"
+        )
+    for field in (
+        "case_working_directory_digest",
+        "common_ctest_environment_digest",
+        "working_directory_digest",
+    ):
+        value = execution.get(field)
+        if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+            raise CoverageError(
+                f"coverage report execution identity has invalid {field}"
+            )
+    record_count = execution.get("case_working_directory_record_count")
+    if (
+        isinstance(record_count, bool)
+        or not isinstance(record_count, int)
+        or record_count <= 0
+    ):
+        raise CoverageError(
+            "coverage report execution identity has invalid "
+            "case_working_directory_record_count"
+        )
     for field in (
         "covered_branch_arms",
         "covered_functions",
@@ -1069,6 +1131,18 @@ def validate_coverage_report(report: Mapping[str, object]) -> None:
         "covered_regions",
     ):
         _coverage_set(report, field)
+
+
+def _test_refactor_identity(identity: Mapping[str, object]) -> dict[str, object]:
+    normalized = dict(identity)
+    execution = normalized.get("execution")
+    assert isinstance(execution, dict)
+    normalized["execution"] = {
+        field: value
+        for field, value in execution.items()
+        if field not in TEST_REFACTOR_MUTABLE_EXECUTION_FIELDS
+    }
+    return normalized
 
 
 def compare_test_only_refactor(
@@ -1080,16 +1154,19 @@ def compare_test_only_refactor(
     candidate_identity = candidate["identity"]
     assert isinstance(baseline_identity, dict)
     assert isinstance(candidate_identity, dict)
+    comparable_baseline_identity = _test_refactor_identity(baseline_identity)
+    comparable_candidate_identity = _test_refactor_identity(candidate_identity)
     mismatches = [
         field
         for field in IDENTITY_FIELDS
-        if baseline_identity[field] != candidate_identity[field]
+        if comparable_baseline_identity[field]
+        != comparable_candidate_identity[field]
     ]
     if mismatches:
         details = {
             field: {
-                "baseline": baseline_identity[field],
-                "candidate": candidate_identity[field],
+                "baseline": comparable_baseline_identity[field],
+                "candidate": comparable_candidate_identity[field],
             }
             for field in mismatches
         }

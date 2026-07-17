@@ -73,7 +73,12 @@ source, production CMake/preset/dependency inputs, normalized production
 compile commands, compiler and LLVM tools, preset/backend identity, exclusion
 policy, and execution mode. It then fails when any previously covered
 production region or either outcome of a covered branch disappears. New
-coverage is allowed. Changed-production-line coverage is emitted separately as
+coverage is allowed. Test executable names and their target-keyed working
+directory diagnostic may change during a test-only split. A separate identity
+keyed by stable test case names still requires every case to run from the same
+normalized working directory, and the comparator also requires the same
+selector, common CTest environment, profile mode, and all other execution
+identity fields. Changed-production-line coverage is emitted separately as
 informational diff evidence; threshold policy waits for repeated baselines
 under `CI-009`.
 
