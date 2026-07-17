@@ -418,6 +418,11 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         )
         self.assertIn("--test-only-refactor", compare["run"])
         self.assertIn("--require-exact", compare["run"])
+        self.assertIn(
+            "| tee build/ci-coverage-cpu/coverage-grouped/"
+            "exact-comparison.txt",
+            compare["run"],
+        )
         self.assertEqual(
             upload["if"],
             "${{ always() && inputs.compare_grouped_ctest }}",
