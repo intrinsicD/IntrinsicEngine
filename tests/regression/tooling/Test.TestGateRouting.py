@@ -727,8 +727,18 @@ def _verify_grouped_ctest_contract(
             f"{expected_name} must select the whole producer exactly once"
         )
 
+    disabled_switches = [
+        argument
+        for argument in command
+        if argument == "--gtest_also_run_disabled_tests"
+    ]
+    if disabled_switches != ["--gtest_also_run_disabled_tests"]:
+        raise ReconciliationError(
+            f"{expected_name} must preserve individual disabled-case execution"
+        )
+
     expected_xml = (
-        f"--gtest_output=xml:{build_dir}/Testing/Temporary/{expected_name}.xml"
+        f"--gtest_output=xml:{build_dir}/reports/grouped-ctest/gtest/{target}.xml"
     )
     xml_outputs = [
         argument
@@ -741,9 +751,9 @@ def _verify_grouped_ctest_contract(
             f"{expected_name} must write one canonical GTest XML diagnostic"
         )
 
-    if _ctest_property(test, "TIMEOUT") != [30.0]:
+    if _ctest_property(test, "TIMEOUT") != [120.0]:
         raise ReconciliationError(
-            f"{expected_name} must retain the canonical 30 second timeout"
+            f"{expected_name} must use the whole-producer 120 second timeout"
         )
 
     working_directories = _ctest_property(test, "WORKING_DIRECTORY")
@@ -1240,6 +1250,17 @@ OrdinarySuite.
             test_cmake.count("${_intrinsic_pure_ctest_registration}"),
             len(GROUPED_PURE_CTEST_TARGETS),
         )
+        grouped_helper = re.search(
+            r"function\(intrinsic_grouped_test\b(?P<body>.*?)endfunction\(\)",
+            test_cmake,
+            flags=re.DOTALL,
+        )
+        self.assertIsNotNone(grouped_helper)
+        assert grouped_helper is not None
+        self.assertRegex(
+            grouped_helper.group("body"),
+            r"PROCESSORS\s+1",
+        )
 
     def test_duplicate_grouped_registration_is_rejected(self) -> None:
         build_dir = Path("/tmp/synthetic-build")
@@ -1250,9 +1271,10 @@ OrdinarySuite.
             "command": [
                 str(build_dir / "bin" / target),
                 "--gtest_filter=*",
+                "--gtest_also_run_disabled_tests",
                 (
-                    f"--gtest_output=xml:{build_dir}/Testing/Temporary/"
-                    f"{name}.xml"
+                    f"--gtest_output=xml:{build_dir}/reports/grouped-ctest/"
+                    f"gtest/{target}.xml"
                 ),
             ],
             "properties": [
@@ -1261,7 +1283,8 @@ OrdinarySuite.
                     "value": sorted(REQUIRED_GTEST_ENVIRONMENT),
                 },
                 {"name": "LABELS", "value": ["gpu", "graphics", "vulkan"]},
-                {"name": "TIMEOUT", "value": 30.0},
+                {"name": "PROCESSORS", "value": 1.0},
+                {"name": "TIMEOUT", "value": 120.0},
                 {
                     "name": "WORKING_DIRECTORY",
                     "value": str(build_dir / "tests"),

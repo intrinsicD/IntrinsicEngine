@@ -94,27 +94,42 @@ endfunction()
 # =============================================================================
 function(intrinsic_grouped_test name target)
     cmake_parse_arguments(ARG "" "FILTER" "LABELS" ${ARGN})
+    if(NOT TARGET "${target}")
+        message(FATAL_ERROR
+            "Grouped test '${name}' references missing target '${target}'"
+        )
+    endif()
+    get_target_property(
+        _intrinsic_grouped_target_discovered
+        "${target}"
+        INTRINSIC_GTEST_DISCOVERED
+    )
+    if(_intrinsic_grouped_target_discovered)
+        message(FATAL_ERROR
+            "Grouped test '${name}' cannot duplicate discovered target '${target}'"
+        )
+    endif()
     intrinsic_validate_test_labels(
         CONTEXT "Grouped test '${name}'"
         LABELS ${ARG_LABELS}
     )
 
-    set(_intrinsic_test_timeout ${_intrinsic_default_test_timeout_seconds})
-    list(FIND ARG_LABELS slow _intrinsic_slow_label_index)
-    if(NOT _intrinsic_slow_label_index EQUAL -1)
-        set(_intrinsic_test_timeout ${_intrinsic_slow_test_timeout_seconds})
-    endif()
-
-    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/Testing/Temporary")
+    set(
+        _intrinsic_grouped_report_dir
+        "${CMAKE_BINARY_DIR}/reports/grouped-ctest/gtest"
+    )
+    file(MAKE_DIRECTORY "${_intrinsic_grouped_report_dir}")
     add_test(NAME ${name}
         COMMAND $<TARGET_FILE:${target}>
             "--gtest_filter=${ARG_FILTER}"
-            "--gtest_output=xml:${CMAKE_BINARY_DIR}/Testing/Temporary/${name}.xml"
+            "--gtest_also_run_disabled_tests"
+            "--gtest_output=xml:${_intrinsic_grouped_report_dir}/${target}.xml"
     )
     set_tests_properties(${name} PROPERTIES
         ENVIRONMENT "${_intrinsic_test_env}"
         LABELS "${ARG_LABELS}"
-        TIMEOUT ${_intrinsic_test_timeout}
+        PROCESSORS 1
+        TIMEOUT ${_intrinsic_slow_test_timeout_seconds}
         WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     )
 endfunction()
