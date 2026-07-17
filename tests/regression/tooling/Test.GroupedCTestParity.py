@@ -382,9 +382,6 @@ def _compare_execution(
     grouped_gtest_dir: Path,
 ) -> dict[str, object]:
     registration_report = _compare_registrations(individual, grouped)
-    expected_dir = (grouped.build_dir / "reports/grouped-ctest/gtest").resolve()
-    if grouped_gtest_dir.resolve() != expected_dir:
-        raise ParityError(f"grouped GTest directory must be canonical: {expected_dir}")
     actual_files = frozenset(path.name for path in grouped_gtest_dir.glob("*.xml"))
     expected_files = frozenset(f"{target}.xml" for target in GROUPED_TARGETS)
     if actual_files != expected_files:
@@ -539,7 +536,7 @@ class GroupedCTestParitySelfTests(unittest.TestCase):
                         grouped.wrappers,
                     ),
                 )
-            report_dir = grouped.build_dir / "reports/grouped-ctest/gtest"
+            report_dir = root / "archived-grouped-gtest"
             report_dir.mkdir(parents=True)
             for target in GROUPED_TARGETS:
                 self._write_grouped_xml(
@@ -553,6 +550,9 @@ class GroupedCTestParitySelfTests(unittest.TestCase):
                 individual, grouped, individual_junit, grouped_junit, report_dir
             )
             self.assertEqual(report["status_counts"]["passed"], len(individual.identities))
+            output = root / "artifacts/parity.json"
+            _print_report(report, output)
+            self.assertEqual(json.loads(output.read_text()), report)
             duplicate = next(iter(GROUPED_TARGETS))
             tree = ElementTree.parse(report_dir / f"{duplicate}.xml")
             tree.getroot().append(tree.getroot().find("testcase"))
@@ -585,7 +585,7 @@ def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
     for command_parser in (registration_parser, execution_parser):
         command_parser.add_argument("--individual-build-dir", type=Path, required=True)
         command_parser.add_argument("--grouped-build-dir", type=Path, required=True)
-        command_parser.add_argument("--output", choices=("text", "json"), default="text")
+        command_parser.add_argument("--output", type=Path)
     execution_parser.add_argument("--individual-junit", type=Path, required=True)
     execution_parser.add_argument("--grouped-junit", type=Path, required=True)
     execution_parser.add_argument("--grouped-gtest-dir", type=Path, required=True)
@@ -604,10 +604,26 @@ def _run_self_tests() -> int:
     return 0 if result.wasSuccessful() else 1
 
 
-def _print_report(report: Mapping[str, object], output: str) -> None:
-    if output == "json":
-        print(json.dumps(report, indent=2, sort_keys=True))
-        return
+def _print_report(report: Mapping[str, object], output: Path | None) -> None:
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                "w",
+                encoding="utf-8",
+                dir=output.parent,
+                prefix=f".{output.name}.",
+                delete=False,
+            ) as handle:
+                json.dump(report, handle, indent=2, sort_keys=True)
+                handle.write("\n")
+                temporary = Path(handle.name)
+            os.replace(temporary, output)
+            temporary = None
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
     fields = " ".join(
         f"{key}={json.dumps(value, separators=(',', ':'))}"
         for key, value in report.items()
