@@ -83,14 +83,21 @@ jobs:
               IntrinsicGraphicsContractTests \
               IntrinsicGraphicsContractCpuTests \
               IntrinsicRuntimeGraphicsCpuTests
-          ctest --test-dir build/ci --output-on-failure -LE "gpu|vulkan|flaky-quarantine" --timeout 60 -j$(nproc)
+          ctest --test-dir build/ci --output-on-failure -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)
 
-      - name: Run SLO/performance tests
+      - name: Run SLO/performance diagnostic (CI-009)
+        continue-on-error: true
         run: |
           python3 tools/ci/check_prerequisites.py test-binaries \
             --build-dir build/ci \
             --targets IntrinsicBenchmarkTests
-          ctest --test-dir build/ci --output-on-failure -L "benchmark|slo"
+          mkdir -p build/ci/reports
+          ctest --test-dir build/ci --output-on-failure \
+            -L "^slo$" \
+            -LE "^(gpu|vulkan|flaky-quarantine)$" \
+            --no-tests=error \
+            --timeout 120 \
+            --output-junit build/ci/reports/architecture-slo.junit.xml
 
       - name: Compile hotspot report
         run: |
@@ -135,6 +142,7 @@ jobs:
           path: |
             build/ci/reports/compile_hotspots_report.json
             build/ci/reports/module_fanout_report.md
+            build/ci/reports/architecture-slo.junit.xml
             build/ci/benchmark/nightly/smoke_result.json
 
   nightly-gpu-optional:

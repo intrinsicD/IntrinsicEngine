@@ -272,15 +272,31 @@ class SanitizerPresetTests(unittest.TestCase):
 
     def test_full_cpu_workflow_requires_real_three_variant_parity(self) -> None:
         payload, _ = _load_workflow("ci-linux-clang.yml")
+        triggers = payload.get("on", payload.get(True, {}))
+        manual = triggers["workflow_dispatch"]["inputs"]["run_sanitizers"]
+        self.assertEqual(
+            manual,
+            {
+                "description": "Run the ASan/UBSan matrix and CPU selection parity",
+                "required": False,
+                "default": True,
+                "type": "boolean",
+            },
+        )
         jobs = payload["jobs"]
         sanitizer_job = jobs["sanitizer-tests"]
         self.assertEqual(
             sanitizer_job["uses"],
             "./.github/workflows/ci-sanitizers.yml",
         )
-        self.assertEqual(sanitizer_job["if"], "github.event_name != 'push'")
+        expected_condition = (
+            "github.event_name == 'pull_request' || "
+            "(github.event_name == 'workflow_dispatch' && inputs.run_sanitizers)"
+        )
+        self.assertEqual(sanitizer_job["if"], expected_condition)
 
         parity_job = jobs["cpu-test-selection-parity"]
+        self.assertEqual(parity_job["if"], expected_condition)
         self.assertEqual(
             parity_job["needs"],
             ["ci-linux-clang", "sanitizer-tests"],
@@ -326,6 +342,8 @@ class SanitizerPresetTests(unittest.TestCase):
             "steps.cpu-selection.outputs.selected-test-count",
             timing,
         )
+        self.assertNotIn("Run FrameGraph SLO gate", steps)
+        self.assertNotIn("IntrinsicBenchmarkTests", timing)
 
     def test_live_workflows_report_explicit_sanitizer_identity(self) -> None:
         expected = {
@@ -364,14 +382,32 @@ class SanitizerPresetTests(unittest.TestCase):
         )
         self.assertIn(
             "--build-dir build/ci",
-            _one_line(cpu_steps["Run SLO/performance tests"]["run"]),
+            _one_line(cpu_steps["Run SLO/performance diagnostic (CI-009)"]["run"]),
         )
+        fast_cpu = _one_line(cpu_steps["Run full CPU test suite"]["run"])
+        self.assertIn(f'-LE "{CPU_EXCLUSION}"', fast_cpu)
+        slo_step = cpu_steps["Run SLO/performance diagnostic (CI-009)"]
+        self.assertTrue(slo_step["continue-on-error"])
+        slo = _one_line(slo_step["run"])
+        self.assertIn('-L "^slo$"', slo)
+        self.assertIn(
+            '-LE "^(gpu|vulkan|flaky-quarantine)$"',
+            slo,
+        )
+        self.assertIn("--no-tests=error", slo)
+        self.assertIn(
+            "--output-junit build/ci/reports/architecture-slo.junit.xml",
+            slo,
+        )
+        self.assertNotIn('benchmark|slo', slo)
         self.assertIn(
             "build/ci/bin/IntrinsicBenchmarkSmoke",
             _one_line(
                 cpu_steps["Run benchmark smoke and selected deep benchmarks"]["run"]
             ),
         )
+        nightly_upload = cpu_steps["Upload nightly reports"]["with"]["path"]
+        self.assertIn("build/ci/reports/architecture-slo.junit.xml", nightly_upload)
 
         gpu_steps = _named_steps(payload["jobs"]["nightly-gpu-optional"])
         self.assertIn(

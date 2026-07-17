@@ -270,7 +270,7 @@ or installed package trees:
 
 | Preset | Resolved sanitizer | Build directory | vcpkg installed directory | Required owner |
 | --- | --- | --- | --- | --- |
-| `ci` | `none` | `build/ci` | `external/vcpkg-installed/ci` | Full CPU correctness, SLO, benchmark, and nightly CPU work |
+| `ci` | `none` | `build/ci` | `external/vcpkg-installed/ci` | Full CPU correctness plus scheduled SLO diagnostics, benchmark, and nightly CPU work |
 | `ci-asan` | `asan` | `build/ci-asan` | `external/vcpkg-installed/ci-asan` | Exact CPU cohort under AddressSanitizer |
 | `ci-ubsan` | `ubsan` | `build/ci-ubsan` | `external/vcpkg-installed/ci-ubsan` | Exact CPU cohort under UndefinedBehaviorSanitizer |
 | `ci-vulkan` | `asan-ubsan` | `build/ci-vulkan` | `external/vcpkg-installed/ci-vulkan` | Promoted Vulkan capability and process-level LeakSanitizer contracts |
@@ -331,12 +331,39 @@ python3 tools/ci/cpu_test_selection.py compare \
 The capture validates the resolved sanitizer mode, compatibility boolean,
 capability flags, aggregate producers, labels, and exact path-free CTest case
 inventory. Comparison fails if any variant selects a different normalized
-cohort. On pull requests and manual `ci-linux-clang` runs, that workflow invokes
-the reusable sanitizer jobs after starting the unsanitized job, downloads all
-three selection artifacts, and requires the same comparison before the workflow
-can pass. The sanitizer workflow is reusable rather than independently
-pull-request-triggered, so enforcing parity does not duplicate the unsanitized
-build or test pass.
+cohort. On pull requests, and on manual `ci-linux-clang` runs that retain the
+default sanitizer input, that workflow invokes the reusable sanitizer jobs
+after starting the unsanitized job, downloads all three selection artifacts,
+and requires the same comparison before the workflow can pass. The sanitizer
+workflow is reusable rather than independently pull-request-triggered, so
+enforcing parity does not duplicate the unsanitized build or test pass.
+
+Manual evidence or diagnosis may run only the unsanitized full CPU job without
+rebuilding unchanged sanitizer variants:
+
+```bash
+gh workflow run ci-linux-clang.yml --ref <ref> -f run_sanitizers=false
+```
+
+The input defaults to `true`; pull requests always run ASan, UBSan, and parity,
+and default-branch pushes retain their unsanitized-only topology.
+
+The full CPU workflow measures exactly the canonical selector; at CI-006
+implementation commit `a7ae8e7f` it contained 4,062 cases. The FrameGraph
+nanosecond SLO diagnostic runs once in the explicit unsanitized nightly lane,
+not again in the pull-request/default-branch debug-correctness job. Nightly's
+broad CPU selector excludes `slow`, the SLO lane matches only the exact `slo`
+label, and the result-producing benchmark lane owns the two benchmark-smoke
+fixture cases.
+Before the topology split, the direct full-CPU invocation used a combined
+sanitizer tree and therefore skipped its own performance assertions.
+Activating the same debug SLO on `ubuntu-24.04` produced 3-5x threshold
+excursions in otherwise passing runs `29589810886` and `29589810898`; all
+4,062 correctness cases passed in both. No threshold was raised. The scheduled
+Debug diagnostic is explicitly non-blocking under `CI-009` and uploads JUnit
+when thresholds fail; this is a tracked warning-mode check, not a claim-grade
+performance result. `CI-009` owns the optimized Release identity, calibration,
+and promotion to a blocking SLO lifecycle.
 
 The retained `CI-003` baseline predates this topology. Its `ci`,
 `ci-vulkan`, and benchmark populations record the historical

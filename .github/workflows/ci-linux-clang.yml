@@ -5,6 +5,12 @@ on:
     branches: ["main"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      run_sanitizers:
+        description: Run the ASan/UBSan matrix and CPU selection parity
+        required: false
+        default: true
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -122,23 +128,13 @@ jobs:
             --json-out build/ci/ci-timing/phases/test.json \
             -- ctest --test-dir build/ci --output-on-failure -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)
 
-      - name: SLO performance gate (FrameGraph 2k-node scenario)
-        run: |
-          python3 tools/ci/check_prerequisites.py test-binaries \
-            --build-dir build/ci \
-            --targets IntrinsicBenchmarkTests
-          python3 tools/ci/time_command.py \
-            --label "Run FrameGraph SLO gate" \
-            --json-out build/ci/ci-timing/phases/test_slo.json \
-            -- ./build/ci/bin/IntrinsicBenchmarkTests --gtest_filter=ArchitectureSLO.FrameGraphP95P99BudgetsAt2000Nodes
-
       - name: Aggregate gate timing result
         if: always()
         run: |
           context_args=()
           selected_tests='${{ steps.cpu-selection.outputs.selected-test-count }}'
           if [[ "$selected_tests" =~ ^[0-9]+$ ]]; then
-            context_args+=(--selected-test-count "$((selected_tests + 2))")
+            context_args+=(--selected-test-count "$selected_tests")
           fi
           if ninja_edges="$(ninja -C build/ci -t commands | sed '/^[[:space:]]*$/d' | wc -l)"; then
             context_args+=(--ninja-edge-count "$ninja_edges")
@@ -148,7 +144,6 @@ jobs:
             --configure-json build/ci/ci-timing/phases/configure_backend_determinism.json \
             --build-json build/ci/ci-timing/phases/build.json \
             --test-json build/ci/ci-timing/phases/test.json \
-            --test-json build/ci/ci-timing/phases/test_slo.json \
             --gate ci-linux-clang \
             --preset ci \
             --build-dir build/ci \
@@ -183,11 +178,15 @@ jobs:
           if-no-files-found: error
 
   sanitizer-tests:
-    if: github.event_name != 'push'
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' && inputs.run_sanitizers)
     uses: ./.github/workflows/ci-sanitizers.yml
 
   cpu-test-selection-parity:
-    if: github.event_name != 'push'
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' && inputs.run_sanitizers)
     needs:
       - ci-linux-clang
       - sanitizer-tests

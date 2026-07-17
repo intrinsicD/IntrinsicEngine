@@ -321,9 +321,10 @@ class CiTimingTests(unittest.TestCase):
 
         ci_linux = (WORKFLOW_ROOT / "ci-linux-clang.yml").read_text(encoding="utf-8")
         self.assertIn(
-            '--selected-test-count "$((selected_tests + 2))"',
+            '--selected-test-count "$selected_tests"',
             ci_linux,
         )
+        self.assertNotIn("test_slo.json", ci_linux)
         self.assertIn(
             "--configure-json "
             "build/ci/ci-timing/phases/configure_backend_determinism.json",

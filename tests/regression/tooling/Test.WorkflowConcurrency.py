@@ -21,7 +21,7 @@ WORKFLOWS = {
     "pr-fast.yml": ("ci-gate-timing-pr-fast", 1, True),
     "ci-linux-clang.yml": (
         "ci-gate-timing-ci-linux-clang",
-        2,
+        1,
         "${{ github.event_name == 'pull_request' }}",
     ),
     "ci-sanitizers.yml": (
