@@ -1043,16 +1043,16 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
     engine.Shutdown();
 }
 
-TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsSmallGeneratedGrid)
+TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsGeneratedGridAndCompletesDeterministically)
 {
-    constexpr std::uint32_t side = 2u;
+    constexpr std::uint32_t side = 32u;
     constexpr std::size_t expectedVertexCount =
         static_cast<std::size_t>(side + 1u) *
         static_cast<std::size_t>(side + 1u);
     constexpr std::size_t expectedFaceCount =
         static_cast<std::size_t>(side) * static_cast<std::size_t>(side) * 2u;
     TempAssetFile meshFile(
-        "bug101_direct_mesh_small_grid.obj",
+        "bug101_direct_mesh_grid.obj",
         GridObjText(side));
 
     {
@@ -1323,6 +1323,7 @@ TEST(RuntimeAssetImportFormatCoverage, AssetImportPipelineAccessorExposesQueueAn
         "assetio147_pipeline_accessor_albedo.png",
         std::span<const std::byte>(pngBytes.data(), pngBytes.size()));
 
+    auto readState = std::make_shared<BlockingReadBackendState>();
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<WaitForConditionApplication>(
@@ -1338,6 +1339,11 @@ TEST(RuntimeAssetImportFormatCoverage, AssetImportPipelineAccessorExposesQueueAn
     engine.Initialize();
 
     Runtime::AssetImportPipeline& pipeline = engine.GetAssetImportPipeline();
+    pipeline.SetModelTextureImportIOBackendFactoryForTest(
+        [readState]()
+        {
+            return std::make_unique<BlockingReadIOBackend>(readState);
+        });
 
     auto queued = pipeline.QueueModelTextureImport(
         Runtime::RuntimeAssetImportRequest{
@@ -1345,6 +1351,7 @@ TEST(RuntimeAssetImportFormatCoverage, AssetImportPipelineAccessorExposesQueueAn
             .PayloadKind = Assets::AssetPayloadKind::Texture2D,
         });
     ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
+    WaitUntilTrue(readState->ReadStarted);
 
     Runtime::RuntimeAssetImportQueueSnapshot queue =
         pipeline.GetAssetImportQueueSnapshot();
@@ -1357,6 +1364,7 @@ TEST(RuntimeAssetImportFormatCoverage, AssetImportPipelineAccessorExposesQueueAn
               Runtime::RuntimeAssetImportQueueStage::Decoding);
     EXPECT_FALSE(pipeline.GetLastAssetImportEvent().has_value());
 
+    readState->ReleaseRead.store(true, std::memory_order_release);
     engine.Run();
 
     queue = pipeline.GetAssetImportQueueSnapshot();

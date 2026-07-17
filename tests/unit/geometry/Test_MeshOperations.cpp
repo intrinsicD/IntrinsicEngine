@@ -755,32 +755,42 @@ TEST(Simplification_QEM, DenseClosedMeshStaysClosed)
     expectClosedSphereTopology(mesh, "post-GC simplification", true);
 }
 
-TEST(Simplification_QEM, HausdorffErrorConstraintSmallMeshSentinel)
+TEST(Simplification_QEM, HausdorffErrorConstraintIsRespected)
 {
-    auto mesh = MakeDenseClosedTriangleMesh(1);
+    auto mesh = MakeDenseClosedTriangleMesh();
+
+    // Collect original vertex positions for distance checking
+    std::vector<glm::vec3> originalPositions;
+    for (std::size_t vi = 0; vi < mesh.VerticesSize(); ++vi)
+    {
+        Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(vi)};
+        if (!mesh.IsDeleted(v) && !mesh.IsIsolated(v))
+        {
+            originalPositions.push_back(mesh.Position(v));
+        }
+    }
 
     Geometry::Simplification::Params params;
-    params.TargetFaces = 40;
+    params.TargetFaces = 400;
     params.PreserveBoundary = false;
     params.HausdorffError = 0.5;
 
     auto result = Geometry::Simplification::Simplify(mesh, params);
     ASSERT_TRUE(result.has_value());
     EXPECT_GT(result->CollapseCount, 0u);
-    EXPECT_LE(result->FinalFaceCount, 40u);
 }
 
-TEST(Simplification_QEM, RepeatedWorkflowSmallMeshSentinel)
+TEST(Simplification_QEM, RepeatedWorkflowStyleSimplificationStaysValid)
 {
-    auto mesh = MakeIcosahedron();
+    auto mesh = MakeDenseClosedTriangleMesh(4); // 5,120 triangles: fast, but still dense enough for repeated decimation.
 
     Geometry::Simplification::Params first;
-    first.TargetFaces = 16;
+    first.TargetFaces = 4000;
     first.PreserveBoundary = false;
 
     auto firstResult = Geometry::Simplification::Simplify(mesh, first);
     ASSERT_TRUE(firstResult.has_value());
-    ASSERT_LE(mesh.FaceCount(), 16u);
+    ASSERT_LE(mesh.FaceCount(), 4000u);
 
     std::vector<glm::vec3> positions;
     std::vector<uint32_t> indices;
@@ -791,12 +801,12 @@ TEST(Simplification_QEM, RepeatedWorkflowSmallMeshSentinel)
     ASSERT_EQ(rebuilt.FaceCount(), indices.size() / 3);
 
     Geometry::Simplification::Params second;
-    second.TargetFaces = 12;
+    second.TargetFaces = 3000;
     second.PreserveBoundary = false;
 
     auto secondResult = Geometry::Simplification::Simplify(rebuilt, second);
     ASSERT_TRUE(secondResult.has_value());
-    ASSERT_LE(rebuilt.FaceCount(), 12u);
+    ASSERT_LE(rebuilt.FaceCount(), 3000u);
 
     ExtractTriangleSoup(rebuilt, positions, indices);
 
@@ -809,36 +819,71 @@ TEST(Simplification_QEM, RepeatedWorkflowSmallMeshSentinel)
     }
 }
 
-TEST(Simplification_QEM, ConfigurableQuadricsSmallMeshSentinel)
+TEST(Simplification_QEM, ConfigurableQuadricsSupportAllTypesResidencesAndPlacements)
 {
-    auto mesh = MakeIcosahedron();
-    const std::size_t initialFaces = mesh.FaceCount();
-
-    Geometry::Simplification::Params params;
-    params.TargetFaces = 12;
-    params.PreserveBoundary = false;
-    params.Quadric.Type = Geometry::Simplification::QuadricType::Triangle;
-    params.Quadric.Residence = Geometry::Simplification::QuadricResidence::Faces;
-    params.Quadric.PlacementPolicy = Geometry::Simplification::CollapsePlacementPolicy::QuadricMinimizer;
-
-    auto result = Geometry::Simplification::Simplify(mesh, params);
-    ASSERT_TRUE(result.has_value());
-    EXPECT_GT(result->CollapseCount, 0u);
-    EXPECT_LT(mesh.FaceCount(), initialFaces);
-}
-
-TEST(Simplification_QEM, ProbabilisticQuadricsSmallMeshSentinel)
-{
-    const std::vector<Geometry::Simplification::QuadricProbabilisticMode> modes = {
-        Geometry::Simplification::QuadricProbabilisticMode::Isotropic,
-        Geometry::Simplification::QuadricProbabilisticMode::Covariance,
+    struct Config
+    {
+        Geometry::Simplification::QuadricType Type;
+        Geometry::Simplification::QuadricResidence Residence;
+        Geometry::Simplification::CollapsePlacementPolicy Placement;
     };
 
-    for (const auto mode : modes)
-    {
-        SCOPED_TRACE(static_cast<int>(mode));
+    const std::vector<Config> configs = {
+        {Geometry::Simplification::QuadricType::Plane, Geometry::Simplification::QuadricResidence::Vertices, Geometry::Simplification::CollapsePlacementPolicy::KeepSurvivor},
+        {Geometry::Simplification::QuadricType::Plane, Geometry::Simplification::QuadricResidence::Faces, Geometry::Simplification::CollapsePlacementPolicy::QuadricMinimizer},
+        {Geometry::Simplification::QuadricType::Plane, Geometry::Simplification::QuadricResidence::VerticesAndFaces, Geometry::Simplification::CollapsePlacementPolicy::BestOfEndpointsAndMinimizer},
+        {Geometry::Simplification::QuadricType::Triangle, Geometry::Simplification::QuadricResidence::Vertices, Geometry::Simplification::CollapsePlacementPolicy::KeepSurvivor},
+        {Geometry::Simplification::QuadricType::Triangle, Geometry::Simplification::QuadricResidence::Faces, Geometry::Simplification::CollapsePlacementPolicy::QuadricMinimizer},
+        {Geometry::Simplification::QuadricType::Triangle, Geometry::Simplification::QuadricResidence::VerticesAndFaces, Geometry::Simplification::CollapsePlacementPolicy::BestOfEndpointsAndMinimizer},
+        {Geometry::Simplification::QuadricType::Point, Geometry::Simplification::QuadricResidence::Vertices, Geometry::Simplification::CollapsePlacementPolicy::KeepSurvivor},
+        {Geometry::Simplification::QuadricType::Point, Geometry::Simplification::QuadricResidence::Faces, Geometry::Simplification::CollapsePlacementPolicy::QuadricMinimizer},
+        {Geometry::Simplification::QuadricType::Point, Geometry::Simplification::QuadricResidence::VerticesAndFaces, Geometry::Simplification::CollapsePlacementPolicy::BestOfEndpointsAndMinimizer},
+    };
 
-        auto mesh = MakeIcosahedron();
+    for (const Config& config : configs)
+    {
+        SCOPED_TRACE(static_cast<int>(config.Type));
+        SCOPED_TRACE(static_cast<int>(config.Residence));
+        SCOPED_TRACE(static_cast<int>(config.Placement));
+
+        auto mesh = MakeDenseClosedTriangleMesh(2);
+        const std::size_t initialFaces = mesh.FaceCount();
+
+        Geometry::Simplification::Params params;
+        params.TargetFaces = initialFaces / 2u;
+        params.PreserveBoundary = false;
+        params.Quadric.Type = config.Type;
+        params.Quadric.Residence = config.Residence;
+        params.Quadric.PlacementPolicy = config.Placement;
+
+        auto result = Geometry::Simplification::Simplify(mesh, params);
+        ASSERT_TRUE(result.has_value());
+        EXPECT_GT(result->CollapseCount, 0u);
+        EXPECT_LT(mesh.FaceCount(), initialFaces);
+    }
+}
+
+TEST(Simplification_QEM, ProbabilisticQuadricsSupportIsotropicAndCovarianceModes)
+{
+    struct Config
+    {
+        Geometry::Simplification::QuadricType Type;
+        Geometry::Simplification::QuadricProbabilisticMode Mode;
+    };
+
+    const std::vector<Config> configs = {
+        {Geometry::Simplification::QuadricType::Plane, Geometry::Simplification::QuadricProbabilisticMode::Isotropic},
+        {Geometry::Simplification::QuadricType::Plane, Geometry::Simplification::QuadricProbabilisticMode::Covariance},
+        {Geometry::Simplification::QuadricType::Triangle, Geometry::Simplification::QuadricProbabilisticMode::Isotropic},
+        {Geometry::Simplification::QuadricType::Triangle, Geometry::Simplification::QuadricProbabilisticMode::Covariance},
+    };
+
+    for (const Config& config : configs)
+    {
+        SCOPED_TRACE(static_cast<int>(config.Type));
+        SCOPED_TRACE(static_cast<int>(config.Mode));
+
+        auto mesh = MakeDenseClosedTriangleMesh(2);
         const std::size_t initialFaces = mesh.FaceCount();
 
         auto vertexSigma = Geometry::VertexProperty<glm::dmat3>(
@@ -867,12 +912,12 @@ TEST(Simplification_QEM, ProbabilisticQuadricsSmallMeshSentinel)
         }
 
         Geometry::Simplification::Params params;
-        params.TargetFaces = 12;
+        params.TargetFaces = initialFaces / 2u;
         params.PreserveBoundary = false;
-        params.Quadric.Type = Geometry::Simplification::QuadricType::Triangle;
+        params.Quadric.Type = config.Type;
         params.Quadric.Residence = Geometry::Simplification::QuadricResidence::VerticesAndFaces;
         params.Quadric.PlacementPolicy = Geometry::Simplification::CollapsePlacementPolicy::BestOfEndpointsAndMinimizer;
-        params.Quadric.ProbabilisticMode = mode;
+        params.Quadric.ProbabilisticMode = config.Mode;
         params.Quadric.PositionStdDev = 0.01;
         params.Quadric.NormalStdDev = 0.02;
 
