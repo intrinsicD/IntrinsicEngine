@@ -2,9 +2,9 @@ session:
   id: "2026-07-17_001"
   date: "2026-07-17"
   started: "2026-07-17T00:22+02:00"
-  last_turn: "2026-07-17T00:22+02:00"
-  turn_count: 1
-  summary: "Materialized the historical-engine audit as ten reviewed, dependency-ordered IntrinsicEngine backlog tasks while deferring consumerless framework work."
+  last_turn: "2026-07-17T07:02+02:00"
+  turn_count: 2
+  summary: "Materialized the historical-engine audit as ten reviewed backlog tasks, then committed the repository snapshot and recorded the session epilogue."
 
 events_logged:
   - turn: 1
@@ -19,6 +19,18 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Authored ten dependency-ordered tasks, applied three independent reviews, and passed the complete task/documentation structural gate."
+  - turn: 2
+    type: decision
+    id: "N245"
+    routing: direct
+    provenance: user
+    summary: "Requested that the current working tree be committed as a single snapshot."
+  - turn: 2
+    type: experiment
+    id: "N246"
+    routing: direct
+    provenance: ai-executed
+    summary: "Passed a whitespace sanity check, staged the full tree, and created commit 0809cfd7."
 
 ai_actions:
   - turn: 1
@@ -55,12 +67,22 @@ ai_actions:
       - "ara/trace/pm_reasoning_log.yaml"
       - "ara/trace/sessions/2026-07-17_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
+  - turn: 2
+    action: "Recorded the repository snapshot commit in ARA after confirming the tree with git diff --check."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-07-17_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
 
 claims_touched: []
 
 key_context:
   - turn: 1
     excerpt: "User accepted the repository audit and requested that its selected work be added to the IntrinsicEngine backlog."
+  - turn: 2
+    excerpt: "User requested that all current changes be committed."
 
 open_threads:
   - "Select the next bounded architecture/runtime slice; RUNTIME-168 is the smallest reviewed private-surface candidate, while ARCH-014 remains the umbrella that gates REVIEW-003."

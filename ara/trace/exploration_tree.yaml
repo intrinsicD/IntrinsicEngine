@@ -5758,3 +5758,21 @@ tree:
       and diff checks. No filesystem-watcher or Gaussian-derivative task was
       opened without a live consumer.
     status: resolved
+  - id: N245
+    type: decision
+    title: "Commit the repository snapshot that includes the backlog audit and epilogue"
+    provenance: user
+    timestamp: "2026-07-17T07:02+02:00"
+    also_depends_on: [N243, N244]
+    choice: >
+      Commit the current working tree as a single repository snapshot so the
+      reviewed backlog additions, task-index updates, asset additions, and
+      session-state changes are captured together.
+    alternatives:
+      - "Leave the working tree uncommitted"
+      - "Split the current state into multiple commits"
+    evidence:
+      - "User instruction: commit all changes accordingly"
+      - "git diff --check"
+      - "git commit -m "Sync backlog and session artifacts""
+    status: resolved
