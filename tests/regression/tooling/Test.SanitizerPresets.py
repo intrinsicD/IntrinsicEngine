@@ -397,7 +397,7 @@ class SanitizerPresetTests(unittest.TestCase):
         )
         self.assertIn("--no-tests=error", slo)
         self.assertIn(
-            "--output-junit build/ci/reports/architecture-slo.junit.xml",
+            "--output-junit reports/architecture-slo.junit.xml",
             slo,
         )
         self.assertNotIn('benchmark|slo', slo)

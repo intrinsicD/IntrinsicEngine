@@ -92,7 +92,7 @@ jobs:
             --preset ci-coverage-cpu \
             --cohort cpu-coverage \
             --diff-base HEAD^ \
-            --jobs 2
+            --jobs 1
 
       - name: Validate source-coverage self parity
         run: |

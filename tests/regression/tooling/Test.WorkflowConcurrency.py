@@ -105,7 +105,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             "            --preset ci-coverage-cpu \\\n"
             "            --cohort cpu-coverage \\\n"
             "            --diff-base HEAD^ \\\n"
-            "            --jobs 2",
+            "            --jobs 1",
             coverage,
         )
         self.assertIn(

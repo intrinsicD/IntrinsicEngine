@@ -1128,6 +1128,7 @@ class InventoryCase:
 class InventoryEvidence:
     aggregate: str
     cases: Mapping[tuple[str, str], InventoryCase]
+    ctest_case_keys: Mapping[str, tuple[str, str]]
     common_environment_digest: str
     working_directory_digest: str
 
@@ -1209,6 +1210,7 @@ def validate_test_inventory(
     if not isinstance(raw_targets, list) or not raw_targets:
         raise CoverageError(f"{context} test inventory targets must be nonempty")
     cases: dict[tuple[str, str], InventoryCase] = {}
+    ctest_case_keys: dict[str, tuple[str, str]] = {}
     target_names: list[str] = []
     gtest_target_count = 0
     manual_target_count = 0
@@ -1251,6 +1253,10 @@ def validate_test_inventory(
                 case_context = f"{target_context} case #{case_index}"
                 if not isinstance(raw_case, dict):
                     raise CoverageError(f"{case_context} must be an object")
+                ctest_name = _inventory_string(
+                    raw_case.get("ctest_name"),
+                    context=f"{case_context} ctest_name",
+                )
                 name = _inventory_string(
                     raw_case.get("gtest_filter"),
                     context=f"{case_context} gtest_filter",
@@ -1273,6 +1279,11 @@ def validate_test_inventory(
                     raise CoverageError(
                         f"{context} test inventory repeats enabled case {name!r}"
                     )
+                if ctest_name in ctest_case_keys:
+                    raise CoverageError(
+                        f"{context} test inventory repeats CTest name "
+                        f"{ctest_name!r}"
+                    )
                 cases[key] = InventoryCase(
                     kind="gtest",
                     labels=labels,
@@ -1280,6 +1291,7 @@ def validate_test_inventory(
                     target=target_name,
                     working_directory=working_directory,
                 )
+                ctest_case_keys[ctest_name] = key
                 enabled_gtest_case_count += 1
         elif kind == "manual":
             manual_target_count += 1
@@ -1312,6 +1324,10 @@ def validate_test_inventory(
                     raise CoverageError(
                         f"{context} test inventory repeats manual case {name!r}"
                     )
+                if name in ctest_case_keys:
+                    raise CoverageError(
+                        f"{context} test inventory repeats CTest name {name!r}"
+                    )
                 cases[key] = InventoryCase(
                     kind="manual",
                     labels=labels,
@@ -1319,6 +1335,7 @@ def validate_test_inventory(
                     target=target_name,
                     working_directory=working_directory,
                 )
+                ctest_case_keys[name] = key
                 manual_ctest_test_count += 1
         else:
             raise CoverageError(
@@ -1349,6 +1366,7 @@ def validate_test_inventory(
     return InventoryEvidence(
         aggregate=aggregate,
         cases=cases,
+        ctest_case_keys=ctest_case_keys,
         common_environment_digest=common_environment_digest,
         working_directory_digest=_sha256(
             _canonical_json(gtest_working_directories)
@@ -1631,9 +1649,37 @@ def compare_test_cohort_transition(
     candidate_cases = candidate_evidence.cases
     baseline_keys = set(baseline_cases)
     candidate_keys = set(candidate_cases)
-    expected_added = {
-        ("gtest", name) for name in transition.added_fast_sentinels
-    }
+    def resolve_declared_ctest_names(
+        names: Sequence[str],
+        evidence: InventoryEvidence,
+        *,
+        context: str,
+    ) -> set[tuple[str, str]]:
+        resolved: set[tuple[str, str]] = set()
+        missing: list[str] = []
+        for name in names:
+            key = evidence.ctest_case_keys.get(name)
+            if key is None:
+                missing.append(name)
+            else:
+                resolved.add(key)
+        if missing:
+            raise CoverageError(
+                f"{context} inventory does not map declared CTest names: "
+                f"{missing!r}"
+            )
+        if len(resolved) != len(names):
+            raise CoverageError(
+                f"{context} inventory maps multiple declared CTest names to "
+                "one execution identity"
+            )
+        return resolved
+
+    expected_added = resolve_declared_ctest_names(
+        transition.added_fast_sentinels,
+        candidate_evidence,
+        context="candidate",
+    )
     actual_added = candidate_keys - baseline_keys
     missing = sorted(baseline_keys - candidate_keys)
     unexpected = sorted(actual_added - expected_added)
@@ -1645,17 +1691,24 @@ def compare_test_cohort_transition(
             f"missing_sentinels={undeclared_missing_sentinels!r}"
         )
 
-    moved_keys = {("gtest", name) for name in transition.moved_to_slow}
-    missing_moved = sorted(
-        key
-        for key in moved_keys
-        if key not in baseline_cases or key not in candidate_cases
+    baseline_moved_keys = resolve_declared_ctest_names(
+        transition.moved_to_slow,
+        baseline_evidence,
+        context="baseline",
     )
-    if missing_moved:
+    candidate_moved_keys = resolve_declared_ctest_names(
+        transition.moved_to_slow,
+        candidate_evidence,
+        context="candidate",
+    )
+    if baseline_moved_keys != candidate_moved_keys:
         raise CoverageError(
-            "test-cohort transition omits declared moved cases: "
-            f"{missing_moved!r}"
+            "test-cohort transition maps declared moved CTest names to "
+            "different execution identities: "
+            f"baseline={sorted(baseline_moved_keys)!r}, "
+            f"candidate={sorted(candidate_moved_keys)!r}"
         )
+    moved_keys = baseline_moved_keys
 
     for key in sorted(baseline_keys):
         baseline_case = baseline_cases[key]
