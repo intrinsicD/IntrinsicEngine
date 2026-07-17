@@ -343,11 +343,18 @@ namespace
                             double /*dt*/) override {}
         void OnShutdown(Extrinsic::Runtime::Engine& /*engine*/) override {}
     };
+
+    [[nodiscard]] Extrinsic::Core::Config::EngineConfig SingleWorkerEngineConfig()
+    {
+        Extrinsic::Core::Config::EngineConfig config{};
+        config.Simulation.WorkerThreadCount = 1u;
+        return config;
+    }
 }
 
 TEST(EngineReferenceScene, DefaultEngineConfigKeepsReferenceSceneDisabledAndCreatesNoEntities)
 {
-    Extrinsic::Core::Config::EngineConfig config{};
+    Extrinsic::Core::Config::EngineConfig config = SingleWorkerEngineConfig();
     ASSERT_FALSE(config.ReferenceScene.Enabled);
 
     Extrinsic::Runtime::Engine engine(config, std::make_unique<StubApplication>());
@@ -364,7 +371,7 @@ TEST(EngineReferenceScene, DefaultEngineConfigKeepsReferenceSceneDisabledAndCrea
 
 TEST(EngineReferenceScene, ReferenceEngineConfigInvokesPreRegisteredProviderOnce)
 {
-    Extrinsic::Core::Config::EngineConfig config{};
+    Extrinsic::Core::Config::EngineConfig config = SingleWorkerEngineConfig();
     config.ReferenceScene.Enabled = true;
     config.ReferenceScene.Selector = ReferenceSceneSelector::Triangle;
 
@@ -392,7 +399,7 @@ TEST(EngineReferenceScene, ReferenceEngineConfigInvokesPreRegisteredProviderOnce
 
 TEST(EngineReferenceScene, ReferenceEnabledInstallsDefaultTriangleProviderWhenAbsent)
 {
-    Extrinsic::Core::Config::EngineConfig config{};
+    Extrinsic::Core::Config::EngineConfig config = SingleWorkerEngineConfig();
     config.ReferenceScene.Enabled = true;
     config.ReferenceScene.Selector = ReferenceSceneSelector::Triangle;
 
@@ -419,7 +426,7 @@ TEST(EngineReferenceScene, ReferenceEnabledInstallsDefaultTriangleProviderWhenAb
 
 TEST(EngineReferenceScene, RenderExtractionReportsOneCandidateAndOneAllocatedInstance)
 {
-    Extrinsic::Core::Config::EngineConfig config{};
+    Extrinsic::Core::Config::EngineConfig config = SingleWorkerEngineConfig();
     config.ReferenceScene.Enabled = true;
     config.ReferenceScene.Selector = ReferenceSceneSelector::Triangle;
 
@@ -445,7 +452,7 @@ TEST(EngineReferenceScene, RenderExtractionReportsOneCandidateAndOneAllocatedIns
 
 TEST(EngineReferenceScene, DefaultTriangleIsSelectableAndVisibleToSandboxEditorModels)
 {
-    Extrinsic::Core::Config::EngineConfig config{};
+    Extrinsic::Core::Config::EngineConfig config = SingleWorkerEngineConfig();
     config.ReferenceScene.Enabled = true;
     config.ReferenceScene.Selector = ReferenceSceneSelector::Triangle;
 

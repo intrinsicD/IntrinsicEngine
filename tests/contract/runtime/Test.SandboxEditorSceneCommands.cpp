@@ -698,6 +698,7 @@ class RecordingImportCameraController final : public Runtime::ICameraController
 [[nodiscard]] Extrinsic::Core::Config::EngineConfig HeadlessConfig()
     {
         Extrinsic::Core::Config::EngineConfig config{};
+        config.Simulation.WorkerThreadCount = 1u;
         config.ReferenceScene.Enabled = false;
         config.Camera.Enabled = false;
         config.Window.Backend = Core::Config::WindowBackend::Null;

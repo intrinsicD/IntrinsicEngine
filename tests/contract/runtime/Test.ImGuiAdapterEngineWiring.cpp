@@ -329,6 +329,7 @@ namespace
     [[nodiscard]] Extrinsic::Core::Config::EngineConfig HeadlessConfig()
     {
         Extrinsic::Core::Config::EngineConfig config{};
+        config.Simulation.WorkerThreadCount = 1u;
         config.ReferenceScene.Enabled = false;
         config.Camera.Enabled         = false;
         return config;
@@ -337,6 +338,7 @@ namespace
     [[nodiscard]] Extrinsic::Core::Config::EngineConfig InputRoutingConfig()
     {
         Extrinsic::Core::Config::EngineConfig config{};
+        config.Simulation.WorkerThreadCount = 1u;
         config.ReferenceScene.Enabled = false;
         config.Camera.Enabled = true;
         return config;

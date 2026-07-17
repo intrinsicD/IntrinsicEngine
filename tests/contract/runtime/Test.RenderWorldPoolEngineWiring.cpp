@@ -59,6 +59,7 @@ namespace
     [[nodiscard]] Extrinsic::Core::Config::EngineConfig PoolConfig(const bool synchronous)
     {
         Extrinsic::Core::Config::EngineConfig config{};
+        config.Simulation.WorkerThreadCount = 1u;
         config.ReferenceScene.Enabled       = false;
         config.Camera.Enabled               = false;
         config.Render.SynchronousExtraction = synchronous;

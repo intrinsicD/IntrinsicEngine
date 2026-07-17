@@ -91,6 +91,7 @@ namespace
     [[nodiscard]] CoreConfig::EngineConfig HeadlessConfig()
     {
         CoreConfig::EngineConfig config{};
+        config.Simulation.WorkerThreadCount = 1u;
         config.ReferenceScene.Enabled = false;
         config.Camera.Enabled = false;
         config.Window.Backend = CoreConfig::WindowBackend::Null;

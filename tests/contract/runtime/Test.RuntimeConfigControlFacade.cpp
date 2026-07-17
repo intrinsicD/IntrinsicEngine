@@ -40,6 +40,7 @@ namespace
     [[nodiscard]] CoreConfig::EngineConfig HeadlessConfig()
     {
         CoreConfig::EngineConfig config = Runtime::CreateReferenceEngineConfig();
+        config.Simulation.WorkerThreadCount = 1u;
         config.Window.Backend = CoreConfig::WindowBackend::Null;
         config.Render.EnablePromotedVulkanDevice = false;
         config.ReferenceScene.Enabled = false;

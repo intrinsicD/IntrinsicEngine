@@ -24,6 +24,7 @@ public:
 
 [[nodiscard]] Core::Config::EngineConfig HeadlessConfig() {
   Core::Config::EngineConfig config{};
+  config.Simulation.WorkerThreadCount = 1u;
   config.ReferenceScene.Enabled = false;
   config.Camera.Enabled = false;
   config.Window.Backend = Core::Config::WindowBackend::Null;

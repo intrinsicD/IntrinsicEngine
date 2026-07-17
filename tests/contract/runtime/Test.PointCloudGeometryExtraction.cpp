@@ -46,6 +46,7 @@ namespace
     [[nodiscard]] Extrinsic::Core::Config::EngineConfig HeadlessConfig()
     {
         Extrinsic::Core::Config::EngineConfig config{};
+        config.Simulation.WorkerThreadCount = 1u;
         config.ReferenceScene.Enabled = false;
         return config;
     }

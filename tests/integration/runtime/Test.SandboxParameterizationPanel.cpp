@@ -57,6 +57,7 @@ namespace
     [[nodiscard]] Config::EngineConfig HeadlessConfig()
     {
         Config::EngineConfig config{};
+        config.Simulation.WorkerThreadCount = 1u;
         config.ReferenceScene.Enabled = false;
         config.Camera.Enabled = false;
         config.Window.Backend = Config::WindowBackend::Null;

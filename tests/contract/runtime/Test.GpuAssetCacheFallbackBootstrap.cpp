@@ -26,11 +26,18 @@ namespace
                             double /*dt*/) override {}
         void OnShutdown(Extrinsic::Runtime::Engine& /*engine*/) override {}
     };
+
+    [[nodiscard]] Extrinsic::Core::Config::EngineConfig SingleWorkerEngineConfig()
+    {
+        Extrinsic::Core::Config::EngineConfig config{};
+        config.Simulation.WorkerThreadCount = 1u;
+        return config;
+    }
 }
 
 TEST(GpuAssetCacheFallbackBootstrap, NullDeviceLeavesFallbackUnreadyDeterministically)
 {
-    Extrinsic::Core::Config::EngineConfig config{};
+    Extrinsic::Core::Config::EngineConfig config = SingleWorkerEngineConfig();
     Extrinsic::Runtime::Engine engine(config, std::make_unique<StubApplication>());
 
     engine.Initialize();
@@ -47,7 +54,7 @@ TEST(GpuAssetCacheFallbackBootstrap, NullDeviceLeavesFallbackUnreadyDeterministi
 
 TEST(GpuAssetCacheFallbackBootstrap, ReInitializeRebootstrapsExactlyOnce)
 {
-    Extrinsic::Core::Config::EngineConfig config{};
+    Extrinsic::Core::Config::EngineConfig config = SingleWorkerEngineConfig();
     Extrinsic::Runtime::Engine engine(config, std::make_unique<StubApplication>());
 
     engine.Initialize();

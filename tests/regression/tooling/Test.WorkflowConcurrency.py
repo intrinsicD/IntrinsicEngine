@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -37,6 +38,41 @@ WORKFLOWS = {
         True,
     ),
 }
+CPU_ENGINE_CONFIG_ROOTS = (
+    ("tests/contract/runtime/Test.AssetImportFormatCoverage.cpp", "HeadlessConfig"),
+    ("tests/contract/runtime/Test.EditorUiHost.cpp", "HeadlessConfig"),
+    ("tests/contract/runtime/Test.GizmoInteractionEngineWiring.cpp", "HeadlessConfig"),
+    ("tests/contract/runtime/Test.GpuAssetCacheFallbackBootstrap.cpp", "SingleWorkerEngineConfig"),
+    ("tests/contract/runtime/Test.GraphGeometryExtraction.cpp", "HeadlessConfig"),
+    ("tests/contract/runtime/Test.ImGuiAdapterEngineWiring.cpp", "HeadlessConfig"),
+    ("tests/contract/runtime/Test.ImGuiAdapterEngineWiring.cpp", "InputRoutingConfig"),
+    ("tests/contract/runtime/Test.MeshGeometryExtraction.cpp", "HeadlessConfig"),
+    ("tests/contract/runtime/Test.MeshPrimitiveViewExtraction.cpp", "HeadlessConfig"),
+    ("tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp", "HeadlessConfig"),
+    ("tests/contract/runtime/Test.ProceduralGeometryExtraction.cpp", "HeadlessConfig"),
+    ("tests/contract/runtime/Test.RenderExtractionContract.cpp", "HeadlessConfig"),
+    ("tests/contract/runtime/Test.RenderWorldPoolEngineWiring.cpp", "PoolConfig"),
+    ("tests/contract/runtime/Test.RuntimeConfigControlFacade.cpp", "HeadlessConfig"),
+    ("tests/contract/runtime/Test.RuntimeInputActions.cpp", "InputActionConfig"),
+    ("tests/contract/runtime/Test.RuntimeJobService.cpp", "NullWindowHeadlessConfig"),
+    ("tests/contract/runtime/Test.RuntimeKernelEvents.cpp", "NullWindowHeadlessConfig"),
+    ("tests/contract/runtime/Test.RuntimeModule.cpp", "NullWindowHeadlessConfig"),
+    ("tests/contract/runtime/Test.RuntimeReferenceScene.cpp", "SingleWorkerEngineConfig"),
+    ("tests/contract/runtime/Test.RuntimeRenderRecipeActivation.cpp", "HeadlessConfig"),
+    ("tests/contract/runtime/Test.RuntimeSceneLifecycle.cpp", "HeadlessConfig"),
+    ("tests/contract/runtime/Test.RuntimeVulkanBreadcrumb.cpp", "SingleWorkerEngineConfig"),
+    ("tests/contract/runtime/Test.RuntimeWorldRegistry.cpp", "NullWindowHeadlessConfig"),
+    ("tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp", "HeadlessConfig"),
+    ("tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp", "HeadlessConfig"),
+    ("tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp", "HeadlessConfig"),
+    ("tests/contract/runtime/Test.SandboxEditorVisualization.cpp", "HeadlessConfig"),
+    ("tests/contract/runtime/Test.SelectionSnapshotExtraction.cpp", "HeadlessConfig"),
+    ("tests/contract/runtime/Test.SelectionStableLookupComposition.cpp", "HeadlessConfig"),
+    ("tests/integration/runtime/Test.RuntimeSandboxAcceptance.cpp", "HeadlessConfig"),
+    ("tests/integration/runtime/Test.SandboxDomainPanels.cpp", "HeadlessConfig"),
+    ("tests/integration/runtime/Test.SandboxEditorPresentation.cpp", "HeadlessConfig"),
+    ("tests/integration/runtime/Test.SandboxParameterizationPanel.cpp", "HeadlessConfig"),
+)
 
 
 def _load_workflow(name: str) -> tuple[dict[str, object], str]:
@@ -48,7 +84,59 @@ def _load_workflow(name: str) -> tuple[dict[str, object], str]:
     return payload, text
 
 
+def _function_body(text: str, function_name: str) -> str:
+    signature = re.search(
+        rf"\b{re.escape(function_name)}\s*\([^)]*\)\s*\{{",
+        text,
+    )
+    if signature is None:
+        raise AssertionError(f"function not found: {function_name}")
+
+    opening_brace = signature.end() - 1
+    depth = 0
+    for offset in range(opening_brace, len(text)):
+        if text[offset] == "{":
+            depth += 1
+        elif text[offset] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[opening_brace : offset + 1]
+    raise AssertionError(f"unterminated function body: {function_name}")
+
+
 class WorkflowConcurrencyTests(unittest.TestCase):
+    def test_cpu_engine_config_roots_use_one_worker(self) -> None:
+        self.assertEqual(len(CPU_ENGINE_CONFIG_ROOTS), 33)
+        self.assertEqual(
+            len({path for path, _ in CPU_ENGINE_CONFIG_ROOTS}),
+            32,
+        )
+        worker_budget = "config.Simulation.WorkerThreadCount = 1u;"
+
+        for relative_path, root in CPU_ENGINE_CONFIG_ROOTS:
+            source = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+            with self.subTest(path=relative_path, root=root):
+                body = _function_body(source, root)
+                self.assertEqual(body.count(worker_budget), 1)
+
+    def test_parallelism_sensitive_engine_config_keeps_explicit_budget(
+        self,
+    ) -> None:
+        source = (
+            REPO_ROOT
+            / "tests/contract/runtime/Test.ClusteringModule.cpp"
+        ).read_text(encoding="utf-8")
+        body = _function_body(source, "NullWindowHeadlessConfig")
+        self.assertIn("const unsigned workers = 2u)", source)
+        self.assertEqual(
+            body.count(
+                "config.Simulation.WorkerThreadCount = workers;"
+            ),
+            1,
+        )
+        self.assertEqual(source.count("NullWindowHeadlessConfig(),"), 2)
+        self.assertEqual(source.count("NullWindowHeadlessConfig(1u),"), 1)
+
     def test_ci_fast_preset_is_unsanitized_and_headless(self) -> None:
         payload = json.loads(PRESETS.read_text(encoding="utf-8"))
         configure_presets = {

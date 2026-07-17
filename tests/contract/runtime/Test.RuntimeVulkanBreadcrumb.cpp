@@ -34,6 +34,13 @@ public:
     void OnShutdown(Engine& /*engine*/) override {}
 };
 
+[[nodiscard]] EngineConfig SingleWorkerEngineConfig()
+{
+    EngineConfig config{};
+    config.Simulation.WorkerThreadCount = 1u;
+    return config;
+}
+
 [[nodiscard]] std::size_t CountBreadcrumbWarnings(const LogSnapshot& snapshot,
                                                   const std::uint64_t sinceSequence) noexcept
 {
@@ -101,7 +108,7 @@ TEST(RuntimeVulkanBreadcrumb, DecisionSilentWhenPromotedVulkanNotRequested)
 // -----------------------------------------------------------------------------
 TEST(RuntimeVulkanBreadcrumb, EngineInitializeFiresBreadcrumbOncePerStartupWhenRequested)
 {
-    EngineConfig config{};
+    EngineConfig config = SingleWorkerEngineConfig();
     config.Render.Backend = GraphicsBackend::Vulkan;
     config.Render.EnablePromotedVulkanDevice = true;
 
@@ -124,7 +131,8 @@ TEST(RuntimeVulkanBreadcrumb, EngineInitializeFiresBreadcrumbOncePerStartupWhenR
 
 TEST(RuntimeVulkanBreadcrumb, EngineInitializeSilentWhenPromotedVulkanNotRequested)
 {
-    EngineConfig config{}; // Backend defaults to Vulkan, EnablePromotedVulkanDevice = false.
+    EngineConfig config = SingleWorkerEngineConfig();
+    // Backend defaults to Vulkan, EnablePromotedVulkanDevice = false.
     ASSERT_FALSE(config.Render.EnablePromotedVulkanDevice);
 
     const LogSnapshot before = TakeSnapshot();
@@ -148,7 +156,7 @@ TEST(RuntimeVulkanBreadcrumb, EngineInitializeSucceedsEvenWhenVulkanFallsBackToN
     // Runtime never aborts solely because the requested Vulkan device falls
     // back to Null. Driving the full Initialize/Shutdown cycle on the CPU
     // path locks in the truth-table "Runtime result = continue" column.
-    EngineConfig config{};
+    EngineConfig config = SingleWorkerEngineConfig();
     config.Render.Backend = GraphicsBackend::Vulkan;
     config.Render.EnablePromotedVulkanDevice = true;
 
