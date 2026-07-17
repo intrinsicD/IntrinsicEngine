@@ -19,7 +19,7 @@ from test_cohort_manifest import TestCohortTransition
 
 COVERAGE_SCHEMA = "intrinsic.cpu-source-coverage/v2"
 TEST_INVENTORY_SCHEMA = "intrinsic.cpu-test-inventory/v2"
-EXECUTION_IDENTITY_SCHEMA = "intrinsic.cpu-source-coverage-execution/v2"
+EXECUTION_IDENTITY_SCHEMA = "intrinsic.cpu-source-coverage-execution/v3"
 PRODUCTION_ROOTS = ("src", "methods")
 PRODUCTION_SUFFIXES = frozenset(
     {
@@ -87,6 +87,10 @@ IDENTITY_FIELDS = (
 )
 TEST_REFACTOR_MUTABLE_EXECUTION_FIELDS = frozenset(
     {
+        # Each report binds its exact sibling inventory. Test-only refactor
+        # comparison does not consume those siblings, and their absolute
+        # execution paths may differ across otherwise equivalent build trees.
+        "test_inventory_digest",
         # The v1 diagnostic is keyed by executable target name. The v2
         # case_working_directory_digest below preserves the semantic check.
         "working_directory_digest",
@@ -96,6 +100,7 @@ TEST_COHORT_TRANSITION_MUTABLE_EXECUTION_FIELDS = frozenset(
     {
         "case_working_directory_digest",
         "case_working_directory_record_count",
+        "test_inventory_digest",
         "working_directory_digest",
     }
 )
@@ -109,8 +114,10 @@ REQUIRED_EXECUTION_IDENTITY_FIELDS = frozenset(
         "excluded_labels",
         "gtest_result_format",
         "mode",
+        "producer_jobs",
         "profile_pattern",
         "schema",
+        "test_inventory_digest",
         "working_directory_digest",
     }
 )
@@ -1130,6 +1137,7 @@ class InventoryEvidence:
     cases: Mapping[tuple[str, str], InventoryCase]
     ctest_case_keys: Mapping[str, tuple[str, str]]
     common_environment_digest: str
+    digest: str
     working_directory_digest: str
 
 
@@ -1211,6 +1219,7 @@ def validate_test_inventory(
         raise CoverageError(f"{context} test inventory targets must be nonempty")
     cases: dict[tuple[str, str], InventoryCase] = {}
     ctest_case_keys: dict[str, tuple[str, str]] = {}
+    all_ctest_names: set[str] = set()
     target_names: list[str] = []
     gtest_target_count = 0
     manual_target_count = 0
@@ -1257,6 +1266,12 @@ def validate_test_inventory(
                     raw_case.get("ctest_name"),
                     context=f"{case_context} ctest_name",
                 )
+                if ctest_name in all_ctest_names:
+                    raise CoverageError(
+                        f"{context} test inventory repeats CTest name "
+                        f"{ctest_name!r}"
+                    )
+                all_ctest_names.add(ctest_name)
                 name = _inventory_string(
                     raw_case.get("gtest_filter"),
                     context=f"{case_context} gtest_filter",
@@ -1278,11 +1293,6 @@ def validate_test_inventory(
                 if key in cases:
                     raise CoverageError(
                         f"{context} test inventory repeats enabled case {name!r}"
-                    )
-                if ctest_name in ctest_case_keys:
-                    raise CoverageError(
-                        f"{context} test inventory repeats CTest name "
-                        f"{ctest_name!r}"
                     )
                 cases[key] = InventoryCase(
                     kind="gtest",
@@ -1307,6 +1317,11 @@ def validate_test_inventory(
                     raw_test.get("ctest_name"),
                     context=f"{test_context} ctest_name",
                 )
+                if name in all_ctest_names:
+                    raise CoverageError(
+                        f"{context} test inventory repeats CTest name {name!r}"
+                    )
+                all_ctest_names.add(name)
                 labels = _inventory_labels(
                     raw_test.get("labels"),
                     context=f"{test_context} labels",
@@ -1323,10 +1338,6 @@ def validate_test_inventory(
                 if key in cases:
                     raise CoverageError(
                         f"{context} test inventory repeats manual case {name!r}"
-                    )
-                if name in ctest_case_keys:
-                    raise CoverageError(
-                        f"{context} test inventory repeats CTest name {name!r}"
                     )
                 cases[key] = InventoryCase(
                     kind="manual",
@@ -1368,6 +1379,7 @@ def validate_test_inventory(
         cases=cases,
         ctest_case_keys=ctest_case_keys,
         common_environment_digest=common_environment_digest,
+        digest=digest,
         working_directory_digest=_sha256(
             _canonical_json(gtest_working_directories)
         ),
@@ -1386,6 +1398,11 @@ def bind_test_inventory(
     assert isinstance(identity, dict)
     execution = identity["execution"]
     assert isinstance(execution, dict)
+    if execution["test_inventory_digest"] != evidence.digest:
+        raise CoverageError(
+            f"{context} test inventory digest does not match coverage "
+            "execution identity"
+        )
     if execution["aggregate"] != evidence.aggregate:
         raise CoverageError(
             f"{context} test inventory aggregate does not match coverage "
@@ -1456,6 +1473,7 @@ def validate_coverage_report(report: Mapping[str, object]) -> None:
     for field in (
         "case_working_directory_digest",
         "common_ctest_environment_digest",
+        "test_inventory_digest",
         "working_directory_digest",
     ):
         value = execution.get(field)
@@ -1472,6 +1490,15 @@ def validate_coverage_report(report: Mapping[str, object]) -> None:
         raise CoverageError(
             "coverage report execution identity has invalid "
             "case_working_directory_record_count"
+        )
+    producer_jobs = execution.get("producer_jobs")
+    if (
+        isinstance(producer_jobs, bool)
+        or not isinstance(producer_jobs, int)
+        or producer_jobs <= 0
+    ):
+        raise CoverageError(
+            "coverage report execution identity has invalid producer_jobs"
         )
     for field in (
         "covered_branch_arms",
@@ -1602,6 +1629,12 @@ def compare_test_cohort_transition(
                 f"{context} coverage must use the dedicated cpu-coverage "
                 f"cohort: expected={expected_execution!r}, "
                 f"actual={actual_execution!r}"
+            )
+        if execution["producer_jobs"] != 1:
+            raise CoverageError(
+                f"{context} claim-grade test-cohort coverage must serialize "
+                f"test producers with producer_jobs=1, got "
+                f"{execution['producer_jobs']!r}"
             )
         excluded_cases = {
             case.name: sorted(

@@ -25,7 +25,9 @@ CI helper scripts and workflow validation tools.
   `ctest_name` to `gtest_filter` mapping, permits only the manifest-declared
   fast sentinels, requires every moved heavy case in both populations with only
   the `slow` label added, and compares common-case working-directory plus
-  production coverage parity. Claim-grade workflow collection runs one test
+  production coverage parity. Transition comparison cryptographically binds
+  each report to its exact sibling inventory and records producer parallelism.
+  Claim-grade workflow collection and transition comparison require one test
   producer at a time so unrelated process scheduling cannot create artificial
   branch/region drift between otherwise identical product builds.
 - `test_cohort_manifest.py`: parses the strict shared fast-to-slow transition
@@ -81,6 +83,7 @@ CI helper scripts and workflow validation tools.
     --output build/ci-coverage-cpu/coverage \
     --preset ci-coverage-cpu \
     --cohort cpu-coverage \
+    --jobs 1 \
     --diff-base HEAD^
   ```
 

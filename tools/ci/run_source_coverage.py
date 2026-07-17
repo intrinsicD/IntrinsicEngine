@@ -669,6 +669,9 @@ def collect(arguments: argparse.Namespace) -> dict[str, object]:
             f"{[str(path) for path in empty_discovery_profiles]!r}"
         )
     write_json(output / "test-inventory.json", inventory)
+    inventory_digest = inventory.get("digest")
+    if not isinstance(inventory_digest, str):
+        raise CoverageError("test inventory has no digest")
     targets = inventory["targets"]
     assert isinstance(targets, list)
     prefixes = _safe_target_names(targets)
@@ -861,8 +864,10 @@ def collect(arguments: argparse.Namespace) -> dict[str, object]:
         "excluded_labels": list(cohort.excluded_labels),
         "gtest_result_format": "xml",
         "mode": "per-executable-enabled-gtest-plus-manual-ctest",
+        "producer_jobs": arguments.jobs,
         "profile_pattern": "target/%m-%p.profraw",
         "schema": EXECUTION_IDENTITY_SCHEMA,
+        "test_inventory_digest": inventory_digest,
         "working_directory_digest": working_directory_digest,
     }
     report: dict[str, object] = {
@@ -910,6 +915,7 @@ def collect(arguments: argparse.Namespace) -> dict[str, object]:
         "execution_raw_profile_count": len(all_execution_profiles),
         "gtest_result_xml_count": len(gtest_result_xml),
         "object_count": len(objects),
+        "producer_jobs": arguments.jobs,
         "schema": DIAGNOSTICS_SCHEMA,
         "status": "ok",
         "target_count": len(targets),
