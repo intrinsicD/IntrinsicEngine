@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `PROC-027` — Audit the validator/tool fleet for rent-paying gates (tasks/active/PROC-027-validator-rent-audit.md)
 
 ## Theme B — Rendering modernization
 
@@ -70,7 +70,6 @@ the authoritative open/unblocked view.
 - blocked by `BUG-106`: `CI-010` — Establish CPU source-coverage refactor parity (tasks/backlog/process/CI-010-cpu-source-coverage-refactor-parity.md)
 - blocked by `CI-005`: `CI-011` — Calibrate the slow-test cohort and retain fast sentinels (tasks/backlog/process/CI-011-measured-slow-test-cohort.md)
 - unblocked: `PROC-025` — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality (tasks/backlog/process/PROC-025-port-research-ideation-skill-to-other-repos.md)
-- unblocked: `PROC-027` — Audit the validator/tool fleet for rent-paying gates (tasks/backlog/process/PROC-027-validator-rent-audit.md)
 
 ## Theme I — Research method implementation
 

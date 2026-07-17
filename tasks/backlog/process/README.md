@@ -24,7 +24,8 @@ map.
 - [BUILD-004 — Make compile-hotspot evidence source-complete](BUILD-004-source-complete-compile-hotspot-evidence.md)
 - [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](PROC-025-port-research-ideation-skill-to-other-repos.md)
   (portable playbook; run from a session scoped to the target repo).
-- [PROC-027 — Audit the validator/tool fleet for rent-paying gates](PROC-027-validator-rent-audit.md)
+- [PROC-027 — Audit the validator/tool fleet for rent-paying gates](../../active/PROC-027-validator-rent-audit.md)
+  (currently active).
 
 `PROC-012` (resolve the duplicate `GEOM-027` ID by renumbering the
 control-surface/KMeans backend-seam task to `GEOM-052`) is retired; see the

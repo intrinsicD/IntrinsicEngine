@@ -11,7 +11,9 @@ Each active task should include:
 
 ## Currently active
 
-No active tasks.
+- [`PROC-027`](PROC-027-validator-rent-audit.md) — inventory the complete tool
+  fleet, evidence each keep/warn/retire verdict, and remove only gates that
+  have neither a recent finding nor a load-bearing role.
 
 ## History
 
