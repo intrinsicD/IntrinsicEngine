@@ -11,6 +11,9 @@ concurrency:
 jobs:
   ci-vulkan:
     runs-on: ubuntu-24.04
+    env:
+      VULKAN_READBACK_TEST: GpuReadbackJobGpuSmoke.VulkanTransferReadbackWritesPropertyAndFollowUpUploadsDerivedColor
+      VULKAN_OPERATIONAL_TEST_REGEX: '^(ExtrinsicSandbox\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)|GpuReadbackJobGpuSmoke\.VulkanTransferReadbackWritesPropertyAndFollowUpUploadsDerivedColor)$'
 
     steps:
       - name: Checkout
@@ -70,27 +73,19 @@ jobs:
           python3 tools/ci/time_command.py \
             --label "Build promoted Vulkan targets" \
             --json-out build/ci-vulkan/ci-timing/phases/build.json \
-            -- cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicGpuVulkanTests IntrinsicGlfwLifecycleLsanProcess
+            -- cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicGpuVulkanTests IntrinsicRuntimeGpuReadbackSmokeTests IntrinsicGlfwLifecycleLsanProcess
 
-      # GRAPHICS-080: `ctest -L 'gpu' -L 'vulkan'` is the documented intersection
-      # form across labels (each `-L` regex must match at least one label). The
-      # additional `-LE 'slow|flaky-quarantine'` exclusion narrows the gate to
-      # the actual gpu;vulkan smoke fixtures and keeps the broad
-      # `IntrinsicRuntimeTests` aggregate (plus its grouped entries) off the
-      # PR-time path: those targets are labelled `gpu vulkan slow` by
-      # `tests/CMakeLists.txt` because, per HARDEN-041, they still mix CPU-side
-      # runtime contracts with Vulkan-backed headless tests. Once HARDEN-041
-      # splits the labels we can drop the `slow` exclusion here. On runners
-      # without a Vulkan device the remaining smoke fixtures self-skip via
-      # `GTEST_SKIP` and the runtime fallback breadcrumb fires — the gate passes
-      # as long as no fixture fails. BUG-064 runs the sandbox frame-pacing
-      # capture and BUG-083 leak-on shutdown contract separately under Xvfb and
-      # Mesa's lavapipe software Vulkan implementation because both processes
-      # must execute renderer frames and finish with an operational device. The
-      # software driver is scoped to those Sandbox processes; the remaining
-      # smoke fixtures retain their
-      # capability-skip behavior. `--no-tests=ignore` keeps this batch green if
-      # a future host build trims the fixture set to empty.
+      - name: Reconcile gpu;vulkan test routing
+        run: |
+          python3 tests/regression/tooling/Test.TestGateRouting.py \
+            --build-dir build/ci-vulkan \
+            --aggregate IntrinsicGpuVulkanTests
+
+      # BUG-106 gives CPU/mock cases and the real Vulkan readback smoke separate,
+      # capability-truthful executables. Repeated `-L` arguments are an
+      # intersection. The readback remains `slow`, is built explicitly outside
+      # the fast aggregate, and joins the two Sandbox contracts in the
+      # operational lavapipe/Xvfb batch below.
       - name: Run gpu;vulkan opt-in fixtures
         run: |
           python3 tools/ci/check_prerequisites.py test-binaries \
@@ -98,50 +93,103 @@ jobs:
             --inventory build/ci-vulkan/test-inventories/IntrinsicGpuVulkanTests.txt
           python3 tools/ci/check_prerequisites.py test-binaries \
             --build-dir build/ci-vulkan \
-            --targets ExtrinsicSandbox IntrinsicGlfwLifecycleLsanProcess
+            --targets ExtrinsicSandbox IntrinsicRuntimeGpuReadbackSmokeTests IntrinsicGlfwLifecycleLsanProcess
           python3 tools/ci/time_command.py \
             --label "Run gpu;vulkan opt-in fixtures" \
             --json-out build/ci-vulkan/ci-timing/phases/test.json \
-            -- ctest --test-dir build/ci-vulkan --output-on-failure -L "gpu" -L "vulkan" -LE "slow|flaky-quarantine" -E "^ExtrinsicSandbox\\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)$" --no-tests=ignore --timeout 120 -j$(nproc)
+            -- ctest --test-dir build/ci-vulkan --output-on-failure -L "gpu" -L "vulkan" -LE "slow|flaky-quarantine" -E "$VULKAN_OPERATIONAL_TEST_REGEX" --no-tests=ignore --timeout 120 -j$(nproc)
 
-      - name: Run Sandbox Vulkan process contracts under virtual display
+      - name: Run operational Vulkan fixtures under virtual display
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
           VK_DRIVER_FILES: /usr/share/vulkan/icd.d/lvp_icd.json
         run: |
           test -r "$VK_DRIVER_FILES"
-          sandbox_process_count="$(ctest --test-dir build/ci-vulkan --show-only=json-v1 \
-            -R "^ExtrinsicSandbox\\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)$" \
+          operational_test_count="$(ctest --test-dir build/ci-vulkan --show-only=json-v1 \
+            -R "$VULKAN_OPERATIONAL_TEST_REGEX" \
             -L "gpu" -L "vulkan" \
             | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"
-          if [[ "$sandbox_process_count" -ne 2 ]]; then
-            echo "Expected both Sandbox Vulkan process contracts, found $sandbox_process_count" >&2
+          if [[ "$operational_test_count" -ne 3 ]]; then
+            echo "Expected two Sandbox contracts and the readback smoke, found $operational_test_count" >&2
             exit 1
           fi
+          operational_junit="${GITHUB_WORKSPACE}/build/ci-vulkan/ci-timing/result/operational-vulkan.junit.xml"
+          mkdir -p "$(dirname "$operational_junit")"
+          ctest_status=0
           python3 tools/ci/time_command.py \
-            --label "Run Sandbox Vulkan process contracts under virtual display" \
-            --json-out build/ci-vulkan/ci-timing/phases/test_sandbox_processes.json \
+            --label "Run operational Vulkan fixtures under virtual display" \
+            --json-out build/ci-vulkan/ci-timing/phases/test_operational_vulkan.json \
             -- xvfb-run -a --server-args="-screen 0 1280x720x24" \
               ctest --test-dir build/ci-vulkan --output-on-failure \
-                -R "^ExtrinsicSandbox\\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)$" \
-                -L "gpu" -L "vulkan" --no-tests=error --timeout 180
+                -R "$VULKAN_OPERATIONAL_TEST_REGEX" \
+                -L "gpu" -L "vulkan" --no-tests=error --timeout 180 \
+                --output-junit "$operational_junit" || ctest_status=$?
+          python3 - "$operational_junit" <<'PY'
+          import os
+          import sys
+          import xml.etree.ElementTree as ET
+
+          junit_path, expected_name = sys.argv[1], os.environ["VULKAN_READBACK_TEST"]
+          root = ET.parse(junit_path).getroot()
+
+          def local_name(tag: str) -> str:
+              return tag.rsplit("}", 1)[-1]
+
+          matches = [
+              case
+              for case in root.iter()
+              if local_name(case.tag) == "testcase"
+              and (
+                  case.attrib.get("name") == expected_name
+                  or (
+                      f"{case.attrib.get('classname', '')}."
+                      f"{case.attrib.get('name', '')}"
+                  ).strip(".")
+                  == expected_name
+              )
+          ]
+          if len(matches) != 1:
+              raise SystemExit(
+                  f"expected one JUnit result for {expected_name}, found {len(matches)}"
+              )
+
+          outcome_tags = {local_name(node.tag) for node in matches[0].iter()}
+          status = matches[0].attrib.get("status", "run").lower()
+          failed_outcomes = outcome_tags & {"error", "failure", "skipped"}
+          if failed_outcomes or status in {
+              "disabled",
+              "fail",
+              "failed",
+              "notrun",
+              "skipped",
+          }:
+              raise SystemExit(
+                  f"{expected_name} did not pass: "
+                  f"status={status}, outcomes={sorted(failed_outcomes)}"
+              )
+          print(f"Operational JUnit evidence: {expected_name} passed")
+          PY
+          if [[ "$ctest_status" -ne 0 ]]; then
+            echo "Operational Vulkan CTest batch failed with status $ctest_status" >&2
+            exit "$ctest_status"
+          fi
 
       - name: Aggregate gate timing result
         if: always()
         run: |
           context_args=()
-          if gpu_tests="$(ctest --test-dir build/ci-vulkan --show-only=json-v1 -L "gpu" -L "vulkan" -LE "slow|flaky-quarantine" -E "^ExtrinsicSandbox\\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)$" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')" &&
-             sandbox_process_tests="$(ctest --test-dir build/ci-vulkan --show-only=json-v1 -R "^ExtrinsicSandbox\\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)$" -L "gpu" -L "vulkan" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"; then
-            context_args+=(--selected-test-count "$((gpu_tests + sandbox_process_tests))")
+          if gpu_tests="$(ctest --test-dir build/ci-vulkan --show-only=json-v1 -L "gpu" -L "vulkan" -LE "slow|flaky-quarantine" -E "$VULKAN_OPERATIONAL_TEST_REGEX" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')" &&
+             operational_tests="$(ctest --test-dir build/ci-vulkan --show-only=json-v1 -R "$VULKAN_OPERATIONAL_TEST_REGEX" -L "gpu" -L "vulkan" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"; then
+            context_args+=(--selected-test-count "$((gpu_tests + operational_tests))")
           fi
-          if ninja_edges="$(ninja -C build/ci-vulkan -t commands ExtrinsicSandbox IntrinsicGpuVulkanTests IntrinsicGlfwLifecycleLsanProcess | sed '/^[[:space:]]*$/d' | wc -l)"; then
+          if ninja_edges="$(ninja -C build/ci-vulkan -t commands ExtrinsicSandbox IntrinsicGpuVulkanTests IntrinsicRuntimeGpuReadbackSmokeTests IntrinsicGlfwLifecycleLsanProcess | sed '/^[[:space:]]*$/d' | wc -l)"; then
             context_args+=(--ninja-edge-count "$ninja_edges")
           fi
           python3 tools/ci/aggregate_gate_timing.py \
             --configure-json build/ci-vulkan/ci-timing/phases/configure.json \
             --build-json build/ci-vulkan/ci-timing/phases/build.json \
             --test-json build/ci-vulkan/ci-timing/phases/test.json \
-            --test-json build/ci-vulkan/ci-timing/phases/test_sandbox_processes.json \
+            --test-json build/ci-vulkan/ci-timing/phases/test_operational_vulkan.json \
             --gate ci-vulkan \
             --preset ci-vulkan \
             --build-dir build/ci-vulkan \
@@ -158,10 +206,12 @@ jobs:
         if: always()
         run: python3 tools/benchmark/validate_benchmark_results.py --root build/ci-vulkan/ci-timing/result --strict
 
-      - name: Upload gate timing result
+      - name: Upload gate timing and operational evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ci-gate-timing-ci-vulkan
-          path: build/ci-vulkan/ci-timing/result/result.json
+          path: |
+            build/ci-vulkan/ci-timing/result/result.json
+            build/ci-vulkan/ci-timing/result/operational-vulkan.junit.xml
           if-no-files-found: error

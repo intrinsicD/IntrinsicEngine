@@ -120,8 +120,8 @@ sessions:
     open_threads: 13
   - id: "2026-07-17_001"
     date: "2026-07-17"
-    summary: "Materialized and committed the selective-adaptation backlog, then reproduced BUG-107's clean-versus-warm CI target-graph drift."
-    turn_count: 3
-    events_count: 5
+    summary: "Materialized and committed the selective-adaptation backlog, reproduced BUG-107's configure-history drift, and implemented BUG-106's workflow/documentation routing lane."
+    turn_count: 4
+    events_count: 6
     claims_touched: []
     open_threads: 16

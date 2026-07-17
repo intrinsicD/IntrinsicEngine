@@ -929,3 +929,9 @@ entries:
       - "Did not stage a new generalized observation: H06 already records classification and configure-identity repair before CI optimization, while this turn supplies bounded empirical evidence for its BUG-107 premise."
       - "Kept the implementation recommendation pending rather than crystallizing it; no source patch or user affirmation has selected the exact timing-metadata representation."
       - "No implementation file was edited; only the mandatory ARA epilogue records this read-only diagnosis."
+  - turn: "2026-07-17_001#4"
+    notes:
+      - "Routed the BUG-106 workflow/documentation slice as experiment N248 because it produced concrete CI routing, retained JUnit evidence, exact target-topology documentation, and focused static verification."
+      - "Did not stage a new generalized observation: H06 already records the classification-first test-graph rule, and this turn implements that existing heuristic rather than introducing a new one."
+      - "Recorded the invalid --skip-undeclared plus --inventory combination as a corrected integration detail inside N248, not as a dead end, because it was caught and removed before execution."
+      - "Kept integrated configure/build/CTest and hosted non-skipped readback proof open; this delegated lane intentionally did not mutate either build tree."

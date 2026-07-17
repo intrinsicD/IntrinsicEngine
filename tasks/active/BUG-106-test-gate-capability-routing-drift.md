@@ -7,10 +7,15 @@ depends_on:
 # BUG-106 — Test-gate capability routing hides CPU coverage
 
 ## Status
-- In progress on 2026-07-17; owner: Codex; branch: `main` (local).
-- Next verification: capture the affected source/case baseline, then split
-  CPU/mock and Vulkan-only ownership and reconcile target aggregates against
-  expanded CTest discovery.
+- Implementation complete locally on 2026-07-17; owner: Codex; branch: `main`.
+- Pre-change evidence contained 4,114 GoogleTest registrations, 4,105 distinct
+  cases, and nine duplicated `RuntimeFrameLoopContract` registrations. The
+  corrected graph has 4,105 unique GoogleTest cases plus five manual CTest
+  producers, and the default CPU selector contains 4,061 GoogleTest cases plus
+  one manual producer.
+- Next verification: push the exact implementation commit, retain a passing
+  hosted `ci-linux-clang` gate, and retain a non-skipped passing readback result
+  from the hosted `ci-vulkan` operational lane.
 
 ## Goal
 - Restore one canonical, capability-truthful test graph in which CPU/mock
@@ -54,33 +59,33 @@ depends_on:
   owner and must be replaced by this task.
 
 ## Required changes
-- [ ] Capture the pre-change source-to-object-library, executable-to-label,
+- [x] Capture the pre-change source-to-object-library, executable-to-label,
       and fully expanded GoogleTest case inventory for every affected source.
-- [ ] Move the twelve CPU/mock/source-contract sources out of the mixed
+- [x] Move the twelve CPU/mock/source-contract sources out of the mixed
       Vulkan/slow object library into existing CPU targets where their link
       dependencies fit; add the smallest dependency-coherent CPU executable
       only where reuse would broaden an existing target incorrectly.
-- [ ] Keep `Test.GpuReadbackJobGpuSmoke.cpp` in a dedicated
+- [x] Keep `Test.GpuReadbackJobGpuSmoke.cpp` in a dedicated
       `gpu;vulkan;integration;runtime;graphics` executable with `slow` only if
       current timing evidence satisfies the documented policy.
-- [ ] Register `Test.RuntimeFrameLoopContract.cpp` through exactly one CPU
+- [x] Register `Test.RuntimeFrameLoopContract.cpp` through exactly one CPU
       executable.
-- [ ] Remove `gpu;vulkan` from `IntrinsicGraphicsUnitTests` after proving all
+- [x] Remove `gpu;vulkan` from `IntrinsicGraphicsUnitTests` after proving all
       three sources remain MockDevice-only and require no live backend.
-- [ ] Extend the canonical test-registry tooling or a focused regression so
+- [x] Extend the canonical test-registry tooling or a focused regression so
       duplicate source ownership, duplicate expanded case names, label/build
       aggregate disagreement, and missing expected cases fail closed.
-- [ ] Keep object-library reuse and executable granularity dependency-driven;
+- [x] Keep object-library reuse and executable granularity dependency-driven;
       do not create a new registration framework.
 
 ## Tests
-- [ ] Add `tests/regression/tooling/Test.TestGateRouting.py` (or an equivalently
+- [x] Add `tests/regression/tooling/Test.TestGateRouting.py` (or an equivalently
       focused existing-tool extension) covering unique source/case ownership,
       CPU/GPU capability truth, and aggregate membership.
-- [ ] Compare pre/post `--gtest_list_tests` inventories and prove the distinct
+- [x] Compare pre/post `--gtest_list_tests` inventories and prove the distinct
       assertion-bearing case set is unchanged while duplicate executions are
       removed.
-- [ ] Build and run the reclassified cases through the default CPU selector.
+- [x] Build and run the reclassified cases through the default CPU selector.
 - [ ] Build the dedicated readback executable through `ci-vulkan` and run its
       opt-in test on a capable hosted runner, retaining at least one non-skipped
       passing result; a local capability skip validates registration only and
@@ -89,35 +94,39 @@ depends_on:
       check.
 
 ## Docs
-- [ ] Update `tests/README.md` and `docs/architecture/test-strategy.md` with the
+- [x] Update `tests/README.md` and `docs/architecture/test-strategy.md` with the
       corrected CPU/GPU ownership and replace the stale `HARDEN-042` follow-up
       reference with `BUG-106`.
 - [ ] Update task/category indexes and regenerate `tasks/SESSION-BRIEF.md` on
       retirement.
 
 ## Acceptance criteria
-- [ ] Every affected GoogleTest case has one canonical executable owner and no
+- [x] Every affected GoogleTest case has one canonical executable owner and no
       test body was deleted or weakened.
-- [ ] All 212 CPU-oriented mixed-target definitions and the twenty MockDevice
+- [x] All 212 CPU-oriented mixed-target definitions and the twenty MockDevice
       unit definitions are selected by the default CPU-supported gate.
-- [ ] The one real Vulkan readback definition remains selected by the intended
+- [x] The one real Vulkan readback definition remains selected by the intended
       `gpu;vulkan` lane and not by the CPU lane.
 - [ ] At least one retained `ci-vulkan` result executes the dedicated readback
       test non-skipped and passes; registration-only or capability-skip evidence
       is not sufficient.
-- [ ] `Test.RuntimeFrameLoopContract.cpp` is compiled and executed exactly once
+- [x] `Test.RuntimeFrameLoopContract.cpp` is compiled and executed exactly once
       per complete configured test run.
-- [ ] Build-aggregate inventories and CTest label selection are mechanically
+- [x] Build-aggregate inventories and CTest label selection are mechanically
       consistent and fail closed on a synthetic mismatch.
 
 ## Verification
 ```bash
 cmake --preset ci --fresh
 cmake --build --preset ci --target IntrinsicCpuTests
-python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci
+python3 tests/regression/tooling/Test.TestGateRouting.py \
+  --build-dir build/ci --aggregate IntrinsicCpuTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 cmake --preset ci-vulkan --fresh
-cmake --build --preset ci-vulkan --target IntrinsicGpuVulkanTests
+cmake --build --preset ci-vulkan \
+  --target IntrinsicGpuVulkanTests IntrinsicRuntimeGpuReadbackSmokeTests
+python3 tests/regression/tooling/Test.TestGateRouting.py \
+  --build-dir build/ci-vulkan --aggregate IntrinsicGpuVulkanTests
 ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -LE 'flaky-quarantine' --no-tests=error --timeout 120
 python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict

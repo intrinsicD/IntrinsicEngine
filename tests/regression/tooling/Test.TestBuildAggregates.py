@@ -11,11 +11,19 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 TEST_MODULE = REPO_ROOT / "cmake" / "IntrinsicTest.cmake"
 
 
-def _configure_fixture(root: Path, body: str) -> subprocess.CompletedProcess[str]:
+def _configure_fixture(
+    root: Path,
+    body: str,
+    files: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     source = root / "source"
     build = root / "build"
     source.mkdir()
     (source / "main.cpp").write_text("int main() { return 0; }\n", encoding="utf-8")
+    for relative_path, contents in (files or {}).items():
+        path = source / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(contents, encoding="utf-8")
     (source / "CMakeLists.txt").write_text(
         textwrap.dedent(
             f"""\
@@ -149,8 +157,7 @@ class TestBuildAggregateTests(unittest.TestCase):
                     }
                     for target in registrations:
                         present = any(
-                            dependency == target
-                            or dependency.endswith(f"/{target}")
+                            dependency == target or dependency.endswith(f"/{target}")
                             for dependency in dependencies
                         )
                         if target in members:
@@ -159,12 +166,134 @@ class TestBuildAggregateTests(unittest.TestCase):
                             self.assertFalse(present, target)
 
             registry_lines = (
-                build
-                / "test-inventories"
-                / "RegisteredTestTargets.tsv"
-            ).read_text(encoding="utf-8").splitlines()
+                (build / "test-inventories" / "RegisteredTestTargets.tsv")
+                .read_text(encoding="utf-8")
+                .splitlines()
+            )
             self.assertEqual(registry_lines[0], "target\tlabels")
             self.assertEqual(len(registry_lines), len(registrations) + 1)
+
+    def test_source_registry_records_object_library_ownership(self) -> None:
+        body = """
+            add_library(AlphaObjs OBJECT
+                Test.Alpha.cpp
+                support/Assertions.cpp
+            )
+            add_executable(AlphaTarget main.cpp)
+            target_link_libraries(AlphaTarget PRIVATE AlphaObjs)
+            intrinsic_register_test_executable(
+                TARGET AlphaTarget
+                LABELS unit core
+                OBJECTS AlphaObjs
+            )
+
+            add_library(LegacyObjs OBJECT nested/Test_Legacy.cpp)
+            add_executable(LegacyTarget main.cpp)
+            target_link_libraries(LegacyTarget PRIVATE LegacyObjs)
+            intrinsic_register_test_executable(
+                TARGET LegacyTarget
+                LABELS regression build
+                OBJECTS LegacyObjs
+            )
+            intrinsic_write_test_registry()
+        """
+        files = {
+            "Test.Alpha.cpp": "void alpha_test_fixture() {}\n",
+            "nested/Test_Legacy.cpp": "void legacy_test_fixture() {}\n",
+            "support/Assertions.cpp": "void assertion_support() {}\n",
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = _configure_fixture(root, body, files)
+            self.assertEqual(result.returncode, 0, msg=result.stdout)
+            inventory = (
+                root / "build" / "test-inventories" / "RegisteredTestSources.tsv"
+            ).read_text(encoding="utf-8")
+            self.assertEqual(
+                inventory.splitlines(),
+                [
+                    "source\tobject_library\ttarget",
+                    "Test.Alpha.cpp\tAlphaObjs\tAlphaTarget",
+                    "nested/Test_Legacy.cpp\tLegacyObjs\tLegacyTarget",
+                ],
+            )
+
+    def test_duplicate_source_owners_fail_configure(self) -> None:
+        body = """
+            add_library(FirstObjs OBJECT Test.Shared.cpp)
+            add_library(SecondObjs OBJECT Test.Shared.cpp)
+            add_executable(FirstTarget main.cpp)
+            add_executable(SecondTarget main.cpp)
+            intrinsic_register_test_executable(
+                TARGET FirstTarget LABELS unit OBJECTS FirstObjs)
+            intrinsic_register_test_executable(
+                TARGET SecondTarget LABELS unit OBJECTS SecondObjs)
+        """
+
+        with tempfile.TemporaryDirectory() as tmp:
+            result = _configure_fixture(
+                Path(tmp),
+                body,
+                {"Test.Shared.cpp": "void shared_test_fixture() {}\n"},
+            )
+            self.assertNotEqual(result.returncode, 0, msg=result.stdout)
+            self.assertIn(
+                "Assertion-bearing test source 'Test.Shared.cpp' is already owned",
+                result.stdout,
+            )
+            self.assertIn("'FirstTarget'", result.stdout)
+            self.assertIn("'SecondTarget'", result.stdout)
+
+    def test_reused_object_library_fails_configure(self) -> None:
+        body = """
+            add_library(SharedObjs OBJECT Test.Shared.cpp)
+            add_executable(FirstTarget main.cpp)
+            add_executable(SecondTarget main.cpp)
+            intrinsic_register_test_executable(
+                TARGET FirstTarget LABELS unit OBJECTS SharedObjs)
+            intrinsic_register_test_executable(
+                TARGET SecondTarget LABELS unit OBJECTS SharedObjs)
+        """
+
+        with tempfile.TemporaryDirectory() as tmp:
+            result = _configure_fixture(
+                Path(tmp),
+                body,
+                {"Test.Shared.cpp": "void shared_test_fixture() {}\n"},
+            )
+            self.assertNotEqual(result.returncode, 0, msg=result.stdout)
+            self.assertIn(
+                "Assertion-bearing test source 'Test.Shared.cpp' is already owned",
+                result.stdout,
+            )
+            self.assertIn("object library 'SharedObjs'", result.stdout)
+
+    def test_same_executable_duplicate_source_fails_configure(self) -> None:
+        body = """
+            add_library(FirstObjs OBJECT Test.Shared.cpp)
+            add_library(SecondObjs OBJECT Test.Shared.cpp)
+            add_executable(TestTarget main.cpp)
+            intrinsic_register_test_executable(
+                TARGET TestTarget
+                LABELS unit
+                OBJECTS FirstObjs SecondObjs
+            )
+        """
+
+        with tempfile.TemporaryDirectory() as tmp:
+            result = _configure_fixture(
+                Path(tmp),
+                body,
+                {"Test.Shared.cpp": "void shared_test_fixture() {}\n"},
+            )
+            self.assertNotEqual(result.returncode, 0, msg=result.stdout)
+            self.assertIn(
+                "Assertion-bearing test source 'Test.Shared.cpp' is already owned",
+                result.stdout,
+            )
+            self.assertIn("object library 'FirstObjs'", result.stdout)
+            self.assertIn("through 'SecondObjs'", result.stdout)
 
     def test_invalid_registration_and_aggregate_metadata_fail_configure(self) -> None:
         cases = {
@@ -190,6 +319,17 @@ class TestBuildAggregateTests(unittest.TestCase):
             "non-executable target": """
                 add_library(TestTarget STATIC main.cpp)
                 intrinsic_register_test_executable(TARGET TestTarget LABELS unit)
+            """,
+            "missing object library": """
+                add_executable(TestTarget main.cpp)
+                intrinsic_register_test_executable(
+                    TARGET TestTarget LABELS unit OBJECTS MissingObjs)
+            """,
+            "non-object source target": """
+                add_library(SourceTarget STATIC main.cpp)
+                add_executable(TestTarget main.cpp)
+                intrinsic_register_test_executable(
+                    TARGET TestTarget LABELS unit OBJECTS SourceTarget)
             """,
             "unknown aggregate label": """
                 add_executable(TestTarget main.cpp)

@@ -5800,3 +5800,32 @@ tree:
       30. The experiment confirms BUG-107 and establishes it as a prerequisite
       for stable touched-scope and source-coverage evidence.
     status: resolved
+  - id: N248
+    type: experiment
+    title: "Wire BUG-106 capability routing into the required CI lanes"
+    provenance: ai-executed
+    timestamp: "2026-07-17T09:03+02:00"
+    also_depends_on: [N237, N247]
+    evidence:
+      - ".github/workflows/ci-linux-clang.yml"
+      - ".github/workflows/ci-vulkan.yml"
+      - "tests/regression/tooling/Test.WorkflowConcurrency.py"
+      - "tests/README.md"
+      - "docs/architecture/test-strategy.md"
+      - "python3 tests/regression/tooling/Test.WorkflowConcurrency.py"
+      - "python3 tests/regression/tooling/Test.TestGateRouting.py --self-test"
+      - "python3 tools/ci/check_workflow_names.py --root .github/workflows"
+      - "python3 tools/docs/check_doc_links.py --root . --strict"
+      - "bash -n over the extracted operational Vulkan workflow script"
+    result: >
+      Replaced ci-linux's incomplete hard-coded CPU prerequisite list with the
+      generated IntrinsicCpuTests inventory and added live aggregate
+      reconciliation to both CPU and Vulkan jobs. Routed the dedicated readback
+      smoke with two Sandbox contracts through one timed Xvfb/lavapipe batch,
+      excluded that exact set from the generic capability-skipping batch,
+      retained JUnit, and made absent, skipped, or failed readback evidence
+      fatal. Static workflow, routing self-test, Python format/lint, shell
+      syntax, and strict documentation-link checks passed. No configure, build,
+      CTest, or hosted operational run was performed in this delegated lane;
+      integrated BUG-106 verification remains open.
+    status: resolved

@@ -97,26 +97,17 @@ jobs:
       - name: Validate layering (strict mode)
         run: python3 tools/repo/check_layering.py --root src --strict
 
+      - name: Reconcile CPU test routing
+        run: |
+          python3 tests/regression/tooling/Test.TestGateRouting.py \
+            --build-dir build/ci \
+            --aggregate IntrinsicCpuTests
+
       - name: Run full CPU test suite
         run: |
           python3 tools/ci/check_prerequisites.py test-binaries \
             --build-dir build/ci \
-            --skip-undeclared \
-            --targets \
-              IntrinsicCoreTests \
-              IntrinsicECSTests \
-              IntrinsicContractBuildTests \
-              IntrinsicEcsContractTests \
-              IntrinsicGeometryTests \
-              IntrinsicAssetUnitTests \
-              IntrinsicCoreWrapperUnitTests \
-              IntrinsicPlatformTests \
-              IntrinsicGraphicsAssetsUnitTests \
-              IntrinsicGraphicsRhiCpuUnitTests \
-              IntrinsicGraphicsRendererCpuUnitTests \
-              IntrinsicGraphicsContractTests \
-              IntrinsicGraphicsContractCpuTests \
-              IntrinsicRuntimeGraphicsCpuTests
+            --inventory build/ci/test-inventories/IntrinsicCpuTests.txt
           python3 tools/ci/time_command.py \
             --label "Run full CPU test suite" \
             --json-out build/ci/ci-timing/phases/test.json \

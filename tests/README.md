@@ -46,6 +46,31 @@ undeclared/duplicate labels, duplicate registrations, non-executable producers,
 or empty aggregates. `IntrinsicTests` remains the complete local/default
 correctness target.
 
+The same directory contains two tab-separated audit inventories.
+`RegisteredTestTargets.tsv` records each CTest executable and its sorted labels.
+`RegisteredTestSources.tsv` has the header columns `source`, `object_library`,
+and `target`, and records one sorted row for every repository `Test.*.cpp` or
+compatibility `Test_*.cpp` source, the object library that compiles it, and its
+sole registered CTest executable. Registering the same assertion-bearing source
+to a second executable fails configuration, even when both executables reuse
+the same object library. Support sources that do not match the test-source
+naming policy are intentionally omitted.
+
+After an aggregate is built, `Test.TestGateRouting.py` reconciles those
+inventories with the aggregate file, CTest JSON discovery, and each included
+GoogleTest executable's expanded case list. It fails closed on source/case
+duplication, label or aggregate drift, missing binaries, and missing or extra
+CTest cases. `Test.TestGateRouting.baseline.tsv` additionally pins the exact
+233 BUG-106 affected target/case identities so deleting or renaming a test
+cannot shrink both live inventories into a false green:
+
+```bash
+python3 tests/regression/tooling/Test.TestGateRouting.py \
+  --build-dir build/ci --aggregate IntrinsicCpuTests
+python3 tests/regression/tooling/Test.TestGateRouting.py \
+  --build-dir build/ci-vulkan --aggregate IntrinsicGpuVulkanTests
+```
+
 Use `slow` for valid tests that should not run in fast PR or default local CPU
 correctness gates, including executables that boot the full headless engine,
 initialize Vulkan in a non-`gpu`-only path, run benchmark/SLO thresholds, or
@@ -72,6 +97,29 @@ headless loop coverage, or guard a born-closed configured/live window with the
 established `ShouldClose() -> GTEST_SKIP()` pattern before asserting per-frame
 effects. Without one of those choices, headless GLFW hosts execute zero frames
 and report unrelated assertion failures instead of an explicit environment skip.
+
+## Capability-truthful target ownership
+
+Executable labels describe requirements shared by every case in that
+executable. CPU/mock tests therefore do not share an executable with a test
+that requires a live Vulkan backend. The corrected graphics/runtime topology is:
+
+| Executable | Canonical ownership |
+| --- | --- |
+| `IntrinsicRuntimeIntegrationTests` | Six runtime/core/assets CPU sources, 104 cases, labeled `integration;runtime` |
+| `IntrinsicRuntimeContractTests` | Sole CPU owner of the 25 `CoreGraphInterfaces` and `RuntimeEngineLayering` cases, labeled `contract;runtime` |
+| `IntrinsicRuntimeGraphicsCpuTests` | Sole owner of `RuntimeFrameLoopContract` and its nine cases, labeled `integration;runtime;graphics` |
+| `IntrinsicGraphicsIntegrationCpuTests` | Three MockDevice graphics integration sources, 74 cases, labeled `integration;graphics` |
+| `IntrinsicGraphicsUnitTests` | Three MockDevice unit sources, 20 cases, labeled `unit;graphics` |
+| `IntrinsicRuntimeGpuReadbackSmokeTests` | The one real readback case, labeled `gpu;vulkan;integration;runtime;graphics;slow` |
+
+`IntrinsicRuntimeGpuReadbackSmokeTests` retains `slow`: current Linux-clang
+measurements exceed the documented one-second threshold. Its
+`GpuReadbackJobGpuSmoke.VulkanTransferReadbackWritesPropertyAndFollowUpUploadsDerivedColor`
+case remains outside the fast GPU aggregate, but `ci-vulkan` builds it
+explicitly and runs it under Xvfb with lavapipe alongside the two operational
+Sandbox contracts. The retained JUnit artifact is parsed in the job; an absent,
+skipped, or failed readback result fails the gate.
 
 Common gates:
 
@@ -132,17 +180,17 @@ the Slice 1/2 `RuntimeSandboxAcceptance.*` cases in
 
 `ExtrinsicSandbox.VulkanShutdownLsanContract` is the BUG-083 process-level
 regression (`gpu;vulkan;regression;runtime;graphics`). It is intentionally run
-under Xvfb/lavapipe in `ci-vulkan`, enables LeakSanitizer for an exact five-frame
-Sandbox process, requires five renderer-completed samples and an operational
-final device, then requires a clean process exit. Its first subprocess reuses
-the BUG-082 standalone helper and must still report the named 4096-byte
-synthetic engine leak under the same three-entry suppression file. GoogleTest
-binaries embed no default suppressions; the three entries are scoped to this
-runner.
+under Xvfb/lavapipe in the same operational `ci-vulkan` batch as the readback
+smoke, enables LeakSanitizer for an exact five-frame Sandbox process, requires
+five renderer-completed samples and an operational final device, then requires
+a clean process exit. Its first subprocess reuses the BUG-082 standalone helper
+and must still report the named 4096-byte synthetic engine leak under the same
+three-entry suppression file. GoogleTest binaries embed no default
+suppressions; the three entries are scoped to this runner.
 
 ```bash
 ctest --test-dir build/ci-vulkan --output-on-failure \
-  -R '^ExtrinsicSandbox\.VulkanShutdownLsanContract$' \
+  -R '^(ExtrinsicSandbox\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)|GpuReadbackJobGpuSmoke\.VulkanTransferReadbackWritesPropertyAndFollowUpUploadsDerivedColor)$' \
   -L 'gpu' -L 'vulkan' --no-tests=error --timeout 180
 ```
 

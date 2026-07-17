@@ -68,7 +68,7 @@ function(intrinsic_validate_test_labels)
 endfunction()
 
 function(intrinsic_register_test_executable)
-    cmake_parse_arguments(ARG "" "TARGET" "LABELS" ${ARGN})
+    cmake_parse_arguments(ARG "" "TARGET" "LABELS;OBJECTS" ${ARGN})
     if(ARG_UNPARSED_ARGUMENTS)
         message(FATAL_ERROR
             "Test target registration has unexpected arguments: "
@@ -110,6 +110,139 @@ function(intrinsic_register_test_executable)
     )
     set(_intrinsic_labels "${ARG_LABELS}")
     list(SORT _intrinsic_labels)
+
+    set(_intrinsic_source_root "${CMAKE_SOURCE_DIR}")
+    cmake_path(NORMAL_PATH _intrinsic_source_root)
+    foreach(_intrinsic_object IN LISTS ARG_OBJECTS)
+        if(NOT TARGET "${_intrinsic_object}")
+            message(FATAL_ERROR
+                "CTest producer '${ARG_TARGET}' names missing object library "
+                "'${_intrinsic_object}'"
+            )
+        endif()
+        get_target_property(
+            _intrinsic_object_type
+            "${_intrinsic_object}"
+            TYPE
+        )
+        if(NOT _intrinsic_object_type STREQUAL "OBJECT_LIBRARY")
+            message(FATAL_ERROR
+                "CTest producer '${ARG_TARGET}' source owner "
+                "'${_intrinsic_object}' must be an OBJECT_LIBRARY target, "
+                "got ${_intrinsic_object_type}"
+            )
+        endif()
+
+        get_target_property(
+            _intrinsic_object_sources
+            "${_intrinsic_object}"
+            SOURCES
+        )
+        if(NOT _intrinsic_object_sources)
+            message(FATAL_ERROR
+                "CTest object library '${_intrinsic_object}' has no SOURCES metadata"
+            )
+        endif()
+        get_target_property(
+            _intrinsic_object_source_dir
+            "${_intrinsic_object}"
+            SOURCE_DIR
+        )
+
+        foreach(_intrinsic_source IN LISTS _intrinsic_object_sources)
+            get_filename_component(
+                _intrinsic_source_basename
+                "${_intrinsic_source}"
+                NAME
+            )
+            if(NOT _intrinsic_source_basename MATCHES "^Test\\..*\\.cpp$"
+               AND NOT _intrinsic_source_basename MATCHES "^Test_.*\\.cpp$")
+                continue()
+            endif()
+
+            set(_intrinsic_absolute_source "${_intrinsic_source}")
+            cmake_path(
+                ABSOLUTE_PATH _intrinsic_absolute_source
+                BASE_DIRECTORY "${_intrinsic_object_source_dir}"
+                NORMALIZE
+            )
+            cmake_path(
+                IS_PREFIX _intrinsic_source_root
+                "${_intrinsic_absolute_source}"
+                NORMALIZE
+                _intrinsic_is_repository_source
+            )
+            if(NOT _intrinsic_is_repository_source)
+                continue()
+            endif()
+            cmake_path(
+                RELATIVE_PATH _intrinsic_absolute_source
+                BASE_DIRECTORY "${_intrinsic_source_root}"
+                OUTPUT_VARIABLE _intrinsic_normalized_source
+            )
+
+            string(
+                SHA256
+                _intrinsic_source_key
+                "${_intrinsic_normalized_source}"
+            )
+            get_property(
+                _intrinsic_existing_source
+                GLOBAL
+                PROPERTY "INTRINSIC_TEST_SOURCE_${_intrinsic_source_key}"
+            )
+            if(_intrinsic_existing_source
+               AND NOT _intrinsic_existing_source
+                   STREQUAL "${_intrinsic_normalized_source}")
+                message(FATAL_ERROR
+                    "CTest source registry hash collision between "
+                    "'${_intrinsic_existing_source}' and "
+                    "'${_intrinsic_normalized_source}'"
+                )
+            endif()
+            get_property(
+                _intrinsic_existing_owner
+                GLOBAL
+                PROPERTY "INTRINSIC_TEST_SOURCE_OWNER_${_intrinsic_source_key}"
+            )
+            get_property(
+                _intrinsic_existing_object
+                GLOBAL
+                PROPERTY "INTRINSIC_TEST_SOURCE_OBJECT_${_intrinsic_source_key}"
+            )
+            if(_intrinsic_existing_owner)
+                message(FATAL_ERROR
+                    "Assertion-bearing test source "
+                    "'${_intrinsic_normalized_source}' is already owned by "
+                    "CTest executable '${_intrinsic_existing_owner}' through "
+                    "object library '${_intrinsic_existing_object}'; cannot "
+                    "register it to '${ARG_TARGET}' through "
+                    "'${_intrinsic_object}'"
+                )
+            endif()
+
+            set_property(
+                GLOBAL
+                PROPERTY "INTRINSIC_TEST_SOURCE_${_intrinsic_source_key}"
+                "${_intrinsic_normalized_source}"
+            )
+            set_property(
+                GLOBAL
+                PROPERTY "INTRINSIC_TEST_SOURCE_OWNER_${_intrinsic_source_key}"
+                "${ARG_TARGET}"
+            )
+            set_property(
+                GLOBAL
+                PROPERTY "INTRINSIC_TEST_SOURCE_OBJECT_${_intrinsic_source_key}"
+                "${_intrinsic_object}"
+            )
+            set_property(
+                GLOBAL APPEND
+                PROPERTY INTRINSIC_REGISTERED_TEST_SOURCE_RECORDS
+                "${_intrinsic_normalized_source}\t${_intrinsic_object}\t${ARG_TARGET}"
+            )
+        endforeach()
+    endforeach()
 
     set_property(
         TARGET "${ARG_TARGET}"
@@ -165,6 +298,28 @@ function(intrinsic_write_test_registry)
         WRITE
         "${INTRINSIC_TEST_INVENTORY_DIR}/RegisteredTestTargets.tsv"
         "${_intrinsic_registry}"
+    )
+
+    get_property(
+        _intrinsic_source_records
+        GLOBAL
+        PROPERTY INTRINSIC_REGISTERED_TEST_SOURCE_RECORDS
+    )
+    if(_intrinsic_source_records)
+        list(REMOVE_DUPLICATES _intrinsic_source_records)
+        list(SORT _intrinsic_source_records)
+    endif()
+    set(_intrinsic_source_registry "source\tobject_library\ttarget\n")
+    foreach(_intrinsic_source_record IN LISTS _intrinsic_source_records)
+        string(APPEND
+            _intrinsic_source_registry
+            "${_intrinsic_source_record}\n"
+        )
+    endforeach()
+    file(
+        WRITE
+        "${INTRINSIC_TEST_INVENTORY_DIR}/RegisteredTestSources.tsv"
+        "${_intrinsic_source_registry}"
     )
 endfunction()
 

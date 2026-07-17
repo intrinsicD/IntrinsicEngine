@@ -74,6 +74,10 @@ function(intrinsic_test_executable name)
         intrinsic_register_test_executable(
             TARGET ${name}
             LABELS ${ARG_LABELS}
+            OBJECTS ${ARG_OBJECTS}
+        )
+        set_target_properties(${name} PROPERTIES
+            INTRINSIC_GTEST_DISCOVERED TRUE
         )
         set(_intrinsic_test_labels "${ARG_LABELS}")
         string(REPLACE ";" "\\\\\\\\;" _intrinsic_test_labels "${_intrinsic_test_labels}")
@@ -228,6 +232,7 @@ if(TARGET ExtrinsicRuntime)
     )
 
     set(_runtime_contract_test_files
+        Test.CoreGraphInterfaces.cpp
         Test.GpuAssetCacheFallbackBootstrap.cpp
         Test.AsyncBufferReadback.cpp
         Test.KMeansGpuBackend.cpp
@@ -276,6 +281,7 @@ if(TARGET ExtrinsicRuntime)
         Test.RuntimeCameraControllers.cpp
         Test.RuntimeConfigControlFacade.cpp
         Test.RuntimeEngineConfigBoot.cpp
+        Test.RuntimeEngineLayering.cpp
         Test.RuntimeEnginePrivateGlue.cpp
         Test.RuntimeInputActions.cpp
         Test.RuntimeRenderRecipeActivation.cpp
@@ -751,10 +757,8 @@ intrinsic_test_object_lib(GraphicsRendererCpuUnitTestObjs
 )
 
 # Graphics-assets bridge tests — pure CPU mock-driven, no real GPU.
-# Kept in a separate object lib + target so they carry only `unit graphics`
-# labels and participate in the default CPU-supported correctness gate
-# (the existing GraphicsUnitTestObjs target inherits HARDEN-041 `gpu`/`vulkan`
-# label debt that excludes it from the CPU gate).
+# Kept in a separate object lib + target because their asset/cache link closure
+# differs from the RHI-manager MockDevice unit target.
 set(_graphics_assets_unit_test_files
     Test.GpuAssetCache.cpp
 )
@@ -879,33 +883,59 @@ intrinsic_test_object_lib(RuntimeGraphicsCpuTestObjs
     DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicRHI ExtrinsicECS ExtrinsicCore ExtrinsicPlatform glm::glm
 )
 
-# Promoted integration checks that survived the legacy test-consumer cleanup.
-# These sources import only `Extrinsic.*`/`Geometry.*` modules and no longer
-# depend on the deleted `src/legacy` subtree.
-if(TARGET ExtrinsicRuntime AND TARGET ExtrinsicBackendsVulkan)
-    set(_runtime_integration_test_files
+# Promoted CPU integration checks that survived the legacy test-consumer
+# cleanup. Their dependency set is runtime/assets/core only.
+if(TARGET ExtrinsicRuntime)
+    set(_runtime_integration_cpu_test_files
         Test.AssetLoadPipeline.cpp
         Test.AssetService.cpp
         Test.CoreFrameGraphParallel.cpp
-        Test.CoreGraphInterfaces.cpp
         Test.CoreGraphStress.cpp
         Test.CoreProcess.cpp
-        Test.RuntimeFrameLoopContract.cpp
-        Test.GpuReadbackJobGpuSmoke.cpp
-        Test.RuntimeEngineLayering.cpp
         Test.RuntimeStreamingExecutor.cpp
+    )
+    intrinsic_resolve_test_sources(_runtime_integration_cpu_test_sources
+        SEARCH_DIRS integration/runtime
+        FILES ${_runtime_integration_cpu_test_files}
+    )
+    intrinsic_test_object_lib(RuntimeIntegrationCpuTestObjs
+        SOURCES
+            ${_runtime_integration_cpu_test_sources}
+        DEPS ExtrinsicRuntime ExtrinsicAssets ExtrinsicCore
+    )
+endif()
+
+# Mock-driven graphics integration tests require renderer/RHI symbols but no
+# live graphics backend or Runtime link closure.
+if(TARGET ExtrinsicGraphics)
+    set(_graphics_integration_cpu_test_files
         Test.GpuWorldAndCulling.cpp
         Test.RenderGraphLegacy.cpp
         Test.RendererLegacy.cpp
     )
-    intrinsic_resolve_test_sources(_runtime_integration_test_sources
-        SEARCH_DIRS integration/runtime contract/runtime integration/graphics
-        FILES ${_runtime_integration_test_files}
+    intrinsic_resolve_test_sources(_graphics_integration_cpu_test_sources
+        SEARCH_DIRS integration/graphics
+        FILES ${_graphics_integration_cpu_test_files}
     )
-    intrinsic_test_object_lib(RuntimeIntegrationTestObjs
+    intrinsic_test_object_lib(GraphicsIntegrationCpuTestObjs
         SOURCES
-            ${_runtime_integration_test_sources}
-        DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore glm::glm
+            ${_graphics_integration_cpu_test_sources}
+        DEPS ExtrinsicGraphics ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform glm::glm
+    )
+endif()
+
+# The one operational readback case owns the Vulkan/GLFW capability boundary.
+if(TARGET ExtrinsicRuntime
+   AND TARGET ExtrinsicBackendsVulkan
+   AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
+    intrinsic_resolve_test_sources(_runtime_gpu_readback_smoke_test_sources
+        SEARCH_DIRS integration/runtime
+        FILES Test.GpuReadbackJobGpuSmoke.cpp
+    )
+    intrinsic_test_object_lib(RuntimeGpuReadbackSmokeTestObjs
+        SOURCES
+            ${_runtime_gpu_readback_smoke_test_sources}
+        DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore IntrinsicGeometry glm::glm
     )
 endif()
 
@@ -920,11 +950,19 @@ intrinsic_test_object_lib(TestSupportObjs
 # Executable targets — link pre-compiled objects, no recompilation
 # =============================================================================
 
-if(TARGET RuntimeIntegrationTestObjs)
+if(TARGET RuntimeIntegrationCpuTestObjs)
     intrinsic_test_executable(IntrinsicRuntimeIntegrationTests
-        OBJECTS RuntimeIntegrationTestObjs
-        LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore
-        LABELS integration runtime graphics gpu vulkan slow
+        OBJECTS RuntimeIntegrationCpuTestObjs
+        LINK_LIBS ExtrinsicRuntime ExtrinsicAssets ExtrinsicCore
+        LABELS integration runtime
+    )
+endif()
+
+if(TARGET GraphicsIntegrationCpuTestObjs)
+    intrinsic_test_executable(IntrinsicGraphicsIntegrationCpuTests
+        OBJECTS GraphicsIntegrationCpuTestObjs
+        LINK_LIBS ExtrinsicGraphics ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
+        LABELS integration graphics
     )
 endif()
 
@@ -1117,6 +1155,14 @@ if(TARGET RuntimeKMeansGpuSmokeTestObjs)
     intrinsic_add_glsl_shaders(IntrinsicRuntimeKMeansGpuSmokeTests)
 endif()
 
+if(TARGET RuntimeGpuReadbackSmokeTestObjs)
+    intrinsic_test_executable(IntrinsicRuntimeGpuReadbackSmokeTests
+        OBJECTS RuntimeGpuReadbackSmokeTestObjs
+        LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore IntrinsicGeometry
+        LABELS gpu vulkan integration runtime graphics slow
+    )
+endif()
+
 if(TARGET ExtrinsicSandbox
    AND INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN
    AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
@@ -1165,7 +1211,7 @@ endif()
 intrinsic_test_executable(IntrinsicGraphicsUnitTests
     OBJECTS GraphicsUnitTestObjs
     LINK_LIBS ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
-    LABELS unit graphics gpu vulkan
+    LABELS unit graphics
 )
 
 # CPU-only graphics tests — runs in the default CPU gate.
@@ -1230,11 +1276,23 @@ if(_intrinsic_registered_test_targets)
             "${_intrinsic_label_target}"
             INTRINSIC_CTEST_LABELS
         )
+        get_target_property(
+            _intrinsic_gtest_discovered
+            "${_intrinsic_label_target}"
+            INTRINSIC_GTEST_DISCOVERED
+        )
         string(APPEND _intrinsic_label_fixup_script
             "if(DEFINED ${_intrinsic_label_target}_TESTS)\n"
             "  set_tests_properties($\{${_intrinsic_label_target}_TESTS} PROPERTIES LABELS \"${_intrinsic_label_value}\")\n"
             "endif()\n"
         )
+        if(_intrinsic_gtest_discovered)
+            string(APPEND _intrinsic_label_fixup_script
+                "if(NOT EXISTS \"$<TARGET_FILE:${_intrinsic_label_target}>\")\n"
+                "  set_tests_properties(${_intrinsic_label_target}_NOT_BUILT PROPERTIES LABELS \"${_intrinsic_label_value}\")\n"
+                "endif()\n"
+            )
+        endif()
     endforeach()
     set(_intrinsic_label_fixup_file "${CMAKE_CURRENT_BINARY_DIR}/IntrinsicTestLabelFixups.cmake")
     file(GENERATE OUTPUT "${_intrinsic_label_fixup_file}" CONTENT "${_intrinsic_label_fixup_script}")

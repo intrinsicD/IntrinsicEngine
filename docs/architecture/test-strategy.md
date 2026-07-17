@@ -95,7 +95,65 @@ Operational expectations:
   ctest --test-dir build/ci --output-on-failure -L 'gpu|vulkan' --timeout 60
   ```
 
+- The hosted `ci-vulkan` job gives tests that require non-skipped operational
+  evidence a separate Xvfb/lavapipe lane. Capability-skipping smoke tests remain
+  in the generic opt-in batch; the operational lane retains JUnit and fails when
+  its required readback case is absent, skipped, or not passed.
+
 - `flaky-quarantine` must not be used as a broad skip. Each quarantined test requires a task ID, a reason, and a removal condition.
+
+## Registry and aggregate integrity
+
+`cmake/IntrinsicTest.cmake` writes three forms of configure-time evidence under
+`build/<preset>/test-inventories/`:
+
+- `RegisteredTestTargets.tsv` maps each registered CTest executable to its
+  sorted label set.
+- `RegisteredTestSources.tsv`, with header columns `source`, `object_library`,
+  and `target`, maps every repository `Test.*.cpp` or compatibility
+  `Test_*.cpp` source to the object library that compiles it and its one
+  registered executable owner.
+- Each canonical aggregate has a one-target-per-line `<aggregate>.txt`
+  inventory derived from the registry's exact label policy.
+
+The registry rejects a second executable owner for an assertion-bearing source,
+including reuse through the same object library. After a build,
+`tests/regression/tooling/Test.TestGateRouting.py` independently reselects an
+aggregate from target labels and reconciles its inventory, CTest JSON discovery,
+and expanded `--gtest_list_tests` output. Duplicate raw cases or CTest filters,
+missing/extra aggregate members, label drift, missing binaries, and
+GoogleTest/CTest case mismatches fail closed. Its committed
+`Test.TestGateRouting.baseline.tsv` pins all 233 affected target/case identities
+against simultaneous shrinkage of the live inventories. The required CI lanes
+run it for both `IntrinsicCpuTests` and `IntrinsicGpuVulkanTests` before CTest
+execution.
+
+## Capability routing
+
+Labels apply to whole CTest executables, so every case in an executable must
+share the declared capability requirements. The BUG-106 correction routes the
+former mixed graphics/runtime set as follows:
+
+- `IntrinsicRuntimeIntegrationTests` owns six CPU sources and 104 cases under
+  `integration;runtime`.
+- `IntrinsicRuntimeContractTests` owns the 25 `CoreGraphInterfaces` and
+  `RuntimeEngineLayering` cases under `contract;runtime`.
+- `IntrinsicRuntimeGraphicsCpuTests` is the sole owner of
+  `RuntimeFrameLoopContract` and its nine cases under
+  `integration;runtime;graphics`.
+- `IntrinsicGraphicsIntegrationCpuTests` owns three MockDevice integration
+  sources and 74 cases under `integration;graphics`.
+- `IntrinsicGraphicsUnitTests` owns three MockDevice unit sources and 20 cases
+  under `unit;graphics`.
+- `IntrinsicRuntimeGpuReadbackSmokeTests` owns only
+  `GpuReadbackJobGpuSmoke.VulkanTransferReadbackWritesPropertyAndFollowUpUploadsDerivedColor`
+  under `gpu;vulkan;integration;runtime;graphics;slow`.
+
+The dedicated readback executable retains `slow` because current Linux-clang
+measurements exceed the one-second policy threshold. It remains outside both
+the CPU gate and fast GPU aggregate. `ci-vulkan` builds it explicitly, runs it
+under Xvfb/lavapipe with the two operational Sandbox contracts, and retains
+machine-checked JUnit proving the case executed without a skip.
 
 ## Configure identity and inventory determinism
 
@@ -119,9 +177,6 @@ and timing evidence can be attributed to the graph that produced it.
 - During migration, temporary compatibility entries in `tests/CMakeLists.txt` are allowed.
 - Reclassified tests must update both file location and labels in the same change.
 - Any temporary category mismatch must be tracked in a current task under `tasks/active/` with a removal condition.
-- HARDEN-041B registers relocated wrapper sources under taxonomy-owned targets (`IntrinsicAssetUnitTests`, `IntrinsicCoreWrapperUnitTests`, `IntrinsicGraphicsUnitTests`, `IntrinsicGraphicsContractTests`, `IntrinsicRuntimeIntegrationTests`) instead of subsystem wrapper directories.
-- Graphics/runtime relocated wrapper suites currently mix backend-facing and
-  CPU/mock coverage under executable-wide `gpu`/`vulkan` labels. The open
-  [`BUG-106`](../../tasks/backlog/bugs/BUG-106-test-gate-capability-routing-drift.md)
-  task owns the capability-truthful split/relabel and duplicate-registration
-  correction.
+- BUG-106 replaced the former mixed graphics/runtime wrapper target with the
+  capability-truthful CPU and readback topology documented above. Future moves
+  must preserve its unique source and expanded-case ownership.

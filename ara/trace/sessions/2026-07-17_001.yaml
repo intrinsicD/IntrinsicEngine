@@ -2,9 +2,9 @@ session:
   id: "2026-07-17_001"
   date: "2026-07-17"
   started: "2026-07-17T00:22+02:00"
-  last_turn: "2026-07-17T07:27+02:00"
-  turn_count: 3
-  summary: "Materialized and committed the selective-adaptation backlog, then reproduced BUG-107's clean-versus-warm CI target-graph drift."
+  last_turn: "2026-07-17T09:03+02:00"
+  turn_count: 4
+  summary: "Materialized and committed the selective-adaptation backlog, reproduced BUG-107's configure-history drift, and implemented BUG-106's workflow/documentation routing lane."
 
 events_logged:
   - turn: 1
@@ -37,6 +37,12 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Reproduced BUG-107: unchanged ci reconfigure changed registered targets from 26 to 32 and selected CPU CTest entries from 25 to 30."
+  - turn: 4
+    type: experiment
+    id: "N248"
+    routing: direct
+    provenance: ai-executed
+    summary: "Wired aggregate reconciliation and retained non-skipped readback JUnit evidence into the required CPU/Vulkan CI workflows."
 
 ai_actions:
   - turn: 1
@@ -89,6 +95,19 @@ ai_actions:
       - "ara/trace/pm_reasoning_log.yaml"
       - "ara/trace/sessions/2026-07-17_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
+  - turn: 4
+    action: "Implemented the BUG-106 workflow and documentation lane, including generated aggregate prerequisites, live routing reconciliation, operational Vulkan JUnit evidence, and focused workflow regressions."
+    provenance: ai-executed
+    files_changed:
+      - ".github/workflows/ci-linux-clang.yml"
+      - ".github/workflows/ci-vulkan.yml"
+      - "tests/regression/tooling/Test.WorkflowConcurrency.py"
+      - "tests/README.md"
+      - "docs/architecture/test-strategy.md"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-07-17_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
 
 claims_touched: []
 
@@ -99,6 +118,8 @@ key_context:
     excerpt: "User requested that all current changes be committed."
   - turn: 3
     excerpt: "BUG-107 was requested as a read-only readiness and exact-fix analysis because it must unlock CI-005 and CI-010."
+  - turn: 4
+    excerpt: "BUG-106 requires capability-truthful CPU/GPU aggregate reconciliation and retained non-skipped hosted readback evidence."
 
 open_threads:
   - "Select the next bounded architecture/runtime slice; RUNTIME-168 is the smallest reviewed private-surface candidate, while ARCH-014 remains the umbrella that gates REVIEW-003."

@@ -8,7 +8,9 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW_ROOT = REPO_ROOT / ".github" / "workflows"
-EXPECTED_GROUP = "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"
+EXPECTED_GROUP = (
+    "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"
+)
 WORKFLOWS = {
     "pr-fast.yml": ("ci-gate-timing-pr-fast", 1, True),
     "ci-linux-clang.yml": (
@@ -66,18 +68,97 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             pr_fast,
         )
 
+        _, linux = _load_workflow("ci-linux-clang.yml")
+        self.assertIn(
+            "--inventory build/ci/test-inventories/IntrinsicCpuTests.txt",
+            linux,
+        )
+        cpu_inventory_position = linux.index(
+            "--inventory build/ci/test-inventories/IntrinsicCpuTests.txt"
+        )
+        self.assertNotIn(
+            "--skip-undeclared",
+            linux[max(0, cpu_inventory_position - 120) : cpu_inventory_position],
+        )
+        self.assertIn(
+            "Test.TestGateRouting.py \\\n"
+            "            --build-dir build/ci \\\n"
+            "            --aggregate IntrinsicCpuTests",
+            linux,
+        )
+
         _, vulkan = _load_workflow("ci-vulkan.yml")
         self.assertIn(
-            "--target ExtrinsicSandbox IntrinsicGpuVulkanTests",
+            "--target ExtrinsicSandbox IntrinsicGpuVulkanTests "
+            "IntrinsicRuntimeGpuReadbackSmokeTests "
+            "IntrinsicGlfwLifecycleLsanProcess",
             vulkan,
         )
         self.assertIn(
-            "--inventory "
-            "build/ci-vulkan/test-inventories/IntrinsicGpuVulkanTests.txt",
+            "--inventory build/ci-vulkan/test-inventories/IntrinsicGpuVulkanTests.txt",
             vulkan,
         )
         self.assertNotIn(
             "--target ExtrinsicSandbox IntrinsicTests",
+            vulkan,
+        )
+        self.assertIn(
+            "Test.TestGateRouting.py \\\n"
+            "            --build-dir build/ci-vulkan \\\n"
+            "            --aggregate IntrinsicGpuVulkanTests",
+            vulkan,
+        )
+
+    def test_vulkan_workflow_retains_non_skipped_readback_evidence(self) -> None:
+        payload, vulkan = _load_workflow("ci-vulkan.yml")
+        jobs = payload.get("jobs")
+        self.assertIsInstance(jobs, dict)
+        job = jobs.get("ci-vulkan")
+        self.assertIsInstance(job, dict)
+        env = job.get("env")
+        self.assertIsInstance(env, dict)
+        self.assertEqual(
+            env.get("VULKAN_READBACK_TEST"),
+            "GpuReadbackJobGpuSmoke."
+            "VulkanTransferReadbackWritesPropertyAndFollowUpUploadsDerivedColor",
+        )
+        operational_regex = env.get("VULKAN_OPERATIONAL_TEST_REGEX")
+        self.assertIsInstance(operational_regex, str)
+        self.assertIn(
+            r"GpuReadbackJobGpuSmoke\."
+            "VulkanTransferReadbackWritesPropertyAndFollowUpUploadsDerivedColor",
+            operational_regex,
+        )
+
+        self.assertIn('-E "$VULKAN_OPERATIONAL_TEST_REGEX"', vulkan)
+        self.assertGreaterEqual(
+            vulkan.count('-R "$VULKAN_OPERATIONAL_TEST_REGEX"'),
+            2,
+        )
+        self.assertIn(
+            'if [[ "$operational_test_count" -ne 3 ]]',
+            vulkan,
+        )
+        self.assertIn(
+            '--selected-test-count "$((gpu_tests + operational_tests))"',
+            vulkan,
+        )
+        self.assertIn('--output-junit "$operational_junit"', vulkan)
+        self.assertIn(
+            'failed_outcomes = outcome_tags & {"error", "failure", "skipped"}',
+            vulkan,
+        )
+        self.assertIn(
+            "build/ci-vulkan/ci-timing/phases/test_operational_vulkan.json",
+            vulkan,
+        )
+        self.assertIn(
+            "build/ci-vulkan/ci-timing/result/operational-vulkan.junit.xml",
+            vulkan,
+        )
+        self.assertIn(
+            "--targets ExtrinsicSandbox IntrinsicRuntimeGpuReadbackSmokeTests "
+            "IntrinsicGlfwLifecycleLsanProcess",
             vulkan,
         )
 
@@ -99,8 +180,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
                 _, text = _load_workflow(name)
                 self.assertEqual(text.count("aggregate_gate_timing.py"), 1)
                 self.assertIn(
-                    "validate_benchmark_results.py --root "
-                    "build/",
+                    "validate_benchmark_results.py --root build/",
                     text,
                 )
                 self.assertIn("actions/upload-artifact@v4", text)
