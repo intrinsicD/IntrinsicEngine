@@ -122,7 +122,6 @@ function(intrinsic_grouped_test name target)
     add_test(NAME ${name}
         COMMAND $<TARGET_FILE:${target}>
             "--gtest_filter=${ARG_FILTER}"
-            "--gtest_also_run_disabled_tests"
             "--gtest_output=xml:${_intrinsic_grouped_report_dir}/${target}.xml"
     )
     set_tests_properties(${name} PROPERTIES

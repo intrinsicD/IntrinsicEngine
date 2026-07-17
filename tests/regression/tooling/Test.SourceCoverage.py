@@ -73,7 +73,6 @@ function(add_coverage_test target production_source test_source case_name)
             COMMAND
                 "${target}"
                 "--gtest_filter=*"
-                "--gtest_also_run_disabled_tests"
                 "--gtest_output=xml:${CMAKE_BINARY_DIR}/reports/grouped-ctest/gtest/${target}.xml"
         )
         set_tests_properties(

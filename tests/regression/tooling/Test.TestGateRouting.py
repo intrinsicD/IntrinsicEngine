@@ -760,9 +760,9 @@ def _verify_grouped_ctest_contract(
         for argument in command
         if argument == "--gtest_also_run_disabled_tests"
     ]
-    if disabled_switches != ["--gtest_also_run_disabled_tests"]:
+    if disabled_switches:
         raise ReconciliationError(
-            f"{expected_name} must preserve individual disabled-case execution"
+            f"{expected_name} must preserve disabled-case suppression"
         )
 
     expected_xml = (
@@ -1288,6 +1288,10 @@ OrdinarySuite.
             grouped_helper.group("body"),
             r"PROCESSORS\s+1",
         )
+        self.assertNotIn(
+            "--gtest_also_run_disabled_tests",
+            grouped_helper.group("body"),
+        )
 
     def test_duplicate_grouped_registration_is_rejected(self) -> None:
         build_dir = Path("/tmp/synthetic-build")
@@ -1298,7 +1302,6 @@ OrdinarySuite.
             "command": [
                 str(build_dir / "bin" / target),
                 "--gtest_filter=*",
-                "--gtest_also_run_disabled_tests",
                 (
                     f"--gtest_output=xml:{build_dir}/reports/grouped-ctest/"
                     f"gtest/{target}.xml"
@@ -1318,6 +1321,20 @@ OrdinarySuite.
                 },
             ],
         }
+        invalid = dict(record)
+        invalid["command"] = [
+            *record["command"],
+            "--gtest_also_run_disabled_tests",
+        ]
+        with self.assertRaisesRegex(
+            ReconciliationError, "disabled-case suppression"
+        ):
+            _verify_grouped_ctest_contract(
+                invalid,
+                target,
+                build_dir,
+                invalid["command"],
+            )
         with self.assertRaisesRegex(
             ReconciliationError, "duplicate grouped CTest registrations"
         ):

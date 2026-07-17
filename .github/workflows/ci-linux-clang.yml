@@ -27,6 +27,18 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  reject-conflicting-evidence-inputs:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.collect_test_timing &&
+      inputs.collect_grouped_ctest_evidence
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Reject conflicting evidence modes
+        run: |
+          echo "::error::collect_test_timing and collect_grouped_ctest_evidence are mutually exclusive"
+          exit 1
+
   ci-linux-clang:
     if: >-
       github.event_name != 'workflow_dispatch' ||

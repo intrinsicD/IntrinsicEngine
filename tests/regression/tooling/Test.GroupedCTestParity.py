@@ -468,15 +468,24 @@ def _compare_execution(
 
 class GroupedCTestParitySelfTests(unittest.TestCase):
     def _registration_pair(self, root: Path) -> tuple[Registration, Registration]:
-        grouped_cases = {
-            target: (f"Types/{target}Suite.Case/0",)
-            for target in sorted(GROUPED_TARGETS)
-        }
+        grouped_cases = {}
+        disabled_target = sorted(GROUPED_TARGETS)[0]
+        for target in sorted(GROUPED_TARGETS):
+            target_cases = (f"Types/{target}Suite.Case/0",)
+            if target == disabled_target:
+                target_cases += (
+                    f"Types/{target}Suite.DISABLED_Case/0",
+                )
+            grouped_cases[target] = target_cases
         cases = {**grouped_cases, "Unaffected": ("Values/Suite.Case/0",)}
         individual_names = {
             f"{target}.Pretty": (target, target_cases[0])
             for target, target_cases in grouped_cases.items()
         }
+        individual_names["DisabledPretty"] = (
+            disabled_target,
+            grouped_cases[disabled_target][1],
+        )
         individual_names["PrettyValue"] = ("Unaffected", "Values/Suite.Case/0")
         individual = Registration(
             root / "individual",
@@ -504,8 +513,17 @@ class GroupedCTestParitySelfTests(unittest.TestCase):
     def _write_junit(path: Path, names: Iterable[str]) -> None:
         root = ElementTree.Element("testsuites")
         for name in names:
+            attributes = {
+                "name": name,
+                "status": "run",
+                "result": "completed",
+            }
+            if name == "DisabledPretty":
+                attributes.update({"status": "notrun", "result": "suppressed"})
             ElementTree.SubElement(
-                root, "testcase", {"name": name, "status": "run", "result": "completed"}
+                root,
+                "testcase",
+                attributes,
             )
         ElementTree.ElementTree(root).write(path, encoding="utf-8")
 
@@ -563,6 +581,23 @@ class GroupedCTestParitySelfTests(unittest.TestCase):
                 self._write_grouped_xml(
                     report_dir / f"{target}.xml", individual.cases[target][0]
                 )
+            disabled_target = sorted(GROUPED_TARGETS)[0]
+            disabled_case = individual.cases[disabled_target][1]
+            disabled_xml = report_dir / f"{disabled_target}.xml"
+            disabled_tree = ElementTree.parse(disabled_xml)
+            classname, name = disabled_case.split(".", maxsplit=1)
+            ElementTree.SubElement(
+                disabled_tree.getroot(),
+                "testcase",
+                {
+                    "classname": classname,
+                    "name": name,
+                    "status": "notrun",
+                    "result": "suppressed",
+                },
+            )
+            disabled_tree.getroot().set("tests", "2")
+            disabled_tree.write(disabled_xml, encoding="utf-8")
             individual_junit = root / "individual.xml"
             grouped_junit = root / "grouped.xml"
             self._write_junit(individual_junit, individual.physical_names)
@@ -570,7 +605,11 @@ class GroupedCTestParitySelfTests(unittest.TestCase):
             report = _compare_execution(
                 individual, grouped, individual_junit, grouped_junit, report_dir
             )
-            self.assertEqual(report["status_counts"]["passed"], len(individual.identities))
+            self.assertEqual(
+                report["status_counts"]["passed"],
+                len(individual.identities) - 1,
+            )
+            self.assertEqual(report["status_counts"]["disabled"], 1)
             output = root / "artifacts/parity.json"
             _print_report(report, output)
             self.assertEqual(json.loads(output.read_text()), report)
@@ -589,7 +628,7 @@ class GroupedCTestParitySelfTests(unittest.TestCase):
                     individual, grouped, individual_junit, grouped_junit, report_dir
                 )
             self._write_junit(grouped_junit, grouped.physical_names)
-            duplicate = next(iter(GROUPED_TARGETS))
+            duplicate = sorted(GROUPED_TARGETS)[1]
             tree = ElementTree.parse(report_dir / f"{duplicate}.xml")
             tree.getroot().append(tree.getroot().find("testcase"))
             tree.getroot().set("tests", "2")

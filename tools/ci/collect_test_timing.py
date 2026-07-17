@@ -228,7 +228,7 @@ def _capture_inventory(
                 len(gtest_outputs) != 1
                 or name != f"{producer}.Grouped"
                 or "--gtest_filter=*" not in command
-                or command.count("--gtest_also_run_disabled_tests") != 1
+                or "--gtest_also_run_disabled_tests" in command
                 or grouped_xml != expected_xml
             ):
                 raise TimingError(

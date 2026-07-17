@@ -573,6 +573,21 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         )
 
         jobs = payload["jobs"]
+        conflict = jobs["reject-conflicting-evidence-inputs"]
+        self.assertEqual(
+            " ".join(conflict["if"].split()),
+            (
+                "github.event_name == 'workflow_dispatch' && "
+                "inputs.collect_test_timing && "
+                "inputs.collect_grouped_ctest_evidence"
+            ),
+        )
+        self.assertEqual(conflict["runs-on"], "ubuntu-24.04")
+        reject = conflict["steps"][0]
+        self.assertEqual(reject["name"], "Reject conflicting evidence modes")
+        self.assertIn("mutually exclusive", reject["run"])
+        self.assertIn("exit 1", reject["run"])
+
         full_job = jobs["ci-linux-clang"]
         self.assertEqual(
             " ".join(full_job["if"].split()),

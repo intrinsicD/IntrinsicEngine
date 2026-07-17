@@ -47,7 +47,6 @@ def _grouped_test_record(build_dir: Path) -> dict[str, object]:
         "command": [
             str(build_dir / "bin" / "AlphaTests"),
             "--gtest_filter=*",
-            "--gtest_also_run_disabled_tests",
             (
                 "--gtest_output=xml:"
                 f"{build_dir}/reports/grouped-ctest/gtest/AlphaTests.xml"

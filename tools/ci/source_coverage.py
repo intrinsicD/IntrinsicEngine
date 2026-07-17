@@ -492,7 +492,6 @@ def _grouped_gtest_cases(
     expected = (
         str(target_path),
         "--gtest_filter=*",
-        "--gtest_also_run_disabled_tests",
         "--gtest_output=xml:"
         f"{build_dir / 'reports/grouped-ctest/gtest' / f'{target}.xml'}",
     )
