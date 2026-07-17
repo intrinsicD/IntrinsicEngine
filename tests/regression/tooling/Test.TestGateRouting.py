@@ -134,12 +134,38 @@ GROUPED_PURE_CTEST_TARGETS = frozenset(
         "IntrinsicPhysicsWorldTests",
     }
 )
-GEOMETRY_IO_SOURCE = "tests/unit/geometry/Test.GeometryIO.cpp"
-GEOMETRY_IO_OWNER = SourceOwner(
-    GEOMETRY_IO_SOURCE,
-    "GeometryIoTestObjs",
-    "IntrinsicGeometryIoTests",
-)
+GROUPED_EXCLUDED_SOURCE_OWNERS = {
+    "tests/unit/geometry/Test.GeometryIO.cpp": SourceOwner(
+        "tests/unit/geometry/Test.GeometryIO.cpp",
+        "GeometryIoTestObjs",
+        "IntrinsicGeometryIoTests",
+    ),
+    "tests/unit/geometry/Test_HtexPatch.cpp": SourceOwner(
+        "tests/unit/geometry/Test_HtexPatch.cpp",
+        "GeometryProcessStateTestObjs",
+        "IntrinsicGeometryProcessStateTests",
+    ),
+    "tests/unit/geometry/Test_RuntimeGeometry.cpp": SourceOwner(
+        "tests/unit/geometry/Test_RuntimeGeometry.cpp",
+        "GeometryProcessStateTestObjs",
+        "IntrinsicGeometryProcessStateTests",
+    ),
+    "tests/unit/geometry/Test_SDF.cpp": SourceOwner(
+        "tests/unit/geometry/Test_SDF.cpp",
+        "GeometryProcessStateTestObjs",
+        "IntrinsicGeometryProcessStateTests",
+    ),
+    "tests/unit/geometry/Test_ContactManifold.cpp": SourceOwner(
+        "tests/unit/geometry/Test_ContactManifold.cpp",
+        "GeometryProcessStateTestObjs",
+        "IntrinsicGeometryProcessStateTests",
+    ),
+    "tests/unit/geometry/Test_GJK.cpp": SourceOwner(
+        "tests/unit/geometry/Test_GJK.cpp",
+        "GeometryProcessStateTestObjs",
+        "IntrinsicGeometryProcessStateTests",
+    ),
+}
 MANUAL_CTEST_TARGETS = frozenset(
     {
         "IntrinsicBenchmarkSmoke",
@@ -472,15 +498,17 @@ def _validate_affected_contract(
 def _validate_grouped_source_contract(
     sources: Mapping[str, SourceOwner],
 ) -> None:
-    actual = sources.get(GEOMETRY_IO_SOURCE)
-    if actual != GEOMETRY_IO_OWNER:
-        raise ReconciliationError(
-            f"{GEOMETRY_IO_SOURCE} must be owned by "
-            f"{GEOMETRY_IO_OWNER.object_library}/{GEOMETRY_IO_OWNER.target}, "
-            f"got {actual!r}"
-        )
-    if GEOMETRY_IO_OWNER.target in GROUPED_PURE_CTEST_TARGETS:
-        raise ReconciliationError("Geometry IO must remain outside the grouped cohort")
+    for source, expected in GROUPED_EXCLUDED_SOURCE_OWNERS.items():
+        actual = sources.get(source)
+        if actual != expected:
+            raise ReconciliationError(
+                f"{source} must be owned by "
+                f"{expected.object_library}/{expected.target}, got {actual!r}"
+            )
+        if expected.target in GROUPED_PURE_CTEST_TARGETS:
+            raise ReconciliationError(
+                f"{source} must remain outside the grouped cohort"
+            )
 
 
 _SUITE_RE = re.compile(r"^(?P<suite>\S+)\.\s*(?:#.*)?$")
@@ -1165,20 +1193,19 @@ class TestGateRoutingSelfTests(unittest.TestCase):
             ):
                 _read_source_registry(path)
 
-    def test_geometry_io_requires_dedicated_individual_owner(self) -> None:
-        _validate_grouped_source_contract(
-            {GEOMETRY_IO_SOURCE: GEOMETRY_IO_OWNER}
-        )
-        with self.assertRaisesRegex(ReconciliationError, "GeometryIoTestObjs"):
-            _validate_grouped_source_contract(
-                {
-                    GEOMETRY_IO_SOURCE: SourceOwner(
-                        GEOMETRY_IO_SOURCE,
-                        "GeometryTestObjs",
-                        "IntrinsicGeometryTests",
-                    )
-                }
+    def test_grouped_exclusions_require_individual_owners(self) -> None:
+        _validate_grouped_source_contract(GROUPED_EXCLUDED_SOURCE_OWNERS)
+        for source, expected in GROUPED_EXCLUDED_SOURCE_OWNERS.items():
+            invalid = dict(GROUPED_EXCLUDED_SOURCE_OWNERS)
+            invalid[source] = SourceOwner(
+                source,
+                "GeometryTestObjs",
+                "IntrinsicGeometryTests",
             )
+            with self.subTest(source=source), self.assertRaisesRegex(
+                ReconciliationError, expected.object_library
+            ):
+                _validate_grouped_source_contract(invalid)
 
     def test_listing_expands_comments_and_preserves_disabled_names(self) -> None:
         listing = """\

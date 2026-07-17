@@ -458,7 +458,6 @@ set(_geometry_test_files
     Test_MeshQuantities.cpp
     Test_MeshClosestFace.cpp
     Test_LinalgEigenMap.cpp
-    Test_RuntimeGeometry.cpp
     Test_RuntimeGraph.cpp
     Test_RuntimeGraphKNN.cpp
     Test.GraphQueries.cpp
@@ -495,7 +494,6 @@ set(_geometry_test_files
     Test_HalfedgeMeshPropertyAccess.cpp
     Test_HalfedgeMeshTopology.cpp
     Test.MeshTopologyUtilities.cpp
-    Test_HtexPatch.cpp
     Test_Validation.cpp
     Test_Curvature.cpp
     Test.CurvatureTensor.cpp
@@ -505,12 +503,9 @@ set(_geometry_test_files
     Test_Overlap.cpp
     Test_Grid.cpp
     Test_MarchingCubes.cpp
-    Test_GJK.cpp
     Test_ImplicitPlaneField.cpp
-    Test_SDF.cpp
     Test_Containment.cpp
     Test_Support.cpp
-    Test_ContactManifold.cpp
     Test_Simplification.cpp
     Test_Geodesic.cpp
     Test_VectorHeatMethod.cpp
@@ -546,6 +541,26 @@ intrinsic_test_object_lib(GeometryTestObjs
     DEPS ExtrinsicCore IntrinsicGeometry
 )
 target_compile_definitions(GeometryTestObjs PRIVATE
+    INTRINSIC_TEST_SUPPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/support"
+)
+
+# These tests exercise production paths that write process-global telemetry or
+# logging state, so they remain individually discovered.
+intrinsic_resolve_test_sources(_geometry_process_state_test_sources
+    SEARCH_DIRS unit/geometry
+    FILES
+        Test_RuntimeGeometry.cpp
+        Test_HtexPatch.cpp
+        Test_SDF.cpp
+        Test_ContactManifold.cpp
+        Test_GJK.cpp
+)
+intrinsic_test_object_lib(GeometryProcessStateTestObjs
+    SOURCES
+        ${_geometry_process_state_test_sources}
+    DEPS ExtrinsicCore IntrinsicGeometry
+)
+target_compile_definitions(GeometryProcessStateTestObjs PRIVATE
     INTRINSIC_TEST_SUPPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/support"
 )
 
@@ -1174,6 +1189,12 @@ endif()
 
 intrinsic_test_executable(IntrinsicGeometryIoTests
     OBJECTS GeometryIoTestObjs
+    LINK_LIBS ExtrinsicCore IntrinsicGeometry
+    LABELS unit geometry
+)
+
+intrinsic_test_executable(IntrinsicGeometryProcessStateTests
+    OBJECTS GeometryProcessStateTestObjs
     LINK_LIBS ExtrinsicCore IntrinsicGeometry
     LABELS unit geometry
 )
