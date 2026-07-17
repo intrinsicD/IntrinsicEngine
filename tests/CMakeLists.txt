@@ -70,12 +70,12 @@ function(intrinsic_test_executable name)
     target_link_libraries(${name} PRIVATE TestSupportObjs)
     # Link against the actual libraries for symbol resolution
     target_link_libraries(${name} PRIVATE IntrinsicConfig ${ARG_LINK_LIBS} GTest::gtest_main dl)
+    intrinsic_register_test_executable(
+        TARGET ${name}
+        LABELS ${ARG_LABELS}
+        OBJECTS ${ARG_OBJECTS}
+    )
     if(NOT ARG_NO_DISCOVER)
-        intrinsic_register_test_executable(
-            TARGET ${name}
-            LABELS ${ARG_LABELS}
-            OBJECTS ${ARG_OBJECTS}
-        )
         set_target_properties(${name} PROPERTIES
             INTRINSIC_GTEST_DISCOVERED TRUE
         )
@@ -90,9 +90,7 @@ function(intrinsic_test_executable name)
 endfunction()
 
 # =============================================================================
-# Helper: add an additional grouped CTest entry for selected GoogleTest suites.
-# Individual gtest_discover_tests registrations remain intact; grouped entries
-# are opt-in and are used only where a shared per-process fixture has been added.
+# Helper: register one grouped CTest process for a NO_DISCOVER GoogleTest target.
 # =============================================================================
 function(intrinsic_grouped_test name target)
     cmake_parse_arguments(ARG "" "FILTER" "LABELS" ${ARGN})
@@ -107,13 +105,17 @@ function(intrinsic_grouped_test name target)
         set(_intrinsic_test_timeout ${_intrinsic_slow_test_timeout_seconds})
     endif()
 
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/Testing/Temporary")
     add_test(NAME ${name}
-        COMMAND $<TARGET_FILE:${target}> "--gtest_filter=${ARG_FILTER}"
+        COMMAND $<TARGET_FILE:${target}>
+            "--gtest_filter=${ARG_FILTER}"
+            "--gtest_output=xml:${CMAKE_BINARY_DIR}/Testing/Temporary/${name}.xml"
     )
     set_tests_properties(${name} PROPERTIES
         ENVIRONMENT "${_intrinsic_test_env}"
         LABELS "${ARG_LABELS}"
         TIMEOUT ${_intrinsic_test_timeout}
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     )
 endfunction()
 
@@ -442,7 +444,6 @@ set(_geometry_test_files
     Test_MeshClosestFace.cpp
     Test_LinalgEigenMap.cpp
     Test_RuntimeGeometry.cpp
-    Test.GeometryIO.cpp
     Test_RuntimeGraph.cpp
     Test_RuntimeGraphKNN.cpp
     Test.GraphQueries.cpp
@@ -530,6 +531,21 @@ intrinsic_test_object_lib(GeometryTestObjs
     DEPS ExtrinsicCore IntrinsicGeometry
 )
 target_compile_definitions(GeometryTestObjs PRIVATE
+    INTRINSIC_TEST_SUPPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/support"
+)
+
+# Geometry IO owns process-static temporary-path counters and filesystem
+# fixtures, so it remains individually discovered in grouped configurations.
+intrinsic_resolve_test_sources(_geometry_io_test_sources
+    SEARCH_DIRS unit/geometry
+    FILES Test.GeometryIO.cpp
+)
+intrinsic_test_object_lib(GeometryIoTestObjs
+    SOURCES
+        ${_geometry_io_test_sources}
+    DEPS ExtrinsicCore IntrinsicGeometry
+)
+target_compile_definitions(GeometryIoTestObjs PRIVATE
     INTRINSIC_TEST_SUPPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/support"
 )
 
@@ -1058,19 +1074,42 @@ intrinsic_test_executable(IntrinsicBenchmarkTests
     LABELS benchmark slo slow
 )
 
+set(_intrinsic_pure_ctest_registration)
+if(INTRINSIC_GROUP_PURE_CTEST)
+    set(_intrinsic_pure_ctest_registration NO_DISCOVER)
+endif()
+
 # --- Physics method reference tests (CPU-only) ---
 intrinsic_test_executable(IntrinsicPhysicsMethodTests
     OBJECTS PhysicsMethodTestObjs
     LINK_LIBS ExtrinsicCore ExtrinsicPhysics
     LABELS unit physics
+    ${_intrinsic_pure_ctest_registration}
 )
+if(INTRINSIC_GROUP_PURE_CTEST)
+    intrinsic_grouped_test(
+        IntrinsicPhysicsMethodTests.Grouped
+        IntrinsicPhysicsMethodTests
+        FILTER "*"
+        LABELS unit physics
+    )
+endif()
 
 # --- Geometry method reference tests (CPU-only) ---
 intrinsic_test_executable(IntrinsicGeometryMethodTests
     OBJECTS GeometryMethodTestObjs
     LINK_LIBS ExtrinsicCore IntrinsicProgressivePoissonReference
     LABELS unit geometry
+    ${_intrinsic_pure_ctest_registration}
 )
+if(INTRINSIC_GROUP_PURE_CTEST)
+    intrinsic_grouped_test(
+        IntrinsicGeometryMethodTests.Grouped
+        IntrinsicGeometryMethodTests
+        FILTER "*"
+        LABELS unit geometry
+    )
+endif()
 
 intrinsic_test_executable(IntrinsicGeometryMethodSlowTests
     OBJECTS GeometryMethodSlowTestObjs
@@ -1083,7 +1122,16 @@ intrinsic_test_executable(IntrinsicPhysicsWorldTests
     OBJECTS PhysicsWorldTestObjs
     LINK_LIBS ExtrinsicPhysics
     LABELS unit physics
+    ${_intrinsic_pure_ctest_registration}
 )
+if(INTRINSIC_GROUP_PURE_CTEST)
+    intrinsic_grouped_test(
+        IntrinsicPhysicsWorldTests.Grouped
+        IntrinsicPhysicsWorldTests
+        FILTER "*"
+        LABELS unit physics
+    )
+endif()
 
 if(TARGET RuntimePhysicsBridgeTestObjs)
     intrinsic_test_executable(IntrinsicRuntimePhysicsBridgeTests
@@ -1096,6 +1144,21 @@ endif()
 # --- Core + Geometry (DEC, mesh algorithms — no GPU, no ECS) ---
 intrinsic_test_executable(IntrinsicGeometryTests
     OBJECTS  GeometryTestObjs
+    LINK_LIBS ExtrinsicCore IntrinsicGeometry
+    LABELS unit geometry
+    ${_intrinsic_pure_ctest_registration}
+)
+if(INTRINSIC_GROUP_PURE_CTEST)
+    intrinsic_grouped_test(
+        IntrinsicGeometryTests.Grouped
+        IntrinsicGeometryTests
+        FILTER "*"
+        LABELS unit geometry
+    )
+endif()
+
+intrinsic_test_executable(IntrinsicGeometryIoTests
+    OBJECTS GeometryIoTestObjs
     LINK_LIBS ExtrinsicCore IntrinsicGeometry
     LABELS unit geometry
 )
@@ -1282,7 +1345,17 @@ intrinsic_test_executable(IntrinsicGraphicsBufferTransferTests
     OBJECTS GraphicsBufferTransferTestObjs
     LINK_LIBS ExtrinsicRHI ExtrinsicCore
     LABELS unit graphics
+    ${_intrinsic_pure_ctest_registration}
 )
+if(INTRINSIC_GROUP_PURE_CTEST)
+    intrinsic_grouped_test(
+        IntrinsicGraphicsBufferTransferTests.Grouped
+        IntrinsicGraphicsBufferTransferTests
+        FILTER "*"
+        LABELS unit graphics
+    )
+endif()
+unset(_intrinsic_pure_ctest_registration)
 
 intrinsic_test_executable(IntrinsicGraphicsRendererCpuUnitTests
     OBJECTS GraphicsRendererCpuUnitTestObjs

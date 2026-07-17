@@ -69,7 +69,11 @@ DEFAULT_CI_TOOL_REGRESSION_SCRIPTS = (
 )
 
 LAYER_SCOPES: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
-    ("src/geometry/", ("geometry",), ("IntrinsicGeometryTests",)),
+    (
+        "src/geometry/",
+        ("geometry",),
+        ("IntrinsicGeometryTests", "IntrinsicGeometryIoTests"),
+    ),
     ("src/assets/", ("assets",), ("IntrinsicAssetUnitTests",)),
     (
         "src/ecs/",
@@ -117,6 +121,11 @@ LAYER_SCOPES: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
 )
 
 TEST_SCOPES: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
+    (
+        "tests/unit/geometry/Test.GeometryIO.cpp",
+        ("geometry",),
+        ("IntrinsicGeometryIoTests",),
+    ),
     ("tests/unit/geometry/", ("geometry",), ("IntrinsicGeometryTests",)),
     (
         "tests/integration/geometry/",

@@ -125,6 +125,21 @@ RHI_MANAGER_SOURCES = frozenset(
 READBACK_SOURCE = "Test.GpuReadbackJobGpuSmoke.cpp"
 READBACK_TARGET = "IntrinsicRuntimeGpuReadbackSmokeTests"
 FRAME_LOOP_SOURCE = "Test.RuntimeFrameLoopContract.cpp"
+GROUPED_PURE_CTEST_TARGETS = frozenset(
+    {
+        "IntrinsicGeometryTests",
+        "IntrinsicGeometryMethodTests",
+        "IntrinsicGraphicsBufferTransferTests",
+        "IntrinsicPhysicsMethodTests",
+        "IntrinsicPhysicsWorldTests",
+    }
+)
+GEOMETRY_IO_SOURCE = "tests/unit/geometry/Test.GeometryIO.cpp"
+GEOMETRY_IO_OWNER = SourceOwner(
+    GEOMETRY_IO_SOURCE,
+    "GeometryIoTestObjs",
+    "IntrinsicGeometryIoTests",
+)
 MANUAL_CTEST_TARGETS = frozenset(
     {
         "IntrinsicBenchmarkSmoke",
@@ -454,6 +469,20 @@ def _validate_affected_contract(
         )
 
 
+def _validate_grouped_source_contract(
+    sources: Mapping[str, SourceOwner],
+) -> None:
+    actual = sources.get(GEOMETRY_IO_SOURCE)
+    if actual != GEOMETRY_IO_OWNER:
+        raise ReconciliationError(
+            f"{GEOMETRY_IO_SOURCE} must be owned by "
+            f"{GEOMETRY_IO_OWNER.object_library}/{GEOMETRY_IO_OWNER.target}, "
+            f"got {actual!r}"
+        )
+    if GEOMETRY_IO_OWNER.target in GROUPED_PURE_CTEST_TARGETS:
+        raise ReconciliationError("Geometry IO must remain outside the grouped cohort")
+
+
 _SUITE_RE = re.compile(r"^(?P<suite>\S+)\.\s*(?:#.*)?$")
 _COMMENT_RE = re.compile(r"\s+#.*$")
 
@@ -514,6 +543,28 @@ def _read_ctest_document(build_dir: Path) -> dict[str, object]:
     if not isinstance(document, dict) or not isinstance(document.get("tests"), list):
         raise ReconciliationError("CTest JSON does not contain a tests array")
     return document
+
+
+def _cache_bool(build_dir: Path, key: str) -> bool:
+    declaration = re.compile(rf"^{re.escape(key)}:BOOL=(ON|OFF)$")
+    try:
+        lines = (build_dir / "CMakeCache.txt").read_text(
+            encoding="utf-8"
+        ).splitlines()
+    except OSError as error:
+        raise ReconciliationError(
+            f"cannot read CMake cache under {build_dir}: {error}"
+        ) from error
+    matches = [
+        match.group(1)
+        for line in lines
+        if (match := declaration.fullmatch(line)) is not None
+    ]
+    if len(matches) != 1:
+        raise ReconciliationError(
+            f"CMake cache must declare {key}:BOOL exactly once"
+        )
+    return matches[0] == "ON"
 
 
 def _candidate_binary_paths(build_dir: Path, target: str) -> tuple[Path, Path]:
@@ -652,6 +703,61 @@ def _verify_ctest_label_route(
         )
 
 
+def _verify_grouped_ctest_contract(
+    test: Mapping[str, object],
+    target: str,
+    build_dir: Path,
+    command: Sequence[object],
+) -> None:
+    name = test.get("name")
+    expected_name = f"{target}.Grouped"
+    if name != expected_name:
+        raise ReconciliationError(
+            f"grouped CTest registration for {target!r} must be named "
+            f"{expected_name!r}, got {name!r}"
+        )
+
+    filters = [
+        argument
+        for argument in command
+        if isinstance(argument, str) and argument.startswith("--gtest_filter=")
+    ]
+    if filters != ["--gtest_filter=*"]:
+        raise ReconciliationError(
+            f"{expected_name} must select the whole producer exactly once"
+        )
+
+    expected_xml = (
+        f"--gtest_output=xml:{build_dir}/Testing/Temporary/{expected_name}.xml"
+    )
+    xml_outputs = [
+        argument
+        for argument in command
+        if isinstance(argument, str)
+        and argument.startswith("--gtest_output=xml:")
+    ]
+    if xml_outputs != [expected_xml]:
+        raise ReconciliationError(
+            f"{expected_name} must write one canonical GTest XML diagnostic"
+        )
+
+    if _ctest_property(test, "TIMEOUT") != [30.0]:
+        raise ReconciliationError(
+            f"{expected_name} must retain the canonical 30 second timeout"
+        )
+
+    working_directories = _ctest_property(test, "WORKING_DIRECTORY")
+    expected_working_directory = _resolved_path(str(build_dir / "tests"))
+    if (
+        len(working_directories) != 1
+        or not isinstance(working_directories[0], str)
+        or _resolved_path(working_directories[0]) != expected_working_directory
+    ):
+        raise ReconciliationError(
+            f"{expected_name} must run from {expected_working_directory}"
+        )
+
+
 def _registered_gtest_cases_by_target(
     document: Mapping[str, object],
     build_dir: Path,
@@ -659,6 +765,7 @@ def _registered_gtest_cases_by_target(
     target_labels: Mapping[str, frozenset[str]],
     aggregate: str,
     aggregate_members: frozenset[str],
+    expected_grouped_targets: frozenset[str] = frozenset(),
 ) -> dict[str, tuple[str, ...]]:
     path_to_target: dict[Path, str] = {}
     for target in source_targets:
@@ -668,6 +775,7 @@ def _registered_gtest_cases_by_target(
     cases: dict[str, list[str]] = defaultdict(list)
     representations: dict[str, set[str]] = defaultdict(set)
     placeholder_counts: Counter[str] = Counter()
+    grouped_counts: Counter[str] = Counter()
     tests = document.get("tests")
     if not isinstance(tests, list):
         raise ReconciliationError("CTest JSON does not contain a tests array")
@@ -708,9 +816,9 @@ def _registered_gtest_cases_by_target(
         if target is None:
             continue
 
-        # GoogleTest discovery entries use this switch. Direct manual/grouped
-        # CTest producers are intentionally outside case reconciliation.
-        if "--gtest_also_run_disabled_tests" not in command:
+        discovered = "--gtest_also_run_disabled_tests" in command
+        grouped = name == f"{target}.Grouped"
+        if not discovered and not grouped:
             continue
         _verify_ctest_environment(test)
         _verify_ctest_label_route(
@@ -720,6 +828,16 @@ def _registered_gtest_cases_by_target(
             aggregate,
             aggregate_members,
         )
+        if grouped:
+            _verify_grouped_ctest_contract(test, target, build_dir, command)
+            representations[target].add("grouped")
+            grouped_counts[target] += 1
+            if target in aggregate_members:
+                cases[target].extend(
+                    _run_gtest_listing(Path(command[0]), target)
+                )
+            continue
+
         representations[target].add("discovered")
         filters = [
             argument.removeprefix("--gtest_filter=")
@@ -739,16 +857,29 @@ def _registered_gtest_cases_by_target(
                 f"registered GoogleTest target {target!r} has neither discovered "
                 "CTest cases nor a NOT_BUILT placeholder"
             )
-        if kinds == {"placeholder", "discovered"}:
+        if len(kinds) > 1:
             raise ReconciliationError(
-                f"registered GoogleTest target {target!r} has both discovered "
-                "cases and a NOT_BUILT placeholder"
+                f"registered GoogleTest target {target!r} has conflicting "
+                f"CTest representations {_format_values(kinds)}"
             )
         if placeholder_counts[target] > 1:
             raise ReconciliationError(
                 f"registered GoogleTest target {target!r} has duplicate "
                 "NOT_BUILT placeholders"
             )
+        if grouped_counts[target] > 1:
+            raise ReconciliationError(
+                f"registered GoogleTest target {target!r} has duplicate "
+                "grouped CTest registrations"
+            )
+
+    actual_grouped_targets = frozenset(grouped_counts)
+    if actual_grouped_targets != expected_grouped_targets:
+        raise ReconciliationError(
+            "grouped CTest cohort mismatch; "
+            f"missing={_format_values(expected_grouped_targets - actual_grouped_targets)}, "
+            f"extra={_format_values(actual_grouped_targets - expected_grouped_targets)}"
+        )
 
     return {target: tuple(target_cases) for target, target_cases in cases.items()}
 
@@ -939,12 +1070,18 @@ def reconcile(build_dir: Path, aggregate: str) -> tuple[int, int, int]:
     _verify_aggregate_membership(targets, aggregate, members)
     source_backed_targets = _classify_registered_targets(targets, sources)
     _validate_affected_contract(targets, sources)
+    _validate_grouped_source_contract(sources)
 
     inspected_targets = sorted(members.intersection(source_backed_targets))
     target_binaries = {
         target: _binary_path(build_dir, target) for target in inspected_targets
     }
     ctest_document = _read_ctest_document(build_dir)
+    expected_grouped_targets = (
+        GROUPED_PURE_CTEST_TARGETS
+        if _cache_bool(build_dir, "INTRINSIC_GROUP_PURE_CTEST")
+        else frozenset()
+    )
     all_registered_cases = _registered_gtest_cases_by_target(
         ctest_document,
         build_dir,
@@ -952,6 +1089,7 @@ def reconcile(build_dir: Path, aggregate: str) -> tuple[int, int, int]:
         targets,
         aggregate,
         members,
+        expected_grouped_targets,
     )
     expected_affected_targets = members & AFFECTED_TARGET_CASE_COUNTS.keys()
     if aggregate == "IntrinsicGpuVulkanTests":
@@ -1017,6 +1155,21 @@ class TestGateRoutingSelfTests(unittest.TestCase):
             ):
                 _read_source_registry(path)
 
+    def test_geometry_io_requires_dedicated_individual_owner(self) -> None:
+        _validate_grouped_source_contract(
+            {GEOMETRY_IO_SOURCE: GEOMETRY_IO_OWNER}
+        )
+        with self.assertRaisesRegex(ReconciliationError, "GeometryIoTestObjs"):
+            _validate_grouped_source_contract(
+                {
+                    GEOMETRY_IO_SOURCE: SourceOwner(
+                        GEOMETRY_IO_SOURCE,
+                        "GeometryTestObjs",
+                        "IntrinsicGeometryTests",
+                    )
+                }
+            )
+
     def test_listing_expands_comments_and_preserves_disabled_names(self) -> None:
         listing = """\
 Running main() from gtest_main.cc
@@ -1058,6 +1211,76 @@ OrdinarySuite.
                 {"Target": ("Suite.First",)},
             )
 
+    def test_grouped_ctest_configuration_is_narrow_and_default_off(self) -> None:
+        root_cmake = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        test_cmake = (REPO_ROOT / "tests" / "CMakeLists.txt").read_text(
+            encoding="utf-8"
+        )
+        option = re.search(
+            r"option\(INTRINSIC_GROUP_PURE_CTEST\b(?P<body>.*?)\)",
+            root_cmake,
+            flags=re.DOTALL,
+        )
+        self.assertIsNotNone(option)
+        assert option is not None
+        self.assertRegex(option.group("body"), r"\bOFF\s*$")
+
+        grouped_targets = frozenset(
+            match.group("target")
+            for match in re.finditer(
+                r"intrinsic_grouped_test\(\s*"
+                r"(?P<name>Intrinsic\w+\.Grouped)\s+"
+                r"(?P<target>Intrinsic\w+)\s+"
+                r'FILTER "\*"',
+                test_cmake,
+            )
+        )
+        self.assertEqual(grouped_targets, GROUPED_PURE_CTEST_TARGETS)
+        self.assertEqual(
+            test_cmake.count("${_intrinsic_pure_ctest_registration}"),
+            len(GROUPED_PURE_CTEST_TARGETS),
+        )
+
+    def test_duplicate_grouped_registration_is_rejected(self) -> None:
+        build_dir = Path("/tmp/synthetic-build")
+        target = "Target"
+        name = f"{target}.Grouped"
+        record = {
+            "name": name,
+            "command": [
+                str(build_dir / "bin" / target),
+                "--gtest_filter=*",
+                (
+                    f"--gtest_output=xml:{build_dir}/Testing/Temporary/"
+                    f"{name}.xml"
+                ),
+            ],
+            "properties": [
+                {
+                    "name": "ENVIRONMENT",
+                    "value": sorted(REQUIRED_GTEST_ENVIRONMENT),
+                },
+                {"name": "LABELS", "value": ["gpu", "graphics", "vulkan"]},
+                {"name": "TIMEOUT", "value": 30.0},
+                {
+                    "name": "WORKING_DIRECTORY",
+                    "value": str(build_dir / "tests"),
+                },
+            ],
+        }
+        with self.assertRaisesRegex(
+            ReconciliationError, "duplicate grouped CTest registrations"
+        ):
+            _registered_gtest_cases_by_target(
+                {"tests": [record, record]},
+                build_dir,
+                frozenset({target}),
+                {target: frozenset({"gpu", "graphics", "vulkan"})},
+                "IntrinsicCpuTests",
+                frozenset(),
+                frozenset({target}),
+            )
+
     def test_affected_case_deletion_is_rejected(self) -> None:
         expected = frozenset(
             {
@@ -1095,7 +1318,7 @@ OrdinarySuite.
                 ),
             )
 
-    def test_ctest_extraction_ignores_manual_entries_and_outside_placeholders(
+    def test_ctest_extraction_uses_raw_filter_not_display_name(
         self,
     ) -> None:
         build_dir = Path("/tmp/synthetic-build")
@@ -1114,7 +1337,7 @@ OrdinarySuite.
                     "command": [str(binary), "--gtest_filter=Suite.*"],
                 },
                 {
-                    "name": "Suite.DISABLED_Case",
+                    "name": "PrettyDisplay.DISABLED_Case",
                     "command": [
                         str(binary),
                         "--gtest_filter=Suite.DISABLED_Case",

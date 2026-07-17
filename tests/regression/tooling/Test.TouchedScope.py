@@ -37,6 +37,7 @@ def write_registry(
     inventory.mkdir(parents=True)
     rows = rows or [
         ("IntrinsicGeometryTests", "geometry,unit"),
+        ("IntrinsicGeometryIoTests", "geometry,unit"),
         ("GeometryContractTests", "contract,geometry"),
         ("IntrinsicRuntimeGraphicsCpuTests", "graphics,integration,runtime"),
     ]
@@ -144,6 +145,17 @@ class TouchedScopeTests(unittest.TestCase):
         self.assertEqual(geometry["route"], "focused")
         self.assertEqual(geometry["owner_labels"], ["geometry"])
         self.assertIn("IntrinsicGeometryTests", geometry["anchor_targets"])
+        self.assertIn("IntrinsicGeometryIoTests", geometry["anchor_targets"])
+
+        geometry_io = touched_scope.analyze_change_records(
+            [record("tests/unit/geometry/Test.GeometryIO.cpp")]
+        )
+        self.assertEqual(geometry_io["route"], "focused")
+        self.assertEqual(geometry_io["owner_labels"], ["geometry"])
+        self.assertEqual(
+            geometry_io["anchor_targets"],
+            ["IntrinsicGeometryIoTests"],
+        )
 
         cross_layer = touched_scope.analyze_change_records(
             [
@@ -463,6 +475,7 @@ class TouchedScopeTests(unittest.TestCase):
             self.assertIn("geometry", text)
             self.assertIn("broad fallback: `false`", text)
             self.assertIn("IntrinsicGeometryTests", text)
+            self.assertIn("IntrinsicGeometryIoTests", text)
 
     def test_finalize_selects_owner_while_smoke_is_unadmitted(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -477,6 +490,7 @@ class TouchedScopeTests(unittest.TestCase):
                 finalized["finalization"]["selected_targets"],
                 [
                     "GeometryContractTests",
+                    "IntrinsicGeometryIoTests",
                     "IntrinsicGeometryTests",
                 ],
             )
@@ -492,10 +506,12 @@ class TouchedScopeTests(unittest.TestCase):
                         "name": "focused-owner",
                         "targets": [
                             "GeometryContractTests",
+                            "IntrinsicGeometryIoTests",
                             "IntrinsicGeometryTests",
                         ],
                         "producer_targets": [
                             "GeometryContractTests",
+                            "IntrinsicGeometryIoTests",
                             "IntrinsicGeometryTests",
                         ],
                     },
@@ -514,6 +530,7 @@ class TouchedScopeTests(unittest.TestCase):
                         ],
                         "producer_targets": [
                             "GeometryContractTests",
+                            "IntrinsicGeometryIoTests",
                             "IntrinsicGeometryTests",
                         ],
                     },
