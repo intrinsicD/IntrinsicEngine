@@ -6,6 +6,12 @@ depends_on:
 ---
 # BUG-106 — Test-gate capability routing hides CPU coverage
 
+## Status
+- In progress on 2026-07-17; owner: Codex; branch: `main` (local).
+- Next verification: capture the affected source/case baseline, then split
+  CPU/mock and Vulkan-only ownership and reconcile target aggregates against
+  expanded CTest discovery.
+
 ## Goal
 - Restore one canonical, capability-truthful test graph in which CPU/mock
   cases run in the default CPU gate, the real Vulkan readback case stays

@@ -17,7 +17,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   the explicit-pole variants overwrite the north pole, leave element zero
   defaulted, and underflow/write out of bounds for small counts; define and
   regress the common `0`/`1`/`2` contract.
-- [`BUG-106` — Test-gate capability routing hides CPU coverage](BUG-106-test-gate-capability-routing-drift.md):
+- [`BUG-106` — Test-gate capability routing hides CPU coverage](../../active/BUG-106-test-gate-capability-routing-drift.md):
   CPU/mock cases are hidden behind executable-wide GPU/Vulkan/slow labels and
   one runtime source is registered twice; restore unique, capability-truthful
   ownership and mechanically reconcile build aggregates with CTest selection.
