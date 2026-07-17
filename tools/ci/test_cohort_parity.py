@@ -12,8 +12,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Sequence
 
+from test_cohort_manifest import (
+    CohortManifestError,
+    read_test_cohort_manifest,
+)
 
-MANIFEST_SCHEMA = "intrinsic.test-cohort-transition/v1"
 REPORT_SCHEMA = "intrinsic.test-timing/v1"
 VALID_STATUSES = {"disabled", "error", "failed", "passed", "skipped"}
 MIN_SAMPLE_COUNT = 5
@@ -93,37 +96,6 @@ def _string_list(
     if result != tuple(sorted(result)):
         raise ParityError(f"{context} must be sorted")
     return result
-
-
-def _read_manifest(path: Path) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    document = _read_json_object(path, "transition manifest")
-    expected_keys = {"added_fast_sentinels", "moved_to_slow", "schema"}
-    if set(document) != expected_keys:
-        raise ParityError(
-            "transition manifest keys must be exactly "
-            f"{sorted(expected_keys)!r}, got {sorted(document)!r}"
-        )
-    if document["schema"] != MANIFEST_SCHEMA:
-        raise ParityError(
-            "transition manifest schema must be "
-            f"{MANIFEST_SCHEMA!r}, got {document['schema']!r}"
-        )
-    moved = _string_list(
-        document["moved_to_slow"],
-        context="transition manifest moved_to_slow",
-        require_nonempty=True,
-    )
-    sentinels = _string_list(
-        document["added_fast_sentinels"],
-        context="transition manifest added_fast_sentinels",
-        require_nonempty=False,
-    )
-    overlap = sorted(set(moved).intersection(sentinels))
-    if overlap:
-        raise ParityError(
-            f"transition manifest repeats moved cases as fast sentinels: {overlap!r}"
-        )
-    return moved, sentinels
 
 
 def _positive_int(value: object, context: str) -> int:
@@ -480,10 +452,14 @@ def _verify_scheduled_junit(path: Path, moved: Sequence[str]) -> None:
             raise ParityError(f"{path}: JUnit repeats testcase {name!r}")
         statuses[name] = _junit_status(testcase, f"JUnit testcase {name!r}")
 
-    missing = sorted(set(moved) - statuses.keys())
-    if missing:
+    moved_set = set(moved)
+    scheduled_set = set(statuses)
+    missing = sorted(moved_set - scheduled_set)
+    extra = sorted(scheduled_set - moved_set)
+    if missing or extra:
         raise ParityError(
-            f"scheduled slow JUnit omits declared moved cases {missing!r}"
+            "scheduled slow JUnit must contain exactly declared moved cases; "
+            f"missing={missing!r}, extra={extra!r}"
         )
     not_passed = {
         name: statuses[name] for name in moved if statuses[name] != "passed"
@@ -505,7 +481,12 @@ def _compare(
     candidate_slow_path: Path,
     scheduled_slow_junit: Path,
 ) -> dict[str, int]:
-    moved, sentinels = _read_manifest(manifest)
+    try:
+        transition = read_test_cohort_manifest(manifest)
+    except CohortManifestError as error:
+        raise ParityError(str(error)) from error
+    moved = transition.moved_to_slow
+    sentinels = transition.added_fast_sentinels
     baseline_cpu = _read_report(baseline_cpu_path, "cpu")
     baseline_pr_fast = _read_report(baseline_pr_fast_path, "pr-fast")
     candidate_cpu = _read_report(candidate_cpu_path, "cpu")

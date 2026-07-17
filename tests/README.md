@@ -36,6 +36,7 @@ one-target-per-line inventories under `build/<preset>/test-inventories/`:
 | `IntrinsicTests` | Every registered CTest-producing executable |
 | `IntrinsicPrFastTests` | Any `unit` or `contract`; exclude `gpu`, `vulkan`, `slow`, `flaky-quarantine` |
 | `IntrinsicCpuTests` | Exclude `gpu`, `vulkan`, `slow`, `flaky-quarantine` |
+| `IntrinsicCpuCoverageTests` | Exclude `benchmark`, `slo`, `gpu`, `vulkan`, `flaky-quarantine`; include ordinary `slow` correctness |
 | `IntrinsicCpuSlowTests` | Require `slow`; exclude `benchmark`, `slo`, `gpu`, `vulkan`, `flaky-quarantine` |
 | `IntrinsicGpuVulkanTests` | When Vulkan is configured, require both `gpu` and `vulkan`; exclude `slow`, `flaky-quarantine` |
 | `IntrinsicPrSmokeTests` | Require `integration`, `runtime`, and `graphics`; apply the standard fast exclusions |
@@ -139,6 +140,71 @@ initialize Vulkan in a non-`gpu`-only path, run benchmark/SLO thresholds, or
 regularly exceed one second of wall-clock time on the reference Linux-clang
 runner. Do not add `slow` to pure CPU unit or contract suites merely because
 they contain many cheap cases.
+
+## Measured ordinary-slow correctness cohort
+
+`CI-011` applies `slow` only from at least five comparable hosted samples with
+per-case status, runner identity, and host-load diagnostics. Timing and declared
+behavior must agree: a stress or large-iteration case whose median exceeds one
+second may move, as may an explicitly large full-engine workload whose p95
+crosses that boundary. One local observation, executable size, a failure, or a
+cheap sibling in the same executable is not classification evidence.
+
+Because CTest labels are executable-wide, a measured heavy case moves to a
+dependency-coherent slow producer while a small deterministic case covering the
+same invariant stays in PR-fast. The protocol-complete five-sample CPU job from
+[hosted run 29597683645](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29597683645/job/87941963580)
+established these exact pairs:
+
+| Scheduled heavy case | Median / p95 (seconds) | Retained PR-fast sentinel | Classification reason |
+| --- | --- | --- | --- |
+| `Dimensions/ProgressivePoissonReferenceDim.PoissonGuaranteeHoldsAtEveryLevelBoundary/2` | 1.282820 / 1.292920 | `Dimensions/ProgressivePoissonReferenceDim.SmallDeterministicCloudHoldsAtEveryLevelBoundary/2` | The heavy variant checks every theorem boundary over a 3,000-point 2D cloud; the sentinel checks the same boundary invariant on a small deterministic cloud. |
+| `Dimensions/ProgressivePoissonReferenceDim.PoissonGuaranteeHoldsAtEveryLevelBoundary/3` | 1.121220 / 1.127870 | `Dimensions/ProgressivePoissonReferenceDim.SmallDeterministicCloudHoldsAtEveryLevelBoundary/3` | The heavy variant checks every theorem boundary over a 3,000-point 3D cloud; the sentinel checks the same boundary invariant on a small deterministic cloud. |
+| `ProgressivePoissonReference.CoincidentPointsAcceptExactlyOne` | 1.448930 / 1.450650 | `ProgressivePoissonReference.CoincidentPairAcceptsExactlyOne` | The heavy variant exercises the degenerate coincident-cloud path; the pair sentinel retains the exactly-one-accepted-point invariant. |
+| `RuntimeAssetImportFormatCoverage.DirectMeshEnrichmentCloseDrainsGeneratedGridAndCompletesDeterministically` | 0.990546 / 1.038140 | `RuntimeAssetImportFormatCoverage.DirectMeshEnrichmentCloseDrainsSmallGeneratedGrid` | The heavy variant drives the full-engine close/drain path with a 32x32 generated grid; the small-grid sentinel retains deterministic completion in PR-fast. |
+| `Simplification_QEM.ConfigurableQuadricsSupportAllTypesResidencesAndPlacements` | 2.275210 / 2.584840 | `Simplification_QEM.ConfigurableQuadricsSmallMeshSentinel` | The heavy variant covers a nine-way dense-mesh configuration matrix; the sentinel retains representative type, residence, and placement coverage on a small mesh. |
+| `Simplification_QEM.HausdorffErrorConstraintIsRespected` | 1.159510 / 1.163780 | `Simplification_QEM.HausdorffErrorConstraintSmallMeshSentinel` | The heavy variant runs dense closed-mesh Hausdorff-constrained simplification; the sentinel retains the constrained valid-collapse invariant. |
+| `Simplification_QEM.ProbabilisticQuadricsSupportIsotropicAndCovarianceModes` | 1.508820 / 1.510310 | `Simplification_QEM.ProbabilisticQuadricsSmallMeshSentinel` | The heavy variant covers a four-way dense-mesh probabilistic-quadric matrix; the sentinel retains isotropic and covariance-mode coverage. |
+| `Simplification_QEM.RepeatedWorkflowStyleSimplificationStaysValid` | 3.194550 / 3.307200 | `Simplification_QEM.RepeatedWorkflowSmallMeshSentinel` | The heavy variant repeats simplify/extract/rebuild/simplify over 5,120 triangles; the sentinel retains repeated-workflow topology validity on a small mesh. |
+
+The measured
+`RuntimeAssetImportFormatCoverage.AssetImportPipelineAccessorExposesQueueAndEventState`
+plateau (2.083790-second median, 2.085490-second p95) was a two-second wait
+before the engine could pump the queued work. That wait was removed rather than
+classified `slow`; discovery and harness defects must be fixed, not routed out
+of fast correctness.
+
+The scheduled ordinary-slow lane is deliberately disjoint from benchmark, SLO,
+GPU/Vulkan, and quarantined ownership. Reproduce its exact aggregate and
+selector with:
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicCpuSlowTests
+python3 tests/regression/tooling/Test.TestGateRouting.py \
+  --build-dir build/ci --aggregate IntrinsicCpuSlowTests
+mkdir -p build/ci/reports
+ctest --test-dir build/ci --output-on-failure \
+  -L '^slow$' \
+  -LE '^(benchmark|slo|gpu|vulkan|flaky-quarantine)$' \
+  --no-tests=error --timeout 120 \
+  --output-junit build/ci/reports/cpu-slow.junit.xml \
+  -j$(nproc)
+```
+
+Source-coverage refactor parity uses `IntrinsicCpuCoverageTests`, not the fast
+aggregate alone. That coverage aggregate selects the fast CPU cohort plus this
+ordinary-slow correctness cohort while continuing to exclude benchmark, SLO,
+GPU/Vulkan, and quarantined ownership. This keeps every moved heavy case in the
+candidate coverage population; `tools/ci/slow_test_cohort.json` declares the
+only permitted additions, the retained fast sentinels.
+
+Slow-cohort classification does not own timeout defects. GoogleTest PRE_TEST
+enumeration remains independently owned by
+[`BUG-091`](../tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md);
+the benchmark-smoke execution budget and dedicated lane were independently
+resolved by
+[`BUG-088`](../tasks/done/BUG-088-benchmark-smoke-hard-timeout-host-contention.md).
 
 The 22-result `IntrinsicBenchmarkSmoke.Run` → `.Validate` fixture pair is an
 explicit example: it remains in the complete aggregate with a 120-second runner

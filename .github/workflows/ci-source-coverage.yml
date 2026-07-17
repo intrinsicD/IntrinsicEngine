@@ -74,22 +74,23 @@ jobs:
             --json-out build/ci-coverage-cpu/ci-timing/phases/configure.json \
             -- cmake --preset ci-coverage-cpu --fresh
 
-      - name: Build canonical CPU test cohort
+      - name: Build complete CPU correctness coverage cohort
         run: |
           python3 tools/ci/time_command.py \
-            --label "Build canonical CPU test cohort" \
+            --label "Build complete CPU correctness coverage cohort" \
             --json-out build/ci-coverage-cpu/ci-timing/phases/build.json \
-            -- cmake --build --preset ci-coverage-cpu --target IntrinsicCpuTests
+            -- cmake --build --preset ci-coverage-cpu --target IntrinsicCpuCoverageTests
 
-      - name: Collect canonical CPU source coverage
+      - name: Collect complete CPU correctness source coverage
         run: |
           python3 tools/ci/time_command.py \
-            --label "Collect canonical CPU source coverage" \
+            --label "Collect complete CPU correctness source coverage" \
             --json-out build/ci-coverage-cpu/ci-timing/phases/test.json \
             -- python3 tools/ci/run_source_coverage.py \
             --build-dir build/ci-coverage-cpu \
             --output build/ci-coverage-cpu/coverage \
             --preset ci-coverage-cpu \
+            --cohort cpu-coverage \
             --diff-base HEAD^ \
             --jobs 2
 
@@ -104,10 +105,10 @@ jobs:
         if: always()
         run: |
           context_args=()
-          if selected_tests="$(ctest --test-dir build/ci-coverage-cpu --show-only=json-v1 -LE "gpu|vulkan|slow|flaky-quarantine" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"; then
+          if selected_tests="$(ctest --test-dir build/ci-coverage-cpu --show-only=json-v1 -LE "^(benchmark|slo|gpu|vulkan|flaky-quarantine)$" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"; then
             context_args+=(--selected-test-count "$selected_tests")
           fi
-          if ninja_edges="$(ninja -C build/ci-coverage-cpu -t commands IntrinsicCpuTests | sed '/^[[:space:]]*$/d' | wc -l)"; then
+          if ninja_edges="$(ninja -C build/ci-coverage-cpu -t commands IntrinsicCpuCoverageTests | sed '/^[[:space:]]*$/d' | wc -l)"; then
             context_args+=(--ninja-edge-count "$ninja_edges")
           fi
           python3 tools/ci/aggregate_gate_timing.py \

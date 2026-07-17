@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import re
 import shutil
@@ -181,6 +182,7 @@ endif()
 
 list(SORT cpu_targets)
 add_custom_target(IntrinsicCpuTests DEPENDS ${cpu_targets})
+add_custom_target(IntrinsicCpuCoverageTests DEPENDS ${cpu_targets})
 
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/test-inventories")
 set(target_registry "target\tlabels\n")
@@ -197,6 +199,11 @@ file(
 file(
     WRITE
     "${CMAKE_BINARY_DIR}/test-inventories/IntrinsicCpuTests.txt"
+    "${aggregate_inventory}"
+)
+file(
+    WRITE
+    "${CMAKE_BINARY_DIR}/test-inventories/IntrinsicCpuCoverageTests.txt"
     "${aggregate_inventory}"
 )
 """
@@ -425,7 +432,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--build-dir", required=True)
 parser.add_argument("--aggregate", required=True)
 arguments = parser.parse_args()
-if arguments.aggregate != "IntrinsicCpuTests":
+if arguments.aggregate not in {"IntrinsicCpuCoverageTests", "IntrinsicCpuTests"}:
     parser.error("unexpected aggregate")
 profile_pattern = os.environ.get("LLVM_PROFILE_FILE")
 if profile_pattern is None:
@@ -526,6 +533,11 @@ def _write(path: Path, contents: str) -> None:
 
 def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _json_digest(value: Any) -> str:
+    payload = json.dumps(value, separators=(",", ":"), sort_keys=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _covered_set(report: dict[str, Any], name: str) -> list[str]:
@@ -712,9 +724,10 @@ class SourceCoverageTests(unittest.TestCase):
         build_dir: Path,
         output: Path,
         *,
+        cohort: str | None = None,
         llvm_profdata: str | None = None,
     ) -> list[str]:
-        return [
+        command = [
             sys.executable,
             str(RUN_COVERAGE),
             "--build-dir",
@@ -734,13 +747,22 @@ class SourceCoverageTests(unittest.TestCase):
             "--repo-root",
             str(cls.source_root),
         ]
+        if cohort is not None:
+            command.extend(["--cohort", cohort])
+        return command
 
     @classmethod
-    def _collect(cls, build_dir: Path, name: str) -> Path:
+    def _collect(
+        cls,
+        build_dir: Path,
+        name: str,
+        *,
+        cohort: str | None = None,
+    ) -> Path:
         output = cls.root / name
         shutil.rmtree(output, ignore_errors=True)
         _run(
-            cls._coverage_command(build_dir, output),
+            cls._coverage_command(build_dir, output, cohort=cohort),
             cwd=cls.root,
             timeout=180,
         )
@@ -799,6 +821,188 @@ class SourceCoverageTests(unittest.TestCase):
         )
         return path
 
+    @staticmethod
+    def _case_working_directories(
+        inventory: dict[str, Any],
+    ) -> list[dict[str, str]]:
+        records: list[dict[str, str]] = []
+        for target in inventory["targets"]:
+            if target["kind"] == "gtest":
+                for case in target["cases"]:
+                    if not case["disabled"]:
+                        records.append(
+                            {
+                                "kind": "gtest",
+                                "name": case["gtest_filter"],
+                                "working_directory": target[
+                                    "working_directory_identity"
+                                ],
+                            }
+                        )
+            else:
+                for test in target["ctest_tests"]:
+                    records.append(
+                        {
+                            "kind": "manual",
+                            "name": test["ctest_name"],
+                            "working_directory": test[
+                                "working_directory_identity"
+                            ],
+                        }
+                    )
+        return sorted(records, key=lambda record: (record["kind"], record["name"]))
+
+    @staticmethod
+    def _refresh_inventory_digest(inventory: dict[str, Any]) -> None:
+        inventory.pop("digest", None)
+        inventory["digest"] = _json_digest(inventory)
+
+    @classmethod
+    def _refresh_transition_execution(
+        cls,
+        report: dict[str, Any],
+        inventory: dict[str, Any],
+    ) -> None:
+        records = cls._case_working_directories(inventory)
+        execution = report["identity"]["execution"]
+        execution["aggregate"] = "IntrinsicCpuCoverageTests"
+        execution["excluded_labels"] = [
+            "benchmark",
+            "flaky-quarantine",
+            "gpu",
+            "slo",
+            "vulkan",
+        ]
+        execution["case_working_directory_digest"] = _json_digest(records)
+        execution["case_working_directory_record_count"] = len(records)
+        execution["working_directory_digest"] = _json_digest(
+            {
+                target["name"]: target["working_directory_identity"]
+                for target in inventory["targets"]
+                if target["kind"] == "gtest"
+            }
+        )
+
+    def _write_transition_bundle(
+        self,
+        name: str,
+        report: dict[str, Any],
+        inventory: dict[str, Any],
+    ) -> Path:
+        output = self.root / name
+        shutil.rmtree(output, ignore_errors=True)
+        output.mkdir(parents=True)
+        (output / "coverage.json").write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        (output / "test-inventory.json").write_text(
+            json.dumps(inventory, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        return output / "coverage.json"
+
+    def _transition_fixture(
+        self,
+        name: str,
+    ) -> tuple[Path, Path, Path]:
+        baseline_report = copy.deepcopy(
+            _load_json(self.report_a / "coverage.json")
+        )
+        candidate_report = copy.deepcopy(baseline_report)
+        baseline_inventory = copy.deepcopy(
+            _load_json(self.report_a / "test-inventory.json")
+        )
+        candidate_inventory = copy.deepcopy(baseline_inventory)
+
+        baseline_inventory["aggregate"] = "IntrinsicCpuCoverageTests"
+        candidate_inventory["aggregate"] = "IntrinsicCpuCoverageTests"
+        alpha = next(
+            target
+            for target in candidate_inventory["targets"]
+            if target["name"] == "AlphaTests"
+        )
+        moved_case = copy.deepcopy(alpha["cases"][0])
+        sentinel_case = copy.deepcopy(moved_case)
+        sentinel_case["ctest_name"] = "Alpha.SmallSentinel"
+        sentinel_case["gtest_filter"] = "Alpha.SmallSentinel"
+        alpha["cases"] = [sentinel_case]
+
+        slow_target = copy.deepcopy(alpha)
+        slow_target["name"] = "AlphaSlowTests"
+        slow_target["labels"] = ["core", "slow", "unit"]
+        moved_case["labels"] = ["core", "slow", "unit"]
+        slow_target["cases"] = [moved_case]
+        candidate_inventory["targets"].append(slow_target)
+        candidate_inventory["targets"].sort(key=lambda target: target["name"])
+        candidate_inventory["summary"] = {
+            "ctest_test_count": 4,
+            "enabled_gtest_case_count": 3,
+            "gtest_target_count": 3,
+            "manual_ctest_test_count": 1,
+            "manual_target_count": 1,
+            "target_count": 4,
+        }
+
+        self._refresh_inventory_digest(baseline_inventory)
+        self._refresh_inventory_digest(candidate_inventory)
+        self._refresh_transition_execution(
+            baseline_report,
+            baseline_inventory,
+        )
+        self._refresh_transition_execution(
+            candidate_report,
+            candidate_inventory,
+        )
+        baseline = self._write_transition_bundle(
+            f"{name}-baseline",
+            baseline_report,
+            baseline_inventory,
+        )
+        candidate = self._write_transition_bundle(
+            f"{name}-candidate",
+            candidate_report,
+            candidate_inventory,
+        )
+        manifest = self.root / f"{name}-transition.json"
+        manifest.write_text(
+            json.dumps(
+                {
+                    "added_fast_sentinels": ["Alpha.SmallSentinel"],
+                    "moved_to_slow": ["Alpha.CoversBothArms"],
+                    "schema": "intrinsic.test-cohort-transition/v1",
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return baseline, candidate, manifest
+
+    def _compare_transition(
+        self,
+        baseline: Path,
+        candidate: Path,
+        manifest: Path,
+        *,
+        check: bool,
+    ) -> subprocess.CompletedProcess[str]:
+        return _run(
+            [
+                sys.executable,
+                str(COMPARE_COVERAGE),
+                "--baseline",
+                str(baseline),
+                "--candidate",
+                str(candidate),
+                "--test-cohort-transition",
+                str(manifest),
+            ],
+            cwd=self.root,
+            check=check,
+        )
+
     def test_parallel_collection_merges_every_producer_and_exact_case(self) -> None:
         report = _load_json(self.report_a / "coverage.json")
         inventory = _load_json(self.report_a / "test-inventory.json")
@@ -821,6 +1025,32 @@ class SourceCoverageTests(unittest.TestCase):
         self.assertEqual(
             report["identity"]["execution"]["case_working_directory_record_count"],
             3,
+        )
+
+    def test_named_cpu_coverage_cohort_binds_aggregate_and_label_identity(
+        self,
+    ) -> None:
+        output = self._collect(
+            self.build_a,
+            "coverage-named-cpu-cohort",
+            cohort="cpu-coverage",
+        )
+        report = _load_json(output / "coverage.json")
+        inventory = _load_json(output / "test-inventory.json")
+        self.assertEqual(inventory["aggregate"], "IntrinsicCpuCoverageTests")
+        self.assertEqual(
+            report["identity"]["execution"]["aggregate"],
+            "IntrinsicCpuCoverageTests",
+        )
+        self.assertEqual(
+            report["identity"]["execution"]["excluded_labels"],
+            [
+                "benchmark",
+                "flaky-quarantine",
+                "gpu",
+                "slo",
+                "vulkan",
+            ],
         )
         targets_by_name = {
             target["name"]: target for target in inventory["targets"]
@@ -1234,6 +1464,163 @@ class SourceCoverageTests(unittest.TestCase):
             r"(?is)test-only refactor identity mismatch.*"
             r"execution.*common_ctest_environment_digest",
         )
+
+    def test_declared_test_cohort_transition_preserves_source_coverage(self) -> None:
+        baseline, candidate, manifest = self._transition_fixture(
+            "valid-cohort-transition"
+        )
+        result = self._compare_transition(
+            baseline,
+            candidate,
+            manifest,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("lost_regions=0 lost_branch_arms=0", result.stdout)
+
+    def test_test_cohort_transition_rejects_undeclared_population_change(
+        self,
+    ) -> None:
+        baseline, candidate, manifest = self._transition_fixture(
+            "undeclared-cohort-addition"
+        )
+        transition = _load_json(manifest)
+        transition["added_fast_sentinels"] = []
+        manifest.write_text(
+            json.dumps(transition, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        result = self._compare_transition(
+            baseline,
+            candidate,
+            manifest,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertRegex(
+            result.stdout,
+            r"(?is)(?:population|sentinel|addition|extra|undeclared)",
+        )
+
+    def test_test_cohort_transition_inventory_proof_fails_closed(self) -> None:
+        for scenario in ("digest", "report-binding"):
+            with self.subTest(scenario=scenario):
+                baseline, candidate, manifest = self._transition_fixture(
+                    f"cohort-inventory-{scenario}"
+                )
+                if scenario == "digest":
+                    inventory_path = candidate.parent / "test-inventory.json"
+                    inventory = _load_json(inventory_path)
+                    inventory["digest"] = "0" * 64
+                    inventory_path.write_text(
+                        json.dumps(inventory, indent=2, sort_keys=True) + "\n",
+                        encoding="utf-8",
+                    )
+                else:
+                    report = _load_json(candidate)
+                    report["identity"]["execution"][
+                        "case_working_directory_record_count"
+                    ] += 1
+                    candidate.write_text(
+                        json.dumps(report, indent=2, sort_keys=True) + "\n",
+                        encoding="utf-8",
+                    )
+                result = self._compare_transition(
+                    baseline,
+                    candidate,
+                    manifest,
+                    check=False,
+                )
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertRegex(
+                    result.stdout,
+                    r"(?is)(?:inventory|digest|binding|record_count|case count)",
+                )
+
+    def test_test_cohort_transition_rejects_common_working_directory_drift(
+        self,
+    ) -> None:
+        baseline, candidate, manifest = self._transition_fixture(
+            "cohort-working-directory-drift"
+        )
+        inventory_path = candidate.parent / "test-inventory.json"
+        inventory = _load_json(inventory_path)
+        moved_target = next(
+            target
+            for target in inventory["targets"]
+            if target["name"] == "AlphaSlowTests"
+        )
+        moved_target["working_directory_identity"] = "$BUILD/moved"
+        self._refresh_inventory_digest(inventory)
+        report = _load_json(candidate)
+        self._refresh_transition_execution(report, inventory)
+        self._write_transition_bundle(
+            candidate.parent.name,
+            report,
+            inventory,
+        )
+        result = self._compare_transition(
+            baseline,
+            candidate,
+            manifest,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertRegex(result.stdout, r"(?is)working.?director")
+
+    def test_test_cohort_transition_rejects_non_slow_label_drift(self) -> None:
+        for scenario, labels in (
+            ("missing-slow", ["core", "unit"]),
+            ("extra-label", ["core", "regression", "slow", "unit"]),
+        ):
+            with self.subTest(scenario=scenario):
+                baseline, candidate, manifest = self._transition_fixture(
+                    f"cohort-label-drift-{scenario}"
+                )
+                inventory_path = candidate.parent / "test-inventory.json"
+                inventory = _load_json(inventory_path)
+                moved_target = next(
+                    target
+                    for target in inventory["targets"]
+                    if target["name"] == "AlphaSlowTests"
+                )
+                moved_target["labels"] = labels
+                moved_target["cases"][0]["labels"] = labels
+                self._refresh_inventory_digest(inventory)
+                inventory_path.write_text(
+                    json.dumps(inventory, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+                result = self._compare_transition(
+                    baseline,
+                    candidate,
+                    manifest,
+                    check=False,
+                )
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertRegex(result.stdout, r"(?is)label")
+
+    def test_test_cohort_transition_rejects_covered_region_loss(self) -> None:
+        baseline, candidate, manifest = self._transition_fixture(
+            "cohort-region-loss"
+        )
+        report = _load_json(candidate)
+        regions = _covered_set(report, "covered_regions")
+        self.assertTrue(regions)
+        lost = regions.pop()
+        candidate.write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        result = self._compare_transition(
+            baseline,
+            candidate,
+            manifest,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn(lost, result.stdout)
+        self.assertRegex(result.stdout, r"(?is)lost.*region|region.*lost")
 
     def test_lost_covered_region_fails_despite_rising_total(self) -> None:
         report = _load_json(self.report_b / "coverage.json")

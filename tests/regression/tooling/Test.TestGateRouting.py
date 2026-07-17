@@ -173,6 +173,14 @@ def _cpu(labels: frozenset[str]) -> bool:
     return not bool(labels.intersection(EXCLUDED_FROM_CPU))
 
 
+def _cpu_coverage(labels: frozenset[str]) -> bool:
+    return not bool(
+        labels.intersection(
+            {"benchmark", "slo", "gpu", "vulkan", "flaky-quarantine"}
+        )
+    )
+
+
 def _cpu_slow(labels: frozenset[str]) -> bool:
     return "slow" in labels and not bool(
         labels.intersection(
@@ -197,6 +205,7 @@ AGGREGATE_PREDICATES: dict[str, AggregatePredicate] = {
     "IntrinsicTests": _all_targets,
     "IntrinsicPrFastTests": _pr_fast,
     "IntrinsicCpuTests": _cpu,
+    "IntrinsicCpuCoverageTests": _cpu_coverage,
     "IntrinsicCpuSlowTests": _cpu_slow,
     "IntrinsicGpuVulkanTests": _gpu_vulkan,
     "IntrinsicPrSmokeTests": _pr_smoke,

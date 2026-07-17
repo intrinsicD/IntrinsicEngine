@@ -91,6 +91,10 @@ class TestBuildAggregateTests(unittest.TestCase):
                     "EXCLUDE_ANY gpu vulkan slow flaky-quarantine)"
                 ),
                 (
+                    "intrinsic_add_test_aggregate(NAME IntrinsicCpuCoverageTests "
+                    "EXCLUDE_ANY benchmark slo gpu vulkan flaky-quarantine)"
+                ),
+                (
                     "intrinsic_add_test_aggregate(NAME IntrinsicCpuSlowTests "
                     "INCLUDE_ALL slow "
                     "EXCLUDE_ANY benchmark slo gpu vulkan flaky-quarantine)"
@@ -127,6 +131,19 @@ class TestBuildAggregateTests(unittest.TestCase):
                     target
                     for target, labels in registrations.items()
                     if not labels.intersection(excluded)
+                },
+                "IntrinsicCpuCoverageTests": {
+                    target
+                    for target, labels in registrations.items()
+                    if not labels.intersection(
+                        {
+                            "benchmark",
+                            "slo",
+                            "gpu",
+                            "vulkan",
+                            "flaky-quarantine",
+                        }
+                    )
                 },
                 "IntrinsicCpuSlowTests": {
                     target

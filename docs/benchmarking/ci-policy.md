@@ -179,8 +179,10 @@ The manually dispatched `ci-source-coverage` workflow owns the reproducible
 Clang CPU source-coverage baseline. It is intentionally absent from pull
 request and default-branch triggers until `CI-009` reviews heavy-gate lifecycle
 placement. The workflow uses the unsanitized `ci-coverage-cpu` preset and
-builds only `IntrinsicCpuTests`; the canonical Linux/Vulkan/Glfw identity is
-explicit so CPU-side Vulkan and GLFW contracts are not silently omitted.
+builds only `IntrinsicCpuCoverageTests`. That aggregate combines the default
+fast CPU cohort with ordinary slow correctness while excluding benchmark, SLO,
+GPU/Vulkan, and quarantined ownership. The canonical Linux/Vulkan/Glfw identity
+is explicit so CPU-side Vulkan and GLFW contracts are not silently omitted.
 
 Coverage evidence has a narrower meaning than correctness evidence:
 
@@ -200,12 +202,19 @@ policy, and execution mode. It then fails when any previously covered
 production region or either outcome of a covered branch disappears. New
 coverage is allowed. Test executable names and their target-keyed working
 directory diagnostic may change during a test-only split. A separate identity
-keyed by stable test case names still requires every case to run from the same
-normalized working directory, and the comparator also requires the same
-selector, common CTest environment, profile mode, and all other execution
-identity fields. Changed-production-line coverage is emitted separately as
-informational diff evidence; threshold policy waits for repeated baselines
-under `CI-009`.
+keyed by stable test case names still requires every common case to run from
+the same normalized working directory, and the comparator also requires the
+same selector, common CTest environment, profile mode, and all other execution
+identity fields.
+
+The stricter `--test-cohort-transition` mode binds each report to its sibling
+test inventory. It permits only the fast sentinels declared by the supplied
+transition manifest, requires every moved heavy case in both complete CPU
+coverage populations, and permits its labels to change only by adding `slow`.
+This prevents a fast-only coverage run from treating routed-out stress cases as
+covered by smaller replacements. Changed-production-line coverage is emitted
+separately as informational diff evidence; threshold policy waits for repeated
+baselines under `CI-009`.
 
 ### Included and excluded sources
 
@@ -216,9 +225,10 @@ or third-party code, and compiler/runtime sources. LLVM's full JSON export is
 retained beside the normalized report so filtering and summary calculations
 remain auditable.
 
-Every executable in the generated `IntrinsicCpuTests.txt` inventory must
-exist, match the CPU selection derived from `RegisteredTestTargets.tsv`, emit
-an instrumented profile, and appear in the one `llvm-cov` object set.
+Every executable in the generated `IntrinsicCpuCoverageTests.txt` inventory
+must exist, match the complete CPU correctness selection derived from
+`RegisteredTestTargets.tsv`, emit an instrumented profile, and appear in the
+one `llvm-cov` object set.
 GoogleTest producers run once with the exact enabled-case filter derived from
 CTest, and their machine-readable XML must name that exact executed set;
 manual producers run through CTest separately. This coverage-reporting-only
@@ -245,16 +255,17 @@ Local reproduction is:
 
 ```bash
 cmake --preset ci-coverage-cpu --fresh
-cmake --build --preset ci-coverage-cpu --target IntrinsicCpuTests
+cmake --build --preset ci-coverage-cpu --target IntrinsicCpuCoverageTests
 python3 tools/ci/run_source_coverage.py \
   --build-dir build/ci-coverage-cpu \
   --output build/ci-coverage-cpu/coverage \
   --preset ci-coverage-cpu \
+  --cohort cpu-coverage \
   --diff-base HEAD^
 python3 tools/ci/compare_source_coverage.py \
   --baseline <baseline>/coverage.json \
   --candidate build/ci-coverage-cpu/coverage/coverage.json \
-  --test-only-refactor
+  --test-cohort-transition tools/ci/slow_test_cohort.json
 ```
 
 The output directory must be absent or empty so stale raw profiles cannot enter

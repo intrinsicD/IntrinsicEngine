@@ -94,7 +94,8 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             1,
         )
         self.assertIn(
-            "cmake --build --preset ci-coverage-cpu --target IntrinsicCpuTests",
+            "cmake --build --preset ci-coverage-cpu "
+            "--target IntrinsicCpuCoverageTests",
             coverage,
         )
         self.assertIn(
@@ -102,6 +103,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             "            --build-dir build/ci-coverage-cpu \\\n"
             "            --output build/ci-coverage-cpu/coverage \\\n"
             "            --preset ci-coverage-cpu \\\n"
+            "            --cohort cpu-coverage \\\n"
             "            --diff-base HEAD^ \\\n"
             "            --jobs 2",
             coverage,
@@ -111,6 +113,10 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             "            --baseline build/ci-coverage-cpu/coverage/coverage.json \\\n"
             "            --candidate build/ci-coverage-cpu/coverage/coverage.json \\\n"
             "            --test-only-refactor",
+            coverage,
+        )
+        self.assertIn(
+            '-LE "^(benchmark|slo|gpu|vulkan|flaky-quarantine)$"',
             coverage,
         )
 

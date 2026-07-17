@@ -17,11 +17,10 @@ from pathlib import Path
 from typing import Mapping, Sequence
 
 from source_coverage import (
-    AGGREGATE,
+    COVERAGE_COHORTS,
     COVERAGE_SCHEMA,
     CoverageError,
     EXECUTION_IDENTITY_SCHEMA,
-    EXCLUDED_CPU_LABELS,
     changed_line_coverage,
     exclusion_identity,
     load_cpu_test_inventory,
@@ -47,13 +46,19 @@ def _bounded_default_jobs() -> int:
 def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Collect fail-closed Clang source coverage for the canonical "
-            "IntrinsicCpuTests executable cohort."
+            "Collect fail-closed Clang source coverage for a declared CPU "
+            "test aggregate and label identity."
         )
     )
     parser.add_argument("--build-dir", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--preset", default="ci-coverage-cpu")
+    parser.add_argument(
+        "--cohort",
+        choices=tuple(COVERAGE_COHORTS),
+        default="cpu",
+        help="named aggregate/label identity to collect (default: cpu)",
+    )
     parser.add_argument("--jobs", type=int, default=_bounded_default_jobs())
     parser.add_argument("--diff-base")
     parser.add_argument("--reconciler", type=Path)
@@ -629,6 +634,7 @@ def collect(arguments: argparse.Namespace) -> dict[str, object]:
     if not build_dir.is_dir():
         raise CoverageError(f"coverage build directory does not exist: {build_dir}")
     output = _prepare_output(arguments.output)
+    cohort = COVERAGE_COHORTS[arguments.cohort]
     for directory in (
         output / "discovery-profiles",
         output / "gtest-results",
@@ -651,6 +657,7 @@ def collect(arguments: argparse.Namespace) -> dict[str, object]:
         reconciler=arguments.reconciler,
         reconciler_log=output / "logs/reconciler.log",
         discovery_profile_dir=output / "discovery-profiles",
+        cohort=cohort,
     )
     discovery_profiles = sorted((output / "discovery-profiles").glob("*.profraw"))
     empty_discovery_profiles = [
@@ -846,12 +853,12 @@ def collect(arguments: argparse.Namespace) -> dict[str, object]:
         ).encode("utf-8")
     ).hexdigest()
     execution_identity = {
-        "aggregate": AGGREGATE,
+        "aggregate": cohort.aggregate,
         "case_working_directory_digest": case_working_directory_digest,
         "case_working_directory_record_count": len(case_working_directories),
         "common_ctest_environment_digest": environment_digest,
         "discovery_profile_pattern": "discovery-profiles/%m-%p.profraw",
-        "excluded_labels": list(EXCLUDED_CPU_LABELS),
+        "excluded_labels": list(cohort.excluded_labels),
         "gtest_result_format": "xml",
         "mode": "per-executable-enabled-gtest-plus-manual-ctest",
         "profile_pattern": "target/%m-%p.profraw",

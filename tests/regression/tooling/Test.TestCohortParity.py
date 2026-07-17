@@ -377,7 +377,19 @@ class TestCohortParityTests(unittest.TestCase):
     def test_rejects_missing_duplicate_or_nonpassing_scheduled_cases(self) -> None:
         result = self._run(junit_records=(("Legacy.Slow", ""),))
         self.assertEqual(result.returncode, 3)
-        self.assertIn("omits declared moved cases", result.stderr)
+        self.assertIn("must contain exactly declared moved cases", result.stderr)
+        self.assertIn("missing=['Heavy.Stress']", result.stderr)
+        self.assertIn("extra=['Legacy.Slow']", result.stderr)
+
+        result = self._run(
+            junit_records=(
+                ("Heavy.Stress", ""),
+                ("Undeclared.Extra", ""),
+            )
+        )
+        self.assertEqual(result.returncode, 3)
+        self.assertIn("must contain exactly declared moved cases", result.stderr)
+        self.assertIn("extra=['Undeclared.Extra']", result.stderr)
 
         result = self._run(
             junit_records=(

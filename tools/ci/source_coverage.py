@@ -10,14 +10,16 @@ import shlex
 import subprocess
 import sys
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Iterable, Mapping, Sequence
+
+from test_cohort_manifest import TestCohortTransition
 
 
 COVERAGE_SCHEMA = "intrinsic.cpu-source-coverage/v2"
 TEST_INVENTORY_SCHEMA = "intrinsic.cpu-test-inventory/v2"
 EXECUTION_IDENTITY_SCHEMA = "intrinsic.cpu-source-coverage-execution/v2"
-AGGREGATE = "IntrinsicCpuTests"
 PRODUCTION_ROOTS = ("src", "methods")
 PRODUCTION_SUFFIXES = frozenset(
     {
@@ -47,7 +49,30 @@ EXCLUDED_PATH_SEGMENTS = frozenset(
         "third_party",
     }
 )
-EXCLUDED_CPU_LABELS = ("flaky-quarantine", "gpu", "slow", "vulkan")
+
+
+@dataclass(frozen=True)
+class CoverageCohort:
+    aggregate: str
+    excluded_labels: tuple[str, ...]
+
+
+COVERAGE_COHORTS = {
+    "cpu": CoverageCohort(
+        aggregate="IntrinsicCpuTests",
+        excluded_labels=("flaky-quarantine", "gpu", "slow", "vulkan"),
+    ),
+    "cpu-coverage": CoverageCohort(
+        aggregate="IntrinsicCpuCoverageTests",
+        excluded_labels=(
+            "benchmark",
+            "flaky-quarantine",
+            "gpu",
+            "slo",
+            "vulkan",
+        ),
+    ),
+}
 IDENTITY_FIELDS = (
     "production",
     "production_build_inputs",
@@ -64,6 +89,13 @@ TEST_REFACTOR_MUTABLE_EXECUTION_FIELDS = frozenset(
     {
         # The v1 diagnostic is keyed by executable target name. The v2
         # case_working_directory_digest below preserves the semantic check.
+        "working_directory_digest",
+    }
+)
+TEST_COHORT_TRANSITION_MUTABLE_EXECUTION_FIELDS = frozenset(
+    {
+        "case_working_directory_digest",
+        "case_working_directory_record_count",
         "working_directory_digest",
     }
 )
@@ -214,13 +246,15 @@ def _run_reconciler(
     reconciler: Path,
     log_path: Path | None,
     environment: Mapping[str, str] | None,
+    *,
+    aggregate: str,
 ) -> None:
     command = (
         [sys.executable, str(reconciler)]
         if reconciler.suffix == ".py"
         else [str(reconciler)]
     )
-    command.extend(["--build-dir", str(build_dir), "--aggregate", AGGREGATE])
+    command.extend(["--build-dir", str(build_dir), "--aggregate", aggregate])
     result = _run_capture(command, env=environment, timeout=300)
     if log_path is not None:
         log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -402,6 +436,7 @@ def load_cpu_test_inventory(
     reconciler: Path | None = None,
     reconciler_log: Path | None = None,
     discovery_profile_dir: Path,
+    cohort: CoverageCohort = COVERAGE_COHORTS["cpu"],
 ) -> dict[str, object]:
     build_dir = build_dir.resolve()
     repo_root = repo_root.resolve()
@@ -418,36 +453,37 @@ def load_cpu_test_inventory(
         reconciler.resolve(),
         reconciler_log,
         discovery_environment,
+        aggregate=cohort.aggregate,
     )
 
     inventory_dir = build_dir / "test-inventories"
     registered = _read_registered_targets(inventory_dir / "RegisteredTestTargets.tsv")
-    members = _read_aggregate(inventory_dir / f"{AGGREGATE}.txt")
+    members = _read_aggregate(inventory_dir / f"{cohort.aggregate}.txt")
     unknown = set(members) - registered.keys()
     if unknown:
         raise CoverageError(
-            f"{AGGREGATE} names unregistered targets {sorted(unknown)!r}"
+            f"{cohort.aggregate} names unregistered targets {sorted(unknown)!r}"
         )
     expected_members = {
         target
         for target, labels in registered.items()
-        if not set(labels).intersection(EXCLUDED_CPU_LABELS)
+        if not set(labels).intersection(cohort.excluded_labels)
     }
     missing_members = expected_members - set(members)
     extra_members = set(members) - expected_members
     if missing_members or extra_members:
         raise CoverageError(
-            f"{AGGREGATE} disagrees with the canonical CPU label predicate: "
+            f"{cohort.aggregate} disagrees with its declared label predicate: "
             f"missing={sorted(missing_members)!r}, extra={sorted(extra_members)!r}"
         )
     wrongly_selected = {
-        target: sorted(set(registered[target]).intersection(EXCLUDED_CPU_LABELS))
+        target: sorted(set(registered[target]).intersection(cohort.excluded_labels))
         for target in members
-        if set(registered[target]).intersection(EXCLUDED_CPU_LABELS)
+        if set(registered[target]).intersection(cohort.excluded_labels)
     }
     if wrongly_selected:
         raise CoverageError(
-            f"{AGGREGATE} includes capability/opt-in targets {wrongly_selected!r}"
+            f"{cohort.aggregate} includes excluded targets {wrongly_selected!r}"
         )
 
     target_paths = {target: _binary_path(build_dir, target) for target in members}
@@ -621,7 +657,9 @@ def load_cpu_test_inventory(
         )
 
     if enabled_case_count == 0:
-        raise CoverageError(f"{AGGREGATE} selected zero enabled GoogleTest cases")
+        raise CoverageError(
+            f"{cohort.aggregate} selected zero enabled GoogleTest cases"
+        )
     if len(common_environments) != 1:
         raise CoverageError(
             "CPU GoogleTest registrations do not share one CTest environment: "
@@ -629,7 +667,7 @@ def load_cpu_test_inventory(
         )
     common_environment = list(next(iter(common_environments)))
     result: dict[str, object] = {
-        "aggregate": AGGREGATE,
+        "aggregate": cohort.aggregate,
         "common_environment": common_environment,
         "schema": TEST_INVENTORY_SCHEMA,
         "summary": {
@@ -1077,6 +1115,299 @@ def _coverage_set(report: Mapping[str, object], field: str) -> frozenset[str]:
     return result
 
 
+@dataclass(frozen=True)
+class InventoryCase:
+    kind: str
+    labels: tuple[str, ...]
+    name: str
+    target: str
+    working_directory: str
+
+
+@dataclass(frozen=True)
+class InventoryEvidence:
+    aggregate: str
+    cases: Mapping[tuple[str, str], InventoryCase]
+    common_environment_digest: str
+    working_directory_digest: str
+
+
+def _inventory_string(
+    value: object,
+    *,
+    context: str,
+) -> str:
+    if not isinstance(value, str) or not value:
+        raise CoverageError(f"{context} must be a nonempty string")
+    return value
+
+
+def _inventory_labels(
+    value: object,
+    *,
+    context: str,
+) -> tuple[str, ...]:
+    if not isinstance(value, list) or any(
+        not isinstance(label, str) or not label for label in value
+    ):
+        raise CoverageError(f"{context} must be a list of nonempty strings")
+    labels = tuple(value)
+    if not labels:
+        raise CoverageError(f"{context} must not be empty")
+    if len(labels) != len(set(labels)):
+        raise CoverageError(f"{context} contains duplicate labels")
+    if labels != tuple(sorted(labels)):
+        raise CoverageError(f"{context} must be sorted")
+    return labels
+
+
+def validate_test_inventory(
+    inventory: Mapping[str, object],
+    *,
+    context: str,
+) -> InventoryEvidence:
+    if inventory.get("schema") != TEST_INVENTORY_SCHEMA:
+        raise CoverageError(
+            f"{context} expected inventory schema {TEST_INVENTORY_SCHEMA!r}, "
+            f"got {inventory.get('schema')!r}"
+        )
+    digest = inventory.get("digest")
+    if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        raise CoverageError(f"{context} test inventory has an invalid digest")
+    unsigned_inventory = dict(inventory)
+    del unsigned_inventory["digest"]
+    expected_digest = _sha256(_canonical_json(unsigned_inventory))
+    if digest != expected_digest:
+        raise CoverageError(
+            f"{context} test inventory digest mismatch: "
+            f"declared={digest!r}, computed={expected_digest!r}"
+        )
+
+    aggregate = _inventory_string(
+        inventory.get("aggregate"),
+        context=f"{context} test inventory aggregate",
+    )
+    common_environment = inventory.get("common_environment")
+    if not isinstance(common_environment, list) or any(
+        not isinstance(entry, str) or "=" not in entry
+        for entry in common_environment
+    ):
+        raise CoverageError(
+            f"{context} test inventory common_environment is malformed"
+        )
+    environment_keys = [entry.partition("=")[0] for entry in common_environment]
+    if (
+        common_environment != sorted(common_environment)
+        or len(environment_keys) != len(set(environment_keys))
+    ):
+        raise CoverageError(
+            f"{context} test inventory common_environment is not canonical"
+        )
+    common_environment_digest = _sha256(_canonical_json(common_environment))
+
+    raw_targets = inventory.get("targets")
+    if not isinstance(raw_targets, list) or not raw_targets:
+        raise CoverageError(f"{context} test inventory targets must be nonempty")
+    cases: dict[tuple[str, str], InventoryCase] = {}
+    target_names: list[str] = []
+    gtest_target_count = 0
+    manual_target_count = 0
+    enabled_gtest_case_count = 0
+    manual_ctest_test_count = 0
+    gtest_working_directories: dict[str, str] = {}
+    for index, raw_target in enumerate(raw_targets, start=1):
+        target_context = f"{context} test inventory target #{index}"
+        if not isinstance(raw_target, dict):
+            raise CoverageError(f"{target_context} must be an object")
+        target_name = _inventory_string(
+            raw_target.get("name"),
+            context=f"{target_context} name",
+        )
+        target_names.append(target_name)
+        target_labels = _inventory_labels(
+            raw_target.get("labels"),
+            context=f"{target_context} labels",
+        )
+        kind = raw_target.get("kind")
+        raw_cases = raw_target.get("cases")
+        raw_ctest_tests = raw_target.get("ctest_tests")
+        if not isinstance(raw_cases, list) or not isinstance(raw_ctest_tests, list):
+            raise CoverageError(
+                f"{target_context} cases and ctest_tests must be lists"
+            )
+
+        if kind == "gtest":
+            gtest_target_count += 1
+            if raw_ctest_tests:
+                raise CoverageError(
+                    f"{target_context} GoogleTest target has manual CTest records"
+                )
+            working_directory = _inventory_string(
+                raw_target.get("working_directory_identity"),
+                context=f"{target_context} working_directory_identity",
+            )
+            gtest_working_directories[target_name] = working_directory
+            for case_index, raw_case in enumerate(raw_cases, start=1):
+                case_context = f"{target_context} case #{case_index}"
+                if not isinstance(raw_case, dict):
+                    raise CoverageError(f"{case_context} must be an object")
+                name = _inventory_string(
+                    raw_case.get("gtest_filter"),
+                    context=f"{case_context} gtest_filter",
+                )
+                labels = _inventory_labels(
+                    raw_case.get("labels"),
+                    context=f"{case_context} labels",
+                )
+                if labels != target_labels:
+                    raise CoverageError(
+                        f"{case_context} labels differ from target labels"
+                    )
+                disabled = raw_case.get("disabled")
+                if not isinstance(disabled, bool):
+                    raise CoverageError(f"{case_context} disabled must be Boolean")
+                if disabled:
+                    continue
+                key = ("gtest", name)
+                if key in cases:
+                    raise CoverageError(
+                        f"{context} test inventory repeats enabled case {name!r}"
+                    )
+                cases[key] = InventoryCase(
+                    kind="gtest",
+                    labels=labels,
+                    name=name,
+                    target=target_name,
+                    working_directory=working_directory,
+                )
+                enabled_gtest_case_count += 1
+        elif kind == "manual":
+            manual_target_count += 1
+            if raw_cases:
+                raise CoverageError(
+                    f"{target_context} manual target has GoogleTest records"
+                )
+            for test_index, raw_test in enumerate(raw_ctest_tests, start=1):
+                test_context = f"{target_context} CTest record #{test_index}"
+                if not isinstance(raw_test, dict):
+                    raise CoverageError(f"{test_context} must be an object")
+                name = _inventory_string(
+                    raw_test.get("ctest_name"),
+                    context=f"{test_context} ctest_name",
+                )
+                labels = _inventory_labels(
+                    raw_test.get("labels"),
+                    context=f"{test_context} labels",
+                )
+                if labels != target_labels:
+                    raise CoverageError(
+                        f"{test_context} labels differ from target labels"
+                    )
+                working_directory = _inventory_string(
+                    raw_test.get("working_directory_identity"),
+                    context=f"{test_context} working_directory_identity",
+                )
+                key = ("manual", name)
+                if key in cases:
+                    raise CoverageError(
+                        f"{context} test inventory repeats manual case {name!r}"
+                    )
+                cases[key] = InventoryCase(
+                    kind="manual",
+                    labels=labels,
+                    name=name,
+                    target=target_name,
+                    working_directory=working_directory,
+                )
+                manual_ctest_test_count += 1
+        else:
+            raise CoverageError(
+                f"{target_context} kind must be 'gtest' or 'manual'"
+            )
+
+    if target_names != sorted(target_names) or len(target_names) != len(
+        set(target_names)
+    ):
+        raise CoverageError(
+            f"{context} test inventory targets are unsorted or duplicated"
+        )
+    if not cases:
+        raise CoverageError(f"{context} test inventory selects zero enabled cases")
+    expected_summary = {
+        "ctest_test_count": enabled_gtest_case_count + manual_ctest_test_count,
+        "enabled_gtest_case_count": enabled_gtest_case_count,
+        "gtest_target_count": gtest_target_count,
+        "manual_ctest_test_count": manual_ctest_test_count,
+        "manual_target_count": manual_target_count,
+        "target_count": len(raw_targets),
+    }
+    if inventory.get("summary") != expected_summary:
+        raise CoverageError(
+            f"{context} test inventory summary mismatch: "
+            f"expected={expected_summary!r}, actual={inventory.get('summary')!r}"
+        )
+    return InventoryEvidence(
+        aggregate=aggregate,
+        cases=cases,
+        common_environment_digest=common_environment_digest,
+        working_directory_digest=_sha256(
+            _canonical_json(gtest_working_directories)
+        ),
+    )
+
+
+def bind_test_inventory(
+    report: Mapping[str, object],
+    inventory: Mapping[str, object],
+    *,
+    context: str,
+) -> InventoryEvidence:
+    validate_coverage_report(report)
+    evidence = validate_test_inventory(inventory, context=context)
+    identity = report["identity"]
+    assert isinstance(identity, dict)
+    execution = identity["execution"]
+    assert isinstance(execution, dict)
+    if execution["aggregate"] != evidence.aggregate:
+        raise CoverageError(
+            f"{context} test inventory aggregate does not match coverage "
+            f"execution: inventory={evidence.aggregate!r}, "
+            f"execution={execution['aggregate']!r}"
+        )
+    if (
+        execution["common_ctest_environment_digest"]
+        != evidence.common_environment_digest
+    ):
+        raise CoverageError(
+            f"{context} test inventory common environment does not match "
+            "coverage execution identity"
+        )
+    if execution["working_directory_digest"] != evidence.working_directory_digest:
+        raise CoverageError(
+            f"{context} test inventory target working directories do not match "
+            "coverage execution identity"
+        )
+    case_working_directories = [
+        {
+            "kind": case.kind,
+            "name": case.name,
+            "working_directory": case.working_directory,
+        }
+        for _key, case in sorted(evidence.cases.items())
+    ]
+    case_digest = _sha256(_canonical_json(case_working_directories))
+    if (
+        execution["case_working_directory_digest"] != case_digest
+        or execution["case_working_directory_record_count"]
+        != len(case_working_directories)
+    ):
+        raise CoverageError(
+            f"{context} test inventory case population does not match coverage "
+            "execution identity"
+        )
+    return evidence
+
+
 def validate_coverage_report(report: Mapping[str, object]) -> None:
     if report.get("schema") != COVERAGE_SCHEMA:
         raise CoverageError(
@@ -1196,6 +1527,194 @@ def compare_test_only_refactor(
             f"branch_arms={lost_branch_arms[:20]!r}"
         )
     return result
+
+
+def _test_cohort_transition_identity(
+    identity: Mapping[str, object],
+) -> dict[str, object]:
+    normalized = dict(identity)
+    execution = normalized.get("execution")
+    assert isinstance(execution, dict)
+    normalized["execution"] = {
+        field: value
+        for field, value in execution.items()
+        if field not in TEST_COHORT_TRANSITION_MUTABLE_EXECUTION_FIELDS
+    }
+    return normalized
+
+
+def compare_test_cohort_transition(
+    baseline: Mapping[str, object],
+    candidate: Mapping[str, object],
+    baseline_inventory: Mapping[str, object],
+    candidate_inventory: Mapping[str, object],
+    transition: TestCohortTransition,
+) -> dict[str, object]:
+    baseline_evidence = bind_test_inventory(
+        baseline,
+        baseline_inventory,
+        context="baseline",
+    )
+    candidate_evidence = bind_test_inventory(
+        candidate,
+        candidate_inventory,
+        context="candidate",
+    )
+
+    expected_cohort = COVERAGE_COHORTS["cpu-coverage"]
+    for context, report, evidence in (
+        ("baseline", baseline, baseline_evidence),
+        ("candidate", candidate, candidate_evidence),
+    ):
+        identity = report["identity"]
+        assert isinstance(identity, dict)
+        execution = identity["execution"]
+        assert isinstance(execution, dict)
+        expected_execution = {
+            "aggregate": expected_cohort.aggregate,
+            "excluded_labels": list(expected_cohort.excluded_labels),
+        }
+        actual_execution = {
+            field: execution.get(field) for field in expected_execution
+        }
+        if actual_execution != expected_execution or (
+            evidence.aggregate != expected_cohort.aggregate
+        ):
+            raise CoverageError(
+                f"{context} coverage must use the dedicated cpu-coverage "
+                f"cohort: expected={expected_execution!r}, "
+                f"actual={actual_execution!r}"
+            )
+        excluded_cases = {
+            case.name: sorted(
+                set(case.labels).intersection(expected_cohort.excluded_labels)
+            )
+            for case in evidence.cases.values()
+            if set(case.labels).intersection(expected_cohort.excluded_labels)
+        }
+        if excluded_cases:
+            raise CoverageError(
+                f"{context} cpu-coverage inventory contains excluded cases: "
+                f"{excluded_cases!r}"
+            )
+
+    baseline_identity = baseline["identity"]
+    candidate_identity = candidate["identity"]
+    assert isinstance(baseline_identity, dict)
+    assert isinstance(candidate_identity, dict)
+    comparable_baseline_identity = _test_cohort_transition_identity(
+        baseline_identity
+    )
+    comparable_candidate_identity = _test_cohort_transition_identity(
+        candidate_identity
+    )
+    mismatches = [
+        field
+        for field in IDENTITY_FIELDS
+        if comparable_baseline_identity[field]
+        != comparable_candidate_identity[field]
+    ]
+    if mismatches:
+        details = {
+            field: {
+                "baseline": comparable_baseline_identity[field],
+                "candidate": comparable_candidate_identity[field],
+            }
+            for field in mismatches
+        }
+        raise CoverageError(
+            "test-cohort transition identity mismatch: "
+            + json.dumps(details, sort_keys=True)
+        )
+
+    baseline_cases = baseline_evidence.cases
+    candidate_cases = candidate_evidence.cases
+    baseline_keys = set(baseline_cases)
+    candidate_keys = set(candidate_cases)
+    expected_added = {
+        ("gtest", name) for name in transition.added_fast_sentinels
+    }
+    actual_added = candidate_keys - baseline_keys
+    missing = sorted(baseline_keys - candidate_keys)
+    unexpected = sorted(actual_added - expected_added)
+    undeclared_missing_sentinels = sorted(expected_added - actual_added)
+    if missing or unexpected or undeclared_missing_sentinels:
+        raise CoverageError(
+            "test-cohort transition population mismatch: "
+            f"removed={missing!r}, unexpected={unexpected!r}, "
+            f"missing_sentinels={undeclared_missing_sentinels!r}"
+        )
+
+    moved_keys = {("gtest", name) for name in transition.moved_to_slow}
+    missing_moved = sorted(
+        key
+        for key in moved_keys
+        if key not in baseline_cases or key not in candidate_cases
+    )
+    if missing_moved:
+        raise CoverageError(
+            "test-cohort transition omits declared moved cases: "
+            f"{missing_moved!r}"
+        )
+
+    for key in sorted(baseline_keys):
+        baseline_case = baseline_cases[key]
+        candidate_case = candidate_cases[key]
+        if baseline_case.working_directory != candidate_case.working_directory:
+            raise CoverageError(
+                f"test-cohort transition changed working directory for "
+                f"{key!r}: baseline={baseline_case.working_directory!r}, "
+                f"candidate={candidate_case.working_directory!r}"
+            )
+        baseline_labels = set(baseline_case.labels)
+        candidate_labels = set(candidate_case.labels)
+        if key in moved_keys:
+            expected_labels = baseline_labels | {"slow"}
+            if "slow" in baseline_labels or candidate_labels != expected_labels:
+                raise CoverageError(
+                    f"moved case {baseline_case.name!r} labels must transition "
+                    "only by adding 'slow': "
+                    f"baseline={sorted(baseline_labels)!r}, "
+                    f"candidate={sorted(candidate_labels)!r}"
+                )
+        elif candidate_labels != baseline_labels:
+            raise CoverageError(
+                f"test-cohort transition changed labels for undeclared case "
+                f"{key!r}: baseline={sorted(baseline_labels)!r}, "
+                f"candidate={sorted(candidate_labels)!r}"
+            )
+
+    for key in sorted(expected_added):
+        sentinel = candidate_cases[key]
+        if "slow" in sentinel.labels:
+            raise CoverageError(
+                f"declared fast sentinel {sentinel.name!r} carries the slow label"
+            )
+
+    baseline_regions = _coverage_set(baseline, "covered_regions")
+    candidate_regions = _coverage_set(candidate, "covered_regions")
+    baseline_branches = _coverage_set(baseline, "covered_branch_arms")
+    candidate_branches = _coverage_set(candidate, "covered_branch_arms")
+    lost_regions = sorted(baseline_regions - candidate_regions)
+    lost_branch_arms = sorted(baseline_branches - candidate_branches)
+    if lost_regions or lost_branch_arms:
+        raise CoverageError(
+            "test-cohort transition lost covered production evidence: "
+            f"regions={lost_regions[:20]!r}, "
+            f"branch_arms={lost_branch_arms[:20]!r}"
+        )
+    return {
+        "added_fast_sentinel_count": len(expected_added),
+        "baseline_case_count": len(baseline_cases),
+        "candidate_case_count": len(candidate_cases),
+        "gained_branch_arms": sorted(candidate_branches - baseline_branches),
+        "gained_regions": sorted(candidate_regions - baseline_regions),
+        "lost_branch_arms": [],
+        "lost_regions": [],
+        "mode": "test-cohort-transition",
+        "moved_case_count": len(moved_keys),
+        "status": "ok",
+    }
 
 
 def changed_line_coverage(
