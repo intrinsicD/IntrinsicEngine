@@ -328,6 +328,21 @@ class WorkflowConcurrencyTests(unittest.TestCase):
                 "type": "boolean",
             },
         )
+        grouped_input = triggers["workflow_dispatch"]["inputs"][
+            "collect_grouped_ctest_evidence"
+        ]
+        self.assertEqual(
+            grouped_input,
+            {
+                "description": (
+                    "Collect matched individual/grouped CPU timing and "
+                    "parity evidence"
+                ),
+                "required": False,
+                "default": False,
+                "type": "boolean",
+            },
+        )
 
         jobs = payload["jobs"]
         full_job = jobs["ci-linux-clang"]
@@ -335,7 +350,8 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             " ".join(full_job["if"].split()),
             (
                 "github.event_name != 'workflow_dispatch' || "
-                "!inputs.collect_test_timing"
+                "(!inputs.collect_test_timing && "
+                "!inputs.collect_grouped_ctest_evidence)"
             ),
         )
 
@@ -415,6 +431,72 @@ class WorkflowConcurrencyTests(unittest.TestCase):
                 condition = " ".join(jobs[job_name]["if"].split())
                 self.assertIn("inputs.run_sanitizers", condition)
                 self.assertIn("!inputs.collect_test_timing", condition)
+                self.assertIn(
+                    "!inputs.collect_grouped_ctest_evidence",
+                    condition,
+                )
+
+    def test_grouped_ctest_evidence_is_single_runner_and_minimal(self) -> None:
+        payload, _ = _load_workflow("ci-linux-clang.yml")
+        job = payload["jobs"]["grouped-ctest-evidence"]
+        self.assertEqual(
+            " ".join(job["if"].split()),
+            (
+                "github.event_name == 'workflow_dispatch' && "
+                "inputs.collect_grouped_ctest_evidence && "
+                "!inputs.collect_test_timing"
+            ),
+        )
+        self.assertEqual(job["runs-on"], "ubuntu-24.04")
+        self.assertNotIn("strategy", job)
+        steps = {step["name"]: step for step in job["steps"]}
+
+        configure = steps["Configure individual and grouped plans"]["run"]
+        self.assertEqual(configure.count("cmake --preset ci"), 2)
+        self.assertIn("-B build/ci-grouped", configure)
+        self.assertIn("-DINTRINSIC_GROUP_PURE_CTEST=ON", configure)
+
+        build = steps["Build individual and grouped CPU plans"]["run"]
+        self.assertEqual(build.count("--target IntrinsicCpuTests"), 2)
+        reconcile = steps["Reconcile and compare registrations"]["run"]
+        self.assertEqual(
+            reconcile.count("Test.TestGateRouting.py"),
+            2,
+        )
+        reconcile_one_line = " ".join(reconcile.replace("\\", "").split())
+        self.assertIn(
+            "Test.GroupedCTestParity.py registration",
+            reconcile_one_line,
+        )
+
+        collect = steps[
+            "Collect five matched pairs at j1, j2, and j4"
+        ]["run"]
+        self.assertIn("for jobs in 1 2 4", collect)
+        self.assertIn("for pair_index in 1 2 3 4 5", collect)
+        self.assertIn("pair_index % 2 == 0", collect)
+        self.assertEqual(
+            collect.count("tools/ci/collect_test_timing.py"),
+            1,
+        )
+        self.assertIn("--cohort cpu", collect)
+        self.assertIn("--samples 1", collect)
+        self.assertIn("--parallel \"$jobs\"", collect)
+        collect_one_line = " ".join(collect.replace("\\", "").split())
+        self.assertIn(
+            "Test.GroupedCTestParity.py execution",
+            collect_one_line,
+        )
+        for excluded in ("pr-fast", "cpu-slow", "gpu", "vulkan"):
+            with self.subTest(excluded=excluded):
+                self.assertNotIn(excluded, collect)
+
+        upload = steps["Upload grouped CTest evidence"]
+        self.assertEqual(upload["if"], "always()")
+        self.assertEqual(
+            upload["with"]["name"],
+            "ci008-grouped-ctest-evidence",
+        )
 
     def test_nightly_partitions_fast_slow_slo_and_benchmark_owners(self) -> None:
         payload, _ = _load_workflow("nightly-deep.yml")

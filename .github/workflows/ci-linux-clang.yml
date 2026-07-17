@@ -16,6 +16,11 @@ on:
         required: false
         default: false
         type: boolean
+      collect_grouped_ctest_evidence:
+        description: Collect matched individual/grouped CPU timing and parity evidence
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -25,7 +30,8 @@ jobs:
   ci-linux-clang:
     if: >-
       github.event_name != 'workflow_dispatch' ||
-      !inputs.collect_test_timing
+      (!inputs.collect_test_timing &&
+      !inputs.collect_grouped_ctest_evidence)
     runs-on: ubuntu-24.04
 
     steps:
@@ -281,12 +287,134 @@ jobs:
           path: ${{ matrix.cohort.build_dir }}/test-timing/
           if-no-files-found: error
 
+  grouped-ctest-evidence:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.collect_grouped_ctest_evidence &&
+      !inputs.collect_test_timing
+    name: grouped-ctest-evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            clang-20 \
+            clang-tools-20 \
+            python3 \
+            libx11-dev \
+            libxcursor-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxi-dev \
+            libxext-dev \
+            libxfixes-dev \
+            libwayland-dev \
+            libxkbcommon-dev \
+            libgl1-mesa-dev \
+            libvulkan-dev \
+            vulkan-tools \
+            spirv-tools
+
+      - name: Cache vcpkg binary packages
+        uses: actions/cache@v4
+        with:
+          path: external/vcpkg-bincache
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'tools/vcpkg/**', 'tools/setup/bootstrap_vcpkg.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-
+
+      - name: Bootstrap vcpkg
+        run: tools/setup/bootstrap_vcpkg.sh
+
+      - name: Enable vcpkg binary cache
+        run: echo "VCPKG_BINARY_SOURCES=clear;files,${GITHUB_WORKSPACE}/external/vcpkg-bincache,readwrite" >> "$GITHUB_ENV"
+
+      - name: Configure individual and grouped plans
+        run: |
+          cmake --preset ci --fresh
+          cmake --preset ci \
+            -B build/ci-grouped \
+            --fresh \
+            -DINTRINSIC_GROUP_PURE_CTEST=ON
+
+      - name: Build individual and grouped CPU plans
+        run: |
+          cmake --build --preset ci --target IntrinsicCpuTests
+          cmake --build build/ci-grouped --target IntrinsicCpuTests -j4
+
+      - name: Reconcile and compare registrations
+        run: |
+          python3 tests/regression/tooling/Test.TestGateRouting.py \
+            --build-dir build/ci \
+            --aggregate IntrinsicCpuTests
+          python3 tests/regression/tooling/Test.TestGateRouting.py \
+            --build-dir build/ci-grouped \
+            --aggregate IntrinsicCpuTests
+          python3 tests/regression/tooling/Test.GroupedCTestParity.py \
+            registration \
+            --individual-build-dir build/ci \
+            --grouped-build-dir build/ci-grouped \
+            --output build/ci008-grouped-evidence/registration.json
+
+      - name: Collect five matched pairs at j1, j2, and j4
+        run: |
+          set -euo pipefail
+          evidence_root=build/ci008-grouped-evidence
+          for jobs in 1 2 4; do
+            for pair_index in 1 2 3 4 5; do
+              pair=$(printf '%02d' "$pair_index")
+              plans=(individual grouped)
+              if (( pair_index % 2 == 0 )); then
+                plans=(grouped individual)
+              fi
+
+              for plan in "${plans[@]}"; do
+                build_dir=build/ci
+                if [[ "$plan" == grouped ]]; then
+                  build_dir=build/ci-grouped
+                fi
+                python3 tools/ci/collect_test_timing.py \
+                  --build-dir "$build_dir" \
+                  --cohort cpu \
+                  --samples 1 \
+                  --parallel "$jobs" \
+                  --output "$evidence_root/j$jobs/pair-$pair/$plan"
+              done
+
+              python3 tests/regression/tooling/Test.GroupedCTestParity.py \
+                execution \
+                --individual-build-dir build/ci \
+                --grouped-build-dir build/ci-grouped \
+                --individual-junit "$evidence_root/j$jobs/pair-$pair/individual/samples/sample-01.junit.xml" \
+                --grouped-junit "$evidence_root/j$jobs/pair-$pair/grouped/samples/sample-01.junit.xml" \
+                --grouped-gtest-dir "$evidence_root/j$jobs/pair-$pair/grouped/samples/sample-01.gtest" \
+                --output "$evidence_root/j$jobs/pair-$pair/parity.json"
+            done
+          done
+
+      - name: Upload grouped CTest evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci008-grouped-ctest-evidence
+          path: build/ci008-grouped-evidence/
+          if-no-files-found: warn
+
   sanitizer-tests:
     if: >-
       github.event_name == 'pull_request' ||
       (github.event_name == 'workflow_dispatch' &&
       inputs.run_sanitizers &&
-      !inputs.collect_test_timing)
+      !inputs.collect_test_timing &&
+      !inputs.collect_grouped_ctest_evidence)
     uses: ./.github/workflows/ci-sanitizers.yml
 
   cpu-test-selection-parity:
@@ -294,7 +422,8 @@ jobs:
       github.event_name == 'pull_request' ||
       (github.event_name == 'workflow_dispatch' &&
       inputs.run_sanitizers &&
-      !inputs.collect_test_timing)
+      !inputs.collect_test_timing &&
+      !inputs.collect_grouped_ctest_evidence)
     needs:
       - ci-linux-clang
       - sanitizer-tests
