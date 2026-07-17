@@ -15,7 +15,8 @@ map.
 
 ## Tasks
 
-- [CI-005 — Make PR-fast a real touched-scope feedback gate](CI-005-real-touched-scope-pr-fast-gate.md)
+- [CI-005 — Make PR-fast a real touched-scope feedback gate](../../active/CI-005-real-touched-scope-pr-fast-gate.md)
+  (currently active).
 - [CI-006 — Remove duplicate sanitizer work and isolate variants](CI-006-sanitizer-topology-and-test-parallelism.md)
 - [CI-008 — Reduce CTest process overhead without oversubscribing workers](CI-008-grouped-ctest-and-worker-oversubscription.md)
 - [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
@@ -36,7 +37,7 @@ retirement log.
   `CI-007` establishes the bounded module-safe `pr-fast` ccache policy;
   retired `BUG-107` makes the configured target graph deterministic, and
   retired `BUG-106` restores truthful test ownership. Retired `CI-010`
-  establishes coverage parity; `CI-005` next consumes the corrected
+  establishes coverage parity; active `CI-005` consumes the corrected
   registry/graph; `CI-006`
   isolates the
   retained sanitizer variants; `CI-011` measures the fast/slow cohort; and

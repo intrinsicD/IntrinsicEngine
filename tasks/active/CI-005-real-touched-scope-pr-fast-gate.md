@@ -9,6 +9,12 @@ depends_on:
 ---
 # CI-005 — Make PR-fast a real touched-scope feedback gate
 
+## Status
+- In progress on 2026-07-17; owner: Codex; branch: `main`.
+- Next verification: land the staged fail-closed planner and `ci-fast` workflow,
+  then measure the broad-only cross-layer smoke against its declared budget
+  before enabling it for focused source routes.
+
 ## Goal
 - Introduce an unsanitized `ci-fast` preset and wire the existing conservative
   touched-scope planner into PR-fast so small changes receive useful feedback
