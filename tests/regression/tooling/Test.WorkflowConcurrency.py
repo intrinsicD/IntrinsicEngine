@@ -326,10 +326,23 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         payload, coverage = _load_workflow("ci-source-coverage.yml")
         triggers = payload.get("on", payload.get(True, {}))
         self.assertEqual(set(triggers), {"workflow_dispatch"})
+        dispatch = triggers["workflow_dispatch"]
+        self.assertEqual(
+            dispatch["inputs"]["compare_grouped_ctest"],
+            {
+                "description": (
+                    "Compare individual and grouped CTest source coverage"
+                ),
+                "required": False,
+                "default": False,
+                "type": "boolean",
+            },
+        )
         self.assertEqual(
             coverage.count("-- cmake --preset ci-coverage-cpu --fresh"),
             1,
         )
+        self.assertEqual(coverage.count("cmake --build"), 1)
         self.assertIn(
             "cmake --build --preset ci-coverage-cpu "
             "--target IntrinsicCpuCoverageTests",
@@ -355,6 +368,66 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         self.assertIn(
             '-LE "^(benchmark|slo|gpu|vulkan|flaky-quarantine)$"',
             coverage,
+        )
+        steps = payload["jobs"]["cpu-source-coverage"]["steps"]
+        named_steps = {step.get("name"): step for step in steps}
+        reconfigure = named_steps[
+            "Reconfigure grouped CTest coverage registration"
+        ]
+        collect = named_steps["Collect grouped CTest source coverage"]
+        compare = named_steps["Compare grouped CTest source coverage"]
+        baseline_upload = named_steps["Upload CPU source-coverage artifact"]
+        upload = named_steps[
+            "Upload grouped CTest source-coverage artifact"
+        ]
+        self.assertLess(
+            steps.index(baseline_upload),
+            steps.index(reconfigure),
+        )
+        self.assertEqual(
+            reconfigure["if"],
+            "${{ inputs.compare_grouped_ctest }}",
+        )
+        self.assertEqual(
+            " ".join(reconfigure["run"].replace("\\\n", " ").split()),
+            "cmake --preset ci-coverage-cpu "
+            "-B build/ci-coverage-cpu "
+            "-DINTRINSIC_GROUP_PURE_CTEST=ON",
+        )
+        self.assertNotIn("cmake --build", reconfigure["run"])
+        self.assertEqual(
+            collect["if"],
+            "${{ inputs.compare_grouped_ctest }}",
+        )
+        self.assertIn(
+            "--output build/ci-coverage-cpu/coverage-grouped",
+            collect["run"],
+        )
+        self.assertEqual(
+            compare["if"],
+            "${{ inputs.compare_grouped_ctest }}",
+        )
+        self.assertIn(
+            "--baseline build/ci-coverage-cpu/coverage/coverage.json",
+            compare["run"],
+        )
+        self.assertIn(
+            "--candidate "
+            "build/ci-coverage-cpu/coverage-grouped/coverage.json",
+            compare["run"],
+        )
+        self.assertIn("--require-exact", compare["run"])
+        self.assertEqual(
+            upload["if"],
+            "${{ always() && inputs.compare_grouped_ctest }}",
+        )
+        self.assertEqual(
+            upload["with"]["name"],
+            "cpu-source-coverage-grouped-ctest",
+        )
+        self.assertEqual(
+            upload["with"]["path"],
+            "build/ci-coverage-cpu/coverage-grouped/",
         )
 
     def test_pr_fast_classifies_and_runs_structural_checks_before_cpp_setup(

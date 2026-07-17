@@ -2,6 +2,12 @@ name: ci-source-coverage
 
 on:
   workflow_dispatch:
+    inputs:
+      compare_grouped_ctest:
+        description: Compare individual and grouped CTest source coverage
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -146,4 +152,38 @@ jobs:
         with:
           name: cpu-source-coverage
           path: build/ci-coverage-cpu/coverage/
+          if-no-files-found: warn
+
+      - name: Reconfigure grouped CTest coverage registration
+        if: ${{ inputs.compare_grouped_ctest }}
+        run: |
+          cmake --preset ci-coverage-cpu \
+            -B build/ci-coverage-cpu \
+            -DINTRINSIC_GROUP_PURE_CTEST=ON
+
+      - name: Collect grouped CTest source coverage
+        if: ${{ inputs.compare_grouped_ctest }}
+        run: |
+          python3 tools/ci/run_source_coverage.py \
+            --build-dir build/ci-coverage-cpu \
+            --output build/ci-coverage-cpu/coverage-grouped \
+            --preset ci-coverage-cpu \
+            --cohort cpu-coverage \
+            --diff-base HEAD^ \
+            --jobs 1
+
+      - name: Compare grouped CTest source coverage
+        if: ${{ inputs.compare_grouped_ctest }}
+        run: |
+          python3 tools/ci/compare_source_coverage.py \
+            --baseline build/ci-coverage-cpu/coverage/coverage.json \
+            --candidate build/ci-coverage-cpu/coverage-grouped/coverage.json \
+            --require-exact
+
+      - name: Upload grouped CTest source-coverage artifact
+        if: ${{ always() && inputs.compare_grouped_ctest }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpu-source-coverage-grouped-ctest
+          path: build/ci-coverage-cpu/coverage-grouped/
           if-no-files-found: warn
