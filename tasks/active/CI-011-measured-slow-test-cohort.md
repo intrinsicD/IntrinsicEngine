@@ -6,6 +6,7 @@ depends_on:
   - CI-005
   - CI-006
   - CI-010
+  - BUG-112
 ---
 # CI-011 — Calibrate the slow-test cohort and retain fast sentinels
 

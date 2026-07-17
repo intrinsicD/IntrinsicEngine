@@ -11,6 +11,9 @@ Each active task should include:
 
 ## Currently active
 
+- [`BUG-112`](BUG-112-clang-source-coverage-production-path-instability.md) —
+  remove two diagnosed production-path instabilities that prevent strict
+  Clang 20 source-coverage parity from completing.
 - [`CI-011`](CI-011-measured-slow-test-cohort.md) — collect comparable hosted
   per-case timing evidence, split only measured heavy variants, and retain
   complete fast-sentinel plus scheduled-slow coverage.

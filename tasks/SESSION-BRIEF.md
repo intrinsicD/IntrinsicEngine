@@ -8,6 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
+- `BUG-112` — Clang source coverage is unstable on two production paths (tasks/active/BUG-112-clang-source-coverage-production-path-instability.md)
 - `CI-011` — Calibrate the slow-test cohort and retain fast sentinels (tasks/active/CI-011-measured-slow-test-cohort.md)
 
 ## Theme B — Rendering modernization
