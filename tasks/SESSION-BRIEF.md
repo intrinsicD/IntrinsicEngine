@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `BUG-107` — Backend target graph depends on configure history (tasks/active/BUG-107-backend-target-graph-configure-history.md)
 
 ## Theme B — Rendering modernization
 
@@ -55,7 +55,6 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-096` — ICP point-to-plane ignores target normals (tasks/backlog/bugs/BUG-096-icp-point-to-plane-target-normals.md)
 - unblocked: `BUG-097` — Progressive model-scene UV job publishes a zero atlas (tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md)
 - unblocked: `BUG-106` — Test-gate capability routing hides CPU coverage (tasks/backlog/bugs/BUG-106-test-gate-capability-routing-drift.md)
-- unblocked: `BUG-107` — Backend target graph depends on configure history (tasks/backlog/bugs/BUG-107-backend-target-graph-configure-history.md)
 - unblocked: `BUG-108` — Fibonacci sphere sampling small-count and endpoint safety (tasks/backlog/bugs/BUG-108-fibonacci-sphere-small-count-endpoints.md)
 - unblocked: `BUG-109` — Voxel downsampling invalid-input and deterministic-cell ordering (tasks/backlog/bugs/BUG-109-voxel-downsample-invalid-input-ordering.md)
 - unblocked: `BUG-110` — Implicit smoothing applies boundary pins after rather than during solve (tasks/backlog/bugs/BUG-110-implicit-smoothing-boundary-dirichlet-solve.md)

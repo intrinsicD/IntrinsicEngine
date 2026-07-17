@@ -17,7 +17,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   the explicit-pole variants overwrite the north pole, leave element zero
   defaulted, and underflow/write out of bounds for small counts; define and
   regress the common `0`/`1`/`2` contract.
-- [`BUG-107` — Backend target graph depends on configure history](BUG-107-backend-target-graph-configure-history.md):
+- [`BUG-107` — Backend target graph depends on configure history](../../active/BUG-107-backend-target-graph-configure-history.md):
   renderer backend targets can be evaluated before the platform layer defines
   the global backend default, so fresh and reused build trees can expose
   different target/test inventories for identical inputs; establish defaults

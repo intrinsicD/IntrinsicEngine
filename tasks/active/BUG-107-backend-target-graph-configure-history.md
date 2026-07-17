@@ -5,6 +5,12 @@ depends_on: []
 ---
 # BUG-107 — Backend target graph depends on configure history
 
+## Status
+- In progress on 2026-07-17; owner: Codex; branch: `main` (local).
+- Next verification: establish the root-owned identity, then prove normalized
+  fresh/reconfigure/fresh target and test inventories match for Null, Vulkan,
+  and Auto configurations.
+
 ## Goal
 - Make backend and platform target selection deterministic on the first clean
   configure and every same-input reconfigure.
@@ -33,6 +39,11 @@ depends_on: []
   sets on clean versus reused trees, invalidating selection and timing evidence.
 - Owner: root CMake configuration and platform/renderer build wiring. This is
   a build-graph correction, not an engine-layer dependency change.
+- Reproduced on 2026-07-17: two independent fresh `ci` trees each registered
+  26 test targets and 25 initial CPU CTest entries; an unchanged reconfigure
+  of either tree registered 32 targets and 30 entries by adding the Vulkan
+  target family. The second fresh configure matched the first, isolating
+  configure history rather than source or preset drift.
 
 ## Required changes
 - [ ] Establish `EXTRINSIC_PLATFORM` and `EXTRINSIC_BACKEND` defaults in one
