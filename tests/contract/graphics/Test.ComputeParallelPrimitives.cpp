@@ -354,8 +354,16 @@ TEST(ComputeParallelPrimitives, LargePrefixScanPlanAddsOffsetsFromTopDown)
               Graphics::ParallelPrimitivePassKind::PrefixBlockScan);
     EXPECT_EQ(plan.Dispatches[1].Kind,
               Graphics::ParallelPrimitivePassKind::PrefixBlockScan);
+    EXPECT_EQ(plan.Dispatches[1].BlockSumsRole,
+              Graphics::ParallelPrimitiveBufferRole::Scratch);
+    EXPECT_EQ(plan.Dispatches[1].BlockSumsOffsetBytes,
+              plan.ScratchLevels[1].OffsetBytes);
     EXPECT_EQ(plan.Dispatches[2].Kind,
               Graphics::ParallelPrimitivePassKind::PrefixBlockScan);
+    EXPECT_EQ(plan.Dispatches[2].BlockSumsRole,
+              Graphics::ParallelPrimitiveBufferRole::None);
+    EXPECT_EQ(plan.Dispatches[2].BlockSumsOffsetBytes,
+              Graphics::kParallelPrimitiveInvalidOffset);
     EXPECT_EQ(plan.Dispatches[3].Kind,
               Graphics::ParallelPrimitivePassKind::PrefixAddBlockOffsets);
     EXPECT_EQ(plan.Dispatches[3].OutputOffsetBytes, plan.ScratchLevels[0].OffsetBytes);

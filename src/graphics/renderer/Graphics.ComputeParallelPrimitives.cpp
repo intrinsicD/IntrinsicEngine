@@ -157,6 +157,16 @@ namespace Extrinsic::Graphics
             {
                 const ParallelPrimitiveScratchLevel& scratch = plan.ScratchLevels[level];
                 const bool hasNextLevel = level + 1u < plan.ScratchLevels.size();
+                ParallelPrimitiveBufferRole blockSumsRole =
+                    ParallelPrimitiveBufferRole::None;
+                std::uint64_t blockSumsOffsetBytes =
+                    kParallelPrimitiveInvalidOffset;
+                if (hasNextLevel)
+                {
+                    blockSumsRole = ParallelPrimitiveBufferRole::Scratch;
+                    blockSumsOffsetBytes =
+                        plan.ScratchLevels[level + 1u].OffsetBytes;
+                }
                 const std::uint32_t dispatchIndex =
                     static_cast<std::uint32_t>(plan.Dispatches.size());
                 plan.Dispatches.push_back(ParallelPrimitiveDispatchDesc{
@@ -170,14 +180,10 @@ namespace Extrinsic::Graphics
                     .GroupCountZ = 1u,
                     .InputRole = ParallelPrimitiveBufferRole::Scratch,
                     .OutputRole = ParallelPrimitiveBufferRole::Scratch,
-                    .BlockSumsRole = hasNextLevel
-                        ? ParallelPrimitiveBufferRole::Scratch
-                        : ParallelPrimitiveBufferRole::None,
+                    .BlockSumsRole = blockSumsRole,
                     .InputOffsetBytes = scratch.OffsetBytes,
                     .OutputOffsetBytes = scratch.OffsetBytes,
-                    .BlockSumsOffsetBytes = hasNextLevel
-                        ? plan.ScratchLevels[level + 1u].OffsetBytes
-                        : kParallelPrimitiveInvalidOffset,
+                    .BlockSumsOffsetBytes = blockSumsOffsetBytes,
                 });
                 AddScratchBarrier(plan, dispatchIndex);
             }
