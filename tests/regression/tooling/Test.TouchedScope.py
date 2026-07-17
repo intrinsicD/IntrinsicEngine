@@ -120,16 +120,22 @@ class TouchedScopeTests(unittest.TestCase):
         self.assertEqual(whitespace, [record(" docs/file.md ")])
 
     def test_docs_and_tasks_are_structural_only(self) -> None:
-        route = touched_scope.analyze_change_records(
-            [
-                record("docs/build-troubleshooting.md"),
-                record("tasks/active/CI-005.md"),
-            ]
+        docs = touched_scope.analyze_change_records(
+            [record("docs/build-troubleshooting.md")]
         )
-        self.assertEqual(route["route"], "structural")
-        self.assertFalse(route["needs_cpp"])
-        self.assertIn("docs", route["structural_checks"])
-        self.assertIn("task_policy", route["structural_checks"])
+        self.assertEqual(docs["route"], "structural")
+        self.assertFalse(docs["needs_cpp"])
+        self.assertEqual(docs["structural_checks"], ["docs"])
+
+        tasks = touched_scope.analyze_change_records(
+            [record("tasks/active/CI-005.md")]
+        )
+        self.assertEqual(tasks["route"], "structural")
+        self.assertFalse(tasks["needs_cpp"])
+        self.assertEqual(
+            tasks["structural_checks"],
+            ["docs", "session_brief", "task_policy", "task_state"],
+        )
 
     def test_known_single_and_cross_layer_sources_are_focused(self) -> None:
         geometry = touched_scope.analyze_change_records(
@@ -444,7 +450,7 @@ class TouchedScopeTests(unittest.TestCase):
             self.assertIn("broad fallback: `false`", text)
             self.assertIn("IntrinsicGeometryTests", text)
 
-    def test_finalize_selects_every_owner_producer(self) -> None:
+    def test_finalize_selects_owner_while_smoke_is_unadmitted(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             build_dir = Path(tmp)
             write_registry(build_dir)
@@ -455,11 +461,52 @@ class TouchedScopeTests(unittest.TestCase):
             self.assertEqual(finalized["route"], "focused")
             self.assertEqual(
                 finalized["finalization"]["selected_targets"],
-                ["GeometryContractTests", "IntrinsicGeometryTests"],
+                [
+                    "GeometryContractTests",
+                    "IntrinsicGeometryTests",
+                ],
             )
             self.assertFalse(finalized["smoke"]["focused_enabled"])
+            self.assertEqual(
+                finalized["smoke"]["policy"],
+                "broad-only-pending-budget",
+            )
+            self.assertEqual(
+                finalized["finalization"]["build_batches"],
+                [
+                    {
+                        "name": "focused-owner",
+                        "targets": [
+                            "GeometryContractTests",
+                            "IntrinsicGeometryTests",
+                        ],
+                        "producer_targets": [
+                            "GeometryContractTests",
+                            "IntrinsicGeometryTests",
+                        ],
+                    },
+                ],
+            )
+            self.assertEqual(
+                touched_scope._test_batches(finalized),
+                [
+                    {
+                        "name": "focused-owner",
+                        "selector": [
+                            "-L",
+                            "geometry",
+                            "-LE",
+                            "gpu|vulkan|slow|flaky-quarantine",
+                        ],
+                        "producer_targets": [
+                            "GeometryContractTests",
+                            "IntrinsicGeometryTests",
+                        ],
+                    },
+                ],
+            )
 
-    def test_focused_route_excludes_unadmitted_smoke_producer(self) -> None:
+    def test_focused_runtime_route_excludes_unadmitted_smoke(self) -> None:
         rows = [
             ("IntrinsicRuntimeContractTests", "contract,runtime"),
             ("IntrinsicRuntimeUnitTests", "runtime,unit"),
@@ -476,21 +523,45 @@ class TouchedScopeTests(unittest.TestCase):
                 [record("src/runtime/Runtime.Engine.cpp")]
             )
             finalized = touched_scope.finalize_route(route, build_dir)
-            selected = finalized["finalization"]["selected_targets"]
-            self.assertIn("IntrinsicRuntimeIntegrationTests", selected)
-            self.assertNotIn("IntrinsicRuntimeGraphicsCpuTests", selected)
             self.assertEqual(
+                finalized["finalization"]["selected_targets"],
                 [
-                    batch["name"]
-                    for batch in finalized["finalization"]["build_batches"]
+                    "IntrinsicRuntimeContractTests",
+                    "IntrinsicRuntimeIntegrationTests",
+                    "IntrinsicRuntimeUnitTests",
                 ],
-                ["focused-owner"],
+            )
+            self.assertEqual(
+                finalized["finalization"]["build_batches"],
+                [
+                    {
+                        "name": "focused-owner",
+                        "targets": [
+                            "IntrinsicRuntimeContractTests",
+                            "IntrinsicRuntimeIntegrationTests",
+                            "IntrinsicRuntimeUnitTests",
+                        ],
+                        "producer_targets": [
+                            "IntrinsicRuntimeContractTests",
+                            "IntrinsicRuntimeIntegrationTests",
+                            "IntrinsicRuntimeUnitTests",
+                        ],
+                    },
+                ],
             )
             test_batches = touched_scope._test_batches(finalized)
-            self.assertEqual(len(test_batches), 1)
             self.assertEqual(
-                test_batches[0]["producer_targets"],
-                selected,
+                [
+                    batch["producer_targets"]
+                    for batch in test_batches
+                ],
+                [
+                    [
+                        "IntrinsicRuntimeContractTests",
+                        "IntrinsicRuntimeIntegrationTests",
+                        "IntrinsicRuntimeUnitTests",
+                    ],
+                ],
             )
 
             direct_smoke_change = touched_scope.analyze_change_records(
@@ -501,9 +572,12 @@ class TouchedScopeTests(unittest.TestCase):
                 build_dir,
             )
             self.assertEqual(widened["route"], "broad")
-            self.assertIn(
-                "IntrinsicRuntimeGraphicsCpuTests",
-                widened["finalization"]["selected_targets"],
+            self.assertEqual(
+                [
+                    batch["name"]
+                    for batch in widened["finalization"]["build_batches"]
+                ],
+                ["pr-fast", "pr-smoke"],
             )
 
     def test_missing_focused_anchor_widens_to_broad(self) -> None:
@@ -523,8 +597,52 @@ class TouchedScopeTests(unittest.TestCase):
             finalized = touched_scope.finalize_route(route, build_dir)
             self.assertEqual(finalized["route"], "broad")
             self.assertEqual(
-                [batch["name"] for batch in finalized["finalization"]["build_batches"]],
-                ["pr-fast", "pr-smoke"],
+                finalized["finalization"]["build_batches"],
+                [
+                    {
+                        "name": "pr-fast",
+                        "targets": ["IntrinsicPrFastTests"],
+                        "producer_targets": ["RuntimeOwnerTests"],
+                    },
+                    {
+                        "name": "pr-smoke",
+                        "targets": ["IntrinsicPrSmokeTests"],
+                        "producer_targets": [
+                            "IntrinsicRuntimeGraphicsCpuTests"
+                        ],
+                    },
+                ],
+            )
+            self.assertEqual(
+                touched_scope._test_batches(finalized),
+                [
+                    {
+                        "name": "pr-fast",
+                        "selector": [
+                            "-L",
+                            "unit|contract",
+                            "-LE",
+                            "gpu|vulkan|slow|flaky-quarantine",
+                        ],
+                        "producer_targets": ["RuntimeOwnerTests"],
+                    },
+                    {
+                        "name": "pr-smoke",
+                        "selector": [
+                            "-L",
+                            "integration",
+                            "-L",
+                            "runtime",
+                            "-L",
+                            "graphics",
+                            "-LE",
+                            "gpu|vulkan|slow|flaky-quarantine",
+                        ],
+                        "producer_targets": [
+                            "IntrinsicRuntimeGraphicsCpuTests"
+                        ],
+                    },
+                ],
             )
 
     def test_malformed_registry_and_aggregate_mismatch_fail_closed(self) -> None:
@@ -550,6 +668,26 @@ class TouchedScopeTests(unittest.TestCase):
                 [record("src/geometry/Geometry.Mesh.cpp")]
             )
             with self.assertRaises(touched_scope.RouteError):
+                touched_scope.finalize_route(route, build_dir)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            build_dir = Path(tmp)
+            write_registry(
+                build_dir,
+                fast=[
+                    "IntrinsicGeometryTests",
+                    "GeometryContractTests",
+                    "UndeclaredTestTarget",
+                ],
+            )
+            route = touched_scope.analyze_change_records(
+                [record("src/geometry/Geometry.Mesh.cpp")]
+            )
+            with self.assertRaisesRegex(
+                touched_scope.RouteError,
+                r"aggregate inventory references undeclared target\(s\): "
+                r"UndeclaredTestTarget",
+            ):
                 touched_scope.finalize_route(route, build_dir)
 
     def test_duplicate_registry_target_fails_closed(self) -> None:

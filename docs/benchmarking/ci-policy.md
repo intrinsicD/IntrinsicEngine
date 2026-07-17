@@ -22,15 +22,41 @@ interfaces, headers, CMake/toolchain/dependency inputs, and unknown paths
 cannot produce an empty success; they select the bounded broad route or fail
 on a malformed configured registry.
 
-The focused lane initially excludes the candidate `IntrinsicPrSmokeTests`
-cross-layer smoke. The admission budget was declared on 2026-07-17 before any
-`ci-fast` hosted result was read: at least five comparable
-`ubuntu-24.04`/Clang samples at one source and preset identity, no more than 5%
-unique incremental Ninja command closure relative to `IntrinsicPrFastTests`,
-and at most 60 seconds nearest-rank p95 for the incremental smoke build plus
-exact smoke-test batch. Median, p95, cache state, selected cases, and run IDs
-must be retained. Until that evidence passes, the smoke remains broad-only;
-docs/task-only routes never pay it.
+Focused source routes currently build only their reconciled owner producers.
+Broad routes build `IntrinsicPrFastTests` and then the candidate
+`IntrinsicPrSmokeTests` cross-layer smoke; docs/task-only routes never pay
+either C++ batch.
+
+The admission budget was declared on 2026-07-17 before any `ci-fast` hosted
+result was read: at least five comparable `ubuntu-24.04`/Clang samples at one
+source and preset identity, no more than 5% unique incremental Ninja command
+closure relative to `IntrinsicPrFastTests`, and at most 60 seconds nearest-rank
+p95 for the incremental smoke build plus exact smoke-test batch. The counted
+population used commit `1098922a321ba51759ab9b489bfbd8c8af05c562`,
+`ci-fast`, Clang/scan-deps 20.1.2, ccache 4.9.1, an exact warm cache hit with
+606 hits and zero misses/errors, 19 PR-fast producers, one smoke producer, and
+3,740 + 60 exact selected cases in every run:
+
+| Run | PR-fast commands | Incremental smoke commands | Smoke build | Smoke test | Smoke total |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| [`29582459870`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29582459870) | 2,007 | 12 (0.598%) | 18.264 s | 1.143 s | 19.406 s |
+| [`29582459918`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29582459918) | 2,007 | 12 (0.598%) | 18.252 s | 1.143 s | 19.395 s |
+| [`29582459867`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29582459867) | 2,007 | 12 (0.598%) | 18.200 s | 1.131 s | 19.331 s |
+| [`29582459970`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29582459970) | 2,007 | 12 (0.598%) | 17.626 s | 0.984 s | 18.610 s |
+| [`29582459959`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29582459959) | 2,007 | 12 (0.598%) | 18.372 s | 1.123 s | 19.495 s |
+
+The broad-route incremental smoke median is 19.395 seconds and nearest-rank
+p95 is 19.495 seconds. Its 0.598% incremental closure after the complete
+PR-fast aggregate and measured p95 pass the declared numerical limits, but
+that result does not establish the cost after a focused owner build. A
+configured-graph audit found 856 incremental commands after geometry owners
+(42.651% of PR-fast), 348 after graphics owners (17.339%), 1,200 after assets
+(59.791%), and 1,232 after platform (61.385%). Those closures exceed the 5%
+admission limit, so the smoke remains broad-only while it is right-sized.
+Cache-priming run
+[`29580789612`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29580789612)
+is not in the counted population; its cold diagnostic was 12 incremental
+commands after PR-fast and 48.884 seconds.
 
 ### Monolithic smoke ownership and budget
 
