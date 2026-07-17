@@ -765,6 +765,160 @@ namespace Geometry::PointCloudIO
             return T{};
         }
 
+        [[nodiscard]] constexpr bool IsPlyIntegralScalar(PlyScalar scalar)
+        {
+            return scalar == PlyScalar::Int8 || scalar == PlyScalar::UInt8 ||
+                   scalar == PlyScalar::Int16 || scalar == PlyScalar::UInt16 ||
+                   scalar == PlyScalar::Int32 || scalar == PlyScalar::UInt32;
+        }
+
+        [[nodiscard]] constexpr bool IsPlySignedScalar(PlyScalar scalar)
+        {
+            return scalar == PlyScalar::Int8 || scalar == PlyScalar::Int16 ||
+                   scalar == PlyScalar::Int32;
+        }
+
+        [[nodiscard]] bool TryReadBinaryPlyListCount(std::span<const std::byte> body,
+                                                     std::size_t& cursor,
+                                                     PlyScalar countType,
+                                                     bool bigEndian,
+                                                     std::uint64_t& count)
+        {
+            if (!IsPlyIntegralScalar(countType))
+            {
+                return false;
+            }
+
+            const std::size_t width = PlyScalarBytes(countType);
+            if (cursor > body.size() || width > body.size() - cursor)
+            {
+                return false;
+            }
+
+            std::uint64_t raw = 0;
+            if (bigEndian)
+            {
+                for (std::size_t i = 0; i < width; ++i)
+                {
+                    raw = (raw << 8u) | std::to_integer<std::uint8_t>(body[cursor + i]);
+                }
+            }
+            else
+            {
+                for (std::size_t i = 0; i < width; ++i)
+                {
+                    raw |= static_cast<std::uint64_t>(
+                               std::to_integer<std::uint8_t>(body[cursor + i]))
+                           << (i * 8u);
+                }
+            }
+            cursor += width;
+
+            const std::uint64_t signBit = std::uint64_t{1} << (width * 8u - 1u);
+            if (IsPlySignedScalar(countType) && (raw & signBit) != 0)
+            {
+                return false;
+            }
+
+            count = raw;
+            return true;
+        }
+
+        [[nodiscard]] bool TryConsumeBinaryPlyElement(std::span<const std::byte> body,
+                                                      std::size_t& cursor,
+                                                      const PlyElement& element,
+                                                      bool bigEndian,
+                                                      bool allowLists)
+        {
+            const bool hasLists = std::ranges::any_of(
+                element.Properties,
+                [](const PlyProperty& property) { return property.IsList; });
+            if (hasLists && !allowLists)
+            {
+                return false;
+            }
+
+            if (!hasLists)
+            {
+                std::size_t rowStride = 0;
+                for (const PlyProperty& property : element.Properties)
+                {
+                    const std::size_t width = PlyScalarBytes(property.ScalarType);
+                    if (width > std::numeric_limits<std::size_t>::max() - rowStride)
+                    {
+                        return false;
+                    }
+                    rowStride += width;
+                }
+
+                if (cursor > body.size())
+                {
+                    return false;
+                }
+                const std::size_t remaining = body.size() - cursor;
+                if (rowStride != 0 && element.Count > remaining / rowStride)
+                {
+                    return false;
+                }
+                cursor += element.Count * rowStride;
+                return true;
+            }
+
+            std::size_t minimumRowStride = 0;
+            for (const PlyProperty& property : element.Properties)
+            {
+                if (property.IsList && !IsPlyIntegralScalar(property.ListCountType))
+                {
+                    return false;
+                }
+                const std::size_t width = PlyScalarBytes(
+                    property.IsList ? property.ListCountType : property.ScalarType);
+                if (width > std::numeric_limits<std::size_t>::max() - minimumRowStride)
+                {
+                    return false;
+                }
+                minimumRowStride += width;
+            }
+            if (cursor > body.size() ||
+                element.Count > (body.size() - cursor) / minimumRowStride)
+            {
+                return false;
+            }
+
+            for (std::size_t row = 0; row < element.Count; ++row)
+            {
+                for (const PlyProperty& property : element.Properties)
+                {
+                    if (!property.IsList)
+                    {
+                        const std::size_t width = PlyScalarBytes(property.ScalarType);
+                        if (cursor > body.size() || width > body.size() - cursor)
+                        {
+                            return false;
+                        }
+                        cursor += width;
+                        continue;
+                    }
+
+                    std::uint64_t listCount = 0;
+                    if (!TryReadBinaryPlyListCount(
+                            body, cursor, property.ListCountType, bigEndian, listCount))
+                    {
+                        return false;
+                    }
+
+                    const std::size_t itemWidth = PlyScalarBytes(property.ScalarType);
+                    const std::size_t remaining = body.size() - cursor;
+                    if (listCount > remaining / itemWidth)
+                    {
+                        return false;
+                    }
+                    cursor += static_cast<std::size_t>(listCount) * itemWidth;
+                }
+            }
+            return true;
+        }
+
         [[nodiscard]] Extrinsic::Core::Expected<PointCloudIOResult> ParseAsciiPLYPointCloud(std::string_view text,
                                                                                 std::size_t cursor,
                                                                                 const std::vector<PlyElement>& elements,
@@ -971,7 +1125,12 @@ namespace Geometry::PointCloudIO
                 {
                     bIndex = static_cast<int>(i);
                 }
-                vertexStride += PlyScalarBytes(p.ScalarType);
+                const std::size_t width = PlyScalarBytes(p.ScalarType);
+                if (width > std::numeric_limits<std::size_t>::max() - vertexStride)
+                {
+                    return InvalidPointCloudFormat();
+                }
+                vertexStride += width;
             }
             if (xIndex < 0 || yIndex < 0 || zIndex < 0)
             {
@@ -990,8 +1149,24 @@ namespace Geometry::PointCloudIO
                 }
             }
 
-            const std::byte* cursor = body.data();
-            const std::byte* const end = body.data() + body.size();
+            std::size_t bodyCursor = 0;
+            std::size_t vertexBodyOffset = 0;
+            for (const PlyElement& element : elements)
+            {
+                if (&element == vertexElement)
+                {
+                    vertexBodyOffset = bodyCursor;
+                }
+                if (!TryConsumeBinaryPlyElement(
+                        body,
+                        bodyCursor,
+                        element,
+                        bigEndian,
+                        element.Name != "vertex"))
+                {
+                    return InvalidPointCloudFormat();
+                }
+            }
 
             PointCloudIOResult result;
             ApplyPathInfo(result, absolute_path);
@@ -1011,70 +1186,40 @@ namespace Geometry::PointCloudIO
                 return v;
             };
 
-            for (const PlyElement& element : elements)
+            for (std::size_t row = 0; row < vertexElement->Count; ++row)
             {
-                if (&element == vertexElement)
+                const std::byte* base = body.data() + vertexBodyOffset + row * vertexStride;
+                const glm::vec3 position(
+                    ReadFloatingScalarAt(base, vertexOffsets[xIndex], vertexElement->Properties[xIndex].ScalarType, bigEndian),
+                    ReadFloatingScalarAt(base, vertexOffsets[yIndex], vertexElement->Properties[yIndex].ScalarType, bigEndian),
+                    ReadFloatingScalarAt(base, vertexOffsets[zIndex], vertexElement->Properties[zIndex].ScalarType, bigEndian));
+                if (!IsFinite(position))
                 {
-                    const std::size_t total = element.Count * vertexStride;
-                    if (static_cast<std::size_t>(end - cursor) < total)
-                    {
-                        return InvalidPointCloudFormat();
-                    }
-                    for (std::size_t row = 0; row < element.Count; ++row)
-                    {
-                        const std::byte* base = cursor + row * vertexStride;
-                        const glm::vec3 position(
-                            ReadFloatingScalarAt(base, vertexOffsets[xIndex], vertexElement->Properties[xIndex].ScalarType, bigEndian),
-                            ReadFloatingScalarAt(base, vertexOffsets[yIndex], vertexElement->Properties[yIndex].ScalarType, bigEndian),
-                            ReadFloatingScalarAt(base, vertexOffsets[zIndex], vertexElement->Properties[zIndex].ScalarType, bigEndian));
-                        if (!IsFinite(position))
-                        {
-                            return InvalidPointCloudFormat();
-                        }
-                        const auto point = result.Cloud.AddPoint(position);
-                        if (hasNormals)
-                        {
-                            const glm::vec3 normal(
-                                ReadFloatingScalarAt(base, vertexOffsets[nxIndex], vertexElement->Properties[nxIndex].ScalarType, bigEndian),
-                                ReadFloatingScalarAt(base, vertexOffsets[nyIndex], vertexElement->Properties[nyIndex].ScalarType, bigEndian),
-                                ReadFloatingScalarAt(base, vertexOffsets[nzIndex], vertexElement->Properties[nzIndex].ScalarType, bigEndian));
-                            if (!IsFinite(normal))
-                            {
-                                return InvalidPointCloudFormat();
-                            }
-                            result.Cloud.Normal(point) = normal;
-                        }
-                        if (hasColors)
-                        {
-                            const float r = static_cast<float>(readUInt8(base, vertexOffsets[rIndex]));
-                            const float g = static_cast<float>(readUInt8(base, vertexOffsets[gIndex]));
-                            const float b = static_cast<float>(readUInt8(base, vertexOffsets[bIndex]));
-                            result.Cloud.Color(point) = glm::vec4(
-                                NormalizeColorChannel(r),
-                                NormalizeColorChannel(g),
-                                NormalizeColorChannel(b),
-                                1.0f);
-                        }
-                    }
-                    cursor += total;
+                    return InvalidPointCloudFormat();
                 }
-                else
+                const auto point = result.Cloud.AddPoint(position);
+                if (hasNormals)
                 {
-                    std::size_t scalarStride = 0;
-                    for (const auto& p : element.Properties)
-                    {
-                        if (p.IsList)
-                        {
-                            return InvalidPointCloudFormat();
-                        }
-                        scalarStride += PlyScalarBytes(p.ScalarType);
-                    }
-                    const std::size_t total = element.Count * scalarStride;
-                    if (static_cast<std::size_t>(end - cursor) < total)
+                    const glm::vec3 normal(
+                        ReadFloatingScalarAt(base, vertexOffsets[nxIndex], vertexElement->Properties[nxIndex].ScalarType, bigEndian),
+                        ReadFloatingScalarAt(base, vertexOffsets[nyIndex], vertexElement->Properties[nyIndex].ScalarType, bigEndian),
+                        ReadFloatingScalarAt(base, vertexOffsets[nzIndex], vertexElement->Properties[nzIndex].ScalarType, bigEndian));
+                    if (!IsFinite(normal))
                     {
                         return InvalidPointCloudFormat();
                     }
-                    cursor += total;
+                    result.Cloud.Normal(point) = normal;
+                }
+                if (hasColors)
+                {
+                    const float r = static_cast<float>(readUInt8(base, vertexOffsets[rIndex]));
+                    const float g = static_cast<float>(readUInt8(base, vertexOffsets[gIndex]));
+                    const float b = static_cast<float>(readUInt8(base, vertexOffsets[bIndex]));
+                    result.Cloud.Color(point) = glm::vec4(
+                        NormalizeColorChannel(r),
+                        NormalizeColorChannel(g),
+                        NormalizeColorChannel(b),
+                        1.0f);
                 }
             }
 

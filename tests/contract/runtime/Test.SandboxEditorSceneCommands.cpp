@@ -1,6 +1,7 @@
 // ARCH-006 runtime Sandbox editor SceneCommands contract partition.
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -49,6 +50,7 @@ import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Hierarchy.Mutation;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Material;
@@ -71,6 +73,7 @@ import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressiveRenderData;
@@ -464,6 +467,232 @@ class WaitForConditionApplication final : public Runtime::IApplication
         std::function<bool(Runtime::Engine&)> m_Ready{};
         std::uint32_t m_MaxFrames{1u};
         std::uint32_t m_ObservedFrames{0u};
+    };
+
+struct BlockingGeometryDecodeState
+    {
+        std::atomic_bool Started{false};
+        std::atomic_bool Release{false};
+        std::atomic_bool MutationObservedWhileBlocked{false};
+        std::atomic_uint32_t FramesWhileBlocked{0u};
+        std::atomic_uint32_t ObservedPayloadKind{0u};
+        Runtime::RuntimeAssetIngestHandle Operation{};
+        std::size_t BaselineLiveAssetCount{0u};
+        std::uint32_t ImGuiFramesProducedAtBlockStart{0u};
+        std::uint32_t ImGuiFramesProducedWhileBlocked{0u};
+        bool ImGuiFrameBaselineCaptured{false};
+        bool CancelAttempted{false};
+        bool CancelSucceeded{false};
+    };
+
+enum class BlockedGeometryImportAction : std::uint8_t
+    {
+        Release,
+        Cancel,
+    };
+
+class DriveBlockedGeometryImportApplication final : public Runtime::IApplication
+    {
+    public:
+        explicit DriveBlockedGeometryImportApplication(
+            std::shared_ptr<BlockingGeometryDecodeState> state,
+            const BlockedGeometryImportAction action =
+                BlockedGeometryImportAction::Release,
+            const std::uint32_t maxFrames = 512u)
+            : m_State(std::move(state))
+            , m_Action(action)
+            , m_MaxFrames(maxFrames)
+        {
+        }
+
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            ++m_ObservedFrames;
+            if (m_State->Started.load(std::memory_order_acquire) &&
+                !m_State->Release.load(std::memory_order_acquire))
+            {
+                const std::uint32_t framesProduced =
+                    engine.GetImGuiAdapter().GetDiagnostics().FramesProduced;
+                if (!m_State->ImGuiFrameBaselineCaptured)
+                {
+                    m_State->ImGuiFramesProducedAtBlockStart = framesProduced;
+                    m_State->ImGuiFrameBaselineCaptured = true;
+                }
+                m_State->ImGuiFramesProducedWhileBlocked = framesProduced;
+
+                if (engine.GetEditorCommandHistory().IsDirty() ||
+                    !engine.GetSelectionController().SelectedStableIds().empty() ||
+                    engine.GetAssetService().LiveAssetCount() !=
+                        m_State->BaselineLiveAssetCount)
+                {
+                    m_State->MutationObservedWhileBlocked.store(
+                        true,
+                        std::memory_order_release);
+                }
+                const std::uint32_t blockedFrames =
+                    m_State->FramesWhileBlocked.fetch_add(
+                        1u,
+                        std::memory_order_acq_rel) + 1u;
+                if (blockedFrames >= 3u)
+                {
+                    if (m_Action == BlockedGeometryImportAction::Cancel)
+                    {
+                        m_State->CancelAttempted = true;
+                        m_State->CancelSucceeded =
+                            engine.GetAssetImportPipeline()
+                                .CancelAssetImport(m_State->Operation)
+                                .has_value();
+                    }
+                    m_State->Release.store(true, std::memory_order_release);
+                }
+            }
+
+            if ((m_Action == BlockedGeometryImportAction::Release &&
+                 engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value()) ||
+                (m_Action == BlockedGeometryImportAction::Cancel &&
+                 m_State->CancelAttempted && ++m_FramesAfterAction >= 16u) ||
+                m_ObservedFrames >= m_MaxFrames)
+            {
+                m_State->Release.store(true, std::memory_order_release);
+                engine.RequestExit();
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        void OnShutdown(Runtime::Engine&) override
+        {
+            m_State->Release.store(true, std::memory_order_release);
+        }
+
+    private:
+        std::shared_ptr<BlockingGeometryDecodeState> m_State{};
+        BlockedGeometryImportAction m_Action{
+            BlockedGeometryImportAction::Release};
+        std::uint32_t m_MaxFrames{1u};
+        std::uint32_t m_ObservedFrames{0u};
+        std::uint32_t m_FramesAfterAction{0u};
+    };
+
+struct ShutdownBlockedGeometryImportState
+    {
+        std::atomic_bool Started{false};
+        std::atomic_bool Release{false};
+        Runtime::RuntimeAssetIngestHandle Operation{};
+        std::size_t BaselineLiveAssetCount{0u};
+        std::uint32_t InitializeCalls{0u};
+        std::uint32_t ShutdownCalls{0u};
+        std::uint32_t CompletionCalls{0u};
+        bool PoliciesRegistered{false};
+        bool CompletionProbeRegistered{false};
+        bool ExitRequestedWhileWorkerBlocked{false};
+        bool PoliciesUnregisteredBeforeWorkerRelease{false};
+        bool WorkerReleasedFromOnShutdown{false};
+    };
+
+class ShutdownWhileGeometryImportBlockedApplication final
+    : public Runtime::IApplication
+    {
+    public:
+        explicit ShutdownWhileGeometryImportBlockedApplication(
+            std::shared_ptr<ShutdownBlockedGeometryImportState> state,
+            const std::uint32_t maxFrames = 512u)
+            : m_State(std::move(state))
+            , m_MaxFrames(maxFrames)
+        {
+        }
+
+        void OnInitialize(Runtime::Engine& engine) override
+        {
+            ++m_State->InitializeCalls;
+            m_ObservedFrames = 0u;
+            m_ExitRequested = false;
+            m_DefaultPolicies =
+                Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
+            m_State->PoliciesRegistered = !m_DefaultPolicies.IsEmpty();
+            m_Editor.Attach(engine);
+        }
+
+        void OnSimTick(Runtime::Engine&, double) override {}
+
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            ++m_ObservedFrames;
+            if (!m_ExitRequested &&
+                m_State->Started.load(std::memory_order_acquire))
+            {
+                m_State->ExitRequestedWhileWorkerBlocked =
+                    !m_State->Release.load(std::memory_order_acquire);
+                m_ExitRequested = true;
+                engine.RequestExit();
+            }
+            else if (m_ObservedFrames >= m_MaxFrames)
+            {
+                m_ExitRequested = true;
+                engine.RequestExit();
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+
+        void OnShutdown(Runtime::Engine& engine) override
+        {
+            m_Editor.Detach();
+            Runtime::UnregisterSandboxDefaultRuntimePolicies(
+                engine,
+                m_DefaultPolicies);
+
+            if (m_State->ShutdownCalls == 0u)
+            {
+                m_State->PoliciesUnregisteredBeforeWorkerRelease =
+                    m_DefaultPolicies.IsEmpty() &&
+                    !m_State->Release.load(std::memory_order_acquire);
+                m_State->WorkerReleasedFromOnShutdown = true;
+            }
+            m_State->Release.store(true, std::memory_order_release);
+            ++m_State->ShutdownCalls;
+        }
+
+        [[nodiscard]] Runtime::SandboxEditorSession& Editor() noexcept
+        {
+            return m_Editor;
+        }
+
+    private:
+        std::shared_ptr<ShutdownBlockedGeometryImportState> m_State{};
+        Runtime::SandboxEditorSession m_Editor{};
+        Runtime::RuntimeSandboxDefaultPolicyRegistration m_DefaultPolicies{};
+        std::uint32_t m_MaxFrames{1u};
+        std::uint32_t m_ObservedFrames{0u};
+        bool m_ExitRequested{false};
+    };
+
+class RecordingImportCameraController final : public Runtime::ICameraController
+    {
+    public:
+        void Seed(const Graphics::CameraViewInput&) noexcept override {}
+
+        void Focus(const Runtime::CameraFocusTarget target) noexcept override
+        {
+            LastFocus = target;
+            ++FocusCalls;
+        }
+
+        void Update(const Plat::Input::Context&, double) noexcept override {}
+
+        [[nodiscard]] Graphics::CameraViewInput GetView(
+            Core::Extent2D) const noexcept override
+        {
+            return Runtime::DefaultCameraControllerSeed();
+        }
+
+        [[nodiscard]] Core::Config::CameraControllerKind Kind()
+            const noexcept override
+        {
+            return Core::Config::CameraControllerKind::Orbit;
+        }
+
+        std::optional<Runtime::CameraFocusTarget> LastFocus{};
+        std::uint32_t FocusCalls{0u};
     };
 
 [[nodiscard]] Extrinsic::Core::Config::EngineConfig HeadlessConfig()
@@ -1594,6 +1823,604 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesObjWithoutAuthoredTexcoordsA
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
 }
+
+TEST(SandboxEditorUi, QueuedManualGeometryImportsRemainResponsiveAndApplyOnce)
+{
+    TmpFile meshFile(
+        "runtime_manual_queue_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+    TmpFile graphFile(
+        "runtime_manual_queue_graph.tgf",
+        "1 0 0 0 first\n"
+        "2 1 0 0 second\n"
+        "#\n"
+        "1 2 1.0 edge\n");
+    TmpFile cloudFile(
+        "runtime_manual_queue_cloud.xyz",
+        "0 0 0\n"
+        "1 2 3\n");
+
+    struct ImportCase
+    {
+        std::filesystem::path Path{};
+        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+        GS::Domain Domain{GS::Domain::None};
+    };
+    const std::array cases{
+        ImportCase{meshFile.Path, Assets::AssetPayloadKind::Mesh, GS::Domain::Mesh},
+        ImportCase{graphFile.Path, Assets::AssetPayloadKind::Graph, GS::Domain::Graph},
+        ImportCase{
+            cloudFile.Path,
+            Assets::AssetPayloadKind::PointCloud,
+            GS::Domain::PointCloud},
+    };
+
+    for (const ImportCase& importCase : cases)
+    {
+        SCOPED_TRACE(Assets::DebugNameForAssetPayloadKind(importCase.PayloadKind));
+        auto decodeState = std::make_shared<BlockingGeometryDecodeState>();
+        auto application =
+            std::make_unique<DriveBlockedGeometryImportApplication>(decodeState);
+
+        Core::Config::EngineConfig config = HeadlessConfig();
+        config.Camera.Enabled = true;
+        Runtime::Engine engine(config, std::move(application));
+        engine.Initialize();
+        InstallSandboxDefaultRuntimePolicies(engine);
+        decodeState->BaselineLiveAssetCount =
+            engine.GetAssetService().LiveAssetCount();
+
+        std::uint32_t completionCalls = 0u;
+        const Runtime::RuntimeImportCompletedHandlerHandle completionHandle =
+            engine.GetAssetImportPipeline().RegisterImportCompletedHandler(
+                Runtime::RuntimeImportCompletedHandlerDesc{
+                    .DebugName = "BUG-100 queued manual geometry completion probe",
+                    .PayloadKind = importCase.PayloadKind,
+                    .Handle =
+                        [&completionCalls](
+                            const Runtime::RuntimeImportCompletedContext&,
+                            Runtime::RuntimeImportCompletedServices&)
+                        {
+                            ++completionCalls;
+                            return Core::Ok();
+                        },
+                });
+        ASSERT_TRUE(completionHandle.IsValid());
+
+        auto recordingController =
+            std::make_unique<RecordingImportCameraController>();
+        RecordingImportCameraController* recorder = recordingController.get();
+        engine.GetCameraControllerRegistry().Replace(
+            Runtime::CameraControllerSlot::Main,
+            std::move(recordingController));
+
+        engine.GetAssetImportPipeline()
+            .SetQueuedGeometryImportBeforeDecodeHookForTest(
+                [decodeState](const Runtime::RuntimeAssetImportRequest& request)
+                {
+                    decodeState->ObservedPayloadKind.store(
+                        static_cast<std::uint32_t>(request.PayloadKind),
+                        std::memory_order_release);
+                    decodeState->Started.store(true, std::memory_order_release);
+                    while (!decodeState->Release.load(std::memory_order_acquire))
+                    {
+                        std::this_thread::sleep_for(
+                            std::chrono::milliseconds(1));
+                    }
+                });
+
+        Runtime::SandboxEditorSession session;
+        session.Attach(engine);
+        ASSERT_TRUE(session.PrepareFrame(
+            {},
+            importCase.Path.string(),
+            importCase.PayloadKind));
+
+        std::optional<Runtime::SandboxEditorFileImportResult> commandResult{};
+        ASSERT_TRUE(session.VisitPreparedFrame(
+            [&](Runtime::SandboxEditorPreparedFrameView prepared)
+            {
+                commandResult = Runtime::ApplySandboxEditorFileImportCommand(
+                    prepared.Context,
+                    Runtime::SandboxEditorFileImportCommand{
+                        .Path = importCase.Path.string(),
+                        .PayloadKind = importCase.PayloadKind,
+                    });
+                prepared.LastAssetImportResult = commandResult;
+            }));
+        ASSERT_TRUE(commandResult.has_value());
+        EXPECT_EQ(commandResult->Status, Runtime::SandboxEditorCommandStatus::Pending);
+        EXPECT_TRUE(commandResult->Operation.IsValid());
+        EXPECT_EQ(commandResult->PayloadKind, importCase.PayloadKind);
+        decodeState->Operation = commandResult->Operation;
+        EXPECT_FALSE(engine.GetEditorCommandHistory().IsDirty());
+        EXPECT_TRUE(engine.GetSelectionController().SelectedStableIds().empty());
+        EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), importCase.Domain), 0u);
+
+        Runtime::RuntimeAssetImportQueueSnapshot queue =
+            engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+        ASSERT_EQ(queue.Entries.size(), 1u);
+        EXPECT_EQ(queue.ActiveCount, 1u);
+        EXPECT_EQ(queue.Entries[0].Source,
+                  Runtime::RuntimeAssetIngestSource::ManualImport);
+        EXPECT_EQ(queue.Entries[0].Operation, commandResult->Operation);
+
+        engine.Run();
+
+        EXPECT_TRUE(decodeState->Started.load(std::memory_order_acquire));
+        EXPECT_GE(
+            decodeState->FramesWhileBlocked.load(std::memory_order_acquire),
+            3u);
+        EXPECT_TRUE(decodeState->ImGuiFrameBaselineCaptured);
+        EXPECT_GT(
+            decodeState->ImGuiFramesProducedWhileBlocked,
+            decodeState->ImGuiFramesProducedAtBlockStart);
+        EXPECT_FALSE(decodeState->MutationObservedWhileBlocked.load(
+            std::memory_order_acquire));
+        EXPECT_EQ(
+            decodeState->ObservedPayloadKind.load(std::memory_order_acquire),
+            static_cast<std::uint32_t>(importCase.PayloadKind));
+
+        queue = engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+        ASSERT_EQ(queue.Entries.size(), 1u);
+        EXPECT_EQ(queue.ActiveCount, 0u);
+        EXPECT_EQ(queue.TerminalCount, 1u);
+        EXPECT_EQ(queue.Entries[0].TerminalStatus,
+                  Runtime::RuntimeAssetImportQueueTerminalStatus::Complete);
+        EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), importCase.Domain), 1u);
+        EXPECT_TRUE(engine.GetEditorCommandHistory().IsDirty());
+        EXPECT_EQ(engine.GetEditorCommandHistory().Snapshot().Revision, 1u);
+        EXPECT_EQ(engine.GetSelectionController().SelectedStableIds().size(), 1u);
+        EXPECT_EQ(recorder->FocusCalls, 1u);
+        EXPECT_TRUE(recorder->LastFocus.has_value());
+        EXPECT_EQ(completionCalls, 1u);
+
+        const auto importedEntity =
+            FindFirstEntityWithDomain(engine.GetScene(), importCase.Domain);
+        ASSERT_TRUE(importedEntity.has_value());
+        EXPECT_EQ(
+            engine.GetSelectionController().SelectedStableIds().front(),
+            Runtime::SelectionController::ToStableEntityId(*importedEntity));
+
+        const std::vector<Runtime::RuntimeAssetIngestRecord> records =
+            engine.GetAssetImportPipeline().GetAssetIngestRecordsForTest();
+        ASSERT_EQ(records.size(), 1u);
+        EXPECT_EQ(records[0].Request.Source,
+                  Runtime::RuntimeAssetIngestSource::ManualImport);
+        EXPECT_EQ(records[0].Phase, Runtime::RuntimeAssetIngestPhase::Complete);
+        ASSERT_TRUE(records[0].Result.has_value());
+        EXPECT_EQ(records[0].Result->PayloadKind, importCase.PayloadKind);
+        EXPECT_EQ(records[0].Result->PrimitiveEntitiesCreated, 1u);
+
+        const auto& event =
+            engine.GetAssetImportPipeline().GetLastAssetImportEvent();
+        ASSERT_TRUE(event.has_value());
+        EXPECT_TRUE(event->Succeeded());
+        EXPECT_EQ(event->Sequence, 1u);
+        ASSERT_TRUE(event->Result.has_value());
+        EXPECT_EQ(event->Result->PayloadKind, importCase.PayloadKind);
+        EXPECT_TRUE(event->Result->Asset.IsValid());
+        EXPECT_TRUE(engine.GetAssetService().IsAlive(event->Result->Asset));
+
+        session.Detach();
+        engine.Shutdown();
+    }
+}
+
+TEST(SandboxEditorUi, QueuedManualGeometryCancellationPreventsApply)
+{
+    TmpFile meshFile(
+        "runtime_manual_queue_cancel_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    auto decodeState = std::make_shared<BlockingGeometryDecodeState>();
+    auto application = std::make_unique<DriveBlockedGeometryImportApplication>(
+        decodeState,
+        BlockedGeometryImportAction::Cancel);
+
+    Core::Config::EngineConfig config = HeadlessConfig();
+    config.Camera.Enabled = true;
+    Runtime::Engine engine(config, std::move(application));
+    engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
+    decodeState->BaselineLiveAssetCount =
+        engine.GetAssetService().LiveAssetCount();
+
+    auto recordingController = std::make_unique<RecordingImportCameraController>();
+    RecordingImportCameraController* recorder = recordingController.get();
+    engine.GetCameraControllerRegistry().Replace(
+        Runtime::CameraControllerSlot::Main,
+        std::move(recordingController));
+
+    std::uint32_t completionCalls = 0u;
+    const Runtime::RuntimeImportCompletedHandlerHandle completionHandle =
+        engine.GetAssetImportPipeline().RegisterImportCompletedHandler(
+            Runtime::RuntimeImportCompletedHandlerDesc{
+                .DebugName = "BUG-100 cancelled manual geometry completion probe",
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+                .Handle =
+                    [&completionCalls](
+                        const Runtime::RuntimeImportCompletedContext&,
+                        Runtime::RuntimeImportCompletedServices&)
+                    {
+                        ++completionCalls;
+                        return Core::Ok();
+                    },
+            });
+    ASSERT_TRUE(completionHandle.IsValid());
+
+    engine.GetAssetImportPipeline()
+        .SetQueuedGeometryImportBeforeDecodeHookForTest(
+            [decodeState](const Runtime::RuntimeAssetImportRequest& request)
+            {
+                decodeState->ObservedPayloadKind.store(
+                    static_cast<std::uint32_t>(request.PayloadKind),
+                    std::memory_order_release);
+                decodeState->Started.store(true, std::memory_order_release);
+                while (!decodeState->Release.load(std::memory_order_acquire))
+                {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+            });
+
+    Runtime::SandboxEditorSession session;
+    session.Attach(engine);
+    ASSERT_TRUE(session.PrepareFrame(
+        {},
+        meshFile.Path.string(),
+        Assets::AssetPayloadKind::Mesh));
+
+    std::optional<Runtime::SandboxEditorFileImportResult> commandResult{};
+    ASSERT_TRUE(session.VisitPreparedFrame(
+        [&](Runtime::SandboxEditorPreparedFrameView prepared)
+        {
+            commandResult = Runtime::ApplySandboxEditorFileImportCommand(
+                prepared.Context,
+                Runtime::SandboxEditorFileImportCommand{
+                    .Path = meshFile.Path.string(),
+                    .PayloadKind = Assets::AssetPayloadKind::Mesh,
+                });
+            prepared.LastAssetImportResult = commandResult;
+        }));
+    ASSERT_TRUE(commandResult.has_value());
+    ASSERT_EQ(commandResult->Status, Runtime::SandboxEditorCommandStatus::Pending);
+    ASSERT_TRUE(commandResult->Operation.IsValid());
+    decodeState->Operation = commandResult->Operation;
+
+    engine.Run();
+
+    EXPECT_TRUE(decodeState->Started.load(std::memory_order_acquire));
+    EXPECT_GE(
+        decodeState->FramesWhileBlocked.load(std::memory_order_acquire),
+        3u);
+    EXPECT_FALSE(decodeState->MutationObservedWhileBlocked.load(
+        std::memory_order_acquire));
+    EXPECT_TRUE(decodeState->CancelAttempted);
+    EXPECT_TRUE(decodeState->CancelSucceeded);
+    EXPECT_EQ(
+        decodeState->ObservedPayloadKind.load(std::memory_order_acquire),
+        static_cast<std::uint32_t>(Assets::AssetPayloadKind::Mesh));
+
+    const Runtime::RuntimeAssetImportQueueSnapshot queue =
+        engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 1u);
+    EXPECT_EQ(queue.ActiveCount, 0u);
+    EXPECT_EQ(queue.TerminalCount, 1u);
+    EXPECT_EQ(queue.Entries[0].Source,
+              Runtime::RuntimeAssetIngestSource::ManualImport);
+    EXPECT_EQ(queue.Entries[0].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Cancelled);
+
+    const std::vector<Runtime::RuntimeAssetIngestRecord> records =
+        engine.GetAssetImportPipeline().GetAssetIngestRecordsForTest();
+    ASSERT_EQ(records.size(), 1u);
+    EXPECT_EQ(records[0].Phase, Runtime::RuntimeAssetIngestPhase::Cancelled);
+    EXPECT_EQ(records[0].Diagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::Cancelled);
+    EXPECT_FALSE(records[0].Result.has_value());
+
+    const auto& event =
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
+    ASSERT_TRUE(event.has_value());
+    EXPECT_FALSE(event->Succeeded());
+    EXPECT_EQ(event->Sequence, 1u);
+    EXPECT_EQ(event->RequestedPayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(event->Error, Core::ErrorCode::InvalidState);
+    EXPECT_EQ(event->IngestDiagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::Cancelled);
+
+    EXPECT_EQ(engine.GetAssetService().LiveAssetCount(),
+              decodeState->BaselineLiveAssetCount);
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 0u);
+    EXPECT_EQ(engine.GetEditorCommandHistory().Snapshot().Revision, 0u);
+    EXPECT_TRUE(engine.GetSelectionController().SelectedStableIds().empty());
+    EXPECT_EQ(recorder->FocusCalls, 0u);
+    EXPECT_EQ(completionCalls, 0u);
+
+    session.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, ShutdownCancelsBlockedManualGeometryBeforePolicyUnregister)
+{
+    TmpFile meshFile(
+        "runtime_manual_queue_shutdown_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    auto shutdownState =
+        std::make_shared<ShutdownBlockedGeometryImportState>();
+    auto application =
+        std::make_unique<ShutdownWhileGeometryImportBlockedApplication>(
+            shutdownState);
+    ShutdownWhileGeometryImportBlockedApplication* applicationPtr =
+        application.get();
+
+    Core::Config::EngineConfig config = HeadlessConfig();
+    config.Camera.Enabled = true;
+    Runtime::Engine engine(config, std::move(application));
+    engine.Initialize();
+    ASSERT_EQ(shutdownState->InitializeCalls, 1u);
+    ASSERT_TRUE(shutdownState->PoliciesRegistered);
+    shutdownState->BaselineLiveAssetCount =
+        engine.GetAssetService().LiveAssetCount();
+
+    const Runtime::RuntimeImportCompletedHandlerHandle completionProbe =
+        engine.GetAssetImportPipeline().RegisterImportCompletedHandler(
+            Runtime::RuntimeImportCompletedHandlerDesc{
+                .DebugName = "BUG-100 shutdown cancellation completion probe",
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+                .Handle =
+                    [shutdownState](
+                        const Runtime::RuntimeImportCompletedContext&,
+                        Runtime::RuntimeImportCompletedServices&)
+                    {
+                        ++shutdownState->CompletionCalls;
+                        return Core::Ok();
+                    },
+            });
+    shutdownState->CompletionProbeRegistered = completionProbe.IsValid();
+    ASSERT_TRUE(shutdownState->CompletionProbeRegistered);
+
+    engine.GetAssetImportPipeline()
+        .SetQueuedGeometryImportBeforeDecodeHookForTest(
+            [shutdownState](const Runtime::RuntimeAssetImportRequest&)
+            {
+                shutdownState->Started.store(true, std::memory_order_release);
+                while (!shutdownState->Release.load(std::memory_order_acquire))
+                {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+            });
+
+    Runtime::SandboxEditorSession& session = applicationPtr->Editor();
+    ASSERT_TRUE(session.PrepareFrame(
+        {},
+        meshFile.Path.string(),
+        Assets::AssetPayloadKind::Mesh));
+
+    std::optional<Runtime::SandboxEditorFileImportResult> commandResult{};
+    ASSERT_TRUE(session.VisitPreparedFrame(
+        [&](Runtime::SandboxEditorPreparedFrameView prepared)
+        {
+            commandResult = Runtime::ApplySandboxEditorFileImportCommand(
+                prepared.Context,
+                Runtime::SandboxEditorFileImportCommand{
+                    .Path = meshFile.Path.string(),
+                    .PayloadKind = Assets::AssetPayloadKind::Mesh,
+                });
+            prepared.LastAssetImportResult = commandResult;
+        }));
+    ASSERT_TRUE(commandResult.has_value());
+    ASSERT_EQ(commandResult->Status, Runtime::SandboxEditorCommandStatus::Pending);
+    ASSERT_TRUE(commandResult->Operation.IsValid());
+    shutdownState->Operation = commandResult->Operation;
+
+    engine.Run();
+
+    ASSERT_TRUE(shutdownState->Started.load(std::memory_order_acquire));
+    EXPECT_TRUE(shutdownState->ExitRequestedWhileWorkerBlocked);
+    EXPECT_FALSE(shutdownState->Release.load(std::memory_order_acquire));
+    EXPECT_EQ(engine.GetAssetService().LiveAssetCount(),
+              shutdownState->BaselineLiveAssetCount);
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 0u);
+    EXPECT_EQ(engine.GetEditorCommandHistory().Snapshot().Revision, 0u);
+    EXPECT_TRUE(engine.GetSelectionController().SelectedStableIds().empty());
+    EXPECT_EQ(shutdownState->CompletionCalls, 0u);
+
+    const Runtime::RuntimeAssetImportQueueSnapshot activeQueue =
+        engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+    ASSERT_EQ(activeQueue.Entries.size(), 1u);
+    EXPECT_EQ(activeQueue.ActiveCount, 1u);
+    EXPECT_EQ(activeQueue.TerminalCount, 0u);
+    EXPECT_EQ(activeQueue.Entries[0].Operation, shutdownState->Operation);
+    EXPECT_EQ(activeQueue.Entries[0].Source,
+              Runtime::RuntimeAssetIngestSource::ManualImport);
+
+    engine.Shutdown();
+
+    EXPECT_EQ(shutdownState->ShutdownCalls, 1u);
+    EXPECT_TRUE(shutdownState->PoliciesUnregisteredBeforeWorkerRelease);
+    EXPECT_TRUE(shutdownState->WorkerReleasedFromOnShutdown);
+    EXPECT_TRUE(shutdownState->Release.load(std::memory_order_acquire));
+    EXPECT_EQ(shutdownState->CompletionCalls, 0u);
+
+    const Runtime::RuntimeAssetImportQueueSnapshot cancelledQueue =
+        engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+    ASSERT_EQ(cancelledQueue.Entries.size(), 1u);
+    EXPECT_EQ(cancelledQueue.ActiveCount, 0u);
+    EXPECT_EQ(cancelledQueue.TerminalCount, 1u);
+    EXPECT_EQ(cancelledQueue.Entries[0].Operation, shutdownState->Operation);
+    EXPECT_EQ(cancelledQueue.Entries[0].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Cancelled);
+
+    const std::vector<Runtime::RuntimeAssetIngestRecord> records =
+        engine.GetAssetImportPipeline().GetAssetIngestRecordsForTest();
+    ASSERT_EQ(records.size(), 1u);
+    EXPECT_EQ(records[0].Handle, shutdownState->Operation);
+    EXPECT_EQ(records[0].Phase, Runtime::RuntimeAssetIngestPhase::Cancelled);
+    EXPECT_EQ(records[0].Diagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::Cancelled);
+    EXPECT_FALSE(records[0].Result.has_value());
+
+    const auto& event =
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
+    ASSERT_TRUE(event.has_value());
+    EXPECT_FALSE(event->Succeeded());
+    EXPECT_EQ(event->Sequence, 1u);
+    EXPECT_EQ(event->Error, Core::ErrorCode::InvalidState);
+    EXPECT_EQ(event->IngestDiagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::Cancelled);
+    EXPECT_FALSE(event->Result.has_value());
+
+    engine.Initialize();
+
+    EXPECT_EQ(shutdownState->InitializeCalls, 2u);
+    EXPECT_EQ(shutdownState->CompletionCalls, 0u);
+    EXPECT_EQ(engine.GetAssetService().LiveAssetCount(), 0u);
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 0u);
+    EXPECT_EQ(engine.GetEditorCommandHistory().Snapshot().Revision, 0u);
+    EXPECT_FALSE(engine.GetEditorCommandHistory().IsDirty());
+    EXPECT_TRUE(engine.GetSelectionController().SelectedStableIds().empty());
+
+    const Runtime::RuntimeAssetImportQueueSnapshot reinitializedQueue =
+        engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+    ASSERT_EQ(reinitializedQueue.Entries.size(), 1u);
+    EXPECT_EQ(reinitializedQueue.ActiveCount, 0u);
+    EXPECT_EQ(reinitializedQueue.TerminalCount, 1u);
+    EXPECT_EQ(reinitializedQueue.Entries[0].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Cancelled);
+
+    engine.GetAssetImportPipeline()
+        .SetQueuedGeometryImportBeforeDecodeHookForTest({});
+    engine.GetAssetImportPipeline().UnregisterImportCompletedHandler(
+        completionProbe);
+    engine.Shutdown();
+    EXPECT_EQ(shutdownState->ShutdownCalls, 2u);
+}
+
+TEST(SandboxEditorUi, QueuedManualGeometryDecodeFailureIsFailClosed)
+{
+    TmpFile malformedMeshFile(
+        "runtime_manual_queue_malformed_mesh.obj",
+        "v nan 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    Core::Config::EngineConfig config = HeadlessConfig();
+    config.Camera.Enabled = true;
+    Runtime::Engine engine(
+        config,
+        std::make_unique<WaitForAssetImportEventApplication>(128u));
+    engine.Initialize();
+    InstallSandboxDefaultRuntimePolicies(engine);
+    const std::size_t baselineLiveAssetCount =
+        engine.GetAssetService().LiveAssetCount();
+
+    auto recordingController = std::make_unique<RecordingImportCameraController>();
+    RecordingImportCameraController* recorder = recordingController.get();
+    engine.GetCameraControllerRegistry().Replace(
+        Runtime::CameraControllerSlot::Main,
+        std::move(recordingController));
+
+    std::uint32_t completionCalls = 0u;
+    const Runtime::RuntimeImportCompletedHandlerHandle completionHandle =
+        engine.GetAssetImportPipeline().RegisterImportCompletedHandler(
+            Runtime::RuntimeImportCompletedHandlerDesc{
+                .DebugName = "BUG-100 failed manual geometry completion probe",
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+                .Handle =
+                    [&completionCalls](
+                        const Runtime::RuntimeImportCompletedContext&,
+                        Runtime::RuntimeImportCompletedServices&)
+                    {
+                        ++completionCalls;
+                        return Core::Ok();
+                    },
+            });
+    ASSERT_TRUE(completionHandle.IsValid());
+
+    Runtime::SandboxEditorSession session;
+    session.Attach(engine);
+    ASSERT_TRUE(session.PrepareFrame(
+        {},
+        malformedMeshFile.Path.string(),
+        Assets::AssetPayloadKind::Mesh));
+
+    std::optional<Runtime::SandboxEditorFileImportResult> commandResult{};
+    ASSERT_TRUE(session.VisitPreparedFrame(
+        [&](Runtime::SandboxEditorPreparedFrameView prepared)
+        {
+            commandResult = Runtime::ApplySandboxEditorFileImportCommand(
+                prepared.Context,
+                Runtime::SandboxEditorFileImportCommand{
+                    .Path = malformedMeshFile.Path.string(),
+                    .PayloadKind = Assets::AssetPayloadKind::Mesh,
+                });
+            prepared.LastAssetImportResult = commandResult;
+        }));
+    ASSERT_TRUE(commandResult.has_value());
+    ASSERT_EQ(commandResult->Status, Runtime::SandboxEditorCommandStatus::Pending);
+    ASSERT_TRUE(commandResult->Operation.IsValid());
+
+    EXPECT_EQ(engine.GetAssetService().LiveAssetCount(), baselineLiveAssetCount);
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 0u);
+    EXPECT_EQ(engine.GetEditorCommandHistory().Snapshot().Revision, 0u);
+    EXPECT_TRUE(engine.GetSelectionController().SelectedStableIds().empty());
+
+    engine.Run();
+
+    const Runtime::RuntimeAssetImportQueueSnapshot queue =
+        engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 1u);
+    EXPECT_EQ(queue.ActiveCount, 0u);
+    EXPECT_EQ(queue.TerminalCount, 1u);
+    EXPECT_EQ(queue.Entries[0].Source,
+              Runtime::RuntimeAssetIngestSource::ManualImport);
+    EXPECT_EQ(queue.Entries[0].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Failed);
+    EXPECT_FALSE(queue.Entries[0].DiagnosticText.empty());
+
+    const std::vector<Runtime::RuntimeAssetIngestRecord> records =
+        engine.GetAssetImportPipeline().GetAssetIngestRecordsForTest();
+    ASSERT_EQ(records.size(), 1u);
+    EXPECT_EQ(records[0].Phase, Runtime::RuntimeAssetIngestPhase::Failed);
+    EXPECT_EQ(records[0].Diagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::DecodeFailed);
+    EXPECT_EQ(records[0].Error, Core::ErrorCode::InvalidFormat);
+    EXPECT_FALSE(records[0].Result.has_value());
+
+    const auto& event =
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
+    ASSERT_TRUE(event.has_value());
+    EXPECT_FALSE(event->Succeeded());
+    EXPECT_EQ(event->Sequence, 1u);
+    EXPECT_EQ(event->RequestedPayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(event->Error, Core::ErrorCode::InvalidFormat);
+    EXPECT_EQ(event->IngestDiagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::DecodeFailed);
+    EXPECT_FALSE(event->Result.has_value());
+
+    EXPECT_EQ(engine.GetAssetService().LiveAssetCount(), baselineLiveAssetCount);
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 0u);
+    EXPECT_EQ(engine.GetEditorCommandHistory().Snapshot().Revision, 0u);
+    EXPECT_TRUE(engine.GetSelectionController().SelectedStableIds().empty());
+    EXPECT_EQ(recorder->FocusCalls, 0u);
+    EXPECT_EQ(completionCalls, 0u);
+
+    session.Detach();
+    engine.Shutdown();
+}
+
 TEST(SandboxEditorUi, DuplicateDroppedGeometryImportUsesSingleIngestRecord)
 {
     TmpFile meshFile(

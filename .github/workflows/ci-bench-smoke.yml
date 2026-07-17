@@ -48,7 +48,7 @@ jobs:
           python3 tools/ci/time_command.py \
             --label "Configure (ci preset)" \
             --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
-            --max-warm-seconds 20 \
+            --max-warm-seconds 40 \
             --json-out build/ci/ci-timing/phases/configure.json \
             -- cmake --preset ci
 
@@ -63,6 +63,7 @@ jobs:
             -- cmake --build --preset ci --target IntrinsicBenchmarkSmoke
 
       - name: Run benchmark smoke runner
+        timeout-minutes: 2
         env:
           GIT_COMMIT: ${{ github.sha }}
         run: |
@@ -78,7 +79,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-smoke-result
-          path: build/ci/benchmark/IntrinsicBenchmarkSmoke/result.json
+          path: build/ci/benchmark/IntrinsicBenchmarkSmoke/
+          if-no-files-found: error
 
       - name: Aggregate gate timing result
         if: always()

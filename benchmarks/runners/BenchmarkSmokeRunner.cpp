@@ -366,6 +366,150 @@ auto EmitUvAtlasPromotionSmoke(const std::string &commit) -> EmittedBenchmark {
                           metrics.PromotionPass};
 }
 
+auto EmitUvAtlasEdgeGroupingScaling(const std::string &commit)
+    -> EmittedBenchmark {
+  using namespace Intrinsic::Bench::Geometry;
+
+  const auto metrics = RunUvAtlasEdgeGroupingScaling();
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed);
+  out.precision(17);
+  out << "{\n"
+      << "  \"benchmark_id\": \""
+      << EscapeJson(kUvAtlasEdgeGroupingScalingBenchmarkId) << "\",\n"
+      << "  \"method\": \""
+      << EscapeJson(kUvAtlasEdgeGroupingScalingMethod) << "\",\n"
+      << "  \"backend\": \"cpu_optimized\",\n"
+      << "  \"dataset\": \""
+      << EscapeJson(kUvAtlasEdgeGroupingScalingDataset) << "\",\n"
+      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+      << "  \"metrics\": {\n"
+      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+      << "    \"throughput_items_per_sec\": "
+      << metrics.ThroughputFacesPerSecond << ",\n"
+      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+      << "  },\n"
+      << "  \"diagnostics\": {\n"
+      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+      << "    \"mode\": \"performance_scaling_smoke\",\n"
+      << "    \"dataset_generation\": \"deterministic indexed planar grids\",\n"
+      << "    \"warmup_pairs\": " << kUvAtlasEdgeGroupingWarmupPairs
+      << ",\n"
+      << "    \"measured_pairs\": " << kUvAtlasEdgeGroupingMeasuredPairs
+      << ",\n"
+      << "    \"timing_statistic\": \""
+      << EscapeJson(kUvAtlasEdgeGroupingTimingStatistic) << "\",\n"
+      << "    \"measurement_order\": \"alternating_small_large_large_small\",\n"
+      << "    \"small_grid_side\": " << kUvAtlasEdgeGroupingSmallGridSide
+      << ",\n"
+      << "    \"large_grid_side\": " << kUvAtlasEdgeGroupingLargeGridSide
+      << ",\n"
+      << "    \"small_vertex_count\": " << metrics.SmallVertexCount << ",\n"
+      << "    \"small_face_count\": " << metrics.SmallFaceCount << ",\n"
+      << "    \"large_vertex_count\": " << metrics.LargeVertexCount << ",\n"
+      << "    \"large_face_count\": " << metrics.LargeFaceCount << ",\n"
+      << "    \"large_output_vertex_count\": "
+      << metrics.LargeOutputVertexCount << ",\n"
+      << "    \"large_output_face_count\": "
+      << metrics.LargeOutputFaceCount << ",\n"
+      << "    \"large_chart_count\": " << metrics.LargeChartCount << ",\n"
+      << "    \"large_seam_count\": " << metrics.LargeSeamCount << ",\n"
+      << "    \"large_boundary_seam_count\": "
+      << metrics.LargeBoundarySeamCount << ",\n"
+      << "    \"large_uv_min\": [" << metrics.LargeUvMinX << ", "
+      << metrics.LargeUvMinY << "],\n"
+      << "    \"large_uv_max\": [" << metrics.LargeUvMaxX << ", "
+      << metrics.LargeUvMaxY << "],\n"
+      << "    \"large_mean_conformal_distortion\": "
+      << metrics.LargeMeanConformalDistortion << ",\n"
+      << "    \"large_max_stretch\": " << metrics.LargeMaxStretch
+      << ",\n"
+      << "    \"large_flipped_element_count\": "
+      << metrics.LargeFlippedElementCount << ",\n"
+      << "    \"small_runtime_samples_ms\": ";
+  EmitDoubleSamples(out, metrics.SmallRuntimeSamplesMilliseconds);
+  out << ",\n"
+      << "    \"large_runtime_samples_ms\": ";
+  EmitDoubleSamples(out, metrics.LargeRuntimeSamplesMilliseconds);
+  out << ",\n"
+      << "    \"small_median_runtime_ms\": "
+      << metrics.SmallMedianRuntimeMilliseconds << ",\n"
+      << "    \"large_median_runtime_ms\": "
+      << metrics.LargeMedianRuntimeMilliseconds << ",\n"
+      << "    \"face_count_ratio\": " << metrics.FaceCountRatio << ",\n"
+      << "    \"runtime_scaling_ratio\": " << metrics.RuntimeScalingRatio
+      << ",\n"
+      << "    \"normalized_runtime_scaling_factor\": "
+      << metrics.NormalizedRuntimeScalingFactor << ",\n"
+      << "    \"baseline_snapshot\": \""
+      << EscapeJson(kUvAtlasEdgeGroupingBaselineSnapshot) << "\",\n"
+      << "    \"baseline_commit\": \""
+      << EscapeJson(kUvAtlasEdgeGroupingBaselineCommit) << "\",\n"
+      << "    \"baseline_large_median_runtime_ms\": "
+      << kUvAtlasEdgeGroupingBaselineLargeRuntimeMilliseconds << ",\n"
+      << "    \"baseline_normalized_runtime_scaling_factor\": "
+      << kUvAtlasEdgeGroupingBaselineNormalizedScalingFactor << ",\n"
+      << "    \"candidate_to_baseline_large_runtime_ratio\": "
+      << metrics.LargeMedianRuntimeMilliseconds /
+             kUvAtlasEdgeGroupingBaselineLargeRuntimeMilliseconds
+      << ",\n"
+      << "    \"candidate_to_baseline_normalized_scaling_ratio\": "
+      << metrics.NormalizedRuntimeScalingFactor /
+             kUvAtlasEdgeGroupingBaselineNormalizedScalingFactor
+      << ",\n"
+      << "    \"baseline_comparison_scope\": \"same-host same-toolchain local before/after\",\n"
+      << "    \"quality_vector_definition\": \"relative output vertex/face/chart counts, absolute seam count, relative boundary count, raw normalized UV bounds, relative mean conformal distortion/max stretch, absolute flipped count\",\n"
+      << "    \"quality_vector_baseline\": {\n"
+      << "      \"output_vertex_count\": "
+      << kUvAtlasEdgeGroupingBaselineOutputVertexCount << ",\n"
+      << "      \"output_face_count\": "
+      << kUvAtlasEdgeGroupingBaselineOutputFaceCount << ",\n"
+      << "      \"chart_count\": "
+      << kUvAtlasEdgeGroupingBaselineChartCount << ",\n"
+      << "      \"seam_count\": "
+      << kUvAtlasEdgeGroupingBaselineSeamCount << ",\n"
+      << "      \"boundary_seam_count\": "
+      << kUvAtlasEdgeGroupingBaselineBoundarySeamCount << ",\n"
+      << "      \"uv_min\": [" << kUvAtlasEdgeGroupingBaselineUvMinX
+      << ", " << kUvAtlasEdgeGroupingBaselineUvMinY << "],\n"
+      << "      \"uv_max\": [" << kUvAtlasEdgeGroupingBaselineUvMaxX
+      << ", " << kUvAtlasEdgeGroupingBaselineUvMaxY << "],\n"
+      << "      \"mean_conformal_distortion\": "
+      << kUvAtlasEdgeGroupingBaselineMeanConformalDistortion << ",\n"
+      << "      \"max_stretch\": "
+      << kUvAtlasEdgeGroupingBaselineMaxStretch << ",\n"
+      << "      \"flipped_element_count\": "
+      << kUvAtlasEdgeGroupingBaselineFlippedElementCount << "\n"
+      << "    },\n"
+      << "    \"quality_vector_delta\": ";
+  EmitDoubleSamples(out, metrics.QualityVectorDelta);
+  out << ",\n"
+      << "    \"output_signature\": \""
+      << metrics.LargeOutputSignature << "\",\n"
+      << "    \"baseline_output_signature\": \""
+      << kUvAtlasEdgeGroupingBaselineOutputSignature << "\",\n"
+      << "    \"matches_baseline_output_signature\": "
+      << (metrics.MatchesBaselineOutputSignature ? "true" : "false")
+      << ",\n"
+      << "    \"large_succeeded\": "
+      << (metrics.LargeSucceeded ? "true" : "false") << ",\n"
+      << "    \"large_finite_normalized\": "
+      << (metrics.LargeFiniteNormalized ? "true" : "false") << ",\n"
+      << "    \"large_used_fallback\": "
+      << (metrics.LargeUsedFallback ? "true" : "false") << ",\n"
+      << "    \"deterministic_topology\": "
+      << (metrics.DeterministicTopology ? "true" : "false") << ",\n"
+      << "    \"performance_claim\": false\n"
+      << "  },\n"
+      << "  \"status\": \"" << (metrics.Passed ? "passed" : "failed")
+      << "\"\n"
+      << "}\n";
+
+  return EmittedBenchmark{kUvAtlasEdgeGroupingScalingBenchmarkId, out.str(),
+                          metrics.Passed};
+}
+
 auto EmitProgressivePoissonReferenceSmoke(const std::string &commit)
     -> EmittedBenchmark {
   using namespace Intrinsic::Bench::Geometry;
@@ -1226,6 +1370,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitParameterizationDiagnosticsSmoke(commit));
   emitted.push_back(EmitUvAtlasSmoke(commit));
   emitted.push_back(EmitUvAtlasPromotionSmoke(commit));
+  emitted.push_back(EmitUvAtlasEdgeGroupingScaling(commit));
   emitted.push_back(EmitProgressivePoissonReferenceSmoke(commit));
   emitted.push_back(EmitSignedHeatReferenceSmoke(commit));
   emitted.push_back(EmitBoundaryFirstFlatteningReferenceSmoke(commit));

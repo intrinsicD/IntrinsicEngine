@@ -25,9 +25,9 @@ startup/shutdown.
 | `Extrinsic.Runtime.Engine` | Composition root, frame loop, subsystem construction/wiring, and transitional subsystem accessors such as `GetConfigControl()`, `GetAssetImportPipeline()`, `GetSceneDocument()`, input-action facade methods, and reference-scene facade accessors. Platform drop events remain Engine-owned because they are platform routing, but they delegate import handling to `AssetImportPipeline`. JobService GPU-queue renderer-hook ownership and participant shutdown sequencing route through `JobServiceGpuQueueBridge`; scene-file persistence routes through `SceneDocument`, live recipe/config control routes through `EngineConfigControl`, input-action registration/dispatch routes through `InputActions`, reference-scene install/teardown state routes through `ReferenceSceneControl`, runtime-module contribution records/order/dispatch routes through `ModuleSchedule`, selection pick readback drain/cache state routes through `SelectionReadback`, frame-pacing diagnostics record/counter mirroring routes through `FramePacingDiagnostics`, Dear ImGui overlay/adapter/callback ownership stays in the Engine-private `ImGuiEditorBridge` declared by `Runtime.ImGuiEditorBridge.Internal.hpp`, object-space normal bake queue composition routes through `ObjectSpaceNormalBakeService`, transform-gizmo frame state routes through `GizmoFrameService`, render-extraction cache/pool/stats/frame-index ownership stays in the Engine-private `RenderExtractionService` declared by `Runtime.RenderExtractionService.Internal.hpp`, GPU asset cache/model-handoff residency ownership stays in the Engine-private `AssetResidencyService` declared by `Runtime.AssetResidencyService.Internal.hpp`, and streaming/derived-job ownership plus maintenance drains route through `AsyncWorkService`. The `Core.FrameLoop` hook adapters and per-frame helper routines are include-only implementation glue in `Runtime.Engine.FrameLoop.Internal.hpp`, consumed only by `Runtime.Engine.cpp`. |
 | `Extrinsic.Runtime.FramePacingDiagnostics` | Runtime-owned frame-pacing diagnostics module from `RUNTIME-158`. Exports `RuntimeFramePacingDiagnostics` plus pure mirroring helpers that copy `ImGuiAdapterDiagnostics` producer counters and renderer `RenderGraphFrameStats` compile/execute timings into the current frame sample. `Engine::RunFrame()` still writes phase-boundary timings and publishes the last sample through `Engine::GetLastFramePacingDiagnostics()`, but the wide record definition and cross-subsystem counter-copy policy no longer live in `Runtime.Engine.cppm` / `.cpp`. |
 | `Extrinsic.Runtime.SceneDocument` | Engine-owned scene persistence subsystem from `RUNTIME-148`. Exports scene-file operation/event records plus save/load/queue/new/close APIs. It owns the async scene save/load queue, the scene-file event log, serializable-scene snapshot helpers, and the single scene-replacement boundary: pre-clear render-extraction sidecars, selection hover/click/pick-correlation state, object-space normal-bake queue state, refined-primitive cache, scene registry replacement/clear, stable-lookup rebuild or clear, and `EditorCommandHistory` dirty/path transitions. Engine world-maintenance uses the same outgoing-scene runtime-state clear before active-world scene pointer refresh. |
-| `Extrinsic.Runtime.AssetImportPipeline` | Engine-owned asset import subsystem from `RUNTIME-147`. Exports runtime asset import/reimport requests, queued import records, import result/event records, IO-backend test seam, and post-import processor/import-authoring/import-completed registry contracts. It owns the promoted ASSETIO geometry/model/texture decoder composition, ingest state-machine wiring, import event log, queue snapshot/cancel/clear facade, standalone geometry ECS materialization with local/world culling bounds, model/texture handoffs, dropped-file import routing, and the decode/materialize helpers previously in `Engine`. Platform drops enter through `Engine` and then call `AssetImportPipeline::ImportDroppedFilePaths(...)`. Scene-changing successful imports mark the engine-owned `EditorCommandHistory` dirty via the borrowed history service, preserving direct import, reimport, dropped-file apply, and queued apply document-state behavior. Dropped ambiguous geometry extensions such as PLY try supported geometry payloads in import-router order before failing closed. Runtime logs dropped-file receipt, per-path routing/queue decisions, and shared import completion so failed drops remain diagnosable outside the editor panel. Direct mesh imports publish the decoded raw mesh entity with explicit or synthesized `v:normal` before derived materialization; derived UV/normal-bake work is owned by registered post-import processors instead of hardcoded materialization. Mesh imports that fail strict shared-topology conversion only for renderable non-manifold/inconsistent-winding diagnostics materialize through a disconnected render-only mesh fallback; geometry algorithms still use the strict converter as their topology contract. |
+| `Extrinsic.Runtime.AssetImportPipeline` | Engine-owned asset import subsystem from `RUNTIME-147`. Exports runtime asset import/reimport requests, queued geometry/model/texture entry points and records, import result/event records, IO/backend decode-block test seams, and post-import processor/import-authoring/import-completed registry contracts. It owns the promoted ASSETIO geometry/model/texture decoder composition, ingest state-machine wiring, import event log, queue snapshot/cancel/clear facade, standalone geometry ECS materialization with local/world culling bounds, model/texture handoffs, dropped-file import routing, and the decode/materialize helpers previously in `Engine`. Platform drops enter through `Engine` and then call `AssetImportPipeline::ImportDroppedFilePaths(...)`. Scene-changing successful imports mark the engine-owned `EditorCommandHistory` dirty via the borrowed history service, preserving direct import, reimport, dropped-file apply, and queued apply document-state behavior. Dropped ambiguous geometry extensions such as PLY try supported geometry payloads in import-router order before failing closed. Runtime logs dropped-file receipt, per-path routing/queue decisions, and shared import completion so failed drops remain diagnosable outside the editor panel. Direct mesh imports publish the decoded raw mesh entity with explicit or synthesized `v:normal` before derived materialization; derived UV/normal-bake work is owned by registered post-import processors instead of hardcoded materialization. Mesh imports that fail strict shared-topology conversion only for renderable non-manifold/inconsistent-winding diagnostics materialize through a disconnected render-only mesh fallback; geometry algorithms still use the strict converter as their topology contract. |
 | `Extrinsic.Runtime.SandboxDefaultPolicies` | Runtime-owned sandbox/default composition helper. `RegisterSandboxDefaultRuntimePolicies(Engine&)` installs the standard direct-mesh generated-normal post-import processor, import authoring defaults (`SelectableTag`, render lanes, visualization defaults), import-completed focus/auto-select UX, and the `F` focus-on-selection input action; `UnregisterSandboxDefaultRuntimePolicies(...)` removes the returned handles. Asset-import policies register through `Engine::GetAssetImportPipeline()`, while the input action registers through Engine's compatibility facade and is stored/dispatched by `Extrinsic.Runtime.InputActions`. The helper keeps the default behavior opt-in for app/feature composition. When `RuntimePostImportProcessorServices` supplies a `RuntimeObjectSpaceNormalBakeQueue`, the direct-mesh post-processor resolves UVs/normals on the streaming lane, then schedules an object-space normal GPU-bake request on main-thread apply and leaves material binding deferred; non-operational backends record the queue's no-CPU-fallback diagnostic. Without that queue service, the legacy CPU generated-normal compatibility helper remains available for older isolated callers. |
-| `Extrinsic.Runtime.AssetIngestStateMachine` | Runtime-owned ingest request/result state machine (`RUNTIME-101`). Exports request sources for manual import, dropped files, and reimport; phases from `Queued` through route resolution, decode scheduling/execution, main-thread apply, `Complete`, `Failed`, and `Cancelled`; and a diagnostic taxonomy for missing path/file, route failures, invalid reimport target, duplicate active request, decode failure, callback failure, materialization failure, cancellation, stale completion, invalid transition, and unknown handles. The state machine is backend-neutral and owns no decoders, ECS mutation, `AssetService`, graphics, RHI, or worker threads. `AssetImportPipeline::ImportAssetFromPath(...)`, `QueueModelTextureImport(...)`, `ReimportAsset(...)`, synchronous dropped non-promoted imports, and deferred dropped geometry/model-scene/texture imports submit records through this contract; deferred file reads and decodes run on `Runtime.StreamingExecutor` and complete/fail only from its main-thread apply lane. Reimport resolves the existing asset path and payload kind from `AssetService`, reloads the same `AssetId` transactionally, lets texture/model-scene handoffs consume `Reloaded`/`Ready` events, and does not revive ECS `AssetSourceRef` coupling; standalone geometry scene entities remain authoring snapshots and are not duplicated. |
+| `Extrinsic.Runtime.AssetIngestStateMachine` | Runtime-owned ingest request/result state machine (`RUNTIME-101`). Exports request sources for manual import, dropped files, and reimport; phases from `Queued` through route resolution, decode scheduling/execution, main-thread apply, `Complete`, `Failed`, and `Cancelled`; and a diagnostic taxonomy for missing path/file, route failures, invalid reimport target, duplicate active request, decode failure, callback failure, materialization failure, cancellation, stale completion, invalid transition, and unknown handles. The state machine is backend-neutral and owns no decoders, ECS mutation, `AssetService`, graphics, RHI, or worker threads. `AssetImportPipeline::ImportAssetFromPath(...)`, `QueueGeometryImport(...)`, `QueueModelTextureImport(...)`, `ReimportAsset(...)`, synchronous dropped non-promoted imports, and deferred dropped geometry/model-scene/texture imports submit records through this contract; deferred file reads and decodes run on `Runtime.StreamingExecutor` and complete/fail only from its main-thread apply lane. Reimport resolves the existing asset path and payload kind from `AssetService`, reloads the same `AssetId` transactionally, lets texture/model-scene handoffs consume `Reloaded`/`Ready` events, and does not revive ECS `AssetSourceRef` coupling; standalone geometry scene entities remain authoring snapshots and are not duplicated. |
 | `Extrinsic.Runtime.AssetGeometryIO` | Runtime-owned registration seam for `ASSETIO-001` Slice B. Exports `RegisterPromotedGeometryIOCallbacks(Assets::AssetGeometryIOBridge&)`, imports the promoted geometry IO modules in runtime, and registers OBJ/OFF/STL/PLY mesh importers, XYZ/PTS/XYZRGB/PCD/PLY point-cloud importers, TGF/edge-list graph importers, OBJ/STL/PLY mesh exporters, XYZ/PCD/PLY point-cloud exporters, and TGF/edge-list graph exporters. The adapter translates legacy geometry `Core.Error` decoder failures into promoted `Extrinsic.Core.Error` codes before they enter the asset bridge, keeping `src/assets` free of geometry/runtime/graphics imports. It does not construct ECS entities or GPU residency; later `ASSETIO-001` slices own model/texture payloads and runtime handoff. |
 | `Extrinsic.Runtime.AssetMeshNormals` | Runtime-owned mesh payload materialization helper for asset import paths. Exports `RuntimeMeshUvResolutionOptions`, `RuntimeMeshGeometryOnlyOptions`, `RuntimeMeshMaterializationDiagnostics`, `BuildRuntimeHalfedgeMeshGeometryOnly(...)`, `BuildRuntimeHalfedgeMeshMaterialization(...)`, the compatibility wrapper `BuildRuntimeHalfedgeMeshWithNormals(...)`, and `MeshPayloadHasValidVertexTexcoords(...)`. The geometry-only helper triangulates promoted `Geometry::MeshIO::MeshIOResult` payloads for immediate authoring publication without invoking UV atlas resolution or texture baking; it copies typed vertex properties and writes explicit `v:normal` vectors or deterministic area-weighted fallback normals so the first upload has count-matched normals. The full materialization helper validates authored UVs through `Geometry.UvAtlas`, preserves valid authored `v:texcoord` by default, invokes the selected atlas backend when UVs are missing/invalid or regeneration is forced, defaults to `UvAtlasMethod::FastStaged`, exposes explicit `Method` and `AllowXAtlasFallback` controls for compatibility/fail-closed tests, and fails closed under the default required-UV policy when no valid UVs can be produced. It copies explicit `v:normal` vectors or synthesizes deterministic area-weighted normals, preserves typed vertex payload properties such as `glm::vec3`/`glm::vec4` colors and scalar/vector algorithm results across seam-split output using source-vertex xrefs, records `v:source_vertex` / `f:source_face` provenance, and reports authored-vs-generated UV provenance, invalid-authored status, backend status, seam-split count, chart count, and atlas dimensions. Direct mesh imports may opt into the disconnected render-only fallback for non-manifold/inconsistent-winding payloads; model-scene materialization uses the strict topology path. |
 | `Extrinsic.Runtime.MeshAttributeTextureBake` | Runtime-owned CPU texture bake helper for mesh attributes over resolved UVs. Exports the generic `MeshAttributeTextureBakeRequest` / `BakeMeshAttributeTexture(...)` seam for `GeometrySources::ConstSourceView` and `Geometry::HalfedgeMesh::Mesh`, stable `BuildMeshAttributeTextureBakeAssetPath(...)` keys, status/result/diagnostic records, and compatibility wrappers `BakeMeshVertexNormalTexture(...)` and `BakeMeshVertexColorTexture(...)`. The generic path supports vertex and face source domains, finite scalar `float`/`double`, label `uint32`, and finite `glm::vec2`/`glm::vec3`/`glm::vec4` properties whose count matches the selected domain. Encoders cover scalar colormap, linear scalar R8, label palette RGBA8, vector2 RG8, vector3 RGB8, normal RGBA8, and RGBA color outputs; scalar ranges are either finite auto-ranges with flat-range expansion or explicit increasing manual ranges. The baker requires mesh-domain topology and count-matched finite vertex `v:texcoord`; missing UVs, unsupported domains/types, invalid ranges/resolutions, non-finite data, degenerate UV triangles, and zero-coverage bakes fail closed with diagnostics. It does not generate UVs and has no `AssetService`, graphics, RHI, or Vulkan dependency; runtime callers can use the stable generated path to reload the intended CPU texture payload when a dirty stamp changes. |
@@ -96,11 +96,12 @@ Dropped geometry, model-scene, and texture imports now share the same
 `StreamingExecutor` shape: route and ingest records are created on the frame
 thread, file read/decode runs on the worker lane, and only decoded CPU payloads
 cross back into the bounded main-thread apply drain for `AssetService`, ECS,
-handoff, selection, and document-history mutation. Sandbox editor model-scene
-and texture import commands use
-`Engine::GetAssetImportPipeline().QueueModelTextureImport(...)`, return
-`Pending` with an ingest handle to the ImGui callback, and publish completion
-through the existing runtime import event plus queue snapshot. Sandbox editor
+handoff, selection, and document-history mutation. Sandbox editor geometry
+commands use `Engine::GetAssetImportPipeline().QueueGeometryImport(...)` while
+model-scene and texture commands use `QueueModelTextureImport(...)`; every
+supported File / Import command returns `Pending` with an ingest handle to the
+ImGui callback and publishes completion through the existing runtime import
+event plus queue snapshot. Sandbox editor
 scene save commands use
 `Engine::GetSceneDocument().QueueSceneSaveToPath(...)`, snapshot persisted ECS
 state on the frame thread, serialize/write that snapshot on the worker lane,
@@ -117,7 +118,10 @@ synchronous APIs outside the frame-driven UI/drop routes.
 `Engine::GetAssetImportPipeline().SetModelTextureImportIOBackendFactoryForTest(...)`
 is a contract-test seam for injecting slow or fake model/texture IO backends
 into queued imports; production queued imports fall back to
-`Core::IO::FileIOBackend`.
+`Core::IO::FileIOBackend`. The queued-geometry before-decode test hook can hold
+a worker deterministically while a real Null-window Sandbox session proves
+frames continue and no asset, ECS, selection, focus, or history mutation occurs
+before main-thread apply; production leaves the hook empty.
 Geometry decode results are held as shared immutable mesh/graph/point-cloud
 payloads until main-thread apply. `AssetService` publication still takes its
 own payload copy, and graph/point-cloud materialization still makes the mutable
@@ -801,11 +805,12 @@ no higher-layer imports; `Runtime.Engine` supplies runtime-specific hook
 implementations during composition.
 
 `Engine::RunFrame()` keeps per-frame lifecycle state in an internal
-`RuntimeFrameContext` record: clamped frame delta, fixed-step interpolation
-alpha, monotonic render frame index, `RenderFrameInput`, extraction stats, and
-the acquired `RenderWorldPool` front slot. This keeps the stage data explicit
-without exporting a runtime API or reviving legacy `Runtime.FrameLoop`,
-`Runtime.RenderOrchestrator`, or `Runtime.ResourceMaintenance` modules.
+`RuntimeFrameContext` record: clamped prior completed-frame delta, fixed-step
+interpolation alpha, monotonic render frame index, `RenderFrameInput`,
+extraction stats, and the acquired `RenderWorldPool` front slot. This keeps the
+stage data explicit without exporting a runtime API or reviving legacy
+`Runtime.FrameLoop`, `Runtime.RenderOrchestrator`, or
+`Runtime.ResourceMaintenance` modules.
 Single-use frame-hook adapters, fixed-step/camera/input helpers, pick-context
 capture, and pick-readback refinement live as private `Runtime.Engine.cpp`
 helpers so `RunFrame` stays an ordered phase list while preserving the same
@@ -1054,9 +1059,14 @@ execution should request `Core::Config::WindowBackend::Null` explicitly.
     reclaimable next frame.
 16. Frame clock finalize.
 
-`Engine::RunFrame()` consumes `Extrinsic.Core.FrameClock` for wall-clock frame
-delta sampling and post-sleep resampling; runtime owns the phase orchestration,
-not the reusable clock value type.
+`Engine::RunFrame()` consumes `Extrinsic.Core.FrameClock` by sampling the stored
+prior completed-frame duration for simulation, runtime hooks, camera controls,
+and Dear ImGui timers. `EndFrame()` records the current frame for consumption by
+the next frame, while post-sleep resampling keeps deliberate minimized/idle
+sleep out of that record. Runtime owns the phase orchestration, not the reusable
+clock value type. Before any frame has completed, the clock query
+deterministically returns zero; the ImGui adapter retains its existing
+non-positive-delta fallback for that first frame.
 
 `UI-030` adds `Engine::GetLastFramePacingDiagnostics()` as a copied runtime
 frame-pacing sample for the most recent `RunFrame()` attempt; `RUNTIME-158`
@@ -1153,21 +1163,34 @@ main-thread apply, GPU upload, terminal states), determinate vs indeterminate
 progress, and terminal diagnostics.
 `Engine::GetAssetImportPipeline().GetAssetImportQueueSnapshot()` polls those
 records for editor/UI consumers, marks only active deferred `StreamingExecutor`
-geometry imports as cancellable, and exposes
+imports as cancellable, and exposes
 `AssetImportPipeline::CancelAssetImport(...)` /
 `AssetImportPipeline::ClearCompletedAssetImports()` without moving asset, ECS,
-graphics, or UI ownership below runtime. Manual imports and reimports still use
-the same state-machine records, but they usually reach a terminal queue row
-inside the synchronous command call.
+graphics, or UI ownership below runtime. Sandbox manual File / Import commands
+and promoted dropped geometry/model/texture requests remain queued across the
+worker/apply boundary; explicit direct imports and reimports still use the same
+state-machine records but reach a terminal row inside their synchronous call.
+`Engine::Shutdown()` calls
+`AssetImportPipeline::CancelActiveAssetImportsForShutdown()` immediately after
+discarding pending engine commands and before ImGui or application policy
+teardown. The lifecycle call reuses the executor plus ingest-state cancellation
+path for pending, ready, running, and decoded work waiting for main-thread apply,
+so those records become `Cancelled` and their materialization callbacks cannot
+run after Sandbox unregisters its import policies. Interactive queue cancellation
+keeps its existing pre-apply boundary; the additional decoded-work allowance is
+shutdown-only. Worker execution is still joined by the normal async-work drain.
 
 Shutdown order requirement:
 
-1. `AsyncWorkService::ShutdownAndDrain()` over the live `StreamingExecutor`
+1. active asset-import cancellation before ImGui/application policy teardown
+2. application shutdown, which may unregister import policies and release a
+   blocked decoder
+3. `AsyncWorkService::ShutdownAndDrain()` over the live `StreamingExecutor`
    before scene/assets reset. It first joins and drains executor work, then
    drains derived completions/readbacks, applies readbacks already ready at the
    shutdown boundary, and cancels every surviving derived record. Once it
    returns, later readiness polling cannot run a derived main-thread callback.
-2. task scheduler teardown
+4. task scheduler teardown
 
 ## Stable entity lookup ownership and policy
 

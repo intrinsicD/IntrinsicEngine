@@ -290,8 +290,9 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
             .PayloadKind = Assets::AssetPayloadKind::Mesh,
         });
     EXPECT_EQ(activeImport.Status,
-              Runtime::SandboxEditorCommandStatus::AssetImportFailed);
-    EXPECT_EQ(activeImport.Error, Core::ErrorCode::FileNotFound);
+              Runtime::SandboxEditorCommandStatus::Pending);
+    EXPECT_TRUE(activeImport.Operation.IsValid());
+    EXPECT_EQ(activeImport.Error, Core::ErrorCode::Success);
 
     session.Detach();
     session.Attach(engine);

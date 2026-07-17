@@ -44,12 +44,16 @@ engine-owned registry, toggles mesh edge/vertex primitive views through runtime
 extraction-cache settings, routes selected-entity spatial-debug options through
 `SpatialDebugBinding`, routes material/scalar/color visualization choices
 through `VisualizationConfig`, routes visualization adapter bindings through
-runtime extraction-cache state, and submits file/import path commands through
-`Engine::GetAssetImportPipeline().ImportAssetFromPath(...)`. Asset routing,
-decoding, `AssetService` mutation, model-scene materialization, texture-upload
-requests, and default import/input policy implementation remain runtime/asset
-owned; the sandbox app implementation only composes the runtime-provided
-defaults.
+runtime extraction-cache state, and submits frame-driven file/import commands
+through `Engine::GetAssetImportPipeline().QueueGeometryImport(...)` or
+`QueueModelTextureImport(...)`. Every supported `File / Import` payload is
+therefore queued before decode; the worker reads and decodes while bounded
+main-thread completion owns `AssetService`, ECS, selection, focus, and document
+history mutation. The direct `ImportAssetFromPath(...)` API remains synchronous
+for explicit non-frame callers and is not used by the Sandbox ImGui callback.
+Asset routing, decoding, materialization, texture-upload requests, and default
+import/input policy implementation remain runtime/asset owned; the sandbox app
+implementation only composes the runtime-provided defaults.
 
 `File / Import` is a linear path -> payload-hint -> import workflow. The path
 field remains editable whenever the window is bound, while the runtime facade
@@ -67,8 +71,9 @@ runtime-owned AssetIO queue. Rows show queued/running/apply/upload/terminal
 import stages, payload kind, path basename, elapsed time, determinate progress
 where available, indeterminate stage labels where decoder progress is unknown,
 and failure/cancellation diagnostics. Clear-completed and cancellable
-dropped-geometry commands route back to `Engine::GetAssetImportPipeline()`; the
-sandbox app and UI never own asset, ECS, or graphics state.
+manual or dropped import commands route back to
+`Engine::GetAssetImportPipeline()`; the sandbox app and UI never own asset, ECS,
+or graphics state.
 
 The promoted editor also exposes stable top-level ImGui menu slots for
 `PointCloud`, `Graph`, and `Mesh`. Their submenu items open selected-entity

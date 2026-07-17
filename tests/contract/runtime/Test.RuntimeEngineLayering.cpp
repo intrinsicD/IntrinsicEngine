@@ -225,7 +225,10 @@ TEST(RuntimeEngineLayering, ObjectSpaceNormalBakeServiceKeepsGpuQueueComposition
 
     EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.ObjectSpaceNormalBakeGpuQueue"),
               std::string::npos);
-    EXPECT_NE(engineInterface.find(
+    // RUNTIME-178 keeps the public CPU request queue reachable through the
+    // service re-export while moving the private asset-residency glue that
+    // names the queue into the Engine implementation unit.
+    EXPECT_EQ(engineInterface.find(
                   "import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;"),
               std::string::npos);
     EXPECT_EQ(engineInterface.find(
@@ -235,7 +238,7 @@ TEST(RuntimeEngineLayering, ObjectSpaceNormalBakeServiceKeepsGpuQueueComposition
               std::string::npos);
     EXPECT_EQ(engineImpl.find("import Extrinsic.Runtime.ObjectSpaceNormalBakeGpuQueue"),
               std::string::npos);
-    EXPECT_EQ(engineImpl.find("import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue"),
+    EXPECT_NE(engineImpl.find("import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;"),
               std::string::npos);
     EXPECT_EQ(engineImpl.find("RuntimeObjectSpaceNormalBakeGpuQueueDependencies"),
               std::string::npos);

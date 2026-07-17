@@ -3729,6 +3729,53 @@ namespace
         return bytes;
     }
 
+    [[nodiscard]] std::array<std::byte, 2> EncodeUint16(std::uint16_t value, BinaryPlyEndian endian)
+    {
+        std::array<std::byte, 2> bytes{};
+        std::memcpy(bytes.data(), &value, 2);
+        if (endian == BinaryPlyEndian::Big)
+        {
+            std::swap(bytes[0], bytes[1]);
+        }
+        return bytes;
+    }
+
+    template <std::size_t N>
+    void AppendEncodedBytes(std::string& contents, const std::array<std::byte, N>& bytes)
+    {
+        contents.append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+    }
+
+    [[nodiscard]] std::string MakeBinaryPLYPointCloudTriangle(
+        BinaryPlyEndian endian,
+        std::string_view trailingElementHeader)
+    {
+        const char* formatToken =
+            endian == BinaryPlyEndian::Little ? "binary_little_endian" : "binary_big_endian";
+        std::string contents = "ply\nformat ";
+        contents += formatToken;
+        contents += " 1.0\n"
+                    "element vertex 3\n"
+                    "property float x\n"
+                    "property float y\n"
+                    "property float z\n";
+        contents += trailingElementHeader;
+        contents += "end_header\n";
+
+        const std::array<glm::vec3, 3> positions{
+            glm::vec3{0.0f, 0.0f, 0.0f},
+            glm::vec3{1.0f, 0.0f, 0.0f},
+            glm::vec3{0.0f, 1.0f, 0.0f},
+        };
+        for (const glm::vec3& position : positions)
+        {
+            AppendEncodedBytes(contents, EncodeFloat(position.x, endian));
+            AppendEncodedBytes(contents, EncodeFloat(position.y, endian));
+            AppendEncodedBytes(contents, EncodeFloat(position.z, endian));
+        }
+        return contents;
+    }
+
     struct BinaryPlyVertex
     {
         glm::vec3 Position{0.0f};
@@ -4484,6 +4531,98 @@ TEST(GeometryIO_PointCloudIO, LoadsBinaryBigEndianPLYPointCloud)
     EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{2}), glm::vec3(0.0f, 1.0f, 2.0f));
 }
 
+TEST(GeometryIO_PointCloudIO, LoadsBinaryLittleEndianPLYPointCloudWithFaceList)
+{
+    const std::array<BinaryPlyVertex, 3> vertices{{
+        {glm::vec3{0.0f, 0.0f, 0.0f}, false, 0, 0, 0},
+        {glm::vec3{1.0f, 0.0f, 0.0f}, false, 0, 0, 0},
+        {glm::vec3{0.0f, 1.0f, 0.0f}, false, 0, 0, 0},
+    }};
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    TempBinaryPLY file(vertices, faces, BinaryPlyEndian::Little);
+
+    const auto result = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result->Cloud.VerticesSize(), 3u);
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), vertices[0].Position);
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), vertices[1].Position);
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{2}), vertices[2].Position);
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsBinaryBigEndianPLYPointCloudWithFaceList)
+{
+    const std::array<BinaryPlyVertex, 3> vertices{{
+        {glm::vec3{0.0f, 0.0f, 0.0f}, false, 0, 0, 0},
+        {glm::vec3{1.0f, 0.0f, 0.0f}, false, 0, 0, 0},
+        {glm::vec3{0.0f, 1.0f, 0.0f}, false, 0, 0, 0},
+    }};
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    TempBinaryPLY file(vertices, faces, BinaryPlyEndian::Big);
+
+    const auto result = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result->Cloud.VerticesSize(), 3u);
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), vertices[0].Position);
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), vertices[1].Position);
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{2}), vertices[2].Position);
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsBinaryBigEndianPLYPointCloudWithInterleavedNonVertexProperties)
+{
+    std::string contents = MakeBinaryPLYPointCloudTriangle(
+        BinaryPlyEndian::Big,
+        "element face 1\n"
+        "property uchar material\n"
+        "property list ushort int vertex_indices\n"
+        "property float quality\n"
+        "element metadata 2\n"
+        "property uint id\n"
+        "property list uchar ushort samples\n");
+
+    contents.push_back(static_cast<char>(7));
+    AppendEncodedBytes(contents, EncodeUint16(3u, BinaryPlyEndian::Big));
+    AppendEncodedBytes(contents, EncodeUint32(0u, BinaryPlyEndian::Big));
+    AppendEncodedBytes(contents, EncodeUint32(1u, BinaryPlyEndian::Big));
+    AppendEncodedBytes(contents, EncodeUint32(2u, BinaryPlyEndian::Big));
+    AppendEncodedBytes(contents, EncodeFloat(0.75f, BinaryPlyEndian::Big));
+
+    AppendEncodedBytes(contents, EncodeUint32(11u, BinaryPlyEndian::Big));
+    contents.push_back(static_cast<char>(2));
+    AppendEncodedBytes(contents, EncodeUint16(4u, BinaryPlyEndian::Big));
+    AppendEncodedBytes(contents, EncodeUint16(5u, BinaryPlyEndian::Big));
+    AppendEncodedBytes(contents, EncodeUint32(12u, BinaryPlyEndian::Big));
+    contents.push_back(static_cast<char>(1));
+    AppendEncodedBytes(contents, EncodeUint16(6u, BinaryPlyEndian::Big));
+
+    TempFile file(".ply", std::move(contents));
+    const auto result = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result->Cloud.VerticesSize(), 3u);
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 0.0f));
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(1.0f, 0.0f, 0.0f));
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{2}), glm::vec3(0.0f, 1.0f, 0.0f));
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsCheckedInBinaryPLYPointCloudEndianFixtures)
+{
+    const std::array<const char*, 2> filenames{
+        "__test_triangle_le.ply",
+        "__test_triangle_be.ply",
+    };
+    for (const char* filename : filenames)
+    {
+        SCOPED_TRACE(filename);
+        const std::string path =
+            std::string(INTRINSIC_TEST_SUPPORT_DIR) + "/../../assets/models/" + filename;
+        const auto result = Geometry::PointCloudIO::LoadPLY(path);
+        ASSERT_TRUE(result.has_value());
+        ASSERT_EQ(result->Cloud.VerticesSize(), 3u);
+        EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 0.0f));
+        EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(1.0f, 0.0f, 0.0f));
+        EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{2}), glm::vec3(0.0f, 1.0f, 0.0f));
+    }
+}
+
 TEST(GeometryIO_PointCloudIO, LoadsBinaryPLYPointCloudWithNormalsAndColor)
 {
     const std::array<BinaryPlyPointCloudVertex, 1> vertices{{
@@ -4582,6 +4721,95 @@ TEST(GeometryIO_PointCloudIO, LoadPLYPointCloudRejectsTruncatedBinaryBody)
                                  /*injectListPropertyInVertex=*/false,
                                  /*truncateBodyAfterFirst=*/true);
 
+    const auto result = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Extrinsic::Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_PointCloudIO, BinaryPLYPointCloudRejectsTruncatedNonVertexListCount)
+{
+    std::string contents = MakeBinaryPLYPointCloudTriangle(
+        BinaryPlyEndian::Little,
+        "element face 1\n"
+        "property list uint int vertex_indices\n");
+    contents.push_back(static_cast<char>(3));
+    contents.push_back(static_cast<char>(0));
+
+    TempFile file(".ply", std::move(contents));
+    const auto result = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Extrinsic::Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_PointCloudIO, BinaryPLYPointCloudRejectsTruncatedNonVertexListPayload)
+{
+    std::string contents = MakeBinaryPLYPointCloudTriangle(
+        BinaryPlyEndian::Little,
+        "element face 1\n"
+        "property list uchar int vertex_indices\n");
+    contents.push_back(static_cast<char>(3));
+    AppendEncodedBytes(contents, EncodeUint32(0u, BinaryPlyEndian::Little));
+    AppendEncodedBytes(contents, EncodeUint32(1u, BinaryPlyEndian::Little));
+
+    TempFile file(".ply", std::move(contents));
+    const auto result = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Extrinsic::Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_PointCloudIO, BinaryPLYPointCloudRejectsNegativeBigEndianListCount)
+{
+    std::string contents = MakeBinaryPLYPointCloudTriangle(
+        BinaryPlyEndian::Big,
+        "element face 1\n"
+        "property list int int vertex_indices\n");
+    AppendEncodedBytes(
+        contents, EncodeUint32(std::numeric_limits<std::uint32_t>::max(), BinaryPlyEndian::Big));
+
+    TempFile file(".ply", std::move(contents));
+    const auto result = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Extrinsic::Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_PointCloudIO, BinaryPLYPointCloudRejectsFloatingListCountType)
+{
+    std::string contents = MakeBinaryPLYPointCloudTriangle(
+        BinaryPlyEndian::Little,
+        "element face 1\n"
+        "property list float int vertex_indices\n");
+    AppendEncodedBytes(contents, EncodeFloat(3.0f, BinaryPlyEndian::Little));
+
+    TempFile file(".ply", std::move(contents));
+    const auto result = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Extrinsic::Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_PointCloudIO, BinaryPLYPointCloudRejectsOversizedListPayloadBeforeMultiplication)
+{
+    std::string contents = MakeBinaryPLYPointCloudTriangle(
+        BinaryPlyEndian::Little,
+        "element metadata 1\n"
+        "property list uint double values\n");
+    AppendEncodedBytes(
+        contents, EncodeUint32(std::numeric_limits<std::uint32_t>::max(), BinaryPlyEndian::Little));
+
+    TempFile file(".ply", std::move(contents));
+    const auto result = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Extrinsic::Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_PointCloudIO, BinaryPLYPointCloudRejectsOverflowingFixedElementByteCount)
+{
+    const std::string trailingHeader =
+        "element metadata " + std::to_string(std::numeric_limits<std::size_t>::max()) +
+        "\nproperty double value\n";
+    std::string contents =
+        MakeBinaryPLYPointCloudTriangle(BinaryPlyEndian::Little, trailingHeader);
+
+    TempFile file(".ply", std::move(contents));
     const auto result = Geometry::PointCloudIO::LoadPLY(file.Path);
     ASSERT_FALSE(result.has_value());
     EXPECT_EQ(result.error(), Extrinsic::Core::ErrorCode::InvalidFormat);

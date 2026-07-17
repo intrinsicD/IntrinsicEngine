@@ -8,6 +8,118 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-088`](BUG-088-benchmark-smoke-hard-timeout-host-contention.md) — the
+benchmark smoke lane-classification defect retired on 2026-07-16. Commit
+`6856768a` labels the complete CTest fixture pair `slow`, gives its opt-in
+runner a 120-second bound, and preserves the Run→Validate dependency. The
+dedicated PR workflow now has the matching two-minute runner-step budget,
+strictly validates every emitted JSON, and retains the complete result
+directory. Seven hosted execution-phase samples justify classification only,
+not a performance claim. Exact implementation-head benchmark run `29538352251`
+completed the runner in 34.924 seconds, validated and uploaded all 22 results;
+CPU run `29538352281` passed 3,789/3,789 without selecting the fixture; docs run
+`29538352271` exercised all new policy and negative-validator regressions; and
+pr-fast, Vulkan, ASan, and UBSan passed on the same SHA.
+
+[`BUG-105`](BUG-105-runtime-module-ecs-structural-hazard.md) — the runtime
+module/ECS structural hazard retired on 2026-07-16. Commit `f0ea3987` gives
+every module sim system an implicit structural read because its context exposes
+the live world, and marks the three promoted baseline ECS passes that add or
+remove components as structural writers through the existing FrameGraph token.
+The regression independently pins every baseline writer against an immediate
+module reader; the focused selection passed 9/9, the original sanitizer
+harness passed 100/100 repetitions, the clean default CPU gate passed
+3,791/3,791, and repaired exact-head `pr-fast` run `29531364667` passed in
+15m31s. No global lock, serial scheduler mode, new hazard abstraction, or
+layering exception was added.
+
+[`BUG-104`](BUG-104-kernel-convergence-regression-stale-snapshot.md) — the
+kernel-convergence repository-snapshot regression retired on 2026-07-16.
+Commit `fb582056` replaces only the stale `49/28` and `RUNTIME-178` output
+assertions with the already-enforced `42/21`, two export imports, 31 public
+getter names, and debt-free diagnostic. The Engine interface, checker, policy,
+and all 18 synthetic/fail-closed cases are unchanged. The pre-fix suite failed
+only the repository snapshot, then passed 19/19 after the correction; the
+strict live checker passed independently, and repaired exact-head `pr-fast`
+run `29524872998` completed successfully in 17m05s.
+
+[`BUG-081`](BUG-081-warm-configure-budget-runner-variance.md) — the
+warm-configure hosted-tail guard defect retired on 2026-07-16. Commit
+`d3017621` applies one finite 40-second exact-vcpkg-hit limit across all seven
+workflow call sites, derived as the slowest contemporary hosted-context p95
+(`30.368 s`) plus a 25% margin and five-second rounding. The canonical policy
+retains the raw run URLs, exact cache identities, image mapping, conventional
+medians, nearest-rank p95s, and the conservative transfer policy for the
+inactive self-hosted GPU context. `time_command.py` and its timing JSON remain
+unchanged; the synthetic exact-hit overrun still returns failure, timing and
+workflow-policy regressions passed 18/18, and all five repaired-head workflow
+runs (including both sanitizer matrix contexts) passed Configure and reached
+compilation.
+
+[`BUG-103`](BUG-103-rendergraph-lifetime-test-culls-history-chain.md) — the
+render-graph lifetime fixture drift retired on 2026-07-16 at `CPUContracted`.
+Commit `566424a5` connects `HistoryRead` to the live `Present` root through the
+existing `DependsOn()` contract and pins topological order `{0, 1, 2}`; the
+compiler continues to cull disconnected passes and measure lifetimes in live
+execution-rank space. The pre-fix test and compiler matched `origin/main`,
+ccache-disabled rebuilds reproduced the failure, the corrected exact case
+passed 20/20 in both `ci` and `ci-vulkan`, both `GraphicsRenderGraph` selections
+passed 57/57, and the repaired promoted Vulkan/GPU label gate passed 286/286.
+
+[`BUG-102`](BUG-102-object-space-normal-bake-layering-test-import-placement.md)
+— the object-space bake source-layering test drift retired on 2026-07-16 at
+`CPUContracted`. Commit `b17a8bde` updates only the two stale public CPU
+request-queue import-placement predicates to match RUNTIME-178's intentional
+Engine interface-to-implementation move. Every negative GPU queue ownership,
+composition, dependency, and ready-frame-policy assertion remains unchanged,
+and the 42-import interface convergence ratchet holds. The exact case passed
+3/3 in both presets, `RuntimeEngineLayering` passed 21/21, and the repaired
+promoted Vulkan/GPU label gate passed 286/286.
+
+[`BUG-101`](BUG-101-fast-staged-uv-edge-grouping-quadratic.md) — fast-staged UV
+edge grouping retired on 2026-07-16 at `Operational`. Commit `25d27068`
+replaces the per-incidence vector-wide search with reserved normalized edge-key
+lookup while preserving first-seen group and face order, then reuses those
+groups for seam recording. Two deterministic geometry regressions plus a real
+generated-grid runtime enrichment/close contract passed 3/3. The declared
+runner emitted 22 strictly valid results; on one controlled local Clang 23
+Debug ASan/UBSan host, the large-grid median changed from 1,031.895895 ms to
+555.416594 ms (46.175% lower), normalized scaling changed from 1.726739 to
+1.195250, quality L2 remained zero, and the exact output signature matched.
+The evidence is explicitly local and is neither a broad claim nor a timing
+gate. The aggregate build and default CPU-supported gate passed 3,830/3,830.
+
+[`BUG-100`](BUG-100-manual-geometry-import-blocks-frame-loop.md) — manual
+Sandbox geometry import retired on 2026-07-16 at `Operational`. Commit
+`56352aa7` routes Mesh, Graph, PointCloud, ModelScene, and Texture2D commands
+through the existing queued import lane: route state stays on the frame thread,
+decode runs on the worker, and assets/ECS/selection/focus/history apply once on
+the bounded main-thread drain. Shutdown now cancels blocked or apply-ready
+imports before unregistering application policy. Commit `694b8b3f` updates the
+stale-session regression for the queued `Pending` contract while retaining its
+detach/reattach rejection proof. Focused runtime/diagnostic coverage passed
+5/5, app presentation coverage passed 3/3, the repaired lifecycle test passed
+1/1, and the aggregate default CPU-supported gate passed 3,830/3,830.
+
+[`BUG-099`](BUG-099-binary-ply-pointcloud-skips-face-lists.md) — binary PLY
+point-cloud list consumption retired on 2026-07-16 at `CPUContracted`. Commit
+`bb985f61` adds endian-aware, bounds-checked consumption of non-vertex scalar
+and list properties while rejecting negative, floating, overflowing, or
+truncated counts and retaining strict vertex-list rejection. Both checked-in
+endian fixtures and generated interleaving/malformed cases passed; the focused
+binary selection passed 17/17 and the aggregate default CPU-supported gate
+passed 3,830/3,830. `ASSETIO-011` retains the real Sandbox `Operational`
+workflow matrix.
+
+[`BUG-098`](BUG-098-frame-clock-samples-incomplete-frame-delta.md) — incomplete
+frame-delta sampling retired on 2026-07-16 at `Operational`. Commit `c9f7067a`
+makes `FrameDeltaClamped()` return the bounded previous completed-frame
+duration instead of the few microseconds elapsed immediately after
+`BeginFrame()`, while preserving first-frame zero and minimized-window sleep
+exclusion. Six clock cases and the real Null-window `Engine::Run()` production-
+delay File / Import tooltip path passed 7/7. The aggregate build and default
+CPU-supported gate passed 3,830/3,830, with no Vulkan-specific follow-up owed.
+
 [`BUG-094`](BUG-094-model-scene-node-semantics-selection.md) — the model-scene
 node-semantics and selection defect retired on 2026-07-16 at `Operational`.
 Commit `16c30545` retains the selected glTF scene's deterministic hierarchy,

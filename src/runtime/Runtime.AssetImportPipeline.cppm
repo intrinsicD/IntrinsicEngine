@@ -275,6 +275,8 @@ namespace Extrinsic::Runtime
             RuntimeAssetImportRequest request);
         [[nodiscard]] Core::Expected<RuntimeQueuedAssetImport> QueueModelTextureImport(
             RuntimeAssetImportRequest request);
+        [[nodiscard]] Core::Expected<RuntimeQueuedAssetImport> QueueGeometryImport(
+            RuntimeAssetImportRequest request);
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ReimportAsset(
             RuntimeAssetReimportRequest request);
         [[nodiscard]] RuntimePostImportProcessorHandle RegisterPostImportProcessor(
@@ -294,17 +296,22 @@ namespace Extrinsic::Runtime
             GetAssetIngestRecordsForTest() const;
         void SetModelTextureImportIOBackendFactoryForTest(
             RuntimeIOBackendFactory factory);
+        void SetQueuedGeometryImportBeforeDecodeHookForTest(
+            std::function<void(const RuntimeAssetImportRequest&)> hook);
         [[nodiscard]] RuntimeAssetImportQueueSnapshot
             GetAssetImportQueueSnapshot() const;
         [[nodiscard]] std::size_t ClearCompletedAssetImports();
         [[nodiscard]] Core::Result CancelAssetImport(
             RuntimeAssetIngestHandle operation);
+        void CancelActiveAssetImportsForShutdown();
         void ImportDroppedFilePaths(std::span<const std::string> paths);
 
     private:
-        void QueueDroppedGeometryImport(
-            std::string path,
-            std::vector<Assets::AssetPayloadKind> payloadKinds);
+        [[nodiscard]] Core::Expected<RuntimeQueuedAssetImport>
+            QueueGeometryImportWithIngest(
+                RuntimeAssetImportRequest request,
+                RuntimeAssetIngestSource source,
+                std::vector<Assets::AssetPayloadKind> payloadKinds);
         [[nodiscard]] Core::Expected<RuntimeQueuedAssetImport>
             QueueModelTextureImportWithIngest(
                 RuntimeAssetImportRequest request,
@@ -320,6 +327,9 @@ namespace Extrinsic::Runtime
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ImportAssetFromPathImpl(
             RuntimeAssetImportRequest request,
             Assets::AssetId existingAsset);
+        [[nodiscard]] Core::Result CancelAssetImportImpl(
+            RuntimeAssetIngestHandle operation,
+            bool allowWaitingForMainThreadApply);
         void RecordAssetImportEvent(
             const RuntimeAssetImportRequest& request,
             const Core::Expected<RuntimeAssetImportResult>& result,
@@ -340,6 +350,8 @@ namespace Extrinsic::Runtime
         BorrowedSubsystem<RuntimeObjectSpaceNormalBakeQueue> m_ObjectSpaceNormalBakeQueue{};
         BorrowedSubsystem<const RHI::IDevice> m_Device{};
         RuntimeIOBackendFactory m_ModelTextureImportIOBackendFactoryForTest{};
+        std::function<void(const RuntimeAssetImportRequest&)>
+            m_QueuedGeometryImportBeforeDecodeHookForTest{};
         RuntimeAssetIngestStateMachine m_AssetIngestStateMachine{};
         std::vector<RuntimePostImportProcessorRecord> m_PostImportProcessors{};
         std::uint64_t m_NextPostImportProcessorHandle{1u};

@@ -80,6 +80,9 @@ namespace Extrinsic::ECS::Systems::TransformHierarchy
         graph.AddPass(PassName,
             [](Extrinsic::Core::FrameGraphBuilder& builder)
             {
+                // UpdateNode adds/removes transient transform tags, including
+                // first-use component storage creation.
+                builder.StructuralWrite();
                 builder.Read<Components::Transform::Component>();
                 builder.Read<Components::Hierarchy::Component>();
                 builder.Write<Components::Transform::WorldMatrix>();

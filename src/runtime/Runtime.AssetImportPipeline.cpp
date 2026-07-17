@@ -147,7 +147,7 @@ namespace Extrinsic::Runtime
             DecodedGeometryImportPayload Payload{};
         };
 
-        struct DroppedGeometryImportState
+        struct QueuedGeometryImportState
         {
             RuntimeAssetIngestHandle IngestHandle{};
             RuntimeAssetImportRequest Request{};
@@ -1584,6 +1584,28 @@ namespace Extrinsic::Runtime
             {});
     }
 
+    Core::Expected<RuntimeQueuedAssetImport> AssetImportPipeline::QueueGeometryImport(
+        RuntimeAssetImportRequest request)
+    {
+        auto route = Assets::ResolveAssetImportRoute(
+            request.Path,
+            Assets::AssetRouteOperation::Import,
+            Assets::AssetImportHint{.PayloadKind = request.PayloadKind});
+        if (!route.has_value())
+            return Core::Err<RuntimeQueuedAssetImport>(route.error());
+        if (!Assets::IsGeometryPayloadKind(route->PayloadKind))
+        {
+            return Core::Err<RuntimeQueuedAssetImport>(
+                Core::ErrorCode::AssetTypeMismatch);
+        }
+
+        request.PayloadKind = route->PayloadKind;
+        return QueueGeometryImportWithIngest(
+            std::move(request),
+            RuntimeAssetIngestSource::ManualImport,
+            {route->PayloadKind});
+    }
+
     Core::Expected<RuntimeAssetImportResult> AssetImportPipeline::ReimportAsset(
         RuntimeAssetReimportRequest request)
     {
@@ -1645,6 +1667,12 @@ namespace Extrinsic::Runtime
         RuntimeIOBackendFactory factory)
     {
         m_ModelTextureImportIOBackendFactoryForTest = std::move(factory);
+    }
+
+    void AssetImportPipeline::SetQueuedGeometryImportBeforeDecodeHookForTest(
+        std::function<void(const RuntimeAssetImportRequest&)> hook)
+    {
+        m_QueuedGeometryImportBeforeDecodeHookForTest = std::move(hook);
     }
 
     RuntimeAssetImportQueueSnapshot AssetImportPipeline::GetAssetImportQueueSnapshot() const
@@ -1745,6 +1773,26 @@ namespace Extrinsic::Runtime
     Core::Result AssetImportPipeline::CancelAssetImport(
         const RuntimeAssetIngestHandle operation)
     {
+        return CancelAssetImportImpl(operation, false);
+    }
+
+    void AssetImportPipeline::CancelActiveAssetImportsForShutdown()
+    {
+        for (const RuntimeAssetImportStreamingTask& task :
+             m_AssetImportStreamingTasks)
+        {
+            const std::optional<RuntimeAssetIngestRecord> record =
+                m_AssetIngestStateMachine.Snapshot(task.Ingest);
+            if (!record.has_value() || IsTerminal(record->Phase))
+                continue;
+            (void)CancelAssetImportImpl(task.Ingest, true);
+        }
+    }
+
+    Core::Result AssetImportPipeline::CancelAssetImportImpl(
+        const RuntimeAssetIngestHandle operation,
+        const bool allowWaitingForMainThreadApply)
+    {
         const std::optional<RuntimeAssetIngestRecord> record =
             m_AssetIngestStateMachine.Snapshot(operation);
         if (!record.has_value())
@@ -1772,7 +1820,9 @@ namespace Extrinsic::Runtime
 
         const StreamingTaskState state =
             m_StreamingExecutor->GetState(taskIt->Streaming);
-        if (!StreamingTaskStateCanCancel(state))
+        if (!StreamingTaskStateCanCancel(state) &&
+            !(allowWaitingForMainThreadApply &&
+              state == StreamingTaskState::WaitingForMainThreadApply))
         {
             return Core::Err(Core::ErrorCode::InvalidState);
         }
@@ -1837,7 +1887,13 @@ namespace Extrinsic::Runtime
                         "[Runtime] Dropped ambiguous geometry file routed to deferred import: path='{}' candidate_count={}",
                         path,
                         geometryPayloads.size());
-                    QueueDroppedGeometryImport(path, std::move(geometryPayloads));
+                    (void)QueueGeometryImportWithIngest(
+                        RuntimeAssetImportRequest{
+                            .Path = path,
+                            .PayloadKind = geometryPayloads.front(),
+                        },
+                        RuntimeAssetIngestSource::DroppedFile,
+                        std::move(geometryPayloads));
                     continue;
                 }
             }
@@ -1855,7 +1911,13 @@ namespace Extrinsic::Runtime
                     "[Runtime] Dropped geometry file routed to deferred import: path='{}' payload={}",
                     path,
                     Assets::DebugNameForAssetPayloadKind(route->PayloadKind));
-                QueueDroppedGeometryImport(path, {route->PayloadKind});
+                (void)QueueGeometryImportWithIngest(
+                    RuntimeAssetImportRequest{
+                        .Path = path,
+                        .PayloadKind = route->PayloadKind,
+                    },
+                    RuntimeAssetIngestSource::DroppedFile,
+                    {route->PayloadKind});
                 continue;
             }
             if (route.has_value() &&
@@ -1889,25 +1951,24 @@ namespace Extrinsic::Runtime
         }
     }
 
-    void AssetImportPipeline::QueueDroppedGeometryImport(
-        std::string path,
+    Core::Expected<RuntimeQueuedAssetImport>
+    AssetImportPipeline::QueueGeometryImportWithIngest(
+        RuntimeAssetImportRequest request,
+        const RuntimeAssetIngestSource source,
         std::vector<Assets::AssetPayloadKind> payloadKinds)
     {
-        RuntimeAssetImportRequest request{
-            .Path = path,
-            .PayloadKind = payloadKinds.empty()
-                ? Assets::AssetPayloadKind::Unknown
-                : payloadKinds.front(),
-        };
+        if (!payloadKinds.empty())
+            request.PayloadKind = payloadKinds.front();
         RuntimeAssetIngestTransition submit =
             m_AssetIngestStateMachine.Submit(
                 MakeRuntimeAssetIngestRequest(
                     request,
-                    RuntimeAssetIngestSource::DroppedFile));
+                    source));
         if (!submit.Succeeded())
         {
             Core::Log::Warn(
-                "[Runtime] Dropped geometry import rejected by ingest state machine: path='{}' payload={} diagnostic={} error={}",
+                "[Runtime] Geometry import rejected by ingest state machine: source={} path='{}' payload={} diagnostic={} error={}",
+                DebugNameForRuntimeAssetIngestSource(source),
                 request.Path,
                 Assets::DebugNameForAssetPayloadKind(request.PayloadKind),
                 DebugNameForRuntimeAssetIngestDiagnostic(submit.Diagnostic),
@@ -1917,14 +1978,18 @@ namespace Extrinsic::Runtime
                 Core::Err<RuntimeAssetImportResult>(
                     ErrorFromIngestTransition(submit)),
                 submit.Diagnostic);
-            return;
+            return Core::Err<RuntimeQueuedAssetImport>(
+                ErrorFromIngestTransition(submit));
         }
 
         if (!m_Initialized ||
             !m_StreamingExecutor ||
             !m_AssetService ||
+            !m_GpuAssetCache ||
+            !m_RenderExtraction ||
             !m_Scene ||
-            path.empty() ||
+            !m_EditorCommandHistory ||
+            request.Path.empty() ||
             payloadKinds.empty())
         {
             RuntimeAssetIngestTransition failed =
@@ -1932,7 +1997,8 @@ namespace Extrinsic::Runtime
                     submit.Handle,
                     Core::ErrorCode::InvalidState);
             Core::Log::Warn(
-                "[Runtime] Dropped geometry import rejected before queueing: path='{}' payload={} error={}",
+                "[Runtime] Geometry import rejected before queueing: source={} path='{}' payload={} error={}",
+                DebugNameForRuntimeAssetIngestSource(source),
                 request.Path,
                 Assets::DebugNameForAssetPayloadKind(request.PayloadKind),
                 Core::Error::ToString(Core::ErrorCode::InvalidState));
@@ -1940,12 +2006,13 @@ namespace Extrinsic::Runtime
                 request,
                 Core::Err<RuntimeAssetImportResult>(Core::ErrorCode::InvalidState),
                 failed.Diagnostic);
-            return;
+            return Core::Err<RuntimeQueuedAssetImport>(
+                Core::ErrorCode::InvalidState);
         }
 
         const Assets::AssetRouteDiagnostic routeDiagnostic =
             Assets::DiagnoseAssetImportRoute(
-                path,
+                request.Path,
                 Assets::AssetRouteOperation::Import,
                 Assets::AssetImportHint{.PayloadKind = request.PayloadKind});
         RuntimeAssetIngestTransition routeResolved =
@@ -1959,7 +2026,8 @@ namespace Extrinsic::Runtime
                 Core::Err<RuntimeAssetImportResult>(
                     ErrorFromIngestTransition(routeResolved)),
                 routeResolved.Diagnostic);
-            return;
+            return Core::Err<RuntimeQueuedAssetImport>(
+                ErrorFromIngestTransition(routeResolved));
         }
 
         RuntimeAssetIngestTransition decodeQueued =
@@ -1971,7 +2039,8 @@ namespace Extrinsic::Runtime
                 Core::Err<RuntimeAssetImportResult>(
                     ErrorFromIngestTransition(decodeQueued)),
                 decodeQueued.Diagnostic);
-            return;
+            return Core::Err<RuntimeQueuedAssetImport>(
+                ErrorFromIngestTransition(decodeQueued));
         }
 
         RuntimeAssetIngestTransition decoding =
@@ -1983,26 +2052,32 @@ namespace Extrinsic::Runtime
                 Core::Err<RuntimeAssetImportResult>(
                     ErrorFromIngestTransition(decoding)),
                 decoding.Diagnostic);
-            return;
+            return Core::Err<RuntimeQueuedAssetImport>(
+                ErrorFromIngestTransition(decoding));
         }
 
-        auto state = std::make_shared<DroppedGeometryImportState>();
+        auto state = std::make_shared<QueuedGeometryImportState>();
         state->IngestHandle = submit.Handle;
         state->Request = request;
         const std::size_t candidateCount = payloadKinds.size();
+        auto beforeDecodeHook =
+            m_QueuedGeometryImportBeforeDecodeHookForTest;
 
         const StreamingTaskHandle handle = m_StreamingExecutor->Submit(
             StreamingTaskDesc{
-                .Name = "Runtime.ImportDroppedGeometry." +
-                    FileNameFromPath(path),
+                .Name = "Runtime.ImportGeometry." +
+                    FileNameFromPath(request.Path),
                 .Kind = Core::Dag::TaskKind::AssetDecode,
                 .Priority = Core::Dag::TaskPriority::Normal,
                 .EstimatedCost = 4u,
                 .Execute = [
                     state,
-                    path = std::move(path),
+                    path = request.Path,
+                    beforeDecodeHook = std::move(beforeDecodeHook),
                     payloadKinds = std::move(payloadKinds)]() mutable -> StreamingResult
                 {
+                    if (beforeDecodeHook)
+                        beforeDecodeHook(state->Request);
                     Core::ErrorCode lastError = Core::ErrorCode::Unknown;
                     for (const Assets::AssetPayloadKind payloadKind : payloadKinds)
                     {
@@ -2174,7 +2249,8 @@ namespace Extrinsic::Runtime
                 .PayloadKind = state->Request.PayloadKind,
             };
             Core::Log::Warn(
-                "[Runtime] Dropped geometry import queue submission failed: path='{}' payload={} error={}",
+                "[Runtime] Geometry import queue submission failed: source={} path='{}' payload={} error={}",
+                DebugNameForRuntimeAssetIngestSource(source),
                 request.Path,
                 Assets::DebugNameForAssetPayloadKind(request.PayloadKind),
                 Core::Error::ToString(Core::ErrorCode::InvalidState));
@@ -2186,7 +2262,8 @@ namespace Extrinsic::Runtime
                 request,
                 Core::Err<RuntimeAssetImportResult>(Core::ErrorCode::InvalidState),
                 failed.Diagnostic);
-            return;
+            return Core::Err<RuntimeQueuedAssetImport>(
+                Core::ErrorCode::InvalidState);
         }
 
         m_AssetImportStreamingTasks.push_back(RuntimeAssetImportStreamingTask{
@@ -2194,11 +2271,28 @@ namespace Extrinsic::Runtime
             .Streaming = handle,
         });
 
-        Core::Log::Info(
-            "[Runtime] Queued dropped geometry import: path='{}' payload={} candidate_count={}",
-            state->Request.Path,
-            Assets::DebugNameForAssetPayloadKind(state->Request.PayloadKind),
-            candidateCount);
+        if (source == RuntimeAssetIngestSource::DroppedFile)
+        {
+            Core::Log::Info(
+                "[Runtime] Queued dropped geometry import: path='{}' payload={} candidate_count={}",
+                request.Path,
+                Assets::DebugNameForAssetPayloadKind(request.PayloadKind),
+                candidateCount);
+        }
+        else
+        {
+            Core::Log::Info(
+                "[Runtime] Queued geometry import: source={} path='{}' payload={} candidate_count={}",
+                DebugNameForRuntimeAssetIngestSource(source),
+                request.Path,
+                Assets::DebugNameForAssetPayloadKind(request.PayloadKind),
+                candidateCount);
+        }
+
+        return RuntimeQueuedAssetImport{
+            .Operation = state->IngestHandle,
+            .PayloadKind = request.PayloadKind,
+        };
     }
 
     Core::Expected<RuntimeQueuedAssetImport>

@@ -101,14 +101,14 @@ if(TARGET ExtrinsicRuntime AND TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLAT
     intrinsic_add_glsl_shaders(IntrinsicKMeansGpuBenchmarkSmoke)
 endif()
 
-# Register the smoke runner as a CTest case so the default CPU gate exercises
-# the benchmark workloads + emitted result schema, not just placeholders. The
-# validator script is invoked as a follow-up fixture so the JSON is
-# structurally checked on every run.
+# Keep the monolithic smoke runner available as an opt-in CTest fixture. The
+# required pull-request benchmark workflow owns execution and strict JSON
+# validation; hosted evidence classifies the complete pair outside the default
+# 30-second fast-test budget (BUG-088).
 if(BUILD_TESTING)
     intrinsic_register_test_executable(
         TARGET IntrinsicBenchmarkSmoke
-        LABELS benchmark geometry graphics physics
+        LABELS benchmark geometry graphics physics slow
     )
 
     set(_intrinsic_bench_smoke_test_dir "${CMAKE_BINARY_DIR}/benchmark-ctest/IntrinsicBenchmarkSmokeTest")
@@ -118,8 +118,8 @@ if(BUILD_TESTING)
         COMMAND $<TARGET_FILE:IntrinsicBenchmarkSmoke> "${_intrinsic_bench_smoke_test_dir}"
     )
     set_tests_properties(IntrinsicBenchmarkSmoke.Run PROPERTIES
-        LABELS "benchmark;geometry;graphics;physics"
-        TIMEOUT 30
+        LABELS "benchmark;geometry;graphics;physics;slow"
+        TIMEOUT 120
         FIXTURES_SETUP IntrinsicBenchmarkSmoke
     )
 
@@ -133,7 +133,7 @@ if(BUILD_TESTING)
                 --strict
         )
         set_tests_properties(IntrinsicBenchmarkSmoke.Validate PROPERTIES
-            LABELS "benchmark;geometry;graphics;physics"
+            LABELS "benchmark;geometry;graphics;physics;slow"
             TIMEOUT 30
             FIXTURES_REQUIRED IntrinsicBenchmarkSmoke
         )

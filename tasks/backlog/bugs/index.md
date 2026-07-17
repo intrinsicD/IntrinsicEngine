@@ -43,19 +43,67 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   an unrelated cold sanitizer binary enumerates tests, before the selected
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
-- [`BUG-088` — Benchmark smoke hard timeout flakes under host contention](BUG-088-benchmark-smoke-hard-timeout-host-contention.md):
-  the required default CPU gate timed out the monolithic 21-result smoke at its
-  hard 30-second limit under concurrent load, while the same pair passed in
-  14.71 seconds in isolation; collect a timing population and choose an
-  evidence-backed PR-fast split or slow-lane classification without weakening
-  strict result validation.
-- [`BUG-081` — Warm-configure CI budget still flakes on hosted-runner variance](BUG-081-warm-configure-budget-runner-variance.md):
-  an exact-vcpkg-hit configure took 22.002 s against the recalibrated 20 s
-  budget and stopped the job before ccache restore or compilation; collect a
-  comparable hosted population and set an evidence-backed budget with explicit
-  headroom while preserving fail-closed semantics.
-
 ## Verified / Closed
+
+- Closed 2026-07-16: [`BUG-088` — Benchmark smoke hard timeout flakes under host contention](../../done/BUG-088-benchmark-smoke-hard-timeout-host-contention.md).
+  The 22-result fixture pair is now explicitly `slow` with a 120-second opt-in
+  bound, while the dedicated PR workflow owns a two-minute runner step, strict
+  validation, and complete artifact retention. Exact implementation-head docs,
+  benchmark, CPU, pr-fast, Vulkan, ASan, and UBSan checks all passed.
+
+- Closed 2026-07-16: [`BUG-105` — Runtime module reader races ECS structural mutation](../../done/BUG-105-runtime-module-ecs-structural-hazard.md).
+  Runtime module systems now conservatively declare structural reads because
+  their context exposes the live world, while all promoted baseline ECS passes
+  that add or remove components declare structural writes through the existing
+  FrameGraph token. Deterministic layer-order regressions, the original harness
+  repeated 100/100 under sanitizers, the 3,791-test CPU gate, and repaired
+  exact-head `pr-fast` all passed.
+
+- Closed 2026-07-16: [`BUG-104` — Kernel-convergence regression asserts a retired snapshot](../../done/BUG-104-kernel-convergence-regression-stale-snapshot.md).
+  The repository-snapshot regression now asserts the policy's live `42/21`,
+  two export imports, 31 getter names, and debt-free diagnostic. Production
+  checker/policy code and all synthetic fail-closed cases are unchanged; 19/19
+  regressions, the strict live checker, and repaired exact-head `pr-fast`
+  passed.
+
+- Closed 2026-07-16: [`BUG-081` — Warm-configure CI budget still flakes on hosted-runner variance](../../done/BUG-081-warm-configure-budget-runner-variance.md).
+  Seven configure guards now share the finite 40-second budget derived from
+  the slowest contemporary hosted-context p95 plus a declared 25% margin and
+  five-second rounding. Exact cache keys, images, raw samples, and inactive
+  self-hosted transfer policy remain auditable; the wrapper still hard-fails
+  synthetic exact-hit overruns, and every repaired-head PR context reached
+  compilation.
+
+- Closed 2026-07-16: [`BUG-103` — Render-graph lifetime test culls its history chain](../../done/BUG-103-rendergraph-lifetime-test-culls-history-chain.md).
+  The history read is now connected to the live present root through the
+  existing dependency contract, preserving current execution-rank lifetimes
+  and pass culling while pinning deterministic order `{0, 1, 2}`.
+
+- Closed 2026-07-16: [`BUG-102` — Object-space bake layering test asserts pre-ratchet import placement](../../done/BUG-102-object-space-normal-bake-layering-test-import-placement.md).
+  The source-layering contract now recognizes RUNTIME-178's implementation-unit
+  CPU queue import while preserving every Engine-side GPU queue exclusion and
+  the interface convergence ratchet.
+
+- Closed 2026-07-16: [`BUG-101` — Fast-staged UV edge grouping is quadratic](../../done/BUG-101-fast-staged-uv-edge-grouping-quadratic.md).
+  Normalized edge-key lookup now preserves deterministic first-seen ordering
+  and reuses source groups for seam recording. Declared baseline comparison
+  records exact output parity and scoped local sanitized scaling evidence;
+  generated runtime coverage proves bounded enrichment and close.
+
+- Closed 2026-07-16: [`BUG-100` — Manual geometry import blocks the Sandbox frame loop](../../done/BUG-100-manual-geometry-import-blocks-frame-loop.md).
+  Every frame-driven payload now uses the existing queued import lane, with
+  worker-only decode, bounded main-thread apply, fail-closed cancellation, and
+  shutdown cancellation before policy teardown.
+
+- Closed 2026-07-16: [`BUG-099` — Binary PLY point-cloud import rejects face-list elements](../../done/BUG-099-binary-ply-pointcloud-skips-face-lists.md).
+  The binary point-cloud reader now safely consumes unrelated scalar/list rows
+  in either endian order while retaining strict vertex-list rejection and
+  truncation/overflow checks.
+
+- Closed 2026-07-16: [`BUG-098` — Frame clock samples an incomplete frame delta](../../done/BUG-098-frame-clock-samples-incomplete-frame-delta.md).
+  Runtime consumers now receive the bounded previous completed-frame duration,
+  restoring real production-delay ImGui hover timing without changing the
+  minimized-window sleep contract.
 
 - Closed 2026-07-16: [`BUG-094` — Model-scene import drops node semantics and standard selection behavior](../../done/BUG-094-model-scene-node-semantics-selection.md).
   CPU decode now retains active-scene hierarchy, transforms, and shared

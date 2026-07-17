@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -10,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -52,15 +54,18 @@ namespace
         void OnShutdown(Runtime::Engine&) override {}
     };
 
-    class ThreeFrameApplication final : public Runtime::IApplication
+    class TooltipDelayApplication final : public Runtime::IApplication
     {
     public:
+        static constexpr std::uint32_t MaxFrames = 64u;
+
         void OnInitialize(Runtime::Engine&) override {}
         void OnSimTick(Runtime::Engine&, double) override {}
         void OnVariableTick(Runtime::Engine& engine, double, double) override
         {
+            std::this_thread::sleep_for(std::chrono::milliseconds{10});
             ++m_Frames;
-            if (m_Frames == 3u)
+            if (m_Frames >= MaxFrames)
                 engine.RequestExit();
         }
         void OnShutdown(Runtime::Engine&) override {}
@@ -550,7 +555,7 @@ TEST(SandboxEditorPresentation,
      FileImportDisabledReasonRendersThroughRealHoveredControl)
 {
     Runtime::Engine engine(
-        HeadlessConfig(), std::make_unique<ThreeFrameApplication>());
+        HeadlessConfig(), std::make_unique<TooltipDelayApplication>());
     engine.Initialize();
 
     SandboxEditor::EditorShell shell;
@@ -622,19 +627,23 @@ TEST(SandboxEditorPresentation,
                         (ImGui::GetCurrentContext()->HoveredId == 0u &&
                          ImGui::GetCurrentContext()->HoveredIdIsDisabled);
                     tooltipVisible = ActiveImGuiTooltipExists();
+                    if (tooltipVisible)
+                        engine.RequestExit();
                 },
         });
     ASSERT_TRUE(observer.IsValid());
 
-    ImGuiStyle& style = ImGui::GetStyle();
-    const ImGuiHoveredFlags savedTooltipHoverFlags =
-        style.HoverFlagsForTooltipMouse;
-    style.HoverFlagsForTooltipMouse = ImGuiHoveredFlags_DelayNone;
+    const ImGuiHoveredFlags productionTooltipHoverFlags =
+        ImGui::GetStyle().HoverFlagsForTooltipMouse;
+    ASSERT_TRUE(
+        (productionTooltipHoverFlags & ImGuiHoveredFlags_Stationary) != 0);
+    ASSERT_TRUE(
+        (productionTooltipHoverFlags & ImGuiHoveredFlags_DelayShort) != 0);
     shell.Attach(engine);
     engine.Run();
-    style.HoverFlagsForTooltipMouse = savedTooltipHoverFlags;
 
-    ASSERT_EQ(observerFrames, 3u);
+    ASSERT_GE(observerFrames, 3u);
+    ASSERT_LT(observerFrames, TooltipDelayApplication::MaxFrames);
     ASSERT_FALSE(shell.GetLastFrame().FileImport.CanImport);
     ASSERT_FALSE(shell.GetLastFrame().FileImport.ImportDisabledReason.empty());
     EXPECT_TRUE(importButtonHovered)

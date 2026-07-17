@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <limits>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -29,6 +30,51 @@ FakeBackendState g_FakeBackendState{};
   const auto v3 = mesh.AddVertex({0.0f, 1.0f, 0.0f});
   (void)mesh.AddTriangle(v0, v1, v2);
   (void)mesh.AddTriangle(v0, v2, v3);
+  return mesh;
+}
+
+[[nodiscard]] Geometry::MeshSoup::IndexedMesh
+MakeGridMesh(const std::uint32_t side) {
+  Geometry::MeshSoup::IndexedMesh mesh;
+  std::vector<std::uint32_t> vertices;
+  vertices.reserve(static_cast<std::size_t>(side + 1u) *
+                   static_cast<std::size_t>(side + 1u));
+  for (std::uint32_t y = 0u; y <= side; ++y) {
+    for (std::uint32_t x = 0u; x <= side; ++x) {
+      vertices.push_back(mesh.AddVertex(
+          {static_cast<float>(x), static_cast<float>(y), 0.0f}));
+    }
+  }
+
+  const auto vertex = [&vertices, side](const std::uint32_t x,
+                                        const std::uint32_t y) {
+    return vertices[static_cast<std::size_t>(y) *
+                        static_cast<std::size_t>(side + 1u) +
+                    static_cast<std::size_t>(x)];
+  };
+  for (std::uint32_t y = 0u; y < side; ++y) {
+    for (std::uint32_t x = 0u; x < side; ++x) {
+      const std::uint32_t v00 = vertex(x, y);
+      const std::uint32_t v10 = vertex(x + 1u, y);
+      const std::uint32_t v01 = vertex(x, y + 1u);
+      const std::uint32_t v11 = vertex(x + 1u, y + 1u);
+      (void)mesh.AddTriangle(v00, v10, v11);
+      (void)mesh.AddTriangle(v00, v11, v01);
+    }
+  }
+  return mesh;
+}
+
+[[nodiscard]] Geometry::MeshSoup::IndexedMesh MakeNonmanifoldEdgeMesh() {
+  Geometry::MeshSoup::IndexedMesh mesh;
+  const auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+  const auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+  const auto v2 = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+  const auto v3 = mesh.AddVertex({0.0f, 0.0f, 1.0f});
+  const auto v4 = mesh.AddVertex({0.0f, -1.0f, 0.0f});
+  (void)mesh.AddTriangle(v0, v1, v2);
+  (void)mesh.AddTriangle(v1, v0, v3);
+  (void)mesh.AddTriangle(v0, v1, v4);
   return mesh;
 }
 
@@ -157,6 +203,53 @@ void ExpectSuccessfulChartQuality(
       Geometry::Parameterization::ParameterizationDiagnosticsStatus::Success);
   EXPECT_GT(chart.Quality.EvaluatedFaceCount, 0u);
   EXPECT_EQ(chart.Quality.FlippedElementCount, 0u);
+}
+
+void ExpectSameAtlasRecords(
+    const Geometry::UvAtlas::UvAtlasResult &expected,
+    const Geometry::UvAtlas::UvAtlasResult &actual) {
+  EXPECT_EQ(actual.Status, expected.Status);
+  EXPECT_EQ(actual.Provenance, expected.Provenance);
+  EXPECT_EQ(actual.SourceVertexForOutputVertex,
+            expected.SourceVertexForOutputVertex);
+  EXPECT_EQ(actual.SourceFaceForOutputFace, expected.SourceFaceForOutputFace);
+  EXPECT_EQ(actual.OutputFaceChart, expected.OutputFaceChart);
+  ASSERT_EQ(actual.Charts.size(), expected.Charts.size());
+  for (std::size_t i = 0u; i < expected.Charts.size(); ++i) {
+    const auto &a = actual.Charts[i];
+    const auto &b = expected.Charts[i];
+    EXPECT_EQ(a.ChartId, b.ChartId);
+    EXPECT_EQ(a.SourceFaceStart, b.SourceFaceStart);
+    EXPECT_EQ(a.SourceFaceCount, b.SourceFaceCount);
+    EXPECT_EQ(a.OutputFaceStart, b.OutputFaceStart);
+    EXPECT_EQ(a.OutputFaceCount, b.OutputFaceCount);
+    EXPECT_EQ(a.OutputVertexStart, b.OutputVertexStart);
+    EXPECT_EQ(a.OutputVertexCount, b.OutputVertexCount);
+    EXPECT_EQ(a.UvMin, b.UvMin);
+    EXPECT_EQ(a.UvMax, b.UvMax);
+    EXPECT_EQ(a.ParameterizationBackend, b.ParameterizationBackend);
+  }
+
+  ASSERT_EQ(actual.SeamCuts.size(), expected.SeamCuts.size());
+  for (std::size_t i = 0u; i < expected.SeamCuts.size(); ++i) {
+    const auto &a = actual.SeamCuts[i];
+    const auto &b = expected.SeamCuts[i];
+    EXPECT_EQ(a.SourceVertexA, b.SourceVertexA);
+    EXPECT_EQ(a.SourceVertexB, b.SourceVertexB);
+    EXPECT_EQ(a.SourceFaceA, b.SourceFaceA);
+    EXPECT_EQ(a.SourceFaceB, b.SourceFaceB);
+    EXPECT_EQ(a.ChartA, b.ChartA);
+    EXPECT_EQ(a.ChartB, b.ChartB);
+    EXPECT_EQ(a.Boundary, b.Boundary);
+  }
+
+  const auto actualUvs = actual.OutputMesh.GetVertexProperty<glm::vec2>(
+      Geometry::MeshUtils::kVertexTexcoordPropertyName);
+  const auto expectedUvs = expected.OutputMesh.GetVertexProperty<glm::vec2>(
+      Geometry::MeshUtils::kVertexTexcoordPropertyName);
+  ASSERT_TRUE(actualUvs.IsValid());
+  ASSERT_TRUE(expectedUvs.IsValid());
+  EXPECT_EQ(actualUvs.Vector(), expectedUvs.Vector());
 }
 } // namespace
 
@@ -292,6 +385,83 @@ TEST(UvAtlas, FastStagedCubeCutsFaceChartsAndCopiesProperties) {
     const std::uint32_t source = result.SourceVertexForOutputVertex[i];
     ASSERT_LT(source, mesh.VertexCount());
     EXPECT_EQ(outputColors[i], colors.Vector()[source]);
+  }
+}
+
+TEST(UvAtlas, FastStagedHighCardinalityGridIsFiniteAndDeterministic) {
+  constexpr std::uint32_t side = 20u;
+  auto mesh = MakeGridMesh(side);
+
+  Geometry::UvAtlas::UvAtlasOptions options{};
+  options.PreserveValidAuthoredUvs = false;
+  options.Method = Geometry::UvAtlas::UvAtlasMethod::FastStaged;
+  options.AllowXAtlasFallback = false;
+  options.Resolution = 256u;
+
+  const auto first = Geometry::UvAtlas::ResolveUvAtlas(
+      Geometry::UvAtlas::BorrowInput(mesh), options);
+  const auto second = Geometry::UvAtlas::ResolveUvAtlas(
+      Geometry::UvAtlas::BorrowInput(mesh), options);
+
+  ASSERT_EQ(first.Status, Geometry::UvAtlas::UvAtlasStatus::Success)
+      << Geometry::UvAtlas::ToString(first.Status);
+  ASSERT_EQ(second.Status, Geometry::UvAtlas::UvAtlasStatus::Success)
+      << Geometry::UvAtlas::ToString(second.Status);
+  EXPECT_EQ(first.OutputMesh.FaceCount(), mesh.FaceCount());
+  EXPECT_EQ(first.SourceFaceForOutputFace.size(), mesh.FaceCount());
+  EXPECT_EQ(first.Diagnostics.ChartCount, 1u);
+  EXPECT_EQ(first.Diagnostics.SeamCutCount, 0u);
+  EXPECT_EQ(first.Diagnostics.BoundarySeamCount, side * 4u);
+  const auto outputUvs = first.OutputMesh.GetVertexProperty<glm::vec2>(
+      Geometry::MeshUtils::kVertexTexcoordPropertyName);
+  ASSERT_TRUE(outputUvs.IsValid());
+  for (const glm::vec2 uv : outputUvs.Vector()) {
+    ExpectFiniteNormalizedUv(uv);
+  }
+  ExpectSameAtlasRecords(first, second);
+}
+
+TEST(UvAtlas, FastStagedKeepsFirstSeenBoundaryAndNonmanifoldSeamOrder) {
+  auto mesh = MakeNonmanifoldEdgeMesh();
+
+  Geometry::UvAtlas::UvAtlasOptions options{};
+  options.PreserveValidAuthoredUvs = false;
+  options.Method = Geometry::UvAtlas::UvAtlasMethod::FastStaged;
+  options.AllowXAtlasFallback = false;
+  options.Resolution = 128u;
+
+  const auto result = Geometry::UvAtlas::ResolveUvAtlas(
+      Geometry::UvAtlas::BorrowInput(mesh), options);
+
+  ASSERT_EQ(result.Status, Geometry::UvAtlas::UvAtlasStatus::Success)
+      << Geometry::UvAtlas::ToString(result.Status);
+  EXPECT_EQ(result.Diagnostics.ChartCount, 3u);
+  EXPECT_EQ(result.Diagnostics.SeamCutCount, 3u);
+  EXPECT_EQ(result.Diagnostics.BoundarySeamCount, 6u);
+  ASSERT_EQ(result.SeamCuts.size(), 9u);
+
+  for (std::size_t i = 0u; i < 3u; ++i) {
+    EXPECT_EQ(result.SeamCuts[i].SourceVertexA, 0u);
+    EXPECT_EQ(result.SeamCuts[i].SourceVertexB, 1u);
+    EXPECT_FALSE(result.SeamCuts[i].Boundary);
+  }
+  EXPECT_EQ(result.SeamCuts[0].SourceFaceA, 0u);
+  EXPECT_EQ(result.SeamCuts[0].SourceFaceB, 1u);
+  EXPECT_EQ(result.SeamCuts[1].SourceFaceA, 0u);
+  EXPECT_EQ(result.SeamCuts[1].SourceFaceB, 2u);
+  EXPECT_EQ(result.SeamCuts[2].SourceFaceA, 1u);
+  EXPECT_EQ(result.SeamCuts[2].SourceFaceB, 2u);
+
+  const std::vector<std::pair<std::uint32_t, std::uint32_t>>
+      expectedBoundaryEdges{
+          {1u, 2u}, {0u, 2u}, {0u, 3u},
+          {1u, 3u}, {1u, 4u}, {0u, 4u},
+      };
+  for (std::size_t i = 0u; i < expectedBoundaryEdges.size(); ++i) {
+    const auto &seam = result.SeamCuts[i + 3u];
+    EXPECT_TRUE(seam.Boundary);
+    EXPECT_EQ(seam.SourceVertexA, expectedBoundaryEdges[i].first);
+    EXPECT_EQ(seam.SourceVertexB, expectedBoundaryEdges[i].second);
   }
 }
 

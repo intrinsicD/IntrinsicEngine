@@ -11,6 +11,7 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -217,6 +218,8 @@ MeshScale(const std::span<const glm::vec3> positions) noexcept {
 BuildSourceEdgeFaceGroups(const UvAtlasInput &input) {
   std::vector<SourceEdgeFaces> groups;
   groups.reserve(input.Faces.size() * 3u);
+  std::unordered_map<std::uint64_t, std::size_t> groupIndexByKey;
+  groupIndexByKey.reserve(input.Faces.size() * 3u);
 
   for (std::size_t faceIndex = 0u; faceIndex < input.Faces.size();
        ++faceIndex) {
@@ -226,19 +229,20 @@ BuildSourceEdgeFaceGroups(const UvAtlasInput &input) {
       const std::uint32_t rawB = face.Indices[(corner + 1u) % 3u];
       const std::uint32_t a = std::min(rawA, rawB);
       const std::uint32_t b = std::max(rawA, rawB);
+      const std::uint64_t key = (static_cast<std::uint64_t>(a) << 32u) |
+                                static_cast<std::uint64_t>(b);
 
-      auto match = std::find_if(groups.begin(), groups.end(),
-                                [a, b](const SourceEdgeFaces &candidate) {
-                                  return candidate.A == a && candidate.B == b;
-                                });
-      if (match == groups.end()) {
+      const auto [match, inserted] =
+          groupIndexByKey.try_emplace(key, groups.size());
+      if (inserted) {
         groups.push_back(SourceEdgeFaces{
             .A = a,
             .B = b,
             .Faces = {static_cast<std::uint32_t>(faceIndex)},
         });
       } else {
-        match->Faces.push_back(static_cast<std::uint32_t>(faceIndex));
+        groups[match->second].Faces.push_back(
+            static_cast<std::uint32_t>(faceIndex));
       }
     }
   }
@@ -722,11 +726,9 @@ PackFastCharts(const std::vector<FastChartParameterization> &parameterizations,
   return best;
 }
 
-void RecordFastStagedSeams(const UvAtlasInput &input,
+void RecordFastStagedSeams(const std::vector<SourceEdgeFaces> &edgeGroups,
                            const std::span<const std::uint32_t> sourceFaceChart,
                            UvAtlasResult &result) {
-  const std::vector<SourceEdgeFaces> edgeGroups =
-      BuildSourceEdgeFaceGroups(input);
   for (const SourceEdgeFaces &edge : edgeGroups) {
     if (edge.Faces.size() == 1u) {
       const std::uint32_t face = edge.Faces.front();
@@ -1083,7 +1085,7 @@ GenerateWithFastStaged(const UvAtlasInput &input,
     texcoords.Vector()[i] = outputUvs[i];
   }
 
-  RecordFastStagedSeams(input, sourceFaceChart, result);
+  RecordFastStagedSeams(edgeGroups, sourceFaceChart, result);
   result.Diagnostics.SeamCutCount = static_cast<std::uint32_t>(std::count_if(
       result.SeamCuts.begin(), result.SeamCuts.end(),
       [](const UvAtlasSeamCutRecord &seam) { return !seam.Boundary; }));

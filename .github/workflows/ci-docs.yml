@@ -83,9 +83,10 @@ jobs:
       - name: Validate structural CI policy regressions
         run: python3 tests/regression/tooling/Test.CheckTaskStateLinks.py
 
-      - name: Validate CI timing and ccache pilot policy
+      - name: Validate CI timing, benchmark result, and ccache policy
         run: |
           python3 tests/regression/tooling/Test.CiTiming.py
+          python3 tests/regression/tooling/Test_BenchmarkResultValidator.py
           python3 tests/regression/tooling/Test.CcacheWorkflow.py
           python3 tests/regression/tooling/Test.CcacheModuleInvalidationProbe.py
 

@@ -786,15 +786,17 @@ TEST(GraphicsRenderGraph, LifetimeFirstAndLastUseTracksPassIndices)
     (void)graph.AddPass("HistoryWrite", [history](RenderGraphBuilder& builder) {
         (void)builder.Write(history, TextureUsage::ColorAttachmentWrite);
     });
-    (void)graph.AddPass("HistoryRead", [history](RenderGraphBuilder& builder) {
+    const auto historyRead = graph.AddPass("HistoryRead", [history](RenderGraphBuilder& builder) {
         (void)builder.Read(history, TextureUsage::ShaderRead);
     });
-    (void)graph.AddPass("Present", [backbuffer](RenderGraphBuilder& builder) {
+    (void)graph.AddPass("Present", [backbuffer, historyRead](RenderGraphBuilder& builder) {
+        builder.DependsOn(historyRead);
         (void)builder.Read(backbuffer, TextureUsage::Present);
     });
 
     auto compiled = graph.Compile();
     ASSERT_TRUE(compiled.has_value());
+    ASSERT_EQ(compiled->TopologicalOrder, (std::vector<std::uint32_t>{0u, 1u, 2u}));
     ASSERT_GE(compiled->TextureLifetimes.size(), 2u);
     const auto& historyLifetime = compiled->TextureLifetimes[history.Index];
     EXPECT_TRUE(historyLifetime.HasUse);

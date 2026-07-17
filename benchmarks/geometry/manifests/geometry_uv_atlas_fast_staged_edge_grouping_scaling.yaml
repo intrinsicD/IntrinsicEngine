@@ -1,0 +1,44 @@
+# BUG-101 - deterministic fast-staged source-edge grouping scaling evidence.
+#
+# This is a PR-fast measurement with no timing gate on the scaling ratio. The
+# recorded baseline and current result support a same-host before/after
+# comparison; they are not a cross-host performance guarantee.
+
+benchmark_id: geometry.uv_atlas.fast_staged_edge_grouping.scaling
+method: geometry.uv_atlas.fast_staged_edge_grouping
+dataset: builtin.uv_atlas_edge_grouping_grid_pair_v1
+params:
+  fixture_generator: indexed_planar_grid
+  small_grid_side: 16
+  large_grid_side: 32
+  small_face_count: 512
+  large_face_count: 2048
+  resolution: 256
+  padding: 2
+  warmup_pairs: 1
+  measured_pairs: 5
+  timing_statistic: median_alternating_pair_runtime
+  measurement_order: alternating_small_large_large_small
+  baseline_snapshot: benchmarks/baselines/geometry_uv_atlas_fast_staged_edge_grouping_scaling_8ca52438.json
+  baseline_commit: 8ca52438
+  baseline_large_median_runtime_ms: 1031.8958949999999
+  baseline_normalized_runtime_scaling_factor: 1.7267393198597933
+  baseline_output_vertex_count: 1089
+  baseline_output_face_count: 2048
+  baseline_chart_count: 1
+  baseline_seam_count: 0
+  baseline_boundary_seam_count: 128
+  baseline_uv_min: [0.0078125, 0.0078125]
+  baseline_uv_max: [0.9921875596046448, 0.9176806807518005]
+  baseline_mean_conformal_distortion: 1.1827855110050354
+  baseline_max_stretch: 0.7054570258921236
+  baseline_flipped_element_count: 0
+  baseline_output_signature: "5684639256857304174"
+  adoption_claim: false
+metrics:
+  - runtime_ms
+  - throughput_items_per_sec
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 5000
+  quality_error_l2_max: 1.0e-12

@@ -44,6 +44,11 @@ maturity_target: Operational
   locks only the normal special case. It does not coordinate submission/apply
   deterministically, mutate positions or topology, or assert an observable
   stale-discard result.
+- The 2026-07-16 local `child.obj` audit also proved that the same pending
+  completion remains live while every mesh mutation panel is advertised. Its
+  avoidable multi-minute CPU cost and close-time drain were fixed by
+  `BUG-101`; this task still owns stale-write prevention and pending action
+  readiness now that the work completes in bounded time.
 
 ## Required changes
 - [ ] Introduce the smallest runtime-owned direct-mesh enrichment generation
