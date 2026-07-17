@@ -178,6 +178,7 @@ jobs:
           python3 tools/ci/compare_source_coverage.py \
             --baseline build/ci-coverage-cpu/coverage/coverage.json \
             --candidate build/ci-coverage-cpu/coverage-grouped/coverage.json \
+            --test-only-refactor \
             --require-exact
 
       - name: Upload grouped CTest source-coverage artifact

@@ -194,7 +194,8 @@ jobs:
   test-timing-profile:
     if: >-
       github.event_name == 'workflow_dispatch' &&
-      inputs.collect_test_timing
+      inputs.collect_test_timing &&
+      !inputs.collect_grouped_ctest_evidence
     name: test-timing-profile (${{ matrix.cohort.name }})
     runs-on: ubuntu-24.04
     timeout-minutes: 90

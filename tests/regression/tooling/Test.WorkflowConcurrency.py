@@ -416,6 +416,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             "build/ci-coverage-cpu/coverage-grouped/coverage.json",
             compare["run"],
         )
+        self.assertIn("--test-only-refactor", compare["run"])
         self.assertIn("--require-exact", compare["run"])
         self.assertEqual(
             upload["if"],
@@ -582,7 +583,8 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             " ".join(profile["if"].split()),
             (
                 "github.event_name == 'workflow_dispatch' && "
-                "inputs.collect_test_timing"
+                "inputs.collect_test_timing && "
+                "!inputs.collect_grouped_ctest_evidence"
             ),
         )
         self.assertFalse(profile["strategy"]["fail-fast"])
@@ -709,6 +711,16 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             "Test.GroupedCTestParity.py execution",
             collect_one_line,
         )
+        for path in (
+            '"$evidence_root/j$jobs/pair-$pair/individual/samples/'
+            'sample-01.junit.xml"',
+            '"$evidence_root/j$jobs/pair-$pair/grouped/samples/'
+            'sample-01.junit.xml"',
+            '"$evidence_root/j$jobs/pair-$pair/grouped/samples/'
+            'sample-01.gtest"',
+            '"$evidence_root/j$jobs/pair-$pair/parity.json"',
+        ):
+            self.assertIn(path, collect)
         for excluded in ("pr-fast", "cpu-slow", "gpu", "vulkan"):
             with self.subTest(excluded=excluded):
                 self.assertNotIn(excluded, collect)

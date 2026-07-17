@@ -396,6 +396,17 @@ def _compare_execution(
     grouped_junit_statuses = _read_ctest_junit(
         grouped_junit, grouped.physical_names
     )
+    unchanged_names = individual.physical_names.intersection(grouped.physical_names)
+    unchanged_mismatches = {
+        name: (individual_junit_statuses[name], grouped_junit_statuses[name])
+        for name in unchanged_names
+        if individual_junit_statuses[name] != grouped_junit_statuses[name]
+    }
+    if unchanged_mismatches:
+        raise ParityError(
+            "unchanged physical CTest status mismatch: "
+            f"{_sample(unchanged_mismatches.items())}"
+        )
     individual_statuses = _map_discovered_statuses(
         individual_junit_statuses, individual.ctest_cases
     )
@@ -431,6 +442,9 @@ def _compare_execution(
     if mismatches:
         raise ParityError(f"logical execution status mismatch: {_sample(mismatches.items())}")
     counts = Counter(individual_statuses.values())
+    unchanged_counts = Counter(
+        individual_junit_statuses[name] for name in unchanged_names
+    )
     if not set(counts).issubset(VALID_STATUSES):
         raise ParityError("execution produced an unsupported logical status")
     return {
@@ -441,6 +455,13 @@ def _compare_execution(
         },
         "status_digest": _digest(
             (*identity, status) for identity, status in individual_statuses.items()
+        ),
+        "unchanged_physical_status_counts": {
+            status: unchanged_counts.get(status, 0)
+            for status in sorted(VALID_STATUSES)
+        },
+        "unchanged_physical_status_digest": _digest(
+            (name, individual_junit_statuses[name]) for name in unchanged_names
         ),
     }
 
@@ -459,7 +480,7 @@ class GroupedCTestParitySelfTests(unittest.TestCase):
         individual_names["PrettyValue"] = ("Unaffected", "Values/Suite.Case/0")
         individual = Registration(
             root / "individual",
-            frozenset(individual_names),
+            frozenset({"Manual.Check", *individual_names}),
             cases,
             {target: "discovered" for target in cases},
             individual_names,
@@ -468,7 +489,7 @@ class GroupedCTestParitySelfTests(unittest.TestCase):
         grouped_wrappers = {target: f"{target}.Grouped" for target in GROUPED_TARGETS}
         grouped = Registration(
             root / "grouped",
-            frozenset({"PrettyValue", *grouped_wrappers.values()}),
+            frozenset({"Manual.Check", "PrettyValue", *grouped_wrappers.values()}),
             cases,
             {
                 target: ("grouped" if target in GROUPED_TARGETS else "discovered")
@@ -553,6 +574,21 @@ class GroupedCTestParitySelfTests(unittest.TestCase):
             output = root / "artifacts/parity.json"
             _print_report(report, output)
             self.assertEqual(json.loads(output.read_text()), report)
+            tree = ElementTree.parse(grouped_junit)
+            manual = next(
+                case
+                for case in tree.getroot().iter("testcase")
+                if case.get("name") == "Manual.Check"
+            )
+            ElementTree.SubElement(manual, "skipped")
+            tree.write(grouped_junit, encoding="utf-8")
+            with self.assertRaisesRegex(
+                ParityError, "unchanged physical CTest status mismatch"
+            ):
+                _compare_execution(
+                    individual, grouped, individual_junit, grouped_junit, report_dir
+                )
+            self._write_junit(grouped_junit, grouped.physical_names)
             duplicate = next(iter(GROUPED_TARGETS))
             tree = ElementTree.parse(report_dir / f"{duplicate}.xml")
             tree.getroot().append(tree.getroot().find("testcase"))
