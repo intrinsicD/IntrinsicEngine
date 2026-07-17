@@ -11,7 +11,9 @@ Each active task should include:
 
 ## Currently active
 
-No active tasks.
+- [`CI-010`](CI-010-cpu-source-coverage-refactor-parity.md) — establish a
+  reproducible full-cohort CPU source-coverage report and fail closed when a
+  test-only refactor loses a previously covered production region or branch.
 
 ## History
 

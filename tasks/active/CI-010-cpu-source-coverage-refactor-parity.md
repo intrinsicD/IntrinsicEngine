@@ -8,6 +8,12 @@ depends_on:
 ---
 # CI-010 — Establish CPU source-coverage refactor parity
 
+## Status
+- In progress on 2026-07-17; owner: Codex; branch: `main`.
+- Next verification: add the instrumented preset and fail-closed coverage
+  collector/comparator, then validate the two-executable synthetic fixture
+  before dispatching one complete hosted baseline.
+
 ## Goal
 - Produce a reproducible Clang source-coverage baseline for the canonical CPU
   test cohort and a fail-closed comparison mode for test-only refactors.

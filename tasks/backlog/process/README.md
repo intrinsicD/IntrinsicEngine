@@ -19,7 +19,8 @@ map.
 - [CI-006 — Remove duplicate sanitizer work and isolate variants](CI-006-sanitizer-topology-and-test-parallelism.md)
 - [CI-008 — Reduce CTest process overhead without oversubscribing workers](CI-008-grouped-ctest-and-worker-oversubscription.md)
 - [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
-- [CI-010 — Establish CPU source-coverage refactor parity](CI-010-cpu-source-coverage-refactor-parity.md)
+- [CI-010 — Establish CPU source-coverage refactor parity](../../active/CI-010-cpu-source-coverage-refactor-parity.md)
+  (currently active).
 - [CI-011 — Calibrate the slow-test cohort and retain fast sentinels](CI-011-measured-slow-test-cohort.md)
 - [BUILD-004 — Make compile-hotspot evidence source-complete](BUILD-004-source-complete-compile-hotspot-evidence.md)
 - [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](PROC-025-port-research-ideation-skill-to-other-repos.md)
