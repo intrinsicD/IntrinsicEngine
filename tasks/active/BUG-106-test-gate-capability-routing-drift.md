@@ -16,6 +16,11 @@ depends_on:
 - Next verification: push the exact implementation commit, retain a passing
   hosted `ci-linux-clang` gate, and retain a non-skipped passing readback result
   from the hosted `ci-vulkan` operational lane.
+- Hosted run `29563636181` failed before build because the truthful relabeling
+  left Null/headless with no `gpu;vulkan` producers while the root required a
+  non-empty GPU aggregate. The follow-up conditionally omits that
+  backend-inapplicable aggregate and retains the non-empty guard for Vulkan
+  configurations.
 
 ## Goal
 - Restore one canonical, capability-truthful test graph in which CPU/mock

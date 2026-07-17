@@ -36,7 +36,7 @@ one-target-per-line inventories under `build/<preset>/test-inventories/`:
 | `IntrinsicTests` | Every registered CTest-producing executable |
 | `IntrinsicPrFastTests` | Any `unit` or `contract`; exclude `gpu`, `vulkan`, `slow`, `flaky-quarantine` |
 | `IntrinsicCpuTests` | Exclude `gpu`, `vulkan`, `slow`, `flaky-quarantine` |
-| `IntrinsicGpuVulkanTests` | Require both `gpu` and `vulkan`; exclude `slow`, `flaky-quarantine` |
+| `IntrinsicGpuVulkanTests` | When Vulkan is configured, require both `gpu` and `vulkan`; exclude `slow`, `flaky-quarantine` |
 | `IntrinsicPrSmokeTests` | Require `integration`, `runtime`, and `graphics`; apply the standard fast exclusions |
 
 Repeated `-L` CTest arguments are intersections, so `IntrinsicGpuVulkanTests`
@@ -45,6 +45,11 @@ and `IntrinsicPrSmokeTests` use `INCLUDE_ALL`; the PR-fast
 undeclared/duplicate labels, duplicate registrations, non-executable producers,
 or empty aggregates. `IntrinsicTests` remains the complete local/default
 correctness target.
+
+Backend-inapplicable aggregates are omitted rather than emitted empty. A
+Null/headless configure therefore has no `IntrinsicGpuVulkanTests` target or
+inventory; a Vulkan configure still fails closed if that aggregate selects no
+registered executable.
 
 The same directory contains two tab-separated audit inventories.
 `RegisteredTestTargets.tsv` records each CTest executable and its sorted labels.

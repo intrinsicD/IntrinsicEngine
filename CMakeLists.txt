@@ -344,11 +344,13 @@ if(INTRINSIC_BUILD_TESTS AND BUILD_TESTING)
         NAME IntrinsicCpuTests
         EXCLUDE_ANY gpu vulkan slow flaky-quarantine
     )
-    intrinsic_add_test_aggregate(
-        NAME IntrinsicGpuVulkanTests
-        INCLUDE_ALL gpu vulkan
-        EXCLUDE_ANY slow flaky-quarantine
-    )
+    if(TARGET ExtrinsicBackendsVulkan)
+        intrinsic_add_test_aggregate(
+            NAME IntrinsicGpuVulkanTests
+            INCLUDE_ALL gpu vulkan
+            EXCLUDE_ANY slow flaky-quarantine
+        )
+    endif()
     intrinsic_add_test_aggregate(
         NAME IntrinsicPrSmokeTests
         INCLUDE_ALL integration runtime graphics
