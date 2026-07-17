@@ -139,6 +139,16 @@ class TouchedScopeTests(unittest.TestCase):
         self.assertIn("check_task_policy.py", command_text)
         self.assertIn("check_doc_links.py", command_text)
 
+    def test_generic_tool_change_uses_broad_fallback_without_retired_smoke(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            plan = touched_scope.analyze_changed_files(["tools/analysis/module_fanout.py"])
+            commands = touched_scope.commands_for_plan(plan, make_args(tmp))
+            command_text = "\n".join(command.shell_text() for command in commands)
+
+        self.assertTrue(plan.broad_cpu_gate)
+        self.assertIn("cmake --preset ci", command_text)
+        self.assertNotIn("check_pr_contract.py", command_text)
+
 
 if __name__ == "__main__":
     unittest.main()

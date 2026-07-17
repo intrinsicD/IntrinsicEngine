@@ -5,7 +5,7 @@ agent sandboxes, locked-down hooks. Every check reads ``agentkit.toml`` from
 ``--root`` and follows the shared conventions:
 
   * args:        ``--root`` (default ".") and ``--strict``
-  * exit codes:  0 pass/warn-only · 1 strict failure · 2 usage/env · 3 BLOCKED
+  * exit codes:  0 pass/warn-only · 1 strict failure · 2 usage/env
   * reporting:   ``[<tool>] LEVEL: message`` lines + a final summary
 """
 from __future__ import annotations
@@ -19,7 +19,6 @@ from typing import Any, Iterator
 EXIT_OK = 0
 EXIT_FAIL = 1
 EXIT_USAGE = 2
-EXIT_BLOCKED = 3
 
 CONFIG_FILENAME = "agentkit.toml"
 

@@ -24,8 +24,6 @@ map.
 - [BUILD-004 — Make compile-hotspot evidence source-complete](BUILD-004-source-complete-compile-hotspot-evidence.md)
 - [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](PROC-025-port-research-ideation-skill-to-other-repos.md)
   (portable playbook; run from a session scoped to the target repo).
-- [PROC-027 — Audit the validator/tool fleet for rent-paying gates](../../active/PROC-027-validator-rent-audit.md)
-  (currently active).
 
 `PROC-012` (resolve the duplicate `GEOM-027` ID by renumbering the
 control-surface/KMeans backend-seam task to `GEOM-052`) is retired; see the
@@ -74,13 +72,19 @@ retirement log.
 
 Forbidden across all members: engine code changes, renaming retired task files,
 weakening any check that currently runs strict in CI, and embedding
-task-specific policy into `docs/agent/prompt/prompt.md`.
+task-specific policy into `docs/agent/prompt/prompt.md`. The sole exception in
+this batch is the evidence-backed `check_pr_contract.py` retirement audited by
+`PROC-027`.
 
 ## Retired
 
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [PROC-027 — Audit the validator/tool fleet for rent-paying gates](../../done/PROC-027-validator-rent-audit.md)
+  (done 2026-07-17): inventoried all 57 snapshot Python tools plus 16
+  non-Python wrappers, retained 53, kept 2 report-only, and retired 2
+  evidence-free tools with every live caller and stale documentation reference.
 - [DOCS-006 — Curated "how this repo is built" agentic-development narrative](../../done/DOCS-006-agentic-development-narrative.md)
   (done 2026-07-17): authored the outside-reader tour of the task lifecycle,
   convergence themes, skill and validator tiers, and CI gates, grounded in the

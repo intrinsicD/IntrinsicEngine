@@ -202,11 +202,6 @@ def analyze_changed_files(changed_files: list[str]) -> Plan:
             plan.structural_checks.add("touched_scope_tests")
             plan.reasons.append(f"{path}: CI helper changed; selected tooling regression tests")
             matched = True
-        elif path.startswith("tools/"):
-            plan.structural_checks.add("tool_smoke")
-            plan.reasons.append(f"{path}: generic tool changed; selected broad tool smoke")
-            matched = True
-
         if path.startswith("src/core/"):
             plan.broad_cpu_gate = True
             plan.structural_checks.add("layering")
@@ -299,8 +294,6 @@ def structural_commands(root_arg: str, checks: set[str]) -> list[Command]:
                 "workflow policy regression tests",
             )
         )
-    if "tool_smoke" in checks:
-        commands.append(Command(("python3", "tools/repo/check_pr_contract.py", "--root", root_arg, "--mode", "local"), "generic tool smoke"))
     if "layering" in checks:
         commands.append(Command(("python3", "tools/repo/check_layering.py", "--root", "src", "--strict"), "layering contract"))
     if "test_layout" in checks:

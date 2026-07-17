@@ -56,7 +56,6 @@ CHECK_FILES = [
     "check_root_hygiene.py",
     "check_workflow_names.py",
     "check_agent_config.py",
-    "check_prereqs.py",
 ]
 
 # Source doc (relative to target root) -> (skill template dir, reference filename).

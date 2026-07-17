@@ -125,7 +125,6 @@ python3 tests/regression/tooling/Test.TouchedScope.py
 python3 tools/ci/touched_scope.py --root . --base-ref origin/main --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print
 python3 tools/ci/touched_scope.py --root . --changed-file docs/build-troubleshooting.md --print
 python3 tools/ci/touched_scope.py --root . --changed-file src/runtime/Runtime.Engine.cppm --print
-python3 tools/repo/check_pr_contract.py --root .
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
 

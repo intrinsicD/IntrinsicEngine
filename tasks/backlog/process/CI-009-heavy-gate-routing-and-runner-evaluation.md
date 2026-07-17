@@ -129,7 +129,6 @@ depends_on:
 ## Verification
 ```bash
 python3 tests/regression/tooling/Test.WorkflowRouting.py
-python3 tools/repo/check_pr_contract.py --root .
 python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
 python3 tools/benchmark/validate_benchmark_results.py --root build/ci/benchmark --strict
 python3 tools/agents/check_task_policy.py --root . --strict

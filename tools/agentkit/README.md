@@ -87,7 +87,7 @@ Edit it, then re-run `init --force` to regenerate, or just re-run the checks.
 
 Each is standard-library only, reads `agentkit.toml`, and follows one
 convention: `--root` + `--strict`, exit codes `0` pass / `1` strict failure /
-`2` usage / `3` BLOCKED.
+`2` usage or environment failure.
 
 - `check_tasks.py` — task dirs, task shape, lifecycle integrity, duplicate ids.
 - `check_doc_links.py` — relative + root-relative markdown links resolve.
@@ -96,7 +96,6 @@ convention: `--root` + `--strict`, exit codes `0` pass / `1` strict failure /
 - `check_root_hygiene.py` — only allowed markdown at the repo root.
 - `check_workflow_names.py` — workflow naming/structure policy.
 - `check_agent_config.py` — every agent surface points at the one contract.
-- `check_prereqs.py` — fail-fast producer-artifact guard (the `3 = BLOCKED` state).
 
 ## Design
 

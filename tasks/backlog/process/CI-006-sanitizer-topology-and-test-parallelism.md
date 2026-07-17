@@ -93,7 +93,6 @@ cmake --preset ci-ubsan
 cmake --build --preset ci-ubsan --target IntrinsicCpuTests
 ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tests/regression/tooling/Test.SanitizerPresets.py
-python3 tools/repo/check_pr_contract.py --root .
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
 

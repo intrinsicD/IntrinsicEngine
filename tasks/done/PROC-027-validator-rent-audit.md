@@ -6,10 +6,14 @@ depends_on: []
 # PROC-027 — Audit the validator/tool fleet for rent-paying gates
 
 ## Status
-- In progress on 2026-07-17; owner: Codex; branch: `main` (local).
-- Next verification: finish the source-complete inventory and prove every
-  retire verdict has no remaining CI, touched-scope, documentation, or
-  open-task caller.
+- Completed on 2026-07-17 at `Retired`; owner: Codex.
+- Commit reference: this retirement commit contains the implementation and
+  lifecycle closure.
+- The pre-verdict snapshot contains 57 Python files: 53 keep, 2 warn, and
+  2 retire. Both retired tools and their live callers/documentation were
+  removed; the AgentKit product self-test and strict structural bundle pass.
+- `cmake --preset ci` and the `IntrinsicTests` build passed; the exclusive
+  default CPU-supported CTest gate passed 3,830/3,830.
 
 ## Goal
 - Inventory the Python tools under `tools/` (~56 scripts), determine which
@@ -60,27 +64,34 @@ depends_on: []
 - Reintroduction trigger: add a fail-closed check only if a future hosted
   workflow can validate submitted pull-request body content or a recorded
   template-drift incident demonstrates a unique machine-checkable invariant.
+- Element: AgentKit's generated `check_prereqs.py` is copied and documented,
+  but no generated runner or workflow invokes it and its self-test does not
+  exercise a blocked producer.
+- Simpler alternative: remove the checker, copied-file registration, and
+  otherwise-unused `BLOCKED` exit-code convention together.
+- Reintroduction trigger: a concrete generated producer/consumer workflow and
+  a negative product self-test must require the three-state result.
 
 ## Required changes
-- [ ] Produce a source-complete inventory table (tool, purpose, CI wiring,
+- [x] Produce a source-complete inventory table (tool, purpose, CI wiring,
   last finding/load-bearing evidence, verdict keep/warn/retire) under
   `docs/reports/`.
-- [ ] Apply the verdicts: remove retired tools + their CI wiring and doc
+- [x] Apply the verdicts: remove retired tools + their CI wiring and doc
   references; downgrade warn-tier tools to warning mode where CI runs them
   strict without evidence.
 
 ## Tests
-- [ ] Structural checks still pass strict after removals
+- [x] Structural checks still pass strict after removals
   (`check_task_policy`, `check_doc_links`, `check_docs_sync`,
   `check_layering`, `check_test_layout`, skill-mirror check).
 
 ## Docs
-- [ ] `tools/*/README.md` entries updated for every removed/downgraded tool;
+- [x] `tools/*/README.md` entries updated for every removed/downgraded tool;
   docs-sync rules updated if a rule references a removed tool.
 
 ## Acceptance criteria
-- [ ] Every tool under `tools/` has a recorded verdict with evidence.
-- [ ] No CI job invokes a tool classified retire.
+- [x] Every tool under `tools/` has a recorded verdict with evidence.
+- [x] No CI job invokes a tool classified retire.
 
 ## Verification
 ```bash

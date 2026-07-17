@@ -27,7 +27,6 @@ Repository structure and policy scripts.
 - `check_ui_contract_guard.sh`: UI boundary guard script (canonical path).
 - `check_layering_allowlist_quality.py`: validates layering allowlist entry hygiene (required metadata, duplicate keys, broad legacy wildcard bans, and open task-owner references).
 - `check_test_layout.py`: enforces taxonomy-owned test source layout and forbids legacy wrapper test directories.
-- `check_pr_contract.py`: checks architecture/PR contract coverage (scope, layering, docs-sync, task-state) for local and CI workflows. Runs in `ci-docs.yml`.
 - `check_shader_outputs.py`: validates that a shader compilation output tree contains the expected SPIR-V files; used by shader build/compile tasks to fail closed on an empty or partial compile. Not wired into a workflow gate.
 - `generate_module_inventory.py`: module inventory generator for `src/`; defaults to `docs/api/generated/module_inventory.md`.
 - `export_module_graph.py`: emits a [graphify](https://github.com/safishamsi/graphify)-schema `graph.json` for the C++23 module dependency graph, reusing this directory's own module/layering parsers (graphify's tree-sitter C++ extractor cannot parse module syntax). Edges are tagged `same-layer`/`allowed`/`violation`; the authoritative gate remains `check_layering.py`.

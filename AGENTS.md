@@ -290,8 +290,9 @@ When code, structure, or policy changes:
 - Touched-scope structural checks use the repository tools, for example
   `python3 tools/agents/check_task_policy.py --root . --strict`, `python3 tools/docs/check_doc_links.py --root .`,
   `python3 tools/repo/check_layering.py --root src --strict`, and
-  `python3 tools/repo/check_test_layout.py --root . --strict`. Repository-root and PR-contract hygiene are enforced by
-  `python3 tools/repo/check_root_hygiene.py --root .` and `python3 tools/repo/check_pr_contract.py`.
+  `python3 tools/repo/check_test_layout.py --root . --strict`. Repository-root hygiene is enforced by
+  `python3 tools/repo/check_root_hygiene.py --root .`; PR review structure lives
+  in `.github/pull_request_template.md` and `docs/agent/review-checklist.md`.
 
 ## 11. Task execution workflow
 

@@ -104,7 +104,7 @@ monolithic linter:
 | --- | --- | --- |
 | Task and agent policy | Task shape, unique IDs, dependency resolution, lifecycle links, maturity follow-ups, generated session state, and skill mirrors. | [`tools/agents/`](../../tools/agents/README.md) |
 | Documentation | Relative-link integrity and changed-file documentation synchronization. | [`tools/docs/`](../../tools/docs/README.md) |
-| Repository structure | Layer imports and CMake edges, root hygiene, test layout, allowlist quality, module inventory, and PR contract structure. | [`tools/repo/`](../../tools/repo/README.md) |
+| Repository structure | Layer imports and CMake edges, root hygiene, test layout, allowlist quality, and module inventory. | [`tools/repo/`](../../tools/repo/README.md) |
 | Methods and benchmarks | Method manifests, benchmark manifests, result schemas, and comparable evidence identities. | [Method workflow](method-workflow.md) and [benchmark workflow](benchmark-workflow.md) |
 | Workflow regressions | Static fixtures that pin CI routing, prerequisite, timing, cache, and aggregate behavior without waiting for a hosted run to expose drift. | [`tests/regression/tooling/`](../../tests/regression/tooling/) |
 

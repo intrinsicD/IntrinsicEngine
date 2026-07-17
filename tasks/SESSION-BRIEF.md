@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `PROC-027` — Audit the validator/tool fleet for rent-paying gates (tasks/active/PROC-027-validator-rent-audit.md)
+- none
 
 ## Theme B — Rendering modernization
 

@@ -105,7 +105,6 @@ cmake --build --preset ci-coverage-cpu --target IntrinsicCpuTests
 python3 tools/ci/run_source_coverage.py --build-dir build/ci-coverage-cpu --output build/ci-coverage-cpu/coverage
 python3 tests/regression/tooling/Test.SourceCoverage.py
 python3 tools/ci/compare_source_coverage.py --baseline <baseline.json> --candidate <candidate.json> --test-only-refactor
-python3 tools/repo/check_pr_contract.py --root .
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
 

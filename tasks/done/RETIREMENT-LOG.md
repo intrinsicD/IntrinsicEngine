@@ -8,6 +8,19 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`PROC-027`](PROC-027-validator-rent-audit.md) — the validator rent audit
+retired on 2026-07-17 after classifying every Python file in the 57-file
+pre-verdict `tools/` snapshot and separately listing 13 shell and 3 CMake
+wrappers. The evidence-backed verdict retains 53 tools, keeps
+`check_audit_cadence.py` and `module_fanout.py` explicitly report-only, and
+retires the repository PR-template checker plus AgentKit's uncoupled
+prerequisite scaffold. Their CI, touched-scope, copied-file, common exit-code,
+tooling-index, and open-task references were removed together; a regression
+pins the conservative generic-tool fallback. AgentKit's end-to-end self-test,
+strict task/state/docs/layering/layout/root/skill/workflow checks, the
+`IntrinsicTests` build, and the exclusive default CPU-supported CTest gate
+passed, with 3,830/3,830 selected cases.
+
 [`DOCS-006`](DOCS-006-agentic-development-narrative.md) — the curated
 outside-reader development narrative retired on 2026-07-17. The new
 `docs/agent/how-this-repo-is-built.md` explains the backlog-to-archive
