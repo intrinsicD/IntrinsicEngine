@@ -54,6 +54,9 @@ The helper selects affected build targets, CTest labels, and structural checks, 
 
 ## Agent Workflow Pointer
 
+For an outside-reader tour of the task, skill, validator, and CI evidence
+system, read [How IntrinsicEngine is built](docs/agent/how-this-repo-is-built.md).
+
 For authoritative agent operating rules, task workflow, and review checklist, use:
 
 - `AGENTS.md`

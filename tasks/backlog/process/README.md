@@ -25,8 +25,6 @@ map.
 - [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](PROC-025-port-research-ideation-skill-to-other-repos.md)
   (portable playbook; run from a session scoped to the target repo).
 - [PROC-027 — Audit the validator/tool fleet for rent-paying gates](PROC-027-validator-rent-audit.md)
-- [DOCS-006 — Curated "how this repo is built" agentic-development narrative](../../active/DOCS-006-agentic-development-narrative.md)
-  (currently active).
 
 `PROC-012` (resolve the duplicate `GEOM-027` ID by renumbering the
 control-surface/KMeans backend-seam task to `GEOM-052`) is retired; see the
@@ -82,6 +80,10 @@ task-specific policy into `docs/agent/prompt/prompt.md`.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [DOCS-006 — Curated "how this repo is built" agentic-development narrative](../../done/DOCS-006-agentic-development-narrative.md)
+  (done 2026-07-17): authored the outside-reader tour of the task lifecycle,
+  convergence themes, skill and validator tiers, and CI gates, grounded in the
+  complete `CI-004` seed-to-archive evidence trail.
 - [CI-007 — Pilot persistent module-safe ccache in CI](../../archive/CI-007-module-safe-persistent-ccache-pilot.md)
   (done 2026-07-13): retained the bounded `pr-fast` ccache store after five
   cold and five warm hosted samples, zero cache errors, 56.7% lower build

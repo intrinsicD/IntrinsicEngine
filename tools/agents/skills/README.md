@@ -42,11 +42,15 @@ Packaging the same content as Agent Skills gives three additional benefits:
 | `intrinsicengine-benchmark` | `docs/agent/benchmark-workflow.md` + `docs/agent/benchmark-review-checklist.md` | Benchmark manifests, runners, performance claims |
 | `intrinsicengine-docs-sync` | `docs/agent/docs-sync-policy.md` | File moves, API surface changes, inventory regeneration |
 
-Together these cover all 14 of the `docs/agent/*.md` files plus `AGENTS.md`
-itself, the session-onboarding prompt under `docs/agent/prompt/prompt.md`, and
-the task template at `tasks/templates/task.md`. The authoritative
-source-to-mirror mapping is `REFERENCE_MAP` in `tools/agents/sync_skills.py`;
-if that map and this table disagree, the map wins.
+Together these cover all 14 procedure files under `docs/agent/` plus
+`AGENTS.md` itself, the session-onboarding prompt under
+`docs/agent/prompt/prompt.md`, and the task template at
+`tasks/templates/task.md`. The curated
+`docs/agent/how-this-repo-is-built.md` narrative is orientation material, not a
+source procedure, so it is intentionally not mirrored into a skill. The
+authoritative source-to-mirror mapping is `REFERENCE_MAP` in
+`tools/agents/sync_skills.py`; if that map and this table disagree, the map
+wins.
 
 ### Cross-cutting workflow disciplines (twelve)
 

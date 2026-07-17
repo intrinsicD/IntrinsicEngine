@@ -6,10 +6,12 @@ depends_on: []
 # DOCS-006 — Curated "how this repo is built" agentic-development narrative
 
 ## Status
-- In progress on 2026-07-17; owner: Codex; branch: `main` (local).
-- Next verification:
-  `python3 tools/docs/check_doc_links.py --root .` and
-  `python3 tools/docs/check_docs_sync.py --root . --strict`.
+- Completed on 2026-07-17 at `Retired`; owner: Codex.
+- Commit reference: this retirement commit contains the implementation and
+  lifecycle closure.
+- Strict documentation links passed for 2,815 relative links; strict
+  documentation synchronization, skill-mirror sync, root hygiene, task policy,
+  and task-state link checks passed.
 
 ## Goal
 - Write one curated document that explains the agentic development system to
@@ -31,28 +33,32 @@ depends_on: []
 - Owner: `docs/agent/`, root `README.md` link.
 
 ## Required changes
-- [ ] Author `docs/agent/how-this-repo-is-built.md`: system overview,
+- [x] Author `docs/agent/how-this-repo-is-built.md`: system overview,
   lifecycle diagram, skill/validator tiers, one traced example task
   (seed → slice → verification → retirement → archive).
-- [ ] Link it from the root `README.md` and the `docs/agent/` index in
+- [x] Link it from the root `README.md` and the `docs/agent/` index in
   `AGENTS.md` §"Related expanded docs".
 
 ## Tests
-- [ ] `check_doc_links` passes; docs-sync validator satisfied.
+- [x] `check_doc_links` passes; docs-sync validator satisfied.
 
 ## Docs
-- [ ] This task is the docs change; skill mirrors resynced if
+- [x] This task is the docs change; skill mirrors resynced if
   `docs/agent/*` routing tables change.
 
 ## Acceptance criteria
-- [ ] A reader who knows none of the repo conventions can explain the task
+- [x] A reader who knows none of the repo conventions can explain the task
   lifecycle and where to find evidence for any retired claim after reading
   the one document.
 
 ## Verification
 ```bash
-python3 tools/docs/check_doc_links.py --root .
-python3 tools/docs/check_docs_sync.py --root .
+python3 tools/docs/check_doc_links.py --root . --strict
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main --strict
+python3 tools/agents/sync_skills.py --check
+python3 tools/repo/check_root_hygiene.py --root . --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/check_task_state_links.py --root . --strict
 ```
 
 ## Forbidden changes

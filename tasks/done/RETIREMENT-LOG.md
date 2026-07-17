@@ -8,6 +8,17 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`DOCS-006`](DOCS-006-agentic-development-narrative.md) — the curated
+outside-reader development narrative retired on 2026-07-17. The new
+`docs/agent/how-this-repo-is-built.md` explains the backlog-to-archive
+lifecycle, dependency-derived convergence view, three skill tiers, validator
+ownership, and current CI workflow roles without introducing a second process
+contract. Its worked `CI-004` example links each seed, promotion,
+implementation, evidence, retirement, and archive commit and explains how to
+audit the final claim boundary. Root, canonical documentation, agent-contract,
+and skill-index navigation now expose the page. Strict link, docs-sync,
+skill-mirror, root-hygiene, task-policy, and task-state gates pass.
+
 [`BUG-088`](BUG-088-benchmark-smoke-hard-timeout-host-contention.md) — the
 benchmark smoke lane-classification defect retired on 2026-07-16. Commit
 `6856768a` labels the complete CTest fixture pair `slow`, gives its opt-in

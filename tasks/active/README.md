@@ -11,9 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`DOCS-006`](DOCS-006-agentic-development-narrative.md) — curate the
-  outside-reader narrative for the repository's task, skill, validator, and CI
-  system, grounded in one retired task's Git and retirement evidence.
+No active tasks.
 
 ## History
 

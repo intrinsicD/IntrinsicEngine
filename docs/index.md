@@ -39,6 +39,7 @@ This page is the canonical entry point for repository documentation.
 
 ## Agent workflow
 
+- [How IntrinsicEngine is built](agent/how-this-repo-is-built.md)
 - [Agent contract](agent/contract.md)
 - [Task format](agent/task-format.md)
 - [Review checklist](agent/review-checklist.md)

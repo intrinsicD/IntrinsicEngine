@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `DOCS-006` — Curated "how this repo is built" agentic-development narrative (tasks/active/DOCS-006-agentic-development-narrative.md)
+- none
 
 ## Theme B — Rendering modernization
 
