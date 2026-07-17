@@ -133,6 +133,50 @@ new C++ populations are warm, unsanitized, and route-specific. The comparison
 therefore measures the delivered policy as a whole; it does not attribute the
 reduction to ccache, sanitizer removal, or touched-scope selection separately.
 
+### CI-011 measured slow-cohort evidence
+
+The claim-grade timing comparison uses two manual `ci-linux-clang` profiles on
+the same `ubuntu-24.04` hosted-runner protocol, with five samples per cohort,
+four-way CTest parallelism, serial PRE_TEST discovery, restored CTest cost data,
+and per-sample load diagnostics. Baseline
+[`run 29600380925`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29600380925)
+used the pre-split test population at `e3fa9187`; candidate
+[`run 29600381191`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29600381191)
+used the calibrated population at `9830559c`.
+
+| Cohort | Cases | Baseline median / p95 | Candidate median / p95 | Median / p95 reduction | Candidate results over five samples |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Full fast CPU | 4,062 | 31.016747 / 31.160935 s | 24.830993 / 24.894463 s | 19.943% / 20.110% | 20,275 pass, 35 skip, 0 fail/error |
+| PR-fast | 3,740 | 29.233065 / 29.557700 s | 20.297884 / 20.880414 s | 30.565% / 29.357% | 18,690 pass, 10 skip, 0 fail/error |
+| Ordinary-slow timing cohort | 8 | N/A | 4.051059 / 4.083242 s | N/A | 40 pass, 0 skip/fail/error |
+
+The parity comparator proved exact eight-for-eight heavy-case removals and
+fast-sentinel additions in both fast populations, with no other case or label
+drift. The manual ordinary-slow timing report contains exactly the eight moved
+cases, all passing in every sample. The unchanged fast counts therefore do not
+mean the stress cases still run in fast gates: the retained sentinels replace
+them, and the named ordinary-slow lane owns the originals. The exact mappings
+and per-case classification evidence are documented in
+[`tests/README.md`](../../tests/README.md).
+
+Scheduled ownership was verified separately by manual nightly-deep
+[`run 29603101707`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29603101707)
+at `ad264dca`. Its retained `nightly-deep-reports` artifact contained one
+`cpu-slow.junit.xml` execution with exactly eight passes and no skips,
+failures, errors, duplicates, or unrelated cases
+(`sha256:5b402222068439b7297f32cd2b6e2632b3e7e2c789392e280894f446c0f0faac`).
+
+One additional measured outlier,
+`RuntimeAssetImportFormatCoverage.AssetImportPipelineAccessorExposesQueueAndEventState`,
+waited two seconds before the engine could pump queued work. That harness defect
+was removed rather than classified `slow`; the existing blocked-worker contract
+remains in `SlowQueuedTextureReadDoesNotBlockRunFrame`.
+
+The `CI-003` and `CI-005` populations remain historical context only. They used
+different sanitizer, cache, selector, invocation, and case populations, so the
+matched reduction above is not calculated against either and no isolated
+per-change speedup is inferred from them.
+
 ### Monolithic smoke ownership and budget
 
 The required `ci-bench-smoke` pull-request workflow owns execution of the
