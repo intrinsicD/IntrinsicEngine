@@ -36,6 +36,10 @@ depends_on:
 - The current baseline contains only `src/geometry/Geometry.Octree.cppm`, so a
   passing gate does not demonstrate visibility of the runtime/test hot spots
   observed in recent logs.
+- `IntrinsicTests` is the source-complete compile-only evidence target: it
+  builds every registered test producer, including method and benchmark
+  translation units, without invoking the `IntrinsicBenchmarks` custom target
+  that also executes the benchmark runner.
 - `CI-003` supplies the historical timing methodology. Baselines must be
   refreshed only after edge identity and source resolution are normalized.
 
@@ -46,44 +50,49 @@ depends_on:
   five comparable clean samples, refresh the baseline, then move the repaired
   report behind correctness feedback.
 
+## Status
+- Slice A is implemented and focused non-CMake checks pass. Slice B hosted
+  sampling, baseline refresh, real-build validation, and retirement remain
+  pending.
+
 ## Required changes
-- [ ] Define and document a deterministic physical compile-edge identity from
+- [x] Define and document a deterministic physical compile-edge identity from
       Ninja evidence so outputs of one command are aggregated once while
       distinct BMI/object/compiler phases remain distinguishable.
-- [ ] Resolve repository-owned sources under `src/`, `tests/`, `methods/`, and
+- [x] Resolve repository-owned sources under `src/`, `tests/`, `methods/`, and
       `benchmarks/`, with deterministic behavior for ambiguous basenames and
       generated/non-source outputs.
-- [ ] Report unresolved outputs, counts, edge kind, all physical outputs, and
+- [x] Report unresolved outputs, counts, edge kind, all physical outputs, and
       resolution diagnostics in machine-readable results instead of silently
       omitting or overwriting them.
-- [ ] Compare baselines against normalized physical edge/source records and
+- [x] Compare baselines against normalized physical edge/source records and
       fail on ambiguous/missing required targets with actionable diagnostics.
 - [ ] Refresh the baseline from at least five comparable clean samples after
       normalization, naming the actual top repository-owned offenders rather
       than preserving stale targets by fiat.
-- [ ] Move the compile-hotspot failure/report after CPU correctness tests or
+- [x] Move the compile-hotspot failure/report after CPU correctness tests or
       into an independent always-reporting job so a hotspot regression cannot
       suppress already-built correctness feedback.
-- [ ] Keep source optimization in owning tasks; this task produces trustworthy
+- [x] Keep source optimization in owning tasks; this task produces trustworthy
       evidence only.
 
 ## Tests
-- [ ] Add synthetic Ninja-log/build fixtures for one-command `.pcm`+`.o`
+- [x] Add synthetic Ninja-log/build fixtures for one-command `.pcm`+`.o`
       outputs, distinct module phases, duplicate basenames in different roots,
       test/method/benchmark sources, generated outputs, and unresolved outputs.
-- [ ] Prove one physical command contributes once to rankings and baseline
+- [x] Prove one physical command contributes once to rankings and baseline
       comparison while its complete output list remains visible.
-- [ ] Prove distinct physical phases for the same source are retained with
+- [x] Prove distinct physical phases for the same source are retained with
       explicit identities rather than overwritten.
 - [ ] Run the repaired analyzer against clean `ci` logs and validate the JSON
       result and refreshed baseline.
 
 ## Docs
-- [ ] Update `docs/benchmarking/ci-policy.md` and
+- [x] Update `docs/benchmarking/ci-policy.md` and
       `docs/build-troubleshooting.md` with physical-edge semantics, covered
       source roots, unresolved-output policy, sample requirements, and baseline
       refresh procedure.
-- [ ] Cross-link `RUNTIME-166` and other source-owner tasks as consumers without
+- [x] Cross-link `RUNTIME-166` and other source-owner tasks as consumers without
       claiming those sources have already been optimized.
 - [ ] Update process/task indexes and regenerate `tasks/SESSION-BRIEF.md` on
       retirement.
@@ -106,7 +115,7 @@ depends_on:
 ```bash
 python3 tests/regression/tooling/Test.CompileHotspots.py
 cmake --preset ci --fresh
-cmake --build --preset ci --target IntrinsicTests IntrinsicBenchmarks
+cmake --build --preset ci --target IntrinsicTests
 python3 tools/analysis/compile_hotspots.py --build-dir build/ci --top 40 --json-out build/ci/compile_hotspots_report.json --baseline-json tools/analysis/compile_hotspot_baseline.json
 python3 tools/agents/check_task_policy.py --root . --strict
 ```

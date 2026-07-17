@@ -771,6 +771,10 @@ selection. Retain each full JSON report, rank normalized repository-owned
 edges across the cohort, and record the chosen offenders and threshold
 derivation with the hosted run IDs. Do not mix incremental logs, select a
 convenient retry, preserve stale targets by fiat, or impose per-root quotas.
+For the one source-completeness diagnostic, build the compile-only
+`IntrinsicTests` aggregate. It covers registered test, method, and benchmark
+producers without invoking the `IntrinsicBenchmarks` custom target, whose build
+also executes the benchmark runner.
 The checked-in Octree budget is the historical BUG-004 threshold migrated to
 the strict identity schema; it is not a BUILD-004 five-sample refresh.
 [`RUNTIME-166`](../../tasks/backlog/runtime/RUNTIME-166-slim-render-extraction-module.md)

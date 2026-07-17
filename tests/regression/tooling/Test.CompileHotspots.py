@@ -143,7 +143,7 @@ class CompileHotspotTests(unittest.TestCase):
             )
 
     def test_supported_ninja_log_versions_share_five_field_layout(self) -> None:
-        for version in (4, 7):
+        for version in (4, 5):
             with self.subTest(version=version):
                 with tempfile.TemporaryDirectory() as temporary:
                     fixture = CompileHotspotFixture(
@@ -519,7 +519,7 @@ class CompileHotspotTests(unittest.TestCase):
             ):
                 compile_hotspots.parse_ninja_log(log, build)
 
-            for version in (3, 8):
+            for version in (3, 6):
                 with self.subTest(version=version):
                     log.write_text(
                         f"# ninja log v{version}\n",
@@ -541,30 +541,27 @@ class CompileHotspotTests(unittest.TestCase):
             ):
                 compile_hotspots.parse_ninja_log(log, build)
 
-            for version in (5, 6, 7):
-                with self.subTest(version=version, defect="malformed-hash"):
-                    log.write_text(
-                        f"# ninja log v{version}\n"
-                        "0\t5\t0\tCore.Version.cpp.o\tnot-hex\n",
-                        encoding="utf-8",
-                    )
-                    with self.assertRaisesRegex(
-                        compile_hotspots.AnalysisError,
-                        "command hash.*lowercase hexadecimal",
-                    ):
-                        compile_hotspots.parse_ninja_log(log, build)
+            log.write_text(
+                "# ninja log v5\n"
+                "0\t5\t0\tCore.Version.cpp.o\tnot-hex\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                compile_hotspots.AnalysisError,
+                "command hash.*lowercase hexadecimal",
+            ):
+                compile_hotspots.parse_ninja_log(log, build)
 
-                with self.subTest(version=version, defect="extra-field"):
-                    log.write_text(
-                        f"# ninja log v{version}\n"
-                        "0\t5\t0\tCore.Version.cpp.o\tabc123\textra\n",
-                        encoding="utf-8",
-                    )
-                    with self.assertRaisesRegex(
-                        compile_hotspots.AnalysisError,
-                        "expected five",
-                    ):
-                        compile_hotspots.parse_ninja_log(log, build)
+            log.write_text(
+                "# ninja log v5\n"
+                "0\t5\t0\tCore.Version.cpp.o\tabc123\textra\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                compile_hotspots.AnalysisError,
+                "expected five",
+            ):
+                compile_hotspots.parse_ninja_log(log, build)
 
     def test_baseline_rejects_empty_target_set(self) -> None:
         with self.assertRaisesRegex(

@@ -15,7 +15,7 @@ COMPILE_OUTPUT_SUFFIXES = (".cppm.o", ".cpp.o", ".cc.o", ".cxx.o", ".c.o", ".o",
 SOURCE_ROOTS = ("src", "tests", "methods", "benchmarks")
 DEPENDENCY_ROOTS = ("external", "third_party")
 MIN_NINJA_LOG_VERSION = 4
-MAX_NINJA_LOG_VERSION = 7
+MAX_NINJA_LOG_VERSION = 5
 BASELINE_ROOT_FIELDS = frozenset({"max_regression_ms", "targets"})
 BASELINE_TARGET_FIELDS = frozenset(
     {"edge_id", "source", "edge_kind", "outputs", "max_duration_ms"}

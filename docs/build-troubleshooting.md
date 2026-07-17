@@ -302,8 +302,12 @@ An incremental tree can retain log entries for targets absent from the current
 configured graph. If those entries appear as unresolved, do not add a basename
 fallback or delete individual log lines. Reproduce with a fresh `ci` configure
 (`cmake --preset ci --fresh`), build the exact target population being
-measured, and analyze the resulting matched log/compile-command pair. Baseline
-refreshes require five comparable clean samples as described in the
+measured, and analyze the resulting matched log/compile-command pair. Use
+`cmake --build --preset ci --target IntrinsicTests` for a compile-only
+source-completeness diagnostic across registered test, method, and benchmark
+producers. Do not use `IntrinsicBenchmarks` for that diagnostic because the
+custom target also executes the benchmark runner. Baseline refreshes require
+five comparable clean samples as described in the
 [benchmark CI policy](benchmarking/ci-policy.md#compile-hotspot-evidence);
 a single local report is diagnostic only.
 
