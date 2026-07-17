@@ -42,10 +42,12 @@
     },
     {
       "name": "ci",
-      "displayName": "Debug tests-only (CUDA off)",
+      "displayName": "Debug CI without Sandbox (CUDA off)",
       "inherits": "base",
-      "description": "Smaller headless-friendly configure preset for CI or focused test runs.",
+      "description": "CI configure without Sandbox for focused test and benchmark runs. The pinned Linux/Vulkan identity resolves Auto to GLFW; use explicit Null/headless overrides for no-GLFW work.",
       "cacheVariables": {
+        "EXTRINSIC_PLATFORM": "Linux",
+        "EXTRINSIC_BACKEND": "Vulkan",
         "INTRINSIC_BUILD_SANDBOX": "OFF",
         "INTRINSIC_ENABLE_CUDA": "OFF"
       }
@@ -56,7 +58,6 @@
       "inherits": "ci",
       "description": "CI preset that opts in to the promoted Vulkan backend (INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON) and includes the Sandbox target for end-to-end visible-triangle smoke. Runtime still falls back to Null per the GRAPHICS-033 truth table when the operational gate is not satisfied; gpu;vulkan fixtures opt in via 'ctest -L gpu -L vulkan'.",
       "cacheVariables": {
-        "EXTRINSIC_BACKEND": "Vulkan",
         "INTRINSIC_BUILD_SANDBOX": "ON",
         "INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN": "ON"
       }

@@ -81,6 +81,10 @@ project(IntrinsicEngine
         LANGUAGES CXX C
 )
 
+# Global build identity must exist before any renderer or platform consumer.
+set(EXTRINSIC_PLATFORM "${CMAKE_SYSTEM_NAME}" CACHE STRING "Configured target platform selection")
+set(EXTRINSIC_BACKEND "Vulkan" CACHE STRING "Graphics backend selection")
+
 include(cmake/ClangToolchainSelection.cmake)
 
 if(NOT CMAKE_C_COMPILER_ID STREQUAL "Clang"

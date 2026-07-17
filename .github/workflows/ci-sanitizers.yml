@@ -92,6 +92,7 @@ jobs:
             --test-json build/ci/ci-timing/phases/test.json \
             --gate 'ci-sanitizers-${{ matrix.sanitizer.name }}' \
             --preset ci \
+            --build-dir build/ci \
             --compiler clang-20 \
             --sanitizer '${{ matrix.sanitizer.name }}' \
             --runner-image ubuntu-24.04 \

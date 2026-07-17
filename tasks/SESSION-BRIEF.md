@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-107` — Backend target graph depends on configure history (tasks/active/BUG-107-backend-target-graph-configure-history.md)
+- none
 
 ## Theme B — Rendering modernization
 

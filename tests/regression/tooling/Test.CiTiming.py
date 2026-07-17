@@ -39,6 +39,13 @@ WARM_CONFIGURE_CALL_COUNTS = {
     "ci-bench-smoke.yml": 1,
     "nightly-deep.yml": 2,
 }
+TIMING_WORKFLOW_BUILD_DIRS = {
+    "pr-fast.yml": "build/ci",
+    "ci-linux-clang.yml": "build/ci",
+    "ci-vulkan.yml": "build/ci-vulkan",
+    "ci-bench-smoke.yml": "build/ci",
+    "ci-sanitizers.yml": "build/ci",
+}
 
 
 def _write_phase(path: Path, elapsed_seconds: float, returncode: int = 0) -> None:
@@ -71,6 +78,32 @@ def _write_ccache_stats(path: Path, error_count: int = 0) -> None:
                 },
                 "raw": {},
             }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_build_configuration(
+    build_dir: Path,
+    *,
+    platform: str = "Linux",
+    backend: str = "Vulkan",
+    intrinsic_platform_backend: str = "Auto",
+    headless_no_glfw: str = "OFF",
+    platform_backend_selected: str = "Glfw",
+) -> None:
+    build_dir.mkdir(parents=True, exist_ok=True)
+    (build_dir / "CMakeCache.txt").write_text(
+        "\n".join(
+            (
+                f"EXTRINSIC_PLATFORM:STRING={platform}",
+                f"EXTRINSIC_BACKEND:STRING={backend}",
+                f"INTRINSIC_PLATFORM_BACKEND:STRING={intrinsic_platform_backend}",
+                f"INTRINSIC_HEADLESS_NO_GLFW:BOOL={headless_no_glfw}",
+                "INTRINSIC_PLATFORM_BACKEND_SELECTED:INTERNAL="
+                f"{platform_backend_selected}",
+            )
         )
         + "\n",
         encoding="utf-8",
@@ -263,6 +296,35 @@ class CiTimingTests(unittest.TestCase):
         }
         self.assertEqual(observed, expected)
 
+    def test_live_timing_workflows_supply_configured_build_directory(self) -> None:
+        for workflow_name, build_dir in TIMING_WORKFLOW_BUILD_DIRS.items():
+            with self.subTest(workflow=workflow_name):
+                workflow = yaml.safe_load(
+                    (WORKFLOW_ROOT / workflow_name).read_text(encoding="utf-8")
+                )
+                aggregator_steps = [
+                    step
+                    for job in workflow["jobs"].values()
+                    for step in job["steps"]
+                    if "aggregate_gate_timing.py" in step.get("run", "")
+                ]
+                self.assertEqual(len(aggregator_steps), 1)
+                self.assertIn(
+                    f"--build-dir {build_dir}",
+                    aggregator_steps[0]["run"],
+                )
+
+        ci_linux = (WORKFLOW_ROOT / "ci-linux-clang.yml").read_text(encoding="utf-8")
+        self.assertIn(
+            '--selected-test-count "$((selected_tests + 2))"',
+            ci_linux,
+        )
+        self.assertIn(
+            "--configure-json "
+            "build/ci/ci-timing/phases/configure_backend_determinism.json",
+            ci_linux,
+        )
+
     def test_benchmark_smoke_registration_matches_dedicated_lane(self) -> None:
         cmake = "\n".join(
             line.split("#", 1)[0]
@@ -351,9 +413,7 @@ class CiTimingTests(unittest.TestCase):
             if "Test_BenchmarkResultValidator.py" in step.get("run", "")
         ]
         self.assertEqual(len(validator_regression_steps), 1)
-        self.assertFalse(
-            validator_regression_steps[0].get("continue-on-error", False)
-        )
+        self.assertFalse(validator_regression_steps[0].get("continue-on-error", False))
 
     def test_aggregator_converts_units_and_emits_valid_result(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -511,6 +571,115 @@ class CiTimingTests(unittest.TestCase):
         self.assertFalse(payload["diagnostics"]["ccache_stats_required"])
         self.assertEqual(payload["diagnostics"]["ccache_stats_health"], "not_requested")
         self.assertEqual(payload["diagnostics"]["ccache_stats_errors"], [])
+
+    def test_aggregator_reads_configured_backend_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            build_dir = tmp_path / "build"
+            _write_build_configuration(
+                build_dir,
+                platform="Linux",
+                backend="Vulkan",
+                intrinsic_platform_backend="Auto",
+                headless_no_glfw="OFF",
+                platform_backend_selected="Glfw",
+            )
+            result, payload = self._run_fixture_aggregator(
+                tmp_path,
+                ["--build-dir", str(build_dir)],
+            )
+
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        self.assertEqual(payload["status"], "passed")
+        diagnostics = payload["diagnostics"]
+        self.assertEqual(diagnostics["extrinsic_platform"], "Linux")
+        self.assertEqual(diagnostics["extrinsic_backend"], "Vulkan")
+        self.assertEqual(diagnostics["intrinsic_platform_backend"], "Auto")
+        self.assertEqual(diagnostics["intrinsic_headless_no_glfw"], "OFF")
+        self.assertEqual(
+            diagnostics["intrinsic_platform_backend_selected"],
+            "Glfw",
+        )
+        self.assertTrue(diagnostics["build_configuration_available"])
+        self.assertEqual(diagnostics["build_configuration_errors"], [])
+
+    def test_aggregator_preserves_legacy_behavior_without_build_directory(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            result, payload = self._run_fixture_aggregator(Path(tmp))
+
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        self.assertEqual(payload["status"], "passed")
+        diagnostics = payload["diagnostics"]
+        self.assertEqual(diagnostics["extrinsic_platform"], "")
+        self.assertEqual(diagnostics["extrinsic_backend"], "")
+        self.assertEqual(diagnostics["intrinsic_platform_backend"], "")
+        self.assertEqual(diagnostics["intrinsic_headless_no_glfw"], "")
+        self.assertEqual(diagnostics["intrinsic_platform_backend_selected"], "")
+        self.assertFalse(diagnostics["build_configuration_available"])
+        self.assertEqual(diagnostics["build_configuration_errors"], [])
+
+    def test_aggregator_fails_closed_when_configured_cache_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            build_dir = tmp_path / "missing-build"
+            result, payload = self._run_fixture_aggregator(
+                tmp_path,
+                ["--build-dir", str(build_dir)],
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(payload["status"], "error")
+        diagnostics = payload["diagnostics"]
+        self.assertFalse(diagnostics["build_configuration_available"])
+        self.assertEqual(diagnostics["extrinsic_platform"], "")
+        self.assertEqual(diagnostics["extrinsic_backend"], "")
+        self.assertEqual(diagnostics["intrinsic_platform_backend"], "")
+        self.assertEqual(diagnostics["intrinsic_headless_no_glfw"], "")
+        self.assertEqual(diagnostics["intrinsic_platform_backend_selected"], "")
+        self.assertIn(
+            "missing configured CMake cache",
+            diagnostics["build_configuration_errors"][0],
+        )
+
+    def test_aggregator_fails_closed_when_backend_identity_is_incomplete(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            build_dir = tmp_path / "build"
+            build_dir.mkdir()
+            (build_dir / "CMakeCache.txt").write_text(
+                "\n".join(
+                    (
+                        "EXTRINSIC_PLATFORM:STRING=Linux",
+                        "EXTRINSIC_BACKEND:STRING=Null",
+                        "INTRINSIC_PLATFORM_BACKEND:STRING=Null",
+                        "INTRINSIC_HEADLESS_NO_GLFW:BOOL=ON",
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            result, payload = self._run_fixture_aggregator(
+                tmp_path,
+                ["--build-dir", str(build_dir)],
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(payload["status"], "error")
+        diagnostics = payload["diagnostics"]
+        self.assertFalse(diagnostics["build_configuration_available"])
+        self.assertEqual(diagnostics["extrinsic_platform"], "Linux")
+        self.assertEqual(diagnostics["extrinsic_backend"], "Null")
+        self.assertEqual(diagnostics["intrinsic_platform_backend"], "Null")
+        self.assertEqual(diagnostics["intrinsic_headless_no_glfw"], "ON")
+        self.assertEqual(diagnostics["intrinsic_platform_backend_selected"], "")
+        self.assertIn(
+            "INTRINSIC_PLATFORM_BACKEND_SELECTED",
+            diagnostics["build_configuration_errors"][0],
+        )
 
     def test_aggregator_marks_missing_required_ccache_stats_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -120,8 +120,8 @@ sessions:
     open_threads: 13
   - id: "2026-07-17_001"
     date: "2026-07-17"
-    summary: "Materialized the historical-engine audit as ten reviewed backlog tasks, then committed the repository snapshot and recorded the session epilogue."
-    turn_count: 2
-    events_count: 4
+    summary: "Materialized and committed the selective-adaptation backlog, then reproduced BUG-107's clean-versus-warm CI target-graph drift."
+    turn_count: 3
+    events_count: 5
     claims_touched: []
-    open_threads: 15
+    open_threads: 16

@@ -923,3 +923,9 @@ entries:
       - "Routed the user's commit-all-changes instruction as decision N245 and the actual snapshot commit as experiment N246."
       - "Recorded the whitespace sanity check and repo-wide staging as process evidence only; no new research claim crystallized from the commit itself."
       - "Kept the backlog and task-state threads unchanged because this turn only captured the already-reviewed repository state in version control."
+  - turn: "2026-07-17_001#3"
+    notes:
+      - "Routed the clean/warm/second-clean BUG-107 configure probes as experiment N247 because they produced reproducible target, aggregate, and CTest inventory deltas."
+      - "Did not stage a new generalized observation: H06 already records classification and configure-identity repair before CI optimization, while this turn supplies bounded empirical evidence for its BUG-107 premise."
+      - "Kept the implementation recommendation pending rather than crystallizing it; no source patch or user affirmation has selected the exact timing-metadata representation."
+      - "No implementation file was edited; only the mandatory ARA epilogue records this read-only diagnosis."

@@ -97,6 +97,23 @@ Operational expectations:
 
 - `flaky-quarantine` must not be used as a broad skip. Each quarantined test requires a task ID, a reason, and a removal condition.
 
+## Configure identity and inventory determinism
+
+Test target selection is meaningful only when identical configure inputs
+produce an identical target graph. The root `CMakeLists.txt` owns
+`EXTRINSIC_PLATFORM` and `EXTRINSIC_BACKEND` before the renderer consumes
+them; the platform layer resolves `INTRINSIC_PLATFORM_BACKEND` without
+redefining those inputs. Current CI presets pin the intended Linux/Vulkan
+identity, while explicit local Null/headless and Glfw/Vulkan configurations
+remain supported.
+
+`tests/regression/tooling/Test.BackendConfigureDeterminism.py` compares
+normalized first-fresh, unchanged-reconfigure, and second-fresh target,
+generated aggregate, and CTest inventories. A deliberate identity change may
+change the graph; configure history may not. CI timing results receive the
+same configured identity from the build tree's `CMakeCache.txt`, so inventory
+and timing evidence can be attributed to the graph that produced it.
+
 ## Migration notes
 
 - During migration, temporary compatibility entries in `tests/CMakeLists.txt` are allowed.

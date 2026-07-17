@@ -35,9 +35,10 @@ retirement log.
 - CI latency order: retired `CI-003` establishes telemetry/cancellation and
   retired `CI-004` establishes label-derived test build aggregates; retired
   `CI-007` establishes the bounded module-safe `pr-fast` ccache policy;
-  `BUG-106` first restores truthful test ownership and `BUG-107` makes the
-  configured target graph deterministic. `CI-010` then establishes coverage
-  parity; `CI-005` consumes the corrected registry/graph; `CI-006` isolates the
+  retired `BUG-107` makes the configured target graph deterministic, and
+  `BUG-106` next restores truthful test ownership. `CI-010` then establishes
+  coverage parity; `CI-005` consumes the corrected registry/graph; `CI-006`
+  isolates the
   retained sanitizer variants; `CI-011` measures the fast/slow cohort; and
   `CI-008` groups safe families and sets worker budgets only after those inputs
   settle. `BUILD-004` independently repairs compile-hotspot evidence and gates

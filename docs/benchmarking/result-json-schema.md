@@ -44,9 +44,15 @@ The measured total is the sum of those phases, not whole-job time.
 
 Gate, preset, compiler, sanitizer, runner image, cold/warm cache state, selected
 test count, Ninja command-edge count, ccache hit/miss counts, ccache cache size,
-ccache error count, vcpkg cache state, phase return codes, and
-unavailable-counter flags belong in `diagnostics`. Cold and warm results are
-different populations for baseline comparison.
+ccache error count, vcpkg cache state, phase return codes, and unavailable
+counter flags belong in `diagnostics`. The configured graph identity is the
+five-field tuple `extrinsic_platform`, `extrinsic_backend`,
+`intrinsic_platform_backend`, `intrinsic_headless_no_glfw`, and
+`intrinsic_platform_backend_selected`. `build_configuration_available` is true
+only when all five values were read from the configured `CMakeCache.txt`;
+explicit missing or incomplete cache input records
+`build_configuration_errors` and produces status `error`. Cold and warm
+results are different populations for baseline comparison.
 
 When a gate requires ccache telemetry, `ccache_stats_required` is true and
 `ccache_stats_health` is `healthy`, `invalid`, or `errors_reported`.

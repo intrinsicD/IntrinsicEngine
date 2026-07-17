@@ -8,6 +8,20 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-107`](BUG-107-backend-target-graph-configure-history.md) — the
+configure-history-dependent backend graph defect retired on 2026-07-17.
+Platform and graphics-backend defaults now belong to the root before any
+consumer, current CI presets pin their intended target identity, and one
+configure diagnostic plus timing metadata records the five requested/resolved
+identity fields. A real temporary-tree regression compares normalized Ninja
+targets, registered targets and labels, CTest names, and cache identity across
+fresh, unchanged reconfigure, second-fresh, and deliberate backend-transition
+configurations for explicit Null/headless, Vulkan/Glfw, and Auto. The corrected
+first clean `ci` tree registers all 32 test targets instead of gaining six
+Vulkan targets only when warmed. Both fresh preset aggregate builds passed,
+the focused platform/renderer targets passed, and the default CPU-supported
+CTest gate passed 3,830/3,830.
+
 [`PROC-027`](PROC-027-validator-rent-audit.md) — the validator rent audit
 retired on 2026-07-17 after classifying every Python file in the 57-file
 pre-verdict `tools/` snapshot and separately listing 13 shell and 3 CMake

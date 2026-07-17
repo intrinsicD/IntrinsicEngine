@@ -2,9 +2,9 @@ session:
   id: "2026-07-17_001"
   date: "2026-07-17"
   started: "2026-07-17T00:22+02:00"
-  last_turn: "2026-07-17T07:02+02:00"
-  turn_count: 2
-  summary: "Materialized the historical-engine audit as ten reviewed backlog tasks, then committed the repository snapshot and recorded the session epilogue."
+  last_turn: "2026-07-17T07:27+02:00"
+  turn_count: 3
+  summary: "Materialized and committed the selective-adaptation backlog, then reproduced BUG-107's clean-versus-warm CI target-graph drift."
 
 events_logged:
   - turn: 1
@@ -31,6 +31,12 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Passed a whitespace sanity check, staged the full tree, and created commit 0809cfd7."
+  - turn: 3
+    type: experiment
+    id: "N247"
+    routing: direct
+    provenance: ai-executed
+    summary: "Reproduced BUG-107: unchanged ci reconfigure changed registered targets from 26 to 32 and selected CPU CTest entries from 25 to 30."
 
 ai_actions:
   - turn: 1
@@ -75,6 +81,14 @@ ai_actions:
       - "ara/trace/pm_reasoning_log.yaml"
       - "ara/trace/sessions/2026-07-17_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
+  - turn: 3
+    action: "Inspected BUG-107, root/platform/renderer CMake ownership, presets, test inventories, CI timing metadata, and follow-on CI-005/CI-010 contracts; ran clean, warm, and second-clean configure probes without editing implementation files."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-07-17_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
 
 claims_touched: []
 
@@ -83,6 +97,8 @@ key_context:
     excerpt: "User accepted the repository audit and requested that its selected work be added to the IntrinsicEngine backlog."
   - turn: 2
     excerpt: "User requested that all current changes be committed."
+  - turn: 3
+    excerpt: "BUG-107 was requested as a read-only readiness and exact-fix analysis because it must unlock CI-005 and CI-010."
 
 open_threads:
   - "Select the next bounded architecture/runtime slice; RUNTIME-168 is the smallest reviewed private-surface candidate, while ARCH-014 remains the umbrella that gates REVIEW-003."
@@ -100,6 +116,7 @@ open_threads:
   - "When GRAPHICS-041-Impl-C activates live reload, adopt handle-based watcher lifecycle and created/modified/erased event semantics while preserving Intrinsic debounce and scheduler dispatch."
   - "Keep Gaussian/GMM analytic derivatives deferred until a production method consumes them."
   - "Preserve the two unprovenanced local model files outside task, research, commit, and publication scope."
+  - "Implement BUG-107 by defining global backend inputs before renderer consumption, pinning current CI identity, and comparing normalized clean/warm/fresh target and test inventories before starting CI-005 or CI-010."
 
 ai_suggestions_pending:
   - "Use RUNTIME-168 as the next small convergence slice before larger RUNTIME-166 or ARCH-015 work."
@@ -110,3 +127,4 @@ ai_suggestions_pending:
   - "Start the new consolidation work with BUG-108 and BUG-109, then choose among GEOM-068, GEOM-070, GEOM-071, GRAPHICS-127, and HARDEN-086 by current subsystem priority."
   - "Use Engine25 only as the concept source for weighted graph, tree-query, and mesh-feature behavior; retain IntrinsicEngine's containers, diagnostics, and ownership model."
   - "Finish IntrinsicEngine's native Vulkan timestamp profiler rather than copying Test's CPU-clock-as-GPU implementation."
+  - "Keep engine graphics/platform identity in CI timing diagnostics sourced from configured CMake state; do not repurpose the benchmark result's top-level backend field."

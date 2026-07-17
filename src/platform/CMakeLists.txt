@@ -1,13 +1,6 @@
 set(target_name ExtrinsicPlatform)
 intrinsic_add_module_library(${target_name})
 
-if(NOT DEFINED EXTRINSIC_PLATFORM)
-        set(EXTRINSIC_PLATFORM "${CMAKE_SYSTEM_NAME}" CACHE STRING "Host platform selection")
-endif()
-if(NOT DEFINED EXTRINSIC_BACKEND)
-        set(EXTRINSIC_BACKEND "Vulkan" CACHE STRING "Graphics backend selection")
-endif()
-
 set(INTRINSIC_PLATFORM_BACKEND "Auto" CACHE STRING "Platform backend: Auto, Null, or Glfw")
 set_property(CACHE INTRINSIC_PLATFORM_BACKEND PROPERTY STRINGS Auto Null Glfw)
 
@@ -61,4 +54,10 @@ else()
         target_compile_definitions(${target_name} PRIVATE INTRINSIC_PLATFORM_BACKEND_NULL=1)
 endif()
 
-message(STATUS "ExtrinsicPlatform: selected ${_intrinsic_platform_backend} backend")
+message(STATUS
+        "IntrinsicEngine configure identity: "
+        "platform=${EXTRINSIC_PLATFORM}; "
+        "graphics_backend=${EXTRINSIC_BACKEND}; "
+        "platform_backend_request=${INTRINSIC_PLATFORM_BACKEND}; "
+        "platform_backend_selected=${_intrinsic_platform_backend}; "
+        "headless_no_glfw=${INTRINSIC_HEADLESS_NO_GLFW}")

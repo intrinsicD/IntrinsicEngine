@@ -21,6 +21,16 @@ CCACHE_SUMMARY_FIELDS = (
     "cache_size_kib",
     "error_count",
 )
+BUILD_CONFIGURATION_FIELDS = (
+    ("EXTRINSIC_PLATFORM", "extrinsic_platform"),
+    ("EXTRINSIC_BACKEND", "extrinsic_backend"),
+    ("INTRINSIC_PLATFORM_BACKEND", "intrinsic_platform_backend"),
+    ("INTRINSIC_HEADLESS_NO_GLFW", "intrinsic_headless_no_glfw"),
+    (
+        "INTRINSIC_PLATFORM_BACKEND_SELECTED",
+        "intrinsic_platform_backend_selected",
+    ),
+)
 
 
 def _timestamp_utc() -> str:
@@ -115,6 +125,47 @@ def _read_ccache_stats(path: Path) -> tuple[dict[str, int] | None, str | None]:
     return validated, None
 
 
+def _read_build_configuration(
+    build_dir: Path,
+) -> tuple[dict[str, str], list[str]]:
+    cache_path = build_dir / "CMakeCache.txt"
+    values = {diagnostic_name: "" for _, diagnostic_name in BUILD_CONFIGURATION_FIELDS}
+    try:
+        text = cache_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return values, [f"missing configured CMake cache: {cache_path}"]
+    except UnicodeError as exc:
+        return values, [f"invalid configured CMake cache encoding {cache_path}: {exc}"]
+    except OSError as exc:
+        return values, [f"could not read configured CMake cache {cache_path}: {exc}"]
+
+    cache_entries: dict[str, str] = {}
+    requested_fields = {name for name, _ in BUILD_CONFIGURATION_FIELDS}
+    for line in text.splitlines():
+        if not line or line.startswith(("#", "//")) or "=" not in line:
+            continue
+        key_and_type, value = line.split("=", 1)
+        if ":" not in key_and_type:
+            continue
+        key, _ = key_and_type.split(":", 1)
+        if key in requested_fields:
+            cache_entries[key] = value.strip()
+
+    missing_fields: list[str] = []
+    for cache_name, diagnostic_name in BUILD_CONFIGURATION_FIELDS:
+        value = cache_entries.get(cache_name, "")
+        values[diagnostic_name] = value
+        if not value:
+            missing_fields.append(cache_name)
+
+    if missing_fields:
+        return values, [
+            "configured CMake cache is missing non-empty backend identity entries "
+            f"({', '.join(missing_fields)}): {cache_path}"
+        ]
+    return values, []
+
+
 def _append_summary(result: dict[str, object]) -> None:
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if not summary_path:
@@ -157,6 +208,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cache-state", choices=("cold", "warm"), required=True)
     parser.add_argument("--selected-test-count", type=_nonnegative_int)
     parser.add_argument("--ninja-edge-count", type=_nonnegative_int)
+    parser.add_argument("--build-dir", type=Path)
     parser.add_argument("--ccache-stats-json", type=Path)
     parser.add_argument("--require-ccache-stats", action="store_true")
     parser.add_argument("--vcpkg-cache-hit", type=_parse_bool)
@@ -214,6 +266,18 @@ def main() -> int:
         if ccache_stats_error:
             ccache_stats_errors.append(ccache_stats_error)
 
+    build_configuration = {
+        diagnostic_name: "" for _, diagnostic_name in BUILD_CONFIGURATION_FIELDS
+    }
+    build_configuration_errors: list[str] = []
+    if args.build_dir is not None:
+        build_configuration, build_configuration_errors = _read_build_configuration(
+            args.build_dir
+        )
+    build_configuration_available = (
+        args.build_dir is not None and not build_configuration_errors
+    )
+
     ccache_stats_available = ccache_stats is not None
     ccache_values = ccache_stats or {field: 0 for field in CCACHE_SUMMARY_FIELDS}
     if ccache_stats_errors:
@@ -225,7 +289,7 @@ def main() -> int:
     else:
         ccache_stats_health = "healthy"
 
-    if phase_errors or ccache_stats_errors:
+    if phase_errors or ccache_stats_errors or build_configuration_errors:
         status = "error"
     elif (
         any(
@@ -251,6 +315,15 @@ def main() -> int:
         "selected_test_count_available": args.selected_test_count is not None,
         "ninja_edge_count": args.ninja_edge_count or 0,
         "ninja_edge_count_available": args.ninja_edge_count is not None,
+        "extrinsic_platform": build_configuration["extrinsic_platform"],
+        "extrinsic_backend": build_configuration["extrinsic_backend"],
+        "intrinsic_platform_backend": build_configuration["intrinsic_platform_backend"],
+        "intrinsic_headless_no_glfw": build_configuration["intrinsic_headless_no_glfw"],
+        "intrinsic_platform_backend_selected": build_configuration[
+            "intrinsic_platform_backend_selected"
+        ],
+        "build_configuration_available": build_configuration_available,
+        "build_configuration_errors": build_configuration_errors,
         "ccache_hit_count": ccache_values["hit_count"],
         "ccache_miss_count": ccache_values["miss_count"],
         "ccache_cache_size_kib": ccache_values["cache_size_kib"],
@@ -303,6 +376,8 @@ def main() -> int:
     for error in phase_errors:
         print(f"ERROR: {error}")
     for error in ccache_stats_errors:
+        print(f"ERROR: {error}")
+    for error in build_configuration_errors:
         print(f"ERROR: {error}")
     if ccache_stats_available and ccache_values["error_count"] > 0:
         print(f"FAILED: ccache reported {ccache_values['error_count']} error(s)")

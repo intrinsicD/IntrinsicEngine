@@ -144,6 +144,7 @@ jobs:
             --test-json build/ci-vulkan/ci-timing/phases/test_sandbox_processes.json \
             --gate ci-vulkan \
             --preset ci-vulkan \
+            --build-dir build/ci-vulkan \
             --compiler clang-20 \
             --runner-image ubuntu-24.04 \
             --commit '${{ github.sha }}' \

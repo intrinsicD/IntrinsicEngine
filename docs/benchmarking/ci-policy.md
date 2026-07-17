@@ -65,9 +65,12 @@ checks, or artifact upload.
 The result uses the canonical benchmark JSON schema with
 `backend: external_baseline`. Gate identity, preset, compiler, sanitizer,
 runner image, cache state, selected test count, Ninja command-edge count, and
-cache diagnostics remain explicit. Unavailable counters are represented by
-zero plus a matching `*_available: false` diagnostic rather than being silently
-invented.
+cache diagnostics remain explicit. The five configured graph-identity fields
+(`EXTRINSIC_PLATFORM`, `EXTRINSIC_BACKEND`, requested and selected platform
+backend, and the headless flag) are read from the gate's `CMakeCache.txt`;
+missing or incomplete explicit cache input fails aggregation closed.
+Unavailable counters are represented by zero plus a matching
+`*_available: false` diagnostic rather than being silently invented.
 
 Cold and warm-cache samples are reported separately. Performance claims require
 at least five comparable samples and cite median and p95 plus the exact commit,

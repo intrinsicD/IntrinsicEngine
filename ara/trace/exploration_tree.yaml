@@ -5774,5 +5774,29 @@ tree:
     evidence:
       - "User instruction: commit all changes accordingly"
       - "git diff --check"
-      - "git commit -m "Sync backlog and session artifacts""
+      - 'git commit -m "Sync backlog and session artifacts"'
+    status: resolved
+  - id: N247
+    type: experiment
+    title: "Reproduce BUG-107 configure-history-dependent target inventories"
+    provenance: ai-executed
+    timestamp: "2026-07-17T07:27+02:00"
+    also_depends_on: [N237, N239]
+    evidence:
+      - "tasks/backlog/bugs/BUG-107-backend-target-graph-configure-history.md"
+      - "cmake --preset ci -B /tmp/intrinsic-bug107-ci.wchPfQ"
+      - "cmake --preset ci -B /tmp/intrinsic-bug107-ci.wchPfQ"
+      - "cmake --preset ci -B /tmp/intrinsic-bug107-ci-fresh2.QAqeKT"
+      - "build-tree test-inventories/*.txt and RegisteredTestTargets.tsv hashes"
+      - "ctest --show-only=json-v1 CPU selector inventories"
+    result: >
+      Two independent fresh ci configures produced identical 26-target
+      registered-test inventories and 25 selected CPU CTest entries, with no
+      ExtrinsicBackendsVulkan target. Reconfiguring either unchanged tree after
+      platform cached EXTRINSIC_BACKEND=Vulkan added ExtrinsicBackendsVulkan,
+      changed the registered-test inventory to 32 targets, changed the CPU
+      aggregate from 22 to 23 executables, changed the gpu/vulkan aggregate
+      from 1 to 5 executables, and raised the selected CPU CTest inventory to
+      30. The experiment confirms BUG-107 and establishes it as a prerequisite
+      for stable touched-scope and source-coverage evidence.
     status: resolved

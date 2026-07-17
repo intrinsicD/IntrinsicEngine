@@ -8,7 +8,9 @@ an engine method.
 measured-total wall time for one gate invocation. Results use the canonical
 benchmark JSON schema with `backend: external_baseline`; gate, preset, compiler,
 sanitizer, cache state, selected test count, Ninja command-edge count, and cache
-statistics are diagnostics.
+statistics are diagnostics. The configured target platform, graphics backend,
+requested and selected platform backend, and headless flag identify the exact
+generated graph behind each timing sample.
 
 The measured total is the sum of the three instrumented phases. Dependency
 installation, queue time, artifact upload, and unrelated structural checks are

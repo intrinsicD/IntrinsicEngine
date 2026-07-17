@@ -148,6 +148,7 @@ jobs:
             --test-json build/ci/ci-timing/phases/test.json \
             --gate pr-fast \
             --preset ci \
+            --build-dir build/ci \
             --compiler '${{ steps.toolchain.outputs.compiler }}' \
             --sanitizer '${{ steps.toolchain.outputs.sanitizer }}' \
             --runner-image ubuntu-24.04 \

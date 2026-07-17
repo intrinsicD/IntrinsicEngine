@@ -150,6 +150,24 @@ the generated cache. A warning about an ignored path containing only spaces is
 an IDE argument-list issue and is non-fatal; remove the blank argument from the
 profile to silence it.
 
+### Backend identity and clean configure parity
+
+The root `CMakeLists.txt` owns the global `EXTRINSIC_PLATFORM` and
+`EXTRINSIC_BACKEND` cache defaults before any renderer or platform
+subdirectory is evaluated. `src/platform/CMakeLists.txt` resolves only
+`INTRINSIC_PLATFORM_BACKEND=Auto|Null|Glfw`; it must not establish those
+global defaults. Configure prints one identity line containing the configured
+target platform, graphics backend, requested and resolved platform backend,
+and headless flag.
+
+The `ci` preset pins `EXTRINSIC_PLATFORM=Linux` and
+`EXTRINSIC_BACKEND=Vulkan`; `ci-vulkan` inherits that build identity and adds
+only the promoted runtime/Sandbox opt-ins. A first clean configure and an
+unchanged reconfigure must therefore generate identical target and test
+inventories. If they differ, do not treat the warm tree as valid evidence:
+run `python3 tests/regression/tooling/Test.BackendConfigureDeterminism.py` and
+fix the first consumer/default-order defect instead of preserving the cache.
+
 For repeat local builds, use a filesystem binary cache:
 
 ```bash

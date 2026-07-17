@@ -11,9 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`BUG-107`](BUG-107-backend-target-graph-configure-history.md) — make
-  platform/backend inputs root-owned before their first consumer and prove
-  clean/reconfigure target and test inventories are identical.
+None.
 
 ## History
 
