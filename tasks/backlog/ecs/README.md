@@ -11,7 +11,10 @@ map.
 
 ## Tasks
 
-No open ECS backlog tasks are currently queued here.
+- [HARDEN-086 — Guarded hierarchy query helpers](HARDEN-086-guarded-hierarchy-query-helpers.md)
+  (deterministic, all-or-nothing child/preorder queries in the existing
+  hierarchy-structure module, adopted by editor delete planning and
+  progressive composition summaries).
 
 ## Convergence
 
@@ -47,6 +50,10 @@ No open ECS backlog tasks are currently queued here.
   contract: it separates underlying provenance from available vertex/node,
   edge, halfedge, and face source data so runtime/UI consumers do not treat
   exact `ActiveDomain` as the only capability query.
+- HARDEN-086 is a **Theme F** architecture/runtime foundation leaf rather than
+  a reopening of completed Theme D. It removes two runtime-local hierarchy
+  walks while keeping query mechanics in ECS and editor/composition policy in
+  runtime.
 - Forbidden across all members: physics-world handles, runtime sidecars,
   graphics handles, RHI handles, or live `AssetService` traffic in canonical
   ECS components.

@@ -144,3 +144,27 @@
   tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md,
   tasks/SESSION-BRIEF.md]
 - **From staging**: O47
+
+## A14: Historical-Engine Adaptations Use Consumer-Backed Native Slices
+- **Decision**: Selective historical-engine adaptation is represented by
+  IntrinsicEngine-native task slices: weighted Dijkstra before A*, rectangular
+  LSQR with LSCM as adopter, a narrow fixed-variable smoothing solve, reusable
+  sharp-feature facts before Catmull-Clark creases, device-lifetime Vulkan
+  timestamp profiling, and guarded ECS hierarchy traversal. Legacy repositories
+  provide behavior and integration evidence rather than subsystem ownership.
+  Watcher lifecycle work stays with a future live-reload consumer, and
+  Gaussian-derivative expansion stays deferred until a concrete consumer exists.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N240, N243, N244,
+  tasks/backlog/geometry/GEOM-068-weighted-dijkstra-edge-cost-contract.md,
+  tasks/backlog/geometry/GEOM-069-astar-graph-shortest-path.md,
+  tasks/backlog/geometry/GEOM-070-sparse-lsqr-lscm-adoption.md,
+  tasks/backlog/bugs/BUG-110-implicit-smoothing-boundary-dirichlet-solve.md,
+  tasks/backlog/geometry/GEOM-071-reusable-sharp-feature-classification.md,
+  tasks/backlog/geometry/GEOM-072-catmull-clark-crease-masks.md,
+  tasks/backlog/rendering/GRAPHICS-127-native-gpu-timestamp-profiler.md,
+  tasks/backlog/ecs/HARDEN-086-guarded-hierarchy-query-helpers.md,
+  tasks/backlog/rendering/README.md,
+  tasks/backlog/geometry/README.md]
+- **From staging**: O51

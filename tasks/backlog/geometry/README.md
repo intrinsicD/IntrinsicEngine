@@ -41,6 +41,21 @@ map.
 - [GEOM-067 — Memory-aware BVH merged-node evidence](GEOM-067-memory-aware-bvh-merged-node-evidence.md)
   (post-stability CPU median/SAH/MSAH comparison with exact query parity;
   blocked by `REVIEW-003`, with no default BVH or RHI change).
+- [GEOM-068 — Weighted Dijkstra edge-cost contract](GEOM-068-weighted-dijkstra-edge-cost-contract.md)
+  (optional borrowed nonnegative edge costs on the existing indexed-heap
+  Dijkstra; Euclidean behavior remains the exact default).
+- [GEOM-069 — A* graph shortest path](GEOM-069-astar-graph-shortest-path.md)
+  (single-source/single-target A* with data-driven heuristics; depends on
+  `GEOM-068` and reuses its weighted-cost/failure contract).
+- [GEOM-070 — Rectangular sparse LSQR and LSCM adoption](GEOM-070-sparse-lsqr-lscm-adoption.md)
+  (adds an LSQR-style free function to `Geometry.Sparse` and removes LSCM's
+  private normal-equation path in the same slice).
+- [GEOM-071 — Reusable sharp-feature classification](GEOM-071-reusable-sharp-feature-classification.md)
+  (plain boundary/dihedral feature facts with behavior-preserving FA-QEM
+  adoption; concrete second consumer is `GEOM-072`).
+- [GEOM-072 — Catmull-Clark crease masks](GEOM-072-catmull-clark-crease-masks.md)
+  (opt-in crease stencils and multi-iteration tag propagation; depends on
+  `GEOM-071`).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ### bcg_code_base geometry-processing port gaps (seeded 2026-06-26)
@@ -63,6 +78,21 @@ and `methods/METHOD-016` (LOP/WLOP consolidation) and the editor task
 `ui/UI-034` (framework24 interaction/layout conventions). Each task file names
 the exact `lib_bcg_framework`/`lib_bcg_viewer` source headers it ports and the
 robustness/determinism contracts the port must add over the originals.
+
+A third consolidation sweep (2026-07-16) compared the current
+`bcg_geometry_processing`, `Engine24`, `Engine25`, `Engine26`, `framework`,
+`Geometry`, `RD_Engine`, `Test`, and `UnsungEngine` checkouts against current
+IntrinsicEngine. It selected the strongest idea rather than the newest copy:
+`GEOM-068`/`069` adapt Engine25's weighted-Dijkstra/A* concepts onto
+IntrinsicEngine's better indexed heap and diagnostics; `GEOM-070` answers the
+old rectangular-solver demand with an Intrinsic-native LSQR path and immediate
+LSCM adopter; and `GEOM-071`/`072` combine the current FA-QEM/Loop feature
+semantics with useful Catmull-Clark crease rules from the older engines. The
+sweep also opened correctness prerequisites `BUG-108..110` and gated
+`GEOM-061` on `BUG-109`. Gaussian/GMM analytic gradient/Hessian and level-set
+curvature ideas remain deliberately un-opened: current `METHOD-017` consumes
+the fitted density/closed-form attraction term, not those derivatives. No
+standalone Gaussian-differential or general constraint framework was opened.
 
 `GEOM-062` (`Geometry.PointCloud.Kernels`) is the follow-on shared-weighting
 seam factored out of the LOP consolidation family so `methods/METHOD-016`
@@ -99,6 +129,17 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
   METHOD-006 variant B and the Spectral Conformal Parameterization method
   `methods/METHOD-024`. Promote it when either becomes the next-priority
   spectral method.
+- GEOM-068 establishes optional nonnegative edge costs without changing
+  current Euclidean Dijkstra calls; GEOM-069 then adds A* as a separately
+  reviewable dependent algorithm rather than introducing a generic
+  search-policy framework.
+- GEOM-070 is the rectangular least-squares seam with an immediate LSCM
+  adopter. The mathematically distinct fixed-boundary smoothing defect remains
+  the focused correctness task `BUG-110`, not a general constrained-solver
+  expansion.
+- GEOM-071 extracts plain, lossless sharp-feature facts into Simplification;
+  GEOM-072 is its named second adopter and owns Catmull-Clark crease stencils
+  and tag propagation.
 - Retired GEOM-063 and open GEOM-064 are the parameterization-family seams that realize
   Packs 3–4 of the
   [parameterization/mapping roadmap](../../../docs/architecture/parameterization-mapping-roadmap.md).

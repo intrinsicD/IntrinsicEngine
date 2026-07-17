@@ -8,6 +8,8 @@ depends_on:
   - BUG-089
   - CORE-006
   - CORE-009
+  - GRAPHICS-127
+  - HARDEN-086
   - RUNTIME-166
   - RUNTIME-167
   - RUNTIME-168
@@ -55,6 +57,15 @@ depends_on:
   research-artifact root and named ignored local state; readiness requires the
   policy and executable check to agree without weakening unexpected-root
   detection.
+- `GRAPHICS-127` is a gate because the cross-repository audit found an exported
+  `IProfiler` seam whose Vulkan implementation is never constructed or driven
+  and whose Null implementation labels host-clock data as GPU timing. The
+  readiness audit cannot accept that dead/misleading public seam as current
+  architecture.
+- `HARDEN-086` is a gate because the same audit found two divergent
+  runtime-local hierarchy walks that can publish partial results on corrupt
+  linked structure. The promoted ECS structure module must own one checked
+  query contract before the right-sizing/ownership inventory is accepted.
 - Retired `WORKSHOP-009`, `REVIEW-001`, and `REVIEW-002` provide the review
   procedures but cannot act as this future gate: dependencies on tasks in
   `tasks/done/` or `tasks/archive/` are already satisfied.

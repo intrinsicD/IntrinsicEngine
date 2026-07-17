@@ -910,3 +910,11 @@ entries:
       - "Recorded the full Clang 23 configure/build and 3,810-test CPU-supported gate because this turn upgraded the prior documentation-only validation to integration-grade evidence."
       - "Did not push origin/main because the user requested commit and merge only; local main remains ahead and ready for an explicit later publication request."
       - "Preserved M16.xyz and child.obj under N232 and did not stage a new generalized performance claim from a single correctness-gate run."
+  - turn: "2026-07-17_001#1"
+    notes:
+      - "Routed the user's instruction to turn the historical-engine audit into backlog work as decision N243 and the authored/reviewed/validated ten-task graph as experiment N244."
+      - "Crystallized O49 to H07, O50 to K21, and O51 to A14 via artifact commitment because the new task files, dependency edges, and category notes now depend on those selective-adaptation rules; provenance was not upgraded."
+      - "Recorded the narrower reviewed contracts: normalized face normals, device-lifetime profiler allocation, complete hierarchy invariants, one canonical crease property, and separate rectangular-LSQR versus fixed-variable smoothing surfaces."
+      - "Did not open filesystem-watcher or Gaussian-derivative work because no live production consumer currently justifies either surface; the category notes retain explicit activation conditions."
+      - "Kept O08, O09, O13, and O38 non-stale because module diet, model training, and Progressive Poisson parity remain explicit open threads; this turn introduced no contradiction."
+      - "No C++ build or CTest run was needed for task/research-only changes; strict task, policy, state, docs, layering, test-layout, generated-inventory, and diff gates passed."

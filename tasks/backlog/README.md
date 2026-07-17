@@ -100,6 +100,15 @@ meshlet, cluster-LOD, and differentiable-rendering plans; they do not recreate
 those broad umbrellas. Historical FetchContent instructions in the archived
 plans are superseded by the current vcpkg-manifest-only contract.
 
+The 2026-07-16 old-engine consolidation opened one immediately actionable
+Theme B remediation: `GRAPHICS-127` completes the already-exported RHI GPU
+timestamp profiler across native Vulkan pass recording, truthful Null
+provenance, telemetry, and the existing Frame Graph panel. It is also a
+dependency of `REVIEW-003` because the dead/misleading public seam must close
+before architecture readiness can be accepted. The conditional
+`GRAPHICS-041` hot-reload watcher child remains unopened until its Slang
+compile/reflection prerequisites and a live consumer exist.
+
 ### Theme C — Physics readiness (P1)
 
 Define physics layer ownership before any solver code lands; then implement
@@ -165,6 +174,11 @@ runtime-authoritative linear action readiness and disabled-reason tooltips
 after `BUG-096` and `RUNTIME-138`; and `UI-038` owns explicit, undoable safety
 for destructive Progressive Poisson mesh conversion. The reproducible
 correctness defects themselves remain Theme G bugs.
+
+The 2026-07-16 old-engine consolidation also opened `HARDEN-086`: two
+runtime-local hierarchy walks move onto deterministic, all-or-nothing query
+helpers in the existing promoted ECS structure module. This is a Theme F
+composition/right-sizing leaf and does not reopen completed Theme D.
 
 `RUNTIME-131` is retired to `tasks/done`: runtime exposes the agent/CLI
 config-control facade for render-recipe preview/activation and the current
@@ -275,6 +289,7 @@ Open members (kernel-seam priority set first):
 - [`architecture/ARCH-014-kernel-convergence-tracking.md`](architecture/ARCH-014-kernel-convergence-tracking.md) (umbrella north-star; not a slice).
 - [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) (one-shot post-convergence admission gate; blocked until known architecture/right-sizing/tool-rent work retires).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
+- [`ecs/HARDEN-086-guarded-hierarchy-query-helpers.md`](ecs/HARDEN-086-guarded-hierarchy-query-helpers.md).
 - [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).
 - [`assets/ASSETIO-010-async-model-companion-preflight.md`](assets/ASSETIO-010-async-model-companion-preflight.md).
 - [`ui/UI-037-linear-domain-action-readiness-tooltips.md`](ui/UI-037-linear-domain-action-readiness-tooltips.md) (blocked by `BUG-096` and `RUNTIME-138`).
@@ -386,7 +401,10 @@ strategies only), and its delivered engine-integration/view leaves
 `GRAPHICS-122` delivered the optional GPU-shaded UV target at `Operational`).
 The method-readiness seams are `GEOM-013`,
 `GEOM-024`, `GEOM-058`, `GEOM-059`, `GEOM-060`, `GEOM-061`, `GEOM-062`,
-`GEOM-064`. The post-stability Issue 445 research incubations are
+`GEOM-064`, plus the 2026-07-16 consolidation leaves `GEOM-068` weighted
+Dijkstra, `GEOM-069` A* (blocked by `GEOM-068`), `GEOM-070` rectangular
+LSQR/LSCM, `GEOM-071` shared sharp-feature classification, and `GEOM-072`
+Catmull-Clark creases (blocked by `GEOM-071`). The post-stability Issue 445 research incubations are
 `GEOM-065`, `METHOD-027..031`, and `HARDEN-084`; each is blocked first by
 `REVIEW-003`, and their task files require killing tests or concrete
 two-consumer evidence before opening broader engine integration.
@@ -404,6 +422,12 @@ are preserved in the retirement log.
 - **Issue 445 incubations ⇐ REVIEW-003.** The deferred Theme B/Theme I tasks
   created from the 2026-07-15 literature scan remain blocked until the
   commit-scoped architecture stability and right-sizing audit retires cleanly.
+- **REVIEW-003 ⇐ GRAPHICS-127 / HARDEN-086.** Architecture readiness remains
+  blocked until the exported-but-unwired GPU profiler has truthful backend
+  provenance and an operational native-Vulkan consumer path, and duplicated
+  runtime hierarchy walks converge on the promoted checked ECS query contract.
+- **GEOM-061 ⇐ BUG-109.** Grid reduction strategies build only on the repaired
+  fail-closed quantization and deterministic cell ordering baseline.
 
 ## Promotion checklist
 

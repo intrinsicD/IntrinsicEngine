@@ -26,6 +26,11 @@ without requiring them to read every file.
 
 - The 2026-07-03 review R13 follow-up `GRAPHICS-119` retired parallel
   render-pass command recording via the task scheduler on 2026-07-07.
+- [`GRAPHICS-127`](GRAPHICS-127-native-gpu-timestamp-profiler.md) — make the
+  already-exported RHI profiler truthful and operational: nonblocking native
+  Vulkan timestamps around actual compiled passes, honest Null provenance,
+  and reuse of current telemetry/Frame Graph presentation. Its Vulkan,
+  multi-queue, and parallel-recording prerequisites are all satisfied.
 - The following Theme B incubation leaves are deliberately blocked by the
   architecture-stability gate `REVIEW-003`; they are not eligible for
   implementation during the current convergence/right-sizing phase:
@@ -42,6 +47,18 @@ without requiring them to read every file.
   - [`GRAPHICS-126`](GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md) —
     external-capture-only bandwidth cost model; absent two provenance-complete
     datasets it closes without instrumentation, scheduling, or recipe changes.
+
+The 2026-07-16 cross-repository consolidation did **not** open the archived
+`GRAPHICS-041` Impl-C hot-reload child. Slang compile/reflection Impl-A/B are
+not implemented and there is no live watcher consumer/source-compiler path,
+so a task would be falsely selectable or depend on nonexistent IDs. When those gates exist,
+adapt the existing concrete `Core::Filesystem::FileWatcher` as a runtime-owned
+instance with watch handles, unwatch/clear, typed create/modify/erase events,
+initially-missing path support, timestamp-or-size detection, callback-safe
+shutdown, and last-known-good pipeline retirement. Retain IntrinsicEngine's
+debounce, scheduler dispatch budget, and statistics; do not port `Test`'s
+`engine/platform/.../filesystem/watcher.*` ownership, manual-poll architecture,
+or CPU-clock profiler behavior.
 
 ## Retired cross-domain rendering leaves
 
@@ -74,6 +91,11 @@ when retiring legacy behavior is the priority.
 The following list is the minimum dependency order for the rendering backlog.
 Each entry lists the upstream tasks that must be complete (or explicitly
 out-of-scope) before the entry is eligible for "in-progress" selection.
+
+- [GRAPHICS-127 — Native GPU timestamp profiler and frame-recipe timing integration](GRAPHICS-127-native-gpu-timestamp-profiler.md):
+  depends on retired `GRAPHICS-033` (operational Vulkan), `GRAPHICS-037D`
+  (multi-queue recording), and `GRAPHICS-119` (parallel pass recording); all
+  prerequisites are satisfied, so this remediation leaf is selectable.
 
 - [GRAPHICS-021 — Rendering backlog workflow cleanup](../../archive/GRAPHICS-021-rendering-backlog-workflow-cleanup.md):
   completed cleanup precondition for further rendering task churn

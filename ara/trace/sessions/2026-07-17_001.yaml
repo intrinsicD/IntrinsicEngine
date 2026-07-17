@@ -1,0 +1,90 @@
+session:
+  id: "2026-07-17_001"
+  date: "2026-07-17"
+  started: "2026-07-17T00:22+02:00"
+  last_turn: "2026-07-17T00:22+02:00"
+  turn_count: 1
+  summary: "Materialized the historical-engine audit as ten reviewed, dependency-ordered IntrinsicEngine backlog tasks while deferring consumerless framework work."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: "N243"
+    routing: direct
+    provenance: user
+    summary: "Directed the vetted historical-engine findings to be added as concrete IntrinsicEngine backlog tasks."
+  - turn: 1
+    type: experiment
+    id: "N244"
+    routing: direct
+    provenance: ai-executed
+    summary: "Authored ten dependency-ordered tasks, applied three independent reviews, and passed the complete task/documentation structural gate."
+
+ai_actions:
+  - turn: 1
+    action: "Authored three correctness tasks, five geometry tasks, one native GPU-profiler task, and one guarded ECS hierarchy task; updated dependent tasks, indexes, and the generated session brief."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/backlog/bugs/BUG-108-fibonacci-sphere-small-count-endpoints.md"
+      - "tasks/backlog/bugs/BUG-109-voxel-downsample-invalid-input-ordering.md"
+      - "tasks/backlog/bugs/BUG-110-implicit-smoothing-boundary-dirichlet-solve.md"
+      - "tasks/backlog/geometry/GEOM-068-weighted-dijkstra-edge-cost-contract.md"
+      - "tasks/backlog/geometry/GEOM-069-astar-graph-shortest-path.md"
+      - "tasks/backlog/geometry/GEOM-070-sparse-lsqr-lscm-adoption.md"
+      - "tasks/backlog/geometry/GEOM-071-reusable-sharp-feature-classification.md"
+      - "tasks/backlog/geometry/GEOM-072-catmull-clark-crease-masks.md"
+      - "tasks/backlog/rendering/GRAPHICS-127-native-gpu-timestamp-profiler.md"
+      - "tasks/backlog/ecs/HARDEN-086-guarded-hierarchy-query-helpers.md"
+      - "tasks/backlog/geometry/GEOM-061-grid-downsampling-reduction-strategies.md"
+      - "tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md"
+      - "tasks/backlog/README.md"
+      - "tasks/backlog/bugs/index.md"
+      - "tasks/backlog/geometry/README.md"
+      - "tasks/backlog/rendering/README.md"
+      - "tasks/backlog/ecs/README.md"
+      - "tasks/SESSION-BRIEF.md"
+  - turn: 1
+    action: "Applied independent geometry, graphics/ECS, and task-integrity corrections; validated 119 tasks and every affected task, state, docs, layering, layout, generated-inventory, and diff contract."
+    provenance: ai-executed
+    files_changed:
+      - "ara/logic/solution/architecture.md"
+      - "ara/logic/solution/constraints.md"
+      - "ara/logic/solution/heuristics.md"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-07-17_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "User accepted the repository audit and requested that its selected work be added to the IntrinsicEngine backlog."
+
+open_threads:
+  - "Select the next bounded architecture/runtime slice; RUNTIME-168 is the smallest reviewed private-surface candidate, while ARCH-014 remains the umbrella that gates REVIEW-003."
+  - "BUG-091, BUG-088, and BUG-081 remain open because their cold-discovery and hosted-runner timing evidence was not safely reproducible within the prior task loop."
+  - "Resolve whether model training means GEOM-058 or a new neural/LLM workflow."
+  - "Adjudicate O38 by narrowing Progressive Poisson's README or collecting a non-skipped actual-Vulkan dispatch/readback and CPU-reference parity artifact."
+  - "Keep every Issue 445 candidate ineligible until REVIEW-003 passes; only then select among the tasks using their explicit start/kill evidence."
+  - "Recover provenance and redistribution rights before proposing M16.xyz or child.obj for publication; otherwise retain them only as local audit inputs."
+  - "Implement BUG-093 first; it unblocks ASSETIO-010 companion preview and supplies the disabled-tooltip convention consumed by UI-037."
+  - "Resolve BUG-094 through BUG-097 and UI-038 with their regression-first slice plans before claiming the audited model workflows are linear, truthful, and recoverable."
+  - "Execute BUG-106 and BUG-107 first, then follow the validated CI dependency chain through CI-005/010, CI-006/011, CI-008, BUILD-004/RUNTIME-166, and CI-009."
+  - "Implement BUG-108 and BUG-109 before expanding their sampling and grid-reduction families; GEOM-061 is explicitly gated on BUG-109."
+  - "Implement GEOM-068 before GEOM-069 and GEOM-071 before GEOM-072; GEOM-070 and BUG-110 remain independently selectable numerical slices."
+  - "Implement GRAPHICS-127 and HARDEN-086 before REVIEW-003 can close its native-profiler and hierarchy-query readiness evidence."
+  - "When GRAPHICS-041-Impl-C activates live reload, adopt handle-based watcher lifecycle and created/modified/erased event semantics while preserving Intrinsic debounce and scheduler dispatch."
+  - "Keep Gaussian/GMM analytic derivatives deferred until a production method consumes them."
+  - "Preserve the two unprovenanced local model files outside task, research, commit, and publication scope."
+
+ai_suggestions_pending:
+  - "Use RUNTIME-168 as the next small convergence slice before larger RUNTIME-166 or ARCH-015 work."
+  - "Collect BUG-091/088/081 timing populations in their reported cold or contended hosted environments rather than relaxing local timeouts."
+  - "Treat GEOM-058 Gaussian-mixture fitting as the provisional repository-native model-training target unless the user specifies a neural or LLM model."
+  - "Keep Progressive Poisson at Scaffolded until actual-backend dispatch, readback, and CPU-reference parity evidence exists."
+  - "Prioritize BUG-093 as the first bounded model-workflow implementation because it directly fixes the live fail-late import states and unlocks two dependent tasks."
+  - "Start the new consolidation work with BUG-108 and BUG-109, then choose among GEOM-068, GEOM-070, GEOM-071, GRAPHICS-127, and HARDEN-086 by current subsystem priority."
+  - "Use Engine25 only as the concept source for weighted graph, tree-query, and mesh-feature behavior; retain IntrinsicEngine's containers, diagnostics, and ownership model."
+  - "Finish IntrinsicEngine's native Vulkan timestamp profiler rather than copying Test's CPU-clock-as-GPU implementation."

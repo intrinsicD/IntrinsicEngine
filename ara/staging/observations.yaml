@@ -603,9 +603,9 @@ observations:
       architecture and failure contracts were weaker than IntrinsicEngine.
     potential_type: heuristic
     bound_to: [N240]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H07"
+    crystallized_via: artifact-commitment
     stale: false
   - id: O50
     timestamp: "2026-07-16T23:05+02:00"
@@ -620,9 +620,9 @@ observations:
       that contradicts public sampling semantics and retired GEOM-016 acceptance.
     potential_type: constraint
     bound_to: [N240]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K21"
+    crystallized_via: artifact-commitment
     stale: false
   - id: O51
     timestamp: "2026-07-16T23:05+02:00"
@@ -640,7 +640,7 @@ observations:
       historical repositories requested by the user.
     potential_type: architecture
     bound_to: [N240]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A14"
+    crystallized_via: artifact-commitment
     stale: false

@@ -5702,3 +5702,59 @@ tree:
       8126756d and is two commits ahead of origin/main; no push was requested
       or performed, and M16.xyz plus child.obj remain untouched and untracked.
     status: resolved
+  - id: N243
+    type: decision
+    title: "Materialize the selective historical-engine findings as backlog work"
+    provenance: user
+    timestamp: "2026-07-17T00:22+02:00"
+    also_depends_on: [N240]
+    choice: >
+      Add the vetted architecture, feature, geometry, data-structure, and
+      correctness gaps as concrete IntrinsicEngine backlog tasks, selecting
+      useful legacy behavior while preserving IntrinsicEngine-native ownership,
+      diagnostics, determinism, and validation contracts.
+    alternatives:
+      - "Leave the cross-repository audit as advisory prose"
+      - "Port historical subsystems wholesale or task every legacy feature"
+    evidence:
+      - "N240"
+      - "O49"
+      - "O50"
+      - "O51"
+      - "User instruction: now add the tasks to the backlog of IntrinsicEngine"
+    status: resolved
+  - id: N244
+    type: experiment
+    title: "Author and independently validate the selective-adaptation backlog"
+    provenance: ai-executed
+    timestamp: "2026-07-17T00:22+02:00"
+    also_depends_on: [N240, N243]
+    evidence:
+      - "tasks/backlog/bugs/BUG-108-fibonacci-sphere-small-count-endpoints.md"
+      - "tasks/backlog/bugs/BUG-109-voxel-downsample-invalid-input-ordering.md"
+      - "tasks/backlog/bugs/BUG-110-implicit-smoothing-boundary-dirichlet-solve.md"
+      - "tasks/backlog/geometry/GEOM-068-weighted-dijkstra-edge-cost-contract.md"
+      - "tasks/backlog/geometry/GEOM-069-astar-graph-shortest-path.md"
+      - "tasks/backlog/geometry/GEOM-070-sparse-lsqr-lscm-adoption.md"
+      - "tasks/backlog/geometry/GEOM-071-reusable-sharp-feature-classification.md"
+      - "tasks/backlog/geometry/GEOM-072-catmull-clark-crease-masks.md"
+      - "tasks/backlog/rendering/GRAPHICS-127-native-gpu-timestamp-profiler.md"
+      - "tasks/backlog/ecs/HARDEN-086-guarded-hierarchy-query-helpers.md"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/agents/check_task_state_links.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root . --strict"
+      - "python3 tools/docs/check_docs_sync.py --root . --strict"
+      - "Independent geometry, graphics/ECS, and task-integrity reviews"
+    result: >
+      Authored ten right-sized backlog tasks, gated GEOM-061 on BUG-109,
+      gated GEOM-069 and GEOM-072 on their new foundations, and added
+      GRAPHICS-127 plus HARDEN-086 to REVIEW-003 readiness. Independent review
+      corrected profiler lifetime and target contracts, complete hierarchy
+      invariants, sparse-solver scope, feature-normal normalization, crease-mask
+      ownership, sampling validity scope, and method-readiness edges. All 119
+      task files passed strict task, policy, maturity, state-link,
+      documentation, layering, test-layout, session-brief, module-inventory,
+      and diff checks. No filesystem-watcher or Gaussian-derivative task was
+      opened without a live consumer.
+    status: resolved

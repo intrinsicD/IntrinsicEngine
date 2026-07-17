@@ -86,3 +86,17 @@
   tasks/backlog/process/CI-010-cpu-source-coverage-refactor-parity.md, N237,
   N238, N239]
 - **From staging**: O48
+
+## H07: Adapt Legacy Behavior Into Native Seams, Not Whole Subsystems
+- **Rationale**: Historical repositories are most useful as evidence for
+  formulas, edge cases, and intended integration. When IntrinsicEngine already
+  has stronger ownership, diagnostics, deterministic containers, and tests,
+  rederive the narrow capability inside those native seams and reject unsafe
+  numerical code or unused framework abstractions instead of transplanting the
+  surrounding legacy architecture.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Sensitivity**: medium
+- **Code ref**: [N240, N243, N244, tasks/backlog/geometry/README.md,
+  tasks/backlog/rendering/README.md, tasks/backlog/ecs/README.md]
+- **From staging**: O49

@@ -5,6 +5,18 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-110` — Implicit smoothing applies boundary pins after rather than during solve](BUG-110-implicit-smoothing-boundary-dirichlet-solve.md):
+  `PreserveBoundary` currently solves an all-free shifted system and only then
+  overwrites boundary entries, so interior vertices do not satisfy the claimed
+  Dirichlet problem; impose fixed variables during the solve.
+- [`BUG-109` — Voxel downsampling invalid-input and deterministic-cell ordering](BUG-109-voxel-downsample-invalid-input-ordering.md):
+  non-finite/out-of-range quantization can reach unsafe integral conversion and
+  unordered-map iteration determines output order; fail closed and sort cell
+  keys before publishing. This is the prerequisite for `GEOM-061`.
+- [`BUG-108` — Fibonacci sphere sampling small-count and endpoint safety](BUG-108-fibonacci-sphere-small-count-endpoints.md):
+  the explicit-pole variants overwrite the north pole, leave element zero
+  defaulted, and underflow/write out of bounds for small counts; define and
+  regress the common `0`/`1`/`2` contract.
 - [`BUG-107` — Backend target graph depends on configure history](BUG-107-backend-target-graph-configure-history.md):
   renderer backend targets can be evaluated before the platform layer defines
   the global backend default, so fresh and reused build trees can expose

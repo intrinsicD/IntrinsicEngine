@@ -256,3 +256,18 @@
   tasks/done/GRAPHICS-122-uv-view-offscreen-render-target.md,
   N221]
 - **From staging**: O46
+
+## K21: Correctness Repairs Gate Sampling and Downsampling Expansion
+- **Constraint**: Sphere-sampling and voxel-downsampling feature expansion is
+  gated on repairing the current baseline contracts first. Fibonacci variants
+  must handle zero, one, and two samples and preserve explicit poles for valid
+  spheres; voxel downsampling must fail closed on invalid or unrepresentable
+  quantization input and retain deterministic cell order. GEOM-061 therefore
+  depends on BUG-109 rather than extending the defective path in parallel.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N240, N243, N244,
+  tasks/backlog/bugs/BUG-108-fibonacci-sphere-small-count-endpoints.md,
+  tasks/backlog/bugs/BUG-109-voxel-downsample-invalid-input-ordering.md,
+  tasks/backlog/geometry/GEOM-061-grid-downsampling-reduction-strategies.md]
+- **From staging**: O50

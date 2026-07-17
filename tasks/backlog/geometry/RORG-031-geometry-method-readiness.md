@@ -29,16 +29,24 @@ depends_on: []
   (permutohedral lattice filtering), `GEOM-061` (grid-downsampling
   reduction strategies), `GEOM-062` (point-set projection kernels), and
   `GEOM-064` (parameterization optimization
-  kernels).
+  kernels); post-stability evidence leaves `GEOM-065..067`; and the
+  2026-07-16 cross-repository consolidation leaves `GEOM-068` (weighted
+  Dijkstra), `GEOM-069` (A*), `GEOM-070` (rectangular LSQR/LSCM), `GEOM-071`
+  (shared sharp-feature classification), and `GEOM-072` (Catmull-Clark
+  creases).
 - Retired children/foundations: `GEOM-005..012`, `GEOM-014..016`,
   `GEOM-017`, `GEOM-019..023`, `GEOM-025..034`, `GEOM-037..052`,
   `GEOM-054`, `GEOM-055`, `GEOM-063`, `GEOIO-002`, and `GEOIO-003`
   (narratives in the retirement log; index in the category README).
-- Method-readiness edges this seed watches: `GEOM-020 → METHOD-002`,
-  `GEOM-023 → METHOD-003`, `GEOM-024 → METHOD-006`, `GEOM-058 → METHOD-015`
-  (encoded in those tasks' `depends_on`), the deferred
-  `GEOM-060 →` METHOD-015 optimized-nonrigid fast-path edge, and retired
-  `GEOM-017 →` future robust/global registration method packages.
+- Method-readiness edges this seed watches: retired `GEOM-020 → METHOD-002`,
+  retired `GEOM-023 → METHOD-003`, `GEOM-024 → METHOD-006/METHOD-024`,
+  `GEOM-058 → METHOD-015/METHOD-017`,
+  `GEOM-062 → METHOD-016/METHOD-017/METHOD-018`, and
+  `GEOM-064 → METHOD-021/METHOD-022` (encoded in the consuming tasks'
+  `depends_on` front matter), plus the deferred `GEOM-060 →` a future
+  optimized CPD follow-up to `METHOD-015`, `GEOM-060/GEOM-061 → METHOD-019`
+  LOP-family fast paths, and retired `GEOM-017 →` future robust/global
+  registration packages.
 
 ## Required changes
 - [ ] Keep the open-children list in Context aligned with the actual
@@ -65,7 +73,7 @@ depends_on: []
 
 ## Verification
 ```bash
-for t in GEOM-013 GEOM-024 GEOM-058 GEOM-059 GEOM-060 GEOM-061 GEOM-062 GEOM-064; do
+for t in GEOM-013 GEOM-024 GEOM-058 GEOM-059 GEOM-060 GEOM-061 GEOM-062 GEOM-064 GEOM-065 GEOM-066 GEOM-067 GEOM-068 GEOM-069 GEOM-070 GEOM-071 GEOM-072; do
   ls tasks/backlog/geometry/${t}-*.md >/dev/null || { echo "missing ${t}"; exit 1; }
 done
 python3 tools/agents/validate_tasks.py --root tasks --strict

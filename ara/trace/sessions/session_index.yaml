@@ -118,3 +118,10 @@ sessions:
     events_count: 20
     claims_touched: []
     open_threads: 13
+  - id: "2026-07-17_001"
+    date: "2026-07-17"
+    summary: "Materialized the historical-engine audit as ten reviewed, dependency-ordered IntrinsicEngine backlog tasks while deferring consumerless framework work."
+    turn_count: 1
+    events_count: 2
+    claims_touched: []
+    open_threads: 15
