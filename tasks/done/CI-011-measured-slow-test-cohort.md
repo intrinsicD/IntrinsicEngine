@@ -11,12 +11,11 @@ depends_on:
 # CI-011 — Calibrate the slow-test cohort and retain fast sentinels
 
 ## Status
-- In progress on 2026-07-17; owner: Codex; branch: `main`.
-- Profiling scaffold complete: fail-closed per-case/JUnit collection, a
-  manual-only two-cohort hosted matrix, a complete CPU-slow build aggregate,
-  and disjoint nightly ordinary-slow/SLO/benchmark ownership.
-- Next verification: capture comparable hosted `pr-fast` and full-CPU
-  populations, then classify only candidates supported by five-sample evidence.
+- Completed on 2026-07-17 at `Operational`; owner: Codex; branch: `main`.
+- Implementation commits: `0e5dc29b`, `9830559c`, `07c6d138`, and
+  `ad264dca`; final evidence commit: `23108975`.
+- Five-sample hosted timing, exact cohort parity, scheduled ordinary-slow
+  execution, and identical-product zero-loss coverage evidence all passed.
 
 ## Goal
 - Move only repeatedly measured long-running or stress variants out of fast
@@ -48,60 +47,89 @@ depends_on:
   final unsanitized fast-preset shape against which latency is measured.
 
 ## Required changes
-- [ ] Collect at least five comparable reference-runner samples for the
+- [x] Collect at least five comparable reference-runner samples for the
       canonical fast and full CPU cohorts, retaining per-case duration,
       executable, labels, skip/fail status, host identity/load diagnostics, and
       selected-case count.
-- [ ] Classify candidates from median/p95 evidence and declared behavior:
+- [x] Classify candidates from median/p95 evidence and declared behavior:
       stress/large iterative/full-engine cases may enter `slow`; cheap analytic
       contracts remain fast even when a sibling variant is heavy.
-- [ ] Split mixed-duration executables only at natural dependency/runtime
+- [x] Split mixed-duration executables only at natural dependency/runtime
       boundaries so `slow` does not remove cheap sentinels; do not create an
       executable per file.
-- [ ] For every heavy variant, retain or add a small deterministic sentinel
+- [x] For every heavy variant, retain or add a small deterministic sentinel
       covering the same core invariant in PR-fast, and keep the full variant in
       a named scheduled lane.
-- [ ] Audit measured sleep/thread/file-system hot spots and replace waits only
+- [x] Audit measured sleep/thread/file-system hot spots and replace waits only
       where an existing manual pump, latch, scheduler count, fake clock, or
       equivalent public seam preserves the tested contract.
-- [ ] Update aggregate/selector expectations and prove no reclassified test
+- [x] Update aggregate/selector expectations and prove no reclassified test
       disappears from all required or scheduled workflows; add a label-derived
       `IntrinsicCpuSlowTests` aggregate for the complete scheduled CPU slow
       lane.
-- [ ] Record before/after fast test wall time and selected-case counts against
+- [x] Record before/after fast test wall time and selected-case counts against
       `CI-003` and `CI-005`; make no speed claim from unmatched populations.
 
 ## Tests
-- [ ] Add a regression that compares pre/post fully expanded GoogleTest
+- [x] Add a regression that compares pre/post fully expanded GoogleTest
       inventories and fails on missing or duplicate cases.
-- [ ] Use `CI-010` to compare covered production regions/branches for each
+- [x] Use `CI-010` to compare covered production regions/branches for each
       test-only split or label refactor on an identical product commit.
-- [ ] Prove the fast selector retains every declared sentinel and excludes the
+- [x] Prove the fast selector retains every declared sentinel and excludes the
       measured heavy variants.
-- [ ] Prove the scheduled slow selector executes every reclassified variant
+- [x] Prove the scheduled slow selector executes every reclassified variant
       exactly once with actionable individual case results.
-- [ ] Repeat the final fast cohort at least five times and report median/p95,
+- [x] Repeat the final fast cohort at least five times and report median/p95,
       failures, skips, and case count.
 
 ## Docs
-- [ ] Update `tests/README.md` with the measured cohort, sentinel/slow split
+- [x] Update `tests/README.md` with the measured cohort, sentinel/slow split
       rule, scheduled reproduction command, and references to `BUG-091` and
       `BUG-088` for independent timeout defects.
-- [ ] Update CI policy with the retained fast/slow case counts and comparable
+- [x] Update CI policy with the retained fast/slow case counts and comparable
       timing evidence.
-- [ ] Update process/task indexes and regenerate `tasks/SESSION-BRIEF.md` on
+- [x] Update process/task indexes and regenerate `tasks/SESSION-BRIEF.md` on
       retirement.
 
 ## Acceptance criteria
-- [ ] Every `slow` classification cites a repeatable timing/behavior reason and
+- [x] Every `slow` classification cites a repeatable timing/behavior reason and
       no cheap case is excluded merely because it shared an executable.
-- [ ] The fast gate retains deterministic sentinels for every moved stress or
+- [x] The fast gate retains deterministic sentinels for every moved stress or
       large-iteration invariant.
-- [ ] Complete scheduled coverage executes every moved case exactly once, and
+- [x] Complete scheduled coverage executes every moved case exactly once, and
       `CI-010` reports no lost covered production region for test-only splits.
-- [ ] Fast-gate median/p95 and selected-case deltas are reported against named,
+- [x] Fast-gate median/p95 and selected-case deltas are reported against named,
       comparable baselines without weakening failures, assertions, or timeouts.
-- [ ] No speculative production test interface is added.
+- [x] No speculative production test interface is added.
+
+## Evidence
+- Baseline
+  [`29600380925`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29600380925)
+  at `e3fa9187` and candidate
+  [`29600381191`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29600381191)
+  at `9830559c` each retained five comparable `ubuntu-24.04` samples.
+  Full-fast CPU retained 4,062 selected cases while median/p95 fell from
+  `31.016747/31.160935` to `24.830993/24.894463` seconds; PR-fast retained
+  3,740 selected cases while median/p95 fell from
+  `29.233065/29.557700` to `20.297884/20.880414` seconds. Candidate samples
+  recorded 38,965 passes, 45 skips, and no failures or errors across the two
+  fast populations.
+- Exact cohort parity reported eight measured heavy-case removals and eight
+  corresponding fast-sentinel additions, with no other case or label drift.
+  The ordinary-slow cohort contained exactly the eight moved cases and passed
+  all 40 executions across five samples at `4.051059/4.083242` seconds
+  median/p95.
+- Scheduled nightly-deep
+  [`29603101707`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29603101707)
+  at `ad264dca` retained one JUnit execution for each of the eight ordinary-slow
+  cases, with no skips, failures, errors, duplicates, or unrelated cases.
+- Final serialized source-coverage runs
+  [`29613834782`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29613834782)
+  and
+  [`29613834772`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29613834772)
+  shared production/build/compile identities. The declared transition reported
+  `baseline_cases=4062`, `candidate_cases=4070`, `moved_cases=8`,
+  `added_fast_sentinels=8`, `lost_regions=0`, and `lost_branch_arms=0`.
 
 ## Verification
 ```bash

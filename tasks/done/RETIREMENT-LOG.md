@@ -8,6 +8,17 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`CI-011`](CI-011-measured-slow-test-cohort.md) — measured slow-test cohort
+retired on 2026-07-17 at `Operational`. Five comparable hosted samples moved
+exactly eight heavy cases to the disjoint scheduled ordinary-slow lane and
+retained eight fast sentinels, with no other case or label drift. Full-fast CPU
+retained 4,062 selected cases and reduced median/p95 by 19.943%/20.110%;
+PR-fast retained 3,740 and reduced median/p95 by 30.565%/29.357%. Nightly run
+`29603101707` executed every moved case exactly once, and matched coverage runs
+`29613834782`/`29613834772` reported zero lost production regions or branch
+arms. No timeout, assertion, failure policy, or production test seam was
+weakened.
+
 [`BUG-112`](BUG-112-clang-source-coverage-production-path-instability.md) —
 Clang 20 source-coverage instability retired on 2026-07-17 at
 `CPUContracted`. `Scheduler::WaitForAll` now carries one positive in-flight

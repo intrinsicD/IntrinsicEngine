@@ -17,8 +17,6 @@ map.
 
 - [CI-008 — Reduce CTest process overhead without oversubscribing workers](CI-008-grouped-ctest-and-worker-oversubscription.md)
 - [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
-- [CI-011 — Calibrate the slow-test cohort and retain fast sentinels](../../active/CI-011-measured-slow-test-cohort.md)
-  (currently active).
 - [BUILD-004 — Make compile-hotspot evidence source-complete](BUILD-004-source-complete-compile-hotspot-evidence.md)
 - [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](PROC-025-port-research-ideation-skill-to-other-repos.md)
   (portable playbook; run from a session scoped to the target repo).
@@ -37,9 +35,9 @@ retirement log.
   retired `BUG-106` restores truthful test ownership. Retired `CI-010`
   establishes coverage parity; retired `CI-005` consumes the corrected
   registry/graph; retired `CI-006` isolates the retained sanitizer variants;
-  `CI-011` measures the fast/slow cohort; and
-  `CI-008` groups safe families and sets worker budgets only after those inputs
-  settle. `BUILD-004` independently repairs compile-hotspot evidence and gates
+  retired `CI-011` establishes the measured fast/slow cohort; and `CI-008` is
+  now unblocked to group safe families and set worker budgets from those
+  settled inputs. `BUILD-004` independently repairs compile-hotspot evidence and gates
   `RUNTIME-166`. `CI-009` evaluates lifecycle/runner changes last, after the
   software duplication and evidence defects are removed.
 - Compile-hotspot analyzer ownership is `BUILD-004`; source optimization stays
@@ -80,6 +78,11 @@ this batch is the evidence-backed `check_pr_contract.py` retirement audited by
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [CI-011 — Calibrate the slow-test cohort and retain fast sentinels](../../done/CI-011-measured-slow-test-cohort.md)
+  (done 2026-07-17): moved exactly eight measured heavy cases to the scheduled
+  ordinary-slow lane, retained eight fast sentinels, reduced comparable
+  PR-fast median/p95 by 30.565%/29.357%, and proved zero lost source regions or
+  branch arms.
 - [CI-006 — Remove duplicate sanitizer work and isolate variants](../../done/CI-006-sanitizer-topology-and-test-parallelism.md)
   (done 2026-07-17): isolated unsanitized, ASan, UBSan, and promoted-Vulkan
   identities, proved exact 4,062-case parity across the three CPU variants,

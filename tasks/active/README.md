@@ -11,9 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`CI-011`](CI-011-measured-slow-test-cohort.md) — collect comparable hosted
-  per-case timing evidence, split only measured heavy variants, and retain
-  complete fast-sentinel plus scheduled-slow coverage.
+No active tasks.
 
 ## History
 
