@@ -6006,3 +6006,51 @@ tree:
       docs/task-only changes. No implementation file, task state, build, or
       CTest workload was changed or run during this readiness audit.
     status: resolved
+  - id: N255
+    type: experiment
+    title: "Audit CI-006 sanitizer topology and selector parity"
+    provenance: ai-executed
+    timestamp: "2026-07-17T12:16+02:00"
+    also_depends_on: [N237, N254]
+    evidence:
+      - "tasks/backlog/process/CI-006-sanitizer-topology-and-test-parallelism.md"
+      - "CMakePresets.json"
+      - ".github/workflows/ci-sanitizers.yml"
+      - ".github/workflows/ci-linux-clang.yml"
+      - ".github/workflows/nightly-deep.yml"
+      - ".github/workflows/ci-vulkan.yml"
+      - "CMakeLists.txt"
+      - "tests/CMakeLists.txt"
+      - "build/ci/test-inventories/RegisteredTestTargets.tsv"
+      - "build/ci/test-inventories/IntrinsicTests.txt"
+      - "build/ci/test-inventories/IntrinsicCpuTests.txt"
+      - "ctest --test-dir build/ci --show-only=json-v1 selector comparison"
+      - "python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicCpuTests"
+      - "ninja -C build/ci -t commands IntrinsicTests"
+      - "ninja -C build/ci -t commands IntrinsicCpuTests"
+      - "python3 tests/regression/tooling/Test.WorkflowConcurrency.py"
+      - "python3 tests/regression/tooling/Test.CiTiming.py"
+    result: >
+      The canonical CPU selector currently contains 4,062 CTest cases: 4,061
+      GoogleTest cases plus the manual GLFW lifecycle LeakSanitizer contract.
+      The dedicated sanitizer workflow's additional
+      unit|contract|integration include filter selects 4,061 and omits exactly
+      that ASan-specific regression. No canonical CPU case declares CTest
+      PROCESSORS, RUN_SERIAL, resource locks/groups, fixtures, or COST, and the
+      dedicated sanitizer workflow is serial, so CI-006 should preserve serial
+      execution and leave concurrency policy to CI-008. IntrinsicTests closes
+      2,351 unique Ninja commands across 34 targets while IntrinsicCpuTests
+      closes 2,149 across 26, making the CPU aggregate the safe sanitizer build
+      target. Nightly's sanitizer selector already equals all 4,062 canonical
+      cases, so once the dedicated jobs adopt parity its two same-tree
+      sanitizer rebuilds are redundant; its full CPU pass also repeats four
+      slow benchmark/SLO cases later selected by the performance steps. The
+      smallest safe topology waits for CI-005, then makes ci explicitly
+      unsanitized, adds isolated ci-asan and ci-ubsan presets, retains the
+      combined sanitizer explicitly in ci-vulkan for unique GPU coverage,
+      reconciles every variant against IntrinsicCpuTests, and removes sanitizer
+      reruns from nightly while keeping performance work in the unsanitized ci
+      tree. Static workflow and timing regressions passed; no sanitizer
+      configure, build, CTest execution, implementation edit, or task-state
+      change occurred in this readiness audit.
+    status: resolved

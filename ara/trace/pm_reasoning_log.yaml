@@ -971,3 +971,9 @@ entries:
       - "Kept the implementation right-sized around the existing touched_scope.py: one preconfigure classifier and one postconfigure registry reconciler, not a new planner service or target registry."
       - "Recorded label-closure expansion as required correctness behavior because configured CTest placeholders can otherwise select executables that the narrow build omitted."
       - "Did not stage a new generalized heuristic because H06 already owns classification-first CI optimization; no existing staged observation received a closure, contradiction, or stale signal."
+  - turn: "2026-07-17_001#11"
+    notes:
+      - "Routed the CI-006 selector, closure, resource-property, and nightly-duplication audit as experiment N255 because it produced bounded repository evidence without changing sanitizer topology."
+      - "Did not propose a new sanitizer framework or worker-control surface: named presets plus the existing aggregate and routing reconciler are sufficient, while CI-008 explicitly owns measured concurrency."
+      - "Kept the historical CI-003 baseline immutable and required a new five-sample same-generation population before any speedup claim because current case counts and workflow closure have drifted."
+      - "Did not stage a new generalized observation because CI-006 and H06 already encode isolated, classification-first CI optimization; no staged observation received a closure, contradiction, or stale signal."

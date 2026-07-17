@@ -2,9 +2,9 @@ session:
   id: "2026-07-17_001"
   date: "2026-07-17"
   started: "2026-07-17T00:22+02:00"
-  last_turn: "2026-07-17T11:54+02:00"
-  turn_count: 10
-  summary: "Materialized and committed the selective-adaptation backlog, reproduced BUG-107's configure-history drift, implemented BUG-106 routing, established and adversarially validated CI-010's exact source-coverage lane, and mapped CI-005's smallest safe touched-scope slice."
+  last_turn: "2026-07-17T12:16+02:00"
+  turn_count: 11
+  summary: "Materialized and committed the selective-adaptation backlog, reproduced BUG-107's configure-history drift, implemented BUG-106 routing, established and adversarially validated CI-010's exact source-coverage lane, and mapped CI-005 plus CI-006's smallest safe CI topology slices."
 
 events_logged:
   - turn: 1
@@ -79,6 +79,12 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Identified CI-005's unsafe empty-success and target-routing seams, measured aggregate closure, and defined the smallest fail-closed two-phase implementation."
+  - turn: 11
+    type: experiment
+    id: "N255"
+    routing: direct
+    provenance: ai-executed
+    summary: "Found the dedicated sanitizer selector's one-case LSan omission, measured exact build closure and nightly duplication, and mapped isolated variants without changing concurrency."
 
 ai_actions:
   - turn: 1
@@ -207,6 +213,14 @@ ai_actions:
       - "ara/trace/pm_reasoning_log.yaml"
       - "ara/trace/sessions/2026-07-17_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
+  - turn: 11
+    action: "Read CI-006, sanitizer/full/nightly/Vulkan workflows, presets, sanitizer CMake flags, CTest registration and resource properties, timing baselines, regressions, and policy docs; compared selectors and static Ninja closure without configuring or building a sanitizer variant."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-07-17_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
 
 claims_touched: []
 
@@ -231,6 +245,8 @@ key_context:
     excerpt: "A successful GoogleTest process and nonempty profile are insufficient execution proof when its retained XML omits a requested enabled case; discovery profiles must also remain isolated from the canonical merge."
   - turn: 10
     excerpt: "CI-005 must classify exact base/head changes before any C++ setup, fail closed on uncertain diffs and broad-impact paths, then reconcile every narrow label route against the configured registry before building or testing."
+  - turn: 11
+    excerpt: "CI-006 must preserve the exact CPU selector across unsanitized, ASan, and UBSan variants, isolate their trees and metadata, retain unique combined GPU sanitizer coverage, and defer worker-budget changes to CI-008."
 
 open_threads:
   - "Select the next bounded architecture/runtime slice; RUNTIME-168 is the smallest reviewed private-surface candidate, while ARCH-014 remains the umbrella that gates REVIEW-003."
@@ -241,7 +257,7 @@ open_threads:
   - "Recover provenance and redistribution rights before proposing M16.xyz or child.obj for publication; otherwise retain them only as local audit inputs."
   - "Implement BUG-093 first; it unblocks ASSETIO-010 companion preview and supplies the disabled-tooltip convention consumed by UI-037."
   - "Resolve BUG-094 through BUG-097 and UI-038 with their regression-first slice plans before claiming the audited model workflows are linear, truthful, and recoverable."
-  - "Implement CI-005's fail-closed preconfigure classification, ci-fast identity, postconfigure registry closure, conditional PR-fast wiring, and hosted route-class timing evidence before downstream CI-006/011 work."
+  - "Implement CI-005's fail-closed touched-scope gate first, then land CI-006's isolated unsanitized/ASan/UBSan topology, exact selector reports, nightly de-duplication, and five-sample hosted timing evidence before CI-008/009."
   - "Implement BUG-108 and BUG-109 before expanding their sampling and grid-reduction families; GEOM-061 is explicitly gated on BUG-109."
   - "Implement GEOM-068 before GEOM-069 and GEOM-071 before GEOM-072; GEOM-070 and BUG-110 remain independently selectable numerical slices."
   - "Implement GRAPHICS-127 and HARDEN-086 before REVIEW-003 can close its native-profiler and hierarchy-query readiness evidence."
