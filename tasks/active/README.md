@@ -11,9 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`BUG-106`](BUG-106-test-gate-capability-routing-drift.md) — restore unique,
-  capability-truthful CPU/mock and Vulkan test ownership, then mechanically
-  reconcile build aggregates with expanded CTest selection.
+No active tasks.
 
 ## History
 

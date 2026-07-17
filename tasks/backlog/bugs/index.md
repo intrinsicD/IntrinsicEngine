@@ -17,10 +17,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   the explicit-pole variants overwrite the north pole, leave element zero
   defaulted, and underflow/write out of bounds for small counts; define and
   regress the common `0`/`1`/`2` contract.
-- [`BUG-106` — Test-gate capability routing hides CPU coverage](../../active/BUG-106-test-gate-capability-routing-drift.md):
-  CPU/mock cases are hidden behind executable-wide GPU/Vulkan/slow labels and
-  one runtime source is registered twice; restore unique, capability-truthful
-  ownership and mechanically reconcile build aggregates with CTest selection.
 - [`BUG-097` — Progressive model-scene UV job publishes a zero atlas](BUG-097-progressive-model-scene-zero-uv-atlas.md):
   the default-off progressive enrichment path labels an all-zero authoritative
   `v:texcoord` property as an atlas and can publish it after newer UV/topology
@@ -39,6 +35,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-07-17: [`BUG-106` — Test-gate capability routing hides CPU coverage](../../done/BUG-106-test-gate-capability-routing-drift.md).
+  The corrected graph has one owner per affected case, routes all 4,061
+  CPU-selected GoogleTest cases through truthful targets, and isolates the
+  real Vulkan readback. Hosted Linux passed 4,062/4,062 selected entries;
+  hosted Vulkan retained a three-test operational JUnit with no skips and a
+  passing 2.22-second readback.
 
 - Closed 2026-07-17: [`BUG-107` — Backend target graph depends on configure history](../../done/BUG-107-backend-target-graph-configure-history.md).
   Root-owned platform/backend defaults now precede every consumer; explicit

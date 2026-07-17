@@ -359,9 +359,9 @@ telemetry, a claim-grade aggregate baseline, and stale-run cancellation.
 build aggregates. `CI-007` is retired after retaining a module-safe,
 `pr-fast`-only ccache store with hosted cold/warm and interface-invalidation
 evidence. Retired `BUG-107` established configure-history-independent target
-inventories; open `BUG-106` next repairs capability-truthful test ownership.
-`CI-010`
-then establishes complete CPU source-coverage parity; `CI-005` makes PR-fast a
+inventories, and retired `BUG-106` established capability-truthful test
+ownership. `CI-010` next establishes complete CPU source-coverage parity;
+`CI-005` makes PR-fast a
 fail-closed touched-scope gate; `CI-006` isolates sanitizer variants; `CI-011`
 uses comparable measurements to split only genuinely slow cases; and `CI-008`
 groups safe suites and calibrates nested worker budgets. `BUILD-004` repairs

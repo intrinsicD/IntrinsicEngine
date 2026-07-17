@@ -36,7 +36,7 @@ retirement log.
   retired `CI-004` establishes label-derived test build aggregates; retired
   `CI-007` establishes the bounded module-safe `pr-fast` ccache policy;
   retired `BUG-107` makes the configured target graph deterministic, and
-  `BUG-106` next restores truthful test ownership. `CI-010` then establishes
+  retired `BUG-106` restores truthful test ownership. `CI-010` next establishes
   coverage parity; `CI-005` consumes the corrected registry/graph; `CI-006`
   isolates the
   retained sanitizer variants; `CI-011` measures the fast/slow cohort; and

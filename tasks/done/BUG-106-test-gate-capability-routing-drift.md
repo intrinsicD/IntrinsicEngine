@@ -7,15 +7,20 @@ depends_on:
 # BUG-106 — Test-gate capability routing hides CPU coverage
 
 ## Status
-- Implementation complete locally on 2026-07-17; owner: Codex; branch: `main`.
+- Completed on 2026-07-17 at `Retired`; owner: Codex; branch: `main`.
+- Commit reference: this retirement commit records lifecycle closure after the
+  implementation and exact hosted evidence commits.
 - Pre-change evidence contained 4,114 GoogleTest registrations, 4,105 distinct
   cases, and nine duplicated `RuntimeFrameLoopContract` registrations. The
   corrected graph has 4,105 unique GoogleTest cases plus five manual CTest
   producers, and the default CPU selector contains 4,061 GoogleTest cases plus
   one manual producer.
-- Next verification: push the exact implementation commit, retain a passing
-  hosted `ci-linux-clang` gate, and retain a non-skipped passing readback result
-  from the hosted `ci-vulkan` operational lane.
+- Hosted `ci-linux-clang` run `29565803940` reconciled 25 CPU targets, 4,061
+  unique GoogleTest cases, and 334 assertion sources, then passed all 4,062
+  selected CTest entries plus the SLO step.
+- Hosted `ci-vulkan` run `29565813844` reconciled four fast GPU/Vulkan targets
+  and 41 cases. Its operational JUnit contains exactly three passing tests with
+  zero skips; the dedicated readback ran and passed in 2.22 seconds.
 - Hosted run `29563636181` failed before build because the truthful relabeling
   left Null/headless with no `gpu;vulkan` producers while the root required a
   non-empty GPU aggregate. The follow-up conditionally omits that
@@ -100,18 +105,18 @@ depends_on:
       assertion-bearing case set is unchanged while duplicate executions are
       removed.
 - [x] Build and run the reclassified cases through the default CPU selector.
-- [ ] Build the dedicated readback executable through `ci-vulkan` and run its
+- [x] Build the dedicated readback executable through `ci-vulkan` and run its
       opt-in test on a capable hosted runner, retaining at least one non-skipped
       passing result; a local capability skip validates registration only and
       cannot close operational evidence.
-- [ ] Run the complete CPU-supported correctness gate and strict test-layout
+- [x] Run the complete CPU-supported correctness gate and strict test-layout
       check.
 
 ## Docs
 - [x] Update `tests/README.md` and `docs/architecture/test-strategy.md` with the
       corrected CPU/GPU ownership and replace the stale `HARDEN-042` follow-up
       reference with `BUG-106`.
-- [ ] Update task/category indexes and regenerate `tasks/SESSION-BRIEF.md` on
+- [x] Update task/category indexes and regenerate `tasks/SESSION-BRIEF.md` on
       retirement.
 
 ## Acceptance criteria
@@ -121,7 +126,7 @@ depends_on:
       unit definitions are selected by the default CPU-supported gate.
 - [x] The one real Vulkan readback definition remains selected by the intended
       `gpu;vulkan` lane and not by the CPU lane.
-- [ ] At least one retained `ci-vulkan` result executes the dedicated readback
+- [x] At least one retained `ci-vulkan` result executes the dedicated readback
       test non-skipped and passes; registration-only or capability-skip evidence
       is not sufficient.
 - [x] `Test.RuntimeFrameLoopContract.cpp` is compiled and executed exactly once

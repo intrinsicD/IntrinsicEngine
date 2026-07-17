@@ -8,6 +8,19 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-106`](BUG-106-test-gate-capability-routing-drift.md) — the
+capability-routing defect retired on 2026-07-17. Twelve CPU/mock sources and
+three MockDevice RHI sources now belong to capability-truthful CPU targets,
+the real Vulkan readback has a dedicated slow operational target, and the nine
+duplicate frame-loop registrations are gone. The canonical registry now
+rejects duplicate assertion-source ownership and the reconciler proves exact
+target, label, case, source, aggregate, and discovered-test-environment parity.
+Hosted Linux run `29565803940` reconciled 25 targets, 4,061 unique cases, and
+334 sources before passing 4,062/4,062 selected CTest entries. Hosted Vulkan
+run `29565813844` reconciled four fast targets and 41 cases; its operational
+JUnit retained exactly three passes, zero skips, and a 2.22-second passing
+readback.
+
 [`BUG-107`](BUG-107-backend-target-graph-configure-history.md) — the
 configure-history-dependent backend graph defect retired on 2026-07-17.
 Platform and graphics-backend defaults now belong to the root before any
