@@ -42,7 +42,10 @@ CPU_ENGINE_CONFIG_ROOTS = (
     ("tests/contract/runtime/Test.AssetImportFormatCoverage.cpp", "HeadlessConfig"),
     ("tests/contract/runtime/Test.EditorUiHost.cpp", "HeadlessConfig"),
     ("tests/contract/runtime/Test.GizmoInteractionEngineWiring.cpp", "HeadlessConfig"),
-    ("tests/contract/runtime/Test.GpuAssetCacheFallbackBootstrap.cpp", "SingleWorkerEngineConfig"),
+    (
+        "tests/contract/runtime/Test.GpuAssetCacheFallbackBootstrap.cpp",
+        "SingleWorkerEngineConfig",
+    ),
     ("tests/contract/runtime/Test.GraphGeometryExtraction.cpp", "HeadlessConfig"),
     ("tests/contract/runtime/Test.ImGuiAdapterEngineWiring.cpp", "HeadlessConfig"),
     ("tests/contract/runtime/Test.ImGuiAdapterEngineWiring.cpp", "InputRoutingConfig"),
@@ -57,21 +60,36 @@ CPU_ENGINE_CONFIG_ROOTS = (
     ("tests/contract/runtime/Test.RuntimeJobService.cpp", "NullWindowHeadlessConfig"),
     ("tests/contract/runtime/Test.RuntimeKernelEvents.cpp", "NullWindowHeadlessConfig"),
     ("tests/contract/runtime/Test.RuntimeModule.cpp", "NullWindowHeadlessConfig"),
-    ("tests/contract/runtime/Test.RuntimeReferenceScene.cpp", "SingleWorkerEngineConfig"),
+    (
+        "tests/contract/runtime/Test.RuntimeReferenceScene.cpp",
+        "SingleWorkerEngineConfig",
+    ),
     ("tests/contract/runtime/Test.RuntimeRenderRecipeActivation.cpp", "HeadlessConfig"),
     ("tests/contract/runtime/Test.RuntimeSceneLifecycle.cpp", "HeadlessConfig"),
-    ("tests/contract/runtime/Test.RuntimeVulkanBreadcrumb.cpp", "SingleWorkerEngineConfig"),
-    ("tests/contract/runtime/Test.RuntimeWorldRegistry.cpp", "NullWindowHeadlessConfig"),
+    (
+        "tests/contract/runtime/Test.RuntimeVulkanBreadcrumb.cpp",
+        "SingleWorkerEngineConfig",
+    ),
+    (
+        "tests/contract/runtime/Test.RuntimeWorldRegistry.cpp",
+        "NullWindowHeadlessConfig",
+    ),
     ("tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp", "HeadlessConfig"),
     ("tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp", "HeadlessConfig"),
     ("tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp", "HeadlessConfig"),
     ("tests/contract/runtime/Test.SandboxEditorVisualization.cpp", "HeadlessConfig"),
     ("tests/contract/runtime/Test.SelectionSnapshotExtraction.cpp", "HeadlessConfig"),
-    ("tests/contract/runtime/Test.SelectionStableLookupComposition.cpp", "HeadlessConfig"),
+    (
+        "tests/contract/runtime/Test.SelectionStableLookupComposition.cpp",
+        "HeadlessConfig",
+    ),
     ("tests/integration/runtime/Test.RuntimeSandboxAcceptance.cpp", "HeadlessConfig"),
     ("tests/integration/runtime/Test.SandboxDomainPanels.cpp", "HeadlessConfig"),
     ("tests/integration/runtime/Test.SandboxEditorPresentation.cpp", "HeadlessConfig"),
-    ("tests/integration/runtime/Test.SandboxParameterizationPanel.cpp", "HeadlessConfig"),
+    (
+        "tests/integration/runtime/Test.SandboxParameterizationPanel.cpp",
+        "HeadlessConfig",
+    ),
 )
 CPU_MULTIWORKER_SOURCE_TARGETS = {
     "tests/unit/core/Test.CoreTasks.cpp": "IntrinsicCoreWrapperUnitTests",
@@ -153,6 +171,13 @@ def _gtest_bodies(text: str) -> dict[str, str]:
     return bodies
 
 
+def _scheduler_peak_slots(requested_workers: int) -> int:
+    actual_workers = (
+        requested_workers - 1 if requested_workers > 2 else requested_workers
+    )
+    return actual_workers + 1
+
+
 def _source_multiworker_budgets() -> set[tuple[str, str, int]]:
     budgets: set[tuple[str, str, int]] = set()
     literal_patterns = (
@@ -195,8 +220,7 @@ def _source_multiworker_budgets() -> set[tuple[str, str, int]]:
                     case_budgets.add(int(declaration.group(1)))
 
             if (
-                relative_path
-                == "tests/contract/runtime/Test.ClusteringModule.cpp"
+                relative_path == "tests/contract/runtime/Test.ClusteringModule.cpp"
                 and re.search(r"NullWindowHeadlessConfig\(\s*\)", body)
             ):
                 case_budgets.add(2)
@@ -207,7 +231,7 @@ def _source_multiworker_budgets() -> set[tuple[str, str, int]]:
                     f"{sorted(case_budgets)}"
                 )
             for budget in case_budgets:
-                budgets.add((target, name, budget))
+                budgets.add((target, name, _scheduler_peak_slots(budget)))
     return budgets
 
 
@@ -230,24 +254,19 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         self,
     ) -> None:
         source = (
-            REPO_ROOT
-            / "tests/contract/runtime/Test.ClusteringModule.cpp"
+            REPO_ROOT / "tests/contract/runtime/Test.ClusteringModule.cpp"
         ).read_text(encoding="utf-8")
         body = _function_body(source, "NullWindowHeadlessConfig")
         self.assertIn("const unsigned workers = 2u)", source)
         self.assertEqual(
-            body.count(
-                "config.Simulation.WorkerThreadCount = workers;"
-            ),
+            body.count("config.Simulation.WorkerThreadCount = workers;"),
             1,
         )
         self.assertEqual(source.count("NullWindowHeadlessConfig(),"), 2)
         self.assertEqual(source.count("NullWindowHeadlessConfig(1u),"), 1)
 
     def test_exact_multiworker_ctest_budgets_match_cpu_sources(self) -> None:
-        cmake = (REPO_ROOT / "tests/CMakeLists.txt").read_text(
-            encoding="utf-8"
-        )
+        cmake = (REPO_ROOT / "tests/CMakeLists.txt").read_text(encoding="utf-8")
         budget_block = re.search(
             r"set\(_intrinsic_multiworker_test_budgets\s*"
             r"(?P<body>.*?)\n\)",
@@ -269,12 +288,11 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         self.assertEqual(
             {
                 budget: sum(
-                    declared_budget == budget
-                    for _, _, declared_budget in declared
+                    declared_budget == budget for _, _, declared_budget in declared
                 )
-                for budget in (2, 4)
+                for budget in (3, 4)
             },
-            {2: 22, 4: 19},
+            {3: 22, 4: 19},
         )
         self.assertIn(
             "Declared multi-worker test "
@@ -291,9 +309,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         configure_presets = {
             preset["name"]: preset for preset in payload["configurePresets"]
         }
-        build_presets = {
-            preset["name"]: preset for preset in payload["buildPresets"]
-        }
+        build_presets = {preset["name"]: preset for preset in payload["buildPresets"]}
         ci_fast = configure_presets["ci-fast"]
         self.assertEqual(ci_fast["inherits"], "ci")
         self.assertEqual(
@@ -330,9 +346,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         self.assertEqual(
             dispatch["inputs"]["compare_grouped_ctest"],
             {
-                "description": (
-                    "Compare individual and grouped CTest source coverage"
-                ),
+                "description": ("Compare individual and grouped CTest source coverage"),
                 "required": False,
                 "default": False,
                 "type": "boolean",
@@ -344,8 +358,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         )
         self.assertEqual(coverage.count("cmake --build"), 1)
         self.assertIn(
-            "cmake --build --preset ci-coverage-cpu "
-            "--target IntrinsicCpuCoverageTests",
+            "cmake --build --preset ci-coverage-cpu --target IntrinsicCpuCoverageTests",
             coverage,
         )
         self.assertIn(
@@ -371,15 +384,11 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         )
         steps = payload["jobs"]["cpu-source-coverage"]["steps"]
         named_steps = {step.get("name"): step for step in steps}
-        reconfigure = named_steps[
-            "Reconfigure grouped CTest coverage registration"
-        ]
+        reconfigure = named_steps["Reconfigure grouped CTest coverage registration"]
         collect = named_steps["Collect grouped CTest source coverage"]
         compare = named_steps["Compare grouped CTest source coverage"]
         baseline_upload = named_steps["Upload CPU source-coverage artifact"]
-        upload = named_steps[
-            "Upload grouped CTest source-coverage artifact"
-        ]
+        upload = named_steps["Upload grouped CTest source-coverage artifact"]
         self.assertLess(
             steps.index(baseline_upload),
             steps.index(reconfigure),
@@ -412,15 +421,13 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             compare["run"],
         )
         self.assertIn(
-            "--candidate "
-            "build/ci-coverage-cpu/coverage-grouped/coverage.json",
+            "--candidate build/ci-coverage-cpu/coverage-grouped/coverage.json",
             compare["run"],
         )
         self.assertIn("--test-only-refactor", compare["run"])
         self.assertIn("--require-exact", compare["run"])
         self.assertIn(
-            "| tee build/ci-coverage-cpu/coverage-grouped/"
-            "exact-comparison.txt",
+            "| tee build/ci-coverage-cpu/coverage-grouped/exact-comparison.txt",
             compare["run"],
         )
         self.assertEqual(
@@ -465,11 +472,11 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         )
         self.assertIn("if ! python3 -c 'import yaml'", python_dependency["run"])
         self.assertEqual(
-            pr_fast.count("--github-output \"$GITHUB_OUTPUT\""),
+            pr_fast.count('--github-output "$GITHUB_OUTPUT"'),
             5,
         )
         self.assertEqual(
-            pr_fast.count("--step-summary \"$GITHUB_STEP_SUMMARY\""),
+            pr_fast.count('--step-summary "$GITHUB_STEP_SUMMARY"'),
             5,
         )
 
@@ -492,7 +499,18 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         )
         self.assertNotIn("IntrinsicPrFastTests", pr_fast)
 
-        _, linux = _load_workflow("ci-linux-clang.yml")
+        linux_payload, linux = _load_workflow("ci-linux-clang.yml")
+        linux_steps = {
+            step["name"]: step
+            for step in linux_payload["jobs"]["ci-linux-clang"]["steps"]
+        }
+        configure = " ".join(
+            linux_steps["Configure (ci preset)"]["run"].replace("\\", "").split()
+        )
+        self.assertIn(
+            "-- cmake --preset ci --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON",
+            configure,
+        )
         self.assertIn(
             "--inventory build/ci/test-inventories/IntrinsicCpuTests.txt",
             linux,
@@ -515,6 +533,30 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             linux,
         )
         self.assertNotIn("-- cmake --build --preset ci\n", linux)
+        cpu_test = " ".join(
+            linux_steps["Run full CPU test suite"]["run"].replace("\\", "").split()
+        )
+        self.assertIn("--parallel 4", cpu_test)
+        self.assertNotIn("nproc", cpu_test)
+        self.assertIn(
+            "--output-junit reports/cpu.junit.xml",
+            cpu_test,
+        )
+        results = linux_steps["Upload CPU test results"]
+        self.assertEqual(results["if"], "always()")
+        self.assertEqual(
+            results["with"]["name"],
+            "ci-cpu-test-results-ci-linux-clang",
+        )
+        self.assertIn(
+            "build/ci/reports/cpu.junit.xml",
+            results["with"]["path"],
+        )
+        self.assertIn(
+            "build/ci/reports/grouped-ctest/gtest/",
+            results["with"]["path"],
+        )
+        self.assertEqual(results["with"]["if-no-files-found"], "warn")
 
         _, vulkan = _load_workflow("ci-vulkan.yml")
         self.assertIn(
@@ -541,9 +583,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
     def test_manual_test_timing_profile_is_isolated_and_five_sample(self) -> None:
         payload, _ = _load_workflow("ci-linux-clang.yml")
         triggers = payload.get("on", payload.get(True, {}))
-        timing_input = triggers["workflow_dispatch"]["inputs"][
-            "collect_test_timing"
-        ]
+        timing_input = triggers["workflow_dispatch"]["inputs"]["collect_test_timing"]
         self.assertEqual(
             timing_input,
             {
@@ -563,8 +603,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             grouped_input,
             {
                 "description": (
-                    "Collect matched individual/grouped CPU timing and "
-                    "parity evidence"
+                    "Collect matched individual/grouped CPU timing and parity evidence"
                 ),
                 "required": False,
                 "default": False,
@@ -713,9 +752,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             reconcile_one_line,
         )
 
-        collect = steps[
-            "Collect five matched pairs at j1, j2, and j4"
-        ]["run"]
+        collect = steps["Collect five matched pairs at j1, j2, and j4"]["run"]
         self.assertIn("for jobs in 1 2 4", collect)
         self.assertIn("for pair_index in 1 2 3 4 5", collect)
         self.assertIn("pair_index % 2 == 0", collect)
@@ -725,19 +762,16 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         )
         self.assertIn("--cohort cpu", collect)
         self.assertIn("--samples 1", collect)
-        self.assertIn("--parallel \"$jobs\"", collect)
+        self.assertIn('--parallel "$jobs"', collect)
         collect_one_line = " ".join(collect.replace("\\", "").split())
         self.assertIn(
             "Test.GroupedCTestParity.py execution",
             collect_one_line,
         )
         for path in (
-            '"$evidence_root/j$jobs/pair-$pair/individual/samples/'
-            'sample-01.junit.xml"',
-            '"$evidence_root/j$jobs/pair-$pair/grouped/samples/'
-            'sample-01.junit.xml"',
-            '"$evidence_root/j$jobs/pair-$pair/grouped/samples/'
-            'sample-01.gtest"',
+            '"$evidence_root/j$jobs/pair-$pair/individual/samples/sample-01.junit.xml"',
+            '"$evidence_root/j$jobs/pair-$pair/grouped/samples/sample-01.junit.xml"',
+            '"$evidence_root/j$jobs/pair-$pair/grouped/samples/sample-01.gtest"',
             '"$evidence_root/j$jobs/pair-$pair/parity.json"',
         ):
             self.assertIn(path, collect)
@@ -755,9 +789,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
     def test_nightly_partitions_fast_slow_slo_and_benchmark_owners(self) -> None:
         payload, _ = _load_workflow("nightly-deep.yml")
         triggers = payload.get("on", payload.get(True, {}))
-        slow_evidence = triggers["workflow_dispatch"]["inputs"][
-            "slow_evidence_only"
-        ]
+        slow_evidence = triggers["workflow_dispatch"]["inputs"]["slow_evidence_only"]
         self.assertEqual(slow_evidence["type"], "boolean")
         self.assertFalse(slow_evidence["default"])
         steps = payload["jobs"]["nightly-cpu-deep"]["steps"]
@@ -766,8 +798,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             named_steps["Build nightly CPU target partitions"]["run"].split()
         )
         self.assertIn(
-            "targets=(IntrinsicCpuTests IntrinsicCpuSlowTests "
-            "IntrinsicBenchmarkTests)",
+            "targets=(IntrinsicCpuTests IntrinsicCpuSlowTests IntrinsicBenchmarkTests)",
             build_partitions,
         )
         self.assertIn(
@@ -780,20 +811,14 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         )
         self.assertNotIn("Build full CPU targets", named_steps)
         self.assertNotIn("Build scheduled CPU slow cohort", named_steps)
-        reconcile_slow = named_steps[
-            "Reconcile scheduled CPU slow cohort"
-        ]["run"]
+        reconcile_slow = named_steps["Reconcile scheduled CPU slow cohort"]["run"]
         self.assertIn("--aggregate IntrinsicCpuSlowTests", reconcile_slow)
 
         fast = named_steps["Run full CPU test suite"]["run"]
-        slow = named_steps[
-            "Run scheduled CPU slow correctness cohort"
-        ]["run"]
+        slow = named_steps["Run scheduled CPU slow correctness cohort"]["run"]
         slo_step = named_steps["Run SLO/performance diagnostic (CI-009)"]
         slo = slo_step["run"]
-        benchmark_step = named_steps[
-            "Run benchmark smoke and selected deep benchmarks"
-        ]
+        benchmark_step = named_steps["Run benchmark smoke and selected deep benchmarks"]
         full_partition_condition = (
             "${{ github.event_name != 'workflow_dispatch' || "
             "!inputs.slow_evidence_only }}"
@@ -821,8 +846,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             slow,
         )
         self.assertIn(
-            "--inventory "
-            "build/ci/test-inventories/IntrinsicCpuSlowTests.txt",
+            "--inventory build/ci/test-inventories/IntrinsicCpuSlowTests.txt",
             slow,
         )
         self.assertIn(
@@ -845,14 +869,10 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         self.assertFalse(benchmark_step.get("continue-on-error", False))
         self.assertLess(
             steps.index(named_steps["Run full CPU test suite"]),
-            steps.index(
-                named_steps["Run scheduled CPU slow correctness cohort"]
-            ),
+            steps.index(named_steps["Run scheduled CPU slow correctness cohort"]),
         )
         self.assertLess(
-            steps.index(
-                named_steps["Run scheduled CPU slow correctness cohort"]
-            ),
+            steps.index(named_steps["Run scheduled CPU slow correctness cohort"]),
             steps.index(slo_step),
         )
         upload_paths = named_steps["Upload nightly reports"]["with"]["path"]
@@ -933,9 +953,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
                 concurrency = payload.get("concurrency")
                 self.assertIsInstance(concurrency, dict)
                 expected_group = (
-                    SANITIZER_GROUP
-                    if name == "ci-sanitizers.yml"
-                    else EXPECTED_GROUP
+                    SANITIZER_GROUP if name == "ci-sanitizers.yml" else EXPECTED_GROUP
                 )
                 self.assertEqual(concurrency.get("group"), expected_group)
                 self.assertEqual(

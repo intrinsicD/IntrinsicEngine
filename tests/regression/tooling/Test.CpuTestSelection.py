@@ -42,8 +42,22 @@ def _canonical_digest(value: object) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _properties(labels: tuple[str, ...], disabled: bool = False) -> list[object]:
-    records: list[object] = [{"name": "LABELS", "value": list(labels)}]
+def _properties(
+    labels: tuple[str, ...],
+    build_dir: Path,
+    disabled: bool = False,
+) -> list[object]:
+    records: list[object] = [
+        {
+            "name": "ENVIRONMENT",
+            "value": ["CPU_SELECTION_MARKER=from-ctest"],
+        },
+        {"name": "LABELS", "value": list(labels)},
+        {
+            "name": "WORKING_DIRECTORY",
+            "value": str((build_dir / "tests").resolve()),
+        },
+    ]
     if disabled:
         records.append({"name": "DISABLED", "value": True})
     return records
@@ -72,7 +86,7 @@ def _test_record(
     return {
         "command": command,
         "name": name,
-        "properties": _properties(labels, disabled),
+        "properties": _properties(labels, build_dir, disabled),
     }
 
 
@@ -120,7 +134,7 @@ def _grouped_record(
             ),
         ],
         "name": f"{producer}.Grouped",
-        "properties": _properties(labels),
+        "properties": _properties(labels, build_dir),
     }
 
 
@@ -143,6 +157,7 @@ def _write_build(
     registered = REGISTERED if registered is None else registered
     build_dir.mkdir(parents=True)
     (build_dir / "bin").mkdir()
+    (build_dir / "tests").mkdir()
     listings = {"AlphaTests": ALPHA_LISTING} if listings is None else listings
     for producer, listing in listings.items():
         binary = build_dir / "bin" / producer
@@ -150,9 +165,15 @@ def _write_build(
             "\n".join(
                 (
                     f"#!{sys.executable}",
+                    "import os",
                     "import sys",
+                    "from pathlib import Path",
                     "if sys.argv[1:] != ['--gtest_list_tests']:",
                     "    raise SystemExit(2)",
+                    f"if Path.cwd() != Path({str((build_dir / 'tests').resolve())!r}):",
+                    "    raise SystemExit(3)",
+                    "if os.environ.get('CPU_SELECTION_MARKER') != 'from-ctest':",
+                    "    raise SystemExit(4)",
                     f"print({listing!r}, end='')",
                 )
             )
@@ -472,7 +493,7 @@ Alpha.
     def test_capture_rejects_discovered_disabled_state_drift(self) -> None:
         build = self.root / "build"
         tests = _default_tests(build)
-        tests[1]["properties"] = _properties(REGISTERED["AlphaTests"])
+        tests[1]["properties"] = _properties(REGISTERED["AlphaTests"], build)
         _write_build(build, "none", tests=tests)
 
         result, output = self._capture(build, "ci", "none", check=False)
@@ -548,7 +569,7 @@ Alpha.
     def test_capture_rejects_ctest_label_drift(self) -> None:
         build = self.root / "build"
         tests = _default_tests(build)
-        tests[0]["properties"] = _properties(("core", "regression", "unit"))
+        tests[0]["properties"] = _properties(("core", "regression", "unit"), build)
         _write_build(build, "none", tests=tests)
         result, _output = self._capture(build, "ci", "none", check=False)
         self.assertEqual(result.returncode, 3)
@@ -561,7 +582,7 @@ Alpha.
             {
                 "command": [str(build / "bin" / "UnknownTests")],
                 "name": "Unknown.Case",
-                "properties": _properties(("core", "unit")),
+                "properties": _properties(("core", "unit"), build),
             }
         )
         _write_build(build, "none", tests=tests)

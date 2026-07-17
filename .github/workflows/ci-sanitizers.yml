@@ -70,7 +70,7 @@ jobs:
             --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
             --max-warm-seconds 40 \
             --json-out ${{ matrix.sanitizer.build_dir }}/ci-timing/phases/configure.json \
-            -- cmake --preset ${{ matrix.sanitizer.preset }} --fresh
+            -- cmake --preset ${{ matrix.sanitizer.preset }} --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON
 
       - name: Build IntrinsicCpuTests (${{ matrix.sanitizer.name }})
         run: |
@@ -99,7 +99,13 @@ jobs:
           python3 tools/ci/time_command.py \
             --label "Run selected CPU tests (${{ matrix.sanitizer.name }})" \
             --json-out ${{ matrix.sanitizer.build_dir }}/ci-timing/phases/test.json \
-            -- ctest --test-dir ${{ matrix.sanitizer.build_dir }} --output-on-failure -LE "gpu|vulkan|slow|flaky-quarantine" --no-tests=error --timeout 60
+            -- ctest --test-dir ${{ matrix.sanitizer.build_dir }} \
+              --output-on-failure \
+              -LE "gpu|vulkan|slow|flaky-quarantine" \
+              --no-tests=error \
+              --timeout 60 \
+              --output-junit reports/cpu.junit.xml \
+              --parallel 1
 
       - name: Aggregate gate timing result (${{ matrix.sanitizer.name }})
         if: always()
@@ -148,6 +154,16 @@ jobs:
           name: ci-cpu-test-selection-${{ matrix.sanitizer.name }}
           path: ${{ matrix.sanitizer.build_dir }}/test-selection/selection.json
           if-no-files-found: error
+
+      - name: Upload CPU test results (${{ matrix.sanitizer.name }})
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-cpu-test-results-${{ matrix.sanitizer.name }}
+          path: |
+            ${{ matrix.sanitizer.build_dir }}/reports/cpu.junit.xml
+            ${{ matrix.sanitizer.build_dir }}/reports/grouped-ctest/gtest/
+          if-no-files-found: warn
 
       - name: Document skipped categories
         run: |

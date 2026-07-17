@@ -101,7 +101,7 @@ jobs:
             --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
             --max-warm-seconds 40 \
             --json-out build/ci/ci-timing/phases/configure.json \
-            -- cmake --preset ci --fresh
+            -- cmake --preset ci --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON
 
       - name: Validate backend configure determinism
         run: |
@@ -152,7 +152,11 @@ jobs:
           python3 tools/ci/time_command.py \
             --label "Run full CPU test suite" \
             --json-out build/ci/ci-timing/phases/test.json \
-            -- ctest --test-dir build/ci --output-on-failure -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)
+            -- ctest --test-dir build/ci --output-on-failure \
+              -LE "gpu|vulkan|slow|flaky-quarantine" \
+              --timeout 60 \
+              --output-junit reports/cpu.junit.xml \
+              --parallel 4
 
       - name: Aggregate gate timing result
         if: always()
@@ -202,6 +206,16 @@ jobs:
           name: ci-cpu-test-selection-ci-linux-clang
           path: build/ci/test-selection/selection.json
           if-no-files-found: error
+
+      - name: Upload CPU test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-cpu-test-results-ci-linux-clang
+          path: |
+            build/ci/reports/cpu.junit.xml
+            build/ci/reports/grouped-ctest/gtest/
+          if-no-files-found: warn
 
   test-timing-profile:
     if: >-

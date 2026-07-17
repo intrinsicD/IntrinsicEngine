@@ -30,6 +30,7 @@ MODE_IDENTITIES = {
 }
 _GTEST_SUITE_RE = re.compile(r"^(?P<suite>\S+)\.\s*(?:#.*)?$")
 _GTEST_COMMENT_RE = re.compile(r"\s+#.*$")
+ExecutionContext = tuple[Path, tuple[tuple[str, str], ...]]
 
 
 class SelectionError(RuntimeError):
@@ -291,6 +292,61 @@ def _disabled(test: Mapping[str, object]) -> bool:
     )
 
 
+def _execution_context(test: Mapping[str, object], test_name: str) -> ExecutionContext:
+    working_records = _property_records(test, "WORKING_DIRECTORY")
+    if len(working_records) != 1:
+        raise SelectionError(
+            f"CTest test {test_name!r} must have exactly one WORKING_DIRECTORY property"
+        )
+    raw_working_directory = working_records[0].get("value")
+    if (
+        not isinstance(raw_working_directory, str)
+        or not raw_working_directory
+        or not Path(raw_working_directory).is_absolute()
+    ):
+        raise SelectionError(
+            f"CTest test {test_name!r} has invalid WORKING_DIRECTORY "
+            f"{raw_working_directory!r}"
+        )
+    working_directory = Path(raw_working_directory).resolve()
+    if not working_directory.is_dir():
+        raise SelectionError(
+            f"CTest test {test_name!r} working directory is missing: "
+            f"{working_directory}"
+        )
+
+    if _property_records(test, "ENVIRONMENT_MODIFICATION"):
+        raise SelectionError(
+            f"CTest test {test_name!r} uses unsupported ENVIRONMENT_MODIFICATION"
+        )
+    environment_records = _property_records(test, "ENVIRONMENT")
+    if len(environment_records) != 1:
+        raise SelectionError(
+            f"CTest test {test_name!r} must have exactly one ENVIRONMENT property"
+        )
+    raw_environment = environment_records[0].get("value")
+    entries = (
+        raw_environment if isinstance(raw_environment, list) else [raw_environment]
+    )
+    overrides: dict[str, str] = {}
+    for entry in entries:
+        if not isinstance(entry, str) or "=" not in entry:
+            raise SelectionError(
+                f"CTest test {test_name!r} has malformed ENVIRONMENT entry {entry!r}"
+            )
+        key, value = entry.split("=", 1)
+        if not key or "\0" in key or "=" in key or "\0" in value:
+            raise SelectionError(
+                f"CTest test {test_name!r} has malformed ENVIRONMENT entry {entry!r}"
+            )
+        if key in overrides:
+            raise SelectionError(
+                f"CTest test {test_name!r} repeats ENVIRONMENT key {key!r}"
+            )
+        overrides[key] = value
+    return working_directory, tuple(sorted(overrides.items()))
+
+
 def _argument_path(argument: str) -> Path | None:
     candidate = argument.partition("=")[2] if "=" in argument else argument
     if not candidate:
@@ -354,9 +410,13 @@ def _parse_gtest_listing(output: str, producer: str) -> tuple[str, ...]:
     return tuple(cases)
 
 
-def _run_gtest_listing(binary: Path, producer: str) -> tuple[str, ...]:
+def _run_gtest_listing(
+    binary: Path, producer: str, context: ExecutionContext
+) -> tuple[str, ...]:
     command = [str(binary), "--gtest_list_tests"]
+    working_directory, overrides = context
     environment = os.environ.copy()
+    environment.update(overrides)
     environment["GTEST_COLOR"] = "no"
     try:
         result = subprocess.run(
@@ -367,6 +427,7 @@ def _run_gtest_listing(binary: Path, producer: str) -> tuple[str, ...]:
             check=False,
             timeout=60,
             env=environment,
+            cwd=working_directory,
         )
     except (OSError, subprocess.SubprocessError) as error:
         raise SelectionError(
@@ -507,6 +568,7 @@ def _capture(
     representations: dict[str, set[str]] = {}
     discovered_cases: dict[str, dict[str, bool]] = {}
     discovered_binaries: dict[str, Path] = {}
+    discovered_contexts: dict[str, ExecutionContext] = {}
     for raw_test in document["tests"]:
         if not isinstance(raw_test, dict):
             raise SelectionError("CTest JSON contains a malformed test record")
@@ -555,12 +617,13 @@ def _capture(
             binary = _validate_grouped_command(
                 command, producer, binaries, name, build_dir
             )
+            context = _execution_context(raw_test, name)
             if _disabled(raw_test):
                 raise SelectionError(
                     f"canonical grouped GoogleTest wrapper {name!r} is disabled"
                 )
             representations.setdefault(producer, set()).add("grouped")
-            listed_cases = _run_gtest_listing(binary, producer)
+            listed_cases = _run_gtest_listing(binary, producer, context)
             for case in listed_cases:
                 selected_tests.append(
                     {
@@ -577,6 +640,7 @@ def _capture(
             binary, case = _validate_discovered_command(
                 command, producer, binaries, name
             )
+            context = _execution_context(raw_test, name)
             disabled = _disabled(raw_test)
             expected_disabled = _gtest_case_disabled(case)
             if disabled != expected_disabled:
@@ -589,6 +653,12 @@ def _capture(
             if previous_binary != binary:
                 raise SelectionError(
                     f"discovered producer {producer!r} maps to multiple binaries"
+                )
+            previous_context = discovered_contexts.setdefault(producer, context)
+            if previous_context != context:
+                raise SelectionError(
+                    f"discovered producer {producer!r} has inconsistent "
+                    "CTest execution contexts"
                 )
             cases = discovered_cases.setdefault(producer, {})
             if case in cases:
@@ -634,7 +704,13 @@ def _capture(
             f"{conflicting_representations!r}"
         )
     for producer, cases in discovered_cases.items():
-        listed = set(_run_gtest_listing(discovered_binaries[producer], producer))
+        listed = set(
+            _run_gtest_listing(
+                discovered_binaries[producer],
+                producer,
+                discovered_contexts[producer],
+            )
+        )
         registered_cases = set(cases)
         missing = sorted(listed - registered_cases)
         extra = sorted(registered_cases - listed)

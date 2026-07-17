@@ -201,7 +201,8 @@ class SanitizerPresetTests(unittest.TestCase):
             steps["Configure (${{ matrix.sanitizer.name }})"]["run"]
         )
         self.assertIn(
-            "-- cmake --preset ${{ matrix.sanitizer.preset }} --fresh",
+            "-- cmake --preset ${{ matrix.sanitizer.preset }} --fresh "
+            "-DINTRINSIC_GROUP_PURE_CTEST=ON",
             configure,
         )
         self.assertIn(
@@ -245,7 +246,29 @@ class SanitizerPresetTests(unittest.TestCase):
         self.assertIn("--no-tests=error", test)
         self.assertNotIn(" -L ", test)
         self.assertNotIn(" -j", test)
-        self.assertNotIn("--parallel", test)
+        self.assertIn(
+            "--output-junit reports/cpu.junit.xml",
+            test,
+        )
+        self.assertIn("--parallel 1", test)
+
+        results = steps[
+            "Upload CPU test results (${{ matrix.sanitizer.name }})"
+        ]
+        self.assertEqual(results["if"], "always()")
+        self.assertEqual(
+            results["with"]["name"],
+            "ci-cpu-test-results-${{ matrix.sanitizer.name }}",
+        )
+        self.assertIn(
+            "${{ matrix.sanitizer.build_dir }}/reports/cpu.junit.xml",
+            results["with"]["path"],
+        )
+        self.assertIn(
+            "${{ matrix.sanitizer.build_dir }}/reports/grouped-ctest/gtest/",
+            results["with"]["path"],
+        )
+        self.assertEqual(results["with"]["if-no-files-found"], "warn")
 
         timing = _one_line(
             steps["Aggregate gate timing result (${{ matrix.sanitizer.name }})"][
