@@ -38,6 +38,11 @@ CI helper scripts and workflow validation tools.
   build-directory paths as selection drift. Pull-request and manual
   `ci-linux-clang` runs require the comparison over artifacts from the
   unsanitized job and its reusable ASan/UBSan jobs.
+- `collect_test_timing.py`: runs repeated canonical `pr-fast`, `cpu`, or
+  `cpu-slow` CTest cohorts at an explicit recorded parallelism, reconciles every
+  JUnit result against serial PRE_TEST discovery and aggregate inventories,
+  restores the incoming CTest scheduler cost data between samples, and retains
+  per-case integer-microsecond timing/status plus host/load diagnostics.
 - `run_repo_hygiene_checks.sh`: warning-mode wrapper running the canonical
   `check_root_hygiene.py` policy check once, followed by `check_doc_links.py`.
   Local convenience; not wired into a workflow.

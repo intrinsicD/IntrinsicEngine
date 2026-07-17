@@ -11,9 +11,11 @@ depends_on:
 
 ## Status
 - In progress on 2026-07-17; owner: Codex; branch: `main`.
-- Next verification: add the fail-closed five-sample hosted timing collector,
-  capture comparable `pr-fast` and full-CPU populations, and classify only
-  candidates supported by that evidence.
+- Profiling scaffold complete: fail-closed per-case/JUnit collection, a
+  manual-only two-cohort hosted matrix, a complete CPU-slow build aggregate,
+  and disjoint nightly ordinary-slow/SLO/benchmark ownership.
+- Next verification: capture comparable hosted `pr-fast` and full-CPU
+  populations, then classify only candidates supported by five-sample evidence.
 
 ## Goal
 - Move only repeatedly measured long-running or stress variants out of fast

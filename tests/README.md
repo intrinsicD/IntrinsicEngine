@@ -36,6 +36,7 @@ one-target-per-line inventories under `build/<preset>/test-inventories/`:
 | `IntrinsicTests` | Every registered CTest-producing executable |
 | `IntrinsicPrFastTests` | Any `unit` or `contract`; exclude `gpu`, `vulkan`, `slow`, `flaky-quarantine` |
 | `IntrinsicCpuTests` | Exclude `gpu`, `vulkan`, `slow`, `flaky-quarantine` |
+| `IntrinsicCpuSlowTests` | Require `slow`; exclude `gpu`, `vulkan`, `flaky-quarantine` |
 | `IntrinsicGpuVulkanTests` | When Vulkan is configured, require both `gpu` and `vulkan`; exclude `slow`, `flaky-quarantine` |
 | `IntrinsicPrSmokeTests` | Require `integration`, `runtime`, and `graphics`; apply the standard fast exclusions |
 

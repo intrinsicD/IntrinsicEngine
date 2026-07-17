@@ -11,6 +11,11 @@ on:
         required: false
         default: true
         type: boolean
+      collect_test_timing:
+        description: Collect five pr-fast and full-CPU timing samples instead of gates
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -18,6 +23,9 @@ concurrency:
 
 jobs:
   ci-linux-clang:
+    if: >-
+      github.event_name != 'workflow_dispatch' ||
+      !inputs.collect_test_timing
     runs-on: ubuntu-24.04
 
     steps:
@@ -177,16 +185,112 @@ jobs:
           path: build/ci/test-selection/selection.json
           if-no-files-found: error
 
+  test-timing-profile:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.collect_test_timing
+    name: test-timing-profile (${{ matrix.cohort.name }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        cohort:
+          - name: pr-fast
+            preset: ci-fast
+            build_dir: build/ci-fast
+            aggregate: IntrinsicPrFastTests
+          - name: cpu
+            preset: ci
+            build_dir: build/ci
+            aggregate: IntrinsicCpuTests
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            clang-20 \
+            clang-tools-20 \
+            python3 \
+            libx11-dev \
+            libxcursor-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxi-dev \
+            libxext-dev \
+            libxfixes-dev \
+            libwayland-dev \
+            libxkbcommon-dev \
+            libgl1-mesa-dev \
+            libvulkan-dev \
+            vulkan-tools \
+            spirv-tools
+
+      - name: Cache vcpkg binary packages
+        uses: actions/cache@v4
+        with:
+          path: external/vcpkg-bincache
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'tools/vcpkg/**', 'tools/setup/bootstrap_vcpkg.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-
+
+      - name: Bootstrap vcpkg
+        run: tools/setup/bootstrap_vcpkg.sh
+
+      - name: Enable vcpkg binary cache
+        run: echo "VCPKG_BINARY_SOURCES=clear;files,${GITHUB_WORKSPACE}/external/vcpkg-bincache,readwrite" >> "$GITHUB_ENV"
+
+      - name: Configure timing cohort
+        run: cmake --preset ${{ matrix.cohort.preset }} --fresh
+
+      - name: Build timing cohort
+        run: >-
+          cmake --build --preset ${{ matrix.cohort.preset }}
+          --target ${{ matrix.cohort.aggregate }}
+
+      - name: Reconcile timing cohort
+        run: |
+          python3 tests/regression/tooling/Test.TestGateRouting.py \
+            --build-dir ${{ matrix.cohort.build_dir }} \
+            --aggregate ${{ matrix.cohort.aggregate }}
+
+      - name: Collect five timing samples
+        run: |
+          python3 tools/ci/collect_test_timing.py \
+            --build-dir ${{ matrix.cohort.build_dir }} \
+            --cohort ${{ matrix.cohort.name }} \
+            --samples 5 \
+            --parallel $(nproc) \
+            --output ${{ matrix.cohort.build_dir }}/test-timing
+
+      - name: Upload timing profile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-test-timing-${{ matrix.cohort.name }}
+          path: ${{ matrix.cohort.build_dir }}/test-timing/
+          if-no-files-found: error
+
   sanitizer-tests:
     if: >-
       github.event_name == 'pull_request' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_sanitizers)
+      (github.event_name == 'workflow_dispatch' &&
+      inputs.run_sanitizers &&
+      !inputs.collect_test_timing)
     uses: ./.github/workflows/ci-sanitizers.yml
 
   cpu-test-selection-parity:
     if: >-
       github.event_name == 'pull_request' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_sanitizers)
+      (github.event_name == 'workflow_dispatch' &&
+      inputs.run_sanitizers &&
+      !inputs.collect_test_timing)
     needs:
       - ci-linux-clang
       - sanitizer-tests

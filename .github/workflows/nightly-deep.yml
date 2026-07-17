@@ -63,6 +63,15 @@ jobs:
       - name: Build full CPU targets
         run: cmake --build --preset ci
 
+      - name: Build scheduled CPU slow cohort
+        run: cmake --build --preset ci --target IntrinsicCpuSlowTests
+
+      - name: Reconcile scheduled CPU slow cohort
+        run: |
+          python3 tests/regression/tooling/Test.TestGateRouting.py \
+            --build-dir build/ci \
+            --aggregate IntrinsicCpuSlowTests
+
       - name: Run full CPU test suite
         run: |
           python3 tools/ci/check_prerequisites.py test-binaries \
@@ -84,6 +93,19 @@ jobs:
               IntrinsicGraphicsContractCpuTests \
               IntrinsicRuntimeGraphicsCpuTests
           ctest --test-dir build/ci --output-on-failure -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)
+
+      - name: Run scheduled CPU slow correctness cohort
+        run: |
+          python3 tools/ci/check_prerequisites.py test-binaries \
+            --build-dir build/ci \
+            --inventory build/ci/test-inventories/IntrinsicCpuSlowTests.txt
+          mkdir -p build/ci/reports
+          ctest --test-dir build/ci --output-on-failure \
+            -L "^slow$" \
+            -LE "^(benchmark|gpu|slo|vulkan|flaky-quarantine)$" \
+            --timeout 120 \
+            --output-junit build/ci/reports/cpu-slow.junit.xml \
+            -j$(nproc)
 
       - name: Run SLO/performance diagnostic (CI-009)
         continue-on-error: true
@@ -142,6 +164,7 @@ jobs:
           path: |
             build/ci/reports/compile_hotspots_report.json
             build/ci/reports/module_fanout_report.md
+            build/ci/reports/cpu-slow.junit.xml
             build/ci/reports/architecture-slo.junit.xml
             build/ci/benchmark/nightly/smoke_result.json
 

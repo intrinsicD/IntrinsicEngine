@@ -211,6 +211,178 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             vulkan,
         )
 
+    def test_manual_test_timing_profile_is_isolated_and_five_sample(self) -> None:
+        payload, _ = _load_workflow("ci-linux-clang.yml")
+        triggers = payload.get("on", payload.get(True, {}))
+        timing_input = triggers["workflow_dispatch"]["inputs"][
+            "collect_test_timing"
+        ]
+        self.assertEqual(
+            timing_input,
+            {
+                "description": (
+                    "Collect five pr-fast and full-CPU timing samples instead "
+                    "of gates"
+                ),
+                "required": False,
+                "default": False,
+                "type": "boolean",
+            },
+        )
+
+        jobs = payload["jobs"]
+        full_job = jobs["ci-linux-clang"]
+        self.assertEqual(
+            " ".join(full_job["if"].split()),
+            (
+                "github.event_name != 'workflow_dispatch' || "
+                "!inputs.collect_test_timing"
+            ),
+        )
+
+        profile = jobs["test-timing-profile"]
+        self.assertEqual(
+            " ".join(profile["if"].split()),
+            (
+                "github.event_name == 'workflow_dispatch' && "
+                "inputs.collect_test_timing"
+            ),
+        )
+        self.assertFalse(profile["strategy"]["fail-fast"])
+        self.assertEqual(
+            profile["strategy"]["matrix"]["cohort"],
+            [
+                {
+                    "name": "pr-fast",
+                    "preset": "ci-fast",
+                    "build_dir": "build/ci-fast",
+                    "aggregate": "IntrinsicPrFastTests",
+                },
+                {
+                    "name": "cpu",
+                    "preset": "ci",
+                    "build_dir": "build/ci",
+                    "aggregate": "IntrinsicCpuTests",
+                },
+            ],
+        )
+        steps = {step["name"]: step for step in profile["steps"]}
+        self.assertIn(
+            "cmake --preset ${{ matrix.cohort.preset }} --fresh",
+            steps["Configure timing cohort"]["run"],
+        )
+        self.assertIn(
+            "--target ${{ matrix.cohort.aggregate }}",
+            steps["Build timing cohort"]["run"],
+        )
+        reconcile = steps["Reconcile timing cohort"]["run"]
+        self.assertIn(
+            "--build-dir ${{ matrix.cohort.build_dir }}",
+            reconcile,
+        )
+        self.assertIn(
+            "--aggregate ${{ matrix.cohort.aggregate }}",
+            reconcile,
+        )
+        collect = steps["Collect five timing samples"]["run"]
+        self.assertIn("tools/ci/collect_test_timing.py", collect)
+        self.assertIn("--cohort ${{ matrix.cohort.name }}", collect)
+        self.assertIn("--samples 5", collect)
+        self.assertIn("--parallel $(nproc)", collect)
+        self.assertIn(
+            "--output ${{ matrix.cohort.build_dir }}/test-timing",
+            collect,
+        )
+        upload = steps["Upload timing profile"]
+        self.assertEqual(upload["if"], "always()")
+        self.assertEqual(
+            upload["with"]["name"],
+            "ci-test-timing-${{ matrix.cohort.name }}",
+        )
+        self.assertEqual(
+            upload["with"]["path"],
+            "${{ matrix.cohort.build_dir }}/test-timing/",
+        )
+        self.assertEqual(upload["with"]["if-no-files-found"], "error")
+
+        for job_name in ("sanitizer-tests", "cpu-test-selection-parity"):
+            with self.subTest(job=job_name):
+                condition = " ".join(jobs[job_name]["if"].split())
+                self.assertIn("inputs.run_sanitizers", condition)
+                self.assertIn("!inputs.collect_test_timing", condition)
+
+    def test_nightly_partitions_fast_slow_slo_and_benchmark_owners(self) -> None:
+        payload, _ = _load_workflow("nightly-deep.yml")
+        steps = payload["jobs"]["nightly-cpu-deep"]["steps"]
+        named_steps = {step["name"]: step for step in steps}
+        build_slow = named_steps["Build scheduled CPU slow cohort"]["run"]
+        self.assertIn(
+            "--target IntrinsicCpuSlowTests",
+            build_slow,
+        )
+        reconcile_slow = named_steps[
+            "Reconcile scheduled CPU slow cohort"
+        ]["run"]
+        self.assertIn("--aggregate IntrinsicCpuSlowTests", reconcile_slow)
+
+        fast = named_steps["Run full CPU test suite"]["run"]
+        slow = named_steps[
+            "Run scheduled CPU slow correctness cohort"
+        ]["run"]
+        slo_step = named_steps["Run SLO/performance diagnostic (CI-009)"]
+        slo = slo_step["run"]
+        benchmark_step = named_steps[
+            "Run benchmark smoke and selected deep benchmarks"
+        ]
+        self.assertIn(
+            '-LE "gpu|vulkan|slow|flaky-quarantine"',
+            fast,
+        )
+        self.assertIn('-L "^slow$"', slow)
+        self.assertIn(
+            '-LE "^(benchmark|gpu|slo|vulkan|flaky-quarantine)$"',
+            slow,
+        )
+        self.assertIn(
+            "--inventory "
+            "build/ci/test-inventories/IntrinsicCpuSlowTests.txt",
+            slow,
+        )
+        self.assertIn(
+            "--output-junit build/ci/reports/cpu-slow.junit.xml",
+            slow,
+        )
+        self.assertFalse(
+            named_steps["Run scheduled CPU slow correctness cohort"].get(
+                "continue-on-error",
+                False,
+            )
+        )
+        self.assertIn('-L "^slo$"', slo)
+        self.assertTrue(slo_step["continue-on-error"])
+        self.assertFalse(benchmark_step.get("continue-on-error", False))
+        self.assertLess(
+            steps.index(named_steps["Run full CPU test suite"]),
+            steps.index(
+                named_steps["Run scheduled CPU slow correctness cohort"]
+            ),
+        )
+        self.assertLess(
+            steps.index(
+                named_steps["Run scheduled CPU slow correctness cohort"]
+            ),
+            steps.index(slo_step),
+        )
+        upload_paths = named_steps["Upload nightly reports"]["with"]["path"]
+        self.assertIn(
+            "build/ci/reports/cpu-slow.junit.xml",
+            upload_paths,
+        )
+        self.assertIn(
+            "build/ci/reports/architecture-slo.junit.xml",
+            upload_paths,
+        )
+
     def test_vulkan_workflow_retains_non_skipped_readback_evidence(self) -> None:
         payload, vulkan = _load_workflow("ci-vulkan.yml")
         jobs = payload.get("jobs")

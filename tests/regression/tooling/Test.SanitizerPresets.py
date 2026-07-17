@@ -291,7 +291,8 @@ class SanitizerPresetTests(unittest.TestCase):
         )
         expected_condition = (
             "github.event_name == 'pull_request' || "
-            "(github.event_name == 'workflow_dispatch' && inputs.run_sanitizers)"
+            "(github.event_name == 'workflow_dispatch' && "
+            "inputs.run_sanitizers && !inputs.collect_test_timing)"
         )
         self.assertEqual(sanitizer_job["if"], expected_condition)
 
