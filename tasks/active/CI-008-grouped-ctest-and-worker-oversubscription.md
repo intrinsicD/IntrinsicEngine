@@ -10,6 +10,17 @@ depends_on:
 ---
 # CI-008 — Reduce CTest process overhead without oversubscribing workers
 
+## Status
+- In progress on 2026-07-17; owner: Codex; branch: `main`.
+- `CI-011` is retired with the measured fast/slow cohort. Slice A now adds one
+  opt-in grouped configuration for an audited pure cohort while normal `ci`
+  retains individual discovery.
+- Right-sizing decision: reuse the existing registry, timing collector, cohort
+  parity, and source-coverage comparator. Do not add a second registration
+  framework, benchmark schema, calibration summarizer, or grouped presets.
+- Next verification: configure isolated individual/grouped trees, prove exact
+  logical-case parity, then collect matched `-j1/-j2/-j4` timing evidence.
+
 ## Goal
 - Execute safe pure suites in grouped GoogleTest processes and assign measured
   CTest/process worker budgets so thousands of process launches and nested
@@ -120,8 +131,8 @@ depends_on:
 ```bash
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicCpuTests
-cmake --preset ci-grouped
-cmake --build --preset ci-grouped --target IntrinsicCpuTests
+cmake --preset ci -B build/ci-grouped -DINTRINSIC_GROUP_PURE_CTEST=ON
+cmake --build build/ci-grouped --target IntrinsicCpuTests
 python3 tests/regression/tooling/Test.GroupedCTestParity.py --individual-build-dir build/ci --grouped-build-dir build/ci-grouped
 ctest --test-dir build/ci-grouped --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j<measured-value>
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j<measured-value>

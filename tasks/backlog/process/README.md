@@ -15,7 +15,8 @@ map.
 
 ## Tasks
 
-- [CI-008 — Reduce CTest process overhead without oversubscribing workers](CI-008-grouped-ctest-and-worker-oversubscription.md)
+- [CI-008 — Reduce CTest process overhead without oversubscribing workers](../../active/CI-008-grouped-ctest-and-worker-oversubscription.md)
+  (currently active).
 - [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
 - [BUILD-004 — Make compile-hotspot evidence source-complete](BUILD-004-source-complete-compile-hotspot-evidence.md)
 - [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](PROC-025-port-research-ideation-skill-to-other-repos.md)
