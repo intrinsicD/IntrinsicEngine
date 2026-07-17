@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `CI-010` — Establish CPU source-coverage refactor parity (tasks/active/CI-010-cpu-source-coverage-refactor-parity.md)
+- none
 
 ## Theme B — Rendering modernization
 

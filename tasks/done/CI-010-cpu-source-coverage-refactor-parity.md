@@ -9,10 +9,21 @@ depends_on:
 # CI-010 — Establish CPU source-coverage refactor parity
 
 ## Status
-- In progress on 2026-07-17; owner: Codex; branch: `main`.
-- Next verification: add the instrumented preset and fail-closed coverage
-  collector/comparator, then validate the two-executable synthetic fixture
-  before dispatching one complete hosted baseline.
+- Completed on 2026-07-17 at `Operational`; owner: Codex; branch: `main`.
+- Commit reference: `b9f74774` added the canonical collector, workflow,
+  preset, policy, and regression suite; `0d26bbaf` corrected the CTest selector;
+  `67adc536` made test-target splits parity-safe while retaining exact
+  case-working-directory identity.
+- Exact-head hosted run `29575099005` at
+  `67adc53614e14a8ca59c656265103f04f1e69ec4` passed the complete v2 workflow.
+  Coverage artifact `8405268613` and timing artifact `8405267687` retain the
+  claim-grade outputs.
+- The baseline reconciles 26 targets, 4,062 CTest records, 50 discovery
+  profiles, 26 execution profiles, 25 GoogleTest XML reports, and 26 coverage
+  objects. All 4,061 enabled GoogleTest cases passed; the one manual CTest
+  producer emitted its required profile and object.
+- Schema-v2 execution identity covers all 4,062 case working directories.
+  Self-parity lost zero covered production regions and zero branch arms.
 
 ## Goal
 - Produce a reproducible Clang source-coverage baseline for the canonical CPU
@@ -45,63 +56,63 @@ depends_on:
   flags, preset identity, and exclusion rules are identical on both sides.
 
 ## Required changes
-- [ ] Add an unsanitized `ci-coverage-cpu` configure/build preset with tests
+- [x] Add an unsanitized `ci-coverage-cpu` configure/build preset with tests
       enabled, Sandbox/benchmarks/CUDA disabled, explicit backend identity, and
       Clang source-coverage compile/link flags.
-- [ ] Derive the selected CPU executable list from the canonical generated test
+- [x] Derive the selected CPU executable list from the canonical generated test
       registry and fail if an expected binary is missing, uninstrumented, or
       omitted from the `llvm-cov` object set.
-- [ ] Run the canonical CPU selector with collision-safe raw-profile paths,
+- [x] Run the canonical CPU selector with collision-safe raw-profile paths,
       merge every shard with `llvm-profdata`, and retain missing/corrupt-profile
       diagnostics.
-- [ ] Export machine-readable line, branch, function, and region coverage plus
+- [x] Export machine-readable line, branch, function, and region coverage plus
       the exact unique GoogleTest name/label/executable inventory.
-- [ ] Define and document engine-owned production roots and deterministic
+- [x] Define and document engine-owned production roots and deterministic
       exclusions for tests, generated files, vcpkg/external code, compiler
       runtime code, and other non-product inputs.
-- [ ] Add a comparison mode for identical-production-commit test refactors that
+- [x] Add a comparison mode for identical-production-commit test refactors that
       normalizes paths and fails when a previously covered production region or
       branch disappears, independent of the aggregate percentage.
-- [ ] Emit informational diff coverage for changed production lines without
+- [x] Emit informational diff coverage for changed production lines without
       making a permanent threshold required until baseline stability is
       reviewed under `CI-009`.
-- [ ] Publish the report and raw/merged profile diagnostics from a dedicated
+- [x] Publish the report and raw/merged profile diagnostics from a dedicated
       default-branch, scheduled, or manually triggered job; final lifecycle
       placement remains `CI-009`.
 
 ## Tests
-- [ ] Add synthetic tooling regressions with at least two instrumented
+- [x] Add synthetic tooling regressions with at least two instrumented
       executables and parallel profile writes, proving complete object/profile
       aggregation.
-- [ ] Prove missing executable mappings, zero selected tests, corrupt profiles,
+- [x] Prove missing executable mappings, zero selected tests, corrupt profiles,
       production-source drift in parity mode, and a lost covered region fail
       nonzero with actionable diagnostics.
-- [ ] Prove normalized path/exclusion handling is deterministic across two
+- [x] Prove normalized path/exclusion handling is deterministic across two
       build directories.
-- [ ] Capture one named baseline from the complete selected CPU cohort and
+- [x] Capture one named baseline from the complete selected CPU cohort and
       validate its JSON/export artifacts.
 
 ## Docs
-- [ ] Add the CPU source-coverage policy to
+- [x] Add the CPU source-coverage policy to
       `docs/benchmarking/ci-policy.md`, distinguishing test inventory, source
       regions, assertions/invariants, and backend-specific evidence.
-- [ ] Document local reproduction, included/excluded roots, comparison
+- [x] Document local reproduction, included/excluded roots, comparison
       preconditions, artifact schema, and why a percentage alone is not a
       no-coverage-loss proof.
-- [ ] Update process/task indexes and regenerate `tasks/SESSION-BRIEF.md` on
+- [x] Update process/task indexes and regenerate `tasks/SESSION-BRIEF.md` on
       retirement.
 
 ## Acceptance criteria
-- [ ] One command sequence produces a complete CPU test inventory, merged
+- [x] One command sequence produces a complete CPU test inventory, merged
       profile, and line/branch/region export using every registered CPU binary.
-- [ ] Parallel shards cannot overwrite one another and missing mappings or
+- [x] Parallel shards cannot overwrite one another and missing mappings or
       profiles cannot yield a success-shaped partial report.
-- [ ] On an identical production commit, removing execution of a previously
+- [x] On an identical production commit, removing execution of a previously
       covered region causes the test-refactor parity check to fail even if the
       global percentage stays equal or rises.
-- [ ] The baseline records compiler/preset/backend identity and deterministic
+- [x] The baseline records compiler/preset/backend identity and deterministic
       exclusions so later results are comparable.
-- [ ] Existing correctness, sanitizer, and GPU gates remain authoritative and
+- [x] Existing correctness, sanitizer, and GPU gates remain authoritative and
       unchanged.
 
 ## Verification
@@ -113,6 +124,18 @@ python3 tests/regression/tooling/Test.SourceCoverage.py
 python3 tools/ci/compare_source_coverage.py --baseline <baseline.json> --candidate <candidate.json> --test-only-refactor
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+Exact hosted evidence:
+
+- `ci-linux-clang` run `29570979186` passed all 4,062 selected CPU entries,
+  routing reconciliation, layering, compile-hotspot reporting, and SLO checks.
+- Initial coverage run `29570990788` failed closed on a CTest-incompatible
+  selector before collection; commit `0d26bbaf` corrected the selector.
+- Corrected v1 run `29573162676` established the first complete baseline.
+- Final v2 run `29575099005` passed in 27m16s: configure 6.454s, build
+  1,511.530s, collection 50.016s, 2,149 Ninja edges, and 4,062 selected tests.
+  It represented 524 production files and covered 70,207 unique regions,
+  34,339 branch arms, 10,107 functions, and 113,817 lines.
 
 ## Forbidden changes
 - Reporting engine-wide coverage from only `IntrinsicCoreTests` or another

@@ -8,6 +8,19 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`CI-010`](CI-010-cpu-source-coverage-refactor-parity.md) — canonical CPU
+source-coverage parity retired on 2026-07-17. The dedicated Clang 20 preset and
+manual workflow derive all 26 CPU producers from the configured registry,
+reconcile 4,062 selected records with 50 discovery profiles, 26 execution
+profiles, 25 GoogleTest XML reports, and 26 `llvm-cov` objects, then publish
+line/function/branch/region data and raw diagnostics. Schema-v2 execution
+identity permits test-target splits while retaining exact normalized
+case-working-directory identity. Hosted run `29575099005` passed at exact
+commit `67adc536`, represented 524 production files, covered 70,207 regions
+and 34,339 branch arms, and lost zero regions or branch arms under self-parity.
+Coverage artifact `8405268613` and timing artifact `8405267687` retain the
+claim-grade baseline.
+
 [`BUG-106`](BUG-106-test-gate-capability-routing-drift.md) — the
 capability-routing defect retired on 2026-07-17. Twelve CPU/mock sources and
 three MockDevice RHI sources now belong to capability-truthful CPU targets,

@@ -19,8 +19,6 @@ map.
 - [CI-006 — Remove duplicate sanitizer work and isolate variants](CI-006-sanitizer-topology-and-test-parallelism.md)
 - [CI-008 — Reduce CTest process overhead without oversubscribing workers](CI-008-grouped-ctest-and-worker-oversubscription.md)
 - [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
-- [CI-010 — Establish CPU source-coverage refactor parity](../../active/CI-010-cpu-source-coverage-refactor-parity.md)
-  (currently active).
 - [CI-011 — Calibrate the slow-test cohort and retain fast sentinels](CI-011-measured-slow-test-cohort.md)
 - [BUILD-004 — Make compile-hotspot evidence source-complete](BUILD-004-source-complete-compile-hotspot-evidence.md)
 - [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](PROC-025-port-research-ideation-skill-to-other-repos.md)
@@ -37,8 +35,9 @@ retirement log.
   retired `CI-004` establishes label-derived test build aggregates; retired
   `CI-007` establishes the bounded module-safe `pr-fast` ccache policy;
   retired `BUG-107` makes the configured target graph deterministic, and
-  retired `BUG-106` restores truthful test ownership. `CI-010` next establishes
-  coverage parity; `CI-005` consumes the corrected registry/graph; `CI-006`
+  retired `BUG-106` restores truthful test ownership. Retired `CI-010`
+  establishes coverage parity; `CI-005` next consumes the corrected
+  registry/graph; `CI-006`
   isolates the
   retained sanitizer variants; `CI-011` measures the fast/slow cohort; and
   `CI-008` groups safe families and sets worker budgets only after those inputs
@@ -83,6 +82,11 @@ this batch is the evidence-backed `check_pr_contract.py` retirement audited by
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [CI-010 — Establish CPU source-coverage refactor parity](../../done/CI-010-cpu-source-coverage-refactor-parity.md)
+  (done 2026-07-17): added a complete Clang CPU source-coverage baseline,
+  exact producer/profile/object reconciliation, and schema-v2 refactor parity
+  that permits test-target splits but fails on lost production regions,
+  branches, or case working-directory identity.
 - [PROC-027 — Audit the validator/tool fleet for rent-paying gates](../../done/PROC-027-validator-rent-audit.md)
   (done 2026-07-17): inventoried all 57 snapshot Python tools plus 16
   non-Python wrappers, retained 53, kept 2 report-only, and retired 2
