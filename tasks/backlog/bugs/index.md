@@ -5,10 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-111` — GitHub artifact finalization can discard passing CI evidence](BUG-111-github-artifact-finalization-403.md):
-  ASan run `29589810886` passed 4,062/4,062 cases and validated its timing
-  result before `actions/upload-artifact@v4` finalization returned intermediary
-  HTTP 403; characterize recurrence and retain fail-closed, bounded recovery.
 - [`BUG-110` — Implicit smoothing applies boundary pins after rather than during solve](BUG-110-implicit-smoothing-boundary-dirichlet-solve.md):
   `PreserveBoundary` currently solves an all-free shifted system and only then
   overwrites boundary entries, so interior vertices do not satisfy the claimed
@@ -39,6 +35,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-07-17: [`BUG-111` — GitHub artifact finalization can discard passing CI evidence](../../done/BUG-111-github-artifact-finalization-403.md).
+  The one failing artifact finalization was isolated to GitHub's intermediary:
+  its sibling upload succeeded, and a specific-job rerun at the same SHA passed
+  and finalized both artifacts without rebuilding UBSan or unsanitized jobs.
+  Required evidence remains fail closed; matching incidents use bounded
+  `gh run rerun --job`.
 
 - Closed 2026-07-17: [`BUG-106` — Test-gate capability routing hides CPU coverage](../../done/BUG-106-test-gate-capability-routing-drift.md).
   The corrected graph has one owner per affected case, routes all 4,061

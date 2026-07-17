@@ -8,6 +8,16 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-111`](BUG-111-github-artifact-finalization-403.md) — hosted artifact
+finalization incident retired on 2026-07-17 with an external-service
+disposition. ASan job `87915791947` passed 4,062/4,062 tests and validated its
+timing result before `actions/upload-artifact@v4` received intermediary HTTP
+403 finalizing that artifact; its immediately following selection upload
+succeeded. The bounded `gh run rerun --job` recovery retained SHA `a7ae8e7f`,
+reran only ASan as job `87928232616`, and finalized timing artifact
+`8412801543` plus selection artifact `8412802000`. Required parity remains fail
+closed and the failed attempt is excluded from claim-grade evidence.
+
 [`CI-005`](CI-005-real-touched-scope-pr-fast-gate.md) — the real touched-scope
 PR-fast gate retired on 2026-07-17. The new unsanitized Null/headless
 `ci-fast` route classifies the merge-base diff before setup, skips C++ work for

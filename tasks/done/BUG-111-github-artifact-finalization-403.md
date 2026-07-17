@@ -5,6 +5,13 @@ depends_on: []
 ---
 # BUG-111 — GitHub artifact finalization can discard passing CI evidence
 
+## Status
+- Completed on 2026-07-17; owner: Codex; branch: `main`.
+- Tracking commit: `44da41e3`.
+- GitHub's specific-job rerun retained the original SHA/ref and reran only the
+  failed ASan matrix child. Attempt 2 job `87928232616` passed and finalized
+  timing artifact `8412801543` plus selection artifact `8412802000`.
+
 ## Goal
 - Determine whether hosted artifact finalization failures need a repository
   mitigation or an explicit bounded rerun policy, without treating a passing
@@ -31,33 +38,50 @@ depends_on: []
   claim-grade timing population.
 
 ## Required changes
-- [ ] Collect the action version, runner image, artifact name/size, run/job IDs,
+- [x] Collect the action version, runner image, artifact name/size, run/job IDs,
       and service response for every recurrence; distinguish a platform
       incident from deterministic repository input.
-- [ ] Evaluate the smallest supported recovery mechanism, including an
+- [x] Evaluate the smallest supported recovery mechanism, including an
       artifact-only retry when GitHub Actions exposes one; do not rerun all
       sanitizer variants by default.
-- [ ] If no repository mitigation is reliable, document a bounded failed-job
+- [x] If no repository mitigation is reliable, document a bounded failed-job
       rerun policy and the evidence needed to close this as external.
-- [ ] Preserve fail-closed selection parity whenever any required artifact is
+- [x] Preserve fail-closed selection parity whenever any required artifact is
       absent or unvalidated.
 
 ## Tests
-- [ ] Add workflow-contract coverage for any repository-owned retry or
+- [x] Add workflow-contract coverage for any repository-owned retry or
       diagnostic path; an external-only disposition records why a hermetic
       failure injection is not representative.
 
 ## Docs
-- [ ] Update CI policy with the final recovery/disposition and retained
+- [x] Update CI policy with the final recovery/disposition and retained
       incident evidence.
 
 ## Acceptance criteria
-- [ ] The incident has a reproducible repository trigger or an evidence-backed
+- [x] The incident has a reproducible repository trigger or an evidence-backed
       external-service disposition.
-- [ ] Required artifacts and parity cannot silently succeed when finalization
+- [x] Required artifacts and parity cannot silently succeed when finalization
       fails.
-- [ ] Any retry is bounded to the smallest failed work and cannot duplicate
+- [x] Any retry is bounded to the smallest failed work and cannot duplicate
       unrelated sanitizer or CPU builds.
+
+## Disposition
+- Attempt 1 ASan job `87915791947` passed 4,062/4,062 tests and validated a
+  passing result. `actions/upload-artifact@v4` then received intermediary HTTP
+  403 while finalizing the 954-byte timing artifact; the following 73,649-byte
+  selection artifact finalized successfully.
+- `gh run rerun --job 87915791947` created attempt 2 job `87928232616` at the
+  same `a7ae8e7f` SHA. It passed the same selector and finalized both artifacts.
+  The retained UBSan and unsanitized dependency records kept their original
+  timestamps, proving they were not rerun.
+- The one-action failure followed by sibling and exact-rerun success provides
+  no deterministic repository trigger. A synthetic HTTP failure would test a
+  different path than GitHub's managed artifact finalization, so no hermetic
+  repository regression was added.
+- Required jobs remain fail closed. Recover a matching incident with
+  `gh run rerun --job <failed-job-id>`; do not use a whole-run or whole-matrix
+  retry unless additional jobs actually failed.
 
 ## Verification
 ```bash

@@ -348,6 +348,13 @@ gh workflow run ci-linux-clang.yml --ref <ref> -f run_sanitizers=false
 The input defaults to `true`; pull requests always run ASan, UBSan, and parity,
 and default-branch pushes retain their unsanitized-only topology.
 
+Required timing/selection uploads fail closed. `BUG-111` recorded one hosted
+intermediary HTTP 403 after ASan tests and result validation had passed; the
+next artifact in the same job succeeded, and a specific-job rerun at the same
+SHA finalized both outputs. For the same failure signature, use
+`gh run rerun --job <failed-job-id>` rather than rerunning the whole workflow
+or sanitizer matrix. A failed artifact attempt does not enter timing evidence.
+
 The full CPU workflow measures exactly the canonical selector; at CI-006
 implementation commit `a7ae8e7f` it contained 4,062 cases. The FrameGraph
 nanosecond SLO diagnostic runs once in the explicit unsanitized nightly lane,
