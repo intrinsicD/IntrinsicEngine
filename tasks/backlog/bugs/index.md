@@ -5,10 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-112` — Clang source coverage is unstable on two production paths](../../active/BUG-112-clang-source-coverage-production-path-instability.md):
-  the claim-grade `CI-011` A/B pair cannot normalize or compare deterministically
-  because one scheduler fallback is schedule-dependent and Clang 20 underflows
-  a repeated renderer conditional's derived coverage counter.
 - [`BUG-110` — Implicit smoothing applies boundary pins after rather than during solve](BUG-110-implicit-smoothing-boundary-dirichlet-solve.md):
   `PreserveBoundary` currently solves an all-free shifted system and only then
   overwrites boundary entries, so interior vertices do not satisfy the claimed
@@ -39,6 +35,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-07-17: [`BUG-112` — Clang source coverage is unstable on two production paths](../../done/BUG-112-clang-source-coverage-production-path-instability.md).
+  One retained scheduler observation removes a schedule-dependent fallback,
+  and one renderer branch now computes its correlated descriptor fields
+  without Clang 20's repeated-conditional mapping underflow. Matched atomic
+  runs normalized without saturated counters and lost zero regions or branch
+  arms.
 
 - Closed 2026-07-17: [`BUG-111` — GitHub artifact finalization can discard passing CI evidence](../../done/BUG-111-github-artifact-finalization-403.md).
   The one failing artifact finalization was isolated to GitHub's intermediary:

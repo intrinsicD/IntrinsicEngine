@@ -260,6 +260,36 @@ covered by smaller replacements. Changed-production-line coverage is emitted
 separately as informational diff evidence; threshold policy waits for repeated
 baselines under `CI-009`.
 
+### Clang 20 counter determinism
+
+Coverage normalization rejects negative or saturated exported execution
+counters. An `INT64_MAX` value is not treated as covered, uncovered, or an
+approved coordinate: LLVM's JSON exporter can clamp an unsigned count derived
+from an invalid mapping expression to that value, so accepting it would make
+the evidence ambiguous.
+
+Atomic baseline run `29609841968` and candidate run `29609841892` exposed two
+production-source manifestations while correctly failing closed. Clang 20
+mapped the second use of one renderer `hasNextLevel` condition to a subtraction
+that evaluated negative before unsigned conversion and JSON clamping.
+Separately, `Scheduler::WaitForAll` reloaded its in-flight count after a failed
+pop, making one fallback branch depend on whether a worker completed in that
+window. `BUG-112` removed the redundant reload and computes the renderer's
+correlated role/offset pair through one control-flow site. No coverage schema,
+coordinate allowlist, or test-only production hook was added.
+
+The final serialized-producer pair passed at identical production identity:
+baseline
+[`29613834782`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29613834782)
+(`dc7d09f3`, artifact `8420178739`) and candidate
+[`29613834772`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29613834772)
+(`ad751bf7`, artifact `8420345114`). Both raw exports are free of saturated
+counters. Their shared production, build-input, and compile-command digests are
+`b754df9f393e16b4a0384236b1eb06fd9187a18cf8c9703c0ef14bb8a0d0e553`,
+`4c24e3f6e30449d04f45257e9a21dbd3494b69a3b317c94f3b448fa00491c619`,
+and `6fc85cd42aef613364a666bb180d4d8f1981e74f81bd94575a7ec5a755873622`;
+the declared cohort comparison reported zero lost regions and branch arms.
+
 ### Included and excluded sources
 
 The engine-owned production roots are C++ source and headers under `src/` and

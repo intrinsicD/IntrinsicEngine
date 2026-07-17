@@ -8,6 +8,17 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-112`](BUG-112-clang-source-coverage-production-path-instability.md) —
+Clang 20 source-coverage instability retired on 2026-07-17 at
+`CPUContracted`. `Scheduler::WaitForAll` now carries one positive in-flight
+observation into `atomic::wait`, and recursive prefix dispatch planning derives
+its block-sums role/offset pair through one condition. Focused scheduler and
+graphics contracts passed. Matched hosted runs `29613834782` and `29613834772`
+used identical production, build-input, and compile-command identities,
+contained no saturated exported counters, and reported zero lost regions or
+branch arms without an allowlist, schema exception, or test-only production
+hook.
+
 [`CI-006`](CI-006-sanitizer-topology-and-test-parallelism.md) — sanitizer
 topology isolation retired on 2026-07-17 at `Operational`. Unsanitized, ASan,
 UBSan, and promoted-Vulkan presets now use explicit identities and distinct
