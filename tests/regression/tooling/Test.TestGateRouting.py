@@ -123,6 +123,7 @@ RHI_MANAGER_SOURCES = frozenset(
     }
 )
 READBACK_SOURCE = "Test.GpuReadbackJobGpuSmoke.cpp"
+READBACK_TARGET = "IntrinsicRuntimeGpuReadbackSmokeTests"
 FRAME_LOOP_SOURCE = "Test.RuntimeFrameLoopContract.cpp"
 MANUAL_CTEST_TARGETS = frozenset(
     {
@@ -398,14 +399,23 @@ def _validate_affected_contract(
                 f"{_format_values(labels or ())}"
             )
 
+    if READBACK_TARGET not in targets:
+        unexpected_readback = owners.get(READBACK_SOURCE, [])
+        if unexpected_readback:
+            raise ReconciliationError(
+                f"{READBACK_SOURCE} is registered without capability target "
+                f"{READBACK_TARGET}"
+            )
+        return
+
     readback = _require_affected_owner(owners, READBACK_SOURCE)
     if (
         readback.object_library != "RuntimeGpuReadbackSmokeTestObjs"
-        or readback.target != "IntrinsicRuntimeGpuReadbackSmokeTests"
+        or readback.target != READBACK_TARGET
     ):
         raise ReconciliationError(
             f"{READBACK_SOURCE} must be owned by "
-            "RuntimeGpuReadbackSmokeTestObjs/IntrinsicRuntimeGpuReadbackSmokeTests, "
+            f"RuntimeGpuReadbackSmokeTestObjs/{READBACK_TARGET}, "
             f"got {readback.object_library}/{readback.target}"
         )
     readback_labels = targets.get(readback.target)
@@ -1279,6 +1289,10 @@ OrdinarySuite.
             "IntrinsicRuntimeGpuReadbackSmokeTests",
         )
 
+        _validate_affected_contract(targets, sources)
+
+        del targets[READBACK_TARGET]
+        del sources[readback_source]
         _validate_affected_contract(targets, sources)
 
 
