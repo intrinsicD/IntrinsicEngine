@@ -326,7 +326,7 @@ endfunction()
 function(intrinsic_add_test_aggregate)
     cmake_parse_arguments(
         ARG
-        ""
+        "OMIT_IF_EMPTY"
         "NAME"
         "INCLUDE_ANY;INCLUDE_ALL;EXCLUDE_ANY"
         ${ARGN}
@@ -434,6 +434,13 @@ function(intrinsic_add_test_aggregate)
     endforeach()
 
     if(NOT _intrinsic_selected_targets)
+        if(ARG_OMIT_IF_EMPTY)
+            file(
+                REMOVE
+                "${INTRINSIC_TEST_INVENTORY_DIR}/${ARG_NAME}.txt"
+            )
+            return()
+        endif()
         message(FATAL_ERROR
             "Test aggregate '${ARG_NAME}' selected no executable targets"
         )

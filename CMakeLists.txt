@@ -478,6 +478,7 @@ if(INTRINSIC_BUILD_TESTS AND BUILD_TESTING)
     )
     intrinsic_add_test_aggregate(
         NAME IntrinsicCpuSlowTests
+        OMIT_IF_EMPTY
         INCLUDE_ALL slow
         EXCLUDE_ANY benchmark slo gpu vulkan flaky-quarantine
     )
