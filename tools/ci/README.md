@@ -16,7 +16,9 @@ CI helper scripts and workflow validation tools.
   filter, reconciles exact execution from per-target XML, merges collision-safe
   execution profiles, and writes the raw and normalized CPU coverage artifacts.
   Discovery profiles are isolated and retained for diagnostics but excluded
-  from the merge.
+  from the merge. Coverage builds use atomic profile-counter updates because
+  CPU tests exercise instrumented production paths from multiple threads; the
+  collector rejects non-atomic build identity and saturated LLVM counters.
 - `compare_source_coverage.py`: validates two normalized coverage reports and,
   in `--test-only-refactor` mode, rejects identity drift or loss of any
   previously covered production region or branch outcome. Its

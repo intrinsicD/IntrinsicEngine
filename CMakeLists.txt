@@ -324,15 +324,26 @@ endif()
 
 set(INTRINSIC_COVERAGE_COMPILE_FLAGS "")
 set(INTRINSIC_COVERAGE_LINK_FLAGS "")
+set(INTRINSIC_SOURCE_COVERAGE_PROFILE_UPDATE
+    "none"
+    CACHE INTERNAL "Source-coverage profile counter update mode" FORCE
+)
 if(INTRINSIC_ENABLE_SOURCE_COVERAGE)
+    set(INTRINSIC_SOURCE_COVERAGE_PROFILE_UPDATE
+        "atomic"
+        CACHE INTERNAL "Source-coverage profile counter update mode" FORCE
+    )
     set(INTRINSIC_COVERAGE_COMPILE_FLAGS
         -fprofile-instr-generate
+        -fprofile-update=atomic
         -fcoverage-mapping
     )
     set(INTRINSIC_COVERAGE_LINK_FLAGS
         -fprofile-instr-generate
     )
-    message(STATUS "Clang source coverage instrumentation ENABLED")
+    message(STATUS
+        "Clang source coverage instrumentation ENABLED "
+        "(profile updates: ${INTRINSIC_SOURCE_COVERAGE_PROFILE_UPDATE})")
 else()
     message(STATUS "Clang source coverage instrumentation DISABLED")
 endif()
