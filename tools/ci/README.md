@@ -21,9 +21,13 @@ CI helper scripts and workflow validation tools.
   in `--test-only-refactor` mode, rejects identity drift or loss of any
   previously covered production region or branch outcome. Its
   `--test-cohort-transition` mode additionally binds each report to its sibling
-  test inventory, permits only the manifest-declared fast sentinels, requires
-  every moved heavy case in both populations with only the `slow` label added,
-  and compares common-case working-directory plus production coverage parity.
+  test inventory, resolves canonical manifest CTest names through the retained
+  `ctest_name` to `gtest_filter` mapping, permits only the manifest-declared
+  fast sentinels, requires every moved heavy case in both populations with only
+  the `slow` label added, and compares common-case working-directory plus
+  production coverage parity. Claim-grade workflow collection runs one test
+  producer at a time so unrelated process scheduling cannot create artificial
+  branch/region drift between otherwise identical product builds.
 - `test_cohort_manifest.py`: parses the strict shared fast-to-slow transition
   manifest consumed by timing and source-coverage parity.
 - `validate_gate_timing_baseline.py`: validates the CI-003 historical gate-latency baseline and statistics payloads. Exercised by `tests/regression/tooling/Test.CiTiming.py`; see `benchmarks/ci/README.md`.

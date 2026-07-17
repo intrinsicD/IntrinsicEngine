@@ -917,6 +917,15 @@ class SourceCoverageTests(unittest.TestCase):
 
         baseline_inventory["aggregate"] = "IntrinsicCpuCoverageTests"
         candidate_inventory["aggregate"] = "IntrinsicCpuCoverageTests"
+        moved_ctest_name = "Display/Alpha.CoversBothArms/2"
+        sentinel_ctest_name = "Display/Alpha.SmallSentinel/2"
+        for inventory in (baseline_inventory, candidate_inventory):
+            inventory_alpha = next(
+                target
+                for target in inventory["targets"]
+                if target["name"] == "AlphaTests"
+            )
+            inventory_alpha["cases"][0]["ctest_name"] = moved_ctest_name
         alpha = next(
             target
             for target in candidate_inventory["targets"]
@@ -924,7 +933,7 @@ class SourceCoverageTests(unittest.TestCase):
         )
         moved_case = copy.deepcopy(alpha["cases"][0])
         sentinel_case = copy.deepcopy(moved_case)
-        sentinel_case["ctest_name"] = "Alpha.SmallSentinel"
+        sentinel_case["ctest_name"] = sentinel_ctest_name
         sentinel_case["gtest_filter"] = "Alpha.SmallSentinel"
         alpha["cases"] = [sentinel_case]
 
@@ -968,8 +977,8 @@ class SourceCoverageTests(unittest.TestCase):
         manifest.write_text(
             json.dumps(
                 {
-                    "added_fast_sentinels": ["Alpha.SmallSentinel"],
-                    "moved_to_slow": ["Alpha.CoversBothArms"],
+                    "added_fast_sentinels": [sentinel_ctest_name],
+                    "moved_to_slow": [moved_ctest_name],
                     "schema": "intrinsic.test-cohort-transition/v1",
                 },
                 indent=2,
