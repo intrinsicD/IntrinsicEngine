@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import unittest
 from pathlib import Path
 
@@ -8,6 +9,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW_ROOT = REPO_ROOT / ".github" / "workflows"
+PRESETS = REPO_ROOT / "CMakePresets.json"
 EXPECTED_GROUP = (
     "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"
 )
@@ -43,6 +45,39 @@ def _load_workflow(name: str) -> tuple[dict[str, object], str]:
 
 
 class WorkflowConcurrencyTests(unittest.TestCase):
+    def test_ci_fast_preset_is_unsanitized_and_headless(self) -> None:
+        payload = json.loads(PRESETS.read_text(encoding="utf-8"))
+        configure_presets = {
+            preset["name"]: preset for preset in payload["configurePresets"]
+        }
+        build_presets = {
+            preset["name"]: preset for preset in payload["buildPresets"]
+        }
+        ci_fast = configure_presets["ci-fast"]
+        self.assertEqual(ci_fast["inherits"], "ci")
+        self.assertEqual(
+            ci_fast["cacheVariables"],
+            {
+                "BUILD_TESTING": "ON",
+                "EXTRINSIC_PLATFORM": "Linux",
+                "EXTRINSIC_BACKEND": "Null",
+                "INTRINSIC_PLATFORM_BACKEND": "Null",
+                "INTRINSIC_HEADLESS_NO_GLFW": "ON",
+                "INTRINSIC_BUILD_SANDBOX": "OFF",
+                "INTRINSIC_BUILD_TESTS": "ON",
+                "INTRINSIC_BUILD_BENCHMARKS": "OFF",
+                "INTRINSIC_ENABLE_CUDA": "OFF",
+                "INTRINSIC_ENABLE_SANITIZERS": "OFF",
+                "INTRINSIC_ENABLE_SOURCE_COVERAGE": "OFF",
+                "INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN": "OFF",
+                "VCPKG_MANIFEST_NO_DEFAULT_FEATURES": "ON",
+            },
+        )
+        self.assertEqual(
+            build_presets["ci-fast"]["configurePreset"],
+            "ci-fast",
+        )
+
     def test_source_coverage_workflow_is_manual_and_uses_canonical_cohort(
         self,
     ) -> None:
@@ -74,35 +109,61 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             coverage,
         )
 
-    def test_pr_fast_keeps_kernel_convergence_guards(self) -> None:
-        _, pr_fast = _load_workflow("pr-fast.yml")
+    def test_pr_fast_classifies_and_runs_structural_checks_before_cpp_setup(
+        self,
+    ) -> None:
+        payload, pr_fast = _load_workflow("pr-fast.yml")
+        steps = payload["jobs"]["pr-fast"]["steps"]
+        named_steps = {step.get("name"): step for step in steps}
+        checkout = named_steps["Checkout"]
+        plan = named_steps["Plan touched scope"]
+        python_dependency = named_steps["Ensure Python validation dependency"]
+        structural = named_steps["Run selected structural checks"]
+        install = named_steps["Install system dependencies"]
+
+        self.assertEqual(checkout["with"]["fetch-depth"], 0)
+        self.assertFalse(checkout["with"]["persist-credentials"])
+        self.assertLess(steps.index(plan), steps.index(python_dependency))
+        self.assertLess(steps.index(python_dependency), steps.index(structural))
+        self.assertLess(steps.index(structural), steps.index(install))
+        self.assertIn("base_ref=origin/main", plan["run"])
+        self.assertIn("head_ref=HEAD", plan["run"])
+        self.assertIn("${{ github.event.pull_request.base.sha }}", plan["run"])
+        self.assertIn("${{ github.event.pull_request.head.sha }}", plan["run"])
+        self.assertIn("--action plan", plan["run"])
+        self.assertIn("--action structural", structural["run"])
+        self.assertIn(
+            "--output build/ci-fast/ci-routing/route.json",
+            plan["run"],
+        )
+        self.assertIn("if ! python3 -c 'import yaml'", python_dependency["run"])
         self.assertEqual(
-            pr_fast.count(
-                "python3 tests/regression/tooling/Test.CheckKernelConvergence.py"
-            ),
-            1,
+            pr_fast.count("--github-output \"$GITHUB_OUTPUT\""),
+            5,
         )
         self.assertEqual(
-            pr_fast.count(
-                "python3 tools/repo/check_kernel_convergence.py --root . --strict"
-            ),
-            1,
+            pr_fast.count("--step-summary \"$GITHUB_STEP_SUMMARY\""),
+            5,
         )
 
     def test_specialized_workflows_build_only_selected_aggregates(self) -> None:
         _, pr_fast = _load_workflow("pr-fast.yml")
         self.assertIn(
-            "cmake --build --preset ci --target IntrinsicPrFastTests",
+            "--action finalize",
             pr_fast,
         )
         self.assertIn(
-            "--inventory build/ci/test-inventories/IntrinsicPrFastTests.txt",
+            "--action build",
             pr_fast,
         )
+        self.assertIn("--action test", pr_fast)
+        self.assertIn("--build-dir build/ci-fast", pr_fast)
+        self.assertIn("-- cmake --preset ci-fast --fresh", pr_fast)
         self.assertNotIn(
             "cmake --build --preset ci --target IntrinsicTests",
             pr_fast,
         )
+        self.assertNotIn("IntrinsicPrFastTests", pr_fast)
 
         _, linux = _load_workflow("ci-linux-clang.yml")
         self.assertIn(
@@ -224,6 +285,65 @@ class WorkflowConcurrencyTests(unittest.TestCase):
                 self.assertIn("if: always()", text)
                 self.assertIn("/ci-timing/result/result.json", text)
                 self.assertEqual(text.count("--test-json"), expected_test_reports)
+
+    def test_pr_fast_always_publishes_route_and_guards_cpp_steps(self) -> None:
+        payload, _ = _load_workflow("pr-fast.yml")
+        steps = payload["jobs"]["pr-fast"]["steps"]
+        named_steps = {step.get("name"): step for step in steps}
+        cpp_steps = {
+            "Install system dependencies",
+            "Configure ccache pilot",
+            "Cache vcpkg binary packages",
+            "Bootstrap vcpkg",
+            "Enable vcpkg binary cache",
+            "Configure (ci-fast preset)",
+            "Finalize touched scope",
+            "Detect configured compiler and cache identity",
+            "Restore compatible ccache store",
+            "Validate ccache pilot mode",
+            "Run module invalidation ccache probe",
+            "Zero ccache stats",
+            "Build selected test closure",
+            "Collect ccache stats",
+            "Run selected tests",
+            "Aggregate gate timing result",
+            "Validate gate timing result",
+            "Upload gate timing result",
+            "Upload module invalidation probe result",
+            "Save validated ccache store",
+        }
+        for name in cpp_steps:
+            with self.subTest(step=name):
+                condition = named_steps[name].get("if", "")
+                self.assertIn("steps.route.outputs.needs_cpp == 'true'", condition)
+
+        route_upload = named_steps["Upload touched-scope route"]
+        self.assertEqual(route_upload["if"], "always()")
+        self.assertEqual(route_upload["uses"], "actions/upload-artifact@v4")
+        self.assertEqual(
+            route_upload["with"]["name"],
+            "ci-pr-fast-touched-scope-route",
+        )
+        self.assertEqual(
+            route_upload["with"]["path"],
+            "build/ci-fast/ci-routing/",
+        )
+        self.assertEqual(route_upload["with"]["if-no-files-found"], "error")
+        for name in (
+            "Aggregate gate timing result",
+            "Validate gate timing result",
+            "Upload gate timing result",
+            "Upload module invalidation probe result",
+        ):
+            with self.subTest(always_step=name):
+                self.assertEqual(
+                    named_steps[name]["if"],
+                    "always() && steps.route.outputs.needs_cpp == 'true'",
+                )
+
+    def test_structural_workflow_uses_read_only_permissions(self) -> None:
+        payload, _ = _load_workflow("ci-docs.yml")
+        self.assertEqual(payload["permissions"], {"contents": "read"})
 
     def test_all_measured_phases_write_versioned_json_inputs(self) -> None:
         for name in WORKFLOWS:

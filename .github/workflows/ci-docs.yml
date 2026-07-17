@@ -4,6 +4,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   docs-validation:
     runs-on: ubuntu-latest
@@ -76,7 +79,9 @@ jobs:
         run: python3 tests/regression/tooling/Test.WorkflowConcurrency.py
 
       - name: Validate structural CI policy regressions
-        run: python3 tests/regression/tooling/Test.CheckTaskStateLinks.py
+        run: |
+          python3 tests/regression/tooling/Test.CheckTaskStateLinks.py
+          python3 tests/regression/tooling/Test.CheckKernelConvergence.py
 
       - name: Validate CI timing, benchmark result, and ccache policy
         run: |
@@ -89,6 +94,9 @@ jobs:
         run: |
           python3 tests/regression/tooling/Test.TestBuildAggregates.py
           python3 tests/regression/tooling/Test_CiPrerequisiteGuards.py
+
+      - name: Validate touched-scope routing
+        run: python3 tests/regression/tooling/Test.TouchedScope.py
 
       - name: Validate generated module inventory freshness
         run: |

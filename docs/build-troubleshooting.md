@@ -284,19 +284,22 @@ to plan or run the strongest relevant subset without waiting for the full CPU
 gate every time:
 
 ```bash
-python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir cmake-build-debug --print
-python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir cmake-build-debug --run
+python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print
+python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --run
 ```
 
-The helper maps changed paths to conservative CMake targets, CTest labels, and
-repository structural checks. For example, `src/geometry/` changes select
-`IntrinsicGeometryTests`, `-L geometry`, and the layering check; docs/tasks-only
-changes select docs/task validators without a C++ build. Build-system changes,
-foundational `src/core/` changes, and unknown source paths fall back to the broad
-CPU-supported gate.
+The helper first resolves the unique merge base of the supplied base/head refs
+and computes the exact merge-base-to-head name-status diff. Docs/tasks-only
+changes select structural validators without C++ setup. Known implementation
+units configure `ci-fast`, then reconcile every owner-labeled producer against
+the generated registry before build. Missing/empty diffs, rename/delete/type
+ambiguity, module interfaces, headers, build/dependency inputs, foundational
+`src/core/`, and unknown paths fail closed to the bounded broad feedback route.
+Inspect `build/ci-fast/ci-routing/route.json` and its sibling inventories before
+diagnosing a supposedly missing test.
 
-This helper is an iteration aid, not a replacement for the canonical PR/merge
-verification from `AGENTS.md`:
+This helper and `pr-fast` are feedback aids, not replacements for the canonical
+CPU/sanitizer/capability PR/merge verification from `AGENTS.md`:
 
 ```bash
 cmake --preset ci

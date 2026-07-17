@@ -113,6 +113,7 @@ class CcacheWorkflowTests(unittest.TestCase):
         self.assertIn("sanitizer-${{ steps.toolchain.outputs.sanitizer }}", text)
         self.assertIn("${{ github.sha }}", text)
         self.assertNotIn("-ci-nosan-", text)
+        self.assertIn("preset-ci-fast-sanitizer-", text)
         self.assertIn("'CMakePresets.json'", text)
         self.assertIn("'cmake/**/*.cmake'", text)
         self.assertIn("'tools/ci/ccache_module_invalidation_probe.py'", text)
@@ -144,7 +145,7 @@ class CcacheWorkflowTests(unittest.TestCase):
         self.assertNotIn(" || 0", text)
 
         self.assertLess(
-            text.index("Configure (ci preset)"),
+            text.index("Configure (ci-fast preset)"),
             text.index("Restore compatible ccache store"),
         )
         self.assertLess(
@@ -157,22 +158,25 @@ class CcacheWorkflowTests(unittest.TestCase):
         )
         self.assertLess(
             text.index("ccache --zero-stats"),
-            text.index("Build PR-fast test aggregate"),
+            text.index("Build selected test closure"),
         )
         self.assertLess(
             text.index("Collect ccache stats"),
             text.index("Aggregate gate timing result"),
         )
         self.assertLess(
-            text.index("Validate layering (strict mode)"),
+            text.index("Validate gate timing result"),
             text.index("Save validated ccache store"),
         )
+        self.assertIn("--build-dir build/ci-fast", text)
+        self.assertIn("--expected-sanitizer none", text)
 
     def test_pr_fast_cache_has_read_only_repository_permissions(self) -> None:
         payload = yaml.safe_load(self._workflow_text())
         self.assertEqual(payload["permissions"], {"contents": "read"})
         checkout = payload["jobs"]["pr-fast"]["steps"][0]
         self.assertFalse(checkout["with"]["persist-credentials"])
+        self.assertEqual(checkout["with"]["fetch-depth"], 0)
 
     def test_static_ccache_and_timing_regressions_run_in_ci_docs(self) -> None:
         text = CI_DOCS_WORKFLOW.read_text(encoding="utf-8")
@@ -181,6 +185,7 @@ class CcacheWorkflowTests(unittest.TestCase):
         self.assertIn(
             "tests/regression/tooling/Test.CcacheModuleInvalidationProbe.py", text
         )
+        self.assertIn("tests/regression/tooling/Test.TouchedScope.py", text)
 
     def test_cmake_ccache_launcher_has_explicit_opt_out(self) -> None:
         text = DEPENDENCIES.read_text(encoding="utf-8")

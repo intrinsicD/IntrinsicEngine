@@ -112,12 +112,15 @@ For local iteration on changed paths, prefer the touched-scope helper before the
 full gate:
 
 ```bash
-python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir build/ci --print
-python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir build/ci --run
+python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print
+python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --run
 ```
 
-The helper plans affected build targets, CTest labels, and structural checks — it
-is an iteration aid, not a replacement for the full PR/merge gate.
+The helper drives the staged `pr-fast` feedback lane: structural-only changes
+skip C++ setup, focused source changes use the unsanitized Null/headless
+`ci-fast` preset, and ambiguous or graph-affecting changes broaden. It is not a
+replacement for the full CPU, sanitizer, or capability-specific PR/merge
+gates.
 
 Touched-scope structural checks (run when relevant):
 

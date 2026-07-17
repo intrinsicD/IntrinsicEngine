@@ -14,6 +14,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CHECKER = REPO_ROOT / "tools" / "repo" / "check_kernel_convergence.py"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr-fast.yml"
+CI_DOCS_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci-docs.yml"
 
 BASE_SOURCE = """\
 export module Fixture.Engine;
@@ -325,17 +326,26 @@ class KernelConvergenceTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stdout)
         self.assertIn("must resolve exactly once", result.stdout)
 
-    def test_pr_fast_keeps_live_and_synthetic_guards(self) -> None:
-        text = WORKFLOW.read_text(encoding="utf-8")
+    def test_ci_keeps_synthetic_guard_and_routes_live_checks(self) -> None:
+        pr_fast = WORKFLOW.read_text(encoding="utf-8")
+        ci_docs = CI_DOCS_WORKFLOW.read_text(encoding="utf-8")
         self.assertEqual(
-            text.count("python3 tests/regression/tooling/Test.CheckKernelConvergence.py"),
+            ci_docs.count(
+                "python3 tests/regression/tooling/Test.CheckKernelConvergence.py"
+            ),
             1,
         )
         self.assertEqual(
-            text.count(
-                "python3 tools/repo/check_kernel_convergence.py --root . --strict"
-            ),
+            pr_fast.count("--action structural"),
             1,
+        )
+        self.assertNotIn(
+            "python3 tests/regression/tooling/Test.CheckKernelConvergence.py",
+            pr_fast,
+        )
+        self.assertNotIn(
+            "python3 tools/repo/check_kernel_convergence.py --root . --strict",
+            pr_fast,
         )
 
 

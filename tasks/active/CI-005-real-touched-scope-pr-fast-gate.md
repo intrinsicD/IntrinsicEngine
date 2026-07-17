@@ -56,6 +56,19 @@ depends_on:
   ambiguous registry or configure-history-dependent graph would only make the
   fast gate confidently incomplete.
 
+## Measurement policy
+- Declared on 2026-07-17 before reading any `ci-fast` hosted result:
+  `IntrinsicPrSmokeTests` remains broad-fallback-only until at least five
+  comparable `ubuntu-24.04`/Clang hosted samples exist at one source and preset
+  identity.
+- The candidate passes only when its unique incremental Ninja command closure
+  is at most 5% of `IntrinsicPrFastTests` and nearest-rank p95 for its
+  incremental build batch plus exact smoke test batch is at most 60 seconds.
+  Median, p95, cache state, selected cases, and run IDs must all be retained.
+- After the budget passes, a separate commit may enable the smoke for focused
+  source routes. Docs/task-only routes remain structural-only, and a failed or
+  incomplete sample cannot count toward the population.
+
 ## Required changes
 - [ ] Add `ci-fast` configure/build presets with Clang 20 module scanning,
       tests enabled, Sandbox/benchmarks/CUDA/sanitizers disabled explicitly,
@@ -64,9 +77,10 @@ depends_on:
       post-configure target/inventory validation. Docs/task-only changes finish
       structural checks without configure; source plans validate against the
       freshly configured canonical registry before build.
-- [ ] Determine changed files from the PR base/head SHAs and make diff failure,
-      empty/missing base refs, rename/delete ambiguity, or planner exceptions
-      fail closed into the broad path rather than an empty success.
+- [ ] Determine changed files from the unique merge base of the PR base/head
+      SHAs and make merge-base/diff failure, empty/missing refs, rename/delete
+      ambiguity, or planner exceptions fail closed into the broad path rather
+      than an empty success.
 - [ ] Repair stale runtime mappings, add physics ownership, and make every
       module-interface, CMake/preset/toolchain, dependency-manifest, and unknown
       source change broad-fall back until real dependency evidence proves a
@@ -77,9 +91,10 @@ depends_on:
 - [ ] Execute the conservative plan in PR-fast. Broad-fallback scopes build the
       complete PR-fast aggregate rather than the default `all` target.
 - [ ] Measure the actual source/test closure and wall time of
-      `IntrinsicPrSmokeTests`, declare an incremental p95 latency/compile-closure
-      budget from comparable reference runs, and right-size the existing
-      registry-derived aggregate if it exceeds that budget.
+      `IntrinsicPrSmokeTests` with comparable reference runs, evaluate them
+      against the predeclared incremental p95 latency/compile-closure budget,
+      and right-size the existing registry-derived aggregate if it exceeds that
+      budget.
 - [ ] Only after the candidate meets the declared budget, run the resulting
       bounded cross-layer smoke for source changes in addition to touched-owner
       tests. Until then, retain it in broad fallback rather than making every

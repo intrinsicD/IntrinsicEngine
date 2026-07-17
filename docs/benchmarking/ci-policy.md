@@ -4,9 +4,33 @@ Benchmark execution is split by cost so CI remains fast while still guarding qua
 
 ## PR-fast expectations
 
-- Run only smoke benchmarks.
-- Enforce strict runtime budget.
-- Validate benchmark result JSON schema.
+- Classify the exact merge-base-to-head pull-request diff before toolchain
+  setup.
+- Run docs/task-only structural routes without a C++ configure or build.
+- Use the unsanitized Null/headless `ci-fast` preset for focused and bounded
+  broad source feedback, with strict post-configure registry reconciliation.
+- Preserve the full CPU, sanitizer, and Vulkan gates as separate required
+  confidence signals.
+
+### Touched-scope feedback and smoke admission
+
+`pr-fast` publishes `ci-pr-fast-touched-scope-route`, containing the exact
+changed-file records, selection reasons, fallback state, configured producer
+inventory, selected CTest inventory, command closure, and per-batch timing.
+Missing refs, diff failure, zero PR files, rename/delete/type ambiguity, module
+interfaces, headers, CMake/toolchain/dependency inputs, and unknown paths
+cannot produce an empty success; they select the bounded broad route or fail
+on a malformed configured registry.
+
+The focused lane initially excludes the candidate `IntrinsicPrSmokeTests`
+cross-layer smoke. The admission budget was declared on 2026-07-17 before any
+`ci-fast` hosted result was read: at least five comparable
+`ubuntu-24.04`/Clang samples at one source and preset identity, no more than 5%
+unique incremental Ninja command closure relative to `IntrinsicPrFastTests`,
+and at most 60 seconds nearest-rank p95 for the incremental smoke build plus
+exact smoke-test batch. Median, p95, cache state, selected cases, and run IDs
+must be retained. Until that evidence passes, the smoke remains broad-only;
+docs/task-only routes never pay it.
 
 ### Monolithic smoke ownership and budget
 

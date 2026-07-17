@@ -122,7 +122,7 @@ coverage, and expensive evidence visible as distinct jobs:
 
 | Workflow | Primary role |
 | --- | --- |
-| [`pr-fast.yml`](../../.github/workflows/pr-fast.yml) | Pull-request correctness feedback with stale-run cancellation and measured gate telemetry. |
+| [`pr-fast.yml`](../../.github/workflows/pr-fast.yml) | Exact-diff touched-scope feedback: structural-only changes skip C++ setup; source changes use registry-validated unsanitized `ci-fast`; ambiguous changes broaden. The route artifact and C++ timing remain distinct from full confidence gates. |
 | [`ci-docs.yml`](../../.github/workflows/ci-docs.yml) | Strict structural, task, documentation, manifest, skill-sync, and workflow-policy checks. |
 | [`ci-linux-clang.yml`](../../.github/workflows/ci-linux-clang.yml) | Canonical Linux/Clang CPU build and correctness coverage. |
 | [`ci-sanitizers.yml`](../../.github/workflows/ci-sanitizers.yml) | Dedicated sanitizer variants. |

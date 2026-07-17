@@ -46,11 +46,14 @@ This is the default CPU-supported correctness gate. GPU/Vulkan, slow, and explic
 For fast local iteration on small, well-scoped changes, plan or run the conservative touched-scope helper before the full gate:
 
 ```bash
-python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir cmake-build-debug --print
-python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir cmake-build-debug --run
+python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print
+python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --run
 ```
 
-The helper selects affected build targets, CTest labels, and structural checks, but it does not replace the full CPU-supported PR/merge gate above.
+The helper selects structural-only, focused-source, or bounded broad feedback.
+Its source routes use the unsanitized Null/headless `ci-fast` preset and validate
+selected producers against the configured registry. It does not replace the
+full CPU-supported, sanitizer, or capability-specific PR/merge gates above.
 
 ## Agent Workflow Pointer
 
@@ -91,7 +94,10 @@ Benchmark structure, manifests, and result schema:
 
 ## CI Status and Expectations
 
-The repository uses split workflows under `.github/workflows/` for fast PR validation, full CPU CI, sanitizers, docs/manifests, benchmark smoke, and nightly deep checks. `tools/ci/touched_scope.py` is available for local/touched-scope verification planning between full CI runs.
+The repository uses split workflows under `.github/workflows/` for staged
+touched-scope PR feedback, full CPU CI, sanitizers, docs/manifests, benchmark
+smoke, and nightly deep checks. `tools/ci/touched_scope.py` drives both local
+planning and the `pr-fast` route artifact between full confidence runs.
 
 When changing code/docs/structure, keep touched-scope checks green and update related docs/tasks in the same PR.
 

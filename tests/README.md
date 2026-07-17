@@ -203,13 +203,16 @@ For fast local iteration on changed paths, use the touched-scope helper to plan
 or run the relevant subset before the full gate:
 
 ```bash
-python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir cmake-build-debug --print
-python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir cmake-build-debug --run
+python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print
+python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --run
 ```
 
-The helper is conservative and may broaden to the full CPU-supported gate for
-foundational or unknown changes; it is not a replacement for final PR/merge
-verification.
+The helper classifies before configure. Structural-only changes skip C++ setup;
+known implementation-unit changes use owner-labeled producers from the fresh
+`ci-fast` registry; module/header/build/dependency, missing-diff, and unknown
+changes fail closed to a bounded broad feedback route. The generated routing
+artifact records the exact selection. This lane does not replace final
+CPU/sanitizer/capability PR/merge verification.
 
 `CMakePresets.json` currently defines configure/build presets but no CTest
 `testPresets`, so use the directory-based `ctest --test-dir build/ci ...`

@@ -41,7 +41,7 @@ WARM_CONFIGURE_CALL_COUNTS = {
     "nightly-deep.yml": 2,
 }
 TIMING_WORKFLOW_BUILD_DIRS = {
-    "pr-fast.yml": "build/ci",
+    "pr-fast.yml": "build/ci-fast",
     "ci-linux-clang.yml": "build/ci",
     "ci-vulkan.yml": "build/ci-vulkan",
     "ci-bench-smoke.yml": "build/ci",

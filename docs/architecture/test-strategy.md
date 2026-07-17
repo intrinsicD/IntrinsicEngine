@@ -65,10 +65,17 @@ Minimum label requirements by directory:
 
 Operational expectations:
 
-- Fast PR checks run unit and contract tests:
+- The staged `pr-fast` feedback lane resolves the PR base/head merge base and
+  classifies the exact merge-base-to-head diff before C++ setup.
+  Documentation/task-only routes run structural checks only; known
+  implementation-unit routes configure the unsanitized Null/headless
+  `ci-fast` preset and select owner-labeled producers; graph-affecting or
+  ambiguous routes build the bounded PR-fast plus cross-layer-smoke
+  aggregates. Every C++ route reconciles the fresh registry before build.
+  The broad unit/contract selector is:
 
   ```bash
-  ctest --test-dir build/ci --output-on-failure -L 'unit|contract' -LE 'gpu|vulkan|slow|flaky-quarantine'
+  ctest --test-dir build/ci-fast --output-on-failure -L 'unit|contract' -LE 'gpu|vulkan|slow|flaky-quarantine'
   ```
 
 - The default full CPU-supported local/CI gate excludes only capability-heavy, slow, or explicitly quarantined tests:
@@ -81,13 +88,14 @@ Operational expectations:
   or run conservative affected checks from changed paths:
 
   ```bash
-  python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir cmake-build-debug --print
-  python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir cmake-build-debug --run
+  python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print
+  python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --run
   ```
 
-  The helper maps touched paths to build targets, CTest labels, and structural
-  checks. It is not a replacement for the default full CPU-supported PR/merge
-  gate.
+  The route artifact records changed files, reasons, fallback state, targets,
+  labels, selected cases, command closure, and per-batch timing. This feedback
+  lane is not a replacement for the full CPU, sanitizer, or capability-specific
+  PR/merge gates.
 
 - GPU/Vulkan tests are opt-in and should run on capable developer machines or self-hosted GPU runners:
 

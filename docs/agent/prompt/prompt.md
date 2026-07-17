@@ -62,11 +62,16 @@ Session-procedural reminders on top of the contract:
 
 Run focused targets first; broaden only when the focused gate passes and the task requires it.
 
-For local iteration on changed paths, you may use the touched-scope helper to plan or run conservative affected checks. Treat it as an iteration aid, not a replacement for the default CPU gate when PR/merge-level confidence is required.
+For local iteration on changed paths, you may use the same staged touched-scope
+planner as `pr-fast`. Structural-only routes avoid C++ setup; source routes use
+the unsanitized Null/headless `ci-fast` preset and validate the selected
+producer inventory after configure. Treat it as feedback, not a replacement
+for the default CPU, sanitizer, or capability-specific gates when
+PR/merge-level confidence is required.
 
 ```
-python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir <configured-build> --print
-python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir <configured-build> --run
+python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print
+python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --run
 ```
 
 Default CPU gate (when code/tests touched):

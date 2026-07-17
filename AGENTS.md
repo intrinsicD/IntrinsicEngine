@@ -227,8 +227,12 @@ For each change:
     - Treat non-default build trees as valid evidence only after confirming their compiler/toolchain satisfies the
       repository C++23 requirements; stale trees with older compilers are not valid verification.
     - For local iteration on changed paths, use `python3 tools/ci/touched_scope.py --root . --base-ref origin/main
-      --build-dir <configured-build> --print` (or `--run`) to plan conservative touched-scope build/test/structural
-      checks; this helper is not a substitute for the full PR/merge gate.
+      --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print` (or
+      `--run`). The same staged planner drives `pr-fast`: it runs structural-only changes before C++ setup, configures
+      the unsanitized Null/headless `ci-fast` identity for source routes, and reconciles selected producers against the
+      fresh test registry before build. Missing/ambiguous diffs, module interfaces, headers, build/dependency inputs,
+      and unknown paths fail closed to the bounded broad feedback route. This helper and workflow are feedback aids,
+      not substitutes for the full CPU, sanitizer, or capability-specific PR/merge gates.
     - Treat `Testing/Temporary/LastTestsFailed.log` as historical state only; current pass/fail state comes from the
       CTest command just run.
     - For noisy commands, capture full output with `tee`, display a bounded tail, and use `set -o pipefail` so filtering

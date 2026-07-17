@@ -24,9 +24,45 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           persist-credentials: false
 
+      - name: Plan touched scope
+        id: route
+        shell: bash
+        run: |
+          base_ref=origin/main
+          head_ref=HEAD
+          if [[ '${{ github.event_name }}' == 'pull_request' ]]; then
+            base_ref='${{ github.event.pull_request.base.sha }}'
+            head_ref='${{ github.event.pull_request.head.sha }}'
+          fi
+          python3 tools/ci/touched_scope.py \
+            --root . \
+            --action plan \
+            --base-ref "$base_ref" \
+            --head-ref "$head_ref" \
+            --output build/ci-fast/ci-routing/route.json \
+            --github-output "$GITHUB_OUTPUT" \
+            --step-summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Ensure Python validation dependency
+        run: |
+          if ! python3 -c 'import yaml' >/dev/null 2>&1; then
+            python3 -m pip install --disable-pip-version-check pyyaml
+          fi
+
+      - name: Run selected structural checks
+        run: |
+          python3 tools/ci/touched_scope.py \
+            --root . \
+            --action structural \
+            --plan build/ci-fast/ci-routing/route.json \
+            --github-output "$GITHUB_OUTPUT" \
+            --step-summary "$GITHUB_STEP_SUMMARY"
+
       - name: Install system dependencies
+        if: steps.route.outputs.needs_cpp == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -38,6 +74,7 @@ jobs:
             python3
 
       - name: Configure ccache pilot
+        if: steps.route.outputs.needs_cpp == 'true'
         run: |
           mkdir -p "$CCACHE_DIR"
           ccache --set-config=max_size="$CCACHE_MAXSIZE"
@@ -47,6 +84,7 @@ jobs:
 
       - name: Cache vcpkg binary packages
         id: vcpkg-cache
+        if: steps.route.outputs.needs_cpp == 'true'
         uses: actions/cache@v4
         with:
           path: external/vcpkg-bincache
@@ -55,153 +93,176 @@ jobs:
             ${{ runner.os }}-vcpkg-
 
       - name: Bootstrap vcpkg
+        if: steps.route.outputs.needs_cpp == 'true'
         run: tools/setup/bootstrap_vcpkg.sh
 
       - name: Enable vcpkg binary cache
+        if: steps.route.outputs.needs_cpp == 'true'
         run: echo "VCPKG_BINARY_SOURCES=clear;files,${GITHUB_WORKSPACE}/external/vcpkg-bincache,readwrite" >> "$GITHUB_ENV"
 
-      - name: Configure (ci preset)
+      - name: Configure (ci-fast preset)
+        if: steps.route.outputs.needs_cpp == 'true'
         run: |
           python3 tools/ci/time_command.py \
-            --label "Configure (ci preset)" \
+            --label "Configure (ci-fast preset)" \
             --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
             --max-warm-seconds 40 \
-            --json-out build/ci/ci-timing/phases/configure.json \
-            -- cmake --preset ci
+            --json-out build/ci-fast/ci-timing/phases/configure.json \
+            -- cmake --preset ci-fast --fresh
+
+      - name: Finalize touched scope
+        id: finalize
+        if: steps.route.outputs.needs_cpp == 'true'
+        run: |
+          python3 tools/ci/touched_scope.py \
+            --root . \
+            --action finalize \
+            --plan build/ci-fast/ci-routing/route.json \
+            --build-dir build/ci-fast \
+            --github-output "$GITHUB_OUTPUT" \
+            --step-summary "$GITHUB_STEP_SUMMARY"
 
       - name: Detect configured compiler and cache identity
         id: toolchain
+        if: steps.route.outputs.needs_cpp == 'true'
         run: |
           python3 tools/ci/ccache_ci.py configured-identity \
-            --build-dir build/ci \
-            --expected-sanitizer combined-project-default
+            --build-dir build/ci-fast \
+            --expected-sanitizer none
 
       - name: Restore compatible ccache store
         id: ccache-restore
+        if: steps.route.outputs.needs_cpp == 'true'
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ccache-v1-${{ runner.os }}-${{ runner.arch }}-pr-fast-${{ steps.toolchain.outputs.compiler-key }}-${{ steps.toolchain.outputs.scan-deps-key }}-${{ steps.toolchain.outputs.ccache-key }}-preset-ci-sanitizer-${{ steps.toolchain.outputs.sanitizer }}-${{ hashFiles('.github/workflows/pr-fast.yml', 'CMakeLists.txt', 'CMakePresets.json', 'cmake/**/*.cmake', 'tools/ci/ccache_ci.py', 'tools/ci/ccache_module_invalidation_probe.py', 'tools/setup/bootstrap_vcpkg.sh', 'tools/vcpkg/**', 'vcpkg.json', 'vcpkg-configuration.json') }}-${{ github.sha }}
+          key: ccache-v1-${{ runner.os }}-${{ runner.arch }}-pr-fast-${{ steps.toolchain.outputs.compiler-key }}-${{ steps.toolchain.outputs.scan-deps-key }}-${{ steps.toolchain.outputs.ccache-key }}-preset-ci-fast-sanitizer-${{ steps.toolchain.outputs.sanitizer }}-${{ hashFiles('.github/workflows/pr-fast.yml', 'CMakeLists.txt', 'CMakePresets.json', 'cmake/**/*.cmake', 'tools/ci/ccache_ci.py', 'tools/ci/ccache_module_invalidation_probe.py', 'tools/setup/bootstrap_vcpkg.sh', 'tools/vcpkg/**', 'vcpkg.json', 'vcpkg-configuration.json') }}-${{ github.sha }}
           restore-keys: |
-            ccache-v1-${{ runner.os }}-${{ runner.arch }}-pr-fast-${{ steps.toolchain.outputs.compiler-key }}-${{ steps.toolchain.outputs.scan-deps-key }}-${{ steps.toolchain.outputs.ccache-key }}-preset-ci-sanitizer-${{ steps.toolchain.outputs.sanitizer }}-${{ hashFiles('.github/workflows/pr-fast.yml', 'CMakeLists.txt', 'CMakePresets.json', 'cmake/**/*.cmake', 'tools/ci/ccache_ci.py', 'tools/ci/ccache_module_invalidation_probe.py', 'tools/setup/bootstrap_vcpkg.sh', 'tools/vcpkg/**', 'vcpkg.json', 'vcpkg-configuration.json') }}-
+            ccache-v1-${{ runner.os }}-${{ runner.arch }}-pr-fast-${{ steps.toolchain.outputs.compiler-key }}-${{ steps.toolchain.outputs.scan-deps-key }}-${{ steps.toolchain.outputs.ccache-key }}-preset-ci-fast-sanitizer-${{ steps.toolchain.outputs.sanitizer }}-${{ hashFiles('.github/workflows/pr-fast.yml', 'CMakeLists.txt', 'CMakePresets.json', 'cmake/**/*.cmake', 'tools/ci/ccache_ci.py', 'tools/ci/ccache_module_invalidation_probe.py', 'tools/setup/bootstrap_vcpkg.sh', 'tools/vcpkg/**', 'vcpkg.json', 'vcpkg-configuration.json') }}-
 
       - name: Validate ccache pilot mode
+        if: steps.route.outputs.needs_cpp == 'true'
         run: |
           python3 tools/ci/ccache_ci.py check-config \
-            --build-dir build/ci \
+            --build-dir build/ci-fast \
             --repo-root . \
             --expected-cache-dir "$CCACHE_DIR" \
             --expected-max-size "$INTRINSIC_CCACHE_MAXSIZE_DISPLAY"
 
       - name: Run module invalidation ccache probe
+        if: steps.route.outputs.needs_cpp == 'true'
         run: |
           python3 tools/ci/ccache_module_invalidation_probe.py \
             --work-dir "$RUNNER_TEMP/intrinsic-ccache-module-probe" \
             --cxx '${{ steps.toolchain.outputs.compiler-path }}' \
             --scan-deps '${{ steps.toolchain.outputs.scan-deps-path }}' \
-            --output build/ci/ci-timing/ccache/module-invalidation-probe.json
+            --output build/ci-fast/ci-timing/ccache/module-invalidation-probe.json
 
       - name: Zero ccache stats
+        if: steps.route.outputs.needs_cpp == 'true'
         run: ccache --zero-stats
 
-      - name: Build PR-fast test aggregate
+      - name: Build selected test closure
+        id: build
+        if: steps.route.outputs.needs_cpp == 'true'
         run: |
           python3 tools/ci/time_command.py \
-            --label "Build PR-fast test aggregate" \
-            --json-out build/ci/ci-timing/phases/build.json \
-            -- cmake --build --preset ci --target IntrinsicPrFastTests
+            --label "Build selected test closure" \
+            --json-out build/ci-fast/ci-timing/phases/build.json \
+            -- python3 tools/ci/touched_scope.py \
+              --root . \
+              --action build \
+              --plan build/ci-fast/ci-routing/route.json \
+              --build-dir build/ci-fast \
+              --github-output "$GITHUB_OUTPUT" \
+              --step-summary "$GITHUB_STEP_SUMMARY"
 
       - name: Collect ccache stats
         id: ccache-stats
-        if: always()
+        if: always() && steps.route.outputs.needs_cpp == 'true'
         run: |
           python3 tools/ci/ccache_ci.py write-stats \
-            --output build/ci/ci-timing/ccache/stats.json
+            --output build/ci-fast/ci-timing/ccache/stats.json
 
-      - name: Run unit and contract tests
+      - name: Run selected tests
+        id: test
+        if: steps.route.outputs.needs_cpp == 'true'
         run: |
-          python3 tools/ci/check_prerequisites.py test-binaries \
-            --build-dir build/ci \
-            --inventory build/ci/test-inventories/IntrinsicPrFastTests.txt
           python3 tools/ci/time_command.py \
-            --label "Run unit and contract tests" \
-            --json-out build/ci/ci-timing/phases/test.json \
-            -- ctest --test-dir build/ci --output-on-failure -L "unit|contract" -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)
+            --label "Run selected tests" \
+            --json-out build/ci-fast/ci-timing/phases/test.json \
+            -- python3 tools/ci/touched_scope.py \
+              --root . \
+              --action test \
+              --plan build/ci-fast/ci-routing/route.json \
+              --build-dir build/ci-fast \
+              --github-output "$GITHUB_OUTPUT" \
+              --step-summary "$GITHUB_STEP_SUMMARY"
 
       - name: Aggregate gate timing result
-        if: always()
+        if: always() && steps.route.outputs.needs_cpp == 'true'
         run: |
           context_args=()
           cache_state=cold
           if [ -n '${{ steps.ccache-restore.outputs.cache-matched-key }}' ]; then
             cache_state=warm
           fi
-          if selected_tests="$(ctest --test-dir build/ci --show-only=json-v1 -L "unit|contract" -LE "gpu|vulkan|slow|flaky-quarantine" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"; then
-            context_args+=(--selected-test-count "$selected_tests")
+          if [ -n '${{ steps.test.outputs.selected_test_count }}' ]; then
+            context_args+=(--selected-test-count '${{ steps.test.outputs.selected_test_count }}')
           fi
-          if ninja_edges="$(ninja -C build/ci -t commands IntrinsicPrFastTests | sed '/^[[:space:]]*$/d' | wc -l)"; then
-            context_args+=(--ninja-edge-count "$ninja_edges")
+          if [ -n '${{ steps.build.outputs.ninja_edge_count }}' ]; then
+            context_args+=(--ninja-edge-count '${{ steps.build.outputs.ninja_edge_count }}')
           fi
           python3 tools/ci/aggregate_gate_timing.py \
-            --configure-json build/ci/ci-timing/phases/configure.json \
-            --build-json build/ci/ci-timing/phases/build.json \
-            --test-json build/ci/ci-timing/phases/test.json \
+            --configure-json build/ci-fast/ci-timing/phases/configure.json \
+            --build-json build/ci-fast/ci-timing/phases/build.json \
+            --test-json build/ci-fast/ci-timing/phases/test.json \
             --gate pr-fast \
-            --preset ci \
-            --build-dir build/ci \
+            --preset ci-fast \
+            --build-dir build/ci-fast \
             --compiler '${{ steps.toolchain.outputs.compiler }}' \
             --sanitizer '${{ steps.toolchain.outputs.sanitizer }}' \
             --runner-image ubuntu-24.04 \
             --commit '${{ github.sha }}' \
             --cache-state "$cache_state" \
-            --ccache-stats-json build/ci/ci-timing/ccache/stats.json \
+            --ccache-stats-json build/ci-fast/ci-timing/ccache/stats.json \
             --require-ccache-stats \
             --vcpkg-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
             --job-url 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}' \
             "${context_args[@]}" \
-            --output build/ci/ci-timing/result/result.json
+            --output build/ci-fast/ci-timing/result/result.json
 
       - name: Validate gate timing result
-        if: always()
-        run: python3 tools/benchmark/validate_benchmark_results.py --root build/ci/ci-timing/result --strict
+        if: always() && steps.route.outputs.needs_cpp == 'true'
+        run: python3 tools/benchmark/validate_benchmark_results.py --root build/ci-fast/ci-timing/result --strict
 
       - name: Upload gate timing result
-        if: always()
+        if: always() && steps.route.outputs.needs_cpp == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ci-gate-timing-pr-fast
-          path: build/ci/ci-timing/result/result.json
+          path: build/ci-fast/ci-timing/result/result.json
           if-no-files-found: error
 
       - name: Upload module invalidation probe result
-        if: always()
+        if: always() && steps.route.outputs.needs_cpp == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ci-ccache-module-invalidation-pr-fast
-          path: build/ci/ci-timing/ccache/module-invalidation-probe.json
+          path: build/ci-fast/ci-timing/ccache/module-invalidation-probe.json
           if-no-files-found: error
 
-      - name: Install Python validation deps
-        run: python3 -m pip install --disable-pip-version-check pyyaml
-
-      - name: Validate kernel-convergence checker regressions
-        run: python3 tests/regression/tooling/Test.CheckKernelConvergence.py
-
-      - name: Validate kernel convergence (strict mode)
-        run: python3 tools/repo/check_kernel_convergence.py --root . --strict
-
-      - name: Validate task policy (strict mode)
-        run: python3 tools/agents/check_task_policy.py --root . --strict
-
-      - name: Validate docs links (warning mode)
-        run: python3 tools/docs/check_doc_links.py --root .
-
-      - name: Validate layering (strict mode)
-        run: python3 tools/repo/check_layering.py --root src --strict
-
       - name: Save validated ccache store
-        if: success()
+        if: success() && steps.route.outputs.needs_cpp == 'true'
         uses: actions/cache/save@v4
         with:
           path: ${{ env.CCACHE_DIR }}
           key: ${{ steps.ccache-restore.outputs.cache-primary-key }}
+
+      - name: Upload touched-scope route
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-pr-fast-touched-scope-route
+          path: build/ci-fast/ci-routing/
+          if-no-files-found: error

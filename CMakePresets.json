@@ -53,6 +53,27 @@
       }
     },
     {
+      "name": "ci-fast",
+      "displayName": "Unsanitized headless PR feedback",
+      "inherits": "ci",
+      "description": "Minimal unsanitized Linux/Null configuration for touched-scope PR feedback. Full CPU, sanitizer, and Vulkan confidence remains in dedicated gates.",
+      "cacheVariables": {
+        "BUILD_TESTING": "ON",
+        "EXTRINSIC_PLATFORM": "Linux",
+        "EXTRINSIC_BACKEND": "Null",
+        "INTRINSIC_PLATFORM_BACKEND": "Null",
+        "INTRINSIC_HEADLESS_NO_GLFW": "ON",
+        "INTRINSIC_BUILD_SANDBOX": "OFF",
+        "INTRINSIC_BUILD_TESTS": "ON",
+        "INTRINSIC_BUILD_BENCHMARKS": "OFF",
+        "INTRINSIC_ENABLE_CUDA": "OFF",
+        "INTRINSIC_ENABLE_SANITIZERS": "OFF",
+        "INTRINSIC_ENABLE_SOURCE_COVERAGE": "OFF",
+        "INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN": "OFF",
+        "VCPKG_MANIFEST_NO_DEFAULT_FEATURES": "ON"
+      }
+    },
+    {
       "name": "ci-coverage-cpu",
       "displayName": "Debug CPU source coverage",
       "inherits": "ci",
@@ -97,6 +118,10 @@
     {
       "name": "ci",
       "configurePreset": "ci"
+    },
+    {
+      "name": "ci-fast",
+      "configurePreset": "ci-fast"
     },
     {
       "name": "ci-coverage-cpu",
