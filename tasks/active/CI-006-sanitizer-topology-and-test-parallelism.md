@@ -7,6 +7,12 @@ depends_on:
 ---
 # CI-006 — Remove duplicate sanitizer work and isolate variants
 
+## Status
+- In progress on 2026-07-17; owner: Codex; branch: `main`.
+- Next verification: configure the isolated `ci-asan` and `ci-ubsan` presets,
+  reconcile their exact CPU selection, and run the sanitizer preset/workflow
+  regression.
+
 ## Goal
 - Define one explicit, isolated sanitizer topology so CI does not pay for
   overlapping combined/dedicated variants or accidentally run performance

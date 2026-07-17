@@ -15,7 +15,8 @@ map.
 
 ## Tasks
 
-- [CI-006 — Remove duplicate sanitizer work and isolate variants](CI-006-sanitizer-topology-and-test-parallelism.md)
+- [CI-006 — Remove duplicate sanitizer work and isolate variants](../../active/CI-006-sanitizer-topology-and-test-parallelism.md)
+  (currently active).
 - [CI-008 — Reduce CTest process overhead without oversubscribing workers](CI-008-grouped-ctest-and-worker-oversubscription.md)
 - [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
 - [CI-011 — Calibrate the slow-test cohort and retain fast sentinels](CI-011-measured-slow-test-cohort.md)

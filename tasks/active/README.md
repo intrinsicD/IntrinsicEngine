@@ -11,7 +11,9 @@ Each active task should include:
 
 ## Currently active
 
-No tasks are currently active.
+- [`CI-006`](CI-006-sanitizer-topology-and-test-parallelism.md) — isolate the
+  unsanitized, ASan, and UBSan preset/workflow identities and prove exact CPU
+  selection parity without duplicate sanitizer work.
 
 ## History
 
