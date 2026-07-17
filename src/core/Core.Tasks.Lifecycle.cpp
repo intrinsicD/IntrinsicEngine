@@ -77,7 +77,9 @@ namespace Extrinsic::Core::Tasks
 
         for (;;)
         {
-            if (s_Ctx->inFlightTasks.load(std::memory_order_acquire) == 0)
+            const auto observed =
+                s_Ctx->inFlightTasks.load(std::memory_order_acquire);
+            if (observed == 0)
                 break;
 
             LocalTask task;
@@ -87,11 +89,7 @@ namespace Extrinsic::Core::Tasks
                 continue;
             }
 
-            const auto observed = s_Ctx->inFlightTasks.load(std::memory_order_acquire);
-            if (observed > 0)
-                s_Ctx->inFlightTasks.wait(observed, std::memory_order_relaxed);
-            else
-                Detail::CpuRelaxOrYield();
+            s_Ctx->inFlightTasks.wait(observed, std::memory_order_relaxed);
         }
     }
 }
