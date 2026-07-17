@@ -24,6 +24,7 @@ MINIMUM_LLVM_MAJOR = 20
 sys.path.insert(0, str(REPO_ROOT / "tools" / "ci"))
 
 from source_coverage import CoverageError, normalize_llvm_cov_export  # noqa: E402
+from source_coverage import _grouped_gtest_cases  # noqa: E402
 
 CMAKE_PROJECT = r"""
 cmake_minimum_required(VERSION 3.24)
@@ -53,6 +54,7 @@ option(INCLUDE_XML_OMISSION "Include a producer with incomplete execution XML" O
 option(RENAME_TEST_TARGETS "Rename only the GoogleTest producer targets" OFF)
 option(MOVE_TEST_WORKING_DIRECTORY "Move one case to another build subdirectory" OFF)
 option(MOVE_MANUAL_TEST_WORKING_DIRECTORY "Move the manual CTest producer" OFF)
+option(GROUP_GTESTS "Replace individual GoogleTest cases with grouped wrappers" OFF)
 
 function(add_coverage_test target production_source test_source case_name)
     add_executable("${target}" "${production_source}" "${test_source}")
@@ -65,14 +67,33 @@ function(add_coverage_test target production_source test_source case_name)
         -fcoverage-mapping
     )
     target_link_options("${target}" PRIVATE -fprofile-instr-generate)
-    add_test(
-        NAME "${case_name}"
-        COMMAND
-            "${target}"
-            "--gtest_filter=${case_name}"
-            "--gtest_also_run_disabled_tests"
-    )
-    set_tests_properties("${case_name}" PROPERTIES LABELS "core;unit")
+    if(GROUP_GTESTS)
+        add_test(
+            NAME "${target}.Grouped"
+            COMMAND
+                "${target}"
+                "--gtest_filter=*"
+                "--gtest_also_run_disabled_tests"
+                "--gtest_output=xml:${CMAKE_BINARY_DIR}/reports/grouped-ctest/gtest/${target}.xml"
+        )
+        set_tests_properties(
+            "${target}.Grouped"
+            PROPERTIES
+            LABELS "core;unit"
+            PROCESSORS 1
+            TIMEOUT 120
+            WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+        )
+    else()
+        add_test(
+            NAME "${case_name}"
+            COMMAND
+                "${target}"
+                "--gtest_filter=${case_name}"
+                "--gtest_also_run_disabled_tests"
+        )
+        set_tests_properties("${case_name}" PROPERTIES LABELS "core;unit")
+    endif()
 endfunction()
 
 set(alpha_target AlphaTests)
@@ -94,6 +115,16 @@ add_coverage_test(
     "${CMAKE_SOURCE_DIR}/tests/beta_test.cpp"
     "Beta.CoversBothArms"
 )
+if(NOT GROUP_GTESTS)
+    add_test(
+        NAME "Beta.DISABLED_NotRun"
+        COMMAND
+            "${beta_target}"
+            "--gtest_filter=Beta.DISABLED_NotRun"
+            "--gtest_also_run_disabled_tests"
+    )
+    set_tests_properties("Beta.DISABLED_NotRun" PROPERTIES DISABLED TRUE LABELS "core;unit")
+endif()
 
 if(MOVE_TEST_WORKING_DIRECTORY)
     file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/moved-working-directory")
@@ -261,7 +292,7 @@ int beta_value(int);
 int main(int argc, char** argv) {
     const auto arguments = fake_gtest::parse(argc, argv);
     if (arguments.list_tests) {
-        std::cout << "Beta.\n  CoversBothArms\n";
+        std::cout << "Beta.\n  CoversBothArms\n  DISABLED_NotRun\n";
         return 0;
     }
     fake_gtest::write_xml(arguments, "Beta", "CoversBothArms");
@@ -572,11 +603,13 @@ class SourceCoverageTests(unittest.TestCase):
     source_root: Path
     build_a: Path
     build_b: Path
+    build_grouped: Path
     build_moved_manual_working_directory: Path
     build_moved_working_directory: Path
     build_renamed_targets: Path
     report_a: Path
     report_b: Path
+    report_grouped: Path
     report_parallel: Path
     report_moved_manual_working_directory: Path
     report_moved_working_directory: Path
@@ -639,6 +672,7 @@ class SourceCoverageTests(unittest.TestCase):
 
         cls.build_a = cls.root / "build-a"
         cls.build_b = cls.root / "different" / "build-b"
+        cls.build_grouped = cls.root / "build-grouped"
         cls.build_moved_manual_working_directory = (
             cls.root / "build-moved-manual-working-directory"
         )
@@ -646,6 +680,7 @@ class SourceCoverageTests(unittest.TestCase):
         cls.build_renamed_targets = cls.root / "build-renamed-targets"
         cls._configure_and_build(cls.build_a)
         cls._configure_and_build(cls.build_b)
+        cls._configure_and_build(cls.build_grouped, group_gtests=True)
         cls._configure_and_build(
             cls.build_moved_manual_working_directory,
             move_manual_test_working_directory=True,
@@ -660,6 +695,15 @@ class SourceCoverageTests(unittest.TestCase):
         )
         cls.report_a = cls._collect(cls.build_a, "coverage-a", jobs=1)
         cls.report_b = cls._collect(cls.build_b, "coverage-b", jobs=1)
+        _write(
+            cls.build_grouped / "reports/grouped-ctest/gtest/BetaTests.xml",
+            "<stale/>\n",
+        )
+        cls.report_grouped = cls._collect(
+            cls.build_grouped,
+            "coverage-grouped",
+            jobs=1,
+        )
         cls.report_parallel = cls._collect(
             cls.build_a,
             "coverage-parallel",
@@ -698,6 +742,7 @@ class SourceCoverageTests(unittest.TestCase):
         move_manual_test_working_directory: bool = False,
         move_test_working_directory: bool = False,
         rename_test_targets: bool = False,
+        group_gtests: bool = False,
     ) -> None:
         _run(
             [
@@ -718,6 +763,7 @@ class SourceCoverageTests(unittest.TestCase):
                 "-DMOVE_TEST_WORKING_DIRECTORY="
                 f"{'ON' if move_test_working_directory else 'OFF'}",
                 f"-DRENAME_TEST_TARGETS={'ON' if rename_test_targets else 'OFF'}",
+                f"-DGROUP_GTESTS={'ON' if group_gtests else 'OFF'}",
             ],
             cwd=cls.root,
         )
@@ -825,17 +871,21 @@ class SourceCoverageTests(unittest.TestCase):
         candidate: Path,
         *,
         check: bool,
+        require_exact: bool = False,
     ) -> subprocess.CompletedProcess[str]:
+        command = [
+            sys.executable,
+            str(COMPARE_COVERAGE),
+            "--baseline",
+            str(baseline),
+            "--candidate",
+            str(candidate),
+            "--test-only-refactor",
+        ]
+        if require_exact:
+            command.append("--require-exact")
         return _run(
-            [
-                sys.executable,
-                str(COMPARE_COVERAGE),
-                "--baseline",
-                str(baseline),
-                "--candidate",
-                str(candidate),
-                "--test-only-refactor",
-            ],
+            command,
             cwd=self.root,
             check=check,
         )
@@ -1106,7 +1156,11 @@ class SourceCoverageTests(unittest.TestCase):
                 for target in inventory["targets"]
                 for case in target["cases"]
             },
-            {"Alpha.CoversBothArms", "Beta.CoversBothArms"},
+            {
+                "Alpha.CoversBothArms",
+                "Beta.CoversBothArms",
+                "Beta.DISABLED_NotRun",
+            },
         )
         self.assertEqual(
             {
@@ -1114,7 +1168,11 @@ class SourceCoverageTests(unittest.TestCase):
                 for target in inventory["targets"]
                 for case in target["cases"]
             },
-            {"Alpha.CoversBothArms", "Beta.CoversBothArms"},
+            {
+                "Alpha.CoversBothArms",
+                "Beta.CoversBothArms",
+                "Beta.DISABLED_NotRun",
+            },
         )
         manual_target = next(
             target
@@ -1384,6 +1442,62 @@ class SourceCoverageTests(unittest.TestCase):
             )
         )
 
+    def test_grouped_wrappers_preserve_raw_inventory_and_exact_coverage(
+        self,
+    ) -> None:
+        baseline_inventory = _load_json(self.report_a / "test-inventory.json")
+        grouped_inventory = _load_json(
+            self.report_grouped / "test-inventory.json"
+        )
+
+        def raw_cases(inventory: dict[str, Any]) -> set[tuple[str, str, bool]]:
+            return {
+                (target["name"], case["gtest_filter"], case["disabled"])
+                for target in inventory["targets"]
+                if target["kind"] == "gtest"
+                for case in target["cases"]
+            }
+
+        self.assertEqual(raw_cases(baseline_inventory), raw_cases(grouped_inventory))
+        wrappers = [
+            test["ctest_name"]
+            for target in grouped_inventory["targets"]
+            for test in target["ctest_tests"]
+        ]
+        self.assertIn("BetaTests.Grouped", wrappers)
+        comparison = self._compare(
+            self.report_a / "coverage.json",
+            self.report_grouped / "coverage.json",
+            check=False,
+            require_exact=True,
+        )
+        self.assertEqual(comparison.returncode, 0, comparison.stdout)
+        self.assertIn(
+            "gained_lines=0 gained_regions=0 gained_branch_arms=0",
+            comparison.stdout,
+        )
+        stale = self.build_grouped / "reports/grouped-ctest/gtest/BetaTests.xml"
+        self.assertEqual(stale.read_text(encoding="utf-8"), "<stale/>\n")
+
+    def test_noncanonical_grouped_timeout_fails_closed(self) -> None:
+        target = "AlphaTests"
+        executable = (self.build_grouped / "bin" / target).resolve()
+        command = _load_json(
+            self.report_grouped / "test-inventory.json"
+        )["targets"][0]["ctest_tests"][0]["command"]
+        with self.assertRaisesRegex(CoverageError, "not the canonical grouped"):
+            _grouped_gtest_cases(
+                build_dir=self.build_grouped.resolve(),
+                command=command,
+                discovery_environment={},
+                environment=(),
+                name=f"{target}.Grouped",
+                target=target,
+                target_path=executable,
+                test={"properties": [{"name": "TIMEOUT", "value": 60.0}]},
+                working_directory=self.build_grouped.resolve(),
+            )
+
     def test_missing_registered_binary_fails_closed(self) -> None:
         binary = self.build_a / "bin" / "BetaTests"
         hidden = binary.with_suffix(".hidden")
@@ -1436,6 +1550,17 @@ class SourceCoverageTests(unittest.TestCase):
         result = output / "gtest-results" / "LiarTests.xml"
         self.assertTrue(result.is_file(), result)
         self.assertEqual(list(ET.parse(result).iterfind(".//testcase")), [])
+
+    def test_grouped_execution_xml_omission_fails_closed(self) -> None:
+        build_dir = self.root / "build-grouped-xml-omission"
+        self._configure_and_build(
+            build_dir, include_xml_omission=True, group_gtests=True
+        )
+        self._assert_collection_fails(
+            build_dir,
+            "failure-grouped-xml-omission",
+            r"(?is)LiarTests.*XML execution inventory mismatch.*Liar\.Requested",
+        )
 
     def test_omitted_cpu_aggregate_member_fails_closed(self) -> None:
         aggregate = (

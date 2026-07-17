@@ -33,7 +33,7 @@ def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
         action="store_true",
         help=(
             "require identical production/build identities and reject every "
-            "lost covered production region or branch arm"
+            "lost covered production line, region, or branch arm"
         ),
     )
     mode.add_argument(
@@ -45,7 +45,15 @@ def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
             "report's bound test inventory"
         ),
     )
-    return parser.parse_args(argv)
+    parser.add_argument(
+        "--require-exact",
+        action="store_true",
+        help="with --test-only-refactor, reject gained evidence too",
+    )
+    arguments = parser.parse_args(argv)
+    if arguments.require_exact and not arguments.test_only_refactor:
+        parser.error("--require-exact requires --test-only-refactor")
+    return arguments
 
 
 def _read_report(path: Path) -> Mapping[str, object]:
@@ -99,7 +107,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         baseline = _read_report(arguments.baseline)
         candidate = _read_report(arguments.candidate)
         if arguments.test_only_refactor:
-            result = compare_test_only_refactor(baseline, candidate)
+            result = compare_test_only_refactor(
+                baseline,
+                candidate,
+                require_exact=arguments.require_exact,
+            )
         else:
             baseline_inventory = _read_bound_inventory(
                 arguments.baseline,
@@ -125,13 +137,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     except CoverageError as error:
         print(f"CPU source coverage comparison: error: {error}", file=sys.stderr)
         return 1
-    summary = (
-        "CPU source coverage comparison: ok: "
-        f"mode={result['mode']} "
+    summary = f"CPU source coverage comparison: ok: mode={result['mode']} "
+    if result["mode"] == "test-only-refactor":
+        summary += f"gained_lines={len(result['gained_lines'])} "
+    summary += (
         f"gained_regions={len(result['gained_regions'])} "
         f"gained_branch_arms={len(result['gained_branch_arms'])} "
-        "lost_regions=0 lost_branch_arms=0"
     )
+    if result["mode"] == "test-only-refactor":
+        summary += "lost_lines=0 "
+    summary += "lost_regions=0 lost_branch_arms=0"
     if result["mode"] == "test-cohort-transition":
         summary += (
             f" baseline_cases={result['baseline_case_count']}"

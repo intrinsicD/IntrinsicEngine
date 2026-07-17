@@ -25,6 +25,7 @@ from source_coverage import (
     exclusion_identity,
     load_cpu_test_inventory,
     normalize_llvm_cov_export,
+    parse_gtest_listing,
     production_build_input_digest,
     production_source_digest,
     read_cmake_cache,
@@ -35,8 +36,6 @@ from source_coverage import (
 
 DIAGNOSTICS_SCHEMA = "intrinsic.cpu-source-coverage-diagnostics/v1"
 _VERSION_RE = re.compile(r"\b(?:clang|LLVM) version\s+(?P<major>\d+)", re.I)
-_GTEST_SUITE_RE = re.compile(r"^(?P<suite>\S+)\.\s*(?:#.*)?$")
-_GTEST_COMMENT_RE = re.compile(r"\s+#.*$")
 
 
 def _bounded_default_jobs() -> int:
@@ -309,35 +308,6 @@ def _run_logged(
         )
 
 
-def _parse_gtest_listing(output: str, target: str) -> tuple[str, ...]:
-    suite: str | None = None
-    cases: list[str] = []
-    for line_number, line in enumerate(output.splitlines(), start=1):
-        if not line.strip():
-            continue
-        if line.startswith("  "):
-            if suite is None:
-                raise CoverageError(
-                    f"{target}: GoogleTest case precedes suite at line {line_number}"
-                )
-            case = _GTEST_COMMENT_RE.sub("", line.strip())
-            if not case or any(character.isspace() for character in case):
-                raise CoverageError(
-                    f"{target}: malformed GoogleTest case at line {line_number}"
-                )
-            cases.append(f"{suite}.{case}")
-            continue
-        match = _GTEST_SUITE_RE.fullmatch(line)
-        if match:
-            suite = match.group("suite")
-    if not cases:
-        raise CoverageError(f"{target}: --gtest_list_tests selected zero cases")
-    duplicates = sorted(case for case, count in Counter(cases).items() if count > 1)
-    if duplicates:
-        raise CoverageError(f"{target}: duplicate listed cases {duplicates!r}")
-    return tuple(cases)
-
-
 def _profiles_for(target: str, directory: Path) -> list[Path]:
     profiles = sorted(directory.glob("*.profraw"))
     if not profiles:
@@ -374,7 +344,7 @@ def _probe_gtest_target(
         cwd=Path(str(target["working_directory"])),
     )
     output_text = log_path.read_text(encoding="utf-8").split("\n", 1)[-1]
-    listed = frozenset(_parse_gtest_listing(output_text, str(target["name"])))
+    listed = frozenset(parse_gtest_listing(output_text, str(target["name"])))
     expected = frozenset(
         str(case["gtest_filter"])
         for case in target["cases"]  # type: ignore[index]

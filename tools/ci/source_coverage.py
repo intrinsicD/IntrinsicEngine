@@ -437,6 +437,103 @@ def _target_for_command(
     return next(iter(matches), None)
 
 
+_GTEST_SUITE_RE = re.compile(r"^(?P<suite>\S+)\.\s*(?:#.*)?$")
+_GTEST_COMMENT_RE = re.compile(r"\s+#.*$")
+
+
+def parse_gtest_listing(output: str, target: str) -> tuple[str, ...]:
+    suite: str | None = None
+    cases: list[str] = []
+    for line_number, line in enumerate(output.splitlines(), start=1):
+        if not line.strip():
+            continue
+        if line.startswith("  "):
+            if suite is None:
+                raise CoverageError(
+                    f"{target}: GoogleTest case precedes suite at line {line_number}"
+                )
+            case = _GTEST_COMMENT_RE.sub("", line.strip())
+            if not case or any(character.isspace() for character in case):
+                raise CoverageError(
+                    f"{target}: malformed GoogleTest case at line {line_number}"
+                )
+            cases.append(f"{suite}.{case}")
+            continue
+        match = _GTEST_SUITE_RE.fullmatch(line)
+        if match:
+            suite = match.group("suite")
+    if not cases:
+        raise CoverageError(f"{target}: --gtest_list_tests selected zero cases")
+    duplicates = sorted(case for case, count in Counter(cases).items() if count > 1)
+    if duplicates:
+        raise CoverageError(f"{target}: duplicate listed cases {duplicates!r}")
+    return tuple(cases)
+
+
+def _grouped_gtest_cases(
+    *,
+    build_dir: Path,
+    command: Sequence[str],
+    discovery_environment: Mapping[str, str],
+    environment: Sequence[str],
+    name: str,
+    target: str,
+    target_path: Path,
+    test: Mapping[str, object],
+    working_directory: Path,
+) -> tuple[tuple[str, bool], ...] | None:
+    grouped_marker = (
+        name == f"{target}.Grouped"
+        or "--gtest_filter=*" in command
+        or any(arg.startswith("--gtest_output=xml:") for arg in command)
+    )
+    if not grouped_marker:
+        return None
+    expected = (
+        str(target_path),
+        "--gtest_filter=*",
+        "--gtest_also_run_disabled_tests",
+        "--gtest_output=xml:"
+        f"{build_dir / 'reports/grouped-ctest/gtest' / f'{target}.xml'}",
+    )
+    timeout = _property_values(test, "TIMEOUT")
+    if (
+        name != f"{target}.Grouped"
+        or tuple(command) != expected
+        or timeout != [120.0]
+        or _disabled(test)
+    ):
+        raise CoverageError(
+            f"CTest registration {name!r} is not the canonical grouped "
+            f"GoogleTest wrapper for {target}"
+        )
+    listing_environment = dict(discovery_environment)
+    for entry in environment:
+        key, _separator, value = entry.partition("=")
+        listing_environment[key] = value
+    result = _run_capture(
+        [str(target_path), "--gtest_list_tests"],
+        cwd=working_directory,
+        env=listing_environment,
+        timeout=300,
+    )
+    if result.returncode != 0:
+        raise CoverageError(
+            f"{target}: --gtest_list_tests failed with exit "
+            f"{result.returncode}:\n{result.stdout}"
+        )
+    return tuple(
+        (
+            case,
+            any(
+                part.startswith("DISABLED_")
+                for part in case.replace(".", "/").split("/")
+            ),
+        )
+        for case in parse_gtest_listing(result.stdout, target)
+    )
+
+
 def load_cpu_test_inventory(
     build_dir: Path,
     *,
@@ -532,37 +629,66 @@ def load_cpu_test_inventory(
                 f"CTest test {name!r} labels differ from {target}: "
                 f"expected={registered[target]!r}, actual={labels!r}"
             )
+        environment = _environment(raw_test)
+        working_directory = _working_directory(raw_test, build_dir)
         filters = [
             argument.removeprefix("--gtest_filter=")
             for argument in command
             if argument.startswith("--gtest_filter=")
         ]
-        is_gtest = (
-            _resolved(command[0]) == target_paths[target]
+        grouped_cases = _grouped_gtest_cases(
+            build_dir=build_dir,
+            command=command,
+            discovery_environment=discovery_environment,
+            environment=environment,
+            name=name,
+            target=target,
+            target_path=target_paths[target],
+            test=raw_test,
+            working_directory=working_directory,
+        )
+        is_individual_gtest = (
+            grouped_cases is None
+            and _resolved(command[0]) == target_paths[target]
             and "--gtest_also_run_disabled_tests" in command
             and bool(filters)
         )
-        if is_gtest and (len(filters) != 1 or not filters[0]):
+        if is_individual_gtest and (len(filters) != 1 or not filters[0]):
             raise CoverageError(
                 f"CTest GoogleTest registration {name!r} has invalid filter"
             )
-        target_records[target].append(
-            {
-                "ctest_name": name,
-                "command": command,
-                "disabled": _disabled(raw_test),
-                "environment": list(_environment(raw_test)),
-                "gtest_filter": filters[0] if is_gtest else None,
-                "is_gtest": is_gtest,
-                "labels": list(labels),
-                "working_directory": str(_working_directory(raw_test, build_dir)),
-            }
+        cases = (
+            grouped_cases
+            if grouped_cases is not None
+            else (
+                (
+                    filters[0] if is_individual_gtest else None,
+                    _disabled(raw_test),
+                ),
+            )
         )
+        for case, disabled in cases:
+            target_records[target].append(
+                {
+                    "ctest_name": case if grouped_cases is not None else name,
+                    "command": command,
+                    "disabled": disabled,
+                    "environment": list(environment),
+                    "gtest_filter": case,
+                    "grouped_ctest_name": (
+                        name if grouped_cases is not None else None
+                    ),
+                    "is_gtest": is_individual_gtest or grouped_cases is not None,
+                    "labels": list(labels),
+                    "working_directory": str(working_directory),
+                }
+            )
 
     targets: list[dict[str, object]] = []
     common_environments: set[tuple[str, ...]] = set()
     global_cases: dict[str, str] = {}
     enabled_case_count = 0
+    gtest_ctest_test_count = 0
     manual_test_count = 0
     gtest_target_count = 0
     manual_target_count = 0
@@ -585,6 +711,31 @@ def load_cpu_test_inventory(
         if is_gtest:
             gtest_target_count += 1
             seen_filters: set[str] = set()
+            grouped_names = {record["grouped_ctest_name"] for record in records}
+            if len(grouped_names) != 1:
+                raise CoverageError(
+                    f"CPU GoogleTest target {target!r} mixes grouped and "
+                    "individual registrations"
+                )
+            grouped_name = next(iter(grouped_names))
+            if grouped_name is not None:
+                if grouped_name != f"{target}.Grouped":
+                    raise CoverageError(
+                        f"CPU GoogleTest target {target!r} has a malformed "
+                        "grouped registration name"
+                    )
+                record = records[0]
+                ctest_tests.append(
+                    {
+                        "command": record["command"],
+                        "ctest_name": grouped_name,
+                        "timeout_seconds": 120,
+                        "working_directory_identity": _working_directory_identity(
+                            Path(str(record["working_directory"])), build_dir
+                        ),
+                    }
+                )
+                gtest_ctest_test_count += 1
             working_directories = {
                 str(record["working_directory"]) for record in records
             }
@@ -615,6 +766,8 @@ def load_cpu_test_inventory(
                 common_environments.add(environment)
                 disabled = bool(record["disabled"])
                 enabled_case_count += not disabled
+                if grouped_name is None:
+                    gtest_ctest_test_count += not disabled
                 cases.append(
                     {
                         "ctest_name": record["ctest_name"],
@@ -679,7 +832,7 @@ def load_cpu_test_inventory(
         "common_environment": common_environment,
         "schema": TEST_INVENTORY_SCHEMA,
         "summary": {
-            "ctest_test_count": enabled_case_count + manual_test_count,
+            "ctest_test_count": gtest_ctest_test_count + manual_test_count,
             "enabled_gtest_case_count": enabled_case_count,
             "gtest_target_count": gtest_target_count,
             "manual_ctest_test_count": manual_test_count,
@@ -1258,6 +1411,7 @@ def validate_test_inventory(
     gtest_target_count = 0
     manual_target_count = 0
     enabled_gtest_case_count = 0
+    gtest_ctest_test_count = 0
     manual_ctest_test_count = 0
     gtest_working_directories: dict[str, str] = {}
     for index, raw_target in enumerate(raw_targets, start=1):
@@ -1283,15 +1437,28 @@ def validate_test_inventory(
 
         if kind == "gtest":
             gtest_target_count += 1
-            if raw_ctest_tests:
-                raise CoverageError(
-                    f"{target_context} GoogleTest target has manual CTest records"
-                )
             working_directory = _inventory_string(
                 raw_target.get("working_directory_identity"),
                 context=f"{target_context} working_directory_identity",
             )
             gtest_working_directories[target_name] = working_directory
+            grouped = bool(raw_ctest_tests)
+            if grouped:
+                if len(raw_ctest_tests) != 1 or not isinstance(
+                    raw_ctest_tests[0], dict
+                ):
+                    raise CoverageError(
+                        f"{target_context} must retain one grouped CTest wrapper"
+                    )
+                wrapper = raw_ctest_tests[0]
+                if (
+                    wrapper.get("ctest_name") != f"{target_name}.Grouped"
+                    or wrapper.get("timeout_seconds") != 120
+                ):
+                    raise CoverageError(
+                        f"{target_context} grouped CTest wrapper is malformed"
+                    )
+                gtest_ctest_test_count += 1
             for case_index, raw_case in enumerate(raw_cases, start=1):
                 case_context = f"{target_context} case #{case_index}"
                 if not isinstance(raw_case, dict):
@@ -1300,12 +1467,13 @@ def validate_test_inventory(
                     raw_case.get("ctest_name"),
                     context=f"{case_context} ctest_name",
                 )
-                if ctest_name in all_ctest_names:
+                if not grouped and ctest_name in all_ctest_names:
                     raise CoverageError(
                         f"{context} test inventory repeats CTest name "
                         f"{ctest_name!r}"
                     )
-                all_ctest_names.add(ctest_name)
+                if not grouped:
+                    all_ctest_names.add(ctest_name)
                 name = _inventory_string(
                     raw_case.get("gtest_filter"),
                     context=f"{case_context} gtest_filter",
@@ -1323,6 +1491,8 @@ def validate_test_inventory(
                     raise CoverageError(f"{case_context} disabled must be Boolean")
                 if disabled:
                     continue
+                if not grouped:
+                    gtest_ctest_test_count += 1
                 key = ("gtest", name)
                 if key in cases:
                     raise CoverageError(
@@ -1396,7 +1566,7 @@ def validate_test_inventory(
     if not cases:
         raise CoverageError(f"{context} test inventory selects zero enabled cases")
     expected_summary = {
-        "ctest_test_count": enabled_gtest_case_count + manual_ctest_test_count,
+        "ctest_test_count": gtest_ctest_test_count + manual_ctest_test_count,
         "enabled_gtest_case_count": enabled_gtest_case_count,
         "gtest_target_count": gtest_target_count,
         "manual_ctest_test_count": manual_ctest_test_count,
@@ -1556,7 +1726,10 @@ def _test_refactor_identity(identity: Mapping[str, object]) -> dict[str, object]
 
 
 def compare_test_only_refactor(
-    baseline: Mapping[str, object], candidate: Mapping[str, object]
+    baseline: Mapping[str, object],
+    candidate: Mapping[str, object],
+    *,
+    require_exact: bool = False,
 ) -> dict[str, object]:
     validate_coverage_report(baseline)
     validate_coverage_report(candidate)
@@ -1585,25 +1758,41 @@ def compare_test_only_refactor(
             + json.dumps(details, sort_keys=True)
         )
 
-    baseline_regions = _coverage_set(baseline, "covered_regions")
-    candidate_regions = _coverage_set(candidate, "covered_regions")
-    baseline_branches = _coverage_set(baseline, "covered_branch_arms")
-    candidate_branches = _coverage_set(candidate, "covered_branch_arms")
-    lost_regions = sorted(baseline_regions - candidate_regions)
-    lost_branch_arms = sorted(baseline_branches - candidate_branches)
+    changes: dict[str, list[str]] = {}
+    for name, field in (
+        ("lines", "covered_lines"),
+        ("regions", "covered_regions"),
+        ("branch_arms", "covered_branch_arms"),
+    ):
+        baseline_set = _coverage_set(baseline, field)
+        candidate_set = _coverage_set(candidate, field)
+        changes[f"gained_{name}"] = sorted(candidate_set - baseline_set)
+        changes[f"lost_{name}"] = sorted(baseline_set - candidate_set)
+    losses = any(
+        changes[f"lost_{name}"] for name in ("lines", "regions", "branch_arms")
+    )
+    gains = any(
+        changes[f"gained_{name}"] for name in ("lines", "regions", "branch_arms")
+    )
     result = {
-        "gained_branch_arms": sorted(candidate_branches - baseline_branches),
-        "gained_regions": sorted(candidate_regions - baseline_regions),
-        "lost_branch_arms": lost_branch_arms,
-        "lost_regions": lost_regions,
+        **changes,
         "mode": "test-only-refactor",
-        "status": "ok" if not lost_regions and not lost_branch_arms else "failed",
+        "require_exact": require_exact,
+        "status": "failed" if losses or (require_exact and gains) else "ok",
     }
-    if lost_regions or lost_branch_arms:
+    if losses:
         raise CoverageError(
             "test-only refactor lost covered production evidence: "
-            f"regions={lost_regions[:20]!r}, "
-            f"branch_arms={lost_branch_arms[:20]!r}"
+            f"lines={changes['lost_lines'][:20]!r}, "
+            f"regions={changes['lost_regions'][:20]!r}, "
+            f"branch_arms={changes['lost_branch_arms'][:20]!r}"
+        )
+    if require_exact and gains:
+        raise CoverageError(
+            "exact test-only refactor gained covered production evidence: "
+            f"lines={changes['gained_lines'][:20]!r}, "
+            f"regions={changes['gained_regions'][:20]!r}, "
+            f"branch_arms={changes['gained_branch_arms'][:20]!r}"
         )
     return result
 
