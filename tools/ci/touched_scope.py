@@ -596,6 +596,15 @@ def analyze_change_records(
                 path,
             )
             matched = True
+        elif path == "tools/analysis/compile_hotspots.py":
+            structural.add("tooling_test:Test.CompileHotspots.py")
+            _reason(
+                reasons,
+                "analysis-tooling",
+                "compile-hotspot analyzer change selected its synthetic regression",
+                path,
+            )
+            matched = True
         elif path.startswith("tools/ci/"):
             if not path.endswith(".md"):
                 scripts = CI_TOOL_REGRESSION_SCRIPTS.get(

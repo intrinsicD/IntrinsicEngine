@@ -739,6 +739,44 @@ no-ccache source state passed the complete 3,617-test CPU gate. The temporary
 API marker was removed by `fd97d4d1`; it was never merged into the production
 source surface.
 
+## Compile-hotspot evidence
+
+`tools/analysis/compile_hotspots.py` reports physical compiler invocations from
+the latest record for each `.o` or `.pcm` output in a Ninja log. Outputs are
+grouped only when their start time, end time, and Ninja command hash match.
+This counts a module command that emits both a BMI and an object once, while
+retaining separately executed BMI, object, or implementation phases. Each
+group also has a cross-run `edge_id`, computed from its resolved source, edge
+kind, and sorted output list; run-local timestamps and command hashes remain
+diagnostics and are not part of that stable baseline key.
+
+Source ownership comes from the configured `compile_commands.json`, not an
+output-name guess. The declared repository roots are `src/`, `tests/`,
+`methods/`, and `benchmarks/`. Generated build sources, repository dependency
+roots (`external/` and `third_party/`), and sources outside the declared roots
+are classified separately. Missing output mappings and mappings with more than
+one source remain in `resolution_issues` with candidate diagnostics; they are
+never silently omitted from the full edge inventory or admitted to a
+baseline. The printed top-N is the global repository-owned ranking and has no
+per-root quota.
+
+The Linux correctness workflow enforces the hotspot baseline only after its
+CPU correctness suite reports. Nightly likewise runs its fast and scheduled
+slow correctness cohorts before the report, so a hotspot failure cannot
+suppress already-built correctness feedback.
+
+Refresh a target set only from at least five clean, comparable builds at one
+commit, preset, compiler/scanner, runner image, cache state, and producer
+selection. Retain each full JSON report, rank normalized repository-owned
+edges across the cohort, and record the chosen offenders and threshold
+derivation with the hosted run IDs. Do not mix incremental logs, select a
+convenient retry, preserve stale targets by fiat, or impose per-root quotas.
+The checked-in Octree budget is the historical BUG-004 threshold migrated to
+the strict identity schema; it is not a BUILD-004 five-sample refresh.
+[`RUNTIME-166`](../../tasks/backlog/runtime/RUNTIME-166-slim-render-extraction-module.md)
+is a current source-owner consumer of this evidence. Compile optimization
+belongs to the affected layer task rather than to the analysis tool.
+
 ## Stale-run cancellation
 
 Compile-heavy pull-request workflows use this workflow-level concurrency key:

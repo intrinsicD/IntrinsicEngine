@@ -117,15 +117,6 @@ jobs:
             --json-out build/ci/ci-timing/phases/build.json \
             -- cmake --build --preset ci --target IntrinsicCpuTests
 
-      - name: Compile hotspot benchmark gate
-        run: |
-          python3 tools/analysis/compile_hotspots.py \
-            --build-dir build/ci \
-            --top 40 \
-            --json-out build/ci/compile_hotspots_report.json \
-            --baseline-json tools/analysis/compile_hotspot_baseline.json
-
-
       - name: Validate layering (strict mode)
         run: python3 tools/repo/check_layering.py --root src --strict
 
@@ -157,6 +148,14 @@ jobs:
               --timeout 60 \
               --output-junit reports/cpu.junit.xml \
               --parallel 4
+
+      - name: Compile hotspot benchmark gate
+        run: |
+          python3 tools/analysis/compile_hotspots.py \
+            --build-dir build/ci \
+            --top 40 \
+            --json-out build/ci/compile_hotspots_report.json \
+            --baseline-json tools/analysis/compile_hotspot_baseline.json
 
       - name: Aggregate gate timing result
         if: always()

@@ -277,6 +277,36 @@ inventory. Missing, empty, malformed, or duplicate inventory entries fail
 closed. `--targets ... --skip-undeclared` remains available for legacy or
 configuration-conditional checks; it cannot be combined with `--inventory`.
 
+## Compile-hotspot diagnostics
+
+Run the compile-hotspot analyzer only after the intended producer build has
+completed:
+
+```bash
+python3 tools/analysis/compile_hotspots.py \
+  --build-dir build/ci \
+  --top 40 \
+  --json-out build/ci/compile_hotspots_report.json \
+  --baseline-json tools/analysis/compile_hotspot_baseline.json
+```
+
+The analyzer requires both `build/ci/.ninja_log` and the matching
+`build/ci/compile_commands.json`. It keeps the latest record for each object or
+BMI output, groups outputs emitted by the same timed Ninja command, and
+resolves sources through compile-command outputs. A missing mapping is reported
+as `unresolved` with diagnostic candidates; duplicate mappings are
+`ambiguous`. These rows remain visible in the JSON but cannot satisfy a
+baseline target.
+
+An incremental tree can retain log entries for targets absent from the current
+configured graph. If those entries appear as unresolved, do not add a basename
+fallback or delete individual log lines. Reproduce with a fresh `ci` configure
+(`cmake --preset ci --fresh`), build the exact target population being
+measured, and analyze the resulting matched log/compile-command pair. Baseline
+refreshes require five comparable clean samples as described in the
+[benchmark CI policy](benchmarking/ci-policy.md#compile-hotspot-evidence);
+a single local report is diagnostic only.
+
 ## Fast touched-scope verification
 
 For local iteration on small, well-scoped changes, use the touched-scope helper

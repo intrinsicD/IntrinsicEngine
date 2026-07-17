@@ -265,6 +265,27 @@ class TouchedScopeTests(unittest.TestCase):
         self.assertIn("Test.CiTiming.py", timing_text)
         self.assertNotIn("Test.TouchedScope.py", timing_text)
 
+    def test_compile_hotspot_analyzer_selects_only_its_regression(self) -> None:
+        route = touched_scope.analyze_change_records(
+            [record("tools/analysis/compile_hotspots.py")]
+        )
+
+        self.assertEqual(route["route"], "structural")
+        self.assertFalse(route["needs_cpp"])
+        self.assertEqual(
+            route["structural_checks"],
+            ["tooling_test:Test.CompileHotspots.py"],
+        )
+        commands = touched_scope.structural_commands(
+            ".",
+            route["structural_checks"],
+        )
+        self.assertEqual(len(commands), 1)
+        self.assertEqual(
+            commands[0].shell_text(),
+            "python3 tests/regression/tooling/Test.CompileHotspots.py",
+        )
+
     def test_rename_delete_type_and_unmerged_statuses_broaden(self) -> None:
         for status in ("R100", "D", "T", "U"):
             with self.subTest(status=status):

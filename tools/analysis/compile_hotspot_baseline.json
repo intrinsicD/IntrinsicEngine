@@ -2,7 +2,13 @@
   "max_regression_ms": 3000,
   "targets": [
     {
+      "edge_id": "1bcfb38caa97dfd2e2af85affe30ff72f5ee10e1c70935f95dab807ed53fdbc7",
       "source": "src/geometry/Geometry.Octree.cppm",
+      "edge_kind": "module-interface",
+      "outputs": [
+        "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Octree.cppm.o",
+        "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Octree.pcm"
+      ],
       "max_duration_ms": 92000
     }
   ]

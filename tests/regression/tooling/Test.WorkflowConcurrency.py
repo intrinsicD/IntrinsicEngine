@@ -580,6 +580,30 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             vulkan,
         )
 
+    def test_compile_hotspot_gates_follow_cpu_correctness(self) -> None:
+        for workflow, job_name, test_step, hotspot_step in (
+            (
+                "ci-linux-clang.yml",
+                "ci-linux-clang",
+                "Run full CPU test suite",
+                "Compile hotspot benchmark gate",
+            ),
+            (
+                "nightly-deep.yml",
+                "nightly-cpu-deep",
+                "Run scheduled CPU slow correctness cohort",
+                "Compile hotspot report",
+            ),
+        ):
+            with self.subTest(workflow=workflow):
+                payload, _ = _load_workflow(workflow)
+                steps = payload["jobs"][job_name]["steps"]
+                named_steps = {step["name"]: step for step in steps}
+                self.assertLess(
+                    steps.index(named_steps[test_step]),
+                    steps.index(named_steps[hotspot_step]),
+                )
+
     def test_manual_test_timing_profile_is_isolated_and_five_sample(self) -> None:
         payload, _ = _load_workflow("ci-linux-clang.yml")
         triggers = payload.get("on", payload.get(True, {}))

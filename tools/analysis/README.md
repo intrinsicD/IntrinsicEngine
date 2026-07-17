@@ -4,7 +4,10 @@ Static analysis and performance analysis tooling.
 
 ## Current scripts
 
-- `tools/analysis/compile_hotspots.py`
+- `tools/analysis/compile_hotspots.py`: normalizes the latest Ninja records
+  into physical compiler invocations, resolves their sources through the
+  configured `compile_commands.json`, and optionally checks stable edge
+  identities against `compile_hotspot_baseline.json`.
 - `tools/analysis/module_fanout.py`: reports import/include/export fan-out for
   selected files or `--root src`. Nightly runs it in report-only mode;
   `--fail-on-regression` is an opt-in local comparison against files present in
@@ -19,3 +22,6 @@ Static analysis and performance analysis tooling.
 - BUG-004 refreshed `compile_hotspot_baseline.json` to use canonical source
   paths under the then-current layout; stale `src/Runtime/...` migration aliases
   are not accepted by the gate.
+- BUILD-004 migrates that historical target to a stable normalized identity.
+  Its 92-second budget remains historical until a comparable five-sample
+  cohort justifies replacing the target set and thresholds.
