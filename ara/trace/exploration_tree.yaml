@@ -5966,3 +5966,43 @@ tree:
       parity. All 13 regressions passed with Clang/LLVM 20 in 12.6 seconds;
       Python compilation, diff, and strict test-layout checks also passed.
     status: resolved
+  - id: N254
+    type: experiment
+    title: "Audit CI-005 touched-scope readiness and closure cost"
+    provenance: ai-executed
+    timestamp: "2026-07-17T11:54+02:00"
+    also_depends_on: [N237, N247]
+    evidence:
+      - "tasks/backlog/process/CI-005-real-touched-scope-pr-fast-gate.md"
+      - "tools/ci/touched_scope.py"
+      - ".github/workflows/pr-fast.yml"
+      - "CMakePresets.json"
+      - "build/ci/test-inventories/RegisteredTestTargets.tsv"
+      - "build/ci/test-inventories/IntrinsicPrFastTests.txt"
+      - "build/ci/test-inventories/IntrinsicPrSmokeTests.txt"
+      - "tests/regression/tooling/Test.TouchedScope.py"
+      - "tests/regression/tooling/Test.CcacheWorkflow.py"
+      - "tests/regression/tooling/Test.WorkflowConcurrency.py"
+      - "tests/regression/tooling/Test.CiTiming.py"
+      - "ninja -C build/ci -t commands IntrinsicPrFastTests"
+      - "ninja -C build/ci -t commands IntrinsicPrSmokeTests"
+      - "ninja -C build/ci -t commands IntrinsicCpuTests"
+    result: >
+      The current planner is not safe for merge-gate use: diff failures and
+      zero-change plans can succeed empty, runtime names an undeclared target,
+      physics has no mapping, module interfaces can route narrowly, and
+      undeclared targets are silently filtered. Registered CTest placeholders
+      also mean a label-selected run can reference unbuilt executables, so a
+      post-config phase must validate required targets and expand the complete
+      eligible registry label closure before building. Static Ninja closure
+      counts were 2,077 commands for IntrinsicPrFastTests, 1,443 for
+      IntrinsicPrSmokeTests, 2,149 for IntrinsicCpuTests, and 2,089 for the
+      fast-plus-smoke union; smoke adds only 12 commands after the broad
+      PR-fast aggregate but is too large as a standalone narrow-route default.
+      The smallest safe implementation starts with an explicit unsanitized
+      Null/headless ci-fast preset plus fail-closed preconfigure JSON
+      classification and postconfigure registry reconciliation in the existing
+      script, before conditionally wiring pr-fast to skip C++ setup for
+      docs/task-only changes. No implementation file, task state, build, or
+      CTest workload was changed or run during this readiness audit.
+    status: resolved

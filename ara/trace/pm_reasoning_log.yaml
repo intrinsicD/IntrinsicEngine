@@ -965,3 +965,9 @@ entries:
       - "Recorded the zero-exit/nonempty-profile XML omission, propagated collision-safe discovery template, retained XML and discovery diagnostics, and production-build-input identity mismatch."
       - "Did not crystallize a generalized coverage claim because the complete instrumented repository cohort and named hosted baseline remain open."
       - "No staged observation received a closure, contradiction, or stale signal from this regression-hardening slice."
+  - turn: "2026-07-17_001#10"
+    notes:
+      - "Routed the CI-005 readiness and static closure audit as experiment N254 because it produced bounded repository-specific evidence and an implementation map without changing the planner or workflow."
+      - "Kept the implementation right-sized around the existing touched_scope.py: one preconfigure classifier and one postconfigure registry reconciler, not a new planner service or target registry."
+      - "Recorded label-closure expansion as required correctness behavior because configured CTest placeholders can otherwise select executables that the narrow build omitted."
+      - "Did not stage a new generalized heuristic because H06 already owns classification-first CI optimization; no existing staged observation received a closure, contradiction, or stale signal."

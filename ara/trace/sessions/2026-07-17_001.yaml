@@ -2,9 +2,9 @@ session:
   id: "2026-07-17_001"
   date: "2026-07-17"
   started: "2026-07-17T00:22+02:00"
-  last_turn: "2026-07-17T11:30+02:00"
-  turn_count: 9
-  summary: "Materialized and committed the selective-adaptation backlog, reproduced BUG-107's configure-history drift, implemented BUG-106 routing, and established plus adversarially validated CI-010's exact source-coverage lane."
+  last_turn: "2026-07-17T11:54+02:00"
+  turn_count: 10
+  summary: "Materialized and committed the selective-adaptation backlog, reproduced BUG-107's configure-history drift, implemented BUG-106 routing, established and adversarially validated CI-010's exact source-coverage lane, and mapped CI-005's smallest safe touched-scope slice."
 
 events_logged:
   - turn: 1
@@ -73,6 +73,12 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Passed 13 LLVM 20 regressions including exact execution XML, discovery-profile isolation, and production-build-input parity."
+  - turn: 10
+    type: experiment
+    id: "N254"
+    routing: direct
+    provenance: ai-executed
+    summary: "Identified CI-005's unsafe empty-success and target-routing seams, measured aggregate closure, and defined the smallest fail-closed two-phase implementation."
 
 ai_actions:
   - turn: 1
@@ -193,6 +199,14 @@ ai_actions:
       - "ara/trace/pm_reasoning_log.yaml"
       - "ara/trace/sessions/2026-07-17_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
+  - turn: 10
+    action: "Read CI-005, the current touched-scope planner, PR-fast workflow, presets, generated test registry, aggregate inventories, timing and ccache regressions, and documentation contracts; measured static Ninja closure without editing implementation or task-state files."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-07-17_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
 
 claims_touched: []
 
@@ -215,6 +229,8 @@ key_context:
     excerpt: "CI-010 must prove the exact enabled cases actually executed, prevent discovery profiles from contaminating coverage, and reject production build-topology drift during test-only parity."
   - turn: 9
     excerpt: "A successful GoogleTest process and nonempty profile are insufficient execution proof when its retained XML omits a requested enabled case; discovery profiles must also remain isolated from the canonical merge."
+  - turn: 10
+    excerpt: "CI-005 must classify exact base/head changes before any C++ setup, fail closed on uncertain diffs and broad-impact paths, then reconcile every narrow label route against the configured registry before building or testing."
 
 open_threads:
   - "Select the next bounded architecture/runtime slice; RUNTIME-168 is the smallest reviewed private-surface candidate, while ARCH-014 remains the umbrella that gates REVIEW-003."
@@ -225,7 +241,7 @@ open_threads:
   - "Recover provenance and redistribution rights before proposing M16.xyz or child.obj for publication; otherwise retain them only as local audit inputs."
   - "Implement BUG-093 first; it unblocks ASSETIO-010 companion preview and supplies the disabled-tooltip convention consumed by UI-037."
   - "Resolve BUG-094 through BUG-097 and UI-038 with their regression-first slice plans before claiming the audited model workflows are linear, truthful, and recoverable."
-  - "Execute BUG-106 and BUG-107 first, then follow the validated CI dependency chain through CI-005/010, CI-006/011, CI-008, BUILD-004/RUNTIME-166, and CI-009."
+  - "Implement CI-005's fail-closed preconfigure classification, ci-fast identity, postconfigure registry closure, conditional PR-fast wiring, and hosted route-class timing evidence before downstream CI-006/011 work."
   - "Implement BUG-108 and BUG-109 before expanding their sampling and grid-reduction families; GEOM-061 is explicitly gated on BUG-109."
   - "Implement GEOM-068 before GEOM-069 and GEOM-071 before GEOM-072; GEOM-070 and BUG-110 remain independently selectable numerical slices."
   - "Implement GRAPHICS-127 and HARDEN-086 before REVIEW-003 can close its native-profiler and hierarchy-query readiness evidence."

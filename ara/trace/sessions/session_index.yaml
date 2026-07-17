@@ -120,8 +120,8 @@ sessions:
     open_threads: 13
   - id: "2026-07-17_001"
     date: "2026-07-17"
-    summary: "Materialized and committed the selective-adaptation backlog, reproduced BUG-107's configure-history drift, implemented BUG-106 routing, and established plus adversarially validated CI-010's exact source-coverage lane."
-    turn_count: 9
-    events_count: 11
+    summary: "Materialized and committed the selective-adaptation backlog, reproduced BUG-107's configure-history drift, implemented BUG-106 routing, established and adversarially validated CI-010's exact source-coverage lane, and mapped CI-005's smallest safe touched-scope slice."
+    turn_count: 10
+    events_count: 12
     claims_touched: []
     open_threads: 17
