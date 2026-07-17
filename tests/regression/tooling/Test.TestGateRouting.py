@@ -32,6 +32,12 @@ class SourceOwner:
 
 
 EXCLUDED_FROM_CPU = frozenset({"gpu", "vulkan", "slow", "flaky-quarantine"})
+REQUIRED_GTEST_ENVIRONMENT = frozenset(
+    {
+        "LSAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=0",
+        "ASAN_OPTIONS=symbolize=1:detect_leaks=0:fast_unwind_on_malloc=0",
+    }
+)
 ALLOWED_TEST_LABELS = frozenset(
     {
         "assets",
@@ -552,6 +558,45 @@ def _ctest_labels(test: Mapping[str, object]) -> frozenset[str]:
     return frozenset(labels)
 
 
+def _verify_ctest_environment(test: Mapping[str, object]) -> None:
+    raw_environment = _ctest_property(test, "ENVIRONMENT")
+    invalid_types = [
+        value for value in raw_environment if not isinstance(value, str)
+    ]
+    if invalid_types:
+        raise ReconciliationError(
+            f"CTest registration {test.get('name')!r} has non-string environment "
+            f"entries {invalid_types!r}"
+        )
+    environment = [
+        value for value in raw_environment if isinstance(value, str)
+    ]
+    malformed = sorted(value for value in environment if "=" not in value)
+    if malformed:
+        raise ReconciliationError(
+            f"CTest registration {test.get('name')!r} has malformed environment "
+            f"entries {_format_values(malformed)}"
+        )
+    duplicate_keys = sorted(
+        key
+        for key, count in Counter(
+            value.partition("=")[0] for value in environment
+        ).items()
+        if count > 1
+    )
+    if duplicate_keys:
+        raise ReconciliationError(
+            f"CTest registration {test.get('name')!r} has duplicate environment "
+            f"keys {_format_values(duplicate_keys)}"
+        )
+    missing = REQUIRED_GTEST_ENVIRONMENT - set(environment)
+    if missing:
+        raise ReconciliationError(
+            f"CTest registration {test.get('name')!r} is missing required "
+            f"environment entries {_format_values(missing)}"
+        )
+
+
 def _verify_ctest_label_route(
     test: Mapping[str, object],
     target: str,
@@ -639,6 +684,7 @@ def _registered_gtest_cases_by_target(
         # CTest producers are intentionally outside case reconciliation.
         if "--gtest_also_run_disabled_tests" not in command:
             continue
+        _verify_ctest_environment(test)
         _verify_ctest_label_route(
             test,
             target,
@@ -1046,7 +1092,13 @@ OrdinarySuite.
                         "--gtest_filter=Suite.DISABLED_Case",
                         "--gtest_also_run_disabled_tests",
                     ],
-                    "properties": [{"name": "LABELS", "value": ["unit", "graphics"]}],
+                    "properties": [
+                        {"name": "LABELS", "value": ["unit", "graphics"]},
+                        {
+                            "name": "ENVIRONMENT",
+                            "value": sorted(REQUIRED_GTEST_ENVIRONMENT),
+                        },
+                    ],
                 },
             ]
         }
@@ -1123,7 +1175,7 @@ OrdinarySuite.
                 }
             )
 
-    def test_gtest_discovery_has_one_canonical_label_writer(self) -> None:
+    def test_gtest_discovery_has_one_canonical_property_writer(self) -> None:
         cmake_source = (REPO_ROOT / "tests" / "CMakeLists.txt").read_text(
             encoding="utf-8"
         )
@@ -1135,12 +1187,42 @@ OrdinarySuite.
         )
         self.assertIsNotNone(discovery)
         assert discovery is not None
-        self.assertNotRegex(discovery.group("body"), r"(?m)^\s*LABELS(?:\s|$)")
+        self.assertNotRegex(
+            discovery.group("body"),
+            r"(?m)^\s*(?:ENVIRONMENT|LABELS)(?:\s|$)",
+        )
         self.assertIn(
-            "_intrinsic_label_target}_TESTS} PROPERTIES LABELS",
+            "_intrinsic_label_target}_TESTS} PROPERTIES",
             cmake_source,
         )
-        self.assertIn("${_intrinsic_label_value}", cmake_source)
+        self.assertIn('ENVIRONMENT \\"${_intrinsic_test_env}\\"', cmake_source)
+        self.assertIn('LABELS \\"${_intrinsic_label_value}\\"', cmake_source)
+
+    def test_discovered_gtest_environment_fails_closed(self) -> None:
+        cases = {
+            "missing required": [
+                "LSAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=0"
+            ],
+            "non-string": [*sorted(REQUIRED_GTEST_ENVIRONMENT), 7],
+            "malformed": [*sorted(REQUIRED_GTEST_ENVIRONMENT), "NO_VALUE"],
+            "duplicate environment keys": [
+                *sorted(REQUIRED_GTEST_ENVIRONMENT),
+                "ASAN_OPTIONS=duplicate",
+            ],
+        }
+        for expected, environment in cases.items():
+            with (
+                self.subTest(expected=expected),
+                self.assertRaisesRegex(ReconciliationError, expected),
+            ):
+                _verify_ctest_environment(
+                    {
+                        "name": "Suite.Case",
+                        "properties": [
+                            {"name": "ENVIRONMENT", "value": environment}
+                        ],
+                    }
+                )
 
     def test_registered_target_without_sources_must_be_explicitly_manual(
         self,

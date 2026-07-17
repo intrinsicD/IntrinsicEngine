@@ -26,6 +26,10 @@ depends_on:
   test batch. Discovered-test labels now have one canonical writer in the
   generated post-discovery fixup instead of also passing the legacy CMake 3.28
   escape workaround through `gtest_discover_tests`.
+- The same cross-version audit found that discovery-time sanitizer environment
+  lists could lose `ASAN_OPTIONS`. The canonical fixup now owns both labels and
+  sanitizer environment entries, and reconciliation fails closed if either
+  required sanitizer entry is absent or malformed.
 
 ## Goal
 - Restore one canonical, capability-truthful test graph in which CPU/mock
