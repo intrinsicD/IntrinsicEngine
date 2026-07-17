@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Capture and compare the canonical exclusion-only CPU CTest selection."""
+"""Capture and compare the canonical exclusion-only CPU logical selection."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import csv
 import hashlib
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -27,6 +28,8 @@ MODE_IDENTITIES = {
     "undefined": "ubsan",
     "address,undefined": "asan-ubsan",
 }
+_GTEST_SUITE_RE = re.compile(r"^(?P<suite>\S+)\.\s*(?:#.*)?$")
+_GTEST_COMMENT_RE = re.compile(r"\s+#.*$")
 
 
 class SelectionError(RuntimeError):
@@ -58,7 +61,9 @@ def _read_cache(build_dir: Path) -> dict[str, str]:
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except OSError as error:
-        raise SelectionError(f"cannot read configured CMake cache {path}: {error}") from error
+        raise SelectionError(
+            f"cannot read configured CMake cache {path}: {error}"
+        ) from error
 
     entries: dict[str, str] = {}
     for line_number, line in enumerate(lines, start=1):
@@ -85,9 +90,7 @@ def _cache_bool(cache: Mapping[str, str], key: str) -> bool:
     raise SelectionError(f"CMake cache entry {key} is not Boolean: {cache[key]!r}")
 
 
-def _sanitizer_identity(
-    cache: Mapping[str, str], expected_sanitizer: str
-) -> str:
+def _sanitizer_identity(cache: Mapping[str, str], expected_sanitizer: str) -> str:
     identity = cache.get("INTRINSIC_SANITIZER_IDENTITY")
     if identity not in SANITIZER_IDENTITIES:
         raise SelectionError(
@@ -164,7 +167,9 @@ def _read_tsv(path: Path) -> dict[str, tuple[str, ...]]:
             target = row["target"]
             labels = tuple(row["labels"].split(","))
             if target in targets:
-                raise SelectionError(f"{path}:{line_number}: duplicate target {target!r}")
+                raise SelectionError(
+                    f"{path}:{line_number}: duplicate target {target!r}"
+                )
             if previous_target is not None and target <= previous_target:
                 raise SelectionError(f"{path}: registered targets are not sorted")
             if (
@@ -192,7 +197,9 @@ def _read_aggregate(path: Path) -> tuple[str, ...]:
             if line.strip()
         )
     except OSError as error:
-        raise SelectionError(f"cannot read aggregate inventory {path}: {error}") from error
+        raise SelectionError(
+            f"cannot read aggregate inventory {path}: {error}"
+        ) from error
     if not members:
         raise SelectionError(f"{path}: aggregate selected zero producers")
     duplicates = sorted(name for name, count in Counter(members).items() if count > 1)
@@ -310,6 +317,145 @@ def _producer_for_command(
     return next(iter(matches), None)
 
 
+def _parse_gtest_listing(output: str, producer: str) -> tuple[str, ...]:
+    suite: str | None = None
+    cases: list[str] = []
+    for line_number, line in enumerate(output.splitlines(), start=1):
+        if not line.strip():
+            continue
+        if line.startswith("  "):
+            if suite is None:
+                raise SelectionError(
+                    f"{producer}: GoogleTest case appears before a suite "
+                    f"at output line {line_number}"
+                )
+            test = _GTEST_COMMENT_RE.sub("", line.strip())
+            if not test or any(character.isspace() for character in test):
+                raise SelectionError(
+                    f"{producer}: malformed GoogleTest case at output line "
+                    f"{line_number}: {line!r}"
+                )
+            cases.append(f"{suite}.{test}")
+            continue
+
+        match = _GTEST_SUITE_RE.fullmatch(line)
+        if match:
+            suite = match.group("suite")
+        else:
+            suite = None
+
+    duplicates = sorted(case for case, count in Counter(cases).items() if count > 1)
+    if duplicates:
+        raise SelectionError(
+            f"{producer}: duplicate expanded GoogleTest names {duplicates!r}"
+        )
+    if not cases:
+        raise SelectionError(f"{producer}: --gtest_list_tests returned no cases")
+    return tuple(cases)
+
+
+def _run_gtest_listing(binary: Path, producer: str) -> tuple[str, ...]:
+    command = [str(binary), "--gtest_list_tests"]
+    environment = os.environ.copy()
+    environment["GTEST_COLOR"] = "no"
+    try:
+        result = subprocess.run(
+            command,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+            timeout=60,
+            env=environment,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise SelectionError(
+            f"cannot run {producer} --gtest_list_tests: {error}"
+        ) from error
+    if result.returncode != 0:
+        raise SelectionError(
+            f"{producer}: --gtest_list_tests failed with exit "
+            f"{result.returncode}:\n{result.stdout}"
+        )
+    return _parse_gtest_listing(result.stdout, producer)
+
+
+def _gtest_case_disabled(name: str) -> bool:
+    suite, separator, test = name.partition(".")
+    if not separator or not suite or not test:
+        raise SelectionError(f"malformed raw GoogleTest identity {name!r}")
+    suite_parts = suite.split("/")
+    test_name = test.split("/", maxsplit=1)[0]
+    return any(part.startswith("DISABLED_") for part in suite_parts) or (
+        test_name.startswith("DISABLED_")
+    )
+
+
+def _direct_producer(
+    command: Sequence[str], binaries: Mapping[Path, str]
+) -> str | None:
+    if not command:
+        return None
+    path = _argument_path(command[0])
+    return binaries.get(path) if path is not None else None
+
+
+def _validate_discovered_command(
+    command: Sequence[str],
+    producer: str,
+    binaries: Mapping[Path, str],
+    test_name: str,
+) -> tuple[Path, str]:
+    filters = [
+        argument for argument in command if argument.startswith("--gtest_filter=")
+    ]
+    disabled_switches = [
+        argument
+        for argument in command
+        if argument == "--gtest_also_run_disabled_tests"
+    ]
+    if (
+        _direct_producer(command, binaries) != producer
+        or len(filters) != 1
+        or not filters[0].removeprefix("--gtest_filter=")
+        or disabled_switches != ["--gtest_also_run_disabled_tests"]
+        or list(command)
+        != [
+            command[0],
+            filters[0],
+            "--gtest_also_run_disabled_tests",
+        ]
+    ):
+        raise SelectionError(
+            f"CTest test {test_name!r} is not a canonical discovered "
+            f"GoogleTest registration for {producer!r}"
+        )
+    return Path(command[0]).resolve(), filters[0].removeprefix("--gtest_filter=")
+
+
+def _validate_grouped_command(
+    command: Sequence[str],
+    producer: str,
+    binaries: Mapping[Path, str],
+    test_name: str,
+    build_dir: Path,
+) -> Path:
+    expected_name = f"{producer}.Grouped"
+    expected_output = (
+        f"--gtest_output=xml:{build_dir}/reports/grouped-ctest/gtest/{producer}.xml"
+    )
+    if (
+        test_name != expected_name
+        or _direct_producer(command, binaries) != producer
+        or list(command) != [command[0], "--gtest_filter=*", expected_output]
+    ):
+        raise SelectionError(
+            f"CTest test {test_name!r} is not the canonical grouped "
+            f"GoogleTest wrapper for {producer!r}"
+        )
+    return Path(command[0]).resolve()
+
+
 def _capture(
     build_dir: Path, preset: str, expected_sanitizer: str
 ) -> dict[str, object]:
@@ -343,7 +489,9 @@ def _capture(
     for target in registered:
         for suffix in ("", ".exe"):
             path = Path(
-                os.path.realpath(os.path.abspath(build_dir / "bin" / f"{target}{suffix}"))
+                os.path.realpath(
+                    os.path.abspath(build_dir / "bin" / f"{target}{suffix}")
+                )
             )
             previous = binaries.get(path)
             if previous is not None and previous != target:
@@ -356,6 +504,9 @@ def _capture(
     seen_names: set[str] = set()
     selected_tests: list[dict[str, object]] = []
     producer_case_counts = Counter[str]()
+    representations: dict[str, set[str]] = {}
+    discovered_cases: dict[str, dict[str, bool]] = {}
+    discovered_binaries: dict[str, Path] = {}
     for raw_test in document["tests"]:
         if not isinstance(raw_test, dict):
             raise SelectionError("CTest JSON contains a malformed test record")
@@ -374,7 +525,9 @@ def _capture(
         ):
             command = raw_command
         producer = (
-            _producer_for_command(command, binaries, name) if command is not None else None
+            _producer_for_command(command, binaries, name)
+            if command is not None
+            else None
         )
         if producer is not None and labels != registered[producer]:
             raise SelectionError(
@@ -394,6 +547,68 @@ def _capture(
             raise SelectionError(
                 f"selected CTest test {name!r} maps outside {AGGREGATE}: {producer!r}"
             )
+
+        gtest_arguments = [
+            argument for argument in command if argument.startswith("--gtest_")
+        ]
+        if name.endswith(".Grouped"):
+            binary = _validate_grouped_command(
+                command, producer, binaries, name, build_dir
+            )
+            if _disabled(raw_test):
+                raise SelectionError(
+                    f"canonical grouped GoogleTest wrapper {name!r} is disabled"
+                )
+            representations.setdefault(producer, set()).add("grouped")
+            listed_cases = _run_gtest_listing(binary, producer)
+            for case in listed_cases:
+                selected_tests.append(
+                    {
+                        "disabled": _gtest_case_disabled(case),
+                        "labels": list(labels),
+                        "name": case,
+                        "producer": producer,
+                    }
+                )
+                producer_case_counts[producer] += 1
+            continue
+
+        if gtest_arguments:
+            binary, case = _validate_discovered_command(
+                command, producer, binaries, name
+            )
+            disabled = _disabled(raw_test)
+            expected_disabled = _gtest_case_disabled(case)
+            if disabled != expected_disabled:
+                raise SelectionError(
+                    f"CTest test {name!r} disabled state differs from raw "
+                    f"GoogleTest identity {case!r}: expected={expected_disabled!r}, "
+                    f"actual={disabled!r}"
+                )
+            previous_binary = discovered_binaries.setdefault(producer, binary)
+            if previous_binary != binary:
+                raise SelectionError(
+                    f"discovered producer {producer!r} maps to multiple binaries"
+                )
+            cases = discovered_cases.setdefault(producer, {})
+            if case in cases:
+                raise SelectionError(
+                    f"producer {producer!r} repeats raw GoogleTest identity {case!r}"
+                )
+            cases[case] = disabled
+            representations.setdefault(producer, set()).add("discovered")
+            selected_tests.append(
+                {
+                    "disabled": disabled,
+                    "labels": list(labels),
+                    "name": case,
+                    "producer": producer,
+                }
+            )
+            producer_case_counts[producer] += 1
+            continue
+
+        representations.setdefault(producer, set()).add("manual")
         selected_tests.append(
             {
                 "disabled": _disabled(raw_test),
@@ -405,14 +620,50 @@ def _capture(
         producer_case_counts[producer] += 1
 
     if not selected_tests:
-        raise SelectionError("canonical exclusion-only selector selected zero CTest cases")
+        raise SelectionError(
+            "canonical exclusion-only selector selected zero CTest cases"
+        )
+    conflicting_representations = {
+        producer: sorted(kinds)
+        for producer, kinds in representations.items()
+        if len(kinds) != 1
+    }
+    if conflicting_representations:
+        raise SelectionError(
+            "registered producers mix CTest representations: "
+            f"{conflicting_representations!r}"
+        )
+    for producer, cases in discovered_cases.items():
+        listed = set(_run_gtest_listing(discovered_binaries[producer], producer))
+        registered_cases = set(cases)
+        missing = sorted(listed - registered_cases)
+        extra = sorted(registered_cases - listed)
+        if missing or extra:
+            raise SelectionError(
+                f"{producer}: discovered CTest cases disagree with "
+                f"--gtest_list_tests: missing={missing!r}, extra={extra!r}"
+            )
     producers_without_cases = sorted(set(members) - producer_case_counts.keys())
     if producers_without_cases:
         raise SelectionError(
             f"{AGGREGATE} producers have no selected CTest cases: "
             f"{producers_without_cases!r}"
         )
-    selected_tests.sort(key=lambda record: str(record["name"]))
+    selected_tests.sort(
+        key=lambda record: (str(record["producer"]), str(record["name"]))
+    )
+    logical_identities = [
+        (str(record["producer"]), str(record["name"])) for record in selected_tests
+    ]
+    if len(logical_identities) != len(set(logical_identities)):
+        duplicates = sorted(
+            identity
+            for identity, count in Counter(logical_identities).items()
+            if count > 1
+        )
+        raise SelectionError(
+            f"canonical CPU selection repeats logical identities: {duplicates!r}"
+        )
 
     producers = [
         {
@@ -459,9 +710,13 @@ def _load_report(path: Path) -> dict[str, object]:
     try:
         report = json.loads(path.read_text(encoding="utf-8"))
     except OSError as error:
-        raise SelectionError(f"cannot read CPU selection report {path}: {error}") from error
+        raise SelectionError(
+            f"cannot read CPU selection report {path}: {error}"
+        ) from error
     except json.JSONDecodeError as error:
-        raise SelectionError(f"CPU selection report {path} is invalid JSON: {error}") from error
+        raise SelectionError(
+            f"CPU selection report {path} is invalid JSON: {error}"
+        ) from error
     if not isinstance(report, dict) or report.get("schema") != REPORT_SCHEMA:
         raise SelectionError(f"{path}: expected schema {REPORT_SCHEMA!r}")
 
@@ -569,7 +824,7 @@ def _validate_normalized(
         raise SelectionError(f"{path}: producer records must be sorted and unique")
 
     tests: list[dict[str, object]] = []
-    test_names: list[str] = []
+    test_identities: list[tuple[str, str]] = []
     actual_counts = Counter[str]()
     for index, record in enumerate(raw_tests):
         context = f"test record {index}"
@@ -596,10 +851,12 @@ def _validate_normalized(
         if labels != producer_labels[producer]:
             raise SelectionError(f"{path}: {context} labels differ from its producer")
         tests.append(record)
-        test_names.append(name)
+        test_identities.append((producer, name))
         actual_counts[producer] += 1
-    if test_names != sorted(set(test_names)):
-        raise SelectionError(f"{path}: test records must be sorted and unique")
+    if test_identities != sorted(set(test_identities)):
+        raise SelectionError(
+            f"{path}: test records must be sorted and unique by producer/name"
+        )
     if dict(actual_counts) != expected_counts:
         raise SelectionError(
             f"{path}: producer selected-test counts disagree with test records"
@@ -616,6 +873,27 @@ def _selection_names(normalized: Mapping[str, object], key: str) -> set[str]:
         for record in records
         if isinstance(record, dict) and isinstance(record.get("name"), str)
     }
+
+
+def _selection_test_identities(
+    normalized: Mapping[str, object],
+) -> set[tuple[str, str]]:
+    records = normalized.get("tests", [])
+    if not isinstance(records, list):
+        return set()
+    return {
+        (str(record["producer"]), str(record["name"]))
+        for record in records
+        if isinstance(record, dict)
+        and isinstance(record.get("producer"), str)
+        and isinstance(record.get("name"), str)
+    }
+
+
+def _render_test_identities(
+    identities: set[tuple[str, str]],
+) -> list[str]:
+    return [f"{producer}:{name}" for producer, name in sorted(identities)]
 
 
 def _compare(
@@ -653,11 +931,13 @@ def _compare(
             _selection_names(normalized, "producers")
             - _selection_names(baseline, "producers")
         )
-        missing_tests = sorted(
-            _selection_names(baseline, "tests") - _selection_names(normalized, "tests")
+        missing_tests = _render_test_identities(
+            _selection_test_identities(baseline)
+            - _selection_test_identities(normalized)
         )
-        extra_tests = sorted(
-            _selection_names(normalized, "tests") - _selection_names(baseline, "tests")
+        extra_tests = _render_test_identities(
+            _selection_test_identities(normalized)
+            - _selection_test_identities(baseline)
         )
         raise SelectionError(
             f"report {index} selection differs from report 1: "
