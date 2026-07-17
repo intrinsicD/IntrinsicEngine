@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `DOCS-006` — Curated "how this repo is built" agentic-development narrative (tasks/active/DOCS-006-agentic-development-narrative.md)
 
 ## Theme B — Rendering modernization
 
@@ -69,7 +69,6 @@ the authoritative open/unblocked view.
 - blocked by `CI-005`: `CI-009` — Route heavy gates by lifecycle and evaluate runner scaling (tasks/backlog/process/CI-009-heavy-gate-routing-and-runner-evaluation.md)
 - blocked by `BUG-106`: `CI-010` — Establish CPU source-coverage refactor parity (tasks/backlog/process/CI-010-cpu-source-coverage-refactor-parity.md)
 - blocked by `CI-005`: `CI-011` — Calibrate the slow-test cohort and retain fast sentinels (tasks/backlog/process/CI-011-measured-slow-test-cohort.md)
-- unblocked: `DOCS-006` — Curated "how this repo is built" agentic-development narrative (tasks/backlog/process/DOCS-006-agentic-development-narrative.md)
 - unblocked: `PROC-025` — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality (tasks/backlog/process/PROC-025-port-research-ideation-skill-to-other-repos.md)
 - unblocked: `PROC-027` — Audit the validator/tool fleet for rent-paying gates (tasks/backlog/process/PROC-027-validator-rent-audit.md)
 

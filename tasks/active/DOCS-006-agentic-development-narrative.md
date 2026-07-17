@@ -5,6 +5,12 @@ depends_on: []
 ---
 # DOCS-006 — Curated "how this repo is built" agentic-development narrative
 
+## Status
+- In progress on 2026-07-17; owner: Codex; branch: `main` (local).
+- Next verification:
+  `python3 tools/docs/check_doc_links.py --root .` and
+  `python3 tools/docs/check_docs_sync.py --root . --strict`.
+
 ## Goal
 - Write one curated document that explains the agentic development system to
   an outside reader (portfolio audience): task lifecycle
