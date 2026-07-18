@@ -13,7 +13,7 @@ map.
 Opened from the 2026-07-03 main-loop/task-graph/render-graph review
 ([`docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`](../../../docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md)):
 
-- [`CORE-005`](CORE-005-nonblocking-taskgraph-submit-api.md) — non-blocking
+- [`CORE-005`](../../active/CORE-005-nonblocking-taskgraph-submit-api.md) — non-blocking
   TaskGraph submission/completion API (gated on `BUG-055`).
 - [`CORE-007`](CORE-007-scheduler-priority-wait-wake-hardening.md) —
   scheduler priority lanes, waiter stealing, wake and hot-path hardening.

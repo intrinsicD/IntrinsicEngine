@@ -3,6 +3,7 @@ id: CORE-005
 theme: F
 depends_on:
   - BUG-055
+  - CORE-006
 ---
 # CORE-005 — Non-blocking TaskGraph submission and completion API
 
@@ -24,20 +25,28 @@ depends_on:
 - Owner/layer: `core` (`Core.Dag.TaskGraph`, `Core.Tasks`).
 - Today `Execute()` blocks the caller until the whole graph finishes and the
   caller busy-polls: it drains main-thread-only passes, else
-  `std::this_thread::yield()` (`src/core/Core.Dag.TaskGraph.cpp:999-1020`) —
+  `std::this_thread::yield()` (`src/core/Core.Dag.TaskGraph.cpp:960-979`) —
   burning a core without helping the scheduler (never steals/pops) and
   without parking. There is no submit/poll/join API; `Reset()` asserts while
-  `Executing`. Non-CPU `QueueDomain` graphs cannot execute at all, which is
-  why streaming work bypasses the DAG (`Runtime.DerivedJobGraph` reimplements
-  dependency handling over `StreamingExecutor`).
+  `Executing`.
 - Origin: `docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`
   finding R12.
 - Gated on `BUG-055` because completion-state lifetime must be safe before it
   can escape `Execute`'s stack frame as a token.
+- Ordered after retired `CORE-006` so the submission API is implemented
+  directly on Core's domain-free task/DAG vocabulary.
 - ARCH-013 re-review (2026-07-08): Decision unchanged. This remains core
   scheduler/DAG substrate below `JobService`; the submit token may underpin
   runtime jobs or frame-graph work, but it must not grow runtime/module domain
   vocabulary or duplicate command/event semantics.
+
+## Status
+
+- Status: `in-progress`.
+- Owner: Codex.
+- Branch: `codex/core-005-nonblocking-submit`.
+- Next verification: adapt the preserved task-specific implementation to the
+  retired `CORE-006` API, then run focused submission/completion contracts.
 
 ## Required changes
 - [ ] Add a non-blocking submission API returning a completion handle
