@@ -47,9 +47,7 @@ def _absolute(root: Path, value: str | Path) -> Path:
 
 def _normalize_output(output: str, directory: Path, build_dir: Path) -> str:
     path = Path(output)
-    absolute = (path if path.is_absolute() else directory / path).resolve(
-        strict=False
-    )
+    absolute = (path if path.is_absolute() else directory / path).resolve(strict=False)
     try:
         return absolute.relative_to(build_dir.resolve(strict=False)).as_posix()
     except ValueError:
@@ -179,16 +177,13 @@ class SourceResolver:
             for root in SOURCE_ROOTS
         }
         self.sources = tuple(
-            source
-            for root in SOURCE_ROOTS
-            for source in self.sources_by_root[root]
+            source for root in SOURCE_ROOTS for source in self.sources_by_root[root]
         )
         self.by_output: dict[str, tuple[tuple[str, str, str | None], ...]] = {}
         self.configured_root_counts: Counter[str] = Counter()
         if self.build_dir is not None:
             self._load_compile_commands(
-                compile_commands_path
-                or self.build_dir / "compile_commands.json"
+                compile_commands_path or self.build_dir / "compile_commands.json"
             )
 
     def _classify(
@@ -226,7 +221,9 @@ class SourceResolver:
         try:
             commands = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
-            raise AnalysisError(f"cannot read compile commands {path}: {error}") from error
+            raise AnalysisError(
+                f"cannot read compile commands {path}: {error}"
+            ) from error
         if not isinstance(commands, list):
             raise AnalysisError(f"{path}: compile commands root must be an array")
         mapped: dict[str, set[tuple[str, str, str | None]]] = defaultdict(set)
@@ -240,16 +237,13 @@ class SourceResolver:
                 )
             directory = Path(values[0])
             directory = (
-                directory
-                if directory.is_absolute()
-                else self.build_dir / directory
+                directory if directory.is_absolute() else self.build_dir / directory
             ).resolve(strict=False)
             output = _normalize_output(values[2], directory, self.build_dir)
             candidate = self._classify(values[1], directory)
             mapped[output].add(candidate)
         self.by_output = {
-            output: tuple(sorted(candidates))
-            for output, candidates in mapped.items()
+            output: tuple(sorted(candidates)) for output, candidates in mapped.items()
         }
         self.configured_root_counts.update(
             root
@@ -261,7 +255,9 @@ class SourceResolver:
     def _diagnostic_candidates(self, outputs: Iterable[str]) -> list[str]:
         matches: set[str] = set()
         for output in outputs:
-            fragment = output.split(".dir/", 1)[1] if ".dir/" in output else Path(output).name
+            fragment = (
+                output.split(".dir/", 1)[1] if ".dir/" in output else Path(output).name
+            )
             stem, preferred_extension = strip_compile_suffix(fragment)
             output_matches: set[str] = set()
             for token in (stem, Path(stem).name):
@@ -446,7 +442,8 @@ def analyze_build(repo_root: Path, build_dir: Path) -> dict[str, object]:
                 "indexed_source_count": len(resolver.sources_by_root[root]),
                 "configured_command_count": resolver.configured_root_counts[root],
                 "compiled_edge_count": compiled_roots[root],
-                "present_in_configured_graph": resolver.configured_root_counts[root] > 0,
+                "present_in_configured_graph": resolver.configured_root_counts[root]
+                > 0,
                 "present_in_sampled_build": compiled_roots[root] > 0,
             }
             for root in SOURCE_ROOTS
@@ -549,10 +546,7 @@ def _validate_baseline(
                 raise AnalysisError(f"{context} source must be a non-empty string")
         if "edge_kind" in target:
             edge_kind = target["edge_kind"]
-            if (
-                not isinstance(edge_kind, str)
-                or edge_kind not in BASELINE_EDGE_KINDS
-            ):
+            if not isinstance(edge_kind, str) or edge_kind not in BASELINE_EDGE_KINDS:
                 raise AnalysisError(
                     f"{context} edge_kind must be one of "
                     f"{sorted(BASELINE_EDGE_KINDS)!r}"
@@ -591,6 +585,7 @@ def compare_baseline(
 
     failures: list[str] = []
     seen: set[tuple[str, str]] = set()
+    seen_edges: dict[str, tuple[str, str]] = {}
     for index, target in enumerate(targets):
         edge_id, source = target.get("edge_id"), target.get("source")
         if edge_id is not None:
@@ -618,6 +613,16 @@ def compare_baseline(
             failures.append(f"duplicate baseline target {key[0]} '{key[1]}'")
             continue
         seen.add(key)
+        resolved_edge_id = str(row["edge_id"])
+        previous_key = seen_edges.get(resolved_edge_id)
+        if previous_key is not None:
+            failures.append(
+                f"duplicate baseline physical edge '{resolved_edge_id}': "
+                f"{key[0]} '{key[1]}' resolves the same edge as "
+                f"{previous_key[0]} '{previous_key[1]}'"
+            )
+            continue
+        seen_edges[resolved_edge_id] = key
         status = row["resolution"]["status"]
         if status != "resolved":
             failures.append(
@@ -653,18 +658,11 @@ def compare_baseline(
 def _repository_owned_rows(
     rows: Sequence[Mapping[str, object]],
 ) -> list[Mapping[str, object]]:
-    return [
-        row
-        for row in rows
-        if row["resolution"]["status"] == "resolved"
-    ]
+    return [row for row in rows if row["resolution"]["status"] == "resolved"]
 
 
 def _print_rows(rows: Sequence[Mapping[str, object]], log_path: Path) -> None:
-    print(
-        f"Top {len(rows)} repository-owned physical compile edges "
-        f"from {log_path}:"
-    )
+    print(f"Top {len(rows)} repository-owned physical compile edges from {log_path}:")
     print("duration_s\toutput\tsource\tsource_lines\tincludes\timports\texports")
     for row in rows:
         values = [

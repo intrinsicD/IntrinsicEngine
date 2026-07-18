@@ -59,8 +59,7 @@ class CompileHotspotFixture:
     ) -> None:
         command_field = self.log_command_field(command_hash)
         self.log_lines.append(
-            f"{start_ms}\t{end_ms}\t{restat_mtime}\t"
-            f"{output}\t{command_field}"
+            f"{start_ms}\t{end_ms}\t{restat_mtime}\t{output}\t{command_field}"
         )
 
     def write(self) -> None:
@@ -86,9 +85,7 @@ class CompileHotspotTests(unittest.TestCase):
                 "src/core/Core.Alpha.cppm",
                 "#include <cstdint>\nexport module Core.Alpha;\nimport Core.Beta;\n",
             )
-            object_output = (
-                "src/core/CMakeFiles/Core.dir/Core.Alpha.cppm.o"
-            )
+            object_output = "src/core/CMakeFiles/Core.dir/Core.Alpha.cppm.o"
             pcm_output = "src/core/CMakeFiles/Core.dir/Core.Alpha.pcm"
             fixture.command(source, object_output)
             fixture.record(
@@ -151,14 +148,10 @@ class CompileHotspotTests(unittest.TestCase):
                         log_version=version,
                     )
                     source = fixture.source("src/core/Core.Version.cpp")
-                    output = (
-                        "src/core/CMakeFiles/Core.dir/Core.Version.cpp.o"
-                    )
+                    output = "src/core/CMakeFiles/Core.dir/Core.Version.cpp.o"
                     fixture.command(source, output)
                     command_field = (
-                        "clang++\t-c Core.Version.cpp"
-                        if version == 4
-                        else "abc123"
+                        "clang++\t-c Core.Version.cpp" if version == 4 else "abc123"
                     )
                     fixture.record(0, 5, output, command_field)
 
@@ -241,8 +234,7 @@ class CompileHotspotTests(unittest.TestCase):
                 relative = f"{source_root}/nested/Shared.cpp"
                 source = fixture.source(relative)
                 output = (
-                    f"{source_root}/CMakeFiles/Owner{index}.dir/"
-                    "nested/Shared.cpp.o"
+                    f"{source_root}/CMakeFiles/Owner{index}.dir/nested/Shared.cpp.o"
                 )
                 fixture.command(source, output)
                 fixture.record(index * 10, index * 10 + 5, output, f"hash-{index}")
@@ -251,15 +243,10 @@ class CompileHotspotTests(unittest.TestCase):
             report = fixture.analyze()
 
             self.assertEqual(
-                {
-                    edge["output"]: edge["source"]
-                    for edge in report["edges"]
-                },
+                {edge["output"]: edge["source"] for edge in report["edges"]},
                 expected,
             )
-            roots = {
-                root["root"]: root for root in report["source_roots"]
-            }
+            roots = {root["root"]: root for root in report["source_roots"]}
             for source_root in compile_hotspots.SOURCE_ROOTS:
                 with self.subTest(source_root=source_root):
                     self.assertEqual(
@@ -270,9 +257,7 @@ class CompileHotspotTests(unittest.TestCase):
                         roots[source_root]["compiled_edge_count"],
                         1,
                     )
-                    self.assertTrue(
-                        roots[source_root]["present_in_sampled_build"]
-                    )
+                    self.assertTrue(roots[source_root]["present_in_sampled_build"])
 
     def test_generated_outside_root_and_unresolved_outputs_are_diagnostic(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -281,12 +266,8 @@ class CompileHotspotTests(unittest.TestCase):
             fixture.source("methods/b/Duplicate.cpp")
             generated = fixture.source("build/ci/generated/Generated.cpp")
             outside_declared = fixture.source("tools/analysis/OwnedHelper.cpp")
-            generated_output = (
-                "CMakeFiles/Generated.dir/generated/Generated.cpp.o"
-            )
-            outside_output = (
-                "CMakeFiles/Helper.dir/tools/analysis/OwnedHelper.cpp.o"
-            )
+            generated_output = "CMakeFiles/Generated.dir/generated/Generated.cpp.o"
+            outside_output = "CMakeFiles/Helper.dir/tools/analysis/OwnedHelper.cpp.o"
             unresolved_output = "CMakeFiles/Missing.dir/Duplicate.cpp.o"
             fixture.command(generated, generated_output)
             fixture.command(outside_declared, outside_output)
@@ -296,9 +277,7 @@ class CompileHotspotTests(unittest.TestCase):
 
             report = fixture.analyze()
 
-            by_output = {
-                edge["output"]: edge for edge in report["edges"]
-            }
+            by_output = {edge["output"]: edge for edge in report["edges"]}
             self.assertEqual(
                 by_output[generated_output]["resolution"]["status"],
                 "generated",
@@ -351,10 +330,7 @@ class CompileHotspotTests(unittest.TestCase):
                 expected_sources,
             )
             self.assertEqual(
-                {
-                    edge["resolution"]["status"]
-                    for edge in report["edges"]
-                },
+                {edge["resolution"]["status"] for edge in report["edges"]},
                 {"dependency"},
             )
             self.assertEqual(report["summary"]["dependency_edge_count"], 2)
@@ -542,8 +518,7 @@ class CompileHotspotTests(unittest.TestCase):
                 compile_hotspots.parse_ninja_log(log, build)
 
             log.write_text(
-                "# ninja log v5\n"
-                "0\t5\t0\tCore.Version.cpp.o\tnot-hex\n",
+                "# ninja log v5\n0\t5\t0\tCore.Version.cpp.o\tnot-hex\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(
@@ -553,8 +528,7 @@ class CompileHotspotTests(unittest.TestCase):
                 compile_hotspots.parse_ninja_log(log, build)
 
             log.write_text(
-                "# ninja log v5\n"
-                "0\t5\t0\tCore.Version.cpp.o\tabc123\textra\n",
+                "# ninja log v5\n0\t5\t0\tCore.Version.cpp.o\tabc123\textra\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(
@@ -716,9 +690,7 @@ class CompileHotspotTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             fixture = CompileHotspotFixture(Path(temporary))
             source = fixture.source("benchmarks/Bench_Alpha.cpp")
-            output = (
-                "benchmarks/CMakeFiles/Bench.dir/Bench_Alpha.cpp.o"
-            )
+            output = "benchmarks/CMakeFiles/Bench.dir/Bench_Alpha.cpp.o"
             fixture.command(source, output)
             fixture.record(0, 50, output, "benchmark")
             edge = fixture.analyze()["edges"][0]
@@ -747,6 +719,34 @@ class CompileHotspotTests(unittest.TestCase):
             self.assertIn("exceeds budget", failures[0])
             self.assertIn("duplicate baseline target", failures[1])
             self.assertIn("missing compile edge_id", failures[2])
+
+    def test_baseline_rejects_mixed_selectors_for_one_physical_edge(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = CompileHotspotFixture(Path(temporary))
+            source = fixture.source("benchmarks/Bench_Alpha.cpp")
+            output = "benchmarks/CMakeFiles/Bench.dir/Bench_Alpha.cpp.o"
+            fixture.command(source, output)
+            fixture.record(0, 50, output, "benchmark")
+            edge = fixture.analyze()["edges"][0]
+            selectors = [
+                {"edge_id": edge["edge_id"], "max_duration_ms": 50},
+                {"source": edge["source"], "max_duration_ms": 50},
+            ]
+
+            for targets in (selectors, list(reversed(selectors))):
+                with self.subTest(first_selector=next(iter(targets[0]))):
+                    failures = compile_hotspots.compare_baseline(
+                        [edge],
+                        {
+                            "max_regression_ms": 0,
+                            "targets": targets,
+                        },
+                    )
+
+                    self.assertEqual(len(failures), 1)
+                    self.assertIn("duplicate baseline physical edge", failures[0])
+                    self.assertIn(edge["edge_id"], failures[0])
+                    self.assertIn("resolves the same edge as", failures[0])
 
 
 if __name__ == "__main__":

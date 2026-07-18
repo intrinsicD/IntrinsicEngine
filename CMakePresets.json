@@ -47,6 +47,7 @@
       "inherits": "base",
       "description": "Unsanitized CI configure without Sandbox for full CPU test and benchmark runs. The pinned Linux/Vulkan identity resolves Auto to GLFW; use explicit Null/headless overrides for no-GLFW work.",
       "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "EXTRINSIC_PLATFORM": "Linux",
         "EXTRINSIC_BACKEND": "Vulkan",
         "INTRINSIC_BUILD_SANDBOX": "OFF",

@@ -336,6 +336,27 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             "ci-fast",
         )
 
+    def test_ci_preset_exports_compile_commands_for_hotspot_analysis(self) -> None:
+        payload = json.loads(PRESETS.read_text(encoding="utf-8"))
+        configure_presets = {
+            preset["name"]: preset for preset in payload["configurePresets"]
+        }
+
+        self.assertNotIn(
+            "CMAKE_EXPORT_COMPILE_COMMANDS",
+            configure_presets["base"]["cacheVariables"],
+        )
+        self.assertEqual(
+            configure_presets["ci"]["cacheVariables"]["CMAKE_EXPORT_COMPILE_COMMANDS"],
+            "ON",
+        )
+        self.assertEqual(
+            configure_presets["ci-coverage-cpu"]["cacheVariables"][
+                "CMAKE_EXPORT_COMPILE_COMMANDS"
+            ],
+            "ON",
+        )
+
     def test_source_coverage_workflow_is_manual_and_uses_canonical_cohort(
         self,
     ) -> None:
@@ -640,9 +661,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         self.assertEqual(
             compile_input,
             {
-                "description": (
-                    "Collect five clean BUILD-004 compile-hotspot samples"
-                ),
+                "description": ("Collect five clean BUILD-004 compile-hotspot samples"),
                 "required": False,
                 "default": False,
                 "type": "boolean",
@@ -923,9 +942,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         self.assertIn('"present_in_configured_graph"', source_assert["run"])
         self.assertIn('"present_in_sampled_build"', source_assert["run"])
 
-        all_commands = "\n".join(
-            str(step.get("run", "")) for step in job["steps"]
-        )
+        all_commands = "\n".join(str(step.get("run", "")) for step in job["steps"])
         self.assertNotRegex(all_commands, r"(?m)^\s*ctest(?:\s|$)")
         self.assertNotIn("tools/ci/collect_test_timing.py", all_commands)
         upload = steps["Upload compile-hotspot evidence"]
