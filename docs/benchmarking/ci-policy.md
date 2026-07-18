@@ -778,6 +778,13 @@ by median duration with `edge_id` as the tie-breaker; retain the five slowest;
 and set each budget by rounding `1.25 * nearest-rank p95` up to a whole second
 with `max_regression_ms=0`. The single source-complete report proves root
 visibility only and does not enter timing thresholds.
+Inventory equality compares a canonical map keyed by stable `edge_id`, with
+`source`, `source_root`, `edge_kind`, sorted `outputs`, and resolution status as
+values. It ignores duration-sorted report order and the run-local
+timestamp/command-hash `physical_identity`. Ranking is median descending and
+then `edge_id` lexicographically ascending. Every retained baseline target
+carries `edge_id`, `source`, `edge_kind`, and `outputs`; the refreshed baseline
+therefore describes the required CPU cohort, not source-complete timing.
 For the one source-completeness diagnostic, build the compile-only
 `IntrinsicTests` aggregate. It covers registered test, method, and benchmark
 producers without invoking the `IntrinsicBenchmarks` custom target, whose build

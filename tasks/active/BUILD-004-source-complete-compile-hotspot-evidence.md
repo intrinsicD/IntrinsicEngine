@@ -62,6 +62,13 @@ depends_on:
   each budget by rounding `1.25 * nearest-rank p95` up to a whole second with
   `max_regression_ms=0`. The one source-complete report proves root visibility
   only and does not enter timing thresholds.
+- Inventory equality means equality of the canonical map keyed by stable
+  `edge_id` with `source`, `source_root`, `edge_kind`, sorted `outputs`, and
+  resolution status as values. It ignores duration-sorted report order and the
+  run-local timestamp/command-hash `physical_identity`. Ranking is median
+  descending, then `edge_id` lexicographically ascending. Every retained target
+  carries `edge_id`, `source`, `edge_kind`, and `outputs`; the resulting
+  baseline describes the required CPU cohort, not source-complete timing.
 
 ## Required changes
 - [x] Define and document a deterministic physical compile-edge identity from
