@@ -373,7 +373,10 @@ five unchanged-SHA hosted samples, separated quick feedback from fail-closed
 candidate confidence, and retained `ubuntu-24.04` below the documented
 queue/total reopen thresholds. No comparable larger runner was registered, so
 future scaling remains gated by quantified cost, benefit, maintenance, and
-rollback criteria.
+rollback criteria. Retired `PROC-025` also verified and refreshed the
+repo-native research-ideation skills in StructSplat and Prospect on their
+designated branches without copying IntrinsicEngine's placement or altering
+either production tree.
 
 `DOCS-005` is retired; the feature-module playbook now has the minimal-feature
 floor and config/command artifact.

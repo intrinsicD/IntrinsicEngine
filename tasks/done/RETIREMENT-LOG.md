@@ -8,6 +8,18 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`PROC-025`](PROC-025-port-research-ideation-skill-to-other-repos.md) —
+cross-repository research-ideation skill parity retired on 2026-07-18 at
+`Operational`. The complete skills already existed on both target
+`origin/main` branches; this task preserved their native registration and
+refreshed only the repository-specific skill body/context. StructSplat commit
+`c1288a67` records the negative `BENCH-007` frontier and exact FIT/CUDA status;
+Prospect commit `0124df61` records explicit MIT metadata plus the implemented
+but formally rejected WM-001 v1.3 frontier. Both designated branches are
+pushed, clean, independently reviewed, and pass focused skill/Python/native
+gates. No installer, `AGENTS.md` append, top-level path, registration change,
+or production code was introduced.
+
 [`CI-009`](CI-009-heavy-gate-routing-and-runner-evaluation.md) — heavy-gate
 lifecycle routing and runner evaluation retired on 2026-07-18 at
 `Operational` for the checked-in GitHub Actions topology. Quick structural and

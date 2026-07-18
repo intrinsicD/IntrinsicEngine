@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `PROC-025` — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality (tasks/active/PROC-025-port-research-ideation-skill-to-other-repos.md)
+- none
 
 ## Theme B — Rendering modernization
 

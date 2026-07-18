@@ -15,9 +15,7 @@ map.
 
 ## Tasks
 
-- [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](../../active/PROC-025-port-research-ideation-skill-to-other-repos.md)
-  is active. Both repo-native skills already landed; the designated target
-  branches now refresh their research frontier and verify structural parity.
+No process tasks are currently open.
 
 `PROC-012` (resolve the duplicate `GEOM-027` ID by renumbering the
 control-surface/KMeans backend-seam task to `GEOM-052`) is retired; see the
@@ -64,6 +62,10 @@ retirement log.
   per-category READMEs (follow-up opened by `PROC-003`).
 - `PROC-009` (done 2026-06-22) imported the third-party `teach`,
   `grilling`, and `grill-me` productivity skills into the repo skill surface.
+- `PROC-025` (done 2026-07-18) verified the already-landed StructSplat and
+  Prospect research-ideation skills, refreshed each repository's live research
+  frontier on its designated branch, and preserved native placement,
+  registration, and provenance.
 - `PROC-007` owns deduplicating contract restatements out of the onboarding
   prompt and giving loop mode explicit defaults and a checkpoint rule;
   `PROC-004` owns the prompt's reading-order change — the two prompt-touching
@@ -80,6 +82,12 @@ this batch is the evidence-backed `check_pr_contract.py` retirement audited by
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](../../done/PROC-025-port-research-ideation-skill-to-other-repos.md)
+  (done 2026-07-18): verified both existing repo-native installations,
+  refreshed StructSplat's post-`BENCH-007` frontier in `c1288a67` and
+  Prospect's post-WM-001 frontier in `0124df61`, passed each repository's
+  focused structural gates, and pushed both designated branches without
+  changing production code, registration, `AGENTS.md`, or top-level layout.
 - [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](../../done/CI-009-heavy-gate-routing-and-runner-evaluation.md)
   (done 2026-07-18): separated quick feedback from fail-closed candidate
   confidence, promoted an unsanitized optimized Release SLO/benchmark lane,
