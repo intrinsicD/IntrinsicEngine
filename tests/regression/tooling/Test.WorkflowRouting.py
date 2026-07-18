@@ -477,12 +477,10 @@ class WorkflowRoutingTests(unittest.TestCase):
         self,
     ) -> None:
         presets = json.loads(PRESETS_PATH.read_text(encoding="utf-8"))
-        configure = {
-            preset["name"]: preset for preset in presets["configurePresets"]
-        }["ci-release"]
-        builds = {
-            preset["name"]: preset for preset in presets["buildPresets"]
-        }
+        configure = {preset["name"]: preset for preset in presets["configurePresets"]}[
+            "ci-release"
+        ]
+        builds = {preset["name"]: preset for preset in presets["buildPresets"]}
         self.assertEqual(configure["inherits"], "ci")
         self.assertEqual(
             configure["cacheVariables"],
@@ -518,9 +516,7 @@ class WorkflowRoutingTests(unittest.TestCase):
             optimized_if,
         )
         steps = _named_steps(optimized)
-        build = _one_line(
-            steps["Build Release benchmark and SLO targets"]["run"]
-        )
+        build = _one_line(steps["Build Release benchmark and SLO targets"]["run"])
         self.assertIn("--preset ci-release", build)
         self.assertIn(
             "--target IntrinsicBenchmarkSmoke IntrinsicBenchmarkTests",
@@ -542,8 +538,7 @@ class WorkflowRoutingTests(unittest.TestCase):
             _one_line(benchmark["run"]),
         )
         self.assertIn(
-            "validate_benchmark_results.py "
-            "--root build/ci-release/benchmark --strict",
+            "validate_benchmark_results.py --root build/ci-release/benchmark --strict",
             _one_line(steps["Validate benchmark result JSON"]["run"]),
         )
 

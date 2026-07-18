@@ -19,8 +19,7 @@ SANITIZER_GROUP = (
     "${{ github.event.pull_request.number || github.ref }}"
 )
 CANDIDATE_CANCELLATION = (
-    "${{ github.event_name == 'pull_request' || "
-    "github.event_name == 'merge_group' }}"
+    "${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}"
 )
 WORKFLOWS = {
     "pr-fast.yml": ("ci-gate-timing-pr-fast", 1, True),
@@ -498,12 +497,8 @@ class WorkflowConcurrencyTests(unittest.TestCase):
                 "EVENT_NAME": "${{ github.event_name }}",
                 "PR_BASE_SHA": "${{ github.event.pull_request.base.sha }}",
                 "PR_HEAD_SHA": "${{ github.event.pull_request.head.sha }}",
-                "MERGE_GROUP_BASE_SHA": (
-                    "${{ github.event.merge_group.base_sha }}"
-                ),
-                "MERGE_GROUP_HEAD_SHA": (
-                    "${{ github.event.merge_group.head_sha }}"
-                ),
+                "MERGE_GROUP_BASE_SHA": ("${{ github.event.merge_group.base_sha }}"),
+                "MERGE_GROUP_HEAD_SHA": ("${{ github.event.merge_group.head_sha }}"),
             },
         )
         self.assertIn('base_ref="$PR_BASE_SHA"', plan["run"])

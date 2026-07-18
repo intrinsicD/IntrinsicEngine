@@ -39,9 +39,17 @@ def parse_rules(path: Path) -> list[Rule]:
         if not stripped or stripped.startswith("#"):
             continue
 
-        if not line.startswith(" ") and stripped.endswith(":") and stripped != "one_of:":
+        if (
+            not line.startswith(" ")
+            and stripped.endswith(":")
+            and stripped != "one_of:"
+        ):
             if current_trigger is not None:
-                rules.append(Rule(trigger_glob=current_trigger, required_any_globs=required.copy()))
+                rules.append(
+                    Rule(
+                        trigger_glob=current_trigger, required_any_globs=required.copy()
+                    )
+                )
             current_trigger = stripped[:-1].strip()
             in_one_of = False
             required = []
@@ -58,7 +66,9 @@ def parse_rules(path: Path) -> list[Rule]:
         raise ValueError(f"Unsupported rules format line: {raw}")
 
     if current_trigger is not None:
-        rules.append(Rule(trigger_glob=current_trigger, required_any_globs=required.copy()))
+        rules.append(
+            Rule(trigger_glob=current_trigger, required_any_globs=required.copy())
+        )
 
     return rules
 
@@ -103,7 +113,9 @@ def evaluate(rules: list[Rule], changed_paths: list[str]) -> tuple[list[str], in
     evaluated = 0
 
     for rule in rules:
-        matched_triggers = [p for p in changed_paths if fnmatch.fnmatch(p, rule.trigger_glob)]
+        matched_triggers = [
+            p for p in changed_paths if fnmatch.fnmatch(p, rule.trigger_glob)
+        ]
         if not matched_triggers:
             continue
 
@@ -118,7 +130,9 @@ def evaluate(rules: list[Rule], changed_paths: list[str]) -> tuple[list[str], in
         if has_required_doc:
             continue
 
-        required_fmt = ", ".join(rule.required_any_globs) if rule.required_any_globs else "<none>"
+        required_fmt = (
+            ", ".join(rule.required_any_globs) if rule.required_any_globs else "<none>"
+        )
         sample = ", ".join(matched_triggers[:5])
         violations.append(
             f"trigger '{rule.trigger_glob}' matched [{sample}] but none of [{required_fmt}] were changed"
@@ -161,7 +175,9 @@ def main() -> int:
     args = parser.parse_args()
 
     root = args.root.resolve()
-    rules_path = (root / args.rules).resolve() if not args.rules.is_absolute() else args.rules
+    rules_path = (
+        (root / args.rules).resolve() if not args.rules.is_absolute() else args.rules
+    )
 
     if not rules_path.exists():
         print(f"[check_docs_sync] Rules file missing: {rules_path}")

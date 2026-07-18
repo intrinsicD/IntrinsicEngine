@@ -106,8 +106,7 @@ def _write_build_configuration(
                 f"INTRINSIC_HEADLESS_NO_GLFW:BOOL={headless_no_glfw}",
                 "INTRINSIC_PLATFORM_BACKEND_SELECTED:INTERNAL="
                 f"{platform_backend_selected}",
-                "INTRINSIC_SANITIZER_IDENTITY:INTERNAL="
-                f"{sanitizer_identity}",
+                f"INTRINSIC_SANITIZER_IDENTITY:INTERNAL={sanitizer_identity}",
             )
         )
         + "\n",
@@ -399,8 +398,7 @@ class CiTimingTests(unittest.TestCase):
         self.assertIn("--target IntrinsicBenchmarks", runner_step["run"])
         self.assertFalse(validator_step.get("continue-on-error", False))
         self.assertIn(
-            "validate_benchmark_results.py --root "
-            "build/ci-release/benchmark --strict",
+            "validate_benchmark_results.py --root build/ci-release/benchmark --strict",
             validator_step["run"],
         )
         self.assertLess(steps.index(runner_step), steps.index(validator_step))

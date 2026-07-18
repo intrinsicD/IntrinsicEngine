@@ -17,7 +17,7 @@ DOCS_WORKFLOW = WORKFLOW_ROOT / "ci-docs.yml"
 SANITIZER_WORKFLOW = WORKFLOW_ROOT / "ci-sanitizers.yml"
 NIGHTLY_WORKFLOW = WORKFLOW_ROOT / "nightly-deep.yml"
 
-CPU_EXCLUSION = 'gpu|vulkan|slow|flaky-quarantine'
+CPU_EXCLUSION = "gpu|vulkan|slow|flaky-quarantine"
 SANITIZER_MATRIX = [
     {"name": "asan", "preset": "ci-asan", "build_dir": "build/ci-asan"},
     {"name": "ubsan", "preset": "ci-ubsan", "build_dir": "build/ci-ubsan"},
@@ -124,8 +124,7 @@ class SanitizerPresetTests(unittest.TestCase):
 
         resolved["binaryDir"] = expand(resolved.get("binaryDir"))
         resolved["cacheVariables"] = {
-            key: expand(value)
-            for key, value in resolved["cacheVariables"].items()
+            key: expand(value) for key, value in resolved["cacheVariables"].items()
         }
         return resolved
 
@@ -197,9 +196,7 @@ class SanitizerPresetTests(unittest.TestCase):
             with self.subTest(package=package):
                 self.assertIn(package, install)
 
-        configure = _one_line(
-            steps["Configure (${{ matrix.sanitizer.name }})"]["run"]
-        )
+        configure = _one_line(steps["Configure (${{ matrix.sanitizer.name }})"]["run"])
         self.assertIn(
             "-- cmake --preset ${{ matrix.sanitizer.preset }} --fresh "
             "-DINTRINSIC_GROUP_PURE_CTEST=ON",
@@ -221,9 +218,7 @@ class SanitizerPresetTests(unittest.TestCase):
         self.assertNotIn("IntrinsicTests", build)
 
         reconcile = _one_line(
-            steps["Reconcile CPU test routing (${{ matrix.sanitizer.name }})"][
-                "run"
-            ]
+            steps["Reconcile CPU test routing (${{ matrix.sanitizer.name }})"]["run"]
         )
         self.assertIn("--aggregate IntrinsicCpuTests", reconcile)
         self.assertIn("--build-dir ${{ matrix.sanitizer.build_dir }}", reconcile)
@@ -252,9 +247,7 @@ class SanitizerPresetTests(unittest.TestCase):
         )
         self.assertIn("--parallel 1", test)
 
-        results = steps[
-            "Upload CPU test results (${{ matrix.sanitizer.name }})"
-        ]
+        results = steps["Upload CPU test results (${{ matrix.sanitizer.name }})"]
         self.assertEqual(results["if"], "always()")
         self.assertEqual(
             results["with"]["name"],
@@ -271,9 +264,7 @@ class SanitizerPresetTests(unittest.TestCase):
         self.assertEqual(results["with"]["if-no-files-found"], "warn")
 
         timing = _one_line(
-            steps["Aggregate gate timing result (${{ matrix.sanitizer.name }})"][
-                "run"
-            ]
+            steps["Aggregate gate timing result (${{ matrix.sanitizer.name }})"]["run"]
         )
         self.assertIn("--preset ${{ matrix.sanitizer.preset }}", timing)
         self.assertIn("--build-dir ${{ matrix.sanitizer.build_dir }}", timing)
@@ -426,9 +417,10 @@ class SanitizerPresetTests(unittest.TestCase):
             _one_line(gpu_steps["Configure (ci-vulkan preset)"]["run"]),
         )
         self.assertIn(
-            "cmake --build --preset ci-vulkan "
-            "--target ExtrinsicSandbox IntrinsicTests",
-            _one_line(gpu_steps["Build IntrinsicTests for GPU-labeled coverage"]["run"]),
+            "cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicTests",
+            _one_line(
+                gpu_steps["Build IntrinsicTests for GPU-labeled coverage"]["run"]
+            ),
         )
         self.assertIn(
             "--test-dir build/ci-vulkan",
@@ -438,7 +430,7 @@ class SanitizerPresetTests(unittest.TestCase):
             gpu_steps["Run optional GPU tests (self-hosted runner)"]["run"]
         )
         self.assertIn('-L "gpu" -L "vulkan"', gpu_test)
-        self.assertNotIn('gpu|vulkan', gpu_test)
+        self.assertNotIn("gpu|vulkan", gpu_test)
 
     def test_static_regression_is_required_by_docs_ci(self) -> None:
         payload, text = _load_workflow("ci-docs.yml")
