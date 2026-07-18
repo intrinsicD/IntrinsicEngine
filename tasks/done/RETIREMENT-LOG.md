@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`ARCH-015`](ARCH-015-runtime-module-scope-by-consumer-contract.md) —
+runtime-module scope retired on 2026-07-18 as accepted
+[ADR-0026](../../docs/adr/0026-runtime-module-scope-by-consumer-contract.md).
+The repository does not predeclare algorithm-family modules: after ADR-0024
+places a responsibility in runtime composition, integrations share one module
+only when app lifecycle, durable-state scope, dependency/cancellation/commit
+ownership, and published-state consumer reactions are cohesive. Family or
+result shape alone is insufficient, while an extra service or different
+execution mechanism alone does not force a split. Commands, statuses,
+completions, and diagnostics stay method-specific until two production callers
+prove identical semantics. DBSCAN, GMM, and hierarchical clustering remain
+conditional probes rather than promised placements, and `REVIEW-003` retains
+authority to keep, replace, or remove `IRuntimeModule`. Strict docs/task/state,
+layering, root-hygiene, session-brief, and diff checks passed; independent fact
+checking and adversarial review found no remaining actionable issue.
+
 [`CORE-009`](CORE-009-app-owned-config-sections.md) — application-owned config
 sections retired on 2026-07-18 at `Operational`. Core now owns only generic,
 schema-versioned `app.sections` records plus a small sorted registration lane;

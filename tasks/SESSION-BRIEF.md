@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `ARCH-015` — Runtime-module scope by composition and consumer cohesion (tasks/active/ARCH-015-runtime-module-scope-by-consumer-contract.md)
+- none
 
 ## Theme B — Rendering modernization
 

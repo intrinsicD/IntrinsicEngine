@@ -21,10 +21,6 @@ are retired to `tasks/done/`; `ARCH-014` remains the open umbrella:
   convergence scorecard and the review/ratchet guardrail; stays open
   until the whole ADR-0024 migration is reached. Retired child `HARDEN-085`
   delivered the monotone checker and `pr-fast` gate.
-- [`ARCH-015`](../../active/ARCH-015-runtime-module-scope-by-consumer-contract.md)
-  is active — grilling + ADR to decide runtime-module scope from demonstrated
-  composition, state, commit, and consumer cohesion without predeclaring a
-  method-family taxonomy. Decision record only; no engine code.
 - [`REVIEW-003`](REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
   one-shot, commit-anchored architecture stability and right-sizing audit. It
   is blocked on the known convergence, privatization, validator, root-hygiene,
@@ -112,6 +108,16 @@ root must update the relevant `docs/architecture/*` doc set in the same PR per
 - [`docs/agent/architecture-review-checklist.md`](../../../docs/agent/architecture-review-checklist.md).
 
 ## Retired
+
+- [`ARCH-015`](../../done/ARCH-015-runtime-module-scope-by-consumer-contract.md)
+  — retired 2026-07-18 as accepted
+  [ADR-0026](../../../docs/adr/0026-runtime-module-scope-by-consumer-contract.md):
+  runtime integrations share a composed module only when app lifecycle,
+  state scope, dependency/cancellation/commit ownership, and consumer reactions
+  are cohesive. Family/result shape, an extra service, or a different execution
+  mechanism alone does not decide the boundary; shared records wait for a real
+  second production caller, and `REVIEW-003` still owns `IRuntimeModule`
+  right-sizing.
 
 - [`CORE-009`](../../done/CORE-009-app-owned-config-sections.md) —
   retired 2026-07-18 at `Operational`: Core now carries only generic,

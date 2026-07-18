@@ -11,10 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`ARCH-015`](ARCH-015-runtime-module-scope-by-consumer-contract.md) —
-  demand-driven runtime-module scope ADR; owner: Codex; branch:
-  `codex/arch-015-runtime-module-scope`; next gate: write ADR-0026 and
-  synchronize the canonical runtime docs.
+No active tasks.
 
 ## History
 
