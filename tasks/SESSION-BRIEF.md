@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `CORE-006` — Domain-free core task/DAG vocabulary (tasks/active/CORE-006-domain-free-core-task-vocabulary.md)
+- none
 
 ## Theme B — Rendering modernization
 

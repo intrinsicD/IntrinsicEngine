@@ -15,9 +15,6 @@ Opened from the 2026-07-03 main-loop/task-graph/render-graph review
 
 - [`CORE-005`](CORE-005-nonblocking-taskgraph-submit-api.md) — non-blocking
   TaskGraph submission/completion API (gated on `BUG-055`).
-- [`CORE-006`](../../active/CORE-006-domain-free-core-task-vocabulary.md) — domain-free
-  core task/DAG vocabulary (opaque task kinds; GPU/streaming naming out of
-  core).
 - [`CORE-007`](CORE-007-scheduler-priority-wait-wake-hardening.md) —
   scheduler priority lanes, waiter stealing, wake and hot-path hardening.
 - [`CORE-008`](CORE-008-compiled-taskgraph-plan-reuse.md) — compiled
@@ -129,6 +126,13 @@ root must update the relevant `docs/architecture/*` doc set in the same PR per
 - [`docs/agent/architecture-review-checklist.md`](../../../docs/agent/architecture-review-checklist.md).
 
 ## Retired
+
+- [`CORE-006`](../../done/CORE-006-domain-free-core-task-vocabulary.md) —
+  retired 2026-07-18 at `CPUContracted`: Core now carries opaque task-kind
+  tokens and neutral execute/plan-only graph modes, while Runtime owns the
+  stable task taxonomy. Queue domains, queue budgets, lane placeholders, and
+  domain-specific graph vocabulary are gone; the default CPU gate passed
+  4,063/4,063.
 
 - [ARCH-007 — Kernel command bus with a single pre-sim drain point](../../archive/ARCH-007-kernel-command-bus-single-drain-point.md)
   (done, 2026-07-08, `CPUContracted`, PR #1010): first ADR-0024 kernel seam.

@@ -42,46 +42,52 @@ depends_on: []
 
 ## Status
 
-- Status: `in-progress`.
-- Owner: Codex.
-- Branch: `codex/core-006-domain-free-v2`.
-- Next verification: adapt the preserved task-specific implementation to
-  current `main`, then run the focused core/runtime graph contracts.
+- Completed on 2026-07-18 at `CPUContracted`; owner: Codex; branch:
+  `codex/core-006-domain-free-v2`; implementation commit:
+  `54e7133bbed3766ded45b8054f505b63c63645b2`.
+- Right-sizing verdict: the opaque `TaskKind` is a plain value struct that
+  removes upper-layer taxonomy from Core, and `TaskGraphExecutionMode`
+  replaces domain-driven behavior without adding a registration framework or
+  forwarding facade.
+- Focused graph/streaming contracts passed 110/110. The complete
+  CPU-supported gate passed 4,063/4,063 with one GLFW capability skip. The
+  strict clean-workshop bundle, test-layout check, and docs-sync check passed;
+  the regenerated 386-module inventory was byte-identical.
 
 ## Required changes
-- [ ] Replace the `TaskKind` domain enum with an opaque token
+- [x] Replace the `TaskKind` domain enum with an opaque token
       (e.g. `std::uint8_t`-backed strong type); define the domain taxonomy
       where it is consumed (`runtime`), preserving current values so
       diagnostics stay stable.
-- [ ] Replace `QueueDomain`-driven API branching with an explicit execution
+- [x] Replace `QueueDomain`-driven API branching with an explicit execution
       mode (execute-inline vs plan-only); move Gpu/Streaming domain naming
       and `queueBudget*` plumbing out of core `BuildConfig` into the callers
       that need plans, or delete if unused.
-- [ ] Delete `ResolveLane` or move lane assignment to the domain-specific
+- [x] Delete `ResolveLane` or move lane assignment to the domain-specific
       `BuildPlan` caller; remove the "reserved for GPU render-graph callers"
       contract language from core doc comments.
-- [ ] Mechanically update consumers (`Runtime.DerivedJobGraph`,
+- [x] Mechanically update consumers (`Runtime.DerivedJobGraph`,
       `Core.FrameGraph`, `Graphics.RenderPrepPipeline`, tests) with no
       behavior change.
 
 ## Tests
-- [ ] Existing `CoreTaskGraph.*`, frame-graph, and render-prep suites stay
+- [x] Existing `CoreTaskGraph.*`, frame-graph, and render-prep suites stay
       green with unchanged semantics.
-- [ ] Contract: plan-only mode still emits the same deterministic plan for a
+- [x] Contract: plan-only mode still emits the same deterministic plan for a
       fixed graph (golden comparison against pre-change output).
 
 ## Docs
-- [ ] Update `docs/architecture/task-graphs.md` (core is domain-free;
+- [x] Update `docs/architecture/task-graphs.md` (core is domain-free;
       runtime owns the taxonomy).
-- [ ] Regenerate `docs/api/generated/module_inventory.md` if `.cppm`
+- [x] Regenerate `docs/api/generated/module_inventory.md` if `.cppm`
       surfaces change.
 
 ## Acceptance criteria
-- [ ] `src/core/` contains no asset/geometry/physics/render/streaming task
+- [x] `src/core/` contains no asset/geometry/physics/render/streaming task
       vocabulary (grep-clean for the removed identifiers).
-- [ ] All consumers compile against the opaque-token API with identical
+- [x] All consumers compile against the opaque-token API with identical
       runtime behavior; default CPU gate green.
-- [ ] `python3 tools/repo/check_layering.py --root src --strict` passes.
+- [x] `python3 tools/repo/check_layering.py --root src --strict` passes.
 
 ## Verification
 ```bash

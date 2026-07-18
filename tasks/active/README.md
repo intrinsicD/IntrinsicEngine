@@ -11,9 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`CORE-006`](CORE-006-domain-free-core-task-vocabulary.md) — domain-free
-  core task/DAG vocabulary; owned by Codex on
-  `codex/core-006-domain-free-v2`.
+No tasks are currently active.
 
 ## History
 
