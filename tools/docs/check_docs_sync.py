@@ -63,10 +63,14 @@ def parse_rules(path: Path) -> list[Rule]:
     return rules
 
 
-def git_changed_paths(root: Path, base_ref: str) -> tuple[list[str], str | None]:
+def git_changed_paths(
+    root: Path,
+    base_ref: str,
+    head_ref: str,
+) -> tuple[list[str], str | None]:
     try:
         merge_base = subprocess.check_output(
-            ["git", "-C", str(root), "merge-base", "HEAD", base_ref],
+            ["git", "-C", str(root), "merge-base", head_ref, base_ref],
             text=True,
             stderr=subprocess.STDOUT,
         ).strip()
@@ -81,7 +85,7 @@ def git_changed_paths(root: Path, base_ref: str) -> tuple[list[str], str | None]
         "diff",
         "--name-only",
         "--diff-filter=ACMR",
-        f"{merge_base}...HEAD",
+        f"{merge_base}...{head_ref}",
     ]
 
     try:
@@ -138,6 +142,11 @@ def main() -> int:
         help="Git base ref used for --diff-mode (default: origin/main)",
     )
     parser.add_argument(
+        "--head-ref",
+        default="HEAD",
+        help="Git head ref used for --diff-mode (default: HEAD)",
+    )
+    parser.add_argument(
         "--diff-mode",
         action="store_true",
         help="Evaluate files changed from merge-base(base-ref)...HEAD",
@@ -168,8 +177,8 @@ def main() -> int:
         changed = [Path(p).as_posix() for p in args.files]
         source = "--files"
     elif args.diff_mode:
-        changed, diff_error = git_changed_paths(root, args.base_ref)
-        source = f"git diff {args.base_ref}"
+        changed, diff_error = git_changed_paths(root, args.base_ref, args.head_ref)
+        source = f"git diff {args.base_ref}...{args.head_ref}"
         if diff_error:
             print(f"[check_docs_sync] Could not compute diff: {diff_error}")
             print("[check_docs_sync] WARNING MODE: non-fatal diff lookup failure.")

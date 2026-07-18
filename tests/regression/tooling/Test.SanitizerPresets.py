@@ -318,7 +318,8 @@ class SanitizerPresetTests(unittest.TestCase):
             "!github.event.pull_request.draft) || "
             "(github.event_name == 'workflow_dispatch' && "
             "inputs.run_sanitizers && !inputs.collect_test_timing && "
-            "!inputs.collect_grouped_ctest_evidence)"
+            "!inputs.collect_grouped_ctest_evidence && "
+            "!inputs.collect_compile_hotspot_evidence)"
         )
         self.assertEqual(sanitizer_job["if"], expected_condition)
 

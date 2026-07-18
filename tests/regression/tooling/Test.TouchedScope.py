@@ -185,6 +185,24 @@ class TouchedScopeTests(unittest.TestCase):
                 self.assertEqual(route["route"], "broad")
                 self.assertTrue(route["needs_cpp"])
 
+    def test_release_routing_admits_method_benchmark_and_build_inputs(self) -> None:
+        paths = (
+            "benchmarks/geometry/example/benchmark.yaml",
+            "benchmarks/baselines/example.json",
+            "benchmarks/geometry/example/Benchmark.Example.cpp",
+            "methods/geometry/example/method.yaml",
+            "methods/geometry/example/Geometry.Example.cpp",
+            "CMakeLists.txt",
+            "CMakePresets.json",
+            "cmake/IntrinsicClangToolchain.cmake",
+            "vcpkg.json",
+        )
+        for path in paths:
+            with self.subTest(path=path):
+                route = touched_scope.analyze_change_records([record(path)])
+                self.assertEqual(route["route"], "broad")
+                self.assertTrue(route["needs_cpp"])
+
     def test_workflow_change_is_structural_and_selects_static_regressions(
         self,
     ) -> None:

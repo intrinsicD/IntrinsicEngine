@@ -46,15 +46,38 @@ jobs:
         run: python3 tools/agents/check_task_state_links.py --root . --strict
 
       - name: Validate documentation synchronization (strict mode)
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
         run: |
           base_ref=origin/main
-          if [ -n '${{ github.event.pull_request.base.sha }}' ]; then
-            base_ref='${{ github.event.pull_request.base.sha }}'
-          fi
+          head_ref=HEAD
+          case "$EVENT_NAME" in
+            pull_request)
+              [[ -n "$PR_BASE_SHA" && -n "$PR_HEAD_SHA" ]] || {
+                echo "::error::pull_request docs route is missing base/head SHA"
+                exit 1
+              }
+              base_ref="$PR_BASE_SHA"
+              head_ref="$PR_HEAD_SHA"
+              ;;
+            merge_group)
+              [[ -n "$MERGE_GROUP_BASE_SHA" && -n "$MERGE_GROUP_HEAD_SHA" ]] || {
+                echo "::error::merge_group docs route is missing base/head SHA"
+                exit 1
+              }
+              base_ref="$MERGE_GROUP_BASE_SHA"
+              head_ref="$MERGE_GROUP_HEAD_SHA"
+              ;;
+          esac
           python3 tools/docs/check_docs_sync.py \
             --root . \
             --diff-mode \
             --base-ref "$base_ref" \
+            --head-ref "$head_ref" \
             --strict
 
       - name: Validate agent skill mirrors

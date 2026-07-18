@@ -35,7 +35,11 @@ WORKFLOWS = {
         True,
     ),
     "ci-vulkan.yml": ("ci-gate-timing-ci-vulkan", 2, True),
-    "ci-release.yml": ("ci-release-results", 2, True),
+    "ci-release.yml": (
+        "ci-release-results",
+        2,
+        CANDIDATE_CANCELLATION,
+    ),
     "ci-source-coverage.yml": (
         "ci-gate-timing-ci-source-coverage",
         1,
@@ -367,7 +371,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         payload, coverage = _load_workflow("ci-source-coverage.yml")
         triggers = payload.get("on", payload.get(True, {}))
         self.assertEqual(set(triggers), {"schedule", "workflow_dispatch"})
-        self.assertEqual(triggers["schedule"], [{"cron": "0 5 * * 1"}])
+        self.assertEqual(triggers["schedule"], [{"cron": "0 3 * * 1"}])
         dispatch = triggers["workflow_dispatch"]
         self.assertEqual(
             dispatch["inputs"]["compare_grouped_ctest"],
@@ -488,8 +492,24 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         self.assertLess(steps.index(structural), steps.index(install))
         self.assertIn("base_ref=origin/main", plan["run"])
         self.assertIn("head_ref=HEAD", plan["run"])
-        self.assertIn("${{ github.event.pull_request.base.sha }}", plan["run"])
-        self.assertIn("${{ github.event.pull_request.head.sha }}", plan["run"])
+        self.assertEqual(
+            plan["env"],
+            {
+                "EVENT_NAME": "${{ github.event_name }}",
+                "PR_BASE_SHA": "${{ github.event.pull_request.base.sha }}",
+                "PR_HEAD_SHA": "${{ github.event.pull_request.head.sha }}",
+                "MERGE_GROUP_BASE_SHA": (
+                    "${{ github.event.merge_group.base_sha }}"
+                ),
+                "MERGE_GROUP_HEAD_SHA": (
+                    "${{ github.event.merge_group.head_sha }}"
+                ),
+            },
+        )
+        self.assertIn('base_ref="$PR_BASE_SHA"', plan["run"])
+        self.assertIn('head_ref="$PR_HEAD_SHA"', plan["run"])
+        self.assertIn('base_ref="$MERGE_GROUP_BASE_SHA"', plan["run"])
+        self.assertIn('head_ref="$MERGE_GROUP_HEAD_SHA"', plan["run"])
         self.assertIn("--action plan", plan["run"])
         self.assertIn("--action structural", structural["run"])
         self.assertIn(
@@ -633,6 +653,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
     def test_manual_test_timing_profile_is_isolated_and_five_sample(self) -> None:
         payload, _ = _load_workflow("ci-linux-clang.yml")
         triggers = payload.get("on", payload.get(True, {}))
+        self.assertEqual(triggers["push"], {"branches": ["main"]})
         timing_input = triggers["workflow_dispatch"]["inputs"]["collect_test_timing"]
         self.assertEqual(
             timing_input,

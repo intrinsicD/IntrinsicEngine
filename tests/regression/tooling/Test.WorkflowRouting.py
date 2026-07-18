@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -61,6 +64,102 @@ def _named_steps(job: object) -> dict[str, dict[str, object]]:
     return result
 
 
+def _run_script(
+    script: str,
+    env: dict[str, str],
+) -> subprocess.CompletedProcess[str]:
+    runtime_env = os.environ.copy()
+    runtime_env.update(env)
+    return subprocess.run(
+        [
+            "bash",
+            "--noprofile",
+            "--norc",
+            "-eu",
+            "-o",
+            "pipefail",
+            "-c",
+            script,
+        ],
+        cwd=REPO_ROOT,
+        env=runtime_env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def _run_workflow_step(
+    workflow_name: str,
+    job_name: str,
+    step_name: str,
+    env: dict[str, str],
+) -> subprocess.CompletedProcess[str]:
+    payload, _ = _load_workflow(workflow_name)
+    step = _named_steps(payload["jobs"][job_name])[step_name]
+    script = step.get("run")
+    if not isinstance(script, str):
+        raise AssertionError(f"{workflow_name}:{job_name}:{step_name} has no script")
+    return _run_script(script, env)
+
+
+def _run_route_step(
+    workflow_name: str,
+    job_name: str,
+    step_name: str,
+    *,
+    event_name: str,
+    pr_base: str = "pr-base",
+    pr_head: str = "pr-head",
+    merge_base: str = "merge-base",
+    merge_head: str = "merge-head",
+    stub_exit: int = 0,
+) -> tuple[subprocess.CompletedProcess[str], list[str]]:
+    with tempfile.TemporaryDirectory(prefix="intrinsic-ci009-route-") as temp:
+        temp_root = Path(temp)
+        bin_dir = temp_root / "bin"
+        bin_dir.mkdir()
+        captured_args = temp_root / "args.txt"
+        python_stub = bin_dir / "python3"
+        python_stub.write_text(
+            "#!/usr/bin/env bash\n"
+            'printf "%s\\n" "$@" > "$CAPTURE_ARGS"\n'
+            'exit "$STUB_EXIT"\n',
+            encoding="utf-8",
+        )
+        python_stub.chmod(0o755)
+        result = _run_workflow_step(
+            workflow_name,
+            job_name,
+            step_name,
+            {
+                "EVENT_NAME": event_name,
+                "PR_BASE_SHA": pr_base,
+                "PR_HEAD_SHA": pr_head,
+                "MERGE_GROUP_BASE_SHA": merge_base,
+                "MERGE_GROUP_HEAD_SHA": merge_head,
+                "GITHUB_OUTPUT": str(temp_root / "github-output.txt"),
+                "GITHUB_STEP_SUMMARY": str(temp_root / "summary.md"),
+                "CAPTURE_ARGS": str(captured_args),
+                "STUB_EXIT": str(stub_exit),
+                "PATH": f"{bin_dir}:{os.environ['PATH']}",
+            },
+        )
+        args = (
+            captured_args.read_text(encoding="utf-8").splitlines()
+            if captured_args.exists()
+            else []
+        )
+        return result, args
+
+
+def _argument_value(arguments: list[str], flag: str) -> str:
+    try:
+        return arguments[arguments.index(flag) + 1]
+    except (ValueError, IndexError) as error:
+        raise AssertionError(f"missing argument {flag}: {arguments}") from error
+
+
 class WorkflowRoutingTests(unittest.TestCase):
     def test_quick_feedback_covers_every_candidate_update_and_merge_group(
         self,
@@ -97,6 +196,92 @@ class WorkflowRoutingTests(unittest.TestCase):
                 self.assertIn("workflow_dispatch", triggers)
                 self.assertNotIn("paths:", text)
                 self.assertNotIn("paths-ignore:", text)
+        linux, _ = _load_workflow("ci-linux-clang.yml")
+        self.assertEqual(
+            _triggers(linux)["push"],
+            {"branches": ["main"]},
+        )
+
+    def test_route_scripts_execute_event_specific_refs_and_fail_closed(
+        self,
+    ) -> None:
+        route_steps = (
+            (
+                "pr-fast.yml",
+                "pr-fast",
+                "Plan touched scope",
+                "tools/ci/touched_scope.py",
+            ),
+            (
+                "ci-release.yml",
+                "release_route",
+                "Plan Release confidence scope",
+                "tools/ci/touched_scope.py",
+            ),
+            (
+                "ci-docs.yml",
+                "docs-validation",
+                "Validate documentation synchronization (strict mode)",
+                "tools/docs/check_docs_sync.py",
+            ),
+        )
+        event_refs = (
+            ("pull_request", "pr-base", "pr-head"),
+            ("merge_group", "merge-base", "merge-head"),
+            ("workflow_dispatch", "origin/main", "HEAD"),
+        )
+        for workflow, job, step, script_path in route_steps:
+            for event_name, expected_base, expected_head in event_refs:
+                with self.subTest(workflow=workflow, event=event_name):
+                    result, arguments = _run_route_step(
+                        workflow,
+                        job,
+                        step,
+                        event_name=event_name,
+                    )
+                    self.assertEqual(
+                        result.returncode,
+                        0,
+                        result.stdout + result.stderr,
+                    )
+                    self.assertEqual(arguments[0], script_path)
+                    self.assertEqual(
+                        _argument_value(arguments, "--base-ref"),
+                        expected_base,
+                    )
+                    self.assertEqual(
+                        _argument_value(arguments, "--head-ref"),
+                        expected_head,
+                    )
+
+            for event_name, missing in (
+                ("pull_request", {"pr_base": "", "pr_head": ""}),
+                ("merge_group", {"merge_base": "", "merge_head": ""}),
+            ):
+                with self.subTest(
+                    workflow=workflow,
+                    event=event_name,
+                    state="missing-refs",
+                ):
+                    result, arguments = _run_route_step(
+                        workflow,
+                        job,
+                        step,
+                        event_name=event_name,
+                        **missing,
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(arguments, [])
+
+            with self.subTest(workflow=workflow, state="route-command-failure"):
+                result, _ = _run_route_step(
+                    workflow,
+                    job,
+                    step,
+                    event_name="merge_group",
+                    stub_exit=17,
+                )
+                self.assertEqual(result.returncode, 17)
 
     def test_cpu_and_vulkan_required_results_are_stable_and_draft_safe(
         self,
@@ -154,6 +339,106 @@ class WorkflowRoutingTests(unittest.TestCase):
                 self.assertIn('"$PR_DRAFT" == "true"', command)
                 self.assertIn('!= "skipped"', command)
                 self.assertIn("exit 1", command)
+
+    def test_cpu_required_result_script_executes_success_failure_and_skip_cases(
+        self,
+    ) -> None:
+        base = {
+            "EVENT_NAME": "pull_request",
+            "PR_DRAFT": "false",
+            "CPU_RESULT": "success",
+            "SANITIZER_RESULT": "success",
+            "PARITY_RESULT": "success",
+        }
+        cases = (
+            ("opened-ready", {}, True),
+            ("reopened-ready", {}, True),
+            ("synchronize-ready", {}, True),
+            ("ready-for-review", {}, True),
+            ("merge-group", {"EVENT_NAME": "merge_group"}, True),
+            (
+                "converted-to-draft",
+                {
+                    "PR_DRAFT": "true",
+                    "CPU_RESULT": "skipped",
+                    "SANITIZER_RESULT": "skipped",
+                    "PARITY_RESULT": "skipped",
+                },
+                True,
+            ),
+            (
+                "draft-implementation-ran",
+                {
+                    "PR_DRAFT": "true",
+                    "CPU_RESULT": "success",
+                    "SANITIZER_RESULT": "skipped",
+                    "PARITY_RESULT": "skipped",
+                },
+                False,
+            ),
+            ("cpu-failed", {"CPU_RESULT": "failure"}, False),
+            ("sanitizer-skipped", {"SANITIZER_RESULT": "skipped"}, False),
+            ("parity-cancelled", {"PARITY_RESULT": "cancelled"}, False),
+        )
+        for name, overrides, succeeds in cases:
+            with self.subTest(case=name):
+                env = base | overrides
+                result = _run_workflow_step(
+                    "ci-linux-clang.yml",
+                    "required-ci-linux-clang",
+                    "Resolve ci-linux-clang lifecycle result",
+                    env,
+                )
+                if succeeds:
+                    self.assertEqual(
+                        result.returncode,
+                        0,
+                        result.stdout + result.stderr,
+                    )
+                else:
+                    self.assertNotEqual(result.returncode, 0)
+
+    def test_vulkan_required_result_script_executes_failure_and_skip_cases(
+        self,
+    ) -> None:
+        base = {
+            "EVENT_NAME": "pull_request",
+            "PR_DRAFT": "false",
+            "VULKAN_RESULT": "success",
+        }
+        cases = (
+            ("ready", {}, True),
+            ("merge-group", {"EVENT_NAME": "merge_group"}, True),
+            (
+                "draft-skipped",
+                {"PR_DRAFT": "true", "VULKAN_RESULT": "skipped"},
+                True,
+            ),
+            (
+                "draft-implementation-ran",
+                {"PR_DRAFT": "true", "VULKAN_RESULT": "success"},
+                False,
+            ),
+            ("implementation-failed", {"VULKAN_RESULT": "failure"}, False),
+            ("implementation-skipped", {"VULKAN_RESULT": "skipped"}, False),
+        )
+        for name, overrides, succeeds in cases:
+            with self.subTest(case=name):
+                env = base | overrides
+                result = _run_workflow_step(
+                    "ci-vulkan.yml",
+                    "required-ci-vulkan",
+                    "Resolve ci-vulkan lifecycle result",
+                    env,
+                )
+                if succeeds:
+                    self.assertEqual(
+                        result.returncode,
+                        0,
+                        result.stdout + result.stderr,
+                    )
+                else:
+                    self.assertNotEqual(result.returncode, 0)
 
     def test_cpu_candidate_path_requires_sanitizers_and_selection_parity(
         self,
@@ -271,6 +556,94 @@ class WorkflowRoutingTests(unittest.TestCase):
         self.assertNotIn("actions/download-artifact", text)
         self.assertFalse((WORKFLOW_ROOT / "ci-bench-smoke.yml").exists())
 
+    def test_release_result_script_executes_route_failure_and_skip_contract(
+        self,
+    ) -> None:
+        base = {
+            "EVENT_NAME": "pull_request",
+            "PR_DRAFT": "false",
+            "NEEDS_RELEASE": "true",
+            "ROUTE_RESULT": "success",
+            "RELEASE_RESULT": "success",
+        }
+        cases = (
+            ("ready-required-success", {}, True),
+            ("merge-group-success", {"EVENT_NAME": "merge_group"}, True),
+            (
+                "manual-independent-success",
+                {
+                    "EVENT_NAME": "workflow_dispatch",
+                    "NEEDS_RELEASE": "false",
+                },
+                True,
+            ),
+            (
+                "draft-valid-skip",
+                {
+                    "PR_DRAFT": "true",
+                    "NEEDS_RELEASE": "false",
+                    "RELEASE_RESULT": "skipped",
+                },
+                True,
+            ),
+            (
+                "path-valid-skip",
+                {
+                    "NEEDS_RELEASE": "false",
+                    "RELEASE_RESULT": "skipped",
+                },
+                True,
+            ),
+            ("route-failed", {"ROUTE_RESULT": "failure"}, False),
+            ("route-cancelled", {"ROUTE_RESULT": "cancelled"}, False),
+            ("invalid-route-verdict", {"NEEDS_RELEASE": ""}, False),
+            (
+                "draft-invalid-success",
+                {
+                    "PR_DRAFT": "true",
+                    "NEEDS_RELEASE": "false",
+                    "RELEASE_RESULT": "success",
+                },
+                False,
+            ),
+            (
+                "path-invalid-success",
+                {
+                    "NEEDS_RELEASE": "false",
+                    "RELEASE_RESULT": "success",
+                },
+                False,
+            ),
+            ("required-implementation-failed", {"RELEASE_RESULT": "failure"}, False),
+            ("required-implementation-skipped", {"RELEASE_RESULT": "skipped"}, False),
+            (
+                "manual-implementation-failed",
+                {
+                    "EVENT_NAME": "workflow_dispatch",
+                    "NEEDS_RELEASE": "false",
+                    "RELEASE_RESULT": "failure",
+                },
+                False,
+            ),
+        )
+        for name, overrides, succeeds in cases:
+            with self.subTest(case=name):
+                env = base | overrides
+                result = _run_workflow_step(
+                    "ci-release.yml",
+                    "required_ci_release",
+                    "Resolve ci-release lifecycle result",
+                    env,
+                )
+                if succeeds:
+                    self.assertEqual(
+                        result.returncode,
+                        0,
+                        result.stdout + result.stderr,
+                    )
+                else:
+                    self.assertNotEqual(result.returncode, 0)
+
     def test_complete_source_coverage_is_weekly_and_manual(self) -> None:
         payload, _ = _load_workflow("ci-source-coverage.yml")
         triggers = _triggers(payload)
@@ -278,7 +651,7 @@ class WorkflowRoutingTests(unittest.TestCase):
             set(triggers),
             {"schedule", "workflow_dispatch"},
         )
-        self.assertEqual(triggers["schedule"], [{"cron": "0 5 * * 1"}])
+        self.assertEqual(triggers["schedule"], [{"cron": "0 3 * * 1"}])
 
     def test_nightly_no_longer_owns_debug_slo(self) -> None:
         payload, text = _load_workflow("nightly-deep.yml")
