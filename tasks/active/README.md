@@ -11,10 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`CORE-009`](CORE-009-app-owned-config-sections.md) — generic app config
-  sections with pre-boot Sandbox registration and feature-neutral live apply;
-  owner: Codex; branch: `codex/core-009-app-config-sections`; next gate:
-  implement the core record/registry contract and focused parsing tests.
+No active tasks.
 
 ## History
 

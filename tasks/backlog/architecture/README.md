@@ -10,13 +10,6 @@ map.
 
 ## Tasks
 
-Opened from the 2026-07-03 main-loop/task-graph/render-graph review
-([`docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`](../../../docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md)):
-
-- [`CORE-009`](../../active/CORE-009-app-owned-config-sections.md) is active —
-  app-owned Progressive Poisson and parameterization sections move out of core
-  `EngineConfig` behind one pre-boot generic section registry.
-
 Opened from the 2026-07-08 kernel/module architecture decision record
 ([`docs/adr/0024-kernel-module-architecture.md`](../../../docs/adr/0024-kernel-module-architecture.md));
 seams-first migration order. All additive seams (`ARCH-007`..`ARCH-011`), the
@@ -119,6 +112,15 @@ root must update the relevant `docs/architecture/*` doc set in the same PR per
 - [`docs/agent/architecture-review-checklist.md`](../../../docs/agent/architecture-review-checklist.md).
 
 ## Retired
+
+- [`CORE-009`](../../done/CORE-009-app-owned-config-sections.md) —
+  retired 2026-07-18 at `Operational`: Core now carries only generic,
+  schema-versioned application-section records and registration; Runtime owns
+  the Sandbox feature codecs and generic live apply; and Sandbox composes both
+  current sections before boot through the real Null `Engine::Run()` path.
+  Focused config, runtime/Sandbox, and application integration suites passed
+  34/34, 167/167, and 28/28, while the full CPU, fresh ASan, and fresh UBSan
+  selectors passed 4,103/4,103, 2,757/2,757, and 2,757/2,757.
 
 - [`CORE-008`](../../done/CORE-008-compiled-taskgraph-plan-reuse.md) —
   retired 2026-07-18 at `Operational`: exact registration replay now retains

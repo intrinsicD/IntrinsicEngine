@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`CORE-009`](CORE-009-app-owned-config-sections.md) — application-owned config
+sections retired on 2026-07-18 at `Operational`. Core now owns only generic,
+schema-versioned `app.sections` records plus a small sorted registration lane;
+Runtime owns the Progressive Poisson and parameterization codecs and
+feature-neutral live apply; Sandbox composes both registrations before boot
+and passes the same registry through a real Null `Engine::Run()` path.
+Rejected input preserves canonical defaults and fires no callbacks, while a
+committed value change reports ordered section names and invokes its owning
+callback exactly once. Focused config, direct runtime/Sandbox, and application
+integration suites passed 34/34, 167/167, and 28/28; the full CPU selector
+passed 4,103/4,103, and fresh serial grouped ASan and UBSan each passed
+2,757/2,757. The kernel-convergence ratchet stayed at 42 plain imports, 21
+domain imports, 2 direct exports, and 31 getters, and all strict structural
+checks passed. No Vulkan-specific follow-up is owed for this CPU/headless
+config seam.
+
 [`CORE-008`](CORE-008-compiled-taskgraph-plan-reuse.md) — compiled TaskGraph
 plan reuse retired on 2026-07-18 at `Operational`. Explicit
 `ResetForReplay()` retains one successful topology, compares every
