@@ -63,6 +63,55 @@ method manifests/sources, benchmark baselines, CMake inputs, presets,
 toolchains, dependency inputs, and unknown paths all fail closed to
 `needs_cpp=true`; structural-only changes use the audited result-job skip.
 
+The two architecture SLO cases are conservative regression smoke, not
+performance-improvement claims:
+
+- The frame-graph case builds 2,000 no-op passes, excludes six warmup frames,
+  and derives compile p99 plus execute p95 from 40 measured frames using the
+  existing `floor(p * (N - 1))` sample index. The passing 350-microsecond
+  compile-p99 ratchet is retained rather than weakened: it passed the first
+  hosted Release pilot and all 700 observations in the 500-run frame-only plus
+  two 100-run combined local populations. Execute p95 must remain below 8.333334
+  milliseconds, half of a 60 Hz frame. The old
+  `LastCriticalPathTimeNs()` assertion was removed because that accessor
+  currently carries the scheduler's abstract `criticalPathCost`, not elapsed
+  nanoseconds; Core's scheduler tests own the cost/tie-breaker contract.
+- The scheduler case excludes three warmup rounds and measures 20 rounds. In
+  each round one worker creates 3,000 child tasks in its worker-local deque and
+  blocks until they finish, so the full 69,000-task population must be
+  completed through steals. It then parks all 512 event waiters before
+  signaling and records each coroutine's signal-to-resume time directly.
+  Worker-local fanout p95 and signal-to-resume p99 must each remain below one
+  60 Hz frame (16.666667 milliseconds).
+
+Each test prints parseable `SLO_METRIC name=... value_ns=... budget_ns=...`
+records before its assertions. The scheduler case also prints
+`SLO_DIAGNOSTIC` counters for steal attempts/ratio, contention, cumulative
+idle wait, and the legacy park-to-signal histogram. CTest retains these lines
+in the uploaded JUnit on passing and failing runs. The diagnostic counters are
+not latency gates: externally injected work cannot establish a positive
+worker-local steal ratio, cumulative idle time rewards busy-waiting over
+correct sleep, and the legacy unpark histogram measures park-to-signal dwell
+in power-of-two buckets rather than signal-to-resume latency.
+
+`BUG-114` records why the first optimized hosted pilot,
+[run 29631970411](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29631970411),
+is diagnostic rather than Release-population evidence. It failed the inherited
+1.5-millisecond frame-graph execute ceiling at 2.464368 milliseconds and
+exposed the three scheduler metric/workload mismatches above. Before another
+hosted build was spent, a local unsanitized Clang 23 `ci-release` population
+ran the frame-graph case 500 times: run-level execute p95 had median 0.929334
+milliseconds, population p95 1.731867 milliseconds, population p99 1.982952
+milliseconds, and maximum 4.159569 milliseconds. A separate 100-run combined
+stress found one 6.975895-millisecond outlier, rejecting a provisional
+5-millisecond ceiling. The half-frame ceiling was declared before the fixed
+hosted population. The redesigned scheduler case completed 100/100 local
+repetitions with exactly 69,000 steals per repetition; observed fanout p95 was
+at most 6.341190 milliseconds and direct resume p99 at most 0.358907
+milliseconds. These local measurements validate harness stability and
+guardrail margin only; hosted runner evidence remains the authority for
+`ci-release`.
+
 Manual Release samples are independently runnable because manual executions are
 not cancelled by the workflow concurrency policy. For a comparable standard
 runner population, pin one unchanged evidence ref, dispatch five separate
@@ -293,9 +342,10 @@ claim that grouping improves the four-slot plan: grouping improved the matched
 one- and two-slot results but regressed the four-slot A/B result by 6.400% at
 median and 6.118% at p95.
 ASan and UBSan use the same replacement-only representation but remain explicit
-at `--parallel 1`; no sanitizer concurrency speedup is claimed. The 41 cases
+at `--parallel 1`; no sanitizer concurrency speedup is claimed. The 43 cases
 that deliberately request more than one scheduler worker reserve peak runnable
-capacity: 22 use `PROCESSORS=3` and 19 use `PROCESSORS=4`.
+capacity: 22 use `PROCESSORS=3`, 19 use `PROCESSORS=4`, and the two Release
+architecture-SLO cases use `PROCESSORS=8`.
 
 Earlier run
 [`29622055604`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29622055604)

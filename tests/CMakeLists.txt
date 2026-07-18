@@ -1430,6 +1430,8 @@ intrinsic_test_executable(IntrinsicRuntimeGraphicsCpuTests
 # worker. Keep these case-scoped: producer-wide weights would serialize the
 # thousands of neighboring tests that do not own a worker pool.
 set(_intrinsic_multiworker_test_budgets
+    "IntrinsicBenchmarkTests|ArchitectureSLO.FrameGraphP95P99BudgetsAt2000Nodes|8"
+    "IntrinsicBenchmarkTests|ArchitectureSLO.TaskSchedulerLocalStealAndWakeCompletionBudgets|8"
     "IntrinsicCoreWrapperUnitTests|CoreTasks.BasicDispatch|3"
     "IntrinsicCoreWrapperUnitTests|CoreTasks.ContendedDispatchCompletes|4"
     "IntrinsicCoreWrapperUnitTests|CoreTasks.CoroutineDispatch|3"

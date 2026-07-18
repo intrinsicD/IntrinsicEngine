@@ -99,6 +99,7 @@ CPU_ENGINE_CONFIG_ROOTS = (
     ),
 )
 CPU_MULTIWORKER_SOURCE_TARGETS = {
+    "tests/benchmark/slo/Test.ArchitectureSLO.cpp": "IntrinsicBenchmarkTests",
     "tests/unit/core/Test.CoreTasks.cpp": "IntrinsicCoreWrapperUnitTests",
     "tests/unit/core/Test.CoreFrameGraph.cpp": "IntrinsicCoreWrapperUnitTests",
     "tests/unit/core/Test.Core.TaskGraphLegacy.cpp": "IntrinsicCoreWrapperUnitTests",
@@ -291,15 +292,15 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         source_budgets = _source_multiworker_budgets()
 
         self.assertEqual(declared, source_budgets)
-        self.assertEqual(len(declared), 41)
+        self.assertEqual(len(declared), 43)
         self.assertEqual(
             {
                 budget: sum(
                     declared_budget == budget for _, _, declared_budget in declared
                 )
-                for budget in (3, 4)
+                for budget in (3, 4, 8)
             },
-            {3: 22, 4: 19},
+            {3: 22, 4: 19, 8: 2},
         )
         self.assertIn(
             "Declared multi-worker test "

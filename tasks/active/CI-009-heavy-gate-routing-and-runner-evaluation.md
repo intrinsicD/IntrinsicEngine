@@ -32,8 +32,9 @@ depends_on:
   Release pilot `29631970411` exposed invalid architecture-SLO metric/workload
   pairings after routing and build succeeded. No successful five-sample
   population has started; the failed pilot cannot count. Next verification:
-  retire `BUG-114`, pass one fixed hosted pilot, then collect five sequential
-  hosted `ci-release` samples at one unchanged SHA.
+  land the `BUG-114` fix, count a successful fixed pilot as sample 1, collect
+  four more sequential hosted `ci-release` samples at that unchanged SHA, then
+  retire the blocker.
 - Owner: GitHub Actions trigger topology, required-check contracts, benchmark
   routing, and runner policy.
 - `CI-003` observed independent cold compile-heavy jobs on every PR update:

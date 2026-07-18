@@ -25,8 +25,8 @@ depends_on: []
 
 ## Context
 - Status: active on 2026-07-18; owner: Codex; branch: `main`; blocks
-  `CI-009`. Next verification: redesign the two SLO cases, rebuild only
-  `IntrinsicBenchmarkTests`, and repeat the exact cases in `ci-release`.
+  `CI-009`. Next verification: land the locally verified fixed SHA and dispatch
+  the first hosted `ci-release` sample; stop immediately if it fails.
 - Owner: `tests/benchmark/slo/Test.ArchitectureSLO.cpp`, its retained JUnit
   evidence, and the documented `ci-release` SLO contract.
 - Symptom: manual `ci-release` run
@@ -83,56 +83,60 @@ depends_on: []
      owning production task rather than calibrating around it.
 
 ## Required changes
-- [ ] Retain the frame-graph compile and execute warmup/measured populations,
+- [x] Retain the frame-graph compile and execute warmup/measured populations,
       print their percentiles and budgets on every run, and remove the false
       critical-path nanosecond assertion.
-- [ ] Replace the scheduler's global-inject steal-ratio assertion with a
+- [x] Replace the scheduler's global-inject steal-ratio assertion with a
       controlled worker-local backlog that must complete through actual steals.
-- [ ] Park the complete waiter population before signaling, measure
+- [x] Park the complete waiter population before signaling, measure
       signal-to-resume directly in each coroutine, and gate the derived tail
       rather than park-to-signal dwell time.
-- [ ] Record cumulative idle, contention, ratio, and histogram telemetry as
+- [x] Record cumulative idle, contention, ratio, and histogram telemetry as
       diagnostics only; do not present them as latency SLOs.
-- [ ] Give retained smoke ceilings an explicit, conservative calibration rule
+- [x] Give retained smoke ceilings an explicit, conservative calibration rule
       and document that they are regression guardrails rather than performance
       improvement claims.
-- [ ] Keep the workflow fail closed and preserve its existing stop-before-
+- [x] Keep the workflow fail closed and preserve its existing stop-before-
       benchmark behavior after an SLO failure.
 - [ ] Run one hosted pilot at the fixed SHA. Only after it passes may that
-      unchanged SHA begin the five sequential `CI-009` retirement samples.
+      unchanged SHA continue with sequential `CI-009` retirement samples. A
+      successful pilot is sample 1 because its identity and acceptance rule
+      are declared before dispatch.
 
 ## Tests
-- [ ] Pass each redesigned SLO case independently and together in the
+- [x] Pass each redesigned SLO case independently and together in the
       unsanitized `ci-release` tree.
-- [ ] Repeat the focused local Release cases enough to expose deterministic
+- [x] Repeat the focused local Release cases enough to expose deterministic
       harness defects without treating local timing as hosted claim evidence.
-- [ ] Pass the existing workflow routing, concurrency, and timing regressions;
+- [x] Pass the existing workflow routing, concurrency, and timing regressions;
       no workflow behavior changes are expected.
 - [ ] Pass one hosted `ci-release` pilot with the stable result context
       remaining fail closed.
-- [ ] After the pilot, pass five sequential hosted samples at one unchanged
-      SHA, preset, selector, runner image, and cache identity; stop immediately
-      if any sample fails.
+- [ ] Complete five sequential hosted samples total at one unchanged SHA,
+      preset, selector, runner image, and cache identity: the successful pilot
+      is sample 1, then dispatch four more; stop immediately if any sample
+      fails.
 
 ## Docs
 - [ ] Correct `docs/benchmarking/ci-policy.md` with the failed-run diagnosis,
       metric definitions, workload shape, guardrail rationale, and final hosted
       evidence.
-- [ ] Re-gate `CI-009` on `BUG-114` and state that run `29631970411` is
+- [x] Re-gate `CI-009` on `BUG-114` and state that run `29631970411` is
       diagnostic, not sample 1.
-- [ ] Update the active-task, bug, and process indexes while the blocker is
+- [x] Update the active-task, bug, and process indexes while the blocker is
       active.
 - [ ] Regenerate `tasks/SESSION-BRIEF.md` after opening, re-gating, and
       retirement.
 
 ## Acceptance criteria
-- [ ] Every asserted scheduler performance metric is exercised by the workload
+- [x] Every asserted scheduler performance metric is exercised by the workload
       and has explicit units and an explicit observation window.
 - [ ] Frame-graph and scheduler derived percentiles plus budgets are retained
       in hosted JUnit evidence on success and failure.
 - [ ] No threshold is edited after reading a candidate population to
       manufacture a pass.
-- [ ] A focused hosted pilot passes before the five-run population starts.
+- [ ] The first run in the five-sample population passes before samples 2–5
+      are dispatched.
 - [ ] Five sequential `ci-release` runs pass at one unchanged SHA with the
       exact Release preset, selector, and standard `ubuntu-24.04` runner.
 - [ ] A failing SLO still fails `optimized-release` and stable `ci-release`;
