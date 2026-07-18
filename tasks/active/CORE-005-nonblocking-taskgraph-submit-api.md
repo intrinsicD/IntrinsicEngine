@@ -42,55 +42,84 @@ depends_on:
 
 ## Status
 
-- Status: `in-progress`.
-- Owner: Codex.
-- Branch: `codex/core-005-nonblocking-submit`.
-- Next verification: adapt the preserved task-specific implementation to the
-  retired `CORE-006` API, then run focused submission/completion contracts.
+- Completed on 2026-07-18 at `CPUContracted`; owner: Codex; branch:
+  `codex/core-005-nonblocking-submit`; implementation commits:
+  `87740902e9cb0b6f3f37c190474d8a4b7ec06288` and
+  `72070e4a339868b4f07743c2cc9f89b6b70ab48e`.
+- Right-sizing verdict: one copyable completion handle and one shared
+  execution-state implementation are justified by the escaped lifetime and
+  submit-owner pump contract. Existing `Scheduler`/`CounterEvent` seams were
+  extended directly; no factory, service, registry, or second scheduling
+  framework was added.
+- The full CPU gate exposed a stale deterministic-fallback test that treated a
+  one-worker scheduler as single-thread execution and wrote an unsynchronized
+  vector from callbacks. A no-ccache clean rebuild reproduced it. The test now
+  exercises the documented no-scheduler fallback; the production one-worker
+  help-run/steal contract remains intact.
 
 ## Required changes
-- [ ] Add a non-blocking submission API returning a completion handle
+- [x] Add a non-blocking submission API returning a completion handle
       (poll `IsReady()`, blocking `Wait()`); heap/shared-own the execution
       state so it legally outlives the submitting scope (builds on the
       BUG-055 restructure).
-- [ ] Keep main-thread-only passes correct under submission: define and
+- [x] Keep main-thread-only passes correct under submission: define and
       document how the owning thread drains the main-thread queue for a
       submitted graph (explicit `PumpMainThreadPasses()` on the handle is
       acceptable).
-- [ ] Rework the blocking wait: while the graph runs, the calling thread
+- [x] Rework the blocking wait: while the graph runs, the calling thread
       help-executes scheduler work (inject queue and stealing) and parks on
       the completion `CounterEvent` when idle, instead of `yield()` spinning.
-- [ ] Make `Execute()` a thin wrapper over submit+wait so there is one code
+- [x] Make `Execute()` a thin wrapper over submit+wait so there is one code
       path.
-- [ ] Preserve `Reset()`-while-executing protection with the new lifetime
+- [x] Preserve `Reset()`-while-executing protection with the new lifetime
       model (fail-closed error, not assert-only).
 
 ## Tests
-- [ ] Contract: submitted graph completes with correct dependency order while
+- [x] Contract: submitted graph completes with correct dependency order while
       the submitting thread runs unrelated work before waiting.
-- [ ] Contract: main-thread-only passes execute on the owning thread via the
+- [x] Contract: main-thread-only passes execute on the owning thread via the
       documented pump path for a submitted graph.
-- [ ] Contract: blocking wait makes progress when all workers are saturated
+- [x] Contract: blocking wait makes progress when all workers are saturated
       (help-run proven with a single-worker-forced configuration).
-- [ ] Contract: `Reset()` during a live submission fails closed.
-- [ ] Existing `CoreTaskGraph.*` and `CoreTasks.*` suites stay green.
+- [x] Contract: `Reset()` during a live submission fails closed.
+- [x] Existing `CoreTaskGraph.*` and `CoreTasks.*` suites stay green.
 
 ## Docs
-- [ ] Update `docs/architecture/task-graphs.md` with the submit/completion
+- [x] Update `docs/architecture/task-graphs.md` with the submit/completion
       model and the main-thread pump contract.
-- [ ] Update `src/core/README.md` module notes.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` if `.cppm` surfaces
+- [x] Update `src/core/README.md` module notes.
+- [x] Regenerate `docs/api/generated/module_inventory.md` if `.cppm` surfaces
       change.
 
 ## Acceptance criteria
-- [ ] A graph can be submitted, progressed, and completed without the caller
+- [x] A graph can be submitted, progressed, and completed without the caller
       blocking; completion observable via token.
-- [ ] The blocking path no longer spins: CPU profile of an idle wait shows
+- [x] The blocking path no longer spins: CPU profile of an idle wait shows
       parked caller, and the caller demonstrably executes stolen tasks under
       saturation.
-- [ ] Default CPU gate green.
+- [x] Default CPU gate green.
 
 ## Verification
+
+- `IntrinsicTests` built successfully; focused TaskGraph/Tasks contracts
+  passed 80/80. The corrected no-scheduler fallback passed 100 repetitions,
+  and three one-worker help/steal cases passed 100 repetitions each.
+- The default CPU-supported gate passed 4,078/4,078 with one expected GLFW
+  capability skip.
+- The canonical ASan gate configured fresh, built 2,153/2,153 actions, and
+  passed 2,732/2,732 selected tests serially with no skip or diagnostic.
+  The canonical UBSan gate configured fresh, built 2,153/2,153 actions, and
+  passed 2,732/2,732 selected tests serially with one expected LSan-only
+  capability skip and no UBSan diagnostic.
+- Host policy blocked `perf` (`kernel.perf_event_paranoid=4`), so no perf
+  sample is claimed. A direct `strace -f -e futex` run covered 50 repetitions
+  of 200 worker-to-owner handoffs (10,000 total); the owner issued 10,064
+  `FUTEX_WAIT` calls, directly demonstrating parking. The saturation/local
+  steal contracts supplied the separate caller-help evidence.
+- Strict task policy/state-link, layering, test-layout, documentation-link,
+  root-hygiene, skill-sync, docs-sync, and clean-workshop checks passed.
+  Regenerating the 386-module inventory was byte-identical.
+
 ```bash
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
@@ -105,6 +134,6 @@ python3 tools/repo/check_layering.py --root src --strict
 - Timing-based synchronization.
 
 ## Maturity
-- Target: `CPUContracted`; the API is fully provable on the CPU gate.
+- Reached: `CPUContracted`; the API is fully proved on the CPU gate.
   No `Operational` follow-up is owed (consumers adopt it in their own tasks,
   e.g. `GRAPHICS-119`, future streaming-graph unification).
