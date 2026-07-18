@@ -8,6 +8,18 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`CI-008`](CI-008-grouped-ctest-and-worker-oversubscription.md) — grouped CTest
+and worker-budget calibration retired on 2026-07-18 at `Operational`. Required
+CPU variants now replace 1,351 individual cases from five audited pure producers
+with five grouped wrappers while preserving default local individual discovery
+and per-case XML diagnostics. Physical records fell from 4,062 to 2,716 with
+exact logical status and production-coverage parity. Five matched pairs at each
+of j1, j2, and j4 selected j4 as the fastest absolute grouped plan, while
+recording honestly that grouping regressed the j4 A/B median/p95 by
+6.400%/6.118%. Final run `29627099771` passed the identical 4,062-case
+unsanitized, ASan, and UBSan selections; sanitizers remain conservative at j1
+without a speedup claim. Lifecycle/runner routing remains owned by `CI-009`.
+
 [`BUG-113`](BUG-113-runtime-world-reload-assumes-one-frame-completion.md) —
 runtime-world reload harness defect retired on 2026-07-18 at `CPUContracted`.
 The scene-borrower regression now drives the existing per-asset CPU completion

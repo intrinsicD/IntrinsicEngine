@@ -243,22 +243,27 @@ For each change:
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
-  GPU/Vulkan, slow, and explicitly quarantined tests are opt-in and must be justified by label policy.
+  GPU/Vulkan, slow, and explicitly quarantined tests are opt-in and must be justified by label policy. The required
+  hosted full-CPU workflow explicitly enables replacement-only grouped registration and invokes the same selector with
+  `--parallel 4`. This is a fixed workflow budget, not a host-derived local default; the command above retains
+  individual registration and does not infer a parallel budget from the host.
 - The canonical `ci` preset is unsanitized. Required address and undefined-behavior sanitizer coverage uses the
   isolated `ci-asan` and `ci-ubsan` presets, their matching `build/ci-asan` and `build/ci-ubsan` trees, and the same
   exclusion-only CPU selector:
 
   ```bash
-  cmake --preset ci-asan --fresh
+  cmake --preset ci-asan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON
   cmake --build --preset ci-asan --target IntrinsicCpuTests
-  ctest --test-dir build/ci-asan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
-  cmake --preset ci-ubsan --fresh
+  ctest --test-dir build/ci-asan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1
+  cmake --preset ci-ubsan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON
   cmake --build --preset ci-ubsan --target IntrinsicCpuTests
-  ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+  ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1
   ```
 
-  Sanitizer CTest execution remains serial until `CI-008` establishes a measured worker budget. Do not add `-j` to
-  these commands as an incidental optimization.
+  Required CPU variants use replacement-only grouped registration for the audited pure cohort. Sanitizer CTest
+  execution remains explicitly serial with `--parallel 1`; do not raise that budget without matched sanitizer
+  evidence. Tests that intentionally create multiple scheduler workers carry case-specific CTest `PROCESSORS`
+  reservations.
 - Promoted Vulkan opt-in verification uses the `ci-vulkan` preset plus GPU/Vulkan label intersection. Among required
   CI gates, this is the only one that retains combined ASan+UBSan instrumentation because the Vulkan shutdown contract
   owns explicit LeakSanitizer evidence:

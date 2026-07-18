@@ -15,10 +15,8 @@ map.
 
 ## Tasks
 
-- [CI-008 — Reduce CTest process overhead without oversubscribing workers](../../active/CI-008-grouped-ctest-and-worker-oversubscription.md)
-  (currently active).
-- [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
 - [BUILD-004 — Make compile-hotspot evidence source-complete](BUILD-004-source-complete-compile-hotspot-evidence.md)
+- [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
 - [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](PROC-025-port-research-ideation-skill-to-other-repos.md)
   (portable playbook; run from a session scoped to the target repo).
 
@@ -36,11 +34,12 @@ retirement log.
   retired `BUG-106` restores truthful test ownership. Retired `CI-010`
   establishes coverage parity; retired `CI-005` consumes the corrected
   registry/graph; retired `CI-006` isolates the retained sanitizer variants;
-  retired `CI-011` establishes the measured fast/slow cohort; and `CI-008` is
-  now unblocked to group safe families and set worker budgets from those
-  settled inputs. `BUILD-004` independently repairs compile-hotspot evidence and gates
-  `RUNTIME-166`. `CI-009` evaluates lifecycle/runner changes last, after the
-  software duplication and evidence defects are removed.
+  retired `CI-011` establishes the measured fast/slow cohort; and retired
+  `CI-008` now groups five audited pure producers, retains local individual
+  discovery, and fixes the required full-CPU worker budget at four.
+  `BUILD-004` is next: it independently repairs compile-hotspot evidence and
+  gates `RUNTIME-166`. `CI-009` evaluates lifecycle/runner changes last, after
+  the software duplication and evidence defects are removed.
 - Compile-hotspot analyzer ownership is `BUILD-004`; source optimization stays
   outside the process queue. `ARCH-006` retired the Sandbox editor/UI hotspot,
   `RUNTIME-146..151` own the historical `Runtime.Engine` decomposition, and
@@ -79,6 +78,11 @@ this batch is the evidence-backed `check_pr_contract.py` retirement audited by
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [CI-008 — Reduce CTest process overhead without oversubscribing workers](../../done/CI-008-grouped-ctest-and-worker-oversubscription.md)
+  (done 2026-07-18): replaced 1,351 individual cases from five audited pure
+  producers with five grouped wrappers in required CPU variants, reduced
+  physical records from 4,062 to 2,716, proved exact logical/coverage parity,
+  and retained the fastest absolute grouped plan at `--parallel 4`.
 - [CI-011 — Calibrate the slow-test cohort and retain fast sentinels](../../done/CI-011-measured-slow-test-cohort.md)
   (done 2026-07-17): moved exactly eight measured heavy cases to the scheduled
   ordinary-slow lane, retained eight fast sentinels, reduced comparable

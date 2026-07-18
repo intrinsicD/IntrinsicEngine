@@ -80,6 +80,65 @@ python3 tests/regression/tooling/Test.TestGateRouting.py \
   --build-dir build/ci-vulkan --aggregate IntrinsicGpuVulkanTests
 ```
 
+## Grouped CTest execution and worker budgets
+
+`INTRINSIC_GROUP_PURE_CTEST` defaults to `OFF`, so a normal local `ci`
+configure retains one discovered CTest entry per GoogleTest case for focused
+`ctest -R` diagnosis. Required full CPU, ASan, and UBSan workflows enable the
+option explicitly. In that plan, these five producers replace their individual
+entries with one CTest wrapper each:
+
+- `IntrinsicGeometryTests`
+- `IntrinsicGeometryMethodTests`
+- `IntrinsicGraphicsBufferTransferTests`
+- `IntrinsicPhysicsMethodTests`
+- `IntrinsicPhysicsWorldTests`
+
+Grouping is replacement-only, not additive. Configuration rejects a grouped
+wrapper whose producer still has individual discovery, and
+`Test.GroupedCTestParity.py` verifies exact producer/case registration and
+execution-status parity between plans.
+
+A producer is eligible only when its cases do not depend on mutable
+process-global scheduler, logger, telemetry, registry, filesystem, environment,
+windowing, RHI, device, or runtime lifetime state. A producer with such state
+remains individually discovered until a deterministic same-process reset
+regression exists. `IntrinsicGeometryIoTests` remains individual because its
+fixtures own filesystem and process-static temporary-path state.
+`IntrinsicGeometryProcessStateTests` separately owns the geometry telemetry and
+logging writers for the same reason.
+
+Grouped wrappers reserve one CTest processor and use a 120-second wrapper
+timeout. Required full CPU execution uses the evidence-backed
+`--parallel 4` workflow budget. It was the fastest absolute grouped plan across
+matched one-, two-, and four-slot evidence even though grouping itself improved
+the one- and two-slot A/B results but regressed the four-slot A/B result. ASan
+and UBSan remain explicit at `--parallel 1`. The required CPU cohort's
+runtime-bearing fixtures request one engine worker unless worker-count behavior
+is the contract. The 41 cases that intentionally create larger pools carry
+exact case-scoped `PROCESSORS` reservations: 22 reserve three slots and 19
+reserve four. Do not replace these budgets with independently inferred
+host-core counts.
+
+The case-scoped reservation list in
+[`tests/CMakeLists.txt`](CMakeLists.txt) intentionally covers only tests that
+request more than one scheduler worker. Fixtures configured with one worker
+remain ordinary single-slot CTest cases: their worker is not uniformly runnable
+alongside the driving test thread, and producer-wide weighting would serialize
+thousands of unrelated cases. Expanding that scope requires a case-level
+runtime inventory and matched evidence rather than assuming every configured
+thread is active.
+
+CTest JUnit retains the physical wrapper result. Per-case GoogleTest XML is
+written under `build/<tree>/reports/grouped-ctest/gtest/` and uploaded beside
+the JUnit result, so a grouped failure keeps its individual case name and
+status.
+
+This replacement-only policy supersedes the additive grouped registrations
+recorded by retired
+[`CI-001`](../tasks/archive/CI-001-slim-engine-test-runtime.md); that historical
+task remains unchanged.
+
 ## CPU and sanitizer gate identities
 
 The canonical `ci` preset is unsanitized. Required ASan and UBSan coverage uses
@@ -87,23 +146,23 @@ the isolated `ci-asan` and `ci-ubsan` presets, builds only the exact
 `IntrinsicCpuTests` aggregate, and applies the same exclusion-only selector:
 
 ```bash
-cmake --preset ci-asan --fresh
+cmake --preset ci-asan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON
 cmake --build --preset ci-asan --target IntrinsicCpuTests
 ctest --test-dir build/ci-asan --output-on-failure \
   -LE 'gpu|vulkan|slow|flaky-quarantine' \
-  --no-tests=error --timeout 60
+  --no-tests=error --timeout 60 --parallel 1
 
-cmake --preset ci-ubsan --fresh
+cmake --preset ci-ubsan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON
 cmake --build --preset ci-ubsan --target IntrinsicCpuTests
 ctest --test-dir build/ci-ubsan --output-on-failure \
   -LE 'gpu|vulkan|slow|flaky-quarantine' \
-  --no-tests=error --timeout 60
+  --no-tests=error --timeout 60 --parallel 1
 ```
 
-There is intentionally no positive `-L` filter and no CTest `-j` flag in either
-sanitizer command. Regression-only CPU producers remain selected, and `CI-008`
-owns any later measured sanitizer worker budget. The two variants use distinct
-`build/ci-asan` and `build/ci-ubsan` trees and matching
+There is intentionally no positive `-L` filter in either sanitizer command.
+Regression-only CPU producers remain selected, and sanitizer CTest execution is
+explicitly serial. The two variants use distinct `build/ci-asan` and
+`build/ci-ubsan` trees and matching
 `external/vcpkg-installed/ci-asan` and
 `external/vcpkg-installed/ci-ubsan` package trees.
 
@@ -255,9 +314,13 @@ Common gates:
 
 ```bash
 cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -L 'unit|contract' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j$(nproc)
-ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j$(nproc)
+ctest --test-dir build/ci --output-on-failure -L 'unit|contract' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
+
+These local commands use the default individual registration and do not infer a
+parallel budget from the host. The required full CPU workflow enables grouped
+registration and passes the explicit evidence-backed `--parallel 4` value.
 
 Opt-in promoted Vulkan smoke coverage is selected with the label intersection
 form below. `IntrinsicGraphicsVulkanSmokeTests` includes the default-recipe,
@@ -343,10 +406,10 @@ final CPU/sanitizer/capability PR/merge verification.
 
 `CMakePresets.json` currently defines configure/build presets but no CTest
 `testPresets`, so use the directory-based `ctest --test-dir build/ci ...`
-commands above rather than `ctest --preset ci`. Test registration sets a
-30-second CTest `TIMEOUT` by default; executables or grouped entries labeled
-`slow` receive a 120-second CTest `TIMEOUT` so opt-in/nightly coverage has room
-for valid longer-running cases without raising the default for cheap CPU tests.
+commands above rather than `ctest --preset ci`. Regular discovered tests use a
+30-second CTest `TIMEOUT` by default; slow discovered tests and every grouped
+wrapper use a 120-second CTest `TIMEOUT` so valid longer-running coverage does
+not raise the default for cheap CPU tests.
 
 ## Shared fixtures
 

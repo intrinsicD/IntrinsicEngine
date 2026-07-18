@@ -177,6 +177,68 @@ different sanitizer, cache, selector, invocation, and case populations, so the
 matched reduction above is not calculated against either and no isolated
 per-change speedup is inferred from them.
 
+### CI-008 grouped CTest and worker-budget evidence
+
+Matched hosted run
+[`29625346673`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29625346673)
+at `886495e78f64b47262db76ecf7cb996d74b06686`, artifact `8424178333`
+(`sha256:344f0f8d8960791407e16c2bb6b3f0d704e255d482e6853dac3e459c64b60dc2`),
+configured individual and grouped plans from the same source identity. The
+workflow built the CPU product once, materialized the grouped binary view with
+hardlinks, and failed closed unless all 28 inventoried producer binaries shared
+the corresponding inode. Cross-plan selection retained 4,062 logical records
+across 28 producers: 4,061 GoogleTest cases across 27 source-backed producers
+plus one manual process-level CTest.
+`Test.GroupedCTestParity.py registration` proved exact parity for the 4,061
+GoogleTest identities and replacement-only preservation of the manual CTest
+record. Exactly 1,351 cases from five audited producers changed representation;
+physical CPU CTest records fell from 4,062 to 2,716, a reduction of 1,346
+process entries. No unaffected producer changed representation.
+
+| CTest budget | Individual median / p95 (s) | Grouped median / p95 (s) | Median / p95 reduction (%) |
+| --- | ---: | ---: | ---: |
+| `--parallel 1` | 72.278999 / 73.071192 | 62.085994 / 62.533167 | 14.102 / 14.422 |
+| `--parallel 2` | 39.256532 / 39.445179 | 37.201451 / 37.313669 | 5.235 / 5.404 |
+| `--parallel 4` | 27.715948 / 27.847886 | 29.489894 / 29.551698 | -6.400 / -6.118 |
+
+All 15 alternating matched pairs reported exact logical status parity:
+4,055 passed and six disabled, with no failed, skipped, or error cases. The
+grouped physical CTest reports retained 2,709 passed records, including the five
+wrapper processes, and seven skipped/disabled records; no physical record
+failed or errored. The required full CPU workflow therefore retains
+`--parallel 4`, the fastest absolute grouped-plan median and p95. This is not a
+claim that grouping improves the four-slot plan: grouping improved the matched
+one- and two-slot results but regressed the four-slot A/B result by 6.400% at
+median and 6.118% at p95.
+ASan and UBSan use the same replacement-only representation but remain explicit
+at `--parallel 1`; no sanitizer concurrency speedup is claimed. The 41 cases
+that deliberately request more than one scheduler worker reserve peak runnable
+capacity: 22 use `PROCESSORS=3` and 19 use `PROCESSORS=4`.
+
+Earlier run
+[`29622055604`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29622055604)
+exposed the individually registered RuntimeWorldRegistry harness race tracked
+and retired as `BUG-113`. Because that correction changed executed test code,
+none of the earlier run's partial timings enter the table above.
+
+Matched source-coverage run
+[`29620815336`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29620815336)
+at `4ab702451dc0aaf0a3c16dc98c891cb39499f504`, artifact
+`8422537827`
+(`sha256:cad43ca733d69d8747f521eea1e95bcd91f05a50ca41fcc8368e7082530cc145`),
+reused one instrumented product build for both registration plans. Exact
+comparison reported zero gained or lost covered production lines, regions, and
+branch arms. Later changes added CTest scheduling metadata, selection
+diagnostics, workflow updates, and an explicit completion step in the
+individually registered RuntimeWorldRegistry harness. That fixture is outside
+the grouped cohort; none of those changes alter instrumented product source or
+grouped product execution.
+
+The `CI-003` 3,594-case, 217.53-second full-CPU phase remains historical
+context only: its source population, sanitizer topology, and invocation differ.
+The same-SHA matched A/B population above is the decision evidence, so no
+causal reduction is calculated against `CI-003`.
+
 ### Monolithic smoke ownership and budget
 
 The required `ci-bench-smoke` pull-request workflow owns execution of the
@@ -369,21 +431,25 @@ The dedicated ASan and UBSan jobs build `IntrinsicCpuTests` and use only the
 canonical exclusion predicate:
 
 ```bash
+cmake --preset <sanitizer-preset> --fresh \
+  -DINTRINSIC_GROUP_PURE_CTEST=ON
+cmake --build --preset <sanitizer-preset> --target IntrinsicCpuTests
 ctest --test-dir build/<sanitizer-preset> --output-on-failure \
   -LE 'gpu|vulkan|slow|flaky-quarantine' \
-  --no-tests=error --timeout 60
+  --no-tests=error --timeout 60 --parallel 1
 ```
 
 They do not add a positive `-L` filter, because doing so can silently omit a
-valid regression-only producer. They also do not pass `-j`: sanitizer CTest
-parallelism remains serial until `CI-008` measures and owns a worker budget.
-The variants have distinct defect ownership rather than overlapping combined
-CPU compiles: ASan owns address/lifetime/leak findings and UBSan owns undefined
-behavior findings. `ci-vulkan` is the sole retained combined ASan+UBSan preset
-among required CI gates because `ExtrinsicSandbox.VulkanShutdownLsanContract`
-requires address instrumentation and a LeakSanitizer negative control on the
-promoted Vulkan path. Developer presets retain their existing local combined
-instrumentation semantics.
+valid regression-only producer. `CI-008` retained replacement-only grouped
+registration for the audited pure cohort, while sanitizer CTest execution stays
+explicitly serial at `--parallel 1`; no sanitizer concurrency speedup is
+claimed. The variants have distinct defect ownership rather than overlapping
+combined CPU compiles: ASan owns address/lifetime/leak findings and UBSan owns
+undefined behavior findings. `ci-vulkan` is the sole retained combined
+ASan+UBSan preset among required CI gates because
+`ExtrinsicSandbox.VulkanShutdownLsanContract` requires address instrumentation
+and a LeakSanitizer negative control on the promoted Vulkan path. Developer
+presets retain their existing local combined instrumentation semantics.
 
 Nightly CPU correctness, SLO, benchmark smoke, and performance diagnostics
 configure the unsanitized `ci` preset once and stay in `build/ci`. The nightly
@@ -495,7 +561,8 @@ The real three-report comparison passed with schema
 
 This table is the first isolated identical-selector baseline. It supports
 topology identity and current-cost claims only. It does not isolate a causal
-performance effect, and `CI-008` owns future concurrency A/B measurements.
+performance effect; the later same-SHA grouped-registration A/B evidence is
+recorded in the CI-008 section above.
 
 The retained `CI-003` baseline predates this topology. Its `ci`,
 `ci-vulkan`, and benchmark populations record the historical

@@ -21,7 +21,9 @@ CI helper scripts and workflow validation tools.
   collector rejects non-atomic build identity and saturated LLVM counters.
 - `compare_source_coverage.py`: validates two normalized coverage reports and,
   in `--test-only-refactor` mode, rejects identity drift or loss of any
-  previously covered production region or branch outcome. Its
+  previously covered production line, region, or branch arm. Its
+  `--require-exact` mode additionally rejects gained evidence in those same
+  sets when two registration plans must execute an identical product path. Its
   `--test-cohort-transition` mode additionally binds each report to its sibling
   test inventory, resolves canonical manifest CTest names through the retained
   `ctest_name` to `gtest_filter` mapping, permits only the manifest-declared
@@ -47,17 +49,21 @@ CI helper scripts and workflow validation tools.
   per-batch timing. Missing or ambiguous input fails closed rather than
   producing an empty plan.
 - `cpu_test_selection.py`: captures the exact path-free `IntrinsicCpuTests`
-  producer and CTest-case inventory selected by the canonical
+  producer and logical test-case inventory selected by the canonical
   `-LE 'gpu|vulkan|slow|flaky-quarantine'` predicate, validates the configured
-  resolved sanitizer identity, and compares reports without treating isolated
-  build-directory paths as selection drift. Pull-request and manual
+  resolved sanitizer identity, expands canonical grouped wrappers through
+  `--gtest_list_tests`, and compares reports without treating representation or
+  isolated build-directory paths as selection drift. Pull-request and manual
   `ci-linux-clang` runs require the comparison over artifacts from the
   unsanitized job and its reusable ASan/UBSan jobs.
 - `collect_test_timing.py`: runs repeated canonical `pr-fast`, `cpu`, or
   `cpu-slow` CTest cohorts at an explicit recorded parallelism, reconciles every
   JUnit result against serial PRE_TEST discovery and aggregate inventories,
   restores the incoming CTest scheduler cost data between samples, and retains
-  per-case integer-microsecond timing/status plus host/load diagnostics.
+  per-case integer-microsecond timing/status plus host/load diagnostics. For
+  grouped wrappers it removes stale GoogleTest XML before each sample, requires
+  every configured report, and archives the per-producer XML beside the CTest
+  JUnit and log.
 - `test_cohort_parity.py`: compares protocol-complete baseline CPU and PR-fast
   reports with candidate CPU, PR-fast, and ordinary-slow reports plus the
   scheduled slow JUnit. It fails closed on undeclared removals/additions,
@@ -75,6 +81,23 @@ CI helper scripts and workflow validation tools.
 - `check_workflow_names.py --strict` reserves enforcement for the full
   canonical workflow set, including `ci-source-coverage.yml` and
   `nightly-deep.yml`.
+- The CI-008 evidence mode configures individual and grouped
+  `IntrinsicCpuTests` plans from one source identity. It builds the CPU product
+  once, hardlinks the resulting `bin/` view into the grouped tree, and verifies
+  that every producer named by the aggregate inventory shares its corresponding
+  inode before executing either plan.
+  `Test.GroupedCTestParity.py registration` proves replacement-only logical
+  inventory parity; five alternating A/B pairs at CTest parallelism 1, 2, and
+  4 then use `Test.GroupedCTestParity.py execution` to compare exact logical
+  statuses. Artifact `ci008-grouped-ctest-evidence` retains registration,
+  timing, JUnit, GoogleTest XML, logs, load diagnostics, and all 15 parity
+  verdicts.
+- The `ci-source-coverage` input `compare_grouped_ctest=true` collects the
+  individual baseline, reconfigures the same instrumented tree for grouped
+  registration without recompiling production, and requires exact line,
+  region, and branch-arm equality. Artifact
+  `cpu-source-coverage-grouped-ctest` retains the grouped report and
+  `exact-comparison.txt`.
 - The reproducible local CPU source-coverage sequence is:
 
   ```bash
