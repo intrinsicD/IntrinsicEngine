@@ -3,6 +3,7 @@ id: METHOD-014
 theme: I
 depends_on:
   - METHOD-013
+  - CORE-009
 maturity_target: ParityProven
 ---
 # METHOD-014 — Progressive Poisson GPU operational parity
@@ -27,7 +28,8 @@ maturity_target: ParityProven
   progressive Poisson Vulkan backend.
 
 ## Control surfaces
-- Config: `EngineConfig.sandbox.progressive_poisson.backend`.
+- Config: registered app section
+  `sandbox.progressive_poisson` field `backend`.
 - Command/API: `SandboxEditorProgressivePoissonCommand::Config.Backend`.
 - UI: retired `RUNTIME-136` already exposes requested backend and fallback
   readout.

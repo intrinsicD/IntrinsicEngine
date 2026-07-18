@@ -13,9 +13,9 @@ map.
 Opened from the 2026-07-03 main-loop/task-graph/render-graph review
 ([`docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`](../../../docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md)):
 
-- [`CORE-009`](CORE-009-app-owned-config-sections.md) — app-owned config
-  sections out of core `EngineConfig` (Progressive Poisson block moves
-  behind a generic section mechanism).
+- [`CORE-009`](../../active/CORE-009-app-owned-config-sections.md) is active —
+  app-owned Progressive Poisson and parameterization sections move out of core
+  `EngineConfig` behind one pre-boot generic section registry.
 
 Opened from the 2026-07-08 kernel/module architecture decision record
 ([`docs/adr/0024-kernel-module-architecture.md`](../../../docs/adr/0024-kernel-module-architecture.md));

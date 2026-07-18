@@ -18,12 +18,16 @@ maturity_target: Operational
 - Owner/layer: `src/app/Sandbox/Editor/` (ImGui panels). `app -> runtime` only; panels import runtime seams, not lower layers.
 - Panel pattern to mirror: `Sandbox.MethodPanels.cpp` (the K-Means panel — a `Backend##` `BeginCombo` selects the variant, Apply calls `Runtime::ApplySandboxEditor...Command`, and requested-vs-actual backend + fallback reason are rendered). The **config-lane** exemplar is the progressive-Poisson panel: editor mirror config type with `Make*` converters and an apply routed through `EngineConfigControl::PreviewEngineConfigControlDocument` / `ApplyEngineConfigHotSubset`. Mirror the progressive-Poisson panel so the panel is the config lane's UI surface, not a private path.
 - Window registration: `UI-034` `Runtime.EditorWindowRegistry` (decentralized registration, lazy lifecycle, one input-capture snapshot, generic scalar-property widgets) — register through it, not a central enum.
-- Coordinate with `ARCH-006` Slice 4, which is moving the point-cloud processing panels from runtime into `src/app`; place the consolidation window with the other app-owned point-cloud panels and consume the runtime facade only.
+- Retired `ARCH-006` moved point-cloud presentation into `src/app`; place the
+  consolidation window with the other app-owned point-cloud panels and consume
+  the runtime facade only.
 - The consolidated result is applied back to the selected entity by the `RUNTIME-175` facade (`PopulateFromCloud` + `MarkVertexPositionsDirty`, undoable), so the viewport shows the cleaned cloud immediately — this is the `Operational`, visible-in-sandbox proof.
 
 ## Control surfaces
 - UI: `PointCloud > Processing > Consolidate (LOP/WLOP/CLOP/EAR)` window.
-- Config/Agent: unchanged from `RUNTIME-175` — the panel edits the same `EngineConfig.sandbox.point_cloud_consolidation` section and applies through the tagged `Editor` source, so config files and agents remain co-equal drivers.
+- Config/Agent: unchanged from `RUNTIME-175` — the panel edits registered app
+  section `sandbox.point_cloud_consolidation` and applies through the tagged
+  `Editor` source, so config files and agents remain co-equal drivers.
 
 ## Required changes
 - [ ] Add a registered consolidation window in `src/app/Sandbox/Editor/` (mirroring `Sandbox.MethodPanels.cpp`), receiving `SandboxEditorContext`, not `Engine&`.
