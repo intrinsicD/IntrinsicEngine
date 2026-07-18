@@ -5386,3 +5386,19 @@ regression is intentionally absent. The replayed exact-head build passed
 without diagnostics, the focused editor inventory passed 155/155, the full
 default CPU-supported gate passed 3,706/3,706, and strict structural/docs
 evidence is recorded in the retired task.
+
+[`ARCH-016`](ARCH-016-right-size-runtime-composition-target.md) — runtime
+composition right-sizing retired to `tasks/done/` on 2026-07-18 at the
+structural `Retired` endpoint. Accepted ADR-0027 preserves a domain-free
+Engine, explicit app composition, global/world state-scope decisions, and
+no-`Engine&` behavior surfaces while replacing wrapper-count and zero-consumer
+framework outcomes with present-use deletion tests. `WorldHandle` is now
+correctly classified as kernel substrate; the exact live Engine snapshot is
+42 plain imports, 20 domain imports, two re-exports, and 31 getter names with
+no temporary debt. The acyclic implementation graph runs through
+`RUNTIME-179`..`RUNTIME-187`, separating behavior owners, app lifecycle,
+mechanism pruning, residual semantic API migration, and the final mechanical
+PImpl/checker ratchet. Strict task/state/docs/layering/root/workshop checks,
+the live convergence checker, and all 19 checker regressions passed; three
+independent adversarial reviews found no residual scope, reference, metric, or
+dependency-cycle issue. Decision checkpoint: `b62005e4`.

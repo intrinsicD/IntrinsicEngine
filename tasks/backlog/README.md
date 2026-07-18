@@ -315,7 +315,6 @@ The non-blocking TaskGraph substrate (`CORE-005`) and scheduler hardening
 
 Open members (kernel-seam priority set first):
 - [`../active/ARCH-014-kernel-convergence-tracking.md`](../active/ARCH-014-kernel-convergence-tracking.md) (active umbrella north-star; not a slice).
-- [`../active/ARCH-016-right-size-runtime-composition-target.md`](../active/ARCH-016-right-size-runtime-composition-target.md) (active ADR-0027 decision/task-graph slice; implementation children are now seeded).
 - [`runtime/RUNTIME-179-extract-async-work-module.md`](runtime/RUNTIME-179-extract-async-work-module.md) through [`runtime/RUNTIME-187-finalize-domain-free-engine-surface.md`](runtime/RUNTIME-187-finalize-domain-free-engine-surface.md) (ADR-0027 behavior-owner, app-lifecycle, mechanism-pruning, semantic auxiliary-surface, and final-ratchet graph; see the runtime index for exact dependencies).
 - [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) (one-shot post-convergence admission gate; blocked until known architecture/right-sizing/tool-rent work retires).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).

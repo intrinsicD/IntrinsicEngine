@@ -47,6 +47,7 @@ depends_on:
 - Completed 2026-07-18; owner: Codex; branch:
   `codex/arch-016-runtime-composition-target`; activated after the ARCH-014
   reconciliation merged.
+- Accepted decision/task-graph commit: `b62005e4`.
 - The focused grilling/right-sizing pass uses the completed live-tree audits:
   one production `IRuntimeModule`; zero extension-registry, priority
   input-filter-chain, and `InlineModule` consumers; six evidence-backed

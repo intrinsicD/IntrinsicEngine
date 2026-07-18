@@ -59,8 +59,8 @@ depends_on:
   not regrow while the migration is in flight.
 
 ## Status
-- Blocked on `ARCH-016` and the final `RUNTIME-187` convergence leaf; owner:
-  Codex; coordination branch:
+- Blocked on the final `RUNTIME-187` convergence leaf; owner: Codex;
+  coordination branch:
   `codex/arch-014-kernel-convergence-program`; activated 2026-07-18 after
   `ARCH-015` retirement.
 - The 2026-07-18 reconciliation audit measured the exact clean ratchet at
@@ -69,7 +69,8 @@ depends_on:
   extension/input frameworks, an unused `InlineModule`, and mechanical
   `IRuntimeModule` wrappers while the right-sizing audit that owns that
   interface is itself blocked on this umbrella.
-- `ARCH-016` accepted ADR-0027, corrected `WorldHandle` to substrate, replaced
+- Retired `ARCH-016` accepted ADR-0027, corrected `WorldHandle` to substrate,
+  replaced
   mechanism-count outcomes with greppable ownership outcomes, re-scoped the
   contradictory `RUNTIME-172`, and seeded only behavior-carrying children.
   The implementation graph converges through `RUNTIME-179`..`187`;

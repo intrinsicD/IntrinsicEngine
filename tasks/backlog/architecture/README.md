@@ -20,17 +20,10 @@ are retired to `tasks/done/`; `ARCH-014` remains the active umbrella:
   umbrella
   north-star: owns the [kernel target-state](../../../docs/architecture/kernel-target-state.md)
   convergence scorecard and the review/ratchet guardrail; stays open
-  until the ADR-0027-right-sized target is reached. It is blocked on
-  `ARCH-016` and the final `RUNTIME-187` leaf, which is transitively gated on
-  the behavior owners and `RUNTIME-129`. Retired child `HARDEN-085` delivered the
-  monotone checker and `pr-fast` gate.
-- [`ARCH-016`](../../active/ARCH-016-right-size-runtime-composition-target.md)
-  is active — accepted
-  [ADR-0027](../../../docs/adr/0027-right-sized-runtime-composition.md) breaks
-  the ARCH-014/REVIEW-003 decision loop, distinguishes domain ownership from a
-  mandatory C++ wrapper, removes zero-consumer mechanism blockers, corrects
-  the scorecard to 42/20/2/31, and seeds only behavior-carrying children
-  `RUNTIME-179`..`187`.
+  until the ADR-0027-right-sized target is reached. It is blocked on the final
+  `RUNTIME-187` leaf, which is transitively gated on the behavior owners and
+  `RUNTIME-129`. Retired child `HARDEN-085` delivered the monotone checker and
+  `pr-fast` gate.
 - [`REVIEW-003`](REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
   one-shot, commit-anchored architecture stability and right-sizing audit. It
   is blocked on the known convergence, privatization, validator, root-hygiene,
@@ -40,6 +33,13 @@ are retired to `tasks/done/`; `ARCH-014` remains the active umbrella:
 
 ### Retired seam tasks
 
+- [`ARCH-016`](../../done/ARCH-016-right-size-runtime-composition-target.md) —
+  accepted
+  [ADR-0027](../../../docs/adr/0027-right-sized-runtime-composition.md), broke
+  the ARCH-014/REVIEW-003 decision loop, distinguished domain ownership from a
+  mandatory C++ wrapper, removed zero-consumer mechanism blockers, corrected
+  the scorecard to 42/20/2/31, and seeded only behavior-carrying children
+  `RUNTIME-179`..`187` (retired 2026-07-18).
 - [`HARDEN-085`](../../done/HARDEN-085-enforce-runtime-engine-kernel-convergence-ratchet.md)
   delivered the exact allowlist-complement Engine ratchet, getter/re-export
   guards, temporary-debt lifecycle, synthetic regressions, touched-scope
