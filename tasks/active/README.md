@@ -11,9 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`CORE-005`](CORE-005-nonblocking-taskgraph-submit-api.md) — non-blocking
-  TaskGraph submission and completion API; owned by Codex on
-  `codex/core-005-nonblocking-submit`.
+No tasks are currently active.
 
 ## History
 

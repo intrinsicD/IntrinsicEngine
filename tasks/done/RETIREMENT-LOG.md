@@ -8,6 +8,18 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`CORE-005`](CORE-005-nonblocking-taskgraph-submit-api.md) — non-blocking
+TaskGraph submission and completion retired on 2026-07-18 at
+`CPUContracted`. TaskGraph now exposes one submit/poll/pump/wait execution
+path with copyable shared completion state, owner-thread pass affinity,
+worker-saturated help execution, deterministic no-scheduler fallback, and
+fail-closed live reset/submission and scheduler-replacement behavior.
+Instance-scoped scheduler-work progress plus definitive external deque scans
+close late-enqueue, retirement, and contended-queue lost-wake windows without
+changing the normal opportunistic worker loop. The exact committed CPU gate
+passed 4,082/4,082 with one capability skip; fresh ASan and UBSan gates each
+passed 2,736/2,736 with no sanitizer diagnostic.
+
 [`CORE-006`](CORE-006-domain-free-core-task-vocabulary.md) — domain-free Core
 task/DAG vocabulary retired on 2026-07-18 at `CPUContracted`. Implementation
 commit `54e7133bbed3766ded45b8054f505b63c63645b2` replaces Core's

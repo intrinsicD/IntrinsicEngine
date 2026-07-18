@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `CORE-005` — Non-blocking TaskGraph submission and completion API (tasks/active/CORE-005-nonblocking-taskgraph-submit-api.md)
+- none
 
 ## Theme B — Rendering modernization
 

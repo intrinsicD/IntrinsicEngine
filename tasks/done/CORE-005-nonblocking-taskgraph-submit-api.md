@@ -42,7 +42,7 @@ depends_on:
 
 ## Status
 
-- Completed on 2026-07-18 at `CPUContracted`; owner: Codex; branch:
+- Completed on 2026-07-18 at `CPUContracted`; owner: Codex; implementation branch:
   `codex/core-005-nonblocking-submit`; principal implementation commits:
   `87740902e9cb0b6f3f37c190474d8a4b7ec06288` and
   `72070e4a339868b4f07743c2cc9f89b6b70ab48e`; progress-wait hardening
