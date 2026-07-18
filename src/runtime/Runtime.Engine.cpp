@@ -371,7 +371,7 @@ namespace Extrinsic::Runtime
 
     Engine::Engine(Core::Config::EngineConfig config,
                    std::unique_ptr<IApplication> application,
-                   Core::Config::EngineConfigSectionRegistry sectionRegistry)
+                   RuntimeEngineConfigSectionRegistry sectionRegistry)
         : m_Config(std::move(config))
         , m_Application(std::move(application))
         , m_ConfigSectionRegistry(std::move(sectionRegistry))

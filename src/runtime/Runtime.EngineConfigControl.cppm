@@ -17,6 +17,9 @@ import Extrinsic.Platform.Window;
 
 namespace Extrinsic::Runtime
 {
+    export using RuntimeEngineConfigSectionRegistry =
+        Core::Config::EngineConfigSectionRegistry;
+
     export enum class RuntimeRenderRecipeActivationSource : std::uint8_t
     {
         None = 0,
@@ -109,7 +112,7 @@ namespace Extrinsic::Runtime
     export struct EngineConfigControlDependencies
     {
         Core::Config::EngineConfig* Config{};
-        const Core::Config::EngineConfigSectionRegistry* SectionRegistry{};
+        const RuntimeEngineConfigSectionRegistry* SectionRegistry{};
         const Platform::IWindow* Window{};
         Graphics::IRenderer* Renderer{};
     };

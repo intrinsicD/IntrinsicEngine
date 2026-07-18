@@ -16,7 +16,6 @@ export import Extrinsic.Runtime.FramePacingDiagnostics;
 export import Extrinsic.Runtime.InputActions;
 
 import Extrinsic.Core.Config.Engine;
-import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
@@ -165,7 +164,7 @@ namespace Extrinsic::Runtime
     public:
         Engine(Core::Config::EngineConfig config,
                std::unique_ptr<IApplication> application,
-               Core::Config::EngineConfigSectionRegistry sectionRegistry = {});
+               RuntimeEngineConfigSectionRegistry sectionRegistry = {});
         ~Engine();
 
         Engine(const Engine&)            = delete;
@@ -363,7 +362,7 @@ namespace Extrinsic::Runtime
 
         Core::Config::EngineConfig           m_Config;
         std::unique_ptr<IApplication>        m_Application;
-        Core::Config::EngineConfigSectionRegistry m_ConfigSectionRegistry{};
+        RuntimeEngineConfigSectionRegistry m_ConfigSectionRegistry{};
         std::vector<std::unique_ptr<IRuntimeModule>> m_RuntimeModules{};
         std::unique_ptr<Platform::IWindow>   m_Window;
         std::unique_ptr<RHI::IDevice>        m_Device;
