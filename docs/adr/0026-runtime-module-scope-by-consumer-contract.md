@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-18
 - **Owners:** Runtime / Architecture
-- **Related tasks:** `ARCH-015`, `REVIEW-003`
+- **Related tasks:** `ARCH-015`, `ARCH-016`, `REVIEW-003`
 - **Related ADRs:** [ADR-0024](0024-kernel-module-architecture.md) D1/D2/D3/D9/D12
 
 ## Context
@@ -89,9 +89,11 @@ Potential future methods are conditional probes, not predetermined placements:
   clustering-family name.
 
 This ADR governs logical responsibility grouping, not the C++ mechanism used
-to compose it. It neither ratifies nor changes `IRuntimeModule`; the
-`REVIEW-003` right-sizing audit may retain, replace, or remove that interface
-while preserving this cohesion rule.
+to compose it. It neither ratifies nor changes `IRuntimeModule`;
+`ARCH-016` owns the prerequisite composition-mechanism decision and ADR-0027
+amendment, which may retain, simplify, replace, or remove the interface;
+`REVIEW-003` later audits the accepted mechanism while preserving this
+cohesion rule.
 
 ## Consequences
 
@@ -118,7 +120,8 @@ while preserving this cohesion rule.
   the only production caller, so no second case proves common semantics.
 - **Freeze `IRuntimeModule` as part of the taxonomy — rejected.** The grouping
   decision is independent of its current implementation mechanism, whose
-  retention belongs to `REVIEW-003`.
+  keep/simplify/remove decision belongs to `ARCH-016`/ADR-0027 and whose
+  accepted result is later audited by `REVIEW-003`.
 
 ## Validation
 
