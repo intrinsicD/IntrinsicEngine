@@ -36,9 +36,10 @@ depends_on:
 - `CI-003` observed independent cold compile-heavy jobs on every PR update:
   ~25m PR-fast, ~17m16s UBSan, ~23m03s Vulkan, and ~7m51s benchmark smoke.
   Compilation represented 80–97% of non-doc wall time.
-- `ci-bench-smoke` builds `IntrinsicBenchmarkSmoke` and then
-  `IntrinsicBenchmarks` even when changed paths cannot affect benchmark code.
-  `ci-vulkan` likewise pays a full promoted build for about 60 selected tests.
+- Before this task, the now-retired `ci-bench-smoke` workflow built
+  `IntrinsicBenchmarkSmoke` and then `IntrinsicBenchmarks` even when changed
+  paths could not affect benchmark code. `ci-vulkan` likewise paid a full
+  promoted build for about 60 selected tests.
 - Stale-run cancellation (`CI-003`), gate aggregates (`CI-004`), touched-scope
   PR feedback (`CI-005`), sanitizer rationalization (`CI-006`), ccache
   (`CI-007`), grouped tests (`CI-008`), CPU coverage (`CI-010`), the measured
@@ -58,6 +59,20 @@ depends_on:
   Do not introduce a second dispatcher or a benchmark-specific path classifier.
   Reconsider that decision only if an independently required gate needs a
   different path vocabulary.
+- Candidate stable contexts are `docs-validation`, `pr-fast`,
+  `ci-linux-clang`, `ci-vulkan`, and `ci-release`. They are not currently
+  protected externally. The unsanitized grouped full-CPU `main` push therefore
+  remains uncancelled; sanitizer work is not duplicated on that event.
+- No comparable larger hosted or ephemeral runner is registered. Retain
+  `ubuntu-24.04` and reopen the experiment when a five-sample standard Release
+  population has queue p95 above five minutes or total p95 above 20 minutes
+  and a candidate can be budgeted at no more than $1 incremental cost per
+  merge candidate. Adoption then requires at least 20% lower median, 25% lower
+  p95, no queue-p95 regression above 60 seconds, and an explicit rollback.
+- Five standard Release samples remain retirement evidence, not preparation
+  evidence. Manual Release runs are uncancelled and the documented protocol
+  requires five separate runs at one unchanged ref/SHA, waiting for each run
+  to complete before dispatching the next.
 
 ## Slice plan
 - Slice A — inventory required checks and implement always-reporting lifecycle
@@ -144,7 +159,7 @@ depends_on:
 ```bash
 python3 tests/regression/tooling/Test.WorkflowRouting.py
 python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
-python3 tools/benchmark/validate_benchmark_results.py --root build/ci/benchmark --strict
+python3 tools/benchmark/validate_benchmark_results.py --root build/ci-release/benchmark --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
 

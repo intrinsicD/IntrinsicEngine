@@ -30,7 +30,9 @@ Documentation updates are required in the same PR when code/structure/policy cha
 - Run `python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main`
   for a local warning-mode docs-sync preview against changed files.
 - `ci-docs.yml` fetches full history and runs the same changed-file comparison
-  with `--strict`; a missing required documentation update is a merge blocker.
+  with `--strict`; pull requests and merge groups supply both event base/head
+  SHAs through `--base-ref` and `--head-ref`, while local use defaults the head
+  to `HEAD`. A missing required documentation update is a merge blocker.
 - `ci-docs.yml` also runs
   `python3 tools/agents/check_task_state_links.py --root . --strict`, enforcing
   that task links and nearby lifecycle claims match the task's actual

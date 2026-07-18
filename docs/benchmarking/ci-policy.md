@@ -9,8 +9,90 @@ Benchmark execution is split by cost so CI remains fast while still guarding qua
 - Run docs/task-only structural routes without a C++ configure or build.
 - Use the unsanitized Null/headless `ci-fast` preset for focused and bounded
   broad source feedback, with strict post-configure registry reconciliation.
-- Preserve the full CPU, sanitizer, and Vulkan gates as separate required
+- Preserve the full CPU, sanitizer, and Vulkan gates as separate stable
   confidence signals.
+
+### Candidate lifecycle and stable check contexts
+
+The checked-in topology separates quick feedback from merge confidence without
+using workflow-level path filters. The repository currently has no branch
+protection rule, ruleset, merge queue, auto-merge policy, or registered
+repository runner. This inventory was read from the GitHub repository settings
+and APIs on 2026-07-18. Consequently, the names below are stable candidate
+contexts for an owner to protect; the repository does not currently enforce
+them as required checks.
+
+| Event | `docs-validation` | `pr-fast` | `ci-linux-clang` | `ci-vulkan` | `ci-release` |
+| --- | --- | --- | --- | --- | --- |
+| PR `opened`, `reopened`, `synchronize`, or `ready_for_review`, non-draft | Run | Run | Full grouped CPU + ASan + UBSan + exact selection parity | Run promoted Vulkan evidence | Run optimized Release SLO/benchmark when `touched_scope.py` reports C++ impact; otherwise terminal success via audited skip |
+| PR `converted_to_draft` or any draft update | Run | Run | Heavy jobs must all be skipped; result job reports terminal success | Heavy job must be skipped; result job reports terminal success | Route runs; optimized job must be skipped; result job reports terminal success |
+| `merge_group/checks_requested` | Run with explicit merge-group base/head | Run with explicit merge-group base/head | Full grouped CPU + ASan + UBSan + exact selection parity | Run promoted Vulkan evidence | Same path-aware optimized Release contract as a ready PR |
+| Push to `main` | No trigger | No trigger | Unsanitized grouped full CPU only; this run is not cancelled by candidate concurrency | No trigger | No trigger |
+| Manual dispatch | Independent workflow-specific diagnosis/evidence path | Independent workflow-specific diagnosis/evidence path | Normal gates or one mutually exclusive timing/grouped/hotspot evidence mode | Full Vulkan path | Optimized Release path always runs, regardless of the route verdict |
+
+The always-reporting heavy result jobs are named `ci-linux-clang`,
+`ci-vulkan`, and `ci-release`. They execute exact shell policies that reject a
+failed route, a failed/cancelled required implementation, an implementation
+that ran for a draft, or an implementation that ran despite a valid path skip.
+`docs-validation` and `pr-fast` run directly on every candidate update and do
+not need skip wrappers. All candidate workflows resolve refs from the event:
+pull requests use their explicit base/head SHAs and merge groups use
+`merge_group.base_sha`/`head_sha`; missing endpoints fail closed.
+
+The unsanitized `main` push remains because no external protection or merge
+queue currently guarantees that a candidate result covers the eventual
+default-branch commit. It does not duplicate ASan or UBSan. Candidate
+concurrency cancellation applies only to pull requests and merge groups, so a
+default-branch push and manually dispatched Release samples are not cancelled
+by a newer candidate run.
+
+Complete CPU source coverage runs at 03:00 UTC each Monday and on manual
+dispatch. The weekly slot is deliberately staggered from `nightly-deep` at
+05:00 UTC. Coverage remains a distinct unsanitized instrumented identity and
+does not make ordinary correctness or Release jobs pay coverage overhead.
+
+### Optimized Release and runner evidence
+
+`ci-release` replaces the retired Debug `ci-bench-smoke` workflow as the
+current result-producing benchmark/SLO lane. Its `ci-release` preset is
+unsanitized `Release`, builds `IntrinsicBenchmarkSmoke` and
+`IntrinsicBenchmarkTests`, runs the exact architecture `slo` selector
+serially, executes `IntrinsicBenchmarks`, strictly validates benchmark JSON,
+and retains JUnit, result JSON, and gate timing in one job. Benchmark and
+method manifests/sources, benchmark baselines, CMake inputs, presets,
+toolchains, dependency inputs, and unknown paths all fail closed to
+`needs_cpp=true`; structural-only changes use the audited result-job skip.
+
+Manual Release samples are independently runnable because manual executions are
+not cancelled by the workflow concurrency policy. For a comparable standard
+runner population, pin one unchanged evidence ref, dispatch five separate
+`ci-release` runs, and wait for each to finish before dispatching the next so
+the samples do not intentionally contend:
+
+```bash
+gh workflow run ci-release.yml --ref <unchanged-evidence-ref>
+gh run watch <run-id> --exit-status
+```
+
+Repeat exactly five times without moving the ref. Each sample must record
+`github.sha`, runner image, queue time, Release build time, SLO time, benchmark
+time, total job time, billed minutes, cache identity, and artifact digest.
+Median and nearest-rank p95 use only successful samples at the same source,
+preset, selector, and runner class.
+
+No comparable larger hosted or ephemeral runner is currently registered, so
+the policy decision is to retain `ubuntu-24.04` and defer an A/B rather than
+fabricate capacity, pricing, or measurements. Reopen the runner experiment
+when either the standard Release queue p95 exceeds five minutes or its
+successful total-time p95 exceeds 20 minutes over a comparable five-sample
+population, and a candidate runner can be budgeted at no more than $1
+incremental cost per merge candidate. Adoption then requires at least five
+matched samples on each runner at one commit/preset/selector, at least a 20%
+median and 25% p95 total-time reduction, no queue-p95 regression greater than
+60 seconds, and a documented rollback to `ubuntu-24.04`. A hosted larger
+runner has low repository maintenance burden; an ephemeral/self-hosted runner
+also must price image upkeep, security patching, capacity monitoring, and
+failure recovery before adoption.
 
 ### Touched-scope feedback and smoke admission
 
@@ -241,20 +323,21 @@ causal reduction is calculated against `CI-003`.
 
 ### Monolithic smoke ownership and budget
 
-The required `ci-bench-smoke` pull-request workflow owns execution of the
-22-result `IntrinsicBenchmarkSmoke` aggregate. It builds and runs the
-`IntrinsicBenchmarks` target, then invokes strict result validation before
-uploading the complete result directory. Its runner step has a two-minute
-bound. The matching CTest `Run` → `Validate` fixture pair remains available
-for explicit local/nightly selection, but carries the
+The path-aware `ci-release` candidate workflow owns execution of the 22-result
+`IntrinsicBenchmarkSmoke` aggregate in an optimized unsanitized identity. It
+builds and runs the `IntrinsicBenchmarks` target, then invokes strict result
+validation before uploading the complete result directory. Its runner step has
+a two-minute bound. The matching CTest `Run` → `Validate` fixture pair remains
+available for explicit local/nightly selection, but carries the
 `benchmark;geometry;graphics;physics;slow` labels. The opt-in CTest runner uses
 the same 120-second slow-test limit; the CTest schema validator retains its
 focused 30-second limit. Consequently, the default CPU-supported `-LE slow`
 gate does not execute the same monolithic workload concurrently with thousands
 of correctness tests.
 
-`BUG-088` classified the pair from seven same-branch `ubuntu-24.04`, Clang 20,
-`ci`-preset gate-timing artifacts rather than a passing retry. The measured
+`BUG-088` classified the pair in the retired Debug `ci-bench-smoke` lane from
+seven same-branch `ubuntu-24.04`, Clang 20, `ci`-preset gate-timing artifacts
+rather than a passing retry. The measured
 `IntrinsicBenchmarks` workflow execution phases (including build-tool
 orchestration) were:
 
@@ -281,14 +364,15 @@ claim.
 
 ## CPU source-coverage policy
 
-The manually dispatched `ci-source-coverage` workflow owns the reproducible
-Clang CPU source-coverage baseline. It is intentionally absent from pull
-request and default-branch triggers until `CI-009` reviews heavy-gate lifecycle
-placement. The workflow uses the unsanitized `ci-coverage-cpu` preset and
-builds only `IntrinsicCpuCoverageTests`. That aggregate combines the default
-fast CPU cohort with ordinary slow correctness while excluding benchmark, SLO,
-GPU/Vulkan, and quarantined ownership. The canonical Linux/Vulkan/Glfw identity
-is explicit so CPU-side Vulkan and GLFW contracts are not silently omitted.
+The weekly and manually dispatched `ci-source-coverage` workflow owns the
+reproducible Clang CPU source-coverage baseline. It is intentionally absent
+from pull-request and default-branch push triggers; its Monday 03:00 UTC slot
+is staggered from the 05:00 UTC nightly lane. The workflow uses the unsanitized
+`ci-coverage-cpu` preset and builds only `IntrinsicCpuCoverageTests`. That
+aggregate combines the default fast CPU cohort with ordinary slow correctness
+while excluding benchmark, SLO, GPU/Vulkan, and quarantined ownership. The
+canonical Linux/Vulkan/Glfw identity is explicit so CPU-side Vulkan and GLFW
+contracts are not silently omitted.
 
 Coverage evidence has a narrower meaning than correctness evidence:
 
@@ -417,10 +501,11 @@ or installed package trees:
 
 | Preset | Resolved sanitizer | Build directory | vcpkg installed directory | Required owner |
 | --- | --- | --- | --- | --- |
-| `ci` | `none` | `build/ci` | `external/vcpkg-installed/ci` | Full CPU correctness plus scheduled SLO diagnostics, benchmark, and nightly CPU work |
+| `ci` | `none` | `build/ci` | `external/vcpkg-installed/ci` | Full CPU correctness plus nightly CPU/benchmark diagnostics |
 | `ci-asan` | `asan` | `build/ci-asan` | `external/vcpkg-installed/ci-asan` | Exact CPU cohort under AddressSanitizer |
 | `ci-ubsan` | `ubsan` | `build/ci-ubsan` | `external/vcpkg-installed/ci-ubsan` | Exact CPU cohort under UndefinedBehaviorSanitizer |
 | `ci-vulkan` | `asan-ubsan` | `build/ci-vulkan` | `external/vcpkg-installed/ci-vulkan` | Promoted Vulkan capability and process-level LeakSanitizer contracts |
+| `ci-release` | `none` | `build/ci-release` | `external/vcpkg-installed/ci-release` | Optimized benchmark smoke and blocking architecture SLO confidence |
 
 `INTRINSIC_ENABLE_SANITIZERS` remains a compatibility switch for raw CMake
 callers. Named presets additionally set `INTRINSIC_SANITIZER_MODE` to `none`,
@@ -451,11 +536,12 @@ ASan+UBSan preset among required CI gates because
 and a LeakSanitizer negative control on the promoted Vulkan path. Developer
 presets retain their existing local combined instrumentation semantics.
 
-Nightly CPU correctness, SLO, benchmark smoke, and performance diagnostics
-configure the unsanitized `ci` preset once and stay in `build/ci`. The nightly
-job does not reconfigure that tree with raw sanitizer flags; required sanitizer
-coverage remains in the isolated presets above. `CI-009` owns any later
-optimized Release performance identity.
+Nightly CPU correctness, benchmark smoke, and performance diagnostics configure
+the unsanitized `ci` preset once and stay in `build/ci`. The nightly job does
+not reconfigure that tree with raw sanitizer flags; required sanitizer coverage
+remains in the isolated presets above. Blocking architecture SLO and
+result-producing benchmark confidence use the separate optimized
+`ci-release` identity.
 
 After configuring and building `IntrinsicCpuTests` in all three CPU trees,
 capture and compare the normalized producer/case selections with:
@@ -482,12 +568,14 @@ python3 tools/ci/cpu_test_selection.py compare \
 The capture validates the resolved sanitizer mode, compatibility boolean,
 capability flags, aggregate producers, labels, and exact path-free CTest case
 inventory. Comparison fails if any variant selects a different normalized
-cohort. On pull requests, and on manual `ci-linux-clang` runs that retain the
-default sanitizer input, that workflow invokes the reusable sanitizer jobs
-after starting the unsanitized job, downloads all three selection artifacts,
-and requires the same comparison before the workflow can pass. The sanitizer
-workflow is reusable rather than independently pull-request-triggered, so
-enforcing parity does not duplicate the unsanitized build or test pass.
+cohort. On non-draft pull-request candidates, merge groups, and manual
+`ci-linux-clang` runs that retain the default sanitizer input, that workflow
+invokes the reusable sanitizer jobs after starting the unsanitized job,
+downloads all three selection artifacts, and requires the same comparison
+before the workflow can pass. Draft candidates require all three
+implementation jobs to resolve as skipped. The sanitizer workflow is reusable
+rather than independently pull-request-triggered, so enforcing parity does not
+duplicate the unsanitized build or test pass.
 
 Manual evidence or diagnosis may run only the unsanitized full CPU job without
 rebuilding unchanged sanitizer variants:
@@ -496,8 +584,9 @@ rebuilding unchanged sanitizer variants:
 gh workflow run ci-linux-clang.yml --ref <ref> -f run_sanitizers=false
 ```
 
-The input defaults to `true`; pull requests always run ASan, UBSan, and parity,
-and default-branch pushes retain their unsanitized-only topology.
+The input defaults to `true`; non-draft pull requests and merge groups run
+ASan, UBSan, and parity, draft candidates use audited terminal skips, and
+default-branch pushes retain their unsanitized-only topology.
 
 Required timing/selection uploads fail closed. `BUG-111` recorded one hosted
 intermediary HTTP 403 after ASan tests and result validation had passed; the
@@ -507,21 +596,17 @@ SHA finalized both outputs. For the same failure signature, use
 or sanitizer matrix. A failed artifact attempt does not enter timing evidence.
 
 The full CPU workflow measures exactly the canonical selector; at CI-006
-implementation commit `a7ae8e7f` it contained 4,062 cases. The FrameGraph
-nanosecond SLO diagnostic runs once in the explicit unsanitized nightly lane,
-not again in the pull-request/default-branch debug-correctness job. Nightly's
-broad CPU selector excludes `slow`, the SLO lane matches only the exact `slo`
-label, and the result-producing benchmark lane owns the two benchmark-smoke
-fixture cases.
-Before the topology split, the direct full-CPU invocation used a combined
-sanitizer tree and therefore skipped its own performance assertions.
-Activating the same debug SLO on `ubuntu-24.04` produced 3-5x threshold
+implementation commit `a7ae8e7f` it contained 4,062 cases. It does not execute
+performance assertions. The optimized Release lane matches only the exact
+`slo` label and owns the two result-producing benchmark-smoke fixture cases.
+Before this topology split, the direct full-CPU invocation used a combined
+sanitizer tree and therefore skipped its own performance assertions. Running
+the same SLO in a Debug `ubuntu-24.04` identity produced 3-5x threshold
 excursions in otherwise passing runs `29589810886` and `29589810898`; all
-4,062 correctness cases passed in both. No threshold was raised. The scheduled
-Debug diagnostic is explicitly non-blocking under `CI-009` and uploads JUnit
-when thresholds fail; this is a tracked warning-mode check, not a claim-grade
-performance result. `CI-009` owns the optimized Release identity, calibration,
-and promotion to a blocking SLO lifecycle.
+4,062 correctness cases passed in both. No threshold was raised. That
+non-blocking Debug diagnostic has been removed rather than treated as
+claim-grade evidence; current blocking SLO confidence comes only from
+`ci-release`.
 
 ### CI-006 isolated-topology baseline
 
@@ -620,7 +705,7 @@ these small populations.
 | `ci-sanitizers` ASan | [29519782498](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29519782498): 30.368; [29326012509](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29326012509): 15.137; [29310409592](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29310409592): 13.916; [29306897170](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29306897170): 11.365; [29290382723](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29290382723): 12.115; [29204545802](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29204545802): 10.013 | 13.016 s | 30.368 s |
 | `ci-sanitizers` UBSan | [29326012509](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29326012509): 10.598; [29310409592](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29310409592): 11.399; [29306897170](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29306897170): 10.077; [29290382723](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29290382723): 8.710; [29204545802](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29204545802): 8.758 | 10.077 s | 11.399 s |
 | `ci-vulkan` | [29326012577](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29326012577): 5.208; [29310409655](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29310409655): 6.198; [29306897280](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29306897280): 14.553; [29290382751](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29290382751): 9.333; [29280699135](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29280699135): 10.406; [29278614647](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29278614647): 5.943; [29277091536](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29277091536): 15.074; [29275795415](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29275795415): 10.871; [29204545763](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29204545763): 10.656 | 10.406 s | 15.074 s |
-| `ci-bench-smoke` | [29519782520](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29519782520): 11.251; [29326012574](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29326012574): 10.211; [29325473494](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29325473494): 12.525; [29310409612](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29310409612): 13.450; [29306897190](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29306897190): 7.508; [29290382853](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29290382853): 10.294; [29204545807](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29204545807): 11.795; [29082107982](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29082107982): 14.019; [29079330843](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29079330843): 9.363 | 11.251 s | 14.019 s |
+| `ci-bench-smoke` (retired historical lane) | [29519782520](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29519782520): 11.251; [29326012574](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29326012574): 10.211; [29325473494](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29325473494): 12.525; [29310409612](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29310409612): 13.450; [29306897190](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29306897190): 7.508; [29290382853](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29290382853): 10.294; [29204545807](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29204545807): 11.795; [29082107982](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29082107982): 14.019; [29079330843](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29079330843): 9.363 | 11.251 s | 14.019 s |
 | `nightly-deep` CPU | [29475153703](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29475153703): 7.492; [29392444882](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29392444882): 14.153; [29309516631](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29309516631): 8.492; [29227934714](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29227934714): 11.781; [29182066778](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29182066778): 19.032; [29141930320](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29141930320): 10.315; [28998474622](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/28998474622): 24.265 | 11.781 s | 24.265 s |
 
 Direct job-log comparison retained the exact configured/restored primary cache
@@ -631,7 +716,7 @@ identity. Three keys appear in the table:
 - `Linux-vcpkg-51c6cfee9c817d807dcfa0537b51e86c806aa8f10aaa7d35037f0d43dd873785`
   covers `pr-fast` runs `29211278659` and `29211167225`, both sanitizer
   contexts in run `29204545802`, `ci-vulkan` run `29204545763`,
-  `ci-bench-smoke` runs `29204545807`, `29082107982`, and `29079330843`,
+  retired `ci-bench-smoke` runs `29204545807`, `29082107982`, and `29079330843`,
   and nightly runs `29141930320`, `29182066778`, and `29227934714`.
 - `Linux-vcpkg-018e2147eaa8a1e2b807e186151e000be7ed0ad931c1822a99e99b9a6813cfa9`
   covers nightly run `28998474622`.

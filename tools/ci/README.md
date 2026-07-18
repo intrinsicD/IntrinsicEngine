@@ -6,8 +6,8 @@ CI helper scripts and workflow validation tools.
 
 - `check_workflow_names.py`: validates workflow file allowlist, `name` consistency, explicit `on` triggers, and readability (no one-line compressed YAML). Runs in `ci-docs.yml`.
 - `check_prerequisites.py`: fails fast when CI steps are blocked by missing build artifacts (test binaries, inventories) instead of surfacing a downstream error. Invoked by `ci-linux-clang.yml`, `ci-vulkan.yml`, and `nightly-deep.yml`.
-- `time_command.py`: runs a command, streams its output, and writes an elapsed wall-clock phase report for gate-timing aggregation. Invoked by `pr-fast.yml`, `ci-linux-clang.yml`, `ci-vulkan.yml`, `ci-bench-smoke.yml`, `ci-sanitizers.yml`, `ci-source-coverage.yml`, and `nightly-deep.yml`.
-- `aggregate_gate_timing.py`: aggregates the per-phase configure/build/test reports emitted by `time_command.py` into one machine-readable CI gate result and records the complete configured backend/platform identity from `CMakeCache.txt`. Invoked by `pr-fast.yml`, `ci-linux-clang.yml`, `ci-vulkan.yml`, `ci-bench-smoke.yml`, `ci-sanitizers.yml`, and `ci-source-coverage.yml`.
+- `time_command.py`: runs a command, streams its output, and writes an elapsed wall-clock phase report for gate-timing aggregation. Invoked by `pr-fast.yml`, `ci-linux-clang.yml`, `ci-vulkan.yml`, `ci-release.yml`, `ci-sanitizers.yml`, `ci-source-coverage.yml`, and `nightly-deep.yml`.
+- `aggregate_gate_timing.py`: aggregates the per-phase configure/build/test reports emitted by `time_command.py` into one machine-readable CI gate result and records the complete configured backend/platform identity from `CMakeCache.txt`. Invoked by `pr-fast.yml`, `ci-linux-clang.yml`, `ci-vulkan.yml`, `ci-release.yml`, `ci-sanitizers.yml`, and `ci-source-coverage.yml`.
 - `source_coverage.py`: shared fail-closed Clang source-coverage collection,
   normalization, identity, and parity primitives.
 - `run_source_coverage.py`: reconciles either the default `IntrinsicCpuTests`

@@ -270,11 +270,14 @@ resolved by
 The 22-result `IntrinsicBenchmarkSmoke.Run` → `.Validate` fixture pair is an
 explicit example: it remains in the complete aggregate with a 120-second runner
 bound, but is `benchmark;slow` and therefore outside the default CPU-supported
-gate. The required `ci-bench-smoke` pull-request workflow still runs the full
-aggregate under its own two-minute runner-step bound, strictly validates every
-emitted JSON, and retains the complete result directory. The hosted timing
-population and ownership rationale are recorded in the
-[benchmark CI policy](../docs/benchmarking/ci-policy.md#monolithic-smoke-ownership-and-budget).
+gate. The path-aware `ci-release` candidate workflow runs the full aggregate in
+an unsanitized optimized Release tree under its own two-minute runner-step
+bound, strictly validates every emitted JSON, and retains the complete result
+directory. Structural-only candidate changes reach the stable `ci-release`
+result through an audited skip; benchmark, method, CMake, preset, toolchain,
+and dependency changes always run the Release implementation. The hosted
+historical timing population and current ownership rationale are recorded in
+the [benchmark CI policy](../docs/benchmarking/ci-policy.md#monolithic-smoke-ownership-and-budget).
 
 Use `flaky-quarantine` only as a temporary quarantine. Any test or executable
 with this label must have a linked task ID, a reason, and a removal condition in
