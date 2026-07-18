@@ -1004,3 +1004,16 @@ entries:
       - "Narrowed the report away from cross-machine, end-to-end frame, render-graph, or allocation-count claims; the timed scope contains registration, compile, and replay reset only."
       - "Did not stage or crystallize a generalized performance observation: the task-specific report and machine-readable evidence already bind this resolved experiment."
       - "No existing staged observation received a closure, contradiction, or stale signal from this bounded report audit."
+  - turn: "2026-07-18_001#5"
+    notes:
+      - "Routed the CORE-009 Core implementation and focused verification as experiment N264 because it produced bounded code and test evidence for one task slice."
+      - "Recorded the opaque section record, registry/default validation, fail-closed record handling, 263-test Core result, and strict layering result."
+      - "Did not stage or crystallize a generalized observation: this slice implements an already-selected repository architecture decision."
+      - "Kept CORE-009 integration, documentation, full CPU verification, and retirement open for the coordinating agent."
+  - turn: "2026-07-18_001#6"
+    notes:
+      - "Routed the CORE-009 Runtime/Sandbox typed-section implementation and verification as experiment N265 because it produced bounded code, contract, and Null integration evidence."
+      - "Recorded exact ownership migration, prior parser-semantic parity, the final 42-test RuntimeContract result, and the 1-test Sandbox live-callback integration result."
+      - "Did not stage or crystallize a generalized observation: this turn completes another slice of the already-selected CORE-009 architecture."
+      - "Kept O08, O09, O13, and O38 unpromoted because this config migration supplies no closure or contradiction for module posture, model training, or actual Progressive Poisson Vulkan parity."
+      - "Left CORE-009 documentation, aggregate CPU verification, and retirement to the coordinating agent."
