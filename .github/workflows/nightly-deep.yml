@@ -67,7 +67,7 @@ jobs:
 
       - name: Build nightly CPU target partitions
         run: |
-          targets=(IntrinsicCpuTests IntrinsicCpuSlowTests IntrinsicBenchmarkTests)
+          targets=(IntrinsicCpuTests IntrinsicCpuSlowTests)
           if [ '${{ inputs.slow_evidence_only }}' = 'true' ]; then
             targets=(IntrinsicCpuSlowTests)
           fi
@@ -115,21 +115,6 @@ jobs:
             --timeout 120 \
             --output-junit reports/cpu-slow.junit.xml \
             -j$(nproc)
-
-      - name: Run SLO/performance diagnostic (CI-009)
-        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.slow_evidence_only }}
-        continue-on-error: true
-        run: |
-          python3 tools/ci/check_prerequisites.py test-binaries \
-            --build-dir build/ci \
-            --targets IntrinsicBenchmarkTests
-          mkdir -p build/ci/reports
-          ctest --test-dir build/ci --output-on-failure \
-            -L "^slo$" \
-            -LE "^(gpu|vulkan|flaky-quarantine)$" \
-            --no-tests=error \
-            --timeout 120 \
-            --output-junit reports/architecture-slo.junit.xml
 
       - name: Compile hotspot report
         if: ${{ github.event_name != 'workflow_dispatch' || !inputs.slow_evidence_only }}
@@ -180,7 +165,6 @@ jobs:
             build/ci/reports/compile_hotspots_report.json
             build/ci/reports/module_fanout_report.md
             build/ci/reports/cpu-slow.junit.xml
-            build/ci/reports/architecture-slo.junit.xml
             build/ci/benchmark/nightly/smoke_result.json
           if-no-files-found: error
 

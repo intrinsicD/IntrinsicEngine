@@ -14,7 +14,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW_ROOT = REPO_ROOT / ".github" / "workflows"
 BENCHMARK_CMAKE = REPO_ROOT / "benchmarks" / "CMakeLists.txt"
-BENCHMARK_WORKFLOW = WORKFLOW_ROOT / "ci-bench-smoke.yml"
+BENCHMARK_WORKFLOW = WORKFLOW_ROOT / "ci-release.yml"
 DOCS_WORKFLOW = WORKFLOW_ROOT / "ci-docs.yml"
 TIME_COMMAND = REPO_ROOT / "tools" / "ci" / "time_command.py"
 AGGREGATOR = REPO_ROOT / "tools" / "ci" / "aggregate_gate_timing.py"
@@ -36,7 +36,7 @@ WARM_CONFIGURE_CALL_COUNTS = {
     "ci-linux-clang.yml": 1,
     "ci-sanitizers.yml": 1,
     "ci-vulkan.yml": 1,
-    "ci-bench-smoke.yml": 1,
+    "ci-release.yml": 1,
     "ci-source-coverage.yml": 1,
     "nightly-deep.yml": 2,
 }
@@ -44,7 +44,7 @@ TIMING_WORKFLOW_BUILD_DIRS = {
     "pr-fast.yml": "build/ci-fast",
     "ci-linux-clang.yml": "build/ci",
     "ci-vulkan.yml": "build/ci-vulkan",
-    "ci-bench-smoke.yml": "build/ci",
+    "ci-release.yml": "build/ci-release",
     "ci-sanitizers.yml": "${{ matrix.sanitizer.build_dir }}",
     "ci-source-coverage.yml": "build/ci-coverage-cpu",
 }
@@ -387,27 +387,28 @@ class CiTimingTests(unittest.TestCase):
         workflow = yaml.safe_load(BENCHMARK_WORKFLOW.read_text(encoding="utf-8"))
         triggers = workflow.get("on", workflow.get(True, {}))
         self.assertIn("pull_request", triggers)
-        job = workflow["jobs"]["benchmark-smoke"]
-        self.assertEqual(job["timeout-minutes"], 15)
+        job = workflow["jobs"]["optimized-release"]
+        self.assertEqual(job["timeout-minutes"], 30)
         steps = job["steps"]
         named_steps = {step.get("name"): step for step in steps}
-        runner_step = named_steps["Run benchmark smoke runner"]
+        runner_step = named_steps["Run Release benchmark smoke"]
         validator_step = named_steps["Validate benchmark result JSON"]
-        artifact_step = named_steps["Upload benchmark smoke artifact"]
+        artifact_step = named_steps["Upload Release confidence results"]
         self.assertEqual(runner_step["timeout-minutes"], 2)
         self.assertFalse(runner_step.get("continue-on-error", False))
         self.assertIn("--target IntrinsicBenchmarks", runner_step["run"])
         self.assertFalse(validator_step.get("continue-on-error", False))
         self.assertIn(
-            "validate_benchmark_results.py --root build/ci/benchmark --strict",
+            "validate_benchmark_results.py --root "
+            "build/ci-release/benchmark --strict",
             validator_step["run"],
         )
         self.assertLess(steps.index(runner_step), steps.index(validator_step))
         self.assertLess(steps.index(validator_step), steps.index(artifact_step))
         self.assertEqual(artifact_step["uses"], "actions/upload-artifact@v4")
         self.assertEqual(
-            artifact_step["with"]["path"],
-            "build/ci/benchmark/IntrinsicBenchmarkSmoke/",
+            artifact_step["with"]["path"].splitlines()[0],
+            "build/ci-release/benchmark/IntrinsicBenchmarkSmoke/",
         )
         self.assertEqual(artifact_step["with"]["if-no-files-found"], "error")
 

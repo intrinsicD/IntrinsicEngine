@@ -372,7 +372,7 @@ class SanitizerPresetTests(unittest.TestCase):
 
     def test_live_workflows_report_explicit_sanitizer_identity(self) -> None:
         expected = {
-            "ci-bench-smoke.yml": ("benchmark-smoke", "none"),
+            "ci-release.yml": ("optimized-release", "none"),
             "ci-source-coverage.yml": ("cpu-source-coverage", "none"),
             "ci-vulkan.yml": ("ci-vulkan", "asan-ubsan"),
         }
@@ -405,26 +405,9 @@ class SanitizerPresetTests(unittest.TestCase):
             "cmake --preset ci --fresh",
             _one_line(cpu_steps["Configure (ci preset)"]["run"]),
         )
-        self.assertIn(
-            "--build-dir build/ci",
-            _one_line(cpu_steps["Run SLO/performance diagnostic (CI-009)"]["run"]),
-        )
         fast_cpu = _one_line(cpu_steps["Run full CPU test suite"]["run"])
         self.assertIn(f'-LE "{CPU_EXCLUSION}"', fast_cpu)
-        slo_step = cpu_steps["Run SLO/performance diagnostic (CI-009)"]
-        self.assertTrue(slo_step["continue-on-error"])
-        slo = _one_line(slo_step["run"])
-        self.assertIn('-L "^slo$"', slo)
-        self.assertIn(
-            '-LE "^(gpu|vulkan|flaky-quarantine)$"',
-            slo,
-        )
-        self.assertIn("--no-tests=error", slo)
-        self.assertIn(
-            "--output-junit reports/architecture-slo.junit.xml",
-            slo,
-        )
-        self.assertNotIn('benchmark|slo', slo)
+        self.assertNotIn("Run SLO/performance diagnostic (CI-009)", cpu_steps)
         self.assertIn(
             "build/ci/bin/IntrinsicBenchmarkSmoke",
             _one_line(
@@ -432,7 +415,7 @@ class SanitizerPresetTests(unittest.TestCase):
             ),
         )
         nightly_upload = cpu_steps["Upload nightly reports"]["with"]["path"]
-        self.assertIn("build/ci/reports/architecture-slo.junit.xml", nightly_upload)
+        self.assertNotIn("architecture-slo.junit.xml", nightly_upload)
 
         gpu_steps = _named_steps(payload["jobs"]["nightly-gpu-optional"])
         self.assertIn(

@@ -1,6 +1,8 @@
 name: ci-source-coverage
 
 on:
+  schedule:
+    - cron: "0 5 * * 1"
   workflow_dispatch:
     inputs:
       compare_grouped_ctest:

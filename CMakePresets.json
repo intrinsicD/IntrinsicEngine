@@ -100,6 +100,21 @@
       }
     },
     {
+      "name": "ci-release",
+      "displayName": "Optimized Release benchmark and SLO CI",
+      "inherits": "ci",
+      "description": "Unsanitized optimized Release configuration for benchmark smoke and architecture SLO evidence.",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "INTRINSIC_BUILD_SANDBOX": "OFF",
+        "INTRINSIC_BUILD_TESTS": "ON",
+        "INTRINSIC_BUILD_BENCHMARKS": "ON",
+        "INTRINSIC_ENABLE_SANITIZERS": "OFF",
+        "INTRINSIC_SANITIZER_MODE": "none",
+        "INTRINSIC_ENABLE_SOURCE_COVERAGE": "OFF"
+      }
+    },
+    {
       "name": "ci-coverage-cpu",
       "displayName": "Debug CPU source coverage",
       "inherits": "ci",
@@ -159,6 +174,10 @@
     {
       "name": "ci-fast",
       "configurePreset": "ci-fast"
+    },
+    {
+      "name": "ci-release",
+      "configurePreset": "ci-release"
     },
     {
       "name": "ci-coverage-cpu",

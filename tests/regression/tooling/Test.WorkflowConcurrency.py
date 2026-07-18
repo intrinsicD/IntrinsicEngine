@@ -31,7 +31,7 @@ WORKFLOWS = {
         True,
     ),
     "ci-vulkan.yml": ("ci-gate-timing-ci-vulkan", 2, True),
-    "ci-bench-smoke.yml": ("ci-gate-timing-ci-bench-smoke", 1, True),
+    "ci-release.yml": ("ci-release-results", 2, True),
     "ci-source-coverage.yml": (
         "ci-gate-timing-ci-source-coverage",
         1,
@@ -357,12 +357,13 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             "ON",
         )
 
-    def test_source_coverage_workflow_is_manual_and_uses_canonical_cohort(
+    def test_source_coverage_workflow_is_weekly_manual_and_uses_canonical_cohort(
         self,
     ) -> None:
         payload, coverage = _load_workflow("ci-source-coverage.yml")
         triggers = payload.get("on", payload.get(True, {}))
-        self.assertEqual(set(triggers), {"workflow_dispatch"})
+        self.assertEqual(set(triggers), {"schedule", "workflow_dispatch"})
+        self.assertEqual(triggers["schedule"], [{"cron": "0 5 * * 1"}])
         dispatch = triggers["workflow_dispatch"]
         self.assertEqual(
             dispatch["inputs"]["compare_grouped_ctest"],
@@ -957,7 +958,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         )
         self.assertEqual(upload["with"]["if-no-files-found"], "error")
 
-    def test_nightly_partitions_fast_slow_slo_and_benchmark_owners(self) -> None:
+    def test_nightly_partitions_fast_slow_and_benchmark_owners(self) -> None:
         payload, _ = _load_workflow("nightly-deep.yml")
         triggers = payload.get("on", payload.get(True, {}))
         slow_evidence = triggers["workflow_dispatch"]["inputs"]["slow_evidence_only"]
@@ -969,9 +970,10 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             named_steps["Build nightly CPU target partitions"]["run"].split()
         )
         self.assertIn(
-            "targets=(IntrinsicCpuTests IntrinsicCpuSlowTests IntrinsicBenchmarkTests)",
+            "targets=(IntrinsicCpuTests IntrinsicCpuSlowTests)",
             build_partitions,
         )
+        self.assertNotIn("IntrinsicBenchmarkTests", build_partitions)
         self.assertIn(
             "targets=(IntrinsicCpuSlowTests)",
             build_partitions,
@@ -987,8 +989,6 @@ class WorkflowConcurrencyTests(unittest.TestCase):
 
         fast = named_steps["Run full CPU test suite"]["run"]
         slow = named_steps["Run scheduled CPU slow correctness cohort"]["run"]
-        slo_step = named_steps["Run SLO/performance diagnostic (CI-009)"]
-        slo = slo_step["run"]
         benchmark_step = named_steps["Run benchmark smoke and selected deep benchmarks"]
         full_partition_condition = (
             "${{ github.event_name != 'workflow_dispatch' || "
@@ -996,7 +996,6 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         )
         for step_name in (
             "Run full CPU test suite",
-            "Run SLO/performance diagnostic (CI-009)",
             "Compile hotspot report",
             "Module fanout report",
             "Build benchmark smoke target",
@@ -1031,20 +1030,12 @@ class WorkflowConcurrencyTests(unittest.TestCase):
                 False,
             )
         )
-        self.assertIn('-L "^slo$"', slo)
-        self.assertIn(
-            "--output-junit reports/architecture-slo.junit.xml",
-            slo,
-        )
-        self.assertTrue(slo_step["continue-on-error"])
+        self.assertNotIn("Run SLO/performance diagnostic (CI-009)", named_steps)
+        self.assertNotIn("architecture-slo.junit.xml", named_steps)
         self.assertFalse(benchmark_step.get("continue-on-error", False))
         self.assertLess(
             steps.index(named_steps["Run full CPU test suite"]),
             steps.index(named_steps["Run scheduled CPU slow correctness cohort"]),
-        )
-        self.assertLess(
-            steps.index(named_steps["Run scheduled CPU slow correctness cohort"]),
-            steps.index(slo_step),
         )
         upload_paths = named_steps["Upload nightly reports"]["with"]["path"]
         self.assertEqual(
@@ -1059,10 +1050,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             "build/ci/reports/cpu-slow.junit.xml",
             upload_paths,
         )
-        self.assertIn(
-            "build/ci/reports/architecture-slo.junit.xml",
-            upload_paths,
-        )
+        self.assertNotIn("architecture-slo.junit.xml", upload_paths)
 
     def test_vulkan_workflow_retains_non_skipped_readback_evidence(self) -> None:
         payload, vulkan = _load_workflow("ci-vulkan.yml")

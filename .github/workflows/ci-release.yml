@@ -1,0 +1,228 @@
+name: ci-release
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  route-release:
+    runs-on: ubuntu-24.04
+    outputs:
+      needs-release: ${{ steps.route.outputs.needs_cpp }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Plan Release confidence scope
+        id: route
+        shell: bash
+        run: |
+          base_ref=origin/main
+          head_ref=HEAD
+          if [[ '${{ github.event_name }}' == 'pull_request' ]]; then
+            base_ref='${{ github.event.pull_request.base.sha }}'
+            head_ref='${{ github.event.pull_request.head.sha }}'
+          elif [[ '${{ github.event_name }}' == 'merge_group' ]]; then
+            base_ref='${{ github.event.merge_group.base_sha }}'
+            head_ref='${{ github.event.merge_group.head_sha }}'
+          fi
+          python3 tools/ci/touched_scope.py \
+            --root . \
+            --action plan \
+            --base-ref "$base_ref" \
+            --head-ref "$head_ref" \
+            --output build/ci-release/ci-routing/route.json \
+            --github-output "$GITHUB_OUTPUT" \
+            --step-summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Release route
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-release-touched-scope-route
+          path: build/ci-release/ci-routing/
+          if-no-files-found: error
+
+  optimized-release:
+    name: optimized-release
+    needs: route-release
+    if: >-
+      (github.event_name != 'pull_request' ||
+      !github.event.pull_request.draft)
+      &&
+      (github.event_name == 'workflow_dispatch' ||
+      needs.route-release.outputs.needs-release == 'true')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            clang-20 \
+            clang-tools-20 \
+            python3 \
+            python3-yaml
+
+      - name: Cache vcpkg binary packages
+        id: vcpkg-cache
+        uses: actions/cache@v4
+        with:
+          path: external/vcpkg-bincache
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'tools/vcpkg/**', 'tools/setup/bootstrap_vcpkg.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-
+
+      - name: Bootstrap vcpkg
+        run: tools/setup/bootstrap_vcpkg.sh
+
+      - name: Enable vcpkg binary cache
+        run: echo "VCPKG_BINARY_SOURCES=clear;files,${GITHUB_WORKSPACE}/external/vcpkg-bincache,readwrite" >> "$GITHUB_ENV"
+
+      - name: Validate benchmark manifests (strict)
+        run: python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
+
+      - name: Configure (ci-release preset)
+        run: |
+          python3 tools/ci/time_command.py \
+            --label "Configure (ci-release preset)" \
+            --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
+            --max-warm-seconds 40 \
+            --json-out build/ci-release/ci-timing/phases/configure.json \
+            -- cmake --preset ci-release --fresh
+
+      - name: Build Release benchmark and SLO targets
+        run: |
+          python3 tools/ci/time_command.py \
+            --label "Build Release benchmark and SLO targets" \
+            --json-out build/ci-release/ci-timing/phases/build.json \
+            -- cmake --build --preset ci-release \
+              --target IntrinsicBenchmarkSmoke IntrinsicBenchmarkTests
+
+      - name: Run Release architecture SLO
+        run: |
+          mkdir -p build/ci-release/reports
+          python3 tools/ci/time_command.py \
+            --label "Run Release architecture SLO" \
+            --json-out build/ci-release/ci-timing/phases/test_slo.json \
+            -- ctest --test-dir build/ci-release --output-on-failure \
+              -L "^slo$" \
+              -LE "gpu|vulkan|flaky-quarantine" \
+              --no-tests=error \
+              --timeout 120 \
+              --output-junit reports/architecture-slo.junit.xml \
+              --parallel 1
+
+      - name: Run Release benchmark smoke
+        timeout-minutes: 2
+        env:
+          GIT_COMMIT: ${{ github.sha }}
+        run: |
+          python3 tools/ci/time_command.py \
+            --label "Run Release benchmark smoke" \
+            --json-out build/ci-release/ci-timing/phases/test_benchmark.json \
+            -- cmake --build --preset ci-release --target IntrinsicBenchmarks
+
+      - name: Validate benchmark result JSON
+        run: python3 tools/benchmark/validate_benchmark_results.py --root build/ci-release/benchmark --strict
+
+      - name: Aggregate gate timing result
+        if: always()
+        run: |
+          context_args=()
+          if selected_tests="$(ctest --test-dir build/ci-release --show-only=json-v1 -L "^slo$" -LE "gpu|vulkan|flaky-quarantine" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"; then
+            context_args+=(--selected-test-count "$selected_tests")
+          fi
+          if ninja_edges="$(ninja -C build/ci-release -t commands IntrinsicBenchmarkTests IntrinsicBenchmarks | sed '/^[[:space:]]*$/d' | wc -l)"; then
+            context_args+=(--ninja-edge-count "$ninja_edges")
+          fi
+          python3 tools/ci/aggregate_gate_timing.py \
+            --configure-json build/ci-release/ci-timing/phases/configure.json \
+            --build-json build/ci-release/ci-timing/phases/build.json \
+            --test-json build/ci-release/ci-timing/phases/test_slo.json \
+            --test-json build/ci-release/ci-timing/phases/test_benchmark.json \
+            --gate ci-release \
+            --preset ci-release \
+            --build-dir build/ci-release \
+            --compiler clang-20 \
+            --sanitizer none \
+            --runner-image ubuntu-24.04 \
+            --commit '${{ github.sha }}' \
+            --cache-state cold \
+            --vcpkg-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
+            --job-url 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}' \
+            "${context_args[@]}" \
+            --output build/ci-release/ci-timing/result/result.json
+
+      - name: Validate gate timing result
+        if: always()
+        run: python3 tools/benchmark/validate_benchmark_results.py --root build/ci-release/ci-timing/result --strict
+
+      - name: Upload Release confidence results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-release-results
+          path: |
+            build/ci-release/benchmark/IntrinsicBenchmarkSmoke/
+            build/ci-release/reports/architecture-slo.junit.xml
+            build/ci-release/ci-timing/result/result.json
+          if-no-files-found: error
+
+  required-ci-release:
+    name: ci-release
+    if: always()
+    needs:
+      - route-release
+      - optimized-release
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Resolve ci-release lifecycle result
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_DRAFT: ${{ github.event.pull_request.draft || false }}
+          NEEDS_RELEASE: ${{ needs.route-release.outputs.needs-release }}
+          ROUTE_RESULT: ${{ needs.route-release.result }}
+          RELEASE_RESULT: ${{ needs.optimized-release.result }}
+        run: |
+          if [[ "$ROUTE_RESULT" != "success" ]]; then
+            echo "::error::Release routing failed with result $ROUTE_RESULT"
+            exit 1
+          fi
+          if [[ "$EVENT_NAME" == "pull_request" && "$PR_DRAFT" == "true" ]]; then
+            echo "Release confidence skipped for draft pull request"
+            exit 0
+          fi
+          if [[ "$EVENT_NAME" != "workflow_dispatch" && "$NEEDS_RELEASE" != "true" ]]; then
+            if [[ "$RELEASE_RESULT" != "skipped" ]]; then
+              echo "::error::Path-skipped Release job resolved as $RELEASE_RESULT"
+              exit 1
+            fi
+            echo "Release confidence not required for structural-only changes"
+            exit 0
+          fi
+          if [[ "$RELEASE_RESULT" != "success" ]]; then
+            echo "::error::Release confidence failed with result $RELEASE_RESULT"
+            exit 1
+          fi
