@@ -4,6 +4,7 @@ module;
 #include <chrono>
 #include <atomic>
 #include <coroutine>
+#include <cstdint>
 
 module Extrinsic.Core.Tasks;
 
@@ -61,6 +62,32 @@ namespace Extrinsic::Core::Tasks
 
     namespace
     {
+        struct ThreadWaitShardCursor
+        {
+            std::uint64_t SchedulerInstance = 0u;
+            std::uint32_t NextShard = 0u;
+        };
+
+        thread_local ThreadWaitShardCursor waitShardCursor{};
+
+        [[nodiscard]] std::uint32_t SelectWaitShard() noexcept
+        {
+            constexpr auto shardCount =
+                static_cast<std::uint32_t>(Detail::WaitShardCount);
+            if (waitShardCursor.SchedulerInstance != s_Ctx->instanceId)
+            {
+                waitShardCursor.SchedulerInstance = s_Ctx->instanceId;
+                waitShardCursor.NextShard =
+                    s_Ctx->nextWaitShard.fetch_add(
+                        1u, std::memory_order_relaxed) %
+                    shardCount;
+            }
+
+            const std::uint32_t shardIndex = waitShardCursor.NextShard;
+            waitShardCursor.NextShard = (shardIndex + 1u) % shardCount;
+            return shardIndex;
+        }
+
         [[nodiscard]] constexpr std::uint32_t WaitShardIndex(
             const Scheduler::WaitToken token) noexcept
         {
@@ -90,9 +117,7 @@ namespace Extrinsic::Core::Tasks
         if (!s_Ctx)
             return {};
 
-        const std::uint32_t shardIndex =
-            s_Ctx->nextWaitShard.fetch_add(1u, std::memory_order_relaxed) %
-            static_cast<std::uint32_t>(Detail::WaitShardCount);
+        const std::uint32_t shardIndex = SelectWaitShard();
         auto& shard = s_Ctx->waitShards[shardIndex];
         std::lock_guard lock(shard.Mutex);
         uint32_t localSlot = 0;

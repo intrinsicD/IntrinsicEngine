@@ -14,6 +14,9 @@ namespace Extrinsic::Core::Tasks
 {
     namespace
     {
+        inline constexpr std::uint8_t NormalPriorityLane =
+            static_cast<std::uint8_t>(DispatchPriority::Normal);
+
         [[nodiscard]] constexpr std::uint8_t PriorityLaneIndex(
             const DispatchPriority priority) noexcept
         {
@@ -72,8 +75,11 @@ namespace Extrinsic::Core::Tasks
         s_Ctx->inFlightTasks.fetch_add(1, std::memory_order_release);
         s_Ctx->activeTaskCount.fetch_add(1, std::memory_order_relaxed);
         s_Ctx->queuedTaskCount.fetch_add(1, std::memory_order_relaxed);
-        s_Ctx->queuedTaskCountByLane[lane].fetch_add(
-            1, std::memory_order_relaxed);
+        if (lane != NormalPriorityLane)
+        {
+            s_Ctx->queuedTaskCountByLane[lane].fetch_add(
+                1, std::memory_order_relaxed);
+        }
 
         if (s_WorkerIndex >= 0)
         {
@@ -128,7 +134,8 @@ namespace Extrinsic::Core::Tasks
             // This count is an ordinary-worker hint only. A false negative is
             // closed by the work-signal park handshake. Definitive helper
             // scans never consult it.
-            if (s_Ctx->queuedTaskCountByLane[lane].load(
+            if (lane != NormalPriorityLane &&
+                s_Ctx->queuedTaskCountByLane[lane].load(
                     std::memory_order_relaxed) == 0)
             {
                 continue;
@@ -329,8 +336,11 @@ namespace Extrinsic::Core::Tasks
     void OnTaskDequeuedAndRun(LocalTask& task, const std::uint8_t lane)
     {
         s_Ctx->queuedTaskCount.fetch_sub(1, std::memory_order_relaxed);
-        s_Ctx->queuedTaskCountByLane[lane].fetch_sub(
-            1, std::memory_order_relaxed);
+        if (lane != NormalPriorityLane)
+        {
+            s_Ctx->queuedTaskCountByLane[lane].fetch_sub(
+                1, std::memory_order_relaxed);
+        }
         if (task.Valid())
             task();
 

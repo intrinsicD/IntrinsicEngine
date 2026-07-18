@@ -87,6 +87,9 @@ export namespace Extrinsic::Core::Tasks
             alignas(64) std::atomic<uint64_t> inFlightTasks{0};
             alignas(64) std::atomic<int> activeTaskCount{0};
             alignas(64) std::atomic<int> queuedTaskCount{0};
+            // Advisory counts are maintained for High and Low only. Normal
+            // is always scanned so default dispatch avoids two extra atomic
+            // read-modify-writes per task.
             alignas(64) std::array<std::atomic<int>, PriorityLaneCount>
                 queuedTaskCountByLane{};
             alignas(64) std::atomic<uint64_t> workProgressEpoch{0};
