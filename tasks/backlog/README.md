@@ -366,11 +366,11 @@ fail-closed touched-scope gate; retired `CI-006` isolates sanitizer variants;
 retired `CI-011` uses comparable measurements to split only genuinely slow
 cases; and retired `CI-008` groups five audited pure producers, preserves local
 individual discovery, and retains the fastest absolute grouped full-CPU plan
-at four CTest workers. Active `BUILD-004` repairs source-complete compile-hotspot
-evidence and is a prerequisite of `RUNTIME-166`. `CI-009` remains deliberately
-last and blocked by `BUILD-004`: heavy-gate lifecycle and larger-runner
-decisions must use corrected post-optimization evidence rather than masking
-avoidable cold-build work with hardware.
+at four CTest workers. Retired `BUILD-004` supplies source-complete,
+normalized compile-hotspot evidence and unblocks both `RUNTIME-166` and
+`CI-009`. Heavy-gate lifecycle and larger-runner decisions can now use
+corrected post-optimization evidence rather than masking avoidable cold-build
+work with hardware.
 
 `DOCS-005` is retired; the feature-module playbook now has the minimal-feature
 floor and config/command artifact.

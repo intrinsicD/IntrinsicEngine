@@ -15,8 +15,6 @@ map.
 
 ## Tasks
 
-- [BUILD-004 — Make compile-hotspot evidence source-complete](../../active/BUILD-004-source-complete-compile-hotspot-evidence.md)
-  (currently active).
 - [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
 - [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](PROC-025-port-research-ideation-skill-to-other-repos.md)
   (portable playbook; run from a session scoped to the target repo).
@@ -38,13 +36,14 @@ retirement log.
   retired `CI-011` establishes the measured fast/slow cohort; and retired
   `CI-008` now groups five audited pure producers, retains local individual
   discovery, and fixes the required full-CPU worker budget at four.
-  Active `BUILD-004` independently repairs compile-hotspot evidence and gates
-  `RUNTIME-166`. `CI-009` evaluates lifecycle/runner changes last, after the
-  software duplication and evidence defects are removed.
-- Compile-hotspot analyzer ownership is `BUILD-004`; source optimization stays
-  outside the process queue. `ARCH-006` retired the Sandbox editor/UI hotspot,
-  `RUNTIME-146..151` own the historical `Runtime.Engine` decomposition, and
-  `RUNTIME-166` owns `Runtime.RenderExtraction` after `BUILD-004`.
+  Retired `BUILD-004` independently repairs compile-hotspot evidence and
+  unblocks `RUNTIME-166` and `CI-009`. `CI-009` now evaluates
+  lifecycle/runner changes after the software duplication and evidence defects
+  have been removed.
+- Compile-hotspot analyzer ownership is retired `BUILD-004`; source
+  optimization stays outside the process queue. `ARCH-006` retired the Sandbox
+  editor/UI hotspot, `RUNTIME-146..151` own the historical `Runtime.Engine`
+  decomposition, and `RUNTIME-166` owns `Runtime.RenderExtraction`.
 - Dependency order: `PROC-001` first (every other task edits docs that are
   mirrored into skills), then `PROC-005`, `PROC-002`, and `PROC-007`
   (independent of each other), then `PROC-003`, then `PROC-004`, then
@@ -79,6 +78,11 @@ this batch is the evidence-backed `check_pr_contract.py` retirement audited by
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [BUILD-004 — Make compile-hotspot evidence source-complete](../../done/BUILD-004-source-complete-compile-hotspot-evidence.md)
+  (done 2026-07-18): normalized physical Ninja compile edges across all
+  repository-owned C++ roots, calibrated five exact edge baselines from five
+  clean hosted samples, and proved the normal CPU workflow reports all 4,062
+  logical correctness cases before enforcing the hotspot gate.
 - [CI-008 — Reduce CTest process overhead without oversubscribing workers](../../done/CI-008-grouped-ctest-and-worker-oversubscription.md)
   (done 2026-07-18): replaced 1,351 individual cases from five audited pure
   producers with five grouped wrappers in required CPU variants, reduced

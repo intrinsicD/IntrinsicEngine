@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUILD-004` — Make compile-hotspot evidence source-complete (tasks/active/BUILD-004-source-complete-compile-hotspot-evidence.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -42,7 +42,7 @@ the authoritative open/unblocked view.
 - blocked by `ARCH-014`: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
-- blocked by `BUILD-004`: `RUNTIME-166` — Slim and partition the RenderExtraction module (tasks/backlog/runtime/RUNTIME-166-slim-render-extraction-module.md)
+- unblocked: `RUNTIME-166` — Slim and partition the RenderExtraction module (tasks/backlog/runtime/RUNTIME-166-slim-render-extraction-module.md)
 - unblocked: `RUNTIME-168` — Privatize the Sandbox default policies surface (tasks/backlog/runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
 - unblocked: `RUNTIME-172` — Privatize the SceneDocument surface (tasks/backlog/runtime/RUNTIME-172-privatize-scene-document-surface.md)
 - blocked by `BUG-096`: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
@@ -60,7 +60,7 @@ the authoritative open/unblocked view.
 
 ## Theme H — Agentic workflow hardening
 
-- blocked by `BUILD-004`: `CI-009` — Route heavy gates by lifecycle and evaluate runner scaling (tasks/backlog/process/CI-009-heavy-gate-routing-and-runner-evaluation.md)
+- unblocked: `CI-009` — Route heavy gates by lifecycle and evaluate runner scaling (tasks/backlog/process/CI-009-heavy-gate-routing-and-runner-evaluation.md)
 - unblocked: `PROC-025` — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality (tasks/backlog/process/PROC-025-port-research-ideation-skill-to-other-repos.md)
 
 ## Theme I — Research method implementation

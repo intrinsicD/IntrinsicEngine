@@ -8,6 +8,17 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUILD-004`](BUILD-004-source-complete-compile-hotspot-evidence.md) —
+source-complete compile-hotspot evidence retired on 2026-07-18 at
+`Operational`. The analyzer now normalizes multi-output physical Ninja edges,
+resolves all repository-owned C++ roots, and fails closed on ambiguous or
+unsupported evidence. Five clean hosted samples calibrated exact baselines for
+the actual top five edges with identical inventories and zero resolution
+issues. Final run `29630624415` selected all 4,062 logical CPU cases, retained
+4,055 passes plus seven skips and zero failures, then passed the five-target
+hotspot gate strictly after correctness reporting. Source optimization remains
+with the owning layer tasks; `CI-009` is now unblocked.
+
 [`CI-008`](CI-008-grouped-ctest-and-worker-oversubscription.md) — grouped CTest
 and worker-budget calibration retired on 2026-07-18 at `Operational`. Required
 CPU variants now replace 1,351 individual cases from five audited pure producers
