@@ -129,6 +129,71 @@ time, total job time, billed minutes, cache identity, and artifact digest.
 Median and nearest-rank p95 use only successful samples at the same source,
 preset, selector, and runner class.
 
+The fixed hosted population followed that protocol at exact SHA
+`502422ce7559a757354bce105ddebd2a0966c996`. All five attempt-1 runs used
+`ubuntu-24.04` image version `20260714.240.1`, unsanitized `Release` preset
+`ci-release`, and an exact primary vcpkg cache hit on
+`Linux-vcpkg-5473e109440db896a38daaa7aa8eefd0d12331c980f6c350c190cb108ad20c1b`.
+The architecture selector was unchanged across the population:
+
+```bash
+ctest --test-dir build/ci-release --output-on-failure \
+  -L "^slo$" -LE "gpu|vulkan|flaky-quarantine" \
+  --no-tests=error --timeout 120 \
+  --output-junit reports/architecture-slo.junit.xml --parallel 1
+```
+
+Times below are seconds. Queue is the optimized job's API `created_at` to
+`started_at`; measured total is the validated sum of configure, build, SLO,
+and benchmark phases; job wall is optimized-job `started_at` to
+`completed_at`.
+
+| Sample | Run / optimized job | Queue | Configure | Build | SLO | Benchmark | Measured total | Job wall | Billed API |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | [`29633396211`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29633396211) / `88051300297` | 3 | 12.608 | 414.788 | 1.040 | 10.909 | 439.345 | 478 | 0 m* |
+| 2 | [`29633689288`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29633689288) / `88052077701` | 3 | 6.745 | 355.701 | 0.812 | 9.731 | 372.989 | 399 | 0 m* |
+| 3 | [`29633934571`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29633934571) / `88052730313` | 2 | 13.295 | 391.694 | 1.022 | 11.139 | 417.150 | 445 | 0 m* |
+| 4 | [`29634185888`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29634185888) / `88053434908` | 2 | 19.362 | 406.942 | 2.154 | 10.652 | 439.110 | 465 | 0 m* |
+| 5 | [`29634432796`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29634432796) / `88054139261` | 2 | 13.469 | 374.817 | 1.006 | 10.868 | 400.160 | 434 | 0 m* |
+| Median |  | 2 | 13.295 | 391.694 | 1.022 | 10.868 | 417.150 | 445 | 0 m* |
+| Nearest-rank p95 |  | 3 | 19.362 | 414.788 | 2.154 | 11.139 | 439.345 | 478 | 0 m* |
+
+With five observations, nearest-rank p95 is the maximum. The GitHub Actions
+timing API reported `billable.UBUNTU.total_ms=0` and zero duration for each of
+the three jobs in every run because this is public-repository hosted usage.
+The `0 m*` cells therefore describe the API's billing response, not zero
+compute consumption or a reusable cost estimate; job wall remains the
+operational latency measure.
+
+Each retained JUnit passed both selected cases without a skip and contains all
+four `SLO_METRIC` records below. Values and budgets are nanoseconds.
+
+| Sample / run | Frame compile p99 (`350000`) | Frame execute p95 (`8333334`) | Local fanout p95 (`16666667`) | Signal-to-resume p99 (`16666667`) |
+| --- | ---: | ---: | ---: | ---: |
+| 1 / `29633396211` | 269360 | 2541289 | 3810948 | 326557 |
+| 2 / `29633689288` | 186044 | 2456273 | 3503920 | 296536 |
+| 3 / `29633934571` | 216141 | 4679455 | 4300222 | 380314 |
+| 4 / `29634185888` | 210271 | 2430310 | 3392529 | 309656 |
+| 5 / `29634432796` | 260205 | 3226437 | 4009775 | 379110 |
+
+The complete result and route artifacts are content-addressed independently:
+
+| Sample / run | Release-results artifact | Touched-scope-route artifact |
+| --- | --- | --- |
+| 1 / `29633396211` | `8426317225`, `sha256:a4c6689a4e8c788920a453cdcb05535546b3fa588d3e5f3210118eb4eaecad76` | `8426245852`, `sha256:bc79671ec9deddfc8fd89b83c3c8d19155f165ffcc265f39217f9f9e1a2540cd` |
+| 2 / `29633689288` | `8426399626`, `sha256:cfd458a429ab47d7b220e166fac56537b0f399210af25fe1fbc91fd959af8d74` | `8426338406`, `sha256:a5fef4a1d25c0fb34788eeb40d975c79d2ba643e463fa324d55df5afaa209679` |
+| 3 / `29633934571` | `8426485035`, `sha256:175765a7d42da8ea5bc5244ed82f34029079bc41282f7467efec6b79e79776cc` | `8426415328`, `sha256:62ff6e0d00d7d2712bce6887765f534219a5a57e291131e5890744657feefa79` |
+| 4 / `29634185888` | `8426575498`, `sha256:616543b158b6730ad6e96f2a8d94c40fae683749e1e9d8bb546630a813cf7592` | `8426496746`, `sha256:1d68c648d0efca3dbc0355755e7517d16e2df0b6a4a75bb2cd9ed3c6ef8ea0d6` |
+| 5 / `29634432796` | `8426671863`, `sha256:732b6ad54ac0d7aebde4f2ed3491e17f32d45e9ea6ed0647266647e01579431c` | `8426586476`, `sha256:5a6a4e975c40554f7a562b346d5ff58e21ffb189bae6a9aa667e58616d323944` |
+
+Every optimized job, stable `ci-release` wrapper, strict 22-result benchmark
+validation, timing-result validation, and artifact upload passed. Sample 1
+completed at 06:14:02 UTC before sample 2 was dispatched at 06:15:51; the
+later completion-to-dispatch gaps were 86, 59, and 47 seconds. The API reports
+`run_attempt=1` for all five, establishing sequential, non-overlapping,
+no-retry collection. The SLO thresholds were already fixed at the common SHA
+before sample 1 and were not edited during the population.
+
 No comparable larger hosted or ephemeral runner is currently registered, so
 the policy decision is to retain `ubuntu-24.04` and defer an A/B rather than
 fabricate capacity, pricing, or measurements. Reopen the runner experiment
@@ -142,6 +207,12 @@ median and 25% p95 total-time reduction, no queue-p95 regression greater than
 runner has low repository maintenance burden; an ephemeral/self-hosted runner
 also must price image upkeep, security patching, capacity monitoring, and
 failure recovery before adoption.
+
+The completed standard-runner population does not reopen that experiment:
+queue p95 is 3 seconds against the 300-second threshold, measured-total p95 is
+439.345 seconds, and optimized-job-wall p95 is 478 seconds against the
+1,200-second total-time threshold. Retain `ubuntu-24.04`; a larger-runner A/B
+remains deferred until both a threshold and a budgeted candidate exist.
 
 ### Touched-scope feedback and smoke admission
 

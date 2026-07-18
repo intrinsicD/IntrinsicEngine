@@ -8,7 +8,6 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-114` — Release architecture SLOs use mismatched metrics and uncalibrated budgets (tasks/active/BUG-114-ci-release-architecture-slo-calibration.md)
 - `CI-009` — Route heavy gates by lifecycle and evaluate runner scaling (tasks/active/CI-009-heavy-gate-routing-and-runner-evaluation.md)
 
 ## Theme B — Rendering modernization

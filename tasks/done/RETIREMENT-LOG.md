@@ -8,6 +8,17 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-114`](BUG-114-ci-release-architecture-slo-calibration.md) — Release
+architecture-SLO contract repair retired on 2026-07-18 at `Operational`.
+Implementation commit `502422ce` replaces structurally mismatched scheduler
+proxies with forced worker-local stealing and direct signal-to-resume
+measurements, removes the false critical-path nanosecond assertion, and retains
+four parseable metrics plus diagnostics in JUnit. Five sequential attempt-1
+hosted runs at one unchanged SHA, image, preset, selector, and cache key passed
+without threshold adjustment; ordinary full-CPU run `29633359676` passed at
+the same SHA. No production, module-surface, dependency, or workflow change
+was absorbed. `CI-009` is active and unblocked.
+
 [`BUILD-004`](BUILD-004-source-complete-compile-hotspot-evidence.md) —
 source-complete compile-hotspot evidence retired on 2026-07-18 at
 `Operational`. The analyzer now normalizes multi-output physical Ninja edges,

@@ -5,6 +5,21 @@ depends_on: []
 ---
 # BUG-114 — Release architecture SLOs use mismatched metrics and uncalibrated budgets
 
+## Status
+- Completed on 2026-07-18 at `Operational`; owner: Codex; branch: `main`;
+  implementation commit:
+  `502422ce7559a757354bce105ddebd2a0966c996`.
+- Five sequential attempt-1 hosted runs passed at that unchanged SHA:
+  [`29633396211`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29633396211),
+  [`29633689288`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29633689288),
+  [`29633934571`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29633934571),
+  [`29634185888`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29634185888),
+  and
+  [`29634432796`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29634432796).
+- The fix changed only the architecture-SLO test contract, its CTest resource
+  reservations, tooling regression expectations, and documentation. It made
+  no production, public module-surface, dependency, or workflow change.
+
 ## Goal
 - Restore a scientifically defensible, fail-closed `ci-release` architecture
   SLO gate whose workloads exercise the metrics they assert, whose units and
@@ -24,9 +39,8 @@ depends_on: []
   remains red.
 
 ## Context
-- Status: active on 2026-07-18; owner: Codex; branch: `main`; blocks
-  `CI-009`. Next verification: land the locally verified fixed SHA and dispatch
-  the first hosted `ci-release` sample; stop immediately if it fails.
+- Status: completed on 2026-07-18 at `Operational`; the fixed population
+  unblocks `CI-009`.
 - Owner: `tests/benchmark/slo/Test.ArchitectureSLO.cpp`, its retained JUnit
   evidence, and the documented `ci-release` SLO contract.
 - Symptom: manual `ci-release` run
@@ -98,7 +112,7 @@ depends_on: []
       improvement claims.
 - [x] Keep the workflow fail closed and preserve its existing stop-before-
       benchmark behavior after an SLO failure.
-- [ ] Run one hosted pilot at the fixed SHA. Only after it passes may that
+- [x] Run one hosted pilot at the fixed SHA. Only after it passes may that
       unchanged SHA continue with sequential `CI-009` retirement samples. A
       successful pilot is sample 1 because its identity and acceptance rule
       are declared before dispatch.
@@ -110,40 +124,70 @@ depends_on: []
       harness defects without treating local timing as hosted claim evidence.
 - [x] Pass the existing workflow routing, concurrency, and timing regressions;
       no workflow behavior changes are expected.
-- [ ] Pass one hosted `ci-release` pilot with the stable result context
+- [x] Pass one hosted `ci-release` pilot with the stable result context
       remaining fail closed.
-- [ ] Complete five sequential hosted samples total at one unchanged SHA,
+- [x] Complete five sequential hosted samples total at one unchanged SHA,
       preset, selector, runner image, and cache identity: the successful pilot
       is sample 1, then dispatch four more; stop immediately if any sample
       fails.
 
 ## Docs
-- [ ] Correct `docs/benchmarking/ci-policy.md` with the failed-run diagnosis,
+- [x] Correct `docs/benchmarking/ci-policy.md` with the failed-run diagnosis,
       metric definitions, workload shape, guardrail rationale, and final hosted
       evidence.
 - [x] Re-gate `CI-009` on `BUG-114` and state that run `29631970411` is
       diagnostic, not sample 1.
 - [x] Update the active-task, bug, and process indexes while the blocker is
       active.
-- [ ] Regenerate `tasks/SESSION-BRIEF.md` after opening, re-gating, and
+- [x] Regenerate `tasks/SESSION-BRIEF.md` after opening, re-gating, and
       retirement.
 
 ## Acceptance criteria
 - [x] Every asserted scheduler performance metric is exercised by the workload
       and has explicit units and an explicit observation window.
-- [ ] Frame-graph and scheduler derived percentiles plus budgets are retained
+- [x] Frame-graph and scheduler derived percentiles plus budgets are retained
       in hosted JUnit evidence on success and failure.
-- [ ] No threshold is edited after reading a candidate population to
+- [x] No threshold is edited after reading a candidate population to
       manufacture a pass.
-- [ ] The first run in the five-sample population passes before samples 2–5
+- [x] The first run in the five-sample population passes before samples 2–5
       are dispatched.
-- [ ] Five sequential `ci-release` runs pass at one unchanged SHA with the
+- [x] Five sequential `ci-release` runs pass at one unchanged SHA with the
       exact Release preset, selector, and standard `ubuntu-24.04` runner.
-- [ ] A failing SLO still fails `optimized-release` and stable `ci-release`;
+- [x] A failing SLO still fails `optimized-release` and stable `ci-release`;
       no skip, retry, quarantine, or nonblocking path is introduced.
-- [ ] No production scheduler change, public module-surface change, dependency
+- [x] No production scheduler change, public module-surface change, dependency
       edge, or `CORE-007` scope is absorbed.
-- [ ] `CI-009` resumes only after `BUG-114` is retired with hosted evidence.
+- [x] `CI-009` resumes only after `BUG-114` is retired with hosted evidence.
+
+## Evidence
+- The five fixed hosted JUnits each contain both passing cases and all four
+  parseable `SLO_METRIC` records. The fixed source prints those records before
+  its assertions. Diagnostic failed run
+  [`29631970411`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29631970411)
+  proves CTest retains failure stdout, so success/failure retention is
+  established compositionally without manufacturing a failing fixed run.
+- The five runs used exact SHA
+  `502422ce7559a757354bce105ddebd2a0966c996`, image
+  `ubuntu-24.04@20260714.240.1`, preset `ci-release`, the exact `slo`
+  include/exclude selector, and vcpkg key
+  `Linux-vcpkg-5473e109440db896a38daaa7aa8eefd0d12331c980f6c350c190cb108ad20c1b`.
+  Every optimized job and stable result wrapper passed; all 22 benchmark
+  results and the gate-timing result validated and uploaded.
+- Sample 1 completed before sample 2 was dispatched, and the same rule held
+  for all later samples. All five API records report `run_attempt=1`; no retry,
+  overlap, changed-SHA sample, or failed diagnostic entered the population.
+- The budgets landed in implementation commit `502422ce` before sample 1 and
+  were not edited after any hosted observation. Exact SLO values, phase
+  timings, job IDs, artifact IDs/digests, medians, and nearest-rank p95s are
+  recorded in
+  [`docs/benchmarking/ci-policy.md`](../../docs/benchmarking/ci-policy.md#optimized-release-and-runner-evidence).
+- Ordinary full-CPU push run
+  [`29633359676`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29633359676)
+  passed at the same fixed SHA, including strict task policy, configure
+  determinism, the complete CPU cohort, layering, routing reconciliation, and
+  compile-hotspot validation.
+- No production source, C++23 module interface, dependency edge, workflow, or
+  threshold changed during the hosted population.
 
 ## Verification
 ```bash

@@ -11,12 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-- [`BUG-114`](BUG-114-ci-release-architecture-slo-calibration.md) — repair the
-  mismatched workloads, metrics, and uncalibrated guardrails exposed by the
-  first hosted Release architecture-SLO pilot.
-- [`CI-009`](CI-009-heavy-gate-routing-and-runner-evaluation.md) — blocked by
-  `BUG-114` after failed Release pilot `29631970411`; resume with a fresh
-  five-sample unchanged-SHA population only after the blocker retires.
+- [`CI-009`](CI-009-heavy-gate-routing-and-runner-evaluation.md) — active and
+  unblocked after `BUG-114` retired with five successful unchanged-SHA hosted
+  Release samples; complete the lifecycle/runner decision and retirement
+  review.
 
 ## History
 

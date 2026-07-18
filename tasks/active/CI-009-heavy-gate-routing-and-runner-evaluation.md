@@ -28,13 +28,19 @@ depends_on:
 - No runner purchase/plan change without measured cost and queue data.
 
 ## Context
-- Blocked on 2026-07-18 by `BUG-114`; owner: Codex; branch: `main`. Hosted
-  Release pilot `29631970411` exposed invalid architecture-SLO metric/workload
-  pairings after routing and build succeeded. No successful five-sample
-  population has started; the failed pilot cannot count. Next verification:
-  land the `BUG-114` fix, count a successful fixed pilot as sample 1, collect
-  four more sequential hosted `ci-release` samples at that unchanged SHA, then
-  retire the blocker.
+- Active and resumed on 2026-07-18 after `BUG-114` retired; owner: Codex;
+  branch: `main`. The dependency remains in front matter as resolved
+  provenance. Five sequential attempt-1 hosted `ci-release` runs passed at
+  unchanged SHA `502422ce7559a757354bce105ddebd2a0966c996`:
+  [`29633396211`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29633396211),
+  [`29633689288`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29633689288),
+  [`29633934571`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29633934571),
+  [`29634185888`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29634185888),
+  and
+  [`29634432796`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29634432796).
+  The failed diagnostic pilot `29631970411` is excluded. Next verification:
+  audit the completed lifecycle topology and runner decision against the task
+  acceptance criteria, then retire `CI-009`.
 - Owner: GitHub Actions trigger topology, required-check contracts, benchmark
   routing, and runner policy.
 - `CI-003` observed independent cold compile-heavy jobs on every PR update:
