@@ -294,8 +294,9 @@ This pack is outside `src/geometry` — it wires the geometry family surface int
 Scope:
 
 - Runtime facade + config lane (`RUNTIME-176`): an
-  `EngineConfig.sandbox.parameterization` section applied through
-  `EngineConfigControl`; stable `lscm`, `harmonic_cotangent`,
+  app-owned `sandbox.parameterization` record under
+  `EngineConfig::AppSections`, applied through `EngineConfigControl`; stable
+  `lscm`, `harmonic_cotangent`,
   `tutte_uniform`, and `bff` tokens; nested typed LSCM, harmonic, and BFF
   values; an undoable editor command that writes UVs back as `v:texcoord` via
   `GeometrySources`; and a pointer-free UV view model containing UVs, triangle

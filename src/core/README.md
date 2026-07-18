@@ -251,6 +251,11 @@ consumes at composition time. Per-field ownership is:
   lives in `runtime`; `core` only carries the value-type enum
   `ReferenceSceneSelector` so this header stays free of runtime/graphics
   imports.
+- `AppSections` — name-sorted generic records containing a stable name,
+  schema id/version, and canonical opaque JSON payload. Core owns no
+  application or method DTOs. Hosts provide plain `EngineConfigSectionRegistration`
+  descriptors through `EngineConfigSectionRegistry`; each descriptor supplies
+  a default, validator, and optional post-commit callback.
 
 `Extrinsic.Core.Config.EngineLoad` is the adjacent parse/serialize lane for
 that value type. It exports the versioned JSON schema id
@@ -258,7 +263,11 @@ that value type. It exports the versioned JSON schema id
 `LoadEngineConfigFile(...)`, `SerializeEngineConfig(...)`, and typed
 diagnostics. The loader starts from caller-provided defaults, ignores invalid or
 unknown fields with `FallbackApplied` diagnostics, and keeps the value-type
-`EngineConfig` module free of IO imports. The schema and boot-only field
+`EngineConfig` module free of IO imports. Registered `app.sections` records are
+validated through the caller-supplied registry; unknown, duplicate,
+schema/version-mismatched, or invalid records retain registered defaults.
+Core stores only the validator's canonical payload and never interprets
+application fields. The schema and boot-only field
 partition are documented in
 [`docs/architecture/engine-config.md`](../../docs/architecture/engine-config.md).
 

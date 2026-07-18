@@ -10,6 +10,11 @@ only the app factory and runtime-module registration declarations; the concrete
 lifecycle hooks, but engine feature wiring, frame phases, and subsystem behavior
 belong in `Runtime` or lower engine layers. The executable obtains its default
 configuration through `Runtime` and should not import lower layers directly.
+`Sandbox.ConfigSections` is the pre-boot composition surface for the current
+`sandbox.progressive_poisson` and `sandbox.parameterization` records. The
+runtime module owns their typed DTOs/codecs; this app module only registers both
+descriptors before `ResolveEngineConfigForBoot(...)` and passes the same
+registry into `Engine`.
 
 The app-owned `Sandbox.Editor.Controller` owns `Sandbox.Editor.Shell` and all
 panel-family lifetimes behind one attach/detach interface. The shell owns the
@@ -93,7 +98,7 @@ implemented by the runtime facade: LSCM, harmonic cotangent, uniform Tutte, and
 Boundary First Flattening. Its controls keep an explicit panel-local draft for
 the selected strategy's typed values; edits remain marked as unapplied until
 the user applies or reloads the draft. Applying routes through the validated
-`EngineConfig.sandbox.parameterization` preview/apply lane, and running the
+registered `sandbox.parameterization` preview/apply lane, and running the
 configured strategy writes `v:texcoord` through the runtime command-history
 path, with undo and redo controls in the same window. No panel-only solver or
 configuration path exists.
@@ -102,7 +107,8 @@ The parameterization window stores its controls-to-UV split ratio in panel
 state and exposes a draggable divider. Its config-backed view controls choose
 `CPU layout` or `GPU shaded`, a grid/checker/texel-density/selected-albedo
 background, and the optional conformal-distortion heatmap. These values use the
-same validated `EngineConfig.sandbox.parameterization.view` preview/apply lane
+same validated `view` payload in the registered
+`sandbox.parameterization` preview/apply lane
 as config-file and agent callers; they are not panel-only renderer switches.
 
 `CPU layout` is the default and the deterministic fallback. It fits the
@@ -150,8 +156,10 @@ The sandbox app does not create, render, select, or special-case the triangle.
 
 ## Build presets
 
-- `cmake --preset ci` configures the headless CPU/null gate (Sandbox disabled,
-  promoted Vulkan disabled). Use this for fast CPU verification.
+- `cmake --preset ci` configures the headless CPU/null gate (Sandbox executable
+  disabled, promoted Vulkan disabled). With tests enabled it still builds
+  `ExtrinsicSandboxEditor` and the `integration;runtime` app-composition tests,
+  including the pre-boot config registry plus Null `Engine::Run()` proof.
 - `cmake --preset ci-vulkan` configures the same Debug + tests profile with
   `INTRINSIC_BUILD_SANDBOX=ON` and `INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON`
   so `ExtrinsicSandbox` runs against the promoted Vulkan backend on
@@ -233,6 +241,8 @@ capture to zero samples.
 - `Editor/Sandbox.MeshProcessingPanels.cpp`
 - `Editor/Sandbox.MethodPanels.cppm`
 - `Editor/Sandbox.MethodPanels.cpp`
+- `Sandbox.ConfigSections.cppm`
+- `Sandbox.ConfigSections.cpp`
 - `Sandbox.cpp`
 - `Sandbox.cppm`
 - `main.cpp`

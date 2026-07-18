@@ -85,14 +85,15 @@ There are three current edit lanes over the same preview/apply contract:
   `ApplyRenderRecipeConfigPreview(...)` expose the same side-effect-free preview
   and fail-closed apply path to agents, CLI tools, tests, and application code.
 
-Runtime config control also exposes `render.default_recipe_config_path`,
-`sandbox.progressive_poisson`, and `sandbox.parameterization` through the
+Runtime config control also exposes `render.default_recipe_config_path` and
+registered `app.sections` records (currently
+`sandbox.progressive_poisson` and `sandbox.parameterization`) through the
 separate engine-config lane.
 `Engine::Initialize()` attempts the configured boot recipe after renderer
 initialization. Live hot-apply is deliberately limited to those fields:
 `ApplyEngineConfigHotSubset(...)` validates the referenced recipe before
-mutating the active engine config, updates sandbox playground state as value-only
-config, and rejects boot-only field changes.
+mutating the active engine config, commits canonical application-section
+records, and rejects boot-only field changes.
 
 ## Frame Lifecycle
 
@@ -146,15 +147,15 @@ is a side effect so the target remains an observable output even when ImGui is
 not recorded for that frame. When ImGui is active, its declared read of
 `UvViewColor` expresses the producer-before-sampler dependency. This is a
 fixed typed recipe branch, not a `RenderRecipeConfig` pass-injection surface.
-The `sandbox.parameterization.view` config controls influence this branch only
-through runtime's validated request submission; they do not directly edit the
-frame recipe. The request is a per-frame heartbeat: a visible GPU pane refreshes
-the same semantic token before renderer preparation, while a closed or globally
-hidden editor window submits nothing and the renderer disables `UvViewPass` for
-that frame. Same-token heartbeats do not replace or re-upload the retained
-topology buffers. Requests above the bounded 4096-by-4096 target limit fail
-closed to the CPU layout rather than silently rendering an extent that cannot
-match the panel.
+The `view` values in the registered `sandbox.parameterization` payload
+influence this branch only through runtime's validated request submission; they
+do not directly edit the frame recipe. The request is a per-frame heartbeat: a
+visible GPU pane refreshes the same semantic token before renderer preparation,
+while a closed or globally hidden editor window submits nothing and the
+renderer disables `UvViewPass` for that frame. Same-token heartbeats do not
+replace or re-upload the retained topology buffers. Requests above the bounded
+4096-by-4096 target limit fail closed to the CPU layout rather than silently
+rendering an extent that cannot match the panel.
 
 A newly allocated or resized target enters the graph in `Undefined` and exits
 in `ShaderRead`; a previously completed target imports in `ShaderRead`. The UV
