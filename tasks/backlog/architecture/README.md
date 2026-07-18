@@ -21,10 +21,10 @@ are retired to `tasks/done/`; `ARCH-014` remains the open umbrella:
   convergence scorecard and the review/ratchet guardrail; stays open
   until the whole ADR-0024 migration is reached. Retired child `HARDEN-085`
   delivered the monotone checker and `pr-fast` gate.
-- [`ARCH-015`](ARCH-015-runtime-module-scope-by-result-consumer-contract.md) —
-  grilling + ADR to decide the `IRuntimeModule` scoping rule (cluster methods by
-  shared result-consumer contract, e.g. DBSCAN inside `ClusteringModule`, not a
-  rigid per-algorithm interface). Decision record only; no engine code.
+- [`ARCH-015`](../../active/ARCH-015-runtime-module-scope-by-consumer-contract.md)
+  is active — grilling + ADR to decide runtime-module scope from demonstrated
+  composition, state, commit, and consumer cohesion without predeclaring a
+  method-family taxonomy. Decision record only; no engine code.
 - [`REVIEW-003`](REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
   one-shot, commit-anchored architecture stability and right-sizing audit. It
   is blocked on the known convergence, privatization, validator, root-hygiene,
