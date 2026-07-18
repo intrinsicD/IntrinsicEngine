@@ -107,7 +107,19 @@ maturity_target: CPUContracted
 - Focused verification: all 47
   `CoreTasks.*:CoreTaskGraphCompletionLifetime.*` cases passed; the three
   review-added race/shard/worker-local cases passed 50 consecutive
-  repetitions. Full CPU and sanitizer gates remain before retirement.
+  repetitions.
+- Required gates passed on 2026-07-18 with Clang 23:
+  - canonical unsanitized `ci`: `IntrinsicTests` built and 4,090/4,090
+    selected CPU tests passed in 51.67 s; the registered ASan-specific GLFW
+    leak-control case skipped;
+  - fresh grouped `ci-asan`: `IntrinsicCpuTests` built and 2,744/2,744
+    selected tests passed serially in 232.84 s, including GLFW leak control;
+  - fresh grouped `ci-ubsan`: `IntrinsicCpuTests` built and 2,744/2,744
+    selected tests passed serially in 91.70 s; the ASan-specific leak-control
+    case skipped;
+  - optimized `ci-release`: all three commit-stamped 23-result benchmark
+    captures validated strictly, and
+    `ArchitectureSLO.TaskSchedulerLocalStealAndWakeCompletionBudgets` passed.
 
 ## Required changes
 - [x] Add a small fixed set of priority lanes to external dispatch (e.g.
@@ -133,7 +145,7 @@ maturity_target: CPUContracted
 - [x] Regression: a single worker retains owned local progress after its
       fairness probe; initially ready and dependent TaskGraph priorities reach
       external and worker-local scheduler lanes.
-- [ ] Existing `CoreTasks.*`/`CoreTaskGraph.*` suites green; BUG-046
+- [x] Existing `CoreTasks.*`/`CoreTaskGraph.*` suites green; BUG-046
       ordering and all `CORE-005` late-enqueue/progress-wait regressions stay
       green.
 
@@ -153,7 +165,7 @@ maturity_target: CPUContracted
       execution order under contention.
 - [x] Benchmark evidence recorded in this file for each landed change
       (or an explicit "no measurable win, dropped" note per item).
-- [ ] Default CPU gate green.
+- [x] Default CPU gate green.
 
 ## Maturity
 
@@ -165,6 +177,21 @@ maturity_target: CPUContracted
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --preset ci-asan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON
+cmake --build --preset ci-asan --target IntrinsicCpuTests
+ctest --test-dir build/ci-asan --output-on-failure \
+  -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error \
+  --timeout 60 --parallel 1
+cmake --preset ci-ubsan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON
+cmake --build --preset ci-ubsan --target IntrinsicCpuTests
+ctest --test-dir build/ci-ubsan --output-on-failure \
+  -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error \
+  --timeout 60 --parallel 1
+cmake --preset ci-release
+cmake --build --preset ci-release \
+  --target IntrinsicBenchmarkSmoke IntrinsicBenchmarkTests
+python3 tools/benchmark/validate_benchmark_manifests.py
+python3 tools/benchmark/validate_benchmark_results.py --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
 
