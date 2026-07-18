@@ -447,13 +447,13 @@ causal reduction is calculated against `CI-003`.
 
 ### Monolithic smoke ownership and budget
 
-The path-aware `ci-release` candidate workflow owns execution of the 22-result
+The path-aware `ci-release` candidate workflow owns execution of the 23-result
 `IntrinsicBenchmarkSmoke` aggregate in an optimized unsanitized identity. It
 builds and runs the `IntrinsicBenchmarks` target, then invokes strict result
 validation before uploading the complete result directory. Its runner step has
 a two-minute bound. The matching CTest `Run` → `Validate` fixture pair remains
 available for explicit local/nightly selection, but carries the
-`benchmark;geometry;graphics;physics;slow` labels. The opt-in CTest runner uses
+`benchmark;core;geometry;graphics;physics;slow` labels. The opt-in CTest runner uses
 the same 120-second slow-test limit; the CTest schema validator retains its
 focused 30-second limit. Consequently, the default CPU-supported `-LE slow`
 gate does not execute the same monolithic workload concurrently with thousands

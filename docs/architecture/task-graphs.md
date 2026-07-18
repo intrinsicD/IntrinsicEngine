@@ -31,6 +31,42 @@ work.
 `FrameGraph` is the typed Core facade over the default callback-executing task
 graph.
 
+## Scheduler preferences and wake contract
+
+The Core task scheduler exposes fixed, generic `High`, `Normal`, and `Low`
+preference lanes. `TaskGraph` maps `Critical` and `High` passes to `High`,
+`Normal` to `Normal`, and `Low` and `Background` to `Low` when it dispatches
+worker-eligible callbacks. Workers inspect lanes from high to low, but this is
+a preference policy rather than a realtime or starvation-free guarantee.
+
+Each worker has one local deque per lane. The external inject path retains a
+65,536-task lock-free queue for the common `Normal` lane and uses bounded
+8,192-task lock-free queues for each of the additional `High` and `Low` lanes;
+per-lane overflow deques preserve accepted work after those bounds are reached.
+Ordinary workers use advisory queued counts for the less common `High` and
+`Low` lanes, always inspect the common `Normal` lane, and opportunistically
+skip contended victim deques. Completion help is stricter: `WaitForAll()` and
+`TryRunOne()` ignore those hints and use definitive, high-to-low scans that
+wait through short worker-deque critical sections.
+Their following park path retains the scheduler-instance-qualified
+work-progress epoch from `CORE-005`, so dispatch or retirement after a queue
+check cannot strand the helper.
+
+Worker parking uses a sequentially consistent signal/count handshake. A worker
+publishes its parked state and then rechecks the signal; dispatch advances the
+signal and calls `notify_one()` only when at least one parked worker is
+published. Shutdown remains an unconditional broadcast. This notification
+policy is separate from the scheduler's queue `SpinLock`: `SpinLock::unlock()`
+must still call `notify_one()` because contending queue scanners use
+`atomic::wait` after their bounded spin phase.
+
+Coroutine wait tokens use a 16-way sharded registry. Each thread receives a
+globally dispersed initial shard for a scheduler instance, then rotates through
+all shards locally so repeated allocation does not require a shared selector
+increment. `WaitToken::Slot` encodes the selected shard and shard-local slot,
+while `Generation` and `SchedulerInstance` continue to reject recycled or
+replacement-scheduler tokens.
+
 ## Submission and completion
 
 `TaskGraph::Submit()` starts dependency-ready callbacks and returns immediately

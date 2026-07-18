@@ -16,11 +16,12 @@ if(INTRINSIC_BENCHMARK_LLVM_SYMBOLIZER)
     list(APPEND _intrinsic_benchmark_test_env "ASAN_SYMBOLIZER_PATH=${INTRINSIC_BENCHMARK_LLVM_SYMBOLIZER}")
 endif()
 
-# GEOM-009 — geometry smoke benchmark executable. The runner imports the
-# Geometry C++23 modules so the target enables module scanning and links
-# promoted geometry/core module libraries.
+# Monolithic CPU smoke benchmark executable. The runner imports promoted
+# module libraries across its declared ownership labels, so module scanning
+# remains enabled for every workload source.
 add_executable(IntrinsicBenchmarkSmoke
     runners/BenchmarkSmokeRunner.cpp
+    core/Bench_SchedulerHardeningSmoke.cpp
     geometry/Bench_BoundaryFirstFlatteningReferenceSmoke.cpp
     geometry/Bench_ExampleSmoke.cpp
     geometry/Bench_PointCloudFilteringSmoke.cpp
@@ -108,7 +109,7 @@ endif()
 if(BUILD_TESTING)
     intrinsic_register_test_executable(
         TARGET IntrinsicBenchmarkSmoke
-        LABELS benchmark geometry graphics physics slow
+        LABELS benchmark core geometry graphics physics slow
     )
 
     set(_intrinsic_bench_smoke_test_dir "${CMAKE_BINARY_DIR}/benchmark-ctest/IntrinsicBenchmarkSmokeTest")
@@ -118,7 +119,8 @@ if(BUILD_TESTING)
         COMMAND $<TARGET_FILE:IntrinsicBenchmarkSmoke> "${_intrinsic_bench_smoke_test_dir}"
     )
     set_tests_properties(IntrinsicBenchmarkSmoke.Run PROPERTIES
-        LABELS "benchmark;geometry;graphics;physics;slow"
+        LABELS "benchmark;core;geometry;graphics;physics;slow"
+        PROCESSORS 9
         TIMEOUT 120
         FIXTURES_SETUP IntrinsicBenchmarkSmoke
     )
@@ -133,7 +135,7 @@ if(BUILD_TESTING)
                 --strict
         )
         set_tests_properties(IntrinsicBenchmarkSmoke.Validate PROPERTIES
-            LABELS "benchmark;geometry;graphics;physics;slow"
+            LABELS "benchmark;core;geometry;graphics;physics;slow"
             TIMEOUT 30
             FIXTURES_REQUIRED IntrinsicBenchmarkSmoke
         )

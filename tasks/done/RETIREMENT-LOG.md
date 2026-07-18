@@ -8,6 +8,20 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`CORE-007`](CORE-007-scheduler-priority-wait-wake-hardening.md) — scheduler
+priority and worker-wake hardening retired on 2026-07-18 at `CPUContracted`.
+Fixed High/Normal/Low lanes preserve TaskGraph priority through external and
+worker-local dispatch; a sequentially consistent parked-worker handshake
+suppresses unnecessary notifications without reopening the dispatch-to-park
+race; and 16 scheduler-instance-safe wait-token shards reduce registry
+contention. Matched optimized evidence improved contended wait-registry
+throughput 7.2558x, eliminated the priority-inversion error, and improved
+dispatch throughput 34.3903% while retaining the spin-locked deque after its
+Release SLO stayed within budget. The full CPU gate passed 4,090/4,090, fresh
+ASan and UBSan gates each passed 2,744/2,744, and an independent final
+concurrency review found no actionable issue. Retained execution-plan storage
+and reuse remain owned by `CORE-008`.
+
 [`CORE-005`](CORE-005-nonblocking-taskgraph-submit-api.md) — non-blocking
 TaskGraph submission and completion retired on 2026-07-18 at
 `CPUContracted`. TaskGraph now exposes one submit/poll/pump/wait execution

@@ -2,12 +2,17 @@ module;
 
 #include <array>
 #include <atomic>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <deque>
-#include <vector>
-#include <thread>
 #include <coroutine>
+#include <limits>
 #include <memory>
+#include <mutex>
 #include <optional>
+#include <thread>
+#include <vector>
 
 export module Extrinsic.Core.Tasks:Internal;
 
@@ -18,6 +23,12 @@ export namespace Extrinsic::Core::Tasks
 {
     namespace Detail
     {
+        inline constexpr std::size_t PriorityLaneCount = 3u;
+        inline constexpr std::size_t WaitShardCount = 16u;
+        inline constexpr std::size_t HighPriorityInjectCapacity = 8'192u;
+        inline constexpr std::size_t NormalPriorityInjectCapacity = 65'536u;
+        inline constexpr std::size_t LowPriorityInjectCapacity = 8'192u;
+
         [[nodiscard]] bool CpuRelaxOnce() noexcept;
         void CpuRelaxOrYield() noexcept;
 
@@ -36,7 +47,7 @@ export namespace Extrinsic::Core::Tasks
             struct alignas(64) WorkerState
             {
                 SpinLock localLock{};
-                std::deque<LocalTask> localDeque{};
+                std::array<std::deque<LocalTask>, PriorityLaneCount> localDeques{};
                 std::atomic<uint64_t> stealCount{0};
 
                 WorkerState() = default;
@@ -46,18 +57,41 @@ export namespace Extrinsic::Core::Tasks
                 WorkerState& operator=(WorkerState&& other) noexcept;
             };
 
+            struct InjectLane
+            {
+                explicit InjectLane(const std::size_t capacity)
+                    : Queue(capacity)
+                {
+                }
+
+                LockFreeQueue<LocalTask> Queue;
+                std::mutex OverflowMutex{};
+                std::deque<LocalTask> OverflowQueue{};
+                std::atomic<bool> HasOverflow{false};
+            };
+
             std::vector<std::thread> workers;
             std::vector<WorkerState> workerStates;
-            LockFreeQueue<LocalTask> globalQueue{65536};
-            std::mutex overflowMutex;
-            std::deque<LocalTask> overflowQueue;
-            std::atomic<bool> hasOverflow{false};
+            // Preserve the common Normal lane's previous capacity while
+            // bounding the two preference lanes at 8K slots each. This is a
+            // 25% aggregate increase, not the historical threefold copy.
+            std::array<InjectLane, PriorityLaneCount> injectLanes{
+                InjectLane{HighPriorityInjectCapacity},
+                InjectLane{NormalPriorityInjectCapacity},
+                InjectLane{LowPriorityInjectCapacity},
+            };
 
             alignas(64) std::atomic<uint32_t> workSignal{0};
+            alignas(64) std::atomic<uint32_t> parkedWorkerCount{0};
             alignas(64) std::atomic<bool> isRunning{false};
             alignas(64) std::atomic<uint64_t> inFlightTasks{0};
             alignas(64) std::atomic<int> activeTaskCount{0};
             alignas(64) std::atomic<int> queuedTaskCount{0};
+            // Advisory counts are maintained for High and Low only. Normal
+            // is always scanned so default dispatch avoids two extra atomic
+            // read-modify-writes per task.
+            alignas(64) std::array<std::atomic<int>, PriorityLaneCount>
+                queuedTaskCountByLane{};
             alignas(64) std::atomic<uint64_t> workProgressEpoch{0};
             alignas(64) std::atomic<uint32_t> externalProgressWaiters{0};
 
@@ -77,6 +111,7 @@ export namespace Extrinsic::Core::Tasks
             alignas(64) std::atomic<uint64_t> idleWaitCount{0};
             alignas(64) std::atomic<uint64_t> idleWaitTotalNs{0};
             alignas(64) std::atomic<uint64_t> queueContentionCount{0};
+            alignas(64) std::atomic<uint64_t> workerWakeNotificationCount{0};
 
             static constexpr uint32_t InvalidParkedNode = std::numeric_limits<uint32_t>::max();
 
@@ -103,11 +138,17 @@ export namespace Extrinsic::Core::Tasks
                 ParkedContinuation continuation{};
             };
 
-            std::mutex waitMutex;
-            std::vector<WaitSlot> waitSlots;
-            std::vector<uint32_t> freeWaitSlots;
-            std::vector<ParkedNode> parkedNodes;
-            std::vector<uint32_t> freeParkedNodes;
+            struct WaitShard
+            {
+                std::mutex Mutex{};
+                std::vector<WaitSlot> Slots{};
+                std::vector<uint32_t> FreeSlots{};
+                std::vector<ParkedNode> ParkedNodes{};
+                std::vector<uint32_t> FreeParkedNodes{};
+            };
+
+            std::array<WaitShard, WaitShardCount> waitShards{};
+            std::atomic<uint32_t> nextWaitShard{0u};
         };
 
         [[nodiscard]] uint64_t EstimateLatencyPercentile(
@@ -120,23 +161,30 @@ export namespace Extrinsic::Core::Tasks
             std::array<std::atomic<uint64_t>, SchedulerContext::LatencyBucketCount>& histogram,
             uint64_t latencyNs);
 
-        // Caller must hold SchedulerContext::waitMutex while transferring the
+        // Caller must hold the owning WaitShard::Mutex while transferring the
         // slot's single-use continuation tokens out of the wait registry.
         [[nodiscard]] std::vector<SchedulerContext::ParkedContinuation>
-        TakeParkedContinuationsLocked(SchedulerContext& context,
+        TakeParkedContinuationsLocked(SchedulerContext::WaitShard& shard,
                                       SchedulerContext::WaitSlot& slot);
         void DestroyParkedContinuations(
             std::vector<SchedulerContext::ParkedContinuation>& continuations) noexcept;
     }
 
-    bool EnqueueInject(LocalTask&& task);
-    bool TryPopGlobalInject(LocalTask& outTask);
-    bool TryPopLocal(unsigned workerIndex, LocalTask& outTask);
-    bool TrySteal(unsigned thiefIndex, LocalTask& outTask);
-    bool TryStealExternal(LocalTask& outTask);
-    bool TryPopTask(LocalTask& outTask, std::optional<unsigned> workerIndex);
+    bool EnqueueInject(LocalTask&& task, std::uint8_t lane);
+    bool TryPopGlobalInject(LocalTask& outTask, std::uint8_t lane);
+    bool TryPopLocal(unsigned workerIndex, LocalTask& outTask, std::uint8_t lane);
+    bool TrySteal(unsigned thiefIndex, LocalTask& outTask, std::uint8_t lane);
+    bool TryStealExternal(LocalTask& outTask, std::uint8_t lane);
+    bool TryPopWorkerTask(LocalTask& outTask,
+                          unsigned workerIndex,
+                          std::uint8_t& poppedLane,
+                          bool allowLocal,
+                          bool& poppedLocal);
+    bool TryPopDefinitiveTask(LocalTask& outTask,
+                              std::optional<unsigned> workerIndex,
+                              std::uint8_t& poppedLane);
     void PublishWorkProgress() noexcept;
-    void OnTaskDequeuedAndRun(LocalTask& task);
+    void OnTaskDequeuedAndRun(LocalTask& task, std::uint8_t lane);
     // Global scheduler state declarations.
     // These are defined exactly once in Core.Tasks.State.cpp.
     extern std::unique_ptr<Detail::SchedulerContext> s_Ctx;

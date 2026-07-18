@@ -1,0 +1,40 @@
+{
+  "benchmark_id": "core.scheduler_hardening.smoke",
+  "method": "core.scheduler_hardening",
+  "backend": "cpu_optimized",
+  "dataset": "builtin.synthetic_scheduler_contention.v1",
+  "commit": "59fbb84a905df42710940e7169442eabb3a83894",
+  "metrics": {
+    "runtime_ms": 2.159489,
+    "throughput_items_per_sec": 3793490.033985,
+    "quality_error_l2": 16.000000
+  },
+  "diagnostics": {
+    "runner": "IntrinsicBenchmarkSmoke",
+    "mode": "smoke",
+    "warmup_iterations": 3,
+    "measured_iterations": 9,
+    "timing_statistic": "median",
+    "dispatch_worker_request": 4,
+    "dispatch_worker_count": 3,
+    "dispatch_task_count": 8192,
+    "dispatch_succeeded": true,
+    "priority_low_task_count": 64,
+    "priority_high_task_count": 16,
+    "priority_low_before_first_high": 64,
+    "priority_low_in_high_window": 16,
+    "priority_probe_runtime_ms": 0.017196,
+    "priority_contract_satisfied": false,
+    "wait_registry_thread_count": 8,
+    "wait_registry_operations_per_thread": 4096,
+    "wait_registry_single_thread_median_ms": 0.127978,
+    "wait_registry_contended_median_ms": 9.630202,
+    "wait_registry_single_thread_throughput_items_per_sec": 32005500.945475,
+    "wait_registry_contended_throughput_items_per_sec": 3402628.522226,
+    "wait_registry_contended_scaling_efficiency": 0.013289,
+    "wait_registry_succeeded": true,
+    "worker_wake_notification_telemetry_available": false,
+    "worker_wake_evidence": "candidate_stats_and_contract_tests"
+  },
+  "status": "failed"
+}

@@ -55,6 +55,11 @@ namespace Extrinsic::Core::Tasks
             s_Ctx->workProgressEpoch.load(std::memory_order_relaxed);
         stats.ExternalProgressWaiters =
             s_Ctx->externalProgressWaiters.load(std::memory_order_acquire);
+        stats.WorkerWakeNotifications =
+            s_Ctx->workerWakeNotificationCount.load(
+                std::memory_order_relaxed);
+        stats.ParkedWorkers =
+            s_Ctx->parkedWorkerCount.load(std::memory_order_seq_cst);
 
         if (stats.TotalStealAttempts > 0)
         {
@@ -68,7 +73,10 @@ namespace Extrinsic::Core::Tasks
         for (auto& worker : s_Ctx->workerStates)
         {
             std::lock_guard lock(worker.localLock);
-            stats.WorkerLocalDepths.push_back(static_cast<uint32_t>(worker.localDeque.size()));
+            std::uint32_t localDepth = 0u;
+            for (const auto& lane : worker.localDeques)
+                localDepth += static_cast<std::uint32_t>(lane.size());
+            stats.WorkerLocalDepths.push_back(localDepth);
             stats.WorkerVictimStealCounts.push_back(worker.stealCount.load(std::memory_order_relaxed));
         }
 

@@ -4,6 +4,7 @@ module;
 #include <chrono>
 #include <atomic>
 #include <coroutine>
+#include <cstdint>
 
 module Extrinsic.Core.Tasks;
 
@@ -14,7 +15,7 @@ namespace Extrinsic::Core::Tasks
     namespace Detail
     {
         std::vector<SchedulerContext::ParkedContinuation>
-        TakeParkedContinuationsLocked(SchedulerContext& context,
+        TakeParkedContinuationsLocked(SchedulerContext::WaitShard& shard,
                                       SchedulerContext::WaitSlot& slot)
         {
             std::vector<SchedulerContext::ParkedContinuation> continuations;
@@ -27,12 +28,12 @@ namespace Extrinsic::Core::Tasks
             {
                 if (++iterations > safetyLimit)
                     break;
-                auto& parkedNode = context.parkedNodes[node];
+                auto& parkedNode = shard.ParkedNodes[node];
                 const uint32_t next = parkedNode.next;
                 parkedNode.next = SchedulerContext::InvalidParkedNode;
                 continuations.push_back(std::move(parkedNode.continuation));
                 parkedNode.continuation = {};
-                context.freeParkedNodes.push_back(node);
+                shard.FreeParkedNodes.push_back(node);
                 node = next;
             }
 
@@ -59,31 +60,89 @@ namespace Extrinsic::Core::Tasks
         }
     }
 
+    namespace
+    {
+        struct ThreadWaitShardCursor
+        {
+            std::uint64_t SchedulerInstance = 0u;
+            std::uint32_t NextShard = 0u;
+        };
+
+        thread_local ThreadWaitShardCursor waitShardCursor{};
+
+        [[nodiscard]] std::uint32_t SelectWaitShard() noexcept
+        {
+            constexpr auto shardCount =
+                static_cast<std::uint32_t>(Detail::WaitShardCount);
+            if (waitShardCursor.SchedulerInstance != s_Ctx->instanceId)
+            {
+                waitShardCursor.SchedulerInstance = s_Ctx->instanceId;
+                waitShardCursor.NextShard =
+                    s_Ctx->nextWaitShard.fetch_add(
+                        1u, std::memory_order_relaxed) %
+                    shardCount;
+            }
+
+            const std::uint32_t shardIndex = waitShardCursor.NextShard;
+            waitShardCursor.NextShard = (shardIndex + 1u) % shardCount;
+            return shardIndex;
+        }
+
+        [[nodiscard]] constexpr std::uint32_t WaitShardIndex(
+            const Scheduler::WaitToken token) noexcept
+        {
+            return token.Slot %
+                static_cast<std::uint32_t>(Detail::WaitShardCount);
+        }
+
+        [[nodiscard]] constexpr std::uint32_t WaitShardLocalSlot(
+            const Scheduler::WaitToken token) noexcept
+        {
+            return token.Slot /
+                static_cast<std::uint32_t>(Detail::WaitShardCount);
+        }
+
+        [[nodiscard]] constexpr std::uint32_t EncodeWaitSlot(
+            const std::uint32_t shardIndex,
+            const std::uint32_t localSlot) noexcept
+        {
+            return localSlot *
+                       static_cast<std::uint32_t>(Detail::WaitShardCount) +
+                   shardIndex;
+        }
+    }
+
     Scheduler::WaitToken Scheduler::AcquireWaitToken()
     {
         if (!s_Ctx)
             return {};
 
-        std::lock_guard lock(s_Ctx->waitMutex);
-        uint32_t slot = 0;
-        if (!s_Ctx->freeWaitSlots.empty())
+        const std::uint32_t shardIndex = SelectWaitShard();
+        auto& shard = s_Ctx->waitShards[shardIndex];
+        std::lock_guard lock(shard.Mutex);
+        uint32_t localSlot = 0;
+        if (!shard.FreeSlots.empty())
         {
-            slot = s_Ctx->freeWaitSlots.back();
-            s_Ctx->freeWaitSlots.pop_back();
+            localSlot = shard.FreeSlots.back();
+            shard.FreeSlots.pop_back();
         }
         else
         {
-            slot = static_cast<uint32_t>(s_Ctx->waitSlots.size());
-            s_Ctx->waitSlots.emplace_back();
+            localSlot = static_cast<uint32_t>(shard.Slots.size());
+            shard.Slots.emplace_back();
         }
 
-        auto& waitSlot = s_Ctx->waitSlots[slot];
+        auto& waitSlot = shard.Slots[localSlot];
         waitSlot.inUse = true;
         waitSlot.parkedHead = Detail::SchedulerContext::InvalidParkedNode;
         waitSlot.parkedTail = Detail::SchedulerContext::InvalidParkedNode;
         waitSlot.parkedCount = 0;
         waitSlot.ready = false;
-        return WaitToken{slot, waitSlot.generation, s_Ctx->instanceId};
+        return WaitToken{
+            EncodeWaitSlot(shardIndex, localSlot),
+            waitSlot.generation,
+            s_Ctx->instanceId,
+        };
     }
 
     void Scheduler::ReleaseWaitToken(WaitToken token)
@@ -93,22 +152,24 @@ namespace Extrinsic::Core::Tasks
 
         std::vector<Detail::SchedulerContext::ParkedContinuation> abandoned;
         {
-            std::lock_guard lock(s_Ctx->waitMutex);
-            if (token.Slot >= s_Ctx->waitSlots.size())
+            auto& shard = s_Ctx->waitShards[WaitShardIndex(token)];
+            const std::uint32_t localSlot = WaitShardLocalSlot(token);
+            std::lock_guard lock(shard.Mutex);
+            if (localSlot >= shard.Slots.size())
                 return;
 
-            auto& slot = s_Ctx->waitSlots[token.Slot];
+            auto& slot = shard.Slots[localSlot];
             if (!slot.inUse || slot.generation != token.Generation)
                 return;
 
             slot.inUse = false;
-            abandoned = Detail::TakeParkedContinuationsLocked(*s_Ctx, slot);
+            abandoned = Detail::TakeParkedContinuationsLocked(shard, slot);
             slot.ready = false;
             slot.generation++;
             if (slot.generation == 0)
                 slot.generation = 1;
 
-            s_Ctx->freeWaitSlots.push_back(token.Slot);
+            shard.FreeSlots.push_back(localSlot);
         }
 
         Detail::DestroyParkedContinuations(abandoned);
@@ -123,10 +184,12 @@ namespace Extrinsic::Core::Tasks
 
         const auto parkStart = std::chrono::steady_clock::now();
         {
-            std::lock_guard lock(s_Ctx->waitMutex);
-            if (token.Slot >= s_Ctx->waitSlots.size())
+            auto& shard = s_Ctx->waitShards[WaitShardIndex(token)];
+            const std::uint32_t localSlot = WaitShardLocalSlot(token);
+            std::lock_guard lock(shard.Mutex);
+            if (localSlot >= shard.Slots.size())
                 return false;
-            auto& slot = s_Ctx->waitSlots[token.Slot];
+            auto& slot = shard.Slots[localSlot];
             if (!slot.inUse || slot.generation != token.Generation)
                 return false;
 
@@ -134,18 +197,19 @@ namespace Extrinsic::Core::Tasks
                 return false;
 
             uint32_t parkedNodeIndex = Detail::SchedulerContext::InvalidParkedNode;
-            if (!s_Ctx->freeParkedNodes.empty())
+            if (!shard.FreeParkedNodes.empty())
             {
-                parkedNodeIndex = s_Ctx->freeParkedNodes.back();
-                s_Ctx->freeParkedNodes.pop_back();
+                parkedNodeIndex = shard.FreeParkedNodes.back();
+                shard.FreeParkedNodes.pop_back();
             }
             else
             {
-                parkedNodeIndex = static_cast<uint32_t>(s_Ctx->parkedNodes.size());
-                s_Ctx->parkedNodes.emplace_back();
+                parkedNodeIndex =
+                    static_cast<uint32_t>(shard.ParkedNodes.size());
+                shard.ParkedNodes.emplace_back();
             }
 
-            auto& parkedNode = s_Ctx->parkedNodes[parkedNodeIndex];
+            auto& parkedNode = shard.ParkedNodes[parkedNodeIndex];
             parkedNode.next = Detail::SchedulerContext::InvalidParkedNode;
             parkedNode.continuation = Detail::SchedulerContext::ParkedContinuation{
                 .Handle = h,
@@ -160,7 +224,7 @@ namespace Extrinsic::Core::Tasks
             }
             else
             {
-                s_Ctx->parkedNodes[slot.parkedTail].next = parkedNodeIndex;
+                shard.ParkedNodes[slot.parkedTail].next = parkedNodeIndex;
                 slot.parkedTail = parkedNodeIndex;
             }
 
@@ -183,10 +247,12 @@ namespace Extrinsic::Core::Tasks
 
         std::vector<Detail::SchedulerContext::ParkedContinuation> continuations;
         {
-            std::lock_guard lock(s_Ctx->waitMutex);
-            if (token.Slot >= s_Ctx->waitSlots.size())
+            auto& shard = s_Ctx->waitShards[WaitShardIndex(token)];
+            const std::uint32_t localSlot = WaitShardLocalSlot(token);
+            std::lock_guard lock(shard.Mutex);
+            if (localSlot >= shard.Slots.size())
                 return 0;
-            auto& slot = s_Ctx->waitSlots[token.Slot];
+            auto& slot = shard.Slots[localSlot];
             if (!slot.inUse || slot.generation != token.Generation)
                 return 0;
 
@@ -194,7 +260,7 @@ namespace Extrinsic::Core::Tasks
             if (slot.parkedHead == Detail::SchedulerContext::InvalidParkedNode)
                 return 0;
 
-            continuations = Detail::TakeParkedContinuationsLocked(*s_Ctx, slot);
+            continuations = Detail::TakeParkedContinuationsLocked(shard, slot);
         }
 
         if (continuations.empty())
@@ -220,11 +286,13 @@ namespace Extrinsic::Core::Tasks
         if (!s_Ctx || !token.Valid() || token.SchedulerInstance != s_Ctx->instanceId)
             return;
 
-        std::lock_guard lock(s_Ctx->waitMutex);
-        if (token.Slot >= s_Ctx->waitSlots.size())
+        auto& shard = s_Ctx->waitShards[WaitShardIndex(token)];
+        const std::uint32_t localSlot = WaitShardLocalSlot(token);
+        std::lock_guard lock(shard.Mutex);
+        if (localSlot >= shard.Slots.size())
             return;
 
-        auto& slot = s_Ctx->waitSlots[token.Slot];
+        auto& slot = shard.Slots[localSlot];
         if (!slot.inUse || slot.generation != token.Generation)
             return;
 

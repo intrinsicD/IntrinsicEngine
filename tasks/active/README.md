@@ -11,7 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-No tasks are currently active.
+None.
 
 ## History
 

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
+#include <array>
 #include <atomic>
+#include <chrono>
 #include <thread>
 #include <vector>
 #include <coroutine>
@@ -121,6 +123,191 @@ TEST(CoreTasks, BasicDispatch) {
     
     EXPECT_EQ(counter, 100);
     
+    Scheduler::Shutdown();
+}
+
+TEST(CoreTasks, SaturatedPriorityLanesPreferHighPriorityWork)
+{
+    Scheduler::Initialize(1);
+
+    constexpr std::uint32_t lowTaskCount = 32u;
+    constexpr std::uint32_t highTaskCount = 8u;
+    constexpr std::uint32_t taskCount = lowTaskCount + highTaskCount;
+    std::atomic<bool> blockerStarted{false};
+    std::atomic<bool> releaseBlocker{false};
+    std::atomic<std::uint32_t> nextOrder{0u};
+    std::atomic<std::uint32_t> completed{0u};
+    std::array<std::uint8_t, taskCount> order{};
+
+    Scheduler::Dispatch([&]()
+    {
+        blockerStarted.store(true, std::memory_order_release);
+        blockerStarted.notify_all();
+        while (!releaseBlocker.load(std::memory_order_acquire))
+            releaseBlocker.wait(false, std::memory_order_acquire);
+    });
+    while (!blockerStarted.load(std::memory_order_acquire))
+        blockerStarted.wait(false, std::memory_order_acquire);
+
+    const auto enqueueClass = [&](const DispatchPriority priority,
+                                  const std::uint32_t count,
+                                  const std::uint8_t classId)
+    {
+        for (std::uint32_t task = 0u; task < count; ++task)
+        {
+            Scheduler::Dispatch(priority, [&, classId]()
+            {
+                const auto index = nextOrder.fetch_add(1u, std::memory_order_acq_rel);
+                order[index] = classId;
+                const auto finished = completed.fetch_add(1u, std::memory_order_acq_rel) + 1u;
+                if (finished == taskCount)
+                    completed.notify_all();
+            });
+        }
+    };
+
+    enqueueClass(DispatchPriority::Low, lowTaskCount, 0u);
+    enqueueClass(DispatchPriority::High, highTaskCount, 1u);
+
+    releaseBlocker.store(true, std::memory_order_release);
+    releaseBlocker.notify_all();
+    auto observed = completed.load(std::memory_order_acquire);
+    while (observed < taskCount)
+    {
+        completed.wait(observed, std::memory_order_acquire);
+        observed = completed.load(std::memory_order_acquire);
+    }
+    Scheduler::WaitForAll();
+
+    for (std::uint32_t index = 0u; index < highTaskCount; ++index)
+        EXPECT_EQ(order[index], 1u) << "low-priority task ran at index " << index;
+
+    Scheduler::Shutdown();
+}
+
+TEST(CoreTasks, DispatchWhileWorkerIsActiveSuppressesWakeNotification)
+{
+    Scheduler::Initialize(1);
+
+    constexpr std::uint32_t taskCount = 32u;
+    std::atomic<bool> blockerStarted{false};
+    std::atomic<bool> releaseBlocker{false};
+    std::atomic<std::uint32_t> completed{0u};
+
+    Scheduler::Dispatch([&]()
+    {
+        blockerStarted.store(true, std::memory_order_release);
+        blockerStarted.notify_all();
+        while (!releaseBlocker.load(std::memory_order_acquire))
+            releaseBlocker.wait(false, std::memory_order_acquire);
+    });
+    while (!blockerStarted.load(std::memory_order_acquire))
+        blockerStarted.wait(false, std::memory_order_acquire);
+
+    const auto before = Scheduler::GetStats();
+    EXPECT_EQ(before.ParkedWorkers, 0u);
+    for (std::uint32_t task = 0u; task < taskCount; ++task)
+    {
+        Scheduler::Dispatch([&]()
+        {
+            completed.fetch_add(1u, std::memory_order_release);
+        });
+    }
+    const auto after = Scheduler::GetStats();
+
+    EXPECT_EQ(after.ParkedWorkers, 0u);
+    EXPECT_EQ(after.WorkerWakeNotifications, before.WorkerWakeNotifications);
+
+    releaseBlocker.store(true, std::memory_order_release);
+    releaseBlocker.notify_all();
+    Scheduler::WaitForAll();
+    EXPECT_EQ(completed.load(std::memory_order_acquire), taskCount);
+    Scheduler::Shutdown();
+}
+
+TEST(CoreTasks, ParkedWorkerDispatchHandshakeMakesRepeatedProgress)
+{
+    Scheduler::Initialize(1);
+
+    constexpr std::uint32_t iterationCount = 512u;
+    std::atomic<std::uint32_t> completed{0u};
+
+    while (Scheduler::GetStats().ParkedWorkers != 1u)
+        std::this_thread::yield();
+    const auto wakeNotificationsBefore = Scheduler::GetStats().WorkerWakeNotifications;
+
+    for (std::uint32_t iteration = 0u; iteration < iterationCount; ++iteration)
+    {
+        while (Scheduler::GetStats().ParkedWorkers != 1u)
+            std::this_thread::yield();
+
+        Scheduler::Dispatch([&completed]()
+        {
+            completed.fetch_add(1u, std::memory_order_release);
+            completed.notify_all();
+        });
+
+        const auto expected = iteration + 1u;
+        auto observed = completed.load(std::memory_order_acquire);
+        while (observed < expected)
+        {
+            completed.wait(observed, std::memory_order_acquire);
+            observed = completed.load(std::memory_order_acquire);
+        }
+    }
+
+    Scheduler::WaitForAll();
+    const auto stats = Scheduler::GetStats();
+    EXPECT_EQ(completed.load(std::memory_order_acquire), iterationCount);
+    EXPECT_EQ(stats.WorkerWakeNotifications,
+              wakeNotificationsBefore + static_cast<std::uint64_t>(iterationCount));
+    EXPECT_LE(stats.ParkedWorkers, 1u);
+    Scheduler::Shutdown();
+}
+
+TEST(CoreTasks, DispatchRacingWorkerParkMakesRepeatedProgress)
+{
+    Scheduler::Initialize(1);
+
+    constexpr std::uint32_t iterationCount = 2'048u;
+    constexpr auto progressTimeout = std::chrono::milliseconds{250};
+    std::atomic<std::uint32_t> completed{0u};
+
+    for (std::uint32_t iteration = 0u; iteration < iterationCount; ++iteration)
+    {
+        // Do not observe ParkedWorkers here. Alternating immediate dispatch
+        // with a yield samples both sides of the worker's empty-scan/park
+        // transition instead of constraining every dispatch to an already
+        // published parked state.
+        if ((iteration & 1u) != 0u)
+            std::this_thread::yield();
+
+        Scheduler::Dispatch([&completed]()
+        {
+            completed.fetch_add(1u, std::memory_order_release);
+        });
+
+        const auto expected = iteration + 1u;
+        const auto deadline = std::chrono::steady_clock::now() + progressTimeout;
+        while (completed.load(std::memory_order_acquire) < expected &&
+               std::chrono::steady_clock::now() < deadline)
+        {
+            std::this_thread::yield();
+        }
+
+        if (completed.load(std::memory_order_acquire) < expected)
+        {
+            ADD_FAILURE() << "dispatch made no progress while racing worker park "
+                          << "at iteration " << iteration;
+            // A second publication should observe the now-parked worker and
+            // rescue cleanup even when the first race is broken.
+            Scheduler::Dispatch([]() {});
+            break;
+        }
+    }
+
+    Scheduler::WaitForAll();
+    EXPECT_EQ(completed.load(std::memory_order_acquire), iterationCount);
     Scheduler::Shutdown();
 }
 
@@ -670,6 +857,89 @@ TEST(CoreTasks, CounterEventHighFanInRandomizedSignalsResumeExactlyOnce)
     Scheduler::Shutdown();
 }
 
+TEST(CoreTasks, IndependentCounterEventsPreserveSchedulerInstanceAcrossWaitShards)
+{
+    Scheduler::Initialize(4);
+    auto staleEvent = std::make_unique<CounterEvent>(1u);
+    const auto staleToken = staleEvent->Token();
+    const auto staleInstance = Scheduler::CurrentInstanceId();
+    Scheduler::Shutdown();
+
+    Scheduler::Initialize(4);
+    constexpr std::size_t waitShardCount = 16u;
+    constexpr std::size_t eventCount = 64u;
+    constexpr std::size_t signalerCount = 4u;
+    std::array<Scheduler::WaitToken, waitShardCount> recycledTokens{};
+    std::array<bool, waitShardCount> observedShards{};
+    {
+        std::array<std::unique_ptr<CounterEvent>, waitShardCount> retiredEvents{};
+        for (std::size_t event = 0u; event < retiredEvents.size(); ++event)
+        {
+            retiredEvents[event] = std::make_unique<CounterEvent>(1u);
+            recycledTokens[event] = retiredEvents[event]->Token();
+            observedShards[recycledTokens[event].Slot % waitShardCount] = true;
+        }
+    }
+    for (const bool observed : observedShards)
+        EXPECT_TRUE(observed);
+
+    std::array<std::unique_ptr<CounterEvent>, eventCount> events{};
+    std::atomic<int> startedCount{0};
+    std::atomic<int> resumedCount{0};
+    const auto currentInstance = Scheduler::CurrentInstanceId();
+    const auto initialParkCount = Scheduler::GetParkCount();
+
+    EXPECT_NE(currentInstance, staleInstance);
+    for (std::size_t event = 0u; event < events.size(); ++event)
+    {
+        events[event] = std::make_unique<CounterEvent>(1u);
+        EXPECT_EQ(events[event]->Token().SchedulerInstance, currentInstance);
+        if (event < recycledTokens.size())
+        {
+            EXPECT_EQ(events[event]->Token().Slot, recycledTokens[event].Slot);
+            EXPECT_NE(events[event]->Token().Generation,
+                      recycledTokens[event].Generation);
+        }
+        Scheduler::Dispatch(WaitForCounterTrackStartAndIncrement(
+            events[event].get(), &startedCount, &resumedCount));
+    }
+
+    const auto targetParkCount = initialParkCount + static_cast<std::uint64_t>(eventCount);
+    auto observedParks = Scheduler::ParkCountAtomic().load(std::memory_order_acquire);
+    while (observedParks < targetParkCount)
+    {
+        Scheduler::ParkCountAtomic().wait(observedParks, std::memory_order_acquire);
+        observedParks = Scheduler::ParkCountAtomic().load(std::memory_order_acquire);
+    }
+
+    EXPECT_EQ(Scheduler::UnparkReady(staleToken), 0u);
+    staleEvent.reset();
+    for (const auto recycledToken : recycledTokens)
+    {
+        EXPECT_EQ(Scheduler::UnparkReady(recycledToken), 0u);
+        Scheduler::ReleaseWaitToken(recycledToken);
+    }
+    EXPECT_EQ(resumedCount.load(std::memory_order_acquire), 0);
+
+    std::array<std::thread, signalerCount> signalers{};
+    for (std::size_t signaler = 0u; signaler < signalerCount; ++signaler)
+    {
+        signalers[signaler] = std::thread([&, signaler]()
+        {
+            for (std::size_t event = signaler; event < events.size(); event += signalerCount)
+                events[event]->Signal();
+        });
+    }
+    for (auto& signaler : signalers)
+        signaler.join();
+
+    Scheduler::WaitForAll();
+    EXPECT_EQ(startedCount.load(std::memory_order_acquire), static_cast<int>(eventCount));
+    EXPECT_EQ(resumedCount.load(std::memory_order_acquire), static_cast<int>(eventCount));
+    EXPECT_EQ(Scheduler::GetUnparkCount(), targetParkCount);
+    Scheduler::Shutdown();
+}
+
 TEST(CoreTasks, OverflowHandling)
 {
     // Initialize with 1 thread to force accumulation
@@ -721,6 +991,8 @@ TEST(CoreTasks, SchedulerStatsExposeQueueAndStealTelemetry)
     EXPECT_GE(stats.IdleWaitCount, 0u);
     EXPECT_GE(stats.IdleWaitTotalNs, 0u);
     EXPECT_GE(stats.QueueContentionCount, 0u);
+    EXPECT_LE(stats.WorkerWakeNotifications, stats.InjectPushCount);
+    EXPECT_LE(stats.ParkedWorkers, 2u);
 
     Scheduler::Shutdown();
 }

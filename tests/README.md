@@ -115,8 +115,8 @@ matched one-, two-, and four-slot evidence even though grouping itself improved
 the one- and two-slot A/B results but regressed the four-slot A/B result. ASan
 and UBSan remain explicit at `--parallel 1`. The required CPU cohort's
 runtime-bearing fixtures request one engine worker unless worker-count behavior
-is the contract. The 52 cases that intentionally create larger pools carry
-exact case-scoped `PROCESSORS` reservations: 29 reserve three slots, 21 reserve
+is the contract. The 57 cases that intentionally create larger pools carry
+exact case-scoped `PROCESSORS` reservations: 33 reserve three slots, 22 reserve
 four, and the two Release architecture-SLO cases reserve eight. Do not replace
 these budgets with independently inferred host-core counts.
 
@@ -267,7 +267,7 @@ the benchmark-smoke execution budget and dedicated lane were independently
 resolved by
 [`BUG-088`](../tasks/done/BUG-088-benchmark-smoke-hard-timeout-host-contention.md).
 
-The 22-result `IntrinsicBenchmarkSmoke.Run` → `.Validate` fixture pair is an
+The 23-result `IntrinsicBenchmarkSmoke.Run` → `.Validate` fixture pair is an
 explicit example: it remains in the complete aggregate with a 120-second runner
 bound, but is `benchmark;slow` and therefore outside the default CPU-supported
 gate. The path-aware `ci-release` candidate workflow runs the full aggregate in
