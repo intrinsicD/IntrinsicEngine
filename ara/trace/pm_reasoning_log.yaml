@@ -977,3 +977,11 @@ entries:
       - "Did not propose a new sanitizer framework or worker-control surface: named presets plus the existing aggregate and routing reconciler are sufficient, while CI-008 explicitly owns measured concurrency."
       - "Kept the historical CI-003 baseline immutable and required a new five-sample same-generation population before any speedup claim because current case counts and workflow closure have drifted."
       - "Did not stage a new generalized observation because CI-006 and H06 already encode isolated, classification-first CI optimization; no staged observation received a closure, contradiction, or stale signal."
+  - turn: "2026-07-18_001#1"
+    notes:
+      - "Routed the user's CI-first, task-scoped completion mandate as decision N256 and the prerequisite CI closure, Release/lifecycle population, cross-repository skill refresh, and final reduced-cost main proof as experiments N257 through N260."
+      - "Staged O52 through O54 and crystallized them immediately to H08 through H10 via artifact commitment because the checked-in workflows, SLO contract, retired tasks, and pushed target-skill branches depend on those rules."
+      - "Kept Release measurements bounded to one exact five-run population and recorded the standard-runner decision without inferring a larger-runner result from unavailable capacity or zero public-repository billing."
+      - "Did not create a generalized speedup claim: the evidence establishes final topology, exact hosted durations, and skipped optional work, not a counterfactual cost or wall-time reduction."
+      - "Kept O08, O09, O13, and O38 unpromoted because module posture, model training, and Progressive Poisson parity remain open; their open-thread references prevent stale promotion."
+      - "Recorded the final ARA trace after the successful main gate so ARA-only metadata can be committed locally without another push or redundant hosted CPU run."

@@ -100,3 +100,49 @@
 - **Code ref**: [N240, N243, N244, tasks/backlog/geometry/README.md,
   tasks/backlog/rendering/README.md, tasks/backlog/ecs/README.md]
 - **From staging**: O49
+
+## H08: Route Required CI Confidence by Candidate Lifecycle
+- **Rationale**: Run the complete CPU correctness gate plus its inline hotspot
+  and gate-timing diagnostics on an ordinary main push. Reserve sanitizer,
+  source-coverage, optimized Release, Vulkan, and dedicated
+  timing/calibration evidence modes for their declared candidate, scheduled,
+  or manual lifecycle. Stable wrappers preserve terminal candidate-check
+  semantics; scheduled/manual evidence jobs fail closed and retain artifacts
+  directly.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Sensitivity**: high
+- **Code ref**: [.github/workflows/ci-linux-clang.yml,
+  .github/workflows/ci-release.yml, .github/workflows/ci-source-coverage.yml,
+  .github/workflows/ci-vulkan.yml, .github/workflows/pr-fast.yml,
+  tests/regression/tooling/Test.WorkflowRouting.py,
+  tasks/done/CI-009-heavy-gate-routing-and-runner-evaluation.md, N257, N258,
+  N260]
+- **From staging**: O52
+
+## H09: Gate Architecture SLOs on Directly Exercised Metrics
+- **Rationale**: Construct a workload that exercises the exact asserted event
+  and observation window, then gate its direct tail. Keep cumulative worker
+  idle, incompatible queue ratios, park-to-signal dwell, abstract costs, and
+  other indirect telemetry as diagnostics rather than relabeling them as
+  latency or throughput SLOs.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Sensitivity**: high
+- **Code ref**: [tests/benchmark/slo/Test.ArchitectureSLO.cpp,
+  docs/benchmarking/ci-policy.md,
+  tasks/done/BUG-114-ci-release-architecture-slo-calibration.md, N258]
+- **From staging**: O53
+
+## H10: Adapt Agent Skills Through Repository-Native Context
+- **Rationale**: Preserve each target's native skill location and registration,
+  verify bundled profiles as hypotheses, rewrite context against current code
+  and empirical stop states, and run the target's actual structural gates.
+  Generic installation is not parity when it invents architecture, workflow,
+  or capability claims.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Sensitivity**: medium
+- **Code ref**: [tasks/done/PROC-025-port-research-ideation-skill-to-other-repos.md,
+  N259]
+- **From staging**: O54

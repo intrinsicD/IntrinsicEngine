@@ -6054,3 +6054,116 @@ tree:
       configure, build, CTest execution, implementation edit, or task-state
       change occurred in this readiness audit.
     status: resolved
+  - id: N256
+    type: decision
+    title: "Finish process work CI-first with task-scoped commits"
+    provenance: user
+    timestamp: "2026-07-18T10:10+02:00"
+    choice: >
+      Repair and right-size the CI pipelines before completing the remaining
+      process backlog, commit each completed task, and iterate until no process
+      task remains open.
+    alternatives:
+      - "Start the non-CI process work before correcting redundant hosted gates."
+      - "Run every broad test variant after each small change regardless of touched scope."
+      - "Leave implemented process tasks active without retirement evidence."
+    evidence:
+      - "User direction: fix the CI pipelines first to avoid unnecessary testing and reduce completion time."
+      - "tasks/backlog/process/README.md"
+    status: resolved
+  - id: N257
+    type: experiment
+    title: "Complete the classification-first CI process stack"
+    provenance: ai-executed
+    timestamp: "2026-07-18T10:10+02:00"
+    also_depends_on: [N237, N254, N255, N256]
+    evidence:
+      - "tasks/done/CI-005-real-touched-scope-pr-fast-gate.md"
+      - "tasks/done/CI-006-sanitizer-topology-and-test-parallelism.md"
+      - "tasks/done/CI-008-grouped-ctest-and-worker-oversubscription.md"
+      - "tasks/done/CI-010-cpu-source-coverage-refactor-parity.md"
+      - "tasks/done/CI-011-measured-slow-test-cohort.md"
+      - "tasks/done/BUILD-004-source-complete-compile-hotspot-evidence.md"
+      - "commits 1b5bd9d3, 020a0010, 5b41c951, 14538017, c26a502b, and 77557c59"
+      - "focused workflow, selector, source-coverage, timing, and task-policy regressions"
+    result: >
+      Completed and retired the remaining prerequisite CI stack with fail-closed
+      touched-scope routing, isolated sanitizer identities, deterministic
+      source-coverage parity, measured slow-test placement, bounded grouped
+      CTest evidence, and source-complete compile-hotspot calibration. Blocking
+      BUG-111's external artifact-finalization incident was diagnosed and
+      dispositioned through a bounded rerun, while BUG-112's deterministic
+      coverage defect and BUG-113's harness defect were repaired rather than
+      weakening a gate. Each task received a separate retirement commit, and
+      validation stayed focused until a task's declared hosted or aggregate
+      evidence required a broader run.
+    status: resolved
+  - id: N258
+    type: experiment
+    title: "Calibrate Release SLOs and route confidence by lifecycle"
+    provenance: ai-executed
+    timestamp: "2026-07-18T10:10+02:00"
+    also_depends_on: [N256, N257]
+    evidence:
+      - "tasks/done/BUG-114-ci-release-architecture-slo-calibration.md"
+      - "tasks/done/CI-009-heavy-gate-routing-and-runner-evaluation.md"
+      - "docs/benchmarking/ci-policy.md"
+      - "implementation SHA 502422ce7559a757354bce105ddebd2a0966c996"
+      - "GitHub Actions runs 29633396211, 29633689288, 29633934571, 29634185888, and 29634432796"
+      - "commits 941fa2d3, 5e7e4e91, 8e3973c9, 2a946b50, c91b362c, and 191bec28"
+    result: >
+      Replaced mismatched Release scheduler assertions with controlled
+      worker-local stealing plus direct signal-to-resume and fanout tails,
+      retained frame-graph compile/execute percentiles, and preserved
+      fail-closed result wrappers. Five sequential attempt-1 ci-release runs
+      passed at one SHA, image, preset, selector, and cache identity. Queue
+      median/p95 was 2/3 seconds, measured-phase median/p95 was
+      417.150/439.345 seconds, and optimized job-wall median/p95 was 445/478
+      seconds. These remained below the 300-second queue and 1,200-second total
+      reopen thresholds, so the standard ubuntu-24.04 runner was retained
+      without fabricating a larger-runner A/B.
+    status: resolved
+  - id: N259
+    type: experiment
+    title: "Refresh research-ideation skills in StructSplat and Prospect"
+    provenance: ai-executed
+    timestamp: "2026-07-18T10:10+02:00"
+    also_depends_on: [N256]
+    evidence:
+      - "tasks/done/PROC-025-port-research-ideation-skill-to-other-repos.md"
+      - "StructSplat commit c1288a6784b873951dda62afdfa3284c5af4a3c0"
+      - "Prospect commit 0124df612a6df0f096272e75c0fb6307c5897aa7"
+      - "portfolio self-tests, skill quick validation, Ruff, strict mypy, 85 Prospect pytest cases, symlink/ancestry checks, and diff checks"
+    result: >
+      Refreshed the already-installed skills in dedicated clean worktrees,
+      preserving each repository's native placement and registration while
+      rewriting repository context against current evidence. StructSplat now
+      records BENCH-007's negative frontier and exact FIT/PORT boundaries;
+      Prospect records WM-001 v1.3's implemented-but-formally-rejected outcome
+      and fresh confirmation path. Both scoped branches were pushed at their
+      recorded commits without modifying production code, primary worktrees,
+      AGENTS files, or top-level layouts.
+    status: resolved
+  - id: N260
+    type: experiment
+    title: "Close the process backlog through the reduced-cost main path"
+    provenance: ai-executed
+    timestamp: "2026-07-18T10:10+02:00"
+    also_depends_on: [N256, N257, N258, N259]
+    evidence:
+      - "tasks/backlog/process/README.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "main SHA 4a71ba63bdac07873afa068e6f36c06f53df24f6"
+      - "GitHub Actions run 29636116292"
+      - "strict task policy, task-state, documentation-link, root-hygiene, test-layout, benchmark-manifest, and session-brief checks"
+    result: >
+      Every process task now has exactly one done or archived record and no
+      active/backlog record; tasks/backlog/process contains only README.md.
+      The retirement commits were batched into one main push. Its full-CPU job
+      passed task policy, clean ci configuration, backend determinism, the
+      required CPU build and suite, strict layering, selector reconciliation,
+      compile-hotspot validation, timing validation, and artifact uploads.
+      Sanitizer, grouped-evidence, conflict-rejection, compile-hotspot-evidence,
+      timing-profile, and downstream parity variants all resolved skipped, so
+      the final confirmation consumed only the required ordinary-main gate.
+    status: resolved

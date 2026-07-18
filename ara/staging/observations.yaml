@@ -644,3 +644,59 @@ observations:
     promoted_to: "logic/solution/architecture.md:A14"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O52
+    timestamp: "2026-07-18T10:10+02:00"
+    provenance: ai-suggested
+    content: >
+      Required CI confidence should be routed by candidate lifecycle: ordinary
+      main pushes run the complete CPU correctness gate with its inline hotspot
+      and gate-timing diagnostics; sanitizer, source-coverage, optimized
+      Release, Vulkan, and dedicated timing/calibration evidence modes run only
+      at their declared candidate, scheduled, or manual lifecycle. Stable
+      always-reporting wrappers cover candidate check contexts, while
+      scheduled/manual evidence jobs fail closed and retain artifacts directly.
+    context: >
+      CI-005 through CI-011 and BUILD-004 implementation, hosted evidence,
+      CI-009 retirement, and final ordinary-main confirmation.
+    potential_type: heuristic
+    bound_to: [N257, N258, N260]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H08"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O53
+    timestamp: "2026-07-18T10:10+02:00"
+    provenance: ai-suggested
+    content: >
+      An architecture SLO must gate a metric directly exercised by its
+      workload and observation window. Cumulative worker idle, global-inject
+      steal ratios, park-to-signal dwell, and abstract critical-path cost are
+      diagnostics rather than substitutes for direct signal-to-resume,
+      controlled worker-local stealing, or elapsed compile/execute tails.
+    context: >
+      BUG-114 diagnosis, redesigned Release SLO workloads, 100 local combined
+      repetitions, and five sequential passing hosted samples.
+    potential_type: heuristic
+    bound_to: [N258]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H09"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O54
+    timestamp: "2026-07-18T10:10+02:00"
+    provenance: ai-suggested
+    content: >
+      Cross-repository agent skills should preserve the target repository's
+      native placement and registration, treat bundled profiles as hypotheses,
+      rewrite repository context from current tree and empirical boundaries,
+      and validate with the target's own gates rather than reinstalling a
+      generic layout.
+    context: >
+      PROC-025 refresh and independent validation of the existing StructSplat
+      and Prospect research-ideation skills.
+    potential_type: heuristic
+    bound_to: [N259]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H10"
+    crystallized_via: artifact-commitment
+    stale: false

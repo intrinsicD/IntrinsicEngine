@@ -1,0 +1,111 @@
+session:
+  id: "2026-07-18_001"
+  date: "2026-07-18"
+  started: "2026-07-18T10:10+02:00"
+  last_turn: "2026-07-18T10:10+02:00"
+  turn_count: 1
+  summary: "Completed the classification-first CI stack, calibrated and routed Release confidence, refreshed two repository-native research skills, and retired every process backlog task."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: "N256"
+    routing: direct
+    provenance: user
+    summary: "Prioritized CI repair and focused verification before task-scoped completion of the entire process backlog."
+  - turn: 1
+    type: experiment
+    id: "N257"
+    routing: direct
+    provenance: ai-executed
+    summary: "Completed and retired the touched-scope, sanitizer, coverage, slow-test, grouped-CTest, and compile-hotspot CI prerequisite stack."
+  - turn: 1
+    type: experiment
+    id: "N258"
+    routing: direct
+    provenance: ai-executed
+    summary: "Redesigned invalid Release SLOs, passed five sequential fixed-identity hosted samples, and retained the standard runner under declared thresholds."
+  - turn: 1
+    type: experiment
+    id: "N259"
+    routing: direct
+    provenance: ai-executed
+    summary: "Refreshed and pushed repository-native StructSplat and Prospect research-ideation skills with focused validation."
+  - turn: 1
+    type: experiment
+    id: "N260"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired the final process task and passed one ordinary-main full-CPU gate while every optional costly variant skipped."
+  - turn: 1
+    type: observation
+    id: "O52"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized lifecycle-routed required CI confidence as H08 through checked-in workflow and task commitment."
+  - turn: 1
+    type: observation
+    id: "O53"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized direct architecture-SLO measurement as H09 through the redesigned fixed-SHA Release evidence."
+  - turn: 1
+    type: observation
+    id: "O54"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized repository-native cross-repository skill adaptation as H10 through two validated target commits."
+
+ai_actions:
+  - turn: 1
+    action: "Implemented, reviewed, validated, and retired the remaining dependency-ordered CI process tasks; diagnosed and dispositioned BUG-111 and repaired BUG-112/113 with task-scoped commits."
+    provenance: ai-executed
+    files_changed:
+      - ".github/workflows/"
+      - "tools/ci/"
+      - "tests/regression/tooling/"
+      - "tests/benchmark/slo/Test.ArchitectureSLO.cpp"
+      - "docs/benchmarking/ci-policy.md"
+      - "tasks/done/"
+  - turn: 1
+    action: "Collected exactly five sequential fixed-SHA ci-release samples, validated their SLO, benchmark, timing, artifact, runner, and cache identity, and retained the standard runner."
+    provenance: ai-executed
+    files_changed:
+      - "docs/benchmarking/ci-policy.md"
+      - "tasks/done/BUG-114-ci-release-architecture-slo-calibration.md"
+      - "tasks/done/CI-009-heavy-gate-routing-and-runner-evaluation.md"
+  - turn: 1
+    action: "Refreshed the StructSplat and Prospect research-ideation skills in dedicated worktrees, ran repository-native validation, and pushed their scoped branches."
+    provenance: ai-executed
+    files_changed:
+      - "StructSplat:.claude/skills/structsplat-research-ideation/"
+      - "Prospect:.agents/skills/prospect-research-ideation/"
+      - "tasks/done/PROC-025-port-research-ideation-skill-to-other-repos.md"
+  - turn: 1
+    action: "Batched final IntrinsicEngine retirements into one main push, verified its reduced-cost hosted topology, and appended the ARA epilogue."
+    provenance: ai-executed
+    files_changed:
+      - "ara/logic/solution/heuristics.md"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-07-18_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "The user required CI pipeline fixes first so unnecessary testing would not extend completion time, then task-scoped commits until every process task retired."
+
+open_threads:
+  - "An owner may externalize the candidate stable contexts through branch protection, rulesets, or a merge queue; none is currently configured."
+  - "Reopen larger-runner evaluation only when a comparable runner exists and the recorded queue or total-time thresholds are crossed."
+  - "Adjudicate O08 and O09 when the module-surface diet is selected or rejected by a committed implementation."
+  - "Resolve whether model training means GEOM-058 or a new neural/LLM workflow."
+  - "Adjudicate O38 by correcting Progressive Poisson capability wording or collecting actual-Vulkan dispatch/readback parity evidence."
+  - "Keep Issue 445 candidates gated behind REVIEW-003 until its architecture-stability and right-sizing audit passes."
+  - "Recover provenance and redistribution rights before publishing the excluded local model datasets."
+
+ai_suggestions_pending:
+  - "Let StructSplat and Prospect owners merge the pushed refresh branches through each repository's normal integration policy."
