@@ -102,9 +102,9 @@ if(TARGET ExtrinsicRuntime AND TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLAT
 endif()
 
 # Keep the monolithic smoke runner available as an opt-in CTest fixture. The
-# required pull-request benchmark workflow owns execution and strict JSON
-# validation; hosted evidence classifies the complete pair outside the default
-# 30-second fast-test budget (BUG-088).
+# optimized Release workflow owns execution and strict JSON validation; hosted
+# evidence classifies the complete pair outside the default 30-second fast-test
+# budget (BUG-088).
 if(BUILD_TESTING)
     intrinsic_register_test_executable(
         TARGET IntrinsicBenchmarkSmoke

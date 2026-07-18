@@ -2,6 +2,9 @@ name: ci-docs
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 permissions:
@@ -76,7 +79,9 @@ jobs:
         run: python3 tools/ci/check_workflow_names.py --root .github/workflows
 
       - name: Validate compile-heavy workflow timing policy
-        run: python3 tests/regression/tooling/Test.WorkflowConcurrency.py
+        run: |
+          python3 tests/regression/tooling/Test.WorkflowConcurrency.py
+          python3 tests/regression/tooling/Test.WorkflowRouting.py
 
       - name: Validate structural CI policy regressions
         run: |

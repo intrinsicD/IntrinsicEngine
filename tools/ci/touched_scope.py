@@ -48,7 +48,10 @@ CI_TOOL_REGRESSION_SCRIPTS: dict[str, tuple[str, ...]] = {
         "Test.CcacheWorkflow.py",
     ),
     "check_prerequisites.py": ("Test_CiPrerequisiteGuards.py",),
-    "check_workflow_names.py": ("Test.WorkflowConcurrency.py",),
+    "check_workflow_names.py": (
+        "Test.WorkflowConcurrency.py",
+        "Test.WorkflowRouting.py",
+    ),
     "compare_source_coverage.py": ("Test.SourceCoverage.py",),
     "cpu_test_selection.py": (
         "Test.CpuTestSelection.py",
@@ -692,7 +695,10 @@ def analyze_change_records(
         elif path.startswith("tests/regression/tooling/") and path.endswith(".py"):
             if path == "tests/regression/tooling/Test.CheckLayering.py":
                 structural.add("layering_regression_tests")
-            elif path == "tests/regression/tooling/Test.WorkflowConcurrency.py":
+            elif path in {
+                "tests/regression/tooling/Test.WorkflowConcurrency.py",
+                "tests/regression/tooling/Test.WorkflowRouting.py",
+            }:
                 structural.add("workflow_regression_tests")
             else:
                 structural.add(f"tooling_test:{PurePosixPath(path).name}")
@@ -935,6 +941,7 @@ def structural_commands(root_arg: str, checks: Sequence[str]) -> list[Command]:
     if "workflow_regression_tests" in selected:
         for script in (
             "Test.WorkflowConcurrency.py",
+            "Test.WorkflowRouting.py",
             "Test.CcacheWorkflow.py",
             "Test.CiTiming.py",
         ):

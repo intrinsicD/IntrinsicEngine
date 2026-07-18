@@ -18,12 +18,16 @@ SANITIZER_GROUP = (
     "${{ github.workflow }}-sanitizers-"
     "${{ github.event.pull_request.number || github.ref }}"
 )
+CANDIDATE_CANCELLATION = (
+    "${{ github.event_name == 'pull_request' || "
+    "github.event_name == 'merge_group' }}"
+)
 WORKFLOWS = {
     "pr-fast.yml": ("ci-gate-timing-pr-fast", 1, True),
     "ci-linux-clang.yml": (
         "ci-gate-timing-ci-linux-clang",
         1,
-        "${{ github.event_name == 'pull_request' }}",
+        CANDIDATE_CANCELLATION,
     ),
     "ci-sanitizers.yml": (
         "ci-gate-timing-ci-sanitizers-${{ matrix.sanitizer.name }}",
@@ -693,10 +697,12 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         self.assertEqual(
             " ".join(full_job["if"].split()),
             (
-                "github.event_name != 'workflow_dispatch' || "
+                "(github.event_name != 'workflow_dispatch' || "
                 "(!inputs.collect_test_timing && "
                 "!inputs.collect_grouped_ctest_evidence && "
-                "!inputs.collect_compile_hotspot_evidence)"
+                "!inputs.collect_compile_hotspot_evidence)) && "
+                "(github.event_name != 'pull_request' || "
+                "!github.event.pull_request.draft)"
             ),
         )
 

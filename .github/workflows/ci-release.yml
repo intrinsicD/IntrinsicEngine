@@ -15,10 +15,10 @@ permissions:
   contents: read
 
 jobs:
-  route-release:
+  release_route:
     runs-on: ubuntu-24.04
     outputs:
-      needs-release: ${{ steps.route.outputs.needs_cpp }}
+      needs_release: ${{ steps.route.outputs.needs_cpp }}
 
     steps:
       - name: Checkout
@@ -57,15 +57,15 @@ jobs:
           path: build/ci-release/ci-routing/
           if-no-files-found: error
 
-  optimized-release:
+  optimized_release:
     name: optimized-release
-    needs: route-release
+    needs: release_route
     if: >-
       (github.event_name != 'pull_request' ||
       !github.event.pull_request.draft)
       &&
       (github.event_name == 'workflow_dispatch' ||
-      needs.route-release.outputs.needs-release == 'true')
+      needs.release_route.outputs.needs_release == 'true')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
@@ -189,12 +189,12 @@ jobs:
             build/ci-release/ci-timing/result/result.json
           if-no-files-found: error
 
-  required-ci-release:
+  required_ci_release:
     name: ci-release
     if: always()
     needs:
-      - route-release
-      - optimized-release
+      - release_route
+      - optimized_release
     runs-on: ubuntu-24.04
 
     steps:
@@ -202,9 +202,9 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           PR_DRAFT: ${{ github.event.pull_request.draft || false }}
-          NEEDS_RELEASE: ${{ needs.route-release.outputs.needs-release }}
-          ROUTE_RESULT: ${{ needs.route-release.result }}
-          RELEASE_RESULT: ${{ needs.optimized-release.result }}
+          NEEDS_RELEASE: ${{ needs.release_route.outputs.needs_release }}
+          ROUTE_RESULT: ${{ needs.release_route.result }}
+          RELEASE_RESULT: ${{ needs.optimized_release.result }}
         run: |
           if [[ "$ROUTE_RESULT" != "success" ]]; then
             echo "::error::Release routing failed with result $ROUTE_RESULT"

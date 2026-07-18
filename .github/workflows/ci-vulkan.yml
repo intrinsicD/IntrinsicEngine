@@ -2,6 +2,9 @@ name: ci-vulkan
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 concurrency:
@@ -10,6 +13,10 @@ concurrency:
 
 jobs:
   ci-vulkan:
+    name: vulkan-tests
+    if: >-
+      github.event_name != 'pull_request' ||
+      !github.event.pull_request.draft
     runs-on: ubuntu-24.04
     env:
       VULKAN_READBACK_TEST: GpuReadbackJobGpuSmoke.VulkanTransferReadbackWritesPropertyAndFollowUpUploadsDerivedColor
@@ -216,3 +223,25 @@ jobs:
             build/ci-vulkan/ci-timing/result/result.json
             build/ci-vulkan/ci-timing/result/operational-vulkan.junit.xml
           if-no-files-found: error
+
+  required-ci-vulkan:
+    name: ci-vulkan
+    if: always()
+    needs: ci-vulkan
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Resolve ci-vulkan lifecycle result
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_DRAFT: ${{ github.event.pull_request.draft || false }}
+          VULKAN_RESULT: ${{ needs['ci-vulkan'].result }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request" && "$PR_DRAFT" == "true" ]]; then
+            echo "Vulkan confidence skipped for draft pull request"
+            exit 0
+          fi
+          if [[ "$VULKAN_RESULT" != "success" ]]; then
+            echo "::error::Vulkan confidence failed with result $VULKAN_RESULT"
+            exit 1
+          fi

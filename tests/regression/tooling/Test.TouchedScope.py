@@ -196,6 +196,7 @@ class TouchedScopeTests(unittest.TestCase):
         commands = touched_scope.structural_commands(".", route["structural_checks"])
         text = "\n".join(command.shell_text() for command in commands)
         self.assertIn("Test.WorkflowConcurrency.py", text)
+        self.assertIn("Test.WorkflowRouting.py", text)
         self.assertIn("Test.CcacheWorkflow.py", text)
         self.assertIn("Test.CiTiming.py", text)
         self.assertIn("check_workflow_names.py", text)

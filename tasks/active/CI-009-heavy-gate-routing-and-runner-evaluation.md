@@ -48,6 +48,16 @@ depends_on:
 - Candidate lifecycle points are PR synchronize/open, ready-for-review,
   `merge_group`, and default-branch push. Required checks must report a terminal
   success/failure/skipped-via-success status for every applicable event.
+- Intake on 2026-07-18 found no repository branch-protection rule, ruleset,
+  merge queue, auto-merge policy, or repository runner registration to mutate.
+  The repository patch therefore defines candidate stable check names and
+  lifecycle behavior only; enabling external protection remains an explicit
+  owner decision.
+- Right-sizing: use workflow-local result jobs plus the existing
+  `touched_scope.py` `needs_cpp` verdict for Release benchmark/SLO routing.
+  Do not introduce a second dispatcher or a benchmark-specific path classifier.
+  Reconsider that decision only if an independently required gate needs a
+  different path vocabulary.
 
 ## Slice plan
 - Slice A — inventory required checks and implement always-reporting lifecycle

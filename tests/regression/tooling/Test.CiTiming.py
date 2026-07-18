@@ -387,7 +387,7 @@ class CiTimingTests(unittest.TestCase):
         workflow = yaml.safe_load(BENCHMARK_WORKFLOW.read_text(encoding="utf-8"))
         triggers = workflow.get("on", workflow.get(True, {}))
         self.assertIn("pull_request", triggers)
-        job = workflow["jobs"]["optimized-release"]
+        job = workflow["jobs"]["optimized_release"]
         self.assertEqual(job["timeout-minutes"], 30)
         steps = job["steps"]
         named_steps = {step.get("name"): step for step in steps}

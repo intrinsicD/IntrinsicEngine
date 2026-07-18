@@ -313,7 +313,9 @@ class SanitizerPresetTests(unittest.TestCase):
             "./.github/workflows/ci-sanitizers.yml",
         )
         expected_condition = (
-            "github.event_name == 'pull_request' || "
+            "github.event_name == 'merge_group' || "
+            "(github.event_name == 'pull_request' && "
+            "!github.event.pull_request.draft) || "
             "(github.event_name == 'workflow_dispatch' && "
             "inputs.run_sanitizers && !inputs.collect_test_timing && "
             "!inputs.collect_grouped_ctest_evidence)"
@@ -372,7 +374,7 @@ class SanitizerPresetTests(unittest.TestCase):
 
     def test_live_workflows_report_explicit_sanitizer_identity(self) -> None:
         expected = {
-            "ci-release.yml": ("optimized-release", "none"),
+            "ci-release.yml": ("optimized_release", "none"),
             "ci-source-coverage.yml": ("cpu-source-coverage", "none"),
             "ci-vulkan.yml": ("ci-vulkan", "asan-ubsan"),
         }

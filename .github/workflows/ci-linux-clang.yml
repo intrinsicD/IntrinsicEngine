@@ -1,9 +1,10 @@
 name: ci-linux-clang
 
 on:
-  push:
-    branches: ["main"]
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
     inputs:
       run_sanitizers:
@@ -29,7 +30,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
 
 jobs:
   reject-conflicting-evidence-inputs:
@@ -49,11 +50,15 @@ jobs:
           exit 1
 
   ci-linux-clang:
+    name: full-cpu
     if: >-
-      github.event_name != 'workflow_dispatch' ||
+      (github.event_name != 'workflow_dispatch' ||
       (!inputs.collect_test_timing &&
       !inputs.collect_grouped_ctest_evidence &&
-      !inputs.collect_compile_hotspot_evidence)
+      !inputs.collect_compile_hotspot_evidence))
+      &&
+      (github.event_name != 'pull_request' ||
+      !github.event.pull_request.draft)
     runs-on: ubuntu-24.04
 
     steps:
@@ -593,7 +598,9 @@ jobs:
 
   sanitizer-tests:
     if: >-
-      github.event_name == 'pull_request' ||
+      github.event_name == 'merge_group' ||
+      (github.event_name == 'pull_request' &&
+      !github.event.pull_request.draft) ||
       (github.event_name == 'workflow_dispatch' &&
       inputs.run_sanitizers &&
       !inputs.collect_test_timing &&
@@ -603,7 +610,9 @@ jobs:
 
   cpu-test-selection-parity:
     if: >-
-      github.event_name == 'pull_request' ||
+      github.event_name == 'merge_group' ||
+      (github.event_name == 'pull_request' &&
+      !github.event.pull_request.draft) ||
       (github.event_name == 'workflow_dispatch' &&
       inputs.run_sanitizers &&
       !inputs.collect_test_timing &&
@@ -653,3 +662,35 @@ jobs:
           name: ci-cpu-test-selection-parity
           path: build/cpu-test-selection/parity.json
           if-no-files-found: error
+
+  required-ci-linux-clang:
+    name: ci-linux-clang
+    if: >-
+      always() &&
+      (github.event_name == 'pull_request' ||
+      github.event_name == 'merge_group')
+    needs:
+      - ci-linux-clang
+      - sanitizer-tests
+      - cpu-test-selection-parity
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Resolve ci-linux-clang lifecycle result
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_DRAFT: ${{ github.event.pull_request.draft || false }}
+          CPU_RESULT: ${{ needs['ci-linux-clang'].result }}
+          SANITIZER_RESULT: ${{ needs['sanitizer-tests'].result }}
+          PARITY_RESULT: ${{ needs['cpu-test-selection-parity'].result }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request" && "$PR_DRAFT" == "true" ]]; then
+            echo "Full CPU and sanitizer confidence skipped for draft pull request"
+            exit 0
+          fi
+          for result in "$CPU_RESULT" "$SANITIZER_RESULT" "$PARITY_RESULT"; do
+            if [[ "$result" != "success" ]]; then
+              echo "::error::CPU/sanitizer confidence resolved as $result"
+              exit 1
+            fi
+          done
