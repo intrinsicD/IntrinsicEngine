@@ -15,7 +15,8 @@ map.
 
 ## Tasks
 
-- [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
+- [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](../../active/CI-009-heavy-gate-routing-and-runner-evaluation.md)
+  (currently active).
 - [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](PROC-025-port-research-ideation-skill-to-other-repos.md)
   (portable playbook; run from a session scoped to the target repo).
 
@@ -37,7 +38,7 @@ retirement log.
   `CI-008` now groups five audited pure producers, retains local individual
   discovery, and fixes the required full-CPU worker budget at four.
   Retired `BUILD-004` independently repairs compile-hotspot evidence and
-  unblocks `RUNTIME-166` and `CI-009`. `CI-009` now evaluates
+  unblocks `RUNTIME-166`. Active `CI-009` now evaluates
   lifecycle/runner changes after the software duplication and evidence defects
   have been removed.
 - Compile-hotspot analyzer ownership is retired `BUILD-004`; source

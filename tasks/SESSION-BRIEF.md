@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `CI-009` — Route heavy gates by lifecycle and evaluate runner scaling (tasks/active/CI-009-heavy-gate-routing-and-runner-evaluation.md)
 
 ## Theme B — Rendering modernization
 
@@ -60,7 +60,6 @@ the authoritative open/unblocked view.
 
 ## Theme H — Agentic workflow hardening
 
-- unblocked: `CI-009` — Route heavy gates by lifecycle and evaluate runner scaling (tasks/backlog/process/CI-009-heavy-gate-routing-and-runner-evaluation.md)
 - unblocked: `PROC-025` — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality (tasks/backlog/process/PROC-025-port-research-ideation-skill-to-other-repos.md)
 
 ## Theme I — Research method implementation

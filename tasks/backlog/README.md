@@ -368,7 +368,7 @@ cases; and retired `CI-008` groups five audited pure producers, preserves local
 individual discovery, and retains the fastest absolute grouped full-CPU plan
 at four CTest workers. Retired `BUILD-004` supplies source-complete,
 normalized compile-hotspot evidence and unblocks both `RUNTIME-166` and
-`CI-009`. Heavy-gate lifecycle and larger-runner decisions can now use
+active `CI-009`. Heavy-gate lifecycle and larger-runner decisions now use
 corrected post-optimization evidence rather than masking avoidable cold-build
 work with hardware.
 

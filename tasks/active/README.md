@@ -11,7 +11,9 @@ Each active task should include:
 
 ## Currently active
 
-None.
+- [`CI-009`](CI-009-heavy-gate-routing-and-runner-evaluation.md) — route heavy
+  confidence gates by candidate lifecycle, add an optimized Release lane, and
+  make a measured runner-scaling decision.
 
 ## History
 

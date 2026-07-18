@@ -27,6 +27,10 @@ depends_on:
 - No runner purchase/plan change without measured cost and queue data.
 
 ## Context
+- Active on 2026-07-18; owner: Codex; branch: `main`. Next verification:
+  integrate the independently reviewed lifecycle-routing commits, run the
+  focused workflow regressions, then collect five sequential hosted
+  `ci-release` samples at one unchanged SHA.
 - Owner: GitHub Actions trigger topology, required-check contracts, benchmark
   routing, and runner policy.
 - `CI-003` observed independent cold compile-heavy jobs on every PR update:
