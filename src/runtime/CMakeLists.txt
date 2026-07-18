@@ -89,6 +89,9 @@ target_sources(${target_name}
         SpatialDebug/Runtime.SpatialDebugClosestFace.cppm
         Visualization/Runtime.VisualizationAdapters.cppm
         PRIVATE
+        FILE_SET render_extraction_impl TYPE CXX_MODULES FILES
+        Runtime.RenderExtraction.Internal.cpp
+        PRIVATE
         Runtime.AsyncWorkService.cpp
         Runtime.AsyncBufferReadback.cpp
         Runtime.AssetImportPipeline.cpp
@@ -160,6 +163,8 @@ target_sources(${target_name}
         Runtime.ReferenceScene.cpp
         Runtime.ReferenceSceneControl.cpp
         Runtime.RenderExtraction.cpp
+        Runtime.RenderExtraction.Adapters.cpp
+        Runtime.RenderExtraction.Geometry.cpp
         Runtime.RenderExtractionService.cpp
         Runtime.RenderWorldPool.cpp
         Runtime.SelectionReadback.cpp

@@ -312,6 +312,37 @@ TEST(PointCloudGeometryExtraction, EntityDestructionRetiresPointCloudGeometryAft
     engine.Shutdown();
 }
 
+TEST(PointCloudGeometryExtraction, CacheDestructionToleratesPendingDeferredRetireState)
+{
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    const EntityHandle entity = MakePointCloudRenderable(scene);
+    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
+
+    {
+        Extrinsic::Runtime::RenderExtractionCache extraction;
+        auto stats = extraction.ExtractAndSubmit(scene,
+                                                 engine.GetRenderer(),
+                                                 &engine.GetGpuAssetCache());
+        ASSERT_EQ(stats.PointCloudGeometryUploads, 1u);
+
+        scene.Destroy(entity);
+        stats = extraction.ExtractAndSubmit(scene,
+                                            engine.GetRenderer(),
+                                            &engine.GetGpuAssetCache());
+        ASSERT_EQ(stats.PointCloudGeometryReleases, 1u);
+        ASSERT_EQ(gpuWorld.GetLiveInstanceCount(), 0u);
+        ASSERT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+    }
+
+    // Destruction safely drops the cache-owned retire record. Explicit
+    // Shutdown remains the contract that releases renderer-owned residency.
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+    engine.Shutdown();
+}
+
 TEST(PointCloudGeometryExtraction, ShutdownReleasesPendingPointCloudResidency)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
