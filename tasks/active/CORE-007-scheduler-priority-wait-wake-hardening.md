@@ -71,9 +71,6 @@ maturity_target: CPUContracted
   candidate improves it without weakening scheduler-instance token
   validation. Per-execution callbacks and ready-list scratch move to
   `CORE-008`, where retained execution state is owned.
-- Next verification step: implement priority lanes, the conditional worker
-  wake handshake, and evidence-admitted wait-registry sharding; run the exact
-  same optimized benchmark for comparison.
 - Baseline captured with the harness-only commit `0001f37c` in optimized
   `ci-release`; the measured scheduler/TaskGraph sources are byte-identical to
   `59fbb84a`. Dispatch median was 2.159489 ms for 8,192 tasks
@@ -84,41 +81,77 @@ maturity_target: CPUContracted
   threads reached only 3,402,629 aggregate pairs/s (1.3289% scaling
   efficiency). Sharding must show a material matched-run improvement without
   regressing scheduler-instance or generation validation.
+- Production commits `491aac49` and `54a397e8` add fixed scheduler lanes,
+  end-to-end TaskGraph priority, a sequentially consistent conditional-wake
+  handshake, candidate telemetry, and 16 wait-token shards. The later commit
+  keeps `Normal` dispatch off the lane-count RMW path and rotates shard
+  selection thread-locally after a globally dispersed per-instance start.
+- Three sequential final captures at production revision `54a397e8` all
+  passed. Their middle values were 1.606879 ms / 5,098,081 tasks/s for
+  dispatch, zero priority error, 31,267,176 single-thread wait-token pairs/s,
+  and 24,688,809 eight-thread aggregate pairs/s (9.8701% efficiency). Against
+  the checked-in baseline, contended registry throughput improved 7.2558x
+  while the single-thread result changed by -2.3069%. See
+  `benchmarks/reports/core_scheduler_hardening_CORE-007.md`.
+- Wake evidence is deliberately split: the baseline public stats cannot expose
+  notification count, while candidate contracts prove active-worker
+  suppression, already-parked notification, and bounded dispatch-vs-park race
+  progress. Review-hardening commit `51fa3ea3` also proves all 16 encoded
+  shards recycle with generation rejection and dependent TaskGraph successors
+  retain priority in worker-local lanes.
+- The spin-locked local deque remains. The optimized Release scheduler SLO
+  completed all 69,000 expected steals with local-fanout p95 3.347 ms and
+  signal-to-resume p99 0.372 ms against 16.667 ms budgets. Queue-contention
+  telemetry is nonzero, but there is no matched evidence that a Chase-Lev
+  rewrite is required or beneficial.
+- Focused verification: all 47
+  `CoreTasks.*:CoreTaskGraphCompletionLifetime.*` cases passed; the three
+  review-added race/shard/worker-local cases passed 50 consecutive
+  repetitions. Full CPU and sanitizer gates remain before retirement.
 
 ## Required changes
-- [ ] Add a small fixed set of priority lanes to external dispatch (e.g.
+- [x] Add a small fixed set of priority lanes to external dispatch (e.g.
       High/Normal/Low inject queues, higher lanes drained first); thread
       `TaskGraphPassOptions::Priority` through worker-eligible pass dispatch.
-- [ ] Track parked-worker count; skip `notify_one` when nobody is parked;
+- [x] Track parked-worker count; skip `notify_one` when nobody is parked;
       retain and document the separate per-unlock `SpinLock` notification
       because the lock itself parks with `atomic::wait`.
-- [ ] Measure the wait-token registry in isolation; either shard it with
+- [x] Measure the wait-token registry in isolation; either shard it with
       scheduler-instance validation intact and record a material win, or
       explicitly drop the change with the measured result.
-- [ ] Add a `ci-release` smoke benchmark (dispatch throughput, priority
-      inversion, active-worker wake count, and an isolated wait-registry
-      contention probe) so before/after claims carry numbers; keep PR-fast
-      coverage deterministic and contract-based.
+- [x] Add a `ci-release` matched smoke benchmark for dispatch throughput,
+      priority inversion, and isolated wait-registry contention. Record the
+      baseline-unavailable wake diagnostic and use deterministic candidate
+      contracts for active-worker notification suppression; keep PR-fast
+      coverage contract-based.
 
 ## Tests
-- [ ] Contract: under a saturated pool, High-priority dispatches complete
+- [x] Contract: under a saturated pool, High-priority dispatches complete
       before queued Low-priority ones (statistical, non-flaky formulation).
-- [ ] Regression: repeated empty-scan-to-park handshakes cannot miss a
+- [x] Regression: repeated empty-scan-to-park handshakes cannot miss a
       dispatch, and active workers do not emit worker-wake notifications.
-- [ ] Regression: a single worker retains owned local progress after its
-      fairness probe; TaskGraph priorities reach the scheduler lanes.
+- [x] Regression: a single worker retains owned local progress after its
+      fairness probe; initially ready and dependent TaskGraph priorities reach
+      external and worker-local scheduler lanes.
 - [ ] Existing `CoreTasks.*`/`CoreTaskGraph.*` suites green; BUG-046
       ordering and all `CORE-005` late-enqueue/progress-wait regressions stay
       green.
 
 ## Docs
-- [ ] Update `src/core/README.md` scheduler notes (lanes, wake policy,
+- [x] Update `src/core/README.md` scheduler notes (lanes, wake policy,
       waiter stealing).
+- [x] Update `docs/architecture/task-graphs.md` with priority, definitive
+      completion-help, worker-wake, spinlock-notify, and wait-shard contracts.
+- [x] Add the matched benchmark report and report index entry.
+- [x] Correct the exact multi-worker processor-reservation totals in
+      `tests/README.md`.
+- [x] Regenerate the public module inventory; it remains byte-identical at
+      386 modules because no module was added or removed.
 
 ## Acceptance criteria
-- [ ] Priority observable end-to-end from `TaskGraphPassOptions` to worker
+- [x] Priority observable end-to-end from `TaskGraphPassOptions` to worker
       execution order under contention.
-- [ ] Benchmark evidence recorded in this file for each landed change
+- [x] Benchmark evidence recorded in this file for each landed change
       (or an explicit "no measurable win, dropped" note per item).
 - [ ] Default CPU gate green.
 

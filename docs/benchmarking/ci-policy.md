@@ -189,7 +189,7 @@ The complete result and route artifacts are content-addressed independently:
 | 4 / `29634185888` | `8426575498`, `sha256:616543b158b6730ad6e96f2a8d94c40fae683749e1e9d8bb546630a813cf7592` | `8426496746`, `sha256:1d68c648d0efca3dbc0355755e7517d16e2df0b6a4a75bb2cd9ed3c6ef8ea0d6` |
 | 5 / `29634432796` | `8426671863`, `sha256:732b6ad54ac0d7aebde4f2ed3491e17f32d45e9ea6ed0647266647e01579431c` | `8426586476`, `sha256:5a6a4e975c40554f7a562b346d5ff58e21ffb189bae6a9aa667e58616d323944` |
 
-Every optimized job, stable `ci-release` wrapper, strict 23-result benchmark
+Every optimized job, stable `ci-release` wrapper, strict 22-result benchmark
 validation, timing-result validation, and artifact upload passed. Sample 1
 completed at 06:14:02 UTC before sample 2 was dispatched at 06:15:51; the
 later completion-to-dispatch gaps were 86, 59, and 47 seconds. The API reports

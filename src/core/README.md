@@ -60,6 +60,10 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
   - Pass options (`TaskGraphPassOptions` / `FrameGraphPassOptions`) provide
     `Priority`, `EstimatedCost`, `MainThreadOnly`, `AllowParallel`, and
     `DebugCategory`.
+    Worker-pass dispatch maps `Critical` and `High` to the scheduler's `High`
+    preference lane, `Normal` to `Normal`, and `Low` and `Background` to
+    `Low`. These lanes express preference rather than realtime scheduling or
+    starvation guarantees.
   - `Submit()` returns a copyable `TaskGraphCompletion`; `IsReady()` is a
     thread-safe poll, while `PumpMainThreadPasses()` and `Wait()` are restricted
     to the submitting thread and return `ThreadViolation` elsewhere. Retain a
@@ -136,6 +140,41 @@ but it exports the domain-free `TaskPlanGraph` API.
 - `Extrinsic.Core.Tasks.CounterEvent`
 - `Extrinsic.Core.Tasks.Internal`
 - `Extrinsic.Core.Tasks.LocalTask`
+
+`Scheduler::Dispatch()` uses three fixed, domain-neutral preference lanes:
+`High`, `Normal`, and `Low`. Workers scan them in that order. Each worker owns
+one local deque per lane, and external dispatch uses one inject queue per lane.
+The common `Normal` inject queue retains its 65,536-task lock-free capacity;
+the additional `High` and `Low` queues are bounded at 8,192 tasks each. Every
+lane has a mutex-protected overflow deque, so exhausting the bounded lock-free
+queue does not drop accepted work. Priority is deliberately preferential, not
+a realtime or starvation-free contract.
+
+Ordinary worker scans use advisory queued counts for `High` and `Low`, always
+inspect the common `Normal` lane, and opportunistically skip a contended victim
+deque. `WaitForAll()` and `TryRunOne()` are different because an empty result
+may be followed by a park: their high-to-low scans ignore the advisory counts
+and wait through each short worker-deque critical section before declaring the
+scheduler empty. Those external-help paths retain the
+scheduler-instance-qualified work-progress epoch introduced by `CORE-005`;
+queue publication and task retirement advance the epoch so a helper cannot
+miss late work between its scan and park.
+
+Dispatch advances the worker signal with sequentially consistent ordering and
+calls `notify_one()` only when the sequentially consistent parked-worker count
+is nonzero. A worker publishes itself in that count before rechecking the
+signal, so either it observes the dispatch before sleeping or the dispatcher
+observes the parked worker and wakes it. Shutdown remains the unconditional
+`notify_all()` case. The queue `SpinLock` has a separate, load-bearing
+`notify_one()` in `unlock()`: its bounded slow path uses `atomic::wait`, so that
+notification must not be removed as redundant scheduler wake traffic.
+
+Coroutine wait-token storage is split across 16 mutex-protected registry
+shards. Each thread receives a globally dispersed initial shard for a scheduler
+instance, then rotates locally through all shards. `WaitToken::Slot` encodes
+the shard together with its shard-local slot. Token validation still requires
+both the slot generation and `SchedulerInstance`, preserving stale-token and
+scheduler-replacement fail-closed behavior.
 
 `CounterEvent` shared-owns its count and scheduler wait token internally.
 `Signal()` retains that state while it publishes and notifies each count
