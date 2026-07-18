@@ -634,6 +634,20 @@ class WorkflowConcurrencyTests(unittest.TestCase):
                 "type": "boolean",
             },
         )
+        compile_input = triggers["workflow_dispatch"]["inputs"][
+            "collect_compile_hotspot_evidence"
+        ]
+        self.assertEqual(
+            compile_input,
+            {
+                "description": (
+                    "Collect five clean BUILD-004 compile-hotspot samples"
+                ),
+                "required": False,
+                "default": False,
+                "type": "boolean",
+            },
+        )
 
         jobs = payload["jobs"]
         conflict = jobs["reject-conflicting-evidence-inputs"]
@@ -641,8 +655,12 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             " ".join(conflict["if"].split()),
             (
                 "github.event_name == 'workflow_dispatch' && "
-                "inputs.collect_test_timing && "
-                "inputs.collect_grouped_ctest_evidence"
+                "((inputs.collect_test_timing && "
+                "inputs.collect_grouped_ctest_evidence) || "
+                "(inputs.collect_test_timing && "
+                "inputs.collect_compile_hotspot_evidence) || "
+                "(inputs.collect_grouped_ctest_evidence && "
+                "inputs.collect_compile_hotspot_evidence))"
             ),
         )
         self.assertEqual(conflict["runs-on"], "ubuntu-24.04")
@@ -657,7 +675,8 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             (
                 "github.event_name != 'workflow_dispatch' || "
                 "(!inputs.collect_test_timing && "
-                "!inputs.collect_grouped_ctest_evidence)"
+                "!inputs.collect_grouped_ctest_evidence && "
+                "!inputs.collect_compile_hotspot_evidence)"
             ),
         )
 
@@ -667,7 +686,8 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             (
                 "github.event_name == 'workflow_dispatch' && "
                 "inputs.collect_test_timing && "
-                "!inputs.collect_grouped_ctest_evidence"
+                "!inputs.collect_grouped_ctest_evidence && "
+                "!inputs.collect_compile_hotspot_evidence"
             ),
         )
         self.assertFalse(profile["strategy"]["fail-fast"])
@@ -742,6 +762,10 @@ class WorkflowConcurrencyTests(unittest.TestCase):
                     "!inputs.collect_grouped_ctest_evidence",
                     condition,
                 )
+                self.assertIn(
+                    "!inputs.collect_compile_hotspot_evidence",
+                    condition,
+                )
 
     def test_grouped_ctest_evidence_is_single_runner_and_minimal(self) -> None:
         payload, _ = _load_workflow("ci-linux-clang.yml")
@@ -751,7 +775,8 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             (
                 "github.event_name == 'workflow_dispatch' && "
                 "inputs.collect_grouped_ctest_evidence && "
-                "!inputs.collect_test_timing"
+                "!inputs.collect_test_timing && "
+                "!inputs.collect_compile_hotspot_evidence"
             ),
         )
         self.assertEqual(job["runs-on"], "ubuntu-24.04")
@@ -837,6 +862,83 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             upload["with"]["name"],
             "ci008-grouped-ctest-evidence",
         )
+
+    def test_compile_hotspot_evidence_is_five_clean_build_only_samples(
+        self,
+    ) -> None:
+        payload, _ = _load_workflow("ci-linux-clang.yml")
+        job = payload["jobs"]["compile-hotspot-evidence"]
+        self.assertEqual(
+            " ".join(job["if"].split()),
+            (
+                "github.event_name == 'workflow_dispatch' && "
+                "inputs.collect_compile_hotspot_evidence && "
+                "!inputs.collect_test_timing && "
+                "!inputs.collect_grouped_ctest_evidence"
+            ),
+        )
+        self.assertEqual(job["runs-on"], "ubuntu-24.04")
+        self.assertFalse(job["strategy"]["fail-fast"])
+        self.assertEqual(
+            job["strategy"]["matrix"]["sample"],
+            [1, 2, 3, 4, 5],
+        )
+
+        steps = {step["name"]: step for step in job["steps"]}
+        configure = steps["Configure clean compile-hotspot sample"]["run"]
+        self.assertEqual(
+            configure,
+            "cmake --preset ci --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON",
+        )
+        self.assertEqual(
+            steps["Build required CPU cohort"]["run"],
+            "cmake --build --preset ci --target IntrinsicCpuTests",
+        )
+
+        analyze = steps["Analyze required CPU cohort"]["run"]
+        self.assertIn("tools/analysis/compile_hotspots.py", analyze)
+        self.assertIn(
+            "--json-out build/ci/build004-evidence/cpu.json",
+            analyze,
+        )
+        self.assertNotIn("--baseline-json", analyze)
+
+        source_build = steps["Build source-complete compile graph"]
+        source_assert = steps["Assert source-complete compile graph"]
+        self.assertEqual(source_build["if"], "${{ matrix.sample == 1 }}")
+        self.assertEqual(source_assert["if"], "${{ matrix.sample == 1 }}")
+        self.assertEqual(
+            source_build["run"],
+            "cmake --build --preset ci --target IntrinsicTests",
+        )
+        self.assertNotIn("IntrinsicBenchmarks", source_build["run"])
+        self.assertIn(
+            "--json-out build/ci/build004-evidence/source-complete.json",
+            source_assert["run"],
+        )
+        self.assertIn(
+            'expected = {"src", "tests", "methods", "benchmarks"}',
+            source_assert["run"],
+        )
+        self.assertIn('"present_in_configured_graph"', source_assert["run"])
+        self.assertIn('"present_in_sampled_build"', source_assert["run"])
+
+        all_commands = "\n".join(
+            str(step.get("run", "")) for step in job["steps"]
+        )
+        self.assertNotRegex(all_commands, r"(?m)^\s*ctest(?:\s|$)")
+        self.assertNotIn("tools/ci/collect_test_timing.py", all_commands)
+        upload = steps["Upload compile-hotspot evidence"]
+        self.assertEqual(upload["if"], "always()")
+        self.assertEqual(
+            upload["with"]["name"],
+            "build004-compile-hotspot-evidence-sample-${{ matrix.sample }}",
+        )
+        self.assertEqual(
+            upload["with"]["path"],
+            "build/ci/build004-evidence/",
+        )
+        self.assertEqual(upload["with"]["if-no-files-found"], "error")
 
     def test_nightly_partitions_fast_slow_slo_and_benchmark_owners(self) -> None:
         payload, _ = _load_workflow("nightly-deep.yml")

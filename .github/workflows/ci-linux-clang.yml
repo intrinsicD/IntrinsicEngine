@@ -21,6 +21,11 @@ on:
         required: false
         default: false
         type: boolean
+      collect_compile_hotspot_evidence:
+        description: Collect five clean BUILD-004 compile-hotspot samples
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -30,20 +35,25 @@ jobs:
   reject-conflicting-evidence-inputs:
     if: >-
       github.event_name == 'workflow_dispatch' &&
-      inputs.collect_test_timing &&
-      inputs.collect_grouped_ctest_evidence
+      ((inputs.collect_test_timing &&
+      inputs.collect_grouped_ctest_evidence) ||
+      (inputs.collect_test_timing &&
+      inputs.collect_compile_hotspot_evidence) ||
+      (inputs.collect_grouped_ctest_evidence &&
+      inputs.collect_compile_hotspot_evidence))
     runs-on: ubuntu-24.04
     steps:
       - name: Reject conflicting evidence modes
         run: |
-          echo "::error::collect_test_timing and collect_grouped_ctest_evidence are mutually exclusive"
+          echo "::error::collect_test_timing, collect_grouped_ctest_evidence, and collect_compile_hotspot_evidence are mutually exclusive"
           exit 1
 
   ci-linux-clang:
     if: >-
       github.event_name != 'workflow_dispatch' ||
       (!inputs.collect_test_timing &&
-      !inputs.collect_grouped_ctest_evidence)
+      !inputs.collect_grouped_ctest_evidence &&
+      !inputs.collect_compile_hotspot_evidence)
     runs-on: ubuntu-24.04
 
     steps:
@@ -220,7 +230,8 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' &&
       inputs.collect_test_timing &&
-      !inputs.collect_grouped_ctest_evidence
+      !inputs.collect_grouped_ctest_evidence &&
+      !inputs.collect_compile_hotspot_evidence
     name: test-timing-profile (${{ matrix.cohort.name }})
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -317,7 +328,8 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' &&
       inputs.collect_grouped_ctest_evidence &&
-      !inputs.collect_test_timing
+      !inputs.collect_test_timing &&
+      !inputs.collect_compile_hotspot_evidence
     name: grouped-ctest-evidence
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -463,13 +475,130 @@ jobs:
           path: build/ci008-grouped-evidence/
           if-no-files-found: warn
 
+  compile-hotspot-evidence:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.collect_compile_hotspot_evidence &&
+      !inputs.collect_test_timing &&
+      !inputs.collect_grouped_ctest_evidence
+    name: compile-hotspot-evidence (sample ${{ matrix.sample }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        sample: [1, 2, 3, 4, 5]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            clang-20 \
+            clang-tools-20 \
+            python3 \
+            libx11-dev \
+            libxcursor-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxi-dev \
+            libxext-dev \
+            libxfixes-dev \
+            libwayland-dev \
+            libxkbcommon-dev \
+            libgl1-mesa-dev \
+            libvulkan-dev \
+            vulkan-tools \
+            spirv-tools
+
+      - name: Cache vcpkg binary packages
+        uses: actions/cache@v4
+        with:
+          path: external/vcpkg-bincache
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'tools/vcpkg/**', 'tools/setup/bootstrap_vcpkg.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-
+
+      - name: Bootstrap vcpkg
+        run: tools/setup/bootstrap_vcpkg.sh
+
+      - name: Enable vcpkg binary cache
+        run: echo "VCPKG_BINARY_SOURCES=clear;files,${GITHUB_WORKSPACE}/external/vcpkg-bincache,readwrite" >> "$GITHUB_ENV"
+
+      - name: Configure clean compile-hotspot sample
+        run: cmake --preset ci --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON
+
+      - name: Build required CPU cohort
+        run: cmake --build --preset ci --target IntrinsicCpuTests
+
+      - name: Analyze required CPU cohort
+        run: |
+          python3 tools/analysis/compile_hotspots.py \
+            --build-dir build/ci \
+            --top 40 \
+            --json-out build/ci/build004-evidence/cpu.json
+
+      - name: Build source-complete compile graph
+        if: ${{ matrix.sample == 1 }}
+        run: cmake --build --preset ci --target IntrinsicTests
+
+      - name: Assert source-complete compile graph
+        if: ${{ matrix.sample == 1 }}
+        run: |
+          python3 tools/analysis/compile_hotspots.py \
+            --build-dir build/ci \
+            --top 40 \
+            --json-out build/ci/build004-evidence/source-complete.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path(
+                  "build/ci/build004-evidence/source-complete.json"
+              ).read_text(encoding="utf-8")
+          )
+          expected = {"src", "tests", "methods", "benchmarks"}
+          roots = {entry["root"]: entry for entry in report["source_roots"]}
+          if set(roots) != expected:
+              raise SystemExit(
+                  f"source root inventory mismatch: expected {sorted(expected)}, "
+                  f"got {sorted(roots)}"
+              )
+          missing = [
+              root
+              for root in sorted(expected)
+              if not roots[root]["present_in_configured_graph"]
+              or not roots[root]["present_in_sampled_build"]
+          ]
+          if missing:
+              raise SystemExit(
+                  "source-complete compile graph omitted roots: "
+                  + ", ".join(missing)
+              )
+          PY
+
+      - name: Upload compile-hotspot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build004-compile-hotspot-evidence-sample-${{ matrix.sample }}
+          path: build/ci/build004-evidence/
+          if-no-files-found: error
+
   sanitizer-tests:
     if: >-
       github.event_name == 'pull_request' ||
       (github.event_name == 'workflow_dispatch' &&
       inputs.run_sanitizers &&
       !inputs.collect_test_timing &&
-      !inputs.collect_grouped_ctest_evidence)
+      !inputs.collect_grouped_ctest_evidence &&
+      !inputs.collect_compile_hotspot_evidence)
     uses: ./.github/workflows/ci-sanitizers.yml
 
   cpu-test-selection-parity:
@@ -478,7 +607,8 @@ jobs:
       (github.event_name == 'workflow_dispatch' &&
       inputs.run_sanitizers &&
       !inputs.collect_test_timing &&
-      !inputs.collect_grouped_ctest_evidence)
+      !inputs.collect_grouped_ctest_evidence &&
+      !inputs.collect_compile_hotspot_evidence)
     needs:
       - ci-linux-clang
       - sanitizer-tests
