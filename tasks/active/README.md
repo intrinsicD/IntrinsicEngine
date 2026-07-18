@@ -11,7 +11,11 @@ Each active task should include:
 
 ## Currently active
 
-None.
+- [`CORE-008`](CORE-008-compiled-taskgraph-plan-reuse.md) — exact
+  registration-replay plan reuse with fixed-step and renderer-prep adoption;
+  owner: Codex; branch: `codex/core-008-compiled-plan-reuse`; next gate:
+  freeze the fallback replay benchmark harness and capture its `ci-release`
+  baseline before implementing reuse.
 
 ## History
 

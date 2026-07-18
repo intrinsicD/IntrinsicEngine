@@ -13,9 +13,9 @@ map.
 Opened from the 2026-07-03 main-loop/task-graph/render-graph review
 ([`docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`](../../../docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md)):
 
-- [`CORE-008`](CORE-008-compiled-taskgraph-plan-reuse.md) — compiled
-  task-graph plan reuse across executions (fixed-step FrameGraph and
-  render-prep adoption).
+- [`CORE-008`](../../active/CORE-008-compiled-taskgraph-plan-reuse.md) is
+  active — exact compiled task-graph registration replay with fixed-step
+  FrameGraph and render-prep adoption.
 - [`CORE-009`](CORE-009-app-owned-config-sections.md) — app-owned config
   sections out of core `EngineConfig` (Progressive Poisson block moves
   behind a generic section mechanism).
