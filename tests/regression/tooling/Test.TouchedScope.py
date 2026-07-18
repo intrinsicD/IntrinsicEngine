@@ -54,9 +54,7 @@ def write_registry(
         smoke = [
             target
             for target, labels in rows
-            if {"graphics", "integration", "runtime"}.issubset(
-                labels.split(",")
-            )
+            if {"graphics", "integration", "runtime"}.issubset(labels.split(","))
             and not set(touched_scope.DEFAULT_EXCLUDE_LABELS).intersection(
                 labels.split(",")
             )
@@ -83,9 +81,7 @@ class TouchedScopeTests(unittest.TestCase):
             ".github/workflows/pr-fast.yml",
         )
         self.assertEqual(
-            touched_scope.normalize_changed_path(
-                "./.github/workflows/pr-fast.yml"
-            ),
+            touched_scope.normalize_changed_path("./.github/workflows/pr-fast.yml"),
             ".github/workflows/pr-fast.yml",
         )
         self.assertEqual(
@@ -99,18 +95,13 @@ class TouchedScopeTests(unittest.TestCase):
 
     def test_nul_name_status_parser_handles_modify_and_rename(self) -> None:
         records = touched_scope.parse_name_status_z(
-            b"M\0src/geometry/Geometry.Mesh.cpp\0"
-            b"R100\0docs/old.md\0docs/new.md\0"
+            b"M\0src/geometry/Geometry.Mesh.cpp\0R100\0docs/old.md\0docs/new.md\0"
         )
         self.assertEqual(
             records,
             [
-                touched_scope.ChangeRecord(
-                    "M", "src/geometry/Geometry.Mesh.cpp"
-                ),
-                touched_scope.ChangeRecord(
-                    "R100", "docs/new.md", "docs/old.md"
-                ),
+                touched_scope.ChangeRecord("M", "src/geometry/Geometry.Mesh.cpp"),
+                touched_scope.ChangeRecord("R100", "docs/new.md", "docs/old.md"),
             ],
         )
         with self.assertRaises(touched_scope.DiffError):
@@ -128,9 +119,7 @@ class TouchedScopeTests(unittest.TestCase):
         self.assertFalse(docs["needs_cpp"])
         self.assertEqual(docs["structural_checks"], ["docs"])
 
-        tasks = touched_scope.analyze_change_records(
-            [record("tasks/active/CI-005.md")]
-        )
+        tasks = touched_scope.analyze_change_records([record("tasks/active/CI-005.md")])
         self.assertEqual(tasks["route"], "structural")
         self.assertFalse(tasks["needs_cpp"])
         self.assertEqual(
@@ -204,9 +193,7 @@ class TouchedScopeTests(unittest.TestCase):
         )
         self.assertEqual(route["route"], "structural")
         self.assertIn("workflow_regression_tests", route["structural_checks"])
-        commands = touched_scope.structural_commands(
-            ".", route["structural_checks"]
-        )
+        commands = touched_scope.structural_commands(".", route["structural_checks"])
         text = "\n".join(command.shell_text() for command in commands)
         self.assertIn("Test.WorkflowConcurrency.py", text)
         self.assertIn("Test.CcacheWorkflow.py", text)
@@ -217,17 +204,13 @@ class TouchedScopeTests(unittest.TestCase):
         route = touched_scope.analyze_change_records(
             [record("tools/repo/check_kernel_convergence.py")]
         )
-        commands = touched_scope.structural_commands(
-            ".", route["structural_checks"]
-        )
+        commands = touched_scope.structural_commands(".", route["structural_checks"])
         text = "\n".join(command.shell_text() for command in commands)
         self.assertIn("Test.CheckKernelConvergence.py", text)
         self.assertIn("check_kernel_convergence.py --root . --strict", text)
 
     def test_ci_tooling_selects_its_owning_regressions(self) -> None:
-        ccache = touched_scope.analyze_change_records(
-            [record("tools/ci/ccache_ci.py")]
-        )
+        ccache = touched_scope.analyze_change_records([record("tools/ci/ccache_ci.py")])
         ccache_text = "\n".join(
             command.shell_text()
             for command in touched_scope.structural_commands(
@@ -319,30 +302,22 @@ class TouchedScopeTests(unittest.TestCase):
             (root / "docs" / "file.md").write_text("base\n", encoding="utf-8")
             subprocess.run(["git", "add", "."], cwd=root, check=True)
             subprocess.run(["git", "commit", "-qm", "base"], cwd=root, check=True)
-            base = (
-                subprocess.run(
-                    ["git", "rev-parse", "HEAD"],
-                    cwd=root,
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                )
-                .stdout.strip()
-            )
-            (root / "docs" / "file.md").write_text(
-                "candidate\n", encoding="utf-8"
-            )
+            base = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            (root / "docs" / "file.md").write_text("candidate\n", encoding="utf-8")
             subprocess.run(["git", "commit", "-qam", "candidate"], cwd=root, check=True)
-            head = (
-                subprocess.run(
-                    ["git", "rev-parse", "HEAD"],
-                    cwd=root,
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                )
-                .stdout.strip()
-            )
+            head = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
             merge_base, records = touched_scope.collect_change_records(
                 root,
                 base,
@@ -603,10 +578,7 @@ class TouchedScopeTests(unittest.TestCase):
             )
             test_batches = touched_scope._test_batches(finalized)
             self.assertEqual(
-                [
-                    batch["producer_targets"]
-                    for batch in test_batches
-                ],
+                [batch["producer_targets"] for batch in test_batches],
                 [
                     [
                         "IntrinsicRuntimeContractTests",
@@ -625,10 +597,7 @@ class TouchedScopeTests(unittest.TestCase):
             )
             self.assertEqual(widened["route"], "broad")
             self.assertEqual(
-                [
-                    batch["name"]
-                    for batch in widened["finalization"]["build_batches"]
-                ],
+                [batch["name"] for batch in widened["finalization"]["build_batches"]],
                 ["pr-fast", "pr-smoke"],
             )
 
@@ -659,9 +628,7 @@ class TouchedScopeTests(unittest.TestCase):
                     {
                         "name": "pr-smoke",
                         "targets": ["IntrinsicPrSmokeTests"],
-                        "producer_targets": [
-                            "IntrinsicRuntimeGraphicsCpuTests"
-                        ],
+                        "producer_targets": ["IntrinsicRuntimeGraphicsCpuTests"],
                     },
                 ],
             )
@@ -690,9 +657,7 @@ class TouchedScopeTests(unittest.TestCase):
                             "-LE",
                             "gpu|vulkan|slow|flaky-quarantine",
                         ],
-                        "producer_targets": [
-                            "IntrinsicRuntimeGraphicsCpuTests"
-                        ],
+                        "producer_targets": ["IntrinsicRuntimeGraphicsCpuTests"],
                     },
                 ],
             )
@@ -701,11 +666,7 @@ class TouchedScopeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             build_dir = Path(tmp)
             write_registry(build_dir)
-            registry = (
-                build_dir
-                / "test-inventories"
-                / "RegisteredTestTargets.tsv"
-            )
+            registry = build_dir / "test-inventories" / "RegisteredTestTargets.tsv"
             registry.write_text("wrong\theader\n", encoding="utf-8")
             route = touched_scope.analyze_change_records(
                 [record("src/geometry/Geometry.Mesh.cpp")]
@@ -783,14 +744,17 @@ class TouchedScopeTests(unittest.TestCase):
             },
         }
         completed = subprocess.CompletedProcess([], 0, "", "")
-        with mock.patch.object(
-            touched_scope,
-            "_ninja_commands",
-            side_effect=[{"a", "b"}, {"b", "c"}],
-        ), mock.patch.object(
-            touched_scope,
-            "_run_command",
-            return_value=completed,
+        with (
+            mock.patch.object(
+                touched_scope,
+                "_ninja_commands",
+                side_effect=[{"a", "b"}, {"b", "c"}],
+            ),
+            mock.patch.object(
+                touched_scope,
+                "_run_command",
+                return_value=completed,
+            ),
         ):
             code, result = touched_scope.execute_build(
                 route,
@@ -800,7 +764,10 @@ class TouchedScopeTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(result["build"]["ninja_edge_count"], 3)
         self.assertEqual(
-            [batch["incremental_command_edge_count"] for batch in result["build"]["batches"]],
+            [
+                batch["incremental_command_edge_count"]
+                for batch in result["build"]["batches"]
+            ],
             [2, 1],
         )
 
@@ -835,9 +802,7 @@ class TouchedScopeTests(unittest.TestCase):
             ),
             "",
         )
-        with mock.patch.object(
-            touched_scope, "_run_command", return_value=duplicate
-        ):
+        with mock.patch.object(touched_scope, "_run_command", return_value=duplicate):
             with self.assertRaises(touched_scope.RouteError):
                 touched_scope._ctest_names(
                     build_dir,
@@ -854,13 +819,7 @@ class TouchedScopeTests(unittest.TestCase):
                     "tests": [
                         {
                             "name": "Other.Case",
-                            "command": [
-                                str(
-                                    (
-                                        build_dir / "bin" / "Other"
-                                    ).resolve()
-                                )
-                            ],
+                            "command": [str((build_dir / "bin" / "Other").resolve())],
                         }
                     ]
                 }
@@ -966,8 +925,7 @@ class TouchedScopeTests(unittest.TestCase):
                 text=True,
             )
             before_names = [
-                test["name"]
-                for test in json.loads(before.stdout).get("tests", [])
+                test["name"] for test in json.loads(before.stdout).get("tests", [])
             ]
             self.assertNotEqual(before_names, ["Fixture.ExactCase"])
             subprocess.run(

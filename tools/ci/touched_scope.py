@@ -320,14 +320,11 @@ def collect_change_records(
             f"{stderr or f'exit {merge_base_result.returncode}'}"
         )
     merge_bases = [
-        line.strip()
-        for line in merge_base_result.stdout.splitlines()
-        if line.strip()
+        line.strip() for line in merge_base_result.stdout.splitlines() if line.strip()
     ]
     if (
         len(merge_bases) != 1
-        or re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", merge_bases[0])
-        is None
+        or re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", merge_bases[0]) is None
     ):
         raise DiffError(
             "git merge-base did not resolve exactly one commit for "
@@ -416,8 +413,16 @@ def _new_route(
 def _is_build_or_dependency_input(path: str) -> bool:
     name = PurePosixPath(path).name
     return (
-        path in {"CMakeLists.txt", "CMakePresets.json", "vcpkg.json", "vcpkg-configuration.json"}
-        or path.startswith(("cmake/", "tools/vcpkg/", "external/vcpkg/", "third_party/"))
+        path
+        in {
+            "CMakeLists.txt",
+            "CMakePresets.json",
+            "vcpkg.json",
+            "vcpkg-configuration.json",
+        }
+        or path.startswith(
+            ("cmake/", "tools/vcpkg/", "external/vcpkg/", "third_party/")
+        )
         or name == "CMakeLists.txt"
         or name.endswith(".cmake")
         or path.startswith(".github/actions/")
@@ -575,9 +580,7 @@ def analyze_change_records(
             )
             matched = True
         elif path == "tools/repo/check_layering.py":
-            structural.update(
-                {"layering", "layering_regression_tests", "test_layout"}
-            )
+            structural.update({"layering", "layering_regression_tests", "test_layout"})
             _reason(
                 reasons,
                 "layering-tooling",
@@ -611,9 +614,7 @@ def analyze_change_records(
                     PurePosixPath(path).name,
                     DEFAULT_CI_TOOL_REGRESSION_SCRIPTS,
                 )
-                structural.update(
-                    f"tooling_test:{script}" for script in scripts
-                )
+                structural.update(f"tooling_test:{script}" for script in scripts)
                 if PurePosixPath(path).name == "check_workflow_names.py":
                     structural.add("workflow_names")
             _reason(
@@ -625,9 +626,8 @@ def analyze_change_records(
             matched = True
 
         suffix = PurePosixPath(path).suffix
-        if (
-            suffix in BROAD_SOURCE_SUFFIXES
-            and path.startswith(("src/", "tests/", "methods/", "benchmarks/"))
+        if suffix in BROAD_SOURCE_SUFFIXES and path.startswith(
+            ("src/", "tests/", "methods/", "benchmarks/")
         ):
             broad = True
             structural.add("layering" if path.startswith("src/") else "test_layout")
@@ -695,9 +695,7 @@ def analyze_change_records(
             elif path == "tests/regression/tooling/Test.WorkflowConcurrency.py":
                 structural.add("workflow_regression_tests")
             else:
-                structural.add(
-                    f"tooling_test:{PurePosixPath(path).name}"
-                )
+                structural.add(f"tooling_test:{PurePosixPath(path).name}")
             _reason(
                 reasons,
                 "tooling-regression",
@@ -705,9 +703,7 @@ def analyze_change_records(
                 path,
             )
             matched = True
-        elif path == (
-            "tests/regression/tooling/Test.TestGateRouting.baseline.tsv"
-        ):
+        elif path == ("tests/regression/tooling/Test.TestGateRouting.baseline.tsv"):
             structural.add("tooling_test:Test.TestGateRouting.py")
             _reason(
                 reasons,
@@ -945,9 +941,9 @@ def structural_commands(root_arg: str, checks: Sequence[str]) -> list[Command]:
             commands.append(
                 Command(
                     ("python3", f"tests/regression/tooling/{script}"),
-                "workflow policy regressions",
+                    "workflow policy regressions",
+                )
             )
-        )
     if "workflow_names" in selected:
         commands.append(
             Command(
@@ -1070,7 +1066,9 @@ def _load_registry(build_dir: Path) -> dict[str, frozenset[str]]:
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except (FileNotFoundError, OSError, UnicodeError) as exc:
-        raise RouteError(f"could not read configured test registry {path}: {exc}") from exc
+        raise RouteError(
+            f"could not read configured test registry {path}: {exc}"
+        ) from exc
     if not lines or lines[0] != "target\tlabels":
         raise RouteError(f"configured test registry has an invalid header: {path}")
     registry: dict[str, frozenset[str]] = {}
@@ -1127,7 +1125,8 @@ def _reconcile_aggregates(
     expected_fast = {
         target
         for target, labels in registry.items()
-        if labels.intersection({"unit", "contract"}) and not labels.intersection(excluded)
+        if labels.intersection({"unit", "contract"})
+        and not labels.intersection(excluded)
     }
     expected_smoke = {
         target
@@ -1371,8 +1370,7 @@ def _ctest_names(
     if not isinstance(tests, list):
         raise RouteError("CTest inventory JSON has no tests array")
     expected_binaries = {
-        (build_dir / "bin" / target).resolve(): target
-        for target in expected_targets
+        (build_dir / "bin" / target).resolve(): target for target in expected_targets
     }
     if not expected_binaries:
         raise RouteError("CTest batch has no expected producer targets")
@@ -1401,9 +1399,7 @@ def _ctest_names(
             + ", ".join(sorted(missing_targets))
         )
     if not names:
-        raise RouteError(
-            f"CTest selector selected zero tests: {shlex.join(selector)}"
-        )
+        raise RouteError(f"CTest selector selected zero tests: {shlex.join(selector)}")
     if len(names) != len(set(names)):
         raise RouteError("CTest selector produced duplicate test names")
     return names
@@ -1496,9 +1492,7 @@ def _exact_name_regexes(
     current_length = 3
     for name in names:
         escaped = re.escape(name)
-        added_length = len(escaped.encode("utf-8")) + (
-            1 if alternatives else 0
-        )
+        added_length = len(escaped.encode("utf-8")) + (1 if alternatives else 0)
         if alternatives and current_length + added_length > maximum_length:
             regexes.append("^(" + "|".join(alternatives) + ")$")
             alternatives = []
@@ -1531,9 +1525,7 @@ def execute_tests(
     returncode = 0
     for batch in _test_batches(route):
         selector = [str(value) for value in batch["selector"]]
-        producer_targets = [
-            str(value) for value in batch["producer_targets"]
-        ]
+        producer_targets = [str(value) for value in batch["producer_targets"]]
         raw_names = _ctest_names(
             build_dir,
             selector,
@@ -1544,8 +1536,7 @@ def execute_tests(
         if len(names) != len(raw_names):
             overlap = sorted(set(raw_names).intersection(selected_names))
             raise RouteError(
-                "CTest batches selected duplicate case(s): "
-                + ", ".join(overlap)
+                "CTest batches selected duplicate case(s): " + ", ".join(overlap)
             )
         selected_names.update(names)
         started = time.monotonic()
@@ -1707,12 +1698,9 @@ def _action_plan(args: argparse.Namespace, root: Path) -> int:
             f"broad fallback: `{str(route['route'] == 'broad').lower()}`",
             f"C++ setup required: `{str(route['needs_cpp']).lower()}`",
             f"merge base: `{route['diff'].get('merge_base') or 'unavailable'}`",
-            "changed files: "
-            + _bounded_summary_json(route["changed_files"]),
-            "owner labels: "
-            + _bounded_summary_json(route["owner_labels"]),
-            "selection reasons: "
-            + _bounded_summary_json(route["reasons"]),
+            "changed files: " + _bounded_summary_json(route["changed_files"]),
+            "owner labels: " + _bounded_summary_json(route["owner_labels"]),
+            "selection reasons: " + _bounded_summary_json(route["reasons"]),
         ),
     )
     if args.print_only or (not args.run and args.action == "plan" and not args.output):
@@ -1734,7 +1722,10 @@ def _action_structural(args: argparse.Namespace, root: Path) -> int:
                 name="structural",
                 status="failed",
                 elapsed_seconds=time.monotonic() - started,
-                details={"command_count": len(commands), "returncode": result.returncode},
+                details={
+                    "command_count": len(commands),
+                    "returncode": result.returncode,
+                },
             )
             write_route(route_path, route)
             return result.returncode
@@ -1795,12 +1786,9 @@ def _action_finalize(args: argparse.Namespace, root: Path) -> int:
         (
             f"final route: `{route['route']}`",
             f"broad fallback: `{str(route['route'] == 'broad').lower()}`",
-            "owner labels: "
-            + _bounded_summary_json(route["owner_labels"]),
+            "owner labels: " + _bounded_summary_json(route["owner_labels"]),
             "selected producers: "
-            + _bounded_summary_json(
-                route["finalization"]["selected_targets"]
-            ),
+            + _bounded_summary_json(route["finalization"]["selected_targets"]),
         ),
     )
     return 0
