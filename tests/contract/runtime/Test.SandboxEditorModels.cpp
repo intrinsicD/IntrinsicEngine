@@ -3112,6 +3112,10 @@ TEST(SandboxEditorUi, ProgressiveInspectorInfersGraphPointCloudAndComposition)
 
     const ECS::EntityHandle parent = MakeSelectable(registry, "ProgressiveModel");
     const ECS::EntityHandle child = MakeSelectable(registry, "ProgressiveChild");
+    const ECS::EntityHandle secondChild =
+        MakeSelectable(registry, "ProgressiveSecondChild");
+    const ECS::EntityHandle grandchild =
+        MakeSelectable(registry, "ProgressiveGrandchild");
     AddTriangleMeshSource(registry, child);
     auto& childVertices = registry.Raw().get<GS::Vertices>(child);
     childVertices.Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f})
@@ -3124,6 +3128,8 @@ TEST(SandboxEditorUi, ProgressiveInspectorInfersGraphPointCloudAndComposition)
         child,
         MakeProgressiveMeshPresentationBindings());
     ECS::Hierarchy::Attach(registry.Raw(), child, parent);
+    ECS::Hierarchy::Attach(registry.Raw(), secondChild, parent);
+    ECS::Hierarchy::Attach(registry.Raw(), grandchild, child);
 
     Runtime::DerivedJobQueueSnapshot jobs{};
     jobs.Entries.push_back(Runtime::DerivedJobSnapshot{
@@ -3145,7 +3151,7 @@ TEST(SandboxEditorUi, ProgressiveInspectorInfersGraphPointCloudAndComposition)
     EXPECT_EQ(frame.Inspector.Progressive.Shape,
               Runtime::ProgressiveEntityShape::Composition);
     EXPECT_TRUE(frame.Inspector.Progressive.Composition.HasChildren);
-    EXPECT_EQ(frame.Inspector.Progressive.Composition.ChildCount, 1u);
+    EXPECT_EQ(frame.Inspector.Progressive.Composition.ChildCount, 2u);
     EXPECT_EQ(frame.Inspector.Progressive.Composition.ChildBindingsCount, 1u);
     EXPECT_EQ(frame.Inspector.Progressive.Composition.ChildPendingSlotCount, 1u);
     EXPECT_EQ(frame.Inspector.Progressive.Composition.ChildJobCount, 1u);
@@ -3158,7 +3164,52 @@ TEST(SandboxEditorUi, ProgressiveInspectorInfersGraphPointCloudAndComposition)
     ASSERT_NE(composition, nullptr);
     EXPECT_EQ(composition->Readiness,
               Runtime::ProgressiveReadinessState::Pending);
-    EXPECT_EQ(frame.Inspector.BoundState.Composition.ChildCount, 1u);
+    EXPECT_EQ(frame.Inspector.BoundState.Composition.ChildCount, 2u);
+}
+
+TEST(SandboxEditorUi, ProgressiveCompositionReportsCorruptHierarchyWithoutPartialSummary)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle parent =
+        MakeSelectable(registry, "CorruptProgressiveModel");
+    const ECS::EntityHandle child =
+        MakeSelectable(registry, "CorruptProgressiveChild");
+    const ECS::EntityHandle danglingSibling =
+        MakeSelectable(registry, "DestroyedProgressiveSibling");
+    ECS::Hierarchy::Attach(registry.Raw(), child, parent);
+    registry.Destroy(danglingSibling);
+
+    auto& parentHierarchy =
+        registry.Raw().get<ECSC::Hierarchy::Component>(parent);
+    auto& childHierarchy =
+        registry.Raw().get<ECSC::Hierarchy::Component>(child);
+    parentHierarchy.ChildCount = 2u;
+    childHierarchy.NextSibling = danglingSibling;
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, parent));
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    const Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    const Runtime::SandboxEditorProgressiveRenderDataModel& progressive =
+        frame.Inspector.Progressive;
+
+    EXPECT_FALSE(progressive.Composition.HasChildren);
+    EXPECT_EQ(progressive.Composition.ChildCount, 0u);
+    EXPECT_EQ(progressive.Composition.ChildBindingsCount, 0u);
+    EXPECT_EQ(progressive.Composition.ChildSlotCount, 0u);
+    EXPECT_TRUE(HasDiagnostic(
+        progressive.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::CorruptHierarchy));
+    ASSERT_EQ(progressive.Diagnostics.size(), 1u);
+    EXPECT_NE(
+        progressive.Diagnostics.front().Message.find("DanglingLink"),
+        std::string::npos);
+    EXPECT_STREQ(
+        Runtime::DebugNameForSandboxEditorDiagnosticCode(
+            Runtime::SandboxEditorDiagnosticCode::CorruptHierarchy),
+        "CorruptHierarchy");
 }
 TEST(SandboxEditorUi, RenderRecipeEditorModelListsDeclaredRecipeControls)
 {

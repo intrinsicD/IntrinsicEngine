@@ -10,7 +10,6 @@ module;
 
 export module Extrinsic.Runtime.EditorCommandHistory;
 
-import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Scene.Handle;

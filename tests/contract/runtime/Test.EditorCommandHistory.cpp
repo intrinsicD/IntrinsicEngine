@@ -289,18 +289,20 @@ TEST(EditorCommandHistory, HierarchyDeletePlanDefinesRecursiveDeleteAndOrphanPol
     const ECS::EntityHandle root = CreateEntity(registry);
     const ECS::EntityHandle child = CreateEntity(registry);
     const ECS::EntityHandle grandchild = CreateEntity(registry);
+    const ECS::EntityHandle sibling = CreateEntity(registry);
 
     registry.Raw().emplace<ECSC::Hierarchy::Component>(
         root,
         ECSC::Hierarchy::Component{
             .FirstChild = child,
-            .ChildCount = 1u,
+            .ChildCount = 2u,
         });
     registry.Raw().emplace<ECSC::Hierarchy::Component>(
         child,
         ECSC::Hierarchy::Component{
             .Parent = root,
             .FirstChild = grandchild,
+            .NextSibling = sibling,
             .ChildCount = 1u,
         });
     registry.Raw().emplace<ECSC::Hierarchy::Component>(
@@ -308,11 +310,19 @@ TEST(EditorCommandHistory, HierarchyDeletePlanDefinesRecursiveDeleteAndOrphanPol
         ECSC::Hierarchy::Component{
             .Parent = child,
         });
+    registry.Raw().emplace<ECSC::Hierarchy::Component>(
+        sibling,
+        ECSC::Hierarchy::Component{
+            .Parent = root,
+            .PrevSibling = child,
+        });
 
     const std::uint32_t rootId = Runtime::SelectionController::ToStableEntityId(root);
     const std::uint32_t childId = Runtime::SelectionController::ToStableEntityId(child);
     const std::uint32_t grandchildId =
         Runtime::SelectionController::ToStableEntityId(grandchild);
+    const std::uint32_t siblingId =
+        Runtime::SelectionController::ToStableEntityId(sibling);
 
     const Runtime::EditorHierarchyDeletePlan recursive =
         Runtime::BuildHierarchyDeletePlan(
@@ -321,7 +331,8 @@ TEST(EditorCommandHistory, HierarchyDeletePlanDefinesRecursiveDeleteAndOrphanPol
             Runtime::EditorHierarchyDeletePolicy::DeleteDescendants);
     EXPECT_EQ(recursive.Status, Runtime::EditorCommandHistoryStatus::Applied);
     EXPECT_EQ(recursive.DeletedStableIds,
-              std::vector<std::uint32_t>({rootId, childId, grandchildId}));
+              std::vector<std::uint32_t>(
+                  {rootId, childId, grandchildId, siblingId}));
     EXPECT_TRUE(recursive.OrphanedStableIds.empty());
 
     const Runtime::EditorHierarchyDeletePlan orphan =
@@ -331,7 +342,8 @@ TEST(EditorCommandHistory, HierarchyDeletePlanDefinesRecursiveDeleteAndOrphanPol
             Runtime::EditorHierarchyDeletePolicy::OrphanDescendants);
     EXPECT_EQ(orphan.DeletedStableIds, std::vector<std::uint32_t>({rootId}));
     EXPECT_EQ(orphan.OrphanedStableIds,
-              std::vector<std::uint32_t>({childId, grandchildId}));
+              std::vector<std::uint32_t>(
+                  {childId, grandchildId, siblingId}));
 
     registry.Destroy(root);
     EXPECT_EQ(Runtime::BuildHierarchyDeletePlan(
@@ -339,4 +351,55 @@ TEST(EditorCommandHistory, HierarchyDeletePlanDefinesRecursiveDeleteAndOrphanPol
                   rootId,
                   Runtime::EditorHierarchyDeletePolicy::DeleteDescendants).Status,
               Runtime::EditorCommandHistoryStatus::StaleEntity);
+}
+
+TEST(EditorCommandHistory, CorruptHierarchyDeletePlanFailsWithoutPartialMutation)
+{
+    ECS::Scene::Registry registry;
+    const ECS::EntityHandle root = CreateEntity(registry);
+    const ECS::EntityHandle child = CreateEntity(registry);
+    const ECS::EntityHandle danglingSibling = CreateEntity(registry);
+    registry.Destroy(danglingSibling);
+
+    registry.Raw().emplace<ECSC::Hierarchy::Component>(
+        root,
+        ECSC::Hierarchy::Component{
+            .FirstChild = child,
+            .ChildCount = 2u,
+        });
+    registry.Raw().emplace<ECSC::Hierarchy::Component>(
+        child,
+        ECSC::Hierarchy::Component{
+            .Parent = root,
+            .NextSibling = danglingSibling,
+        });
+
+    const ECSC::Hierarchy::Component rootBefore =
+        registry.Raw().get<ECSC::Hierarchy::Component>(root);
+    const ECSC::Hierarchy::Component childBefore =
+        registry.Raw().get<ECSC::Hierarchy::Component>(child);
+    const std::uint32_t rootId =
+        Runtime::SelectionController::ToStableEntityId(root);
+
+    for (const Runtime::EditorHierarchyDeletePolicy policy :
+         {Runtime::EditorHierarchyDeletePolicy::DeleteDescendants,
+          Runtime::EditorHierarchyDeletePolicy::OrphanDescendants})
+    {
+        const Runtime::EditorHierarchyDeletePlan plan =
+            Runtime::BuildHierarchyDeletePlan(registry, rootId, policy);
+        EXPECT_EQ(plan.Status, Runtime::EditorCommandHistoryStatus::CommandFailed);
+        EXPECT_TRUE(plan.DeletedStableIds.empty());
+        EXPECT_TRUE(plan.OrphanedStableIds.empty());
+    }
+
+    EXPECT_TRUE(registry.Raw().valid(root));
+    EXPECT_TRUE(registry.Raw().valid(child));
+    const ECSC::Hierarchy::Component& rootAfter =
+        registry.Raw().get<ECSC::Hierarchy::Component>(root);
+    const ECSC::Hierarchy::Component& childAfter =
+        registry.Raw().get<ECSC::Hierarchy::Component>(child);
+    EXPECT_EQ(rootAfter.FirstChild, rootBefore.FirstChild);
+    EXPECT_EQ(rootAfter.ChildCount, rootBefore.ChildCount);
+    EXPECT_EQ(childAfter.Parent, childBefore.Parent);
+    EXPECT_EQ(childAfter.NextSibling, childBefore.NextSibling);
 }
