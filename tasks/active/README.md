@@ -11,10 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`CORE-007`](CORE-007-scheduler-priority-wait-wake-hardening.md) —
-  scheduler priority lanes and measured conditional-wake hardening; owner:
-  Codex; branch: `codex/core-007-scheduler-hardening-v2`; next gate: baseline
-  the `ci-release` scheduler smoke benchmark before production changes.
+None.
 
 ## History
 

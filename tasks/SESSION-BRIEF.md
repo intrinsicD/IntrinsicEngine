@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `CORE-007` — Scheduler priority and worker-wake hardening (tasks/active/CORE-007-scheduler-priority-wait-wake-hardening.md)
+- none
 
 ## Theme B — Rendering modernization
 

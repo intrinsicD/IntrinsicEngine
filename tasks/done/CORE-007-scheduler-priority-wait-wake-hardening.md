@@ -54,8 +54,10 @@ maturity_target: CPUContracted
 
 ## Status
 
-- In progress; owner: Codex; branch:
-  `codex/core-007-scheduler-hardening-v2`.
+- Completed on 2026-07-18 at `CPUContracted`; owner: Codex; implementation
+  branch: `codex/core-007-scheduler-hardening-v2`; principal implementation
+  commits: `491aac49` and `54a397e8`; review-hardening commit: `51fa3ea3`;
+  evidence and verification commits: `8d598b13` and `da6e1084`.
 - Activated after `CORE-005` retirement on 2026-07-18. Historical prototype
   commit `725af9ce` is evidence only and will not be cherry-picked: it predates
   the scheduler-instance and definitive progress-wait hardening in
@@ -169,8 +171,12 @@ maturity_target: CPUContracted
 
 ## Maturity
 
-- Target: `CPUContracted`. This is a CPU-only core scheduler contract; no
-  backend-specific Operational follow-up is owed.
+- Reached: `CPUContracted`. Priority-lane ordering, conditional wake
+  handshakes, wait-token sharding, scheduler-instance rejection, and retained
+  CORE-005 completion progress are covered by deterministic CPU contracts,
+  full CPU gates, sanitizer gates, and matched optimized benchmark evidence.
+- No `Operational` follow-up is owed. This is a CPU-only core scheduler
+  contract; retained-plan storage and reuse remain owned by `CORE-008`.
 
 ## Verification
 ```bash

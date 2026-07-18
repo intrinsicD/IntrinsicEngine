@@ -13,9 +13,6 @@ map.
 Opened from the 2026-07-03 main-loop/task-graph/render-graph review
 ([`docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`](../../../docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md)):
 
-- [`CORE-007`](../../active/CORE-007-scheduler-priority-wait-wake-hardening.md)
-  is active — scheduler priority lanes and measured conditional-wake
-  hardening; retired `CORE-005` already owns definitive waiter stealing.
 - [`CORE-008`](CORE-008-compiled-taskgraph-plan-reuse.md) — compiled
   task-graph plan reuse across executions (fixed-step FrameGraph and
   render-prep adoption).
@@ -125,6 +122,14 @@ root must update the relevant `docs/architecture/*` doc set in the same PR per
 - [`docs/agent/architecture-review-checklist.md`](../../../docs/agent/architecture-review-checklist.md).
 
 ## Retired
+
+- [`CORE-007`](../../done/CORE-007-scheduler-priority-wait-wake-hardening.md) —
+  retired 2026-07-18 at `CPUContracted`: fixed scheduler priority lanes now
+  preserve TaskGraph priority through external and worker-local dispatch,
+  worker notifications use a race-safe parked-worker handshake, and the
+  scheduler-instance-safe wait registry uses 16 shards. Matched Release
+  evidence improved contended registry throughput 7.2558x, the full CPU gate
+  passed 4,090/4,090, and fresh ASan/UBSan gates each passed 2,744/2,744.
 
 - [`CORE-005`](../../done/CORE-005-nonblocking-taskgraph-submit-api.md) —
   retired 2026-07-18 at `CPUContracted`: TaskGraph now supports
