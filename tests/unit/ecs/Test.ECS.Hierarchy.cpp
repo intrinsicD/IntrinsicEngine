@@ -1,3 +1,7 @@
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
 #include <gtest/gtest.h>
 
 #include <entt/entity/registry.hpp>
@@ -27,6 +31,15 @@ namespace
     Components::Hierarchy::Component const& Hier(const Registry& r, EntityHandle e)
     {
         return r.Raw().get<Components::Hierarchy::Component>(e);
+    }
+
+    void ExpectQueryFailure(
+        const Structure::HierarchyQueryResult& result,
+        const Structure::HierarchyQueryStatus expectedStatus)
+    {
+        EXPECT_EQ(result.Status, expectedStatus);
+        EXPECT_FALSE(result.Succeeded());
+        EXPECT_TRUE(result.Entities.empty());
     }
 }
 
@@ -277,4 +290,357 @@ TEST(ECSHierarchy, IsDescendantWalksAncestryChain)
     EXPECT_TRUE(Structure::IsDescendant(r.Raw(), a, c));
     EXPECT_TRUE(Structure::IsDescendant(r.Raw(), a, b));
     EXPECT_FALSE(Structure::IsDescendant(r.Raw(), c, a));
+}
+
+TEST(ECSHierarchy, CollectQueriesPreserveOrderLeafSemanticsAndDeterminism)
+{
+    Registry r;
+    const EntityHandle root = CreateDefault(r, "Root");
+    const EntityHandle a = CreateDefault(r, "A");
+    const EntityHandle b = CreateDefault(r, "B");
+    const EntityHandle a1 = CreateDefault(r, "A1");
+    const EntityHandle a2 = CreateDefault(r, "A2");
+    const EntityHandle b1 = CreateDefault(r, "B1");
+    const EntityHandle bareLeaf = r.Create();
+
+    Attach(r.Raw(), a, root);
+    Attach(r.Raw(), b, root);
+    Attach(r.Raw(), a1, a);
+    Attach(r.Raw(), a2, a);
+    Attach(r.Raw(), b1, b);
+
+    const Structure::HierarchyQueryResult children =
+        Structure::CollectChildren(r.Raw(), root);
+    ASSERT_TRUE(children.Succeeded());
+    EXPECT_EQ(children.Entities, (std::vector<EntityHandle>{b, a}));
+
+    const Structure::HierarchyQueryResult descendants =
+        Structure::CollectDescendantsPreorder(r.Raw(), root);
+    ASSERT_TRUE(descendants.Succeeded());
+    EXPECT_EQ(
+        descendants.Entities,
+        (std::vector<EntityHandle>{b, b1, a, a2, a1}));
+
+    const Structure::HierarchyQueryResult repeated =
+        Structure::CollectDescendantsPreorder(r.Raw(), root);
+    EXPECT_EQ(repeated.Status, descendants.Status);
+    EXPECT_EQ(repeated.Entities, descendants.Entities);
+
+    const Structure::HierarchyQueryResult componentLeaf =
+        Structure::CollectChildren(r.Raw(), a1);
+    EXPECT_TRUE(componentLeaf.Succeeded());
+    EXPECT_TRUE(componentLeaf.Entities.empty());
+
+    const Structure::HierarchyQueryResult noComponentLeaf =
+        Structure::CollectDescendantsPreorder(r.Raw(), bareLeaf);
+    EXPECT_TRUE(noComponentLeaf.Succeeded());
+    EXPECT_TRUE(noComponentLeaf.Entities.empty());
+}
+
+TEST(ECSHierarchy, CollectQueriesRejectInvalidDanglingAndMissingDataWithoutPrefixes)
+{
+    {
+        Registry r;
+        ExpectQueryFailure(
+            Structure::CollectChildren(r.Raw(), InvalidEntityHandle),
+            Structure::HierarchyQueryStatus::InvalidRoot);
+        ExpectQueryFailure(
+            Structure::CollectDescendantsPreorder(
+                r.Raw(),
+                InvalidEntityHandle),
+            Structure::HierarchyQueryStatus::InvalidRoot);
+    }
+
+    {
+        Registry r;
+        auto& raw = r.Raw();
+        const EntityHandle root = raw.create();
+        const EntityHandle danglingChild = raw.create();
+        raw.destroy(danglingChild);
+        raw.emplace<Components::Hierarchy::Component>(
+            root,
+            Components::Hierarchy::Component{
+                .FirstChild = danglingChild,
+                .ChildCount = 1u,
+            });
+
+        ExpectQueryFailure(
+            Structure::CollectChildren(raw, root),
+            Structure::HierarchyQueryStatus::DanglingLink);
+    }
+
+    {
+        Registry r;
+        auto& raw = r.Raw();
+        const EntityHandle root = raw.create();
+        const EntityHandle child = raw.create();
+        const EntityHandle danglingSibling = raw.create();
+        raw.destroy(danglingSibling);
+        raw.emplace<Components::Hierarchy::Component>(
+            root,
+            Components::Hierarchy::Component{
+                .FirstChild = child,
+                .ChildCount = 2u,
+            });
+        raw.emplace<Components::Hierarchy::Component>(
+            child,
+            Components::Hierarchy::Component{
+                .Parent = root,
+                .NextSibling = danglingSibling,
+            });
+
+        ExpectQueryFailure(
+            Structure::CollectChildren(raw, root),
+            Structure::HierarchyQueryStatus::DanglingLink);
+    }
+
+    {
+        Registry r;
+        auto& raw = r.Raw();
+        const EntityHandle root = raw.create();
+        const EntityHandle childWithoutHierarchy = raw.create();
+        raw.emplace<Components::Hierarchy::Component>(
+            root,
+            Components::Hierarchy::Component{
+                .FirstChild = childWithoutHierarchy,
+                .ChildCount = 1u,
+            });
+
+        ExpectQueryFailure(
+            Structure::CollectChildren(raw, root),
+            Structure::HierarchyQueryStatus::MissingChildHierarchy);
+    }
+}
+
+TEST(ECSHierarchy, CollectChildrenRejectsParentBacklinkAndCountCorruption)
+{
+    {
+        Registry r;
+        auto& raw = r.Raw();
+        const EntityHandle root = raw.create();
+        const EntityHandle child = raw.create();
+        raw.emplace<Components::Hierarchy::Component>(
+            root,
+            Components::Hierarchy::Component{
+                .FirstChild = child,
+                .ChildCount = 1u,
+            });
+        raw.emplace<Components::Hierarchy::Component>(
+            child,
+            Components::Hierarchy::Component{});
+
+        ExpectQueryFailure(
+            Structure::CollectChildren(raw, root),
+            Structure::HierarchyQueryStatus::ParentMismatch);
+    }
+
+    {
+        Registry r;
+        auto& raw = r.Raw();
+        const EntityHandle root = raw.create();
+        const EntityHandle child = raw.create();
+        const EntityHandle wrongPrevious = raw.create();
+        raw.emplace<Components::Hierarchy::Component>(
+            root,
+            Components::Hierarchy::Component{
+                .FirstChild = child,
+                .ChildCount = 1u,
+            });
+        raw.emplace<Components::Hierarchy::Component>(
+            child,
+            Components::Hierarchy::Component{
+                .Parent = root,
+                .PrevSibling = wrongPrevious,
+            });
+
+        ExpectQueryFailure(
+            Structure::CollectChildren(raw, root),
+            Structure::HierarchyQueryStatus::SiblingBacklinkMismatch);
+    }
+
+    {
+        Registry r;
+        auto& raw = r.Raw();
+        const EntityHandle root = raw.create();
+        const EntityHandle first = raw.create();
+        const EntityHandle second = raw.create();
+        raw.emplace<Components::Hierarchy::Component>(
+            root,
+            Components::Hierarchy::Component{
+                .FirstChild = first,
+                .ChildCount = 2u,
+            });
+        raw.emplace<Components::Hierarchy::Component>(
+            first,
+            Components::Hierarchy::Component{
+                .Parent = root,
+                .NextSibling = second,
+            });
+        raw.emplace<Components::Hierarchy::Component>(
+            second,
+            Components::Hierarchy::Component{
+                .Parent = root,
+            });
+
+        ExpectQueryFailure(
+            Structure::CollectChildren(raw, root),
+            Structure::HierarchyQueryStatus::SiblingBacklinkMismatch);
+        EXPECT_FALSE(Structure::ValidateInvariants(raw, root));
+    }
+
+    {
+        Registry r;
+        auto& raw = r.Raw();
+        const EntityHandle root = raw.create();
+        const EntityHandle child = raw.create();
+        raw.emplace<Components::Hierarchy::Component>(
+            root,
+            Components::Hierarchy::Component{
+                .FirstChild = child,
+                .ChildCount = 0u,
+            });
+        raw.emplace<Components::Hierarchy::Component>(
+            child,
+            Components::Hierarchy::Component{.Parent = root});
+
+        ExpectQueryFailure(
+            Structure::CollectChildren(raw, root),
+            Structure::HierarchyQueryStatus::ChildCountMismatch);
+    }
+
+    {
+        Registry r;
+        auto& raw = r.Raw();
+        const EntityHandle root = raw.create();
+        raw.emplace<Components::Hierarchy::Component>(
+            root,
+            Components::Hierarchy::Component{.ChildCount = 1u});
+
+        ExpectQueryFailure(
+            Structure::CollectChildren(raw, root),
+            Structure::HierarchyQueryStatus::ChildCountMismatch);
+    }
+
+    {
+        Registry r;
+        auto& raw = r.Raw();
+        const EntityHandle root = raw.create();
+        const EntityHandle child = raw.create();
+        raw.emplace<Components::Hierarchy::Component>(
+            root,
+            Components::Hierarchy::Component{
+                .FirstChild = child,
+                .ChildCount = 2u,
+            });
+        raw.emplace<Components::Hierarchy::Component>(
+            child,
+            Components::Hierarchy::Component{.Parent = root});
+
+        ExpectQueryFailure(
+            Structure::CollectChildren(raw, root),
+            Structure::HierarchyQueryStatus::ChildCountMismatch);
+    }
+}
+
+TEST(ECSHierarchy, CollectQueriesRejectDuplicateLinksAndHierarchyCycles)
+{
+    {
+        Registry r;
+        auto& raw = r.Raw();
+        const EntityHandle root = raw.create();
+        const EntityHandle first = raw.create();
+        const EntityHandle second = raw.create();
+        raw.emplace<Components::Hierarchy::Component>(
+            root,
+            Components::Hierarchy::Component{
+                .FirstChild = first,
+                .ChildCount = 3u,
+            });
+        raw.emplace<Components::Hierarchy::Component>(
+            first,
+            Components::Hierarchy::Component{
+                .Parent = root,
+                .NextSibling = second,
+            });
+        raw.emplace<Components::Hierarchy::Component>(
+            second,
+            Components::Hierarchy::Component{
+                .Parent = root,
+                .NextSibling = first,
+                .PrevSibling = first,
+            });
+
+        ExpectQueryFailure(
+            Structure::CollectChildren(raw, root),
+            Structure::HierarchyQueryStatus::DuplicateOrCycle);
+    }
+
+    {
+        Registry r;
+        auto& raw = r.Raw();
+        const EntityHandle root = raw.create();
+        const EntityHandle child = raw.create();
+        raw.emplace<Components::Hierarchy::Component>(
+            root,
+            Components::Hierarchy::Component{
+                .Parent = child,
+                .FirstChild = child,
+                .ChildCount = 1u,
+            });
+        raw.emplace<Components::Hierarchy::Component>(
+            child,
+            Components::Hierarchy::Component{
+                .Parent = root,
+                .FirstChild = root,
+                .ChildCount = 1u,
+            });
+
+        ExpectQueryFailure(
+            Structure::CollectDescendantsPreorder(raw, root),
+            Structure::HierarchyQueryStatus::DuplicateOrCycle);
+    }
+}
+
+TEST(ECSHierarchy, CollectQueriesFailClosedWhenTraversalLimitIsExceeded)
+{
+    Registry r;
+    auto& raw = r.Raw();
+    const EntityHandle root = raw.create();
+    std::vector<EntityHandle> children{};
+    children.reserve(
+        static_cast<std::size_t>(Structure::kMaxHierarchyQueryEntities) + 1u);
+    for (std::uint32_t i = 0u;
+         i <= Structure::kMaxHierarchyQueryEntities;
+         ++i)
+    {
+        children.push_back(raw.create());
+    }
+
+    raw.emplace<Components::Hierarchy::Component>(
+        root,
+        Components::Hierarchy::Component{
+            .FirstChild = children.front(),
+            .ChildCount = static_cast<std::uint32_t>(children.size()),
+        });
+    for (std::size_t i = 0u; i < children.size(); ++i)
+    {
+        raw.emplace<Components::Hierarchy::Component>(
+            children[i],
+            Components::Hierarchy::Component{
+                .Parent = root,
+                .NextSibling =
+                    i + 1u < children.size()
+                        ? children[i + 1u]
+                        : InvalidEntityHandle,
+                .PrevSibling =
+                    i > 0u ? children[i - 1u] : InvalidEntityHandle,
+            });
+    }
+
+    ExpectQueryFailure(
+        Structure::CollectChildren(raw, root),
+        Structure::HierarchyQueryStatus::TraversalLimitExceeded);
+    ExpectQueryFailure(
+        Structure::CollectDescendantsPreorder(raw, root),
+        Structure::HierarchyQueryStatus::TraversalLimitExceeded);
 }

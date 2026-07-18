@@ -1,6 +1,5 @@
 module;
 
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -13,6 +12,8 @@ module;
 #include <entt/entity/registry.hpp>
 
 module Extrinsic.Runtime.EditorCommandHistory;
+
+import Extrinsic.ECS.Hierarchy.Structure;
 
 namespace Extrinsic::Runtime
 {
@@ -173,34 +174,6 @@ namespace Extrinsic::Runtime
             return EditorCommandHistoryStatus::Applied;
         }
 
-        void AppendDescendantStableIds(
-            const entt::registry& raw,
-            const ECS::EntityHandle entity,
-            std::vector<std::uint32_t>& output,
-            std::vector<ECS::EntityHandle>& visited)
-        {
-            if (std::find(visited.begin(), visited.end(), entity) != visited.end())
-                return;
-            visited.push_back(entity);
-
-            const auto* hierarchy = raw.try_get<ECSC::Hierarchy::Component>(entity);
-            if (hierarchy == nullptr)
-                return;
-
-            ECS::EntityHandle child = hierarchy->FirstChild;
-            while (child != ECS::InvalidEntityHandle && raw.valid(child))
-            {
-                if (std::find(visited.begin(), visited.end(), child) != visited.end())
-                    return;
-                const auto* childHierarchy =
-                    raw.try_get<ECSC::Hierarchy::Component>(child);
-                output.push_back(SelectionController::ToStableEntityId(child));
-                AppendDescendantStableIds(raw, child, output, visited);
-                child = childHierarchy != nullptr
-                    ? childHierarchy->NextSibling
-                    : ECS::InvalidEntityHandle;
-            }
-        }
     }
 
     const char* DebugNameForEditorCommandHistoryStatus(
@@ -588,9 +561,16 @@ namespace Extrinsic::Runtime
             };
         }
 
-        std::vector<std::uint32_t> descendants{};
-        std::vector<ECS::EntityHandle> visited{};
-        AppendDescendantStableIds(raw, root, descendants, visited);
+        const ECS::Hierarchy::Structure::HierarchyQueryResult descendants =
+            ECS::Hierarchy::Structure::CollectDescendantsPreorder(raw, root);
+        if (!descendants.Succeeded())
+        {
+            return EditorHierarchyDeletePlan{
+                .RootStableId = rootStableId,
+                .Policy = policy,
+                .Status = EditorCommandHistoryStatus::CommandFailed,
+            };
+        }
 
         EditorHierarchyDeletePlan plan{
             .RootStableId = rootStableId,
@@ -598,15 +578,22 @@ namespace Extrinsic::Runtime
             .Status = EditorCommandHistoryStatus::Applied,
         };
         plan.DeletedStableIds.push_back(rootStableId);
+        std::vector<std::uint32_t> descendantStableIds{};
+        descendantStableIds.reserve(descendants.Entities.size());
+        for (const ECS::EntityHandle descendant : descendants.Entities)
+        {
+            descendantStableIds.push_back(
+                SelectionController::ToStableEntityId(descendant));
+        }
         if (policy == EditorHierarchyDeletePolicy::DeleteDescendants)
         {
             plan.DeletedStableIds.insert(plan.DeletedStableIds.end(),
-                                         descendants.begin(),
-                                         descendants.end());
+                                         descendantStableIds.begin(),
+                                         descendantStableIds.end());
         }
         else
         {
-            plan.OrphanedStableIds = std::move(descendants);
+            plan.OrphanedStableIds = std::move(descendantStableIds);
         }
         return plan;
     }

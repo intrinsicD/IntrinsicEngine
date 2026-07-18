@@ -89,6 +89,20 @@ commands are queued, replayed, undone, coalesced, or translated from input.
   preservation when transform state is ready). Higher layers decide which user
   action invokes those primitives and how that action participates in history
   or serialization.
+- **Guarded hierarchy queries.** `Hierarchy::Structure::CollectChildren`
+  preserves exact `FirstChild` / `NextSibling` order, while
+  `CollectDescendantsPreorder` returns iterative depth-first preorder and
+  excludes the queried root. A valid entity without a hierarchy component is a
+  successful leaf with an empty result. Both queries are all-or-nothing:
+  `InvalidRoot`, `DanglingLink`, `MissingChildHierarchy`, `ParentMismatch`,
+  `SiblingBacklinkMismatch`, `ChildCountMismatch`, `DuplicateOrCycle`, and
+  `TraversalLimitExceeded` clear the entity list. Child chains require an
+  invalid head `PrevSibling`, exact later backlinks, and enumerated count equal
+  to `ChildCount`; `FirstChild` is invalid exactly when that count is zero.
+  `kMaxHierarchyQueryEntities` bounds corruption work and aliases the existing
+  65,536-entity guard policy rather than imposing a scene-size policy.
+  `ValidateInvariants` uses the same checked child-chain implementation so its
+  definition cannot drift from query behavior.
 - **Transform mutation.** ECS owns transform data and dirty markers. Mutation
   sites update `Components::Transform::Component` through the registry and
   stamp `Components::Transform::IsDirtyTag`; `System.TransformHierarchy`
