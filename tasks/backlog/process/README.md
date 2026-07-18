@@ -15,7 +15,8 @@ map.
 
 ## Tasks
 
-- [BUILD-004 — Make compile-hotspot evidence source-complete](BUILD-004-source-complete-compile-hotspot-evidence.md)
+- [BUILD-004 — Make compile-hotspot evidence source-complete](../../active/BUILD-004-source-complete-compile-hotspot-evidence.md)
+  (currently active).
 - [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](CI-009-heavy-gate-routing-and-runner-evaluation.md)
 - [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](PROC-025-port-research-ideation-skill-to-other-repos.md)
   (portable playbook; run from a session scoped to the target repo).
@@ -37,9 +38,9 @@ retirement log.
   retired `CI-011` establishes the measured fast/slow cohort; and retired
   `CI-008` now groups five audited pure producers, retains local individual
   discovery, and fixes the required full-CPU worker budget at four.
-  `BUILD-004` is next: it independently repairs compile-hotspot evidence and
-  gates `RUNTIME-166`. `CI-009` evaluates lifecycle/runner changes last, after
-  the software duplication and evidence defects are removed.
+  Active `BUILD-004` independently repairs compile-hotspot evidence and gates
+  `RUNTIME-166`. `CI-009` evaluates lifecycle/runner changes last, after the
+  software duplication and evidence defects are removed.
 - Compile-hotspot analyzer ownership is `BUILD-004`; source optimization stays
   outside the process queue. `ARCH-006` retired the Sandbox editor/UI hotspot,
   `RUNTIME-146..151` own the historical `Runtime.Engine` decomposition, and

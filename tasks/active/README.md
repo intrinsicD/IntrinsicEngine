@@ -11,7 +11,9 @@ Each active task should include:
 
 ## Currently active
 
-- None.
+- [`BUILD-004`](BUILD-004-source-complete-compile-hotspot-evidence.md) — make
+  compile-hotspot evidence source-complete, collect five clean compile-only
+  samples, and gate only after correctness feedback.
 
 ## History
 

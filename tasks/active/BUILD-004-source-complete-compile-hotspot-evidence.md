@@ -21,8 +21,11 @@ depends_on:
   source path.
 
 ## Context
-- Owner: `tools/analysis/compile_hotspots.py`, its regressions/baseline, and the
-  workflow step that publishes/enforces the report.
+- Active on 2026-07-18; owner: Codex; branch: `main`. Next verification:
+  integrate the reviewed analyzer/evidence slices, then dispatch the five
+  compile-only hosted samples without CTest.
+- Owning surface: `tools/analysis/compile_hotspots.py`, its
+  regressions/baseline, and the workflow step that publishes/enforces the report.
 - The current `SourceResolver` indexes only `src/**/*`, so test, method, and
   benchmark translation units can appear unresolved even when they dominate a
   gate's compile time.

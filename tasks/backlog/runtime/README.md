@@ -176,7 +176,7 @@ owned by `RUNTIME-151` after the mechanical `RUNTIME-146..150` splits) and
 `Runtime.RenderExtraction.cppm` (106.935s).
 
 - [`RUNTIME-166`](RUNTIME-166-slim-render-extraction-module.md) — after
-  [`BUILD-004`](../process/BUILD-004-source-complete-compile-hotspot-evidence.md)
+  [`BUILD-004`](../../active/BUILD-004-source-complete-compile-hotspot-evidence.md)
   normalizes multi-output compile edges and source coverage, hide
   `RenderExtractionCache` private residency/retire/adapter state, slim the
   exported import surface, and split independent implementation domains without
