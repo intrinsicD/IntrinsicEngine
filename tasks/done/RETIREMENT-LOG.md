@@ -8,6 +8,18 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`CI-009`](CI-009-heavy-gate-routing-and-runner-evaluation.md) — heavy-gate
+lifecycle routing and runner evaluation retired on 2026-07-18 at
+`Operational` for the checked-in GitHub Actions topology. Quick structural and
+touched-scope feedback now precedes fail-closed full CPU, ASan, UBSan, Vulkan,
+and path-aware optimized Release confidence; complete CPU source coverage runs
+weekly or manually. Five sequential unchanged-SHA `ubuntu-24.04` Release runs
+measured 2/3-second queue median/p95 and 445/478-second optimized-job
+median/p95, below the documented reopen thresholds, so the standard runner is
+retained. No comparable larger runner or merge queue was registered: no A/B or
+live `merge_group` execution is claimed, executable fixtures own that event
+contract, and stable contexts remain externally unprotected.
+
 [`BUG-114`](BUG-114-ci-release-architecture-slo-calibration.md) — Release
 architecture-SLO contract repair retired on 2026-07-18 at `Operational`.
 Implementation commit `502422ce` replaces structurally mismatched scheduler
@@ -17,7 +29,7 @@ four parseable metrics plus diagnostics in JUnit. Five sequential attempt-1
 hosted runs at one unchanged SHA, image, preset, selector, and cache key passed
 without threshold adjustment; ordinary full-CPU run `29633359676` passed at
 the same SHA. No production, module-surface, dependency, or workflow change
-was absorbed. `CI-009` is active and unblocked.
+was absorbed. The evidence unblocked the subsequently retired `CI-009`.
 
 [`BUILD-004`](BUILD-004-source-complete-compile-hotspot-evidence.md) —
 source-complete compile-hotspot evidence retired on 2026-07-18 at

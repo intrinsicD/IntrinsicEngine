@@ -11,10 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`CI-009`](CI-009-heavy-gate-routing-and-runner-evaluation.md) — active and
-  unblocked after `BUG-114` retired with five successful unchanged-SHA hosted
-  Release samples; complete the lifecycle/runner decision and retirement
-  review.
+No tasks are currently active.
 
 ## History
 

@@ -15,9 +15,6 @@ map.
 
 ## Tasks
 
-- [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](../../active/CI-009-heavy-gate-routing-and-runner-evaluation.md)
-  is active and unblocked after `BUG-114` retired with five successful
-  unchanged-SHA hosted Release samples.
 - [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](PROC-025-port-research-ideation-skill-to-other-repos.md)
   (portable playbook; run from a session scoped to the target repo).
 
@@ -39,9 +36,11 @@ retirement log.
   `CI-008` now groups five audited pure producers, retains local individual
   discovery, and fixes the required full-CPU worker budget at four.
   Retired `BUILD-004` independently repairs compile-hotspot evidence and
-  unblocks `RUNTIME-166`. Active `CI-009`, unblocked by retired `BUG-114`, now
-  closes the lifecycle/runner decision after the software duplication and
-  evidence defects have been removed.
+  unblocks `RUNTIME-166`. Retired `BUG-114` repairs the Release SLO
+  workload/metric contract, and retired `CI-009` now owns the final
+  quick-feedback, merge-confidence, optimized-Release, coverage-lifecycle, and
+  standard-runner decision after the software duplication and evidence
+  defects were removed.
 - Compile-hotspot analyzer ownership is retired `BUILD-004`; source
   optimization stays outside the process queue. `ARCH-006` retired the Sandbox
   editor/UI hotspot, `RUNTIME-146..151` own the historical `Runtime.Engine`
@@ -80,6 +79,14 @@ this batch is the evidence-backed `check_pr_contract.py` retirement audited by
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](../../done/CI-009-heavy-gate-routing-and-runner-evaluation.md)
+  (done 2026-07-18): separated quick feedback from fail-closed candidate
+  confidence, promoted an unsanitized optimized Release SLO/benchmark lane,
+  scheduled complete CPU source coverage, and retained `ubuntu-24.04` after
+  five unchanged-SHA runs measured 2/3-second queue median/p95 and
+  445/478-second optimized-job median/p95. No comparable larger runner was
+  registered, so the A/B remains deferred behind quantified reopen, cost,
+  adoption, and rollback criteria.
 - [BUILD-004 — Make compile-hotspot evidence source-complete](../../done/BUILD-004-source-complete-compile-hotspot-evidence.md)
   (done 2026-07-18): normalized physical Ninja compile edges across all
   repository-owned C++ roots, calibrated five exact edge baselines from five

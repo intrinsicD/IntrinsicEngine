@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `CI-009` — Route heavy gates by lifecycle and evaluate runner scaling (tasks/active/CI-009-heavy-gate-routing-and-runner-evaluation.md)
+- none
 
 ## Theme B — Rendering modernization
 

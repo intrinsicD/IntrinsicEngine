@@ -367,10 +367,13 @@ retired `CI-011` uses comparable measurements to split only genuinely slow
 cases; and retired `CI-008` groups five audited pure producers, preserves local
 individual discovery, and retains the fastest absolute grouped full-CPU plan
 at four CTest workers. Retired `BUILD-004` supplies source-complete,
-normalized compile-hotspot evidence and unblocks both `RUNTIME-166` and
-active `CI-009`. Heavy-gate lifecycle and larger-runner decisions now use
-corrected post-optimization evidence rather than masking avoidable cold-build
-work with hardware.
+normalized compile-hotspot evidence and unblocks `RUNTIME-166`. Retired
+`BUG-114` repaired the Release SLO contract before retired `CI-009` collected
+five unchanged-SHA hosted samples, separated quick feedback from fail-closed
+candidate confidence, and retained `ubuntu-24.04` below the documented
+queue/total reopen thresholds. No comparable larger runner was registered, so
+future scaling remains gated by quantified cost, benefit, maintenance, and
+rollback criteria.
 
 `DOCS-005` is retired; the feature-module playbook now has the minimal-feature
 floor and config/command artifact.
