@@ -236,7 +236,13 @@ namespace
                     });
                 LoadSucceeded = loaded.has_value();
                 if (loaded.has_value())
+                {
                     ModelAsset = *loaded;
+                    LoadCompletionSucceeded =
+                        engine.GetAssetService()
+                            .CompleteCpuLoadAndFlushEvent(ModelAsset)
+                            .has_value();
+                }
                 return;
             }
 
@@ -246,6 +252,13 @@ namespace
                 ReloadBeforeDestroySucceeded =
                     ModelAsset.IsValid() &&
                     engine.GetAssetService().Reload(ModelAsset).has_value();
+                if (ReloadBeforeDestroySucceeded)
+                {
+                    ReloadBeforeDestroyCompletionSucceeded =
+                        engine.GetAssetService()
+                            .CompleteCpuLoadAndFlushEvent(ModelAsset)
+                            .has_value();
+                }
                 return;
             }
 
@@ -257,6 +270,13 @@ namespace
                 ReloadAfterDestroySucceeded =
                     ModelAsset.IsValid() &&
                     engine.GetAssetService().Reload(ModelAsset).has_value();
+                if (ReloadAfterDestroySucceeded)
+                {
+                    ReloadAfterDestroyCompletionSucceeded =
+                        engine.GetAssetService()
+                            .CompleteCpuLoadAndFlushEvent(ModelAsset)
+                            .has_value();
+                }
                 engine.RequestExit();
             }
         }
@@ -272,9 +292,12 @@ namespace
         bool SwitchRequested{false};
         bool DestroyRequested{false};
         bool LoadSucceeded{false};
+        bool LoadCompletionSucceeded{false};
         bool ReloadBeforeDestroySucceeded{false};
+        bool ReloadBeforeDestroyCompletionSucceeded{false};
         bool OldWorldDestroyed{false};
         bool ReloadAfterDestroySucceeded{false};
+        bool ReloadAfterDestroyCompletionSucceeded{false};
     };
 }
 
@@ -489,9 +512,12 @@ TEST(RuntimeWorldRegistry, EngineRebindsSceneBorrowersBeforeRetiringPreviousWorl
     EXPECT_TRUE(appPtr->SwitchRequested);
     EXPECT_TRUE(appPtr->DestroyRequested);
     EXPECT_TRUE(appPtr->LoadSucceeded);
+    EXPECT_TRUE(appPtr->LoadCompletionSucceeded);
     EXPECT_TRUE(appPtr->ReloadBeforeDestroySucceeded);
+    EXPECT_TRUE(appPtr->ReloadBeforeDestroyCompletionSucceeded);
     EXPECT_TRUE(appPtr->OldWorldDestroyed);
     EXPECT_TRUE(appPtr->ReloadAfterDestroySucceeded);
+    EXPECT_TRUE(appPtr->ReloadAfterDestroyCompletionSucceeded);
     EXPECT_EQ(engine.ActiveWorld(), appPtr->SecondWorld);
     EXPECT_FALSE(engine.Worlds().Contains(appPtr->FirstWorld));
     EXPECT_EQ(appPtr->EntityCountAfterReady, 2u);
