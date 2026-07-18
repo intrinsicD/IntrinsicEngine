@@ -71,9 +71,19 @@ maturity_target: CPUContracted
   candidate improves it without weakening scheduler-instance token
   validation. Per-execution callbacks and ready-list scratch move to
   `CORE-008`, where retained execution state is owned.
-- Next verification step: land the PR-fast benchmark harness without
-  production scheduler changes, record a baseline at merge commit
-  `59fbb84a`, then implement and compare the priority/wake candidate.
+- Next verification step: implement priority lanes, the conditional worker
+  wake handshake, and evidence-admitted wait-registry sharding; run the exact
+  same optimized benchmark for comparison.
+- Baseline captured with the harness-only commit `0001f37c` in optimized
+  `ci-release`; the measured scheduler/TaskGraph sources are byte-identical to
+  `59fbb84a`. Dispatch median was 2.159489 ms for 8,192 tasks
+  (3,793,490 tasks/s). The priority probe failed as expected with all 64 Low
+  callbacks ahead of High and a first-window error of 16.
+- The wait-registry evidence admits sharding into the candidate: one-thread
+  acquire/release throughput was 32,005,501 pairs/s, while eight contending
+  threads reached only 3,402,629 aggregate pairs/s (1.3289% scaling
+  efficiency). Sharding must show a material matched-run improvement without
+  regressing scheduler-instance or generation validation.
 
 ## Required changes
 - [ ] Add a small fixed set of priority lanes to external dispatch (e.g.
