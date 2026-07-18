@@ -1,10 +1,11 @@
 module;
 
-#include <memory>
-#include <thread>
-#include <optional>
+#include <cstdint>
 #include <iterator>
+#include <memory>
+#include <optional>
 #include <mutex>
+#include <thread>
 #include <vector>
 
 module Extrinsic.Core.Tasks;
@@ -41,7 +42,10 @@ namespace Extrinsic::Core::Tasks
         if (!s_Ctx) return;
 
         s_Ctx->isRunning = false;
-        s_Ctx->workSignal.fetch_add(1, std::memory_order_release);
+        // Shutdown is the unconditional broadcast exception to conditional
+        // dispatch wakes. The seq_cst increment participates in the same
+        // parked-worker handshake as ordinary work publication.
+        s_Ctx->workSignal.fetch_add(1, std::memory_order_seq_cst);
         s_Ctx->workSignal.notify_all();
 
         for (auto& t : s_Ctx->workers)
@@ -51,12 +55,13 @@ namespace Extrinsic::Core::Tasks
         }
 
         std::vector<Detail::SchedulerContext::ParkedContinuation> abandoned;
+        for (auto& shard : s_Ctx->waitShards)
         {
-            std::lock_guard lock(s_Ctx->waitMutex);
-            for (auto& slot : s_Ctx->waitSlots)
+            std::lock_guard lock(shard.Mutex);
+            for (auto& slot : shard.Slots)
             {
                 auto slotContinuations =
-                    Detail::TakeParkedContinuationsLocked(*s_Ctx, slot);
+                    Detail::TakeParkedContinuationsLocked(shard, slot);
                 abandoned.insert(abandoned.end(),
                                  std::make_move_iterator(slotContinuations.begin()),
                                  std::make_move_iterator(slotContinuations.end()));
@@ -116,9 +121,11 @@ namespace Extrinsic::Core::Tasks
                 break;
 
             LocalTask task;
-            if (TryPopTask(task, std::nullopt))
+            std::uint8_t lane =
+                static_cast<std::uint8_t>(DispatchPriority::Normal);
+            if (TryPopDefinitiveTask(task, std::nullopt, lane))
             {
-                OnTaskDequeuedAndRun(task);
+                OnTaskDequeuedAndRun(task, lane);
                 continue;
             }
 

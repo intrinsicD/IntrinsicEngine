@@ -48,6 +48,9 @@ namespace Extrinsic::Core::Tasks
         void SpinLock::unlock()
         {
             locked.store(false, std::memory_order_release);
+            // The slow path in lock() parks with atomic::wait after its
+            // bounded spin phase, so this notification is load-bearing. It is
+            // separate from scheduler work notifications.
             locked.notify_one();
         }
 
@@ -71,7 +74,7 @@ namespace Extrinsic::Core::Tasks
         }
 
         SchedulerContext::WorkerState::WorkerState(WorkerState&& other) noexcept
-            : localDeque(std::move(other.localDeque))
+            : localDeques(std::move(other.localDeques))
               , stealCount(other.stealCount.load(std::memory_order_relaxed))
         {
             other.stealCount.store(0, std::memory_order_relaxed);
@@ -81,7 +84,7 @@ namespace Extrinsic::Core::Tasks
         {
             if (this != &other)
             {
-                localDeque = std::move(other.localDeque);
+                localDeques = std::move(other.localDeques);
                 stealCount.store(other.stealCount.load(std::memory_order_relaxed), std::memory_order_relaxed);
                 other.stealCount.store(0, std::memory_order_relaxed);
             }

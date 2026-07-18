@@ -1,9 +1,11 @@
 module;
 
-#include <vector>
-#include <memory>
-#include <coroutine>
 #include <atomic>
+#include <coroutine>
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <vector>
 
 export module Extrinsic.Core.Tasks;
 
@@ -12,6 +14,16 @@ export import :LocalTask;
 namespace Extrinsic::Core::Tasks
 {
 export class Job;
+
+    // Fixed, domain-neutral scheduling preferences. Values are ordered from
+    // most to least urgent so hot scheduler scans need no dynamic policy
+    // state. Priority is preferential rather than realtime or starvation-free.
+    export enum class DispatchPriority : std::uint8_t
+    {
+        High = 0,
+        Normal,
+        Low,
+    };
 
     export class Scheduler
     {
@@ -70,6 +82,8 @@ export class Job;
             std::uint64_t QueueContentionCount = 0;
             std::uint64_t WorkProgressEpoch = 0;
             std::uint32_t ExternalProgressWaiters = 0;
+            std::uint64_t WorkerWakeNotifications = 0;
+            std::uint32_t ParkedWorkers = 0;
             double StealSuccessRatio = 0.0;
             std::vector<std::uint32_t> WorkerLocalDepths{};
             std::vector<std::uint64_t> WorkerVictimStealCounts{};
@@ -79,9 +93,21 @@ export class Job;
         static void Shutdown();
 
         template <typename F>
-        static void Dispatch(F&& task) { DispatchInternal(LocalTask(std::forward<F>(task))); }
+        static void Dispatch(F&& task)
+        {
+            Dispatch(DispatchPriority::Normal, std::forward<F>(task));
+        }
+
+        template <typename F>
+        static void Dispatch(const DispatchPriority priority, F&& task)
+        {
+            DispatchInternal(LocalTask(std::forward<F>(task)), priority);
+        }
 
         static void Dispatch(Job&& job);
+        // Priority applies to this queued resume only. Later coroutine
+        // reschedules return to the normal lane.
+        static void Dispatch(DispatchPriority priority, Job&& job);
         static void Reschedule(std::coroutine_handle<> h, std::shared_ptr<std::atomic<bool>> alive = nullptr);
 
         [[nodiscard]] static bool IsInitialized() noexcept;
@@ -111,7 +137,7 @@ export class Job;
 
     private:
         static void WorkerEntry(unsigned threadIndex);
-        static void DispatchInternal(LocalTask&& task);
+        static void DispatchInternal(LocalTask&& task, DispatchPriority priority);
     };
 
     export class Job

@@ -32,6 +32,23 @@ namespace Extrinsic::Core::Dag
 {
     namespace
     {
+        [[nodiscard]] constexpr Tasks::DispatchPriority ToDispatchPriority(
+            const TaskPriority priority) noexcept
+        {
+            switch (priority)
+            {
+            case TaskPriority::Critical:
+            case TaskPriority::High:
+                return Tasks::DispatchPriority::High;
+            case TaskPriority::Low:
+            case TaskPriority::Background:
+                return Tasks::DispatchPriority::Low;
+            case TaskPriority::Normal:
+            default:
+                return Tasks::DispatchPriority::Normal;
+            }
+        }
+
         struct ResourceState
         {
             std::int32_t LastWriter = -1;
@@ -1081,10 +1098,14 @@ namespace Extrinsic::Core::Dag
 
             for (const auto passIndex : workerPasses)
             {
-                Tasks::Scheduler::Dispatch([passIndex, state]()
-                {
-                    state->ExecuteAndFinish(state, passIndex);
-                });
+                const auto priority =
+                    ToDispatchPriority(impl->Passes[passIndex].Options.Priority);
+                Tasks::Scheduler::Dispatch(
+                    priority,
+                    [passIndex, state]()
+                    {
+                        state->ExecuteAndFinish(state, passIndex);
+                    });
             }
         };
 

@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -384,6 +386,95 @@ TEST(CoreTaskGraphCompletionLifetime, WaitStealsWorkerLocalWorkNeededByGraph)
     ASSERT_TRUE(submitted->Wait().has_value());
 
     EXPECT_EQ(childThread, waitingThread);
+}
+
+TEST(CoreTaskGraphCompletionLifetime, SingleWorkerRetainsLocalProgressAfterFairnessProbe)
+{
+    SchedulerFixture scheduler{1};
+    constexpr std::uint32_t kChildren = 96u;
+    std::atomic<bool> childrenQueued{false};
+    std::atomic<std::uint32_t> childrenCompleted{0u};
+
+    Tasks::Scheduler::Dispatch([&]()
+    {
+        for (std::uint32_t child = 0u; child < kChildren; ++child)
+        {
+            Tasks::Scheduler::Dispatch([&]()
+            {
+                const auto completed =
+                    childrenCompleted.fetch_add(1u, std::memory_order_acq_rel) + 1u;
+                if (completed == kChildren)
+                    childrenCompleted.notify_all();
+            });
+        }
+        Publish(childrenQueued);
+    });
+
+    WaitUntilPublished(childrenQueued);
+    WaitUntilAtLeast(childrenCompleted, kChildren);
+    EXPECT_EQ(childrenCompleted.load(std::memory_order_acquire), kChildren);
+    Tasks::Scheduler::WaitForAll();
+}
+
+TEST(CoreTaskGraphCompletionLifetime, TaskGraphPriorityReachesSchedulerLanes)
+{
+    SchedulerFixture scheduler{1};
+
+    constexpr std::uint32_t kLowPasses = 32u;
+    constexpr std::uint32_t kHighPasses = 8u;
+    constexpr std::uint32_t kPasses = kLowPasses + kHighPasses;
+    std::atomic<bool> blockerStarted{false};
+    std::atomic<bool> releaseBlocker{false};
+    std::atomic<std::uint32_t> nextOrder{0u};
+    std::atomic<std::uint32_t> completed{0u};
+    std::array<std::uint8_t, kPasses> order{};
+
+    Tasks::Scheduler::Dispatch([&]()
+    {
+        Publish(blockerStarted);
+        WaitUntilPublished(releaseBlocker);
+    });
+    WaitUntilPublished(blockerStarted);
+
+    TaskGraph graph;
+    const auto addPasses = [&](const std::uint32_t count,
+                               const TaskPriority priority,
+                               const std::uint8_t classId,
+                               const std::string_view prefix)
+    {
+        TaskGraphPassOptions options{};
+        options.Priority = priority;
+        for (std::uint32_t pass = 0u; pass < count; ++pass)
+        {
+            graph.AddPass(std::string(prefix) + std::to_string(pass), options,
+                [](TaskGraphBuilder&) {},
+                [&, classId]()
+                {
+                    const auto index = nextOrder.fetch_add(1u, std::memory_order_acq_rel);
+                    order[index] = classId;
+                    const auto finished = completed.fetch_add(1u, std::memory_order_acq_rel) + 1u;
+                    if (finished == kPasses)
+                        completed.notify_all();
+                });
+        }
+    };
+
+    addPasses(kLowPasses, TaskPriority::Background, 0u, "Low");
+    addPasses(kHighPasses, TaskPriority::Critical, 1u, "High");
+
+    auto submitted = graph.Submit();
+    if (!submitted.has_value())
+    {
+        Publish(releaseBlocker);
+        ADD_FAILURE() << "priority graph submission failed";
+        return;
+    }
+    Publish(releaseBlocker);
+    WaitUntilAtLeast(completed, kPasses);
+    EXPECT_TRUE(submitted->Wait().has_value());
+
+    for (std::uint32_t index = 0u; index < kHighPasses; ++index)
+        EXPECT_EQ(order[index], 1u) << "low-priority pass ran at index " << index;
 }
 
 TEST(CoreTaskGraphCompletionLifetime, WaitWakesForChildDispatchedAfterHelperRegisters)

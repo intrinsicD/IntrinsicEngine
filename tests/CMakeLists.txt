@@ -1449,6 +1449,7 @@ set(_intrinsic_multiworker_test_budgets
     "IntrinsicCoreWrapperUnitTests|CoreTasks.StaleWaitTokenUnparkDoesNotResumeNewWaiters|3"
     "IntrinsicCoreWrapperUnitTests|CoreTasks.WaitTokenFromPriorSchedulerInstanceCannotReleaseCurrentSlot|3"
     "IntrinsicCoreWrapperUnitTests|CoreTasks.CounterEventHighFanInRandomizedSignalsResumeExactlyOnce|4"
+    "IntrinsicCoreWrapperUnitTests|CoreTasks.IndependentCounterEventsPreserveSchedulerInstanceAcrossWaitShards|4"
     "IntrinsicCoreWrapperUnitTests|CoreTasks.SchedulerStatsExposeQueueAndStealTelemetry|3"
     "IntrinsicCoreWrapperUnitTests|CoreTasks.SchedulerStatsCanBeExportedToFrameTelemetry|3"
     "IntrinsicCoreWrapperUnitTests|CoreTasks.UndispatchedJobDestruction_NoLeak|3"
