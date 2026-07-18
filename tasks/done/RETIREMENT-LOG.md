@@ -5418,3 +5418,20 @@ selector passed 4,110/4,110 with one expected GLFW/LSan capability skip, and
 strict layering, test-layout, documentation-link, task-policy, and module
 inventory checks passed. Implementation checkpoint: `f310e872`; main merge:
 `b983f7c3`.
+
+[`RUNTIME-166`](RUNTIME-166-slim-render-extraction-module.md) —
+RenderExtraction interface slimming retired to `tasks/done/` on 2026-07-19 at
+`Operational`. `RenderExtractionCache` now exposes one opaque implementation
+object while its state has exactly one definition in a non-exported
+implementation partition; base extraction, geometry residency/retirement, and
+visualization/spatial adapters compile as separate ordinary implementation
+units. The primary interface fell from 908 to 599 lines, 38 to 17 module
+dependency statements, and 14 to 5 global-fragment includes without changing
+the public token stream or runtime behavior. A geometry-only touch compiled
+only its implementation object plus the runtime archive. Five alternating,
+same-host Clang 20 direct compiler-edge pairs with ccache disabled measured a
+bounded primary-interface median reduction from 40.87s to 20.72s (49.3%);
+this is not a cold-build, full-gate, or whole-tree claim. Focused extraction
+coverage passed 145/145, the full CPU-supported selector passed 4,104/4,104
+with one expected GLFW/LSan capability skip, and strict structural checks
+passed. Implementation checkpoint: `c02eb142`; main merge: `66f5f7b9`.

@@ -49,11 +49,9 @@ maturity_target: Operational
   same-host primary interface-edge samples and physical rebuild-edge evidence.
 
 ## Status
-- Acceptance evidence complete; owner: Codex team; branch:
-  `codex/runtime-166-slim-render-extraction`; activated 2026-07-18.
-- The implementation split, local correctness/structural verification, and
-  five-pair corrected Clang 20 primary-edge timing population are complete.
-  The task remains active for coordinating-agent retirement only.
+- Completed and retired at `Operational` on 2026-07-19; owner: Codex team;
+  implementation branch: `codex/runtime-166-slim-render-extraction`.
+- Implementation commit: `c02eb142`; merged to `main` as `66f5f7b9`.
 
 ## Before inventory (2026-07-18)
 - Source size at `c0c2c376`: `Runtime.RenderExtraction.cppm` is 908 lines and
@@ -221,7 +219,7 @@ maturity_target: Operational
 - [x] Update runtime architecture/module documentation if implementation
       partitions or the public import surface change.
 - [x] Regenerate `docs/api/generated/module_inventory.md`.
-- [ ] Update `tasks/backlog/runtime/README.md` and regenerate
+- [x] Update `tasks/backlog/runtime/README.md` and regenerate
       `tasks/SESSION-BRIEF.md` on retirement.
 
 ## Acceptance criteria

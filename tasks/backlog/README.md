@@ -380,7 +380,8 @@ retired `CI-011` uses comparable measurements to split only genuinely slow
 cases; and retired `CI-008` groups five audited pure producers, preserves local
 individual discovery, and retains the fastest absolute grouped full-CPU plan
 at four CTest workers. Retired `BUILD-004` supplies source-complete,
-normalized compile-hotspot evidence and unblocks `RUNTIME-166`. Retired
+normalized compile-hotspot evidence; retired `RUNTIME-166` consumed it to slim
+and partition the RenderExtraction primary interface. Retired
 `BUG-114` repaired the Release SLO contract before retired `CI-009` collected
 five unchanged-SHA hosted samples, separated quick feedback from fail-closed
 candidate confidence, and retained `ubuntu-24.04` below the documented

@@ -233,11 +233,13 @@ facades. The other measured interfaces were `Runtime.Engine.cppm` (140.072s,
 owned by `RUNTIME-151` after the mechanical `RUNTIME-146..150` splits) and
 `Runtime.RenderExtraction.cppm` (106.935s).
 
-- [`RUNTIME-166`](../../active/RUNTIME-166-slim-render-extraction-module.md) — after retired
-  `BUILD-004` normalized multi-output compile edges and source coverage, hide
-  `RenderExtractionCache` private residency/retire/adapter state, slim the
-  exported import surface, and split independent implementation domains without
-  changing extraction behavior.
+- [`RUNTIME-166`](../../done/RUNTIME-166-slim-render-extraction-module.md) —
+  retired after hiding `RenderExtractionCache` private state behind one
+  implementation object, slimming the primary interface from 38 to 17 module
+  dependency statements, and splitting three independently compiled
+  implementation domains without changing extraction behavior. Five paired
+  same-host Clang 20 direct-edge samples measured a bounded primary-interface
+  median reduction from 40.87s to 20.72s; no whole-build claim is made.
 
 ### Module-surface diet candidates (seeded 2026-07-10)
 
