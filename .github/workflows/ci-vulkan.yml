@@ -238,6 +238,10 @@ jobs:
           VULKAN_RESULT: ${{ needs['ci-vulkan'].result }}
         run: |
           if [[ "$EVENT_NAME" == "pull_request" && "$PR_DRAFT" == "true" ]]; then
+            if [[ "$VULKAN_RESULT" != "skipped" ]]; then
+              echo "::error::Draft Vulkan job resolved as $VULKAN_RESULT"
+              exit 1
+            fi
             echo "Vulkan confidence skipped for draft pull request"
             exit 0
           fi

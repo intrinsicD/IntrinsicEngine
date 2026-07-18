@@ -152,6 +152,7 @@ class WorkflowRoutingTests(unittest.TestCase):
                 resolve = next(iter(_named_steps(result).values()))
                 command = _one_line(resolve["run"])
                 self.assertIn('"$PR_DRAFT" == "true"', command)
+                self.assertIn('!= "skipped"', command)
                 self.assertIn("exit 1", command)
 
     def test_cpu_candidate_path_requires_sanitizers_and_selection_parity(
@@ -260,6 +261,10 @@ class WorkflowRoutingTests(unittest.TestCase):
         self.assertEqual(result["if"], "always()")
         resolve = _named_steps(result)["Resolve ci-release lifecycle result"]
         command = _one_line(resolve["run"])
+        self.assertIn(
+            '"$NEEDS_RELEASE" != "true" && "$NEEDS_RELEASE" != "false"',
+            command,
+        )
         self.assertIn('"$NEEDS_RELEASE" != "true"', command)
         self.assertIn('"$RELEASE_RESULT" != "skipped"', command)
         self.assertIn('"$RELEASE_RESULT" != "success"', command)

@@ -210,7 +210,15 @@ jobs:
             echo "::error::Release routing failed with result $ROUTE_RESULT"
             exit 1
           fi
+          if [[ "$NEEDS_RELEASE" != "true" && "$NEEDS_RELEASE" != "false" ]]; then
+            echo "::error::Release routing produced invalid verdict '$NEEDS_RELEASE'"
+            exit 1
+          fi
           if [[ "$EVENT_NAME" == "pull_request" && "$PR_DRAFT" == "true" ]]; then
+            if [[ "$RELEASE_RESULT" != "skipped" ]]; then
+              echo "::error::Draft Release job resolved as $RELEASE_RESULT"
+              exit 1
+            fi
             echo "Release confidence skipped for draft pull request"
             exit 0
           fi

@@ -685,6 +685,12 @@ jobs:
           PARITY_RESULT: ${{ needs['cpu-test-selection-parity'].result }}
         run: |
           if [[ "$EVENT_NAME" == "pull_request" && "$PR_DRAFT" == "true" ]]; then
+            for result in "$CPU_RESULT" "$SANITIZER_RESULT" "$PARITY_RESULT"; do
+              if [[ "$result" != "skipped" ]]; then
+                echo "::error::Draft CPU/sanitizer job resolved as $result"
+                exit 1
+              fi
+            done
             echo "Full CPU and sanitizer confidence skipped for draft pull request"
             exit 0
           fi
