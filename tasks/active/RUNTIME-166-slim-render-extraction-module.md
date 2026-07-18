@@ -45,6 +45,12 @@ maturity_target: Operational
   so its before/after claim is not based on duplicated `.pcm`/`.o` rows or a
   source-incomplete baseline.
 
+## Status
+- In progress; owner: Codex team; branch:
+  `codex/runtime-166-slim-render-extraction`; activated 2026-07-18.
+- Next gate: record the public/private import and declaration inventory before
+  the first mechanical implementation-storage slice.
+
 ## Required changes
 - [ ] Inventory interface declarations/imports into public contract, required
       complete public types, and private implementation-only types; record the

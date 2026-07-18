@@ -22,6 +22,12 @@ maturity_target: CPUContracted
 - `Runtime.SandboxEditorFacades.cpp::AccumulateProgressiveCompositionSummary` independently follows only immediate siblings using `ChildCount` as a guard and can silently truncate malformed chains.
 - `Test` contains broader hierarchy iteration ideas, but IntrinsicEngine needs only the two concrete query shapes used today.
 
+## Status
+- In progress; owner: Codex team; branch:
+  `codex/harden-086-guarded-hierarchy-queries`; activated 2026-07-18.
+- Next gate: inventory the shared child-chain invariants, implement the
+  all-or-nothing ECS query contract, and pass focused ECS/runtime coverage.
+
 ## Required changes
 - [ ] Extend `Extrinsic.ECS.Hierarchy.Structure` with plain status/result structs and free functions `CollectChildren` and `CollectDescendantsPreorder`.
 - [ ] Preserve `FirstChild`/`NextSibling` order exactly. Descendant results exclude the queried root and use iterative depth-first preorder so deep valid scenes do not consume the C++ call stack.
