@@ -477,6 +477,69 @@ TEST(CoreTaskGraphCompletionLifetime, TaskGraphPriorityReachesSchedulerLanes)
         EXPECT_EQ(order[index], 1u) << "low-priority pass ran at index " << index;
 }
 
+TEST(CoreTaskGraphCompletionLifetime,
+     DependentTaskGraphPriorityReachesWorkerLocalLanes)
+{
+    SchedulerFixture scheduler{1};
+
+    constexpr std::uint32_t kLowPasses = 32u;
+    constexpr std::uint32_t kHighPasses = 8u;
+    constexpr std::uint32_t kSuccessors = kLowPasses + kHighPasses;
+    std::atomic<std::uint32_t> nextOrder{0u};
+    std::atomic<std::uint32_t> completed{0u};
+    std::array<std::uint8_t, kSuccessors> order{};
+
+    TaskGraph graph;
+    graph.AddPass(
+        "Root",
+        [](TaskGraphBuilder&) {},
+        []() {});
+
+    const auto addSuccessors = [&](const std::uint32_t count,
+                                   const TaskPriority priority,
+                                   const std::uint8_t classId,
+                                   const std::string_view prefix)
+    {
+        TaskGraphPassOptions options{};
+        options.Priority = priority;
+        for (std::uint32_t pass = 0u; pass < count; ++pass)
+        {
+            graph.AddPass(
+                std::string(prefix) + std::to_string(pass),
+                options,
+                [](TaskGraphBuilder& builder)
+                {
+                    builder.DependsOn(0u);
+                },
+                [&, classId]()
+                {
+                    const auto index =
+                        nextOrder.fetch_add(1u, std::memory_order_acq_rel);
+                    order[index] = classId;
+                    const auto finished =
+                        completed.fetch_add(1u, std::memory_order_acq_rel) + 1u;
+                    if (finished == kSuccessors)
+                        completed.notify_all();
+                });
+        }
+    };
+
+    addSuccessors(kLowPasses, TaskPriority::Background, 0u, "Low");
+    addSuccessors(kHighPasses, TaskPriority::Critical, 1u, "High");
+
+    const auto statsBefore = Tasks::Scheduler::GetStats();
+    auto submitted = graph.Submit();
+    ASSERT_TRUE(submitted.has_value());
+    WaitUntilAtLeast(completed, kSuccessors);
+    ASSERT_TRUE(submitted->Wait().has_value());
+    const auto statsAfter = Tasks::Scheduler::GetStats();
+
+    for (std::uint32_t index = 0u; index < kHighPasses; ++index)
+        EXPECT_EQ(order[index], 1u) << "low-priority pass ran at index " << index;
+    EXPECT_GE(statsAfter.LocalPopCount - statsBefore.LocalPopCount,
+              static_cast<std::uint64_t>(kSuccessors));
+}
+
 TEST(CoreTaskGraphCompletionLifetime, WaitWakesForChildDispatchedAfterHelperRegisters)
 {
     SchedulerFixture scheduler{1};
