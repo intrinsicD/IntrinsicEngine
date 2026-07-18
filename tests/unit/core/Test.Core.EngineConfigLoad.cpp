@@ -366,7 +366,8 @@ TEST(CoreEngineConfigLoad, SectionMetadataMismatchRetainsReference)
     }
 }
 
-TEST(CoreEngineConfigLoad, ValidatorFallbackAndMalformedOutputRetainReference)
+TEST(CoreEngineConfigLoad,
+     ValidatorFallbackCanonicalIsAcceptedAndMalformedOutputRetainsReference)
 {
     EngineConfigSectionRegistry registry = FakeRegistry();
     const EngineConfigLoadResult invalidValue = PreviewEngineConfig(
@@ -410,7 +411,8 @@ TEST(CoreEngineConfigLoad, ValidatorFallbackAndMalformedOutputRetainReference)
         EngineConfigParseOptions{.SectionRegistry = &fallbackRegistry});
     ASSERT_EQ(fallbackOutput.State, EngineConfigState::FallbackApplied);
     EXPECT_EQ(RequireSection(fallbackOutput.Preview.Config).PayloadJson,
-              kFakeDefaultPayload);
+              kFakeChangedPayload);
+    EXPECT_EQ(fallbackOutput.Preview.ParsedFieldCount, 2u);
 
     EngineConfigSectionRegistry malformedRegistry{};
     EngineConfigSectionRegistration malformed = FakeRegistration();

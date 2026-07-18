@@ -876,7 +876,7 @@ namespace Extrinsic::Core::Config
                         referencePayload,
                         sectionSubject + ".payload");
                 AppendSectionDiagnostics(result, validation);
-                if (validation.State != EngineConfigState::Valid)
+                if (!validation.Usable())
                 {
                     if (validation.Diagnostics.empty())
                     {
@@ -887,6 +887,15 @@ namespace Extrinsic::Core::Config
                             "Application config section validation failed; reference section retained.");
                     }
                     continue;
+                }
+                if (validation.State == EngineConfigState::FallbackApplied &&
+                    validation.Diagnostics.empty())
+                {
+                    AddWarning(
+                        result,
+                        EngineConfigDiagnosticCode::FallbackApplied,
+                        sectionSubject + ".payload",
+                        "Application config section validation applied reference fallback values.");
                 }
 
                 const std::optional<std::string> canonical =
