@@ -22,8 +22,8 @@ depends_on:
 
 ## Context
 - Active on 2026-07-18; owner: Codex; branch: `main`. Next verification:
-  commit and push Ninja log v4-v7 support, then dispatch one replacement set
-  of five compile-only hosted samples without CTest.
+  commit and push the refreshed baseline, then dispatch one normal hosted CPU
+  workflow to prove correctness reports before the hotspot gate.
 - Owning surface: `tools/analysis/compile_hotspots.py`, its
   regressions/baseline, and the workflow step that publishes/enforces the report.
 - Before Slice A, `SourceResolver` indexed only `src/**/*`, so test, method,
@@ -32,9 +32,9 @@ depends_on:
 - Before Slice A, Ninja `.pcm` and `.o` outputs from one physical compiler
   command were treated as independent edges, and source-only baseline lookup
   could silently overwrite duplicate source rows.
-- The current baseline contains only `src/geometry/Geometry.Octree.cppm`, so a
-  passing gate does not demonstrate visibility of the runtime/test hot spots
-  observed in recent logs.
+- At task intake, the baseline contained only
+  `src/geometry/Geometry.Octree.cppm`, so a passing gate did not demonstrate
+  visibility of the runtime/test hot spots observed in recent logs.
 - `IntrinsicTests` is the source-complete compile-only evidence target: it
   builds every registered test producer, including method and benchmark
   translation units, without invoking the `IntrinsicBenchmarks` custom target
@@ -51,27 +51,29 @@ depends_on:
   report behind correctness feedback.
 
 ## Status
-- Slice A is implemented and focused non-CMake checks pass. Slice B hosted
-  sampling, baseline refresh, real-build validation, and retirement remain
-  pending.
+- Slice A and the Slice B hosted calibration are complete. One normal hosted
+  CPU correctness/baseline run and retirement remain pending.
 - Hosted run `29628467034` completed five clean builds at `f2c5d192`, but all
   five analyzers rejected the hosted runner's Ninja log v7 before producing
   artifacts. The run is diagnostic only and contributes no calibration data.
-  Before reading any successful report, the refresh rule remains fixed:
-  require an identical physical-edge identity and resolution inventory across
-  all five CPU reports; rank baseline-eligible resolved repository edges
-  globally by median duration with `edge_id` as the tie-breaker; retain the
-  five slowest; and set each budget by rounding
-  `1.25 * nearest-rank p95` up to a whole second with
-  `max_regression_ms=0`. The one source-complete report proves root visibility
-  only and does not enter timing thresholds.
-- Inventory equality means equality of the canonical map keyed by stable
-  `edge_id` with `source`, `source_root`, `edge_kind`, sorted `outputs`, and
-  resolution status as values. It ignores duration-sorted report order and the
-  run-local timestamp/command-hash `physical_identity`. Ranking is median
-  descending, then `edge_id` lexicographically ascending. Every retained target
-  carries `edge_id`, `source`, `edge_kind`, and `outputs`; the resulting
-  baseline describes the required CPU cohort, not source-complete timing.
+- Replacement run `29629549095` passed all five samples at
+  `4a53c38961241ee9d5a5544882b7e162c3c95ead`. Every CPU report contained
+  1,032 physical edges, 1,029 eligible resolved repository edges, zero
+  resolution issues, and the identical predeclared status-level inventory
+  SHA-256
+  `c65b7ef3a5a0ea4393fb33cf8894c2b3ed54ba12c8ff8ff24aa707a9c05a64e5`.
+  The additional full-resolution audit also matched, with SHA-256
+  `5d832f6bb35910c9952766f63cf87f9e66dc096864a4c9a63e4d92436abc0efc`.
+- The fixed global median ranking selected
+  `Runtime.SandboxEditorFacades.cppm`, `Runtime.Engine.cppm`,
+  `Runtime.RenderExtraction.cppm`, `Sandbox.MethodPanels.cppm`, and
+  `Sandbox.EditorShell.cppm`. Their max/p95-derived budgets are respectively
+  283000, 165000, 167000, 151000, and 155000 ms with
+  `max_regression_ms=0`; the CI policy records every duration and artifact
+  digest.
+- Sample 1's excluded source-complete report contained 1,077 physical edges,
+  1,074 resolved edges, zero issues, and configured/sampled counts of
+  `src=705`, `tests=339`, `methods=9`, and `benchmarks=21`.
 
 ## Required changes
 - [x] Define and document a deterministic physical compile-edge identity from
@@ -85,7 +87,7 @@ depends_on:
       omitting or overwriting them.
 - [x] Compare baselines against normalized physical edge/source records and
       fail on ambiguous/missing required targets with actionable diagnostics.
-- [ ] Refresh the baseline from at least five comparable clean samples after
+- [x] Refresh the baseline from at least five comparable clean samples after
       normalization, naming the actual top repository-owned offenders rather
       than preserving stale targets by fiat.
 - [x] Move the compile-hotspot failure/report after CPU correctness tests or
@@ -102,7 +104,7 @@ depends_on:
       comparison while its complete output list remains visible.
 - [x] Prove distinct physical phases for the same source are retained with
       explicit identities rather than overwritten.
-- [ ] Run the repaired analyzer against clean `ci` logs and validate the JSON
+- [x] Run the repaired analyzer against clean `ci` logs and validate the JSON
       result and refreshed baseline.
 
 ## Docs
@@ -116,13 +118,13 @@ depends_on:
       retirement.
 
 ## Acceptance criteria
-- [ ] Every repository-owned C++ compile output in the test/CI graph is either
+- [x] Every repository-owned C++ compile output in the test/CI graph is either
       resolved to a source or reported as unresolved with a reason.
-- [ ] A physical multi-output compiler command is ranked once, while genuinely
+- [x] A physical multi-output compiler command is ranked once, while genuinely
       separate phases remain individually inspectable.
-- [ ] Baseline lookup cannot silently overwrite two records for one source or
+- [x] Baseline lookup cannot silently overwrite two records for one source or
       pass when a required source/edge is ambiguous.
-- [ ] The resolver covers every declared repository root, the report states
+- [x] The resolver covers every declared repository root, the report states
       which roots/edges were present in the sampled build graph, and the top-N
       ranking reflects the actual slowest compiled edges without artificial
       per-root quotas.

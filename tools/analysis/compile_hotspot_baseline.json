@@ -1,15 +1,55 @@
 {
-  "max_regression_ms": 3000,
+  "max_regression_ms": 0,
   "targets": [
     {
-      "edge_id": "1bcfb38caa97dfd2e2af85affe30ff72f5ee10e1c70935f95dab807ed53fdbc7",
-      "source": "src/geometry/Geometry.Octree.cppm",
+      "edge_id": "68913ab259a16cbe41cbca3ad32b211492a9189e7905fabe8ed16a4a6fde9503",
+      "source": "src/runtime/Runtime.SandboxEditorFacades.cppm",
       "edge_kind": "module-interface",
       "outputs": [
-        "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Octree.cppm.o",
-        "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Octree.pcm"
+        "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.SandboxEditorFacades.pcm",
+        "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.SandboxEditorFacades.cppm.o"
       ],
-      "max_duration_ms": 92000
+      "max_duration_ms": 283000
+    },
+    {
+      "edge_id": "58ec1170b599cb974764ce6459b83c3f8090403d6455d5555f162baf402ac970",
+      "source": "src/runtime/Runtime.Engine.cppm",
+      "edge_kind": "module-interface",
+      "outputs": [
+        "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.Engine.pcm",
+        "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.Engine.cppm.o"
+      ],
+      "max_duration_ms": 165000
+    },
+    {
+      "edge_id": "86f41c84f63ce2736408ccd2c99e84fd43fca32ea17d9e65aed6bf40c38c398d",
+      "source": "src/runtime/Runtime.RenderExtraction.cppm",
+      "edge_kind": "module-interface",
+      "outputs": [
+        "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.RenderExtraction.pcm",
+        "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.RenderExtraction.cppm.o"
+      ],
+      "max_duration_ms": 167000
+    },
+    {
+      "edge_id": "8eb61c4db16ee5fd2f592219817abb27d0e7cea9af8e10fd848db2e6493a55db",
+      "source": "src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm",
+      "edge_kind": "module-interface",
+      "outputs": [
+        "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MethodPanels.cppm.o",
+        "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Extrinsic.Sandbox.Editor.MethodPanels.pcm"
+      ],
+      "max_duration_ms": 151000
+    },
+    {
+      "edge_id": "8adaad0d2989f723935814184521de743bd720635bb70a700e2a41a9561c1fb4",
+      "source": "src/app/Sandbox/Editor/Sandbox.EditorShell.cppm",
+      "edge_kind": "module-interface",
+      "outputs": [
+        "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.EditorShell.cppm.o",
+        "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Extrinsic.Sandbox.Editor.Shell.pcm"
+      ],
+      "max_duration_ms": 155000
     }
   ]
 }

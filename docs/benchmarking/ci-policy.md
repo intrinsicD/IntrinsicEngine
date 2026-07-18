@@ -780,17 +780,61 @@ with `max_regression_ms=0`. The single source-complete report proves root
 visibility only and does not enter timing thresholds.
 Inventory equality compares a canonical map keyed by stable `edge_id`, with
 `source`, `source_root`, `edge_kind`, sorted `outputs`, and resolution status as
-values. It ignores duration-sorted report order and the run-local
-timestamp/command-hash `physical_identity`. Ranking is median descending and
-then `edge_id` lexicographically ascending. Every retained baseline target
-carries `edge_id`, `source`, `edge_kind`, and `outputs`; the refreshed baseline
-therefore describes the required CPU cohort, not source-complete timing.
+values. It ignores duration-sorted report order and the
+run-local timestamp/command-hash `physical_identity`. Ranking is median
+descending and then `edge_id` lexicographically ascending. Every retained
+baseline target carries `edge_id`, `source`, `edge_kind`, and `outputs`; the
+refreshed baseline therefore describes the required CPU cohort, not
+source-complete timing. Inventory digests serialize that map as UTF-8 JSON with
+recursively sorted keys, compact `,` and `:` separators, and no trailing
+newline.
 For the one source-completeness diagnostic, build the compile-only
 `IntrinsicTests` aggregate. It covers registered test, method, and benchmark
 producers without invoking the `IntrinsicBenchmarks` custom target, whose build
 also executes the benchmark runner.
-The checked-in Octree budget is the historical BUG-004 threshold migrated to
-the strict identity schema; it is not a BUILD-004 five-sample refresh.
+
+Hosted run
+[`29629549095`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29629549095)
+at `4a53c38961241ee9d5a5544882b7e162c3c95ead` supplied the BUILD-004
+refresh. All five clean `ubuntu-24.04`/Clang 20 CPU reports used the same
+required producer cohort and schema `intrinsic.compile-hotspots/v2`. Each
+contained 1,032 physical edges, 1,029 eligible resolved repository edges, and
+zero ambiguous or unresolved outputs. Canonicalizing the predeclared
+status-level inventory above produced the same SHA-256 in every sample:
+`c65b7ef3a5a0ea4393fb33cf8894c2b3ed54ba12c8ff8ff24aa707a9c05a64e5`.
+An additional field-for-field audit of each full `resolution` record also
+matched across all five samples, with canonical SHA-256
+`5d832f6bb35910c9952766f63cf87f9e66dc096864a4c9a63e4d92436abc0efc`;
+that stronger post-declaration audit did not alter ranking or thresholds.
+
+| Rank | Source | Durations, samples 1-5 (ms) | Median (ms) | Max / nearest-rank p95 (ms) | Budget (ms) |
+| ---: | --- | --- | ---: | ---: | ---: |
+| 1 | `src/runtime/Runtime.SandboxEditorFacades.cppm` | 172263, 190304, 226226, 168445, 193698 | 190304 | 226226 | 283000 |
+| 2 | `src/runtime/Runtime.Engine.cppm` | 122826, 129172, 131516, 98530, 126496 | 126496 | 131516 | 165000 |
+| 3 | `src/runtime/Runtime.RenderExtraction.cppm` | 98660, 121353, 133134, 86219, 127875 | 121353 | 133134 | 167000 |
+| 4 | `src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm` | 102288, 109121, 116740, 83473, 120399 | 109121 | 120399 | 151000 |
+| 5 | `src/app/Sandbox/Editor/Sandbox.EditorShell.cppm` | 111968, 107500, 103727, 86185, 123945 | 107500 | 123945 | 155000 |
+
+The sample-1 source-complete report, excluded from those timings, contained
+1,077 physical edges, 1,074 resolved edges, and zero resolution issues. Its
+configured and sampled counts were `src=705`, `tests=339`, `methods=9`, and
+`benchmarks=21`.
+
+| Sample | Artifact ID | Artifact SHA-256 | CPU report SHA-256 |
+| ---: | ---: | --- | --- |
+| 1 | `8425223111` | `978561b5dfe9ba703ddfacdc09b5e34adc51520da6007920010d6d0e61a27f88` | `8ed5b08d1c877b9ed2b9b3adc2cf5fcf2b99d397e0a4080eb44da6ecdc8e64f3` |
+| 2 | `8425221505` | `87f4fb6a9672b46c0c74ba2564b88b5db4763f07f873b2ed7dfe3e2b87315647` | `85d23b2e3f2eb0cb31266a12dca6629a0b015bec0abf21e63b789543726530ce` |
+| 3 | `8425246341` | `152ccf87d665e37a2a17d2ed5517f8825d45c1ef6f13b10a9b2903b931dcf953` | `01e75b3a1b35824b43a37de8d867ee81469ca9b49932e5eb676002971b68e289` |
+| 4 | `8425181316` | `0d38442033112898f347e09dcfeea61f77d5e8c6452e0d57ef89bb1724d3221c` | `22653d7649d63b8942bbd34743419fe5e66d9f668143c178c7afbbb6b4884f72` |
+| 5 | `8425233032` | `0b58c90ead4952555af6502f7ddfd33504d095553b104d4b64206aed80aafd07` | `44ea1c99447e2b9f1098fa3fc027cba59bdbc61f444b31648c39218e83e92d2d` |
+
+Sample 1's source-complete report SHA-256 is
+`69e3aabaf70f95b1be5276087c6656af88450bddd1554a5043cbb24d6c682193`.
+The failed diagnostic run
+[`29628467034`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29628467034)
+produced no reports after encountering the then-unsupported Ninja log v7 and
+does not contribute to the population.
+
 [`RUNTIME-166`](../../tasks/backlog/runtime/RUNTIME-166-slim-render-extraction-module.md)
 is a current source-owner consumer of this evidence. Compile optimization
 belongs to the affected layer task rather than to the analysis tool.

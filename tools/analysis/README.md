@@ -25,6 +25,6 @@ Static analysis and performance analysis tooling.
 - BUG-004 refreshed `compile_hotspot_baseline.json` to use canonical source
   paths under the then-current layout; stale `src/Runtime/...` migration aliases
   are not accepted by the gate.
-- BUILD-004 migrates that historical target to a stable normalized identity.
-  Its 92-second budget remains historical until a comparable five-sample
-  cohort justifies replacing the target set and thresholds.
+- BUILD-004 replaced that historical target with five normalized physical-edge
+  identities calibrated from the comparable hosted cohort documented in
+  `docs/benchmarking/ci-policy.md`.
