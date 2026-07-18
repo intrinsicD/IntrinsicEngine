@@ -28,10 +28,9 @@ maturity_target: CPUContracted
   bound the blast radius.
 
 ## Status
-- `CPUContracted` implementation and verification complete; owner: Codex team; branch:
-  `codex/harden-086-guarded-hierarchy-queries`; activated 2026-07-18.
-- Next gate: commit the verified slice; retirement remains with the integration
-  owner.
+- Completed and retired at `CPUContracted` on 2026-07-18; owner: Codex team;
+  implementation branch: `codex/harden-086-guarded-hierarchy-queries`.
+- Implementation commit: `f310e872`; merged to `main` as `b983f7c3`.
 
 ## Required changes
 - [x] Extend `Extrinsic.ECS.Hierarchy.Structure` with plain status/result structs and free functions `CollectChildren` and `CollectDescendantsPreorder`.

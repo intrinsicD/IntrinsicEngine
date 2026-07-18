@@ -16,11 +16,6 @@ Each active task should include:
   `codex/arch-014-kernel-convergence-program`; blocked on final leaf
   `RUNTIME-187`. Next gate: execute the unblocked ADR-0027 behavior-owner
   leaves and update the convergence scorecard after each retirement.
-- [`HARDEN-086`](HARDEN-086-guarded-hierarchy-query-helpers.md) —
-  corruption-aware hierarchy child/descendant queries and two runtime adopter
-  migrations; owner: Codex team; branch:
-  `codex/harden-086-guarded-hierarchy-queries`. Next gate: shared invariant
-  inventory and focused ECS/runtime contract.
 - [`RUNTIME-166`](RUNTIME-166-slim-render-extraction-module.md) —
   behavior-preserving RenderExtraction interface/storage partition; owner:
   Codex team; branch: `codex/runtime-166-slim-render-extraction`. Next gate:

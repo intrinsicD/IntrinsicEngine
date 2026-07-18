@@ -185,10 +185,10 @@ test recognizes the RUNTIME-178 import-placement ratchet, and the render-graph
 lifetime fixture keeps its measured history chain live under execution-rank
 semantics. Neither correction changes production behavior.
 
-The 2026-07-16 old-engine consolidation also opened `HARDEN-086`: two
-runtime-local hierarchy walks move onto deterministic, all-or-nothing query
-helpers in the existing promoted ECS structure module. This is a Theme F
-composition/right-sizing leaf and does not reopen completed Theme D.
+The 2026-07-16 old-engine consolidation also opened `HARDEN-086`, now retired
+at `CPUContracted`: two runtime-local hierarchy walks moved onto deterministic,
+all-or-nothing query helpers in the existing promoted ECS structure module.
+This Theme F composition/right-sizing leaf did not reopen completed Theme D.
 
 `RUNTIME-131` is retired to `tasks/done`: runtime exposes the agent/CLI
 config-control facade for render-recipe preview/activation and the current
@@ -318,7 +318,6 @@ Open members (kernel-seam priority set first):
 - [`../active/RUNTIME-179-extract-async-work-module.md`](../active/RUNTIME-179-extract-async-work-module.md) plus [`runtime/RUNTIME-180-extract-camera-module.md`](runtime/RUNTIME-180-extract-camera-module.md) through [`runtime/RUNTIME-187-finalize-domain-free-engine-surface.md`](runtime/RUNTIME-187-finalize-domain-free-engine-surface.md) (ADR-0027 behavior-owner, app-lifecycle, mechanism-pruning, semantic auxiliary-surface, and final-ratchet graph; see the runtime index for exact dependencies).
 - [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) (one-shot post-convergence admission gate; blocked until known architecture/right-sizing/tool-rent work retires).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
-- [`../active/HARDEN-086-guarded-hierarchy-query-helpers.md`](../active/HARDEN-086-guarded-hierarchy-query-helpers.md).
 - [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).
 - [`assets/ASSETIO-010-async-model-companion-preflight.md`](assets/ASSETIO-010-async-model-companion-preflight.md).
 - [`assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md`](assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md) (blocked by `ASSETIO-010`; `BUG-098`, `BUG-099`, and `BUG-100` are satisfied dependencies).

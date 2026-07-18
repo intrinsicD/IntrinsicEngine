@@ -11,10 +11,7 @@ map.
 
 ## Tasks
 
-- [HARDEN-086 — Guarded hierarchy query helpers](../../active/HARDEN-086-guarded-hierarchy-query-helpers.md)
-  (deterministic, all-or-nothing child/preorder queries in the existing
-  hierarchy-structure module, adopted by editor delete planning and
-  progressive composition summaries).
+No open ECS tasks.
 
 ## Convergence
 
@@ -50,10 +47,10 @@ map.
   contract: it separates underlying provenance from available vertex/node,
   edge, halfedge, and face source data so runtime/UI consumers do not treat
   exact `ActiveDomain` as the only capability query.
-- HARDEN-086 is a **Theme F** architecture/runtime foundation leaf rather than
-  a reopening of completed Theme D. It removes two runtime-local hierarchy
-  walks while keeping query mechanics in ECS and editor/composition policy in
-  runtime.
+- Retired HARDEN-086 is a **Theme F** architecture/runtime foundation leaf
+  rather than a reopening of completed Theme D. It removes two runtime-local
+  hierarchy walks while keeping query mechanics in ECS and editor/composition
+  policy in runtime.
 - Forbidden across all members: physics-world handles, runtime sidecars,
   graphics handles, RHI handles, or live `AssetService` traffic in canonical
   ECS components.
@@ -63,6 +60,10 @@ map.
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [HARDEN-086 — Guarded hierarchy query helpers](../../done/HARDEN-086-guarded-hierarchy-query-helpers.md)
+  (done, 2026-07-18, `CPUContracted`): deterministic, all-or-nothing
+  child/preorder queries in the existing hierarchy-structure module, adopted
+  by editor delete planning and progressive composition summaries.
 - [HARDEN-060 — Promote ECS scene bootstrap contract](../../archive/HARDEN-060-ecs-scene-bootstrap-contract.md) (done).
 - [HARDEN-061 — Promote ECS hierarchy and transform system parity](../../archive/HARDEN-061-ecs-hierarchy-transform-system-parity.md) (done).
 - [HARDEN-062 — Harden ECS layering and component boundaries](../../archive/HARDEN-062-ecs-layering-and-component-boundary-hardening.md) (done).
