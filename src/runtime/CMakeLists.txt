@@ -35,6 +35,7 @@ target_sources(${target_name}
         Runtime.ProgressiveRenderData.cppm
         Runtime.RenderArtifactPublication.cppm
         Runtime.SandboxDefaultPolicies.cppm
+        Runtime.SandboxConfigSections.cppm
         Runtime.SelectedMeshTextureBake.cppm
         Runtime.EcsSystemBundle.cppm
         Runtime.EditorCommandHistory.cppm
@@ -115,6 +116,7 @@ target_sources(${target_name}
         Runtime.ProgressiveRenderData.cpp
         Runtime.RenderArtifactPublication.cpp
         Runtime.SandboxDefaultPolicies.cpp
+        Runtime.SandboxConfigSections.cpp
         Runtime.SelectedMeshTextureBake.cpp
         Runtime.EcsSystemBundle.cpp
         Runtime.EditorCommandHistory.cpp

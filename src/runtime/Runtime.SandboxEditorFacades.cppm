@@ -57,6 +57,7 @@ import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderArtifactPublication;
+export import Extrinsic.Runtime.SandboxConfigSections;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.StreamingExecutor;
@@ -500,18 +501,18 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] SandboxEditorProgressivePoissonChannel
     MakeSandboxEditorProgressivePoissonChannel(
-        Core::Config::ProgressivePoissonPlaygroundChannel channel) noexcept;
+        ProgressivePoissonPlaygroundChannel channel) noexcept;
 
-    [[nodiscard]] Core::Config::ProgressivePoissonPlaygroundChannel
-    MakeCoreProgressivePoissonPlaygroundChannel(
+    [[nodiscard]] ProgressivePoissonPlaygroundChannel
+    MakeProgressivePoissonPlaygroundChannel(
         SandboxEditorProgressivePoissonChannel channel) noexcept;
 
     [[nodiscard]] SandboxEditorProgressivePoissonBackend
     MakeSandboxEditorProgressivePoissonBackend(
-        Core::Config::ProgressivePoissonPlaygroundBackend backend) noexcept;
+        ProgressivePoissonPlaygroundBackend backend) noexcept;
 
-    [[nodiscard]] Core::Config::ProgressivePoissonPlaygroundBackend
-    MakeCoreProgressivePoissonPlaygroundBackend(
+    [[nodiscard]] ProgressivePoissonPlaygroundBackend
+    MakeProgressivePoissonPlaygroundBackend(
         SandboxEditorProgressivePoissonBackend backend) noexcept;
 
     struct SandboxEditorProgressivePoissonConfig
@@ -540,12 +541,12 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] SandboxEditorProgressivePoissonConfig
     MakeSandboxEditorProgressivePoissonConfig(
-        const Core::Config::ProgressivePoissonPlaygroundConfig& config) noexcept;
+        const ProgressivePoissonPlaygroundConfig& config) noexcept;
 
-    [[nodiscard]] Core::Config::ProgressivePoissonPlaygroundConfig
-    MakeCoreProgressivePoissonPlaygroundConfig(
+    [[nodiscard]] ProgressivePoissonPlaygroundConfig
+    MakeProgressivePoissonPlaygroundConfig(
         const SandboxEditorProgressivePoissonConfig& config,
-        const Core::Config::ProgressivePoissonPlaygroundConfig& defaults = {}) noexcept;
+        const ProgressivePoissonPlaygroundConfig& defaults = {}) noexcept;
 
     struct SandboxEditorProgressivePoissonCommand
     {
@@ -2413,7 +2414,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t Height{0u};
         glm::vec2 UvBoundsMin{0.0f};
         glm::vec2 UvBoundsMax{1.0f};
-        Core::Config::ParameterizationViewConfig View{};
+        ParameterizationViewConfig View{};
         std::vector<std::uint32_t> LineIndices{};
         std::vector<float> TriangleConformalDistortion{};
     };
@@ -2425,14 +2426,14 @@ export namespace Extrinsic::Runtime
     {
         SandboxEditorParameterizationUvViewStatus Status{
             SandboxEditorParameterizationUvViewStatus::Disabled};
-        Core::Config::ParameterizationUvRenderMode RequestedMode{
-            Core::Config::ParameterizationUvRenderMode::CpuLayout};
-        Core::Config::ParameterizationUvRenderMode ActiveMode{
-            Core::Config::ParameterizationUvRenderMode::CpuLayout};
-        Core::Config::ParameterizationUvBackgroundMode RequestedBackground{
-            Core::Config::ParameterizationUvBackgroundMode::Grid};
-        Core::Config::ParameterizationUvBackgroundMode ActiveBackground{
-            Core::Config::ParameterizationUvBackgroundMode::Grid};
+        ParameterizationUvRenderMode RequestedMode{
+            ParameterizationUvRenderMode::CpuLayout};
+        ParameterizationUvRenderMode ActiveMode{
+            ParameterizationUvRenderMode::CpuLayout};
+        ParameterizationUvBackgroundMode RequestedBackground{
+            ParameterizationUvBackgroundMode::Grid};
+        ParameterizationUvBackgroundMode ActiveBackground{
+            ParameterizationUvBackgroundMode::Grid};
         bool HeatmapActive{false};
         bool GpuReady{false};
         std::uint64_t RequestToken{0u};
@@ -2789,8 +2790,7 @@ export namespace Extrinsic::Runtime
         }
     };
 
-    using SandboxEditorParameterizationStrategy =
-        Core::Config::ParameterizationStrategyKind;
+    using SandboxEditorParameterizationStrategy = ParameterizationStrategyKind;
 
     [[nodiscard]] std::string_view
     StableTokenForSandboxEditorParameterizationStrategy(
@@ -2799,7 +2799,7 @@ export namespace Extrinsic::Runtime
     struct SandboxEditorParameterizationCommand
     {
         std::uint32_t StableEntityId{0u};
-        Core::Config::ParameterizationConfig Config{};
+        ParameterizationConfig Config{};
     };
 
     struct SandboxEditorConfiguredParameterizationCommand
@@ -2847,7 +2847,7 @@ export namespace Extrinsic::Runtime
 
     struct SandboxEditorParameterizationConfigCommand
     {
-        Core::Config::ParameterizationConfig Config{};
+        ParameterizationConfig Config{};
         std::string SourceId{"sandbox.parameterization"};
     };
 
@@ -2879,7 +2879,7 @@ export namespace Extrinsic::Runtime
         std::optional<std::uint64_t> DiagnosticInputFingerprint{};
         SandboxEditorParameterizationStrategy Strategy{
             SandboxEditorParameterizationStrategy::Lscm};
-        Core::Config::ParameterizationViewConfig View{};
+        ParameterizationViewConfig View{};
         std::vector<glm::vec2> UVs{};
         std::vector<std::array<std::uint32_t, 3u>> Triangles{};
         std::vector<std::uint32_t> LineIndices{};
@@ -2996,7 +2996,7 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorParameterizationConfigCommand& command);
 
-    [[nodiscard]] std::optional<Core::Config::ParameterizationConfig>
+    [[nodiscard]] std::optional<ParameterizationConfig>
     GetSandboxEditorParameterizationConfig(
         const SandboxEditorContext& context) noexcept;
 

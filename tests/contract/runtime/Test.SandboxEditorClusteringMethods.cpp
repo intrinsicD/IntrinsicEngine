@@ -77,6 +77,7 @@ import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.SandboxConfigSections;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneSerialization;
@@ -1389,6 +1390,12 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
 {
     Runtime::RuntimeEngineConfigControlState controlState{};
     controlState.ActiveConfig = Core::Config::EngineConfig{};
+    Runtime::EngineConfigSectionRegistry sectionRegistry{};
+    ASSERT_TRUE(sectionRegistry.Register(
+        Runtime::MakeProgressivePoissonConfigSectionRegistration()));
+    Core::Config::PopulateEngineConfigSectionDefaults(
+        controlState.ActiveConfig,
+        sectionRegistry);
 
     Runtime::SandboxEditorContext configContext{};
     configContext.EngineConfigControlState = &controlState;
@@ -1403,7 +1410,10 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
         return Core::Config::PreviewEngineConfig(
             document,
             controlState.ActiveConfig,
-            Core::Config::EngineConfigParseOptions{.SourceId = sourceId});
+            Core::Config::EngineConfigParseOptions{
+                .SourceId = sourceId,
+                .SectionRegistry = &sectionRegistry,
+            });
     };
     configContext.ApplyEngineConfigHotSubset =
         [&](const Core::Config::EngineConfigLoadResult& loadResult)
@@ -1422,11 +1432,12 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
         controlState.ActiveConfig = loadResult.Preview.Config;
         apply.Status = Runtime::RuntimeEngineConfigApplyStatus::Applied;
         apply.EngineConfigApplied = true;
-        apply.SandboxProgressivePoissonChanged = true;
+        apply.ChangedSectionNames = {
+            std::string{Runtime::kProgressivePoissonConfigSectionName}};
         return apply;
     };
 
-    Core::Config::ProgressivePoissonPlaygroundConfig config{};
+    Runtime::ProgressivePoissonPlaygroundConfig config{};
     config.Dimension = 2u;
     config.GridWidth = 3u;
     config.MaxLevels = 5u;
@@ -1437,8 +1448,9 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
     config.ShuffleWithinLevels = false;
     config.ShuffleSeed = 29u;
     config.PrefixCount = 3u;
-    config.Channel = Core::Config::ProgressivePoissonPlaygroundChannel::Phase;
-    config.Backend = Core::Config::ProgressivePoissonPlaygroundBackend::VulkanCompute;
+    config.Channel = Runtime::ProgressivePoissonPlaygroundChannel::Phase;
+    config.Backend =
+        Runtime::ProgressivePoissonPlaygroundBackend::VulkanCompute;
     config.AutoRunOnEdit = true;
     config.DebounceSeconds = 0.2;
 
@@ -1454,17 +1466,16 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
     ASSERT_TRUE(configResult.Succeeded()) << configResult.Message;
     EXPECT_EQ(previewCalls, 1);
     EXPECT_EQ(applyCalls, 1);
-    EXPECT_EQ(controlState.ActiveConfig.Sandbox.ProgressivePoisson.GridWidth,
-              3u);
-    EXPECT_EQ(controlState.ActiveConfig.Sandbox.ProgressivePoisson.Channel,
-              Core::Config::ProgressivePoissonPlaygroundChannel::Phase);
-    EXPECT_EQ(controlState.ActiveConfig.Sandbox.ProgressivePoisson.Backend,
-              Core::Config::ProgressivePoissonPlaygroundBackend::VulkanCompute);
-    EXPECT_TRUE(
-        controlState.ActiveConfig.Sandbox.ProgressivePoisson.AutoRunOnEdit);
-    EXPECT_DOUBLE_EQ(
-        controlState.ActiveConfig.Sandbox.ProgressivePoisson.DebounceSeconds,
-        0.2);
+    const auto activePoisson = Runtime::GetProgressivePoissonPlaygroundConfig(
+        controlState.ActiveConfig);
+    ASSERT_TRUE(activePoisson.has_value());
+    EXPECT_EQ(activePoisson->GridWidth, 3u);
+    EXPECT_EQ(activePoisson->Channel,
+              Runtime::ProgressivePoissonPlaygroundChannel::Phase);
+    EXPECT_EQ(activePoisson->Backend,
+              Runtime::ProgressivePoissonPlaygroundBackend::VulkanCompute);
+    EXPECT_TRUE(activePoisson->AutoRunOnEdit);
+    EXPECT_DOUBLE_EQ(activePoisson->DebounceSeconds, 0.2);
 
     const std::optional<Runtime::SandboxEditorProgressivePoissonConfig>
         activeConfig =
@@ -1491,8 +1502,7 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
     SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
 
     const Runtime::SandboxEditorProgressivePoissonConfig runtimeConfig =
-        Runtime::MakeSandboxEditorProgressivePoissonConfig(
-            controlState.ActiveConfig.Sandbox.ProgressivePoisson);
+        Runtime::MakeSandboxEditorProgressivePoissonConfig(*activePoisson);
     EXPECT_EQ(runtimeConfig.Backend,
               Runtime::SandboxEditorProgressivePoissonBackend::VulkanCompute);
     const Runtime::SandboxEditorProgressivePoissonResult result =
@@ -1550,6 +1560,91 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
     }
     EXPECT_EQ(visibleCount, result.PrefixCount);
 }
+
+TEST(SandboxEditorUi,
+     ProgressivePoissonSectionValidationKeepsPerFieldReferenceFallback)
+{
+    Runtime::ProgressivePoissonPlaygroundConfig reference{};
+    reference.Dimension = 3u;
+    reference.GridWidth = 11u;
+
+    const Core::Config::EngineConfigSectionValidationResult validation =
+        Runtime::ValidateProgressivePoissonConfigSection(
+            R"({"dimension":2,"grid_width":0,"unknown_field":true})",
+            Runtime::SerializeProgressivePoissonPlaygroundConfig(reference),
+            "app.sections.sandbox.progressive_poisson.payload");
+
+    EXPECT_EQ(validation.State,
+              Core::Config::EngineConfigState::FallbackApplied);
+    EXPECT_EQ(validation.ParsedFieldCount, 1u);
+    EXPECT_TRUE(std::ranges::any_of(
+        validation.Diagnostics,
+        [](const Core::Config::EngineConfigDiagnostic& diagnostic)
+        {
+            return diagnostic.Code ==
+                Core::Config::EngineConfigDiagnosticCode::InvalidValue;
+        }));
+    EXPECT_TRUE(std::ranges::any_of(
+        validation.Diagnostics,
+        [](const Core::Config::EngineConfigDiagnostic& diagnostic)
+        {
+            return diagnostic.Code ==
+                Core::Config::EngineConfigDiagnosticCode::UnknownField;
+        }));
+
+    Core::Config::EngineConfig canonical{};
+    Core::Config::UpsertEngineConfigSection(
+        canonical.AppSections,
+        Core::Config::EngineConfigSection{
+            .Name =
+                std::string{Runtime::kProgressivePoissonConfigSectionName},
+            .SchemaId = std::string{
+                Runtime::kProgressivePoissonConfigSectionSchemaId},
+            .SchemaVersion =
+                Runtime::kProgressivePoissonConfigSectionSchemaVersion,
+            .PayloadJson = validation.CanonicalPayloadJson,
+        });
+    const auto decoded =
+        Runtime::GetProgressivePoissonPlaygroundConfig(canonical);
+    ASSERT_TRUE(decoded.has_value());
+    EXPECT_EQ(decoded->Dimension, 2u);
+    EXPECT_EQ(decoded->GridWidth, 11u);
+
+    Runtime::EngineConfigSectionRegistry registry{};
+    ASSERT_TRUE(registry.Register(
+        Runtime::MakeProgressivePoissonConfigSectionRegistration()));
+    Core::Config::EngineConfig referenceConfig{};
+    Core::Config::PopulateEngineConfigSectionDefaults(
+        referenceConfig,
+        registry);
+    Runtime::SetProgressivePoissonPlaygroundConfig(
+        referenceConfig,
+        reference);
+    const std::string document =
+        std::string{
+            R"({"schema":"intrinsic.core.engine-config","version":1,"app":{"sections":[{"name":")"} +
+        std::string{Runtime::kProgressivePoissonConfigSectionName} +
+        R"(","schema":")" +
+        std::string{Runtime::kProgressivePoissonConfigSectionSchemaId} +
+        R"(","version":1,"payload":{"dimension":2,"grid_width":0}}]}})";
+    const Core::Config::EngineConfigLoadResult preview =
+        Core::Config::PreviewEngineConfig(
+            document,
+            referenceConfig,
+            Core::Config::EngineConfigParseOptions{
+                .SectionRegistry = &registry,
+            });
+    ASSERT_EQ(
+        preview.State,
+        Core::Config::EngineConfigState::FallbackApplied);
+    const auto previewConfig =
+        Runtime::GetProgressivePoissonPlaygroundConfig(
+            preview.Preview.Config);
+    ASSERT_TRUE(previewConfig.has_value());
+    EXPECT_EQ(previewConfig->Dimension, 2u);
+    EXPECT_EQ(previewConfig->GridWidth, 11u);
+}
+
 TEST(SandboxEditorUi, ProgressivePoissonCommandSamplesMeshSurfaceToPointCloud)
 {
     ECS::Scene::Registry registry;

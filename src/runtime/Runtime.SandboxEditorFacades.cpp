@@ -84,6 +84,7 @@ import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RegistrationAlignment;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderArtifactPublication;
+import Extrinsic.Runtime.SandboxConfigSections;
 import Extrinsic.Runtime.SceneDocument;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
@@ -10611,10 +10612,9 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] Graphics::UvViewBackgroundMode ToGraphicsUvViewBackground(
-            const Core::Config::ParameterizationUvBackgroundMode mode) noexcept
+            const ParameterizationUvBackgroundMode mode) noexcept
         {
-            using ConfigMode =
-                Core::Config::ParameterizationUvBackgroundMode;
+            using ConfigMode = ParameterizationUvBackgroundMode;
             switch (mode)
             {
             case ConfigMode::Grid:
@@ -10629,12 +10629,11 @@ namespace Extrinsic::Runtime
             return Graphics::UvViewBackgroundMode::Grid;
         }
 
-        [[nodiscard]] Core::Config::ParameterizationUvBackgroundMode
+        [[nodiscard]] ParameterizationUvBackgroundMode
         ToConfigUvViewBackground(
             const Graphics::UvViewBackgroundMode mode) noexcept
         {
-            using ConfigMode =
-                Core::Config::ParameterizationUvBackgroundMode;
+            using ConfigMode = ParameterizationUvBackgroundMode;
             switch (mode)
             {
             case Graphics::UvViewBackgroundMode::Grid:
@@ -10686,10 +10685,8 @@ namespace Extrinsic::Runtime
             const RenderExtractionCache* renderExtraction,
             SandboxEditorParameterizationUvViewRequest request)
         {
-            using ConfigBackground =
-                Core::Config::ParameterizationUvBackgroundMode;
-            using ConfigMode =
-                Core::Config::ParameterizationUvRenderMode;
+            using ConfigBackground = ParameterizationUvBackgroundMode;
+            using ConfigMode = ParameterizationUvRenderMode;
             using SandboxStatus =
                 SandboxEditorParameterizationUvViewStatus;
 
@@ -11277,19 +11274,16 @@ namespace Extrinsic::Runtime
                                 SandboxEditorParameterizationUvViewStatus::CpuFallbackNonOperational,
                             .RequestedMode = request.View.RenderMode,
                             .ActiveMode =
-                                Core::Config::ParameterizationUvRenderMode::CpuLayout,
+                                ParameterizationUvRenderMode::CpuLayout,
                             .RequestedBackground =
                                 request.View.BackgroundMode,
                             .ActiveBackground =
                                 request.View.BackgroundMode ==
-                                            Core::Config::
-                                                ParameterizationUvBackgroundMode::Grid ||
+                                            ParameterizationUvBackgroundMode::Grid ||
                                         request.View.BackgroundMode ==
-                                            Core::Config::
-                                                ParameterizationUvBackgroundMode::Checker
+                                            ParameterizationUvBackgroundMode::Checker
                                     ? request.View.BackgroundMode
-                                    : Core::Config::
-                                          ParameterizationUvBackgroundMode::Checker,
+                                    : ParameterizationUvBackgroundMode::Checker,
                             .RequestToken = request.RequestToken,
                             .Width = request.Width,
                             .Height = request.Height,
