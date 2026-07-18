@@ -299,7 +299,7 @@ retired, as is compiled-plan efficiency (`CORE-008`).
 
 Open members (kernel-seam priority set first):
 - [`../active/ARCH-014-kernel-convergence-tracking.md`](../active/ARCH-014-kernel-convergence-tracking.md) (active umbrella north-star; not a slice).
-- [`architecture/ARCH-016-right-size-runtime-composition-target.md`](architecture/ARCH-016-right-size-runtime-composition-target.md) (unblocked ADR-0024/0026 composition-mechanism amendment; precedes implementation-child seeding).
+- [`../active/ARCH-016-right-size-runtime-composition-target.md`](../active/ARCH-016-right-size-runtime-composition-target.md) (active ADR-0024/0026 composition-mechanism amendment; precedes implementation-child seeding).
 - [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) (one-shot post-convergence admission gate; blocked until known architecture/right-sizing/tool-rent work retires).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`ecs/HARDEN-086-guarded-hierarchy-query-helpers.md`](ecs/HARDEN-086-guarded-hierarchy-query-helpers.md).

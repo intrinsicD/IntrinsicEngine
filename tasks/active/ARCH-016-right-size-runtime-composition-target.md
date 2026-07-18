@@ -40,9 +40,15 @@ depends_on:
   directly conflicting with the literal ADR-0024/ARCH-014 target.
 
 ## Status
-- Backlog; unblocked after `ARCH-015` retirement. Next gate: run a focused
-  grilling/right-sizing pass over the live composition mechanisms and write
-  ADR-0027.
+- In progress; owner: Codex; branch:
+  `codex/arch-016-runtime-composition-target`; activated 2026-07-18 after the
+  ARCH-014 reconciliation merged.
+- The focused grilling/right-sizing pass uses the completed live-tree audits:
+  one production `IRuntimeModule`; zero extension-registry, priority
+  input-filter-chain, and `InlineModule` consumers; six evidence-backed
+  responsibility cohorts; and an exact 42/21/2/31 Engine snapshot.
+- Next gate: decide each mechanism against its deletion test, write ADR-0027,
+  correct the target scorecard, and seed the bounded child graph.
 
 ## Required changes
 - [ ] Inventory which semantics in `IRuntimeModule`, `EngineSetup`,

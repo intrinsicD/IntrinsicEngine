@@ -18,7 +18,7 @@
 > **Composition-mechanism decision hold (2026-07-18).** The reconciliation
 > audit found that several literal rows below name zero-consumer mechanisms or
 > conflate a domain-free Engine outcome with implementing `IRuntimeModule`.
-> [`ARCH-016`](../../tasks/backlog/architecture/ARCH-016-right-size-runtime-composition-target.md)
+> [`ARCH-016`](../../tasks/active/ARCH-016-right-size-runtime-composition-target.md)
 > owns ADR-0027 and the evidence-backed scorecard correction. Until it retires,
 > do not create extension registries, input-filter chains, `InlineModule`
 > builders, or one-wrapper-per-service tasks merely to flip these boxes.

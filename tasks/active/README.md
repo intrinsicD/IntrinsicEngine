@@ -16,6 +16,10 @@ Each active task should include:
   `codex/arch-014-kernel-convergence-program`; blocked on `ARCH-016` and
   `RUNTIME-129`. Next gate: retire the right-sizing amendment before seeding
   implementation children.
+- [`ARCH-016`](ARCH-016-right-size-runtime-composition-target.md) — runtime
+  composition-mechanism right-sizing amendment; owner: Codex; branch:
+  `codex/arch-016-runtime-composition-target`; next gate: write ADR-0027 and
+  seed the evidence-backed ARCH-014 child graph.
 
 ## History
 

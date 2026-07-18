@@ -23,10 +23,11 @@ are retired to `tasks/done/`; `ARCH-014` remains the active umbrella:
   until the right-sized ADR-0024 target is reached. It is blocked on
   `ARCH-016` and `RUNTIME-129`. Retired child `HARDEN-085` delivered the
   monotone checker and `pr-fast` gate.
-- [`ARCH-016`](ARCH-016-right-size-runtime-composition-target.md) — unblocked
-  ADR-0024 amendment: break the ARCH-014/REVIEW-003 decision loop, distinguish
-  domain ownership from a mandatory C++ wrapper, remove zero-consumer mechanism
-  blockers, correct the scorecard, and seed only behavior-carrying children.
+- [`ARCH-016`](../../active/ARCH-016-right-size-runtime-composition-target.md)
+  is active — ADR-0024 amendment to break the ARCH-014/REVIEW-003 decision
+  loop, distinguish domain ownership from a mandatory C++ wrapper, remove
+  zero-consumer mechanism blockers, correct the scorecard, and seed only
+  behavior-carrying children.
 - [`REVIEW-003`](REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
   one-shot, commit-anchored architecture stability and right-sizing audit. It
   is blocked on the known convergence, privatization, validator, root-hygiene,
