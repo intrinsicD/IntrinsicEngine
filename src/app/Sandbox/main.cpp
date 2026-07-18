@@ -18,6 +18,7 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 
 import Extrinsic.Sandbox;
+import Extrinsic.Sandbox.ConfigSections;
 
 namespace
 {
@@ -403,7 +404,11 @@ int main(int argc, char** argv)
         return 2;
     }
 
-    auto boot = Extrinsic::Runtime::ResolveEngineConfigForBoot(args);
+    auto sectionRegistry =
+        Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry();
+    auto boot = Extrinsic::Runtime::ResolveEngineConfigForBoot(
+        args,
+        sectionRegistry);
     auto config = std::move(boot.Config);
 
     auto app = Extrinsic::Sandbox::CreateSandboxApp();
@@ -417,7 +422,10 @@ int main(int argc, char** argv)
         app = std::move(captureApp);
     }
 
-    Extrinsic::Runtime::Engine engine{config, std::move(app)};
+    Extrinsic::Runtime::Engine engine{
+        config,
+        std::move(app),
+        std::move(sectionRegistry)};
     Extrinsic::Sandbox::RegisterSandboxRuntimeModules(engine);
     engine.Initialize();
     engine.Run();

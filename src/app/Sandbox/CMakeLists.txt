@@ -8,12 +8,14 @@ if(INTRINSIC_BUILD_SANDBOX OR INTRINSIC_BUILD_TESTS)
             Editor/Sandbox.DomainPanels.cppm
             Editor/Sandbox.MethodPanels.cppm
             Editor/Sandbox.MeshProcessingPanels.cppm
+            Sandbox.ConfigSections.cppm
             PRIVATE
             Editor/Sandbox.EditorController.cpp
             Editor/Sandbox.EditorShell.cpp
             Editor/Sandbox.DomainPanels.cpp
             Editor/Sandbox.MethodPanels.cpp
             Editor/Sandbox.MeshProcessingPanels.cpp
+            Sandbox.ConfigSections.cpp
     )
     target_link_libraries(ExtrinsicSandboxEditor
             PUBLIC
