@@ -372,10 +372,39 @@ jobs:
             --fresh \
             -DINTRINSIC_GROUP_PURE_CTEST=ON
 
-      - name: Build individual and grouped CPU plans
+      - name: Build shared CPU plan
+        run: cmake --build --preset ci --target IntrinsicCpuTests
+
+      - name: Materialize grouped binary view
         run: |
-          cmake --build --preset ci --target IntrinsicCpuTests
-          cmake --build build/ci-grouped --target IntrinsicCpuTests -j4
+          set -euo pipefail
+          mkdir -p build/ci-grouped/bin
+          existing=$(find build/ci-grouped/bin -type f -print -quit)
+          if [[ -n "$existing" ]]; then
+            echo "::error::grouped binary destination was not empty after configure: $existing"
+            exit 1
+          fi
+
+          cp -al build/ci/bin/. build/ci-grouped/bin/
+          shared_count=0
+          while IFS= read -r target; do
+            [[ -n "$target" ]] || continue
+            individual="build/ci/bin/$target"
+            grouped="build/ci-grouped/bin/$target"
+            if [[ ! -f "$individual" || ! -f "$grouped" ]]; then
+              echo "::error::missing shared CPU test binary for $target"
+              exit 1
+            fi
+            if [[ ! "$individual" -ef "$grouped" ]]; then
+              echo "::error::grouped CPU test binary is not the individual-tree inode: $target"
+              exit 1
+            fi
+            shared_count=$((shared_count + 1))
+          done < build/ci/test-inventories/IntrinsicCpuTests.txt
+          if [[ "$shared_count" -eq 0 ]]; then
+            echo "::error::CPU test inventory was empty"
+            exit 1
+          fi
 
       - name: Reconcile and compare registrations
         run: |

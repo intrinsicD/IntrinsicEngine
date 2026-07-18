@@ -739,8 +739,36 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         self.assertIn("-B build/ci-grouped", configure)
         self.assertIn("-DINTRINSIC_GROUP_PURE_CTEST=ON", configure)
 
-        build = steps["Build individual and grouped CPU plans"]["run"]
-        self.assertEqual(build.count("--target IntrinsicCpuTests"), 2)
+        build = steps["Build shared CPU plan"]["run"]
+        self.assertEqual(build.count("--target IntrinsicCpuTests"), 1)
+        self.assertNotIn("build/ci-grouped", build)
+
+        materialize = steps["Materialize grouped binary view"]["run"]
+        self.assertIn(
+            "find build/ci-grouped/bin -type f -print -quit",
+            materialize,
+        )
+        self.assertIn(
+            "cp -al build/ci/bin/. build/ci-grouped/bin/",
+            materialize,
+        )
+        self.assertIn(
+            "done < build/ci/test-inventories/IntrinsicCpuTests.txt",
+            materialize,
+        )
+        self.assertIn('[[ ! "$individual" -ef "$grouped" ]]', materialize)
+        self.assertIn('[[ "$shared_count" -eq 0 ]]', materialize)
+        job_runs = "\n".join(str(step.get("run", "")) for step in job["steps"])
+        self.assertEqual(job_runs.count("cmake --build"), 1)
+        self.assertNotIn("cmake --build build/ci-grouped", job_runs)
+        self.assertLess(
+            list(steps).index("Build shared CPU plan"),
+            list(steps).index("Materialize grouped binary view"),
+        )
+        self.assertLess(
+            list(steps).index("Materialize grouped binary view"),
+            list(steps).index("Reconcile and compare registrations"),
+        )
         reconcile = steps["Reconcile and compare registrations"]["run"]
         self.assertEqual(
             reconcile.count("Test.TestGateRouting.py"),
