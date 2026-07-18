@@ -5,6 +5,12 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-114` — Release architecture SLOs use mismatched metrics and uncalibrated budgets](../../active/BUG-114-ci-release-architecture-slo-calibration.md):
+  `ci-release` run `29631970411` exposed a structurally zero-steal scheduler
+  workload, cumulative idle-time assertion, park-to-signal latency mismatch,
+  false critical-path nanosecond claim, and an uncalibrated frame-graph
+  guardrail; redesign the evidence without weakening the fail-closed Release
+  result.
 - [`BUG-110` — Implicit smoothing applies boundary pins after rather than during solve](BUG-110-implicit-smoothing-boundary-dirichlet-solve.md):
   `PreserveBoundary` currently solves an all-free shifted system and only then
   overwrites boundary entries, so interior vertices do not satisfy the claimed

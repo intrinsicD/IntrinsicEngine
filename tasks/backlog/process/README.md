@@ -16,7 +16,8 @@ map.
 ## Tasks
 
 - [CI-009 — Route heavy gates by lifecycle and evaluate runner scaling](../../active/CI-009-heavy-gate-routing-and-runner-evaluation.md)
-  (currently active).
+  is active but blocked by `BUG-114` after the first hosted Release SLO pilot
+  exposed invalid workload/metric pairings.
 - [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](PROC-025-port-research-ideation-skill-to-other-repos.md)
   (portable playbook; run from a session scoped to the target repo).
 
@@ -38,9 +39,9 @@ retirement log.
   `CI-008` now groups five audited pure producers, retains local individual
   discovery, and fixes the required full-CPU worker budget at four.
   Retired `BUILD-004` independently repairs compile-hotspot evidence and
-  unblocks `RUNTIME-166`. Active `CI-009` now evaluates
-  lifecycle/runner changes after the software duplication and evidence defects
-  have been removed.
+  unblocks `RUNTIME-166`. Active `CI-009`, currently blocked by `BUG-114`, now
+  evaluates lifecycle/runner changes after the software duplication and
+  evidence defects have been removed.
 - Compile-hotspot analyzer ownership is retired `BUILD-004`; source
   optimization stays outside the process queue. `ARCH-006` retired the Sandbox
   editor/UI hotspot, `RUNTIME-146..151` own the historical `Runtime.Engine`

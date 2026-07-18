@@ -11,6 +11,7 @@ depends_on:
   - CI-010
   - CI-011
   - BUILD-004
+  - BUG-114
 ---
 # CI-009 — Route heavy gates by lifecycle and evaluate runner scaling
 
@@ -27,10 +28,12 @@ depends_on:
 - No runner purchase/plan change without measured cost and queue data.
 
 ## Context
-- Active on 2026-07-18; owner: Codex; branch: `main`. Next verification:
-  integrate the independently reviewed lifecycle-routing commits, run the
-  focused workflow regressions, then collect five sequential hosted
-  `ci-release` samples at one unchanged SHA.
+- Blocked on 2026-07-18 by `BUG-114`; owner: Codex; branch: `main`. Hosted
+  Release pilot `29631970411` exposed invalid architecture-SLO metric/workload
+  pairings after routing and build succeeded. No successful five-sample
+  population has started; the failed pilot cannot count. Next verification:
+  retire `BUG-114`, pass one fixed hosted pilot, then collect five sequential
+  hosted `ci-release` samples at one unchanged SHA.
 - Owner: GitHub Actions trigger topology, required-check contracts, benchmark
   routing, and runner policy.
 - `CI-003` observed independent cold compile-heavy jobs on every PR update:
