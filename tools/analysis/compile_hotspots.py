@@ -14,8 +14,7 @@ SOURCE_EXTENSIONS = (".cppm", ".cpp", ".cc", ".cxx", ".c")
 COMPILE_OUTPUT_SUFFIXES = (".cppm.o", ".cpp.o", ".cc.o", ".cxx.o", ".c.o", ".o", ".pcm")
 SOURCE_ROOTS = ("src", "tests", "methods", "benchmarks")
 DEPENDENCY_ROOTS = ("external", "third_party")
-MIN_NINJA_LOG_VERSION = 4
-MAX_NINJA_LOG_VERSION = 5
+SUPPORTED_NINJA_LOG_VERSIONS = frozenset({4, 5, 6, 7})
 BASELINE_ROOT_FIELDS = frozenset({"max_regression_ms", "targets"})
 BASELINE_TARGET_FIELDS = frozenset(
     {"edge_id", "source", "edge_kind", "outputs", "max_duration_ms"}
@@ -71,11 +70,13 @@ def parse_ninja_log(
             f"{path}: malformed Ninja log header {header or '<empty>'!r}"
         )
     log_version = int(version_text)
-    if not MIN_NINJA_LOG_VERSION <= log_version <= MAX_NINJA_LOG_VERSION:
+    if log_version not in SUPPORTED_NINJA_LOG_VERSIONS:
+        supported_versions = ", ".join(
+            f"v{version}" for version in sorted(SUPPORTED_NINJA_LOG_VERSIONS)
+        )
         raise AnalysisError(
             f"{path}: unsupported Ninja log version v{log_version}; "
-            f"supported versions are v{MIN_NINJA_LOG_VERSION}-"
-            f"v{MAX_NINJA_LOG_VERSION}"
+            f"supported versions are {supported_versions}"
         )
 
     # Ninja appends records across incremental builds. Resolve the latest record

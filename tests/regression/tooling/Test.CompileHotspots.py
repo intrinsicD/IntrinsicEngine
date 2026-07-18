@@ -140,7 +140,7 @@ class CompileHotspotTests(unittest.TestCase):
             )
 
     def test_supported_ninja_log_versions_share_five_field_layout(self) -> None:
-        for version in (4, 5):
+        for version in (4, 5, 6, 7):
             with self.subTest(version=version):
                 with tempfile.TemporaryDirectory() as temporary:
                     fixture = CompileHotspotFixture(
@@ -167,6 +167,25 @@ class CompileHotspotTests(unittest.TestCase):
                             edge["physical_identity"]["command_hash"],
                             command_field,
                         )
+
+    def test_ninja_log_v7_groups_multi_output_hash_records(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = CompileHotspotFixture(Path(temporary), log_version=7)
+            source = fixture.source("src/core/Core.Version7.cppm")
+            object_output = "src/core/CMakeFiles/Core.dir/Core.Version7.cppm.o"
+            pcm_output = "src/core/CMakeFiles/Core.dir/Core.Version7.pcm"
+            fixture.command(source, object_output)
+            fixture.record(10, 40, object_output, "v7-command")
+            fixture.record(10, 40, pcm_output, "v7-command")
+
+            edge = fixture.analyze()["edges"][0]
+
+            self.assertEqual(edge["outputs"], sorted([object_output, pcm_output]))
+            self.assertEqual(
+                edge["physical_identity"]["command_hash"],
+                fixture.log_command_field("v7-command"),
+            )
+            self.assertEqual(edge["physical_identity"]["ninja_log_version"], 7)
 
     def test_distinct_phases_for_one_source_keep_distinct_edge_ids(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -495,7 +514,7 @@ class CompileHotspotTests(unittest.TestCase):
             ):
                 compile_hotspots.parse_ninja_log(log, build)
 
-            for version in (3, 6):
+            for version in (3, 8):
                 with self.subTest(version=version):
                     log.write_text(
                         f"# ninja log v{version}\n",

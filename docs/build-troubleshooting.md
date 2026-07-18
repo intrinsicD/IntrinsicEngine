@@ -296,7 +296,11 @@ BMI output, groups outputs emitted by the same timed Ninja command, and
 resolves sources through compile-command outputs. A missing mapping is reported
 as `unresolved` with diagnostic candidates; duplicate mappings are
 `ambiguous`. These rows remain visible in the JSON but cannot satisfy a
-baseline target.
+baseline target. The parser explicitly accepts Ninja log v4-v7. Versions 5-v7
+use the same five-field hashed-command record shape. Command hashes are treated
+as opaque identities, and the version-dependent record mtime is validated but
+excluded from physical-edge grouping. Other versions remain unsupported until
+their record semantics are verified.
 
 An incremental tree can retain log entries for targets absent from the current
 configured graph. If those entries appear as unresolved, do not add a basename

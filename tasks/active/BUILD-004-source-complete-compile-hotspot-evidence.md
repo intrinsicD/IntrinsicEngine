@@ -22,17 +22,16 @@ depends_on:
 
 ## Context
 - Active on 2026-07-18; owner: Codex; branch: `main`. Next verification:
-  integrate the reviewed analyzer/evidence slices, then dispatch the five
-  compile-only hosted samples without CTest.
+  commit and push Ninja log v4-v7 support, then dispatch one replacement set
+  of five compile-only hosted samples without CTest.
 - Owning surface: `tools/analysis/compile_hotspots.py`, its
   regressions/baseline, and the workflow step that publishes/enforces the report.
-- The current `SourceResolver` indexes only `src/**/*`, so test, method, and
-  benchmark translation units can appear unresolved even when they dominate a
-  gate's compile time.
-- Ninja module builds may record `.pcm` and `.o` outputs from one physical
-  compiler command. The current report treats every output record as an
-  independent edge, and `row_by_source` silently keeps only one row when the
-  baseline later maps duplicate source rows.
+- Before Slice A, `SourceResolver` indexed only `src/**/*`, so test, method,
+  and benchmark translation units could appear unresolved even when they
+  dominated a gate's compile time.
+- Before Slice A, Ninja `.pcm` and `.o` outputs from one physical compiler
+  command were treated as independent edges, and source-only baseline lookup
+  could silently overwrite duplicate source rows.
 - The current baseline contains only `src/geometry/Geometry.Octree.cppm`, so a
   passing gate does not demonstrate visibility of the runtime/test hot spots
   observed in recent logs.
@@ -41,7 +40,8 @@ depends_on:
   translation units, without invoking the `IntrinsicBenchmarks` custom target
   that also executes the benchmark runner.
 - `CI-003` supplies the historical timing methodology. Baselines must be
-  refreshed only after edge identity and source resolution are normalized.
+  refreshed from the normalized edge identity and source resolution now
+  implemented by Slice A.
 
 ## Slice plan
 - Slice A — repair physical-edge normalization, source resolution, unresolved
@@ -54,12 +54,15 @@ depends_on:
 - Slice A is implemented and focused non-CMake checks pass. Slice B hosted
   sampling, baseline refresh, real-build validation, and retirement remain
   pending.
-- Hosted run `29628467034` is collecting five clean CPU samples at
-  `f2c5d192`. Before reading any report, the refresh rule is fixed: require an
-  identical physical-edge identity and resolution inventory across all five CPU
-  reports; rank baseline-eligible resolved repository edges globally by median
-  duration with `edge_id` as the tie-breaker; retain the five slowest; and set
-  each budget by rounding `1.25 * nearest-rank p95` up to a whole second with
+- Hosted run `29628467034` completed five clean builds at `f2c5d192`, but all
+  five analyzers rejected the hosted runner's Ninja log v7 before producing
+  artifacts. The run is diagnostic only and contributes no calibration data.
+  Before reading any successful report, the refresh rule remains fixed:
+  require an identical physical-edge identity and resolution inventory across
+  all five CPU reports; rank baseline-eligible resolved repository edges
+  globally by median duration with `edge_id` as the tie-breaker; retain the
+  five slowest; and set each budget by rounding
+  `1.25 * nearest-rank p95` up to a whole second with
   `max_regression_ms=0`. The one source-complete report proves root visibility
   only and does not enter timing thresholds.
 - Inventory equality means equality of the canonical map keyed by stable

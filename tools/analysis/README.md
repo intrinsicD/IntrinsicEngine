@@ -7,7 +7,10 @@ Static analysis and performance analysis tooling.
 - `tools/analysis/compile_hotspots.py`: normalizes the latest Ninja records
   into physical compiler invocations, resolves their sources through the
   configured `compile_commands.json`, and optionally checks stable edge
-  identities against `compile_hotspot_baseline.json`.
+  identities against `compile_hotspot_baseline.json`. The parser explicitly
+  supports Ninja log v4-v7. Versions 5-v7 share the five-field hashed-command
+  layout; command hashes are opaque identities and record mtimes do not
+  participate in physical-edge grouping. Unverified versions fail closed.
 - `tools/analysis/module_fanout.py`: reports import/include/export fan-out for
   selected files or `--root src`. Nightly runs it in report-only mode;
   `--fail-on-regression` is an opt-in local comparison against files present in
