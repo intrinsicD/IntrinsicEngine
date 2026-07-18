@@ -6167,3 +6167,40 @@ tree:
       timing-profile, and downstream parity variants all resolved skipped, so
       the final confirmation consumed only the required ordinary-main gate.
     status: resolved
+  - id: N261
+    type: experiment
+    title: "Run the canonical CORE-005 UBSan CPU gate"
+    provenance: ai-executed
+    timestamp: "2026-07-18T14:11+02:00"
+    evidence:
+      - "cmake --preset ci-ubsan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON"
+      - "cmake --build --preset ci-ubsan --target IntrinsicCpuTests"
+      - "ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1"
+      - "/tmp/core005-ubsan-configure.log"
+      - "/tmp/core005-ubsan-build.log"
+      - "/tmp/core005-ubsan-ctest.log"
+    result: >
+      Fresh Clang 23 UBSan configuration and the 2,153-action
+      IntrinsicCpuTests build passed. The canonical serial CPU selector passed
+      2,732 of 2,732 selected tests with zero failures in 93.66 seconds and no
+      UndefinedBehaviorSanitizer runtime diagnostic. The sole skipped test was
+      the LSan-only GLFW lifecycle contract, which reported BUG082_SKIP because
+      leak-sanitizer instrumentation is unavailable in the UBSan identity.
+    status: resolved
+  - id: N262
+    type: experiment
+    title: "Run the canonical CORE-005 ASan CPU gate"
+    provenance: ai-executed
+    timestamp: "2026-07-18T14:13+02:00"
+    evidence:
+      - "cmake --preset ci-asan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON"
+      - "cmake --build --preset ci-asan --target IntrinsicCpuTests"
+      - "ctest --test-dir build/ci-asan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1"
+      - "/tmp/core005-ci-asan-build.log"
+      - "/tmp/core005-ci-asan-ctest.log"
+    result: >
+      Fresh Clang 23 ASan configuration and the 2,153-action IntrinsicCpuTests
+      build passed. The canonical serial CPU selector passed 2,732 of 2,732
+      selected tests with zero failures, skipped tests, or not-run tests in
+      227.05 seconds and emitted no AddressSanitizer or LeakSanitizer diagnostic.
+    status: resolved

@@ -985,3 +985,15 @@ entries:
       - "Did not create a generalized speedup claim: the evidence establishes final topology, exact hosted durations, and skipped optional work, not a counterfactual cost or wall-time reduction."
       - "Kept O08, O09, O13, and O38 unpromoted because module posture, model training, and Progressive Poisson parity remain open; their open-thread references prevent stale promotion."
       - "Recorded the final ARA trace after the successful main gate so ARA-only metadata can be committed locally without another push or redundant hosted CPU run."
+  - turn: "2026-07-18_001#2"
+    notes:
+      - "Routed the exact fresh CORE-005 UBSan gate as experiment N261 because it produced bounded sanitizer evidence rather than a generalized capability claim."
+      - "Recorded the 2,153-action build, 2,732 selected tests, zero failures, 93.66-second serial runtime, absence of UBSan diagnostics, and the one LSan-only BUG082_SKIP result."
+      - "Did not stage or crystallize a new observation: this gate verifies the current task slice and does not establish a broader sanitizer or performance claim."
+      - "No existing staged observation received a closure, contradiction, or stale signal from this bounded verification run."
+  - turn: "2026-07-18_001#3"
+    notes:
+      - "Routed the exact fresh CORE-005 ASan gate as experiment N262 because it produced bounded sanitizer evidence rather than a generalized capability claim."
+      - "Recorded the 2,153-action build, 2,732 selected tests, zero failures or skips, 227.05-second serial runtime, and absence of AddressSanitizer or LeakSanitizer diagnostics."
+      - "Did not stage or crystallize a new observation: this gate verifies the current task slice and does not establish a broader sanitizer or performance claim."
+      - "No existing staged observation received a closure, contradiction, or stale signal from this bounded verification run."

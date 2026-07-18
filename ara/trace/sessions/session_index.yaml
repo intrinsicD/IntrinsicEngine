@@ -127,8 +127,8 @@ sessions:
     open_threads: 17
   - id: "2026-07-18_001"
     date: "2026-07-18"
-    summary: "Completed the classification-first CI stack, calibrated and routed Release confidence, refreshed two repository-native research skills, and retired every process backlog task."
-    turn_count: 1
-    events_count: 8
+    summary: "Completed the classification-first CI stack, calibrated and routed Release confidence, refreshed two repository-native research skills, retired every process backlog task, and passed the canonical CORE-005 UBSan and ASan CPU gates."
+    turn_count: 3
+    events_count: 10
     claims_touched: []
     open_threads: 7

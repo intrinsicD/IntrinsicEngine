@@ -219,11 +219,12 @@ non-blocking frame-path fixes `RUNTIME-142`, the retired frame-hook/K-Means
 decoupling seam `RUNTIME-143`, the retired post-import/import-UX/input-action
 composition seam `RUNTIME-144`, the retired Sandbox editor ownership seam
 `ARCH-006`, the retired domain-free task/DAG vocabulary seam `CORE-006`, the
-remaining composition-root/config seam `CORE-009`, and scheduler/DAG
-capability and efficiency (`CORE-005`, `CORE-007`, `CORE-008`). The retired
-steady-state frame efficiency polish `RUNTIME-145` removed the recurring
-runtime frame-path waste called out by the review. The retired correctness fix
-`BUG-055` (Theme G) unblocks `CORE-005`.
+retired non-blocking TaskGraph completion seam `CORE-005`, the remaining
+composition-root/config seam `CORE-009`, and remaining scheduler/DAG
+efficiency work (`CORE-007`, `CORE-008`). The retired steady-state frame
+efficiency polish `RUNTIME-145` removed the recurring runtime frame-path waste
+called out by the review. The retired correctness fix `BUG-055` (Theme G)
+enabled `CORE-005`.
 
 **North star: [`docs/architecture/kernel-target-state.md`](../../docs/architecture/kernel-target-state.md)**
 — the living target and convergence scorecard for the ADR-0024 kernel/module
@@ -291,9 +292,10 @@ as a transitional composition accessor rather than a new cross-module pattern.
 `RUNTIME-150` is retired as the private frame-loop partition split, and
 `RUNTIME-151` is retired as the Engine-interface cleanup. `RUNTIME-137` is now
 retired as the JobService `GpuQueue`/async readback substrate, so `RUNTIME-129`
-is unblocked for object-space normal bake GPU submission; the scheduler
-substrate (`CORE-005`/`007`/`008`) may proceed independently when selected by
-its owners.
+is unblocked for object-space normal bake GPU submission. The non-blocking
+TaskGraph substrate (`CORE-005`) is retired; scheduler and compiled-plan
+efficiency (`CORE-007`/`008`) may proceed independently when selected by their
+owners.
 
 Open members (kernel-seam priority set first):
 - [`architecture/ARCH-014-kernel-convergence-tracking.md`](architecture/ARCH-014-kernel-convergence-tracking.md) (umbrella north-star; not a slice).
@@ -305,7 +307,6 @@ Open members (kernel-seam priority set first):
 - [`assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md`](assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md) (blocked by `ASSETIO-010`; `BUG-098`, `BUG-099`, and `BUG-100` are satisfied dependencies).
 - [`ui/UI-037-linear-domain-action-readiness-tooltips.md`](ui/UI-037-linear-domain-action-readiness-tooltips.md) (blocked by `BUG-096` and `RUNTIME-138`).
 - [`ui/UI-038-progressive-poisson-destructive-conversion-safety.md`](ui/UI-038-progressive-poisson-destructive-conversion-safety.md).
-- [`architecture/CORE-005-nonblocking-taskgraph-submit-api.md`](architecture/CORE-005-nonblocking-taskgraph-submit-api.md).
 - [`architecture/CORE-007-scheduler-priority-wait-wake-hardening.md`](architecture/CORE-007-scheduler-priority-wait-wake-hardening.md).
 - [`architecture/CORE-008-compiled-taskgraph-plan-reuse.md`](architecture/CORE-008-compiled-taskgraph-plan-reuse.md).
 - [`architecture/CORE-009-app-owned-config-sections.md`](architecture/CORE-009-app-owned-config-sections.md).

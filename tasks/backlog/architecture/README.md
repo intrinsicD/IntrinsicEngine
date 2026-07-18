@@ -13,8 +13,6 @@ map.
 Opened from the 2026-07-03 main-loop/task-graph/render-graph review
 ([`docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`](../../../docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md)):
 
-- [`CORE-005`](CORE-005-nonblocking-taskgraph-submit-api.md) — non-blocking
-  TaskGraph submission/completion API (gated on `BUG-055`).
 - [`CORE-007`](CORE-007-scheduler-priority-wait-wake-hardening.md) —
   scheduler priority lanes, waiter stealing, wake and hot-path hardening.
 - [`CORE-008`](CORE-008-compiled-taskgraph-plan-reuse.md) — compiled
@@ -126,6 +124,13 @@ root must update the relevant `docs/architecture/*` doc set in the same PR per
 - [`docs/agent/architecture-review-checklist.md`](../../../docs/agent/architecture-review-checklist.md).
 
 ## Retired
+
+- [`CORE-005`](../../done/CORE-005-nonblocking-taskgraph-submit-api.md) —
+  retired 2026-07-18 at `CPUContracted`: TaskGraph now supports
+  submit/poll/pump/wait completion, worker-saturated help execution, and
+  race-free parking on scheduler-work progress. The exact committed CPU gate
+  passed 4,082/4,082, and fresh ASan and UBSan gates each passed
+  2,736/2,736.
 
 - [`CORE-006`](../../done/CORE-006-domain-free-core-task-vocabulary.md) —
   retired 2026-07-18 at `CPUContracted`: Core now carries opaque task-kind

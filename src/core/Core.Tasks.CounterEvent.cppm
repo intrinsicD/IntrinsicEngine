@@ -1,7 +1,7 @@
 module;
 
-#include <atomic>
 #include <coroutine>
+#include <memory>
 
 export module Extrinsic.Core.Tasks.CounterEvent;
 
@@ -14,15 +14,25 @@ namespace Extrinsic::Core::Tasks
     public:
         explicit CounterEvent(uint32_t initialCount = 0);
         ~CounterEvent();
+        CounterEvent(const CounterEvent&) = delete;
+        CounterEvent& operator=(const CounterEvent&) = delete;
+        CounterEvent(CounterEvent&&) = delete;
+        CounterEvent& operator=(CounterEvent&&) = delete;
 
         void Add(uint32_t value = 1);
         void Signal(uint32_t value = 1);
-        [[nodiscard]] bool IsReady() const { return m_Count.load(std::memory_order_acquire) == 0; }
-        [[nodiscard]] Scheduler::WaitToken Token() const { return m_Token; }
+        [[nodiscard]] bool IsReady() const;
+        [[nodiscard]] uint32_t PendingCount() const;
+        [[nodiscard]] Scheduler::WaitToken Token() const;
+
+        // Park until the pending count differs from a value observed before
+        // the caller checked its work queues. Returns immediately when progress
+        // occurred between that observation and this call.
+        void WaitForProgress(uint32_t observedCount) const;
 
     private:
-        std::atomic<uint32_t> m_Count{0};
-        Scheduler::WaitToken m_Token{};
+        struct State;
+        std::shared_ptr<State> m_State{};
     };
 
     export struct WaitCounterAwaiter

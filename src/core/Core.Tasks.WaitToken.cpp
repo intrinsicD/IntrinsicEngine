@@ -83,12 +83,12 @@ namespace Extrinsic::Core::Tasks
         waitSlot.parkedTail = Detail::SchedulerContext::InvalidParkedNode;
         waitSlot.parkedCount = 0;
         waitSlot.ready = false;
-        return WaitToken{slot, waitSlot.generation};
+        return WaitToken{slot, waitSlot.generation, s_Ctx->instanceId};
     }
 
     void Scheduler::ReleaseWaitToken(WaitToken token)
     {
-        if (!s_Ctx || !token.Valid())
+        if (!s_Ctx || !token.Valid() || token.SchedulerInstance != s_Ctx->instanceId)
             return;
 
         std::vector<Detail::SchedulerContext::ParkedContinuation> abandoned;
@@ -117,7 +117,8 @@ namespace Extrinsic::Core::Tasks
     bool Scheduler::ParkCurrentFiberIfNotReady(WaitToken token, std::coroutine_handle<> h,
                                                std::shared_ptr<std::atomic<bool>> alive)
     {
-        if (!s_Ctx || !token.Valid() || !h)
+        if (!s_Ctx || !token.Valid() || !h ||
+            token.SchedulerInstance != s_Ctx->instanceId)
             return false;
 
         const auto parkStart = std::chrono::steady_clock::now();
@@ -177,7 +178,7 @@ namespace Extrinsic::Core::Tasks
 
     uint32_t Scheduler::UnparkReady(WaitToken token)
     {
-        if (!s_Ctx || !token.Valid())
+        if (!s_Ctx || !token.Valid() || token.SchedulerInstance != s_Ctx->instanceId)
             return 0;
 
         std::vector<Detail::SchedulerContext::ParkedContinuation> continuations;
@@ -216,7 +217,7 @@ namespace Extrinsic::Core::Tasks
 
     void Scheduler::MarkWaitTokenNotReady(WaitToken token)
     {
-        if (!s_Ctx || !token.Valid())
+        if (!s_Ctx || !token.Valid() || token.SchedulerInstance != s_Ctx->instanceId)
             return;
 
         std::lock_guard lock(s_Ctx->waitMutex);

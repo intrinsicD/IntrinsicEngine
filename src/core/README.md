@@ -51,20 +51,42 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
   assignment belong to consumers.
 - **`Extrinsic.Core.Dag.TaskGraph`**: closure-based generic task graph API
   with `AddPass`, resource/label declarations, explicit pass dependencies via
-  `TaskGraphBuilder::DependsOn`, `Compile`, `BuildPlan`, `Execute`,
-  `Reset`, `ExecutePass`, and `TakePassExecute`.
+  `TaskGraphBuilder::DependsOn`, `Compile`, `BuildPlan`, nonblocking `Submit`,
+  blocking `Execute`, fail-closed `Reset`, `ExecutePass`, and
+  `TakePassExecute`.
   - `TaskGraphExecutionMode::ExecuteCallbacks` is the default and enables
     whole-graph `Execute()`; `PlanOnly` preserves compilation and per-pass
     callback extraction but rejects whole-graph execution.
   - Pass options (`TaskGraphPassOptions` / `FrameGraphPassOptions`) provide
     `Priority`, `EstimatedCost`, `MainThreadOnly`, `AllowParallel`, and
     `DebugCategory`.
-  - `Execute()` uses graph-local completion (no global scheduler drain), with a
-    deterministic single-thread fallback when workers are unavailable.
-  - Parallel `Execute()` completion state is owned by the caller and by every
-    dispatched worker closure until each closure has retired its completion
-    path. The final `CounterEvent::Signal()` in a completion path is the last
-    access that path may make to graph-local execution state.
+  - `Submit()` returns a copyable `TaskGraphCompletion`; `IsReady()` is a
+    thread-safe poll, while `PumpMainThreadPasses()` and `Wait()` are restricted
+    to the submitting thread and return `ThreadViolation` elsewhere. Retain a
+    completion handle until it is ready so owner-only work retains a pump
+    surface; dropping the last handle does not migrate owner-only callbacks and
+    leaves a surviving graph fail-closed as live.
+  - Setup, compile, submit, plan extraction, and reset on the `TaskGraph`
+    control object require external synchronization. The completion poll is
+    the supported cross-thread observation surface.
+  - `Execute()` is a thin `Submit()` + `Wait()` wrapper. Waiting drains ready
+    owner-thread passes, help-runs one scheduler task (inject or worker-local
+    steal), and parks on completion progress when idle. With no scheduler,
+    owner-thread pumping is the deterministic single-thread fallback.
+    Worker-eligible callbacks are dispatched even for a one-pass graph or a
+    one-worker scheduler so `Submit()` remains non-blocking; explicit
+    owner-thread options are the affinity contract.
+  - Submission state and the graph implementation are shared-owned by the
+    completion handle and dispatched closures. A retained handle can therefore
+    safely outlive the `TaskGraph` object; completion signaling cannot observe
+    destroyed graph-local state.
+  - `Reset()` and a second `Submit()` return `InvalidState` while execution is
+    live instead of relying on an assertion. `AddPass()` likewise leaves the
+    graph unchanged while live, so callback storage cannot be reallocated
+    beneath scheduled workers.
+  - A worker-backed completion records the scheduler instance that accepted
+    it. The instance must remain alive until readiness; unfinished waits and
+    pumps fail closed after scheduler replacement.
   - Main-thread-only passes are queued in deterministic ready order (priority,
     then estimated cost, then insertion order) while worker-ready passes keep
     running on scheduler workers.
@@ -115,10 +137,31 @@ but it exports the domain-free `TaskPlanGraph` API.
 - `Extrinsic.Core.Tasks.Internal`
 - `Extrinsic.Core.Tasks.LocalTask`
 
-`CounterEvent::Signal()` captures its scheduler wait token before publishing a
-zero count. A caller that observes readiness may destroy the event immediately,
-so a signaler that reaches zero must not read any event members after the
-successful zero transition.
+`CounterEvent` shared-owns its count and scheduler wait token internally.
+`Signal()` retains that state while it publishes and notifies each count
+transition, so `WaitForProgress()` can park a blocking thread without a
+signal-versus-destruction race. Blocking callers capture `PendingCount()`
+before checking their work queues and wait only while that value is unchanged,
+closing the count-change queue-check-to-park window. Worker-backed external
+help loops also capture `Scheduler::ObserveWorkProgress()` before checking
+queues and use `WaitForWorkProgress()` when idle. Dispatch and task retirement
+advance that epoch after publishing their state, so work added after
+an external queue check cannot strand a helper on an unrelated completion
+count. Progress tokens do not own scheduler lifetime: `Initialize()` and
+`Shutdown()` remain externally serialized against scheduler calls, and a
+worker-backed graph retains the scheduler-alive precondition documented in
+the task-graph architecture. Coroutine waiters keep the existing wait-token
+park/unpark contract, and destroying the public event releases the token after
+the last in-progress signal or blocking wait retires. Wait tokens include a
+scheduler-instance identity, so destroying an event retained across scheduler
+shutdown cannot release a colliding slot in a later scheduler instance.
+
+`Scheduler::TryRunOne()` is the neutral external-help seam used by graph
+completion waits. It executes at most one task on the caller, checking inject
+work and then worker-local deques. Its final worker-local scan waits for each
+short queue critical section to finish so lock contention cannot be mistaken
+for stable queue emptiness immediately before the helper parks. It does not
+impose graph or runtime domain policy.
 
 Task coroutine handles published to the scheduler are single-use resumption
 tokens. `Scheduler::Reschedule()` resumes a handle but must not inspect

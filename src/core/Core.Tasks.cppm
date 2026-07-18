@@ -20,8 +20,27 @@ export class Job;
         {
             std::uint32_t Slot = 0;
             std::uint32_t Generation = 0;
+            std::uint64_t SchedulerInstance = 0;
 
-            [[nodiscard]] bool Valid() const { return Generation != 0; }
+            [[nodiscard]] bool Valid() const
+            {
+                return Generation != 0 && SchedulerInstance != 0;
+            }
+        };
+
+        // Snapshot used by external help-run loops to close the
+        // queue-check-to-park window. The scheduler instance guards against
+        // waiting on a replacement scheduler. It does not own scheduler
+        // lifetime; Initialize()/Shutdown() remain externally synchronized.
+        struct WorkProgressToken
+        {
+            std::uint64_t SchedulerInstance = 0;
+            std::uint64_t Epoch = 0;
+
+            [[nodiscard]] bool Valid() const
+            {
+                return SchedulerInstance != 0;
+            }
         };
 
         struct Stats
@@ -49,6 +68,8 @@ export class Job;
             std::uint64_t IdleWaitCount = 0;
             std::uint64_t IdleWaitTotalNs = 0;
             std::uint64_t QueueContentionCount = 0;
+            std::uint64_t WorkProgressEpoch = 0;
+            std::uint32_t ExternalProgressWaiters = 0;
             double StealSuccessRatio = 0.0;
             std::vector<std::uint32_t> WorkerLocalDepths{};
             std::vector<std::uint64_t> WorkerVictimStealCounts{};
@@ -64,6 +85,12 @@ export class Job;
         static void Reschedule(std::coroutine_handle<> h, std::shared_ptr<std::atomic<bool>> alive = nullptr);
 
         [[nodiscard]] static bool IsInitialized() noexcept;
+        [[nodiscard]] static std::uint64_t CurrentInstanceId() noexcept;
+        // Observe before checking predicates/queues, then wait only after
+        // finding no work. Scheduler lifetime must remain externally
+        // synchronized across both calls.
+        [[nodiscard]] static WorkProgressToken ObserveWorkProgress() noexcept;
+        [[nodiscard]] static bool WaitForWorkProgress(WorkProgressToken token) noexcept;
         [[nodiscard]] static Stats GetStats();
         [[nodiscard]] static std::uint64_t GetParkCount() noexcept;
         [[nodiscard]] static std::uint64_t GetUnparkCount() noexcept;
@@ -74,6 +101,12 @@ export class Job;
                                                std::shared_ptr<std::atomic<bool>> alive = nullptr);
         static std::uint32_t UnparkReady(WaitToken token);
         static void MarkWaitTokenNotReady(WaitToken token);
+        // Execute at most one queued task on the calling thread. External
+        // callers may consume inject work or steal worker-local work. The
+        // final local-deque scan may briefly wait for a queue critical section
+        // so a contended queue is not reported as empty before the caller
+        // parks.
+        [[nodiscard]] static bool TryRunOne();
         static void WaitForAll();
 
     private:

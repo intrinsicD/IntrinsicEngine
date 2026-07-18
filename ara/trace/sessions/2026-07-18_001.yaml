@@ -2,9 +2,9 @@ session:
   id: "2026-07-18_001"
   date: "2026-07-18"
   started: "2026-07-18T10:10+02:00"
-  last_turn: "2026-07-18T10:10+02:00"
-  turn_count: 1
-  summary: "Completed the classification-first CI stack, calibrated and routed Release confidence, refreshed two repository-native research skills, and retired every process backlog task."
+  last_turn: "2026-07-18T14:13+02:00"
+  turn_count: 3
+  summary: "Completed the classification-first CI stack, calibrated and routed Release confidence, refreshed two repository-native research skills, retired every process backlog task, and passed the canonical CORE-005 UBSan and ASan CPU gates."
 
 events_logged:
   - turn: 1
@@ -55,6 +55,18 @@ events_logged:
     routing: crystallized
     provenance: ai-suggested
     summary: "Crystallized repository-native cross-repository skill adaptation as H10 through two validated target commits."
+  - turn: 2
+    type: experiment
+    id: "N261"
+    routing: direct
+    provenance: ai-executed
+    summary: "Passed the fresh canonical CORE-005 UBSan build and all 2,732 selected CPU tests with zero failures and one LSan-only skip."
+  - turn: 3
+    type: experiment
+    id: "N262"
+    routing: direct
+    provenance: ai-executed
+    summary: "Passed the fresh canonical CORE-005 ASan build and all 2,732 selected CPU tests with zero failures or skips."
 
 ai_actions:
   - turn: 1
@@ -91,6 +103,21 @@ ai_actions:
       - "ara/trace/pm_reasoning_log.yaml"
       - "ara/trace/sessions/2026-07-18_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
+  - turn: 2
+    action: "Ran the exact fresh CORE-005 UBSan configure, IntrinsicCpuTests build, and serial CPU CTest gate; retained complete logs under /tmp and checked them for sanitizer diagnostics."
+    provenance: ai-executed
+    files_changed:
+      - "build/ci-ubsan/"
+      - "/tmp/core005-ubsan-configure.log"
+      - "/tmp/core005-ubsan-build.log"
+      - "/tmp/core005-ubsan-ctest.log"
+  - turn: 3
+    action: "Ran the exact fresh CORE-005 ASan configure, IntrinsicCpuTests build, and serial CPU CTest gate; retained complete logs under /tmp and checked them for sanitizer diagnostics."
+    provenance: ai-executed
+    files_changed:
+      - "build/ci-asan/"
+      - "/tmp/core005-ci-asan-build.log"
+      - "/tmp/core005-ci-asan-ctest.log"
 
 claims_touched: []
 

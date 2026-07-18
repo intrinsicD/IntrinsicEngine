@@ -3,6 +3,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <string_view>
 #include <vector>
@@ -25,9 +26,13 @@ import Extrinsic.Core.Hash;
 //
 //   1. Setup  — AddPass(name, setup_fn, execute_fn) × N
 //   2. Compile — Compile()  → error on dependency cycle
-//   3. Consume — Execute() fires closures in topo-layer order, or BuildPlan()
-//                returns the ordered PlanTask vector
+//   3. Consume — Submit() starts callbacks and returns a completion handle,
+//                Execute() submits and waits, or BuildPlan() returns metadata
 //   4. Reset  — Reset() to begin the next epoch
+//
+// TaskGraph setup/compile/submit/reset operations require external
+// synchronization. TaskGraphCompletion::IsReady() is the cross-thread poll;
+// Wait() and PumpMainThreadPasses() belong to the submitting thread.
 // -----------------------------------------------------------------------
 
 export namespace Extrinsic::Core::Dag
@@ -130,6 +135,36 @@ export namespace Extrinsic::Core::Dag
     };
 
     // -----------------------------------------------------------------------
+    // TaskGraphCompletion — shared completion state for one submission.
+    //
+    // IsReady() is thread-safe. Wait() and PumpMainThreadPasses() must be
+    // called on the thread that called TaskGraph::Submit(); that owning thread
+    // is responsible for callbacks marked MainThreadOnly or !AllowParallel.
+    // -----------------------------------------------------------------------
+    class TaskGraphCompletion
+    {
+    public:
+        TaskGraphCompletion() noexcept;
+        ~TaskGraphCompletion();
+        TaskGraphCompletion(const TaskGraphCompletion&) noexcept;
+        TaskGraphCompletion& operator=(const TaskGraphCompletion&) noexcept;
+        TaskGraphCompletion(TaskGraphCompletion&&) noexcept;
+        TaskGraphCompletion& operator=(TaskGraphCompletion&&) noexcept;
+
+        [[nodiscard]] bool IsValid() const noexcept;
+        [[nodiscard]] bool IsReady() const noexcept;
+        [[nodiscard]] Core::Result Wait();
+        [[nodiscard]] Core::Expected<std::uint32_t> PumpMainThreadPasses();
+
+    private:
+        struct Impl;
+        explicit TaskGraphCompletion(std::shared_ptr<Impl> impl) noexcept;
+
+        std::shared_ptr<Impl> m_Impl{};
+        friend class TaskGraph;
+    };
+
+    // -----------------------------------------------------------------------
     // TaskGraph
     // -----------------------------------------------------------------------
     class TaskGraph
@@ -170,6 +205,8 @@ export namespace Extrinsic::Core::Dag
             const uint32_t idx = AddPassInternal(name,
                 options,
                 GraphExecuteCallback(std::forward<ExecuteFn>(execute)));
+            if (idx == std::numeric_limits<std::uint32_t>::max())
+                return;
             TaskGraphBuilder builder(*this, idx);
             setup(builder);
         }
@@ -203,8 +240,18 @@ export namespace Extrinsic::Core::Dag
 
         // ----- Phase 3a: Execute callbacks -----
 
-        // Fire all pass closures in dependency-ready order, with optional worker
-        // dispatch for non-main-thread passes.
+        // Start all dependency-ready callbacks without waiting. The returned
+        // handle owns the execution state and may outlive this TaskGraph object.
+        // Wait()/PumpMainThreadPasses() are owner-thread operations; IsReady()
+        // may be polled from any thread.
+        //
+        // Returns InvalidState for PlanOnly graphs or a live prior submission.
+        // The scheduler instance used for worker callbacks must remain alive
+        // until completion; Wait/Pump fail closed if it has been replaced.
+        [[nodiscard]] Core::Expected<TaskGraphCompletion> Submit();
+
+        // Blocking compatibility path. Equivalent to Submit() followed by
+        // completion.Wait(); it help-runs scheduler work and parks when idle.
         //
         // Returns InvalidState when the graph was constructed in PlanOnly mode.
         [[nodiscard]] Core::Result Execute();
@@ -226,7 +273,8 @@ export namespace Extrinsic::Core::Dag
         [[nodiscard]] GraphExecuteCallback TakePassExecute(uint32_t passIndex);
 
         // ----- Reset -----
-        void Reset();
+        // Fails closed while a submitted execution is still live.
+        [[nodiscard]] Core::Result Reset();
 
         // ----- Introspection -----
         [[nodiscard]] uint32_t PassCount() const noexcept;
@@ -251,7 +299,7 @@ export namespace Extrinsic::Core::Dag
         void NormalizeOptions(TaskGraphPassOptions& options) const;
 
         struct Impl;
-        std::unique_ptr<Impl> m_Impl;
+        std::shared_ptr<Impl> m_Impl;
     };
 
     // -----------------------------------------------------------------------
