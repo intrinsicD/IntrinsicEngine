@@ -230,7 +230,17 @@ class WorkflowRoutingTests(unittest.TestCase):
             ("merge_group", "merge-base", "merge-head"),
             ("workflow_dispatch", "origin/main", "HEAD"),
         )
+        expected_env = {
+            "EVENT_NAME": "${{ github.event_name }}",
+            "PR_BASE_SHA": "${{ github.event.pull_request.base.sha }}",
+            "PR_HEAD_SHA": "${{ github.event.pull_request.head.sha }}",
+            "MERGE_GROUP_BASE_SHA": "${{ github.event.merge_group.base_sha }}",
+            "MERGE_GROUP_HEAD_SHA": "${{ github.event.merge_group.head_sha }}",
+        }
         for workflow, job, step, script_path in route_steps:
+            payload, _ = _load_workflow(workflow)
+            route_step = _named_steps(payload["jobs"][job])[step]
+            self.assertEqual(route_step["env"], expected_env)
             for event_name, expected_base, expected_head in event_refs:
                 with self.subTest(workflow=workflow, event=event_name):
                     result, arguments = _run_route_step(
