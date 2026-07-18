@@ -23,10 +23,11 @@ depends_on: []
 - The repository has exactly one production `IRuntimeModule` implementation:
   `ClusteringModule`, currently a K-Means integration. Test doubles do not
   establish a second domain consumer.
-- Current output storage, completion records, and reactions are K-Means
-  specific. There is no DBSCAN implementation or backlog task, and the open
-  GMM work is lower-layer numerics for CPD rather than a second runtime
-  clustering integration.
+- Current output storage and completion records are K-Means-specific; the
+  generic-named labels-changed reaction currently has only a K-Means producer.
+  There is no DBSCAN implementation or backlog task, and the planned GMM work
+  is lower-layer geometry numerics for CPD and CLOP rather than a second
+  runtime clustering integration.
 - The original task premise treated result shape as the deciding boundary and
   prescribed a module-family taxonomy. The repository's P1 rule requires the
   opposite direction: decide from demonstrated composition, lifetime, commit,

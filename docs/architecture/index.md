@@ -56,6 +56,9 @@ Status labels:
 - [`0017-default-debug-surface-material.md`](../adr/0017-default-debug-surface-material.md) (`canonical`)
 - [`0018-missing-material-fallback-substitution.md`](../adr/0018-missing-material-fallback-substitution.md) (`canonical`)
 - [`0019-physics-layer-ownership-and-ecs-integration.md`](../adr/0019-physics-layer-ownership-and-ecs-integration.md) (`canonical`)
+- [`0026-runtime-module-scope-by-consumer-contract.md`](../adr/0026-runtime-module-scope-by-consumer-contract.md) (`canonical`) —
+  decides same-module cohesion and objective split triggers after ADR-0024
+  assigns a responsibility to runtime composition.
 
 ## Existing architecture references by status
 
