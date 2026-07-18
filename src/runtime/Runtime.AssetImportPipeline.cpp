@@ -2067,7 +2067,7 @@ namespace Extrinsic::Runtime
             StreamingTaskDesc{
                 .Name = "Runtime.ImportGeometry." +
                     FileNameFromPath(request.Path),
-                .Kind = Core::Dag::TaskKind::AssetDecode,
+                .Kind = RuntimeTaskKinds::AssetDecode,
                 .Priority = Core::Dag::TaskPriority::Normal,
                 .EstimatedCost = 4u,
                 .Execute = [
@@ -2424,7 +2424,7 @@ namespace Extrinsic::Runtime
             StreamingTaskDesc{
                 .Name = "Runtime.ImportModelTexture." +
                     FileNameFromPath(request.Path),
-                .Kind = Core::Dag::TaskKind::AssetDecode,
+                .Kind = RuntimeTaskKinds::AssetDecode,
                 .Priority = Core::Dag::TaskPriority::Normal,
                 .EstimatedCost = 4u,
                 .Execute = [

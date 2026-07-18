@@ -10,7 +10,7 @@ module Extrinsic.Core.FrameGraph;
 namespace Extrinsic::Core
 {
     FrameGraph::FrameGraph()
-        : m_Graph(Dag::CreateTaskGraph(Dag::QueueDomain::Cpu))
+        : m_Graph(Dag::CreateTaskGraph())
     {}
 
     FrameGraph::~FrameGraph() = default;
@@ -19,10 +19,10 @@ namespace Extrinsic::Core
 
     Core::Result FrameGraph::Compile()  { return m_Graph->Compile(); }
     Core::Result FrameGraph::Execute()  { return m_Graph->Execute(); }
-Core::Expected<std::vector<Dag::PlanTask>> FrameGraph::BuildPlan(const Dag::BuildConfig& config)
-{
-    return m_Graph->BuildPlan(config);
-}
+    Core::Expected<std::vector<Dag::PlanTask>> FrameGraph::BuildPlan()
+    {
+        return m_Graph->BuildPlan();
+    }
 
     void         FrameGraph::Reset()    { m_Graph->Reset(); }
 

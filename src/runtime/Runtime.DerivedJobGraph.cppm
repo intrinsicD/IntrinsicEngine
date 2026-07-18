@@ -89,7 +89,7 @@ export namespace Extrinsic::Runtime
         DerivedJobKey Key{};
         std::string Name{};
         ProgressiveJobDomain RequestedJobDomain{ProgressiveJobDomain::Cpu};
-        Core::Dag::TaskKind Kind{Core::Dag::TaskKind::GeometryProcess};
+        Core::Dag::TaskKind Kind{RuntimeTaskKinds::GeometryProcess};
         Core::Dag::TaskPriority Priority{Core::Dag::TaskPriority::Normal};
         std::uint32_t EstimatedCost{1u};
         std::uint64_t CancellationGeneration{0u};

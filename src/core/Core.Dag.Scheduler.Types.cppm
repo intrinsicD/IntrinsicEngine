@@ -22,22 +22,15 @@ export namespace Extrinsic::Core::Dag
     using ResourceId = StrongHandle<ResourceTag>;
     using LabelId = StrongHandle<LabelTag>;
 
-    enum class QueueDomain : uint8_t
+    struct TaskKind
     {
-        Cpu = 0,
-        Gpu = 1,
-        Streaming = 2,
-    };
+        uint8_t Value = 0;
 
-    enum class TaskKind : uint8_t
-    {
-        Generic = 0,
-        AssetIO,
-        AssetDecode,
-        AssetUpload,
-        GeometryProcess,
-        PhysicsStep,
-        RenderPass,
+        constexpr TaskKind() noexcept = default;
+        constexpr explicit TaskKind(const uint8_t value) noexcept
+            : Value(value) {}
+
+        [[nodiscard]] friend constexpr bool operator==(TaskKind, TaskKind) noexcept = default;
     };
 
     enum class TaskPriority : uint8_t
@@ -67,8 +60,7 @@ export namespace Extrinsic::Core::Dag
     {
         TaskId id{};
         std::string_view debugName{};
-        QueueDomain domain = QueueDomain::Cpu;
-        TaskKind kind = TaskKind::Generic;
+        TaskKind kind{};
         TaskPriority priority = TaskPriority::Normal;
         uint32_t estimatedCost = 1;
         uint32_t cancellationGeneration = 0;
@@ -76,20 +68,9 @@ export namespace Extrinsic::Core::Dag
         std::span<const ResourceAccess> resources{};
     };
 
-    struct BuildConfig
-    {
-        uint32_t workerCountCpu = 0;
-        uint32_t queueBudgetCpu = 0;
-        uint32_t queueBudgetGpu = 0;
-        uint32_t queueBudgetStreaming = 0;
-        uint64_t frameIndex = 0;
-    };
-
     struct PlanTask
     {
         TaskId id{};
-        QueueDomain domain = QueueDomain::Cpu;
-        uint32_t lane = 0;
         uint32_t topoOrder = 0;
         uint32_t batch = 0;
     };

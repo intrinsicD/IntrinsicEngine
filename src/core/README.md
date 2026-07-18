@@ -43,13 +43,19 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
   operations. Geometry's Dijkstra frontier uses it as a true decrease-key heap;
   shortest-path outputs remain covered against the previous lazy
   priority-queue reference.
-- **`Extrinsic.Core.Dag.Scheduler`**: shared graph compiler substrate (`TaskId`,
-  `ResourceId`, hazard analysis, deterministic topological layering, schedule
-  stats, cycle diagnostics).
-- **`Extrinsic.Core.Dag.TaskGraph`**: closure-based CPU/streaming task graph API
+- **`Extrinsic.Core.Dag.Scheduler`**: shared domain-free graph compiler
+  substrate (`TaskId`, `ResourceId`, opaque numeric `TaskKind` tokens, hazard
+  analysis, deterministic topological layering, schedule stats, cycle
+  diagnostics). `TaskPlanGraph` is the direct-submit facade and emits only task
+  id, topological order, and batch metadata; queue taxonomy, budgets, and lane
+  assignment belong to consumers.
+- **`Extrinsic.Core.Dag.TaskGraph`**: closure-based generic task graph API
   with `AddPass`, resource/label declarations, explicit pass dependencies via
   `TaskGraphBuilder::DependsOn`, `Compile`, `BuildPlan`, `Execute`,
   `Reset`, `ExecutePass`, and `TakePassExecute`.
+  - `TaskGraphExecutionMode::ExecuteCallbacks` is the default and enables
+    whole-graph `Execute()`; `PlanOnly` preserves compilation and per-pass
+    callback extraction but rejects whole-graph execution.
   - Pass options (`TaskGraphPassOptions` / `FrameGraphPassOptions`) provide
     `Priority`, `EstimatedCost`, `MainThreadOnly`, `AllowParallel`, and
     `DebugCategory`.
@@ -88,6 +94,9 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
 - `Extrinsic.Core.Dag.Scheduler:Policy`
 - `Extrinsic.Core.Dag.Scheduler:Compiler`
 - `Extrinsic.Core.Dag.Scheduler:DomainGraph`
+
+The `:DomainGraph` partition spelling is retained for module compatibility,
+but it exports the domain-free `TaskPlanGraph` API.
 
 ### Memory partition exports
 

@@ -8,6 +8,15 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`CORE-006`](CORE-006-domain-free-core-task-vocabulary.md) — domain-free Core
+task/DAG vocabulary retired on 2026-07-18 at `CPUContracted`. Implementation
+commit `54e7133bbed3766ded45b8054f505b63c63645b2` replaces Core's
+CPU/GPU/streaming taxonomy with opaque task-kind tokens and neutral
+execute/plan-only graph modes; Runtime owns stable named tokens. Queue
+budgets/lane placeholders and domain-specific diagnostic vocabulary are
+removed. Focused contracts passed 110/110 and the full CPU gate passed
+4,063/4,063 with one capability skip.
+
 [`PROC-025`](PROC-025-port-research-ideation-skill-to-other-repos.md) —
 cross-repository research-ideation skill parity retired on 2026-07-18 at
 `Operational`. The complete skills already existed on both target

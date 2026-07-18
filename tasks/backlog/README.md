@@ -218,12 +218,12 @@ the retired async editor method-command lane `RUNTIME-141`, the retired
 non-blocking frame-path fixes `RUNTIME-142`, the retired frame-hook/K-Means
 decoupling seam `RUNTIME-143`, the retired post-import/import-UX/input-action
 composition seam `RUNTIME-144`, the retired Sandbox editor ownership seam
-`ARCH-006`, remaining composition-root/abstractness seams (`CORE-006`,
-`CORE-009`), scheduler/DAG capability and efficiency
-(`CORE-005`, `CORE-007`, `CORE-008`). The retired steady-state frame
-efficiency polish `RUNTIME-145` removed the recurring runtime frame-path waste
-called out by the review. The retired correctness fix `BUG-055` (Theme G)
-unblocks `CORE-005`.
+`ARCH-006`, the retired domain-free task/DAG vocabulary seam `CORE-006`, the
+remaining composition-root/config seam `CORE-009`, and scheduler/DAG
+capability and efficiency (`CORE-005`, `CORE-007`, `CORE-008`). The retired
+steady-state frame efficiency polish `RUNTIME-145` removed the recurring
+runtime frame-path waste called out by the review. The retired correctness fix
+`BUG-055` (Theme G) unblocks `CORE-005`.
 
 **North star: [`docs/architecture/kernel-target-state.md`](../../docs/architecture/kernel-target-state.md)**
 — the living target and convergence scorecard for the ADR-0024 kernel/module
@@ -306,7 +306,6 @@ Open members (kernel-seam priority set first):
 - [`ui/UI-037-linear-domain-action-readiness-tooltips.md`](ui/UI-037-linear-domain-action-readiness-tooltips.md) (blocked by `BUG-096` and `RUNTIME-138`).
 - [`ui/UI-038-progressive-poisson-destructive-conversion-safety.md`](ui/UI-038-progressive-poisson-destructive-conversion-safety.md).
 - [`architecture/CORE-005-nonblocking-taskgraph-submit-api.md`](architecture/CORE-005-nonblocking-taskgraph-submit-api.md).
-- [`architecture/CORE-006-domain-free-core-task-vocabulary.md`](architecture/CORE-006-domain-free-core-task-vocabulary.md).
 - [`architecture/CORE-007-scheduler-priority-wait-wake-hardening.md`](architecture/CORE-007-scheduler-priority-wait-wake-hardening.md).
 - [`architecture/CORE-008-compiled-taskgraph-plan-reuse.md`](architecture/CORE-008-compiled-taskgraph-plan-reuse.md).
 - [`architecture/CORE-009-app-owned-config-sections.md`](architecture/CORE-009-app-owned-config-sections.md).

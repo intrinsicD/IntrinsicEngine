@@ -15,6 +15,18 @@ import Extrinsic.Core.Error;
 
 using namespace Extrinsic::Runtime;
 
+TEST(RuntimeStreamingExecutor, RuntimeTaskKindTokensRemainStable)
+{
+    EXPECT_EQ(RuntimeTaskKinds::Generic.Value, 0u);
+    EXPECT_EQ(RuntimeTaskKinds::AssetIO.Value, 1u);
+    EXPECT_EQ(RuntimeTaskKinds::AssetDecode.Value, 2u);
+    EXPECT_EQ(RuntimeTaskKinds::AssetUpload.Value, 3u);
+    EXPECT_EQ(RuntimeTaskKinds::GeometryProcess.Value, 4u);
+    EXPECT_EQ(RuntimeTaskKinds::PhysicsStep.Value, 5u);
+    EXPECT_EQ(RuntimeTaskKinds::RenderPass.Value, 6u);
+    EXPECT_EQ(StreamingTaskDesc{}.Kind, RuntimeTaskKinds::Generic);
+}
+
 TEST(RuntimeStreamingExecutor, SubmitStaysPendingUntilPumped)
 {
     StreamingExecutor executor{};

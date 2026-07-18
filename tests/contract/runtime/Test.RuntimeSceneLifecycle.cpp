@@ -30,6 +30,7 @@ import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneDocument;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.StreamingExecutor;
 
 namespace Core = Extrinsic::Core;
 namespace Runtime = Extrinsic::Runtime;
@@ -62,7 +63,7 @@ namespace
                     .OutputName = "engine_frame_probe",
                 },
                 .Name = "Engine.Frame.DerivedJob",
-                .Kind = Core::Dag::TaskKind::GeometryProcess,
+                .Kind = Runtime::RuntimeTaskKinds::GeometryProcess,
                 .Priority = Core::Dag::TaskPriority::Normal,
                 .Execute =
                     [this]() -> Runtime::DerivedJobWorkerResult
