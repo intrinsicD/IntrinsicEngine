@@ -6204,3 +6204,32 @@ tree:
       selected tests with zero failures, skipped tests, or not-run tests in
       227.05 seconds and emitted no AddressSanitizer or LeakSanitizer diagnostic.
     status: resolved
+  - id: N263
+    type: experiment
+    title: "Audit CORE-008 matched plan-reuse evidence"
+    provenance: ai-executed
+    timestamp: "2026-07-18T18:48+02:00"
+    evidence:
+      - "/tmp/core008-paired-8a50b725-v2/pair-{1..5}/{baseline,candidate}/"
+      - "benchmarks/baselines/core_taskgraph_plan_reuse_ecs3_smoke_e8df606f.json"
+      - "benchmarks/baselines/core_taskgraph_plan_reuse_renderprep9_smoke_e8df606f.json"
+      - "baseline production revision e8df606f794dc8a77aa03e962fa8f834705effb0"
+      - "candidate production revision 8a50b725eea65a680b04f48e1d01a9ce81f1be33"
+      - "test-only verification revision 28ffc72e41a1b5aa7e225f472a4667b3eca87848"
+      - "python3 tools/benchmark/validate_benchmark_results.py --root <capture> --strict"
+      - "ArchitectureSLO.FrameGraphP95P99BudgetsAt2000Nodes"
+    result: >
+      Independently recomputed five order-balanced baseline/candidate pairs for
+      both frozen CORE-008 smoke IDs. Median paired candidate runtime ratios
+      were 0.154376 for the three-pass ECS shape and 0.150621 for the nine-pass
+      render-prep shape; corresponding inverse-throughput ratios were 6.480003
+      and 6.644610. Every baseline capture built 6,146 plans and reused zero;
+      every candidate built one and reused 6,145, with zero quality error,
+      zero failures, and identical per-shape plan-order and callback-rebind
+      checksums. All ten 25-result capture directories passed strict validation.
+      The optimized cold/rebuild SLO also passed with compile p99 126,887 ns
+      against 350,000 ns and execute p95 793,500 ns against 8,333,334 ns.
+      The resulting report language was narrowed to matched-host synthetic
+      registration/compile/replay overhead rather than cross-machine or
+      end-to-end frame performance.
+    status: resolved

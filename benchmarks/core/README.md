@@ -34,6 +34,8 @@ milliseconds per graph epoch and throughput is graph epochs per second.
 Plan-order and fresh-callback checks run outside the timed window and require
 zero `quality_error_l2`. Plan-build/reuse counters distinguish the
 full-rebuild baseline from the candidate without changing the workload.
+The matched five-pair result and its bounded claims are recorded in
+[`core_taskgraph_plan_reuse_CORE-008.md`](../reports/core_taskgraph_plan_reuse_CORE-008.md).
 
 Run and validate the complete optimized smoke population with:
 

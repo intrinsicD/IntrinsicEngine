@@ -997,3 +997,10 @@ entries:
       - "Recorded the 2,153-action build, 2,732 selected tests, zero failures or skips, 227.05-second serial runtime, and absence of AddressSanitizer or LeakSanitizer diagnostics."
       - "Did not stage or crystallize a new observation: this gate verifies the current task slice and does not establish a broader sanitizer or performance claim."
       - "No existing staged observation received a closure, contradiction, or stale signal from this bounded verification run."
+  - turn: "2026-07-18_001#4"
+    notes:
+      - "Routed the CORE-008 paired benchmark recomputation and strict-validation audit as experiment N263 because it produced bounded matched-host evidence from frozen stable-ID payloads."
+      - "Kept runtime and inverse-throughput effects as one timing signal, reported five pairwise ranges, and bound avoided-work claims to exact build/reuse counters plus zero-error checksums."
+      - "Narrowed the report away from cross-machine, end-to-end frame, render-graph, or allocation-count claims; the timed scope contains registration, compile, and replay reset only."
+      - "Did not stage or crystallize a generalized performance observation: the task-specific report and machine-readable evidence already bind this resolved experiment."
+      - "No existing staged observation received a closure, contradiction, or stale signal from this bounded report audit."

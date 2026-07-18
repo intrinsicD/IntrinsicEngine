@@ -14,4 +14,5 @@ Store machine-readable benchmark baselines used for regression comparisons.
   are the CORE-008 full-rebuild baselines from the frozen replay harness at
   `e8df606f`. They are the median representatives from five sequential
   same-host `ci-release` runs. Both report zero reuse and zero quality error;
-  the matched candidate comparison is recorded in the CORE-008 report.
+  the later five-pair order-balanced candidate comparison is recorded in
+  [`core_taskgraph_plan_reuse_CORE-008.md`](../reports/core_taskgraph_plan_reuse_CORE-008.md).

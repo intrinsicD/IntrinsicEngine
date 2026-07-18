@@ -121,7 +121,8 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
 instance-lifetime accepted compile calls, successful full builds, exact replay
 hits, and the last-reuse flag. An exact replay hit reports zero through
 `LastCompileTimeNs()`; failed compile attempts count as calls but as neither a
-build nor a reuse.
+build nor a reuse. The frozen, order-balanced comparison is documented in the
+[`CORE-008 benchmark report`](../../benchmarks/reports/core_taskgraph_plan_reuse_CORE-008.md).
 
 ### Scheduler partition exports
 
