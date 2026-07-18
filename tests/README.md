@@ -267,7 +267,7 @@ the benchmark-smoke execution budget and dedicated lane were independently
 resolved by
 [`BUG-088`](../tasks/done/BUG-088-benchmark-smoke-hard-timeout-host-contention.md).
 
-The 23-result `IntrinsicBenchmarkSmoke.Run` → `.Validate` fixture pair is an
+The 25-result `IntrinsicBenchmarkSmoke.Run` → `.Validate` fixture pair is an
 explicit example: it remains in the complete aggregate with a 120-second runner
 bound, but is `benchmark;slow` and therefore outside the default CPU-supported
 gate. The path-aware `ci-release` candidate workflow runs the full aggregate in

@@ -740,6 +740,7 @@ namespace Extrinsic::Core::Dag
         std::atomic<uint64_t> LastExecuteNs{0u};
         uint64_t LastCriticalPathNs = 0u;
         ScheduleStats LastStats{};
+        TaskGraphPlanReuseStats PlanReuseStats{};
 
         // The compiled state should not be read/modified while Execute is active.
         // Keep the raw task payload alive for the life of execution.
@@ -954,6 +955,8 @@ namespace Extrinsic::Core::Dag
             return Err(ErrorCode::InvalidState);
         }
 
+        ++m_Impl->PlanReuseStats.CompileCallCount;
+        m_Impl->PlanReuseStats.LastCompileReusedPlan = false;
         const auto t0 = std::chrono::high_resolution_clock::now();
         const auto passCount = static_cast<std::uint32_t>(m_Impl->Passes.size());
         std::string diagnostic;
@@ -976,6 +979,7 @@ namespace Extrinsic::Core::Dag
         m_Impl->InitialInDegree= std::move(graph.InitialInDegree);
         m_Impl->LastStats     = graph.Stats;
         m_Impl->Compiled      = true;
+        ++m_Impl->PlanReuseStats.PlanBuildCount;
 
         const auto t1 = std::chrono::high_resolution_clock::now();
         m_Impl->LastCompileNs = static_cast<std::uint64_t>(
@@ -1254,6 +1258,15 @@ namespace Extrinsic::Core::Dag
         return Ok();
     }
 
+    Core::Result TaskGraph::ResetForReplay()
+    {
+        // Baseline scaffold: preserve the explicit replay lifecycle and
+        // lifetime counters while intentionally rebuilding all structure.
+        // The production CORE-008 change replaces this delegation after the
+        // frozen benchmark captures the full-rebuild baseline.
+        return Reset();
+    }
+
     std::uint32_t TaskGraph::PassCount() const noexcept
     {
         return static_cast<std::uint32_t>(m_Impl->Passes.size());
@@ -1281,6 +1294,11 @@ namespace Extrinsic::Core::Dag
     ScheduleStats TaskGraph::GetScheduleStats() const noexcept
     {
         return m_Impl->LastStats;
+    }
+
+    TaskGraphPlanReuseStats TaskGraph::GetPlanReuseStats() const noexcept
+    {
+        return m_Impl->PlanReuseStats;
     }
 
     std::unique_ptr<TaskGraph> CreateTaskGraph(const TaskGraphExecutionMode mode)

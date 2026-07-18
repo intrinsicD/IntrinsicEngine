@@ -25,7 +25,8 @@ This directory owns IntrinsicEngine benchmark infrastructure and benchmark artif
 ## Build integration
 
 - Benchmark scaffolding is wired through `benchmarks/CMakeLists.txt`.
-- The optimized `ci-release` lane owns the 23-result monolithic
-  `IntrinsicBenchmarkSmoke` population, including the Core scheduler probe.
+- The optimized `ci-release` lane owns the 25-result monolithic
+  `IntrinsicBenchmarkSmoke` population, including the Core scheduler probe
+  and the two TaskGraph replay-lifecycle workloads.
 - The default configuration keeps benchmark binaries lightweight so existing builds remain stable.
 - Heavy datasets and long-running suites are deferred to dedicated benchmark tasks.

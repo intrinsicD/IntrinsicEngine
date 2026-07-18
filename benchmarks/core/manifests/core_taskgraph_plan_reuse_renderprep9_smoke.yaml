@@ -1,0 +1,25 @@
+# CORE-008 - TaskGraph replay lifecycle for the nine-pass render-prep shape.
+
+benchmark_id: core.taskgraph_plan_reuse.renderprep9.smoke
+method: core.taskgraph_plan_reuse
+dataset: builtin.synthetic_taskgraph.render_prep_9.v1
+params:
+  intent: smoke
+  graph_shape: linear_resource_chain
+  pass_count: 9
+  resource_count: 9
+  edge_count: 8
+  warmup_batches: 3
+  measured_batches: 9
+  epochs_per_batch: 512
+  timing_statistic: median_per_epoch_runtime_ms
+  timed_scope: registration_compile_reset_for_replay
+  throughput_item: graph_epoch
+metrics:
+  - runtime_ms
+  - throughput_items_per_sec
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 10
+  throughput_items_per_sec_min: 1
+  quality_error_l2_max: 0.0

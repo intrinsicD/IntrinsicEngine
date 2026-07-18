@@ -14,6 +14,7 @@
 // with the previous scaffold's CMake/CI wiring.
 
 #include "../core/Bench.SchedulerHardeningSmoke.hpp"
+#include "../core/Bench.TaskGraphPlanReuseSmoke.hpp"
 #include "../geometry/Bench.GeometrySmoke.hpp"
 #include "../geometry/Bench.BoundaryFirstFlatteningReferenceSmoke.hpp"
 #include "../geometry/Bench.PointCloudFilteringSmoke.hpp"
@@ -1422,6 +1423,63 @@ auto EmitSchedulerHardeningSmoke(const std::string &commit)
                           metrics.Succeeded};
 }
 
+auto EmitTaskGraphPlanReuseSmoke(
+    const std::string &commit,
+    const Intrinsic::Bench::Core::TaskGraphPlanReuseSmokeMetrics &metrics,
+    const std::string_view benchmarkId,
+    const std::string_view dataset) -> EmittedBenchmark {
+  using namespace Intrinsic::Bench::Core;
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed);
+  out.precision(6);
+  out << "{\n"
+      << "  \"benchmark_id\": \"" << EscapeJson(benchmarkId) << "\",\n"
+      << "  \"method\": \"" << EscapeJson(kTaskGraphPlanReuseSmokeMethod)
+      << "\",\n"
+      << "  \"backend\": \"cpu_optimized\",\n"
+      << "  \"dataset\": \"" << EscapeJson(dataset) << "\",\n"
+      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+      << "  \"metrics\": {\n"
+      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+      << "    \"throughput_items_per_sec\": "
+      << metrics.ThroughputItemsPerSecond << ",\n"
+      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+      << "  },\n"
+      << "  \"diagnostics\": {\n"
+      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+      << "    \"mode\": \"smoke\",\n"
+      << "    \"timed_scope\": \"registration_compile_reset_for_replay\",\n"
+      << "    \"throughput_item\": \"graph_epoch\",\n"
+      << "    \"timing_statistic\": \"median_per_epoch_runtime_ms\",\n"
+      << "    \"warmup_batches\": " << metrics.WarmupBatches << ",\n"
+      << "    \"measured_batches\": " << metrics.MeasuredBatches << ",\n"
+      << "    \"epochs_per_batch\": " << metrics.EpochsPerBatch << ",\n"
+      << "    \"runtime_samples_ms_per_epoch\": ";
+  EmitDoubleSamples(out, metrics.RuntimeSamplesMilliseconds);
+  out << ",\n"
+      << "    \"pass_count\": " << metrics.PassCount << ",\n"
+      << "    \"resource_count\": " << metrics.PassCount << ",\n"
+      << "    \"edge_count\": " << metrics.EdgeCount << ",\n"
+      << "    \"layer_count\": " << metrics.LayerCount << ",\n"
+      << "    \"compile_call_count\": " << metrics.CompileCallCount << ",\n"
+      << "    \"plan_build_count\": " << metrics.PlanBuildCount << ",\n"
+      << "    \"plan_reuse_count\": " << metrics.PlanReuseCount << ",\n"
+      << "    \"last_compile_reused_plan\": "
+      << (metrics.LastCompileReusedPlan ? "true" : "false") << ",\n"
+      << "    \"plan_order_checksum\": " << metrics.PlanChecksum << ",\n"
+      << "    \"callback_rebind_checksum\": " << metrics.CallbackChecksum
+      << ",\n"
+      << "    \"failure_count\": " << metrics.FailureCount << "\n"
+      << "  },\n"
+      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
+      << "\"\n"
+      << "}\n";
+
+  return EmittedBenchmark{std::string(benchmarkId), out.str(),
+                          metrics.Succeeded};
+}
+
 auto WriteFile(const std::filesystem::path &path, std::string_view payload)
     -> bool {
   std::error_code ec;
@@ -1469,6 +1527,14 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitRenderGraphParallelRecordingSmoke(commit));
   emitted.push_back(EmitVertexFetchLayoutSmoke(commit));
   emitted.push_back(EmitSchedulerHardeningSmoke(commit));
+  emitted.push_back(EmitTaskGraphPlanReuseSmoke(
+      commit, Intrinsic::Bench::Core::RunTaskGraphPlanReuseEcs3Smoke(),
+      Intrinsic::Bench::Core::kTaskGraphPlanReuseEcs3SmokeBenchmarkId,
+      Intrinsic::Bench::Core::kTaskGraphPlanReuseEcs3SmokeDataset));
+  emitted.push_back(EmitTaskGraphPlanReuseSmoke(
+      commit, Intrinsic::Bench::Core::RunTaskGraphPlanReuseRenderPrep9Smoke(),
+      Intrinsic::Bench::Core::kTaskGraphPlanReuseRenderPrep9SmokeBenchmarkId,
+      Intrinsic::Bench::Core::kTaskGraphPlanReuseRenderPrep9SmokeDataset));
 
   // Output target: an existing directory or a path with no extension (or no
   // filename component) is treated as a directory and gets one JSON per

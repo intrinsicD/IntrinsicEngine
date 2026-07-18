@@ -86,6 +86,17 @@ export namespace Extrinsic::Core::Dag
         std::string_view DebugCategory = {};
     };
 
+    // Lifetime counters for one TaskGraph instance. CompileCallCount records
+    // public Compile() invocations; PlanBuildCount records full topology
+    // builds; PlanReuseCount records exact-structure replay hits.
+    struct TaskGraphPlanReuseStats
+    {
+        std::uint64_t CompileCallCount = 0u;
+        std::uint64_t PlanBuildCount = 0u;
+        std::uint64_t PlanReuseCount = 0u;
+        bool LastCompileReusedPlan = false;
+    };
+
     class TaskGraphBuilder
     {
     public:
@@ -276,6 +287,15 @@ export namespace Extrinsic::Core::Dag
         // Fails closed while a submitted execution is still live.
         [[nodiscard]] Core::Result Reset();
 
+        // Clear the current registration epoch while allowing the next
+        // AddPass()/Compile() replay to reuse an exactly matching compiled
+        // topology. Fails closed while a submitted execution is still live.
+        //
+        // The initial implementation intentionally performs a destructive
+        // reset; CORE-008 replaces that fallback after matched baseline
+        // capture without changing this API or its benchmark harness.
+        [[nodiscard]] Core::Result ResetForReplay();
+
         // ----- Introspection -----
         [[nodiscard]] uint32_t PassCount() const noexcept;
         [[nodiscard]] const std::vector<std::vector<uint32_t>>& GetExecutionLayers() const noexcept;
@@ -284,6 +304,7 @@ export namespace Extrinsic::Core::Dag
         [[nodiscard]] uint64_t LastExecuteTimeNs()     const noexcept;
         [[nodiscard]] uint64_t LastCriticalPathTimeNs()const noexcept;
         [[nodiscard]] ScheduleStats GetScheduleStats() const noexcept;
+        [[nodiscard]] TaskGraphPlanReuseStats GetPlanReuseStats() const noexcept;
 
     private:
         friend class TaskGraphBuilder;
