@@ -73,6 +73,13 @@ maturity_target: Operational
   fallback and freeze two stable-ID `ci-release` workloads; capture that exact
   scaffold revision, then implement reuse without modifying the harness and
   compare repeated matched-host captures.
+- Frozen baseline commit: `e8df606f794dc8a77aa03e962fa8f834705effb0`.
+  Five sequential, strict-validated `ci-release` runs recorded 6,146 plan
+  builds and zero reuse hits per workload with zero quality error. ECS-like
+  runtime was 0.001020–0.001335 ms/epoch (median 0.001036); render-prep-like
+  runtime was 0.002532–0.002630 ms/epoch (median 0.002624). The preserved
+  baseline binary SHA-256 is
+  `15e536b748d8b99679fe51329e42dc7bdd9b2a6f205ce97170ea4b28a49f539a`.
 
 ## Required changes
 - [ ] Add fail-closed `TaskGraph::ResetForReplay()` and `FrameGraph` forwarding
