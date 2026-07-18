@@ -21,12 +21,28 @@ depends_on: []
   unexpected top-level directory that trips the target repo's hygiene checks.
 
 ## Context
-- Cross-repo request from the session that adapted the skill into IntrinsicEngine.
-  That session could not reach `structsplat`/`prospect`: the claude-code-remote
-  repo tools (`list_repos`, `add_repo`) were **approval-gated** and the session
-  was scoped to `intrinsicD/IntrinsicEngine`. **Run this task from a session
-  scoped to the target repo** (or with the target repo added to scope), one repo
-  at a time on that repo's designated branch.
+- Status: active on 2026-07-18; owner: Codex; IntrinsicEngine branch: `main`;
+  target branches: `proc/025-research-ideation-refresh`. Next verification:
+  finish the two preserved repository-context refreshes, run each repository's
+  focused structural gates, then commit and push each designated branch.
+- The earlier remote-scoped session could not reach `structsplat` or
+  `prospect`. Local intake now confirms that both full skills already landed
+  on `origin/main`, so this task must refresh and verify them rather than
+  reinstalling or duplicating their registration.
+- StructSplat's original landing is
+  `ff88a119ce8257edfccc037ac9f98c70168d30de` at
+  `.claude/skills/structsplat-research-ideation/`, exposed through the native
+  `.agents/skills/` symlink. Its dedicated worktree
+  `/tmp/structsplat-proc025` preserves an uncommitted post-`BENCH-007`
+  frontier refresh; the dirty primary worktree is out of scope.
+- Prospect's original landing is
+  `afcf8f304433a96fd044eff63a25e71ac511112c` at
+  `.agents/skills/prospect-research-ideation/`. Its dedicated worktree
+  `/tmp/prospect-proc025` preserves the explicit license/author/version edit
+  and must fast-forward to clean local `main` at
+  `24a8147bb15b22949c58c00aa2191fbef3692ba0` before the final WM-001 context
+  refresh. The primary worktree and its six owner commits are otherwise out
+  of scope.
 - The kit ships profiles for both repos (`repo-profiles/structsplat.md`,
   `repo-profiles/prospect.md`) and an `install.py` that auto-detects them, but
   the bundled profiles are **starting hypotheses with real errors** — the

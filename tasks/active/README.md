@@ -11,7 +11,9 @@ Each active task should include:
 
 ## Currently active
 
-No tasks are currently active.
+- [`PROC-025`](PROC-025-port-research-ideation-skill-to-other-repos.md) —
+  refresh and verify the already-landed research-ideation skills on the
+  designated StructSplat and Prospect branches, then record their commits.
 
 ## History
 

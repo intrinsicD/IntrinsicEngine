@@ -15,8 +15,9 @@ map.
 
 ## Tasks
 
-- [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](PROC-025-port-research-ideation-skill-to-other-repos.md)
-  (portable playbook; run from a session scoped to the target repo).
+- [PROC-025 — Port the research-ideation skill to structsplat and prospect at IntrinsicEngine-parity quality](../../active/PROC-025-port-research-ideation-skill-to-other-repos.md)
+  is active. Both repo-native skills already landed; the designated target
+  branches now refresh their research frontier and verify structural parity.
 
 `PROC-012` (resolve the duplicate `GEOM-027` ID by renumbering the
 control-surface/KMeans backend-seam task to `GEOM-052`) is retired; see the
