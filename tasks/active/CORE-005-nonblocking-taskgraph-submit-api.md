@@ -42,10 +42,16 @@ depends_on:
 
 ## Status
 
-- Completed on 2026-07-18 at `CPUContracted`; owner: Codex; branch:
-  `codex/core-005-nonblocking-submit`; implementation commits:
+- Status: `in-progress`; owner: Codex; branch:
+  `codex/core-005-nonblocking-submit`; current implementation commits:
   `87740902e9cb0b6f3f37c190474d8a4b7ec06288` and
   `72070e4a339868b4f07743c2cc9f89b6b70ab48e`.
+- Latest blocker: late review found a queue-check-to-park lost wake. A worker
+  can enqueue local child work after the submit owner finds no work but before
+  it parks on the unchanged graph-completion count; if that worker then waits
+  for the child, the owner sleeps instead of stealing it. Add a monotonic
+  scheduler-progress wait handshake and a deterministic dispatch-at-park
+  regression, then rerun the affected gates before retirement.
 - Right-sizing verdict: one copyable completion handle and one shared
   execution-state implementation are justified by the escaped lifetime and
   submit-owner pump contract. Existing `Scheduler`/`CounterEvent` seams were
@@ -66,7 +72,7 @@ depends_on:
       document how the owning thread drains the main-thread queue for a
       submitted graph (explicit `PumpMainThreadPasses()` on the handle is
       acceptable).
-- [x] Rework the blocking wait: while the graph runs, the calling thread
+- [ ] Rework the blocking wait: while the graph runs, the calling thread
       help-executes scheduler work (inject queue and stealing) and parks on
       the completion `CounterEvent` when idle, instead of `yield()` spinning.
 - [x] Make `Execute()` a thin wrapper over submit+wait so there is one code
@@ -79,7 +85,7 @@ depends_on:
       the submitting thread runs unrelated work before waiting.
 - [x] Contract: main-thread-only passes execute on the owning thread via the
       documented pump path for a submitted graph.
-- [x] Contract: blocking wait makes progress when all workers are saturated
+- [ ] Contract: blocking wait makes progress when all workers are saturated
       (help-run proven with a single-worker-forced configuration).
 - [x] Contract: `Reset()` during a live submission fails closed.
 - [x] Existing `CoreTaskGraph.*` and `CoreTasks.*` suites stay green.
@@ -94,24 +100,26 @@ depends_on:
 ## Acceptance criteria
 - [x] A graph can be submitted, progressed, and completed without the caller
       blocking; completion observable via token.
-- [x] The blocking path no longer spins: CPU profile of an idle wait shows
+- [ ] The blocking path no longer spins: CPU profile of an idle wait shows
       parked caller, and the caller demonstrably executes stolen tasks under
       saturation.
-- [x] Default CPU gate green.
+- [ ] Default CPU gate green.
 
 ## Verification
 
-- `IntrinsicTests` built successfully; focused TaskGraph/Tasks contracts
+- Pre-fix evidence: `IntrinsicTests` built successfully; focused
+  TaskGraph/Tasks contracts
   passed 80/80. The corrected no-scheduler fallback passed 100 repetitions,
   and three one-worker help/steal cases passed 100 repetitions each.
-- The default CPU-supported gate passed 4,078/4,078 with one expected GLFW
+- Pre-fix evidence: the default CPU-supported gate passed 4,078/4,078 with one expected GLFW
   capability skip.
-- The canonical ASan gate configured fresh, built 2,153/2,153 actions, and
+- Pre-fix evidence: the canonical ASan gate configured fresh, built 2,153/2,153 actions, and
   passed 2,732/2,732 selected tests serially with no skip or diagnostic.
   The canonical UBSan gate configured fresh, built 2,153/2,153 actions, and
   passed 2,732/2,732 selected tests serially with one expected LSan-only
   capability skip and no UBSan diagnostic.
-- Host policy blocked `perf` (`kernel.perf_event_paranoid=4`), so no perf
+- Pre-fix evidence: host policy blocked `perf`
+  (`kernel.perf_event_paranoid=4`), so no perf
   sample is claimed. A direct `strace -f -e futex` run covered 50 repetitions
   of 200 worker-to-owner handoffs (10,000 total); the owner issued 10,064
   `FUTEX_WAIT` calls, directly demonstrating parking. The saturation/local
@@ -134,6 +142,7 @@ python3 tools/repo/check_layering.py --root src --strict
 - Timing-based synchronization.
 
 ## Maturity
-- Reached: `CPUContracted`; the API is fully proved on the CPU gate.
+- Target: `CPUContracted`; the API is fully provable on the CPU gate once the
+  late-enqueue wait race is closed and the affected evidence is rerun.
   No `Operational` follow-up is owed (consumers adopt it in their own tasks,
   e.g. `GRAPHICS-119`, future streaming-graph unification).
