@@ -13,8 +13,9 @@ map.
 Opened from the 2026-07-03 main-loop/task-graph/render-graph review
 ([`docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`](../../../docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md)):
 
-- [`CORE-007`](CORE-007-scheduler-priority-wait-wake-hardening.md) —
-  scheduler priority lanes, waiter stealing, wake and hot-path hardening.
+- [`CORE-007`](../../active/CORE-007-scheduler-priority-wait-wake-hardening.md)
+  is active — scheduler priority lanes and measured conditional-wake
+  hardening; retired `CORE-005` already owns definitive waiter stealing.
 - [`CORE-008`](CORE-008-compiled-taskgraph-plan-reuse.md) — compiled
   task-graph plan reuse across executions (fixed-step FrameGraph and
   render-prep adoption).

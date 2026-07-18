@@ -42,8 +42,9 @@ depends_on: []
 ## Required changes
 - [ ] Split "clear execution state" from "clear structure": a reset flavor
       that keeps passes + compiled topology and only rewinds per-execution
-      state (remaining-deps, timings), invalidated automatically by any
-      structural mutation (AddPass/DependsOn/resource decl).
+      state (remaining-deps, timings), retained callbacks, and ready-list
+      scratch, invalidated automatically by any structural mutation
+      (AddPass/DependsOn/resource decl).
 - [ ] Key reuse on a structure fingerprint (pass identities, declared
       accesses, edges, options that affect compilation) so an unchanged
       registration replay is detected cheaply, or provide an explicit
@@ -51,6 +52,9 @@ depends_on: []
       re-bind per-tick closures — pick one, document the choice.
 - [ ] Store edge diagnostic strings lazily (only materialized on compile
       failure/dump), intern pass names.
+- [ ] Reuse per-submission callback wrappers and ready-list scratch on the
+      retained execution state; this is the explicit owner of the allocation
+      work deferred from `CORE-007`.
 - [ ] Adopt in `Engine::RunFixedStepSimulationTicks`: unchanged
       pass set (the common `OnSimTick`-adds-nothing case) executes with zero
       recompiles; app-added passes trigger recompile transparently.
