@@ -54,6 +54,14 @@ depends_on:
 - Slice A is implemented and focused non-CMake checks pass. Slice B hosted
   sampling, baseline refresh, real-build validation, and retirement remain
   pending.
+- Hosted run `29628467034` is collecting five clean CPU samples at
+  `f2c5d192`. Before reading any report, the refresh rule is fixed: require an
+  identical physical-edge identity and resolution inventory across all five CPU
+  reports; rank baseline-eligible resolved repository edges globally by median
+  duration with `edge_id` as the tie-breaker; retain the five slowest; and set
+  each budget by rounding `1.25 * nearest-rank p95` up to a whole second with
+  `max_regression_ms=0`. The one source-complete report proves root visibility
+  only and does not enter timing thresholds.
 
 ## Required changes
 - [x] Define and document a deterministic physical compile-edge identity from

@@ -771,6 +771,13 @@ selection. Retain each full JSON report, rank normalized repository-owned
 edges across the cohort, and record the chosen offenders and threshold
 derivation with the hosted run IDs. Do not mix incremental logs, select a
 convenient retry, preserve stale targets by fiat, or impose per-root quotas.
+For the BUILD-004 refresh, the rule declared before hosted artifacts were read
+is: require an identical physical-edge identity and resolution inventory across
+all five CPU reports; rank baseline-eligible resolved repository edges globally
+by median duration with `edge_id` as the tie-breaker; retain the five slowest;
+and set each budget by rounding `1.25 * nearest-rank p95` up to a whole second
+with `max_regression_ms=0`. The single source-complete report proves root
+visibility only and does not enter timing thresholds.
 For the one source-completeness diagnostic, build the compile-only
 `IntrinsicTests` aggregate. It covers registered test, method, and benchmark
 producers without invoking the `IntrinsicBenchmarks` custom target, whose build
