@@ -42,12 +42,13 @@ depends_on:
 
 ## Status
 
-- Status: `in-progress`; owner: Codex; branch:
-  `codex/core-005-nonblocking-submit`; current implementation commits:
+- Completed on 2026-07-18 at `CPUContracted`; owner: Codex; branch:
+  `codex/core-005-nonblocking-submit`; principal implementation commits:
   `87740902e9cb0b6f3f37c190474d8a4b7ec06288` and
-  `72070e4a339868b4f07743c2cc9f89b6b70ab48e`.
-- The late queue-check-to-park blocker is closed in the current hardening
-  slice. Worker-backed help loops observe an instance-scoped scheduler-work
+  `72070e4a339868b4f07743c2cc9f89b6b70ab48e`; progress-wait hardening
+  commit: `64b770fc1fc58f392342819989268d171db4a416`.
+- The late queue-check-to-park blocker is closed by the progress-wait
+  hardening. Worker-backed help loops observe an instance-scoped scheduler-work
   epoch, dispatch and retirement publish progress, and registered waiters
   recheck before parking. The final external-help scan waits through short
   worker-deque lock contention so false emptiness cannot strand published
@@ -106,7 +107,7 @@ depends_on:
 - [x] The blocking path no longer spins: CPU profile of an idle wait shows
       parked caller, and the caller demonstrably executes stolen tasks under
       saturation.
-- [ ] Default CPU gate green.
+- [x] Default CPU gate green.
 
 ## Verification
 
@@ -141,6 +142,13 @@ depends_on:
 - Post-fix parking evidence: a direct `strace -f -e futex` run of 200
   worker-to-owner handoffs passed and recorded 353 main-thread waits on the
   scheduler progress futex address (467 main-thread futex waits total).
+- Exact committed-state gates: canonical `IntrinsicTests` built 1,160/1,160
+  actions and the CPU selector passed 4,082/4,082 with one expected GLFW
+  LeakSanitizer capability skip. Fresh `ci-asan` and `ci-ubsan`
+  `IntrinsicCpuTests` builds each completed 1,118/1,118 actions; each selector
+  passed 2,736/2,736 serially. ASan ran the GLFW LeakSanitizer case, UBSan
+  reported its expected LSan-only capability skip, and raw-log scans found no
+  sanitizer diagnostic.
 - Strict task policy/state-link, layering, test-layout, documentation-link,
   root-hygiene, skill-sync, docs-sync, and clean-workshop checks passed.
   Regenerating the 386-module inventory was byte-identical.
@@ -159,7 +167,10 @@ python3 tools/repo/check_layering.py --root src --strict
 - Timing-based synchronization.
 
 ## Maturity
-- Target: `CPUContracted`; the API is fully provable on the CPU gate once the
-  late-enqueue wait race is closed and the affected evidence is rerun.
-  No `Operational` follow-up is owed (consumers adopt it in their own tasks,
-  e.g. `GRAPHICS-119`, future streaming-graph unification).
+- Reached: `CPUContracted`. The submit/poll/pump/wait contract, owner affinity,
+  scheduler-instance failure behavior, saturated-worker help path, and both
+  queue-check-to-park publication edges are covered on the CPU and sanitizer
+  gates.
+- No `Operational` follow-up is owed. Consumers adopt the capability in their
+  own tasks (for example `GRAPHICS-119` and future streaming-graph
+  unification).
