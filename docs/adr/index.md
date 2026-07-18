@@ -30,6 +30,7 @@ This index tracks long-lived architecture decisions for IntrinsicEngine.
 24. [0024 — Kernel/module runtime architecture and communication contract](0024-kernel-module-architecture.md)
 25. [0025 — Parameterization UV view: derived second view, not a separate entity](0025-parameterization-uv-view-and-split-view.md)
 26. [0026 — Runtime-module scope by composition and consumer cohesion](0026-runtime-module-scope-by-consumer-contract.md)
+27. [0027 — Right-sized runtime composition mechanism](0027-right-sized-runtime-composition.md)
 
 ## Conventions
 

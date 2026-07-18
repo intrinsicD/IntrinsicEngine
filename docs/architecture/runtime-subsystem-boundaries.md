@@ -4,10 +4,13 @@
 > subsystem split and its `GetGraphicsBackend()`/`GetAssetPipeline()`/… getter
 > access policy. Under [ADR-0024](../adr/0024-kernel-module-architecture.md)
 > these `Engine::GetX()` getters are driven to zero (kernel-target-state
-> scorecard), domains become RuntimeModules, callers use narrow capability
-> contexts (D13), and the frame loop uses one command drain + two event pumps
-> (D5/D7) rather than a single dispatcher drain + `OnUpdate`/`OnRender`
-> callbacks (removed at D12). Read it as the starting point the migration
+> scorecard), as right-sized by
+> [ADR-0027](../adr/0027-right-sized-runtime-composition.md): durable domains
+> become app-composed responsibilities without a mandatory wrapper, callers
+> use narrow capability contexts (D13), and the frame loop uses one command
+> drain + two event pumps (D5/D7) rather than a single dispatcher drain +
+> `OnUpdate`/`OnRender` callbacks (removed at D12). Read it as the starting
+> point the migration
 > moves away from, not the target.
 
 This document is the current baseline map for the runtime-side subsystem split introduced around `Engine`, `GraphicsBackend`, `AssetPipeline`, `SceneManager`, and `RenderOrchestrator`.

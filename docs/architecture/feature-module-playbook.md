@@ -7,10 +7,13 @@ Use it when introducing anything like `Runtime.SomethingModule.cppm`, geometry t
 > **Target state first.** Before adding anything to `Runtime.Engine` or a new
 > `Runtime.*Module`, read [`kernel-target-state.md`](kernel-target-state.md)
 > and use its knob-decision table to place the responsibility. The kernel is
-> converging to a slim seam-only core ([ADR-0024](../adr/0024-kernel-module-architecture.md),
+> converging to a slim seam-only core
+> ([ADR-0024](../adr/0024-kernel-module-architecture.md), as amended by
+> [ADR-0027](../adr/0027-right-sized-runtime-composition.md),
 > tracked by [`ARCH-014`](../../tasks/active/ARCH-014-kernel-convergence-tracking.md)):
 > if your feature wants a new `Engine` method, that is the signal it is a
-> module, a command, an event, or a service — not kernel surface.
+> command, event, service, or app-composed responsibility — not kernel
+> surface. A new `IRuntimeModule` wrapper is not automatically required.
 
 ---
 
@@ -38,7 +41,18 @@ behavior inside ad-hoc runtime or ImGui code.
 
 When a feature grows past the floor, it is a small contract-driven slice:
 
-1. **RuntimeModule** — implement `IRuntimeModule` (`Extrinsic.Runtime.Module`) and compose it with `Engine::AddModule`/`EmplaceModule` before boot. Register command handlers, event subscriptions, sim systems, and frame hooks through the narrow `EngineSetup` surface (never an `Engine&`); publish or consume cross-module infrastructure through the two-phase `ServiceRegistry` (`Provide` in `OnRegister`; `Require`/`Find` in `OnResolve`, fail-closed at boot). Module systems use unique stable pass names and explicit `WaitForSignals`/`SignalLabels` for causal order (declared once on `SimSystemDesc`; the schedule derives the per-tick FrameGraph edges from them); Read/Write declarations protect hazards after that order is canonicalized. This is the `ARCH-011` registration seam per [ADR-0024](../adr/0024-kernel-module-architecture.md) D1/D3/D12/D13; module add order is never load-bearing. See [`kernel-target-state.md`](kernel-target-state.md).
+1. **App-composed runtime responsibility** — first apply
+   [ADR-0026](../adr/0026-runtime-module-scope-by-consumer-contract.md) to
+   lifecycle, state scope, commit ownership, and consumers. Use the current
+   `IRuntimeModule`/`EngineSetup` boundary when the responsibility genuinely
+   needs Engine-owned optional lifecycle or frame-loop registration; never
+   pass `Engine&`. Register only the command, event, service, hook, or system
+   surface the production behavior consumes. `Provide`/`Find` is the current
+   typed discovery seam; `Require`/`OnResolve` and the general schedule remain
+   conditional under
+   [ADR-0027](../adr/0027-right-sized-runtime-composition.md), not boilerplate
+   to copy into every feature. See
+   [`kernel-target-state.md`](kernel-target-state.md).
 2. **Domain/service layer** (pure logic, testable without GPU/UI).
 3. **Data contract** (typed IDs/handles, immutable inputs, explicit outputs).
 4. **Adapters** (ECS, GPU, IO, UI hooks).
@@ -96,27 +110,20 @@ minimum shape:
 - `Execute(...) -> std::expected<Result, Error>`
 - `EnqueueAsync(...)` for streaming/off-main-thread heavy work (if applicable)
 
-Runtime integration for a grown feature goes through
-`Extrinsic.Runtime.Module`: implement `IRuntimeModule`, register commands,
-events, jobs, worlds, services, fixed-step sim systems, and frame-phase hooks
-through `EngineSetup`, and add the module to the engine before
-`Engine::Initialize()`. Per ADR-0024 D13, module-facing setup/context surfaces
-must stay narrow capability surfaces and must not receive `Engine&`. Shared
-synchronous infrastructure should be provided in `OnRegister`, required or found
-from the two-phase `ServiceRegistry` in `OnResolve`, and shut down after the
-runtime shutdown announce event has pumped. Register dependency-independent
-sim systems and frame hooks in `OnRegister`; registering either contribution in
-`OnResolve` is also legal when it depends on a resolved service or capability.
-The engine keeps the module schedule mutable through every `OnResolve`, then
-finalizes the complete contribution set exactly once: duplicate identities,
-cycles, and unprovided waits fail boot before any fixed-step pass can execute.
-`ServiceRegistry::Provide` remains legal only in `OnRegister`; `OnResolve` is
-the `Require`/`Find` phase. Module sim systems declare wait/signal labels on
-`SimSystemDesc` so pass ordering is data-driven rather than dependent on
-`AddModule` order.
+Runtime integration for a grown feature uses the smallest app-composition
+shape justified by present behavior. A responsibility needing Engine-owned
+optional lifecycle may implement `IRuntimeModule` and register through
+`EngineSetup` before `Engine::Initialize()`. Per ADR-0024 D13 and ADR-0027,
+setup/context surfaces remain narrow capabilities and never receive `Engine&`.
+Provide a typed service only when another production owner consumes it.
+Register a frame hook or fixed-step system only when the frame loop must
+iterate real behavior. `Require`/`OnResolve`, general wait/signal scheduling,
+and additional registrars must pass ADR-0027's live-consumer deletion test;
+do not copy them as a default module skeleton.
 
-The fixed-step composition appends the promoted baseline ECS bundle before
-module sim systems. That bundle provides `TransformUpdate`, so a module that
+When a production fixed-step contribution exists, the composition appends the
+promoted baseline ECS bundle before registered sim systems. That bundle
+provides `TransformUpdate`, so a contribution that
 consumes the current substep's `Transform::WorldMatrix` declares
 `WaitForSignals = {"TransformUpdate"}` and the matching `Read<WorldMatrix>`
 hazard; it must not rely on module registration order or synthesize a duplicate
@@ -127,10 +134,11 @@ world. A pass that adds or removes ECS components must declare
 `Write<T>` declarations do not protect EnTT's registry-wide storage map from
 first-use pool creation.
 
-This surface is not required for a one-caller, synchronous probe that still fits
-the floor. Add it when a second caller, a backend split, scheduled work,
-persisted config, command routing, UI control, or telemetry-backed diagnostics
-appears.
+This composition surface is not required for a one-caller, synchronous probe
+that still fits the floor. A second caller, backend split, scheduled work,
+persisted config, command routing, UI control, or telemetry diagnostics means
+the feature needs explicit contracts; it does not by itself prove that every
+contract belongs in a new runtime wrapper.
 
 ---
 

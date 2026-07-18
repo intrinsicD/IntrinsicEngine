@@ -2,63 +2,80 @@
 id: RUNTIME-168
 theme: F
 depends_on:
-  - CI-003
-  - RUNTIME-144
+  - RUNTIME-172
+  - RUNTIME-180
+  - RUNTIME-181
+  - RUNTIME-182
+  - RUNTIME-183
 maturity_target: Operational
 ---
-# RUNTIME-168 — Privatize the Sandbox default policies surface
+# RUNTIME-168 — Privatize Sandbox default-policy composition
 
 ## Goal
-- Replace the low-fanout `Extrinsic.Runtime.SandboxDefaultPolicies` module
-  surface with private runtime/app glue while preserving the existing default
-  import, input-action, and post-import policy behavior.
+- Replace the exported, Engine-bound
+  `Extrinsic.Runtime.SandboxDefaultPolicies` surface with private Sandbox app
+  composition glue over the resolved scene, camera, config, editor, and asset
+  module services.
 
 ## Non-goals
-- No default policy behavior changes and no new sandbox UX.
-- No movement of asset, ECS, graphics, or runtime ownership into `app`.
-- No change to `Runtime.AssetImportPipeline` public semantics.
+- No default import, input-action, camera-focus, selection, post-import, or
+  editor behavior change.
+- No new Sandbox policy module, registry, service bundle, or generic
+  application framework.
+- No movement of asset, ECS, graphics, or renderer ownership into `app`.
+- No `Engine&` in the replacement glue.
 
 ## Context
-- Owner/layer: `runtime` for default policy registration; `app/Sandbox` only
-  composes the returned handles.
-- Local 2026-07-10 triage measured `Runtime.SandboxDefaultPolicies.cppm` at up
-  to 53.135s despite a 37-line interface with two imports and one production
-  consumer (`src/app/Sandbox/Sandbox.cppm`), plus tests.
-- `RUNTIME-144` retired the policy seam; this task only changes whether the
-  seam is exported as a module.
+- Owner/layer: runtime retains lower-layer policy implementations; the Sandbox
+  app visibly chooses and composes those defaults while depending on runtime
+  only.
+- The current 37-line exported module has one production consumer and forwards
+  a broad `Engine&` to install policies across several domain owners.
+- After the composition modules land, the defaults can bind their concrete
+  existing service surfaces during app composition without an Engine facade or
+  a new cross-domain wrapper.
+- This task is app policy wiring, not a seventh durable runtime owner.
 
 ## Required changes
-- [ ] Inventory which declarations need app/test visibility and which can stay
-      implementation-local.
-- [ ] Convert the module surface to private header/source glue or fold it into
-      the sandbox composition path, keeping the policy implementation in
-      `runtime`.
-- [ ] Update app and test consumers without introducing lower-layer imports in
-      `app/Sandbox`.
-- [ ] Remove the `.cppm` from runtime CMake module file sets if no module
-      surface remains.
-- [ ] Record before/after compile timing and module/import counts.
+- [ ] Inventory each default registration/unregistration and map it to the
+      owning module service: asset import/postprocess, camera focus, selection/
+      history, editor visibility/input, or config.
+- [ ] Move the exported policy declarations to private runtime/app composition
+      glue, or fold each registration next to the Sandbox composition call
+      that owns it.
+- [ ] Replace `Engine&` with explicit resolved existing capabilities; do not
+      introduce a catch-all dependency struct or service locator facade.
+- [ ] Preserve registration order, returned-handle lifetime, reverse-order
+      unregister, and shutdown behavior.
+- [ ] Remove the `.cppm` module surface and CMake module-file entry when the
+      final consumer is migrated; leave no compatibility import.
+- [ ] Record before/after module/import/consumer counts.
 
 ## Tests
-- [ ] Run sandbox editor, asset import format coverage, and runtime input-action
-      tests that exercise default policy registration/unregistration.
-- [ ] Run strict layering and the default CPU-supported CTest gate.
+- [ ] Preserve Sandbox default import formats, post-import processing, camera
+      focus, selection, input actions, and unregister/shutdown coverage.
+- [ ] Add a source/contract check proving the app glue contains no `Engine&`
+      and app still imports runtime only.
+- [ ] Run focused Sandbox policy/editor/import coverage, strict layering, and
+      the complete default CPU-supported gate.
 
 ## Docs
-- [ ] Update `src/app/Sandbox/README.md`, `src/runtime/README.md`, and generated
-      module inventory if the module surface is removed.
+- [ ] Update Sandbox and runtime composition documentation with the private
+      app-policy ownership.
+- [ ] Regenerate the module inventory.
 
 ## Acceptance criteria
-- [ ] Sandbox default policy behavior and returned-handle cleanup are unchanged.
-- [ ] The default policy seam is no longer a broad exported module surface unless
-      measurements show the module should remain.
-- [ ] `app` still depends on `runtime` only.
+- [ ] Sandbox default behavior and handle cleanup are unchanged.
+- [ ] No exported `SandboxDefaultPolicies` module, Engine facade, replacement
+      policy module, or catch-all service bundle remains.
+- [ ] App composition selects the defaults while all lower-layer behavior and
+      state stays in runtime-owned modules.
 
 ## Verification
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicRuntimeIntegrationTests
-ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|RuntimeInputActions|AssetImportFormatCoverage|RuntimeSandboxAcceptance' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicRuntimeIntegrationTests IntrinsicSandboxEditorIntegrationTests
+ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|RuntimeInputActions|AssetImportFormatCoverage|RuntimeSandboxAcceptance|CameraFocus' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/repo/check_layering.py --root src --strict
@@ -67,10 +84,11 @@ python3 tools/agents/check_task_policy.py --root . --strict
 ```
 
 ## Forbidden changes
+- Adding a public compatibility module, Sandbox policy module, service bundle,
+  or `Engine&` adapter.
 - Reintroducing app ownership of assets, ECS, graphics, or renderer state.
-- Changing default policy semantics while changing module/header shape.
-- Adding a public compatibility module solely to preserve the old import name.
+- Changing default behavior while changing composition shape.
 
 ## Maturity
-- Target: `Operational`; the default policies remain exercised through the
-  sandbox runtime path, so no `Operational` follow-up is owed.
+- Target: `Operational`; the private policy composition must remain exercised
+  through the canonical Sandbox runtime path.

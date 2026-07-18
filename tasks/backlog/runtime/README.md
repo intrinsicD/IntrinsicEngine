@@ -142,6 +142,64 @@ an Engine-private `AssetResidencyService`.
 derived-job facade delegation now live behind
 `Extrinsic.Runtime.AsyncWorkService`.
 
+### ADR-0027 app-composition convergence (seeded 2026-07-18)
+
+[ADR-0027](../../../docs/adr/0027-right-sized-runtime-composition.md)
+right-sizes the ADR-0024 destination around observable ownership instead of
+wrapper counts. It keeps the lean app-to-runtime lifecycle boundary while
+requiring every registrar/service/schedule feature to gain a production
+consumer or disappear. Extension-pass registration, a priority input chain,
+`InlineModule`, and `WorldSwitchModule` are deferred behind named real-consumer
+triggers. The implementation graph is:
+
+- [`RUNTIME-179`](RUNTIME-179-extract-async-work-module.md) — compose the
+  existing global streaming/derived-job owner and remove its Engine facades.
+- [`RUNTIME-180`](RUNTIME-180-extract-camera-module.md) — compose global
+  viewport/controller state with world-qualified targets and move initial
+  reference content to app bootstrap.
+- [`RUNTIME-181`](RUNTIME-181-extract-config-control-module.md) — compose the
+  one global validated config preview/apply and app-section owner.
+- Re-scoped [`RUNTIME-172`](RUNTIME-172-privatize-scene-document-surface.md) —
+  compose the cohesive SceneEditing owner after `RUNTIME-179` and
+  `HARDEN-086`; document/history/selection/lookup/readback/gizmo records are
+  keyed or reset by `WorldHandle`.
+- [`RUNTIME-183`](RUNTIME-183-extract-asset-workflow-module.md) — compose the
+  global asset/residency/import/bake owner after its async, scene, camera, and
+  config capabilities exist; borrowed world handoffs never become hidden ECS
+  ownership.
+- [`RUNTIME-182`](RUNTIME-182-extract-editor-ui-module.md) — compose the
+  optional global ImGui/host owner, with one frame-local kernel capture value
+  and app-owned Sandbox panels.
+- Re-scoped [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md)
+  — make Sandbox defaults explicit app composition glue over the resolved
+  owners, without `Engine&` or a new policy facade.
+- Existing [`RUNTIME-129`](RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
+  completes the operational Vulkan bake inside `AssetWorkflowModule`.
+- [`RUNTIME-184`](RUNTIME-184-replace-application-lifecycle.md) — remove
+  `IApplication` and unrestricted app ticks through explicit Sandbox/module
+  composition, isolated from residual API migration and the final
+  representation/checker ratchet.
+- [`RUNTIME-185`](RUNTIME-185-prune-runtime-composition-mechanisms.md) —
+  separately remove/narrow every lifecycle/setup/service/schedule feature
+  still lacking a production consumer after both explicit app lifecycle and
+  the operational normal-bake consumer graph have landed.
+- [`RUNTIME-186`](RUNTIME-186-retire-engine-auxiliary-surface.md) — settle
+  residual frame-pacing/render-extraction observation and input-action setup
+  APIs, remove Engine re-exports, and migrate callers without absorbing a
+  missed domain-owner correction.
+- [`RUNTIME-187`](RUNTIME-187-finalize-domain-free-engine-surface.md) — final
+  representation-only PImpl plus exact Engine import/getter/type/re-export
+  checker ratchet.
+
+`GRAPHICS-127` follows `RUNTIME-181`/`RUNTIME-182` so its profiling config and
+Frame Graph UI use the settled owners.
+[`RUNTIME-177`](RUNTIME-177-immediate-mode-debug-draw-seam.md) follows
+`RUNTIME-166` and `RUNTIME-181` so debug draw attaches to the final extraction
+storage and shared config lane. `RUNTIME-129` and `RUNTIME-184` may proceed
+independently after their respective owner prerequisites; both gate
+`RUNTIME-185`. `ARCH-014` reaches this graph through `RUNTIME-187`;
+`REVIEW-003` reaches it transitively through `ARCH-014`.
+
 #### Retired decomposition entries
 
 - [RUNTIME-165 — Extract async work service out of Engine](../../archive/RUNTIME-165-extract-async-work-service.md)
@@ -311,8 +369,9 @@ This foundation is recorded in
 [`ADR-0023`](../../../docs/adr/0023-cpu-gpu-transfer-foundation.md).
 `RUNTIME-137` is retired; the async readback helper is the sanctioned compute
 backend drain path and `JobService` owns the `GpuQueue` participant registry.
-`RUNTIME-129` is now unblocked to wire object-space normal bake GPU submission
-through that target.
+That historical prerequisite for `RUNTIME-129` is satisfied; the task is
+currently gated on `RUNTIME-183` so object-space normal bake GPU submission
+lands inside the accepted AssetWorkflow owner.
 
 `RUNTIME-111` through `RUNTIME-115` are retired; additional progressive
 render-data follow-ups should open as value-gated tasks with a concrete

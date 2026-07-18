@@ -20,14 +20,17 @@ are retired to `tasks/done/`; `ARCH-014` remains the active umbrella:
   umbrella
   north-star: owns the [kernel target-state](../../../docs/architecture/kernel-target-state.md)
   convergence scorecard and the review/ratchet guardrail; stays open
-  until the right-sized ADR-0024 target is reached. It is blocked on
-  `ARCH-016` and `RUNTIME-129`. Retired child `HARDEN-085` delivered the
+  until the ADR-0027-right-sized target is reached. It is blocked on
+  `ARCH-016` and the final `RUNTIME-187` leaf, which is transitively gated on
+  the behavior owners and `RUNTIME-129`. Retired child `HARDEN-085` delivered the
   monotone checker and `pr-fast` gate.
 - [`ARCH-016`](../../active/ARCH-016-right-size-runtime-composition-target.md)
-  is active — ADR-0024 amendment to break the ARCH-014/REVIEW-003 decision
-  loop, distinguish domain ownership from a mandatory C++ wrapper, remove
-  zero-consumer mechanism blockers, correct the scorecard, and seed only
-  behavior-carrying children.
+  is active — accepted
+  [ADR-0027](../../../docs/adr/0027-right-sized-runtime-composition.md) breaks
+  the ARCH-014/REVIEW-003 decision loop, distinguishes domain ownership from a
+  mandatory C++ wrapper, removes zero-consumer mechanism blockers, corrects
+  the scorecard to 42/20/2/31, and seeds only behavior-carrying children
+  `RUNTIME-179`..`187`.
 - [`REVIEW-003`](REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
   one-shot, commit-anchored architecture stability and right-sizing audit. It
   is blocked on the known convergence, privatization, validator, root-hygiene,
@@ -123,8 +126,8 @@ root must update the relevant `docs/architecture/*` doc set in the same PR per
   state scope, dependency/cancellation/commit ownership, and consumer reactions
   are cohesive. Family/result shape, an extra service, or a different execution
   mechanism alone does not decide the boundary; shared records wait for a real
-  second production caller, and `REVIEW-003` still owns `IRuntimeModule`
-  right-sizing.
+  second production caller. ADR-0027 now owns the accepted composition
+  mechanism decision; `REVIEW-003` later audits the landed surface.
 
 - [`CORE-009`](../../done/CORE-009-app-owned-config-sections.md) —
   retired 2026-07-18 at `Operational`: Core now carries only generic,

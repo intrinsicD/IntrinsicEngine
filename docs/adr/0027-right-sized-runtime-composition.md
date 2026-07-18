@@ -1,0 +1,276 @@
+# ADR 0027: Right-sized runtime composition by ownership outcome
+
+- **Status:** Accepted
+- **Date:** 2026-07-18
+- **Owners:** Runtime / Architecture
+- **Related tasks:** `ARCH-014`, `ARCH-016`, `RUNTIME-129`, `RUNTIME-168`,
+  `RUNTIME-172`, `RUNTIME-179`..`RUNTIME-187`, `REVIEW-003`
+- **Amends:** [ADR-0024](0024-kernel-module-architecture.md) D1, D2, D3, D9,
+  D10, D11, D12, and D13
+- **Uses:** [ADR-0026](0026-runtime-module-scope-by-consumer-contract.md)
+
+## Context
+
+ADR-0024 correctly requires a domain-free Engine, explicit application
+composition, narrow capabilities instead of `Engine&`, and an explicit
+world/global lifetime for durable state. Its target text also prescribed one
+specific implementation shape for nearly every responsibility:
+`IRuntimeModule`, a two-phase `ServiceRegistry`, `RuntimeModuleSchedule`,
+extension-pass registration, a priority input-capture filter chain, and an
+`InlineModule` builder.
+
+The live tree does not justify that whole mechanism set:
+
+- `ClusteringModule` is the only production `IRuntimeModule` implementor and
+  Sandbox contains the only production `EmplaceModule` call.
+- `ClusteringModule::OnRegister` uses the command, event, job, world, and
+  service capabilities of `EngineSetup`, plus shutdown. Its `OnResolve` is a
+  no-op. It registers no sim system and no frame hook.
+- `ServiceRegistry` receives six production provisions: five Engine-owned
+  records and `ClusteringService`. Only two provided types have production
+  `Find` consumers: `RenderExtractionCache` and `ClusteringService`. No
+  production code calls `Require`.
+- `RuntimeModuleSchedule` receives no production sim-system or frame-hook
+  record. Its duplicate, cycle, signal, and ordering behavior is exercised
+  only by contract tests.
+- No production responsibility registers a D10 extension pass. The renderer
+  currently executes the closed built-in pass vocabulary selected and
+  configured by recipe data.
+- ImGui is the sole production input-capture producer. It records one
+  end-of-editor-frame `EditorInputCaptureSnapshot`, which gates camera, gizmo,
+  picking, and input-action consumption. There is no priority chain.
+- There is no `InlineModule` symbol, production experiment app, or repeated
+  experiment bootstrap to extract into a template.
+- `WorldRegistry` and `WorldHandle` are live kernel substrate. There is no
+  production preview-world readiness or staged-switch policy requiring a
+  `WorldSwitchModule`.
+
+The reconciliation audit recorded 42 plain imports, 21 domain imports, two
+re-exports, and 31 public `Engine::GetX()` names. That domain count included
+`Extrinsic.Runtime.WorldHandle`; this ADR classifies the type as kernel
+substrate. The corrected exact snapshot for the same source is therefore
+42 plain imports, 20 domain imports, two re-exports, and 31 getters.
+
+Literal mechanism rows made `ARCH-014` depend on building zero-consumer
+frameworks before `REVIEW-003` could review whether those frameworks should
+exist. This ADR breaks that decision loop. It preserves the ownership and
+coupling outcomes while making every composition mechanism pass a present-use
+deletion test.
+
+## Decision
+
+### 1. Amendment scope and vocabulary
+
+ADR-0024 D4 through D8 remain unchanged. In particular, command/event pump
+ordering, job snapshot and cancellation rules, world teardown, and explicit
+`WorldHandle` use remain kernel contracts. D2 is refined only to distinguish
+the live `WorldRegistry`/`WorldHandle` substrate from the deferred,
+zero-consumer `WorldSwitchModule` policy.
+
+For D1, D9, and D12, **runtime module** is a logical term: one
+ADR-0026-cohesive, app-composed responsibility with explicit ownership and
+lifecycle. It does not mean that every responsibility must implement the
+current C++ `IRuntimeModule` interface or own a one-to-one wrapper file.
+
+The kernel test becomes:
+
+> Required to execute every frame independent of application policy is kernel
+> substrate. Everything else is an explicitly app-composed responsibility.
+
+A domain noun is a discovery warning, not a proof by spelling. Conversely,
+hiding domain state in an Engine-private owner does not make it substrate.
+`WorldRegistry`, `WorldHandle`, command/event/job pumps, render extraction,
+frame scheduling, and recipe activation are substrate because the frame loop
+directly owns or iterates them.
+
+ADR-0026 decides whether present responsibilities share one logical owner.
+This ADR decides which current composition mechanisms earn their keep. Neither
+decision predeclares a family taxonomy.
+
+### 2. Accepted ownership outcomes
+
+The amended target retains all of these outcomes:
+
+1. `Runtime.Engine` has no domain import, domain re-export, domain-owned member,
+   or domain-facade getter in its public interface.
+2. The application explicitly constructs and composes every optional
+   responsibility. Engine never imports a concrete domain responsibility to
+   make that composition convenient.
+3. No handler, setup, or composed-responsibility surface receives `Engine&`.
+   Narrow contexts carry only the capabilities used by the operation.
+4. Every durable owner states whether it is global or keyed by `WorldHandle`,
+   and states its reset, rebind, cancellation, and destruction behavior when
+   the active world changes or a world retires.
+5. Commands, queued events, jobs, ECS state, and direct narrow capabilities
+   remain the default communication paths. Hidden ownership, mutable
+   backreferences, and ad-hoc peer lookup remain forbidden. The app may pass
+   an explicit narrow non-owning construction capability when its lifetime is
+   declared and it is the simplest wiring for a required peer; typed service
+   discovery remains the option for order-independent or optional peers.
+6. A responsibility is not considered extracted merely because an
+   Engine-private class or forwarding getter has been created. The app
+   composition point, owner, state scope, and consumer-facing interface must
+   all be visible outside `Runtime.Engine`.
+
+### 3. Composition-mechanism verdicts
+
+| Mechanism | Present evidence | Verdict and deletion test | Reintroduction or expansion trigger |
+| --- | --- | --- | --- |
+| `IRuntimeModule` | One production implementor and one production app composition call. Stable name, registration, app optionality, Engine-owned lifetime, and ordered shutdown are live. | **Keep, but narrow and make optional.** It is the only type-erased app-to-runtime seam that lets Engine own an optional responsibility without importing its type. Deleting it today recreates equivalent erased callbacks, a domain-specific Engine entry point, or `Engine&` app wiring, so its core complexity does not vanish. It is not a required wrapper for every cohort. `Name`, live registration, and shutdown earn their keep; `OnResolve` does not yet. | Add surface only when a named production responsibility needs it. Retain `OnResolve` only if a production dependency must be checked after all providers register; otherwise `RUNTIME-185` removes it. |
+| `EngineSetup` and shutdown context | `ClusteringModule` uses commands, events, jobs, worlds, services, and shutdown without receiving `Engine&`. No production caller uses the sim-system or frame-hook registrars. | **Keep and simplify.** The capability context is load-bearing for D13 and concentrates validation. Its accepted surface contains only capabilities and registration operations used by production responsibilities. Zero-consumer registrars are not target requirements. | Add a phase or scheduling registrar with the first production behavior that the frame loop must iterate; do not add a generic registrar for a roadmap noun. |
+| `ServiceRegistry` | Six production provisions, but only `RenderExtractionCache` and `ClusteringService` have production `Find` consumers. There is no production `Require`. | **Keep the typed discovery core; simplify the protocol.** `Provide`/`Find`, null and duplicate rejection, provider identity diagnostics, and locking after boot avoid domain getters. A provision with no lookup consumer is not evidence. Redundant built-in provisions, `Require`, and a mandatory two-phase resolve protocol must be pruned unless a behavior child proves them. | Restore a resolve phase and fail-closed `Require` when a named production responsibility depends on a service provided by another responsibility and registration order must remain irrelevant. |
+| `RuntimeModuleSchedule` | Engine calls the schedule, but production registers zero sim systems and zero frame hooks. All non-empty behavior is test-only. | **Defer ratification and remove it from the destination scorecard.** A zero-record topological sort, hook list, and phase dispatch are not an achieved capability. Behavior-owner children may prove the smallest phase-hook portion; `RUNTIME-185` removes/collapses every branch left without a production consumer. | A first real phase-hook consumer justifies the smallest direct phase registration needed by that consumer. A first real sim system justifies per-tick registration. General causal DAG ordering is justified only when real production systems declare interacting wait/signal labels. |
+| D10 extension-pass registry and insertion slots | Zero production extension registrations; built-in recipe kinds cover the current renderer. | **Defer the registry and slot taxonomy.** Keep a closed core pass vocabulary expressed as recipe data, with schema, capability, named-resource, and dependency validation. Point-splat lighting and order-dependent transparency remain design probes, not blockers. | A named production pass that cannot be expressed as an existing built-in kind must bring its resource contract, required insertion semantics, Null/CPU contract evidence, and capability-appropriate backend evidence. Only that pass's demonstrated slot is added. |
+| D11 priority input-capture filter chain | One ImGui producer records one snapshot; several viewport consumers read it. There is no competing claimant. | **Replace the chain target with the proven snapshot contract.** One data-only kernel capture value is owned by the frame loop for the duration of a frame and resets to “unclaimed” once at frame start. Each ephemeral frame-hook context borrows that same value by reference. The EditorUi `UiBuild` contribution runs `BeginFrame` → registered app panels → `EndFrame` → capture write before returning; later behavior hooks and kernel input-action dispatch read that completed value. This carrier adds no registry, callback facade, or ImGui import to Engine. | A second independent simultaneous capture producer must demonstrate an actual conflicting claim that cannot be represented by extending the single snapshot. Only then is an explicit arbitration policy or chain justified. |
+| D12 `InlineModule` builder | No symbol, production experiment app, or first consumer. | **Defer.** A one-file experiment may first use a concrete app-owned responsibility and the existing narrow composition seam. | A named one-file experiment that needs runtime lifecycle, scheduling, removal, and headless testing may justify the smallest builder. Extract an experiment-app template only after bootstrap is repeated by a second production experiment app. |
+| `WorldSwitchModule` | `WorldRegistry` and deferred world operations are live; no production preview/readiness/switch policy exists. | **Defer the policy owner.** `WorldRegistry` and `WorldHandle` remain kernel substrate; no empty module is created. | A production app creates a secondary or preview world and needs readiness tracking plus a staged activation decision distinct from the registry's deferred mechanism. |
+
+The keep verdict for `IRuntimeModule` is not permission to freeze its current
+surface. `RUNTIME-185` must measure which methods remain in
+production after the first behavior-carrying extractions. A method retained
+only by a test double fails the present-use test.
+
+### 4. Current responsibility hypotheses and state scope
+
+The live Engine responsibilities group into the following six implementation
+hypotheses. They are bounded child-task starting points, not an architectural
+taxonomy. Each child must rerun ADR-0026 and split or merge when lifecycle,
+state, commit, or consumer evidence disagrees.
+
+| Hypothesis | Present responsibility | Required state-scope decision |
+| --- | --- | --- |
+| Async work | `AsyncWorkService`, the persistent streaming executor, derived-job ownership, and maintenance draining | Global owner. Submitted work carries explicit cancellation/commit scope; no worker borrows a live world. |
+| Asset workflow | CPU asset service, GPU residency handoff, import pipeline, and object-space normal-bake orchestration | Global lifecycle owner. Active-world references are borrowed, rebound on world events, and never become hidden ECS ownership. Normal bake remains in this cohort only while its import/residency lifecycle and consumers are cohesive. |
+| Scene editing | `SceneDocument`, command history, selection, stable lookup, pick readback/refinement, and gizmo state | One module-global owner with durable document/editing records keyed by or explicitly reset for `WorldHandle`. World switch and destruction behavior is part of its interface. `RUNTIME-172` must move this owner out of Engine rather than make it Engine-private. |
+| Camera | Camera-controller/viewport state and active camera selection | Global viewport owner whose scene targets are world-qualified and reset or rebound on active-world change. Reference-scene entity creation and the initial camera seed belong to app initial-world bootstrap. |
+| Editor UI | ImGui bridge/host, window contribution state, and production of the single capture snapshot | Global and optional. It owns UI lifetime and writes the frame-loop-owned capture value through a borrowed reference in the `UiBuild` hook context; it does not own camera, selection, scene, input-action, or method state. |
+| Config control | `EngineConfigControl` and the app-section registry used by boot and live apply | Global owner. The app supplies section codecs before boot; preview remains side-effect-free and apply uses the existing validated commit path. |
+
+Clustering remains the existing app-optional composition proof. Its owner is
+global, while job cancellation, commit targets, and label results are scoped
+by `WorldHandle`. A future clustering integration is grouped or split only by
+ADR-0026.
+
+No WorldSwitch child is seeded until its trigger occurs. Render extraction and
+the render-world pool stay kernel/frame-loop substrate. Initial reference
+content is app bootstrap, not another runtime owner.
+
+### 5. Measurable convergence target
+
+`ARCH-014` remains the umbrella, but its scorecard measures outcomes rather
+than wrapper counts:
+
+- `Runtime.Engine.cppm` contains only the exact imports required by its final
+  public surface and no unused plain imports. The present candidate is
+  `Core.Config.Engine`, `Core.FrameGraph`, `RHI.Device`, `Platform.Window`,
+  `Graphics.Renderer`, `Runtime.CommandBus`, `Runtime.KernelEvents`,
+  `Runtime.JobService`, `Runtime.Module`, `Runtime.ServiceRegistry`,
+  `Runtime.WorldHandle`, and `Runtime.WorldRegistry`. This named set of 12 is
+  evidence to verify and shrink as the API lands, not an “at most 12” budget
+  that permits unrelated imports.
+- Domain imports are zero by the exact substrate-allowlist complement.
+  `Extrinsic.Runtime.WorldHandle` is added to the substrate set.
+- Domain re-exports are zero. The two current re-exports remain separately
+  exact-ratcheted and may stay only if their types are classified as kernel
+  substrate.
+- Domain-facade getters are zero. A domain-facade getter is any public
+  `Engine::GetX()` whose returned reference, pointer, view, or value belongs to
+  a responsibility outside the accepted kernel substrate. The final checker
+  maintains an exact allowlist of permitted kernel getter names and owning
+  types; the measured domain set is the complement. Test-only suffixes,
+  aliases, prefixes, and forwarding return types do not exempt a getter.
+- No `Engine&` occurs in a handler, setup, or composed-responsibility surface.
+- `IApplication::OnSimTick` and `OnVariableTick` are removed; application
+  behavior reaches the frame through behavior-carrying composition, not an
+  unrestricted Engine callback.
+- No direct EnTT dispatcher use occurs in composed responsibility code.
+- Every durable responsibility row records global versus `WorldHandle` scope
+  and has contract coverage for its stated switch/destruction behavior.
+- D10 is complete when the closed recipe-data invariant is validated; it does
+  not wait for an extension registry.
+- D11 is complete when the single-producer capture-snapshot contract is
+  validated; it does not wait for a priority chain.
+- The experiment lane is conditional and does not block convergence while no
+  production experiment consumer exists.
+- `IRuntimeModule`, `EngineSetup`, `ServiceRegistry`, or
+  `RuntimeModuleSchedule` counts are never scorecard outcomes. Only live
+  behavior, ownership, interface coupling, and validated lifecycle count.
+
+The exact ratchet continues to fail on stale snapshots as well as growth.
+Every reduction updates the snapshot in the same change, so the budget never
+becomes room for later regrowth.
+
+## Consequences
+
+- Positive: `ARCH-014` can converge without manufacturing unused registries,
+  filters, builders, or one-wrapper-per-noun classes.
+- Positive: the domain-free Engine, explicit app composition, state-scope,
+  and no-`Engine&` outcomes remain stricter than a file- or class-count proxy.
+- Positive: `REVIEW-003` audits the accepted result instead of owning a
+  circular prerequisite decision.
+- Positive: the existing typed composition seam remains available where its
+  deletion would recreate domain Engine glue, while its unused methods receive
+  no blanket protection.
+- Trade-off: the six implementation hypotheses may split after their child
+  inventories apply ADR-0026. Task links, not a permanent module taxonomy,
+  carry that migration detail.
+- Trade-off: the first real extension pass, competing capture producer, or
+  scheduled responsibility must state a focused contract before generalized
+  machinery returns.
+- Trade-off: an experiment app initially writes explicit composition code.
+  A convenience builder and template arrive only after they can remove
+  demonstrated repetition.
+- No engine/runtime behavior code, module surface, build graph, method,
+  benchmark, or performance claim changes directly through this ADR. The
+  structural convergence policy and its repository-snapshot fixture change
+  only for the factual `WorldHandle` classifier correction.
+
+## Alternatives Considered
+
+- **Require one `IRuntimeModule` per scorecard noun — rejected.** Logical
+  ownership and C++ wrapper count are different questions. Mechanical wrappers
+  can leave state and facades inside Engine while appearing complete.
+- **Delete every composition seam because there is one production module —
+  rejected.** Deleting the only type-erased app-to-runtime seam recreates the
+  same lifetime callbacks, adds concrete domain knowledge to Engine, or leaks
+  `Engine&`. The correct action is to narrow it and remove unproven surface.
+- **Keep the complete two-phase service and schedule framework unchanged —
+  rejected.** There is no production `Require`, non-no-op `OnResolve`,
+  registered sim system, or registered frame hook.
+- **Move domain owners behind private Engine classes — rejected.** This
+  reduces file size but not ownership or coupling and preserves domain getters.
+- **Predeclare the six hypotheses as permanent module families — rejected.**
+  ADR-0026 requires present lifecycle, state, commit, and consumer cohesion;
+  the rows are migration hypotheses only.
+- **Freeze an open extension graph, priority capture chain, or experiment
+  builder now — rejected.** Each has zero or one producer and no demonstrated
+  arbitration or extension requirement.
+- **Treat output shape or a domain noun as the composition boundary —
+  rejected.** Names and result shapes are audit clues, not ownership evidence.
+
+## Validation
+
+This ADR is an architecture and structural-policy slice. It is validated by:
+
+1. the live-source counts recorded in Context and a source search confirming
+   one production `IRuntimeModule`, zero production schedule records, zero
+   production `Require`, two production `Find` types, one capture producer,
+   zero extension registrations, and zero `InlineModule` consumers;
+2. strict documentation links, documentation sync, task policy, task-state
+   links, and generated session-brief freshness;
+3. the strict kernel-convergence checker remaining exact and green with
+   `WorldHandle` classified as substrate and the corrected 42/20 snapshot; and
+4. architecture review confirming that this decision adds no dependency edge,
+   owner, interface, backend, control path, or compatibility exception.
+
+Implementation children must additionally prove:
+
+- focused contract/integration behavior for every extracted responsibility;
+- state reset, rebind, cancellation, and teardown behavior at the declared
+  world/global scope;
+- app composition without a concrete domain import in Engine or an `Engine&`
+  responsibility surface;
+- removal or behavior-backed retention of each conditional mechanism in the
+  verdict table; and
+- the final exact Engine-surface ratchet, strict layering, canonical build,
+  and default CPU-supported correctness gate.

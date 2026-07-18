@@ -16,7 +16,9 @@ Status labels:
 
 - [Overview](overview.md) (`canonical`)
 - [Layering rules](layering.md) (`canonical`)
-- [Kernel target state](kernel-target-state.md) (`canonical`) — north-star + convergence scorecard for the ADR-0024 kernel/module migration; tracked by [`ARCH-014`](../../tasks/active/ARCH-014-kernel-convergence-tracking.md).
+- [Kernel target state](kernel-target-state.md) (`canonical`) — north-star +
+  convergence scorecard for ADR-0024 as right-sized by ADR-0027; tracked by
+  [`ARCH-014`](../../tasks/active/ARCH-014-kernel-convergence-tracking.md).
 - [Runtime](runtime.md) (`canonical`)
 - [Runtime config control](runtime-config-control.md) (`canonical`)
 - [Engine config file](engine-config.md) (`canonical`)
@@ -59,6 +61,9 @@ Status labels:
 - [`0026-runtime-module-scope-by-consumer-contract.md`](../adr/0026-runtime-module-scope-by-consumer-contract.md) (`canonical`) —
   decides same-module cohesion and objective split triggers after ADR-0024
   assigns a responsibility to runtime composition.
+- [`0027-right-sized-runtime-composition.md`](../adr/0027-right-sized-runtime-composition.md) (`canonical`) —
+  amends ADR-0024's mechanism-prescriptive rows with evidence-backed
+  keep/simplify/defer verdicts and an ownership-based convergence target.
 
 ## Existing architecture references by status
 

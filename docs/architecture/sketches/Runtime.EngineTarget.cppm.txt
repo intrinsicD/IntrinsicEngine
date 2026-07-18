@@ -1,3 +1,6 @@
+// Historical ADR-0024 sketch. ADR-0027 supersedes its extension-pass,
+// priority-capture-chain, mandatory-wrapper, and schedule prescriptions.
+// Use docs/architecture/kernel-target-state.md for the live target.
 module;
 
 #include <cstdint>

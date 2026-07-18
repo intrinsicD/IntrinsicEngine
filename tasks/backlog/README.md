@@ -228,8 +228,8 @@ called out by the review. The retired correctness fix `BUG-055` (Theme G)
 enabled `CORE-005`.
 
 **North star: [`docs/architecture/kernel-target-state.md`](../../docs/architecture/kernel-target-state.md)**
-— the living target and convergence scorecard for the ADR-0024 kernel/module
-migration, owned by the umbrella task `ARCH-014`. Any agent adding runtime
+— the living target and convergence scorecard for ADR-0024 as right-sized by
+ADR-0027, owned by the umbrella task `ARCH-014`. Any agent adding runtime
 functionality reads its knob-decision table first; the unchecked scorecard
 rows are the remaining work.
 
@@ -280,6 +280,21 @@ cache/model-handoff residency ownership now lives in an Engine-private
 `AssetResidencyService`; persistent streaming executor,
 derived-job registry, maintenance drains, and derived-job facade delegation now
 live behind `Extrinsic.Runtime.AsyncWorkService`.
+Accepted
+[`ADR-0027`](../../docs/adr/0027-right-sized-runtime-composition.md)
+corrects the literal destination: domain responsibilities must be explicitly
+app-composed with stated global/world scope, but no wrapper, registry, schedule,
+priority chain, extension slot, or experiment builder is created without a
+production consumer. The bounded implementation graph is
+`RUNTIME-179` AsyncWork, re-scoped `RUNTIME-172` SceneEditing,
+`RUNTIME-180` Camera, `RUNTIME-181` ConfigControl, `RUNTIME-183`
+AssetWorkflow, `RUNTIME-182` EditorUi, re-scoped `RUNTIME-168` Sandbox
+composition, existing `RUNTIME-129` operational normal bake,
+`RUNTIME-184` application-lifecycle removal, `RUNTIME-185` mechanism pruning,
+and `RUNTIME-186` residual auxiliary-surface cleanup followed by the
+`RUNTIME-187` exact Engine-surface ratchet. The bake and lifecycle leaves may
+proceed independently, then both gate mechanism pruning. The detailed graph
+and state scopes live in the [runtime backlog index](runtime/README.md).
 Sequencing note: tasks whose deliverable ADR-0024 supersedes are
 front-matter gated on their seam dependencies — `RUNTIME-150` on
 `ARCH-007`/`ARCH-008`, `RUNTIME-151` additionally on `ARCH-011`, `ARCH-006`
@@ -291,15 +306,17 @@ recorded per-task decisions for the audit rows, re-scoped `RUNTIME-137` as the
 `RUNTIME-137`, and marked `RUNTIME-147`'s `Engine::GetAssetImportPipeline()`
 as a transitional composition accessor rather than a new cross-module pattern.
 `RUNTIME-150` is retired as the private frame-loop partition split, and
-`RUNTIME-151` is retired as the Engine-interface cleanup. `RUNTIME-137` is now
-retired as the JobService `GpuQueue`/async readback substrate, so `RUNTIME-129`
-is unblocked for object-space normal bake GPU submission. The non-blocking
-TaskGraph substrate (`CORE-005`) and scheduler hardening (`CORE-007`) are
-retired, as is compiled-plan efficiency (`CORE-008`).
+`RUNTIME-151` is retired as the Engine-interface cleanup. `RUNTIME-137` is
+retired as the JobService `GpuQueue`/async readback substrate, satisfying that
+historical prerequisite for `RUNTIME-129`; the task is now gated on
+`RUNTIME-183` so the GPU submission lands in the accepted AssetWorkflow owner.
+The non-blocking TaskGraph substrate (`CORE-005`) and scheduler hardening
+(`CORE-007`) are retired, as is compiled-plan efficiency (`CORE-008`).
 
 Open members (kernel-seam priority set first):
 - [`../active/ARCH-014-kernel-convergence-tracking.md`](../active/ARCH-014-kernel-convergence-tracking.md) (active umbrella north-star; not a slice).
-- [`../active/ARCH-016-right-size-runtime-composition-target.md`](../active/ARCH-016-right-size-runtime-composition-target.md) (active ADR-0024/0026 composition-mechanism amendment; precedes implementation-child seeding).
+- [`../active/ARCH-016-right-size-runtime-composition-target.md`](../active/ARCH-016-right-size-runtime-composition-target.md) (active ADR-0027 decision/task-graph slice; implementation children are now seeded).
+- [`runtime/RUNTIME-179-extract-async-work-module.md`](runtime/RUNTIME-179-extract-async-work-module.md) through [`runtime/RUNTIME-187-finalize-domain-free-engine-surface.md`](runtime/RUNTIME-187-finalize-domain-free-engine-surface.md) (ADR-0027 behavior-owner, app-lifecycle, mechanism-pruning, semantic auxiliary-surface, and final-ratchet graph; see the runtime index for exact dependencies).
 - [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) (one-shot post-convergence admission gate; blocked until known architecture/right-sizing/tool-rent work retires).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`ecs/HARDEN-086-guarded-hierarchy-query-helpers.md`](ecs/HARDEN-086-guarded-hierarchy-query-helpers.md).
