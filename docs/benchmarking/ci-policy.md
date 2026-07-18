@@ -84,15 +84,18 @@ performance-improvement claims:
   Worker-local fanout p95 and signal-to-resume p99 must each remain below one
   60 Hz frame (16.666667 milliseconds).
 
-Each test prints parseable `SLO_METRIC name=... value_ns=... budget_ns=...`
-records before its assertions. The scheduler case also prints
+After its harness-validity checks, each test prints parseable
+`SLO_METRIC name=... value_ns=... budget_ns=...` records before its derived
+budget assertions. The scheduler case also prints
 `SLO_DIAGNOSTIC` counters for steal attempts/ratio, contention, cumulative
 idle wait, and the legacy park-to-signal histogram. CTest retains these lines
-in the uploaded JUnit on passing and failing runs. The diagnostic counters are
-not latency gates: externally injected work cannot establish a positive
-worker-local steal ratio, cumulative idle time rewards busy-waiting over
-correct sleep, and the legacy unpark histogram measures park-to-signal dwell
-in power-of-two buckets rather than signal-to-resume latency.
+in the uploaded JUnit on passing runs and derived-budget failures. An earlier
+fatal harness-validity failure can terminate before a percentile exists; that
+is a correctness diagnostic rather than a budget observation. The diagnostic
+counters are not latency gates: externally injected work cannot establish a
+positive worker-local steal ratio, cumulative idle time rewards busy-waiting
+over correct sleep, and the legacy unpark histogram measures park-to-signal
+dwell in power-of-two buckets rather than signal-to-resume latency.
 
 `BUG-114` records why the first optimized hosted pilot,
 [run 29631970411](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29631970411),

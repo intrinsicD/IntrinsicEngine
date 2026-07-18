@@ -146,7 +146,8 @@ depends_on: []
 - [x] Every asserted scheduler performance metric is exercised by the workload
       and has explicit units and an explicit observation window.
 - [x] Frame-graph and scheduler derived percentiles plus budgets are retained
-      in hosted JUnit evidence on success and failure.
+      in hosted JUnit evidence on success and emitted before every derived-
+      budget assertion so a budget failure retains its metrics.
 - [x] No threshold is edited after reading a candidate population to
       manufacture a pass.
 - [x] The first run in the five-sample population passes before samples 2–5
@@ -161,11 +162,14 @@ depends_on: []
 
 ## Evidence
 - The five fixed hosted JUnits each contain both passing cases and all four
-  parseable `SLO_METRIC` records. The fixed source prints those records before
-  its assertions. Diagnostic failed run
+  parseable `SLO_METRIC` records. After its harness-validity checks, the fixed
+  source prints those records before its derived-budget assertions. Diagnostic
+  failed run
   [`29631970411`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29631970411)
-  proves CTest retains failure stdout, so success/failure retention is
-  established compositionally without manufacturing a failing fixed run.
+  proves CTest retains failure stdout, so derived-budget-failure retention is
+  established compositionally without manufacturing a failing fixed run. An
+  earlier fatal harness-validity failure can terminate before a percentile
+  exists and is not claimed to retain a nonexistent metric.
 - The five runs used exact SHA
   `502422ce7559a757354bce105ddebd2a0966c996`, image
   `ubuntu-24.04@20260714.240.1`, preset `ci-release`, the exact `slo`
