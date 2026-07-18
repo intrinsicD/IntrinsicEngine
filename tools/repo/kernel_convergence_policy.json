@@ -23,7 +23,8 @@
       "Extrinsic.Runtime.ModuleSchedule",
       "Extrinsic.Runtime.ServiceRegistry",
       "Extrinsic.Runtime.RenderExtraction",
-      "Extrinsic.Runtime.RenderWorldPool"
+      "Extrinsic.Runtime.RenderWorldPool",
+      "Extrinsic.Runtime.WorldHandle"
     ]
   },
   "reference_snapshot": {
@@ -68,10 +69,10 @@
     ]
   },
   "current_snapshot": {
-    "date": "2026-07-16",
-    "metric": "exact_allowlist_complement_v1",
+    "date": "2026-07-18",
+    "metric": "exact_allowlist_complement_v2",
     "plain_import_count": 42,
-    "domain_import_count": 21,
+    "domain_import_count": 20,
     "domain_imports": [
       "Extrinsic.Asset.Service",
       "Extrinsic.ECS.Component.StableId",
@@ -92,8 +93,7 @@
       "Extrinsic.Runtime.SceneDocument",
       "Extrinsic.Runtime.SelectionController",
       "Extrinsic.Runtime.SelectionReadback",
-      "Extrinsic.Runtime.StableEntityLookup",
-      "Extrinsic.Runtime.WorldHandle"
+      "Extrinsic.Runtime.StableEntityLookup"
     ],
     "export_import_count": 2,
     "export_imports": [

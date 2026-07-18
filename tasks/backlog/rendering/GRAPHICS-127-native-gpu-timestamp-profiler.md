@@ -1,7 +1,12 @@
 ---
 id: GRAPHICS-127
 theme: B
-depends_on: [GRAPHICS-033, GRAPHICS-037D, GRAPHICS-119]
+depends_on:
+  - GRAPHICS-033
+  - GRAPHICS-037D
+  - GRAPHICS-119
+  - RUNTIME-181
+  - RUNTIME-182
 maturity_target: Operational
 ---
 # GRAPHICS-127 — Native GPU timestamp profiler and frame-recipe timing integration
@@ -24,6 +29,11 @@ maturity_target: Operational
 - There are no production `BeginFrame`/scope/end/resolve calls. Existing `Core.Telemetry` pass-timing storage, `Graphics::RenderGraphFrameStats`, and the Sandbox Frame Graph model/window are the consumers; reuse them.
 - `Test/engine/rendering/src/gpu_profiler.cpp` and its focused test supply useful lifecycle/test-case ideas only. Do not port its CPU-clock fallback or parallel architecture; IntrinsicEngine's native query, provenance, and compiled-pass contracts are stricter.
 - Satisfied `GRAPHICS-033`, `GRAPHICS-037D`, and `GRAPHICS-119` are the operational Vulkan, multi-queue, and parallel pass-recording contracts this integration must respect.
+- ADR-0027 places live config apply in the app-composed ConfigControl owner and
+  editor presentation in the optional EditorUi owner. `RUNTIME-181` and
+  `RUNTIME-182` therefore land first so this task adds the profiling flag and
+  Frame Graph presentation through their narrow service/contribution seams
+  rather than recreating `Engine::GetConfigControl()` or an ImGui facade.
 
 ## Control surfaces
 - Config: add `RenderConfig::EnableGpuProfiling`, default `false`, with parse/serialize/round-trip and completed-frame-boundary hot-apply through the existing config-control lane. The flag gates recording/publication, never device resource lifetime.
@@ -47,6 +57,9 @@ Each slice is a separately reviewable commit and must pass its focused CPU check
 - [ ] Repair the existing RHI contract with explicit monotonic frame identity separate from frame slot, a typed invalid scope result, queue/source provenance, and deterministic invalid-pairing/overflow/unsupported diagnostics.
 - [ ] Make Null/mock profiling validate lifecycle, names, frame-slot reuse, and not-ready behavior without labeling host-clock durations as native GPU time.
 - [ ] Add the one default-off config field and route config, editor, and agent/CLI writes through the canonical runtime config-control path.
+- [ ] Resolve config apply and Frame Graph presentation through the
+      app-composed owners delivered by `RUNTIME-181`/`RUNTIME-182`; do not add
+      a profiling-specific Engine getter, callback, or UI path.
 - [ ] Construct device-lifetime Vulkan profiler/query-pool resources during device initialization whenever native timestamps are supported. `EnableGpuProfiling` gates new recording/resolution/publication at a completed frame boundary; hot disable drains or retains the last resolved sample and never destroys/recreates pools while frames are in flight.
 - [ ] Bind resets and timestamp writes to the real graphics/compute command buffers. Reset a reused slot only after its fence/completion proof, emit frame begin/end, and keep per-slot absolute/local query indexing coherent.
 - [ ] Respect queue-family `timestampValidBits`, device timestamp period, query exhaustion, device loss, and command-buffer lifetime. Resolution must never use `VK_QUERY_RESULT_WAIT_BIT` or otherwise block the frame.
@@ -96,6 +109,8 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Destroying or recreating profiler/query-pool resources in response to a hot toggle while frames may reference them.
 - Reporting host-clock or summed-overlap durations as native GPU frame time.
 - Adding another profiler abstraction, telemetry store, config flag, or editor window.
+- Reintroducing an Engine domain facade or bypassing the shared validated
+  config/UI contribution paths to wire profiling.
 - Instrumenting CPU executor callbacks instead of the command-recording scopes they schedule.
 
 ## Maturity

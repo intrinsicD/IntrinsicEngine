@@ -73,6 +73,18 @@ engine's fail-closed initialization policy, so an invalid schedule cannot
 execute even once (BUG-070, BUG-071). Module shutdown runs after
 `RuntimeShutdownAnnounced` has been published and pumped.
 
+[ADR-0027](../adr/0027-right-sized-runtime-composition.md) distinguishes that
+current mechanism from the accepted ownership target. `IRuntimeModule` remains
+the current lean type-erased app-to-runtime lifecycle boundary; the bounded
+extractions test which real owners need it, and a domain responsibility does
+not need a wrapper merely to satisfy the architecture.
+`EngineSetup` remains the no-`Engine&` capability context. The service
+registry's two-phase `Require`/`OnResolve` path and the general module schedule
+are conditional, however: each must gain a production consumer during the
+convergence work or be removed/narrowed by `RUNTIME-185`. The current schedule
+behavior above remains factual until those children land; it is not a
+requirement to preserve an unused DAG or registrar.
+
 Module granularity follows
 [ADR-0026](../adr/0026-runtime-module-scope-by-consumer-contract.md) only after
 ADR-0024 has established that a responsibility belongs in runtime composition.
@@ -84,8 +96,9 @@ meaning requires a split; an extra service or different execution mechanism
 alone does not. Algorithm family and result shape alone do not decide the
 boundary, and command, status, completion, and diagnostic records stay
 method-specific until two production callers prove identical semantics. This
-grouping rule does not ratify `IRuntimeModule`; its right-sizing remains a
-separate architecture audit.
+grouping rule does not ratify a C++ wrapper. ADR-0027 records the current
+interface's bounded retention and deletion tests; `REVIEW-003` later audits
+the resulting live surface.
 
 `Extrinsic.Runtime.ClusteringModule` is the first extracted domain module on
 this contract. Sandbox composes it from app startup, not from the kernel engine:

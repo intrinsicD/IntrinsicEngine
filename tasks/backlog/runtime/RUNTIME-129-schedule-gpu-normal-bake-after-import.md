@@ -5,6 +5,7 @@ depends_on:
   - GRAPHICS-104
   - GRAPHICS-115
   - RUNTIME-137
+  - RUNTIME-183
 maturity_target: Operational
 ---
 # RUNTIME-129 — Schedule GPU object-space normal bake jobs after import
@@ -42,6 +43,10 @@ maturity_target: Operational
   but submission/completion should route through the kernel job seam, and
   "bake finished → material/attribute refresh" should be a standing kernel
   event reaction rather than an `Engine` callback.
+- `RUNTIME-183` is the accepted composition owner. The remaining production
+  plan provider, request drain, ready publication, material swap, diagnostics,
+  and smoke land inside `AssetWorkflowModule`; this task must not restore
+  queue/service state or callbacks on `Engine`.
 
 ### Open questions (non-blocking — defaults chosen; revisit before Slice C)
 - **GPU job lane.** Default after ARCH-013: keep `DerivedJobGraph` CPU-only and
@@ -54,9 +59,13 @@ maturity_target: Operational
 
 ## Required changes
 - [ ] Add a runtime render-thread GPU bake submission step that drains queued object-space normal bake requests through the `JobService` `GpuQueue` target from `RUNTIME-137`, calls the graphics-owned bake API to record/submit, and registers the GPU-produced texture with `GpuAssetCache` for fence-driven `Ready` promotion. Gate the whole step on `RHI::IDevice::IsOperational()`; no-op deterministically otherwise.
+- [ ] Implement the production Vulkan geometry-buffer/pipeline/dilation plan
+      provider and completion reaction inside `AssetWorkflowModule`, using its
+      owned residency/import/normal-bake state and no `Engine` callback or
+      test facade.
 - [x] Slice B partial: add service-private `ObjectSpaceNormalBakeService` state as the `JobService` `GpuQueue` participant owner, retain pending queue submissions, record injected graphics bake plans through `RecordObjectSpaceNormalTextureBake(...)`, stamp `GpuAssetCache` ready frames, drain ready completions into material bindings, and discard superseded pending submissions before recording.
 - [x] Add an `AssetModelSceneHandoff` queue option so progressive model-scene generated-normal work schedules `RuntimeObjectSpaceNormalBakeQueue` through a dependency-only main-thread apply job instead of marking a fake CPU normal texture ready when the queue is supplied.
-- [x] Wire Engine-owned queue services into model-scene handoff options and direct-mesh post-import processors; direct mesh post-process schedules a queue request from resolved ECS geometry/UV/normal properties instead of registering the CPU-generated texture when the queue is supplied.
+- [x] Wire the then-Engine-owned queue services into model-scene handoff options and direct-mesh post-import processors; `RUNTIME-183` moves that unchanged wiring into `AssetWorkflowModule`. Direct mesh post-process schedules a queue request from resolved ECS geometry/UV/normal properties instead of registering the CPU-generated texture when the queue is supplied.
 - [x] Add a `SelectedMeshTextureBake` queue option so selected mesh-vertex normal outputs schedule `RuntimeObjectSpaceNormalBakeQueue` requests instead of creating CPU-generated normal textures when the queue is supplied.
 - [ ] Wire any remaining generated-normal producers/callers to supply the queue by default where appropriate, recording stale keys for entity, geometry/UV/normal generation, resolution, padding, and normal-map type.
 - [ ] On bake completion (`GpuAssetCache` entry `Ready`), swap the material's `Normal` binding to the generated `AssetId` and set the `ObjectSpaceNormalMap` material flag; discard stale completions whose recorded keys no longer match.
@@ -71,19 +80,19 @@ maturity_target: Operational
 - [x] CPU/null contract: generated `AssetId` selection and content-key reuse return the same id for identical resolved geometry/UV/normal inputs.
 - [x] CPU/null contract: model-scene handoff queue scheduling replaces the fake CPU normal-bake readiness job when configured and leaves the progressive normal slot pending.
 - [x] CPU/null contract: model-scene handoff queue scheduling on a non-operational backend leaves the material `Normal` binding unset and records the no-CPU-fallback diagnostic.
-- [x] CPU/null contract: engine-level non-operational direct-mesh import scheduling leaves the vertex-normal binding and no `ObjectSpaceNormalMap` flag in place.
+- [x] CPU/null contract: composed non-operational direct-mesh import scheduling leaves the vertex-normal binding and no `ObjectSpaceNormalMap` flag in place.
 - [x] CPU/null contract: selected-mesh normal texture command schedules an object-space normal bake queue request without creating a CPU texture when a queue is supplied.
 - [x] CPU/null contract: selected-mesh normal texture command on a non-operational backend records the no-CPU-fallback diagnostic and leaves the progressive normal binding unchanged.
 - [x] CPU/null contract: `JobService` `GpuQueue` participant records an injected object-space normal bake plan, promotes the generated cache entry by ready frame, drains the ready completion, and installs the generated normal binding.
 - [x] CPU/null contract: superseded pending object-space normal bake submissions are discarded before command recording and do not allocate GPU-produced texture cache entries.
 - [x] CPU/null contract: content-key reuse binds an already-ready generated normal texture without recording a duplicate bake or allocating the unused entity-scoped fallback texture.
-- [ ] CPU/null contract: engine-level stale completion does not mutate the material binding.
+- [ ] CPU/null contract: module-level stale completion does not mutate the material binding.
 - [ ] Opt-in `gpu;vulkan` smoke on a Vulkan-capable host: an imported mesh schedules a bake, the cache entry promotes to `Ready`, the material `Normal` binding swaps to the generated texture, and selected texels match expected encoded object-space normals.
 
 ## Docs
 - [x] Update `src/runtime/README.md` for queue-level GPU bake scheduling metadata, stale-key lifecycle, and the non-operational no-op contract.
 - [x] Update `src/runtime/README.md` for optional `AssetModelSceneHandoff` queue scheduling and the deferred binding/submission boundary.
-- [x] Update `src/runtime/README.md` for Engine-owned queue services and direct-mesh post-import queue scheduling.
+- [x] Update `src/runtime/README.md` for the pre-`RUNTIME-183` queue services and direct-mesh post-import queue scheduling.
 - [x] Update `src/runtime/README.md` for optional `SelectedMeshTextureBake` queue scheduling and the non-operational no-CPU-fallback contract.
 - [x] Update `src/runtime/README.md` for the CPU-contracted `JobService` GPU-queue participant, pending-submission retention, command-recording plan-provider seam, ready-frame promotion, and material-binding drain.
 - [ ] Update `src/runtime/README.md` for production Vulkan geometry-buffer plan-provider wiring once landed.
@@ -119,17 +128,19 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' --time
 - Adding live ECS/runtime/AssetService knowledge to graphics-owned bake modules.
 - Treating ordinary glTF tangent-space normal textures as object-space normal maps.
 - Mixing this orchestration with unrelated renderer/runtime/asset features.
+- Restoring object-space-normal bake ownership, diagnostics, or callbacks on
+  `Engine` after `AssetWorkflowModule` owns the workflow.
 
 ## Maturity
 - Target: `Operational` on Vulkan-capable hosts; `CPUContracted` for the scheduling/stale-key/fail-closed orchestration contract on CPU/null.
 - Slice A.1 (CPUContracted, landed in `GRAPHICS-104`): queue-level scheduling decision, generated-`AssetId`/content-key selection, stale-key lifecycle, and non-operational no-op — all CPU/null tested with bake submission deferred behind the operational check.
-- Slice A.2 (CPUContracted, in progress): wire import-generated-normal producers to enqueue GPU bake requests instead of the CPU-domain hardcode, while still deferring render-thread submission to Slice B. The model-scene progressive handoff queue option, Engine-owned direct-mesh queue scheduling, and selected-mesh command queue option are landed; default wiring for any remaining generated-normal callers remains open.
+- Slice A.2 (CPUContracted, in progress): wire import-generated-normal producers to enqueue GPU bake requests instead of the CPU-domain hardcode, while still deferring render-thread submission to Slice B. The model-scene progressive handoff queue option, pre-`RUNTIME-183` direct-mesh queue scheduling, and selected-mesh command queue option are landed; default wiring for any remaining generated-normal callers remains open.
 - Slice B (CPUContracted): render-thread GPU submission step + cache registration wired behind `IsOperational()`, plus the material-binding swap-on-`Ready` logic; CPU contract proves the swap given a faked `Ready` promotion.
 - Current Slice B state (2026-07-16): `CPUContracted` participant substrate landed and is owned by `ObjectSpaceNormalBakeService` private state. It registers through `JobService` `GpuQueue`, records injected graphics bake plans in the renderer command context, stamps `GpuAssetCache` ready frames, drains ready cache entries into `ObjectSpaceNormalBakeBinding`, and discards superseded pending submissions. The production Vulkan plan provider that resolves live geometry buffers/pipeline/dilation resources for imported entities remains open, so this task is not yet `Operational`.
 - Slice C (Operational): real Vulkan submission + `gpu;vulkan` smoke proving an actual baked texture promotes and binds; route import/enrichment off the CPU legacy path.
 
 ## Slice plan
 - **Slice A.1 (landed).** Add `Runtime.ObjectSpaceNormalBakeQueue` for generated-`AssetId`/content-key selection, stale-key records, stale-completion discard, and non-operational no-op diagnostics. Preserves CPU gate and does not mutate materials.
-- **Slice A.2.** Replace the CPU-domain hardcode with a GPU bake request for generated-normal primitives. Preserves CPU gate. Defers all render-thread submission to Slice B. Landed so far: optional `AssetModelSceneHandoff` queue scheduling, Engine-owned queue services, direct-mesh post-import queue scheduling, and selected-mesh command queue scheduling plus CPU/null tests for queued and non-operational backends.
-- **Slice B.** Wire Engine/import scheduling to the GRAPHICS-104 submission and binding helpers through the `JobService` `GpuQueue` target from `RUNTIME-137`: drain queued work on the render thread, record/submit through the graphics bake API, feed the submitted ready frame into `GpuAssetCache`, and swap the material `Normal` binding on `Ready` with stale-completion discard. CPU contract fakes the `Ready` promotion. Landed so far: the `ObjectSpaceNormalBakeService` private participant substrate and CPU/null service tests. Remaining: production Vulkan geometry-buffer/pipeline/dilation plan provider for imported entities.
+- **Slice A.2.** Replace the CPU-domain hardcode with a GPU bake request for generated-normal primitives. Preserves CPU gate. Defers all render-thread submission to Slice B. Landed so far: optional `AssetModelSceneHandoff` queue scheduling, the pre-`RUNTIME-183` queue wiring, direct-mesh post-import queue scheduling, and selected-mesh command queue scheduling plus CPU/null tests for queued and non-operational backends.
+- **Slice B.** Wire `AssetWorkflowModule` import scheduling to the GRAPHICS-104 submission and binding helpers through the `JobService` `GpuQueue` target from `RUNTIME-137`: drain queued work on the render thread, record/submit through the graphics bake API, feed the submitted ready frame into `GpuAssetCache`, and swap the material `Normal` binding on `Ready` with stale-completion discard. CPU contract fakes the `Ready` promotion. Landed so far: the `ObjectSpaceNormalBakeService` private participant substrate and CPU/null service tests. Remaining: production Vulkan geometry-buffer/pipeline/dilation plan provider for imported entities.
 - **Slice C.** Operational Vulkan submission + opt-in `gpu;vulkan` smoke; switch import/enrichment generated-normal use cases off the CPU legacy path. Cites an actually-run Vulkan smoke.

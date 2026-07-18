@@ -90,10 +90,11 @@ Potential future methods are conditional probes, not predetermined placements:
 
 This ADR governs logical responsibility grouping, not the C++ mechanism used
 to compose it. It neither ratifies nor changes `IRuntimeModule`;
-`ARCH-016` owns the prerequisite composition-mechanism decision and ADR-0027
-amendment, which may retain, simplify, replace, or remove the interface;
-`REVIEW-003` later audits the accepted mechanism while preserving this
-cohesion rule.
+[ADR-0027](0027-right-sized-runtime-composition.md) now owns the accepted
+composition-mechanism amendment: it conditionally retains the lean
+app-to-runtime lifecycle boundary, rejects wrapper-count outcomes, and gives
+every unproven service/schedule feature a deletion test. `REVIEW-003` later
+audits that accepted result while preserving this cohesion rule.
 
 ## Consequences
 
@@ -120,8 +121,8 @@ cohesion rule.
   the only production caller, so no second case proves common semantics.
 - **Freeze `IRuntimeModule` as part of the taxonomy — rejected.** The grouping
   decision is independent of its current implementation mechanism, whose
-  keep/simplify/remove decision belongs to `ARCH-016`/ADR-0027 and whose
-  accepted result is later audited by `REVIEW-003`.
+  keep/simplify/remove decision is recorded by ADR-0027 and whose accepted
+  result is later audited by `REVIEW-003`.
 
 ## Validation
 

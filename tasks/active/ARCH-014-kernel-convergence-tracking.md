@@ -3,7 +3,7 @@ id: ARCH-014
 theme: F
 depends_on:
   - ARCH-016
-  - RUNTIME-129
+  - RUNTIME-187
 ---
 # ARCH-014 — Kernel convergence tracking (umbrella north-star)
 
@@ -19,15 +19,16 @@ depends_on:
   work. Retired children remain convergence evidence; open children such as
   `RUNTIME-129` own their implementation. This task
   tracks and enforces; it does not do their work.
-- No re-litigation of ADR-0024 decisions (that is an ADR amendment, not this
-  task).
+- No re-litigation of ADR-0024/ADR-0027 decisions (that is an ADR amendment,
+  not this task).
 - Not retired on a slice: this umbrella closes only when the target-state
   scorecard is fully checked on `main`.
 
 ## Context
 - Owner/layer: architecture/runtime governance (Theme F).
-- Contract: [ADR-0024](../../docs/adr/0024-kernel-module-architecture.md)
-  (frozen decisions). North star:
+- Contract: [ADR-0024](../../docs/adr/0024-kernel-module-architecture.md), as
+  amended by
+  [ADR-0027](../../docs/adr/0027-right-sized-runtime-composition.md). North star:
   [`docs/architecture/kernel-target-state.md`](../../docs/architecture/kernel-target-state.md)
   (living scorecard + knob-decision guide).
 - Baseline 2026-07-08 (post-`ARCH-007`): `Runtime.Engine.cppm` has 45
@@ -38,10 +39,12 @@ depends_on:
 - Fixed legacy-interim reference snapshot 2026-07-13:
   `Runtime.Engine.cppm` had 43 plain imports and 23 domain imports under the
   then-unanchored classifier (which admitted `RenderExtractionService` through
-  the `RenderExtraction` prefix). The checked exact-v1 2026-07-16 snapshot is 49 / 28
-  with 33 distinct public getter names and two re-exports; the `+6 / +5 / +1`
-  delta is explicit temporary debt owned by `RUNTIME-178`, not a rewritten
-  reference. Retired `HARDEN-085` delivered the authoritative exact-policy ratchet.
+  the `RenderExtraction` prefix). Retired `RUNTIME-178` restored the checked
+  exact-v1 snapshot to 42 plain imports, 21 domain imports, 31 distinct public
+  getter names, and two re-exports with no temporary debt. ADR-0027 then
+  corrected `Runtime.WorldHandle` from domain to kernel substrate, making the
+  exact-v2 current snapshot 42 / 20 / 2 / 31 without changing the interface.
+  Retired `HARDEN-085` delivered the authoritative exact-policy ratchet.
   `ARCH-012`
   retired on 2026-07-08 at `Operational`: Sandbox composes
   `Runtime::ClusteringModule`, and `Runtime.Engine.cppm` / `.cpp` contain no
@@ -56,19 +59,25 @@ depends_on:
   not regrow while the migration is in flight.
 
 ## Status
-- Blocked on `ARCH-016` and `RUNTIME-129`; owner: Codex; coordination branch:
+- Blocked on the final `RUNTIME-187` convergence leaf; owner: Codex;
+  coordination branch:
   `codex/arch-014-kernel-convergence-program`; activated 2026-07-18 after
   `ARCH-015` retirement.
 - The 2026-07-18 reconciliation audit measured the exact clean ratchet at
-  42 plain imports, 21 domain imports, 2 re-exports, and 31 public getter
-  names. It also found that the literal scorecard would require zero-consumer
+  42 plain imports, 21 then-classified domain imports, 2 re-exports, and 31
+  public getter names. It also found that the literal scorecard would require zero-consumer
   extension/input frameworks, an unused `InlineModule`, and mechanical
   `IRuntimeModule` wrappers while the right-sizing audit that owns that
   interface is itself blocked on this umbrella.
-- `ARCH-016` therefore precedes implementation-child seeding. It will amend
-  ADR-0024 and replace mechanism-count outcomes with greppable ownership
-  outcomes, correct stale checked rows, resolve the contradictory
-  `RUNTIME-172` direction, and seed only behavior-carrying children.
+- Retired `ARCH-016` accepted ADR-0027, corrected `WorldHandle` to substrate,
+  replaced
+  mechanism-count outcomes with greppable ownership outcomes, re-scoped the
+  contradictory `RUNTIME-172`, and seeded only behavior-carrying children.
+  The implementation graph converges through `RUNTIME-179`..`187`;
+  application lifecycle removal and `RUNTIME-129` operational bake may proceed
+  once their respective owners land; both gate the later mechanism deletion
+  audit, semantic auxiliary-surface cleanup, and final
+  representation/checker leaf.
 
 ## Required changes
 - [ ] After each child seam/extraction merges, update the target-state
@@ -98,8 +107,8 @@ depends_on:
 - [x] Run a 2026-07-18 scorecard/right-sizing reconciliation and seed
       `ARCH-016` instead of manufacturing wrappers for zero-consumer or
       one-consumer mechanisms.
-- [ ] After `ARCH-016` retires, replace this umbrella's dependency graph and
-      acceptance wording with the amended, evidence-backed child program.
+- [x] Replace this umbrella's dependency graph and acceptance wording with the
+      ADR-0027 evidence-backed child program.
 
 ## Tests
 - [x] `python3 tools/agents/check_task_policy.py --root . --strict` passes.
@@ -116,17 +125,21 @@ depends_on:
 
 ## Acceptance criteria
 
-This umbrella closes only when ALL of the following hold on `main`, as
-right-sized by `ARCH-016` without weakening the domain-free Engine outcome:
+This umbrella closes only when ALL of the following hold on `main`:
 
 - [ ] Every "Kernel seams exist" scorecard row is checked.
-- [ ] `Runtime.Engine.cppm` import count ≤ 12 substrate modules; domain-noun
-      imports = 0; `Engine::GetX()` domain-facade accessors = 0.
+- [ ] `Runtime.Engine.cppm` contains only the exact accepted kernel imports,
+      with no unused imports, domain imports, domain re-exports, or
+      `Engine::GetX()` domain facades.
 - [ ] No `entt::dispatcher::trigger` / direct dispatcher in module code; no
       `Engine&` through any module surface; `OnSimTick`/`OnVariableTick`
       removed.
-- [ ] Every "Domains are modules" row is an extracted `Runtime.*Module`.
-- [ ] The `InlineModule` research lane ships.
+- [ ] Every "Domain responsibilities are app-composed" row is checked with its
+      global or world-qualified state scope preserved.
+- [ ] The final deletion test removes or narrows any `EngineSetup`,
+      `ServiceRegistry`, or `ModuleSchedule` surface without a production
+      consumer; deferred D10/D11/D12/world-switch mechanisms remain absent
+      until their recorded triggers occur.
 - [x] The ratchet guard is green in `pr-fast` and prevents new kernel
       backsliding.
 
@@ -140,7 +153,7 @@ python3 tools/agents/generate_session_brief.py
 
 ## Forbidden changes
 - Adding an `Engine` method/member for a responsibility the knob-decision
-  guide places on a module/command/event/service.
+  guide places on an app-composed owner/command/event/service.
 - Marking a scorecard row done without the invariant actually holding on
   `main`.
 - Retiring this umbrella before the scorecard is fully green.

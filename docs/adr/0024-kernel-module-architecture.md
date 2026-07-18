@@ -3,13 +3,14 @@
 - **Status:** Accepted
 - **Date:** 2026-07-08
 - **Owners:** Runtime / Architecture
+- **Amended by:** [ADR-0027](0027-right-sized-runtime-composition.md)
 - **Related tasks:** `ARCH-007`..`ARCH-013` (kernel seams, proving extraction,
   post-seam collision re-review), `RUNTIME-146`..`RUNTIME-151` (Engine
   decomposition), `ARCH-006` (Sandbox editor content), `UI-034` (editor window
   contribution), `RUNTIME-137` (async GPU readback / `JobService` `GpuQueue`),
   `CORE-005`..`CORE-008` (task-system hardening)
 - **Related docs:** [ADR-0003](0003-ideal-runtime-architecture.md) (staged
-  frame products; this ADR refines it), 
+  frame products; this ADR refines it),
   [`docs/architecture/ground-up-redesign-vision.md`](../architecture/ground-up-redesign-vision.md),
   [`docs/architecture/feature-module-playbook.md`](../architecture/feature-module-playbook.md),
   [`docs/architecture/runtime-subsystem-boundaries.md`](../architecture/runtime-subsystem-boundaries.md)
@@ -17,7 +18,7 @@
 ## Context
 
 `Extrinsic.Runtime.Engine` is a god object: ~7.4k lines across
-`Runtime.Engine.cppm`/`.cpp`, 36 module imports including domain machinery
+`Runtime.Engine.cppm`/`.cpp`, with dozens of imports including domain machinery
 (`ImGuiAdapter`, `GizmoInteraction`, `SelectionController`,
 `ObjectSpaceNormalBakeQueue`, `KMeans*`). Domain features keep accreting
 *inside* the runtime because there is no registration seam to put them behind.
@@ -28,28 +29,46 @@ what a module is, and exactly how UI, commands, events, background jobs, and
 worlds interact. This ADR records that contract as thirteen decisions (D1–D13)
 resolved in a full design review on 2026-07-08.
 
+ADR-0027 (accepted 2026-07-18) right-sizes the implementation mechanism after
+the first proving extraction. It preserves the domain-free Engine, explicit
+app composition, state-scope, queued communication, and no-`Engine&` outcomes,
+but amends D1/D2/D3/D9/D10/D11/D12/D13 where this record prescribed an
+unproven wrapper, registry, chain, schedule, or template. The amendment text
+below is authoritative where it differs from the original decision record.
+
 ## Decision
 
 ### D1 — Vocabulary
 
+**ADR-0027 amendment.** `RuntimeModule` is first a logical,
+[ADR-0026](0026-runtime-module-scope-by-consumer-contract.md)-cohesive
+app-composed responsibility, not a requirement to create one
+`IRuntimeModule` wrapper per domain noun. The current interface remains the
+lean type-erased app-to-runtime lifecycle boundary while concrete extractions
+prove it. Registered frame hooks or simulation systems are accepted only when
+a production responsibility uses them; a general schedule is not itself a
+target outcome.
+
 Two composition concepts, not three:
 
-- **System** — a per-frame/per-substep schedulable unit with declared data
-  dependencies (`Read`/`Write` TypeTokens + named signals), exactly as
-  `Runtime.EcsSystemBundle` already registers FrameGraph passes. ECS-query
-  systems are the common flavor; extraction, readback pumps, and bake pumps
-  are Systems too. Module systems carry a unique stable pass name and explicit
-  named wait/signal metadata. The module sink resolves those causal edges and
-  canonicalizes otherwise-independent systems before the sequential-hazard
-  FrameGraph applies `Read`/`Write`; a producer/consumer relationship must use
-  a named signal rather than relying on module registration order.
-- **RuntimeModule** — the app-facing unit of composition: binds command
-  handlers, UI contributions, the Systems it registers, and its owned state.
-  Named `RuntimeModule` to avoid collision with C++23 modules.
-- **Plugin** (dynamic code loading) is explicitly rejected. Hot-reload data
-  (recipes, shaders, command payloads), never code.
+- **System** — a real per-frame/per-substep contribution whose data hazards
+  must join frame scheduling. Stable names and causal signals are introduced
+  only when interacting production systems need them; registration order is
+  never a hidden dependency.
+- **Runtime module** — the logical app-facing unit of composition selected by
+  ADR-0026 cohesion. The current `IRuntimeModule` is one mechanism for this
+  unit, not its definition.
+- **Plugin** (dynamic code loading) remains explicitly rejected. Hot-reload
+  data (recipes, shaders, command payloads), never code.
 
 ### D2 — Worlds: kernel mechanism, module policy
+
+**ADR-0027 amendment.** `WorldRegistry` and `WorldHandle` remain kernel
+substrate. A separate `WorldSwitchModule` is deferred because the repository
+has no production preview/secondary-world workflow or
+`RequestSetActiveWorld()` caller. The first real workflow that needs
+preparation, readiness, or staged-switch policy may introduce a cohesive
+behavior owner; the wrapper is not required beforehand.
 
 The kernel owns a **WorldRegistry**: N `ECS::SceneRegistry` instances behind
 `WorldHandle`s, world lifetimes, and the single *active world* as plain state.
@@ -58,22 +77,29 @@ requests applied only at the frame boundary (Maintenance phase). World #0
 exists from boot so frame 0 is never ambiguous. `Registry&`/`WorldHandle` is
 always an explicit parameter — never a global.
 
-A **WorldSwitchModule** owns the *policy*: creating/preparing preview worlds,
-readiness tracking, and issuing the switch command. There is no `ISceneModule`
-interface: one implementation means no interface, and an app-side scene
-provider would let policy swap the kernel's substrate mid-frame.
+No switch-policy owner is created until a production preview/secondary-world
+workflow needs preparation, readiness, or staged activation. The registry
+mechanism remains usable by that future behavior owner.
 
 ### D3 — Module communication
 
-Default channel: **commands, events, and ECS components**. Escape hatch for
-always-present synchronous infrastructure: a two-phase **ServiceRegistry** —
-`Provide<T>()` during `OnRegister`, `Require<T>()`/`Find<T>()` during
-`OnResolve`; a missing `Require` is a **boot error naming both modules**,
-never a null-deref at frame 400. Direct module-to-module pointers are
-forbidden. Ordering between modules comes from declared data dependencies and
-the two-phase startup, never from registration order. For Systems, named
-signals establish causal direction; `Read`/`Write` then preserve RAW/WAR/WAW
-safety in the resulting stable pass order.
+**ADR-0027 amendment.** Typed `Provide`/`Find`, duplicate/late-provision
+rejection, and registry locking are the proven service-registry core.
+Two-phase `Require`/`OnResolve` and their diagnostics remain subject to the
+ADR-0027 deletion test because no production module currently consumes them:
+the bounded extraction program must demonstrate a real cross-module
+dependency or `RUNTIME-185` removes them. Built-in kernel capabilities are
+passed through `EngineSetup`, not redundantly justified as services.
+
+Default channel: **commands, events, and ECS components**. Typed
+`ServiceRegistry::Provide`/`Find` is the escape hatch for optional or
+order-independent synchronous discovery and stays locked after boot.
+`Require`/`OnResolve` survives only when a production cross-owner dependency
+proves the two-phase protocol. Hidden ownership, mutable peer backreferences,
+and ordering by registration remain forbidden; the app may instead pass an
+explicit narrow non-owning construction capability with a declared lifetime.
+For real interacting Systems, named signals establish causal direction and
+`Read`/`Write` preserves RAW/WAR/WAW safety.
 
 ### D4 — World rendering topology
 
@@ -143,99 +169,116 @@ One shared worker pool, two tiers:
 
 ### D9 — The kernel/module litmus test
 
-> Needed to run a frame → kernel. Has a domain noun in its name → module.
+**ADR-0027 amendment.** The litmus test is an ownership test, not a naming or
+wrapper-count test. The kernel owns only the enumerated machinery required to
+run a frame. A durable domain responsibility is explicitly composed by the app
+outside `Engine`, with its global or world-qualified state scope recorded and
+without a domain facade on `Engine`; its concrete C++ shape follows ADR-0026
+cohesion and present lifecycle/communication needs. A domain noun does not by
+itself justify a new interface, registry, or one-service module.
 
-Kernel: frame loop, CommandBus, EventBus, JobService + worker pool,
-WorldRegistry, FrameGraph seam, FrameRecipe activation + extension slots,
-input capture chain. Modules: clustering, texture baking, asset import
-pipeline, editor UI, world-switch policy, selection/gizmos — everything with a
-domain noun, including then-current kernel residents `KMeans*`,
-`ObjectSpaceNormalBakeQueue`, `SelectionController`, `GizmoInteraction`.
+Kernel substrate is the frame loop plus the command/event/job/world/frame-graph
+and recipe machinery every app needs. Clustering, asset workflow, scene
+editing, camera, config control, and editor UI are the current app-composed
+responsibility hypotheses; each implementation child must verify its actual
+cohesion and state scope.
 
-### D10 — Rendering extensibility: closed core, extension slots
+### D10 — Rendering extensibility: closed recipe-driven core
 
-`FrameRecipe` stays data. The core skeleton (visibility → geometry → lighting
-→ post → present) stays a closed, kernel-verified pass set. Modules register
-**extension passes** at declared insertion slots (`AfterGBuffers`,
-`AfterLighting`, `OverlayPreImGui`, off-critical-path `Compute`), implementing
-the same internal pass interface core passes use: declared reads/writes on
-named frame resources, RenderWorld + RHI command interface only — no `Vk*`
-types, no live ECS. Recipes reference extension passes by registered ID next
-to core kinds. Promoting later to a fully open graph is unsealing a
-restriction, not a rewrite.
+**ADR-0027 amendment.** The accepted present contract is a closed built-in
+pass vocabulary selected by recipe data, with fail-closed schema, capability,
+resource, and binding validation. There is no production extension-pass
+registration API or consumer, so extension registration and insertion slots
+are deferred. Reconsider them when the first production app/module pass cannot
+be expressed by an existing built-in recipe gate and supplies a concrete
+resource-ordering contract; splatting and order-dependent transparency are
+validation cases for that real proposal, not blockers today.
 
-**Open validation items (must be checked before the slot contract freezes):**
-point splatting that needs lighting participation; order-dependent
-transparent/volumetric debug rendering.
+`FrameRecipe` stays data. The current visibility → geometry → lighting → post
+→ present vocabulary remains closed and kernel-validated. A future production
+pass that cannot fit a built-in kind must bring its concrete resource,
+ordering, capability, and backend-evidence contract before any insertion slot
+is added.
 
-### D11 — UI is a module; capture is a kernel primitive
+### D11 — UI is app-composed; capture is a kernel primitive
 
-The kernel mentions UI zero times. An **EditorUiModule** owns the ImGui
-adapter/lifecycle, dockspace/layout, the panel-contribution registry, and
-`Pass.ImGui` as an ordinary extension pass. Modules register panel descriptors
-+ draw callbacks (optional dependency: contribute-if-present via `Find`);
-panels emit commands only. The kernel keeps one primitive: the **input capture
-filter chain** (priority-ordered claim filters; the EditorUiModule claims
-events when ImGui wants capture; unclaimed events flow to input actions).
-Recorded default: no always-on engine UI; diagnostics stay in logs/telemetry.
+**ADR-0027 amendment.** UI remains app-composed domain behavior outside the
+kernel. The proven kernel primitive is one coherent
+frame-loop-owned capture value that resets once at frame start. Every
+ephemeral hook context borrows the same value by reference. The optional
+EditorUi owner writes it during `UiBuild`; later camera,
+scene-editing, and picking behavior hooks plus kernel input-action dispatch
+consume it. The value clears to
+unclaimed every frame, so omitting EditorUi remains deterministic. There is no
+priority filter chain or ImGui import in Engine. Introduce arbitration only
+after a second simultaneous, independent capture producer demonstrates a
+conflict that explicit value composition cannot resolve. Panel content remains
+app-owned; diagnostics stay in logs/telemetry.
 
 ### D12 — Application = parts list; seams-first migration
 
-An app is `main()` + a module manifest + initial world content + initial
-FrameRecipe. All behavior — including Sandbox editor defaults — is modules.
-`IApplication::OnSimTick`/`OnVariableTick` are deprecated and die at the end
-of migration; an **InlineModule builder** keeps experiments at
-one-file-one-registration (a real module underneath: scheduled, removable,
-headless-testable).
+**ADR-0027 amendment.** The app-parts-list and removal of
+`IApplication::OnSimTick`/`OnVariableTick` remain required. `InlineModule` and
+an experiment-app template are deferred: the first real one-file experiment
+with runtime lifecycle may justify a local convenience, and a shared template
+requires a second production/research app that repeats the same bootstrap.
+Ordinary explicit named composition is the default until then.
 
-Migration is strangler-style, seams before extractions, Sandbox green
-throughout: ① CommandBus (`ARCH-007`) ② EventBus wrapper (`ARCH-008`)
-③ JobService (`ARCH-009`) ④ WorldRegistry (`ARCH-010`) ⑤ RuntimeModule
-contract + ServiceRegistry (`ARCH-011`) — all additive inside the current
-Engine — then ⑥ **ClusteringModule as the proving extraction** (`ARCH-012`,
-retired 2026-07-08 after exercising every seam), ⑦ EditorUiModule (`ARCH-006`,
-`UI-034`), then
-`RUNTIME-146`..`151` as further extractions onto the same seams, ⑧ tick
-removal + experiment template. `CommandSequence` lands when its first real
-customer appears.
+An app is `main()` + explicit composed responsibilities + initial world
+content + initial `FrameRecipe`. The additive `ARCH-007`..`ARCH-011` seams and
+`ARCH-012` Clustering extraction are retired. Clustering proved app-owned
+lifecycle, stable naming, command/job/event flow, service provision/discovery,
+and reverse shutdown; it did **not** prove `Require`, non-no-op `OnResolve`,
+sim-system registration, or frame-hook registration. `RUNTIME-179`..`187`
+finish the behavior-owning extractions, application-tick removal, mechanism
+deletion test, residual API migration, and final representation/checker
+ratchet. `CommandSequence`, an inline builder, and an experiment template land
+only when their respective first consumers appear.
 
 ### D13 — No god-handles: contexts carry capabilities
+
+**ADR-0027 amendment.** The no-`Engine&` outcome is unchanged.
+`EngineSetup` remains the narrow composition capability context, but it must
+not accumulate registrars without production consumers. The final convergence
+ratchet removes or narrows unproven setup/service/schedule surface rather than
+retaining it for hypothetical modules.
 
 `Engine&` is never passed through the module/handler surface. Contexts
 (`CommandContext`, frame-hook contexts) carry the narrow capability set
 (`ActiveWorld`, `Commands`, `Events`, `Jobs`, `Worlds`, correlation ID).
 Registration receives an `EngineSetup` (not "KernelSetup" — "kernel" is a
 documentation role word, not code vocabulary; the class stays `Engine`).
-Shutdown is a built-in `QuitRequested` command. `Engine&` appears in exactly
-one place: `main()`.
+Shutdown is a built-in `QuitRequested` command. The target contains no
+`Engine&` in module, handler, setup, or app lifecycle surfaces; `RUNTIME-184`
+removes the remaining legacy `IApplication` uses.
 
 ## Consequences
 
-- Positive: the Engine interface drops from 36 imports to substrate-only;
+- Positive: the Engine interface drops from its measured domain-heavy baseline
+  to substrate-only;
   every feature becomes removable; command streams give deterministic
   replay/repro; experiments compose a minimal parts list instead of paying the
-  god object's build and coupling costs; the `RUNTIME-146`..`151` backlog gets
-  the seams it currently lacks.
+  god object's build and coupling costs.
 - Trade-offs: one frame of latency on discrete UI commands (accepted);
   snapshot copies for background jobs (accepted — versioned results are a
   feature); queued-only events mean "I fired it" never implies "it already
   happened" (accepted; two-phase teardown must be designed in).
 - Risks: hook-vocabulary proliferation (mitigated by D9 and keeping the
-  `EngineSetup` surface small); extension-slot contract freezing before the
-  two D10 validation items are checked (tracked in the slot-contract task).
+  `EngineSetup` surface constrained to live production consumers).
 - Follow-up tasks: `ARCH-007`..`ARCH-012` seeded with this ADR and retired
   through the first proving extraction; `ARCH-013` retired the post-seam
-  collision re-review.
+  collision re-review; ADR-0027 and `RUNTIME-179`..`187` own the right-sized
+  convergence program.
 
 ## Open questions (parked deliberately, none blocks the seams)
 
-1. **Scene persistence** — what serializes a world (interacts with D8's
-   versioned geometry); owner: `RUNTIME-148` follow-up work.
-2. **Determinism/replay policy** — command streams are replayable only under
+1. **Determinism/replay policy** — command streams are replayable only under
    a stated fixed-timestep + seeded-RNG discipline; needs its own decision.
-3. **Asset-system boundary** — `Asset.Service` traffic in Engine likely
-   becomes a Resolve-phase service + import module; decided during
-   `RUNTIME-147`.
+
+Scene persistence and the asset-system boundary are no longer open questions:
+retired `RUNTIME-148`/`RUNTIME-147` established their behavior, and
+ADR-0027's `RUNTIME-172`/`RUNTIME-183` children own their app-composed
+placement.
 
 ## Alternatives Considered
 
@@ -256,7 +299,8 @@ one place: `main()`.
 - **Live-world locking for background jobs** — rejected: deadlock/priority
   tar pit; ends the determinism story.
 - **Fully open render graph now** — rejected: barrier/lifetime validation
-  surface too large for one developer; slots cover the research workload.
+  surface too large for the current production need; the closed built-in
+  recipe vocabulary covers the demonstrated workload.
 - **Renaming `Engine` to `Kernel`** — rejected: churn without behavior;
   "kernel" stays a prose role word (D13).
 
@@ -271,7 +315,9 @@ one place: `main()`.
   visualization refresh reaction. `Runtime.Engine.cppm` and
   `Runtime.Engine.cpp` contain no `KMeans` or `Runtime.ClusteringModule`
   imports/surface tokens; the remaining Vulkan queue move is owned by
-  `RUNTIME-137`.
+  `RUNTIME-137`. This proves the command/job/event and app-owned lifecycle
+  path, not the then-unused `Require`/`OnResolve`, sim-system, frame-hook, or
+  extension mechanisms; ADR-0027 owns their deletion tests.
 - `ARCH-013` (post-seam collision re-review) retired 2026-07-08: every
   front-matter-gated row received a dated confirmation/re-scope note, every
   audit-only row received an unchanged/re-scoped/re-gated decision, `RUNTIME-129`

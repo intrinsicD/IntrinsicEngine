@@ -13,9 +13,9 @@ Each active task should include:
 
 - [`ARCH-014`](ARCH-014-kernel-convergence-tracking.md) — kernel convergence
   umbrella; owner: Codex; coordination branch:
-  `codex/arch-014-kernel-convergence-program`; blocked on `ARCH-016` and
-  `RUNTIME-129`. Next gate: retire the right-sizing amendment before seeding
-  implementation children.
+  `codex/arch-014-kernel-convergence-program`; blocked on final leaf
+  `RUNTIME-187`. Next gate: execute the unblocked ADR-0027 behavior-owner
+  leaves and update the convergence scorecard after each retirement.
 
 ## History
 

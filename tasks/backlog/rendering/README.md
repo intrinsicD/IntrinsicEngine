@@ -30,7 +30,9 @@ without requiring them to read every file.
   already-exported RHI profiler truthful and operational: nonblocking native
   Vulkan timestamps around actual compiled passes, honest Null provenance,
   and reuse of current telemetry/Frame Graph presentation. Its Vulkan,
-  multi-queue, and parallel-recording prerequisites are all satisfied.
+  multi-queue, and parallel-recording prerequisites are satisfied; ADR-0027
+  additionally gates it on `RUNTIME-181`/`RUNTIME-182` so config and UI land
+  through the app-composed owners rather than transitional Engine facades.
 - The following Theme B incubation leaves are deliberately blocked by the
   architecture-stability gate `REVIEW-003`; they are not eligible for
   implementation during the current convergence/right-sizing phase:
@@ -94,8 +96,10 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
 
 - [GRAPHICS-127 — Native GPU timestamp profiler and frame-recipe timing integration](GRAPHICS-127-native-gpu-timestamp-profiler.md):
   depends on retired `GRAPHICS-033` (operational Vulkan), `GRAPHICS-037D`
-  (multi-queue recording), and `GRAPHICS-119` (parallel pass recording); all
-  prerequisites are satisfied, so this remediation leaf is selectable.
+  (multi-queue recording), and `GRAPHICS-119` (parallel pass recording), plus
+  open `RUNTIME-181` (ConfigControl owner) and `RUNTIME-182` (EditorUi owner).
+  The graphics prerequisites are satisfied; the task becomes selectable after
+  those two ADR-0027 composition leaves retire.
 
 - [GRAPHICS-021 — Rendering backlog workflow cleanup](../../archive/GRAPHICS-021-rendering-backlog-workflow-cleanup.md):
   completed cleanup precondition for further rendering task churn

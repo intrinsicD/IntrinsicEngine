@@ -115,7 +115,7 @@ class KernelConvergenceTests(unittest.TestCase):
         result = run_checker(REPO_ROOT)
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn(
-            "plain_imports=42 domain_imports=21 export_imports=2 "
+            "plain_imports=42 domain_imports=20 export_imports=2 "
             "public_getter_names=31",
             result.stdout,
         )
