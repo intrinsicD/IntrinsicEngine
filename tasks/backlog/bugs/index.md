@@ -5,11 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-113` — Runtime-world reload contract assumes one-frame asset completion](BUG-113-runtime-world-reload-assumes-one-frame-completion.md):
-  the active-world borrower regression submits asynchronous asset reload work
-  and assumes it reaches `Ready` before the next fast engine frame; drive the
-  existing explicit CPU-completion seam so host contention cannot turn the
-  second reload into `InvalidState`.
 - [`BUG-110` — Implicit smoothing applies boundary pins after rather than during solve](BUG-110-implicit-smoothing-boundary-dirichlet-solve.md):
   `PreserveBoundary` currently solves an all-free shifted system and only then
   overwrites boundary entries, so interior vertices do not satisfy the claimed
@@ -40,6 +35,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-07-18: [`BUG-113` — Runtime-world reload contract assumed one-frame asset completion](../../done/BUG-113-runtime-world-reload-assumes-one-frame-completion.md).
+  The contract now explicitly completes each submitted CPU load/reload and
+  asserts submission separately from completion. The old one-worker case
+  failed by iteration 7 under pinned CPU contention; the fixed case passed
+  100/100 under the same pressure, all eight owning contracts passed, and all
+  15 hosted CI-008 timing samples completed without retry or exclusion.
 
 - Closed 2026-07-17: [`BUG-112` — Clang source coverage is unstable on two production paths](../../done/BUG-112-clang-source-coverage-production-path-instability.md).
   One retained scheduler observation removes a schedule-dependent fallback,

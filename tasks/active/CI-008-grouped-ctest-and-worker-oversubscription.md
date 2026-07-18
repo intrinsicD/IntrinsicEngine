@@ -11,15 +11,20 @@ depends_on:
 # CI-008 — Reduce CTest process overhead without oversubscribing workers
 
 ## Status
-- In progress on 2026-07-17; owner: Codex; branch: `main`.
-- `CI-011` is retired with the measured fast/slow cohort. Slice A now adds one
-  opt-in grouped configuration for an audited pure cohort while normal `ci`
-  retains individual discovery.
-- Right-sizing decision: reuse the existing registry, timing collector, cohort
-  parity, and source-coverage comparator. Do not add a second registration
-  framework, benchmark schema, calibration summarizer, or grouped presets.
-- Next verification: configure isolated individual/grouped trees, prove exact
-  logical-case parity, then collect matched `-j1/-j2/-j4` timing evidence.
+- In progress on 2026-07-18; owner: Codex; branch: `main`.
+- Promotion commit `7d02187f` enables replacement-only grouping in required CPU
+  variants, preserves local individual discovery, and reserves peak runnable
+  capacity for deliberate multi-worker cases.
+- Hosted source-coverage run `29620815336` passed exact grouped/individual
+  parity. Timing run `29622055604` passed registration and seven pairs, then
+  exposed `BUG-113`: an unchanged runtime contract assumed one-frame async
+  asset completion under `--parallel 2`. Commit `02945683` now drives the
+  existing completion seam, and `886495e7` removes the evidence lane's
+  duplicate 27-minute product build.
+- Replacement timing/parity run `29625346673` passed all 15 fresh reports at
+  `886495e7`; `--parallel 4` is the fastest grouped-plan budget by absolute
+  median and p95. Final required CPU/ASan/UBSan run `29627099771` is in
+  progress at the same SHA.
 
 ## Goal
 - Execute safe pure suites in grouped GoogleTest processes and assign measured
@@ -34,14 +39,14 @@ depends_on:
 ## Context
 - Owner: test CMake helpers, test support, CTest execution planning, and
   scheduler configuration exposed to tests.
-- Current registration uses
-  `gtest_discover_tests(... DISCOVERY_MODE PRE_TEST)`, so each of roughly
-  3,592–3,594 cases runs as a separate process.
-- `intrinsic_grouped_test()` exists in `tests/CMakeLists.txt` but has no call
-  sites. Retired `CI-001` recorded grouped RuntimeRHI, RenderOrchestrator,
-  HeadlessEngine, RenderGraphPacket, and other entries and a suite size near
-  1,599 tests; current gates have more than doubled and the grouped
-  registrations are absent, indicating performance drift.
+- At activation, every GoogleTest case used
+  `gtest_discover_tests(... DISCOVERY_MODE PRE_TEST)` and the existing grouped
+  helper had no live call sites. The current default CPU selector has 4,062
+  logical records across 28 producers.
+- Retired `CI-001` recorded additive grouped RuntimeRHI, RenderOrchestrator,
+  HeadlessEngine, RenderGraphPacket, and other entries against a much smaller
+  historical population. This task supersedes that design with mechanically
+  verified replacement-only grouping.
 - Representative `CI-003` test phases were 221.27s for 3,526 PR-fast cases and
   217.53s for 3,594 full CPU cases. Build is still dominant, but test process
   overhead is material for rapid iteration.

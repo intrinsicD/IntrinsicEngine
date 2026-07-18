@@ -8,6 +8,16 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-113`](BUG-113-runtime-world-reload-assumes-one-frame-completion.md) —
+runtime-world reload harness defect retired on 2026-07-18 at `CPUContracted`.
+The scene-borrower regression now drives the existing per-asset CPU completion
+seam after its initial load and both reload submissions, retaining real
+Reloaded/Ready delivery while removing its adjacent-frame scheduler assumption.
+The old one-worker case failed by iteration 7 under pinned CPU contention; the
+fixed case passed 100/100 under the same pressure, all eight owning contracts
+passed, and hosted run `29625346673` completed all 15 full-CPU timing samples
+without retry, exclusion, timeout, or production-code change.
+
 [`CI-011`](CI-011-measured-slow-test-cohort.md) — measured slow-test cohort
 retired on 2026-07-17 at `Operational`. Five comparable hosted samples moved
 exactly eight heavy cases to the disjoint scheduled ordinary-slow lane and

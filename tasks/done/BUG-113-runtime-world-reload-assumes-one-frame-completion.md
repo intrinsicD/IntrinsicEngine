@@ -19,8 +19,8 @@ depends_on: []
   individually launched CTest process.
 
 ## Context
-- Status: in progress on 2026-07-18; owner: Codex; branch: `main`; next
-  verification is the corrected CI-008 matched hosted evidence run.
+- Status: completed on 2026-07-18 at `CPUContracted`; owner: Codex; branch:
+  `main`; commit: `02945683`; hosted closure run `29625346673`.
 - Owner: `tests/contract/runtime/Test.RuntimeWorldRegistry.cpp`.
 - Symptom: CI-008 hosted run
   [`29622055604`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29622055604)
@@ -58,32 +58,44 @@ depends_on: []
      diagnostics rather than fixing only the queued-state race.
 
 ## Required changes
-- [ ] Preserve the real asynchronous load/reload path but explicitly complete
+- [x] Preserve the real asynchronous load/reload path but explicitly complete
       each prerequisite CPU load through
       `AssetService::CompleteCpuLoadAndFlushEvent()` before the test depends on
       its `Ready` state.
-- [ ] Retain separate assertions for submission and completion so a loader,
+- [x] Retain separate assertions for submission and completion so a loader,
       pipeline, event, rebind, or world-retirement failure remains actionable.
-- [ ] Keep the fix test-local unless evidence identifies a production defect.
+- [x] Keep the fix test-local unless evidence identifies a production defect.
 
 ## Tests
-- [ ] Reproduce or materially amplify the old failure with repeated focused
+- [x] Reproduce or materially amplify the old failure with repeated focused
       execution under CPU contention.
-- [ ] Run the corrected focused case repeatedly under the same contention and
+- [x] Run the corrected focused case repeatedly under the same contention and
       without retries inside the test.
-- [ ] Run the owning `IntrinsicRuntimeContractTests` focused cohort and the
+- [x] Run the owning `IntrinsicRuntimeContractTests` focused cohort and the
       CI-008 matched evidence lane that exposed the failure.
 
 ## Docs
-- [ ] Update the active bug index and CI-008 evidence narrative.
-- [ ] Regenerate `tasks/SESSION-BRIEF.md` on retirement.
+- [x] Update the active bug index and CI-008 evidence narrative.
+- [x] Regenerate `tasks/SESSION-BRIEF.md` on retirement.
 
 ## Acceptance criteria
-- [ ] The contract no longer depends on one-frame worker latency.
-- [ ] It still exercises real model-scene reload events before and after the
+- [x] The contract no longer depends on one-frame worker latency.
+- [x] It still exercises real model-scene reload events before and after the
       previous world is retired.
-- [ ] Hosted CI-008 timing evidence completes without retries, skipped cases,
+- [x] Hosted CI-008 timing evidence completes without retries, skipped cases,
       label changes, or relaxed assertions.
+
+## Evidence
+- With the current one-worker fixture pinned to one CPU beside one CPU burner,
+  the old test failed on iteration 7 at
+  `ReloadAfterDestroySucceeded`. The fixed binary passed 100/100 under the
+  identical contention command, and all eight `RuntimeWorldRegistry.*`
+  contracts passed.
+- Hosted run
+  [`29625346673`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29625346673)
+  executed the fixed case in all 15 full-CPU samples at CTest budgets 1, 2,
+  and 4. Every sample and exact grouped/individual parity report passed without
+  a retry or exclusion.
 
 ## Verification
 ```bash
