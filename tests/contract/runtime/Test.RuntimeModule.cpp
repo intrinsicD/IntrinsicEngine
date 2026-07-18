@@ -93,12 +93,17 @@ namespace
         bool ProviderShutdownSawAnnounce{false};
         bool ConsumerShutdownSawAnnounce{false};
         bool DelayedForFixedStep{false};
+        bool DelayedForReplay{false};
         bool TimedOut{false};
         int CommandEventHits{0};
         int CommandEventValue{0};
         std::uint32_t VariableTicks{0};
         std::uint32_t ProducerRuns{0};
         std::uint32_t ConsumerRuns{0};
+        std::uint64_t FrameGraphCompileCalls{0u};
+        std::uint64_t FrameGraphPlanBuilds{0u};
+        std::uint64_t FrameGraphPlanReuses{0u};
+        bool FrameGraphLastCompileReusedPlan{false};
         Extrinsic::ECS::EntityHandle BaselineProbeEntity{};
         std::uint32_t SimTickMutations{0};
         std::uint32_t BaselineReaderRuns{0};
@@ -509,14 +514,34 @@ namespace
                             double) override
         {
             m_State.VariableTicks += 1u;
+            const auto planStats =
+                engine.GetFrameGraph().GetPlanReuseStats();
+            m_State.FrameGraphCompileCalls =
+                planStats.CompileCallCount;
+            m_State.FrameGraphPlanBuilds =
+                planStats.PlanBuildCount;
+            m_State.FrameGraphPlanReuses =
+                planStats.PlanReuseCount;
+            m_State.FrameGraphLastCompileReusedPlan =
+                planStats.LastCompileReusedPlan;
             if (m_State.CommandEventHits > 0 &&
-                m_State.ConsumerRuns > 0 &&
+                m_State.ConsumerRuns >= 2u &&
+                m_State.FrameGraphPlanReuses >= 1u &&
                 m_State.FirstHookCounts[
                     static_cast<std::size_t>(
                         Runtime::FramePhase::Maintenance)] >= 2)
             {
                 engine.RequestExit();
                 return;
+            }
+
+            if (m_State.ConsumerRuns == 1u &&
+                m_State.FrameGraphPlanReuses == 0u &&
+                !m_State.DelayedForReplay)
+            {
+                m_State.DelayedForReplay = true;
+                std::this_thread::sleep_for(
+                    std::chrono::milliseconds(20));
             }
 
             if (m_State.VariableTicks > 300u)
@@ -687,7 +712,13 @@ TEST(RuntimeModule, EngineComposesTestModulesThroughSetupSurface)
     EXPECT_EQ(state.CommandEventValue, 23);
 
     ASSERT_GE(state.ProducerRuns, 1u);
-    ASSERT_GE(state.ConsumerRuns, 1u);
+    ASSERT_GE(state.ConsumerRuns, 2u);
+    EXPECT_EQ(state.FrameGraphCompileCalls,
+              state.ConsumerRuns);
+    EXPECT_EQ(state.FrameGraphPlanBuilds, 1u);
+    EXPECT_EQ(state.FrameGraphPlanReuses,
+              state.ConsumerRuns - 1u);
+    EXPECT_TRUE(state.FrameGraphLastCompileReusedPlan);
     ASSERT_GE(state.SystemTrace.size(), 2u);
     EXPECT_EQ(state.SystemTrace[0], "Z.Provider.Producer");
     EXPECT_EQ(state.SystemTrace[1], "A.Consumer.Consumer");
@@ -812,7 +843,9 @@ TEST(RuntimeModuleSchedule, DeclarativeSignalsCreatePerTickEdgeForParallelSystem
     };
 
     bool producerRan = false;
-    bool consumerObservedProducer = false;
+    std::vector<bool> consumerObservedProducer{};
+    std::vector<std::uint64_t> observedFrameIndices{};
+    std::vector<Extrinsic::ECS::Scene::Registry*> observedWorlds{};
     Runtime::RuntimeModuleSchedule schedule;
 
     // Register the consumer first so neither registration nor module-name order
@@ -825,9 +858,11 @@ TEST(RuntimeModuleSchedule, DeclarativeSignalsCreatePerTickEdgeForParallelSystem
             .Name = "Consume",
             .Options = parallelOptions,
             .WaitForSignals = {ready},
-            .Execute = [&](Runtime::SimSystemContext&)
+            .Execute = [&](Runtime::SimSystemContext& context)
             {
-                consumerObservedProducer = producerRan;
+                consumerObservedProducer.push_back(producerRan);
+                observedFrameIndices.push_back(context.FrameIndex);
+                observedWorlds.push_back(&context.ActiveWorld);
             },
         });
     schedule.RegisterSimSystem(
@@ -871,7 +906,85 @@ TEST(RuntimeModuleSchedule, DeclarativeSignalsCreatePerTickEdgeForParallelSystem
     EXPECT_EQ(graph.PassName(layers[1][0]), "A.Module.Consume");
 
     ASSERT_TRUE(graph.Execute().has_value());
-    EXPECT_TRUE(consumerObservedProducer);
+    ASSERT_EQ(consumerObservedProducer.size(), 1u);
+    EXPECT_TRUE(consumerObservedProducer[0]);
+    ASSERT_EQ(observedFrameIndices.size(), 1u);
+    EXPECT_EQ(observedFrameIndices[0], 7u);
+    ASSERT_EQ(observedWorlds.size(), 1u);
+    EXPECT_EQ(observedWorlds[0], &activeWorld);
+
+    producerRan = false;
+    Extrinsic::ECS::Scene::Registry replayWorld;
+    ASSERT_TRUE(graph.ResetForReplay().has_value());
+    schedule.RegisterSimSystemsForTick(
+        Runtime::RuntimeModuleSimSystemScheduleContext{
+            .Graph = graph,
+            .ActiveWorld = replayWorld,
+            .ActiveWorldHandle = Runtime::DefaultWorldHandle,
+            .Commands = commands,
+            .Events = events,
+            .Jobs = jobs,
+            .Worlds = worlds,
+            .Services = services,
+            .FrameIndex = 8,
+            .FixedDeltaSeconds = 1.0 / 60.0,
+        });
+
+    ASSERT_TRUE(graph.Compile().has_value());
+    ASSERT_TRUE(graph.Execute().has_value());
+
+    const auto planStats = graph.GetPlanReuseStats();
+    EXPECT_EQ(planStats.CompileCallCount, 2u);
+    EXPECT_EQ(planStats.PlanBuildCount, 1u);
+    EXPECT_EQ(planStats.PlanReuseCount, 1u);
+    EXPECT_TRUE(planStats.LastCompileReusedPlan);
+    ASSERT_EQ(consumerObservedProducer.size(), 2u);
+    EXPECT_TRUE(consumerObservedProducer[1]);
+    ASSERT_EQ(observedFrameIndices.size(), 2u);
+    EXPECT_EQ(observedFrameIndices[1], 8u);
+    ASSERT_EQ(observedWorlds.size(), 2u);
+    EXPECT_EQ(observedWorlds[1], &replayWorld);
+
+    producerRan = false;
+    bool appPassRan = false;
+    Extrinsic::ECS::Scene::Registry changedShapeWorld;
+    ASSERT_TRUE(graph.ResetForReplay().has_value());
+    graph.AddPass(
+        "App.ShapeTransition",
+        [](Core::FrameGraphBuilder&) {},
+        [&appPassRan]()
+        {
+            appPassRan = true;
+        });
+    schedule.RegisterSimSystemsForTick(
+        Runtime::RuntimeModuleSimSystemScheduleContext{
+            .Graph = graph,
+            .ActiveWorld = changedShapeWorld,
+            .ActiveWorldHandle = Runtime::DefaultWorldHandle,
+            .Commands = commands,
+            .Events = events,
+            .Jobs = jobs,
+            .Worlds = worlds,
+            .Services = services,
+            .FrameIndex = 9,
+            .FixedDeltaSeconds = 1.0 / 60.0,
+        });
+
+    ASSERT_TRUE(graph.Compile().has_value());
+    ASSERT_TRUE(graph.Execute().has_value());
+
+    const auto changedShapeStats = graph.GetPlanReuseStats();
+    EXPECT_EQ(changedShapeStats.CompileCallCount, 3u);
+    EXPECT_EQ(changedShapeStats.PlanBuildCount, 2u);
+    EXPECT_EQ(changedShapeStats.PlanReuseCount, 1u);
+    EXPECT_FALSE(changedShapeStats.LastCompileReusedPlan);
+    EXPECT_TRUE(appPassRan);
+    ASSERT_EQ(consumerObservedProducer.size(), 3u);
+    EXPECT_TRUE(consumerObservedProducer[2]);
+    ASSERT_EQ(observedFrameIndices.size(), 3u);
+    EXPECT_EQ(observedFrameIndices[2], 9u);
+    ASSERT_EQ(observedWorlds.size(), 3u);
+    EXPECT_EQ(observedWorlds[2], &changedShapeWorld);
 }
 
 // BUG-105: every module sim-system receives ActiveWorld in its execution

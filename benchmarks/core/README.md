@@ -24,6 +24,19 @@ so this runner does not infer wake behavior from unrelated counters. CORE-007
 uses candidate telemetry and deterministic contract tests for conditional-wake
 evidence while keeping the before/after benchmark executable identical.
 
+CORE-008 adds two stable workloads under method
+`core.taskgraph_plan_reuse`: `core.taskgraph_plan_reuse.ecs3.smoke` models the
+three-pass ECS system bundle, and
+`core.taskgraph_plan_reuse.renderprep9.smoke` models the nine-pass render-prep
+pipeline. Each records three warmup batches and nine measured batches of 512
+registration → compile → replay-reset epochs. `runtime_ms` is the median
+milliseconds per graph epoch and throughput is graph epochs per second.
+Plan-order and fresh-callback checks run outside the timed window and require
+zero `quality_error_l2`. Plan-build/reuse counters distinguish the
+full-rebuild baseline from the candidate without changing the workload.
+The matched five-pair result and its bounded claims are recorded in
+[`core_taskgraph_plan_reuse_CORE-008.md`](../reports/core_taskgraph_plan_reuse_CORE-008.md).
+
 Run and validate the complete optimized smoke population with:
 
 ```bash
@@ -34,5 +47,7 @@ python3 tools/benchmark/validate_benchmark_results.py \
   --root /tmp/intrinsic-benchmark-smoke --strict
 ```
 
-The expected pre-priority exit code is `2`; validate the emitted directory
-even when collecting that intentionally failed baseline.
+The expected exit code is `0` for the current candidate. Exit code `2` applies
+only when reproducing the preserved CORE-007 pre-priority baseline binary;
+validate that emitted directory even though its priority probe intentionally
+fails.

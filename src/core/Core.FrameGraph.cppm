@@ -38,7 +38,7 @@ import Extrinsic.Core.Memory;
 //       []{ /* work */ });
 //   fg.Compile();
 //   fg.Execute();   // fires passes in topo-layer order
-//   fg.Reset();     // reset for next frame
+//   fg.ResetForReplay(); // re-register an exact shape next frame
 // -----------------------------------------------------------------------
 
 export namespace Extrinsic::Core
@@ -223,7 +223,9 @@ export namespace Extrinsic::Core
         [[nodiscard]] Core::Expected<std::vector<Dag::PlanTask>> BuildPlan();
 
         // ----- Reset -----
+        // Reset is destructive; ResetForReplay retains one exact-match plan.
         void Reset();
+        [[nodiscard]] Core::Result ResetForReplay();
 
         // ----- Introspection -----
         [[nodiscard]] uint32_t PassCount()            const noexcept;
@@ -233,6 +235,7 @@ export namespace Extrinsic::Core
         [[nodiscard]] uint64_t LastCompileTimeNs()    const noexcept;
         [[nodiscard]] uint64_t LastExecuteTimeNs()    const noexcept;
         [[nodiscard]] uint64_t LastCriticalPathTimeNs() const noexcept;
+        [[nodiscard]] Dag::TaskGraphPlanReuseStats GetPlanReuseStats() const noexcept;
 
     private:
         std::unique_ptr<Dag::TaskGraph> m_Graph;

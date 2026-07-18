@@ -133,6 +133,37 @@ as an external waiter. This closes both completion-change and late-enqueue
 queue-check-to-park windows. The final task publishes execution timing and the
 idle graph state before it signals completion.
 
+## Registration replay and compiled-plan reuse
+
+`Reset()` remains the destructive clear: it discards pass declarations,
+callbacks, and compiled topology. `ResetForReplay()` is the opt-in steady-state
+lifecycle. It fails closed while a submission is live, destroys callbacks from
+the completed or abandoned registration epoch, exposes a logically empty graph
+for the next registration, and retains only the last successfully compiled
+topology plus two reusable pass-declaration banks.
+
+The next `Compile()` compares the new ordered descriptors with that retained
+plan exactly. Equality covers pass count and order, owned name and debug
+category, normalized priority/cost/threading options, resource declaration
+origin plus raw identity and access mode, explicit predecessor/kind/reason, and
+raw wait/signal labels. Callback identity is deliberately excluded: callbacks
+are rebound from the current epoch on every hit. This prevents normalized
+resource IDs or label-table positions from making distinct declarations appear
+equal.
+
+An exact hit accepts empty compiled graphs, keeps the prior topology, reports
+zero through `LastCompileTimeNs()`, and increments `PlanReuseCount`. A mismatch
+performs a full replacement build and increments `PlanBuildCount` only after
+success. A failed changed compile invalidates the current plan and cannot
+execute or fall back to the previous topology.
+
+`GetPlanReuseStats()` reports instance-lifetime accepted compile calls, full
+plan builds, exact reuse hits, and whether the last accepted compile reused.
+Destructive `Reset()` does not zero these counters. Submission state itself is
+never pooled: each `TaskGraphCompletion` retains its own counted state, so an
+old completed handle remains ready and valid while a later replay submission
+runs.
+
 ## Ownership
 
 - Core owns identifiers, generic task metadata, dependency and hazard

@@ -25,6 +25,7 @@ namespace Extrinsic::Core
     }
 
     void         FrameGraph::Reset()    { (void)m_Graph->Reset(); }
+    Core::Result FrameGraph::ResetForReplay() { return m_Graph->ResetForReplay(); }
 
     uint32_t     FrameGraph::PassCount()           const noexcept { return m_Graph->PassCount(); }
     std::string_view FrameGraph::PassName(uint32_t i) const noexcept { return m_Graph->PassName(i); }
@@ -36,4 +37,8 @@ namespace Extrinsic::Core
     uint64_t     FrameGraph::LastCompileTimeNs()   const noexcept { return m_Graph->LastCompileTimeNs(); }
     uint64_t     FrameGraph::LastExecuteTimeNs()   const noexcept { return m_Graph->LastExecuteTimeNs(); }
     uint64_t     FrameGraph::LastCriticalPathTimeNs() const noexcept { return m_Graph->LastCriticalPathTimeNs(); }
+    Dag::TaskGraphPlanReuseStats FrameGraph::GetPlanReuseStats() const noexcept
+    {
+        return m_Graph->GetPlanReuseStats();
+    }
 }

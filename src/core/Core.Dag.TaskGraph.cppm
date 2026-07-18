@@ -28,7 +28,8 @@ import Extrinsic.Core.Hash;
 //   2. Compile — Compile()  → error on dependency cycle
 //   3. Consume — Submit() starts callbacks and returns a completion handle,
 //                Execute() submits and waits, or BuildPlan() returns metadata
-//   4. Reset  — Reset() to begin the next epoch
+//   4. Reset  — Reset() for a destructive clear, or ResetForReplay() to
+//               retain one compiled topology for exact-structure replay
 //
 // TaskGraph setup/compile/submit/reset operations require external
 // synchronization. TaskGraphCompletion::IsReady() is the cross-thread poll;
@@ -84,6 +85,17 @@ export namespace Extrinsic::Core::Dag
         bool MainThreadOnly = false;
         bool AllowParallel = true;
         std::string_view DebugCategory = {};
+    };
+
+    // Lifetime counters for one TaskGraph instance. CompileCallCount records
+    // accepted Compile() invocations; PlanBuildCount records full topology
+    // builds; PlanReuseCount records exact-structure replay hits.
+    struct TaskGraphPlanReuseStats
+    {
+        std::uint64_t CompileCallCount = 0u;
+        std::uint64_t PlanBuildCount = 0u;
+        std::uint64_t PlanReuseCount = 0u;
+        bool LastCompileReusedPlan = false;
     };
 
     class TaskGraphBuilder
@@ -276,6 +288,11 @@ export namespace Extrinsic::Core::Dag
         // Fails closed while a submitted execution is still live.
         [[nodiscard]] Core::Result Reset();
 
+        // Clear the current registration epoch while allowing the next
+        // AddPass()/Compile() replay to reuse an exactly matching compiled
+        // topology. Fails closed while a submitted execution is still live.
+        [[nodiscard]] Core::Result ResetForReplay();
+
         // ----- Introspection -----
         [[nodiscard]] uint32_t PassCount() const noexcept;
         [[nodiscard]] const std::vector<std::vector<uint32_t>>& GetExecutionLayers() const noexcept;
@@ -284,6 +301,7 @@ export namespace Extrinsic::Core::Dag
         [[nodiscard]] uint64_t LastExecuteTimeNs()     const noexcept;
         [[nodiscard]] uint64_t LastCriticalPathTimeNs()const noexcept;
         [[nodiscard]] ScheduleStats GetScheduleStats() const noexcept;
+        [[nodiscard]] TaskGraphPlanReuseStats GetPlanReuseStats() const noexcept;
 
     private:
         friend class TaskGraphBuilder;
@@ -293,9 +311,13 @@ export namespace Extrinsic::Core::Dag
                                  const TaskGraphPassOptions& options,
                                  GraphExecuteCallback execute);
 
-        // TypeToken → ResourceId translation (stable within an epoch; reset on Reset()).
+        // TypeToken → ResourceId translation (stable within one registration epoch).
         ResourceId TokenToResource(std::size_t token);
         ResourceId StringIdToResource(Hash::StringID stringId);
+        void AddTypeResource(
+            std::uint32_t passIndex,
+            std::size_t token,
+            ResourceAccessMode mode);
         void NormalizeOptions(TaskGraphPassOptions& options) const;
 
         struct Impl;
@@ -308,14 +330,19 @@ export namespace Extrinsic::Core::Dag
     template <typename T>
     void TaskGraphBuilder::Read()
     {
-        // Compute a compile-time type token then delegate to the explicit-id path.
-        ReadResource(m_Graph.TokenToResource(Detail::TypeTokenValue<T>()));
+        m_Graph.AddTypeResource(
+            m_PassIndex,
+            Detail::TypeTokenValue<T>(),
+            ResourceAccessMode::Read);
     }
 
     template <typename T>
     void TaskGraphBuilder::Write()
     {
-        WriteResource(m_Graph.TokenToResource(Detail::TypeTokenValue<T>()));
+        m_Graph.AddTypeResource(
+            m_PassIndex,
+            Detail::TypeTokenValue<T>(),
+            ResourceAccessMode::Write);
     }
 
     // -----------------------------------------------------------------------

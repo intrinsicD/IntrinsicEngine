@@ -8,6 +8,21 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`CORE-008`](CORE-008-compiled-taskgraph-plan-reuse.md) — compiled TaskGraph
+plan reuse retired on 2026-07-18 at `Operational`. Explicit
+`ResetForReplay()` retains one successful topology, compares every
+compilation-affecting descriptor exactly, installs current callbacks, and
+fails closed on mismatch or compile failure while destructive `Reset()` keeps
+its cold-rebuild semantics. Fixed-step runtime and the persistent
+owner-thread-only render-prep graph now use that lifecycle; Null
+`Engine::Run()` proves one build followed by reuse. Five order-balanced local
+pairs reduced median paired registration/compile/replay runtime by 84.562% for
+the three-pass ECS-like shape and 84.938% for the nine-pass render-prep-like
+shape with matching quality checksums. The full CPU gate passed 4,096/4,096,
+fresh ASan and UBSan gates each passed 2,750/2,750, and the destructive-reset
+cold SLO remained within budget. Render-graph caching remains owned by
+`GRAPHICS-117`.
+
 [`CORE-007`](CORE-007-scheduler-priority-wait-wake-hardening.md) — scheduler
 priority and worker-wake hardening retired on 2026-07-18 at `CPUContracted`.
 Fixed High/Normal/Low lanes preserve TaskGraph priority through external and

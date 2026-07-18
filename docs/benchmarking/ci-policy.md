@@ -447,7 +447,7 @@ causal reduction is calculated against `CI-003`.
 
 ### Monolithic smoke ownership and budget
 
-The path-aware `ci-release` candidate workflow owns execution of the 23-result
+The path-aware `ci-release` candidate workflow owns execution of the 25-result
 `IntrinsicBenchmarkSmoke` aggregate in an optimized unsanitized identity. It
 builds and runs the `IntrinsicBenchmarks` target, then invokes strict result
 validation before uploading the complete result directory. Its runner step has

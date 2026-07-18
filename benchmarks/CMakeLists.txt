@@ -22,6 +22,7 @@ endif()
 add_executable(IntrinsicBenchmarkSmoke
     runners/BenchmarkSmokeRunner.cpp
     core/Bench_SchedulerHardeningSmoke.cpp
+    core/Bench_TaskGraphPlanReuseSmoke.cpp
     geometry/Bench_BoundaryFirstFlatteningReferenceSmoke.cpp
     geometry/Bench_ExampleSmoke.cpp
     geometry/Bench_PointCloudFilteringSmoke.cpp
