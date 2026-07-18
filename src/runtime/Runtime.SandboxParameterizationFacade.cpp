@@ -29,6 +29,7 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.MeshGeometryPacker;
+import Extrinsic.Runtime.SandboxConfigSections;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.HalfedgeMesh;
 import Geometry.Parameterization;
@@ -40,7 +41,6 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
-        namespace Config = Core::Config;
         namespace Dirty = ECS::Components::DirtyTags;
         namespace GS = ECS::Components::GeometrySources;
         namespace Parameterization = Geometry::Parameterization;
@@ -167,7 +167,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::optional<glm::vec2> ToFiniteUv(
-            const Config::ParameterizationUvConfig& value) noexcept
+            const ParameterizationUvConfig& value) noexcept
         {
             if (!CanRepresentAsFloat(value.U) ||
                 !CanRepresentAsFloat(value.V))
@@ -179,11 +179,11 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::optional<Parameterization::ParameterizationStrategy>
-        ToGeometryStrategy(const Config::ParameterizationConfig& config)
+        ToGeometryStrategy(const ParameterizationConfig& config)
         {
             switch (config.Strategy)
             {
-            case Config::ParameterizationStrategyKind::Lscm:
+            case ParameterizationStrategyKind::Lscm:
             {
                 const auto pinUv0 = ToFiniteUv(config.Lscm.PinUv0);
                 const auto pinUv1 = ToFiniteUv(config.Lscm.PinUv1);
@@ -212,8 +212,8 @@ namespace Extrinsic::Runtime
                 return Parameterization::ParameterizationStrategy{
                     std::move(params)};
             }
-            case Config::ParameterizationStrategyKind::HarmonicCotangent:
-            case Config::ParameterizationStrategyKind::TutteUniform:
+            case ParameterizationStrategyKind::HarmonicCotangent:
+            case ParameterizationStrategyKind::TutteUniform:
             {
                 if (config.Harmonic.PinnedVertices.size() !=
                     config.Harmonic.PinnedUvs.size())
@@ -224,20 +224,20 @@ namespace Extrinsic::Runtime
                 Parameterization::HarmonicParams params{};
                 params.Weights =
                     config.Strategy ==
-                            Config::ParameterizationStrategyKind::TutteUniform
+                            ParameterizationStrategyKind::TutteUniform
                         ? Parameterization::HarmonicWeightType::Uniform
                         : Parameterization::HarmonicWeightType::Cotangent;
                 switch (config.Harmonic.Boundary)
                 {
-                case Config::ParameterizationBoundaryPolicy::Circle:
+                case ParameterizationBoundaryPolicy::Circle:
                     params.Boundary =
                         Parameterization::HarmonicBoundaryPolicy::Circle;
                     break;
-                case Config::ParameterizationBoundaryPolicy::Square:
+                case ParameterizationBoundaryPolicy::Square:
                     params.Boundary =
                         Parameterization::HarmonicBoundaryPolicy::Square;
                     break;
-                case Config::ParameterizationBoundaryPolicy::Custom:
+                case ParameterizationBoundaryPolicy::Custom:
                     params.Boundary =
                         Parameterization::HarmonicBoundaryPolicy::Custom;
                     break;
@@ -249,7 +249,7 @@ namespace Extrinsic::Runtime
                     config.Harmonic.ClampNonConvexWeights;
                 params.PinnedVertices = config.Harmonic.PinnedVertices;
                 params.PinnedUVs.reserve(config.Harmonic.PinnedUvs.size());
-                for (const Config::ParameterizationUvConfig& uv :
+                for (const ParameterizationUvConfig& uv :
                      config.Harmonic.PinnedUvs)
                 {
                     const auto converted = ToFiniteUv(uv);
@@ -260,7 +260,7 @@ namespace Extrinsic::Runtime
                 return Parameterization::ParameterizationStrategy{
                     std::move(params)};
             }
-            case Config::ParameterizationStrategyKind::Bff:
+            case ParameterizationStrategyKind::Bff:
             {
                 if (!std::isfinite(config.Bff.AngleSumTolerance) ||
                     config.Bff.AngleSumTolerance <= 0.0 ||
@@ -275,19 +275,19 @@ namespace Extrinsic::Runtime
                 Parameterization::BffParams params{};
                 switch (config.Bff.Mode)
                 {
-                case Config::ParameterizationBffBoundaryMode::AutomaticConformal:
+                case ParameterizationBffBoundaryMode::AutomaticConformal:
                     if (!config.Bff.BoundaryData.empty())
                         return std::nullopt;
                     params.Mode =
                         Parameterization::BffBoundaryMode::AutomaticConformal;
                     break;
-                case Config::ParameterizationBffBoundaryMode::TargetLengths:
+                case ParameterizationBffBoundaryMode::TargetLengths:
                     if (config.Bff.BoundaryData.empty())
                         return std::nullopt;
                     params.Mode =
                         Parameterization::BffBoundaryMode::TargetLengths;
                     break;
-                case Config::ParameterizationBffBoundaryMode::TargetAngles:
+                case ParameterizationBffBoundaryMode::TargetAngles:
                     if (config.Bff.BoundaryData.empty())
                         return std::nullopt;
                     params.Mode =
@@ -332,18 +332,18 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool IsSerializableParameterizationConfigValid(
-            const Config::ParameterizationConfig& config)
+            const ParameterizationConfig& config)
         {
             if (StableTokenForSandboxEditorParameterizationStrategy(
                     config.Strategy).empty())
             {
                 return false;
             }
-            Config::ParameterizationConfig candidate = config;
-            for (const Config::ParameterizationStrategyKind strategy : {
-                     Config::ParameterizationStrategyKind::Lscm,
-                     Config::ParameterizationStrategyKind::HarmonicCotangent,
-                     Config::ParameterizationStrategyKind::Bff})
+            ParameterizationConfig candidate = config;
+            for (const ParameterizationStrategyKind strategy : {
+                     ParameterizationStrategyKind::Lscm,
+                     ParameterizationStrategyKind::HarmonicCotangent,
+                     ParameterizationStrategyKind::Bff})
             {
                 candidate.Strategy = strategy;
                 if (!ToGeometryStrategy(candidate).has_value())
@@ -351,18 +351,18 @@ namespace Extrinsic::Runtime
             }
             switch (config.View.RenderMode)
             {
-            case Config::ParameterizationUvRenderMode::CpuLayout:
-            case Config::ParameterizationUvRenderMode::GpuShaded:
+            case ParameterizationUvRenderMode::CpuLayout:
+            case ParameterizationUvRenderMode::GpuShaded:
                 break;
             default:
                 return false;
             }
             switch (config.View.BackgroundMode)
             {
-            case Config::ParameterizationUvBackgroundMode::Grid:
-            case Config::ParameterizationUvBackgroundMode::Checker:
-            case Config::ParameterizationUvBackgroundMode::TexelDensity:
-            case Config::ParameterizationUvBackgroundMode::Texture:
+            case ParameterizationUvBackgroundMode::Grid:
+            case ParameterizationUvBackgroundMode::Checker:
+            case ParameterizationUvBackgroundMode::TexelDensity:
+            case ParameterizationUvBackgroundMode::Texture:
                 break;
             default:
                 return false;
@@ -912,12 +912,27 @@ namespace Extrinsic::Runtime
                     Parameterization::ParameterizationStatus::InvalidInput,
                     "Configured parameterization requires engine config state."));
         }
+        const std::optional<ParameterizationConfig> config =
+            GetParameterizationConfig(
+                context.EngineConfigControlState->ActiveConfig);
+        if (!config.has_value())
+        {
+            SandboxEditorParameterizationCommand direct{
+                .StableEntityId = command.StableEntityId,
+            };
+            return PublishResult(
+                context,
+                MakeResult(
+                    direct,
+                    SandboxEditorCommandStatus::InvalidProcessingParameters,
+                    Parameterization::ParameterizationStatus::InvalidInput,
+                    "Configured parameterization is missing its registered config section."));
+        }
         return ApplySandboxEditorParameterizationCommand(
             context,
             SandboxEditorParameterizationCommand{
                 .StableEntityId = command.StableEntityId,
-                .Config = context.EngineConfigControlState->ActiveConfig.Sandbox
-                              .Parameterization,
+                .Config = *config,
             });
     }
 
@@ -947,15 +962,15 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        Config::EngineConfig candidate =
+        Core::Config::EngineConfig candidate =
             context.EngineConfigControlState->ActiveConfig;
-        candidate.Sandbox.Parameterization = command.Config;
+        SetParameterizationConfig(candidate, command.Config);
         result.Preview = context.PreviewEngineConfigDocument(
-            Config::SerializeEngineConfig(candidate),
+            Core::Config::SerializeEngineConfig(candidate),
             command.SourceId.empty()
                 ? std::string{"sandbox.parameterization"}
                 : command.SourceId);
-        if (!Config::IsConfigUsable(result.Preview))
+        if (!Core::Config::IsConfigUsable(result.Preview))
         {
             result.Status =
                 SandboxEditorParameterizationConfigStatus::PreviewRejected;
@@ -982,14 +997,14 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    std::optional<Config::ParameterizationConfig>
+    std::optional<ParameterizationConfig>
     GetSandboxEditorParameterizationConfig(
         const SandboxEditorContext& context) noexcept
     {
         if (context.EngineConfigControlState == nullptr)
             return std::nullopt;
-        return context.EngineConfigControlState->ActiveConfig.Sandbox
-            .Parameterization;
+        return GetParameterizationConfig(
+            context.EngineConfigControlState->ActiveConfig);
     }
 
     SandboxEditorParameterizationViewModel
@@ -999,11 +1014,12 @@ namespace Extrinsic::Runtime
         SandboxEditorParameterizationViewModel model{};
         if (context.EngineConfigControlState != nullptr)
         {
-            const Config::ParameterizationConfig& active =
-                context.EngineConfigControlState->ActiveConfig.Sandbox
-                    .Parameterization;
-            model.Strategy = active.Strategy;
-            model.View = active.View;
+            if (const auto active = GetParameterizationConfig(
+                    context.EngineConfigControlState->ActiveConfig))
+            {
+                model.Strategy = active->Strategy;
+                model.View = active->View;
+            }
         }
         if (context.Scene == nullptr || context.Selection == nullptr)
         {
@@ -1058,7 +1074,7 @@ namespace Extrinsic::Runtime
         model.Triangles.reserve(surfaceIndices.size() / 3u);
         const bool gpuRequested =
             model.View.RenderMode ==
-            Config::ParameterizationUvRenderMode::GpuShaded;
+            ParameterizationUvRenderMode::GpuShaded;
         if (gpuRequested)
             model.LineIndices.reserve(surfaceIndices.size() * 2u);
         for (std::size_t index = 0u;
@@ -1171,21 +1187,21 @@ namespace Extrinsic::Runtime
     {
         const bool gpuRequested =
             model.View.RenderMode ==
-            Config::ParameterizationUvRenderMode::GpuShaded;
+            ParameterizationUvRenderMode::GpuShaded;
         SandboxEditorParameterizationUvViewState fallback{
             .Status = gpuRequested
                 ? SandboxEditorParameterizationUvViewStatus::WaitingForGpuFrame
                 : SandboxEditorParameterizationUvViewStatus::CpuLayout,
             .RequestedMode = model.View.RenderMode,
-            .ActiveMode = Config::ParameterizationUvRenderMode::CpuLayout,
+            .ActiveMode = ParameterizationUvRenderMode::CpuLayout,
             .RequestedBackground = model.View.BackgroundMode,
             .ActiveBackground =
                 model.View.BackgroundMode ==
-                            Config::ParameterizationUvBackgroundMode::Grid ||
+                            ParameterizationUvBackgroundMode::Grid ||
                         model.View.BackgroundMode ==
-                            Config::ParameterizationUvBackgroundMode::Checker
+                            ParameterizationUvBackgroundMode::Checker
                     ? model.View.BackgroundMode
-                    : Config::ParameterizationUvBackgroundMode::Checker,
+                    : ParameterizationUvBackgroundMode::Checker,
             .Width = width,
             .Height = height,
             .Message = gpuRequested

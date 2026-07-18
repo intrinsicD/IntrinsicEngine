@@ -19,8 +19,5 @@ TEST(CoreConfig, EngineDefaults)
     EXPECT_EQ(cfg.Window.Height, 1080);
     EXPECT_TRUE(cfg.Window.Resizable);
 
-    EXPECT_EQ(cfg.Sandbox.ProgressivePoisson.Dimension, 3u);
-    EXPECT_EQ(cfg.Sandbox.ProgressivePoisson.GridWidth, 4u);
-    EXPECT_EQ(cfg.Sandbox.ProgressivePoisson.MaxLevels, 16u);
-    EXPECT_TRUE(cfg.Sandbox.ProgressivePoisson.AutoRunOnEdit);
+    EXPECT_TRUE(cfg.AppSections.empty());
 }

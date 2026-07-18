@@ -1,7 +1,7 @@
 ---
 id: RUNTIME-175
 theme: I
-depends_on: [METHOD-016]
+depends_on: [METHOD-016, CORE-009]
 maturity_target: Operational
 ---
 # RUNTIME-175 — Point-cloud consolidation runtime facade, config lane, and backend adapter
@@ -15,9 +15,11 @@ maturity_target: Operational
 - No GPU compute kernels — those are `METHOD-020`; the GPU job-queue leg here only schedules that path once it exists.
 
 ## Context
-- Owner/layer: `src/runtime` (composition/wiring) plus a config value struct in `src/core` (`Core.Config.Engine`). `runtime -> all lower layers`; `core -> nothing`.
-- Template to mirror: `RUNTIME-134` (progressive-Poisson interactive playground) — the only method wired through the full P3 config lane. It added a `SandboxConfig` value struct, an `EngineConfigControl` hot-subset apply, a runtime command DTO, ECS-property writeback, and a `CpuReference`/`VulkanCompute` backend toggle.
-- Config lane (`AGENTS.md` §5 P3): reference model `Extrinsic.Graphics.RenderRecipeConfig` (schema-id + version + diagnostics, side-effect-free preview→validate→apply). The engine tree is `EngineConfig { …, SandboxConfig }` in `Core.Config.Engine.cppm`; the file lane is `Core.Config.EngineLoad` (schema `intrinsic.core.engine-config`); the runtime facade is `Extrinsic.Runtime.EngineConfigControl` via `Engine::GetConfigControl()`, whose `RuntimeConfigControlSource { Editor, AgentCli, Programmatic }` tag is the co-equal-surfaces mechanism.
+- Owner/layer: `src/runtime` owns composition/wiring and the typed section
+  codec; `src/app/Sandbox` owns registration and presentation.
+  `runtime -> all lower layers`; `app -> runtime` only.
+- Template to mirror: `RUNTIME-134` (progressive-Poisson interactive playground) — the first method wired through the full P3 config lane. CORE-009 migrates that value/config-control path to a registered app section; this task must consume the resulting generic section lane rather than reintroducing an engine-owned Sandbox aggregate.
+- Config lane (`AGENTS.md` §5 P3): reference model `Extrinsic.Graphics.RenderRecipeConfig` (schema-id + version + diagnostics, side-effect-free preview→validate→apply). CORE-009 owns generic named app-section records/registration in `Core.Config.EngineLoad`; the runtime facade remains `Extrinsic.Runtime.EngineConfigControl` via `Engine::GetConfigControl()`, whose `RuntimeConfigControlSource { Editor, AgentCli, Programmatic }` tag is the co-equal-surfaces mechanism.
 - Editor facade pattern: `ApplySandboxEditor<X>Command` in `Runtime.SandboxEditorFacades.cpp` / `Runtime.SandboxMethodFacade.cpp`, reading geometry via `GS::BuildConstView(raw, entity)` (require `Domain::PointCloud`), writing back via `PopulateFromCloud` + `Dirty::MarkVertexPositionsDirty`, wrapped in `EditorCommandHistory` for undo — mirror `ApplySandboxEditorPointCloudOutlierRemovalCommand`.
 - Backend adapter pattern: `Runtime.KMeansBackend` (RHI convenience overload,
   `IsOperational()` gate, honest fallback) plus the Sandbox editor's private
@@ -28,7 +30,10 @@ maturity_target: Operational
 - `ARCH-006` retired the point-cloud presentation into `src/app/Sandbox`; land the runtime seams so the app-owned panel (`UI-035`) consumes them without owning engine state.
 
 ## Control surfaces
-- Config: `EngineConfig.sandbox.point_cloud_consolidation` (strategy, backend, `h`, `mu`, iterations, CLOP component count, EAR edge sensitivity, seed), round-tripped by `Core.Config.EngineLoad` and applied as a hot subset.
+- Config: registered app section `sandbox.point_cloud_consolidation` (strategy,
+  backend, `h`, `mu`, iterations, CLOP component count, EAR edge sensitivity,
+  seed), round-tripped through the generic engine-config section lane and
+  applied as a hot subset.
 - UI: Sandbox editor consolidation panel (owned by `UI-035`) drives the same validated apply path.
 - Agent/CLI: `config/engine.json` + the `--engine-config <path>` boot flag, and programmatic `Engine::GetConfigControl().LoadAndApplyEngineConfigHotSubsetFile(...)` / `ApplyEngineConfigHotSubset(...)` tagged `AgentCli`/`Programmatic`.
 
@@ -36,8 +41,14 @@ maturity_target: Operational
 - Backend axis: CPU adapter + honest fallback lands now on `METHOD-016`; the explicit GPU job-queue leg is gated on `METHOD-020` (`gpu_vulkan_compute`).
 
 ## Required changes
-- [ ] Add a `PointCloudConsolidationConfig` value struct nested in `SandboxConfig` (`Core.Config.Engine.cppm`): plain `enum`/`std::uint32_t`/`double`/`bool` fields for strategy, backend, and the shared/per-strategy parameters; deterministic defaults.
-- [ ] Extend `Core.Config.EngineLoad.cpp` parser/serializer and the schema table (and `docs/architecture/engine-config.md`) to round-trip the new section with diagnostics; add it to the `EngineConfigControl` hot-apply subset.
+- [ ] Add an app-owned `PointCloudConsolidationConfig` value struct and register
+      its schema/default/validator through the generic CORE-009 section lane:
+      plain `enum`/`std::uint32_t`/`double`/`bool` fields for strategy, backend,
+      and the shared/per-strategy parameters; deterministic defaults. Do not
+      add the type or its fields to `Core.Config.Engine`.
+- [ ] Add the runtime-owned section codec/validator and app-owned registration;
+      let generic `Core.Config.EngineLoad` round-trip the opaque payload and
+      generic `EngineConfigControl` report/dispatch the changed stable name.
 - [ ] Add `Runtime.ConsolidationBackend` (module + impl): a `Consolidate(view, params, RHI::IDevice&)` convenience overload gating GPU on `IsOperational()` and falling back to the `Geometry.PointCloud.Consolidation` CPU reference with `RequestedBackend`/`ActualBackend`/`FellBackToCPU` telemetry.
 - [ ] Add `ApplySandboxEditorPointCloudConsolidationCommand` (+ a config-routed `...ConfigCommand`) in the editor facade: read the selected point cloud, run the requested strategy/backend, write the consolidated positions back via `GeometrySources`/`PopulateFromCloud` + `MarkVertexPositionsDirty`, and record an undoable `EditorCommandHistory` entry.
 - [ ] Export a `SandboxEditorPointCloudConsolidationResult` record with stable backend ids (`cpu_reference`/`gpu_vulkan_compute`), display names, CPU-fallback reason, the chosen strategy token, and convergence diagnostics (iterations, converged flag, moved distance) — no raw geometry pointers.
@@ -45,7 +56,10 @@ maturity_target: Operational
 - [ ] Register the runtime seams in the sandbox default policies / module registration so they are reachable from `Engine::Run()`.
 
 ## Tests
-- [ ] `tests/contract/runtime/Test.PointCloudConsolidationConfig.cpp` (`contract;runtime`): the config section round-trips through `Core.Config.EngineLoad` (parse → serialize → parse is stable) and rejects out-of-range values with explicit diagnostics.
+- [ ] `tests/contract/runtime/Test.PointCloudConsolidationConfig.cpp`
+      (`contract;runtime`): the runtime-owned section codec round-trips through
+      the generic engine-config lane (parse → serialize → parse is stable) and
+      rejects out-of-range values with explicit diagnostics.
 - [ ] `tests/contract/runtime/Test.PointCloudConsolidationFacade.cpp` (`contract;runtime`, Null device): `ApplySandboxEditorPointCloudConsolidationCommand` on a selected point cloud updates positions, marks vertices dirty, and is undoable; a `Backend::GPU` request on the Null device reports `FellBackToCPU` with `ActualBackend == cpu_reference`.
 - [ ] Apply-source parity: applying the same document via `Editor`, `AgentCli`, and `Programmatic` sources produces identical results (co-equal surfaces).
 - [ ] Determinism: identical config + input produce identical consolidated output.
@@ -53,7 +67,8 @@ maturity_target: Operational
 ## Docs
 - [ ] Update `docs/architecture/engine-config.md` and `docs/architecture/runtime-config-control.md` with the new section and hot-apply entry.
 - [ ] Add a short runtime-integration note to the three method-package READMEs (`locally_optimal_projection`, `continuous_lop`, `edge_aware_resampling`) pointing at the runtime facade and config path.
-- [ ] Refresh `docs/api/generated/module_inventory.md` for the new runtime/core modules.
+- [ ] Refresh `docs/api/generated/module_inventory.md` for the new runtime/app
+      module surfaces.
 
 ## Acceptance criteria
 - [ ] A selected point cloud is consolidated and visibly updated through the runtime facade under the Null and default backends.

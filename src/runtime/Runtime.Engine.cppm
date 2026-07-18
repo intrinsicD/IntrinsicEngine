@@ -163,7 +163,8 @@ namespace Extrinsic::Runtime
     {
     public:
         Engine(Core::Config::EngineConfig config,
-               std::unique_ptr<IApplication> application);
+               std::unique_ptr<IApplication> application,
+               RuntimeEngineConfigSectionRegistry sectionRegistry = {});
         ~Engine();
 
         Engine(const Engine&)            = delete;
@@ -361,6 +362,7 @@ namespace Extrinsic::Runtime
 
         Core::Config::EngineConfig           m_Config;
         std::unique_ptr<IApplication>        m_Application;
+        RuntimeEngineConfigSectionRegistry m_ConfigSectionRegistry{};
         std::vector<std::unique_ptr<IRuntimeModule>> m_RuntimeModules{};
         std::unique_ptr<Platform::IWindow>   m_Window;
         std::unique_ptr<RHI::IDevice>        m_Device;

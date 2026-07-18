@@ -8,7 +8,7 @@ Root scanned: `src`
 
 | Layer | Module Count |
 |---|---:|
-| `app` | 6 |
+| `app` | 7 |
 | `assets` | 12 |
 | `core` | 41 |
 | `ecs` | 28 |
@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 79 |
+| `runtime` | 80 |
 
 ## Modules
 
@@ -31,6 +31,7 @@ Root scanned: `src`
 | `Extrinsic.Sandbox.Editor.Shell` | `src/app/Sandbox/Editor/Sandbox.EditorShell.cppm` | `app` |
 | `Extrinsic.Sandbox.Editor.MeshProcessingPanels` | `src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cppm` | `app` |
 | `Extrinsic.Sandbox.Editor.MethodPanels` | `src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm` | `app` |
+| `Extrinsic.Sandbox.ConfigSections` | `src/app/Sandbox/Sandbox.ConfigSections.cppm` | `app` |
 | `Extrinsic.Sandbox` | `src/app/Sandbox/Sandbox.cppm` | `app` |
 | `Extrinsic.Asset.EventBus` | `src/assets/Asset.EventBus.cppm` | `assets` |
 | `Extrinsic.Asset.GeometryIOBridge` | `src/assets/Asset.GeometryIOBridge.cppm` | `assets` |
@@ -394,6 +395,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderArtifactPublication` | `src/runtime/Runtime.RenderArtifactPublication.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderWorldPool` | `src/runtime/Runtime.RenderWorldPool.cppm` | `runtime` |
+| `Extrinsic.Runtime.SandboxConfigSections` | `src/runtime/Runtime.SandboxConfigSections.cppm` | `runtime` |
 | `Extrinsic.Runtime.SandboxDefaultPolicies` | `src/runtime/Runtime.SandboxDefaultPolicies.cppm` | `runtime` |
 | `Extrinsic.Runtime.SandboxEditorFacades` | `src/runtime/Runtime.SandboxEditorFacades.cppm` | `runtime` |
 | `Extrinsic.Runtime.SceneDocument` | `src/runtime/Runtime.SceneDocument.cppm` | `runtime` |
@@ -413,4 +415,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **386**
+Total modules: **388**

@@ -77,6 +77,7 @@ import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RegistrationAlignment;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderArtifactPublication;
+import Extrinsic.Runtime.SandboxConfigSections;
 import Extrinsic.Runtime.SceneDocument;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
@@ -2209,69 +2210,69 @@ namespace Extrinsic::Runtime
     }
 
     SandboxEditorProgressivePoissonChannel MakeSandboxEditorProgressivePoissonChannel(
-        const Core::Config::ProgressivePoissonPlaygroundChannel channel) noexcept
+        const ProgressivePoissonPlaygroundChannel channel) noexcept
     {
         switch (channel)
         {
-        case Core::Config::ProgressivePoissonPlaygroundChannel::Level:
+        case ProgressivePoissonPlaygroundChannel::Level:
             return SandboxEditorProgressivePoissonChannel::Level;
-        case Core::Config::ProgressivePoissonPlaygroundChannel::Phase:
+        case ProgressivePoissonPlaygroundChannel::Phase:
             return SandboxEditorProgressivePoissonChannel::Phase;
-        case Core::Config::ProgressivePoissonPlaygroundChannel::SplatRadius:
+        case ProgressivePoissonPlaygroundChannel::SplatRadius:
             return SandboxEditorProgressivePoissonChannel::SplatRadius;
-        case Core::Config::ProgressivePoissonPlaygroundChannel::PrefixVisible:
+        case ProgressivePoissonPlaygroundChannel::PrefixVisible:
             return SandboxEditorProgressivePoissonChannel::PrefixVisible;
         }
         return SandboxEditorProgressivePoissonChannel::Level;
     }
 
-    Core::Config::ProgressivePoissonPlaygroundChannel
-    MakeCoreProgressivePoissonPlaygroundChannel(
+    ProgressivePoissonPlaygroundChannel
+    MakeProgressivePoissonPlaygroundChannel(
         const SandboxEditorProgressivePoissonChannel channel) noexcept
     {
         switch (channel)
         {
         case SandboxEditorProgressivePoissonChannel::Level:
-            return Core::Config::ProgressivePoissonPlaygroundChannel::Level;
+            return ProgressivePoissonPlaygroundChannel::Level;
         case SandboxEditorProgressivePoissonChannel::Phase:
-            return Core::Config::ProgressivePoissonPlaygroundChannel::Phase;
+            return ProgressivePoissonPlaygroundChannel::Phase;
         case SandboxEditorProgressivePoissonChannel::SplatRadius:
-            return Core::Config::ProgressivePoissonPlaygroundChannel::SplatRadius;
+            return ProgressivePoissonPlaygroundChannel::SplatRadius;
         case SandboxEditorProgressivePoissonChannel::PrefixVisible:
-            return Core::Config::ProgressivePoissonPlaygroundChannel::PrefixVisible;
+            return ProgressivePoissonPlaygroundChannel::PrefixVisible;
         }
-        return Core::Config::ProgressivePoissonPlaygroundChannel::Level;
+        return ProgressivePoissonPlaygroundChannel::Level;
     }
 
     SandboxEditorProgressivePoissonBackend MakeSandboxEditorProgressivePoissonBackend(
-        const Core::Config::ProgressivePoissonPlaygroundBackend backend) noexcept
+        const ProgressivePoissonPlaygroundBackend backend) noexcept
     {
         switch (backend)
         {
-        case Core::Config::ProgressivePoissonPlaygroundBackend::CpuReference:
+        case ProgressivePoissonPlaygroundBackend::CpuReference:
             return SandboxEditorProgressivePoissonBackend::CpuReference;
-        case Core::Config::ProgressivePoissonPlaygroundBackend::VulkanCompute:
+        case ProgressivePoissonPlaygroundBackend::VulkanCompute:
             return SandboxEditorProgressivePoissonBackend::VulkanCompute;
         }
         return SandboxEditorProgressivePoissonBackend::CpuReference;
     }
 
-    Core::Config::ProgressivePoissonPlaygroundBackend
-    MakeCoreProgressivePoissonPlaygroundBackend(
+    ProgressivePoissonPlaygroundBackend
+    MakeProgressivePoissonPlaygroundBackend(
         const SandboxEditorProgressivePoissonBackend backend) noexcept
     {
         switch (backend)
         {
         case SandboxEditorProgressivePoissonBackend::CpuReference:
-            return Core::Config::ProgressivePoissonPlaygroundBackend::CpuReference;
+            return ProgressivePoissonPlaygroundBackend::CpuReference;
         case SandboxEditorProgressivePoissonBackend::VulkanCompute:
-            return Core::Config::ProgressivePoissonPlaygroundBackend::VulkanCompute;
+            return ProgressivePoissonPlaygroundBackend::VulkanCompute;
         }
-        return Core::Config::ProgressivePoissonPlaygroundBackend::CpuReference;
+        return ProgressivePoissonPlaygroundBackend::CpuReference;
     }
 
     SandboxEditorProgressivePoissonConfig MakeSandboxEditorProgressivePoissonConfig(
-        const Core::Config::ProgressivePoissonPlaygroundConfig& config) noexcept
+        const ProgressivePoissonPlaygroundConfig& config) noexcept
     {
         return SandboxEditorProgressivePoissonConfig{
             .Dimension = config.Dimension,
@@ -2295,12 +2296,12 @@ namespace Extrinsic::Runtime
         };
     }
 
-    Core::Config::ProgressivePoissonPlaygroundConfig
-    MakeCoreProgressivePoissonPlaygroundConfig(
+    ProgressivePoissonPlaygroundConfig
+    MakeProgressivePoissonPlaygroundConfig(
         const SandboxEditorProgressivePoissonConfig& config,
-        const Core::Config::ProgressivePoissonPlaygroundConfig& defaults) noexcept
+        const ProgressivePoissonPlaygroundConfig& defaults) noexcept
     {
-        Core::Config::ProgressivePoissonPlaygroundConfig out = defaults;
+        ProgressivePoissonPlaygroundConfig out = defaults;
         out.Dimension = config.Dimension;
         out.GridWidth = config.GridWidth;
         out.MaxLevels = config.MaxLevels;
@@ -2311,8 +2312,8 @@ namespace Extrinsic::Runtime
         out.ShuffleWithinLevels = config.ShuffleWithinLevels;
         out.ShuffleSeed = config.ShuffleSeed;
         out.PrefixCount = config.PrefixCount;
-        out.Channel = MakeCoreProgressivePoissonPlaygroundChannel(config.Channel);
-        out.Backend = MakeCoreProgressivePoissonPlaygroundBackend(config.Backend);
+        out.Channel = MakeProgressivePoissonPlaygroundChannel(config.Channel);
+        out.Backend = MakeProgressivePoissonPlaygroundBackend(config.Backend);
         out.MeshSurfaceSampleCount = config.MeshSurfaceSampleCount;
         out.MeshSurfaceSampleSeed = config.MeshSurfaceSampleSeed;
         out.MeshSurfaceMinTriangleArea = config.MeshSurfaceMinTriangleArea;
@@ -2797,10 +2798,12 @@ namespace Extrinsic::Runtime
 
         Core::Config::EngineConfig candidate =
             context.EngineConfigControlState->ActiveConfig;
-        candidate.Sandbox.ProgressivePoisson =
-            MakeCoreProgressivePoissonPlaygroundConfig(
-                command.Config,
-                candidate.Sandbox.ProgressivePoisson);
+        const ProgressivePoissonPlaygroundConfig current =
+            GetProgressivePoissonPlaygroundConfig(candidate).value_or(
+                ProgressivePoissonPlaygroundConfig{});
+        SetProgressivePoissonPlaygroundConfig(
+            candidate,
+            MakeProgressivePoissonPlaygroundConfig(command.Config, current));
         const std::string document =
             Core::Config::SerializeEngineConfig(candidate);
         const std::string sourceId = command.SourceId.empty()
@@ -2844,9 +2847,11 @@ namespace Extrinsic::Runtime
     {
         if (context.EngineConfigControlState == nullptr)
             return std::nullopt;
-        return MakeSandboxEditorProgressivePoissonConfig(
-            context.EngineConfigControlState->ActiveConfig.Sandbox
-                .ProgressivePoisson);
+        const auto config = GetProgressivePoissonPlaygroundConfig(
+            context.EngineConfigControlState->ActiveConfig);
+        if (!config.has_value())
+            return std::nullopt;
+        return MakeSandboxEditorProgressivePoissonConfig(*config);
     }
 
 

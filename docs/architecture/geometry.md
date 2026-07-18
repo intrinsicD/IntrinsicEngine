@@ -485,13 +485,14 @@ requested-versus-actual telemetry enter only with the tasks that own a real
 second implementation, at the applicable strategy or RHI-visible runtime
 boundary.
 
-The runtime config boundary is
-`EngineConfig.sandbox.parameterization`. It serializes `lscm`,
-`harmonic_cotangent`, `tutte_uniform`, and `bff`, with nested typed LSCM,
-harmonic, and BFF values. `EngineConfigControl` treats that block as an
-additive schema-v1 hot subset, and the configured sandbox facade consumes the
-same validated state used by config-file, agent/CLI, editor, and programmatic
-callers. The facade writes successful UVs to the selected mesh's `v:texcoord`
+The runtime config boundary is the registered
+`sandbox.parameterization` record in `EngineConfig::AppSections`. Its runtime
+codec serializes `lscm`, `harmonic_cotangent`, `tutte_uniform`, and `bff`, with
+nested typed LSCM, harmonic, and BFF values. `EngineConfigControl` treats the
+canonical record as a live application section, and the configured sandbox
+facade consumes the same validated state used by config-file, agent/CLI,
+editor, and programmatic callers. The facade writes successful UVs to the
+selected mesh's `v:texcoord`
 property with undo/redo support and exposes a pointer-free CPU view model of
 UVs, triangle/line indices, finite bounds, aggregate diagnostics, and the
 canonical face-aligned conformal distortion projected into rendered-triangle

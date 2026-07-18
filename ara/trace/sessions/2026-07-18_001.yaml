@@ -2,9 +2,9 @@ session:
   id: "2026-07-18_001"
   date: "2026-07-18"
   started: "2026-07-18T10:10+02:00"
-  last_turn: "2026-07-18T18:48+02:00"
-  turn_count: 4
-  summary: "Completed the classification-first CI stack, calibrated and routed Release confidence, refreshed two repository-native research skills, retired every process backlog task, passed the canonical CORE-005 sanitizer gates, and independently audited CORE-008's paired plan-reuse evidence."
+  last_turn: "2026-07-18T20:08+02:00"
+  turn_count: 6
+  summary: "Completed the classification-first CI stack, calibrated and routed Release confidence, refreshed two repository-native research skills, retired every process backlog task, passed the canonical CORE-005 sanitizer gates, audited CORE-008's paired plan-reuse evidence, and verified CORE-009's generic Core plus typed Runtime/Sandbox config-section integration."
 
 events_logged:
   - turn: 1
@@ -73,6 +73,18 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Recomputed and bounded the five-pair CORE-008 plan-reuse effects, verified exact work/correctness counters, and strictly validated all 250 result payloads."
+  - turn: 5
+    type: experiment
+    id: "N264"
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented and verified CORE-009's generic Core config-section record, registry, fail-closed parser, and stable serializer."
+  - turn: 6
+    type: experiment
+    id: "N265"
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented and verified CORE-009's typed Runtime codecs, validators, section helpers, facade migration, and Null Sandbox integration."
 
 ai_actions:
   - turn: 1
@@ -132,6 +144,27 @@ ai_actions:
       - "ara/trace/sessions/2026-07-18_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
       - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 5
+    action: "Implemented the CORE-009 Core record/registry/parser contract, replaced method-specific Core tests with generic section tests, and ran focused builds, 263 Core wrapper tests, and strict layering."
+    provenance: ai-executed
+    files_changed:
+      - "src/core/Core.Config.Engine.cppm"
+      - "src/core/Core.Config.EngineLoad.cppm"
+      - "src/core/Core.Config.EngineLoad.cpp"
+      - "tests/unit/core/Test.Core.Config.cpp"
+      - "tests/unit/core/Test.Core.EngineConfigLoad.cpp"
+  - turn: 6
+    action: "Implemented the CORE-009 Runtime-owned Progressive Poisson and parameterization section module, migrated runtime facades and focused contracts, and ran the final ci-fast build plus 42 focused runtime tests."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.SandboxConfigSections.cppm"
+      - "src/runtime/Runtime.SandboxConfigSections.cpp"
+      - "src/runtime/Runtime.SandboxEditorFacades.cppm"
+      - "src/runtime/Runtime.SandboxMethodFacade.cpp"
+      - "src/runtime/Runtime.SandboxParameterizationFacade.cpp"
+      - "tests/contract/runtime/Test.ParameterizationFacade.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp"
 
 claims_touched: []
 
@@ -140,6 +173,10 @@ key_context:
     excerpt: "The user required CI pipeline fixes first so unnecessary testing would not extend completion time, then task-scoped commits until every process task retired."
   - turn: 4
     excerpt: "The CORE-008 report must preserve baseline/candidate binary identity, five balanced pairs, all-result strict validation, exact work/correctness counters, cold SLO values, limitations, and reproduction."
+  - turn: 5
+    excerpt: "CORE-009 removes app/method config knowledge from Core and requires invalid generic sections to retain registered reference values."
+  - turn: 6
+    excerpt: "CORE-009 preserves the former typed Sandbox defaults, tokens, field bounds, and per-field fallback semantics while moving their ownership and live consumers into Runtime."
 
 open_threads:
   - "An owner may externalize the candidate stable contexts through branch protection, rulesets, or a merge queue; none is currently configured."
@@ -150,6 +187,7 @@ open_threads:
   - "Keep Issue 445 candidates gated behind REVIEW-003 until its architecture-stability and right-sizing audit passes."
   - "Recover provenance and redistribution rights before publishing the excluded local model datasets."
   - "Land the bounded CORE-008 benchmark report with the task's final verification and retirement evidence."
+  - "Finish CORE-009 documentation, full CPU verification, and task retirement."
 
 ai_suggestions_pending:
   - "Let StructSplat and Prospect owners merge the pushed refresh branches through each repository's normal integration policy."

@@ -25,9 +25,12 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.SandboxConfigSections;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Sandbox.ConfigSections;
 import Extrinsic.Sandbox.Editor.MethodPanels;
 import Extrinsic.Sandbox.Editor.Shell;
 import Geometry.HalfedgeMesh;
@@ -38,6 +41,7 @@ namespace Config = Extrinsic::Core::Config;
 namespace ECS = Extrinsic::ECS;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 namespace Runtime = Extrinsic::Runtime;
+namespace Sandbox = Extrinsic::Sandbox;
 namespace SandboxEditor = Extrinsic::Sandbox::Editor;
 
 namespace
@@ -103,10 +107,14 @@ namespace
         Runtime::SelectionController Selection{};
         Runtime::EditorCommandHistory History{};
         Runtime::SandboxEditorSelectedModelCache ModelCache{};
-        Config::EngineConfig ActiveConfig{};
+        Runtime::EngineConfigSectionRegistry SectionRegistry{
+            Sandbox::CreateSandboxConfigSectionRegistry()};
+        Config::EngineConfig ActiveConfig{
+            Runtime::CreateReferenceEngineConfig(SectionRegistry)};
         Runtime::EngineConfigControl ConfigControl{
             Runtime::EngineConfigControlDependencies{
                 .Config = &ActiveConfig,
+                .SectionRegistry = &SectionRegistry,
             }};
         ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
         std::uint32_t StableEntityId{0u};
@@ -206,7 +214,7 @@ TEST(SandboxParameterizationPanel, RegistrationIsStableAndIdempotent)
 
 TEST(SandboxParameterizationPanel, StrategiesAndTypedRequestAreExact)
 {
-    using Strategy = Config::ParameterizationStrategyKind;
+    using Strategy = Runtime::ParameterizationStrategyKind;
     constexpr std::array expectedStrategies{
         Strategy::Lscm,
         Strategy::HarmonicCotangent,
@@ -228,7 +236,7 @@ TEST(SandboxParameterizationPanel, StrategiesAndTypedRequestAreExact)
             expectedTokens[index]);
     }
 
-    Config::ParameterizationConfig config{};
+    Runtime::ParameterizationConfig config{};
     config.Strategy = Strategy::Bff;
     config.Lscm.AutoPins = false;
     config.Lscm.PinVertex0 = 2u;
@@ -238,19 +246,19 @@ TEST(SandboxParameterizationPanel, StrategiesAndTypedRequestAreExact)
     config.Lscm.SolverTolerance = 2.5e-7;
     config.Lscm.MaxSolverIterations = 1234u;
     config.Harmonic.Boundary =
-        Config::ParameterizationBoundaryPolicy::Custom;
+        Runtime::ParameterizationBoundaryPolicy::Custom;
     config.Harmonic.ArcLengthSpacing = false;
     config.Harmonic.ClampNonConvexWeights = false;
     config.Harmonic.PinnedVertices = {1u, 5u};
     config.Harmonic.PinnedUvs = {{0.1, 0.2}, {0.8, 0.9}};
     config.Bff.Mode =
-        Config::ParameterizationBffBoundaryMode::TargetLengths;
+        Runtime::ParameterizationBffBoundaryMode::TargetLengths;
     config.Bff.BoundaryData = {1.0, 2.0, 3.0};
     config.Bff.AngleSumTolerance = 3.0e-8;
     config.Bff.DegeneracyTolerance = 4.0e-11;
-    config.View.RenderMode = Config::ParameterizationUvRenderMode::GpuShaded;
+    config.View.RenderMode = Runtime::ParameterizationUvRenderMode::GpuShaded;
     config.View.BackgroundMode =
-        Config::ParameterizationUvBackgroundMode::Texture;
+        Runtime::ParameterizationUvBackgroundMode::Texture;
     config.View.ShowDistortionHeatmap = true;
 
     const auto request =
@@ -429,7 +437,7 @@ TEST(SandboxParameterizationPanel, ResultSummaryCarriesAggregateDiagnostics)
 {
     Runtime::SandboxEditorParameterizationResult result{};
     result.Status = Runtime::SandboxEditorCommandStatus::Applied;
-    result.Strategy = Config::ParameterizationStrategyKind::TutteUniform;
+    result.Strategy = Runtime::ParameterizationStrategyKind::TutteUniform;
     result.StrategyToken = "tutte_uniform";
     result.ParameterizationStatus =
         Geometry::Parameterization::ParameterizationStatus::Success;
@@ -471,8 +479,8 @@ TEST(SandboxParameterizationPanel, ResultSummaryCarriesAggregateDiagnostics)
 TEST(SandboxParameterizationPanel, RealWindowAndTypedActionAreOperational)
 {
     ParameterizationPanelHarness harness{};
-    Config::ParameterizationConfig config{};
-    config.Strategy = Config::ParameterizationStrategyKind::TutteUniform;
+    Runtime::ParameterizationConfig config{};
+    config.Strategy = Runtime::ParameterizationStrategyKind::TutteUniform;
     const SandboxEditor::SandboxParameterizationPanelActionResult action =
         SandboxEditor::ApplySandboxParameterizationPanelAction(
             harness.Context,
@@ -481,7 +489,7 @@ TEST(SandboxParameterizationPanel, RealWindowAndTypedActionAreOperational)
     ASSERT_TRUE(action.Succeeded());
     ASSERT_TRUE(action.Execution.has_value());
     EXPECT_EQ(action.Execution->Strategy,
-              Config::ParameterizationStrategyKind::TutteUniform);
+              Runtime::ParameterizationStrategyKind::TutteUniform);
     EXPECT_TRUE(harness.HasFiniteUvs());
     EXPECT_TRUE(harness.History.CanUndo());
 

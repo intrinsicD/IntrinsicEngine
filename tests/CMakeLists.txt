@@ -360,6 +360,7 @@ if(TARGET ExtrinsicSandboxEditor)
         SEARCH_DIRS integration/runtime
         FILES
             Test.SandboxDomainPanels.cpp
+            Test.SandboxConfigSections.cpp
             Test.SandboxEditorPresentation.cpp
             Test.SandboxParameterizationPanel.cpp
     )

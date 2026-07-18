@@ -87,8 +87,10 @@ import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
+import Extrinsic.Runtime.SandboxConfigSections;
 import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Sandbox.ConfigSections;
 import Extrinsic.Sandbox.Editor.MethodPanels;
 import Extrinsic.Sandbox.Editor.Shell;
 import Geometry.Properties;
@@ -766,10 +768,14 @@ struct AcceptanceBootstrap
         };
     }
 
-    auto config = Extrinsic::Runtime::CreateReferenceEngineConfig();
+    auto sectionRegistry =
+        Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry();
+    auto config =
+        Extrinsic::Runtime::CreateReferenceEngineConfig(sectionRegistry);
     auto enginePtr = std::make_unique<Engine>(
         config,
-        std::make_unique<SandboxDefaultPolicyApp>(std::move(app)));
+        std::make_unique<SandboxDefaultPolicyApp>(std::move(app)),
+        std::move(sectionRegistry));
     enginePtr->Initialize();
 
     const auto initInputs = GetVulkanDeviceOperationalInputs(&enginePtr->GetDevice());
@@ -1349,11 +1355,18 @@ public:
     void OnInitialize(Engine& engine) override
     {
         Config::EngineConfig candidate = engine.GetEngineConfig();
-        candidate.Sandbox.Parameterization.View.RenderMode =
-            Config::ParameterizationUvRenderMode::GpuShaded;
-        candidate.Sandbox.Parameterization.View.BackgroundMode =
-            Config::ParameterizationUvBackgroundMode::Checker;
-        candidate.Sandbox.Parameterization.View.ShowDistortionHeatmap = false;
+        auto parameterization =
+            RT::GetParameterizationConfig(candidate);
+        if (!parameterization.has_value())
+        {
+            return;
+        }
+        parameterization->View.RenderMode =
+            RT::ParameterizationUvRenderMode::GpuShaded;
+        parameterization->View.BackgroundMode =
+            RT::ParameterizationUvBackgroundMode::Checker;
+        parameterization->View.ShowDistortionHeatmap = false;
+        RT::SetParameterizationConfig(candidate, *parameterization);
 
         RT::EngineConfigControl& configControl = engine.GetConfigControl();
         const Config::EngineConfigLoadResult preview =
@@ -1371,16 +1384,17 @@ public:
             m_State->ConfigAppliedFromAgentCli =
                 apply.Source == RT::RuntimeConfigControlSource::AgentCli;
             m_State->ParameterizationConfigChanged =
-                apply.SandboxParameterizationChanged;
-            const Config::ParameterizationViewConfig& activeView =
-                configControl.GetEngineConfigControlState()
-                    .ActiveConfig.Sandbox.Parameterization.View;
+                apply.SectionChanged(RT::kParameterizationConfigSectionName);
+            const auto active =
+                RT::GetParameterizationConfig(
+                    configControl.GetEngineConfigControlState().ActiveConfig);
             m_State->ActiveConfigMatchesRequest =
-                activeView.RenderMode ==
-                    Config::ParameterizationUvRenderMode::GpuShaded &&
-                activeView.BackgroundMode ==
-                    Config::ParameterizationUvBackgroundMode::Checker &&
-                !activeView.ShowDistortionHeatmap;
+                active.has_value() &&
+                active->View.RenderMode ==
+                    RT::ParameterizationUvRenderMode::GpuShaded &&
+                active->View.BackgroundMode ==
+                    RT::ParameterizationUvBackgroundMode::Checker &&
+                !active->View.ShowDistortionHeatmap;
         }
 
         const EntityHandle triangle =
@@ -1756,10 +1770,13 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         << "The contributed mesh.processing.parameterize_uv window did not open.";
     const RT::RuntimeEngineConfigControlState& configState =
         engine.GetConfigControl().GetEngineConfigControlState();
-    EXPECT_EQ(configState.ActiveConfig.Sandbox.Parameterization.View.RenderMode,
-              Config::ParameterizationUvRenderMode::GpuShaded);
-    EXPECT_EQ(configState.ActiveConfig.Sandbox.Parameterization.View.BackgroundMode,
-              Config::ParameterizationUvBackgroundMode::Checker);
+    const auto activeParameterization =
+        RT::GetParameterizationConfig(configState.ActiveConfig);
+    ASSERT_TRUE(activeParameterization.has_value());
+    EXPECT_EQ(activeParameterization->View.RenderMode,
+              RT::ParameterizationUvRenderMode::GpuShaded);
+    EXPECT_EQ(activeParameterization->View.BackgroundMode,
+              RT::ParameterizationUvBackgroundMode::Checker);
     EXPECT_TRUE(configState.HasLastApply);
     EXPECT_EQ(configState.LastApply.Source,
               RT::RuntimeConfigControlSource::AgentCli);

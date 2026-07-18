@@ -3,7 +3,9 @@
 `Extrinsic.Runtime.EngineConfigControl` owns the live config-control facade for
 non-ImGui callers and the Sandbox Editor. `Engine` constructs the subsystem,
 keeps ownership of the active `EngineConfig` value, and exposes the facade
-through `Engine::GetConfigControl()`. The facade is a set of typed subsystem
+through `Engine::GetConfigControl()`. The Engine also owns the application
+section registry created before boot and lends the same stable registry to
+preview, file load, and live apply. The facade is a set of typed subsystem
 methods and DTOs, not a command bus.
 
 ## Entry Points
@@ -38,8 +40,7 @@ Engine-config control:
 The live engine-config fields in the current subset are:
 
 - `render.default_recipe_config_path`
-- `sandbox.progressive_poisson`
-- `sandbox.parameterization`
+- registered `app.sections` records
 
 Applying a non-empty path first loads and validates the referenced render recipe
 file. Only a usable recipe result reaches
@@ -48,14 +49,17 @@ rejects the engine-config hot apply without clearing a previously active recipe
 override. Applying an empty path clears the active override and returns to the
 derived default frame recipe.
 
-The sandbox progressive-Poisson block carries the interactive playground's
+`Extrinsic.Runtime.SandboxConfigSections` owns the typed codecs for the current
+two Sandbox records; `Extrinsic.Sandbox.ConfigSections` composes their
+registrations in the application before config boot. The
+`sandbox.progressive_poisson` payload carries the interactive playground's
 reference-sampler knobs, prefix/color-channel selection, mesh surface-sampling
 input controls, and auto-run debounce settings. Applying it updates only the
-active value-type `EngineConfig`; the Sandbox Editor consumes that state and
+active generic record; the Sandbox Editor decodes that state and
 drives METHOD-012 through its runtime command surface. The block has no renderer
 side effects and no direct RHI/device traffic.
 
-The sandbox parameterization block carries one of the implemented CPU strategy
+The `sandbox.parameterization` payload carries one of the implemented CPU strategy
 tokens (`lscm`, `harmonic_cotangent`, `tutte_uniform`, or `bff`) and the typed
 LSCM, harmonic, and BFF values described in
 [engine config](engine-config.md). Harmonic boundary policy uses `circle`,
@@ -63,12 +67,20 @@ LSCM, harmonic, and BFF values described in
 `target_lengths`, or `target_angles`. Its nested `view` value also carries the
 `cpu_layout`/`gpu_shaded` presentation request, background choice, and
 distortion-heatmap toggle. Applying the block updates only the active value-type
-`EngineConfig` and sets
-`RuntimeEngineConfigApplyResult::SandboxParameterizationChanged` when its value
-changed. The configured sandbox parameterization command reads this same live
-state; the parameterization editor reads the same view state when it submits the
-optional renderer request. There is no second UI-only parameter path, and the
-GPU view selector is not a parameterization solver-backend selector.
+record. The configured sandbox parameterization command reads this same live
+state through `GetParameterizationConfig`; the parameterization editor reads
+the same view state when it submits the optional renderer request. There is no
+second UI-only parameter path, and the GPU view selector is not a
+parameterization solver-backend selector.
+
+Section records are compared by canonical name/schema/version/payload.
+`RuntimeEngineConfigApplyResult::ChangedSectionNames` is lexically ordered and
+`SectionChanged(name)` queries it. Apply first rejects boot-only differences
+and preflights a changed render-recipe path. It then commits the recipe path
+and complete section vector, records the live snapshot/result, and invokes each
+changed registration's optional callback exactly once. Callbacks are
+non-failing post-commit notifications and must not re-enter config control.
+Preview, rejected, and no-change operations invoke none.
 
 Every other engine-config difference is boot-only and is reported in
 `RuntimeEngineConfigApplyResult::RejectedBootOnlyFields`; the live config remains
@@ -90,12 +102,14 @@ activation handlers call the same facade callbacks carried by that context:
 - progressive-Poisson knob edits route to
   `Engine::GetConfigControl().PreviewEngineConfigControlDocument` and
   `Engine::GetConfigControl().ApplyEngineConfigHotSubset` with
-  `RuntimeConfigControlSource::Editor`.
+  `RuntimeConfigControlSource::Editor`; the facade updates the typed draft
+  through `SetProgressivePoissonPlaygroundConfig`.
 - The parameterization panel delivered by retired `UI-036` routes strategy,
   value, render-mode, background, and heatmap edits through those same
   engine-config preview/apply methods with
-  `RuntimeConfigControlSource::Editor`; the configured parameterization facade
-  and UV-view request path consume the resulting live config.
+  `RuntimeConfigControlSource::Editor` after
+  `SetParameterizationConfig`; the configured parameterization facade and
+  UV-view request path consume the resulting live config.
 
 Agent/CLI callers use the same `EngineConfigControl` methods with
 `RuntimeConfigControlSource::AgentCli` or
@@ -106,9 +120,9 @@ does not require any ImGui frame.
 
 `Extrinsic.Runtime.SandboxEditorFacades` exposes the CPU parameterization
 operation through the existing editor/session context. The direct command
-accepts a typed `Core::Config::ParameterizationConfig` and fails closed on
+accepts a typed `Runtime::ParameterizationConfig` and fails closed on
 invalid values; the configured command reads
-`EngineConfig.sandbox.parameterization`, so editor, agent/CLI, and
+the registered `sandbox.parameterization` record, so editor, agent/CLI, and
 programmatic applies drive identical strategy conversion and geometry
 execution. Stable config tokens are converted at the runtime boundary to the
 typed `Geometry.Parameterization` variant. Runtime does not serialize variant

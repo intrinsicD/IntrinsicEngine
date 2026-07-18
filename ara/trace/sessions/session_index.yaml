@@ -127,8 +127,8 @@ sessions:
     open_threads: 17
   - id: "2026-07-18_001"
     date: "2026-07-18"
-    summary: "Completed the classification-first CI stack, calibrated and routed Release confidence, refreshed two repository-native research skills, retired every process backlog task, passed the canonical CORE-005 sanitizer gates, and independently audited CORE-008's paired plan-reuse evidence."
-    turn_count: 4
-    events_count: 11
+    summary: "Completed the classification-first CI stack, calibrated and routed Release confidence, refreshed two repository-native research skills, retired every process backlog task, passed the canonical CORE-005 sanitizer gates, audited CORE-008's paired plan-reuse evidence, and verified CORE-009's generic Core plus typed Runtime/Sandbox config-section integration."
+    turn_count: 6
+    events_count: 13
     claims_touched: []
-    open_threads: 8
+    open_threads: 9

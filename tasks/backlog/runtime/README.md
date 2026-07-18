@@ -241,12 +241,14 @@ ported algorithms are retired `UI-024`/`UI-025`/`UI-026` under the UI backlog.
 
 - [`RUNTIME-175 — Point-cloud consolidation runtime facade, config lane, and backend adapter`](RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
   is the engine-integration leaf for the LOP consolidation method family
-  (`methods/METHOD-016..020`): a `PointCloudConsolidationConfig` section in the
-  `Core.Config.Engine` tree, an `EngineConfigControl` hot-apply path, the
+  (`methods/METHOD-016..020`): an app-owned
+  `sandbox.point_cloud_consolidation` section on the generic CORE-009 config
+  lane, an `EngineConfigControl` hot-apply path, the
   `ApplySandboxEditorPointCloudConsolidationCommand` editor facade with
   `GeometrySources` writeback, and the `Runtime.ConsolidationBackend` RHI
   fallback adapter. Gated on `methods/METHOD-016`; the GPU job-queue leg is
-  gated on `methods/METHOD-020`. Mirrors the retired `RUNTIME-134`
+  gated on `methods/METHOD-020`. Gated on `CORE-009` for the section substrate
+  and on `methods/METHOD-016` for the algorithm. Mirrors retired `RUNTIME-134`
   progressive-Poisson playground; the Sandbox panel is `ui/UI-035`; coordinate
   with the app-owned editor structure retired by `ARCH-006`.
 
@@ -257,8 +259,8 @@ ported algorithms are retired `UI-024`/`UI-025`/`UI-026` under the UI backlog.
   `tasks/done/RUNTIME-176-parameterization-runtime-config-integration.md`.
   It delivered the engine-integration leaf for the parameterization method
   family (`methods/METHOD-021..026` on the retired `geometry/GEOM-063` typed
-  CPU strategy surface): a
-  `ParameterizationConfig` section in the `Core.Config.Engine` tree, an
+  CPU strategy surface): a typed parameterization section subsequently moved
+  by CORE-009 onto the generic app-section lane, an
   `EngineConfigControl` hot-apply path, the
   `ApplySandboxEditorParameterizationCommand` editor facade writing UVs back as
   `v:texcoord` via `GeometrySources`, plus a pointer-free

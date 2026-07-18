@@ -77,6 +77,7 @@ import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.SandboxConfigSections;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneSerialization;
@@ -337,20 +338,20 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
                 .StableEntityId = 7u,
                 .Width = 320u,
                 .Height = 180u,
-                .View = Core::Config::ParameterizationViewConfig{
+                .View = Runtime::ParameterizationViewConfig{
                     .RenderMode =
-                        Core::Config::ParameterizationUvRenderMode::GpuShaded,
+                        Runtime::ParameterizationUvRenderMode::GpuShaded,
                     .BackgroundMode =
-                        Core::Config::ParameterizationUvBackgroundMode::Texture,
+                        Runtime::ParameterizationUvBackgroundMode::Texture,
                 },
             });
     EXPECT_EQ(
         staleUvState.Status,
         Runtime::SandboxEditorParameterizationUvViewStatus::CpuFallbackNonOperational);
     EXPECT_EQ(staleUvState.ActiveMode,
-              Core::Config::ParameterizationUvRenderMode::CpuLayout);
+              Runtime::ParameterizationUvRenderMode::CpuLayout);
     EXPECT_EQ(staleUvState.ActiveBackground,
-              Core::Config::ParameterizationUvBackgroundMode::Checker);
+              Runtime::ParameterizationUvBackgroundMode::Checker);
     EXPECT_EQ(staleUvState.RequestToken, 91u);
     EXPECT_FALSE(staleUvState.GpuReady);
     EXPECT_NE(staleUvState.Message.find("attachment expired"),

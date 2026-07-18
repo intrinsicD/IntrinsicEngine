@@ -30,6 +30,7 @@ module Extrinsic.Runtime.Engine;
 #if defined(EXTRINSIC_RUNTIME_HAS_PROMOTED_VULKAN)
 import Extrinsic.Backends.Vulkan;
 #endif
+import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
@@ -369,17 +370,23 @@ namespace Extrinsic::Runtime
     }
 
     Engine::Engine(Core::Config::EngineConfig config,
-                   std::unique_ptr<IApplication> application)
+                   std::unique_ptr<IApplication> application,
+                   RuntimeEngineConfigSectionRegistry sectionRegistry)
         : m_Config(std::move(config))
         , m_Application(std::move(application))
+        , m_ConfigSectionRegistry(std::move(sectionRegistry))
         , m_ImGuiEditorBridge(std::make_unique<ImGuiEditorBridge>())
         , m_AssetResidencyService(std::make_unique<AssetResidencyService>())
     {
         if (!m_Application)
             std::terminate();
+        Core::Config::PopulateEngineConfigSectionDefaults(
+            m_Config,
+            m_ConfigSectionRegistry);
         m_ConfigControl = std::make_unique<EngineConfigControl>(
             EngineConfigControlDependencies{
                 .Config = &m_Config,
+                .SectionRegistry = &m_ConfigSectionRegistry,
             });
         m_AssetImportPipeline = std::make_unique<AssetImportPipeline>(
             AssetImportPipelineDependencies{
@@ -802,6 +809,7 @@ namespace Extrinsic::Runtime
         m_ConfigControl->SetDependencies(
             EngineConfigControlDependencies{
                 .Config = &m_Config,
+                .SectionRegistry = &m_ConfigSectionRegistry,
                 .Window = m_Window.get(),
                 .Renderer = m_Renderer.get(),
             });
@@ -1069,6 +1077,7 @@ namespace Extrinsic::Runtime
             m_ConfigControl->SetDependencies(
                 EngineConfigControlDependencies{
                     .Config = &m_Config,
+                    .SectionRegistry = &m_ConfigSectionRegistry,
                 });
         }
         if (m_AssetImportPipeline)

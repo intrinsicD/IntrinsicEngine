@@ -18,8 +18,9 @@ startup/shutdown.
 | `Extrinsic.Runtime.JobService` | Domain-free snapshot-in/result-out background job service from ADR-0024 D8. CPU jobs submit immutable work to the shared `Core::Tasks` scheduler with a `WorldHandle` scope and cooperative cancellation; workers store `AwaitingGate` under the completion-queue lock before making a result drainable, and only the Engine-owned main-thread completion gate may advance a queued completion to terminal `Published`, `Dropped`, or `Cancelled` before pump B. A terminal drain state is authoritative: the worker performs no state write after queue publication, so same-tick drain/reap cannot leave a phantom in-flight job. The service also owns the `GpuQueue` participant registry used by render-thread GPU work: participants record commands inside the renderer's open frame command context, drain transfer/readback completions during Maintenance, and release resources only after the runtime GPU-queue bridge has performed any required device-idle wait. |
 | `Extrinsic.Runtime.JobServiceGpuQueueBridge` | Runtime-owned bridge from `JobService` GPU-queue participants to the renderer runtime-frame command hook (`RUNTIME-160`). Owns the renderer hook handle, installs a hook that delegates command recording to `JobService::RecordGpuQueueFrameCommands(...)`, detaches the hook before participant shutdown, and forwards the Engine-provided device-idle wait callback into `JobService::ShutdownGpuQueueParticipants(...)`. `Engine` keeps lifecycle ordering and device ownership, while raw hook-token ownership and GPU-participant teardown sequencing no longer live in `Runtime.Engine.cppm` / `.cpp`. |
 | `Extrinsic.Runtime.WorldRegistry` | Runtime-kernel world lifetime mechanism from ADR-0024 D2/D4/D7. Owns `ECS::Scene::Registry` instances behind `WorldHandle`s, creates the boot world, tracks one active world, defers active-world changes and destroys to Maintenance, publishes `WorldWillBeDestroyed` / `ActiveWorldChanged`, and cancels world-scoped jobs before two-phase teardown. Destruction takes precedence over activation: destroy-pending/announced worlds reject activation, and queued activation is revalidated as `Live` at Maintenance. It does not own preview/readiness/switch UX policy. |
-| `Extrinsic.Runtime.EngineConfigBoot` | Free-standing boot-time config helper from `RUNTIME-146`. Exports `CreateReferenceEngineConfig()`, `EngineConfigBoot*` records, and `ResolveEngineConfigForBoot(...)`, preserving sandbox startup precedence (`--engine-config` → `INTRINSIC_ENGINE_CONFIG` → `config/engine.json` → reference defaults) without importing the full `Engine` interface. |
-| `Extrinsic.Runtime.EngineConfigControl` | Engine-owned live config-control subsystem from `RUNTIME-149`. Exports render-recipe preview/load/activate/apply/clear APIs, render-recipe apply state, engine-config hot-subset preview/load/apply APIs, engine-config apply state, and the DTOs used by editor/agent callers. The subsystem mutates only the borrowed Engine-owned `EngineConfig` value, installs/clears `FrameRecipeOverride` on the borrowed renderer, and rejects boot-only config differences without owning boot-time resolution. |
+| `Extrinsic.Runtime.EngineConfigBoot` | Free-standing boot-time config helper from `RUNTIME-146`, extended by `CORE-009`. Exports `CreateReferenceEngineConfig()`, registry-aware overloads, `EngineConfigBoot*` records, and `ResolveEngineConfigForBoot(...)`, preserving sandbox startup precedence (`--engine-config` → `INTRINSIC_ENGINE_CONFIG` → `config/engine.json` → reference defaults) without importing the full `Engine` interface. |
+| `Extrinsic.Runtime.EngineConfigControl` | Engine-owned live config-control subsystem from `RUNTIME-149`, generalized by `CORE-009`. Exports render-recipe preview/load/activate/apply/clear APIs, render-recipe apply state, engine-config hot-subset preview/load/apply APIs, deterministic changed-section reporting, engine-config apply state, and the DTOs used by editor/agent callers. The subsystem mutates only the borrowed Engine-owned `EngineConfig` value, installs/clears `FrameRecipeOverride` on the borrowed renderer, rejects boot-only config differences without owning boot-time resolution, and dispatches registered section callbacks only after commit. |
+| `Extrinsic.Runtime.SandboxConfigSections` | Presentation-free typed DTO, canonical JSON codec/validator, lookup/update helper, and registration-factory surface for the `sandbox.progressive_poisson` and `sandbox.parameterization` application sections. It owns the Sandbox field vocabulary while Core sees only generic records; `app/Sandbox` composes the registrations before boot. |
 | `Extrinsic.Runtime.InputActions` | Runtime-owned input-action registry from `RUNTIME-155`. Exports the action binding/handle/context/service/descriptor API plus `RuntimeInputActionRegistry`, which owns handle allocation, registration/unregistration state, key-edge trigger checks, ImGui keyboard-capture suppression, callback failure logging, and per-frame dispatch after the pre-render transform flush. `Runtime.Engine` re-exports the API for compatibility and delegates `RegisterInputAction(...)`, `UnregisterInputAction(...)`, and frame dispatch to the registry. |
 | `Extrinsic.Runtime.AsyncWorkService` | Engine-owned async-work composition service from `RUNTIME-165`. Owns the persistent `StreamingExecutor` and `DerivedJobRegistry`, constructs the registry over that executor, exposes borrowed executor/registry pointers to dependent runtime subsystems, centralizes maintenance-lane completion/readback drains, count-limited main-thread apply, background pumping, shutdown draining, reset ordering, and the public derived-job facade delegation. Shutdown joins executor work, applies readbacks already ready at the boundary, and terminally cancels unresolved derived records before returning, so no derived callback survives into teardown. `Runtime.Engine` keeps lifecycle order plus compatibility methods such as `SubmitDerivedJob(...)`, but raw streaming executor/derived-job registry ownership no longer lives in `Runtime.Engine.cppm` / `.cpp` or its private frame-loop helper. |
 | `Extrinsic.Runtime.Engine` | Composition root, frame loop, subsystem construction/wiring, and transitional subsystem accessors such as `GetConfigControl()`, `GetAssetImportPipeline()`, `GetSceneDocument()`, input-action facade methods, and reference-scene facade accessors. Platform drop events remain Engine-owned because they are platform routing, but they delegate import handling to `AssetImportPipeline`. JobService GPU-queue renderer-hook ownership and participant shutdown sequencing route through `JobServiceGpuQueueBridge`; scene-file persistence routes through `SceneDocument`, live recipe/config control routes through `EngineConfigControl`, input-action registration/dispatch routes through `InputActions`, reference-scene install/teardown state routes through `ReferenceSceneControl`, runtime-module contribution records/order/dispatch routes through `ModuleSchedule`, selection pick readback drain/cache state routes through `SelectionReadback`, frame-pacing diagnostics record/counter mirroring routes through `FramePacingDiagnostics`, Dear ImGui overlay/adapter/callback ownership stays in the Engine-private `ImGuiEditorBridge` declared by `Runtime.ImGuiEditorBridge.Internal.hpp`, object-space normal bake queue composition routes through `ObjectSpaceNormalBakeService`, transform-gizmo frame state routes through `GizmoFrameService`, render-extraction cache/pool/stats/frame-index ownership stays in the Engine-private `RenderExtractionService` declared by `Runtime.RenderExtractionService.Internal.hpp`, GPU asset cache/model-handoff residency ownership stays in the Engine-private `AssetResidencyService` declared by `Runtime.AssetResidencyService.Internal.hpp`, and streaming/derived-job ownership plus maintenance drains route through `AsyncWorkService`. The `Core.FrameLoop` hook adapters and per-frame helper routines are include-only implementation glue in `Runtime.Engine.FrameLoop.Internal.hpp`, consumed only by `Runtime.Engine.cpp`. |
@@ -463,7 +464,8 @@ the CPU reference backend does not yet export internal phase assignments as a
 stable method result.
 
 Slice C routes the same knobs through the engine config-control facade as
-`sandbox.progressive_poisson`: widget edits serialize a candidate
+the registered `sandbox.progressive_poisson` application section: widget edits
+use `SetProgressivePoissonPlaygroundConfig(...)`, serialize the candidate
 `EngineConfig`, preview it with
 `Engine::GetConfigControl().PreviewEngineConfigControlDocument(...)`,
 hot-apply it with
@@ -759,14 +761,18 @@ restore true normal-aligned surfel ellipses without reusing texture coordinates.
 reference applications can request the standard runtime configuration without
 importing the full `Engine` interface. Applications may pass the returned config
 to `Engine`; runtime remains responsible for interpreting subsystem
-configuration and composition. `ResolveEngineConfigForBoot(...)` is the sandbox
+configuration and composition. Its registry overload populates the canonical
+defaults from a caller-owned `EngineConfigSectionRegistry`.
+`ResolveEngineConfigForBoot(...)` is the sandbox
 boot helper layered on top of that reference value: it checks
 `--engine-config`, `INTRINSIC_ENGINE_CONFIG`, and an existing
 `config/engine.json` path, then uses the core-owned
 `Extrinsic.Core.Config.EngineLoad` diagnostics lane to preview the file before
 constructing `Engine`. Invalid or unreadable explicit files keep the reference
 config and preserve diagnostics in `EngineConfigBootResult`; runtime does not
-mutate a live engine from this path. `CreateReferenceEngineConfig()` flips
+mutate a live engine from this path. Sandbox composes its registry before this
+call and moves the same registry into `Engine` for live control.
+`CreateReferenceEngineConfig()` flips
 `EngineConfig::ReferenceScene::Enabled = true` and
 `Selector = ReferenceSceneSelector::Triangle`; the default-constructed
 `EngineConfig{}` keeps `Enabled = false` so existing CPU/null tests do not
@@ -793,11 +799,12 @@ Recipe preview/activation uses
 `ApplyRenderRecipeConfigPreview(...)`. Engine-config preview uses
 `PreviewEngineConfigControlDocument(...)` /
 `LoadEngineConfigControlFile(...)`; hot apply is intentionally limited to
-`render.default_recipe_config_path` and `sandbox.progressive_poisson` through
-`ApplyEngineConfigHotSubset(...)`. All other engine-config differences are
-reported as boot-only rejections and do not mutate the live engine; the active
-config authority remains the `Engine`-owned `EngineConfig` value borrowed by the
-subsystem.
+`render.default_recipe_config_path` and registered `app.sections` records
+through `ApplyEngineConfigHotSubset(...)`. Changed section names are lexical;
+callbacks fire once after commit and never during preview, rejection, or
+no-change. All other engine-config differences are reported as boot-only
+rejections and do not mutate the live engine; the active config authority
+remains the `Engine`-owned `EngineConfig` value borrowed by the subsystem.
 
 Runtime consumes `Extrinsic.Core.FrameLoop` for reusable platform/render/
 maintenance/shutdown phase contracts. The contract lives in `core` because it has

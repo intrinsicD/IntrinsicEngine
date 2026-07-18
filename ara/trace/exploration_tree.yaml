@@ -6233,3 +6233,56 @@ tree:
       registration/compile/replay overhead rather than cross-machine or
       end-to-end frame performance.
     status: resolved
+  - id: N264
+    type: experiment
+    title: "Verify the CORE-009 generic Core config-section contract"
+    provenance: ai-executed
+    timestamp: "2026-07-18T19:55+02:00"
+    evidence:
+      - "src/core/Core.Config.Engine.cppm"
+      - "src/core/Core.Config.EngineLoad.cppm"
+      - "src/core/Core.Config.EngineLoad.cpp"
+      - "tests/unit/core/Test.Core.EngineConfigLoad.cpp"
+      - "cmake --build --preset ci --target IntrinsicCoreTests -j 4"
+      - "cmake --build --preset ci --target IntrinsicCoreWrapperUnitTests -j 4"
+      - "build/ci/bin/IntrinsicCoreWrapperUnitTests --gtest_color=no"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+    result: >
+      Replaced Core's typed Sandbox/method config ownership with sorted opaque
+      application-section records and a validated vector-backed registry.
+      Unknown, duplicate, mismatched, malformed, and validator-rejected section
+      records retain their registered reference section with fallback
+      diagnostics; serialization emits only the app.sections array shape.
+      Both focused Core targets compiled, all 263 Core wrapper tests passed, and
+      strict layering reported zero violations. The Core tree and its unit
+      tests are grep-clean for SandboxConfig, Progressive Poisson, and
+      parameterization config identifiers.
+    status: resolved
+  - id: N265
+    type: experiment
+    title: "Verify the CORE-009 Runtime and Sandbox section integration"
+    provenance: ai-executed
+    timestamp: "2026-07-18T20:08+02:00"
+    also_depends_on: [N264]
+    evidence:
+      - "src/runtime/Runtime.SandboxConfigSections.cppm"
+      - "src/runtime/Runtime.SandboxConfigSections.cpp"
+      - "src/runtime/Runtime.SandboxMethodFacade.cpp"
+      - "src/runtime/Runtime.SandboxParameterizationFacade.cpp"
+      - "tests/contract/runtime/Test.ParameterizationFacade.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp"
+      - "cmake --build --preset ci-fast --target IntrinsicRuntimeContractTests --parallel 4"
+      - "IntrinsicRuntimeContractTests focused 42-test filter"
+      - "IntrinsicSandboxEditorIntegrationTests --gtest_filter=SandboxConfigSections.*"
+    result: >
+      Moved the unchanged Progressive Poisson and parameterization config
+      families into a presentation-free Runtime module with stable section
+      names, schema ids, canonical codecs, typed lookup/update helpers, and
+      registration factories. The validators preserve the prior field bounds,
+      tokens, paired-array checks, and nested cross-field fallback semantics;
+      runtime facades now consume only generic EngineConfig sections. The final
+      ci-fast RuntimeContract target compiled, all 42 focused
+      parameterization, Poisson, config-control, boot, and session tests passed,
+      and the Null Engine::Run/live-callback Sandbox integration passed 1/1.
+      Final source grep and diff checks were clean.
+    status: resolved

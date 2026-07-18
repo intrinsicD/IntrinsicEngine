@@ -49,71 +49,37 @@ namespace Extrinsic::Runtime
             }
         }
 
-        [[nodiscard]] bool ProgressivePoissonPlaygroundConfigEquals(
-            const Core::Config::ProgressivePoissonPlaygroundConfig& lhs,
-            const Core::Config::ProgressivePoissonPlaygroundConfig& rhs) noexcept
+        [[nodiscard]] std::vector<std::string> FindChangedSectionNames(
+            const std::vector<Core::Config::EngineConfigSection>& current,
+            const std::vector<Core::Config::EngineConfigSection>& candidate)
         {
-            return lhs.Dimension == rhs.Dimension &&
-                   lhs.GridWidth == rhs.GridWidth &&
-                   lhs.MaxLevels == rhs.MaxLevels &&
-                   lhs.HashLoadFactor == rhs.HashLoadFactor &&
-                   lhs.RadiusAlpha == rhs.RadiusAlpha &&
-                   lhs.RandomizeGridOrigin == rhs.RandomizeGridOrigin &&
-                   lhs.GridOriginSeed == rhs.GridOriginSeed &&
-                   lhs.ShuffleWithinLevels == rhs.ShuffleWithinLevels &&
-                   lhs.ShuffleSeed == rhs.ShuffleSeed &&
-                   lhs.PrefixCount == rhs.PrefixCount &&
-                   lhs.Channel == rhs.Channel &&
-                   lhs.Backend == rhs.Backend &&
-                   lhs.MeshSurfaceSampleCount == rhs.MeshSurfaceSampleCount &&
-                   lhs.MeshSurfaceSampleSeed == rhs.MeshSurfaceSampleSeed &&
-                   lhs.MeshSurfaceMinTriangleArea == rhs.MeshSurfaceMinTriangleArea &&
-                   lhs.MeshSurfaceInterpolateNormals == rhs.MeshSurfaceInterpolateNormals &&
-                   lhs.AutoRunOnEdit == rhs.AutoRunOnEdit &&
-                   lhs.DebounceSeconds == rhs.DebounceSeconds;
-        }
+            std::vector<std::string> names{};
+            names.reserve(current.size() + candidate.size());
+            for (const Core::Config::EngineConfigSection& section : current)
+            {
+                names.push_back(section.Name);
+            }
+            for (const Core::Config::EngineConfigSection& section : candidate)
+            {
+                names.push_back(section.Name);
+            }
+            std::sort(names.begin(), names.end());
+            names.erase(std::unique(names.begin(), names.end()), names.end());
 
-        [[nodiscard]] bool ParameterizationUvConfigEquals(
-            const Core::Config::ParameterizationUvConfig& lhs,
-            const Core::Config::ParameterizationUvConfig& rhs) noexcept
-        {
-            return lhs.U == rhs.U && lhs.V == rhs.V;
-        }
-
-        [[nodiscard]] bool ParameterizationConfigEquals(
-            const Core::Config::ParameterizationConfig& lhs,
-            const Core::Config::ParameterizationConfig& rhs) noexcept
-        {
-            const bool pinnedUvsEqual =
-                lhs.Harmonic.PinnedUvs.size() == rhs.Harmonic.PinnedUvs.size() &&
-                std::equal(lhs.Harmonic.PinnedUvs.begin(),
-                           lhs.Harmonic.PinnedUvs.end(),
-                           rhs.Harmonic.PinnedUvs.begin(),
-                           ParameterizationUvConfigEquals);
-            return lhs.Strategy == rhs.Strategy &&
-                   lhs.Lscm.AutoPins == rhs.Lscm.AutoPins &&
-                   lhs.Lscm.PinVertex0 == rhs.Lscm.PinVertex0 &&
-                   lhs.Lscm.PinVertex1 == rhs.Lscm.PinVertex1 &&
-                   ParameterizationUvConfigEquals(lhs.Lscm.PinUv0,
-                                                  rhs.Lscm.PinUv0) &&
-                   ParameterizationUvConfigEquals(lhs.Lscm.PinUv1,
-                                                  rhs.Lscm.PinUv1) &&
-                   lhs.Lscm.SolverTolerance == rhs.Lscm.SolverTolerance &&
-                   lhs.Lscm.MaxSolverIterations == rhs.Lscm.MaxSolverIterations &&
-                   lhs.Harmonic.Boundary == rhs.Harmonic.Boundary &&
-                   lhs.Harmonic.ArcLengthSpacing == rhs.Harmonic.ArcLengthSpacing &&
-                   lhs.Harmonic.ClampNonConvexWeights ==
-                       rhs.Harmonic.ClampNonConvexWeights &&
-                   lhs.Harmonic.PinnedVertices == rhs.Harmonic.PinnedVertices &&
-                   pinnedUvsEqual &&
-                   lhs.Bff.Mode == rhs.Bff.Mode &&
-                   lhs.Bff.BoundaryData == rhs.Bff.BoundaryData &&
-                   lhs.Bff.AngleSumTolerance == rhs.Bff.AngleSumTolerance &&
-                   lhs.Bff.DegeneracyTolerance == rhs.Bff.DegeneracyTolerance &&
-                   lhs.View.RenderMode == rhs.View.RenderMode &&
-                   lhs.View.BackgroundMode == rhs.View.BackgroundMode &&
-                   lhs.View.ShowDistortionHeatmap ==
-                       rhs.View.ShowDistortionHeatmap;
+            std::vector<std::string> changed{};
+            changed.reserve(names.size());
+            for (const std::string& name : names)
+            {
+                const Core::Config::EngineConfigSection* previous =
+                    Core::Config::FindEngineConfigSection(current, name);
+                const Core::Config::EngineConfigSection* next =
+                    Core::Config::FindEngineConfigSection(candidate, name);
+                if (previous == nullptr || next == nullptr || *previous != *next)
+                {
+                    changed.push_back(name);
+                }
+            }
+            return changed;
         }
 
         [[nodiscard]] std::vector<std::string> FindBootOnlyEngineConfigDifferences(
@@ -183,6 +149,15 @@ namespace Extrinsic::Runtime
         }
     }
 
+    bool RuntimeEngineConfigApplyResult::SectionChanged(
+        const std::string_view name) const noexcept
+    {
+        return std::find(
+                   ChangedSectionNames.begin(),
+                   ChangedSectionNames.end(),
+                   name) != ChangedSectionNames.end();
+    }
+
     EngineConfigControl::EngineConfigControl(
         EngineConfigControlDependencies dependencies)
     {
@@ -195,6 +170,12 @@ namespace Extrinsic::Runtime
         m_Dependencies = std::move(dependencies);
         if (m_Dependencies.Config)
         {
+            if (m_Dependencies.SectionRegistry)
+            {
+                Core::Config::PopulateEngineConfigSectionDefaults(
+                    *m_Dependencies.Config,
+                    *m_Dependencies.SectionRegistry);
+            }
             m_ConfigControlState.ActiveConfig = *m_Dependencies.Config;
         }
     }
@@ -382,6 +363,7 @@ namespace Extrinsic::Runtime
             CurrentConfig(),
             Core::Config::EngineConfigParseOptions{
                 .SourceId = std::move(sourceId),
+                .SectionRegistry = m_Dependencies.SectionRegistry,
             });
     }
 
@@ -394,6 +376,7 @@ namespace Extrinsic::Runtime
             CurrentConfig(),
             Core::Config::EngineConfigParseOptions{
                 .SourceId = sourceId,
+                .SectionRegistry = m_Dependencies.SectionRegistry,
             });
     }
 
@@ -428,18 +411,10 @@ namespace Extrinsic::Runtime
         const bool recipePathChanged =
             config->Render.DefaultRecipeConfigPath !=
             candidate.Render.DefaultRecipeConfigPath;
-        const bool progressivePoissonChanged =
-            !ProgressivePoissonPlaygroundConfigEquals(
-                config->Sandbox.ProgressivePoisson,
-                candidate.Sandbox.ProgressivePoisson);
-        const bool parameterizationChanged = !ParameterizationConfigEquals(
-            config->Sandbox.Parameterization,
-            candidate.Sandbox.Parameterization);
         result.DefaultRecipeConfigPathChanged = recipePathChanged;
-        result.SandboxProgressivePoissonChanged = progressivePoissonChanged;
-        result.SandboxParameterizationChanged = parameterizationChanged;
-        if (!recipePathChanged && !progressivePoissonChanged &&
-            !parameterizationChanged)
+        result.ChangedSectionNames =
+            FindChangedSectionNames(config->AppSections, candidate.AppSections);
+        if (!recipePathChanged && result.ChangedSectionNames.empty())
         {
             result.Status = RuntimeEngineConfigApplyStatus::NoChange;
             m_ConfigControlState.ActiveConfig = *config;
@@ -476,6 +451,8 @@ namespace Extrinsic::Runtime
             }
         }
 
+        const std::vector<Core::Config::EngineConfigSection> previousSections =
+            config->AppSections;
         if (recipePathChanged)
         {
             config->Render.DefaultRecipeConfigPath =
@@ -485,19 +462,29 @@ namespace Extrinsic::Runtime
                 ClearActiveRenderRecipeOverride();
             }
         }
-        if (progressivePoissonChanged)
-        {
-            config->Sandbox.ProgressivePoisson =
-                candidate.Sandbox.ProgressivePoisson;
-        }
-        if (parameterizationChanged)
-        {
-            config->Sandbox.Parameterization = candidate.Sandbox.Parameterization;
-        }
+        config->AppSections = candidate.AppSections;
         m_ConfigControlState.ActiveConfig = *config;
         result.Status = RuntimeEngineConfigApplyStatus::Applied;
         result.EngineConfigApplied = true;
         RecordConfigApply(result);
+
+        if (m_Dependencies.SectionRegistry)
+        {
+            for (const std::string& name : result.ChangedSectionNames)
+            {
+                const Core::Config::EngineConfigSectionRegistration* registration =
+                    m_Dependencies.SectionRegistry->Find(name);
+                const Core::Config::EngineConfigSection* previous =
+                    Core::Config::FindEngineConfigSection(previousSections, name);
+                const Core::Config::EngineConfigSection* current =
+                    Core::Config::FindEngineConfigSection(config->AppSections, name);
+                if (registration && registration->OnChanged &&
+                    previous && current)
+                {
+                    registration->OnChanged(*previous, *current);
+                }
+            }
+        }
         return result;
     }
 
