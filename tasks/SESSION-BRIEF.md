@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `CORE-008` — Compiled task-graph plan reuse across executions (tasks/active/CORE-008-compiled-taskgraph-plan-reuse.md)
+- none
 
 ## Theme B — Rendering modernization
 

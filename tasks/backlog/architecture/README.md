@@ -13,9 +13,6 @@ map.
 Opened from the 2026-07-03 main-loop/task-graph/render-graph review
 ([`docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`](../../../docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md)):
 
-- [`CORE-008`](../../active/CORE-008-compiled-taskgraph-plan-reuse.md) is
-  active — exact compiled task-graph registration replay with fixed-step
-  FrameGraph and render-prep adoption.
 - [`CORE-009`](CORE-009-app-owned-config-sections.md) — app-owned config
   sections out of core `EngineConfig` (Progressive Poisson block moves
   behind a generic section mechanism).
@@ -122,6 +119,14 @@ root must update the relevant `docs/architecture/*` doc set in the same PR per
 - [`docs/agent/architecture-review-checklist.md`](../../../docs/agent/architecture-review-checklist.md).
 
 ## Retired
+
+- [`CORE-008`](../../done/CORE-008-compiled-taskgraph-plan-reuse.md) —
+  retired 2026-07-18 at `Operational`: exact registration replay now retains
+  one successful TaskGraph topology, rebinds current callbacks, and fails
+  closed on structural change. Fixed-step runtime and persistent render prep
+  use the lifecycle; matched Release evidence reduced median paired
+  registration/compile/replay runtime by 84.562% and 84.938% for the two
+  frozen shapes, and the full CPU plus fresh ASan/UBSan gates stayed green.
 
 - [`CORE-007`](../../done/CORE-007-scheduler-priority-wait-wake-hardening.md) —
   retired 2026-07-18 at `CPUContracted`: fixed scheduler priority lanes now

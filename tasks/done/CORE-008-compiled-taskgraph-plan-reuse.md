@@ -30,7 +30,7 @@ maturity_target: Operational
 ## Context
 - Owner/layer: `core` for the cache mechanism; `runtime` and
   `graphics/renderer` for adoption.
-- Today every fixed sim tick re-registers the same three ECS system passes
+- Before CORE-008, every fixed sim tick re-registered the same three ECS system passes
   and runs `Compile → Execute → Reset`
   (`src/runtime/Runtime.Engine.FrameLoop.Internal.hpp:326-370`,
   `src/runtime/Runtime.EcsSystemBundle.cpp:15-34`), and
@@ -53,9 +53,11 @@ maturity_target: Operational
 
 ## Status
 
-- In progress; owner: Codex; branch:
-  `codex/core-008-compiled-plan-reuse`; activated after `CORE-005` and
-  `CORE-007` retirement on 2026-07-18.
+- Completed on 2026-07-18 at `Operational`; owner: Codex; implementation
+  branch: `codex/core-008-compiled-plan-reuse`. Activation/right-sizing commit:
+  `88b1edb4`; frozen-harness and baseline commits: `e8df606f` and `78382f1b`;
+  production implementation commit: `8a50b725`; owner-thread regression
+  commit: `28ffc72e`; benchmark report/evidence commit: `49678b53`.
 - Right-sizing decision: use the existing `AddPass` registration surface plus
   explicit `ResetForReplay()`. Retain two bounded pass-node banks so names and
   declaration storage survive replay; compare ordered descriptors exactly
@@ -80,72 +82,105 @@ maturity_target: Operational
   runtime was 0.002532–0.002630 ms/epoch (median 0.002624). The preserved
   baseline binary SHA-256 is
   `15e536b748d8b99679fe51329e42dc7bdd9b2a6f205ce97170ea4b28a49f539a`.
+- The preserved production-candidate binary at `8a50b725` has SHA-256
+  `5fd26220e157100d777e6ecbef3df72e52554fab61402ebe51e5fa5644b0b498`;
+  every candidate capture recorded one plan build plus 6,145 exact reuses,
+  zero quality error, zero failures, and the same plan-order/callback-rebind
+  checksums as baseline.
+- Five order-balanced matched pairs reduced median paired
+  registration/compile/replay runtime by 84.562% for the three-pass ECS-like
+  shape and 84.938% for the nine-pass render-prep-like shape. All 250 emitted
+  payloads validated strictly. Full distributions, exact effect sizes,
+  provenance, limitations, and reproduction live in
+  `benchmarks/reports/core_taskgraph_plan_reuse_CORE-008.md`.
+- Required verification passed with Clang 23: the default CPU selector
+  completed 4,096 tests with zero failures and one expected GLFW/LSan skip;
+  fresh serial grouped ASan and UBSan selectors each completed 2,750 tests
+  with zero failures (UBSan skipped the one ASan-only lifecycle case); the
+  destructive-reset 2,000-node SLO reported 126,887 ns compile p99 against
+  350,000 ns and 793,500 ns execute p95 against 8,333,334 ns.
+- The canonical Null `Engine::Run()` integration path observed one fixed-step
+  plan build followed by reuse, and the persistent render-prep regression
+  proved owner-thread callbacks across initial and replay runs with two
+  scheduler workers. Independent completion and final code reviews found no
+  actionable issue. The generated module inventory remained byte-identical.
 
 ## Required changes
-- [ ] Add fail-closed `TaskGraph::ResetForReplay()` and `FrameGraph` forwarding
+- [x] Add fail-closed `TaskGraph::ResetForReplay()` and `FrameGraph` forwarding
       while preserving destructive `Reset()`. Replay must expose a logically
       empty registration surface, destroy stale callbacks, and retain only the
       last successful topology plus reusable declaration storage.
-- [ ] Compare pass count/order, owned names, compilation-affecting options,
+- [x] Compare pass count/order, owned names, compilation-affecting options,
       resource origin/identity/mode, explicit dependencies/reasons, and raw
       wait/signal labels exactly. Callback identity is excluded and callbacks
       are rebound every epoch; mismatch or compile failure can never execute
       the previous plan.
-- [ ] Expose plain plan-build/reuse counters and a last-reuse flag; a reuse hit
+- [x] Expose plain plan-build/reuse counters and a last-reuse flag; a reuse hit
       reports zero topology compile time. Fix empty compiled graphs so they are
       valid plans.
-- [ ] Reuse the two retained pass-node banks instead of adding a global name
+- [x] Reuse the two retained pass-node banks instead of adding a global name
       interner. Eliminate eager per-successful-compile edge-reason metadata and
       per-submission ready-list/callback-wrapper churn only where the change is
       local and preserves escaped completion lifetime.
-- [ ] Adopt in `Engine::RunFixedStepSimulationTicks`: unchanged
+- [x] Adopt in `Engine::RunFixedStepSimulationTicks`: unchanged
       pass set (the common `OnSimTick`-adds-nothing case) executes with zero
       recompiles; app-added passes trigger recompile transparently.
-- [ ] Adopt in `Graphics.RenderPrepPipeline`: reuse the pipeline graph
+- [x] Adopt in `Graphics.RenderPrepPipeline`: reuse the pipeline graph
       across `Run()` calls and clear all stack-borrowing callbacks on every
       success/fault exit.
 
 ## Tests
-- [ ] Contract: unchanged replay executes without recompiling (compile-count
+- [x] Contract: unchanged replay executes without recompiling (compile-count
       counter exposed via stats), uses freshly rebound callbacks, and preserves
       dependency order. An old completed handle remains ready during a later
       replay submission.
-- [ ] Contract: adding/removing a pass or changing options, explicit edges,
+- [x] Contract: adding/removing a pass or changing options, explicit edges,
       declared access identity/mode, or labels after reuse invalidates the plan
       and recompiles; failed changed replay cannot fall back to the old plan.
-- [ ] Runtime/graphics contracts: two ECS-bundle epochs bind the current scene,
+- [x] Runtime/graphics contracts: two ECS-bundle epochs bind the current scene,
       app/module shape transitions recompile, repeated RenderPrep runs use
       current inputs, and forced failures leave the next run valid.
-- [ ] Null-runtime integration: at least two real fixed ticks observe one plan
+- [x] Null-runtime integration: at least two real fixed ticks observe one plan
       build plus a reuse hit; existing frame-graph, ECS-system, runtime-module,
       render-prep, and cold-compile Architecture SLO suites stay green.
-- [ ] Matched optimized smoke benchmarks: separate stable IDs for the
+- [x] Matched optimized smoke benchmarks: separate stable IDs for the
       3-pass ECS-like and 9-pass render-prep-like shapes. PR-fast coverage
       remains deterministic contract tests; performance runs in `ci-release`.
 
 ## Docs
-- [ ] Update `docs/architecture/task-graphs.md` (plan reuse contract,
+- [x] Update `docs/architecture/task-graphs.md` (plan reuse contract,
       invalidation rules).
-- [ ] Update `src/core/README.md`, runtime fixed-step documentation, renderer
+- [x] Update `src/core/README.md`, runtime fixed-step documentation, renderer
       prep documentation, and benchmark package/report indexes.
 
 ## Acceptance criteria
-- [ ] After the first fixed step, the steady-state sandbox path performs zero
+- [x] After the first fixed step, the steady-state sandbox path performs zero
       additional task-graph topology builds (proven by plan counters on the
       Null runtime path; each replay still makes an accepted `Compile()` call).
-- [ ] Both matched workloads record baseline/candidate distributions,
+- [x] Both matched workloads record baseline/candidate distributions,
       structure/callback quality error zero, and explicit effect sizes.
-- [ ] Default CPU, serial ASan/UBSan, and cold-compile Architecture SLO gates
+- [x] Default CPU, serial ASan/UBSan, and cold-compile Architecture SLO gates
       green; no layering changes.
 
 ## Maturity
 
-- Target: `Operational`. The core contract must be covered deterministically,
-  and the canonical Null `Engine::Run()` fixed-step path plus the persistent
-  renderer-prep owner must exercise reuse. This CPU scheduling optimization
-  does not require a Vulkan-specific proof.
+- Reached: `Operational`. Deterministic core contracts, the canonical Null
+  `Engine::Run()` fixed-step path, and the persistent renderer-prep owner all
+  exercise exact replay. No Vulkan-specific follow-up is owed for this CPU
+  scheduling optimization. Render-graph caching remains separately owned by
+  `GRAPHICS-117`.
 
 ## Verification
+
+- Operational proof:
+  `RuntimeSandboxAcceptance.FixedStepTaskGraphBuildsOnceThenReusesPlan`
+  (`integration;runtime;graphics`) passed 1/1 through the Null
+  `Engine::Run()` path and observed one topology build followed by reuse.
+- Renderer ownership proof: the two-worker
+  `RenderPrepPipeline.TaskGraphReusesPlanAndRebindsCallbacks` contract passed
+  for both initial build and replay and asserted every callback ran on the
+  owner thread.
+
 ```bash
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
