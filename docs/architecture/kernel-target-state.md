@@ -9,11 +9,19 @@
   [ADR-0026](../adr/0026-runtime-module-scope-by-consumer-contract.md) decides
   when demonstrated runtime responsibilities share one composed module or
   split; it defines no family taxonomy and does not ratify `IRuntimeModule`.
-- **Tracked by:** [`ARCH-014`](../../tasks/backlog/architecture/ARCH-014-kernel-convergence-tracking.md)
+- **Tracked by:** [`ARCH-014`](../../tasks/active/ARCH-014-kernel-convergence-tracking.md)
   (umbrella; stays open until the scorecard is all-green).
 - **Read this before** adding anything to `Runtime.Engine` or introducing a
   new `Runtime.*Module`. See the [Feature Module Playbook](feature-module-playbook.md)
   for the per-feature procedure.
+
+> **Composition-mechanism decision hold (2026-07-18).** The reconciliation
+> audit found that several literal rows below name zero-consumer mechanisms or
+> conflate a domain-free Engine outcome with implementing `IRuntimeModule`.
+> [`ARCH-016`](../../tasks/backlog/architecture/ARCH-016-right-size-runtime-composition-target.md)
+> owns ADR-0027 and the evidence-backed scorecard correction. Until it retires,
+> do not create extension registries, input-filter chains, `InlineModule`
+> builders, or one-wrapper-per-service tasks merely to flip these boxes.
 
 ## The destination in one sentence
 

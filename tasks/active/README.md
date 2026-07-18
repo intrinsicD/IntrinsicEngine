@@ -11,7 +11,11 @@ Each active task should include:
 
 ## Currently active
 
-No active tasks.
+- [`ARCH-014`](ARCH-014-kernel-convergence-tracking.md) — kernel convergence
+  umbrella; owner: Codex; coordination branch:
+  `codex/arch-014-kernel-convergence-program`; blocked on `ARCH-016` and
+  `RUNTIME-129`. Next gate: retire the right-sizing amendment before seeding
+  implementation children.
 
 ## History
 

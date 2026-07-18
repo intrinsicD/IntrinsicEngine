@@ -1,7 +1,9 @@
 ---
 id: ARCH-014
 theme: F
-depends_on: []
+depends_on:
+  - ARCH-016
+  - RUNTIME-129
 ---
 # ARCH-014 — Kernel convergence tracking (umbrella north-star)
 
@@ -9,13 +11,13 @@ depends_on: []
 - Own the runtime kernel/module convergence target so any agent touching the
   engine has one place that says *where we are going* and *how far along we
   are*. This is the umbrella that keeps the
-  [kernel target-state doc](../../../docs/architecture/kernel-target-state.md)
+  [kernel target-state doc](../../docs/architecture/kernel-target-state.md)
   scorecard current and stays open until it is all-green.
 
 ## Non-goals
 - No implementation of the seams or extractions here — child tasks own that
   work. Retired children remain convergence evidence; open children such as
-  `RUNTIME-129` and `RUNTIME-178` own their implementation. This task
+  `RUNTIME-129` own their implementation. This task
   tracks and enforces; it does not do their work.
 - No re-litigation of ADR-0024 decisions (that is an ADR amendment, not this
   task).
@@ -24,9 +26,9 @@ depends_on: []
 
 ## Context
 - Owner/layer: architecture/runtime governance (Theme F).
-- Contract: [ADR-0024](../../../docs/adr/0024-kernel-module-architecture.md)
+- Contract: [ADR-0024](../../docs/adr/0024-kernel-module-architecture.md)
   (frozen decisions). North star:
-  [`docs/architecture/kernel-target-state.md`](../../../docs/architecture/kernel-target-state.md)
+  [`docs/architecture/kernel-target-state.md`](../../docs/architecture/kernel-target-state.md)
   (living scorecard + knob-decision guide).
 - Baseline 2026-07-08 (post-`ARCH-007`): `Runtime.Engine.cppm` has 45
   imports, **27 domain (non-substrate) imports** (measured by the allowlist
@@ -53,6 +55,21 @@ depends_on: []
   the scorecard honest, and provides the review guardrail so the kernel does
   not regrow while the migration is in flight.
 
+## Status
+- Blocked on `ARCH-016` and `RUNTIME-129`; owner: Codex; coordination branch:
+  `codex/arch-014-kernel-convergence-program`; activated 2026-07-18 after
+  `ARCH-015` retirement.
+- The 2026-07-18 reconciliation audit measured the exact clean ratchet at
+  42 plain imports, 21 domain imports, 2 re-exports, and 31 public getter
+  names. It also found that the literal scorecard would require zero-consumer
+  extension/input frameworks, an unused `InlineModule`, and mechanical
+  `IRuntimeModule` wrappers while the right-sizing audit that owns that
+  interface is itself blocked on this umbrella.
+- `ARCH-016` therefore precedes implementation-child seeding. It will amend
+  ADR-0024 and replace mechanism-count outcomes with greppable ownership
+  outcomes, correct stale checked rows, resolve the contradictory
+  `RUNTIME-172` direction, and seed only behavior-carrying children.
+
 ## Required changes
 - [ ] After each child seam/extraction merges, update the target-state
       scorecard (flip the invariant boxes that now hold on `main`) and
@@ -78,6 +95,11 @@ depends_on: []
       world-scoped or global. `ARCH-010` supplied `WorldRegistry`; it did not
       make that policy decision for later domain modules. Track those decisions
       here rather than assigning the open work back to retired `ARCH-010`.
+- [x] Run a 2026-07-18 scorecard/right-sizing reconciliation and seed
+      `ARCH-016` instead of manufacturing wrappers for zero-consumer or
+      one-consumer mechanisms.
+- [ ] After `ARCH-016` retires, replace this umbrella's dependency graph and
+      acceptance wording with the amended, evidence-backed child program.
 
 ## Tests
 - [x] `python3 tools/agents/check_task_policy.py --root . --strict` passes.
@@ -94,7 +116,8 @@ depends_on: []
 
 ## Acceptance criteria
 
-This umbrella closes only when ALL of the following hold on `main`:
+This umbrella closes only when ALL of the following hold on `main`, as
+right-sized by `ARCH-016` without weakening the domain-free Engine outcome:
 
 - [ ] Every "Kernel seams exist" scorecard row is checked.
 - [ ] `Runtime.Engine.cppm` import count ≤ 12 substrate modules; domain-noun

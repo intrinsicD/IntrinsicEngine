@@ -14,13 +14,19 @@ Opened from the 2026-07-08 kernel/module architecture decision record
 ([`docs/adr/0024-kernel-module-architecture.md`](../../../docs/adr/0024-kernel-module-architecture.md));
 seams-first migration order. All additive seams (`ARCH-007`..`ARCH-011`), the
 proving extraction (`ARCH-012`), and the post-seam collision sweep (`ARCH-013`)
-are retired to `tasks/done/`; `ARCH-014` remains the open umbrella:
+are retired to `tasks/done/`; `ARCH-014` remains the active umbrella:
 
-- [`ARCH-014`](ARCH-014-kernel-convergence-tracking.md) — umbrella
+- [`ARCH-014`](../../active/ARCH-014-kernel-convergence-tracking.md) — active
+  umbrella
   north-star: owns the [kernel target-state](../../../docs/architecture/kernel-target-state.md)
   convergence scorecard and the review/ratchet guardrail; stays open
-  until the whole ADR-0024 migration is reached. Retired child `HARDEN-085`
-  delivered the monotone checker and `pr-fast` gate.
+  until the right-sized ADR-0024 target is reached. It is blocked on
+  `ARCH-016` and `RUNTIME-129`. Retired child `HARDEN-085` delivered the
+  monotone checker and `pr-fast` gate.
+- [`ARCH-016`](ARCH-016-right-size-runtime-composition-target.md) — unblocked
+  ADR-0024 amendment: break the ARCH-014/REVIEW-003 decision loop, distinguish
+  domain ownership from a mandatory C++ wrapper, remove zero-consumer mechanism
+  blockers, correct the scorecard, and seed only behavior-carrying children.
 - [`REVIEW-003`](REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
   one-shot, commit-anchored architecture stability and right-sizing audit. It
   is blocked on the known convergence, privatization, validator, root-hygiene,
