@@ -43,7 +43,7 @@ TEST(CoreTaskGraphCompletionLifetime, ExecuteKeepsCompletionStateAliveUntilWorke
 
     for (std::uint32_t epoch = 0u; epoch < kEpochs; ++epoch)
     {
-        TaskGraph graph(QueueDomain::Cpu);
+        TaskGraph graph;
         for (std::uint32_t pass = 0u; pass < kPasses; ++pass)
         {
             graph.AddPass(std::string("RacePass") + std::to_string(epoch) + "_" + std::to_string(pass),

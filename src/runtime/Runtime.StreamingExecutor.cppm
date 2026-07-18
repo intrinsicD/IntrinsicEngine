@@ -16,6 +16,17 @@ import Extrinsic.Core.StrongHandle;
 
 export namespace Extrinsic::Runtime
 {
+    namespace RuntimeTaskKinds
+    {
+        inline constexpr Core::Dag::TaskKind Generic{0u};
+        inline constexpr Core::Dag::TaskKind AssetIO{1u};
+        inline constexpr Core::Dag::TaskKind AssetDecode{2u};
+        inline constexpr Core::Dag::TaskKind AssetUpload{3u};
+        inline constexpr Core::Dag::TaskKind GeometryProcess{4u};
+        inline constexpr Core::Dag::TaskKind PhysicsStep{5u};
+        inline constexpr Core::Dag::TaskKind RenderPass{6u};
+    }
+
     struct StreamingTaskTag;
     using StreamingTaskHandle = Core::StrongHandle<StreamingTaskTag>;
 
@@ -58,7 +69,7 @@ export namespace Extrinsic::Runtime
     struct StreamingTaskDesc
     {
         std::string Name{};
-        Core::Dag::TaskKind Kind = Core::Dag::TaskKind::Generic;
+        Core::Dag::TaskKind Kind = RuntimeTaskKinds::Generic;
         Core::Dag::TaskPriority Priority = Core::Dag::TaskPriority::Normal;
         std::uint32_t EstimatedCost = 1;
         std::uint64_t CancellationGeneration = 0;

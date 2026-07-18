@@ -68,7 +68,7 @@ namespace Extrinsic::Core::Dag
         enum class PassDependencyKind : uint8_t
         {
             Default = 0,
-            DomainSpecific,
+            Named,
         };
 
         struct PassDependency
@@ -85,15 +85,13 @@ namespace Extrinsic::Core::Dag
             HazardWaw,
             HazardWar,
             LabelDependency,
-            // Reserved for GPU render-graph callers that want pass-level
-            // semantic reasons beyond generic task/resource edges.
-            DomainSpecific,
+            NamedDependency,
         };
 
         struct EdgeReasonInfo
         {
             EdgeReason Kind = EdgeReason::ExplicitDependency;
-            std::string DomainReason{};
+            std::string Reason{};
             std::uint32_t LabelValue = 0;
         };
 
@@ -130,11 +128,11 @@ namespace Extrinsic::Core::Dag
                     case EdgeReason::HazardWaw: oss << "WAW"; break;
                     case EdgeReason::HazardWar: oss << "WAR"; break;
                     case EdgeReason::LabelDependency: oss << "label(" << reason.LabelValue << ")"; break;
-                    case EdgeReason::DomainSpecific:
-                        if (!reason.DomainReason.empty())
-                            oss << "domain(" << reason.DomainReason << ")";
+                    case EdgeReason::NamedDependency:
+                        if (!reason.Reason.empty())
+                            oss << "reason(" << reason.Reason << ")";
                         else
-                            oss << "domain-specific";
+                            oss << "named";
                         break;
                     }
                     oss << "--> ";
@@ -191,7 +189,7 @@ namespace Extrinsic::Core::Dag
             auto addEdge = [&](const std::uint32_t from,
                                const std::uint32_t to,
                                const EdgeReason reason,
-                               std::string_view domainReason,
+                               std::string_view namedReason,
                                const std::uint32_t labelValue,
                                auto& seenEdges,
                                auto& successors,
@@ -214,7 +212,7 @@ namespace Extrinsic::Core::Dag
                 ++stats.edgeCount;
                 if (reason == EdgeReason::ExplicitDependency ||
                     reason == EdgeReason::LabelDependency ||
-                    reason == EdgeReason::DomainSpecific)
+                    reason == EdgeReason::NamedDependency)
                     ++stats.explicitEdgeCount;
                 else
                     ++stats.hazardEdgeCount;
@@ -222,7 +220,7 @@ namespace Extrinsic::Core::Dag
                     key,
                     EdgeReasonInfo{
                         .Kind = reason,
-                        .DomainReason = std::string(domainReason),
+                        .Reason = std::string(namedReason),
                         .LabelValue = labelValue,
                     });
             };
@@ -256,11 +254,11 @@ namespace Extrinsic::Core::Dag
                             *outDiagnostic = msg;
                         return Err<CompiledPlanState>(ErrorCode::InvalidState);
                     }
-                    const bool hasDomainReason = dependency.Kind != PassDependencyKind::Default;
+                    const bool hasNamedReason = dependency.Kind != PassDependencyKind::Default;
                     addEdge(
                         dependency.Predecessor,
                         i,
-                        hasDomainReason ? EdgeReason::DomainSpecific : EdgeReason::ExplicitDependency,
+                        hasNamedReason ? EdgeReason::NamedDependency : EdgeReason::ExplicitDependency,
                         dependency.Reason,
                         0u,
                         seenEdges,
@@ -664,7 +662,7 @@ namespace Extrinsic::Core::Dag
 
     struct TaskGraph::Impl
     {
-        QueueDomain Domain = QueueDomain::Cpu;
+        TaskGraphExecutionMode Mode = TaskGraphExecutionMode::ExecuteCallbacks;
 
         struct PassNode
         {
@@ -724,19 +722,17 @@ namespace Extrinsic::Core::Dag
     // -----------------------------------------------------------------------
     // TaskGraph public implementation
     // -----------------------------------------------------------------------
-    TaskGraph::TaskGraph(QueueDomain domain)
+    TaskGraph::TaskGraph(const TaskGraphExecutionMode mode)
         : m_Impl(std::make_unique<Impl>())
     {
-        m_Impl->Domain = domain;
+        m_Impl->Mode = mode;
     }
 
     TaskGraph::~TaskGraph() = default;
     TaskGraph::TaskGraph(TaskGraph&&) noexcept = default;
     TaskGraph& TaskGraph::operator=(TaskGraph&&) noexcept = default;
 
-    QueueDomain TaskGraph::Domain() const noexcept { return m_Impl->Domain; }
-
-uint32_t TaskGraph::AddPassInternal(std::string_view name,
+    uint32_t TaskGraph::AddPassInternal(std::string_view name,
                                         const TaskGraphPassOptions& options,
                                         GraphExecuteCallback execute)
     {
@@ -816,26 +812,7 @@ uint32_t TaskGraph::AddPassInternal(std::string_view name,
         return Ok();
     }
 
-    std::uint32_t ResolveLane(const QueueDomain domain,
-                              const uint32_t index,
-                              [[maybe_unused]] const uint32_t order,
-                              const uint32_t cpuBudget,
-                              const uint32_t gpuBudget,
-                              const uint32_t streamBudget)
-    {
-        switch (domain)
-        {
-        case QueueDomain::Cpu:
-            return index % std::max<uint32_t>(1u, cpuBudget);
-        case QueueDomain::Gpu:
-            return index % std::max<uint32_t>(1u, gpuBudget);
-        case QueueDomain::Streaming:
-            return index % std::max<uint32_t>(1u, streamBudget);
-        }
-        return 0u;
-    }
-
-    Core::Expected<std::vector<PlanTask>> TaskGraph::BuildPlan(const BuildConfig& config)
+    Core::Expected<std::vector<PlanTask>> TaskGraph::BuildPlan()
     {
         if (!m_Impl->CanUsePlan())
         {
@@ -848,28 +825,10 @@ uint32_t TaskGraph::AddPassInternal(std::string_view name,
         plan.reserve(passCount);
 
         uint32_t topoOrder = 0u;
-        uint32_t cpuLane = 0u;
-        uint32_t gpuLane = 0u;
-        uint32_t streamLane = 0u;
-        const auto cpuBudget = std::max<uint32_t>(config.queueBudgetCpu, 1u);
-        const auto gpuBudget = std::max<uint32_t>(config.queueBudgetGpu, 1u);
-        const auto streamBudget = std::max<uint32_t>(config.queueBudgetStreaming, 1u);
-
         for (const auto passIndex : m_Impl->ExecutionOrder)
         {
-            const auto lane = ResolveLane(
-                m_Impl->Domain,
-                (m_Impl->Domain == QueueDomain::Cpu ? cpuLane++ :
-                 m_Impl->Domain == QueueDomain::Gpu ? gpuLane++ : streamLane++),
-                topoOrder,
-                cpuBudget,
-                gpuBudget,
-                streamBudget);
-
             plan.push_back(PlanTask{
                 .id = TaskId{passIndex, 1u},
-                .domain = m_Impl->Domain,
-                .lane = lane,
                 .topoOrder = topoOrder++,
                 .batch = m_Impl->PassBatch[passIndex],
             });
@@ -879,10 +838,9 @@ uint32_t TaskGraph::AddPassInternal(std::string_view name,
 
     Core::Result TaskGraph::Execute()
     {
-        if (m_Impl->Domain != QueueDomain::Cpu)
+        if (m_Impl->Mode != TaskGraphExecutionMode::ExecuteCallbacks)
         {
-            Log::Error("[TaskGraph] Execute() called on non-CPU domain graph '{}'",
-                       static_cast<int>(m_Impl->Domain));
+            Log::Error("[TaskGraph] Execute() called on a plan-only graph");
             return Err(ErrorCode::InvalidState);
         }
 
@@ -1117,9 +1075,9 @@ GraphExecuteCallback TaskGraph::TakePassExecute(uint32_t passIndex)
         return m_Impl->LastStats;
     }
 
-    std::unique_ptr<TaskGraph> CreateTaskGraph(QueueDomain domain)
+    std::unique_ptr<TaskGraph> CreateTaskGraph(const TaskGraphExecutionMode mode)
     {
-        return std::make_unique<TaskGraph>(domain);
+        return std::make_unique<TaskGraph>(mode);
     }
 
     // -----------------------------------------------------------------------
@@ -1199,7 +1157,7 @@ GraphExecuteCallback TaskGraph::TakePassExecute(uint32_t passIndex)
         m_Graph.m_Impl->Passes[m_PassIndex].Dependencies.push_back(
             PassDependency{
                 .Predecessor = predecessorPassIndex,
-                .Kind = PassDependencyKind::DomainSpecific,
+                .Kind = PassDependencyKind::Named,
                 .Reason = std::string(reason),
             });
     }

@@ -14,39 +14,30 @@ import Extrinsic.Core.Error;
 import Extrinsic.Core.Hash;
 
 // -----------------------------------------------------------------------
-// Extrinsic::Core::Dag::TaskGraph — General-purpose per-domain task graph.
+// Extrinsic::Core::Dag::TaskGraph — General-purpose closure task graph.
 //
-// A TaskGraph is bound to exactly one QueueDomain at construction time and
-// serves as the execution primitive for all three scheduled work domains:
-//
-//   QueueDomain::Cpu       — ECS system scheduling.
-//                            Execute() schedules ready passes by dependency
-//                            and supports worker-parallel execution with
-//                            graph-local completion.
-//
-//   QueueDomain::Gpu       — GPU render-pass ordering. Virtual resources
-//                            (images, buffers) are declared per pass; the
-//                            compiled plan drives barrier emission.
-//                            Execute() is a no-op; callers iterate
-//                            BuildPlan() and record GPU commands.
-//
-//   QueueDomain::Streaming — Background IO / geometry processing.
-//                            Priority-ordered async work items.
-//                            Execute() is a no-op; the streaming scheduler
-//                            drives execution via BuildPlan().
+// ExecuteCallbacks mode schedules ready closures by dependency and supports
+// worker-parallel execution with graph-local completion. PlanOnly mode retains
+// the same deterministic topology but requires the caller to consume
+// BuildPlan() and explicitly drive any retained callbacks.
 //
 // API (three phases — must be called in order each epoch/frame):
 //
 //   1. Setup  — AddPass(name, setup_fn, execute_fn) × N
 //   2. Compile — Compile()  → error on dependency cycle
-//   3. Execute — Execute()  → CPU: fires closures in topo-layer order
-//             or BuildPlan() → returns ordered PlanTask vector for
-//                              GPU / Streaming callers
+//   3. Consume — Execute() fires closures in topo-layer order, or BuildPlan()
+//                returns the ordered PlanTask vector
 //   4. Reset  — Reset() to begin the next epoch
 // -----------------------------------------------------------------------
 
 export namespace Extrinsic::Core::Dag
 {
+    enum class TaskGraphExecutionMode : std::uint8_t
+    {
+        ExecuteCallbacks = 0,
+        PlanOnly,
+    };
+
     #if __cpp_lib_move_only_function >= 202110L
     using GraphExecuteCallback = std::move_only_function<void()>;
     #else
@@ -98,7 +89,7 @@ export namespace Extrinsic::Core::Dag
 
         // --- Data dependency declarations ---
 
-        // TypeToken-based component dependency (CPU domain / ECS use case).
+        // TypeToken-based component dependency.
         // Translates the compile-time type token to a ResourceId automatically.
         template <typename T>
         void Read();
@@ -106,7 +97,7 @@ export namespace Extrinsic::Core::Dag
         template <typename T>
         void Write();
 
-        // Explicit ResourceId-based resource access (GPU / Streaming use case).
+        // Explicit ResourceId-based resource access.
         // ResourceIds are assigned by the caller and must be consistent within
         // a single epoch (i.e., same ID → same logical resource each frame).
         void ReadResource(ResourceId resource);
@@ -129,9 +120,8 @@ export namespace Extrinsic::Core::Dag
         // Adds a dependency edge from `predecessorPassIndex` to this pass.
         void DependsOn(std::uint32_t predecessorPassIndex);
 
-        // Adds a domain-reasoned dependency edge from `predecessorPassIndex` to
-        // this pass. Use when a consumer should be aware of the dependency
-        // semantics (e.g., resource state transitions in GPU render graphs).
+        // Adds a named dependency edge from `predecessorPassIndex` to this pass.
+        // Use when diagnostics should preserve caller-defined edge semantics.
         void DependsOn(std::uint32_t predecessorPassIndex, std::string_view reason);
 
     private:
@@ -145,14 +135,13 @@ export namespace Extrinsic::Core::Dag
     class TaskGraph
     {
     public:
-        explicit TaskGraph(QueueDomain domain);
+        explicit TaskGraph(
+            TaskGraphExecutionMode mode = TaskGraphExecutionMode::ExecuteCallbacks);
         ~TaskGraph();
         TaskGraph(const TaskGraph&) = delete;
         TaskGraph& operator=(const TaskGraph&) = delete;
         TaskGraph(TaskGraph&&) noexcept;
         TaskGraph& operator=(TaskGraph&&) noexcept;
-
-        [[nodiscard]] QueueDomain Domain() const noexcept;
 
         // ----- Phase 1: Setup -----
 
@@ -161,8 +150,8 @@ export namespace Extrinsic::Core::Dag
         // move-only wrapper where supported; otherwise falls back to std::function).
         //
         // Returns a PassHandle that can be used to query pass metadata.
-        // For GPU/Streaming domains the execute_fn is stored but never called
-        // by Execute(); callers iterate BuildPlan() to drive execution themselves.
+        // In PlanOnly mode the execute_fn is stored but never called by
+        // Execute(); callers consume BuildPlan() and drive callbacks explicitly.
         template <typename SetupFn, typename ExecuteFn>
         void AddPass(std::string_view name, SetupFn&& setup, ExecuteFn&& execute)
         {
@@ -212,26 +201,22 @@ export namespace Extrinsic::Core::Dag
         // Returns Err on cycle detection.
         [[nodiscard]] Core::Result Compile();
 
-    // ----- Phase 3a: Execute (CPU domain) -----
+        // ----- Phase 3a: Execute callbacks -----
 
         // Fire all pass closures in dependency-ready order, with optional worker
         // dispatch for non-main-thread passes.
         //
-        // Asserts (Debug) or returns Err (Release) if called on GPU/Streaming domain.
+        // Returns InvalidState when the graph was constructed in PlanOnly mode.
         [[nodiscard]] Core::Result Execute();
 
-        // ----- Phase 3b: BuildPlan (GPU / Streaming domains) -----
+        // ----- Phase 3b: Build plan -----
 
         // Returns the topologically sorted execution plan.
-        // The caller (GPU render graph or streaming scheduler) iterates the
-        // returned vector and drives pass execution.
-        [[nodiscard]] Core::Expected<std::vector<PlanTask>> BuildPlan(
-            const BuildConfig& config = {});
+        // The caller iterates the returned vector and drives any external work.
+        [[nodiscard]] Core::Expected<std::vector<PlanTask>> BuildPlan();
 
-        // ----- Execute single pass (Streaming / GPU domains) -----
+        // ----- Execute single pass -----
         // Fire the closure registered for pass at `passIndex` (i.e. PlanTask::id.Index).
-        // For GPU passes the closure records GPU commands.
-        // For Streaming passes the closure performs IO / geometry processing.
         // Asserts that passIndex is in range.
         void ExecutePass(uint32_t passIndex);
 
@@ -288,5 +273,6 @@ export namespace Extrinsic::Core::Dag
     // -----------------------------------------------------------------------
     // Factory (produces a concrete TaskGraph implementation)
     // -----------------------------------------------------------------------
-    [[nodiscard]] std::unique_ptr<TaskGraph> CreateTaskGraph(QueueDomain domain);
+    [[nodiscard]] std::unique_ptr<TaskGraph> CreateTaskGraph(
+        TaskGraphExecutionMode mode = TaskGraphExecutionMode::ExecuteCallbacks);
 }

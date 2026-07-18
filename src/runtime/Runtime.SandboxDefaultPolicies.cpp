@@ -462,7 +462,7 @@ namespace Extrinsic::Runtime
                 StreamingTaskDesc{
                     .Name = "Runtime.DirectMeshPostProcess." +
                         FileNameFromPath(state->Path),
-                    .Kind = Core::Dag::TaskKind::AssetDecode,
+                    .Kind = RuntimeTaskKinds::AssetDecode,
                     .Priority = Core::Dag::TaskPriority::Low,
                     .EstimatedCost = 8u,
                     .Execute =

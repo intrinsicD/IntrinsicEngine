@@ -22,14 +22,13 @@ namespace
 
         const ResourceAccess rw{.resource = ctx->resources[0], .mode = ResourceAccessMode::ReadWrite};
 
-        PendingTaskDesc t0{.id = ctx->ids[0], .domain = QueueDomain::Cpu, .estimatedCost = 2};
+        PendingTaskDesc t0{.id = ctx->ids[0], .estimatedCost = 2};
         if (!emit(emitCtx, t0))
             return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidState);
 
         std::array<TaskId, 1> dep1{ctx->ids[0]};
         PendingTaskDesc t1{
             .id = ctx->ids[1],
-            .domain = QueueDomain::Gpu,
             .estimatedCost = 3,
             .dependsOn = std::span<const TaskId>(dep1.data(), dep1.size()),
             .resources = std::span<const ResourceAccess>(&rw, 1)
@@ -40,7 +39,6 @@ namespace
         std::array<TaskId, 1> dep2{ctx->ids[1]};
         PendingTaskDesc t2{
             .id = ctx->ids[2],
-            .domain = QueueDomain::Streaming,
             .estimatedCost = 5,
             .dependsOn = std::span<const TaskId>(dep2.data(), dep2.size())
         };
@@ -56,7 +54,6 @@ namespace
         std::array<TaskId, 1> missingDep{TaskId{99, 1}};
         PendingTaskDesc t0{
             .id = ctx->ids[0],
-            .domain = QueueDomain::Cpu,
             .estimatedCost = 1,
             .dependsOn = std::span<const TaskId>(missingDep.data(), missingDep.size())
         };
@@ -69,11 +66,11 @@ namespace
     {
         auto* ctx = static_cast<ProducerCtx*>(producerCtx);
 
-        PendingTaskDesc t0{.id = ctx->ids[0], .domain = QueueDomain::Cpu, .estimatedCost = 1};
+        PendingTaskDesc t0{.id = ctx->ids[0], .estimatedCost = 1};
         if (!emit(emitCtx, t0))
             return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidState);
 
-        PendingTaskDesc t1{.id = ctx->ids[0], .domain = QueueDomain::Gpu, .estimatedCost = 1};
+        PendingTaskDesc t1{.id = ctx->ids[0], .estimatedCost = 1};
         if (!emit(emitCtx, t1))
             return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidState);
 
@@ -90,7 +87,6 @@ namespace
         PendingTaskDesc a{
             .id = taskA,
             .debugName = "CycleA",
-            .domain = QueueDomain::Cpu,
             .dependsOn = std::span<const TaskId>(depsA),
         };
         if (!emit(emitCtx, a))
@@ -99,7 +95,6 @@ namespace
         PendingTaskDesc b{
             .id = taskB,
             .debugName = "CycleB",
-            .domain = QueueDomain::Cpu,
             .dependsOn = std::span<const TaskId>(depsB),
         };
         if (!emit(emitCtx, b))
@@ -118,7 +113,6 @@ namespace
         PendingTaskDesc a{
             .id = ctx->ids[0],
             .debugName = "WriterA",
-            .domain = QueueDomain::Cpu,
             .dependsOn = std::span<const TaskId>(depA),
             .resources = std::span<const ResourceAccess>(writeAccess),
         };
@@ -128,7 +122,6 @@ namespace
         PendingTaskDesc b{
             .id = ctx->ids[1],
             .debugName = "ReaderB",
-            .domain = QueueDomain::Cpu,
             .resources = std::span<const ResourceAccess>(readAccess),
         };
         if (!emit(emitCtx, b))
@@ -149,19 +142,14 @@ TEST(CoreDagScheduler, BuildsTopologicalPlanAndStats)
     };
 
     auto producer = scheduler->RegisterProducer(
-        ProducerInfo{.name = "unit", .subsystemId = 7, .preferredDomain = QueueDomain::Cpu},
+        ProducerInfo{.name = "unit", .subsystemId = 7},
         &ctx,
         &EmitLinear);
     ASSERT_TRUE(producer.has_value());
 
     ASSERT_TRUE(scheduler->QueryAllPending().has_value());
 
-    BuildConfig cfg{};
-    cfg.queueBudgetCpu = 2;
-    cfg.queueBudgetGpu = 2;
-    cfg.queueBudgetStreaming = 2;
-
-    auto plan = scheduler->BuildSchedule(cfg);
+    auto plan = scheduler->BuildSchedule();
     ASSERT_TRUE(plan.has_value());
     ASSERT_EQ(plan->size(), 3u);
     EXPECT_EQ((*plan)[0].id, ctx.ids[0]);
@@ -186,14 +174,13 @@ TEST(CoreDagScheduler, RejectsMissingDependencyIds)
     };
 
     auto producer = scheduler->RegisterProducer(
-        ProducerInfo{.name = "unit_missing_dep", .subsystemId = 7, .preferredDomain = QueueDomain::Cpu},
+        ProducerInfo{.name = "unit_missing_dep", .subsystemId = 7},
         &ctx,
         &EmitWithMissingDependency);
     ASSERT_TRUE(producer.has_value());
     ASSERT_TRUE(scheduler->QueryAllPending().has_value());
 
-    BuildConfig cfg{};
-    auto plan = scheduler->BuildSchedule(cfg);
+    auto plan = scheduler->BuildSchedule();
     ASSERT_FALSE(plan.has_value());
     EXPECT_EQ(plan.error(), Extrinsic::Core::ErrorCode::InvalidArgument);
 }
@@ -209,14 +196,13 @@ TEST(CoreDagScheduler, RejectsDuplicateTaskIds)
     };
 
     auto producer = scheduler->RegisterProducer(
-        ProducerInfo{.name = "unit_duplicate_id", .subsystemId = 7, .preferredDomain = QueueDomain::Cpu},
+        ProducerInfo{.name = "unit_duplicate_id", .subsystemId = 7},
         &ctx,
         &EmitDuplicateIds);
     ASSERT_TRUE(producer.has_value());
     ASSERT_TRUE(scheduler->QueryAllPending().has_value());
 
-    BuildConfig cfg{};
-    auto plan = scheduler->BuildSchedule(cfg);
+    auto plan = scheduler->BuildSchedule();
     ASSERT_FALSE(plan.has_value());
     EXPECT_EQ(plan.error(), Extrinsic::Core::ErrorCode::InvalidArgument);
 }
@@ -228,7 +214,7 @@ TEST(CoreDagScheduler, RegisterProducerRejectsNullQuery)
     ASSERT_NE(scheduler, nullptr);
 
     auto producer = scheduler->RegisterProducer(
-        ProducerInfo{.name = "null_query", .subsystemId = 1, .preferredDomain = QueueDomain::Cpu},
+        ProducerInfo{.name = "null_query", .subsystemId = 1},
         nullptr,
         nullptr);
     ASSERT_FALSE(producer.has_value());
@@ -256,19 +242,19 @@ TEST(CoreDagScheduler, ResetEpochClearsCachedTasks)
     };
 
     auto producer = scheduler->RegisterProducer(
-        ProducerInfo{.name = "unit_reset", .subsystemId = 8, .preferredDomain = QueueDomain::Cpu},
+        ProducerInfo{.name = "unit_reset", .subsystemId = 8},
         &ctx,
         &EmitLinear);
     ASSERT_TRUE(producer.has_value());
     ASSERT_TRUE(scheduler->QueryAllPending().has_value());
 
-    auto firstPlan = scheduler->BuildSchedule(BuildConfig{});
+    auto firstPlan = scheduler->BuildSchedule();
     ASSERT_TRUE(firstPlan.has_value());
     ASSERT_EQ(firstPlan->size(), 3u);
 
     scheduler->ResetEpoch();
 
-    auto secondPlan = scheduler->BuildSchedule(BuildConfig{});
+    auto secondPlan = scheduler->BuildSchedule();
     ASSERT_TRUE(secondPlan.has_value());
     EXPECT_TRUE(secondPlan->empty());
 
@@ -282,13 +268,13 @@ TEST(CoreDagScheduler, CycleDiagnosticIncludesTaskNamesForExplicitCycle)
     ASSERT_NE(scheduler, nullptr);
 
     auto producer = scheduler->RegisterProducer(
-        ProducerInfo{.name = "unit_cycle_explicit", .subsystemId = 9, .preferredDomain = QueueDomain::Cpu},
+        ProducerInfo{.name = "unit_cycle_explicit", .subsystemId = 9},
         nullptr,
         &EmitExplicitCycle);
     ASSERT_TRUE(producer.has_value());
     ASSERT_TRUE(scheduler->QueryAllPending().has_value());
 
-    const auto plan = scheduler->BuildSchedule(BuildConfig{});
+    const auto plan = scheduler->BuildSchedule();
     ASSERT_FALSE(plan.has_value());
     EXPECT_EQ(plan.error(), Extrinsic::Core::ErrorCode::InvalidState);
 
@@ -309,13 +295,13 @@ TEST(CoreDagScheduler, CycleDiagnosticIncludesHazardReason)
     };
 
     auto producer = scheduler->RegisterProducer(
-        ProducerInfo{.name = "unit_cycle_mixed", .subsystemId = 10, .preferredDomain = QueueDomain::Cpu},
+        ProducerInfo{.name = "unit_cycle_mixed", .subsystemId = 10},
         &ctx,
         &EmitMixedExplicitAndHazardCycle);
     ASSERT_TRUE(producer.has_value());
     ASSERT_TRUE(scheduler->QueryAllPending().has_value());
 
-    const auto plan = scheduler->BuildSchedule(BuildConfig{});
+    const auto plan = scheduler->BuildSchedule();
     ASSERT_FALSE(plan.has_value());
     EXPECT_EQ(plan.error(), Extrinsic::Core::ErrorCode::InvalidState);
 
@@ -328,30 +314,30 @@ TEST(CoreDagScheduler, CycleDiagnosticIncludesHazardReason)
 
 // -----------------------------------------------------------------------------
 // HLFET scheduling behavior: priority > level > insertion order.
-// These tests drive the scheduler through DomainTaskGraph for directness;
+// These tests drive the scheduler through TaskPlanGraph for directness;
 // DagScheduler uses the same BuildPlanFromTasks core.
 // -----------------------------------------------------------------------------
 
 TEST(CoreDagScheduler, PriorityOverridesInsertionOrder)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
     // Two independent tasks. Low priority is submitted first; Critical must
     // still come out first per HLFET.
     PendingTaskDesc low{
-        .id = TaskId{1, 1}, .domain = QueueDomain::Cpu,
+        .id = TaskId{1, 1},
         .priority = TaskPriority::Low,
     };
     PendingTaskDesc critical{
-        .id = TaskId{2, 1}, .domain = QueueDomain::Cpu,
+        .id = TaskId{2, 1},
         .priority = TaskPriority::Critical,
     };
 
     ASSERT_TRUE(graph->Submit(low).has_value());
     ASSERT_TRUE(graph->Submit(critical).has_value());
 
-    auto plan = graph->BuildPlan(BuildConfig{});
+    auto plan = graph->BuildPlan();
     ASSERT_TRUE(plan.has_value());
     ASSERT_EQ(plan->size(), 2u);
     EXPECT_EQ((*plan)[0].id, critical.id);
@@ -360,7 +346,7 @@ TEST(CoreDagScheduler, PriorityOverridesInsertionOrder)
 
 TEST(CoreDagScheduler, LongerCriticalPathBreaksPriorityTie)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
     // Two roots at equal priority: one heads a 3-node chain, the other is
@@ -370,23 +356,23 @@ TEST(CoreDagScheduler, LongerCriticalPathBreaksPriorityTie)
     //   t0 -> t1 -> t2   (chain root t0; level = 3)
     //   t3                (singleton; level = 1)
     const PendingTaskDesc t0{
-        .id = TaskId{10, 1}, .domain = QueueDomain::Cpu,
+        .id = TaskId{10, 1},
         .priority = TaskPriority::Normal, .estimatedCost = 1,
     };
     const TaskId t0DepArr[1] = {t0.id};
     const PendingTaskDesc t1{
-        .id = TaskId{11, 1}, .domain = QueueDomain::Cpu,
+        .id = TaskId{11, 1},
         .priority = TaskPriority::Normal, .estimatedCost = 1,
         .dependsOn = std::span<const TaskId>(t0DepArr, 1),
     };
     const TaskId t1DepArr[1] = {t1.id};
     const PendingTaskDesc t2{
-        .id = TaskId{12, 1}, .domain = QueueDomain::Cpu,
+        .id = TaskId{12, 1},
         .priority = TaskPriority::Normal, .estimatedCost = 1,
         .dependsOn = std::span<const TaskId>(t1DepArr, 1),
     };
     const PendingTaskDesc t3{
-        .id = TaskId{13, 1}, .domain = QueueDomain::Cpu,
+        .id = TaskId{13, 1},
         .priority = TaskPriority::Normal, .estimatedCost = 1,
     };
 
@@ -396,7 +382,7 @@ TEST(CoreDagScheduler, LongerCriticalPathBreaksPriorityTie)
     ASSERT_TRUE(graph->Submit(t1).has_value());
     ASSERT_TRUE(graph->Submit(t2).has_value());
 
-    auto plan = graph->BuildPlan(BuildConfig{});
+    auto plan = graph->BuildPlan();
     ASSERT_TRUE(plan.has_value());
     ASSERT_EQ(plan->size(), 4u);
     EXPECT_EQ((*plan)[0].id, t0.id) << "Critical-path root must precede the singleton.";
@@ -405,24 +391,24 @@ TEST(CoreDagScheduler, LongerCriticalPathBreaksPriorityTie)
 
 TEST(CoreDagScheduler, StableOrderingOnFullTies)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
     // Two independent tasks at identical priority and identical level.
     // The lower-insertion (earlier-submitted) one must come out first.
     const PendingTaskDesc a{
-        .id = TaskId{100, 1}, .domain = QueueDomain::Cpu,
+        .id = TaskId{100, 1},
         .priority = TaskPriority::Normal, .estimatedCost = 1,
     };
     const PendingTaskDesc b{
-        .id = TaskId{101, 1}, .domain = QueueDomain::Cpu,
+        .id = TaskId{101, 1},
         .priority = TaskPriority::Normal, .estimatedCost = 1,
     };
 
     ASSERT_TRUE(graph->Submit(a).has_value());
     ASSERT_TRUE(graph->Submit(b).has_value());
 
-    auto plan = graph->BuildPlan(BuildConfig{});
+    auto plan = graph->BuildPlan();
     ASSERT_TRUE(plan.has_value());
     ASSERT_EQ(plan->size(), 2u);
     EXPECT_EQ((*plan)[0].id, a.id);
@@ -431,7 +417,7 @@ TEST(CoreDagScheduler, StableOrderingOnFullTies)
 
 TEST(CoreDagScheduler, CycleReturnsInvalidState)
 {
-    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    auto graph = CreateTaskPlanGraph();
     ASSERT_NE(graph, nullptr);
 
     // Two-task cycle: t0 -> t1 -> t0. No zero-indegree node exists; Kahn
@@ -443,17 +429,17 @@ TEST(CoreDagScheduler, CycleReturnsInvalidState)
     const TaskId dep1[1] = {id0};  // t1 depends on t0
 
     const PendingTaskDesc t0{
-        .id = id0, .domain = QueueDomain::Cpu,
+        .id = id0,
         .dependsOn = std::span<const TaskId>(dep0, 1),
     };
     const PendingTaskDesc t1{
-        .id = id1, .domain = QueueDomain::Cpu,
+        .id = id1,
         .dependsOn = std::span<const TaskId>(dep1, 1),
     };
     ASSERT_TRUE(graph->Submit(t0).has_value());
     ASSERT_TRUE(graph->Submit(t1).has_value());
 
-    auto plan = graph->BuildPlan(BuildConfig{});
+    auto plan = graph->BuildPlan();
     ASSERT_FALSE(plan.has_value());
     EXPECT_EQ(plan.error(), Extrinsic::Core::ErrorCode::InvalidState);
 }
