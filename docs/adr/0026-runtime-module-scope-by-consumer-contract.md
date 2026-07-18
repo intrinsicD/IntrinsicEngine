@@ -43,8 +43,10 @@ across all four axes:
    resolved, and shut down as one optional application part.
 2. **Durable state and scope** — they share one state owner and the same
    world-scoped or global lifetime.
-3. **Dependencies and commit target** — they require the same services and
-   job/cancellation boundary, and commit into the same authoritative target.
+3. **Dependency and commit ownership** — their service, execution,
+   cancellation, and commit lifecycles are compatible and co-owned by the
+   composed responsibility. Different dependency sets or execution mechanisms
+   may coexist when they do not require independent composition or ownership.
 4. **Published state and consumer reactions** — they publish state with the
    same meaning to the same consumers, and those consumers require the same
    standing follow-through.
@@ -55,15 +57,16 @@ applies:
 - the app must be able to compose, replace, or remove one integration without
   the other;
 - their durable state has different ownership or world/global lifetime;
-- they require distinct services, scheduling/job lifecycles, cancellation
-  scopes, or authoritative commit targets; or
+- their dependency, cancellation, or authoritative commit lifecycle requires
+  independent composition or ownership; or
 - their published state has different meaning, consumers, or standing
   reactions.
 
 Algorithm family and result shape are evidence to examine, but neither is
 necessary nor sufficient for grouping. Conversely, methods from different
 algorithm families may share a module when the demonstrated composition and
-consumer contract is identical.
+consumer contract is cohesive. An extra service or a different execution
+mechanism alone is not a split trigger.
 
 Command, status, completion, and diagnostic records remain method-specific
 until a second production integration demonstrates identical semantics for

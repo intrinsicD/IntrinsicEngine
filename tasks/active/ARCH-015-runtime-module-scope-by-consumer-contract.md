@@ -48,8 +48,9 @@ depends_on: []
 - [ ] Record an accepted ADR that applies only after a responsibility already
       qualifies for runtime composition under ADR-0024.
 - [ ] Define the same-module cohesion test across app composition/lifecycle,
-      durable state and world/global lifetime, required services plus job/commit
-      target, and published state plus consumer reactions.
+      durable state and world/global lifetime, compatible and co-owned
+      dependency/cancellation/commit lifecycles, and published state plus
+      consumer reactions.
 - [ ] Define objective split triggers and state that algorithm family/result
       shape alone is neither sufficient nor necessary.
 - [ ] Keep command, status, completion, and diagnostic records method-specific

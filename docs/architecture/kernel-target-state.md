@@ -25,8 +25,9 @@ composed by the app (ADR-0024 D9).
 
 ADR-0024 D9 decides **kernel versus module**. ADR-0026 then decides **one
 module versus several** from app lifecycle, durable-state scope,
-service/job/commit dependencies, and consumer reactions. A family name or
-matching result shape alone is never the boundary.
+dependency/cancellation/commit ownership, and consumer reactions. A family
+name, matching result shape, extra service, or different execution mechanism
+alone is never the boundary.
 
 ## The knob-decision guide — "where does my thing go?"
 
