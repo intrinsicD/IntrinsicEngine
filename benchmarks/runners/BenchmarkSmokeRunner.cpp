@@ -13,6 +13,7 @@
 // benchmark_id). The single-file form preserves backwards compatibility
 // with the previous scaffold's CMake/CI wiring.
 
+#include "../core/Bench.SchedulerHardeningSmoke.hpp"
 #include "../geometry/Bench.GeometrySmoke.hpp"
 #include "../geometry/Bench.BoundaryFirstFlatteningReferenceSmoke.hpp"
 #include "../geometry/Bench.PointCloudFilteringSmoke.hpp"
@@ -1342,6 +1343,85 @@ auto EmitRenderGraphParallelRecordingSmoke(const std::string &commit)
                           out.str(), metrics.Succeeded};
 }
 
+auto EmitSchedulerHardeningSmoke(const std::string &commit)
+    -> EmittedBenchmark {
+  using namespace Intrinsic::Bench::Core;
+
+  const auto metrics = RunSchedulerHardeningSmoke();
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed);
+  out.precision(6);
+  out << "{\n"
+      << "  \"benchmark_id\": \""
+      << EscapeJson(kSchedulerHardeningSmokeBenchmarkId) << "\",\n"
+      << "  \"method\": \""
+      << EscapeJson(kSchedulerHardeningSmokeMethod) << "\",\n"
+      << "  \"backend\": \"cpu_optimized\",\n"
+      << "  \"dataset\": \""
+      << EscapeJson(kSchedulerHardeningSmokeDataset) << "\",\n"
+      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+      << "  \"metrics\": {\n"
+      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+      << "    \"throughput_items_per_sec\": "
+      << metrics.ThroughputItemsPerSecond << ",\n"
+      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+      << "  },\n"
+      << "  \"diagnostics\": {\n"
+      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+      << "    \"mode\": \"smoke\",\n"
+      << "    \"warmup_iterations\": " << metrics.WarmupIterations << ",\n"
+      << "    \"measured_iterations\": " << metrics.MeasuredIterations
+      << ",\n"
+      << "    \"timing_statistic\": \"median\",\n"
+      << "    \"dispatch_worker_request\": "
+      << metrics.DispatchWorkerRequest << ",\n"
+      << "    \"dispatch_worker_count\": " << metrics.DispatchWorkerCount
+      << ",\n"
+      << "    \"dispatch_task_count\": " << metrics.DispatchTaskCount
+      << ",\n"
+      << "    \"dispatch_succeeded\": "
+      << (metrics.DispatchSucceeded ? "true" : "false") << ",\n"
+      << "    \"priority_low_task_count\": "
+      << metrics.PriorityLowTaskCount << ",\n"
+      << "    \"priority_high_task_count\": "
+      << metrics.PriorityHighTaskCount << ",\n"
+      << "    \"priority_low_before_first_high\": "
+      << metrics.PriorityLowBeforeFirstHigh << ",\n"
+      << "    \"priority_low_in_high_window\": "
+      << metrics.PriorityLowInHighWindow << ",\n"
+      << "    \"priority_probe_runtime_ms\": "
+      << metrics.PriorityProbeRuntimeMilliseconds << ",\n"
+      << "    \"priority_contract_satisfied\": "
+      << (metrics.PriorityContractSatisfied ? "true" : "false") << ",\n"
+      << "    \"wait_registry_thread_count\": "
+      << metrics.WaitRegistryThreadCount << ",\n"
+      << "    \"wait_registry_operations_per_thread\": "
+      << metrics.WaitRegistryOperationsPerThread << ",\n"
+      << "    \"wait_registry_single_thread_median_ms\": "
+      << metrics.WaitRegistrySingleThreadMedianMilliseconds << ",\n"
+      << "    \"wait_registry_contended_median_ms\": "
+      << metrics.WaitRegistryContendedMedianMilliseconds << ",\n"
+      << "    \"wait_registry_single_thread_throughput_items_per_sec\": "
+      << metrics.WaitRegistrySingleThreadThroughputItemsPerSecond << ",\n"
+      << "    \"wait_registry_contended_throughput_items_per_sec\": "
+      << metrics.WaitRegistryContendedThroughputItemsPerSecond << ",\n"
+      << "    \"wait_registry_contended_scaling_efficiency\": "
+      << metrics.WaitRegistryContendedScalingEfficiency << ",\n"
+      << "    \"wait_registry_succeeded\": "
+      << (metrics.WaitRegistrySucceeded ? "true" : "false") << ",\n"
+      << "    \"worker_wake_notification_telemetry_available\": false,\n"
+      << "    \"worker_wake_evidence\": "
+         "\"candidate_stats_and_contract_tests\"\n"
+      << "  },\n"
+      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
+      << "\"\n"
+      << "}\n";
+
+  return EmittedBenchmark{kSchedulerHardeningSmokeBenchmarkId, out.str(),
+                          metrics.Succeeded};
+}
+
 auto WriteFile(const std::filesystem::path &path, std::string_view payload)
     -> bool {
   std::error_code ec;
@@ -1388,6 +1468,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitFrameRecipeCompileCacheSmoke(commit));
   emitted.push_back(EmitRenderGraphParallelRecordingSmoke(commit));
   emitted.push_back(EmitVertexFetchLayoutSmoke(commit));
+  emitted.push_back(EmitSchedulerHardeningSmoke(commit));
 
   // Output target: an existing directory or a path with no extension (or no
   // filename component) is treated as a directory and gets one JSON per

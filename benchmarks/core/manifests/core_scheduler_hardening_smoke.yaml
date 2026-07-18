@@ -1,0 +1,33 @@
+# CORE-007 - deterministic synthetic scheduler contention smoke.
+#
+# The priority quality metric counts Low callbacks occupying the first
+# High-sized execution window. The pre-priority baseline intentionally reports
+# a failed status with a non-zero quality error; that payload remains valid
+# evidence for comparison with the candidate.
+
+benchmark_id: core.scheduler_hardening.smoke
+method: core.scheduler_hardening
+dataset: builtin.synthetic_scheduler_contention.v1
+params:
+  intent: smoke
+  dispatch_worker_request: 4
+  dispatch_task_count: 8192
+  priority_worker_request: 1
+  priority_low_task_count: 64
+  priority_high_task_count: 16
+  priority_registration_order: low_then_high
+  wait_registry_thread_count: 8
+  wait_registry_operations_per_thread: 4096
+  warmup_iterations: 3
+  measured_iterations: 9
+  timing_statistic: median
+  baseline_production_commit: 59fbb84a905df42710940e7169442eabb3a83894
+  worker_wake_notification_probe: unavailable_in_baseline_public_stats
+metrics:
+  - runtime_ms
+  - throughput_items_per_sec
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 1000
+  throughput_items_per_sec_min: 1
+  priority_inversion_quality_error_l2_max: 0.0

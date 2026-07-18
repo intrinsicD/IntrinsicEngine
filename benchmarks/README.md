@@ -13,6 +13,7 @@ This directory owns IntrinsicEngine benchmark infrastructure and benchmark artif
 ## Layout
 
 - `geometry/`: geometry-processing benchmark suites and manifests.
+- `core/`: Core scheduler and task-system benchmark suites and manifests.
 - `ci/`: GitHub-hosted CI gate latency contracts and manifests.
 - `physics/`: physics and dynamics benchmark suites and manifests.
 - `rendering/`: rendering and frame-graph benchmark suites.
@@ -24,5 +25,7 @@ This directory owns IntrinsicEngine benchmark infrastructure and benchmark artif
 ## Build integration
 
 - Benchmark scaffolding is wired through `benchmarks/CMakeLists.txt`.
+- The optimized `ci-release` lane owns the 23-result monolithic
+  `IntrinsicBenchmarkSmoke` population, including the Core scheduler probe.
 - The default configuration keeps benchmark binaries lightweight so existing builds remain stable.
 - Heavy datasets and long-running suites are deferred to dedicated benchmark tasks.

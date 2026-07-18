@@ -345,7 +345,7 @@ class CiTimingTests(unittest.TestCase):
         self.assertIsNotNone(registration, "missing benchmark smoke registration")
         self.assertEqual(
             set(registration.group("labels").split()),
-            {"benchmark", "geometry", "graphics", "physics", "slow"},
+            {"benchmark", "core", "geometry", "graphics", "physics", "slow"},
         )
 
         def properties(test_name: str) -> str:
@@ -368,8 +368,16 @@ class CiTimingTests(unittest.TestCase):
 
         run = properties("IntrinsicBenchmarkSmoke.Run")
         validate = properties("IntrinsicBenchmarkSmoke.Validate")
-        expected_labels = {"benchmark", "geometry", "graphics", "physics", "slow"}
+        expected_labels = {
+            "benchmark",
+            "core",
+            "geometry",
+            "graphics",
+            "physics",
+            "slow",
+        }
         self.assertEqual(set(property_value(run, "LABELS").split(";")), expected_labels)
+        self.assertEqual(property_value(run, "PROCESSORS"), "9")
         self.assertEqual(
             set(property_value(validate, "LABELS").split(";")), expected_labels
         )
