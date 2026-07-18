@@ -162,9 +162,9 @@ depends_on: []
 
 ## Evidence
 - The five fixed hosted JUnits each contain both passing cases and all four
-  parseable `SLO_METRIC` records. After its harness-validity checks, the fixed
-  source prints those records before its derived-budget assertions. Diagnostic
-  failed run
+  parseable `SLO_METRIC` records. After any fatal checks required to derive its
+  percentiles, the fixed source prints those records before its derived-budget
+  assertions. Diagnostic failed run
   [`29631970411`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/29631970411)
   proves CTest retains failure stdout, so derived-budget-failure retention is
   established compositionally without manufacturing a failing fixed run. An

@@ -84,9 +84,9 @@ performance-improvement claims:
   Worker-local fanout p95 and signal-to-resume p99 must each remain below one
   60 Hz frame (16.666667 milliseconds).
 
-After its harness-validity checks, each test prints parseable
-`SLO_METRIC name=... value_ns=... budget_ns=...` records before its derived
-budget assertions. The scheduler case also prints
+After any fatal checks required to derive its percentiles, each test prints
+parseable `SLO_METRIC name=... value_ns=... budget_ns=...` records before its
+derived budget assertions. The scheduler case also prints
 `SLO_DIAGNOSTIC` counters for steal attempts/ratio, contention, cumulative
 idle wait, and the legacy park-to-signal histogram. CTest retains these lines
 in the uploaded JUnit on passing runs and derived-budget failures. An earlier
