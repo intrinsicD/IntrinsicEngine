@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -89,4 +90,75 @@ TEST(RuntimeEngineConfigBoot, MissingExplicitPathFallsBackToReferenceConfig)
         boot.LoadResult,
         Core::Config::EngineConfigDiagnosticCode::LoadError));
     EXPECT_EQ(boot.Config.Window.Width, Runtime::CreateReferenceEngineConfig().Window.Width);
+}
+
+TEST(RuntimeEngineConfigBoot, RegistryDefaultsAndFileSectionsFlowThroughBoot)
+{
+    std::uint32_t callbackCount = 0u;
+    Core::Config::EngineConfigSectionRegistry registry{};
+    ASSERT_TRUE(registry.Register(
+        Core::Config::EngineConfigSectionRegistration{
+            .DefaultSection = Core::Config::EngineConfigSection{
+                .Name = "test",
+                .SchemaId = "test.runtime-boot",
+                .SchemaVersion = 1u,
+                .PayloadJson = R"json({"value":0})json",
+            },
+            .Validate =
+                [](const std::string_view documentPayloadJson,
+                   const std::string_view /*referencePayloadJson*/,
+                   const std::string_view /*diagnosticSubject*/)
+                {
+                    return Core::Config::EngineConfigSectionValidationResult{
+                        .State = Core::Config::EngineConfigState::Valid,
+                        .CanonicalPayloadJson =
+                            std::string{documentPayloadJson},
+                        .ParsedFieldCount = 1u,
+                    };
+                },
+            .OnChanged =
+                [&](const Core::Config::EngineConfigSection&,
+                    const Core::Config::EngineConfigSection&)
+                {
+                    ++callbackCount;
+                },
+        }));
+
+    Core::Config::EngineConfig config =
+        Runtime::CreateReferenceEngineConfig(registry);
+    const Core::Config::EngineConfigSection* defaultSection =
+        Core::Config::FindEngineConfigSection(config.AppSections, "test");
+    ASSERT_NE(defaultSection, nullptr);
+    EXPECT_EQ(defaultSection->PayloadJson, R"json({"value":0})json");
+
+    Core::Config::UpsertEngineConfigSection(
+        config.AppSections,
+        Core::Config::EngineConfigSection{
+            .Name = "test",
+            .SchemaId = "test.runtime-boot",
+            .SchemaVersion = 1u,
+            .PayloadJson = R"json({"value":7})json",
+        });
+    const std::filesystem::path path =
+        std::filesystem::temp_directory_path()
+        / "intrinsic_runtime_engine_config_boot_sections.json";
+    const std::string pathText = path.string();
+    WriteTextFile(path, Core::Config::SerializeEngineConfig(config));
+
+    std::vector<std::string_view> args{"sandbox", "--engine-config", pathText};
+    Runtime::EngineConfigBootOptions options{};
+    options.DefaultConfigPath.clear();
+    options.EnvironmentVariable.clear();
+
+    const Runtime::EngineConfigBootResult boot =
+        Runtime::ResolveEngineConfigForBoot(args, registry, options);
+    std::filesystem::remove(path);
+
+    ASSERT_TRUE(boot.LoadedFile);
+    EXPECT_EQ(boot.LoadResult.State, Core::Config::EngineConfigState::Valid);
+    const Core::Config::EngineConfigSection* loadedSection =
+        Core::Config::FindEngineConfigSection(boot.Config.AppSections, "test");
+    ASSERT_NE(loadedSection, nullptr);
+    EXPECT_EQ(loadedSection->PayloadJson, R"json({"value":7})json");
+    EXPECT_EQ(callbackCount, 0u);
 }

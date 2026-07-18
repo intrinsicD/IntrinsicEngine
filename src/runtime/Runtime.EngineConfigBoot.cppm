@@ -14,6 +14,8 @@ import Extrinsic.Core.Config.Render;
 namespace Extrinsic::Runtime
 {
     export [[nodiscard]] Core::Config::EngineConfig CreateReferenceEngineConfig();
+    export [[nodiscard]] Core::Config::EngineConfig CreateReferenceEngineConfig(
+        const Core::Config::EngineConfigSectionRegistry& sectionRegistry);
 
     export enum class EngineConfigBootSource : std::uint8_t
     {
@@ -42,5 +44,10 @@ namespace Extrinsic::Runtime
 
     export [[nodiscard]] EngineConfigBootResult ResolveEngineConfigForBoot(
         std::span<const std::string_view> args,
+        const EngineConfigBootOptions& options = {});
+
+    export [[nodiscard]] EngineConfigBootResult ResolveEngineConfigForBoot(
+        std::span<const std::string_view> args,
+        const Core::Config::EngineConfigSectionRegistry& sectionRegistry,
         const EngineConfigBootOptions& options = {});
 }

@@ -87,8 +87,7 @@ namespace Extrinsic::Runtime
         RuntimeRenderRecipeApplyResult RecipeApply{};
         bool EngineConfigApplied{false};
         bool DefaultRecipeConfigPathChanged{false};
-        bool SandboxProgressivePoissonChanged{false};
-        bool SandboxParameterizationChanged{false};
+        std::vector<std::string> ChangedSectionNames{};
         std::vector<std::string> RejectedBootOnlyFields{};
 
         [[nodiscard]] bool Succeeded() const noexcept
@@ -96,6 +95,8 @@ namespace Extrinsic::Runtime
             return Status == RuntimeEngineConfigApplyStatus::Applied ||
                 Status == RuntimeEngineConfigApplyStatus::NoChange;
         }
+
+        [[nodiscard]] bool SectionChanged(std::string_view name) const noexcept;
     };
 
     export struct RuntimeEngineConfigControlState
@@ -108,6 +109,7 @@ namespace Extrinsic::Runtime
     export struct EngineConfigControlDependencies
     {
         Core::Config::EngineConfig* Config{};
+        const Core::Config::EngineConfigSectionRegistry* SectionRegistry{};
         const Platform::IWindow* Window{};
         Graphics::IRenderer* Renderer{};
     };

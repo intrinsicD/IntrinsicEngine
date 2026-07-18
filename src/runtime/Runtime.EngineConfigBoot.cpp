@@ -95,12 +95,29 @@ namespace Extrinsic::Runtime
         return config;
     }
 
+    Core::Config::EngineConfig CreateReferenceEngineConfig(
+        const Core::Config::EngineConfigSectionRegistry& sectionRegistry)
+    {
+        Core::Config::EngineConfig config = CreateReferenceEngineConfig();
+        Core::Config::PopulateEngineConfigSectionDefaults(config, sectionRegistry);
+        return config;
+    }
+
     EngineConfigBootResult ResolveEngineConfigForBoot(
         const std::span<const std::string_view> args,
         const EngineConfigBootOptions& options)
     {
+        const Core::Config::EngineConfigSectionRegistry emptyRegistry{};
+        return ResolveEngineConfigForBoot(args, emptyRegistry, options);
+    }
+
+    EngineConfigBootResult ResolveEngineConfigForBoot(
+        const std::span<const std::string_view> args,
+        const Core::Config::EngineConfigSectionRegistry& sectionRegistry,
+        const EngineConfigBootOptions& options)
+    {
         EngineConfigBootResult result{};
-        result.Config = CreateReferenceEngineConfig();
+        result.Config = CreateReferenceEngineConfig(sectionRegistry);
         result.LoadResult.Preview.Config = result.Config;
         result.LoadResult.SourceId = "<reference>";
 
@@ -130,7 +147,10 @@ namespace Extrinsic::Runtime
         result.LoadResult = Core::Config::LoadEngineConfigFile(
             *path,
             result.Config,
-            Core::Config::EngineConfigParseOptions{.SourceId = *path});
+            Core::Config::EngineConfigParseOptions{
+                .SourceId = *path,
+                .SectionRegistry = &sectionRegistry,
+            });
         result.LoadedFile = Core::Config::IsConfigUsable(result.LoadResult);
         result.UsedReferenceFallback =
             result.LoadResult.State != Core::Config::EngineConfigState::Valid;
