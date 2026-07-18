@@ -831,6 +831,16 @@ namespace Extrinsic::Core::Dag
                 return Err(ErrorCode::InvalidState);
             }
 
+            const auto schedulerProgress =
+                state->SchedulerInstance != 0u
+                    ? Tasks::Scheduler::ObserveWorkProgress()
+                    : Tasks::Scheduler::WorkProgressToken{};
+            if (state->SchedulerInstance != 0u &&
+                schedulerProgress.SchedulerInstance != state->SchedulerInstance)
+            {
+                return Err(ErrorCode::InvalidState);
+            }
+
             const auto observedPending = state->Done.PendingCount();
             if (observedPending == 0u)
                 break;
@@ -844,7 +854,15 @@ namespace Extrinsic::Core::Dag
             if (Tasks::Scheduler::TryRunOne())
                 continue;
 
-            state->Done.WaitForProgress(observedPending);
+            if (state->SchedulerInstance != 0u)
+            {
+                if (!Tasks::Scheduler::WaitForWorkProgress(schedulerProgress))
+                    return Err(ErrorCode::InvalidState);
+            }
+            else
+            {
+                state->Done.WaitForProgress(observedPending);
+            }
         }
 
         return Ok();

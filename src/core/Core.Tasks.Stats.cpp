@@ -51,6 +51,10 @@ namespace Extrinsic::Core::Tasks
         stats.IdleWaitCount = s_Ctx->idleWaitCount.load(std::memory_order_relaxed);
         stats.IdleWaitTotalNs = s_Ctx->idleWaitTotalNs.load(std::memory_order_relaxed);
         stats.QueueContentionCount = s_Ctx->queueContentionCount.load(std::memory_order_relaxed);
+        stats.WorkProgressEpoch =
+            s_Ctx->workProgressEpoch.load(std::memory_order_relaxed);
+        stats.ExternalProgressWaiters =
+            s_Ctx->externalProgressWaiters.load(std::memory_order_acquire);
 
         if (stats.TotalStealAttempts > 0)
         {

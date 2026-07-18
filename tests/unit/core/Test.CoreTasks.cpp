@@ -124,6 +124,65 @@ TEST(CoreTasks, BasicDispatch) {
     Scheduler::Shutdown();
 }
 
+TEST(CoreTasks, WaitForAllWakesForChildDispatchedAfterHelperRegisters)
+{
+    Scheduler::Initialize(1);
+
+    std::atomic<bool> parentStarted{false};
+    std::atomic<bool> allowChildDispatch{false};
+    std::atomic<bool> childRan{false};
+    std::thread::id childThread{};
+    const auto waitingThread = std::this_thread::get_id();
+
+    Scheduler::Dispatch([&]()
+    {
+        parentStarted.store(true, std::memory_order_release);
+        parentStarted.notify_all();
+        while (!allowChildDispatch.load(std::memory_order_acquire))
+            allowChildDispatch.wait(false, std::memory_order_acquire);
+
+        Scheduler::Dispatch([&]()
+        {
+            childThread = std::this_thread::get_id();
+            childRan.store(true, std::memory_order_release);
+            childRan.notify_all();
+        });
+        while (!childRan.load(std::memory_order_acquire))
+            childRan.wait(false, std::memory_order_acquire);
+    });
+
+    while (!parentStarted.load(std::memory_order_acquire))
+        parentStarted.wait(false, std::memory_order_acquire);
+
+    std::thread lateDispatcher([&]()
+    {
+        while (Scheduler::GetStats().ExternalProgressWaiters == 0u)
+            std::this_thread::yield();
+        allowChildDispatch.store(true, std::memory_order_release);
+        allowChildDispatch.notify_all();
+    });
+
+    Scheduler::WaitForAll();
+    lateDispatcher.join();
+
+    EXPECT_TRUE(childRan.load(std::memory_order_acquire));
+    EXPECT_EQ(childThread, waitingThread);
+    Scheduler::Shutdown();
+}
+
+TEST(CoreTasks, WorkProgressTokenFromPriorSchedulerInstanceFailsClosed)
+{
+    Scheduler::Initialize(1);
+    const auto staleToken = Scheduler::ObserveWorkProgress();
+    EXPECT_TRUE(staleToken.Valid());
+    Scheduler::Shutdown();
+
+    Scheduler::Initialize(1);
+    EXPECT_NE(staleToken.SchedulerInstance, Scheduler::CurrentInstanceId());
+    EXPECT_FALSE(Scheduler::WaitForWorkProgress(staleToken));
+    Scheduler::Shutdown();
+}
+
 TEST(CoreTasks, ContendedDispatchCompletes)
 {
     // Goal: create sustained contention on the scheduler's queue mutex by dispatching

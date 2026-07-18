@@ -142,17 +142,26 @@ but it exports the domain-free `TaskPlanGraph` API.
 transition, so `WaitForProgress()` can park a blocking thread without a
 signal-versus-destruction race. Blocking callers capture `PendingCount()`
 before checking their work queues and wait only while that value is unchanged,
-closing the queue-check-to-park lost-wake window. Coroutine waiters keep the
-existing wait-token park/unpark contract, and destroying the public event
-releases the token after the last in-progress signal or blocking wait retires.
-Wait tokens include a scheduler-instance identity, so destroying an event
-retained across scheduler shutdown cannot release a colliding slot in a later
-scheduler instance.
+closing the count-change queue-check-to-park window. Worker-backed external
+help loops also capture `Scheduler::ObserveWorkProgress()` before checking
+queues and use `WaitForWorkProgress()` when idle. Dispatch and task retirement
+advance that epoch after publishing their state, so work added after
+an external queue check cannot strand a helper on an unrelated completion
+count. Progress tokens do not own scheduler lifetime: `Initialize()` and
+`Shutdown()` remain externally serialized against scheduler calls, and a
+worker-backed graph retains the scheduler-alive precondition documented in
+the task-graph architecture. Coroutine waiters keep the existing wait-token
+park/unpark contract, and destroying the public event releases the token after
+the last in-progress signal or blocking wait retires. Wait tokens include a
+scheduler-instance identity, so destroying an event retained across scheduler
+shutdown cannot release a colliding slot in a later scheduler instance.
 
 `Scheduler::TryRunOne()` is the neutral external-help seam used by graph
 completion waits. It executes at most one task on the caller, checking inject
-work and then worker-local deques; it does not impose graph or runtime domain
-policy.
+work and then worker-local deques. Its final worker-local scan waits for each
+short queue critical section to finish so lock contention cannot be mistaken
+for stable queue emptiness immediately before the helper parks. It does not
+impose graph or runtime domain policy.
 
 Task coroutine handles published to the scheduler are single-use resumption
 tokens. `Scheduler::Reschedule()` resumes a handle but must not inspect

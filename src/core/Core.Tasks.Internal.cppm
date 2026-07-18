@@ -58,6 +58,8 @@ export namespace Extrinsic::Core::Tasks
             alignas(64) std::atomic<uint64_t> inFlightTasks{0};
             alignas(64) std::atomic<int> activeTaskCount{0};
             alignas(64) std::atomic<int> queuedTaskCount{0};
+            alignas(64) std::atomic<uint64_t> workProgressEpoch{0};
+            alignas(64) std::atomic<uint32_t> externalProgressWaiters{0};
 
             alignas(64) std::atomic<uint64_t> injectPushCount{0};
             alignas(64) std::atomic<uint64_t> injectPopCount{0};
@@ -133,6 +135,7 @@ export namespace Extrinsic::Core::Tasks
     bool TrySteal(unsigned thiefIndex, LocalTask& outTask);
     bool TryStealExternal(LocalTask& outTask);
     bool TryPopTask(LocalTask& outTask, std::optional<unsigned> workerIndex);
+    void PublishWorkProgress() noexcept;
     void OnTaskDequeuedAndRun(LocalTask& task);
     // Global scheduler state declarations.
     // These are defined exactly once in Core.Tasks.State.cpp.

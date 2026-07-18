@@ -46,12 +46,13 @@ depends_on:
   `codex/core-005-nonblocking-submit`; current implementation commits:
   `87740902e9cb0b6f3f37c190474d8a4b7ec06288` and
   `72070e4a339868b4f07743c2cc9f89b6b70ab48e`.
-- Latest blocker: late review found a queue-check-to-park lost wake. A worker
-  can enqueue local child work after the submit owner finds no work but before
-  it parks on the unchanged graph-completion count; if that worker then waits
-  for the child, the owner sleeps instead of stealing it. Add a monotonic
-  scheduler-progress wait handshake and a deterministic dispatch-at-park
-  regression, then rerun the affected gates before retirement.
+- The late queue-check-to-park blocker is closed in the current hardening
+  slice. Worker-backed help loops observe an instance-scoped scheduler-work
+  epoch, dispatch and retirement publish progress, and registered waiters
+  recheck before parking. The final external-help scan waits through short
+  worker-deque lock contention so false emptiness cannot strand published
+  work; this definitive scan also applies when the submitting owner is itself
+  a scheduler worker. Normal worker-loop stealing remains opportunistic.
 - Right-sizing verdict: one copyable completion handle and one shared
   execution-state implementation are justified by the escaped lifetime and
   submit-owner pump contract. Existing `Scheduler`/`CounterEvent` seams were
@@ -72,9 +73,11 @@ depends_on:
       document how the owning thread drains the main-thread queue for a
       submitted graph (explicit `PumpMainThreadPasses()` on the handle is
       acceptable).
-- [ ] Rework the blocking wait: while the graph runs, the calling thread
-      help-executes scheduler work (inject queue and stealing) and parks on
-      the completion `CounterEvent` when idle, instead of `yield()` spinning.
+- [x] Rework the blocking wait: while the graph runs, the calling thread
+      help-executes scheduler work (inject queue and stealing) and uses a
+      race-free progress wait when idle—completion-count progress in the
+      no-scheduler fallback and scheduler-work progress when worker-backed—
+      instead of `yield()` spinning.
 - [x] Make `Execute()` a thin wrapper over submit+wait so there is one code
       path.
 - [x] Preserve `Reset()`-while-executing protection with the new lifetime
@@ -85,7 +88,7 @@ depends_on:
       the submitting thread runs unrelated work before waiting.
 - [x] Contract: main-thread-only passes execute on the owning thread via the
       documented pump path for a submitted graph.
-- [ ] Contract: blocking wait makes progress when all workers are saturated
+- [x] Contract: blocking wait makes progress when all workers are saturated
       (help-run proven with a single-worker-forced configuration).
 - [x] Contract: `Reset()` during a live submission fails closed.
 - [x] Existing `CoreTaskGraph.*` and `CoreTasks.*` suites stay green.
@@ -100,7 +103,7 @@ depends_on:
 ## Acceptance criteria
 - [x] A graph can be submitted, progressed, and completed without the caller
       blocking; completion observable via token.
-- [ ] The blocking path no longer spins: CPU profile of an idle wait shows
+- [x] The blocking path no longer spins: CPU profile of an idle wait shows
       parked caller, and the caller demonstrably executes stolen tasks under
       saturation.
 - [ ] Default CPU gate green.
@@ -124,6 +127,20 @@ depends_on:
   of 200 worker-to-owner handoffs (10,000 total); the owner issued 10,064
   `FUTEX_WAIT` calls, directly demonstrating parking. The saturation/local
   steal contracts supplied the separate caller-help evidence.
+- Post-fix causal evidence: removing only post-enqueue progress publication
+  made the two late-child regressions exceed an external five-second timeout
+  (exit 124); restoring it passed the focused progress set 100 repetitions
+  (400 executions). Removing only post-retirement publication made
+  `WorkerCompletionWakesOwnerForMainThreadSuccessor` exceed the same timeout;
+  restoring it passed 50 repetitions.
+- Post-fix focused evidence: the TaskGraph/Tasks/FrameGraph set passed 79/79.
+  The new worker-owned nested-wait/peer-child regression passed 100
+  repetitions and proved the owning worker executed the blocked peer's child.
+  A strict independent concurrency review found no remaining lost-wake,
+  lock-order, lifecycle, or API-sizing blocker.
+- Post-fix parking evidence: a direct `strace -f -e futex` run of 200
+  worker-to-owner handoffs passed and recorded 353 main-thread waits on the
+  scheduler progress futex address (467 main-thread futex waits total).
 - Strict task policy/state-link, layering, test-layout, documentation-link,
   root-hygiene, skill-sync, docs-sync, and clean-workshop checks passed.
   Regenerating the 386-module inventory was byte-identical.

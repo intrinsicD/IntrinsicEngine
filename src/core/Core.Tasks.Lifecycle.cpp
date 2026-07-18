@@ -76,6 +76,32 @@ namespace Extrinsic::Core::Tasks
         return s_Ctx ? s_Ctx->instanceId : 0u;
     }
 
+    Scheduler::WorkProgressToken Scheduler::ObserveWorkProgress() noexcept
+    {
+        if (!s_Ctx)
+            return {};
+        return WorkProgressToken{
+            .SchedulerInstance = s_Ctx->instanceId,
+            .Epoch = s_Ctx->workProgressEpoch.load(std::memory_order_seq_cst),
+        };
+    }
+
+    bool Scheduler::WaitForWorkProgress(const WorkProgressToken token) noexcept
+    {
+        if (!s_Ctx || !token.Valid() || token.SchedulerInstance != s_Ctx->instanceId)
+            return false;
+
+        s_Ctx->externalProgressWaiters.fetch_add(1u, std::memory_order_seq_cst);
+        const auto current = s_Ctx->workProgressEpoch.load(std::memory_order_seq_cst);
+        if (current == token.Epoch &&
+            s_Ctx->isRunning.load(std::memory_order_acquire))
+        {
+            s_Ctx->workProgressEpoch.wait(token.Epoch, std::memory_order_acquire);
+        }
+        s_Ctx->externalProgressWaiters.fetch_sub(1u, std::memory_order_seq_cst);
+        return s_Ctx->isRunning.load(std::memory_order_acquire);
+    }
+
     void Scheduler::WaitForAll()
     {
         if (!s_Ctx)
@@ -83,6 +109,7 @@ namespace Extrinsic::Core::Tasks
 
         for (;;)
         {
+            const auto progress = ObserveWorkProgress();
             const auto observed =
                 s_Ctx->inFlightTasks.load(std::memory_order_acquire);
             if (observed == 0)
@@ -95,7 +122,8 @@ namespace Extrinsic::Core::Tasks
                 continue;
             }
 
-            s_Ctx->inFlightTasks.wait(observed, std::memory_order_relaxed);
+            if (!WaitForWorkProgress(progress))
+                return;
         }
     }
 }

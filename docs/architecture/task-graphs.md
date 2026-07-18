@@ -51,7 +51,10 @@ The completion contract is:
   returns `ThreadViolation` elsewhere.
 - `Wait()` has the same owner-thread requirement. It pumps owner-thread passes,
   help-executes one scheduler task from the inject queues or worker-local
-  deques, and parks on completion-count progress when no work is available.
+  deques, and parks on a scheduler-work progress epoch when a
+  worker-backed graph has no immediately available work. The external
+  worker-local scan briefly waits for contended queue critical sections before
+  declaring the queues empty.
 - `Execute()` is exactly the blocking compatibility form: `Submit()` followed
   by `Wait()`. There is no separate execution path and no yield-spin loop.
 
@@ -84,12 +87,15 @@ than parking against work that can no longer run.
 
 Each submission owns a counted `CounterEvent`. The event's internal state is
 shared across signal and blocking-wait operations, allowing a signal to notify
-progress after publishing a count transition without racing destruction. The
-owner observes the pending count before checking its work queues, then parks
-only while that exact value is unchanged; a worker-to-owner successor handoff
-therefore cannot lose a count-change wake between the queue check and the
-park. The final task publishes execution timing and the idle graph state
-before it signals completion.
+progress after publishing a count transition without racing destruction.
+No-scheduler waits observe the pending count before checking the owner queue,
+then park only while that value is unchanged. Worker-backed waits additionally
+observe the scheduler's work-progress epoch before checking owner,
+inject, and worker-local queues. Dispatch and task retirement publish that
+epoch after their state changes, and the wait path rechecks it after registering
+as an external waiter. This closes both completion-change and late-enqueue
+queue-check-to-park windows. The final task publishes execution timing and the
+idle graph state before it signals completion.
 
 ## Ownership
 

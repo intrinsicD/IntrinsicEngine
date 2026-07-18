@@ -60,6 +60,7 @@ namespace Extrinsic::Core::Tasks
 
         s_Ctx->workSignal.fetch_add(1, std::memory_order_release);
         s_Ctx->workSignal.notify_one();
+        PublishWorkProgress();
     }
 
     bool EnqueueInject(LocalTask&& task)
@@ -181,7 +182,10 @@ namespace Extrinsic::Core::Tasks
             if (!victim.localLock.try_lock())
             {
                 s_Ctx->queueContentionCount.fetch_add(1, std::memory_order_relaxed);
-                continue;
+                // External helpers park after this scan. Wait for the short
+                // queue critical section so contention cannot masquerade as
+                // an empty victim deque and strand already-published work.
+                victim.localLock.lock();
             }
 
             bool stole = false;
@@ -203,17 +207,40 @@ namespace Extrinsic::Core::Tasks
         return false;
     }
 
+    void PublishWorkProgress() noexcept
+    {
+        // Publish after queue visibility or task retirement. The seq_cst
+        // epoch/waiter handshake guarantees that a waiter either observes the
+        // new epoch before parking or is visible to this notification.
+        s_Ctx->workProgressEpoch.fetch_add(1u, std::memory_order_seq_cst);
+        if (s_Ctx->externalProgressWaiters.load(std::memory_order_seq_cst) != 0u)
+            s_Ctx->workProgressEpoch.notify_all();
+    }
+
     bool Scheduler::TryRunOne()
     {
         if (!s_Ctx || !s_Ctx->isRunning.load(std::memory_order_acquire))
             return false;
 
         LocalTask task;
-        const auto workerIndex = (s_WorkerIndex >= 0)
-            ? std::optional<unsigned>{static_cast<unsigned>(s_WorkerIndex)}
-            : std::nullopt;
-        if (!TryPopTask(task, workerIndex))
+        if (s_WorkerIndex >= 0)
+        {
+            const auto workerIndex = static_cast<unsigned>(s_WorkerIndex);
+            // Explicit help may be followed by a progress wait, even when the
+            // helper is itself a worker. Keep local/global fast paths, then
+            // make the cross-worker scan definitive. WorkerEntry retains the
+            // opportunistic TrySteal path for ordinary scheduling.
+            if (!TryPopLocal(workerIndex, task) &&
+                !TryPopGlobalInject(task) &&
+                !TryStealExternal(task))
+            {
+                return false;
+            }
+        }
+        else if (!TryPopTask(task, std::nullopt))
+        {
             return false;
+        }
 
         OnTaskDequeuedAndRun(task);
         return true;
@@ -229,5 +256,6 @@ namespace Extrinsic::Core::Tasks
         const auto remaining = s_Ctx->inFlightTasks.fetch_sub(1, std::memory_order_acq_rel) - 1;
         if (remaining == 0)
             s_Ctx->inFlightTasks.notify_all();
+        PublishWorkProgress();
     }
 }

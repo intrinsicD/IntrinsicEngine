@@ -223,7 +223,6 @@ TEST(CoreTaskGraphCompletionLifetime, WorkerCompletionWakesOwnerForMainThreadSuc
     for (std::uint32_t epoch = 0u; epoch < kEpochs; ++epoch)
     {
         std::atomic<bool> rootStarted{false};
-        std::atomic<bool> beginWait{false};
         std::atomic<bool> releaseRoot{false};
 
         TaskGraph graph;
@@ -247,12 +246,13 @@ TEST(CoreTaskGraphCompletionLifetime, WorkerCompletionWakesOwnerForMainThreadSuc
 
         std::thread releaser([&]()
         {
-            WaitUntilPublished(beginWait);
+            while (Tasks::Scheduler::GetStats().ExternalProgressWaiters == 0u)
+                std::this_thread::yield();
             Publish(releaseRoot);
         });
-        Publish(beginWait);
-        ASSERT_TRUE(submitted->Wait().has_value());
+        const auto waited = submitted->Wait();
         releaser.join();
+        ASSERT_TRUE(waited.has_value());
     }
 
     EXPECT_EQ(ownerPasses.load(std::memory_order_acquire), kEpochs);
@@ -384,6 +384,108 @@ TEST(CoreTaskGraphCompletionLifetime, WaitStealsWorkerLocalWorkNeededByGraph)
     ASSERT_TRUE(submitted->Wait().has_value());
 
     EXPECT_EQ(childThread, waitingThread);
+}
+
+TEST(CoreTaskGraphCompletionLifetime, WaitWakesForChildDispatchedAfterHelperRegisters)
+{
+    SchedulerFixture scheduler{1};
+    std::atomic<bool> parentStarted{false};
+    std::atomic<bool> allowChildDispatch{false};
+    std::atomic<bool> childRan{false};
+    std::thread::id childThread{};
+    const auto waitingThread = std::this_thread::get_id();
+
+    TaskGraph graph;
+    graph.AddPass("Parent", [&]()
+    {
+        Publish(parentStarted);
+        WaitUntilPublished(allowChildDispatch);
+        Tasks::Scheduler::Dispatch([&]()
+        {
+            childThread = std::this_thread::get_id();
+            Publish(childRan);
+        });
+        WaitUntilPublished(childRan);
+    });
+
+    auto submitted = graph.Submit();
+    ASSERT_TRUE(submitted.has_value());
+    WaitUntilPublished(parentStarted);
+
+    std::thread lateDispatcher([&]()
+    {
+        while (Tasks::Scheduler::GetStats().ExternalProgressWaiters == 0u)
+            std::this_thread::yield();
+        Publish(allowChildDispatch);
+    });
+
+    const auto waited = submitted->Wait();
+    lateDispatcher.join();
+    ASSERT_TRUE(waited.has_value());
+
+    EXPECT_TRUE(childRan.load(std::memory_order_acquire));
+    EXPECT_EQ(childThread, waitingThread);
+}
+
+TEST(CoreTaskGraphCompletionLifetime, WorkerOwnedWaitWakesForChildDispatchedAfterHelperRegisters)
+{
+    SchedulerFixture scheduler{2};
+    std::atomic<bool> submitFinished{false};
+    std::atomic<bool> submitSucceeded{false};
+    std::atomic<bool> parentStarted{false};
+    std::atomic<bool> allowChildDispatch{false};
+    std::atomic<bool> childRan{false};
+    std::atomic<bool> waitFinished{false};
+    std::atomic<bool> waitSucceeded{false};
+    std::thread::id ownerThread{};
+    std::thread::id childThread{};
+
+    Tasks::Scheduler::Dispatch([&]()
+    {
+        ownerThread = std::this_thread::get_id();
+
+        TaskGraph graph;
+        graph.AddPass("Parent", [&]()
+        {
+            Publish(parentStarted);
+            WaitUntilPublished(allowChildDispatch);
+            Tasks::Scheduler::Dispatch([&]()
+            {
+                childThread = std::this_thread::get_id();
+                Publish(childRan);
+            });
+            WaitUntilPublished(childRan);
+        });
+
+        auto submitted = graph.Submit();
+        submitSucceeded.store(submitted.has_value(), std::memory_order_release);
+        Publish(submitFinished);
+        if (!submitted.has_value())
+        {
+            Publish(waitFinished);
+            return;
+        }
+
+        // Let the other worker steal Parent before this worker becomes the
+        // graph's blocking completion helper.
+        WaitUntilPublished(parentStarted);
+        const auto waited = submitted->Wait();
+        waitSucceeded.store(waited.has_value(), std::memory_order_release);
+        Publish(waitFinished);
+    });
+
+    WaitUntilPublished(submitFinished);
+    ASSERT_TRUE(submitSucceeded.load(std::memory_order_acquire));
+    WaitUntilPublished(parentStarted);
+    while (Tasks::Scheduler::GetStats().ExternalProgressWaiters == 0u)
+        std::this_thread::yield();
+    Publish(allowChildDispatch);
+    WaitUntilPublished(waitFinished);
+    Tasks::Scheduler::WaitForAll();
+
+    EXPECT_TRUE(waitSucceeded.load(std::memory_order_acquire));
+    EXPECT_TRUE(childRan.load(std::memory_order_acquire));
+    EXPECT_EQ(childThread, ownerThread);
 }
 
 TEST(CoreTaskGraphCompletionLifetime, NonOwnerCanPollCopiedCompletionUntilReady)
