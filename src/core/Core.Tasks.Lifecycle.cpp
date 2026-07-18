@@ -17,7 +17,9 @@ namespace Extrinsic::Core::Tasks
     void Scheduler::Initialize(unsigned threadCount)
     {
         if (s_Ctx) return;
+        static std::atomic<std::uint64_t> nextInstanceId{1u};
         s_Ctx = std::make_unique<Detail::SchedulerContext>();
+        s_Ctx->instanceId = nextInstanceId.fetch_add(1u, std::memory_order_relaxed);
         s_Ctx->isRunning = true;
 
         if (threadCount == 0)
@@ -69,6 +71,10 @@ namespace Extrinsic::Core::Tasks
         return s_Ctx != nullptr;
     }
 
+    std::uint64_t Scheduler::CurrentInstanceId() noexcept
+    {
+        return s_Ctx ? s_Ctx->instanceId : 0u;
+    }
 
     void Scheduler::WaitForAll()
     {

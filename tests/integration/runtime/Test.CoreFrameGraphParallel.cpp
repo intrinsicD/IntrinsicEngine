@@ -385,7 +385,9 @@ TEST(FrameGraphParallel, GraphLocalCompletionDoesNotWaitForUnrelatedSchedulerWor
 
 TEST(FrameGraphParallel, DeterministicSingleThreadFallbackOrder)
 {
-    Tasks::Scheduler::Initialize(1);
+    // An unavailable scheduler is the documented single-thread fallback.
+    // With one worker, Wait() may help-run alongside that worker.
+    ASSERT_FALSE(Tasks::Scheduler::IsInitialized());
 
     constexpr int kRuns = 32;
     std::vector<std::string> baseline;
@@ -427,6 +429,4 @@ TEST(FrameGraphParallel, DeterministicSingleThreadFallbackOrder)
             EXPECT_EQ(executionOrder, baseline) << "Non-deterministic fallback order on run " << run;
         }
     }
-
-    Tasks::Scheduler::Shutdown();
 }

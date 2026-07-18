@@ -648,18 +648,20 @@ namespace Extrinsic::Core::Dag
             std::atomic<std::uint32_t> RemainingTasks{0u};
             Core::Tasks::CounterEvent Done;
             std::thread::id OwnerThread{};
+            std::uint64_t SchedulerInstance = 0u;
             std::chrono::steady_clock::time_point StartedAt{};
             std::function<void(const std::shared_ptr<ExecutionState>&, std::uint32_t)> OnTaskFinished{};
             std::function<void(const std::shared_ptr<ExecutionState>&,
                                const std::vector<std::uint32_t>&)> ScheduleReadyBatch{};
             std::function<void(const std::shared_ptr<ExecutionState>&, std::uint32_t)> ExecuteAndFinish{};
 
-            explicit ExecutionState(std::uint32_t taskCount)
+            ExecutionState(std::uint32_t taskCount, std::uint64_t schedulerInstance)
                 : RemainingDeps(taskCount),
                   Dispatched(taskCount),
                   RemainingTasks(taskCount),
                   Done(taskCount),
                   OwnerThread(std::this_thread::get_id()),
+                  SchedulerInstance(schedulerInstance),
                   StartedAt(std::chrono::steady_clock::now())
             {
             }
@@ -783,6 +785,11 @@ namespace Extrinsic::Core::Dag
         const auto state = m_Impl->State;
         if (std::this_thread::get_id() != state->OwnerThread)
             return Err<std::uint32_t>(ErrorCode::ThreadViolation);
+        if (!state->Done.IsReady() && state->SchedulerInstance != 0u &&
+            state->SchedulerInstance != Tasks::Scheduler::CurrentInstanceId())
+        {
+            return Err<std::uint32_t>(ErrorCode::InvalidState);
+        }
 
         std::uint32_t executed = 0u;
         for (;;)
@@ -818,6 +825,16 @@ namespace Extrinsic::Core::Dag
 
         while (!state->Done.IsReady())
         {
+            if (state->SchedulerInstance != 0u &&
+                state->SchedulerInstance != Tasks::Scheduler::CurrentInstanceId())
+            {
+                return Err(ErrorCode::InvalidState);
+            }
+
+            const auto observedPending = state->Done.PendingCount();
+            if (observedPending == 0u)
+                break;
+
             auto pumped = PumpMainThreadPasses();
             if (!pumped.has_value())
                 return Err(pumped.error());
@@ -827,7 +844,7 @@ namespace Extrinsic::Core::Dag
             if (Tasks::Scheduler::TryRunOne())
                 continue;
 
-            state->Done.WaitForProgress();
+            state->Done.WaitForProgress(observedPending);
         }
 
         return Ok();
@@ -850,6 +867,12 @@ namespace Extrinsic::Core::Dag
                                         const TaskGraphPassOptions& options,
                                         GraphExecuteCallback execute)
     {
+        if (m_Impl->Executing.load(std::memory_order_acquire) || m_Impl->HasLiveExecution())
+        {
+            Log::Error("[TaskGraph] AddPass() called while execution is active");
+            return std::numeric_limits<std::uint32_t>::max();
+        }
+
         const auto idx = static_cast<std::uint32_t>(m_Impl->Passes.size());
         auto& pass = m_Impl->Passes.emplace_back();
         pass.Name = std::string(name);
@@ -979,9 +1002,17 @@ namespace Extrinsic::Core::Dag
         }
 
         const auto impl = m_Impl;
-        const bool canUseWorkers = Tasks::Scheduler::IsInitialized();
+        const auto schedulerInstance = Tasks::Scheduler::CurrentInstanceId();
+        const bool hasWorkerEligiblePass = std::ranges::any_of(
+            impl->Passes,
+            [](const Impl::PassNode& pass)
+            {
+                return pass.Options.AllowParallel && !pass.Options.MainThreadOnly;
+            });
+        const bool canUseWorkers = schedulerInstance != 0u && hasWorkerEligiblePass;
         auto state = std::make_shared<ExecutionState>(
-            static_cast<std::uint32_t>(impl->Passes.size()));
+            static_cast<std::uint32_t>(impl->Passes.size()),
+            canUseWorkers ? schedulerInstance : 0u);
         impl->TrackExecution(state);
         for (std::uint32_t i = 0; i < impl->Passes.size(); ++i)
         {

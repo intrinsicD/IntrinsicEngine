@@ -3,6 +3,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <string_view>
 #include <vector>
@@ -28,6 +29,10 @@ import Extrinsic.Core.Hash;
 //   3. Consume — Submit() starts callbacks and returns a completion handle,
 //                Execute() submits and waits, or BuildPlan() returns metadata
 //   4. Reset  — Reset() to begin the next epoch
+//
+// TaskGraph setup/compile/submit/reset operations require external
+// synchronization. TaskGraphCompletion::IsReady() is the cross-thread poll;
+// Wait() and PumpMainThreadPasses() belong to the submitting thread.
 // -----------------------------------------------------------------------
 
 export namespace Extrinsic::Core::Dag
@@ -200,6 +205,8 @@ export namespace Extrinsic::Core::Dag
             const uint32_t idx = AddPassInternal(name,
                 options,
                 GraphExecuteCallback(std::forward<ExecuteFn>(execute)));
+            if (idx == std::numeric_limits<std::uint32_t>::max())
+                return;
             TaskGraphBuilder builder(*this, idx);
             setup(builder);
         }
@@ -239,6 +246,8 @@ export namespace Extrinsic::Core::Dag
         // may be polled from any thread.
         //
         // Returns InvalidState for PlanOnly graphs or a live prior submission.
+        // The scheduler instance used for worker callbacks must remain alive
+        // until completion; Wait/Pump fail closed if it has been replaced.
         [[nodiscard]] Core::Expected<TaskGraphCompletion> Submit();
 
         // Blocking compatibility path. Equivalent to Submit() followed by

@@ -184,7 +184,8 @@ TEST(CoreFrameGraph, WriteAfterRead)
     EXPECT_EQ(layers[1].size(), 2u);
     EXPECT_EQ(layers[2].size(), 1u);
 
-    // Execute with scheduler for deterministic ordering assertions.
+    // Execute with a scheduler; assertions cover dependency order only because
+    // the waiting caller may help-run alongside the worker.
     Tasks::Scheduler::Initialize(1);
     EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
     Tasks::Scheduler::Shutdown();
@@ -434,7 +435,8 @@ TEST(CoreFrameGraph, MixedLabelsAndResources)
     auto result = graph.Compile();
     ASSERT_TRUE(result.has_value());
 
-    // Validate dependency semantics deterministically in single-worker mode.
+    // Validate dependency semantics with one scheduler worker. The waiting
+    // caller may also help-run, so only dependency partial order is asserted.
     Tasks::Scheduler::Initialize(1);
     EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
     Tasks::Scheduler::Shutdown();

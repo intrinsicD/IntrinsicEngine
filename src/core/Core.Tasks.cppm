@@ -20,8 +20,12 @@ export class Job;
         {
             std::uint32_t Slot = 0;
             std::uint32_t Generation = 0;
+            std::uint64_t SchedulerInstance = 0;
 
-            [[nodiscard]] bool Valid() const { return Generation != 0; }
+            [[nodiscard]] bool Valid() const
+            {
+                return Generation != 0 && SchedulerInstance != 0;
+            }
         };
 
         struct Stats
@@ -64,6 +68,7 @@ export class Job;
         static void Reschedule(std::coroutine_handle<> h, std::shared_ptr<std::atomic<bool>> alive = nullptr);
 
         [[nodiscard]] static bool IsInitialized() noexcept;
+        [[nodiscard]] static std::uint64_t CurrentInstanceId() noexcept;
         [[nodiscard]] static Stats GetStats();
         [[nodiscard]] static std::uint64_t GetParkCount() noexcept;
         [[nodiscard]] static std::uint64_t GetUnparkCount() noexcept;

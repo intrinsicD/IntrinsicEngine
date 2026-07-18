@@ -55,17 +55,41 @@ The completion contract is:
 - `Execute()` is exactly the blocking compatibility form: `Submit()` followed
   by `Wait()`. There is no separate execution path and no yield-spin loop.
 
+The `TaskGraph` control surface—setup, compile, submit, plan extraction, and
+reset—requires ordinary external synchronization. Cross-thread access is
+provided by `TaskGraphCompletion::IsReady()`; `Wait()` and pumping remain on
+the submitting thread. A second submission observed while the first is live is
+rejected, but concurrent unsynchronized control calls are not a supported
+locking protocol.
+
 When the Core task scheduler is unavailable, ready callbacks remain on the
 owner queue; explicit pumping or `Wait()` therefore provides a deterministic
 single-thread fallback. `Reset()` returns `InvalidState` while a submission is
-live and clears the graph only after completion. A second concurrent
-submission is rejected in the same way.
+live and clears the graph only after completion. `AddPass()` logs and leaves
+the graph unchanged rather than mutating callback storage that workers may
+read.
+
+Worker-eligible callbacks are dispatched whenever a scheduler exists,
+including a one-pass graph or a one-worker scheduler. This is an explicit
+consequence of non-blocking submission: `Submit()` does not run arbitrary
+worker-eligible callbacks inline. `Execute()` inherits that path; callers that
+require owner-thread affinity mark the pass `MainThreadOnly` or disable
+`AllowParallel`.
+
+Each worker-backed submission records the scheduler instance that accepted
+its callbacks. That scheduler must remain alive until the completion becomes
+ready. `Wait()` and `PumpMainThreadPasses()` fail with `InvalidState` when an
+unfinished completion observes a missing or replacement scheduler, rather
+than parking against work that can no longer run.
 
 Each submission owns a counted `CounterEvent`. The event's internal state is
 shared across signal and blocking-wait operations, allowing a signal to notify
 progress after publishing a count transition without racing destruction. The
-final task publishes execution timing and the idle graph state before it
-signals completion.
+owner observes the pending count before checking its work queues, then parks
+only while that exact value is unchanged; a worker-to-owner successor handoff
+therefore cannot lose a count-change wake between the queue check and the
+park. The final task publishes execution timing and the idle graph state
+before it signals completion.
 
 ## Ownership
 

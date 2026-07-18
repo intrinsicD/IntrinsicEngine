@@ -32,6 +32,7 @@ export namespace Extrinsic::Core::Tasks
 
         struct alignas(64) SchedulerContext
         {
+            std::uint64_t instanceId = 0;
             struct alignas(64) WorkerState
             {
                 SpinLock localLock{};

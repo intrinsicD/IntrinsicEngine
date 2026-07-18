@@ -22,12 +22,13 @@ namespace Extrinsic::Core::Tasks
         void Add(uint32_t value = 1);
         void Signal(uint32_t value = 1);
         [[nodiscard]] bool IsReady() const;
+        [[nodiscard]] uint32_t PendingCount() const;
         [[nodiscard]] Scheduler::WaitToken Token() const;
 
-        // Park the calling thread until Signal() changes the pending count.
-        // Returns immediately when already ready. Callers re-check their work
-        // queues and IsReady() after each progress wake.
-        void WaitForProgress() const;
+        // Park until the pending count differs from a value observed before
+        // the caller checked its work queues. Returns immediately when progress
+        // occurred between that observation and this call.
+        void WaitForProgress(uint32_t observedCount) const;
 
     private:
         struct State;

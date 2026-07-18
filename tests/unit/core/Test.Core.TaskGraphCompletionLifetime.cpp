@@ -196,10 +196,66 @@ TEST(CoreTaskGraphCompletionLifetime, ResetFailsClosedWhileSubmissionIsLive)
     if (!secondSubmit.has_value())
         EXPECT_EQ(secondSubmit.error(), ErrorCode::InvalidState);
 
+    std::atomic<bool> lateSetupRan{false};
+    std::atomic<bool> latePassRan{false};
+    graph.AddPass("RejectedWhileLive",
+                  [&](TaskGraphBuilder&)
+                  {
+                      lateSetupRan.store(true, std::memory_order_release);
+                  },
+                  [&]() { latePassRan.store(true, std::memory_order_release); });
+    EXPECT_EQ(graph.PassCount(), 1u);
+
     Publish(release);
     ASSERT_TRUE(submitted->Wait().has_value());
+    EXPECT_FALSE(lateSetupRan.load(std::memory_order_acquire));
+    EXPECT_FALSE(latePassRan.load(std::memory_order_acquire));
     EXPECT_TRUE(graph.Reset().has_value());
     EXPECT_EQ(graph.PassCount(), 0u);
+}
+
+TEST(CoreTaskGraphCompletionLifetime, WorkerCompletionWakesOwnerForMainThreadSuccessor)
+{
+    SchedulerFixture scheduler{2};
+    constexpr std::uint32_t kEpochs = 200u;
+    std::atomic<std::uint32_t> ownerPasses{0u};
+
+    for (std::uint32_t epoch = 0u; epoch < kEpochs; ++epoch)
+    {
+        std::atomic<bool> rootStarted{false};
+        std::atomic<bool> beginWait{false};
+        std::atomic<bool> releaseRoot{false};
+
+        TaskGraph graph;
+        graph.AddPass("WorkerRoot",
+            [&]()
+            {
+                Publish(rootStarted);
+                WaitUntilPublished(releaseRoot);
+            });
+
+        TaskGraphPassOptions ownerOptions{};
+        ownerOptions.MainThreadOnly = true;
+        ownerOptions.AllowParallel = false;
+        graph.AddPass("OwnerSuccessor", ownerOptions,
+            [](TaskGraphBuilder& builder) { builder.DependsOn(0u); },
+            [&]() { ownerPasses.fetch_add(1u, std::memory_order_acq_rel); });
+
+        auto submitted = graph.Submit();
+        ASSERT_TRUE(submitted.has_value());
+        WaitUntilPublished(rootStarted);
+
+        std::thread releaser([&]()
+        {
+            WaitUntilPublished(beginWait);
+            Publish(releaseRoot);
+        });
+        Publish(beginWait);
+        ASSERT_TRUE(submitted->Wait().has_value());
+        releaser.join();
+    }
+
+    EXPECT_EQ(ownerPasses.load(std::memory_order_acquire), kEpochs);
 }
 
 TEST(CoreTaskGraphCompletionLifetime, CompletionKeepsCallbacksAliveAfterGraphDestruction)
@@ -300,6 +356,104 @@ TEST(CoreTaskGraphCompletionLifetime, ExternalHelperStealsWorkerLocalWork)
     EXPECT_TRUE(childRan.load(std::memory_order_acquire));
     Publish(releaseParent);
     Tasks::Scheduler::WaitForAll();
+}
+
+TEST(CoreTaskGraphCompletionLifetime, WaitStealsWorkerLocalWorkNeededByGraph)
+{
+    SchedulerFixture scheduler{1};
+    std::atomic<bool> childQueued{false};
+    std::atomic<bool> childRan{false};
+    std::thread::id childThread{};
+    const auto waitingThread = std::this_thread::get_id();
+
+    TaskGraph graph;
+    graph.AddPass("Parent", [&]()
+    {
+        Tasks::Scheduler::Dispatch([&]()
+        {
+            childThread = std::this_thread::get_id();
+            Publish(childRan);
+        });
+        Publish(childQueued);
+        WaitUntilPublished(childRan);
+    });
+
+    auto submitted = graph.Submit();
+    ASSERT_TRUE(submitted.has_value());
+    WaitUntilPublished(childQueued);
+    ASSERT_TRUE(submitted->Wait().has_value());
+
+    EXPECT_EQ(childThread, waitingThread);
+}
+
+TEST(CoreTaskGraphCompletionLifetime, NonOwnerCanPollCopiedCompletionUntilReady)
+{
+    SchedulerFixture scheduler{2};
+    std::atomic<bool> rootStarted{false};
+    std::atomic<bool> releaseRoot{false};
+    std::atomic<bool> observedNotReady{false};
+    std::atomic<bool> observedReady{false};
+
+    TaskGraph graph;
+    graph.AddPass("Polled", [&]()
+    {
+        Publish(rootStarted);
+        WaitUntilPublished(releaseRoot);
+    });
+
+    auto submitted = graph.Submit();
+    ASSERT_TRUE(submitted.has_value());
+    WaitUntilPublished(rootStarted);
+
+    std::thread poller([completion = *submitted, &observedNotReady, &observedReady]()
+    {
+        while (!completion.IsReady())
+        {
+            Publish(observedNotReady);
+            std::this_thread::yield();
+        }
+        Publish(observedReady);
+    });
+
+    WaitUntilPublished(observedNotReady);
+    Publish(releaseRoot);
+    ASSERT_TRUE(submitted->Wait().has_value());
+    poller.join();
+
+    EXPECT_TRUE(observedNotReady.load(std::memory_order_acquire));
+    EXPECT_TRUE(observedReady.load(std::memory_order_acquire));
+}
+
+TEST(CoreTaskGraphCompletionLifetime, PendingWorkerSubmissionFailsClosedAfterSchedulerReplacement)
+{
+    SchedulerFixture scheduler{2};
+    std::atomic<bool> ownerPassRan{false};
+
+    TaskGraph graph;
+    graph.AddPass("WorkerRoot", []() {});
+
+    TaskGraphPassOptions ownerOptions{};
+    ownerOptions.MainThreadOnly = true;
+    ownerOptions.AllowParallel = false;
+    graph.AddPass("OwnerSuccessor", ownerOptions,
+        [](TaskGraphBuilder& builder) { builder.DependsOn(0u); },
+        [&]() { ownerPassRan.store(true, std::memory_order_release); });
+
+    auto submitted = graph.Submit();
+    ASSERT_TRUE(submitted.has_value());
+    Tasks::Scheduler::WaitForAll();
+    EXPECT_FALSE(submitted->IsReady());
+
+    Tasks::Scheduler::Shutdown();
+    Tasks::Scheduler::Initialize(2);
+
+    const auto pumped = submitted->PumpMainThreadPasses();
+    ASSERT_FALSE(pumped.has_value());
+    EXPECT_EQ(pumped.error(), ErrorCode::InvalidState);
+    const auto waited = submitted->Wait();
+    ASSERT_FALSE(waited.has_value());
+    EXPECT_EQ(waited.error(), ErrorCode::InvalidState);
+    EXPECT_FALSE(ownerPassRan.load(std::memory_order_acquire));
 }
 
 TEST(CoreTaskGraphCompletionLifetime, SubmittedIndependentPassesRunInParallel)

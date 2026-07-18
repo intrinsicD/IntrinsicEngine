@@ -4,6 +4,7 @@
 #include <vector>
 #include <coroutine>
 #include <algorithm>
+#include <memory>
 #include <numeric>
 #include <random>
 
@@ -377,6 +378,22 @@ TEST(CoreTasks, CounterEventCanBeRearmedAfterReady)
     Scheduler::Shutdown();
 }
 
+TEST(CoreTasks, CounterEventProgressObservedBeforeQueueCheckCannotLoseWake)
+{
+    Scheduler::Initialize(2);
+
+    CounterEvent event{2};
+    const auto observed = event.PendingCount();
+    ASSERT_EQ(observed, 2u);
+
+    event.Signal();
+    event.WaitForProgress(observed);
+
+    EXPECT_EQ(event.PendingCount(), 1u);
+    event.Signal();
+    Scheduler::Shutdown();
+}
+
 TEST(CoreTasks, CounterEventResumeBeforeAwaitSuspendReturnsDoesNotTouchDestroyedFrame)
 {
     Scheduler::Initialize(4);
@@ -516,6 +533,39 @@ TEST(CoreTasks, StaleWaitTokenUnparkDoesNotResumeNewWaiters)
     Scheduler::WaitForAll();
     EXPECT_EQ(secondStage.load(std::memory_order_acquire), 2);
 
+    Scheduler::Shutdown();
+}
+
+TEST(CoreTasks, WaitTokenFromPriorSchedulerInstanceCannotReleaseCurrentSlot)
+{
+    Scheduler::Initialize(2);
+    auto staleEvent = std::make_unique<CounterEvent>(1);
+    const auto staleToken = staleEvent->Token();
+    Scheduler::Shutdown();
+
+    Scheduler::Initialize(2);
+    CounterEvent currentEvent{1};
+    const auto currentToken = currentEvent.Token();
+    EXPECT_EQ(staleToken.Slot, currentToken.Slot);
+    EXPECT_EQ(staleToken.Generation, currentToken.Generation);
+    EXPECT_NE(staleToken.SchedulerInstance, currentToken.SchedulerInstance);
+
+    std::atomic<int> startedCount{0};
+    std::atomic<int> resumedCount{0};
+    const uint64_t previousParkCount = Scheduler::GetParkCount();
+    Scheduler::Dispatch(WaitForCounterTrackStartAndIncrement(
+        &currentEvent, &startedCount, &resumedCount));
+    while (startedCount.load(std::memory_order_acquire) == 0)
+        std::this_thread::yield();
+    while (Scheduler::ParkCountAtomic().load(std::memory_order_acquire) == previousParkCount)
+        Scheduler::ParkCountAtomic().wait(previousParkCount, std::memory_order_acquire);
+
+    staleEvent.reset();
+    EXPECT_EQ(resumedCount.load(std::memory_order_acquire), 0);
+
+    currentEvent.Signal();
+    Scheduler::WaitForAll();
+    EXPECT_EQ(resumedCount.load(std::memory_order_acquire), 1);
     Scheduler::Shutdown();
 }
 

@@ -33,8 +33,13 @@ namespace Extrinsic::Core::Tasks
 
     bool CounterEvent::IsReady() const
     {
+        return PendingCount() == 0u;
+    }
+
+    uint32_t CounterEvent::PendingCount() const
+    {
         const auto state = m_State;
-        return state->Count.load(std::memory_order_acquire) == 0;
+        return state->Count.load(std::memory_order_acquire);
     }
 
     Scheduler::WaitToken CounterEvent::Token() const
@@ -42,12 +47,11 @@ namespace Extrinsic::Core::Tasks
         return m_State->Token;
     }
 
-    void CounterEvent::WaitForProgress() const
+    void CounterEvent::WaitForProgress(const uint32_t observedCount) const
     {
         const auto state = m_State;
-        const uint32_t observed = state->Count.load(std::memory_order_acquire);
-        if (observed != 0u)
-            state->Count.wait(observed, std::memory_order_acquire);
+        if (observedCount != 0u)
+            state->Count.wait(observedCount, std::memory_order_acquire);
     }
 
     void CounterEvent::Add(uint32_t value)
