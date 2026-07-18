@@ -15,7 +15,7 @@ Opened from the 2026-07-03 main-loop/task-graph/render-graph review
 
 - [`CORE-005`](CORE-005-nonblocking-taskgraph-submit-api.md) — non-blocking
   TaskGraph submission/completion API (gated on `BUG-055`).
-- [`CORE-006`](CORE-006-domain-free-core-task-vocabulary.md) — domain-free
+- [`CORE-006`](../../active/CORE-006-domain-free-core-task-vocabulary.md) — domain-free
   core task/DAG vocabulary (opaque task kinds; GPU/streaming naming out of
   core).
 - [`CORE-007`](CORE-007-scheduler-priority-wait-wake-hardening.md) —

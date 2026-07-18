@@ -40,6 +40,14 @@ depends_on: []
   domain-free, while runtime/module adapters own any taxonomy consumed by
   `JobService`, render prep, or streaming work.
 
+## Status
+
+- Status: `in-progress`.
+- Owner: Codex.
+- Branch: `codex/core-006-domain-free-v2`.
+- Next verification: adapt the preserved task-specific implementation to
+  current `main`, then run the focused core/runtime graph contracts.
+
 ## Required changes
 - [ ] Replace the `TaskKind` domain enum with an opaque token
       (e.g. `std::uint8_t`-backed strong type); define the domain taxonomy
