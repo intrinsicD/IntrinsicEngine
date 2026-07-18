@@ -1044,7 +1044,7 @@ The failed diagnostic run
 produced no reports after encountering the then-unsupported Ninja log v7 and
 does not contribute to the population.
 
-[`RUNTIME-166`](../../tasks/backlog/runtime/RUNTIME-166-slim-render-extraction-module.md)
+[`RUNTIME-166`](../../tasks/active/RUNTIME-166-slim-render-extraction-module.md)
 is a current source-owner consumer of this evidence. Compile optimization
 belongs to the affected layer task rather than to the analysis tool.
 

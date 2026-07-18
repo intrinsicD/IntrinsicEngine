@@ -11,7 +11,7 @@ map.
 
 ## Tasks
 
-- [HARDEN-086 — Guarded hierarchy query helpers](HARDEN-086-guarded-hierarchy-query-helpers.md)
+- [HARDEN-086 — Guarded hierarchy query helpers](../../active/HARDEN-086-guarded-hierarchy-query-helpers.md)
   (deterministic, all-or-nothing child/preorder queries in the existing
   hierarchy-structure module, adopted by editor delete planning and
   progressive composition summaries).

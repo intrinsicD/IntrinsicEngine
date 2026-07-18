@@ -35,6 +35,12 @@ maturity_target: Operational
   and published-state/consumer reactions. Divergence on any axis requires a
   split; another job kind or internal execution mechanism alone does not.
 
+## Status
+- In progress; owner: Codex team; branch:
+  `codex/runtime-179-async-work-module`; activated 2026-07-18.
+- Next gate: complete the four-axis cohesion and live-caller inventory before
+  changing the Engine/module surface.
+
 ## Required changes
 - [ ] Introduce one concrete `AsyncWorkModule` by folding the existing
       `AsyncWorkService` state and behavior into the runtime-module owner.
@@ -100,7 +106,8 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 ## Forbidden changes
 - Adding another executor, scheduler, registry, or wrapper service.
 - Moving asset-import, scene-document, or editor policy into this module.
-- Changing async semantics while moving ownership.
+- Changing async semantics beyond the explicit world-retirement cancellation
+  and stale-commit hardening owned by this task.
 
 ## Maturity
 - Target: `Operational`; the module must run through the canonical

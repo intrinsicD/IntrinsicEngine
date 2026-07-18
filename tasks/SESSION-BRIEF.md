@@ -9,6 +9,9 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/active/ARCH-014-kernel-convergence-tracking.md)
+- `HARDEN-086` — Guarded hierarchy query helpers (tasks/active/HARDEN-086-guarded-hierarchy-query-helpers.md)
+- `RUNTIME-166` — Slim and partition the RenderExtraction module (tasks/active/RUNTIME-166-slim-render-extraction-module.md)
+- `RUNTIME-179` — Extract the async-work composition module (tasks/active/RUNTIME-179-extract-async-work-module.md)
 
 ## Theme B — Rendering modernization
 
@@ -29,16 +32,13 @@ the authoritative open/unblocked view.
 
 - unblocked: `ASSETIO-010` — Async model companion preflight (tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md)
 - blocked by `ASSETIO-010`: `ASSETIO-011` — Semantic Sandbox File / Import workflow matrix (tasks/backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md)
-- unblocked: `HARDEN-086` — Guarded hierarchy query helpers (tasks/backlog/ecs/HARDEN-086-guarded-hierarchy-query-helpers.md)
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - blocked by `ARCH-014`: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
-- unblocked: `RUNTIME-166` — Slim and partition the RenderExtraction module (tasks/backlog/runtime/RUNTIME-166-slim-render-extraction-module.md)
 - blocked by `RUNTIME-172`: `RUNTIME-168` — Privatize Sandbox default-policy composition (tasks/backlog/runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
 - blocked by `HARDEN-086`: `RUNTIME-172` — Extract the scene-editing composition module (tasks/backlog/runtime/RUNTIME-172-privatize-scene-document-surface.md)
-- unblocked: `RUNTIME-179` — Extract the async-work composition module (tasks/backlog/runtime/RUNTIME-179-extract-async-work-module.md)
 - unblocked: `RUNTIME-180` — Extract the camera composition module (tasks/backlog/runtime/RUNTIME-180-extract-camera-module.md)
 - unblocked: `RUNTIME-181` — Extract the config-control composition module (tasks/backlog/runtime/RUNTIME-181-extract-config-control-module.md)
 - unblocked: `RUNTIME-182` — Extract the editor-UI composition module (tasks/backlog/runtime/RUNTIME-182-extract-editor-ui-module.md)

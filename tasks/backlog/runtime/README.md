@@ -152,7 +152,7 @@ consumer or disappear. Extension-pass registration, a priority input chain,
 `InlineModule`, and `WorldSwitchModule` are deferred behind named real-consumer
 triggers. The implementation graph is:
 
-- [`RUNTIME-179`](RUNTIME-179-extract-async-work-module.md) — compose the
+- [`RUNTIME-179`](../../active/RUNTIME-179-extract-async-work-module.md) — compose the
   existing global streaming/derived-job owner and remove its Engine facades.
 - [`RUNTIME-180`](RUNTIME-180-extract-camera-module.md) — compose global
   viewport/controller state with world-qualified targets and move initial
@@ -233,7 +233,7 @@ facades. The other measured interfaces were `Runtime.Engine.cppm` (140.072s,
 owned by `RUNTIME-151` after the mechanical `RUNTIME-146..150` splits) and
 `Runtime.RenderExtraction.cppm` (106.935s).
 
-- [`RUNTIME-166`](RUNTIME-166-slim-render-extraction-module.md) — after retired
+- [`RUNTIME-166`](../../active/RUNTIME-166-slim-render-extraction-module.md) — after retired
   `BUILD-004` normalized multi-output compile edges and source coverage, hide
   `RenderExtractionCache` private residency/retire/adapter state, slim the
   exported import surface, and split independent implementation domains without
