@@ -193,6 +193,12 @@ TEST(CoreTaskGraphCompletionLifetime, ResetFailsClosedWhileSubmissionIsLive)
         EXPECT_EQ(resetWhileLive.error(), ErrorCode::InvalidState);
     EXPECT_EQ(graph.PassCount(), 1u);
 
+    const auto replayResetWhileLive = graph.ResetForReplay();
+    EXPECT_FALSE(replayResetWhileLive.has_value());
+    if (!replayResetWhileLive.has_value())
+        EXPECT_EQ(replayResetWhileLive.error(), ErrorCode::InvalidState);
+    EXPECT_EQ(graph.PassCount(), 1u);
+
     const auto secondSubmit = graph.Submit();
     EXPECT_FALSE(secondSubmit.has_value());
     if (!secondSubmit.has_value())
@@ -214,6 +220,45 @@ TEST(CoreTaskGraphCompletionLifetime, ResetFailsClosedWhileSubmissionIsLive)
     EXPECT_FALSE(latePassRan.load(std::memory_order_acquire));
     EXPECT_TRUE(graph.Reset().has_value());
     EXPECT_EQ(graph.PassCount(), 0u);
+}
+
+TEST(CoreTaskGraphCompletionLifetime, CompletedHandleRemainsReadyDuringLaterReplaySubmission)
+{
+    TaskGraphPassOptions options{};
+    options.MainThreadOnly = true;
+    options.AllowParallel = false;
+
+    TaskGraph graph;
+    std::vector<std::uint32_t> epochs{};
+    graph.AddPass("OwnerOnly", options,
+        [](TaskGraphBuilder&) {},
+        [&]() { epochs.push_back(1u); });
+    ASSERT_TRUE(graph.Compile().has_value());
+
+    auto first = graph.Submit();
+    ASSERT_TRUE(first.has_value());
+    TaskGraphCompletion retained = *first;
+    ASSERT_TRUE(first->Wait().has_value());
+    ASSERT_TRUE(retained.IsReady());
+
+    ASSERT_TRUE(graph.ResetForReplay().has_value());
+    graph.AddPass("OwnerOnly", options,
+        [](TaskGraphBuilder&) {},
+        [&]() { epochs.push_back(2u); });
+    ASSERT_TRUE(graph.Compile().has_value());
+
+    auto second = graph.Submit();
+    ASSERT_TRUE(second.has_value());
+    EXPECT_TRUE(retained.IsReady());
+    EXPECT_FALSE(second->IsReady());
+    ASSERT_TRUE(second->Wait().has_value());
+
+    EXPECT_TRUE(retained.IsReady());
+    EXPECT_TRUE(second->IsReady());
+    EXPECT_EQ(epochs, (std::vector<std::uint32_t>{1u, 2u}));
+    const auto stats = graph.GetPlanReuseStats();
+    EXPECT_EQ(stats.PlanBuildCount, 1u);
+    EXPECT_EQ(stats.PlanReuseCount, 1u);
 }
 
 TEST(CoreTaskGraphCompletionLifetime, WorkerCompletionWakesOwnerForMainThreadSuccessor)

@@ -467,8 +467,25 @@ TEST(CoreFrameGraph, EmptyGraph)
     EXPECT_EQ(graph.PassCount(), 0u);
     EXPECT_TRUE(graph.GetExecutionLayers().empty());
 
+    const auto plan = graph.BuildPlan();
+    ASSERT_TRUE(plan.has_value());
+    EXPECT_TRUE(plan->empty());
+
     // Execute on empty graph should be a no-op.
     EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
+    auto stats = graph.GetPlanReuseStats();
+    EXPECT_EQ(stats.CompileCallCount, 1u);
+    EXPECT_EQ(stats.PlanBuildCount, 1u);
+    EXPECT_EQ(stats.PlanReuseCount, 0u);
+
+    ASSERT_TRUE(graph.ResetForReplay().has_value());
+    EXPECT_EQ(graph.PassCount(), 0u);
+    ASSERT_TRUE(graph.Compile().has_value());
+    EXPECT_EQ(graph.LastCompileTimeNs(), 0u);
+    stats = graph.GetPlanReuseStats();
+    EXPECT_EQ(stats.CompileCallCount, 2u);
+    EXPECT_EQ(stats.PlanBuildCount, 1u);
+    EXPECT_EQ(stats.PlanReuseCount, 1u);
 }
 
 // =========================================================================
@@ -502,7 +519,8 @@ TEST(CoreFrameGraph, MultiFrameReset)
 
     for (int frame = 0; frame < 3; ++frame)
     {
-        graph.Reset();
+        if (frame > 0)
+            ASSERT_TRUE(graph.ResetForReplay().has_value());
 
         int counter = 0;
 
@@ -521,6 +539,12 @@ TEST(CoreFrameGraph, MultiFrameReset)
 
         EXPECT_EQ(counter, 11) << "Frame " << frame;
     }
+
+    const auto stats = graph.GetPlanReuseStats();
+    EXPECT_EQ(stats.CompileCallCount, 3u);
+    EXPECT_EQ(stats.PlanBuildCount, 1u);
+    EXPECT_EQ(stats.PlanReuseCount, 2u);
+    EXPECT_TRUE(stats.LastCompileReusedPlan);
 }
 
 // =========================================================================

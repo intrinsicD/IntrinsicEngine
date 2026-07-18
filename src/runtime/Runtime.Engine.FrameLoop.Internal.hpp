@@ -366,7 +366,14 @@ namespace Extrinsic::Runtime
                     Core::Log::Error("[Runtime] FrameGraph Compile() failed: error={}",
                                      static_cast<int>(r.error()));
                 }
-                frameGraph.Reset();
+            }
+
+            if (auto reset = frameGraph.ResetForReplay();
+                !reset.has_value())
+            {
+                Core::Log::Error(
+                    "[Runtime] FrameGraph ResetForReplay() failed: error={}",
+                    static_cast<int>(reset.error()));
             }
 
             accumulator -= fixedDt;

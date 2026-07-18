@@ -1197,7 +1197,7 @@ namespace Extrinsic::Runtime
 
         // ── Phase 2: Fixed-step simulation + CPU task graph ───────────────
         // Each tick: app adds FrameGraph passes → Engine compiles and executes
-        // the ECS system DAG → reset for next tick.
+        // the ECS system DAG → resets registration for exact-plan replay.
 
         const double frameDt = m_FrameClock.FrameDeltaClamped(m_MaxFrameDelta);
         frameContext.FrameDeltaSeconds = frameDt;

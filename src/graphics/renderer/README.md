@@ -404,8 +404,16 @@ into graphics public contracts.
 - `Graphics.RenderPrepPipeline` owns the CPU-side `PrepareFrame()` sequencing
   seam. The renderer supplies required manager/system pointers, retained
   transform/light/visualization snapshot spans, and the cluster-light resource
-  hook; the pipeline records structured missing-input and task-graph
-  compile/execute diagnostics before `ExecuteFrame()` can proceed.
+  hook. One persistent nine-pass CPU task graph re-registers current callbacks
+  on each task-graph run and reuses topology only for an exact shape. The strict
+  chain is owner-thread-only, so synchronous execution cannot return with
+  scheduler-owned callbacks still live; under the pipeline's single-owner
+  contract, every path that registered callbacks closes with
+  `ResetForReplay`, including forced and actual compile/execute faults. The
+  result records structured diagnostics plus lifetime compile/build/reuse
+  counters and the last-reuse flag before `ExecuteFrame()` can proceed.
+  Missing-input and sequential paths register no callbacks and report zero
+  task-graph counters in that result.
 
 ### Shader push-constant compatibility policy
 

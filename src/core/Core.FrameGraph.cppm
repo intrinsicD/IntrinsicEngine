@@ -38,7 +38,7 @@ import Extrinsic.Core.Memory;
 //       []{ /* work */ });
 //   fg.Compile();
 //   fg.Execute();   // fires passes in topo-layer order
-//   fg.Reset();     // reset for next frame
+//   fg.ResetForReplay(); // re-register an exact shape next frame
 // -----------------------------------------------------------------------
 
 export namespace Extrinsic::Core
@@ -223,6 +223,7 @@ export namespace Extrinsic::Core
         [[nodiscard]] Core::Expected<std::vector<Dag::PlanTask>> BuildPlan();
 
         // ----- Reset -----
+        // Reset is destructive; ResetForReplay retains one exact-match plan.
         void Reset();
         [[nodiscard]] Core::Result ResetForReplay();
 

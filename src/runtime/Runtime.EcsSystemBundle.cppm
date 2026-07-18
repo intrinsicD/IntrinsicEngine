@@ -50,8 +50,9 @@ export namespace Extrinsic::Runtime
 
     // Register the baseline runtime-owned ECS system passes into the
     // supplied FrameGraph for the supplied scene registry. Safe to
-    // call once per fixed-step substep; the FrameGraph is reset
-    // between substeps so passes do not accumulate across ticks.
+    // call once per fixed-step substep; runtime opens an empty replay
+    // registration epoch between substeps so passes do not accumulate while
+    // an exactly matching compiled topology can be retained.
     //
     // Passes registered (in declaration order; FrameGraph compile
     // resolves the actual execution order via TypeToken and named

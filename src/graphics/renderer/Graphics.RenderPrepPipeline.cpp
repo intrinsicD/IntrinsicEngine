@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -166,7 +167,50 @@ namespace Extrinsic::Graphics
             result.Diagnostic = std::move(diagnostic);
             return result;
         }
+
+        void RecordTaskGraphPlanStats(RenderPrepPipelineResult& result,
+                                      const Core::Dag::TaskGraph& graph)
+        {
+            const Core::Dag::TaskGraphPlanReuseStats stats =
+                graph.GetPlanReuseStats();
+            result.TaskGraphCompileCalls = stats.CompileCallCount;
+            result.TaskGraphPlanBuilds = stats.PlanBuildCount;
+            result.TaskGraphPlanReuses = stats.PlanReuseCount;
+            result.TaskGraphLastCompileReusedPlan =
+                stats.LastCompileReusedPlan;
+        }
+
+        [[nodiscard]] RenderPrepPipelineResult FinishTaskGraphRun(
+            RenderPrepPipelineResult result,
+            Core::Dag::TaskGraph& graph)
+        {
+            RecordTaskGraphPlanStats(result, graph);
+
+            const Core::Result reset = graph.ResetForReplay();
+            if (!reset.has_value())
+            {
+                result.Succeeded = false;
+                result.FailureReason =
+                    RenderPrepFailureReason::TaskGraphExecuteFailed;
+                result.TaskGraphError = reset.error();
+                result.Diagnostic =
+                    "Render prep TaskGraph reset-for-replay failed.";
+            }
+            return result;
+        }
     }
+
+    struct RenderPrepPipeline::Impl
+    {
+        Core::Dag::TaskGraph Graph{};
+    };
+
+    RenderPrepPipeline::RenderPrepPipeline()
+        : m_Impl(std::make_unique<Impl>())
+    {
+    }
+
+    RenderPrepPipeline::~RenderPrepPipeline() = default;
 
     std::string_view ToString(RenderPrepStep step) noexcept
     {
@@ -232,9 +276,15 @@ namespace Extrinsic::Graphics
             return result;
         }
 
-        Core::Dag::TaskGraph graph{};
+        Core::Dag::TaskGraph& graph = m_Impl->Graph;
+        const Core::Dag::TaskGraphPassOptions ownerThreadOptions{
+            .MainThreadOnly = true,
+            .AllowParallel = false,
+            .DebugCategory = "RenderPrep",
+        };
         graph.AddPass(
             "RenderPrep.PipelineCommit",
+            ownerThreadOptions,
             [] (Core::Dag::TaskGraphBuilder& b)
             {
                 b.Write<PrepPipelineCommitTag>();
@@ -245,6 +295,7 @@ namespace Extrinsic::Graphics
             });
         graph.AddPass(
             "RenderPrep.MaterialBaseSync",
+            ownerThreadOptions,
             [] (Core::Dag::TaskGraphBuilder& b)
             {
                 b.Read<PrepPipelineCommitTag>();
@@ -256,6 +307,7 @@ namespace Extrinsic::Graphics
             });
         graph.AddPass(
             "RenderPrep.VisualizationSync",
+            ownerThreadOptions,
             [] (Core::Dag::TaskGraphBuilder& b)
             {
                 b.Read<PrepMaterialBaseSyncTag>();
@@ -267,6 +319,7 @@ namespace Extrinsic::Graphics
             });
         graph.AddPass(
             "RenderPrep.MaterialOverrideSync",
+            ownerThreadOptions,
             [] (Core::Dag::TaskGraphBuilder& b)
             {
                 b.Read<PrepVisualizationSyncTag>();
@@ -278,6 +331,7 @@ namespace Extrinsic::Graphics
             });
         graph.AddPass(
             "RenderPrep.TransformSync",
+            ownerThreadOptions,
             [] (Core::Dag::TaskGraphBuilder& b)
             {
                 b.Read<PrepMaterialOverrideSyncTag>();
@@ -289,6 +343,7 @@ namespace Extrinsic::Graphics
             });
         graph.AddPass(
             "RenderPrep.LightSync",
+            ownerThreadOptions,
             [] (Core::Dag::TaskGraphBuilder& b)
             {
                 b.Read<PrepTransformSyncTag>();
@@ -300,6 +355,7 @@ namespace Extrinsic::Graphics
             });
         graph.AddPass(
             "RenderPrep.ClusterLightTableSync",
+            ownerThreadOptions,
             [] (Core::Dag::TaskGraphBuilder& b)
             {
                 b.Read<PrepLightSyncTag>();
@@ -311,6 +367,7 @@ namespace Extrinsic::Graphics
             });
         graph.AddPass(
             "RenderPrep.GpuWorldSync",
+            ownerThreadOptions,
             [] (Core::Dag::TaskGraphBuilder& b)
             {
                 b.Read<PrepClusterLightTableTag>();
@@ -322,6 +379,7 @@ namespace Extrinsic::Graphics
             });
         graph.AddPass(
             "RenderPrep.CullingSync",
+            ownerThreadOptions,
             [] (Core::Dag::TaskGraphBuilder& b)
             {
                 b.Read<PrepGpuWorldSyncTag>();
@@ -333,24 +391,30 @@ namespace Extrinsic::Graphics
 
         if (options.ForceTaskGraphCompileFailure.has_value())
         {
-            return Failure(RenderPrepFailureReason::TaskGraphCompileFailed,
-                           *options.ForceTaskGraphCompileFailure,
-                           "Render prep TaskGraph compile failed: forced fault.");
+            return FinishTaskGraphRun(
+                Failure(RenderPrepFailureReason::TaskGraphCompileFailed,
+                        *options.ForceTaskGraphCompileFailure,
+                        "Render prep TaskGraph compile failed: forced fault."),
+                graph);
         }
 
         const Core::Result compile = graph.Compile();
         if (!compile.has_value())
         {
-            return Failure(RenderPrepFailureReason::TaskGraphCompileFailed,
-                           compile.error(),
-                           "Render prep TaskGraph compile failed.");
+            return FinishTaskGraphRun(
+                Failure(RenderPrepFailureReason::TaskGraphCompileFailed,
+                        compile.error(),
+                        "Render prep TaskGraph compile failed."),
+                graph);
         }
 
         if (options.ForceTaskGraphExecuteFailure.has_value())
         {
-            return Failure(RenderPrepFailureReason::TaskGraphExecuteFailed,
-                           *options.ForceTaskGraphExecuteFailure,
-                           "Render prep TaskGraph execute failed: forced fault.");
+            return FinishTaskGraphRun(
+                Failure(RenderPrepFailureReason::TaskGraphExecuteFailed,
+                        *options.ForceTaskGraphExecuteFailure,
+                        "Render prep TaskGraph execute failed: forced fault."),
+                graph);
         }
 
         const Core::Result execute = graph.Execute();
@@ -360,10 +424,10 @@ namespace Extrinsic::Graphics
             result.FailureReason = RenderPrepFailureReason::TaskGraphExecuteFailed;
             result.TaskGraphError = execute.error();
             result.Diagnostic = "Render prep TaskGraph execute failed.";
-            return result;
+            return FinishTaskGraphRun(std::move(result), graph);
         }
 
         result.Succeeded = true;
-        return result;
+        return FinishTaskGraphRun(std::move(result), graph);
     }
 }

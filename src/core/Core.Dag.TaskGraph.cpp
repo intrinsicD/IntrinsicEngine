@@ -14,7 +14,6 @@ module;
 #include <queue>
 #include <string>
 #include <string_view>
-#include <span>
 #include <thread>
 #include <tuple>
 #include <unordered_map>
@@ -174,7 +173,7 @@ namespace Extrinsic::Core::Dag
             const PassContainer& passes,
             const std::uint32_t nodeCount,
             std::string* outDiagnostic = nullptr,
-            std::span<const std::uint32_t> labelValues = {})
+            const bool collectEdgeReasons = false)
         {
             CompiledPlanState compiled{};
             compiled.Stats.lastDiagnostic.clear();
@@ -188,20 +187,6 @@ namespace Extrinsic::Core::Dag
             if (nodeCount == 0)
                 return compiled;
 
-            if (nodeCount == 1)
-            {
-                compiled.ExecutionOrder.push_back(0u);
-                compiled.PassBatch[0] = 0u;
-                compiled.Layers.push_back({0u});
-                compiled.Successors.resize(1);
-                compiled.Stats.hazardEdgeCount = 0;
-                compiled.Stats.explicitEdgeCount = 0;
-                compiled.Stats.edgeCount = 0;
-                compiled.Stats.layerCount = 1u;
-                compiled.Stats.criticalPathCost = passes[0].Options.EstimatedCost;
-                return compiled;
-            }
-
             auto addEdge = [&](const std::uint32_t from,
                                const std::uint32_t to,
                                const EdgeReason reason,
@@ -211,7 +196,7 @@ namespace Extrinsic::Core::Dag
                                auto& successors,
                                auto& predecessors,
                                auto& inDegree,
-                               auto& edgeReasons,
+                               auto* edgeReasons,
                                ScheduleStats& stats) -> void
             {
                 if (from == to)
@@ -232,13 +217,16 @@ namespace Extrinsic::Core::Dag
                     ++stats.explicitEdgeCount;
                 else
                     ++stats.hazardEdgeCount;
-                edgeReasons.emplace(
-                    key,
-                    EdgeReasonInfo{
-                        .Kind = reason,
-                        .Reason = std::string(namedReason),
-                        .LabelValue = labelValue,
-                    });
+                if (edgeReasons != nullptr)
+                {
+                    edgeReasons->emplace(
+                        key,
+                        EdgeReasonInfo{
+                            .Kind = reason,
+                            .Reason = std::string(namedReason),
+                            .LabelValue = labelValue,
+                        });
+                }
             };
 
             std::vector<std::vector<std::uint32_t>> successors(nodeCount);
@@ -248,7 +236,10 @@ namespace Extrinsic::Core::Dag
             std::unordered_set<std::uint64_t> seenEdges{};
             seenEdges.reserve(nodeCount * 4u + 16u);
             std::unordered_map<std::uint64_t, EdgeReasonInfo> edgeReasons{};
-            edgeReasons.reserve(nodeCount * 4u + 16u);
+            if (collectEdgeReasons)
+                edgeReasons.reserve(nodeCount * 4u + 16u);
+            auto* edgeReasonSink =
+                collectEdgeReasons ? &edgeReasons : nullptr;
 
             std::unordered_map<std::uint32_t, std::vector<std::uint32_t>> labelSignals{};
             labelSignals.reserve(nodeCount * 2u + 16u);
@@ -270,6 +261,18 @@ namespace Extrinsic::Core::Dag
                             *outDiagnostic = msg;
                         return Err<CompiledPlanState>(ErrorCode::InvalidState);
                     }
+                    if (dependency.Predecessor == i)
+                    {
+                        const auto msg =
+                            "Invalid explicit dependency in pass '" +
+                            std::string(passes[i].Name) +
+                            "': a pass cannot depend on itself";
+                        compiled.Stats.lastDiagnostic = msg;
+                        if (outDiagnostic)
+                            *outDiagnostic = msg;
+                        return Err<CompiledPlanState>(
+                            ErrorCode::InvalidState);
+                    }
                     const bool hasNamedReason = dependency.Kind != PassDependencyKind::Default;
                     addEdge(
                         dependency.Predecessor,
@@ -281,7 +284,7 @@ namespace Extrinsic::Core::Dag
                         successors,
                         predecessors,
                         inDegree,
-                        edgeReasons,
+                        edgeReasonSink,
                         compiled.Stats);
                 }
 
@@ -303,7 +306,7 @@ namespace Extrinsic::Core::Dag
                             successors,
                             predecessors,
                             inDegree,
-                            edgeReasons,
+                            edgeReasonSink,
                             compiled.Stats);
                     }
 
@@ -321,7 +324,7 @@ namespace Extrinsic::Core::Dag
                                 successors,
                                 predecessors,
                                 inDegree,
-                                edgeReasons,
+                                edgeReasonSink,
                                 compiled.Stats);
                         }
 
@@ -343,9 +346,8 @@ namespace Extrinsic::Core::Dag
                     auto signalIt = labelSignals.find(waitLabel);
                     if (signalIt == labelSignals.end())
                     {
-                        const auto labelValue = (waitLabel < labelValues.size()) ? labelValues[waitLabel] : 0u;
                         compiled.Stats.lastDiagnostic =
-                            "No prior signaler for wait label (" + std::to_string(labelValue) +
+                            "No prior signaler for wait label (" + std::to_string(waitLabel) +
                             ") in pass '" + std::string(pass.Name) + "'";
                         if (outDiagnostic)
                             *outDiagnostic = compiled.Stats.lastDiagnostic;
@@ -354,17 +356,16 @@ namespace Extrinsic::Core::Dag
 
                     for (const auto signaler : signalIt->second)
                     {
-                        const auto labelValue = (waitLabel < labelValues.size()) ? labelValues[waitLabel] : 0u;
                         addEdge(signaler,
                                 i,
                                 EdgeReason::LabelDependency,
                                 {},
-                                labelValue,
+                                waitLabel,
                                 seenEdges,
                                 successors,
                                 predecessors,
                                 inDegree,
-                                edgeReasons,
+                                edgeReasonSink,
                                 compiled.Stats);
                     }
                 }
@@ -405,6 +406,25 @@ namespace Extrinsic::Core::Dag
 
                 if (topo.size() != nodeCount)
                 {
+                    if (!collectEdgeReasons && outDiagnostic != nullptr)
+                    {
+                        std::string detailedDiagnostic{};
+                        (void)CompileGraph(
+                            passes,
+                            nodeCount,
+                            &detailedDiagnostic,
+                            true);
+                        if (!detailedDiagnostic.empty())
+                        {
+                            compiled.Stats.lastDiagnostic =
+                                std::move(detailedDiagnostic);
+                            *outDiagnostic =
+                                compiled.Stats.lastDiagnostic;
+                        }
+                        return Err<CompiledPlanState>(
+                            ErrorCode::InvalidState);
+                    }
+
                     std::vector<std::uint8_t> color(nodeCount, 0);
                     std::vector<std::uint32_t> cycle{};
                     std::vector<std::uint32_t> stack{};
@@ -667,10 +687,17 @@ namespace Extrinsic::Core::Dag
             std::thread::id OwnerThread{};
             std::uint64_t SchedulerInstance = 0u;
             std::chrono::steady_clock::time_point StartedAt{};
-            std::function<void(const std::shared_ptr<ExecutionState>&, std::uint32_t)> OnTaskFinished{};
-            std::function<void(const std::shared_ptr<ExecutionState>&,
-                               const std::vector<std::uint32_t>&)> ScheduleReadyBatch{};
-            std::function<void(const std::shared_ptr<ExecutionState>&, std::uint32_t)> ExecuteAndFinish{};
+            // Keep the private graph implementation alive without allocating
+            // captured std::function trampolines for every submission.
+            std::shared_ptr<void> GraphOwner{};
+            bool CanUseWorkers = false;
+
+            using PassFunction = void (*)(
+                const std::shared_ptr<ExecutionState>&,
+                std::uint32_t);
+            PassFunction OnTaskFinished = nullptr;
+            PassFunction ScheduleReadyPass = nullptr;
+            PassFunction ExecuteAndFinish = nullptr;
 
             ExecutionState(std::uint32_t taskCount, std::uint64_t schedulerInstance)
                 : RemainingDeps(taskCount),
@@ -699,18 +726,57 @@ namespace Extrinsic::Core::Dag
     {
         TaskGraphExecutionMode Mode = TaskGraphExecutionMode::ExecuteCallbacks;
 
+        enum class ResourceDeclarationOrigin : std::uint8_t
+        {
+            Explicit = 0,
+            TypeToken,
+            StringId,
+        };
+
+        struct DeclaredResourceAccess
+        {
+            ResourceId resource{};
+            ResourceAccessMode mode = ResourceAccessMode::Read;
+            ResourceDeclarationOrigin Origin =
+                ResourceDeclarationOrigin::Explicit;
+            std::uint64_t Identity = 0u;
+        };
+
         struct PassNode
         {
             std::string Name;
+            std::string DebugCategory;
             GraphExecuteCallback Execute;
-            std::vector<ResourceAccess> Resources{};
+            std::vector<DeclaredResourceAccess> Resources{};
             std::vector<PassDependency> Dependencies{};
             std::vector<std::uint32_t> WaitLabels{};
             std::vector<std::uint32_t> SignalLabels{};
             TaskGraphPassOptions Options{};
+
+            void Prepare(
+                const std::string_view name,
+                const TaskGraphPassOptions& options,
+                GraphExecuteCallback execute)
+            {
+                Name.assign(name);
+                DebugCategory.assign(options.DebugCategory);
+                Execute = std::move(execute);
+                Resources.clear();
+                Dependencies.clear();
+                WaitLabels.clear();
+                SignalLabels.clear();
+                Options = options;
+                // The category is owned separately because the public option
+                // is a view and PassNode storage may move between banks.
+                Options.DebugCategory = {};
+            }
         };
 
         std::vector<PassNode> Passes{};
+        std::vector<PassNode> ReplayPasses{};
+        std::uint32_t ReplayPassCount = 0u;
+        bool ReplayRegistration = false;
+        bool CachedPlanValid = false;
 
         // Compiled topology metadata.
         std::vector<std::uint32_t> ExecutionOrder{};
@@ -730,11 +796,6 @@ namespace Extrinsic::Core::Dag
         // StringID → ResourceId stable mapping (reset each epoch).
         std::unordered_map<std::uint32_t, std::uint32_t> StringResourceMap{};
 
-        // Label map keeps signal labels separate from normal resources.
-        std::unordered_map<std::uint64_t, std::uint32_t> LabelMap{};
-        std::vector<std::uint32_t> LabelValues{};
-        std::uint32_t NextLabelIdx = 0u;
-
         // Schedule stats and timings.
         uint64_t LastCompileNs = 0u;
         std::atomic<uint64_t> LastExecuteNs{0u};
@@ -744,7 +805,105 @@ namespace Extrinsic::Core::Dag
 
         // The compiled state should not be read/modified while Execute is active.
         // Keep the raw task payload alive for the life of execution.
-        bool CanUsePlan() const noexcept { return Compiled && !ExecutionOrder.empty(); }
+        bool CanUsePlan() const noexcept
+        {
+            return Compiled && !ReplayRegistration;
+        }
+
+        [[nodiscard]] std::vector<PassNode>& RegistrationPasses() noexcept
+        {
+            return ReplayRegistration ? ReplayPasses : Passes;
+        }
+
+        [[nodiscard]] const std::vector<PassNode>& RegistrationPasses() const noexcept
+        {
+            return ReplayRegistration ? ReplayPasses : Passes;
+        }
+
+        [[nodiscard]] std::uint32_t RegistrationPassCount() const noexcept
+        {
+            return ReplayRegistration
+                ? ReplayPassCount
+                : static_cast<std::uint32_t>(Passes.size());
+        }
+
+        [[nodiscard]] PassNode& RegistrationPass(
+            const std::uint32_t index) noexcept
+        {
+            return RegistrationPasses()[index];
+        }
+
+        [[nodiscard]] const PassNode& RegistrationPass(
+            const std::uint32_t index) const noexcept
+        {
+            return RegistrationPasses()[index];
+        }
+
+        [[nodiscard]] bool ReplayMatchesCachedPlan() const noexcept
+        {
+            if (!CachedPlanValid || ReplayPassCount != Passes.size())
+                return false;
+
+            for (std::uint32_t index = 0u;
+                 index < ReplayPassCount;
+                 ++index)
+            {
+                const auto& cached = Passes[index];
+                const auto& replay = ReplayPasses[index];
+                if (cached.Name != replay.Name ||
+                    cached.DebugCategory != replay.DebugCategory ||
+                    cached.Options.Priority != replay.Options.Priority ||
+                    cached.Options.EstimatedCost !=
+                        replay.Options.EstimatedCost ||
+                    cached.Options.MainThreadOnly !=
+                        replay.Options.MainThreadOnly ||
+                    cached.Options.AllowParallel !=
+                        replay.Options.AllowParallel ||
+                    cached.Resources.size() != replay.Resources.size() ||
+                    cached.Dependencies.size() !=
+                        replay.Dependencies.size() ||
+                    cached.WaitLabels != replay.WaitLabels ||
+                    cached.SignalLabels != replay.SignalLabels)
+                {
+                    return false;
+                }
+
+                for (std::size_t resource = 0u;
+                     resource < cached.Resources.size();
+                     ++resource)
+                {
+                    const auto& cachedAccess =
+                        cached.Resources[resource];
+                    const auto& replayAccess =
+                        replay.Resources[resource];
+                    if (cachedAccess.resource != replayAccess.resource ||
+                        cachedAccess.mode != replayAccess.mode ||
+                        cachedAccess.Origin != replayAccess.Origin ||
+                        cachedAccess.Identity != replayAccess.Identity)
+                    {
+                        return false;
+                    }
+                }
+
+                for (std::size_t dependency = 0u;
+                     dependency < cached.Dependencies.size();
+                     ++dependency)
+                {
+                    const auto& cachedDependency =
+                        cached.Dependencies[dependency];
+                    const auto& replayDependency =
+                        replay.Dependencies[dependency];
+                    if (cachedDependency.Predecessor !=
+                            replayDependency.Predecessor ||
+                        cachedDependency.Kind != replayDependency.Kind ||
+                        cachedDependency.Reason != replayDependency.Reason)
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
 
         bool HasLiveExecution() const
         {
@@ -909,12 +1068,27 @@ namespace Extrinsic::Core::Dag
             return std::numeric_limits<std::uint32_t>::max();
         }
 
-        const auto idx = static_cast<std::uint32_t>(m_Impl->Passes.size());
-        auto& pass = m_Impl->Passes.emplace_back();
-        pass.Name = std::string(name);
-        pass.Execute = std::move(execute);
-        pass.Options = options;
-        NormalizeOptions(pass.Options);
+        TaskGraphPassOptions normalizedOptions = options;
+        NormalizeOptions(normalizedOptions);
+
+        std::uint32_t idx = 0u;
+        Impl::PassNode* pass = nullptr;
+        if (m_Impl->ReplayRegistration)
+        {
+            idx = m_Impl->ReplayPassCount++;
+            if (idx == m_Impl->ReplayPasses.size())
+                pass = &m_Impl->ReplayPasses.emplace_back();
+            else
+                pass = &m_Impl->ReplayPasses[idx];
+        }
+        else
+        {
+            idx = static_cast<std::uint32_t>(m_Impl->Passes.size());
+            pass = &m_Impl->Passes.emplace_back();
+            m_Impl->CachedPlanValid = false;
+        }
+
+        pass->Prepare(name, normalizedOptions, std::move(execute));
         m_Impl->Compiled = false;
         return idx;
     }
@@ -947,6 +1121,21 @@ namespace Extrinsic::Core::Dag
         return ResourceId{idx, 1u};
     }
 
+    void TaskGraph::AddTypeResource(
+        const std::uint32_t passIndex,
+        const std::size_t token,
+        const ResourceAccessMode mode)
+    {
+        m_Impl->RegistrationPass(passIndex).Resources.push_back(
+            Impl::DeclaredResourceAccess{
+                .resource = TokenToResource(token),
+                .mode = mode,
+                .Origin =
+                    Impl::ResourceDeclarationOrigin::TypeToken,
+                .Identity = static_cast<std::uint64_t>(token),
+            });
+    }
+
     Core::Result TaskGraph::Compile()
     {
         if (m_Impl->Executing.load(std::memory_order_acquire) || m_Impl->HasLiveExecution())
@@ -958,15 +1147,51 @@ namespace Extrinsic::Core::Dag
         ++m_Impl->PlanReuseStats.CompileCallCount;
         m_Impl->PlanReuseStats.LastCompileReusedPlan = false;
         const auto t0 = std::chrono::high_resolution_clock::now();
+
+        if (m_Impl->ReplayRegistration &&
+            m_Impl->ReplayMatchesCachedPlan())
+        {
+            for (std::uint32_t index = 0u;
+                 index < m_Impl->ReplayPassCount;
+                 ++index)
+            {
+                m_Impl->Passes[index].Execute =
+                    std::move(m_Impl->ReplayPasses[index].Execute);
+            }
+
+            m_Impl->ReplayPassCount = 0u;
+            m_Impl->ReplayRegistration = false;
+            m_Impl->Compiled = true;
+            m_Impl->LastCompileNs = 0u;
+            m_Impl->LastCriticalPathNs =
+                m_Impl->LastStats.criticalPathCost;
+            ++m_Impl->PlanReuseStats.PlanReuseCount;
+            m_Impl->PlanReuseStats.LastCompileReusedPlan = true;
+            return Ok();
+        }
+
+        if (m_Impl->ReplayRegistration)
+        {
+            m_Impl->ReplayPasses.resize(m_Impl->ReplayPassCount);
+            m_Impl->Passes.swap(m_Impl->ReplayPasses);
+            m_Impl->ReplayPassCount = 0u;
+            m_Impl->ReplayRegistration = false;
+            m_Impl->CachedPlanValid = false;
+            m_Impl->ClearCompiledState();
+        }
+
         const auto passCount = static_cast<std::uint32_t>(m_Impl->Passes.size());
         std::string diagnostic;
 
-        auto compiled = CompileGraph(m_Impl->Passes, passCount, &diagnostic, m_Impl->LabelValues);
+        auto compiled =
+            CompileGraph(m_Impl->Passes, passCount, &diagnostic);
         if (!compiled.has_value())
         {
             m_Impl->ClearCompiledState();
+            m_Impl->CachedPlanValid = false;
             m_Impl->LastStats = ScheduleStats{};
             m_Impl->LastStats.lastDiagnostic = diagnostic;
+            m_Impl->LastCompileNs = 0u;
             m_Impl->LastCriticalPathNs = 0u;
             return Err(compiled.error());
         }
@@ -979,6 +1204,7 @@ namespace Extrinsic::Core::Dag
         m_Impl->InitialInDegree= std::move(graph.InitialInDegree);
         m_Impl->LastStats     = graph.Stats;
         m_Impl->Compiled      = true;
+        m_Impl->CachedPlanValid = true;
         ++m_Impl->PlanReuseStats.PlanBuildCount;
 
         const auto t1 = std::chrono::high_resolution_clock::now();
@@ -1052,6 +1278,8 @@ namespace Extrinsic::Core::Dag
         auto state = std::make_shared<ExecutionState>(
             static_cast<std::uint32_t>(impl->Passes.size()),
             canUseWorkers ? schedulerInstance : 0u);
+        state->GraphOwner = impl;
+        state->CanUseWorkers = canUseWorkers;
         impl->TrackExecution(state);
         for (std::uint32_t i = 0; i < impl->Passes.size(); ++i)
         {
@@ -1059,74 +1287,63 @@ namespace Extrinsic::Core::Dag
             state->Dispatched[i].store(0u, std::memory_order_release);
         }
 
-        state->ScheduleReadyBatch = [impl, canUseWorkers](const std::shared_ptr<ExecutionState>& state,
-                                                          const std::vector<std::uint32_t>& passIndices)
+        state->ScheduleReadyPass = +[](
+            const std::shared_ptr<ExecutionState>& state,
+            const std::uint32_t passIndex)
         {
-            std::vector<std::uint32_t> workerPasses{};
-            std::vector<ExecutionState::MainThreadReadyEntry> mainThreadPasses{};
-            workerPasses.reserve(passIndices.size());
-            mainThreadPasses.reserve(passIndices.size());
+            auto* impl = static_cast<Impl*>(state->GraphOwner.get());
+            if (passIndex >= impl->Passes.size())
+                return;
 
-            for (const auto passIndex : passIndices)
-            {
-                if (passIndex >= impl->Passes.size())
-                    continue;
+            if (state->Dispatched[passIndex].exchange(
+                    1u, std::memory_order_acq_rel) == 1u)
+                return;
 
-                if (state->Dispatched[passIndex].exchange(1u, std::memory_order_acq_rel) == 1u)
-                    continue;
-
-                const auto& options = impl->Passes[passIndex].Options;
-                const bool canRunOnWorker = options.AllowParallel &&
-                    !options.MainThreadOnly && canUseWorkers;
-                if (canRunOnWorker)
-                {
-                    workerPasses.push_back(passIndex);
-                }
-                else
-                {
-                    mainThreadPasses.push_back(ExecutionState::MainThreadReadyEntry{
-                        .Priority = static_cast<std::uint8_t>(options.Priority),
-                        .EstimatedCost = options.EstimatedCost,
-                        .InsertionOrder = state->NextInsertionOrder.fetch_add(1u, std::memory_order_relaxed),
-                        .PassIndex = passIndex,
-                    });
-                }
-            }
-
-            if (!mainThreadPasses.empty())
-            {
-                std::scoped_lock lock(state->MainThreadQueueMutex);
-                for (const auto& entry : mainThreadPasses)
-                    state->MainThreadQueue.push(entry);
-            }
-
-            for (const auto passIndex : workerPasses)
+            const auto& options = impl->Passes[passIndex].Options;
+            const bool canRunOnWorker =
+                options.AllowParallel &&
+                !options.MainThreadOnly &&
+                state->CanUseWorkers;
+            if (canRunOnWorker)
             {
                 const auto priority =
-                    ToDispatchPriority(impl->Passes[passIndex].Options.Priority);
+                    ToDispatchPriority(options.Priority);
                 Tasks::Scheduler::Dispatch(
                     priority,
                     [passIndex, state]()
                     {
                         state->ExecuteAndFinish(state, passIndex);
                     });
+                return;
+            }
+
+            {
+                std::scoped_lock lock(state->MainThreadQueueMutex);
+                state->MainThreadQueue.push(
+                    ExecutionState::MainThreadReadyEntry{
+                        .Priority =
+                            static_cast<std::uint8_t>(options.Priority),
+                        .EstimatedCost = options.EstimatedCost,
+                        .InsertionOrder =
+                            state->NextInsertionOrder.fetch_add(
+                                1u, std::memory_order_relaxed),
+                        .PassIndex = passIndex,
+                    });
             }
         };
 
-        state->OnTaskFinished = [impl](const std::shared_ptr<ExecutionState>& state,
-                                       const std::uint32_t passIndex)
+        state->OnTaskFinished = +[](
+            const std::shared_ptr<ExecutionState>& state,
+            const std::uint32_t passIndex)
         {
+            auto* impl = static_cast<Impl*>(state->GraphOwner.get());
             if (passIndex < impl->Passes.size())
             {
-                std::vector<std::uint32_t> readySuccessors{};
-                readySuccessors.reserve(impl->Successors[passIndex].size());
                 for (const auto successor : impl->Successors[passIndex])
                 {
                     if (state->RemainingDeps[successor].fetch_sub(1u, std::memory_order_acq_rel) == 1u)
-                        readySuccessors.push_back(successor);
+                        state->ScheduleReadyPass(state, successor);
                 }
-
-                state->ScheduleReadyBatch(state, readySuccessors);
             }
 
             const auto remaining = state->RemainingTasks.fetch_sub(1u, std::memory_order_acq_rel);
@@ -1141,9 +1358,11 @@ namespace Extrinsic::Core::Dag
             state->Done.Signal();
         };
 
-        state->ExecuteAndFinish = [impl](const std::shared_ptr<ExecutionState>& state,
-                                         const std::uint32_t passIndex)
+        state->ExecuteAndFinish = +[](
+            const std::shared_ptr<ExecutionState>& state,
+            const std::uint32_t passIndex)
         {
+            auto* impl = static_cast<Impl*>(state->GraphOwner.get());
             if (passIndex < impl->Passes.size() && impl->Passes[passIndex].Execute)
             {
                 impl->Passes[passIndex].Execute();
@@ -1163,14 +1382,11 @@ namespace Extrinsic::Core::Dag
         }
         else
         {
-            std::vector<std::uint32_t> initialReady{};
-            initialReady.reserve(impl->Passes.size());
             for (std::uint32_t i = 0; i < impl->Passes.size(); ++i)
             {
                 if (impl->InitialInDegree[i] == 0u)
-                    initialReady.push_back(i);
+                    state->ScheduleReadyPass(state, i);
             }
-            state->ScheduleReadyBatch(state, initialReady);
         }
 
         return TaskGraphCompletion(std::make_shared<TaskGraphCompletion::Impl>(std::move(state)));
@@ -1192,7 +1408,7 @@ namespace Extrinsic::Core::Dag
             return;
         }
 
-        if (!m_Impl->Compiled)
+        if (!m_Impl->CanUsePlan())
         {
             Log::Warn("[TaskGraph] ExecutePass requires a compiled graph");
             return;
@@ -1221,7 +1437,7 @@ namespace Extrinsic::Core::Dag
             return {};
         }
 
-        if (!m_Impl->Compiled)
+        if (!m_Impl->CanUsePlan())
         {
             Log::Warn("[TaskGraph] TakePassExecute requires a compiled graph");
             return {};
@@ -1244,13 +1460,14 @@ namespace Extrinsic::Core::Dag
         }
 
         m_Impl->Passes.clear();
+        m_Impl->ReplayPasses.clear();
+        m_Impl->ReplayPassCount = 0u;
+        m_Impl->ReplayRegistration = false;
+        m_Impl->CachedPlanValid = false;
         m_Impl->ClearCompiledState();
         m_Impl->TokenMap.clear();
         m_Impl->StringResourceMap.clear();
-        m_Impl->LabelMap.clear();
-        m_Impl->LabelValues.clear();
         m_Impl->NextResourceIdx = 0u;
-        m_Impl->NextLabelIdx = 0u;
         m_Impl->LastCompileNs = 0u;
         m_Impl->LastExecuteNs.store(0u, std::memory_order_release);
         m_Impl->LastCriticalPathNs = 0u;
@@ -1260,27 +1477,67 @@ namespace Extrinsic::Core::Dag
 
     Core::Result TaskGraph::ResetForReplay()
     {
-        // Baseline scaffold: preserve the explicit replay lifecycle and
-        // lifetime counters while intentionally rebuilding all structure.
-        // The production CORE-008 change replaces this delegation after the
-        // frozen benchmark captures the full-rebuild baseline.
-        return Reset();
+        if (m_Impl->Executing.load(std::memory_order_acquire) ||
+            m_Impl->HasLiveExecution())
+        {
+            Log::Error(
+                "[TaskGraph] ResetForReplay() called while execution is active");
+            return Err(ErrorCode::InvalidState);
+        }
+
+        if (m_Impl->ReplayRegistration)
+        {
+            for (std::uint32_t index = 0u;
+                 index < m_Impl->ReplayPassCount;
+                 ++index)
+            {
+                m_Impl->ReplayPasses[index].Execute = {};
+            }
+            m_Impl->ReplayPassCount = 0u;
+        }
+        else
+        {
+            for (auto& pass : m_Impl->Passes)
+                pass.Execute = {};
+
+            if (!m_Impl->CachedPlanValid)
+            {
+                m_Impl->Passes.clear();
+                m_Impl->ClearCompiledState();
+            }
+        }
+
+        m_Impl->ReplayRegistration = true;
+        m_Impl->Compiled = false;
+        m_Impl->TokenMap.clear();
+        m_Impl->StringResourceMap.clear();
+        m_Impl->NextResourceIdx = 0u;
+        m_Impl->LastCompileNs = 0u;
+        m_Impl->LastExecuteNs.store(0u, std::memory_order_release);
+        m_Impl->LastCriticalPathNs = 0u;
+        return Ok();
     }
 
     std::uint32_t TaskGraph::PassCount() const noexcept
     {
-        return static_cast<std::uint32_t>(m_Impl->Passes.size());
+        return m_Impl->RegistrationPassCount();
     }
 
     std::string_view TaskGraph::PassName(std::uint32_t index) const noexcept
     {
-        if (index < m_Impl->Passes.size())
-            return m_Impl->Passes[index].Name;
+        if (index < m_Impl->RegistrationPassCount())
+            return m_Impl->RegistrationPass(index).Name;
         return {};
     }
 
     const std::vector<std::vector<std::uint32_t>>& TaskGraph::GetExecutionLayers() const noexcept
     {
+        if (m_Impl->ReplayRegistration)
+        {
+            static const std::vector<std::vector<std::uint32_t>>
+                kEmptyLayers{};
+            return kEmptyLayers;
+        }
         return m_Impl->Layers;
     }
 
@@ -1293,6 +1550,8 @@ namespace Extrinsic::Core::Dag
 
     ScheduleStats TaskGraph::GetScheduleStats() const noexcept
     {
+        if (m_Impl->ReplayRegistration)
+            return {};
         return m_Impl->LastStats;
     }
 
@@ -1311,67 +1570,68 @@ namespace Extrinsic::Core::Dag
     // -----------------------------------------------------------------------
     void TaskGraphBuilder::ReadResource(ResourceId resource)
     {
-        m_Graph.m_Impl->Passes[m_PassIndex].Resources.push_back(
-            ResourceAccess{resource, ResourceAccessMode::Read});
+        m_Graph.m_Impl->RegistrationPass(m_PassIndex).Resources.push_back(
+            TaskGraph::Impl::DeclaredResourceAccess{
+                .resource = resource,
+                .mode = ResourceAccessMode::Read,
+                .Origin =
+                    TaskGraph::Impl::ResourceDeclarationOrigin::Explicit,
+                .Identity = PackResource(resource),
+            });
     }
 
     void TaskGraphBuilder::WriteResource(ResourceId resource)
     {
-        m_Graph.m_Impl->Passes[m_PassIndex].Resources.push_back(
-            ResourceAccess{resource, ResourceAccessMode::Write});
+        m_Graph.m_Impl->RegistrationPass(m_PassIndex).Resources.push_back(
+            TaskGraph::Impl::DeclaredResourceAccess{
+                .resource = resource,
+                .mode = ResourceAccessMode::Write,
+                .Origin =
+                    TaskGraph::Impl::ResourceDeclarationOrigin::Explicit,
+                .Identity = PackResource(resource),
+            });
     }
 
     void TaskGraphBuilder::ReadResource(Hash::StringID label)
     {
-        m_Graph.m_Impl->Passes[m_PassIndex].Resources.push_back(
-            ResourceAccess{m_Graph.StringIdToResource(label), ResourceAccessMode::Read});
+        m_Graph.m_Impl->RegistrationPass(m_PassIndex).Resources.push_back(
+            TaskGraph::Impl::DeclaredResourceAccess{
+                .resource = m_Graph.StringIdToResource(label),
+                .mode = ResourceAccessMode::Read,
+                .Origin =
+                    TaskGraph::Impl::ResourceDeclarationOrigin::StringId,
+                .Identity = label.Value,
+            });
     }
 
     void TaskGraphBuilder::WriteResource(Hash::StringID label)
     {
-        m_Graph.m_Impl->Passes[m_PassIndex].Resources.push_back(
-            ResourceAccess{m_Graph.StringIdToResource(label), ResourceAccessMode::Write});
+        m_Graph.m_Impl->RegistrationPass(m_PassIndex).Resources.push_back(
+            TaskGraph::Impl::DeclaredResourceAccess{
+                .resource = m_Graph.StringIdToResource(label),
+                .mode = ResourceAccessMode::Write,
+                .Origin =
+                    TaskGraph::Impl::ResourceDeclarationOrigin::StringId,
+                .Identity = label.Value,
+            });
     }
 
     void TaskGraphBuilder::WaitFor(Hash::StringID label)
     {
-        auto& lm = m_Graph.m_Impl->LabelMap;
-        auto it = lm.find(label.Value);
-        std::uint32_t idx = 0u;
-        if (it != lm.end())
-            idx = static_cast<std::uint32_t>(it->second);
-        else
-        {
-            idx = m_Graph.m_Impl->NextLabelIdx++;
-            lm.emplace(static_cast<std::uint64_t>(label.Value), idx);
-            m_Graph.m_Impl->LabelValues.push_back(label.Value);
-        }
-
-        m_Graph.m_Impl->Passes[m_PassIndex].WaitLabels.push_back(
-            idx);
+        m_Graph.m_Impl->RegistrationPass(m_PassIndex)
+            .WaitLabels.push_back(label.Value);
     }
 
     void TaskGraphBuilder::Signal(Hash::StringID label)
     {
-        auto& lm = m_Graph.m_Impl->LabelMap;
-        auto it = lm.find(label.Value);
-        std::uint32_t idx = 0u;
-        if (it != lm.end())
-            idx = static_cast<std::uint32_t>(it->second);
-        else
-        {
-            idx = m_Graph.m_Impl->NextLabelIdx++;
-            lm.emplace(static_cast<std::uint64_t>(label.Value), idx);
-            m_Graph.m_Impl->LabelValues.push_back(label.Value);
-        }
-
-        m_Graph.m_Impl->Passes[m_PassIndex].SignalLabels.push_back(
-            idx);
+        m_Graph.m_Impl->RegistrationPass(m_PassIndex)
+            .SignalLabels.push_back(label.Value);
     }
 
     void TaskGraphBuilder::DependsOn(std::uint32_t predecessorPassIndex)
     {
-        m_Graph.m_Impl->Passes[m_PassIndex].Dependencies.push_back(
+        m_Graph.m_Impl->RegistrationPass(m_PassIndex)
+            .Dependencies.push_back(
             PassDependency{
                 .Predecessor = predecessorPassIndex,
                 .Kind = PassDependencyKind::Default,
@@ -1380,7 +1640,8 @@ namespace Extrinsic::Core::Dag
 
     void TaskGraphBuilder::DependsOn(std::uint32_t predecessorPassIndex, std::string_view reason)
     {
-        m_Graph.m_Impl->Passes[m_PassIndex].Dependencies.push_back(
+        m_Graph.m_Impl->RegistrationPass(m_PassIndex)
+            .Dependencies.push_back(
             PassDependency{
                 .Predecessor = predecessorPassIndex,
                 .Kind = PassDependencyKind::Named,

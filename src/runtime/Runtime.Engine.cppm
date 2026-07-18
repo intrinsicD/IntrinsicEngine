@@ -78,7 +78,8 @@ namespace Extrinsic::Runtime
     //   per frame:
     //     OnSimTick(engine, fixedDt)   — 0..N times, fixed timestep.
     //                                    Add FrameGraph passes each tick;
-    //                                    Engine calls Compile→Execute→Reset.
+    //                                    Engine calls
+    //                                    Compile→Execute→ResetForReplay.
     //     OnVariableTick(engine,       — once per frame, after all sim ticks.
     //                    alpha, dt)      alpha = accumulator / fixedDt ∈ [0,1).
     //                                    Use for camera, UI, interpolation.
@@ -122,7 +123,7 @@ namespace Extrinsic::Runtime
     //   CPU     — Core::FrameGraph wrapping a Dag::TaskGraph(Cpu).
     //             Drives ECS system scheduling each sim tick.
     //             IApplication::OnSimTick adds passes; Engine calls
-    //             Compile → Execute → Reset per tick.
+    //             Compile → Execute → ResetForReplay per tick.
     //
     //   GPU     — Owned internally by IRenderer.
     //             Engine drives it via BeginFrame / ExecuteFrame / EndFrame.
@@ -141,7 +142,7 @@ namespace Extrinsic::Runtime
     //     [if resized:   WaitIdle → Resize]
     //   FixedStepLoop {
     //     OnSimTick × N
-    //       FrameGraph: Compile → Execute → Reset  (CPU task graph)
+    //       FrameGraph: Compile → Execute → ResetForReplay  (CPU task graph)
     //   }
     //   OnVariableTick(alpha, dt)
     //   BuildRenderFrameInput

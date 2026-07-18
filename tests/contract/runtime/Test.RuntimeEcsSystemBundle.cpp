@@ -165,6 +165,70 @@ TEST(RuntimeEcsSystemBundle, BundleExecutionPropagatesDirtyChildWorldMatrix)
     EXPECT_TRUE(raw.all_of<Components::DirtyTags::DirtyTransform>(child));
 }
 
+TEST(RuntimeEcsSystemBundle, ReplayReusesPlanAndCapturesCurrentScene)
+{
+    Registry firstScene;
+    Registry secondScene;
+    auto& firstRaw = firstScene.Raw();
+    auto& secondRaw = secondScene.Raw();
+    const EntityHandle firstEntity =
+        CreateDefault(firstScene, "FirstReplayScene");
+    const EntityHandle secondEntity =
+        CreateDefault(secondScene, "SecondReplayScene");
+
+    firstRaw.get<Components::Transform::Component>(firstEntity).Position =
+        glm::vec3(1.0f, 0.0f, 0.0f);
+    firstRaw.emplace_or_replace<Components::Transform::IsDirtyTag>(
+        firstEntity);
+    secondRaw.get<Components::Transform::Component>(secondEntity).Position =
+        glm::vec3(7.0f, 0.0f, 0.0f);
+    secondRaw.emplace_or_replace<Components::Transform::IsDirtyTag>(
+        secondEntity);
+
+    FrameGraph graph;
+    (void)RegisterPromotedEcsSystemBundle(graph, firstScene);
+    ASSERT_TRUE(graph.Compile().has_value());
+    ASSERT_TRUE(graph.Execute().has_value());
+
+    const glm::mat4 firstExpected =
+        glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    ASSERT_TRUE(MatricesNear(
+        firstRaw.get<Components::Transform::WorldMatrix>(firstEntity).Matrix,
+        firstExpected));
+
+    // If replay keeps the previous callbacks, the second submission will
+    // incorrectly settle this new mutation instead of the second scene.
+    firstRaw.get<Components::Transform::Component>(firstEntity).Position =
+        glm::vec3(11.0f, 0.0f, 0.0f);
+    firstRaw.emplace_or_replace<Components::Transform::IsDirtyTag>(
+        firstEntity);
+
+    ASSERT_TRUE(graph.ResetForReplay().has_value());
+    (void)RegisterPromotedEcsSystemBundle(graph, secondScene);
+    ASSERT_TRUE(graph.Compile().has_value());
+    ASSERT_TRUE(graph.Execute().has_value());
+
+    const auto planStats = graph.GetPlanReuseStats();
+    EXPECT_EQ(planStats.CompileCallCount, 2u);
+    EXPECT_EQ(planStats.PlanBuildCount, 1u);
+    EXPECT_EQ(planStats.PlanReuseCount, 1u);
+    EXPECT_TRUE(planStats.LastCompileReusedPlan);
+
+    const glm::mat4 secondExpected =
+        glm::translate(glm::mat4(1.0f), glm::vec3(7.0f, 0.0f, 0.0f));
+    EXPECT_TRUE(MatricesNear(
+        secondRaw.get<Components::Transform::WorldMatrix>(secondEntity).Matrix,
+        secondExpected));
+    EXPECT_FALSE(
+        secondRaw.all_of<Components::Transform::IsDirtyTag>(secondEntity));
+
+    EXPECT_TRUE(
+        firstRaw.all_of<Components::Transform::IsDirtyTag>(firstEntity));
+    EXPECT_TRUE(MatricesNear(
+        firstRaw.get<Components::Transform::WorldMatrix>(firstEntity).Matrix,
+        firstExpected));
+}
+
 TEST(RuntimeEcsSystemBundle, BundleExecutionPropagatesWorldBoundsAfterTransformUpdate)
 {
     Registry scene;

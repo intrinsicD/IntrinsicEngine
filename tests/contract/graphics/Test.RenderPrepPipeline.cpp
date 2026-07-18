@@ -78,34 +78,71 @@ namespace
     };
 }
 
-TEST(RenderPrepPipeline, TaskGraphExecutesPrepStepsInRequiredOrder)
+TEST(RenderPrepPipeline, TaskGraphReusesPlanAndRebindsCallbacks)
 {
     PrepHarness harness;
-    std::vector<RenderPrepStep> observedSteps{};
+    std::vector<RenderPrepStep> firstObservedSteps{};
+    std::vector<RenderPrepStep> secondObservedSteps{};
     RenderPrepPipeline pipeline;
 
-    RenderPrepPipelineResult result = pipeline.Run(harness.MakeInputs(observedSteps));
+    const RenderPrepPipelineResult first =
+        pipeline.Run(harness.MakeInputs(firstObservedSteps));
+    const RenderPrepPipelineResult second =
+        pipeline.Run(harness.MakeInputs(secondObservedSteps));
 
-    EXPECT_TRUE(result.Succeeded) << result.Diagnostic;
-    EXPECT_EQ(result.FailureReason, RenderPrepFailureReason::None);
-    EXPECT_EQ(result.ExecutedSteps, ExpectedOrder());
-    EXPECT_EQ(observedSteps, ExpectedOrder());
+    EXPECT_TRUE(first.Succeeded) << first.Diagnostic;
+    EXPECT_EQ(first.FailureReason, RenderPrepFailureReason::None);
+    EXPECT_EQ(first.ExecutedSteps, ExpectedOrder());
+    EXPECT_EQ(firstObservedSteps, ExpectedOrder());
+    EXPECT_EQ(first.TaskGraphCompileCalls, 1u);
+    EXPECT_EQ(first.TaskGraphPlanBuilds, 1u);
+    EXPECT_EQ(first.TaskGraphPlanReuses, 0u);
+    EXPECT_FALSE(first.TaskGraphLastCompileReusedPlan);
+
+    EXPECT_TRUE(second.Succeeded) << second.Diagnostic;
+    EXPECT_EQ(second.FailureReason, RenderPrepFailureReason::None);
+    EXPECT_EQ(second.ExecutedSteps, ExpectedOrder());
+    EXPECT_EQ(secondObservedSteps, ExpectedOrder());
+    EXPECT_EQ(firstObservedSteps, ExpectedOrder());
+    EXPECT_EQ(second.TaskGraphCompileCalls, 2u);
+    EXPECT_EQ(second.TaskGraphPlanBuilds, 1u);
+    EXPECT_EQ(second.TaskGraphPlanReuses, 1u);
+    EXPECT_TRUE(second.TaskGraphLastCompileReusedPlan);
     EXPECT_TRUE(harness.ClusterResourcesRequested);
 }
 
 TEST(RenderPrepPipeline, SequentialFallbackMatchesTaskGraphStepOrder)
 {
     PrepHarness harness;
-    std::vector<RenderPrepStep> observedSteps{};
+    std::vector<RenderPrepStep> firstTaskGraphSteps{};
+    std::vector<RenderPrepStep> sequentialSteps{};
+    std::vector<RenderPrepStep> secondTaskGraphSteps{};
     RenderPrepPipeline pipeline;
 
-    RenderPrepPipelineResult result = pipeline.Run(
-        harness.MakeInputs(observedSteps),
+    const RenderPrepPipelineResult first =
+        pipeline.Run(harness.MakeInputs(firstTaskGraphSteps));
+    const RenderPrepPipelineResult sequential = pipeline.Run(
+        harness.MakeInputs(sequentialSteps),
         RenderPrepPipelineOptions{.UseTaskGraph = false});
+    const RenderPrepPipelineResult second =
+        pipeline.Run(harness.MakeInputs(secondTaskGraphSteps));
 
-    EXPECT_TRUE(result.Succeeded) << result.Diagnostic;
-    EXPECT_EQ(result.ExecutedSteps, ExpectedOrder());
-    EXPECT_EQ(observedSteps, ExpectedOrder());
+    ASSERT_TRUE(first.Succeeded) << first.Diagnostic;
+    EXPECT_TRUE(sequential.Succeeded) << sequential.Diagnostic;
+    EXPECT_EQ(sequential.ExecutedSteps, ExpectedOrder());
+    EXPECT_EQ(sequentialSteps, ExpectedOrder());
+    EXPECT_EQ(sequential.TaskGraphCompileCalls, 0u);
+    EXPECT_EQ(sequential.TaskGraphPlanBuilds, 0u);
+    EXPECT_EQ(sequential.TaskGraphPlanReuses, 0u);
+
+    EXPECT_TRUE(second.Succeeded) << second.Diagnostic;
+    EXPECT_EQ(second.ExecutedSteps, ExpectedOrder());
+    EXPECT_EQ(secondTaskGraphSteps, ExpectedOrder());
+    EXPECT_EQ(firstTaskGraphSteps, ExpectedOrder());
+    EXPECT_EQ(second.TaskGraphCompileCalls, 2u);
+    EXPECT_EQ(second.TaskGraphPlanBuilds, 1u);
+    EXPECT_EQ(second.TaskGraphPlanReuses, 1u);
+    EXPECT_TRUE(second.TaskGraphLastCompileReusedPlan);
     EXPECT_TRUE(harness.ClusterResourcesRequested);
 }
 
@@ -127,47 +164,78 @@ TEST(RenderPrepPipeline, MissingRequiredInputFailsClosedBeforeExecutingSteps)
     EXPECT_TRUE(result.ExecutedSteps.empty());
     EXPECT_TRUE(observedSteps.empty());
     EXPECT_FALSE(harness.ClusterResourcesRequested);
+    EXPECT_EQ(result.TaskGraphCompileCalls, 0u);
+    EXPECT_EQ(result.TaskGraphPlanBuilds, 0u);
+    EXPECT_EQ(result.TaskGraphPlanReuses, 0u);
     EXPECT_NE(result.Diagnostic.find("CullingSystem"), std::string::npos);
 }
 
 TEST(RenderPrepPipeline, ForcedTaskGraphCompileFailureReportsDiagnostic)
 {
     PrepHarness harness;
-    std::vector<RenderPrepStep> observedSteps{};
+    std::vector<RenderPrepStep> failedObservedSteps{};
+    std::vector<RenderPrepStep> recoveredObservedSteps{};
     RenderPrepPipeline pipeline;
 
-    RenderPrepPipelineResult result = pipeline.Run(
-        harness.MakeInputs(observedSteps),
+    const RenderPrepPipelineResult result = pipeline.Run(
+        harness.MakeInputs(failedObservedSteps),
         RenderPrepPipelineOptions{
             .ForceTaskGraphCompileFailure = Extrinsic::Core::ErrorCode::InvalidState,
         });
+    const RenderPrepPipelineResult recovered =
+        pipeline.Run(harness.MakeInputs(recoveredObservedSteps));
 
     EXPECT_FALSE(result.Succeeded);
     EXPECT_EQ(result.FailureReason, RenderPrepFailureReason::TaskGraphCompileFailed);
     EXPECT_EQ(result.TaskGraphError, Extrinsic::Core::ErrorCode::InvalidState);
     EXPECT_TRUE(result.ExecutedSteps.empty());
-    EXPECT_TRUE(observedSteps.empty());
-    EXPECT_FALSE(harness.ClusterResourcesRequested);
+    EXPECT_TRUE(failedObservedSteps.empty());
+    EXPECT_EQ(result.TaskGraphCompileCalls, 0u);
+    EXPECT_EQ(result.TaskGraphPlanBuilds, 0u);
+    EXPECT_EQ(result.TaskGraphPlanReuses, 0u);
     EXPECT_NE(result.Diagnostic.find("compile failed"), std::string::npos);
+
+    EXPECT_TRUE(recovered.Succeeded) << recovered.Diagnostic;
+    EXPECT_EQ(recoveredObservedSteps, ExpectedOrder());
+    EXPECT_TRUE(failedObservedSteps.empty());
+    EXPECT_EQ(recovered.TaskGraphCompileCalls, 1u);
+    EXPECT_EQ(recovered.TaskGraphPlanBuilds, 1u);
+    EXPECT_EQ(recovered.TaskGraphPlanReuses, 0u);
+    EXPECT_TRUE(harness.ClusterResourcesRequested);
 }
 
 TEST(RenderPrepPipeline, ForcedTaskGraphExecuteFailureReportsDiagnostic)
 {
     PrepHarness harness;
-    std::vector<RenderPrepStep> observedSteps{};
+    std::vector<RenderPrepStep> failedObservedSteps{};
+    std::vector<RenderPrepStep> recoveredObservedSteps{};
     RenderPrepPipeline pipeline;
 
-    RenderPrepPipelineResult result = pipeline.Run(
-        harness.MakeInputs(observedSteps),
+    const RenderPrepPipelineResult result = pipeline.Run(
+        harness.MakeInputs(failedObservedSteps),
         RenderPrepPipelineOptions{
             .ForceTaskGraphExecuteFailure = Extrinsic::Core::ErrorCode::InvalidState,
         });
+    const RenderPrepPipelineResult recovered =
+        pipeline.Run(harness.MakeInputs(recoveredObservedSteps));
 
     EXPECT_FALSE(result.Succeeded);
     EXPECT_EQ(result.FailureReason, RenderPrepFailureReason::TaskGraphExecuteFailed);
     EXPECT_EQ(result.TaskGraphError, Extrinsic::Core::ErrorCode::InvalidState);
     EXPECT_TRUE(result.ExecutedSteps.empty());
-    EXPECT_TRUE(observedSteps.empty());
-    EXPECT_FALSE(harness.ClusterResourcesRequested);
+    EXPECT_TRUE(failedObservedSteps.empty());
+    EXPECT_EQ(result.TaskGraphCompileCalls, 1u);
+    EXPECT_EQ(result.TaskGraphPlanBuilds, 1u);
+    EXPECT_EQ(result.TaskGraphPlanReuses, 0u);
+    EXPECT_FALSE(result.TaskGraphLastCompileReusedPlan);
     EXPECT_NE(result.Diagnostic.find("execute failed"), std::string::npos);
+
+    EXPECT_TRUE(recovered.Succeeded) << recovered.Diagnostic;
+    EXPECT_EQ(recoveredObservedSteps, ExpectedOrder());
+    EXPECT_TRUE(failedObservedSteps.empty());
+    EXPECT_EQ(recovered.TaskGraphCompileCalls, 2u);
+    EXPECT_EQ(recovered.TaskGraphPlanBuilds, 1u);
+    EXPECT_EQ(recovered.TaskGraphPlanReuses, 1u);
+    EXPECT_TRUE(recovered.TaskGraphLastCompileReusedPlan);
+    EXPECT_TRUE(harness.ClusterResourcesRequested);
 }

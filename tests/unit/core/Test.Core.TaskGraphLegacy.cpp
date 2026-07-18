@@ -191,6 +191,27 @@ TEST(CoreTaskGraph, WaitAfterLaterSignalStillFailsCompile)
     EXPECT_NE(diagnostic.find("Waiter"), std::string::npos);
 }
 
+TEST(CoreTaskGraph, ExplicitSelfDependencyFailsCompile)
+{
+    TaskGraph graph;
+
+    graph.AddPass(
+        "SelfDependent",
+        [](TaskGraphBuilder& builder)
+        {
+            builder.DependsOn(0u);
+        },
+        []() {});
+
+    const auto compile = graph.Compile();
+    ASSERT_FALSE(compile.has_value());
+    EXPECT_EQ(compile.error(), ErrorCode::InvalidState);
+
+    const auto diagnostic = graph.GetScheduleStats().lastDiagnostic;
+    EXPECT_NE(diagnostic.find("SelfDependent"), std::string::npos);
+    EXPECT_NE(diagnostic.find("cannot depend on itself"), std::string::npos);
+}
+
 TEST(CoreTaskGraph, ExplicitDependencyCanCreateCycleDiagnostic)
 {
     TaskGraph graph;
@@ -416,6 +437,260 @@ TEST(CoreTaskGraph, PlanOnlyBuildPlanAndResetReuse)
     EXPECT_EQ((*secondPlan)[0].id, (TaskId{0, 1}));
 }
 
+TEST(CoreTaskGraph, ReplayReusesExactPlanAndRebindsCallbacks)
+{
+    TaskGraph graph;
+    std::vector<std::string> log;
+
+    const auto registerEpoch =
+        [&](const std::string_view suffix)
+    {
+        graph.AddPass("WritePosition",
+            [](TaskGraphBuilder& b) { b.Write<Position>(); },
+            [&, suffix]() { log.emplace_back("Write" + std::string(suffix)); });
+        graph.AddPass("ReadPosition",
+            [](TaskGraphBuilder& b) { b.Read<Position>(); },
+            [&, suffix]() { log.emplace_back("Read" + std::string(suffix)); });
+    };
+
+    registerEpoch("1");
+    ASSERT_TRUE(graph.Compile().has_value());
+    ASSERT_TRUE(graph.Execute().has_value());
+
+    ASSERT_TRUE(graph.ResetForReplay().has_value());
+    EXPECT_EQ(graph.PassCount(), 0u);
+    EXPECT_TRUE(graph.PassName(0u).empty());
+
+    registerEpoch("2");
+    ASSERT_TRUE(graph.Compile().has_value());
+    EXPECT_EQ(graph.LastCompileTimeNs(), 0u);
+    ASSERT_TRUE(graph.Execute().has_value());
+
+    EXPECT_EQ(log, (std::vector<std::string>{
+        "Write1", "Read1", "Write2", "Read2"}));
+    const auto stats = graph.GetPlanReuseStats();
+    EXPECT_EQ(stats.CompileCallCount, 2u);
+    EXPECT_EQ(stats.PlanBuildCount, 1u);
+    EXPECT_EQ(stats.PlanReuseCount, 1u);
+    EXPECT_TRUE(stats.LastCompileReusedPlan);
+}
+
+TEST(CoreTaskGraph, ReplayStructuralDescriptorChangesRebuild)
+{
+    const auto expectRebuild =
+        [](const std::string_view description,
+           auto&& registerFirst,
+           auto&& registerSecond)
+    {
+        SCOPED_TRACE(description);
+        TaskGraph graph{TaskGraphExecutionMode::PlanOnly};
+        registerFirst(graph);
+        ASSERT_TRUE(graph.Compile().has_value());
+        ASSERT_TRUE(graph.ResetForReplay().has_value());
+        registerSecond(graph);
+        ASSERT_TRUE(graph.Compile().has_value());
+
+        const auto stats = graph.GetPlanReuseStats();
+        EXPECT_EQ(stats.CompileCallCount, 2u);
+        EXPECT_EQ(stats.PlanBuildCount, 2u);
+        EXPECT_EQ(stats.PlanReuseCount, 0u);
+        EXPECT_FALSE(stats.LastCompileReusedPlan);
+    };
+
+    const auto oneNamedPass =
+        [](TaskGraph& graph, const std::string_view name)
+    {
+        graph.AddPass(name, []() {});
+    };
+    expectRebuild("pass name",
+        [&](TaskGraph& graph) { oneNamedPass(graph, "A"); },
+        [&](TaskGraph& graph) { oneNamedPass(graph, "B"); });
+    expectRebuild("pass count",
+        [&](TaskGraph& graph) { oneNamedPass(graph, "A"); },
+        [&](TaskGraph& graph)
+        {
+            oneNamedPass(graph, "A");
+            oneNamedPass(graph, "B");
+        });
+
+    const auto passWithOptions =
+        [](TaskGraph& graph, const TaskGraphPassOptions& options)
+    {
+        graph.AddPass("Pass", options, []() {});
+    };
+    TaskGraphPassOptions normal{};
+    TaskGraphPassOptions high = normal;
+    high.Priority = TaskPriority::High;
+    expectRebuild("priority",
+        [&](TaskGraph& graph) { passWithOptions(graph, normal); },
+        [&](TaskGraph& graph) { passWithOptions(graph, high); });
+
+    TaskGraphPassOptions cheap = normal;
+    TaskGraphPassOptions costly = normal;
+    cheap.EstimatedCost = 1u;
+    costly.EstimatedCost = 8u;
+    expectRebuild("estimated cost",
+        [&](TaskGraph& graph) { passWithOptions(graph, cheap); },
+        [&](TaskGraph& graph) { passWithOptions(graph, costly); });
+
+    TaskGraphPassOptions worker = normal;
+    TaskGraphPassOptions owner = normal;
+    owner.MainThreadOnly = true;
+    expectRebuild("main-thread-only",
+        [&](TaskGraph& graph) { passWithOptions(graph, worker); },
+        [&](TaskGraph& graph) { passWithOptions(graph, owner); });
+
+    TaskGraphPassOptions parallel = normal;
+    TaskGraphPassOptions serial = normal;
+    serial.AllowParallel = false;
+    expectRebuild("allow parallel",
+        [&](TaskGraph& graph) { passWithOptions(graph, parallel); },
+        [&](TaskGraph& graph) { passWithOptions(graph, serial); });
+
+    TaskGraphPassOptions firstCategory = normal;
+    TaskGraphPassOptions secondCategory = normal;
+    firstCategory.DebugCategory = "First";
+    secondCategory.DebugCategory = "Second";
+    expectRebuild("debug category",
+        [&](TaskGraph& graph)
+        {
+            passWithOptions(graph, firstCategory);
+        },
+        [&](TaskGraph& graph)
+        {
+            passWithOptions(graph, secondCategory);
+        });
+
+    expectRebuild("type identity",
+        [](TaskGraph& graph)
+        {
+            graph.AddPass("Pass",
+                [](TaskGraphBuilder& b) { b.Write<Position>(); },
+                []() {});
+        },
+        [](TaskGraph& graph)
+        {
+            graph.AddPass("Pass",
+                [](TaskGraphBuilder& b) { b.Write<Velocity>(); },
+                []() {});
+        });
+    expectRebuild("StringID resource identity",
+        [](TaskGraph& graph)
+        {
+            graph.AddPass("Pass",
+                [](TaskGraphBuilder& b) { b.WriteResource("A"_id); },
+                []() {});
+        },
+        [](TaskGraph& graph)
+        {
+            graph.AddPass("Pass",
+                [](TaskGraphBuilder& b) { b.WriteResource("B"_id); },
+                []() {});
+        });
+    expectRebuild("explicit resource identity",
+        [](TaskGraph& graph)
+        {
+            graph.AddPass("Pass",
+                [](TaskGraphBuilder& b)
+                {
+                    b.WriteResource(ResourceId{7u, 1u});
+                },
+                []() {});
+        },
+        [](TaskGraph& graph)
+        {
+            graph.AddPass("Pass",
+                [](TaskGraphBuilder& b)
+                {
+                    b.WriteResource(ResourceId{8u, 2u});
+                },
+                []() {});
+        });
+    expectRebuild("resource declaration origin",
+        [](TaskGraph& graph)
+        {
+            graph.AddPass("Pass",
+                [](TaskGraphBuilder& b) { b.Write<Position>(); },
+                []() {});
+        },
+        [](TaskGraph& graph)
+        {
+            graph.AddPass("Pass",
+                [](TaskGraphBuilder& b)
+                {
+                    b.WriteResource(ResourceId{0u, 1u});
+                },
+                []() {});
+        });
+    expectRebuild("resource access mode",
+        [](TaskGraph& graph)
+        {
+            graph.AddPass("Pass",
+                [](TaskGraphBuilder& b)
+                {
+                    b.ReadResource(ResourceId{4u, 1u});
+                },
+                []() {});
+        },
+        [](TaskGraph& graph)
+        {
+            graph.AddPass("Pass",
+                [](TaskGraphBuilder& b)
+                {
+                    b.WriteResource(ResourceId{4u, 1u});
+                },
+                []() {});
+        });
+
+    expectRebuild("explicit dependency",
+        [](TaskGraph& graph)
+        {
+            graph.AddPass("A", []() {});
+            graph.AddPass("B", []() {});
+        },
+        [](TaskGraph& graph)
+        {
+            graph.AddPass("A", []() {});
+            graph.AddPass("B",
+                [](TaskGraphBuilder& b) { b.DependsOn(0u); },
+                []() {});
+        });
+    expectRebuild("named dependency reason",
+        [](TaskGraph& graph)
+        {
+            graph.AddPass("A", []() {});
+            graph.AddPass("B",
+                [](TaskGraphBuilder& b) { b.DependsOn(0u, "first"); },
+                []() {});
+        },
+        [](TaskGraph& graph)
+        {
+            graph.AddPass("A", []() {});
+            graph.AddPass("B",
+                [](TaskGraphBuilder& b) { b.DependsOn(0u, "second"); },
+                []() {});
+        });
+    expectRebuild("raw signal/wait label",
+        [](TaskGraph& graph)
+        {
+            graph.AddPass("Signal",
+                [](TaskGraphBuilder& b) { b.Signal("A"_id); },
+                []() {});
+            graph.AddPass("Wait",
+                [](TaskGraphBuilder& b) { b.WaitFor("A"_id); },
+                []() {});
+        },
+        [](TaskGraph& graph)
+        {
+            graph.AddPass("Signal",
+                [](TaskGraphBuilder& b) { b.Signal("B"_id); },
+                []() {});
+            graph.AddPass("Wait",
+                [](TaskGraphBuilder& b) { b.WaitFor("B"_id); },
+                []() {});
+        });
+}
+
 TEST(CoreTaskGraph, BuildPlanBatchesMatchExecutionLayers)
 {
     TaskGraph graph;
@@ -608,21 +883,27 @@ TEST(CoreTaskGraph, MainThreadReadyQueueUsesPriorityAndCostOrdering)
 TEST(CoreTaskGraph, FailedCompileClearsCompiledState)
 {
     TaskGraph graph;
+    std::uint32_t initialRuns = 0u;
+    std::uint32_t brokenRuns = 0u;
 
-    graph.AddPass("First", [](TaskGraphBuilder&) {}, []() {});
+    graph.AddPass("First", [](TaskGraphBuilder&) {}, [&]() { ++initialRuns; });
     graph.AddPass("Second", [](TaskGraphBuilder&) {}, []() {});
 
     ASSERT_TRUE(graph.Compile().has_value()) << "Compile should succeed first time";
     auto initialPlan = graph.BuildPlan();
     ASSERT_TRUE(initialPlan.has_value()) << "Initial BuildPlan should succeed";
     EXPECT_EQ(initialPlan->size(), 2u);
+    ASSERT_TRUE(graph.Execute().has_value());
+    EXPECT_EQ(initialRuns, 1u);
+
+    ASSERT_TRUE(graph.ResetForReplay().has_value());
 
     graph.AddPass("Broken",
         [](TaskGraphBuilder& b)
         {
             b.DependsOn(42u);
         },
-        []() {});
+        [&]() { ++brokenRuns; });
 
     const auto failedCompile = graph.Compile();
     ASSERT_FALSE(failedCompile.has_value());
@@ -636,6 +917,8 @@ TEST(CoreTaskGraph, FailedCompileClearsCompiledState)
     EXPECT_TRUE(graph.GetScheduleStats().lastDiagnostic.find("out of range") != std::string::npos);
     EXPECT_EQ(graph.GetScheduleStats().edgeCount, 0u);
     EXPECT_EQ(graph.GetScheduleStats().taskCount, 0u);
+    EXPECT_EQ(initialRuns, 1u);
+    EXPECT_EQ(brokenRuns, 0u);
 }
 
 TEST(CoreFrameGraph, ResetRebuildsTheCpuGraphCleanly)

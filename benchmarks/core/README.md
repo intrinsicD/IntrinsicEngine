@@ -45,5 +45,7 @@ python3 tools/benchmark/validate_benchmark_results.py \
   --root /tmp/intrinsic-benchmark-smoke --strict
 ```
 
-The expected pre-priority exit code is `2`; validate the emitted directory
-even when collecting that intentionally failed baseline.
+The expected exit code is `0` for the current candidate. Exit code `2` applies
+only when reproducing the preserved CORE-007 pre-priority baseline binary;
+validate that emitted directory even though its priority probe intentionally
+fails.

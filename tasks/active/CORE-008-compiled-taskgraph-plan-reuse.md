@@ -130,8 +130,9 @@ maturity_target: Operational
       prep documentation, and benchmark package/report indexes.
 
 ## Acceptance criteria
-- [ ] Steady-state sandbox frame performs zero task-graph compiles in the
-      fixed-step path (proven by plan counters on the Null runtime path).
+- [ ] After the first fixed step, the steady-state sandbox path performs zero
+      additional task-graph topology builds (proven by plan counters on the
+      Null runtime path; each replay still makes an accepted `Compile()` call).
 - [ ] Both matched workloads record baseline/candidate distributions,
       structure/callback quality error zero, and explicit effect sizes.
 - [ ] Default CPU, serial ASan/UBSan, and cold-compile Architecture SLO gates

@@ -95,16 +95,20 @@ The frame order is:
    command-published events become visible before simulation, and events
    published by listeners defer to the next pump per
    [ADR-0024](../adr/0024-kernel-module-architecture.md) D7 (ARCH-008);
-4. fixed-step simulation and CPU `FrameGraph` execution: the promoted baseline
-   ECS system bundle is appended **first**, before module-registered sim
-   systems, so a module system that reads a baseline output (e.g.
+4. fixed-step simulation and CPU `FrameGraph` execution: application
+   `OnSimTick` contributions are appended first, then the promoted baseline ECS
+   system bundle, then module-registered sim systems. This ensures a module
+   system that reads a baseline output (e.g.
    `Transform::WorldMatrix`) or waits on the baseline `TransformUpdate` signal is
    ordered after its producer — the core `FrameGraph` preserves insertion order
    for passes that share a resource, so bundle-last would place such a module
    before its producer (BUG-069). `Runtime.ModuleSchedule` then canonicalizes sim
    systems by stable module/pass identity under explicit named-signal
    dependencies so the applied order among modules is independent of module
-   registration order (ARCH-011, BUG-066);
+   registration order (ARCH-011, BUG-066). Each substep finishes with
+   `Compile` → `Execute` → `ResetForReplay`: exact repeated descriptors reuse
+   topology with freshly bound callbacks, while application/module shape
+   changes rebuild transparently (CORE-008);
 5. drain `Engine::Jobs()` completions before pump B; `JobService` checks token
    and world-scope cancellation on the main thread, drops suppressed results
    whole, and publishes completion events only for survivors per
@@ -238,8 +242,8 @@ renderable and mouse-pick eligible, selects the first leaf, and focuses the
 camera once after the complete hierarchy is ready.
 
 Runtime uses two tiers for CPU work. The fixed-step `FrameGraph` is the
-per-frame ECS/system DAG: it runs inside the simulation phase and may read/write
-the live active world under the normal frame contract. `JobService` is the
+per-substep ECS/system DAG: it runs inside the simulation phase and may
+read/write the live active world under the normal frame contract. `JobService` is the
 multi-frame background tier from ADR-0024 D8: callers submit immutable snapshots
 and a `WorldHandle` scope, workers receive only `JobCancellation`, and workers
 deposit opaque result envelopes back into the service. The service-owned

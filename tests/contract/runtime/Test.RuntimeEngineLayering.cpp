@@ -427,12 +427,17 @@ TEST(RuntimeEngineLayering, RunFrameRegistersPromotedEcsSystemBundleBetweenSimTi
     const auto bundleRegistration = content.find(
         "RegisterPromotedEcsSystemBundle(frameGraph, scene)");
     const auto compile = content.find("frameGraph.Compile()");
+    const auto execute = content.find("frameGraph.Execute()");
+    const auto resetForReplay =
+        content.find("frameGraph.ResetForReplay()");
     const auto bundleImport =
         engineImpl.find("import Extrinsic.Runtime.EcsSystemBundle");
 
     ASSERT_NE(simTick, std::string::npos);
     ASSERT_NE(bundleRegistration, std::string::npos);
     ASSERT_NE(compile, std::string::npos);
+    ASSERT_NE(execute, std::string::npos);
+    ASSERT_NE(resetForReplay, std::string::npos);
     ASSERT_NE(bundleImport, std::string::npos);
 
     // Bundle activation must run after the app has had its OnSimTick callback
@@ -440,6 +445,9 @@ TEST(RuntimeEngineLayering, RunFrameRegistersPromotedEcsSystemBundleBetweenSimTi
     // resolves dependencies. RUNTIME-091.
     EXPECT_LT(simTick, bundleRegistration);
     EXPECT_LT(bundleRegistration, compile);
+    EXPECT_LT(compile, execute);
+    EXPECT_LT(execute, resetForReplay);
+    EXPECT_EQ(content.find("frameGraph.Reset();"), std::string::npos);
 }
 
 TEST(RuntimeEngineLayering, StreamingExecutorApiStaysCpuOnly)

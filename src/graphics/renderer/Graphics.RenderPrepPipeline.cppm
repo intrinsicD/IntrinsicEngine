@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -94,6 +95,10 @@ namespace Extrinsic::Graphics
         std::vector<RenderPrepRequiredInput> MissingInputs{};
         std::vector<RenderPrepStep> ExecutedSteps{};
         Core::ErrorCode TaskGraphError = Core::ErrorCode::Success;
+        std::uint64_t TaskGraphCompileCalls = 0u;
+        std::uint64_t TaskGraphPlanBuilds = 0u;
+        std::uint64_t TaskGraphPlanReuses = 0u;
+        bool TaskGraphLastCompileReusedPlan = false;
         std::string Diagnostic{};
     };
 
@@ -104,11 +109,17 @@ namespace Extrinsic::Graphics
     export class RenderPrepPipeline final
     {
     public:
+        RenderPrepPipeline();
+        ~RenderPrepPipeline();
+        RenderPrepPipeline(const RenderPrepPipeline&) = delete;
+        RenderPrepPipeline& operator=(const RenderPrepPipeline&) = delete;
+
         [[nodiscard]] RenderPrepPipelineResult Run(
             const RenderPrepPipelineInputs& inputs,
             const RenderPrepPipelineOptions& options = {});
 
     private:
         struct Impl;
+        std::unique_ptr<Impl> m_Impl;
     };
 }

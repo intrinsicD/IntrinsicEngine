@@ -11,10 +11,12 @@
 // is the deferred Operational slice.
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <limits>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -22,6 +24,7 @@
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
+import Extrinsic.Core.Dag.TaskGraph;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.MetaData;
@@ -103,6 +106,40 @@ namespace
             engine.RequestExit();
         }
         void OnShutdown(Runtime::Engine&) override {}
+    };
+
+    class TaskGraphReplayAndExitApplication final
+        : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            Stats = engine.GetFrameGraph().GetPlanReuseStats();
+            if (Stats.PlanReuseCount >= 1u)
+            {
+                engine.RequestExit();
+                return;
+            }
+
+            if (++VariableTicks >= 20u)
+            {
+                TimedOut = true;
+                engine.RequestExit();
+                return;
+            }
+
+            // Force the following frame to own at least one fixed step on
+            // fast headless hosts. Two such frames prove the canonical
+            // Engine::Run() path builds once and then replays.
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+
+        Extrinsic::Core::Dag::TaskGraphPlanReuseStats Stats{};
+        std::uint32_t VariableTicks = 0u;
+        bool TimedOut = false;
     };
 
     [[nodiscard]] Core::Config::EngineConfig HeadlessConfig()
@@ -467,6 +504,30 @@ TEST(RuntimeSandboxAcceptance, IdleFrameSkipsPreRenderTransformFlush)
     EXPECT_EQ(pacing.PreRenderTransformWorldUpdatedObserved, 0u);
     EXPECT_EQ(pacing.PreRenderTransformDirtyTransformStamped, 0u);
     EXPECT_EQ(pacing.PreRenderTransformWorldUpdatedCleared, 0u);
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeSandboxAcceptance, FixedStepTaskGraphBuildsOnceThenReusesPlan)
+{
+    auto app = std::make_unique<TaskGraphReplayAndExitApplication>();
+    auto* appPtr = app.get();
+    Runtime::Engine engine(HeadlessConfig(), std::move(app));
+    engine.Initialize();
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+
+    engine.Run();
+
+    EXPECT_FALSE(appPtr->TimedOut);
+    EXPECT_GE(appPtr->Stats.CompileCallCount, 2u);
+    EXPECT_EQ(appPtr->Stats.PlanBuildCount, 1u);
+    EXPECT_GE(appPtr->Stats.PlanReuseCount, 1u);
+    EXPECT_EQ(appPtr->Stats.CompileCallCount,
+              appPtr->Stats.PlanBuildCount +
+                  appPtr->Stats.PlanReuseCount);
+    EXPECT_TRUE(appPtr->Stats.LastCompileReusedPlan);
 
     engine.Shutdown();
 }

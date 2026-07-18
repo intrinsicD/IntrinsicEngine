@@ -52,8 +52,8 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
 - **`Extrinsic.Core.Dag.TaskGraph`**: closure-based generic task graph API
   with `AddPass`, resource/label declarations, explicit pass dependencies via
   `TaskGraphBuilder::DependsOn`, `Compile`, `BuildPlan`, nonblocking `Submit`,
-  blocking `Execute`, fail-closed `Reset`, `ExecutePass`, and
-  `TakePassExecute`.
+  blocking `Execute`, fail-closed `Reset` / `ResetForReplay`, `ExecutePass`,
+  `TakePassExecute`, and `GetPlanReuseStats`.
   - `TaskGraphExecutionMode::ExecuteCallbacks` is the default and enables
     whole-graph `Execute()`; `PlanOnly` preserves compilation and per-pass
     callback extraction but rejects whole-graph execution.
@@ -88,6 +88,12 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
     live instead of relying on an assertion. `AddPass()` likewise leaves the
     graph unchanged while live, so callback storage cannot be reallocated
     beneath scheduled workers.
+  - `Reset()` destructively clears the graph. `ResetForReplay()` instead opens
+    a logically empty registration epoch while retaining the last successful
+    topology. The next compile reuses only an exact ordered descriptor match,
+    always installs current callbacks, and fully rebuilds on a mismatch;
+    changed compile failures invalidate the plan rather than executing stale
+    topology.
   - A worker-backed completion records the scheduler instance that accepted
     it. The instance must remain alive until readiness; unfinished waits and
     pumps fail closed after scheduler replacement.
@@ -110,6 +116,12 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
 - critical-path cost estimate;
 - compile/execute timing; and
 - last diagnostic text (including cycle details).
+
+`TaskGraph::GetPlanReuseStats()` / `FrameGraph::GetPlanReuseStats()` expose
+instance-lifetime accepted compile calls, successful full builds, exact replay
+hits, and the last-reuse flag. An exact replay hit reports zero through
+`LastCompileTimeNs()`; failed compile attempts count as calls but as neither a
+build nor a reuse.
 
 ### Scheduler partition exports
 
