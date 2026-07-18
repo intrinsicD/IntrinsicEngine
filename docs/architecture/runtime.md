@@ -73,6 +73,20 @@ engine's fail-closed initialization policy, so an invalid schedule cannot
 execute even once (BUG-070, BUG-071). Module shutdown runs after
 `RuntimeShutdownAnnounced` has been published and pumped.
 
+Module granularity follows
+[ADR-0026](../adr/0026-runtime-module-scope-by-consumer-contract.md) only after
+ADR-0024 has established that a responsibility belongs in runtime composition.
+Two integrations share a module only when app lifecycle, durable-state scope,
+dependency/cancellation/commit ownership, and published-state consumer
+reactions are cohesive. Independent composition, incompatible state lifetime,
+independently owned commit or cancellation boundaries, or different consumer
+meaning requires a split; an extra service or different execution mechanism
+alone does not. Algorithm family and result shape alone do not decide the
+boundary, and command, status, completion, and diagnostic records stay
+method-specific until two production callers prove identical semantics. This
+grouping rule does not ratify `IRuntimeModule`; its right-sizing remains a
+separate architecture audit.
+
 `Extrinsic.Runtime.ClusteringModule` is the first extracted domain module on
 this contract. Sandbox composes it from app startup, not from the kernel engine:
 the module provides `ClusteringService`, registers the `RunKMeans` command,

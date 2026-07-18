@@ -5,6 +5,10 @@
 - **Contract:** [ADR-0024](../adr/0024-kernel-module-architecture.md) (the
   *why* and the thirteen decisions; frozen). This doc is the *where we are
   vs. where we are going* (living).
+- **Module-scope refinement:**
+  [ADR-0026](../adr/0026-runtime-module-scope-by-consumer-contract.md) decides
+  when demonstrated runtime responsibilities share one composed module or
+  split; it defines no family taxonomy and does not ratify `IRuntimeModule`.
 - **Tracked by:** [`ARCH-014`](../../tasks/backlog/architecture/ARCH-014-kernel-convergence-tracking.md)
   (umbrella; stays open until the scorecard is all-green).
 - **Read this before** adding anything to `Runtime.Engine` or introducing a
@@ -18,6 +22,12 @@ bus, event bus, JobService + worker pool, WorldRegistry, FrameGraph
 scheduling, FrameRecipe activation + extension-pass slots, input capture
 chain — and **everything with a domain noun in its name is a RuntimeModule**
 composed by the app (ADR-0024 D9).
+
+ADR-0024 D9 decides **kernel versus module**. ADR-0026 then decides **one
+module versus several** from app lifecycle, durable-state scope,
+dependency/cancellation/commit ownership, and consumer reactions. A family
+name, matching result shape, extra service, or different execution mechanism
+alone is never the boundary.
 
 ## The knob-decision guide — "where does my thing go?"
 
