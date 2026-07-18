@@ -1,8 +1,11 @@
 module;
 
 #include <cstdint>
+#include <functional>
+#include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 export module Extrinsic.Core.Config.EngineLoad;
@@ -59,9 +62,56 @@ namespace Extrinsic::Core::Config
         std::uint32_t ParsedFieldCount{0u};
     };
 
+    export struct EngineConfigSectionValidationResult
+    {
+        EngineConfigState State{EngineConfigState::Invalid};
+        std::string CanonicalPayloadJson{};
+        std::uint32_t ParsedFieldCount{0u};
+        std::vector<EngineConfigDiagnostic> Diagnostics{};
+
+        [[nodiscard]] bool Usable() const noexcept
+        {
+            return State == EngineConfigState::Valid ||
+                State == EngineConfigState::FallbackApplied;
+        }
+    };
+
+    export using EngineConfigSectionValidator =
+        std::function<EngineConfigSectionValidationResult(
+            std::string_view documentPayloadJson,
+            std::string_view referencePayloadJson,
+            std::string_view diagnosticSubject)>;
+
+    export using EngineConfigSectionChangedCallback =
+        std::function<void(const EngineConfigSection& previous,
+                           const EngineConfigSection& current)>;
+
+    export struct EngineConfigSectionRegistration
+    {
+        EngineConfigSection DefaultSection{};
+        EngineConfigSectionValidator Validate{};
+        EngineConfigSectionChangedCallback OnChanged{};
+    };
+
+    export class EngineConfigSectionRegistry final
+    {
+    public:
+        EngineConfigSectionRegistry() = default;
+
+        [[nodiscard]] bool Register(EngineConfigSectionRegistration registration);
+        [[nodiscard]] const EngineConfigSectionRegistration*
+        Find(std::string_view name) const noexcept;
+        [[nodiscard]] std::span<const EngineConfigSectionRegistration>
+        Entries() const noexcept;
+
+    private:
+        std::vector<EngineConfigSectionRegistration> m_Entries{};
+    };
+
     export struct EngineConfigParseOptions
     {
         std::string SourceId{"<memory>"};
+        const EngineConfigSectionRegistry* SectionRegistry{nullptr};
     };
 
     export struct EngineConfigLoadResult
@@ -82,6 +132,9 @@ namespace Extrinsic::Core::Config
                                             EngineConfigDiagnosticCode code) noexcept;
     export [[nodiscard]] std::uint32_t CountByState(const EngineConfigLoadResult& result,
                                                     EngineConfigState state) noexcept;
+    export void PopulateEngineConfigSectionDefaults(
+        EngineConfig& config,
+        const EngineConfigSectionRegistry& registry);
 
     export [[nodiscard]] EngineConfigLoadResult PreviewEngineConfig(
         std::string_view document,
