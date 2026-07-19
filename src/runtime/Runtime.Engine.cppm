@@ -22,32 +22,25 @@ import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
-import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CommandBus;
-import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.JobServiceGpuQueueBridge;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ModuleSchedule;
-import Extrinsic.Runtime.ObjectSpaceNormalBakeService;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
-import Extrinsic.Asset.Service;
 import Extrinsic.ECS.Scene.Registry;
 
 #include "Runtime.RenderExtractionService.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {
-    class AssetResidencyService;
-    class EngineSceneReplacementTransitions;
-
     export class Engine;
 
     // ============================================================
@@ -99,7 +92,7 @@ namespace Extrinsic::Runtime
     //
     // Owns: Window, IDevice, IRenderer, FrameClock,
     //       Tasks::Scheduler (static — initialized/shutdown here),
-    //       AssetService, Scene::Registry, FrameGraph (CPU).
+    //       WorldRegistry, Scene::Registry, FrameGraph (CPU).
     //
     // Scheduling surfaces:
     //   CPU     — Core::FrameGraph wrapping a Dag::TaskGraph(Cpu).
@@ -135,7 +128,7 @@ namespace Extrinsic::Runtime
     //   Renderer::EndFrame → completedGpuValue
     //   Device::Present
     //   Device::CollectCompletedTransfers
-    //   AssetService::Tick
+    //   Optional published asset hook + generic geometry retirement
     //   EndFrame(clock)
     // ============================================================
 
@@ -162,12 +155,6 @@ namespace Extrinsic::Runtime
         [[nodiscard]] Graphics::IRenderer&    GetRenderer()      noexcept;
         [[nodiscard]] const Core::Config::EngineConfig&
             GetEngineConfig() const noexcept;
-        [[nodiscard]] Assets::AssetService&   GetAssetService()  noexcept;
-        [[nodiscard]] Graphics::GpuAssetCache& GetGpuAssetCache() noexcept;
-        [[nodiscard]] const RuntimeObjectSpaceNormalBakeQueueDiagnostics&
-            GetObjectSpaceNormalBakeQueueDiagnosticsForTest() const noexcept;
-        [[nodiscard]] std::size_t
-            GetPendingObjectSpaceNormalBakeCountForTest() const noexcept;
         // ARCH-007 — kernel command bus (ADR-0024 D5). Enqueue from any
         // thread/phase; the Engine drains once per frame between platform
         // input and the fixed-step simulation.
@@ -201,11 +188,6 @@ namespace Extrinsic::Runtime
         }
         [[nodiscard]] ServiceRegistry& Services() noexcept;
         [[nodiscard]] const ServiceRegistry& Services() const noexcept;
-        // RUNTIME-147 — runtime-owned asset import pipeline. Engine keeps
-        // composition ownership; callers use the subsystem surface directly
-        // instead of widening the Engine facade with import-specific methods.
-        [[nodiscard]] AssetImportPipeline& GetAssetImportPipeline() noexcept;
-        [[nodiscard]] const AssetImportPipeline& GetAssetImportPipeline() const noexcept;
         [[nodiscard]] RuntimeInputActionHandle RegisterInputAction(
             RuntimeInputActionDesc desc);
         void UnregisterInputAction(RuntimeInputActionHandle handle);
@@ -257,8 +239,6 @@ namespace Extrinsic::Runtime
         Core::Config::EngineConfig           m_Config;
         std::unique_ptr<IApplication>        m_Application;
         std::vector<std::unique_ptr<IRuntimeModule>> m_RuntimeModules{};
-        std::unique_ptr<EngineSceneReplacementTransitions>
-            m_SceneReplacementTransitions{};
         std::unique_ptr<Platform::IWindow>   m_Window;
         std::unique_ptr<RHI::IDevice>        m_Device;
         std::unique_ptr<Graphics::IRenderer> m_Renderer;
@@ -268,14 +248,6 @@ namespace Extrinsic::Runtime
         RenderExtractionService               m_RenderExtractionService{};
         // CPU task graph — ECS system scheduling
         std::unique_ptr<Core::FrameGraph>      m_FrameGraph;
-        // Asset service — CPU payload authority
-        std::unique_ptr<Assets::AssetService>  m_AssetService;
-        // RUNTIME-164 — GPU-side asset residency owner state. Engine keeps
-        // lifecycle/frame ordering and public facades; the service owns the
-        // cache, asset-event listener, model handoffs, and cache/handoff ticks.
-        std::unique_ptr<AssetResidencyService>   m_AssetResidencyService;
-        ObjectSpaceNormalBakeService             m_ObjectSpaceNormalBakeService{};
-        std::unique_ptr<AssetImportPipeline>      m_AssetImportPipeline;
         RuntimeInputActionRegistry            m_InputActions{};
         // ARCH-007 — kernel command bus; drained in RunFrame() pre-sim.
         CommandBus                             m_CommandBus{};
@@ -330,7 +302,5 @@ namespace Extrinsic::Runtime
         void ShutdownRuntimeModules();
         void RefreshActiveWorldScenePointer() noexcept;
         void ApplyWorldRegistryMaintenance();
-        void BindActiveSceneAssetHandoffs();
-        void RegisterSceneReplacementParticipants();
     };
 }

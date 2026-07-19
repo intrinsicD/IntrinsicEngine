@@ -7,6 +7,7 @@ module;
 module Extrinsic.Sandbox;
 
 import Extrinsic.Sandbox.Editor.Controller;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraModule;
@@ -91,6 +92,7 @@ void RegisterSandboxRuntimeModules(Runtime::Engine &engine) {
   engine.EmplaceModule<Runtime::EditorUiModule>();
   engine.EmplaceModule<Runtime::SceneDocumentModule>();
   engine.EmplaceModule<Runtime::SceneInteractionModule>();
+  engine.EmplaceModule<Runtime::AssetWorkflowModule>();
 }
 
 std::unique_ptr<Runtime::IApplication> CreateSandboxApp() {

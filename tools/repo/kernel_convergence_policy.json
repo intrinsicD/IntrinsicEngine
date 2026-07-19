@@ -71,31 +71,21 @@
   "current_snapshot": {
     "date": "2026-07-19",
     "metric": "exact_allowlist_complement_v2",
-    "plain_import_count": 26,
-    "domain_import_count": 4,
-    "domain_imports": [
-      "Extrinsic.Asset.Service",
-      "Extrinsic.Graphics.GpuAssetCache",
-      "Extrinsic.Runtime.AssetImportPipeline",
-      "Extrinsic.Runtime.ObjectSpaceNormalBakeService"
-    ],
+    "plain_import_count": 22,
+    "domain_import_count": 0,
+    "domain_imports": [],
     "export_import_count": 2,
     "export_imports": [
       "Extrinsic.Runtime.FramePacingDiagnostics",
       "Extrinsic.Runtime.InputActions"
     ],
-    "public_getter_count": 15,
+    "public_getter_count": 10,
     "public_getter_names": [
-      "GetAssetImportPipeline",
-      "GetAssetService",
       "GetDevice",
       "GetEngineConfig",
       "GetFrameGraph",
-      "GetGpuAssetCache",
       "GetLastFramePacingDiagnostics",
       "GetLastRenderExtractionStats",
-      "GetObjectSpaceNormalBakeQueueDiagnosticsForTest",
-      "GetPendingObjectSpaceNormalBakeCountForTest",
       "GetRenderWorldPool",
       "GetRenderer",
       "GetVisualizationAdapterBinding",

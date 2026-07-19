@@ -29,88 +29,36 @@ module Extrinsic.Runtime.Engine;
 #if defined(EXTRINSIC_RUNTIME_HAS_PROMOTED_VULKAN)
 import Extrinsic.Backends.Vulkan;
 #endif
-import Extrinsic.Core.Config.EngineLoad;
-import Extrinsic.Core.Config.Render;
-import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.Core.Hash;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.Core.Logging;
-import Extrinsic.Core.IOBackend;
 import Extrinsic.Core.Tasks;
 import Extrinsic.Platform.Window;
-import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
-import Extrinsic.RHI.SamplerManager;
-import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
-import Extrinsic.Graphics.Component.VisualizationConfig;
-import Extrinsic.Runtime.AssetGeometryIO;
 import Extrinsic.Runtime.AssetImportPipeline;
-import Extrinsic.Runtime.AssetMeshNormals;
-import Extrinsic.Runtime.AssetModelSceneHandoff;
-import Extrinsic.Runtime.AssetModelTextureHandoff;
-import Extrinsic.Runtime.AssetModelTextureIO;
 import Extrinsic.Runtime.DeviceBootstrap;
-import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobServiceGpuQueueBridge;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ModuleSchedule;
-import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
-import Extrinsic.Runtime.ObjectSpaceNormalBakeService;
 import Extrinsic.Core.FrameLoop;
 import Extrinsic.Runtime.EcsSystemBundle;
-import Extrinsic.Runtime.ProgressiveRenderData;
-import Extrinsic.Runtime.SceneDocumentModule;
-import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
-import Extrinsic.Asset.EventBus;
-import Extrinsic.Asset.GeometryIOBridge;
-import Extrinsic.Asset.ImportRouter;
-import Extrinsic.Asset.ModelTextureIOBridge;
-import Extrinsic.Asset.ModelTexturePayload;
-import Extrinsic.Asset.Registry;
-import Extrinsic.Asset.Service;
 import Extrinsic.Graphics.GpuAssetCache;
-import Extrinsic.ECS.Component.Collider;
 import Extrinsic.ECS.Component.DirtyTags;
-import Extrinsic.ECS.Component.Hierarchy;
-import Extrinsic.ECS.Component.Light;
-import Extrinsic.ECS.Component.MetaData;
-import Extrinsic.ECS.Component.RigidBody;
-import Extrinsic.ECS.Component.ShadowCaster;
-import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.Transform;
-import Extrinsic.ECS.Components.AssetInstance;
-import Extrinsic.ECS.Components.GeometrySources;
-import Extrinsic.ECS.Components.GeometrySourcesPopulate;
-import Extrinsic.ECS.Component.Culling.Local;
-import Extrinsic.ECS.Component.Culling.World;
-import Extrinsic.ECS.Components.Selection;
-import Extrinsic.ECS.Scene.Bootstrap;
 import Extrinsic.ECS.Scene.Registry;
-import Geometry.Graph.IO;
-import Geometry.Graph;
-import Geometry.AABB;
-import Geometry.HalfedgeMesh;
-import Geometry.HalfedgeMesh.IO;
-import Geometry.OBB;
-import Geometry.PointCloud;
-import Geometry.PointCloud.IO;
-import Geometry.Properties;
-import Geometry.Sphere;
 
-#include "Runtime.AssetResidencyService.Internal.hpp"
 #include "Runtime.Engine.FrameLoop.Internal.hpp"
 
 namespace Extrinsic::Runtime
@@ -119,204 +67,15 @@ namespace Extrinsic::Runtime
     {
     }
 
-    // RUNTIME-183: Engine temporarily composes the asset-handoff replacement
-    // transition until the asset workflow becomes module-owned.
-    class EngineSceneReplacementTransitions final
-    {
-    public:
-        SceneDocumentModule* Documents{};
-        SceneReplacementParticipantHandle AssetHandoffs{};
-
-        void Release() noexcept
-        {
-            SceneDocumentModule* const documents = Documents;
-            Documents = nullptr;
-            if (documents == nullptr)
-            {
-                AssetHandoffs = {};
-                return;
-            }
-
-            if (AssetHandoffs.IsValid())
-            {
-                (void)documents->UnregisterReplacementParticipant(
-                    AssetHandoffs);
-                AssetHandoffs = {};
-            }
-        }
-    };
-
     // ── Construction / destruction ────────────────────────────────────────
-
-    // RUNTIME-178: these low-fanout helpers are defined and implemented in
-    // this single named-module implementation unit. Textually defining either
-    // class in multiple Engine implementation units would not qualify for the
-    // ordinary header ODR exception because the definitions are attached to a
-    // named module.
-
-    AssetResidencyService::~AssetResidencyService() = default;
-
-    void AssetResidencyService::InitializeGpuCache(
-        Assets::AssetService& assets,
-        Graphics::IRenderer& renderer,
-        RHI::IDevice& device)
-    {
-        m_GpuAssetCache = std::make_unique<Graphics::GpuAssetCache>(
-            renderer.GetBufferManager(),
-            renderer.GetTextureManager(),
-            renderer.GetSamplerManager(),
-            device.GetTransferQueue());
-
-        if (Core::Result fallback =
-                InitializeRuntimeGpuAssetFallbackTexture(*m_GpuAssetCache,
-                                                         device);
-            !fallback.has_value())
-        {
-            Core::Log::Warn(
-                "[Runtime] GpuAssetCache fallback texture bootstrap failed: error={}; material code will use factor-only fallback.",
-                static_cast<int>(fallback.error()));
-        }
-
-        m_GpuAssetCacheListener = assets.SubscribeAll(
-            [cache = m_GpuAssetCache.get()](Assets::AssetId id,
-                                            Assets::AssetEvent ev)
-            {
-                switch (ev)
-                {
-                case Assets::AssetEvent::Failed:
-                    cache->NotifyFailed(id);
-                    break;
-                case Assets::AssetEvent::Reloaded:
-                    cache->NotifyReloaded(id);
-                    break;
-                case Assets::AssetEvent::Destroyed:
-                    cache->NotifyDestroyed(id);
-                    break;
-                case Assets::AssetEvent::Ready:
-                    // Type-specific handoffs drive RequestUpload.
-                    break;
-                }
-            });
-    }
-
-    void AssetResidencyService::InitializeSceneHandoffs(
-        Assets::AssetService& assets,
-        ECS::Scene::Registry& scene,
-        Graphics::IRenderer& renderer,
-        AssetResidencySceneHandoffOptions options)
-    {
-        m_AssetModelTextureHandoff =
-            std::make_unique<AssetModelTextureHandoff>(assets, Cache());
-
-        AssetModelSceneHandoffOptions modelSceneOptions{};
-        modelSceneOptions.World = options.World;
-        modelSceneOptions.ObjectSpaceNormalBakeQueue =
-            options.ObjectSpaceNormalBakeQueue;
-        modelSceneOptions.ObjectSpaceNormalBakeGraphicsBackendOperational =
-            options.ObjectSpaceNormalBakeGraphicsBackendOperational;
-
-        m_AssetModelSceneHandoff =
-            std::make_unique<AssetModelSceneHandoff>(
-                assets,
-                Cache(),
-                scene,
-                renderer,
-                std::move(modelSceneOptions));
-    }
-
-    Graphics::GpuAssetCache& AssetResidencyService::Cache() noexcept
-    {
-        return *m_GpuAssetCache;
-    }
-
-    const Graphics::GpuAssetCache&
-    AssetResidencyService::Cache() const noexcept
-    {
-        return *m_GpuAssetCache;
-    }
-
-    Graphics::GpuAssetCache* AssetResidencyService::CachePtr() noexcept
-    {
-        return m_GpuAssetCache.get();
-    }
-
-    const Graphics::GpuAssetCache*
-    AssetResidencyService::CachePtr() const noexcept
-    {
-        return m_GpuAssetCache.get();
-    }
-
-    AssetModelTextureHandoff*
-    AssetResidencyService::ModelTextureHandoff() noexcept
-    {
-        return m_AssetModelTextureHandoff.get();
-    }
-
-    const AssetModelTextureHandoff*
-    AssetResidencyService::ModelTextureHandoff() const noexcept
-    {
-        return m_AssetModelTextureHandoff.get();
-    }
-
-    AssetModelSceneHandoff*
-    AssetResidencyService::ModelSceneHandoff() noexcept
-    {
-        return m_AssetModelSceneHandoff.get();
-    }
-
-    const AssetModelSceneHandoff*
-    AssetResidencyService::ModelSceneHandoff() const noexcept
-    {
-        return m_AssetModelSceneHandoff.get();
-    }
-
-    void AssetResidencyService::TickAssets(
-        Assets::AssetService& assets,
-        const std::uint64_t currentFrame,
-        const std::uint32_t framesInFlight)
-    {
-        assets.Tick();
-        if (m_GpuAssetCache)
-            m_GpuAssetCache->Tick(currentFrame, framesInFlight);
-        if (m_AssetModelSceneHandoff)
-        {
-            static_cast<void>(
-                m_AssetModelSceneHandoff
-                    ->ResolvePendingMaterialTextureBindings());
-        }
-    }
-
-    void AssetResidencyService::DestroySceneBorrowers()
-    {
-        m_AssetModelSceneHandoff.reset();
-    }
-
-    void AssetResidencyService::DestroyAssets(Assets::AssetService* assets)
-    {
-        DestroySceneBorrowers();
-        m_AssetModelTextureHandoff.reset();
-        if (assets != nullptr &&
-            m_GpuAssetCacheListener != Assets::AssetEventBus::InvalidToken)
-        {
-            assets->UnsubscribeAll(m_GpuAssetCacheListener);
-            m_GpuAssetCacheListener = Assets::AssetEventBus::InvalidToken;
-        }
-        m_GpuAssetCache.reset();
-    }
 
     Engine::Engine(Core::Config::EngineConfig config,
                    std::unique_ptr<IApplication> application)
         : m_Config(std::move(config))
         , m_Application(std::move(application))
-        , m_AssetResidencyService(std::make_unique<AssetResidencyService>())
     {
         if (!m_Application)
             std::terminate();
-        m_AssetImportPipeline = std::make_unique<AssetImportPipeline>(
-            AssetImportPipelineDependencies{
-                .Initialized = &m_Initialized,
-                .Config = &m_Config,
-            });
     }
 
     Engine::~Engine()
@@ -647,48 +406,6 @@ namespace Extrinsic::Runtime
 
     void Engine::ShutdownRuntimeModules()
     {
-        // RUNTIME-183 transition: active imports were cancelled after the
-        // earlier announcement and before this reverse module shutdown.
-        // Detach the exact optional selection borrow before its provider stops.
-        if (m_AssetImportPipeline)
-        {
-            m_AssetImportPipeline->SetDependencies(
-                AssetImportPipelineDependencies{
-                    .Initialized = &m_Initialized,
-                    .Config = &m_Config,
-                    .Streaming =
-                        m_ServiceRegistry.Find<
-                            StreamingExecutor>(),
-                    .Worlds = &m_WorldRegistry,
-                    .World = ActiveWorld(),
-                    .AssetService = m_AssetService.get(),
-                    .GpuAssetCache =
-                        m_AssetResidencyService->CachePtr(),
-                    .ModelTextureHandoff =
-                        m_AssetResidencyService->
-                            ModelTextureHandoff(),
-                    .ModelSceneHandoff =
-                        m_AssetResidencyService->
-                            ModelSceneHandoff(),
-                    .RenderExtraction =
-                        &m_RenderExtractionService.Cache(),
-                    .Scene = m_Scene,
-                    .Selection = nullptr,
-                    .CommandHistory =
-                        m_ServiceRegistry.Find<
-                            EditorCommandHistory>(),
-                    .ObjectSpaceNormalBakeQueue =
-                        &m_ObjectSpaceNormalBakeService.Queue(),
-                    .Device = m_Device.get(),
-                });
-        }
-
-        if (m_SceneReplacementTransitions)
-        {
-            m_SceneReplacementTransitions->Release();
-            m_SceneReplacementTransitions.reset();
-        }
-
         RuntimeModuleShutdownContext context{
             .Commands = m_CommandBus,
             .Events = m_KernelEvents,
@@ -728,197 +445,16 @@ namespace Extrinsic::Runtime
             return;
         }
 
-        // Active-world switching is a kernel maintenance path, not a
-        // document replacement. Keep its narrow cleanup explicit so the
-        // SceneDocumentModule participant seam cannot become a second,
-        // delayed world-switch mechanism.
+        // Active-world switching is a kernel maintenance path. Clear generic
+        // render-extraction state immediately; optional modules validate and
+        // rebind their own world-scoped borrowers independently.
         if (m_Renderer != nullptr)
         {
             m_RenderExtractionService.Cache().ClearSceneState(
                 *m_Renderer);
         }
-        m_ObjectSpaceNormalBakeService.Queue().Clear();
-        m_AssetResidencyService->DestroySceneBorrowers();
 
         RefreshActiveWorldScenePointer();
-        // Scene handoffs borrow the registry by reference. Active-world changes
-        // precede deferred destruction, so rebind before the old world retires.
-        BindActiveSceneAssetHandoffs();
-    }
-
-    void Engine::BindActiveSceneAssetHandoffs()
-    {
-        if (m_Scene == nullptr)
-        {
-            m_AssetResidencyService->DestroySceneBorrowers();
-        }
-        else
-        {
-            m_AssetResidencyService->InitializeSceneHandoffs(
-                *m_AssetService,
-                *m_Scene,
-                *m_Renderer,
-                AssetResidencySceneHandoffOptions{
-                    .World = ActiveWorld(),
-                    .ObjectSpaceNormalBakeQueue =
-                        &m_ObjectSpaceNormalBakeService.Queue(),
-                    .ObjectSpaceNormalBakeGraphicsBackendOperational =
-                        m_Device != nullptr && m_Device->IsOperational(),
-                });
-        }
-
-        SelectionController* const importSelection =
-            m_ServiceRegistry.Find<SelectionController>();
-        m_AssetImportPipeline->SetDependencies(
-            AssetImportPipelineDependencies{
-                .Initialized = &m_Initialized,
-                .Config = &m_Config,
-                .Streaming =
-                    m_ServiceRegistry.Find<StreamingExecutor>(),
-                .Worlds = &m_WorldRegistry,
-                .World = ActiveWorld(),
-                .AssetService = m_AssetService.get(),
-                .GpuAssetCache = m_AssetResidencyService->CachePtr(),
-                .ModelTextureHandoff =
-                    m_AssetResidencyService->ModelTextureHandoff(),
-                .ModelSceneHandoff =
-                    m_AssetResidencyService->ModelSceneHandoff(),
-                .RenderExtraction = &m_RenderExtractionService.Cache(),
-                .Scene = m_Scene,
-                .Selection = importSelection,
-                .CommandHistory =
-                    m_ServiceRegistry.Find<EditorCommandHistory>(),
-                .ObjectSpaceNormalBakeQueue =
-                    &m_ObjectSpaceNormalBakeService.Queue(),
-                .Device = m_Device.get(),
-            });
-    }
-
-    void Engine::RegisterSceneReplacementParticipants()
-    {
-        if (m_SceneReplacementTransitions)
-        {
-            Core::Log::Error(
-                "[Runtime] Scene replacement transitions survived a prior boot.");
-            std::terminate();
-        }
-
-        SceneDocumentModule* const documents =
-            m_ServiceRegistry.Find<SceneDocumentModule>();
-        EditorCommandHistory* const history =
-            m_ServiceRegistry.Find<EditorCommandHistory>();
-        if (documents == nullptr || history == nullptr)
-            return;
-
-        auto transitions =
-            std::make_unique<EngineSceneReplacementTransitions>();
-        transitions->Documents = documents;
-
-        // RUNTIME-183 removes this adapter when asset residency, extraction,
-        // and bake handoffs become module-owned. Every capture is an exact
-        // owner/capability with Engine lifetime; the callback receives its
-        // only registry reference and world token from the replacement
-        // context.
-        AssetResidencyService* const residency =
-            m_AssetResidencyService.get();
-        Assets::AssetService* const assets =
-            m_AssetService.get();
-        Graphics::IRenderer* const renderer =
-            m_Renderer.get();
-        RHI::IDevice* const device = m_Device.get();
-        RenderExtractionCache* const extraction =
-            &m_RenderExtractionService.Cache();
-        RuntimeObjectSpaceNormalBakeQueue* const bakeQueue =
-            &m_ObjectSpaceNormalBakeService.Queue();
-        AssetImportPipeline* const importPipeline =
-            m_AssetImportPipeline.get();
-        WorldRegistry* const worlds = &m_WorldRegistry;
-        SelectionController* const importSelection =
-            m_ServiceRegistry.Find<SelectionController>();
-        StreamingExecutor* const streaming =
-            m_ServiceRegistry.Find<StreamingExecutor>();
-        Core::Config::EngineConfig* const config = &m_Config;
-        bool* const initialized = &m_Initialized;
-        auto assetHandoffs =
-            documents->RegisterReplacementParticipant(
-                SceneReplacementParticipantDesc{
-                    .Name =
-                        "RUNTIME-183.EngineAssetHandoffTransition",
-                    .BeforeReplace =
-                        [residency,
-                         renderer,
-                         extraction,
-                         bakeQueue](
-                            const SceneReplacementContext&)
-                        {
-                            extraction->ClearSceneState(*renderer);
-                            bakeQueue->Clear();
-                            residency->DestroySceneBorrowers();
-                        },
-                    .AfterReplace =
-                        [residency,
-                         assets,
-                         renderer,
-                         device,
-                         extraction,
-                         bakeQueue,
-                         importPipeline,
-                         worlds,
-                         importSelection,
-                         streaming,
-                         config,
-                         initialized,
-                         history](
-                            const SceneReplacementContext& context)
-                        {
-                            residency->InitializeSceneHandoffs(
-                                *assets,
-                                context.Registry,
-                                *renderer,
-                                AssetResidencySceneHandoffOptions{
-                                    .World = context.World,
-                                    .ObjectSpaceNormalBakeQueue =
-                                        bakeQueue,
-                                    .ObjectSpaceNormalBakeGraphicsBackendOperational =
-                                        device != nullptr &&
-                                        device->IsOperational(),
-                                });
-                            importPipeline->SetDependencies(
-                                AssetImportPipelineDependencies{
-                                    .Initialized = initialized,
-                                    .Config = config,
-                                    .Streaming = streaming,
-                                    .Worlds = worlds,
-                                    .World = context.World,
-                                    .AssetService = assets,
-                                    .GpuAssetCache =
-                                        residency->CachePtr(),
-                                    .ModelTextureHandoff =
-                                        residency
-                                            ->ModelTextureHandoff(),
-                                    .ModelSceneHandoff =
-                                        residency
-                                            ->ModelSceneHandoff(),
-                                    .RenderExtraction = extraction,
-                                    .Scene = &context.Registry,
-                                    .Selection = importSelection,
-                                    .CommandHistory = history,
-                                    .ObjectSpaceNormalBakeQueue =
-                                        bakeQueue,
-                                    .Device = device,
-                                });
-                        },
-                });
-        if (!assetHandoffs.has_value())
-        {
-            transitions->Release();
-            Core::Log::Error(
-                "[Runtime] Failed to register RUNTIME-183 scene replacement transition: {}",
-                Core::Error::ToString(assetHandoffs.error()));
-            std::terminate();
-        }
-        transitions->AssetHandoffs = *assetHandoffs;
-        m_SceneReplacementTransitions = std::move(transitions);
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
@@ -1020,41 +556,17 @@ namespace Extrinsic::Runtime
         m_WorldRegistry.Clear();
         const WorldHandle bootWorld = m_WorldRegistry.CreateWorld("Main");
         m_Scene = m_WorldRegistry.Get(bootWorld);
-        // ── 5. Runtime-module registration (ARCH-011/RUNTIME-179) ─────────
-        // Registration precedes dependent subsystem wiring so app-composed
-        // owners can publish narrow construction capabilities. The public
-        // Engine surface remains module-agnostic; the explicitly tracked
-        // RUNTIME-183 transition adapter below resolves the exact document
-        // capabilities in this implementation unit. Resolution/finalization
-        // remains at the pre-application boundary below, after every provider
-        // has registered.
+        // ── 5. Runtime-module registration (ARCH-011) ──────────────────────
+        // App-composed owners publish narrow construction capabilities after
+        // every required Engine built-in is live. Resolution/finalization
+        // remains at the pre-application boundary after every provider has
+        // registered.
         RegisterRuntimeModulesForBoot(recipeActivation);
 
-        // ── 6. Asset service ──────────────────────────────────────────────
-        m_AssetService = std::make_unique<Assets::AssetService>();
-
-        // ── 6b. GPU asset residency ───────────────────────────────────────
-        m_AssetResidencyService->InitializeGpuCache(
-            *m_AssetService,
-            *m_Renderer,
-            *m_Device);
-
-        m_ObjectSpaceNormalBakeService.SetDependencies(
-            ObjectSpaceNormalBakeServiceDependencies{
-                .GpuAssets = m_AssetResidencyService->CachePtr(),
-                .RenderExtraction = &m_RenderExtractionService.Cache(),
-                .Device = m_Device.get(),
-            });
-        (void)m_ObjectSpaceNormalBakeService.RegisterGpuQueueParticipant(
-            m_JobService);
-
-        BindActiveSceneAssetHandoffs();
-        RegisterSceneReplacementParticipants();
-
-        // ── 7. Runtime-module resolution/finalization (ARCH-011) ──────────
+        // ── 6. Runtime-module resolution/finalization (ARCH-011) ──────────
         ResolveRuntimeModulesForBoot(recipeActivation);
 
-        // ── 8. Application ────────────────────────────────────────────────
+        // ── 7. Application ────────────────────────────────────────────────
         m_Application->OnInitialize(*this);
 
         m_Initialized = true;
@@ -1076,9 +588,6 @@ namespace Extrinsic::Runtime
         // commands must not replay into the next session's fresh scene.
         m_CommandBus.DiscardPending();
         AnnounceRuntimeShutdown();
-
-        if (m_AssetImportPipeline)
-            m_AssetImportPipeline->CancelActiveAssetImportsForShutdown();
 
         if (m_Window)
             m_Window->Listen({});
@@ -1102,8 +611,6 @@ namespace Extrinsic::Runtime
             std::unique_ptr<RHI::IDevice>& Device;
             std::unique_ptr<Graphics::IRenderer>& Renderer;
             std::unique_ptr<Core::FrameGraph>& FrameGraph;
-            std::unique_ptr<Assets::AssetService>& AssetService;
-            AssetResidencyService& AssetResidency;
             WorldRegistry& Worlds;
             ECS::Scene::Registry*& Scene;
 
@@ -1115,8 +622,6 @@ namespace Extrinsic::Runtime
                           std::unique_ptr<RHI::IDevice>& device,
                           std::unique_ptr<Graphics::IRenderer>& renderer,
                           std::unique_ptr<Core::FrameGraph>& frameGraph,
-                          std::unique_ptr<Assets::AssetService>& assetService,
-                          AssetResidencyService& assetResidency,
                           WorldRegistry& worlds,
                           ECS::Scene::Registry*& scene)
                 : Owner(owner)
@@ -1127,8 +632,6 @@ namespace Extrinsic::Runtime
                 , Device(device)
                 , Renderer(renderer)
                 , FrameGraph(frameGraph)
-                , AssetService(assetService)
-                , AssetResidency(assetResidency)
                 , Worlds(worlds)
                 , Scene(scene)
             {
@@ -1151,16 +654,10 @@ namespace Extrinsic::Runtime
             }
             void DestroyScene() override
             {
-                AssetResidency.DestroySceneBorrowers();
-
                 Scene = nullptr;
                 Worlds.Clear();
             }
-            void DestroyAssets() override
-            {
-                AssetResidency.DestroyAssets(AssetService.get());
-                AssetService.reset();
-            }
+            void DestroyAssets() override {}
             void DestroyStreamingState() override
             {
                 // App-composed async work resets in module OnShutdown.
@@ -1201,20 +698,9 @@ namespace Extrinsic::Runtime
                             m_Device,
                             m_Renderer,
                             m_FrameGraph,
-                            m_AssetService,
-                            *m_AssetResidencyService,
                             m_WorldRegistry,
                             m_Scene);
         Core::ExecuteShutdownContract(hooks);
-        m_ObjectSpaceNormalBakeService.ClearDependencies();
-        if (m_AssetImportPipeline)
-        {
-            m_AssetImportPipeline->SetDependencies(
-                AssetImportPipelineDependencies{
-                    .Initialized = &m_Initialized,
-                    .Config = &m_Config,
-                });
-        }
     }
 
     // ── Main loop ─────────────────────────────────────────────────────────
@@ -1494,10 +980,12 @@ namespace Extrinsic::Runtime
         // consumer's frame-age diagnostic reads 0 in the synchronous baseline.
         frameContext.FrameIndex = m_RenderExtractionService.ConsumeFrameIndex();
 
+        Graphics::GpuAssetCache* const gpuAssetCache =
+            m_ServiceRegistry.Find<Graphics::GpuAssetCache>();
         RuntimeRenderFrameHooks renderHooks(*m_Renderer,
                                             *m_Scene,
                                             m_RenderExtractionService.Cache(),
-                                            m_AssetResidencyService->CachePtr(),
+                                            gpuAssetCache,
                                             m_RenderExtractionService.Pool(),
                                             m_Config.Render.SynchronousExtraction,
                                             frameContext.ExtractionStats,
@@ -1531,8 +1019,9 @@ namespace Extrinsic::Runtime
 
         // ── Phase 10: Maintenance ─────────────────────────────────────────
         TransferHooks transferHooks(*m_Device);
-        AssetHooks assetHooks(*m_AssetService,
-                              *m_AssetResidencyService,
+        AssetHooks assetHooks(
+                              m_ServiceRegistry.Find<
+                                  Core::IAssetFrameHooks>(),
                               *m_Device,
                               m_RenderExtractionService.Cache(),
                               *m_Renderer);
@@ -1629,32 +1118,6 @@ namespace Extrinsic::Runtime
         return m_Config;
     }
 
-    Assets::AssetService& Engine::GetAssetService()  noexcept { return *m_AssetService;  }
-    Graphics::GpuAssetCache& Engine::GetGpuAssetCache() noexcept
-    {
-        return m_AssetResidencyService->Cache();
-    }
-    AssetImportPipeline& Engine::GetAssetImportPipeline() noexcept
-    {
-        return *m_AssetImportPipeline;
-    }
-
-    const AssetImportPipeline& Engine::GetAssetImportPipeline() const noexcept
-    {
-        return *m_AssetImportPipeline;
-    }
-
-    const RuntimeObjectSpaceNormalBakeQueueDiagnostics&
-    Engine::GetObjectSpaceNormalBakeQueueDiagnosticsForTest() const noexcept
-    {
-        return m_ObjectSpaceNormalBakeService.QueueDiagnostics();
-    }
-
-    std::size_t Engine::GetPendingObjectSpaceNormalBakeCountForTest() const noexcept
-    {
-        return m_ObjectSpaceNormalBakeService.PendingCount();
-    }
-
     const RenderWorldPool& Engine::GetRenderWorldPool() const noexcept
     {
         return m_RenderExtractionService.Pool();
@@ -1704,7 +1167,12 @@ namespace Extrinsic::Runtime
     {
         Core::Log::Info("[Runtime] File drop received: path_count={}",
                         event.Paths.size());
-        m_AssetImportPipeline->ImportDroppedFilePaths(event.Paths);
+        if (AssetImportPipeline* const pipeline =
+                m_ServiceRegistry.Find<AssetImportPipeline>();
+            pipeline != nullptr)
+        {
+            pipeline->ImportDroppedFilePaths(event.Paths);
+        }
     }
 
     Core::FrameGraph&     Engine::GetFrameGraph()    noexcept { return *m_FrameGraph;    }
