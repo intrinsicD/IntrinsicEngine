@@ -134,8 +134,15 @@ sessions:
     open_threads: 9
   - id: "2026-07-19_001"
     date: "2026-07-19"
-    summary: "Implemented and verified app-composed RUNTIME-181 config control and RUNTIME-172 scene documents, migrated existing tests to RUNTIME-183's exact-service AssetWorkflow composition, and added real-Sandbox RUNTIME-168 policy lifecycle coverage."
-    turn_count: 4
-    events_count: 6
+    summary: "Implemented and verified app-composed RUNTIME-181 config control and RUNTIME-172 scene documents, migrated existing tests to RUNTIME-183's exact-service AssetWorkflow composition, added real-Sandbox RUNTIME-168 policy lifecycle coverage, and implemented RUNTIME-129's exact residency validation plus Sandbox editor producer wiring."
+    turn_count: 6
+    events_count: 7
     claims_touched: []
-    open_threads: 12
+    open_threads: 13
+  - id: "2026-07-20_001"
+    date: "2026-07-20"
+    summary: "Completed, verified, and retired RUNTIME-129 at Operational after live Vulkan readback exposed and closed a physical-storage texcoord alignment defect."
+    turn_count: 1
+    events_count: 2
+    claims_touched: []
+    open_threads: 0

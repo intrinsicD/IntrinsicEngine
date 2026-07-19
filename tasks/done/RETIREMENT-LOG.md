@@ -5665,3 +5665,26 @@ strict layering, task, docs, test-layout, root-hygiene, generated-inventory,
 and clean-workshop checks passed. Implementation checkpoint: `1d48444b`;
 initial main merge: `39585780`; retained-handle fix: `064336f2`; final fix
 merge: `fc372b2f`; research trace: `0ccb94a0`.
+
+[`RUNTIME-129`](RUNTIME-129-schedule-gpu-normal-bake-after-import.md) —
+GPU object-space normal-bake scheduling retired on 2026-07-19 at
+`Operational`. The existing private workflow queue now owns an exact resolved
+bake identity separately from target lifetime; `AssetWorkflowModule` composes
+collision-safe registry-backed generated assets, pending/proven-ready
+provenance, live `GpuWorld` residency validation, retained raster/dilation
+resources, exact cache-generation publication, and transactional
+normal-semantic binding. Default/progressive model imports, direct-mesh
+postprocessing, and the Sandbox selected-mesh normal command share that path;
+an unavailable or lost Vulkan backend never selects the CPU compatibility
+route as a fallback. The real-app smoke exposed an invalid four-byte-aligned
+`RG32_FLOAT` texcoord BDA after three RGB32 positions; managed uniform-SoA
+texcoords now begin at an eight-byte-aligned address and the graphics/runtime
+seams fail closed on misalignment. The complete CPU-supported selector passed
+4,273/4,273 with one expected self-skip; the ASan+UBSan `gpu` + `vulkan`
+selector passed 47/47 with zero skips, including the nonzero shared-index-slice
+import/readback smoke and shutdown LeakSanitizer contract. Strict task/state,
+docs-link, layering, test-layout, root-hygiene, clean-workshop, generated
+inventory, and whitespace checks passed. Review:
+[`2026-07-19-runtime-129-clean-workshop-review.md`](../../docs/reviews/2026-07-19-runtime-129-clean-workshop-review.md).
+Implementation checkpoints: `35e0fc80`, `d86dbd0d`, `d5ade642`, `d2f838f2`,
+and `f3aacda9`.

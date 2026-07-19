@@ -2,9 +2,9 @@ session:
   id: "2026-07-19_001"
   date: "2026-07-19"
   started: "2026-07-19T04:02+02:00"
-  last_turn: "2026-07-19T19:59+02:00"
-  turn_count: 4
-  summary: "Implemented and verified app-composed RUNTIME-181 config control and RUNTIME-172 scene documents, migrated existing tests to RUNTIME-183's exact-service AssetWorkflow composition, and added real-Sandbox RUNTIME-168 policy lifecycle coverage."
+  last_turn: "2026-07-19T23:40+02:00"
+  turn_count: 6
+  summary: "Implemented and verified app-composed RUNTIME-181 config control and RUNTIME-172 scene documents, migrated existing tests to RUNTIME-183's exact-service AssetWorkflow composition, added real-Sandbox RUNTIME-168 policy lifecycle coverage, and implemented RUNTIME-129's exact residency validation plus Sandbox editor producer wiring."
 
 events_logged:
   - turn: 1
@@ -43,6 +43,12 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Added real-Sandbox default-policy, reinitialization, omission, and blocked-import shutdown coverage; the focused target built and all six composition tests passed."
+  - turn: 5
+    type: experiment
+    id: "N271"
+    routing: direct
+    provenance: ai-executed
+    summary: "Added and compiled RUNTIME-129's exact identity-to-GPU-residency validator; strict clean-workshop checks passed."
 
 ai_actions:
   - turn: 1
@@ -85,6 +91,20 @@ ai_actions:
     provenance: ai-executed
     files_changed:
       - "tests/integration/runtime/Test.SandboxAppComposition.cpp"
+  - turn: 5
+    action: "Implemented RUNTIME-129's shared exact identity-to-GpuGeometryResidencyView validation surface and compiled the focused runtime module object."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeSubmission.cppm"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeSubmission.cpp"
+  - turn: 6
+    action: "Implemented RUNTIME-129's narrow AssetImportPipeline producer-context accessor, wired its borrowed queue, binding epoch, and live device into attached Sandbox editor contexts, selected eligible normal commands before CPU compatibility prerequisites, and added focused editor contracts; diff validation passed while coordinated compilation remained in the root-owned build lane."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.AssetImportPipeline.cppm"
+      - "src/runtime/Runtime.SandboxEditorFacades.cppm"
+      - "src/runtime/Runtime.SandboxEditorFacades.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp"
 
 claims_touched: []
 
@@ -97,6 +117,10 @@ key_context:
     excerpt: "RUNTIME-183 removes Engine asset/cache/import and bake-diagnostic getters; asset-dependent tests must compose SceneDocumentModule plus AssetWorkflowModule and resolve exact services from Engine.Services()."
   - turn: 4
     excerpt: "RUNTIME-168 acceptance requires the real Sandbox app to prove default policies register transactionally, survive clean reinitialization without duplication, and cancel a blocked import before exact service unregistration."
+  - turn: 5
+    excerpt: "RUNTIME-129 provider and completion paths share one deterministic validator for exact content revision, resident identity, UniformSoA channel layouts, managed index residency, and shader-visible counts."
+  - turn: 6
+    excerpt: "RUNTIME-129's selected-mesh normal editor path borrows the existing workflow queue, binding epoch, and live device through AssetImportPipeline; it bypasses AssetService only for the exact queue-backed Surface/Normal/MeshVertex/bind command and retains no CPU fallback."
 
 open_threads:
   - "An owner may externalize the candidate stable contexts through branch protection, rulesets, or a merge queue; none is currently configured."
@@ -111,6 +135,7 @@ open_threads:
   - "Run RUNTIME-181's complete default CPU-supported integration gate, then review and retire the still-active task."
   - "Integrate and review the clean RUNTIME-172 branch, then let the root owner retire the still-active task."
   - "Integrate the focused RUNTIME-168 real-Sandbox lifecycle test with its production, documentation, task, and coordinated full-gate slice."
+  - "Integrate RUNTIME-129's live-residency validator into the private production provider and exact-ready binding path, then add focused mismatch regressions."
 
 ai_suggestions_pending:
   - "Let StructSplat and Prospect owners merge the pushed refresh branches through each repository's normal integration policy."

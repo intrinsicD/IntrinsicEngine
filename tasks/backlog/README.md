@@ -66,11 +66,11 @@ seams), the CPU/GPU transfer foundation (`GRAPHICS-095..098`), and the
 contract-first renderer/snapshot/recipe architecture sequence
 (`GRAPHICS-099..103`, `RUNTIME-127`, `UI-023`) and the object-space normal
 bake graphics dilation and shared-index follow-ups (`GRAPHICS-115` and
-`GRAPHICS-128`) are retired — see
+`GRAPHICS-128`) and runtime scheduling/production closure (`RUNTIME-129`) are
+retired — see
 [`rendering/README.md`](rendering/README.md) and the retirement log. Current
-open Theme B leaves include runtime scheduling/production provider closure
-(`RUNTIME-129`), the profile-gated vertex attribute operational follow-up
-(`RUNTIME-139`), and the 2026-07-03 render-graph review leaves —
+open Theme B leaves include the profile-gated vertex attribute operational
+follow-up (`RUNTIME-139`) and the 2026-07-03 render-graph review leaves —
 pass contribution seam (`GRAPHICS-116`), compile caching
 (`GRAPHICS-117`), placed transient aliasing (`GRAPHICS-118`), and parallel
 command recording (`GRAPHICS-119`); compiler/executor polish (`GRAPHICS-120`)
@@ -264,7 +264,7 @@ as the async-work service extraction. All five additive ADR-0024 seams
 (`ARCH-007`..`ARCH-011`) and the collision sweep (`ARCH-013`) are retired;
 `ARCH-014` remains the open kernel-convergence umbrella.
 Retired `GRAPHICS-128` supplies the nonzero shared-index-slice contract;
-`RUNTIME-129` still owns the production Vulkan provider work inside the
+retired `RUNTIME-129` now supplies the production Vulkan provider inside the
 AssetWorkflow owner retired by `RUNTIME-183`.
 Provider resolution, population state, camera-seed caching, reference-scene
 teardown policy, input-action descriptor/state/dispatch policy, and
@@ -294,13 +294,13 @@ production consumer. The bounded implementation graph is
 `RUNTIME-188` SceneInteraction, `RUNTIME-180` Camera, `RUNTIME-181`
 ConfigControl, `RUNTIME-183` AssetWorkflow, retired `RUNTIME-182` EditorUi,
 retired post-`RUNTIME-188`/`RUNTIME-183` `RUNTIME-168` private Sandbox
-provider/handle composition on the existing editor-facade surface, existing
-`RUNTIME-129` operational normal bake after the now-retired independent
+provider/handle composition on the existing editor-facade surface, retired
+`RUNTIME-129` operational normal bake after the retired independent
 `GRAPHICS-128` shared-index prerequisite,
 `RUNTIME-184` application-lifecycle removal, `RUNTIME-185` mechanism pruning,
 and `RUNTIME-186` residual auxiliary-surface cleanup followed by the
-`RUNTIME-187` exact Engine-surface ratchet. The bake and lifecycle leaves may
-proceed independently, then both gate mechanism pruning. The detailed graph
+`RUNTIME-187` exact Engine-surface ratchet. The bake leaf is retired; the
+lifecycle leaf remains before mechanism pruning. The detailed graph
 and state scopes live in the [runtime backlog index](runtime/README.md).
 Retired `RUNTIME-182` extracted the optional global ImGui/host owner while
 preserving the existing paired frame bracket and one completed capture
@@ -311,8 +311,7 @@ document owner is retired with exact service publication. `RUNTIME-188` now
 is retired with the separate interaction owner, exact optional selection
 service, and `26/4/2/15` Engine ratchet. `RUNTIME-183` is retired with the
 app-composed AssetWorkflow owner and `22/0/2/10` Engine ratchet.
-`RUNTIME-168` is retired. `RUNTIME-129` is active, and `RUNTIME-184` is now
-unblocked.
+`RUNTIME-168` and `RUNTIME-129` are retired, and `RUNTIME-184` is unblocked.
 Sequencing note: tasks whose deliverable ADR-0024 supersedes are
 front-matter gated on their seam dependencies — `RUNTIME-150` on
 `ARCH-007`/`ARCH-008`, `RUNTIME-151` additionally on `ARCH-011`, `ARCH-006`
@@ -334,7 +333,6 @@ The non-blocking TaskGraph substrate (`CORE-005`) and scheduler hardening
 
 Open members (kernel-seam priority set first):
 - [`../active/ARCH-014-kernel-convergence-tracking.md`](../active/ARCH-014-kernel-convergence-tracking.md) (active umbrella north-star; not a slice).
-- [`RUNTIME-129`](../active/RUNTIME-129-schedule-gpu-normal-bake-after-import.md) is the active operational normal-bake leaf; retired `RUNTIME-168` unlocked [`runtime/RUNTIME-184-replace-application-lifecycle.md`](runtime/RUNTIME-184-replace-application-lifecycle.md), and those paths converge through `RUNTIME-185`..`187` (see the runtime index for exact dependencies).
 - [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) (one-shot post-convergence admission gate; blocked until known architecture/right-sizing/tool-rent work retires).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).

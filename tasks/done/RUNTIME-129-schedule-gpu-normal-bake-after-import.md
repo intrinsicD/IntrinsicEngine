@@ -13,18 +13,35 @@ maturity_target: Operational
 
 ## Status
 
-- In progress as of 2026-07-19; owner: Codex team; implementation branch:
+- Completed and retired on 2026-07-19 at `Operational`; owner: Codex team;
+  implementation branch:
   `codex/runtime-129-operational-bake`.
-- All front-matter dependencies are retired. A fresh implementation-readiness
-  audit found that the default non-progressive model-import path still takes
-  the CPU normal-texture route, the current completion overwrites unrelated
-  material bindings, and the proposed identity/provider contracts cannot yet
-  distinguish topology/channel updates or exact cache generations. The
-  corrected contract below closes those gaps before production Vulkan wiring.
-- Next gate: land Slice B.1's authoritative identity, registry-backed generated
-  assets, generation-aware cache publication, and pending/proven-ready CPU
-  contracts without adding another module, provider, queue, registry, or
-  facade.
+- Implementation checkpoints: task promotion and corrected contract
+  `23e2d118`; generation-aware produced-texture readiness `35e0fc80`; geometry
+  residency revisions `d86dbd0d`; authoritative identity `d5ade642`;
+  physical-storage channel alignment `d2f838f2`; operational workflow
+  `f3aacda9`. Commit reference: this retirement commit records the final task
+  state, review, and generated session inventory.
+- Verification evidence:
+  - `IntrinsicTests` built in the canonical `ci` tree and the complete
+    CPU-supported selector passed 4,273/4,273 with one expected self-skip;
+  - the alignment-focused CPU selector passed 88/88, including exact
+    graphics-plan/recorder and runtime-residency rejection of misaligned
+    physical-storage addresses;
+  - `IntrinsicTests` built in `ci-vulkan` with ASan+UBSan, and the complete
+    `gpu` + `vulkan` selector passed 47/47 with zero skips on the live Vulkan
+    host;
+  - the real-app acceptance smoke imported a decoy and target, consumed a
+    nonzero shared-index slice, bound the exact generated cache generation,
+    preserved existing material state, and read back target-normal coverage,
+    the four-texel dilation gutter, and a far alpha-zero texel;
+  - that smoke exposed and then verified the fix for an invalid
+    `base + 36` `RG32_FLOAT` texcoord BDA: managed uniform-SoA texcoords are
+    now eight-byte aligned, the graphics/runtime seams fail closed on
+    misalignment, and the Vulkan shader reads the authored UV footprint;
+  - strict task/state, documentation-link, layering, test-layout,
+    root-hygiene, clean-workshop, generated-inventory, and whitespace checks
+    pass.
 
 ## Goal
 
@@ -58,42 +75,23 @@ maturity_target: Operational
   descriptors preserve `GpuGeometryRecord::SurfaceFirstIndex` while keeping
   indexed-draw base vertex zero; retired `RUNTIME-183` supplies the required
   AssetWorkflow composition owner.
-- Current state: `Extrinsic.Runtime.ObjectSpaceNormalBakeQueue` owns the
-  CPU-contract scheduling metadata for generated texture `AssetId` selection,
-  content-key reuse, stale-key matching, retained pending submissions, and
-  non-operational no-op behavior.
-  `Extrinsic.Runtime.ObjectSpaceNormalBakeSubmission` validates queued stale
-  keys against graphics bake plans, registers cache-owned GPU-produced
-  textures, returns record descriptors for render-thread command recording,
-  and attaches submitted ready-frame values without completing the queue
-  early. `Extrinsic.Runtime.ObjectSpaceNormalBakeBinding` consumes completions
-  only after `GpuAssetCache` exposes a ready generated texture view, rejects
-  stale completions before material mutation, and installs data-only
-  `ObjectSpaceNormal` material bindings through `RenderExtractionCache`.
-  `Extrinsic.Runtime.ObjectSpaceNormalBakeService` privately owns the queue and
-  registers its service-private state as a `JobService` `GpuQueue`
-  participant: CPU/null contract tests inject a deterministic graphics plan
-  through the explicit service test seam and prove pending-submission drain,
-  command recording, cache ready-frame promotion, stale pending discard, and
-  material binding without a standalone queue module. `AssetWorkflowModule`
-  composes this service and passes its request queue to model-scene handoff
-  options, direct-mesh post-import services, and scene-state cleanup.
-  `AssetModelSceneHandoff` progressive raw mode can accept a
-  `RuntimeObjectSpaceNormalBakeQueue`; when supplied, generated-normal work
-  uses a dependency-only main-thread scheduling job to enqueue the runtime GPU
-  bake after UV/normal enrichment and leaves the progressive normal slot
-  pending. The Sandbox default direct-mesh post-import processor schedules the
-  same queue after deferred UV/normal materialization when the workflow
-  supplies it; on the default Null backend this records the no-CPU-fallback
-  diagnostic and leaves the material normal binding unset.
-  `SelectedMeshTextureBakeContext` can carry the same queue: mesh-vertex normal
-  target commands enqueue requests with geometry/UV/normal content keys, mark
-  the progressive normal slot pending on operational backends, and return the
-  queue's no-CPU-fallback diagnostic without creating a CPU texture on
-  non-operational backends. The production Vulkan geometry-buffer/pipeline
-  plan provider and opt-in GPU smoke are not wired yet. Callers that do not
-  supply the queue still use CPU compatibility paths. The derived-job graph
-  fail-closes any non-CPU domain:
+- Completed state: `Extrinsic.Runtime.ObjectSpaceNormalBakeQueue` owns exact
+  resolved bake identities separately from target lifetime; the private
+  `ObjectSpaceNormalBakeService` allocates collision-safe registry metadata,
+  coalesces pending waiters, retains bounded proven-ready provenance, validates
+  live `GpuWorld` residency, and records through the existing `JobService`
+  `GpuQueue` frame-command lane. Exact cache-generation publication and
+  completion revalidation prevent older/current/pending views from binding as
+  newer work. `ObjectSpaceNormalBakeBinding` transactionally merges only the
+  generated normal semantic while preserving albedo, metallic-roughness, and
+  emissive, and advances the matching progressive normal slot only when all
+  world/entity/content/cache/presentation generations still match.
+  `AssetWorkflowModule` privately composes the service and supplies the same
+  queue-backed producer path to default/progressive model imports, direct-mesh
+  postprocessing, and selected-mesh editor commands. Callers without a
+  composed queue retain the legacy CPU compatibility route; an unavailable or
+  lost operational backend never selects that route as a fallback. The
+  derived-job graph still fail-closes any non-CPU domain:
   `IsUnsupportedJobDomain(domain) { return domain != ProgressiveJobDomain::Cpu; }`
   (`Runtime.DerivedJobGraph.cpp:36-47`, rejection at `:348-355`).
   `ProgressiveJobDomain` already reserves `GpuCompute`/`GpuGraphics`/`Auto`
@@ -250,28 +248,28 @@ maturity_target: Operational
   registry-backed generated assets; an identity-less target is non-reusable.
 
 ## Required changes
-- [ ] Replace `RuntimeObjectSpaceNormalBakeContentKey` with the authoritative
+- [x] Replace `RuntimeObjectSpaceNormalBakeContentKey` with the authoritative
       versioned identity and separate target-lifetime record described above.
       Carry both through queue latest-state, submission, ticket, waiters,
       completion, stale checks, exact-ready reuse, and cleanup; derive source
       generations from exact position/topology/texcoord/normal fingerprints
       and entity lifetime from the raw validated handle.
-- [ ] Allocate generated ids through the existing private
+- [x] Allocate generated ids through the existing private
       `AssetWorkflowModule` `AssetService` using a runtime-private metadata
       payload and reserved deterministic identity path. Do not fabricate strong
       handles or publish an id from `Schedule()` before the service drain;
       identity-less target allocations are distinct and non-reusable.
-- [ ] Add generation-aware GPU-produced-texture ready-frame publication and
+- [x] Add generation-aware GPU-produced-texture ready-frame publication and
       exact matching failure/retirement operations to `GpuAssetCache`. Track
       queued, pending-with-generation, waiter, and proven-ready state privately;
       only exact proven-ready cache views may fast-bind. Bound queued/in-flight
       and proven-ready state by fixed entry/byte limits with deterministic
       capacity diagnostics.
-- [ ] Add the plain `GpuGeometryResidencyView` and `GpuWorld` accessor/update
+- [x] Add the plain `GpuGeometryResidencyView` and `GpuWorld` accessor/update
       contract: exact fingerprints/counts/byte widths, monotonic content
       revision, and storage/channel eligibility update on upload and partial
       channel mutation without changing the RHI record surface.
-- [ ] Implement the production Vulkan plan and retained-resource state inside
+- [x] Implement the production Vulkan plan and retained-resource state inside
       the existing `ObjectSpaceNormalBakeService` owned by
       `AssetWorkflowModule`: borrow the exact asset service and renderer,
       recheck operational state around resource resolution, validate the live
@@ -285,19 +283,19 @@ maturity_target: Operational
 - [x] Add an `AssetModelSceneHandoff` queue option so progressive model-scene generated-normal work schedules `RuntimeObjectSpaceNormalBakeQueue` through a dependency-only main-thread apply job instead of marking a fake CPU normal texture ready when the queue is supplied.
 - [x] Wire the then-Engine-owned queue services into model-scene handoff options and direct-mesh post-import processors; `RUNTIME-183` moves that unchanged wiring into `AssetWorkflowModule`. Direct mesh post-process schedules a queue request from resolved ECS geometry/UV/normal properties instead of registering the CPU-generated texture when the queue is supplied.
 - [x] Add a `SelectedMeshTextureBake` queue option so selected mesh-vertex normal outputs schedule `RuntimeObjectSpaceNormalBakeQueue` requests instead of creating CPU-generated normal textures when the queue is supplied.
-- [ ] Route the default non-progressive model handoff through the composed
+- [x] Route the default non-progressive model handoff through the composed
       queue for every eligible missing-authored-normal primitive after resolved
       UV/normal materialization, while preserving CPU albedo generation. Replace
       model/direct/selected hardcoded generations with the authoritative
       identity and query the borrowed device live immediately before schedule;
       direct async work must not capture an operational bool.
-- [ ] Expose the existing workflow queue narrowly through
+- [x] Expose the existing workflow queue narrowly through
       `AssetImportPipeline` into `SandboxEditorContext`, select the queue-backed
       mesh-normal command before checking `AssetService`, and require selected
       UV/normal channels to match bake-readable resident channels. Non-normal
       compatibility bakes still require `AssetService`; a scheduled result does
       not claim a generated texture is already bound.
-- [ ] At exact `Ready`, revalidate world epoch, raw entity lifetime, latest
+- [x] At exact `Ready`, revalidate world epoch, raw entity lifetime, latest
       identity/residency revision, cache generation, presentation key, and
       expected progressive binding generation. Merge only generated `Normal`
       and object-space normal metadata into the existing material binding,
@@ -307,13 +305,13 @@ maturity_target: Operational
 - [x] Route the chosen GPU lane through `JobService` `GpuQueue` without
       regressing CPU job fail-closed behavior for unimplemented
       `DerivedJobGraph` domains.
-- [ ] Make scene replacement detach only old target waiters/unrecorded work;
+- [x] Make scene replacement detach only old target waiters/unrecorded work;
       preserve recorded tickets until safe completion/retirement. Keep retained
       resources visible to `HasInFlightWork()`, then after the existing
       device-idle shutdown boundary fail exact pending generations, retire
       generated cache/assets, and release dilation/pipeline state before
       clearing dependencies.
-- [ ] Retain CPU generated-normal compatibility only for callers with no
+- [x] Retain CPU generated-normal compatibility only for callers with no
       composed queue. Never select it because Vulkan is unavailable, recording
       fails, completion is stale, or capacity is exhausted.
 
@@ -329,53 +327,53 @@ maturity_target: Operational
 - [x] CPU/null contract: `JobService` `GpuQueue` participant records an injected object-space normal bake plan, promotes the generated cache entry by ready frame, drains the ready completion, and installs the generated normal binding.
 - [x] CPU/null contract: superseded pending object-space normal bake submissions are discarded before command recording and do not allocate GPU-produced texture cache entries.
 - [x] CPU/null contract: content-key reuse binds an already-ready generated normal texture without recording a duplicate bake or allocating the unused entity-scoped fallback texture.
-- [ ] CPU/null identity contract: exact topology/order, any resolved size/
+- [x] CPU/null identity contract: exact topology/order, any resolved size/
       padding/space option, or any of the three canonical epsilon bit patterns
       changes the versioned identity; `-0` normalization is deterministic.
-- [ ] CPU/null generated-asset contract: registry-backed ids reuse the same
+- [x] CPU/null generated-asset contract: registry-backed ids reuse the same
       full identity, never collide with unrelated live assets, never repurpose
       one id for different content, and no production path fabricates a strong
       handle. Identity-less targets allocate distinct non-reusable ids.
-- [ ] CPU/null provenance contract: same-identity pending requests attach as
+- [x] CPU/null provenance contract: same-identity pending requests attach as
       waiters without duplicate allocation/recording; first insertion,
       identity-less fallback, and pending state never fast-bind, while exact
       proven-ready reuse does.
-- [ ] CPU/null cache contract: a pending replacement may expose an older
+- [x] CPU/null cache contract: a pending replacement may expose an older
       current view but remains unbound until its generation matches; wrong-
       generation ready publication is rejected without touching the newer
       pending generation.
-- [ ] CPU/null cleanup contract: record failure, ready-publication failure,
+- [x] CPU/null cleanup contract: record failure, ready-publication failure,
       operational loss, stale completion, scene reset, and shutdown purge only
       matching pending provenance and never mutate a material/newer identity.
-- [ ] CPU/null residency contract: upload records full fingerprints/layout;
+- [x] CPU/null residency contract: upload records full fingerprints/layout;
       partial UV/normal channel updates change content revision/fingerprint
       without changing the geometry handle. The provider rejects topology,
       content-revision, channel, and storage-layout mismatch and preserves the
       live nonzero `SurfaceFirstIndex`.
-- [ ] CPU/null capability contract: schedule followed by device loss performs
+- [x] CPU/null capability contract: schedule followed by device loss performs
       no pipeline/dilation/cache creation, command recording, or material
       mutation.
-- [ ] CPU/null binding contract: exact-ready completion preserves existing
+- [x] CPU/null binding contract: exact-ready completion preserves existing
       albedo, metallic-roughness, and emissive; the progressive normal slot
       becomes generated/ready. Changed world/entity/presentation/binding
       generation or resident content revision rejects the entire completion.
-- [ ] CPU/null producer contract: default non-progressive model import with the
+- [x] CPU/null producer contract: default non-progressive model import with the
       live queue creates no CPU normal payload; model/direct/selected topology
       or channel changes and destroy/recreate entity reuse change the recorded
       source/target versions.
-- [ ] CPU/null editor contract: the Sandbox mesh-normal command supplies the
+- [x] CPU/null editor contract: the Sandbox mesh-normal command supplies the
       existing queue and live operational state without context
       `AssetService`, does not claim an already-bound generated texture while
       scheduled, and rejects custom nonresident channels; a non-normal CPU bake
       still fails without `AssetService`.
-- [ ] CPU/null capacity/lifetime contract: queue, in-flight/proven-ready, and
+- [x] CPU/null capacity/lifetime contract: queue, in-flight/proven-ready, and
       dilation entry/byte limits fail deterministically; safe-frame eviction,
       scene replacement with queued/recorded work, and shutdown cannot bind
       into a replacement scene or release referenced resources early.
-- [ ] CPU/source contract: runtime frame-command hooks remain on a
+- [x] CPU/source contract: runtime frame-command hooks remain on a
       graphics-capable final command context suitable for the offscreen raster
       bake, with no second frame acquire/present path.
-- [ ] Opt-in `gpu;vulkan` real-app smoke: bootstrap
+- [x] Opt-in `gpu;vulkan` real-app smoke: bootstrap
       `CreateSandboxApp`, import a decoy OBJ then a distinguishable target OBJ
       through `AssetImportPipeline`, let the real direct-import postprocessor
       schedule the private workflow queue, and assert target
@@ -391,48 +389,48 @@ maturity_target: Operational
 - [x] Update `src/runtime/README.md` for the pre-`RUNTIME-183` queue services and direct-mesh post-import queue scheduling.
 - [x] Update `src/runtime/README.md` for optional `SelectedMeshTextureBake` queue scheduling and the non-operational no-CPU-fallback contract.
 - [x] Update `src/runtime/README.md` for the CPU-contracted `JobService` GPU-queue participant, pending-submission retention, command-recording plan-provider seam, ready-frame promotion, and material-binding drain.
-- [ ] Update `src/runtime/README.md` for production Vulkan geometry-buffer plan-provider wiring once landed.
-- [ ] Update `src/runtime/README.md` and `docs/architecture/runtime.md` for the
+- [x] Update `src/runtime/README.md` for production Vulkan geometry-buffer plan-provider wiring once landed.
+- [x] Update `src/runtime/README.md` and `docs/architecture/runtime.md` for the
       versioned identity/target split, registry-backed ids,
       pending/proven-ready reuse, exact cache-generation binding, material/
       progressive merge, bounded lifetime, default import/editor producers, and
       truthful frame-based readiness.
-- [ ] Update `src/graphics/assets/README.md` for generation-aware
+- [x] Update `src/graphics/assets/README.md` for generation-aware
       GPU-produced-texture publication and `src/graphics/renderer/README.md`
       for the residency DTO/content-revision/layout contract plus retained
       bake-resource/readback requirements.
-- [ ] Update `RUNTIME-139` compatibility wording so optional AoS residency must
+- [x] Update `RUNTIME-139` compatibility wording so optional AoS residency must
       either preserve advertised bake-readable separate channels or return a
       deterministic unsupported-lane result.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` after the changed
+- [x] Regenerate `docs/api/generated/module_inventory.md` after the changed
       `.cppm` surfaces.
 
 ## Acceptance criteria
-- [ ] Default and progressive imported meshes eligible for generated
+- [x] Default and progressive imported meshes eligible for generated
       object-space normals schedule through the composed queue after resolved
       normals/UVs, create no CPU normal texture, and keep vertex-normal shading
       until exact-ready completion.
-- [ ] Exact-ready completion preserves unrelated material bindings, merges the
+- [x] Exact-ready completion preserves unrelated material bindings, merges the
       GPU-resident normal/object-space metadata, updates matching progressive
       state, and discards stale world/entity/content/cache/presentation
       generations without partial mutation.
-- [ ] Distinct full identities cannot alias one generated asset; generated ids
+- [x] Distinct full identities cannot alias one generated asset; generated ids
       cannot collide with unrelated live assets; old/current/pending cache
       generations cannot bind as a newer bake.
-- [ ] The production provider validates live content revision/layout and
+- [x] The production provider validates live content revision/layout and
       consumes a real nonzero shared-index slice with local tightly packed UV/
       normal BDAs and zero base vertex.
-- [ ] The Sandbox editor's queue-backed normal command reaches the same private
+- [x] The Sandbox editor's queue-backed normal command reaches the same private
       runtime path without requiring a CPU texture payload or publishing a
       private service.
-- [ ] Non-operational/lost graphics backends, failed recording, stale
+- [x] Non-operational/lost graphics backends, failed recording, stale
       completion, and capacity exhaustion run no CPU fallback and keep
       vertex-normal shading with deterministic diagnostics.
-- [ ] Queue/proven-ready/dilation state is bounded, scene replacement cannot
+- [x] Queue/proven-ready/dilation state is bounded, scene replacement cannot
       bind into a new target, and retained GPU resources release only after the
       existing idle/safe-frame boundary.
-- [ ] No layering violations (graphics-owned bake stays free of live ECS/runtime/AssetService knowledge; `Vk*` types do not cross RHI/renderer/runtime APIs).
-- [ ] `Operational` cited by an actually-run `gpu;vulkan` smoke; CPU contract gate green for the orchestration logic.
+- [x] No layering violations (graphics-owned bake stays free of live ECS/runtime/AssetService knowledge; `Vk*` types do not cross RHI/renderer/runtime APIs).
+- [x] `Operational` cited by an actually-run `gpu;vulkan` smoke; CPU contract gate green for the orchestration logic.
 
 ## Verification
 ```bash
@@ -442,6 +440,8 @@ python3 tools/agents/check_task_state_links.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/repo/check_root_hygiene.py --root .
+tools/ci/run_clean_workshop_review.sh . --strict
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
@@ -478,47 +478,13 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' --time
   while GPU work may still reference them.
 
 ## Maturity
-- Target: `Operational` on Vulkan-capable hosts; `CPUContracted` for the scheduling/stale-key/fail-closed orchestration contract on CPU/null.
-- Slice A.1 (CPUContracted, landed in `GRAPHICS-104`): queue-level scheduling decision, generated-`AssetId`/content-key selection, stale-key lifecycle, and non-operational no-op — all CPU/null tested with bake submission deferred behind the operational check.
-- Slice A.2 (partially landed): progressive model handoff, direct-mesh, and
-  selected-mesh queue options exist. The default non-progressive model route
-  and Sandbox editor facade remain open; no CPU fallback may be selected merely
-  because the composed GPU path is unavailable.
-- Slice B.1 (`CPUContracted` target): authoritative versioned identity and
-  target lifetime, registry-backed ids, pending/proven-ready waiters, exact
-  cache-generation publication/cleanup, and fixed capacity contracts.
-- Slice B.2 (`CPUContracted` target): `GpuWorld` residency revision/layout DTO,
-  private live provider, retained pipeline/dilation resources, operational-loss
-  and safe shutdown/scene-retirement contracts.
-- Slice B.3 (`CPUContracted` target): default/editor producers plus exact-ready
-  material/progressive merge with all stale target/content generations.
-- Current Slice B state (2026-07-16): `CPUContracted` participant substrate landed and is owned by `ObjectSpaceNormalBakeService` private state. It registers through `JobService` `GpuQueue`, records injected graphics bake plans in the renderer command context, stamps `GpuAssetCache` ready frames, drains ready cache entries into `ObjectSpaceNormalBakeBinding`, and discards superseded pending submissions. The production Vulkan plan provider that resolves live geometry buffers/pipeline/dilation resources for imported entities remains open, so this task is not yet `Operational`.
-- Slice C (Operational): real Vulkan submission + nonzero shared-index-slice
-  `gpu;vulkan` real-app import/readback smoke proving an actual padded baked
-  texture promotes and binds with prior material state preserved.
-
-## Slice plan
-- **Slice A.1 (landed).** Add the initial
-  `Runtime.ObjectSpaceNormalBakeQueue` request/stale-key contract and
-  non-operational diagnostics. Its partial identity/fabricated-id assumptions
-  are explicitly replaced by Slice B.1.
-- **Prerequisite order.** Retired `GRAPHICS-128` and `RUNTIME-183` are
-  satisfied. Add production provider state only inside the private
-  AssetWorkflow bake service, never on `Engine`.
-- **Slice A.2.** Finish default model and Sandbox editor queue producers on top
-  of the already-landed progressive/direct/selected options; use live device
-  state and truthful scheduled results.
-- **Slice B.1.** Make full identity, target lifetime, registry-backed ids,
-  exact cache-generation provenance, waiter reuse, bounded state, and matching
-  cleanup authoritative before production resources expose latent aliasing.
-- **Slice B.2.** Add the plain residency DTO/revision and wire the private
-  provider to live extraction/`GpuWorld` content plus
-  `GRAPHICS-128` `FirstIndex`; retain bounded raster/dilation resources,
-  submit managed upload barriers, and bind only the exact generation after
-  frame-based `Ready`.
-- **Slice B.3.** Merge exact-ready normal results into existing extraction and
-  progressive bindings; close default/editor producer and scene-replacement/
-  shutdown lifetime tests.
-- **Slice C.** Run the opt-in real-Sandbox `gpu;vulkan` import smoke with a
-  preceding decoy geometry, nonzero target shared-index slice, and production
-  texture readback for covered, dilation-gutter, and far-uncovered texels.
+- Target reached: `Operational` on the exercised Vulkan host, with the
+  scheduling, stale-key, fail-closed, capacity, lifetime, and transactional
+  binding contracts `CPUContracted` on CPU/null.
+- The production provider records and publishes a real padded object-space
+  normal texture through the existing runtime frame-command lane, and the
+  real-app Vulkan readback proves covered, gutter, and uncovered semantics on
+  a nonzero shared-index slice.
+- No maturity follow-up is owed by this task. A future backend or tangent-space
+  method would require its own scoped task rather than extending this retired
+  orchestration contract.

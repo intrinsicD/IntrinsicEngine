@@ -1046,3 +1046,23 @@ entries:
       - "Did not stage or crystallize a generalized observation: this test slice verifies an already-selected app-owned policy composition contract."
       - "Kept O08, O09, O13, and O38 unpromoted and non-stale because this bounded lifecycle test supplies no closure or contradiction for their topics."
       - "Left production/docs/task integration and the coordinated full gate to the root owner."
+  - turn: "2026-07-19_001#5"
+    notes:
+      - "Routed the RUNTIME-129 residency-validator implementation and focused compilation as experiment N271 because it produced bounded code and structural evidence for one active-task sub-slice."
+      - "Recorded exact revision, fingerprint, byte/count, UniformSoA, format/stride, buffer-handle, device-address, and record-count rejection behavior without introducing a provider or ownership seam."
+      - "Did not stage or crystallize a generalized observation: this helper implements the already-selected RUNTIME-129 exact-residency contract."
+      - "Kept O08, O09, O13, and O38 unpromoted and non-stale because this bounded runtime/graphics seam supplies no closure or contradiction for their topics."
+      - "Left provider/binding integration, focused mismatch tests, module-inventory refresh, and coordinated full verification to the root owner."
+  - turn: "2026-07-19_001#6"
+    notes:
+      - "Recorded the RUNTIME-129 editor producer work as an AI action only: source and contracts changed, but the coordinated build had not completed, so no experiment node or capability claim was warranted."
+      - "Kept the accessor right-sized as one plain borrowed DTO returned by the existing AssetImportPipeline rather than publishing the private bake service or adding a provider, facade, config, or test-only production seam."
+      - "Did not stage or crystallize a generalized observation because this slice implements the already-selected RUNTIME-129 producer contract."
+      - "Kept O08, O09, O13, and O38 unpromoted and non-stale; this editor wiring supplies no closure or contradiction for their topics."
+  - turn: "2026-07-20_001#1"
+    notes:
+      - "Routed the completed RUNTIME-129 implementation, diagnosis, full CPU gate, and full promoted-Vulkan gate as experiment N272 because they produced bounded operational evidence for one retired task."
+      - "Staged O56 and crystallized it immediately to K22 through artifact commitment: the committed allocator/validators and real Vulkan readback depend on shader-declared physical-storage address alignment."
+      - "Recorded the dynamic CPU UV witness, SPIR-V Aligned 8 texcoord load, invalid base+36 address, corrected per-channel alignment, 4,273/4,273 CPU result, and 47/47 ASan+UBSan gpu+vulkan result without generalizing a performance claim."
+      - "Kept O08, O09, O13, and O38 unpromoted and non-stale because this task supplies no closure or contradiction for module posture, model-training interpretation, or Progressive Poisson parity."
+      - "Closed the RUNTIME-129 research thread with no follow-up: the task retired at Operational and the user explicitly required stopping after repository integration."

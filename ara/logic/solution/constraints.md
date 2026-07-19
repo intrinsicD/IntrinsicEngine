@@ -271,3 +271,21 @@
   tasks/backlog/bugs/BUG-109-voxel-downsample-invalid-input-ordering.md,
   tasks/backlog/geometry/GEOM-061-grid-downsampling-reduction-strategies.md]
 - **From staging**: O50
+
+## K22: Shader Load Alignment Is a Residency Contract
+- **Constraint**: Every physical-storage-buffer address published to a shader
+  must satisfy the alignment declared by the corresponding shader load;
+  element format, stride, and a nonzero BDA do not establish that invariant.
+  Object-space normal baking requires eight-byte-aligned `RG32_FLOAT`
+  texcoords and four-byte-aligned `RGB32_FLOAT` normals. Managed allocation,
+  graphics plan/record validation, and runtime residency validation fail closed
+  on mismatch.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/graphics/renderer/Graphics.GpuWorld.cpp,
+  src/graphics/renderer/Graphics.ObjectSpaceNormalTextureBake.cpp,
+  src/runtime/Runtime.ObjectSpaceNormalBakeSubmission.cpp,
+  tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp,
+  tasks/done/RUNTIME-129-schedule-gpu-normal-bake-after-import.md,
+  d2f838f2, N272]
+- **From staging**: O56
