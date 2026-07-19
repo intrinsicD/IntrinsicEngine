@@ -15,8 +15,11 @@ import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.AssetWorkflowModule;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneInteractionModule;
@@ -25,6 +28,15 @@ import Extrinsic.Runtime.StableEntityLookup;
 
 namespace
 {
+    template <typename T>
+    [[nodiscard]] T& RequiredEngineService(
+        Extrinsic::Runtime::Engine& engine)
+    {
+        T* const service = engine.Services().Find<T>();
+        EXPECT_NE(service, nullptr);
+        return *service;
+    }
+
     namespace Tf = Extrinsic::ECS::Components::Transform;
 
     using Extrinsic::ECS::EntityHandle;
@@ -90,6 +102,10 @@ TEST(GizmoInteractionEngineWiring, ExtractionSubmitsTransformGizmoPackets)
     Engine engine(HeadlessConfig(), std::make_unique<SelectGizmoEntityApplication>());
     engine.EmplaceModule<
         Extrinsic::Runtime::SceneInteractionModule>();
+    engine.EmplaceModule<
+        Extrinsic::Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<
+        Extrinsic::Runtime::AssetWorkflowModule>();
     engine.Initialize();
 
     const EntityHandle entity = MakeTransformEntity(engine, glm::vec3{2.f, 3.f, 4.f});
@@ -125,7 +141,7 @@ TEST(GizmoInteractionEngineWiring, ExtractionSubmitsTransformGizmoPackets)
             });
     (void)extraction.ExtractAndSubmit(*engine.Worlds().Get(engine.ActiveWorld()),
                                       engine.GetRenderer(),
-                                      &engine.GetGpuAssetCache(),
+                                      &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine),
                                       0u,
                                       engine.ActiveWorld());
 

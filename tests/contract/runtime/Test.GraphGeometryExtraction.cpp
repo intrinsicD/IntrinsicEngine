@@ -19,8 +19,11 @@ import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.AssetWorkflowModule;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.Properties;
@@ -33,6 +36,25 @@ using Extrinsic::ECS::Scene::Registry;
 
 namespace
 {
+    template <typename T>
+    [[nodiscard]] T& RequiredEngineService(
+        Extrinsic::Runtime::Engine& engine)
+    {
+        T* const service = engine.Services().Find<T>();
+        EXPECT_NE(service, nullptr);
+        return *service;
+    }
+
+    void InitializeAssetWorkflowEngine(
+        Extrinsic::Runtime::Engine& engine)
+    {
+        engine.EmplaceModule<
+            Extrinsic::Runtime::SceneDocumentModule>();
+        engine.EmplaceModule<
+            Extrinsic::Runtime::AssetWorkflowModule>();
+        engine.Initialize();
+    }
+
     constexpr std::uint32_t kInvalidIndex = std::numeric_limits<std::uint32_t>::max();
 
     class StubApplication final : public Extrinsic::Runtime::IApplication
@@ -143,7 +165,7 @@ namespace
 TEST(GraphGeometryExtraction, LineGraphUploadsOnceAndBindsInstanceGeometry)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeLineGraphRenderable(scene);
@@ -151,7 +173,7 @@ TEST(GraphGeometryExtraction, LineGraphUploadsOnceAndBindsInstanceGeometry)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.CandidateRenderableCount, 1u);
     EXPECT_EQ(stats.AllocatedInstanceCount, 1u);
@@ -189,7 +211,7 @@ TEST(GraphGeometryExtraction, LineGraphUploadsOnceAndBindsInstanceGeometry)
 TEST(GraphGeometryExtraction, PointGraphUploadsOnceAndBindsInstanceGeometry)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakePointGraphRenderable(scene);
@@ -197,7 +219,7 @@ TEST(GraphGeometryExtraction, PointGraphUploadsOnceAndBindsInstanceGeometry)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.GraphGeometryUploads, 1u);
     EXPECT_EQ(stats.GraphGeometryFailedPack, 0u);
@@ -219,7 +241,7 @@ TEST(GraphGeometryExtraction, PointGraphUploadsOnceAndBindsInstanceGeometry)
 TEST(GraphGeometryExtraction, LineAndPointGraphUploadsSingleHandleForBothLanes)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeLineAndPointGraphRenderable(scene);
@@ -227,7 +249,7 @@ TEST(GraphGeometryExtraction, LineAndPointGraphUploadsSingleHandleForBothLanes)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     // Both lanes share one upload / one geometry handle, but line and point
     // lanes use separate instances so their visualization configs can diverge.
@@ -275,7 +297,7 @@ TEST(GraphGeometryExtraction, LaneOverridesColorLineAndPointLanesIndependently)
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeLineAndPointGraphRenderable(scene);
@@ -296,7 +318,7 @@ TEST(GraphGeometryExtraction, LaneOverridesColorLineAndPointLanesIndependently)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                    engine.GetRenderer(),
-                                                   &engine.GetGpuAssetCache());
+                                                   &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.GraphGeometryUploads, 1u);
     EXPECT_EQ(stats.AllocatedInstanceCount, 2u);
@@ -325,7 +347,7 @@ TEST(GraphGeometryExtraction, LaneOverridesColorLineAndPointLanesIndependently)
 TEST(GraphGeometryExtraction, RepeatedExtractionReusesGraphHandleWithoutReupload)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeLineGraphRenderable(scene);
@@ -333,7 +355,7 @@ TEST(GraphGeometryExtraction, RepeatedExtractionReusesGraphHandleWithoutReupload
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
-                                             &engine.GetGpuAssetCache());
+                                             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.GraphGeometryUploads, 1u);
     ASSERT_EQ(stats.GraphGeometryReuseHits, 0u);
 
@@ -347,7 +369,7 @@ TEST(GraphGeometryExtraction, RepeatedExtractionReusesGraphHandleWithoutReupload
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.GraphGeometryUploads, 0u);
     EXPECT_EQ(stats.GraphGeometryReuseHits, 1u);
     EXPECT_EQ(stats.GraphGeometryReleases, 0u);
@@ -365,7 +387,7 @@ TEST(GraphGeometryExtraction, RepeatedExtractionReusesGraphHandleWithoutReupload
 TEST(GraphGeometryExtraction, TwoGraphEntitiesAllocateIndependentUploads)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     (void)MakeLineGraphRenderable(scene);
@@ -374,7 +396,7 @@ TEST(GraphGeometryExtraction, TwoGraphEntitiesAllocateIndependentUploads)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.CandidateRenderableCount, 2u);
     EXPECT_EQ(stats.AllocatedInstanceCount, 2u);
@@ -392,7 +414,7 @@ TEST(GraphGeometryExtraction, TwoGraphEntitiesAllocateIndependentUploads)
 TEST(GraphGeometryExtraction, EntityDestructionRetiresGraphGeometryAfterDeferredWindow)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeLineGraphRenderable(scene);
@@ -400,7 +422,7 @@ TEST(GraphGeometryExtraction, EntityDestructionRetiresGraphGeometryAfterDeferred
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
-                                             &engine.GetGpuAssetCache());
+                                             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.GraphGeometryUploads, 1u);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
@@ -410,7 +432,7 @@ TEST(GraphGeometryExtraction, EntityDestructionRetiresGraphGeometryAfterDeferred
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.FreedInstanceCount, 1u);
     EXPECT_EQ(stats.GraphGeometryReleases, 1u);
     EXPECT_EQ(stats.GraphGeometryFreeRetires, 0u);
@@ -433,7 +455,7 @@ TEST(GraphGeometryExtraction, EntityDestructionRetiresGraphGeometryAfterDeferred
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.GraphGeometryFreeRetires, 1u);
 
     extraction.Shutdown(engine.GetRenderer());
@@ -443,7 +465,7 @@ TEST(GraphGeometryExtraction, EntityDestructionRetiresGraphGeometryAfterDeferred
 TEST(GraphGeometryExtraction, ShutdownReleasesPendingGraphResidency)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     (void)MakeLineGraphRenderable(scene);
@@ -452,7 +474,7 @@ TEST(GraphGeometryExtraction, ShutdownReleasesPendingGraphResidency)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
-                                             &engine.GetGpuAssetCache());
+                                             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.GraphGeometryUploads, 2u);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
@@ -472,7 +494,7 @@ TEST(GraphGeometryExtraction, ProceduralRefPreemptsGraphPathOnSameEntity)
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -485,7 +507,7 @@ TEST(GraphGeometryExtraction, ProceduralRefPreemptsGraphPathOnSameEntity)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     // Procedural intent declared → graph path must not run.
     EXPECT_EQ(stats.ProceduralRenderablesEnumerated, 1u);
@@ -509,7 +531,7 @@ TEST(GraphGeometryExtraction, MissingNodePositionsIncrementsMissingNodesCounter)
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -523,7 +545,7 @@ TEST(GraphGeometryExtraction, MissingNodePositionsIncrementsMissingNodesCounter)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.GraphGeometryUploads, 0u);
     EXPECT_EQ(stats.GraphGeometryMissingNodes, 1u);
@@ -543,7 +565,7 @@ TEST(GraphGeometryExtraction, OutOfRangeEdgeIncrementsInvalidEdgesCounter)
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -560,7 +582,7 @@ TEST(GraphGeometryExtraction, OutOfRangeEdgeIncrementsInvalidEdgesCounter)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.GraphGeometryUploads, 0u);
     EXPECT_EQ(stats.GraphGeometryInvalidEdges, 1u);
@@ -577,7 +599,7 @@ TEST(GraphGeometryExtraction, SurfaceOnlyGraphEntityFailsClosedAsFailedPack)
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -591,7 +613,7 @@ TEST(GraphGeometryExtraction, SurfaceOnlyGraphEntityFailsClosedAsFailedPack)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.GraphGeometryUploads, 0u);
     EXPECT_EQ(stats.GraphGeometryFailedPack, 1u);
@@ -612,7 +634,7 @@ TEST(GraphGeometryExtraction, AddingProceduralRefAfterGraphUploadReleasesGraphRe
     namespace E = Extrinsic::ECS::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeLineGraphRenderable(scene);
@@ -620,7 +642,7 @@ TEST(GraphGeometryExtraction, AddingProceduralRefAfterGraphUploadReleasesGraphRe
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
-                                             &engine.GetGpuAssetCache());
+                                             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.GraphGeometryUploads, 1u);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
@@ -632,7 +654,7 @@ TEST(GraphGeometryExtraction, AddingProceduralRefAfterGraphUploadReleasesGraphRe
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.GraphGeometryUploads, 0u);
     EXPECT_EQ(stats.GraphGeometryReuseHits, 0u);
     EXPECT_EQ(stats.GraphGeometryReleases, 1u);
@@ -660,7 +682,7 @@ TEST(GraphGeometryExtraction, AddingProceduralRefAfterGraphUploadReleasesGraphRe
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.GraphGeometryFreeRetires, 1u);
 
     extraction.Shutdown(engine.GetRenderer());
@@ -672,7 +694,7 @@ TEST(GraphGeometryExtraction, LosingGraphHintReleasesGraphResidency)
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeLineGraphRenderable(scene);
@@ -680,7 +702,7 @@ TEST(GraphGeometryExtraction, LosingGraphHintReleasesGraphResidency)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
-                                             &engine.GetGpuAssetCache());
+                                             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.GraphGeometryUploads, 1u);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
@@ -699,7 +721,7 @@ TEST(GraphGeometryExtraction, LosingGraphHintReleasesGraphResidency)
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.GraphGeometryUploads, 0u);
     EXPECT_EQ(stats.GraphGeometryReuseHits, 0u);
     EXPECT_EQ(stats.GraphGeometryReleases, 1u);
@@ -735,7 +757,7 @@ TEST(GraphGeometryExtraction, GainingLineHintRepacksGraphWithoutDirtyTag)
     namespace D = Extrinsic::ECS::Components::DirtyTags;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -749,7 +771,7 @@ TEST(GraphGeometryExtraction, GainingLineHintRepacksGraphWithoutDirtyTag)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
-                                             &engine.GetGpuAssetCache());
+                                             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.GraphGeometryUploads, 1u);
     ASSERT_EQ(stats.GraphGeometryReuploads, 0u);
 
@@ -769,7 +791,7 @@ TEST(GraphGeometryExtraction, GainingLineHintRepacksGraphWithoutDirtyTag)
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.GraphGeometryUploads, 0u);
     EXPECT_EQ(stats.GraphGeometryReuploads, 1u);
     EXPECT_EQ(stats.GraphGeometryReuseHits, 0u);
@@ -785,7 +807,7 @@ TEST(GraphGeometryExtraction, GainingLineHintRepacksGraphWithoutDirtyTag)
     // The lane mask is now stable, so a clean re-extraction returns to reuse.
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.GraphGeometryReuploads, 0u);
     EXPECT_EQ(stats.GraphGeometryReuseHits, 1u);
 
@@ -799,7 +821,7 @@ TEST(GraphGeometryExtraction, LosingLineHintRepacksGraphWithoutDirtyTag)
     namespace D = Extrinsic::ECS::Components::DirtyTags;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeLineAndPointGraphRenderable(scene);
@@ -807,7 +829,7 @@ TEST(GraphGeometryExtraction, LosingLineHintRepacksGraphWithoutDirtyTag)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
-                                             &engine.GetGpuAssetCache());
+                                             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.GraphGeometryUploads, 1u);
 
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
@@ -824,7 +846,7 @@ TEST(GraphGeometryExtraction, LosingLineHintRepacksGraphWithoutDirtyTag)
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.GraphGeometryUploads, 0u);
     EXPECT_EQ(stats.GraphGeometryReuploads, 1u);
     EXPECT_EQ(stats.GraphGeometryReuseHits, 0u);
@@ -875,7 +897,7 @@ TEST_P(GraphGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     namespace D = Extrinsic::ECS::Components::DirtyTags;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -884,7 +906,7 @@ TEST_P(GraphGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
-                                             &engine.GetGpuAssetCache());
+                                             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.GraphGeometryUploads, 1u);
     ASSERT_EQ(stats.GraphGeometryReuploads, 0u);
 
@@ -917,7 +939,7 @@ TEST_P(GraphGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.GraphGeometryUploads, 0u);
     EXPECT_EQ(stats.GraphGeometryReuploads, 1u);
     EXPECT_EQ(stats.GraphGeometryPartialUploads, fullUploadExpected ? 0u : 1u);
@@ -953,7 +975,7 @@ TEST_P(GraphGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.GraphGeometryReuploads, 0u);
     EXPECT_EQ(stats.GraphGeometryReuseHits, 1u);
     EXPECT_EQ(stats.GraphGeometryReleases, 0u);
@@ -967,7 +989,7 @@ TEST_P(GraphGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.GraphGeometryFreeRetires, fullUploadExpected ? 1u : 0u);
 
     extraction.Shutdown(engine.GetRenderer());
@@ -993,7 +1015,7 @@ TEST(GraphGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesD
     namespace D = Extrinsic::ECS::Components::DirtyTags;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -1002,7 +1024,7 @@ TEST(GraphGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesD
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
-                                             &engine.GetGpuAssetCache());
+                                             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.GraphGeometryUploads, 1u);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
@@ -1021,7 +1043,7 @@ TEST(GraphGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesD
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.GraphGeometryReuploads, 0u);
     EXPECT_EQ(stats.GraphGeometryFailedPack, 1u);
     EXPECT_EQ(stats.GraphGeometryReuseHits, 0u);

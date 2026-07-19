@@ -71,6 +71,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
@@ -121,6 +122,15 @@ namespace Tests = Extrinsic::Tests;
 
 namespace
 {
+    template <typename T>
+    [[nodiscard]] T& RequiredEngineService(
+        Extrinsic::Runtime::Engine& engine)
+    {
+        T* const service = engine.Services().Find<T>();
+        EXPECT_NE(service, nullptr);
+        return *service;
+    }
+
 [[nodiscard]] Runtime::RenderArtifactDeclaration
     MakeSandboxRenderArtifact(std::string artifactId)
     {
@@ -433,8 +443,10 @@ TEST(SandboxEditorSession, ReattachObservesEqualSequenceFromDifferentEngine)
         Runtime::Engine firstEngine(
             HeadlessConfig(),
             std::make_unique<PassiveApplication>());
+        firstEngine.EmplaceModule<Runtime::SceneDocumentModule>();
+        firstEngine.EmplaceModule<Runtime::AssetWorkflowModule>();
         firstEngine.Initialize();
-        EXPECT_FALSE(firstEngine.GetAssetImportPipeline()
+        EXPECT_FALSE(RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(firstEngine)
                          .ImportAssetFromPath(
                              Runtime::RuntimeAssetImportRequest{
                                  .Path =
@@ -443,7 +455,7 @@ TEST(SandboxEditorSession, ReattachObservesEqualSequenceFromDifferentEngine)
                                      Assets::AssetPayloadKind::Mesh,
                              })
                          .has_value());
-        const auto& event = firstEngine.GetAssetImportPipeline()
+        const auto& event = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(firstEngine)
                                 .GetLastAssetImportEvent();
         ASSERT_TRUE(event.has_value());
         firstSequence = event->Sequence;
@@ -466,8 +478,10 @@ TEST(SandboxEditorSession, ReattachObservesEqualSequenceFromDifferentEngine)
         Runtime::Engine secondEngine(
             HeadlessConfig(),
             std::make_unique<PassiveApplication>());
+        secondEngine.EmplaceModule<Runtime::SceneDocumentModule>();
+        secondEngine.EmplaceModule<Runtime::AssetWorkflowModule>();
         secondEngine.Initialize();
-        EXPECT_FALSE(secondEngine.GetAssetImportPipeline()
+        EXPECT_FALSE(RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(secondEngine)
                          .ImportAssetFromPath(
                              Runtime::RuntimeAssetImportRequest{
                                  .Path =
@@ -476,7 +490,7 @@ TEST(SandboxEditorSession, ReattachObservesEqualSequenceFromDifferentEngine)
                                      Assets::AssetPayloadKind::PointCloud,
                              })
                          .has_value());
-        const auto& event = secondEngine.GetAssetImportPipeline()
+        const auto& event = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(secondEngine)
                                 .GetLastAssetImportEvent();
         ASSERT_TRUE(event.has_value());
         ASSERT_EQ(event->Sequence, firstSequence);

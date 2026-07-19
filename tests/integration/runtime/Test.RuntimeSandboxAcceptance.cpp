@@ -39,6 +39,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
@@ -49,6 +50,7 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxEditorFacades;
@@ -72,6 +74,15 @@ using Extrinsic::ECS::Scene::Registry;
 
 namespace
 {
+    template <typename T>
+    [[nodiscard]] T& RequiredEngineService(
+        Extrinsic::Runtime::Engine& engine)
+    {
+        T* const service = engine.Services().Find<T>();
+        EXPECT_NE(service, nullptr);
+        return *service;
+    }
+
     constexpr std::uint32_t kInvalidIndex = std::numeric_limits<std::uint32_t>::max();
 
     class StubApplication final : public Runtime::IApplication
@@ -242,6 +253,8 @@ namespace
 TEST(RuntimeSandboxAcceptance, MeshGraphPointCloudAllResideThroughOneExtraction)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     engine.Initialize();
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
 
@@ -252,7 +265,7 @@ TEST(RuntimeSandboxAcceptance, MeshGraphPointCloudAllResideThroughOneExtraction)
     Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                    engine.GetRenderer(),
-                                                   &engine.GetGpuAssetCache());
+                                                   &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.CandidateRenderableCount, 3u);
     EXPECT_EQ(stats.AllocatedInstanceCount, 3u);
@@ -289,7 +302,7 @@ TEST(RuntimeSandboxAcceptance, MeshGraphPointCloudAllResideThroughOneExtraction)
     // Re-extraction reuses every lane (no spurious re-upload of a static scene).
     const auto reuse = extraction.ExtractAndSubmit(scene,
                                                    engine.GetRenderer(),
-                                                   &engine.GetGpuAssetCache());
+                                                   &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(reuse.MeshGeometryUploads, 0u);
     EXPECT_EQ(reuse.GraphGeometryUploads, 0u);
     EXPECT_EQ(reuse.PointCloudGeometryUploads, 0u);
@@ -479,6 +492,8 @@ TEST(RuntimeSandboxAcceptance, SelectionOutlineSnapshotPopulatedForSelectedEntit
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     engine.Initialize();
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
 
@@ -501,7 +516,7 @@ TEST(RuntimeSandboxAcceptance, SelectionOutlineSnapshotPopulatedForSelectedEntit
         });
     (void)extraction.ExtractAndSubmit(scene,
                                       engine.GetRenderer(),
-                                      &engine.GetGpuAssetCache(),
+                                      &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine),
                                       0u,
                                       engine.ActiveWorld());
     const Graphics::RenderWorld world =

@@ -70,6 +70,8 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.AssetWorkflowModule;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
@@ -119,6 +121,15 @@ namespace Tests = Extrinsic::Tests;
 
 namespace
 {
+    template <typename T>
+    [[nodiscard]] T& RequiredEngineService(
+        Extrinsic::Runtime::Engine& engine)
+    {
+        T* const service = engine.Services().Find<T>();
+        EXPECT_NE(service, nullptr);
+        return *service;
+    }
+
 constexpr std::uint32_t kInvalidIndex =
         std::numeric_limits<std::uint32_t>::max();
 
@@ -949,6 +960,8 @@ TEST(SandboxEditorUi, RenderHintCommandRepackagesGraphLaneResidency)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<PassiveApplication>());
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     engine.Initialize();
 
     ECS::Scene::Registry& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -963,7 +976,7 @@ TEST(SandboxEditorUi, RenderHintCommandRepackagesGraphLaneResidency)
     const Runtime::RuntimeRenderExtractionStats first =
         extraction.ExtractAndSubmit(scene,
                                     engine.GetRenderer(),
-                                    &engine.GetGpuAssetCache());
+                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(first.GraphGeometryUploads, 1u);
     EXPECT_EQ(first.GraphGeometryReuploads, 0u);
 
@@ -984,7 +997,7 @@ TEST(SandboxEditorUi, RenderHintCommandRepackagesGraphLaneResidency)
     const Runtime::RuntimeRenderExtractionStats second =
         extraction.ExtractAndSubmit(scene,
                                     engine.GetRenderer(),
-                                    &engine.GetGpuAssetCache());
+                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(second.GraphGeometryUploads, 0u);
     EXPECT_EQ(second.GraphGeometryReuploads, 1u);
     EXPECT_EQ(second.GraphGeometryReleases, 1u);

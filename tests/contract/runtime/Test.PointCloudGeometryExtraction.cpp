@@ -17,8 +17,11 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.AssetWorkflowModule;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.PointCloud;
@@ -32,6 +35,25 @@ using Extrinsic::ECS::Scene::Registry;
 
 namespace
 {
+    template <typename T>
+    [[nodiscard]] T& RequiredEngineService(
+        Extrinsic::Runtime::Engine& engine)
+    {
+        T* const service = engine.Services().Find<T>();
+        EXPECT_NE(service, nullptr);
+        return *service;
+    }
+
+    void InitializeAssetWorkflowEngine(
+        Extrinsic::Runtime::Engine& engine)
+    {
+        engine.EmplaceModule<
+            Extrinsic::Runtime::SceneDocumentModule>();
+        engine.EmplaceModule<
+            Extrinsic::Runtime::AssetWorkflowModule>();
+        engine.Initialize();
+    }
+
     class StubApplication final : public Extrinsic::Runtime::IApplication
     {
     public:
@@ -88,7 +110,7 @@ namespace
 TEST(PointCloudGeometryExtraction, CloudUploadsOnceAndBindsInstanceGeometry)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakePointCloudRenderable(scene);
@@ -96,7 +118,7 @@ TEST(PointCloudGeometryExtraction, CloudUploadsOnceAndBindsInstanceGeometry)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.CandidateRenderableCount, 1u);
     EXPECT_EQ(stats.AllocatedInstanceCount, 1u);
@@ -154,7 +176,7 @@ TEST(PointCloudGeometryExtraction, PopulateFromCloudResolvesPointCloudDomainAndU
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -175,7 +197,7 @@ TEST(PointCloudGeometryExtraction, PopulateFromCloudResolvesPointCloudDomainAndU
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.PointCloudGeometryUploads, 1u);
     EXPECT_EQ(stats.PointCloudGeometryFailedPack, 0u);
@@ -197,7 +219,7 @@ TEST(PointCloudGeometryExtraction, PopulateFromCloudResolvesPointCloudDomainAndU
 TEST(PointCloudGeometryExtraction, RepeatedExtractionReusesPointCloudHandleWithoutReupload)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakePointCloudRenderable(scene);
@@ -205,7 +227,7 @@ TEST(PointCloudGeometryExtraction, RepeatedExtractionReusesPointCloudHandleWitho
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
-                                             &engine.GetGpuAssetCache());
+                                             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.PointCloudGeometryUploads, 1u);
     ASSERT_EQ(stats.PointCloudGeometryReuseHits, 0u);
 
@@ -219,7 +241,7 @@ TEST(PointCloudGeometryExtraction, RepeatedExtractionReusesPointCloudHandleWitho
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.PointCloudGeometryUploads, 0u);
     EXPECT_EQ(stats.PointCloudGeometryReuseHits, 1u);
     EXPECT_EQ(stats.PointCloudGeometryReleases, 0u);
@@ -237,7 +259,7 @@ TEST(PointCloudGeometryExtraction, RepeatedExtractionReusesPointCloudHandleWitho
 TEST(PointCloudGeometryExtraction, TwoCloudEntitiesAllocateIndependentUploads)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     (void)MakePointCloudRenderable(scene);
@@ -246,7 +268,7 @@ TEST(PointCloudGeometryExtraction, TwoCloudEntitiesAllocateIndependentUploads)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.CandidateRenderableCount, 2u);
     EXPECT_EQ(stats.AllocatedInstanceCount, 2u);
@@ -264,7 +286,7 @@ TEST(PointCloudGeometryExtraction, TwoCloudEntitiesAllocateIndependentUploads)
 TEST(PointCloudGeometryExtraction, EntityDestructionRetiresPointCloudGeometryAfterDeferredWindow)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakePointCloudRenderable(scene);
@@ -272,7 +294,7 @@ TEST(PointCloudGeometryExtraction, EntityDestructionRetiresPointCloudGeometryAft
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
-                                             &engine.GetGpuAssetCache());
+                                             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.PointCloudGeometryUploads, 1u);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
@@ -282,7 +304,7 @@ TEST(PointCloudGeometryExtraction, EntityDestructionRetiresPointCloudGeometryAft
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.FreedInstanceCount, 1u);
     EXPECT_EQ(stats.PointCloudGeometryReleases, 1u);
     EXPECT_EQ(stats.PointCloudGeometryFreeRetires, 0u);
@@ -305,7 +327,7 @@ TEST(PointCloudGeometryExtraction, EntityDestructionRetiresPointCloudGeometryAft
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.PointCloudGeometryFreeRetires, 1u);
 
     extraction.Shutdown(engine.GetRenderer());
@@ -315,7 +337,7 @@ TEST(PointCloudGeometryExtraction, EntityDestructionRetiresPointCloudGeometryAft
 TEST(PointCloudGeometryExtraction, CacheDestructionToleratesPendingDeferredRetireState)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakePointCloudRenderable(scene);
@@ -325,13 +347,13 @@ TEST(PointCloudGeometryExtraction, CacheDestructionToleratesPendingDeferredRetir
         Extrinsic::Runtime::RenderExtractionCache extraction;
         auto stats = extraction.ExtractAndSubmit(scene,
                                                  engine.GetRenderer(),
-                                                 &engine.GetGpuAssetCache());
+                                                 &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
         ASSERT_EQ(stats.PointCloudGeometryUploads, 1u);
 
         scene.Destroy(entity);
         stats = extraction.ExtractAndSubmit(scene,
                                             engine.GetRenderer(),
-                                            &engine.GetGpuAssetCache());
+                                            &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
         ASSERT_EQ(stats.PointCloudGeometryReleases, 1u);
         ASSERT_EQ(gpuWorld.GetLiveInstanceCount(), 0u);
         ASSERT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
@@ -346,7 +368,7 @@ TEST(PointCloudGeometryExtraction, CacheDestructionToleratesPendingDeferredRetir
 TEST(PointCloudGeometryExtraction, ShutdownReleasesPendingPointCloudResidency)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     (void)MakePointCloudRenderable(scene);
@@ -355,7 +377,7 @@ TEST(PointCloudGeometryExtraction, ShutdownReleasesPendingPointCloudResidency)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
-                                             &engine.GetGpuAssetCache());
+                                             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.PointCloudGeometryUploads, 2u);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
@@ -375,7 +397,7 @@ TEST(PointCloudGeometryExtraction, ProceduralRefPreemptsPointCloudPathOnSameEnti
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -388,7 +410,7 @@ TEST(PointCloudGeometryExtraction, ProceduralRefPreemptsPointCloudPathOnSameEnti
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     // Procedural intent declared → point-cloud path must not run.
     EXPECT_EQ(stats.ProceduralRenderablesEnumerated, 1u);
@@ -412,7 +434,7 @@ TEST(PointCloudGeometryExtraction, MissingPositionsIncrementsMissingPositionsCou
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -426,7 +448,7 @@ TEST(PointCloudGeometryExtraction, MissingPositionsIncrementsMissingPositionsCou
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.PointCloudGeometryUploads, 0u);
     EXPECT_EQ(stats.PointCloudGeometryMissingPositions, 1u);
@@ -446,7 +468,7 @@ TEST(PointCloudGeometryExtraction, NonFinitePositionIncrementsInvalidPointsCount
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -462,7 +484,7 @@ TEST(PointCloudGeometryExtraction, NonFinitePositionIncrementsInvalidPointsCount
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.PointCloudGeometryUploads, 0u);
     EXPECT_EQ(stats.PointCloudGeometryInvalidPoints, 1u);
@@ -479,7 +501,7 @@ TEST(PointCloudGeometryExtraction, PerPointSizeSourceFailsClosedAsFailedPack)
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -495,7 +517,7 @@ TEST(PointCloudGeometryExtraction, PerPointSizeSourceFailsClosedAsFailedPack)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.PointCloudGeometryUploads, 0u);
     EXPECT_EQ(stats.PointCloudGeometryFailedPack, 1u);
@@ -519,7 +541,7 @@ TEST(PointCloudGeometryExtraction, AddingProceduralRefAfterUploadReleasesPointCl
     namespace E = Extrinsic::ECS::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakePointCloudRenderable(scene);
@@ -527,7 +549,7 @@ TEST(PointCloudGeometryExtraction, AddingProceduralRefAfterUploadReleasesPointCl
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
-                                             &engine.GetGpuAssetCache());
+                                             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.PointCloudGeometryUploads, 1u);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
@@ -539,7 +561,7 @@ TEST(PointCloudGeometryExtraction, AddingProceduralRefAfterUploadReleasesPointCl
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.PointCloudGeometryUploads, 0u);
     EXPECT_EQ(stats.PointCloudGeometryReuseHits, 0u);
     EXPECT_EQ(stats.PointCloudGeometryReleases, 1u);
@@ -567,7 +589,7 @@ TEST(PointCloudGeometryExtraction, AddingProceduralRefAfterUploadReleasesPointCl
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.PointCloudGeometryFreeRetires, 1u);
 
     extraction.Shutdown(engine.GetRenderer());
@@ -579,7 +601,7 @@ TEST(PointCloudGeometryExtraction, LosingPointHintReleasesPointCloudResidency)
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakePointCloudRenderable(scene);
@@ -587,7 +609,7 @@ TEST(PointCloudGeometryExtraction, LosingPointHintReleasesPointCloudResidency)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
-                                             &engine.GetGpuAssetCache());
+                                             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.PointCloudGeometryUploads, 1u);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
@@ -603,7 +625,7 @@ TEST(PointCloudGeometryExtraction, LosingPointHintReleasesPointCloudResidency)
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.PointCloudGeometryUploads, 0u);
     EXPECT_EQ(stats.PointCloudGeometryReuseHits, 0u);
     EXPECT_EQ(stats.PointCloudGeometryReleases, 1u);
@@ -641,7 +663,7 @@ TEST(PointCloudGeometryExtraction, UnsupportedSurfaceAndEdgeHintsFailClosed)
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -654,7 +676,7 @@ TEST(PointCloudGeometryExtraction, UnsupportedSurfaceAndEdgeHintsFailClosed)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.CandidateRenderableCount, 1u);
     EXPECT_EQ(stats.PointCloudGeometryUploads, 0u);
@@ -676,7 +698,7 @@ TEST(PointCloudGeometryExtraction, UnsupportedSurfaceAndEdgeHintsReleasePriorRes
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakePointCloudRenderable(scene);
@@ -684,7 +706,7 @@ TEST(PointCloudGeometryExtraction, UnsupportedSurfaceAndEdgeHintsReleasePriorRes
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
-                                             &engine.GetGpuAssetCache());
+                                             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.PointCloudGeometryUploads, 1u);
 
     auto& raw = scene.Raw();
@@ -694,7 +716,7 @@ TEST(PointCloudGeometryExtraction, UnsupportedSurfaceAndEdgeHintsReleasePriorRes
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.PointCloudGeometryUploads, 0u);
     EXPECT_EQ(stats.PointCloudGeometryFailedPack, 1u);
@@ -740,7 +762,7 @@ TEST_P(PointCloudGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     namespace D = Extrinsic::ECS::Components::DirtyTags;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -749,7 +771,7 @@ TEST_P(PointCloudGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
-                                             &engine.GetGpuAssetCache());
+                                             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.PointCloudGeometryUploads, 1u);
     ASSERT_EQ(stats.PointCloudGeometryReuploads, 0u);
 
@@ -779,7 +801,7 @@ TEST_P(PointCloudGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.PointCloudGeometryUploads, 0u);
     EXPECT_EQ(stats.PointCloudGeometryReuploads, 1u);
     EXPECT_EQ(stats.PointCloudGeometryPartialUploads, fullUploadExpected ? 0u : 1u);
@@ -814,7 +836,7 @@ TEST_P(PointCloudGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.PointCloudGeometryReuploads, 0u);
     EXPECT_EQ(stats.PointCloudGeometryReuseHits, 1u);
     EXPECT_EQ(stats.PointCloudGeometryReleases, 0u);
@@ -828,7 +850,7 @@ TEST_P(PointCloudGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.PointCloudGeometryFreeRetires, fullUploadExpected ? 1u : 0u);
 
     extraction.Shutdown(engine.GetRenderer());
@@ -849,7 +871,7 @@ TEST(PointCloudGeometryExtraction, VertexCountChangeFallsBackToFullUpload)
     namespace D = Extrinsic::ECS::Components::DirtyTags;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -858,7 +880,7 @@ TEST(PointCloudGeometryExtraction, VertexCountChangeFallsBackToFullUpload)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
-                                             &engine.GetGpuAssetCache());
+                                             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.PointCloudGeometryUploads, 1u);
 
     const auto stableId =
@@ -879,7 +901,7 @@ TEST(PointCloudGeometryExtraction, VertexCountChangeFallsBackToFullUpload)
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.PointCloudGeometryUploads, 0u);
     EXPECT_EQ(stats.PointCloudGeometryReuploads, 1u);
     EXPECT_EQ(stats.PointCloudGeometryPartialUploads, 0u);
@@ -907,7 +929,7 @@ TEST(PointCloudGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPrese
     namespace D = Extrinsic::ECS::Components::DirtyTags;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -916,7 +938,7 @@ TEST(PointCloudGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPrese
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
-                                             &engine.GetGpuAssetCache());
+                                             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.PointCloudGeometryUploads, 1u);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
@@ -934,7 +956,7 @@ TEST(PointCloudGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPrese
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.PointCloudGeometryReuploads, 0u);
     EXPECT_EQ(stats.PointCloudGeometryInvalidPoints, 1u);
     EXPECT_EQ(stats.PointCloudGeometryReuseHits, 0u);
@@ -969,7 +991,7 @@ TEST(PointCloudGeometryExtraction, SwitchingToUnsupportedSizeSourceReleasesResid
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -978,7 +1000,7 @@ TEST(PointCloudGeometryExtraction, SwitchingToUnsupportedSizeSourceReleasesResid
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
-                                             &engine.GetGpuAssetCache());
+                                             &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.PointCloudGeometryUploads, 1u);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
@@ -990,7 +1012,7 @@ TEST(PointCloudGeometryExtraction, SwitchingToUnsupportedSizeSourceReleasesResid
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
-                                        &engine.GetGpuAssetCache());
+                                        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.PointCloudGeometryUploads, 0u);
     EXPECT_EQ(stats.PointCloudGeometryReuseHits, 0u);
     EXPECT_EQ(stats.PointCloudGeometryFailedPack, 1u);

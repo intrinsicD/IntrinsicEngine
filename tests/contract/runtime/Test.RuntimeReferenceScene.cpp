@@ -22,8 +22,11 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
+import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.AssetWorkflowModule;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.ReferenceScene;
@@ -43,6 +46,15 @@ namespace Runtime = Extrinsic::Runtime;
 
 namespace
 {
+    template <typename T>
+    [[nodiscard]] T& RequiredEngineService(
+        Extrinsic::Runtime::Engine& engine)
+    {
+        T* const service = engine.Services().Find<T>();
+        EXPECT_NE(service, nullptr);
+        return *service;
+    }
+
     namespace E = ECS::Components;
     namespace G = Graphics::Components;
     namespace GS = ECS::Components::GeometrySources;
@@ -291,6 +303,8 @@ TEST(ReferenceSceneOwnership,
     Runtime::Engine engine(
         HeadlessConfig(true), std::move(app));
 
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     engine.Initialize();
     ASSERT_EQ(appPtr->InitializeCalls, 1u);
     ASSERT_EQ(appPtr->BootstrapCalls, 1u);
@@ -308,7 +322,7 @@ TEST(ReferenceSceneOwnership,
         extraction.ExtractAndSubmit(
             *engine.Worlds().Get(engine.ActiveWorld()),
             engine.GetRenderer(),
-            &engine.GetGpuAssetCache());
+            &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.CandidateRenderableCount, 1u);
     EXPECT_EQ(stats.AllocatedInstanceCount, 1u);
     EXPECT_EQ(stats.MeshGeometryUploads, 1u);

@@ -71,6 +71,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
@@ -122,6 +123,15 @@ namespace Tests = Extrinsic::Tests;
 
 namespace
 {
+    template <typename T>
+    [[nodiscard]] T& RequiredEngineService(
+        Extrinsic::Runtime::Engine& engine)
+    {
+        T* const service = engine.Services().Find<T>();
+        EXPECT_NE(service, nullptr);
+        return *service;
+    }
+
 constexpr std::uint32_t kInvalidIndex =
         std::numeric_limits<std::uint32_t>::max();
 
@@ -583,8 +593,10 @@ class WaitForConditionApplication final : public Runtime::IApplication
     {
         return MeshHasVertexProperty(engine, entity, "v:texcoord") &&
             MeshHasVertexProperty(engine, entity, "v:normal") &&
-            engine.GetObjectSpaceNormalBakeQueueDiagnosticsForTest()
-                .NonOperationalNoOps > 0u;
+            RequiredEngineService<
+                Extrinsic::Runtime::AssetImportPipeline>(engine)
+                .GetLastAssetImportEvent()
+                .has_value();
     }
 
 void ExpectMeshVertexNormalsNear(
@@ -2939,10 +2951,11 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProce
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
+    engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     engine.Initialize();
     InstallSandboxDefaultRuntimePolicies(engine);
 
-    auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+    auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
@@ -2994,10 +3007,11 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProce
     {
         EXPECT_FALSE(bindings->Normal.IsValid());
     }
-    const auto& diagnostics =
-        engine.GetObjectSpaceNormalBakeQueueDiagnosticsForTest();
-    EXPECT_EQ(diagnostics.NonOperationalNoOps, 1u);
-    EXPECT_EQ(engine.GetPendingObjectSpaceNormalBakeCountForTest(), 0u);
+    EXPECT_TRUE(
+        RequiredEngineService<
+            Extrinsic::Runtime::AssetImportPipeline>(engine)
+            .GetLastAssetImportEvent()
+            .has_value());
     ExpectMeshVertexNormalsNear(
         engine,
         *meshEntity,
@@ -3851,7 +3865,10 @@ TEST(SandboxEditorUi, AttachedEngineContextWiresTextureBakeServiceAndDevice)
         "[[nodiscard]] SandboxEditorContext BuildContextFromEngine(Engine& engine)",
         "[[nodiscard]] bool AttachmentEpochIsActive(");
     ASSERT_FALSE(contextBuilder.empty());
-    EXPECT_NE(contextBuilder.find(".AssetService = &engine.GetAssetService(),"),
+    EXPECT_NE(contextBuilder.find(
+                  "engine.Services().Find<Assets::AssetService>()"),
+              std::string_view::npos);
+    EXPECT_NE(contextBuilder.find(".AssetService = assetService,"),
               std::string_view::npos);
     EXPECT_NE(contextBuilder.find(".Device = &engine.GetDevice(),"),
               std::string_view::npos);
