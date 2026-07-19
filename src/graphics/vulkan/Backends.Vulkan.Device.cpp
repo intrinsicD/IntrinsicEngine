@@ -65,6 +65,8 @@ namespace
     std::atomic<std::uint64_t> g_SuccessfulPipelineCreations{0};
 
     constexpr const char* kValidationLayerName = "VK_LAYER_KHRONOS_validation";
+    constexpr std::uint32_t kEngineRequestedVulkanApiVersion =
+        VK_API_VERSION_1_3;
 
     [[nodiscard]] std::uint64_t ElapsedMicros(
         const std::chrono::steady_clock::time_point start) noexcept
@@ -1479,7 +1481,7 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
     appInfo.applicationVersion = VK_MAKE_VERSION(0, 1, 0);
     appInfo.pEngineName = "IntrinsicEngine";
     appInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_3;
+    appInfo.apiVersion = kEngineRequestedVulkanApiVersion;
 
     const char* enabledLayer = kValidationLayerName;
     VkInstanceCreateInfo instanceInfo{};
@@ -2240,6 +2242,8 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
                 .AsyncComputeQueueAvailable =
                     m_AsyncComputeQueue != VK_NULL_HANDLE,
                 .AsyncComputeQueueFamily = m_AsyncComputeFamily,
+                .EngineRequestedApiVersion =
+                    kEngineRequestedVulkanApiVersion,
                 .Owner = this,
                 .ResolveContext =
                     &VulkanDevice::ResolveProfilerCommandContext,
@@ -2615,6 +2619,35 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
     if (m_Profiler)
     {
         m_Profiler->NotifyFrameSlotComplete(m_FrameSlot);
+    }
+    if (!ShouldContinueVulkanFrameAfterProfilerRetirement(m_DeviceLost))
+    {
+        MutateFrameLifecycleDiagnostics(
+            [this, beginFrameBegin, fenceWaitMicros](
+                VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+            {
+                snapshot.BeginStatus =
+                    VulkanFrameBeginStatus::FailedAcquire;
+                snapshot.LastVkResult =
+                    static_cast<std::int32_t>(VK_ERROR_DEVICE_LOST);
+                snapshot.LastFrameIndex = m_FrameSlot;
+                snapshot.LastSwapchainImageIndex = 0u;
+                snapshot.DeviceOperational = m_Operational;
+                snapshot.SwapchainAvailable =
+                    m_Swapchain != VK_NULL_HANDLE;
+                snapshot.SwapchainImagesAvailable =
+                    !m_SwapchainHandles.empty();
+                snapshot.DeviceLost = true;
+                snapshot.ResizePending = m_HasPendingResize;
+                snapshot.LastBeginFrameMicros =
+                    ElapsedMicros(beginFrameBegin);
+                snapshot.LastFenceWaitMicros = fenceWaitMicros;
+                snapshot.LastAcquireNextImageMicros = 0u;
+            });
+        Core::Log::Error(
+            "[VulkanDevice::BeginFrame] profiler slot retirement observed "
+            "device loss; returning before slot reuse.");
+        return false;
     }
 
     // BUG-034: resource-pool slot reclamation is CPU bookkeeping, separate

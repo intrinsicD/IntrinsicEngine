@@ -146,7 +146,10 @@ pass command callback on its accepted graphics or async-compute context.
 Compiler work, inter-pass barriers, queue waits, submit, present, and CPU
 executor time are outside the interval. Previously submitted queries resolve
 nonblocking only after the normal reused-slot completion proof; profiling adds
-no query wait, queue idle, or device idle.
+no query wait, queue idle, or device idle. Host `steady_clock` elapsed time
+from planning through resolution is used only as a conservative upper bound:
+when it reaches the native counter's full period, multiple wraps are ambiguous
+and the result fails closed without substituting CPU time.
 
 `RenderGraphFrameStats::GpuProfile` reports current status/source/diagnostic,
 fresh versus stale state, resolved submitted-frame key and slot, sample age,
@@ -158,6 +161,15 @@ priming, not ready, exhausted, invalid, or device-lost. Existing
 `Core::Telemetry` pass timing rows are populated only for a fresh recorded
 `NativeGpu` resolution and are cleared on every nonfresh path; Null and
 contract-only backends never synthesize native durations.
+
+Support is evaluated again against the queues actually accepted for each
+nonempty frame plan. A globally ready backend returns per-frame `Unsupported`
+when every used queue lacks timestamp bits. Device-loss status observed while
+resolving a completed slot stops Vulkan frame acquisition and is projected by
+the renderer while retaining only an explicitly stale last-good sample.
+`DeviceLost` also takes precedence over `Disabled` when the current immutable
+render snapshot has profiling off, and over generic unavailability when device
+`BeginFrame()` fails.
 
 The existing Sandbox `view.frame_graph` model/window copies this snapshot and
 shows status, provenance, resolved key/slot/age, queue envelopes, and pass

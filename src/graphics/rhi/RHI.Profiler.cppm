@@ -171,7 +171,8 @@ export namespace Extrinsic::RHI
     ResolveTimestampDurationNs(TimestampQueryValue begin,
                                TimestampQueryValue end,
                                std::uint32_t validBits,
-                               double timestampPeriodNs) noexcept;
+                               double timestampPeriodNs,
+                               std::uint64_t intervalUpperBoundNs) noexcept;
 
     class IProfiler
     {

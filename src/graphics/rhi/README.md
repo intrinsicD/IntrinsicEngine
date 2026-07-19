@@ -74,6 +74,11 @@ This directory contains the `RHI` module/files.
   handles, add a profiler-specific wait, sum overlapping queue envelopes, or
   define a cross-queue frame total. Native timing is default-off diagnostic
   instrumentation, not a wall-clock or performance-claim surface.
+- `ResolveTimestampDurationNs(...)` accepts a conservative host elapsed-time
+  upper bound solely to reject ambiguous multiple-wrap intervals. Native
+  timestamp ticks remain the only duration source. If that upper bound reaches
+  the queue counter's full `2^validBits * timestampPeriod` period, resolution
+  fails with `Overflow` and publishes no duration.
 
 ## Timeline semaphores
 

@@ -2,15 +2,19 @@ module;
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <iomanip>
 #include <limits>
 #include <memory>
 #include <optional>
+#include <sstream>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -88,22 +92,111 @@ namespace
                 QueueQueryRange(0u, 1u).Count ==
             QueueQueryRange(1u, 0u).Base);
 
+    [[nodiscard]] std::string FormatApiVersion(
+        const std::uint32_t version)
+    {
+        return std::to_string(VK_API_VERSION_MAJOR(version)) + "." +
+               std::to_string(VK_API_VERSION_MINOR(version)) + "." +
+               std::to_string(VK_API_VERSION_PATCH(version));
+    }
+
+    [[nodiscard]] std::string FormatUuid(
+        const std::uint8_t* const bytes)
+    {
+        std::ostringstream stream;
+        stream << std::hex << std::setfill('0');
+        for (std::uint32_t index = 0u; index < VK_UUID_SIZE; ++index)
+        {
+            stream << std::setw(2)
+                   << static_cast<std::uint32_t>(bytes[index]);
+        }
+        return stream.str();
+    }
+
+    [[nodiscard]] std::string SelectedDeviceDiagnostic(
+        const VkPhysicalDeviceProperties& properties,
+        const VkPhysicalDeviceIDProperties& idProperties,
+        const VkPhysicalDeviceDriverProperties& driverProperties,
+        const std::uint32_t loaderInstanceApiVersion,
+        const std::uint32_t engineRequestedApiVersion,
+        const double timestampPeriodNs,
+        const std::uint32_t graphicsFamily,
+        const std::uint32_t graphicsValidBits,
+        const bool asyncComputeQueueAvailable,
+        const std::uint32_t asyncComputeFamily,
+        const std::uint32_t asyncComputeValidBits)
+    {
+        std::ostringstream stream;
+        stream << std::setprecision(
+            std::numeric_limits<double>::max_digits10);
+        stream
+            << "selectedDevice=\"" << properties.deviceName << "\""
+            << "; physicalDeviceApi="
+            << FormatApiVersion(properties.apiVersion)
+            << "; loaderInstanceApi="
+            << FormatApiVersion(loaderInstanceApiVersion)
+            << "; engineRequestedApi="
+            << FormatApiVersion(engineRequestedApiVersion)
+            << "; driverName=\"" << driverProperties.driverName << "\""
+            << "; driverInfo=\"" << driverProperties.driverInfo << "\""
+            << "; driverVersion=" << properties.driverVersion
+            << "; deviceUUID=" << FormatUuid(idProperties.deviceUUID)
+            << "; timestampPeriodNs=" << timestampPeriodNs
+            << "; graphicsFamily=" << graphicsFamily
+            << "; graphicsValidBits=" << graphicsValidBits
+            << "; asyncAvailable="
+            << (asyncComputeQueueAvailable ? "true" : "false")
+            << "; asyncFamily=" << asyncComputeFamily
+            << "; asyncValidBits=" << asyncComputeValidBits;
+        return stream.str();
+    }
+
     [[nodiscard]] std::string ReadyDiagnostic(
+        const std::string_view selectedDevice,
         const bool graphicsSupported,
         const bool asyncComputeSupported)
     {
+        std::string diagnostic{selectedDevice};
+        diagnostic += "; capability=";
         if (graphicsSupported && asyncComputeSupported)
         {
-            return "Native Vulkan timestamps are ready for graphics and "
-                   "async-compute queues.";
+            diagnostic +=
+                "Native Vulkan timestamps ready for graphics and "
+                "async-compute queues.";
+            return diagnostic;
         }
         if (graphicsSupported)
         {
-            return "Native Vulkan timestamps are ready for graphics; the "
-                   "async-compute queue is unavailable or unsupported.";
+            diagnostic +=
+                "Native Vulkan timestamps ready for graphics; async-compute "
+                "is unavailable or unsupported.";
+            return diagnostic;
         }
-        return "Native Vulkan timestamps are ready for async-compute; the "
-               "graphics queue does not expose timestamp bits.";
+        diagnostic +=
+            "Native Vulkan timestamps ready for async-compute; graphics "
+            "does not expose timestamp bits.";
+        return diagnostic;
+    }
+
+    [[nodiscard]] std::uint64_t TimestampIntervalUpperBoundNs(
+        const std::chrono::steady_clock::time_point beganAt) noexcept
+    {
+        const auto elapsed =
+            std::chrono::steady_clock::now() - beganAt;
+        const long double elapsedNs =
+            std::chrono::duration<long double, std::nano>{
+                elapsed}.count();
+        if (!std::isfinite(elapsedNs) ||
+            elapsedNs >= static_cast<long double>(
+                std::numeric_limits<std::uint64_t>::max()))
+        {
+            return std::numeric_limits<std::uint64_t>::max();
+        }
+        if (elapsedNs <= 0.0L)
+        {
+            return 0u;
+        }
+        return static_cast<std::uint64_t>(std::ceil(elapsedNs));
     }
 }
 
@@ -147,6 +240,12 @@ VulkanProfilerBootstrapDecision EvaluateVulkanProfilerBootstrap(
 
     decision.QueryPoolRequired = true;
     decision.TotalQueryCount = static_cast<std::uint32_t>(queryCount);
+    if (inputs.QueryPoolCreationDeviceLost)
+    {
+        decision.Status = RHI::ProfilerBackendStatus::DeviceLost;
+        decision.DeviceInitializationMayContinue = false;
+        return decision;
+    }
     decision.Status = inputs.QueryPoolCreationSucceeded
                           ? RHI::ProfilerBackendStatus::Ready
                           : RHI::ProfilerBackendStatus::InitializationFailed;
@@ -191,6 +290,7 @@ struct VulkanProfiler::Impl
         std::vector<QueryPair> ScopeQueries{};
         std::unique_ptr<std::atomic<ScopeLifecycle>[]> ScopeLifecycles{};
         std::array<ActiveQueue, kProfiledQueueCount> Queues{};
+        std::chrono::steady_clock::time_point BeganAt{};
     };
 
     struct PendingFrame
@@ -200,6 +300,7 @@ struct VulkanProfiler::Impl
         std::vector<QueryPair> ScopeQueries{};
         std::vector<bool> ScopeEnded{};
         std::array<ActiveQueue, kProfiledQueueCount> Queues{};
+        std::chrono::steady_clock::time_point BeganAt{};
     };
 
     struct RawTimestampQuery
@@ -243,12 +344,35 @@ struct VulkanProfiler::Impl
             return;
         }
 
-        VkPhysicalDeviceProperties properties{};
-        vkGetPhysicalDeviceProperties(
+        VkPhysicalDeviceDriverProperties driverProperties{};
+        driverProperties.sType =
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
+        VkPhysicalDeviceIDProperties idProperties{};
+        idProperties.sType =
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES;
+        idProperties.pNext = &driverProperties;
+        VkPhysicalDeviceProperties2 properties2{};
+        properties2.sType =
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+        properties2.pNext = &idProperties;
+        vkGetPhysicalDeviceProperties2(
             createInfo.PhysicalDevice,
-            &properties);
+            &properties2);
+        const VkPhysicalDeviceProperties& properties =
+            properties2.properties;
         TimestampPeriodNs =
             static_cast<double>(properties.limits.timestampPeriod);
+
+        std::uint32_t loaderInstanceApiVersion = VK_API_VERSION_1_0;
+        if (vkEnumerateInstanceVersion != nullptr)
+        {
+            const VkResult loaderVersionResult =
+                vkEnumerateInstanceVersion(&loaderInstanceApiVersion);
+            if (loaderVersionResult != VK_SUCCESS)
+            {
+                loaderInstanceApiVersion = VK_API_VERSION_1_0;
+            }
+        }
 
         std::uint32_t queueFamilyCount = 0u;
         vkGetPhysicalDeviceQueueFamilyProperties(
@@ -278,6 +402,18 @@ struct VulkanProfiler::Impl
             createInfo.AsyncComputeQueueAvailable
                 ? validBitsForFamily(createInfo.AsyncComputeQueueFamily)
                 : 0u;
+        DeviceDiagnostic = SelectedDeviceDiagnostic(
+            properties,
+            idProperties,
+            driverProperties,
+            loaderInstanceApiVersion,
+            createInfo.EngineRequestedApiVersion,
+            TimestampPeriodNs,
+            createInfo.GraphicsQueueFamily,
+            QueueValidBits[0],
+            createInfo.AsyncComputeQueueAvailable,
+            createInfo.AsyncComputeQueueFamily,
+            QueueValidBits[1]);
 
         VulkanProfilerBootstrapInputs bootstrapInputs{
             .TimestampPeriodNs = TimestampPeriodNs,
@@ -287,6 +423,7 @@ struct VulkanProfiler::Impl
             .AsyncComputeTimestampValidBits = QueueValidBits[1],
             .FramesInFlight = FramesInFlight,
             .QueryPoolCreationSucceeded = true,
+            .QueryPoolCreationDeviceLost = false,
         };
         VulkanProfilerBootstrapDecision decision =
             EvaluateVulkanProfilerBootstrap(bootstrapInputs);
@@ -299,12 +436,13 @@ struct VulkanProfiler::Impl
             Status = RHI::ProfilerStatusSnapshot{
                 .Status = decision.Status,
                 .Source = RHI::GpuTimestampSource::Unavailable,
-                .Diagnostic =
-                    std::isfinite(TimestampPeriodNs) &&
-                            TimestampPeriodNs > 0.0
-                        ? "No promoted Vulkan graphics or async-compute "
-                          "queue exposes native timestamp bits."
-                        : "Vulkan timestampPeriod is not finite and positive.",
+                .Diagnostic = DeviceDiagnostic + "; capability=" +
+                    (std::isfinite(TimestampPeriodNs) &&
+                             TimestampPeriodNs > 0.0
+                         ? "No promoted Vulkan graphics or async-compute "
+                           "queue exposes native timestamp bits."
+                         : "Vulkan timestampPeriod is not finite and "
+                           "positive."),
             };
             return;
         }
@@ -319,6 +457,8 @@ struct VulkanProfiler::Impl
 
         bootstrapInputs.QueryPoolCreationSucceeded =
             result == VK_SUCCESS && QueryPool != VK_NULL_HANDLE;
+        bootstrapInputs.QueryPoolCreationDeviceLost =
+            result == VK_ERROR_DEVICE_LOST;
         decision = EvaluateVulkanProfilerBootstrap(bootstrapInputs);
         if (decision.Status != RHI::ProfilerBackendStatus::Ready)
         {
@@ -327,10 +467,25 @@ struct VulkanProfiler::Impl
                 vkDestroyQueryPool(Device, QueryPool, nullptr);
                 QueryPool = VK_NULL_HANDLE;
             }
+            if (decision.Status ==
+                RHI::ProfilerBackendStatus::DeviceLost)
+            {
+                DeviceLost = true;
+                NotifyDeviceLost(*Owner);
+                Status = RHI::ProfilerStatusSnapshot{
+                    .Status = RHI::ProfilerBackendStatus::DeviceLost,
+                    .Source = RHI::GpuTimestampSource::Unavailable,
+                    .Diagnostic =
+                        DeviceDiagnostic +
+                        "; capability=Vulkan device loss during timestamp "
+                        "query-pool creation.",
+                };
+                return;
+            }
             Status = RHI::ProfilerStatusSnapshot{
                 .Status = RHI::ProfilerBackendStatus::InitializationFailed,
                 .Source = RHI::GpuTimestampSource::Unavailable,
-                .Diagnostic =
+                .Diagnostic = DeviceDiagnostic + "; capability=" +
                     "Vulkan timestamp query-pool creation failed; rendering "
                     "remains available without native profiling.",
             };
@@ -341,6 +496,7 @@ struct VulkanProfiler::Impl
             .Status = RHI::ProfilerBackendStatus::Ready,
             .Source = RHI::GpuTimestampSource::NativeGpu,
             .Diagnostic = ReadyDiagnostic(
+                DeviceDiagnostic,
                 QueueSupported[0],
                 QueueSupported[1]),
         };
@@ -418,7 +574,8 @@ struct VulkanProfiler::Impl
     [[nodiscard]] std::expected<std::uint64_t, RHI::ProfilerError>
     ReadDuration(
         const QueryPair pair,
-        const std::uint32_t validBits) const
+        const std::uint32_t validBits,
+        const std::uint64_t intervalUpperBoundNs) const
     {
         if (DeviceLost)
         {
@@ -451,8 +608,9 @@ struct VulkanProfiler::Impl
             Status = RHI::ProfilerStatusSnapshot{
                 .Status = RHI::ProfilerBackendStatus::DeviceLost,
                 .Source = RHI::GpuTimestampSource::Unavailable,
-                .Diagnostic =
-                    "Vulkan device loss disabled native timestamp queries.",
+                .Diagnostic = DeviceDiagnostic +
+                    "; capability=Vulkan device loss disabled native "
+                    "timestamp queries.",
             };
             return std::unexpected(RHI::ProfilerError::DeviceLost);
         }
@@ -471,7 +629,8 @@ struct VulkanProfiler::Impl
                 .Available = queries[1].Available != 0u,
             },
             validBits,
-            TimestampPeriodNs);
+            TimestampPeriodNs,
+            intervalUpperBoundNs);
     }
 
     [[nodiscard]] std::expected<RHI::GpuTimestampFrame, RHI::ProfilerError>
@@ -488,6 +647,8 @@ struct VulkanProfiler::Impl
             .Frame = pending.Frame,
             .Source = RHI::GpuTimestampSource::Unavailable,
         };
+        const std::uint64_t intervalUpperBoundNs =
+            TimestampIntervalUpperBoundNs(pending.BeganAt);
         bool hasNativeResult = false;
         for (std::uint32_t queueIndex = 0u;
              queueIndex < kProfiledQueueCount;
@@ -508,7 +669,8 @@ struct VulkanProfiler::Impl
                         .End = queue.Range.Base + 1u,
                         .Supported = true,
                     },
-                    QueueValidBits[queueIndex]);
+                    QueueValidBits[queueIndex],
+                    intervalUpperBoundNs);
                 if (!resolved)
                 {
                     return std::unexpected(resolved.error());
@@ -551,7 +713,10 @@ struct VulkanProfiler::Impl
                         RHI::ProfilerError::InvalidState);
                 }
                 const auto resolved =
-                    ReadDuration(pair, QueueValidBits[*queueIndex]);
+                    ReadDuration(
+                        pair,
+                        QueueValidBits[*queueIndex],
+                        intervalUpperBoundNs);
                 if (!resolved)
                 {
                     return std::unexpected(resolved.error());
@@ -615,6 +780,7 @@ struct VulkanProfiler::Impl
     VulkanProfilerContextResolver ResolveContext = nullptr;
     VulkanProfilerDeviceLostNotifier NotifyDeviceLost = nullptr;
     double TimestampPeriodNs = 0.0;
+    std::string DeviceDiagnostic{};
     std::array<std::uint32_t, kProfiledQueueCount> QueueValidBits{};
     std::array<bool, kProfiledQueueCount> QueueSupported{};
     mutable RHI::ProfilerStatusSnapshot Status{};
@@ -662,6 +828,7 @@ VulkanProfiler::BeginFrame(
         return std::unexpected(RHI::ProfilerError::Exhausted);
     }
 
+    std::array<bool, kProfiledQueueCount> requestedQueues{};
     for (std::size_t scopeIndex = 0u;
          scopeIndex < scopes.size();
          ++scopeIndex)
@@ -676,6 +843,7 @@ VulkanProfiler::BeginFrame(
         {
             return std::unexpected(*queueError);
         }
+        requestedQueues[*QueueIndex(scopes[scopeIndex].Queue)] = true;
         for (std::size_t prior = 0u; prior < scopeIndex; ++prior)
         {
             if (scopes[prior].Ordinal == scopes[scopeIndex].Ordinal)
@@ -684,6 +852,19 @@ VulkanProfiler::BeginFrame(
                     RHI::ProfilerError::InvalidArgument);
             }
         }
+    }
+    if (!scopes.empty() &&
+        !VulkanProfilerFrameHasSupportedTimestampQueue(
+            VulkanProfilerFrameQueueSupportInputs{
+                .GraphicsQueueRequested = requestedQueues[0],
+                .AsyncComputeQueueRequested = requestedQueues[1],
+                .GraphicsTimestampsSupported =
+                    m_Impl->QueueSupported[0],
+                .AsyncComputeTimestampsSupported =
+                    m_Impl->QueueSupported[1],
+            }))
+    {
+        return std::unexpected(RHI::ProfilerError::Unsupported);
     }
 
     if (m_Impl->PendingFrames[frame.FrameSlot].has_value())
@@ -713,6 +894,7 @@ VulkanProfiler::BeginFrame(
     Impl::ActiveFrame active{
         .Frame = frame,
         .PlanGeneration = planGeneration,
+        .BeganAt = std::chrono::steady_clock::now(),
     };
     for (std::uint32_t queueIndex = 0u;
          queueIndex < kProfiledQueueCount;
@@ -1043,6 +1225,7 @@ VulkanProfiler::EndFrame(
         .ScopeQueries = std::move(active.ScopeQueries),
         .ScopeEnded = std::move(scopeEnded),
         .Queues = active.Queues,
+        .BeganAt = active.BeganAt,
     };
     m_Impl->Active.reset();
     return {};
@@ -1114,8 +1297,9 @@ void VulkanProfiler::NotifyDeviceLost() noexcept
     m_Impl->Status = RHI::ProfilerStatusSnapshot{
         .Status = RHI::ProfilerBackendStatus::DeviceLost,
         .Source = RHI::GpuTimestampSource::Unavailable,
-        .Diagnostic =
-            "Vulkan device loss disabled native timestamp queries.",
+        .Diagnostic = m_Impl->DeviceDiagnostic +
+            "; capability=Vulkan device loss disabled native timestamp "
+            "queries.",
     };
 }
 }
