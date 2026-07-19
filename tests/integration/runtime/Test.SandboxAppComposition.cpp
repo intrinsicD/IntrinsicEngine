@@ -855,6 +855,22 @@ TEST(SandboxAppComposition, DefaultPolicyLifecycleIsPrivateAndTransactional)
         app.find("structSandboxDefaultPolicyHandles"),
         std::string::npos);
 
+    const auto appShutdownBegin =
+        app.find(
+            "voidOnShutdown(Runtime::Engine&engine)override{");
+    const auto appShutdownEnd =
+        app.find("private:", appShutdownBegin);
+    ASSERT_NE(appShutdownBegin, std::string::npos);
+    ASSERT_NE(appShutdownEnd, std::string::npos);
+    const std::string_view appShutdown =
+        std::string_view{app}.substr(
+            appShutdownBegin,
+            appShutdownEnd - appShutdownBegin);
+    EXPECT_NE(
+        appShutdown.find(
+            "UninstallSandboxDefaultPolicies(m_DefaultPolicies);"),
+        std::string_view::npos);
+
     const auto installBegin =
         app.find(
             "[[nodiscard]]boolInstallSandboxDefaultPolicies(");
