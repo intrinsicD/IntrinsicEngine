@@ -31,6 +31,8 @@ import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.TextureManager;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.AssetWorkflowModule;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
@@ -46,6 +48,25 @@ using Extrinsic::ECS::Scene::Registry;
 
 namespace
 {
+    template <typename T>
+    [[nodiscard]] T& RequiredEngineService(
+        Extrinsic::Runtime::Engine& engine)
+    {
+        T* const service = engine.Services().Find<T>();
+        EXPECT_NE(service, nullptr);
+        return *service;
+    }
+
+    void InitializeAssetWorkflowEngine(
+        Extrinsic::Runtime::Engine& engine)
+    {
+        engine.EmplaceModule<
+            Extrinsic::Runtime::SceneDocumentModule>();
+        engine.EmplaceModule<
+            Extrinsic::Runtime::AssetWorkflowModule>();
+        engine.Initialize();
+    }
+
     constexpr std::uint32_t kInvalidIndex = std::numeric_limits<std::uint32_t>::max();
     std::array<std::byte, 64u> ZeroTextureBytes{};
 
@@ -185,7 +206,7 @@ namespace
 TEST(MeshGeometryExtraction, SingleMeshEntityUploadsOnceAndBindsInstanceGeometry)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
@@ -193,7 +214,7 @@ TEST(MeshGeometryExtraction, SingleMeshEntityUploadsOnceAndBindsInstanceGeometry
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.CandidateRenderableCount, 1u);
     EXPECT_EQ(stats.AllocatedInstanceCount, 1u);
@@ -471,7 +492,7 @@ TEST(MeshGeometryExtraction, ProgressiveGeneratedPropertyTexturesBindUniqueMater
 TEST(MeshGeometryExtraction, RepeatedExtractionReusesMeshHandleWithoutReupload)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
@@ -481,7 +502,7 @@ TEST(MeshGeometryExtraction, RepeatedExtractionReusesMeshHandleWithoutReupload)
 
     auto stats = extraction.ExtractAndSubmit(scene,
                                               engine.GetRenderer(),
-                                              &engine.GetGpuAssetCache());
+                                              &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.MeshGeometryUploads, 1u);
     ASSERT_EQ(stats.MeshGeometryReuseHits, 0u);
 
@@ -495,7 +516,7 @@ TEST(MeshGeometryExtraction, RepeatedExtractionReusesMeshHandleWithoutReupload)
 
     stats = extraction.ExtractAndSubmit(scene,
                                          engine.GetRenderer(),
-                                         &engine.GetGpuAssetCache());
+                                         &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.MeshGeometryUploads, 0u);
     EXPECT_EQ(stats.MeshGeometryReuseHits, 1u);
     EXPECT_EQ(stats.MeshGeometryReleases, 0u);
@@ -513,7 +534,7 @@ TEST(MeshGeometryExtraction, RepeatedExtractionReusesMeshHandleWithoutReupload)
 TEST(MeshGeometryExtraction, TwoMeshEntitiesAllocateIndependentMeshUploads)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     (void)MakeMeshRenderable(scene);
@@ -522,7 +543,7 @@ TEST(MeshGeometryExtraction, TwoMeshEntitiesAllocateIndependentMeshUploads)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     // Slice B does not share mesh uploads across entities; that is the
     // procedural cache's pattern, not the runtime mesh bridge's.
@@ -542,7 +563,7 @@ TEST(MeshGeometryExtraction, TwoMeshEntitiesAllocateIndependentMeshUploads)
 TEST(MeshGeometryExtraction, EntityDestructionRetiresMeshGeometryAfterDeferredWindow)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
@@ -550,7 +571,7 @@ TEST(MeshGeometryExtraction, EntityDestructionRetiresMeshGeometryAfterDeferredWi
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                               engine.GetRenderer(),
-                                              &engine.GetGpuAssetCache());
+                                              &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.MeshGeometryUploads, 1u);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
@@ -560,7 +581,7 @@ TEST(MeshGeometryExtraction, EntityDestructionRetiresMeshGeometryAfterDeferredWi
 
     stats = extraction.ExtractAndSubmit(scene,
                                          engine.GetRenderer(),
-                                         &engine.GetGpuAssetCache());
+                                         &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.FreedInstanceCount, 1u);
     EXPECT_EQ(stats.MeshGeometryReleases, 1u);
     EXPECT_EQ(stats.MeshGeometryFreeRetires, 0u);
@@ -585,7 +606,7 @@ TEST(MeshGeometryExtraction, EntityDestructionRetiresMeshGeometryAfterDeferredWi
     // The next ExtractAndSubmit surfaces the FreeRetires delta.
     stats = extraction.ExtractAndSubmit(scene,
                                          engine.GetRenderer(),
-                                         &engine.GetGpuAssetCache());
+                                         &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.MeshGeometryFreeRetires, 1u);
 
     extraction.Shutdown(engine.GetRenderer());
@@ -595,7 +616,7 @@ TEST(MeshGeometryExtraction, EntityDestructionRetiresMeshGeometryAfterDeferredWi
 TEST(MeshGeometryExtraction, ShutdownReleasesPendingMeshResidency)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     (void)MakeMeshRenderable(scene);
@@ -604,7 +625,7 @@ TEST(MeshGeometryExtraction, ShutdownReleasesPendingMeshResidency)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                               engine.GetRenderer(),
-                                              &engine.GetGpuAssetCache());
+                                              &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.MeshGeometryUploads, 2u);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
@@ -624,7 +645,7 @@ TEST(MeshGeometryExtraction, ProceduralRefPreemptsMeshPathOnSameEntity)
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -637,7 +658,7 @@ TEST(MeshGeometryExtraction, ProceduralRefPreemptsMeshPathOnSameEntity)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     // Procedural intent declared → mesh path must not run, regardless of
     // mesh-domain GeometrySources being attached.
@@ -662,7 +683,7 @@ TEST(MeshGeometryExtraction, AssetSourcePresentPreemptsMeshPathOnSameEntity)
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -675,7 +696,7 @@ TEST(MeshGeometryExtraction, AssetSourcePresentPreemptsMeshPathOnSameEntity)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.SourceAssetObservationCount, 1u);
     EXPECT_EQ(stats.MeshGeometryUploads, 0u);
@@ -696,7 +717,7 @@ TEST(MeshGeometryExtraction, MissingPositionsIncrementsMissingPositionsCounter)
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -719,7 +740,7 @@ TEST(MeshGeometryExtraction, MissingPositionsIncrementsMissingPositionsCounter)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.MeshGeometryUploads, 0u);
     EXPECT_EQ(stats.MeshGeometryMissingPositions, 1u);
@@ -736,7 +757,7 @@ TEST(MeshGeometryExtraction, MissingPositionsIncrementsMissingPositionsCounter)
 TEST(MeshGeometryExtraction, MissingTexcoordsUploadsWithDefaultUvFallback)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -751,7 +772,7 @@ TEST(MeshGeometryExtraction, MissingTexcoordsUploadsWithDefaultUvFallback)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.MeshGeometryUploads, 1u);
     EXPECT_EQ(stats.MeshGeometryMissingTexcoords, 1u);
@@ -768,7 +789,7 @@ TEST(MeshGeometryExtraction, MissingTexcoordsUploadsWithDefaultUvFallback)
 TEST(MeshGeometryExtraction, NonFiniteTexcoordsUploadWithDefaultUvFallback)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -782,7 +803,7 @@ TEST(MeshGeometryExtraction, NonFiniteTexcoordsUploadWithDefaultUvFallback)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.MeshGeometryUploads, 1u);
     EXPECT_EQ(stats.MeshGeometryMissingTexcoords, 0u);
@@ -802,7 +823,7 @@ TEST(MeshGeometryExtraction, InvalidTopologyIncrementsInvalidTopologyCounter)
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -834,7 +855,7 @@ TEST(MeshGeometryExtraction, InvalidTopologyIncrementsInvalidTopologyCounter)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.MeshGeometryUploads, 0u);
     EXPECT_EQ(stats.MeshGeometryInvalidTopology, 1u);
@@ -853,7 +874,7 @@ TEST(MeshGeometryExtraction, DegenerateAllFacesIncrementsFailedPackCounter)
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -887,7 +908,7 @@ TEST(MeshGeometryExtraction, DegenerateAllFacesIncrementsFailedPackCounter)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.MeshGeometryUploads, 0u);
     EXPECT_EQ(stats.MeshGeometryFailedPack, 1u);
@@ -905,7 +926,7 @@ TEST(MeshGeometryExtraction, AddingProceduralRefAfterMeshUploadReleasesMeshResid
     namespace E = Extrinsic::ECS::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
@@ -913,7 +934,7 @@ TEST(MeshGeometryExtraction, AddingProceduralRefAfterMeshUploadReleasesMeshResid
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                               engine.GetRenderer(),
-                                              &engine.GetGpuAssetCache());
+                                              &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.MeshGeometryUploads, 1u);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
@@ -926,7 +947,7 @@ TEST(MeshGeometryExtraction, AddingProceduralRefAfterMeshUploadReleasesMeshResid
 
     stats = extraction.ExtractAndSubmit(scene,
                                          engine.GetRenderer(),
-                                         &engine.GetGpuAssetCache());
+                                         &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.MeshGeometryUploads, 0u);
     EXPECT_EQ(stats.MeshGeometryReuseHits, 0u);
     EXPECT_EQ(stats.MeshGeometryReleases, 1u);
@@ -955,7 +976,7 @@ TEST(MeshGeometryExtraction, AddingProceduralRefAfterMeshUploadReleasesMeshResid
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
     stats = extraction.ExtractAndSubmit(scene,
                                          engine.GetRenderer(),
-                                         &engine.GetGpuAssetCache());
+                                         &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.MeshGeometryFreeRetires, 1u);
 
     extraction.Shutdown(engine.GetRenderer());
@@ -967,7 +988,7 @@ TEST(MeshGeometryExtraction, AddingAssetSourceAfterMeshUploadReleasesMeshResiden
     namespace E = Extrinsic::ECS::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
@@ -975,7 +996,7 @@ TEST(MeshGeometryExtraction, AddingAssetSourceAfterMeshUploadReleasesMeshResiden
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                               engine.GetRenderer(),
-                                              &engine.GetGpuAssetCache());
+                                              &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.MeshGeometryUploads, 1u);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
@@ -990,7 +1011,7 @@ TEST(MeshGeometryExtraction, AddingAssetSourceAfterMeshUploadReleasesMeshResiden
 
     stats = extraction.ExtractAndSubmit(scene,
                                          engine.GetRenderer(),
-                                         &engine.GetGpuAssetCache());
+                                         &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.MeshGeometryReleases, 1u);
     EXPECT_EQ(stats.MeshGeometryReuseHits, 0u);
     EXPECT_EQ(stats.MeshGeometryFreeRetires, 0u);
@@ -1015,7 +1036,7 @@ TEST(MeshGeometryExtraction, AddingAssetSourceAfterMeshUploadReleasesMeshResiden
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 0u);
     stats = extraction.ExtractAndSubmit(scene,
                                          engine.GetRenderer(),
-                                         &engine.GetGpuAssetCache());
+                                         &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.MeshGeometryFreeRetires, 1u);
 
     extraction.Shutdown(engine.GetRenderer());
@@ -1025,7 +1046,7 @@ TEST(MeshGeometryExtraction, AddingAssetSourceAfterMeshUploadReleasesMeshResiden
 TEST(MeshGeometryExtraction, LosingMeshDomainTopologyReleasesMeshResidency)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
@@ -1033,7 +1054,7 @@ TEST(MeshGeometryExtraction, LosingMeshDomainTopologyReleasesMeshResidency)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                               engine.GetRenderer(),
-                                              &engine.GetGpuAssetCache());
+                                              &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.MeshGeometryUploads, 1u);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
@@ -1051,7 +1072,7 @@ TEST(MeshGeometryExtraction, LosingMeshDomainTopologyReleasesMeshResidency)
 
     stats = extraction.ExtractAndSubmit(scene,
                                          engine.GetRenderer(),
-                                         &engine.GetGpuAssetCache());
+                                         &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.MeshGeometryUploads, 0u);
     EXPECT_EQ(stats.MeshGeometryReuseHits, 0u);
     EXPECT_EQ(stats.MeshGeometryReleases, 1u);
@@ -1084,7 +1105,7 @@ TEST(MeshGeometryExtraction, NonMeshDomainEntityIsIgnoredByMeshPath)
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -1099,7 +1120,7 @@ TEST(MeshGeometryExtraction, NonMeshDomainEntityIsIgnoredByMeshPath)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.MeshGeometryUploads, 0u);
     EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
@@ -1145,7 +1166,7 @@ TEST_P(MeshGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     namespace D = Extrinsic::ECS::Components::DirtyTags;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -1154,7 +1175,7 @@ TEST_P(MeshGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                               engine.GetRenderer(),
-                                              &engine.GetGpuAssetCache());
+                                              &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.MeshGeometryUploads, 1u);
     ASSERT_EQ(stats.MeshGeometryReuploads, 0u);
 
@@ -1192,7 +1213,7 @@ TEST_P(MeshGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
 
     stats = extraction.ExtractAndSubmit(scene,
                                          engine.GetRenderer(),
-                                         &engine.GetGpuAssetCache());
+                                         &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.MeshGeometryUploads, 0u);
     EXPECT_EQ(stats.MeshGeometryReuploads, 1u);
     EXPECT_EQ(stats.MeshGeometryPartialUploads, fullUploadExpected ? 0u : 1u);
@@ -1231,7 +1252,7 @@ TEST_P(MeshGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
 
     stats = extraction.ExtractAndSubmit(scene,
                                          engine.GetRenderer(),
-                                         &engine.GetGpuAssetCache());
+                                         &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.MeshGeometryReuploads, 0u);
     EXPECT_EQ(stats.MeshGeometryReuseHits, 1u);
     EXPECT_EQ(stats.MeshGeometryReleases, 0u);
@@ -1246,7 +1267,7 @@ TEST_P(MeshGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
 
     stats = extraction.ExtractAndSubmit(scene,
                                          engine.GetRenderer(),
-                                         &engine.GetGpuAssetCache());
+                                         &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.MeshGeometryFreeRetires, fullUploadExpected ? 1u : 0u);
 
     extraction.Shutdown(engine.GetRenderer());
@@ -1269,7 +1290,7 @@ TEST(MeshGeometryExtraction, MultipleDirtyTagsCoalesceIntoSingleReupload)
     namespace D = Extrinsic::ECS::Components::DirtyTags;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -1278,7 +1299,7 @@ TEST(MeshGeometryExtraction, MultipleDirtyTagsCoalesceIntoSingleReupload)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                               engine.GetRenderer(),
-                                              &engine.GetGpuAssetCache());
+                                              &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.MeshGeometryUploads, 1u);
 
     // Stamp every dirty tag at once. The reupload semantics are
@@ -1295,7 +1316,7 @@ TEST(MeshGeometryExtraction, MultipleDirtyTagsCoalesceIntoSingleReupload)
 
     stats = extraction.ExtractAndSubmit(scene,
                                          engine.GetRenderer(),
-                                         &engine.GetGpuAssetCache());
+                                         &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.MeshGeometryReuploads, 1u);
     EXPECT_EQ(stats.MeshGeometryReleases, 1u);
     EXPECT_EQ(stats.MeshGeometryReuseHits, 0u);
@@ -1318,7 +1339,7 @@ TEST(MeshGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesDi
     namespace D = Extrinsic::ECS::Components::DirtyTags;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -1327,7 +1348,7 @@ TEST(MeshGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesDi
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                               engine.GetRenderer(),
-                                              &engine.GetGpuAssetCache());
+                                              &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.MeshGeometryUploads, 1u);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
@@ -1344,7 +1365,7 @@ TEST(MeshGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesDi
 
     stats = extraction.ExtractAndSubmit(scene,
                                          engine.GetRenderer(),
-                                         &engine.GetGpuAssetCache());
+                                         &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.MeshGeometryReuploads, 0u);
     EXPECT_EQ(stats.MeshGeometryInvalidTopology, 1u);
     EXPECT_EQ(stats.MeshGeometryReuseHits, 0u);

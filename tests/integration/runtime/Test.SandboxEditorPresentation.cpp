@@ -31,6 +31,7 @@ import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneDocumentModule;
@@ -47,6 +48,15 @@ namespace SandboxEditor = Extrinsic::Sandbox::Editor;
 
 namespace
 {
+    template <typename T>
+    [[nodiscard]] T& RequiredEngineService(
+        Extrinsic::Runtime::Engine& engine)
+    {
+        T* const service = engine.Services().Find<T>();
+        EXPECT_NE(service, nullptr);
+        return *service;
+    }
+
     class OneFrameApplication final : public Runtime::IApplication
     {
     public:
@@ -100,7 +110,7 @@ namespace
                 m_Deadline = now + m_Timeout;
             }
             ++m_ObservedFrames;
-            if (engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value())
+            if (RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).GetLastAssetImportEvent().has_value())
             {
                 m_EventObserved = true;
                 m_Elapsed = now - m_StartedAt;
@@ -770,11 +780,13 @@ TEST(SandboxEditorPresentation, RuntimeImportEventIsReflectedByAppFilePanel)
 {
     Runtime::Engine engine(
         HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     ComposeEditorUiAndInitialize(engine);
     SandboxEditor::EditorShell shell;
     shell.Attach(engine);
 
-    const auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(
+    const auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(
         Runtime::RuntimeAssetImportRequest{
             .Path = "/tmp/intrinsic-arch-006-missing.ply",
             .PayloadKind =
@@ -821,6 +833,7 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
         std::move(waitForImport));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     ComposeEditorUiAndInitialize(engine);
     (void)Runtime::RegisterSandboxDefaultRuntimePolicies(
         engine, nullptr);
@@ -829,14 +842,14 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
     shell.Attach(engine);
 
     const std::vector<std::string> droppedPaths{cloudFile.Path.string()};
-    engine.GetAssetImportPipeline().ImportDroppedFilePaths(droppedPaths);
-    EXPECT_FALSE(engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value());
+    RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportDroppedFilePaths(droppedPaths);
+    EXPECT_FALSE(RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).GetLastAssetImportEvent().has_value());
     ASSERT_FALSE(engine.GetWindow().ShouldClose());
 
     engine.Run();
 
     const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
-        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
+        RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).GetLastAssetImportEvent();
     ASSERT_TRUE(lastEvent.has_value()) << waitDiagnostics->Describe();
     EXPECT_TRUE(lastEvent->Succeeded());
     ASSERT_TRUE(lastEvent->Result.has_value());

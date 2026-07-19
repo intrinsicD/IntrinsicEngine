@@ -22,10 +22,13 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.AssetWorkflowModule;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.RenderExtraction;
 import Geometry.Properties;
 
@@ -50,6 +53,15 @@ static_assert(
 
 namespace
 {
+    template <typename T>
+    [[nodiscard]] T& RequiredEngineService(
+        Extrinsic::Runtime::Engine& engine)
+    {
+        T* const service = engine.Services().Find<T>();
+        EXPECT_NE(service, nullptr);
+        return *service;
+    }
+
     constexpr std::uint32_t kInvalidIndex = std::numeric_limits<std::uint32_t>::max();
 
     class StubApplication final : public Extrinsic::Runtime::IApplication
@@ -159,6 +171,10 @@ TEST(RenderExtractionContract, FailedMeshPackPublishesNoDrawCandidate)
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.EmplaceModule<
+        Extrinsic::Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<
+        Extrinsic::Runtime::AssetWorkflowModule>();
     engine.Initialize();
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -179,7 +195,7 @@ TEST(RenderExtractionContract, FailedMeshPackPublishesNoDrawCandidate)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                    engine.GetRenderer(),
-                                                   &engine.GetGpuAssetCache());
+                                                   &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.CandidateRenderableCount, 1u);
     EXPECT_EQ(stats.MeshGeometryUploads, 0u);
@@ -200,6 +216,10 @@ TEST(RenderExtractionContract, SnapshotSurvivesLiveEcsMutationAndDestruction)
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.EmplaceModule<
+        Extrinsic::Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<
+        Extrinsic::Runtime::AssetWorkflowModule>();
     engine.Initialize();
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -214,7 +234,7 @@ TEST(RenderExtractionContract, SnapshotSurvivesLiveEcsMutationAndDestruction)
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                    engine.GetRenderer(),
-                                                   &engine.GetGpuAssetCache());
+                                                   &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.SubmittedTransformCount, 1u);
 
     // Mutate the live component, then destroy the entity entirely. If the

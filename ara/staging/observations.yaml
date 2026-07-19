@@ -700,3 +700,21 @@ observations:
     promoted_to: "logic/solution/heuristics.md:H10"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O55
+    timestamp: "2026-07-19T17:38+02:00"
+    provenance: ai-executed
+    content: >
+      Asset lifecycle composition now belongs to an app-composed
+      AssetWorkflowModule that publishes exact AssetService,
+      AssetImportPipeline, GpuAssetCache, and IAssetFrameHooks services;
+      Runtime.Engine retains only optional frame/drop consumers and no public
+      asset/cache/import or bake-diagnostic getters.
+    context: >
+      Existing-test migration and source-contract rewrite committed as
+      74a15419 against the RUNTIME-183 AssetWorkflow implementation.
+    potential_type: architecture
+    bound_to: [N268, N269]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A15"
+    crystallized_via: artifact-commitment
+    stale: false

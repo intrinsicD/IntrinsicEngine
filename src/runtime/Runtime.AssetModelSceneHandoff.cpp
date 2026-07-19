@@ -2442,8 +2442,16 @@ namespace Extrinsic::Runtime
             Records.clear();
         }
 
+        [[nodiscard]] bool IsBindingValid() const
+        {
+            return !Options.BindingValid || Options.BindingValid();
+        }
+
         [[nodiscard]] Core::Result MaterializeReadyModelScene(const Assets::AssetId id)
         {
+            if (!IsBindingValid())
+                return Core::Err(Core::ErrorCode::InvalidState);
+
             auto state = MaterializeModelSceneAsset(
                 Service,
                 Cache,
@@ -2473,6 +2481,12 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] Core::Expected<std::uint64_t> ResolvePendingMaterialTextureBindings()
         {
+            if (!IsBindingValid())
+            {
+                return Core::Err<std::uint64_t>(
+                    Core::ErrorCode::InvalidState);
+            }
+
             std::uint64_t resolvedCount = 0u;
             for (auto& [_, record] : Records)
             {
@@ -2530,6 +2544,9 @@ namespace Extrinsic::Runtime
 
         void Handle(const Assets::AssetId id, const Assets::AssetEvent event)
         {
+            if (!IsBindingValid())
+                return;
+
             if (event == Assets::AssetEvent::Ready)
             {
                 HandleReady(id);

@@ -623,15 +623,18 @@ namespace Extrinsic::Runtime
         }
 
         void RegisterSandboxDefaultImportAuthoringPolicies(
-            Engine& engine,
+            AssetImportPipeline* const pipeline,
             RuntimeSandboxDefaultPolicyRegistration& registration)
         {
+            if (pipeline == nullptr)
+                return;
+
             const auto registerAuthoringPolicy =
-                [&engine, &registration](
+                [pipeline, &registration](
                     RuntimeImportEntityAuthoringPolicyDesc desc)
                 {
                     const RuntimeImportEntityAuthoringPolicyHandle handle =
-                        engine.GetAssetImportPipeline().RegisterImportEntityAuthoringPolicy(
+                        pipeline->RegisterImportEntityAuthoringPolicy(
                             std::move(desc));
                     if (handle.IsValid())
                         registration.ImportEntityAuthoringPolicies.push_back(
@@ -740,12 +743,15 @@ namespace Extrinsic::Runtime
         }
 
         void RegisterSandboxDefaultImportCompletedHandler(
-            Engine& engine,
+            AssetImportPipeline* const pipeline,
             CameraControllerRegistry* const cameraControllers,
             RuntimeSandboxDefaultPolicyRegistration& registration)
         {
+            if (pipeline == nullptr)
+                return;
+
             const RuntimeImportCompletedHandlerHandle handle =
-                engine.GetAssetImportPipeline().RegisterImportCompletedHandler(
+                pipeline->RegisterImportCompletedHandler(
                     RuntimeImportCompletedHandlerDesc{
                         .DebugName = "Sandbox.DefaultImportCompletedUx",
                         .PayloadKind = Assets::AssetPayloadKind::Unknown,
@@ -792,11 +798,14 @@ namespace Extrinsic::Runtime
         }
 
         void RegisterSandboxDefaultDirectMeshPostProcessor(
-            Engine& engine,
+            AssetImportPipeline* const pipeline,
             RuntimeSandboxDefaultPolicyRegistration& registration)
         {
+            if (pipeline == nullptr)
+                return;
+
             const RuntimePostImportProcessorHandle handle =
-                engine.GetAssetImportPipeline().RegisterPostImportProcessor(
+                pipeline->RegisterPostImportProcessor(
                     RuntimePostImportProcessorDesc{
                         .DebugName = "Sandbox.DirectMeshGeneratedNormal",
                         .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -905,10 +914,14 @@ namespace Extrinsic::Runtime
         CameraControllerRegistry* const cameraControllers)
     {
         RuntimeSandboxDefaultPolicyRegistration registration{};
-        RegisterSandboxDefaultImportAuthoringPolicies(engine, registration);
+        AssetImportPipeline* const pipeline =
+            engine.Services().Find<AssetImportPipeline>();
+        RegisterSandboxDefaultImportAuthoringPolicies(
+            pipeline, registration);
         RegisterSandboxDefaultImportCompletedHandler(
-            engine, cameraControllers, registration);
-        RegisterSandboxDefaultDirectMeshPostProcessor(engine, registration);
+            pipeline, cameraControllers, registration);
+        RegisterSandboxDefaultDirectMeshPostProcessor(
+            pipeline, registration);
         RegisterSandboxDefaultInputActions(
             engine, cameraControllers, registration);
         return registration;
@@ -918,22 +931,27 @@ namespace Extrinsic::Runtime
         Engine& engine,
         RuntimeSandboxDefaultPolicyRegistration& registration)
     {
-        for (const RuntimePostImportProcessorHandle handle :
-             registration.PostImportProcessors)
+        AssetImportPipeline* const pipeline =
+            engine.Services().Find<AssetImportPipeline>();
+        if (pipeline != nullptr)
         {
-            engine.GetAssetImportPipeline().UnregisterPostImportProcessor(handle);
-        }
-        for (const RuntimeImportEntityAuthoringPolicyHandle handle :
-             registration.ImportEntityAuthoringPolicies)
-        {
-            engine.GetAssetImportPipeline().UnregisterImportEntityAuthoringPolicy(
-                handle);
-        }
-        for (const RuntimeImportCompletedHandlerHandle handle :
-             registration.ImportCompletedHandlers)
-        {
-            engine.GetAssetImportPipeline().UnregisterImportCompletedHandler(
-                handle);
+            for (const RuntimePostImportProcessorHandle handle :
+                 registration.PostImportProcessors)
+            {
+                pipeline->UnregisterPostImportProcessor(handle);
+            }
+            for (const RuntimeImportEntityAuthoringPolicyHandle handle :
+                 registration.ImportEntityAuthoringPolicies)
+            {
+                pipeline->UnregisterImportEntityAuthoringPolicy(
+                    handle);
+            }
+            for (const RuntimeImportCompletedHandlerHandle handle :
+                 registration.ImportCompletedHandlers)
+            {
+                pipeline->UnregisterImportCompletedHandler(
+                    handle);
+            }
         }
         for (const RuntimeInputActionHandle handle : registration.InputActions)
         {

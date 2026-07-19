@@ -26,6 +26,8 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.AssetWorkflowModule;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.WorldHandle;
@@ -41,6 +43,15 @@ namespace Runtime = Extrinsic::Runtime;
 
 namespace
 {
+    template <typename T>
+    [[nodiscard]] T& RequiredEngineService(
+        Extrinsic::Runtime::Engine& engine)
+    {
+        T* const service = engine.Services().Find<T>();
+        EXPECT_NE(service, nullptr);
+        return *service;
+    }
+
     using namespace std::chrono_literals;
 
     struct DestroyProbeResult
@@ -225,7 +236,7 @@ namespace
             {
                 DestroyRequested =
                     engine.Worlds().RequestDestroyWorld(FirstWorld).has_value();
-                auto loaded = engine.GetAssetService().Load<
+                auto loaded = RequiredEngineService<Extrinsic::Assets::AssetService>(engine).Load<
                     Assets::AssetModelScenePayload>(
                     "/virtual/bug-068-world-switch.gltf",
                     [](std::string_view,
@@ -239,7 +250,7 @@ namespace
                 {
                     ModelAsset = *loaded;
                     LoadCompletionSucceeded =
-                        engine.GetAssetService()
+                        RequiredEngineService<Extrinsic::Assets::AssetService>(engine)
                             .CompleteCpuLoadAndFlushEvent(ModelAsset)
                             .has_value();
                 }
@@ -251,11 +262,11 @@ namespace
                 EntityCountAfterReady = CountLiveEntities(*engine.Worlds().Get(engine.ActiveWorld()));
                 ReloadBeforeDestroySucceeded =
                     ModelAsset.IsValid() &&
-                    engine.GetAssetService().Reload(ModelAsset).has_value();
+                    RequiredEngineService<Extrinsic::Assets::AssetService>(engine).Reload(ModelAsset).has_value();
                 if (ReloadBeforeDestroySucceeded)
                 {
                     ReloadBeforeDestroyCompletionSucceeded =
-                        engine.GetAssetService()
+                        RequiredEngineService<Extrinsic::Assets::AssetService>(engine)
                             .CompleteCpuLoadAndFlushEvent(ModelAsset)
                             .has_value();
                 }
@@ -269,11 +280,11 @@ namespace
                     CountLiveEntities(*engine.Worlds().Get(engine.ActiveWorld()));
                 ReloadAfterDestroySucceeded =
                     ModelAsset.IsValid() &&
-                    engine.GetAssetService().Reload(ModelAsset).has_value();
+                    RequiredEngineService<Extrinsic::Assets::AssetService>(engine).Reload(ModelAsset).has_value();
                 if (ReloadAfterDestroySucceeded)
                 {
                     ReloadAfterDestroyCompletionSucceeded =
-                        engine.GetAssetService()
+                        RequiredEngineService<Extrinsic::Assets::AssetService>(engine)
                             .CompleteCpuLoadAndFlushEvent(ModelAsset)
                             .has_value();
                 }
@@ -506,6 +517,8 @@ TEST(RuntimeWorldRegistry, EngineRebindsSceneBorrowersBeforeRetiringPreviousWorl
     EngineSceneBorrowerRebindApplication* appPtr = app.get();
 
     Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     engine.Initialize();
     engine.Run();
 

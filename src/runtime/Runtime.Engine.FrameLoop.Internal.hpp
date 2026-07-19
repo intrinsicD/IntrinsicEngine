@@ -232,19 +232,16 @@ namespace Extrinsic::Runtime
 
     struct AssetHooks final : Core::IAssetFrameHooks
     {
-        Assets::AssetService&     AssetService;
-        AssetResidencyService&    AssetResidency;
+        Core::IAssetFrameHooks*   AssetWorkflow;
         RHI::IDevice&             Device;
         RenderExtractionCache&    Extraction;
         Graphics::IRenderer&      Renderer;
 
-        AssetHooks(Assets::AssetService& assetService,
-                   AssetResidencyService& assetResidency,
+        AssetHooks(Core::IAssetFrameHooks* assetWorkflow,
                    RHI::IDevice& device,
                    RenderExtractionCache& extraction,
                    Graphics::IRenderer& renderer)
-            : AssetService(assetService)
-            , AssetResidency(assetResidency)
+            : AssetWorkflow(assetWorkflow)
             , Device(device)
             , Extraction(extraction)
             , Renderer(renderer)
@@ -253,9 +250,11 @@ namespace Extrinsic::Runtime
 
         void TickAssets() override
         {
+            if (AssetWorkflow != nullptr)
+                AssetWorkflow->TickAssets();
+
             const std::uint64_t currentFrame = Device.GetGlobalFrameNumber();
             const std::uint32_t framesInFlight = Device.GetFramesInFlight();
-            AssetResidency.TickAssets(AssetService, currentFrame, framesInFlight);
             // GRAPHICS-030C: drive the procedural geometry cache's
             // deferred-retire window with the same CPU frame counter and
             // framesInFlight the asset cache uses. Final FreeGeometry calls

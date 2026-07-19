@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace
@@ -210,12 +211,21 @@ TEST(RuntimeEngineLayering, EngineDelegatesGpuQueueLifecycleToJobService)
     EXPECT_EQ(content.find("RegisterRuntimeGpuJobParticipant"), std::string::npos);
 }
 
-TEST(RuntimeEngineLayering, ObjectSpaceNormalBakeServiceKeepsGpuQueueCompositionOutOfEngine)
+TEST(RuntimeEngineLayering,
+     AssetWorkflowModuleOwnsObjectSpaceNormalBakeComposition)
 {
     const auto engineInterface =
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
     const auto engineImpl =
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto workflowInterface =
+        ReadFile(
+            RepoRoot() /
+            "src/runtime/Runtime.AssetWorkflowModule.cppm");
+    const auto workflowImpl =
+        ReadFile(
+            RepoRoot() /
+            "src/runtime/Runtime.AssetWorkflowModule.cpp");
     const auto serviceInterface =
         ReadFile(RepoRoot() / "src/runtime/Runtime.ObjectSpaceNormalBakeService.cppm");
     const auto serviceImpl =
@@ -224,26 +234,38 @@ TEST(RuntimeEngineLayering, ObjectSpaceNormalBakeServiceKeepsGpuQueueComposition
     const auto moduleInventory =
         ReadFile(RepoRoot() / "docs/api/generated/module_inventory.md");
 
-    EXPECT_NE(engineInterface.find("import Extrinsic.Runtime.ObjectSpaceNormalBakeService"),
+    EXPECT_EQ(engineInterface.find("ObjectSpaceNormalBakeService"),
               std::string::npos);
-    EXPECT_NE(engineInterface.find("ObjectSpaceNormalBakeService             m_ObjectSpaceNormalBakeService"),
+    EXPECT_EQ(engineImpl.find("ObjectSpaceNormalBakeService"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_ObjectSpaceNormalBakeService.SetDependencies("),
+    EXPECT_NE(workflowImpl.find(
+                  "import Extrinsic.Runtime.ObjectSpaceNormalBakeService;"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_ObjectSpaceNormalBakeService.RegisterGpuQueueParticipant("),
+    EXPECT_NE(workflowImpl.find("ObjectSpaceNormalBakeService Bake{}"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("&m_ObjectSpaceNormalBakeService.Queue()"),
+    EXPECT_NE(workflowImpl.find("m_Impl->Bake.SetDependencies("),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_ObjectSpaceNormalBakeService.ClearDependencies()"),
+    EXPECT_NE(workflowImpl.find(
+                  "m_Impl->Bake.RegisterGpuQueueParticipant("),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_ObjectSpaceNormalBakeService.QueueDiagnostics()"),
+    EXPECT_EQ(CountOccurrences(
+                  workflowImpl,
+                  ".ObjectSpaceNormalBakeQueue ="),
+              2u);
+    EXPECT_EQ(CountOccurrences(workflowImpl, "&Bake->Queue()"),
+              2u);
+    EXPECT_NE(workflowImpl.find("Bake.ClearDependencies()"),
+              std::string::npos);
+    EXPECT_NE(workflowImpl.find("Bake.Queue().Clear()"),
+              std::string::npos);
+    EXPECT_EQ(workflowImpl.find(
+                  "Provide<ObjectSpaceNormalBakeService>"),
+              std::string::npos);
+    EXPECT_EQ(workflowImpl.find("QueueDiagnostics()"),
               std::string::npos);
 
     EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.ObjectSpaceNormalBakeGpuQueue"),
               std::string::npos);
-    // RUNTIME-178 keeps the public CPU request queue reachable through the
-    // service re-export while moving the private asset-residency glue that
-    // names the queue into the Engine implementation unit.
     EXPECT_EQ(engineInterface.find(
                   "import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;"),
               std::string::npos);
@@ -254,7 +276,7 @@ TEST(RuntimeEngineLayering, ObjectSpaceNormalBakeServiceKeepsGpuQueueComposition
               std::string::npos);
     EXPECT_EQ(engineImpl.find("import Extrinsic.Runtime.ObjectSpaceNormalBakeGpuQueue"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;"),
+    EXPECT_EQ(engineImpl.find("import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;"),
               std::string::npos);
     EXPECT_EQ(engineImpl.find("RuntimeObjectSpaceNormalBakeGpuQueueDependencies"),
               std::string::npos);
@@ -263,6 +285,11 @@ TEST(RuntimeEngineLayering, ObjectSpaceNormalBakeServiceKeepsGpuQueueComposition
     EXPECT_EQ(engineImpl.find("GetGlobalFrameNumber() + 1u"),
               std::string::npos);
 
+    EXPECT_NE(workflowInterface.find(
+                  "export module Extrinsic.Runtime.AssetWorkflowModule"),
+              std::string::npos);
+    EXPECT_EQ(workflowInterface.find("ObjectSpaceNormalBakeService"),
+              std::string::npos);
     EXPECT_NE(serviceInterface.find("export module Extrinsic.Runtime.ObjectSpaceNormalBakeService"),
               std::string::npos);
     EXPECT_NE(serviceInterface.find("export import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue"),
@@ -844,8 +871,8 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
         ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxEditorFacades.cpp");
     const auto readback =
         ReadFile(RepoRoot() / "src/runtime/Runtime.GpuReadbackJob.cpp");
-    const auto engine =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto assetWorkflow =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetWorkflowModule.cpp");
 
     EXPECT_EQ(CountOccurrences(assetImport, "StreamingTaskDesc{"), 2u);
     EXPECT_EQ(
@@ -871,8 +898,8 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     EXPECT_EQ(CountOccurrences(readback, "DerivedJobDesc derived"), 1u);
     EXPECT_EQ(CountOccurrences(readback, ".Scope = desc.Scope"), 1u);
 
-    EXPECT_GE(CountOccurrences(engine, ".World = ActiveWorld()"), 2u);
-    EXPECT_NE(engine.find(".Worlds = &m_WorldRegistry"), std::string::npos);
+    EXPECT_EQ(CountOccurrences(assetWorkflow, ".World = BoundWorld"), 2u);
+    EXPECT_EQ(CountOccurrences(assetWorkflow, ".Worlds = Worlds"), 1u);
 }
 
 TEST(RuntimeEngineLayering, FrameLoopContractDoesNotBecomeCompositionRoot)
@@ -897,12 +924,16 @@ TEST(RuntimeEngineLayering, DeviceBootstrapKeepsBackendAndFallbackPolicyOutOfEng
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
     const auto engineImpl =
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto workflowImpl =
+        ReadFile(
+            RepoRoot() /
+            "src/runtime/Runtime.AssetWorkflowModule.cpp");
     const auto bootstrap =
         ReadFile(RepoRoot() / "src/runtime/Runtime.DeviceBootstrap.cpp");
-    const auto residency = SliceBetween(
-        engineImpl,
-        "void AssetResidencyService::InitializeGpuCache(",
-        "void AssetResidencyService::InitializeSceneHandoffs(");
+    const auto workflowRegistration = SliceBetween(
+        workflowImpl,
+        "Core::Result AssetWorkflowModule::OnRegister(",
+        "Core::Result AssetWorkflowModule::OnResolve(");
     const auto engineInitialize = SliceBetween(
         engineImpl,
         "void Engine::Initialize()",
@@ -914,10 +945,11 @@ TEST(RuntimeEngineLayering, DeviceBootstrapKeepsBackendAndFallbackPolicyOutOfEng
               std::string::npos);
     EXPECT_EQ(engineInitialize.find("InitializeRuntimeGpuAssetFallbackTexture("),
               std::string::npos);
-    EXPECT_NE(residency.find("InitializeRuntimeGpuAssetFallbackTexture("),
+    EXPECT_NE(workflowRegistration.find(
+                  "InitializeRuntimeGpuAssetFallbackTexture("),
               std::string::npos);
-    EXPECT_NE(engineInitialize.find(
-                  "m_AssetResidencyService->InitializeGpuCache("),
+    EXPECT_NE(workflowRegistration.find(
+                  "std::make_unique<Graphics::GpuAssetCache>"),
               std::string::npos);
 
     EXPECT_EQ(engineInterface.find("RuntimeDeviceSelection"), std::string::npos);
@@ -930,6 +962,8 @@ TEST(RuntimeEngineLayering, DeviceBootstrapKeepsBackendAndFallbackPolicyOutOfEng
     EXPECT_EQ(engineImpl.find("BuildFallbackTextureDesc"), std::string::npos);
     EXPECT_EQ(engineImpl.find("CreateVulkanDevice"), std::string::npos);
     EXPECT_EQ(engineImpl.find("CreateNullDevice"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("std::make_unique<Graphics::GpuAssetCache>"),
+              std::string::npos);
 
     EXPECT_NE(bootstrap.find("MakeFallbackTextureBytes"), std::string::npos);
     EXPECT_NE(bootstrap.find("BuildFallbackTextureDesc"), std::string::npos);
@@ -1428,203 +1462,160 @@ TEST(RuntimeEngineLayering, EditorUiModulePrivatelyMirrorsImGuiFramePacingDiagno
 }
 
 TEST(RuntimeEngineLayering,
-     AssetHandoffTransitionBorrowsOptionalSelectionAndDetachesBeforeModules)
+     AssetWorkflowShutdownDetachesBeforeGlobalGpuQuiescence)
 {
+    const auto root = RepoRoot();
     const auto engineInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(root / "src/runtime/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
-    const auto retention =
-        SliceBetween(
-            engineImpl,
-            "class EngineSceneReplacementTransitions final",
-            "// ── Construction / destruction");
-    const auto registration =
-        SliceBetween(
-            engineImpl,
-            "void Engine::RegisterSceneReplacementParticipants()",
-            "// ── Lifecycle");
-    const auto announcementShutdown =
-        SliceBetween(
-            engineImpl,
-            "void Engine::AnnounceAndShutdownRuntimeModules()",
-            "void Engine::RefreshActiveWorldScenePointer()");
-    const auto bind =
-        SliceBetween(
-            engineImpl,
-            "void Engine::BindActiveSceneAssetHandoffs()",
-            "void Engine::RegisterSceneReplacementParticipants()");
-    const auto initialize =
-        SliceBetween(
-            engineImpl,
-            "void Engine::Initialize()",
-            "void Engine::Shutdown()");
-    const auto shutdown =
-        SliceBetween(
-            engineImpl,
-            "void Engine::Shutdown()",
-            "// ── Main loop");
+        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+    const auto workflowImpl =
+        ReadFile(
+            root /
+            "src/runtime/Runtime.AssetWorkflowModule.cpp");
+    const auto coreFrameLoop =
+        ReadFile(root / "src/core/Core.FrameLoop.cpp");
+    const auto announcement = SliceBetween(
+        engineImpl,
+        "void Engine::AnnounceRuntimeShutdown()",
+        "void Engine::ShutdownRuntimeModules()");
+    const auto moduleShutdown = SliceBetween(
+        engineImpl,
+        "void Engine::ShutdownRuntimeModules()",
+        "void Engine::RefreshActiveWorldScenePointer()");
+    const auto shutdown = SliceBetween(
+        engineImpl,
+        "void Engine::Shutdown()",
+        "// ── Main loop");
+    const auto workflowAnnouncement = SliceBetween(
+        workflowImpl,
+        "void AnnounceShutdown()",
+        "AssetImportPipeline Pipeline{}");
+    const auto workflowResolve = SliceBetween(
+        workflowImpl,
+        "Core::Result AssetWorkflowModule::OnResolve(",
+        "void AssetWorkflowModule::OnShutdown(");
 
-    EXPECT_EQ(
-        engineInterface.find(
-            "import Extrinsic.Runtime.SceneDocumentModule"),
-        std::string::npos);
-    EXPECT_EQ(
-        engineInterface.find(
-            "import Extrinsic.Runtime.EditorCommandHistory"),
-        std::string::npos);
-    EXPECT_NE(
-        engineInterface.find(
-            "class EngineSceneReplacementTransitions;"),
-        std::string::npos);
-    EXPECT_NE(
-        engineInterface.find(
-            "m_SceneReplacementTransitions{};"),
-        std::string::npos);
+    constexpr std::string_view removedEngineTokens[] = {
+        "EngineSceneReplacementTransitions",
+        "BindActiveSceneAssetHandoffs",
+        "RegisterSceneReplacementParticipants",
+        "CancelActiveAssetImportsForShutdown",
+        "AnnounceAndShutdownRuntimeModules",
+        "m_SelectionController",
+    };
+    for (const auto token : removedEngineTokens)
+    {
+        EXPECT_EQ(engineInterface.find(token), std::string::npos)
+            << token;
+        EXPECT_EQ(engineImpl.find(token), std::string::npos)
+            << token;
+    }
 
-    EXPECT_EQ(
-        CountOccurrences(
-            retention,
-            "SceneReplacementParticipantHandle"),
-        1u);
-    EXPECT_NE(
-        retention.find(
-            "UnregisterReplacementParticipant(\n"
-            "                    AssetHandoffs)"),
-        std::string::npos);
-    EXPECT_EQ(
-        retention.find(
-            "UnregisterReplacementParticipant(\n"
-            "                    Interaction)"),
-        std::string::npos);
+    EXPECT_NE(workflowResolve.find(
+                  "Require<SceneDocumentModule>"),
+              std::string::npos);
+    EXPECT_NE(workflowResolve.find(
+                  "Require<EditorCommandHistory>"),
+              std::string::npos);
+    EXPECT_NE(workflowResolve.find(
+                  "Find<StreamingExecutor>()"),
+              std::string::npos);
+    EXPECT_NE(workflowResolve.find(
+                  "Find<SelectionController>()"),
+              std::string::npos);
+    EXPECT_NE(workflowResolve.find(
+                  "RegisterReplacementParticipant("),
+              std::string::npos);
 
-    EXPECT_EQ(
-        registration.find(
-            "RUNTIME-188.EngineInteractionTransition"),
-        std::string::npos);
-    EXPECT_NE(
-        registration.find(
-            "transitions->AssetHandoffs = *assetHandoffs;"),
-        std::string::npos);
-    const auto assetRegistrationFailure =
-        registration.find("if (!assetHandoffs.has_value())");
-    const auto rollback =
-        registration.find(
-            "transitions->Release();",
-            assetRegistrationFailure);
-    const auto termination =
-        registration.find("std::terminate();", rollback);
-    ASSERT_NE(assetRegistrationFailure, std::string::npos);
-    ASSERT_NE(rollback, std::string::npos);
-    ASSERT_NE(termination, std::string::npos);
-    EXPECT_LT(assetRegistrationFailure, rollback);
-    EXPECT_LT(rollback, termination);
+    const auto cancelImports = workflowAnnouncement.find(
+        "Pipeline->CancelActiveAssetImportsForShutdown()");
+    const auto detachPipeline =
+        workflowAnnouncement.find("DetachPipeline();");
+    const auto stopCallbacks =
+        workflowAnnouncement.find("AcceptingCallbacks = false;");
+    const auto detachScene =
+        workflowAnnouncement.find("SceneHandoff.reset();");
+    const auto releaseDocument =
+        workflowAnnouncement.find("ReleaseDocumentParticipant();");
+    const auto clearStreaming =
+        workflowAnnouncement.find("Streaming = nullptr;");
+    const auto clearSelection =
+        workflowAnnouncement.find("Selection = nullptr;");
+    ASSERT_NE(cancelImports, std::string::npos);
+    ASSERT_NE(detachPipeline, std::string::npos);
+    ASSERT_NE(stopCallbacks, std::string::npos);
+    ASSERT_NE(detachScene, std::string::npos);
+    ASSERT_NE(releaseDocument, std::string::npos);
+    ASSERT_NE(clearStreaming, std::string::npos);
+    ASSERT_NE(clearSelection, std::string::npos);
+    EXPECT_LT(cancelImports, detachPipeline);
+    EXPECT_LT(detachPipeline, stopCallbacks);
+    EXPECT_LT(stopCallbacks, detachScene);
+    EXPECT_LT(detachScene, releaseDocument);
+    EXPECT_LT(releaseDocument, clearStreaming);
+    EXPECT_LT(clearStreaming, clearSelection);
 
-    EXPECT_EQ(
-        engineInterface.find("SelectionController"),
-        std::string::npos);
-    EXPECT_EQ(
-        engineImpl.find("&m_SelectionController"),
-        std::string::npos);
-    EXPECT_EQ(
-        CountOccurrences(
-            engineImpl,
-            "m_ServiceRegistry.Find<SelectionController>()"),
-        2u);
+    const auto markUninitialized =
+        announcement.find("m_Initialized = false;");
+    const auto publishAnnouncement = announcement.find(
+        "m_KernelEvents.Publish(RuntimeShutdownAnnounced{});");
+    const auto pumpAnnouncement =
+        announcement.find("(void)m_KernelEvents.Pump();");
+    ASSERT_NE(markUninitialized, std::string::npos);
+    ASSERT_NE(publishAnnouncement, std::string::npos);
+    ASSERT_NE(pumpAnnouncement, std::string::npos);
+    EXPECT_LT(markUninitialized, publishAnnouncement);
+    EXPECT_LT(publishAnnouncement, pumpAnnouncement);
 
-    const auto moduleRegistration =
-        initialize.find("RegisterRuntimeModulesForBoot(");
-    const auto initialBorrowBind =
-        initialize.find("BindActiveSceneAssetHandoffs();");
-    ASSERT_NE(moduleRegistration, std::string::npos);
-    ASSERT_NE(initialBorrowBind, std::string::npos);
-    EXPECT_LT(moduleRegistration, initialBorrowBind);
-
-    const auto initialLookup =
-        bind.find(
-            "SelectionController* const importSelection =");
-    const auto initialOptionalFind =
-        bind.find(
-            "m_ServiceRegistry.Find<SelectionController>()",
-            initialLookup);
-    const auto initialAssignment =
-        bind.find(
-            ".Selection = importSelection",
-            initialOptionalFind);
-    ASSERT_NE(initialLookup, std::string::npos);
-    ASSERT_NE(initialOptionalFind, std::string::npos);
-    ASSERT_NE(initialAssignment, std::string::npos);
-    EXPECT_LT(initialLookup, initialOptionalFind);
-    EXPECT_LT(initialOptionalFind, initialAssignment);
-
-    const auto replacementLookup =
-        registration.find(
-            "SelectionController* const importSelection =");
-    const auto replacementOptionalFind =
-        registration.find(
-            "m_ServiceRegistry.Find<SelectionController>()",
-            replacementLookup);
-    const auto replacementCapture =
-        registration.find(
-            "importSelection,",
-            replacementOptionalFind);
-    const auto replacementAssignment =
-        registration.find(
-            ".Selection = importSelection",
-            replacementCapture);
-    ASSERT_NE(replacementLookup, std::string::npos);
-    ASSERT_NE(replacementOptionalFind, std::string::npos);
-    ASSERT_NE(replacementCapture, std::string::npos);
-    ASSERT_NE(replacementAssignment, std::string::npos);
-    EXPECT_LT(replacementLookup, replacementOptionalFind);
-    EXPECT_LT(replacementOptionalFind, replacementCapture);
-    EXPECT_LT(replacementCapture, replacementAssignment);
-
-    const auto cancelActiveImports =
-        shutdown.find(
-            "CancelActiveAssetImportsForShutdown()");
-    const auto shutdownApplication =
-        shutdown.find(
-            "void ShutdownApplication() override");
-    const auto invokeAnnouncementShutdown =
-        shutdown.find(
-            "Owner.AnnounceAndShutdownRuntimeModules();",
-            shutdownApplication);
+    const auto discardCommands =
+        shutdown.find("m_CommandBus.DiscardPending();");
+    const auto invokeAnnouncement =
+        shutdown.find("AnnounceRuntimeShutdown();");
+    const auto quiesceParticipants = shutdown.find(
+        "m_JobServiceGpuQueueBridge.ShutdownParticipants(");
     const auto executeShutdown =
-        shutdown.find(
-            "Core::ExecuteShutdownContract(hooks)");
-    ASSERT_NE(cancelActiveImports, std::string::npos);
-    ASSERT_NE(shutdownApplication, std::string::npos);
-    ASSERT_NE(invokeAnnouncementShutdown, std::string::npos);
+        shutdown.find("Core::ExecuteShutdownContract(hooks)");
+    ASSERT_NE(discardCommands, std::string::npos);
+    ASSERT_NE(invokeAnnouncement, std::string::npos);
+    ASSERT_NE(quiesceParticipants, std::string::npos);
     ASSERT_NE(executeShutdown, std::string::npos);
-    EXPECT_LT(cancelActiveImports, shutdownApplication);
-    EXPECT_LT(shutdownApplication, invokeAnnouncementShutdown);
-    EXPECT_LT(invokeAnnouncementShutdown, executeShutdown);
+    EXPECT_LT(discardCommands, invokeAnnouncement);
+    EXPECT_LT(invokeAnnouncement, quiesceParticipants);
+    EXPECT_LT(quiesceParticipants, executeShutdown);
 
-    const auto announcement =
-        announcementShutdown.find(
-            "m_KernelEvents.Publish(RuntimeShutdownAnnounced{});");
-    const auto announcementPump =
-        announcementShutdown.find(
-            "(void)m_KernelEvents.Pump();");
-    const auto detachSelection =
-        announcementShutdown.find(
-            ".Selection = nullptr");
-    const auto release =
-        announcementShutdown.find(
-            "m_SceneReplacementTransitions->Release();");
-    const auto moduleShutdown =
-        announcementShutdown.find(
-            "m_RuntimeModules.rbegin()");
-    ASSERT_NE(announcement, std::string::npos);
-    ASSERT_NE(announcementPump, std::string::npos);
-    ASSERT_NE(detachSelection, std::string::npos);
-    ASSERT_NE(release, std::string::npos);
-    ASSERT_NE(moduleShutdown, std::string::npos);
-    EXPECT_LT(announcement, announcementPump);
-    EXPECT_LT(announcementPump, detachSelection);
-    EXPECT_LT(detachSelection, release);
-    EXPECT_LT(release, moduleShutdown);
+    const auto applicationHook =
+        shutdown.find("void ShutdownApplication() override");
+    const auto moduleHook =
+        shutdown.find("void ShutdownStreaming() override");
+    const auto invokeModuleShutdown =
+        shutdown.find("Owner.ShutdownRuntimeModules();", moduleHook);
+    ASSERT_NE(applicationHook, std::string::npos);
+    ASSERT_NE(moduleHook, std::string::npos);
+    ASSERT_NE(invokeModuleShutdown, std::string::npos);
+    EXPECT_LT(applicationHook, moduleHook);
+    EXPECT_NE(coreFrameLoop.find(
+                  "hooks.ShutdownApplication();\n"
+                  "        hooks.ShutdownStreaming();"),
+              std::string::npos);
+
+    const auto reverseModules =
+        moduleShutdown.find("m_RuntimeModules.rbegin()");
+    const auto resetServices =
+        moduleShutdown.find("m_ServiceRegistry.Reset();");
+    ASSERT_NE(reverseModules, std::string::npos);
+    ASSERT_NE(resetServices, std::string::npos);
+    EXPECT_LT(reverseModules, resetServices);
+
+    EXPECT_NE(workflowImpl.find(
+                  "setup.Subscribe<RuntimeShutdownAnnounced>"),
+              std::string::npos);
+    EXPECT_NE(workflowImpl.find(
+                  "state->AnnounceShutdown();"),
+              std::string::npos);
+    EXPECT_NE(workflowImpl.find(
+                  "m_Impl->Shared->AnnounceShutdown();"),
+              std::string::npos);
 }
 
 TEST(RuntimeEngineLayering, RenderGraphStaysOutOfECSAndCoreStaysOutOfGpuBarriers)

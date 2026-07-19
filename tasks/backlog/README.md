@@ -264,8 +264,8 @@ as the async-work service extraction. All five additive ADR-0024 seams
 (`ARCH-007`..`ARCH-011`) and the collision sweep (`ARCH-013`) are retired;
 `ARCH-014` remains the open kernel-convergence umbrella.
 Retired `GRAPHICS-128` supplies the nonzero shared-index-slice contract;
-`RUNTIME-129` still owns the production Vulkan provider work after
-`RUNTIME-183` lands.
+`RUNTIME-129` still owns the production Vulkan provider work inside the
+AssetWorkflow owner retired by `RUNTIME-183`.
 Provider resolution, population state, camera-seed caching, reference-scene
 teardown policy, input-action descriptor/state/dispatch policy, and
 runtime-module contribution ordering/dispatch, selection readback correlation
@@ -279,8 +279,8 @@ transform-gizmo frame state, selected-entity scratch, gizmo/selection pointer
 interlock, and transform-gizmo packet production now live outside
 `Runtime.Engine.cpp`; render-extraction cache/pool/stats/frame-index ownership
 now lives in an Engine-private `RenderExtractionService`, and GPU asset
-cache/model-handoff residency ownership now lives in an Engine-private
-`AssetResidencyService`; the persistent streaming executor, derived-job
+cache/model-handoff residency ownership now lives in the app-composed
+`AssetWorkflowModule`; the persistent streaming executor, derived-job
 registry, world-retirement gate, maintenance drains, and shutdown now live in
 the app-composed `Extrinsic.Runtime.AsyncWorkModule`, while the Engine derived
 facades have been removed.
@@ -309,8 +309,9 @@ snapshot. Retired
 camera owner and app-owned reference bootstrap; the corrected `RUNTIME-172`
 document owner is retired with exact service publication. `RUNTIME-188` now
 is retired with the separate interaction owner, exact optional selection
-service, and `26/4/2/15` Engine ratchet. All front-matter prerequisites for
-`RUNTIME-183` are retired, so that asset-owner task is selectable.
+service, and `26/4/2/15` Engine ratchet. `RUNTIME-183` is retired with the
+app-composed AssetWorkflow owner and `22/0/2/10` Engine ratchet, making
+`RUNTIME-168` and `RUNTIME-129` selectable.
 Sequencing note: tasks whose deliverable ADR-0024 supersedes are
 front-matter gated on their seam dependencies — `RUNTIME-150` on
 `ARCH-007`/`ARCH-008`, `RUNTIME-151` additionally on `ARCH-011`, `ARCH-006`
@@ -325,14 +326,14 @@ as a transitional composition accessor rather than a new cross-module pattern.
 `RUNTIME-151` is retired as the Engine-interface cleanup. `RUNTIME-137` is
 retired as the JobService `GpuQueue`/async readback substrate, satisfying that
 historical prerequisite for `RUNTIME-129`; retired `GRAPHICS-128` also closed
-nonzero managed-index slices, so the task is now gated only on `RUNTIME-183`
-and its accepted AssetWorkflow owner.
+nonzero managed-index slices, and retired `RUNTIME-183` supplied its accepted
+AssetWorkflow owner.
 The non-blocking TaskGraph substrate (`CORE-005`) and scheduler hardening
 (`CORE-007`) are retired, as is compiled-plan efficiency (`CORE-008`).
 
 Open members (kernel-seam priority set first):
 - [`../active/ARCH-014-kernel-convergence-tracking.md`](../active/ARCH-014-kernel-convergence-tracking.md) (active umbrella north-star; not a slice).
-- [`runtime/RUNTIME-183-extract-asset-workflow-module.md`](runtime/RUNTIME-183-extract-asset-workflow-module.md) through [`runtime/RUNTIME-187-finalize-domain-free-engine-surface.md`](runtime/RUNTIME-187-finalize-domain-free-engine-surface.md) (remaining ADR-0027 asset-owner, app-lifecycle, mechanism-pruning, semantic auxiliary-surface, and final-ratchet graph; see the runtime index for exact dependencies). Retired `RUNTIME-172` and `RUNTIME-188` satisfy the document/interaction split prerequisites, so `RUNTIME-183` is selectable.
+- [`runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md`](runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md) and [`runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md`](runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md) are selectable leaves; `RUNTIME-168` unlocks [`runtime/RUNTIME-184-replace-application-lifecycle.md`](runtime/RUNTIME-184-replace-application-lifecycle.md), and those paths converge through `RUNTIME-185`..`187` (see the runtime index for exact dependencies).
 - [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) (one-shot post-convergence admission gate; blocked until known architecture/right-sizing/tool-rent work retires).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).

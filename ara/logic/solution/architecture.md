@@ -28,6 +28,7 @@
 - **Evidence**: [docs/adr/0021-progressive-entity-render-data-pipeline.md], [tasks/archive/RUNTIME-110-progressive-entity-render-data-pipeline.md]
 
 ## A05: Engine-Owned Asset Residency Service
+<!-- SUPERSEDED by A15 through RUNTIME-183; retained as historical evidence. -->
 - **Decision**: `Runtime.Engine` keeps asset lifecycle/frame ordering and public asset/GPU-cache compatibility facades, while GPU asset cache construction/listener ownership, fallback bootstrap delegation, model texture/model scene handoff ownership, maintenance ticks, and teardown ordering live in the Engine-private `AssetResidencyService` implementation glue.
 - **Provenance**: ai-suggested
 - **Crystallized via**: artifact-commitment
@@ -168,3 +169,21 @@
   tasks/backlog/rendering/README.md,
   tasks/backlog/geometry/README.md]
 - **From staging**: O51
+
+## A15: App-Composed Asset Workflow Services
+- **Decision**: An app-composed `AssetWorkflowModule` owns asset service,
+  GPU-cache, import-pipeline, model-handoff, and object-space normal-bake
+  composition. It publishes exact `AssetService`, `AssetImportPipeline`,
+  `GpuAssetCache`, and `IAssetFrameHooks` services; `Runtime.Engine` consumes
+  cache, hooks, and dropped-file import capability through optional registry
+  lookups and exposes none of the retired asset/cache/import or bake-diagnostic
+  getters.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N268, N269, commit 74a15419,
+  src/runtime/Runtime.AssetWorkflowModule.cppm,
+  src/runtime/Runtime.AssetWorkflowModule.cpp,
+  tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp,
+  tests/contract/runtime/Test.RuntimeEngineLayering.cpp]
+- **From staging**: O55
+- **Supersedes**: A05

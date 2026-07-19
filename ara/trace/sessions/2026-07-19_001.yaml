@@ -2,9 +2,9 @@ session:
   id: "2026-07-19_001"
   date: "2026-07-19"
   started: "2026-07-19T04:02+02:00"
-  last_turn: "2026-07-19T09:41+02:00"
-  turn_count: 2
-  summary: "Implemented and verified the app-composed RUNTIME-181 config-control and RUNTIME-172 scene-document modules; RUNTIME-172 remains active for root-owned integration and retirement."
+  last_turn: "2026-07-19T17:38+02:00"
+  turn_count: 3
+  summary: "Implemented and verified app-composed RUNTIME-181 config control and RUNTIME-172 scene documents, then migrated existing tests to RUNTIME-183's exact-service AssetWorkflow composition."
 
 events_logged:
   - turn: 1
@@ -19,6 +19,24 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Extracted exact one-world scene-document/history ownership, passed 68 focused and 4,175 complete CPU tests with one capability skip, and reached the 33/11/2/22 Engine ratchet."
+  - turn: 3
+    type: experiment
+    id: "N268"
+    routing: direct
+    provenance: ai-executed
+    summary: "Migrated 23 existing test files to explicit AssetWorkflow composition and exact registry lookups, with zero residual removed getter spellings."
+  - turn: 3
+    type: architecture
+    id: "O55"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized exact-service AssetWorkflow ownership as A15 through test and production artifact commitment."
+  - turn: 3
+    type: decision
+    id: "N269"
+    routing: direct
+    provenance: ai-executed
+    summary: "Resolved the superseded Engine-private asset residency A05 in favor of app-composed AssetWorkflow A15 while preserving A05 as historical evidence."
 
 ai_actions:
   - turn: 1
@@ -46,6 +64,16 @@ ai_actions:
       - "tests/contract/runtime/Test.SceneDocumentModule.cpp"
       - "docs/architecture/runtime.md"
       - "tasks/active/RUNTIME-172-extract-scene-document-module.md"
+  - turn: 3
+    action: "Migrated existing runtime tests off five retired Engine asset getters, composed explicit SceneDocument and AssetWorkflow modules, rewrote source ownership/shutdown contracts, preserved omission cases, removed the stale Engine-transition death fixture, and committed the test-only slice."
+    provenance: ai-executed
+    files_changed:
+      - "tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp"
+      - "tests/contract/runtime/Test.SceneDocumentModule.cpp"
+      - "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp"
+      - "tests/integration/runtime/Test.RuntimeSandboxAcceptance.cpp"
 
 claims_touched: []
 
@@ -54,6 +82,8 @@ key_context:
     excerpt: "RUNTIME-181 requires Engine to retain boot recipe substrate without owning the optional live-control facade, while Sandbox composes and resolves one exact control module/service."
   - turn: 2
     excerpt: "RUNTIME-172 keeps document/history ownership in one optional active-world-bound module while narrow named participants preserve interaction and asset-handoff replacement ordering until their owning tasks land."
+  - turn: 3
+    excerpt: "RUNTIME-183 removes Engine asset/cache/import and bake-diagnostic getters; asset-dependent tests must compose SceneDocumentModule plus AssetWorkflowModule and resolve exact services from Engine.Services()."
 
 open_threads:
   - "An owner may externalize the candidate stable contexts through branch protection, rulesets, or a merge queue; none is currently configured."

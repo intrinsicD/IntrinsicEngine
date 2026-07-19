@@ -10890,7 +10890,10 @@ namespace Extrinsic::Runtime
             RHI::BindlessIndex backgroundTexture =
                 RHI::kInvalidBindlessIndex;
             std::uint64_t backgroundTextureGeneration = 0u;
+            const Graphics::GpuAssetCache* const gpuAssetCache =
+                engine.Services().Find<Graphics::GpuAssetCache>();
             if (renderExtraction != nullptr &&
+                gpuAssetCache != nullptr &&
                 request.View.BackgroundMode == ConfigBackground::Texture)
             {
                 const auto bindings =
@@ -10899,7 +10902,7 @@ namespace Extrinsic::Runtime
                 if (bindings.has_value() && bindings->Albedo.IsValid())
                 {
                     const auto view =
-                        engine.GetGpuAssetCache().GetView(bindings->Albedo);
+                        gpuAssetCache->GetView(bindings->Albedo);
                     if (view.has_value() &&
                         view->Kind == Graphics::GpuAssetKind::Texture &&
                         view->BindlessIdx != RHI::kInvalidBindlessIndex)
@@ -11024,6 +11027,10 @@ namespace Extrinsic::Runtime
                 engine.Services().Find<SceneInteractionModule>();
             SelectionController* const selection =
                 engine.Services().Find<SelectionController>();
+            Assets::AssetService* const assetService =
+                engine.Services().Find<Assets::AssetService>();
+            AssetImportPipeline* const assetImportPipeline =
+                engine.Services().Find<AssetImportPipeline>();
             SandboxEditorDerivedJobCommandSurface derivedJobCommands{};
             if (derivedJobs != nullptr)
             {
@@ -11044,7 +11051,7 @@ namespace Extrinsic::Runtime
                 .World = activeWorld,
                 .Selection = selection,
                 .CommandHistory = commandHistory,
-                .AssetService = &engine.GetAssetService(),
+                .AssetService = assetService,
                 .LastRefinedPrimitive = interaction != nullptr
                     ? &interaction->LastRefinedPrimitive()
                     : nullptr,
@@ -11061,8 +11068,21 @@ namespace Extrinsic::Runtime
                 .Device = &engine.GetDevice(),
                 .AssetImportCommands = SandboxEditorAssetImportCommandSurface{
                     .Import =
-                        [&engine](const SandboxEditorFileImportCommand& command)
+                        [assetImportPipeline](
+                            const SandboxEditorFileImportCommand& command)
                         {
+                            if (assetImportPipeline == nullptr)
+                            {
+                                return SandboxEditorFileImportResult{
+                                    .Status =
+                                        SandboxEditorCommandStatus::
+                                            AssetImportFailed,
+                                    .PayloadKind = command.PayloadKind,
+                                    .Error = Core::ErrorCode::InvalidState,
+                                    .Message = BuildImportFailureMessage(
+                                        Core::ErrorCode::InvalidState),
+                                };
+                            }
                             auto route = Assets::ResolveAssetImportRoute(
                                 command.Path,
                                 Assets::AssetRouteOperation::Import,
@@ -11079,9 +11099,10 @@ namespace Extrinsic::Runtime
                                 };
                                 auto queued = Assets::IsGeometryPayloadKind(
                                                   route->PayloadKind)
-                                    ? engine.GetAssetImportPipeline().QueueGeometryImport(
+                                    ? assetImportPipeline->QueueGeometryImport(
                                           request)
-                                    : engine.GetAssetImportPipeline().QueueModelTextureImport(
+                                    : assetImportPipeline->
+                                          QueueModelTextureImport(
                                           request);
                                 if (!queued.has_value())
                                 {
@@ -11104,7 +11125,8 @@ namespace Extrinsic::Runtime
                                 };
                             }
 
-                            auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(
+                            auto imported =
+                                assetImportPipeline->ImportAssetFromPath(
                                 RuntimeAssetImportRequest{
                                     .Path = command.Path,
                                     .PayloadKind = command.PayloadKind,
@@ -11145,14 +11167,22 @@ namespace Extrinsic::Runtime
                 },
                 .AssetImportQueueCommands = SandboxEditorAssetImportQueueCommandSurface{
                     .ClearCompleted =
-                        [&engine]()
+                        [assetImportPipeline]()
                         {
-                            return engine.GetAssetImportPipeline().ClearCompletedAssetImports();
+                            return assetImportPipeline != nullptr
+                                ? assetImportPipeline->
+                                      ClearCompletedAssetImports()
+                                : std::size_t{0u};
                         },
                     .Cancel =
-                        [&engine](const RuntimeAssetIngestHandle operation)
+                        [assetImportPipeline](
+                            const RuntimeAssetIngestHandle operation)
                         {
-                            return engine.GetAssetImportPipeline().CancelAssetImport(operation);
+                            return assetImportPipeline != nullptr
+                                ? assetImportPipeline->
+                                      CancelAssetImport(operation)
+                                : Core::Err(
+                                      Core::ErrorCode::InvalidState);
                         },
                 },
                 .SceneFileCommands = SandboxEditorSceneFileCommandSurface{
@@ -11341,7 +11371,10 @@ namespace Extrinsic::Runtime
                 .VisualizationAdapterBindingRevision =
                     engine.GetVisualizationAdapterBindingRevision(),
                 .DerivedJobCommands = std::move(derivedJobCommands),
-                .AssetImportQueue = engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot(),
+                .AssetImportQueue =
+                    assetImportPipeline != nullptr
+                        ? assetImportPipeline->GetAssetImportQueueSnapshot()
+                        : RuntimeAssetImportQueueSnapshot{},
                 .RenderGraphStats = &engine.GetRenderer().GetLastRenderGraphStats(),
                 .ImGuiAdapterAvailable =
                     [&engine]
@@ -11350,7 +11383,8 @@ namespace Extrinsic::Runtime
                             engine.Services().Find<EditorUiHost>();
                         return host != nullptr && host->IsOperational();
                     }(),
-                .AssetImportCommandsAvailable = true,
+                .AssetImportCommandsAvailable =
+                    assetImportPipeline != nullptr,
                 .SceneFileCommandsAvailable = true,
                 .CameraRenderCommandsAvailable = true,
                 .VisualizationCommandsAvailable = true,
@@ -16291,14 +16325,21 @@ namespace Extrinsic::Runtime
         {
             return false;
         }
-        const std::optional<RuntimeAssetImportEvent>& runtimeImport =
-            m_Engine->GetAssetImportPipeline().GetLastAssetImportEvent();
-        if (runtimeImport.has_value() &&
-            runtimeImport->Sequence != m_LastObservedRuntimeImportSequence)
+        const AssetImportPipeline* const assetImportPipeline =
+            m_Engine->Services().Find<AssetImportPipeline>();
+        const std::optional<RuntimeAssetImportEvent>* const runtimeImport =
+            assetImportPipeline != nullptr
+                ? &assetImportPipeline->GetLastAssetImportEvent()
+                : nullptr;
+        if (runtimeImport != nullptr &&
+            runtimeImport->has_value() &&
+            (*runtimeImport)->Sequence !=
+                m_LastObservedRuntimeImportSequence)
         {
             m_LastImportResult =
-                BuildFileImportResultFromRuntimeEvent(*runtimeImport);
-            m_LastObservedRuntimeImportSequence = runtimeImport->Sequence;
+                BuildFileImportResultFromRuntimeEvent(**runtimeImport);
+            m_LastObservedRuntimeImportSequence =
+                (*runtimeImport)->Sequence;
         }
         SceneDocumentModule* const sceneDocuments =
             m_Engine->Services().Find<SceneDocumentModule>();

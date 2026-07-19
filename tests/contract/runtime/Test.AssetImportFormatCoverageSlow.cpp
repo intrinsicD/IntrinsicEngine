@@ -30,6 +30,8 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.AssetWorkflowModule;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Geometry.HalfedgeMesh.IO;
 
@@ -42,6 +44,15 @@ namespace Runtime = Extrinsic::Runtime;
 
 namespace
 {
+    template <typename T>
+    [[nodiscard]] T& RequiredEngineService(
+        Extrinsic::Runtime::Engine& engine)
+    {
+        T* const service = engine.Services().Find<T>();
+        EXPECT_NE(service, nullptr);
+        return *service;
+    }
+
     class OneFrameApplication final : public Runtime::IApplication
     {
     public:
@@ -223,8 +234,10 @@ namespace
     {
         return MeshHasVertexProperty(engine, entity, "v:texcoord") &&
             MeshHasVertexProperty(engine, entity, "v:normal") &&
-            engine.GetObjectSpaceNormalBakeQueueDiagnosticsForTest()
-                .NonOperationalNoOps > 0u;
+            RequiredEngineService<
+                Extrinsic::Runtime::AssetImportPipeline>(engine)
+                .GetLastAssetImportEvent()
+                .has_value();
     }
 
     void InstallSandboxDefaultRuntimePolicies(Runtime::Engine& engine)
@@ -251,11 +264,13 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsGeneratedG
             HeadlessConfig(),
             std::make_unique<OneFrameApplication>());
         closingEngine.EmplaceModule<Runtime::AsyncWorkModule>();
+        closingEngine.EmplaceModule<Runtime::SceneDocumentModule>();
+        closingEngine.EmplaceModule<Runtime::AssetWorkflowModule>();
         closingEngine.Initialize();
         InstallSandboxDefaultRuntimePolicies(closingEngine);
 
         auto imported =
-            closingEngine.GetAssetImportPipeline().ImportAssetFromPath(
+            RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(closingEngine).ImportAssetFromPath(
                 Runtime::RuntimeAssetImportRequest{
                     .Path = meshFile.Path.string(),
                     .PayloadKind = Assets::AssetPayloadKind::Mesh,
@@ -286,11 +301,13 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsGeneratedG
             },
             4096u));
     completedEngine.EmplaceModule<Runtime::AsyncWorkModule>();
+    completedEngine.EmplaceModule<Runtime::SceneDocumentModule>();
+    completedEngine.EmplaceModule<Runtime::AssetWorkflowModule>();
     completedEngine.Initialize();
     InstallSandboxDefaultRuntimePolicies(completedEngine);
 
     auto imported =
-        completedEngine.GetAssetImportPipeline().ImportAssetFromPath(
+        RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(completedEngine).ImportAssetFromPath(
             Runtime::RuntimeAssetImportRequest{
                 .Path = meshFile.Path.string(),
                 .PayloadKind = Assets::AssetPayloadKind::Mesh,

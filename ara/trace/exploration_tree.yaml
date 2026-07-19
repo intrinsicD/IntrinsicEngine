@@ -6353,3 +6353,54 @@ tree:
       expectations or production behavior, made all five deterministic reruns
       pass.
     status: resolved
+  - id: N268
+    type: experiment
+    title: "Migrate existing tests to the app-composed asset workflow"
+    provenance: ai-executed
+    timestamp: "2026-07-19T17:38+02:00"
+    also_depends_on: [N267]
+    evidence:
+      - "commit 74a15419"
+      - "tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp"
+      - "tests/contract/runtime/Test.SceneDocumentModule.cpp"
+      - "ninja -C build/runtime183-foundation Test.RuntimeEngineLayering.cpp.o Test.RuntimeEnginePrivateGlue.cpp.o"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+    result: >
+      Migrated 23 existing runtime contract and integration test files from the
+      five retired Engine asset/cache/import/bake diagnostic getters to exact
+      ServiceRegistry lookups. Asset-dependent fixtures now compose both
+      SceneDocumentModule and AssetWorkflowModule while omission tests remain
+      uncomposed. The blocked-import shutdown regression retains the
+      module-owned pipeline pointer across service withdrawal and verifies that
+      reinitialization republishes the same instance. Source-contract objects
+      compiled, strict test layout and diff checks passed, and all five removed
+      getter spellings have zero residual occurrences in existing tests.
+    status: resolved
+  - id: N269
+    type: decision
+    title: "Adjudicate superseded asset-residency ownership records"
+    provenance: ai-executed
+    timestamp: "2026-07-19T17:38+02:00"
+    also_depends_on: [N268]
+    choice: >
+      Adopt A15's app-composed exact-service AssetWorkflowModule ownership and
+      retain A05 only as explicitly superseded historical evidence.
+    alternatives:
+      - "Retain A05's Engine-private residency ownership and compatibility getters."
+      - "Adopt A15's app-composed exact-service AssetWorkflowModule ownership."
+    evidence:
+      - "logic/solution/architecture.md:A05"
+      - "logic/solution/architecture.md:A15"
+      - "commit 0c5b0d23"
+      - "commit 478b0d7d"
+      - "src/runtime/Runtime.AssetWorkflowModule.cppm"
+      - "src/runtime/Runtime.AssetWorkflowModule.cpp"
+      - "docs/adr/0027-right-sized-runtime-composition.md"
+    result: >
+      RUNTIME-183 removed Engine asset/import/cache/bake ownership and facades,
+      composed the exact AssetWorkflow services in Sandbox, and closed the
+      22/0/2/10 convergence contract. A05 no longer describes current
+      ownership and is marked superseded by A15.
+    status: resolved

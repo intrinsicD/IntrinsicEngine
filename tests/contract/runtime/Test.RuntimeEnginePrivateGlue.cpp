@@ -565,23 +565,23 @@ TEST(RuntimeEnginePrivateGlue, RenderExtractionServiceIsEnginePrivateImplementat
               std::string::npos);
 }
 
-TEST(RuntimeEnginePrivateGlue, AssetResidencyServiceIsEnginePrivateImplementation)
+TEST(RuntimeEnginePrivateGlue, AssetWorkflowCompositionIsModuleOwned)
 {
     const auto root = RepoRoot();
-    const auto engineInterface = ReadFile(root / "src/runtime/Runtime.Engine.cppm");
-    const auto engineImpl = ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+    const auto engineInterface =
+        ReadFile(root / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl =
+        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
     const auto frameLoop = ReadFile(
         root / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
-    const auto privateHeader = ReadFile(
-        root / "src/runtime/Runtime.AssetResidencyService.Internal.hpp");
-    const auto runtimeCMake = ReadFile(root / "src/runtime/CMakeLists.txt");
-    const auto moduleInventory = ReadFile(
-        root / "docs/api/generated/module_inventory.md");
-    constexpr std::string_view includeDirective =
-        "#include \"Runtime.AssetResidencyService.Internal.hpp\"";
+    const auto workflowInterface = ReadFile(
+        root / "src/runtime/Runtime.AssetWorkflowModule.cppm");
+    const auto workflowImpl = ReadFile(
+        root / "src/runtime/Runtime.AssetWorkflowModule.cpp");
+    const auto runtimeCMake =
+        ReadFile(root / "src/runtime/CMakeLists.txt");
 
-    std::vector<std::filesystem::path> includeOwners;
-    std::vector<std::filesystem::path> implementationOwners;
+    std::vector<std::filesystem::path> workflowModuleUnits;
     for (const auto& entry : std::filesystem::recursive_directory_iterator(
              root / "src/runtime"))
     {
@@ -590,215 +590,145 @@ TEST(RuntimeEnginePrivateGlue, AssetResidencyServiceIsEnginePrivateImplementatio
         const auto extension = entry.path().extension();
         if (extension != ".cpp" && extension != ".cppm" &&
             extension != ".hpp" && extension != ".h")
+        {
             continue;
-        const auto content = ReadFile(entry.path());
-        if (content.find(includeDirective) != std::string::npos)
-            includeOwners.push_back(entry.path());
-        if (content.find("AssetResidencyService::") != std::string::npos)
-            implementationOwners.push_back(entry.path());
+        }
+        if (ReadFile(entry.path()).find(
+                "module Extrinsic.Runtime.AssetWorkflowModule") !=
+            std::string::npos)
+        {
+            workflowModuleUnits.push_back(entry.path());
+        }
     }
 
+    ASSERT_EQ(workflowModuleUnits.size(), 2u);
+    bool foundInterface = false;
+    bool foundImplementation = false;
+    for (const auto& owner : workflowModuleUnits)
+    {
+        foundInterface |=
+            owner ==
+            root /
+                "src/runtime/Runtime.AssetWorkflowModule.cppm";
+        foundImplementation |=
+            owner ==
+            root /
+                "src/runtime/Runtime.AssetWorkflowModule.cpp";
+    }
+    EXPECT_TRUE(foundInterface);
+    EXPECT_TRUE(foundImplementation);
+    EXPECT_FALSE(std::filesystem::exists(
+        root /
+        "src/runtime/Runtime.AssetResidencyService.Internal.hpp"));
     EXPECT_FALSE(std::filesystem::exists(
         root / "src/runtime/Runtime.AssetResidencyService.cppm"));
     EXPECT_FALSE(std::filesystem::exists(
         root / "src/runtime/Runtime.AssetResidencyService.cpp"));
-    ASSERT_EQ(includeOwners.size(), 1u);
-    EXPECT_EQ(includeOwners.front().filename(), "Runtime.Engine.cpp");
-    ASSERT_EQ(implementationOwners.size(), 1u);
-    EXPECT_EQ(implementationOwners.front().filename(), "Runtime.Engine.cpp");
-    EXPECT_EQ(engineInterface.find(includeDirective), std::string::npos);
-    EXPECT_NE(engineImpl.find(includeDirective), std::string::npos);
-    EXPECT_EQ(engineInterface.find(
-                  "import Extrinsic.Runtime.AssetResidencyService"),
-              std::string::npos);
-    EXPECT_FALSE(ContainsModuleDirective(privateHeader));
-    EXPECT_NE(privateHeader.find(
-                  "Runtime.Engine.cpp is the sole include"),
-              std::string::npos);
-    EXPECT_NE(engineInterface.find("class AssetResidencyService;"),
-              std::string::npos);
-    EXPECT_NE(privateHeader.find("struct AssetResidencySceneHandoffOptions"),
-              std::string::npos);
-    EXPECT_NE(privateHeader.find("class AssetResidencyService"),
-              std::string::npos);
-    EXPECT_NE(privateHeader.find(
-                  "std::unique_ptr<Graphics::GpuAssetCache> m_GpuAssetCache"),
-              std::string::npos);
-    EXPECT_NE(privateHeader.find("m_GpuAssetCacheListener"),
-              std::string::npos);
-    EXPECT_NE(privateHeader.find(
-                  "std::unique_ptr<AssetModelTextureHandoff> m_AssetModelTextureHandoff"),
-              std::string::npos);
-    EXPECT_NE(privateHeader.find(
-                  "std::unique_ptr<AssetModelSceneHandoff> m_AssetModelSceneHandoff"),
-              std::string::npos);
-    EXPECT_NE(engineInterface.find(
-                  "std::unique_ptr<AssetResidencyService>   m_AssetResidencyService"),
-              std::string::npos);
-    const auto assetServiceMember = engineInterface.find(
-        "std::unique_ptr<Assets::AssetService>  m_AssetService");
-    const auto residencyMember = engineInterface.find(
-        "std::unique_ptr<AssetResidencyService>   m_AssetResidencyService");
-    const auto normalBakeMember = engineInterface.find(
-        "ObjectSpaceNormalBakeService             m_ObjectSpaceNormalBakeService");
-    ASSERT_NE(assetServiceMember, std::string::npos);
-    ASSERT_NE(residencyMember, std::string::npos);
-    ASSERT_NE(normalBakeMember, std::string::npos);
-    EXPECT_LT(assetServiceMember, residencyMember);
-    EXPECT_LT(residencyMember, normalBakeMember);
-    EXPECT_EQ(engineInterface.find("m_GpuAssetCache"), std::string::npos);
-    EXPECT_EQ(engineInterface.find("m_GpuAssetCacheListener"),
-              std::string::npos);
-    EXPECT_EQ(engineInterface.find("m_AssetModelTextureHandoff"),
-              std::string::npos);
-    EXPECT_EQ(engineInterface.find("m_AssetModelSceneHandoff"),
-              std::string::npos);
 
-    constexpr std::string_view implementationOnlyImports[] = {
-        "import Extrinsic.Asset.EventBus;",
-        "import Extrinsic.Runtime.AssetModelSceneHandoff;",
-        "import Extrinsic.Runtime.AssetModelTextureHandoff;",
-        "import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;",
+    const std::vector<std::string> removedEngineTokens = {
+        "AssetResidencyService",
+        std::string{"GetAsset"} + "Service(",
+        std::string{"GetGpuAsset"} + "Cache(",
+        std::string{"GetAssetImport"} + "Pipeline(",
+        std::string{"GetObjectSpaceNormalBakeQueue"} +
+            "DiagnosticsForTest(",
+        std::string{"GetPendingObjectSpaceNormalBake"} +
+            "CountForTest(",
+        "m_AssetService",
+        "m_AssetImportPipeline",
+        "m_AssetResidencyService",
+        "m_ObjectSpaceNormalBakeService",
+        "BindActiveSceneAssetHandoffs",
+        "RegisterSceneReplacementParticipants",
     };
-    for (const auto implementationOnlyImport : implementationOnlyImports)
+    for (const auto& token : removedEngineTokens)
     {
-        EXPECT_EQ(engineInterface.find(implementationOnlyImport),
-                  std::string::npos);
-        EXPECT_NE(engineImpl.find(implementationOnlyImport),
-                  std::string::npos);
+        EXPECT_EQ(engineInterface.find(token), std::string::npos)
+            << token;
+        EXPECT_EQ(engineImpl.find(token), std::string::npos)
+            << token;
     }
-    EXPECT_NE(engineInterface.find(
-                  "import Extrinsic.Graphics.GpuAssetCache;"),
-              std::string::npos);
-    EXPECT_NE(engineInterface.find(
-                  "import Extrinsic.Runtime.ObjectSpaceNormalBakeService;"),
-              std::string::npos);
-    EXPECT_TRUE(std::filesystem::exists(
-        root / "src/graphics/assets/Graphics.GpuAssetCache.cppm"));
-    EXPECT_TRUE(std::filesystem::exists(
-        root / "src/runtime/Runtime.AssetModelSceneHandoff.cppm"));
-    EXPECT_TRUE(std::filesystem::exists(
-        root / "src/runtime/Runtime.AssetModelTextureHandoff.cppm"));
-    EXPECT_TRUE(std::filesystem::exists(
-        root / "src/runtime/Runtime.ObjectSpaceNormalBakeQueue.cppm"));
 
-    EXPECT_NE(engineImpl.find("module Extrinsic.Runtime.Engine;"),
+    EXPECT_NE(workflowInterface.find(
+                  "export module Extrinsic.Runtime.AssetWorkflowModule;"),
               std::string::npos);
-    EXPECT_EQ(engineImpl.find(
-                  "module Extrinsic.Runtime.AssetResidencyService;"),
+    EXPECT_NE(workflowInterface.find(
+                  "public Core::IAssetFrameHooks"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find(
-                  "m_AssetResidencyService(std::make_unique<AssetResidencyService>())"),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("m_AssetResidencyService->InitializeGpuCache("),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find(
-                  "m_AssetResidencyService->InitializeSceneHandoffs("),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("m_AssetResidencyService->CachePtr()"),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find(
-                  "m_AssetResidencyService->ModelTextureHandoff()"),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find(
-                  "m_AssetResidencyService->ModelSceneHandoff()"),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("m_AssetResidencyService->Cache()"),
-              std::string::npos);
-    EXPECT_NE(frameLoop.find("AssetResidency.TickAssets(AssetService"),
-              std::string::npos);
-
-    EXPECT_NE(engineImpl.find(
-                  "import Extrinsic.Runtime.AssetModelSceneHandoff"),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find(
-                  "import Extrinsic.Runtime.AssetModelTextureHandoff"),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("import Extrinsic.Asset.EventBus"),
-              std::string::npos);
-    constexpr std::string_view methodDefinitions[] = {
-        "AssetResidencyService::~AssetResidencyService()",
-        "void AssetResidencyService::InitializeGpuCache(",
-        "void AssetResidencyService::InitializeSceneHandoffs(",
-        "Graphics::GpuAssetCache& AssetResidencyService::Cache() noexcept",
-        "AssetResidencyService::Cache() const noexcept",
-        "Graphics::GpuAssetCache* AssetResidencyService::CachePtr() noexcept",
-        "AssetResidencyService::CachePtr() const noexcept",
-        "AssetResidencyService::ModelTextureHandoff() noexcept",
-        "AssetResidencyService::ModelTextureHandoff() const noexcept",
-        "AssetResidencyService::ModelSceneHandoff() noexcept",
-        "AssetResidencyService::ModelSceneHandoff() const noexcept",
-        "void AssetResidencyService::TickAssets(",
-        "void AssetResidencyService::DestroySceneBorrowers()",
-        "void AssetResidencyService::DestroyAssets(",
+    constexpr std::string_view ownedCompositionTokens[] = {
+        "std::unique_ptr<Assets::AssetService> Assets{}",
+        "std::unique_ptr<Graphics::GpuAssetCache> Cache{}",
+        "AssetImportPipeline Pipeline{}",
+        "ObjectSpaceNormalBakeService Bake{}",
+        "Provide<Assets::AssetService>",
+        "Provide<AssetImportPipeline>",
+        "Provide<Graphics::GpuAssetCache>",
+        "Provide<Core::IAssetFrameHooks>",
+        "std::make_unique<AssetModelTextureHandoff>",
+        "std::make_unique<AssetModelSceneHandoff>",
     };
-    for (const auto methodDefinition : methodDefinitions)
-        EXPECT_NE(engineImpl.find(methodDefinition), std::string::npos);
+    for (const auto token : ownedCompositionTokens)
+    {
+        EXPECT_NE(workflowImpl.find(token), std::string::npos)
+            << token;
+        EXPECT_EQ(engineImpl.find(token), std::string::npos)
+            << token;
+        for (const auto& entry :
+             std::filesystem::recursive_directory_iterator(
+                 root / "src/runtime"))
+        {
+            if (!entry.is_regular_file())
+                continue;
+            const auto extension = entry.path().extension();
+            if (extension != ".cpp" &&
+                extension != ".cppm" &&
+                extension != ".hpp" &&
+                extension != ".h")
+            {
+                continue;
+            }
+            if (entry.path() ==
+                root /
+                    "src/runtime/Runtime.AssetWorkflowModule.cpp")
+            {
+                continue;
+            }
+            EXPECT_EQ(
+                ReadFile(entry.path()).find(token),
+                std::string::npos)
+                << token << " in " << entry.path();
+        }
+    }
+    EXPECT_NE(
+        workflowImpl.find(
+            "InitializeRuntimeGpuAssetFallbackTexture("),
+        std::string::npos);
 
-    EXPECT_NE(engineImpl.find("std::make_unique<Graphics::GpuAssetCache>"),
+    EXPECT_NE(workflowImpl.find(
+                  "setup.Services().Find<StreamingExecutor>()"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("std::make_unique<AssetModelTextureHandoff>"),
+    EXPECT_NE(workflowImpl.find(
+                  "setup.Services().Find<SelectionController>()"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("std::make_unique<AssetModelSceneHandoff>"),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("SubscribeAll("), std::string::npos);
-    EXPECT_NE(engineImpl.find("NotifyFailed(id)"), std::string::npos);
-    EXPECT_NE(engineImpl.find("InitializeRuntimeGpuAssetFallbackTexture("),
-              std::string::npos);
-    EXPECT_EQ(frameLoop.find("AssetModelSceneHandoff*"), std::string::npos);
-
     EXPECT_NE(engineImpl.find(
-                  "InitializeRuntimeGpuAssetFallbackTexture(*m_GpuAssetCache"),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("assets.SubscribeAll("), std::string::npos);
-    EXPECT_NE(engineImpl.find("cache->NotifyFailed(id)"),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("std::make_unique<AssetModelTextureHandoff>"),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("std::make_unique<AssetModelSceneHandoff>"),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("ResolvePendingMaterialTextureBindings()"),
+                  "m_ServiceRegistry.Find<Graphics::GpuAssetCache>()"),
               std::string::npos);
     EXPECT_NE(engineImpl.find(
-                  "assets->UnsubscribeAll(m_GpuAssetCacheListener)"),
+                  "Core::IAssetFrameHooks>()"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find(
+                  "m_ServiceRegistry.Find<AssetImportPipeline>()"),
+              std::string::npos);
+    EXPECT_NE(frameLoop.find("if (AssetWorkflow != nullptr)"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("pipeline != nullptr"),
               std::string::npos);
 
-    const auto destroyAssets = engineImpl.find(
-        "void AssetResidencyService::DestroyAssets(");
-    ASSERT_NE(destroyAssets, std::string::npos);
-    const auto destroyScene = engineImpl.find(
-        "DestroySceneBorrowers();", destroyAssets);
-    const auto destroyTextureHandoff = engineImpl.find(
-        "m_AssetModelTextureHandoff.reset();", destroyAssets);
-    const auto unsubscribe = engineImpl.find(
-        "assets->UnsubscribeAll(m_GpuAssetCacheListener)", destroyAssets);
-    const auto destroyCache = engineImpl.find(
-        "m_GpuAssetCache.reset();", destroyAssets);
-    ASSERT_NE(destroyScene, std::string::npos);
-    ASSERT_NE(destroyTextureHandoff, std::string::npos);
-    ASSERT_NE(unsubscribe, std::string::npos);
-    ASSERT_NE(destroyCache, std::string::npos);
-    EXPECT_LT(destroyScene, destroyTextureHandoff);
-    EXPECT_LT(destroyTextureHandoff, unsubscribe);
-    EXPECT_LT(unsubscribe, destroyCache);
-
-    EXPECT_EQ(runtimeCMake.find("Runtime.AssetResidencyService.cpp"),
+    EXPECT_NE(runtimeCMake.find("Runtime.AssetWorkflowModule.cppm"),
               std::string::npos);
-    EXPECT_EQ(runtimeCMake.find("Runtime.AssetResidencyService.cppm"),
+    EXPECT_NE(runtimeCMake.find("Runtime.AssetWorkflowModule.cpp"),
               std::string::npos);
-    EXPECT_EQ(moduleInventory.find(
-                  "Extrinsic.Runtime.AssetResidencyService"),
-              std::string::npos);
-    EXPECT_NE(moduleInventory.find("Extrinsic.Graphics.GpuAssetCache`"),
-              std::string::npos);
-    EXPECT_NE(moduleInventory.find(
-                  "Extrinsic.Runtime.AssetModelSceneHandoff`"),
-              std::string::npos);
-    EXPECT_NE(moduleInventory.find(
-                  "Extrinsic.Runtime.AssetModelTextureHandoff`"),
-              std::string::npos);
-    EXPECT_NE(moduleInventory.find(
-                  "Extrinsic.Runtime.ObjectSpaceNormalBakeQueue`"),
+    EXPECT_EQ(runtimeCMake.find("Runtime.AssetResidencyService"),
               std::string::npos);
 }
 

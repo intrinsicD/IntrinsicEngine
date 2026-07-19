@@ -13,7 +13,10 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.AssetWorkflowModule;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
 
@@ -22,6 +25,25 @@ using Extrinsic::ECS::Scene::Registry;
 
 namespace
 {
+    template <typename T>
+    [[nodiscard]] T& RequiredEngineService(
+        Extrinsic::Runtime::Engine& engine)
+    {
+        T* const service = engine.Services().Find<T>();
+        EXPECT_NE(service, nullptr);
+        return *service;
+    }
+
+    void InitializeAssetWorkflowEngine(
+        Extrinsic::Runtime::Engine& engine)
+    {
+        engine.EmplaceModule<
+            Extrinsic::Runtime::SceneDocumentModule>();
+        engine.EmplaceModule<
+            Extrinsic::Runtime::AssetWorkflowModule>();
+        engine.Initialize();
+    }
+
     class StubApplication final : public Extrinsic::Runtime::IApplication
     {
     public:
@@ -57,7 +79,7 @@ namespace
 TEST(ProceduralGeometryExtraction, SingleRenderableProducesOneInstanceAndOneGeometry)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeProceduralRenderable(scene);
@@ -66,7 +88,7 @@ TEST(ProceduralGeometryExtraction, SingleRenderableProducesOneInstanceAndOneGeom
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.CandidateRenderableCount, 1u);
     EXPECT_EQ(stats.AllocatedInstanceCount, 1u);
@@ -90,7 +112,7 @@ TEST(ProceduralGeometryExtraction, SingleRenderableProducesOneInstanceAndOneGeom
 TEST(ProceduralGeometryExtraction, TwoRenderablesSharingKeyShareGeometryAndDedup)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     (void)MakeProceduralRenderable(scene);
@@ -99,7 +121,7 @@ TEST(ProceduralGeometryExtraction, TwoRenderablesSharingKeyShareGeometryAndDedup
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.CandidateRenderableCount, 2u);
     EXPECT_EQ(stats.AllocatedInstanceCount, 2u);
@@ -118,7 +140,7 @@ TEST(ProceduralGeometryExtraction, TwoRenderablesSharingKeyShareGeometryAndDedup
 TEST(ProceduralGeometryExtraction, GpuWorldReportsBoundGeometryForProceduralInstance)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeProceduralRenderable(scene);
@@ -126,7 +148,7 @@ TEST(ProceduralGeometryExtraction, GpuWorldReportsBoundGeometryForProceduralInst
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.AllocatedInstanceCount, 1u);
     ASSERT_EQ(stats.ProceduralGeometryUploads, 1u);
 
@@ -157,7 +179,7 @@ TEST(ProceduralGeometryExtraction, AssetAndProceduralSourcesOnSameEntityIncremen
     namespace G = Extrinsic::Graphics::Components;
 
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
@@ -170,7 +192,7 @@ TEST(ProceduralGeometryExtraction, AssetAndProceduralSourcesOnSameEntityIncremen
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     EXPECT_EQ(stats.CandidateRenderableCount, 1u);
     EXPECT_EQ(stats.ProceduralRenderablesEnumerated, 1u);
@@ -189,7 +211,7 @@ TEST(ProceduralGeometryExtraction, AssetAndProceduralSourcesOnSameEntityIncremen
 TEST(ProceduralGeometryExtraction, ProceduralSourceClearsSlotSourceAssetSentinel)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     (void)MakeProceduralRenderable(scene);
@@ -197,7 +219,7 @@ TEST(ProceduralGeometryExtraction, ProceduralSourceClearsSlotSourceAssetSentinel
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                     engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+                                                    &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
     ASSERT_EQ(stats.ProceduralGeometryUploads, 1u);
     EXPECT_EQ(stats.SourceAssetObservationCount, 0u);
@@ -211,7 +233,7 @@ TEST(ProceduralGeometryExtraction, ProceduralSourceClearsSlotSourceAssetSentinel
 TEST(ProceduralGeometryExtraction, EntityDestructionRetiresGeometryAfterDeferredWindow)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeProceduralRenderable(scene);
@@ -221,7 +243,7 @@ TEST(ProceduralGeometryExtraction, EntityDestructionRetiresGeometryAfterDeferred
     // First tick: upload the procedural geometry.
     auto stats = extraction.ExtractAndSubmit(scene,
                                               engine.GetRenderer(),
-                                              &engine.GetGpuAssetCache());
+                                              &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.ProceduralGeometryUploads, 1u);
     ASSERT_EQ(stats.ProceduralGeometryReleases, 0u);
     ASSERT_EQ(stats.ProceduralGeometryFreeRetires, 0u);
@@ -236,7 +258,7 @@ TEST(ProceduralGeometryExtraction, EntityDestructionRetiresGeometryAfterDeferred
     // cache refcount to zero, and enqueues the geometry for deferred retire.
     stats = extraction.ExtractAndSubmit(scene,
                                          engine.GetRenderer(),
-                                         &engine.GetGpuAssetCache());
+                                         &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.FreedInstanceCount, 1u);
     EXPECT_EQ(stats.ProceduralGeometryReleases, 1u);
     EXPECT_EQ(stats.ProceduralGeometryFreeRetires, 0u);
@@ -261,7 +283,7 @@ TEST(ProceduralGeometryExtraction, EntityDestructionRetiresGeometryAfterDeferred
     // The next ExtractAndSubmit surfaces the FreeRetires delta.
     stats = extraction.ExtractAndSubmit(scene,
                                          engine.GetRenderer(),
-                                         &engine.GetGpuAssetCache());
+                                         &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.ProceduralGeometryFreeRetires, 1u);
 
     extraction.Shutdown(engine.GetRenderer());
@@ -271,7 +293,7 @@ TEST(ProceduralGeometryExtraction, EntityDestructionRetiresGeometryAfterDeferred
 TEST(ProceduralGeometryExtraction, RecreateProceduralEntityCancelsRetireAndKeepsHandle)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
-    engine.Initialize();
+    InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle first = MakeProceduralRenderable(scene);
@@ -279,7 +301,7 @@ TEST(ProceduralGeometryExtraction, RecreateProceduralEntityCancelsRetireAndKeeps
     Extrinsic::Runtime::RenderExtractionCache extraction;
     auto stats = extraction.ExtractAndSubmit(scene,
                                               engine.GetRenderer(),
-                                              &engine.GetGpuAssetCache());
+                                              &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.ProceduralGeometryUploads, 1u);
 
     const auto firstView =
@@ -291,7 +313,7 @@ TEST(ProceduralGeometryExtraction, RecreateProceduralEntityCancelsRetireAndKeeps
     scene.Destroy(first);
     stats = extraction.ExtractAndSubmit(scene,
                                          engine.GetRenderer(),
-                                         &engine.GetGpuAssetCache());
+                                         &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     ASSERT_EQ(stats.ProceduralGeometryReleases, 1u);
     ASSERT_EQ(stats.ProceduralGeometryFreeRetires, 0u);
 
@@ -302,7 +324,7 @@ TEST(ProceduralGeometryExtraction, RecreateProceduralEntityCancelsRetireAndKeeps
     const EntityHandle second = MakeProceduralRenderable(scene);
     stats = extraction.ExtractAndSubmit(scene,
                                          engine.GetRenderer(),
-                                         &engine.GetGpuAssetCache());
+                                         &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
     EXPECT_EQ(stats.ProceduralGeometryUploads, 0u);
     EXPECT_EQ(stats.ProceduralGeometryRetireCancellations, 1u);
     EXPECT_EQ(stats.ProceduralGeometryFreeRetires, 0u);

@@ -296,7 +296,7 @@ namespace Extrinsic::Runtime
     {
         struct ParticipantSlot
         {
-            std::uint32_t Generation{1u};
+            std::uint32_t Generation{0u};
             bool Occupied{false};
             std::uint64_t Sequence{0u};
             SceneReplacementParticipantDesc Desc{};
@@ -540,6 +540,17 @@ namespace Extrinsic::Runtime
         KernelEventSubscription ShutdownSubscription{};
         bool ModulePublished{false};
         bool HistoryPublished{false};
+        std::uint32_t NextParticipantGeneration{1u};
+
+        [[nodiscard]] std::uint32_t
+        AllocateParticipantGeneration() noexcept
+        {
+            const std::uint32_t generation =
+                NextParticipantGeneration++;
+            if (NextParticipantGeneration == 0u)
+                NextParticipantGeneration = 1u;
+            return generation;
+        }
 
         void ShutdownAndReset()
         {
@@ -1230,6 +1241,8 @@ namespace Extrinsic::Runtime
 
         Impl::ParticipantSlot& slot =
             state->ParticipantSlots[index];
+        slot.Generation =
+            m_Impl->AllocateParticipantGeneration();
         slot.Occupied = true;
         slot.Sequence = state->NextParticipantSequence++;
         slot.Desc = std::move(desc);
@@ -1274,9 +1287,6 @@ namespace Extrinsic::Runtime
         slot.Occupied = false;
         slot.Sequence = 0u;
         slot.Desc = {};
-        ++slot.Generation;
-        if (slot.Generation == 0u)
-            slot.Generation = 1u;
         state->FreeParticipantSlots.push_back(handle.Index);
         return Core::Ok();
     }

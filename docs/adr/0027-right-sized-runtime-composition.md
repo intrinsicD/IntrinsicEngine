@@ -25,8 +25,8 @@ single Scene editing hypothesis:
 - temporary Engine adapters captured only the exact long-lived interaction and
   asset-handoff objects required by the two demonstrated consumers.
   `RUNTIME-188` subsequently removed the interaction adapter;
-  `RUNTIME-183` owns the remaining asset adapter. Active-world Maintenance
-  remains a separate immediate rebind path;
+  `RUNTIME-183` subsequently removed the remaining asset adapter. Active-world
+  Maintenance remains separate from document replacement;
 - queued callbacks use weak module state and validate module generation,
   binding epoch, world, and registry immediately before commit. Shutdown
   announcement invalidates work while still permitting dependent modules to
@@ -59,16 +59,44 @@ separately rather than forcing them through a wrapper bundle.
   readbacks. No generic phase/context was added and extraction retains no
   interaction pointer;
 - the module retains/releases its strong document participant. Engine retains
-  only the named `RUNTIME-183` optional selection borrow for asset-import
-  dependencies, replacing it with null after shutdown announcement and before
-  reverse module teardown; and
+  only the then-named `RUNTIME-183` optional selection borrow for asset-import
+  dependencies at this intermediate slice; the implementation update below
+  removes it; and
 - the zero-consumer Engine mesh primitive-view facade, translation module, and
   extraction settings cache are deleted. Persistent ECS `RenderEdges` /
   `RenderPoints`, component-driven packing/extraction, Sandbox history, and
   scene serialization remain independent authoring state.
 
-The exact post-slice snapshot is 26 plain imports / 4 domain imports /
+The exact post-slice snapshot was 26 plain imports / 4 domain imports /
 2 re-exports / 15 public getter names.
+
+## Implementation update: RUNTIME-183
+
+`RUNTIME-183` applies the AssetWorkflow hypothesis:
+
+- optional app-composed `AssetWorkflowModule` keeps one persistent
+  dependency-empty import pipeline and normal-bake service, recreates per-boot
+  asset/cache/listener/handoffs, and publishes exactly `AssetService`,
+  `AssetImportPipeline`, `GpuAssetCache`, and the existing asset-maintenance
+  hook;
+- Engine publishes the exact built-in device and one read-only initialized
+  state borrow through `EngineSetup`. The asset module requires document and
+  exact history services, optionally resolves streaming and selection, and
+  adds no wrapper, owner facade, shutdown event, frame phase, or GPU bridge;
+- one strong document participant and direct
+  `{WorldHandle, Registry*, binding epoch}` validation clear/rebind scene
+  borrowers. Direct imports and model-scene callbacks fail closed across
+  delayed and away-and-back binding changes;
+- shutdown announcement is split from ordinary reverse module shutdown. The
+  asset listener cancels imports and detaches provider/document borrows before
+  application or provider teardown; the generic GPU bridge drains the retained
+  bake participant before module cleanup; and
+- Engine loses all asset/import/cache/bake imports, members, transition glue,
+  and five getter names. Omission retains generic world/render/transfer/async
+  work plus all five render-extraction geometry-retirement lanes.
+
+The exact post-slice snapshot is 22 plain imports / 0 domain imports /
+2 re-exports / 10 public getter names.
 
 ## Implementation update: RUNTIME-180
 
@@ -203,9 +231,9 @@ The amended target retains all of these outcomes:
 
 | Mechanism | Present evidence | Verdict and deletion test | Reintroduction or expansion trigger |
 | --- | --- | --- | --- |
-| `IRuntimeModule` | Clustering, async work, document, camera, config control, and editor UI are production implementors composed by the Sandbox. Stable name, registration, app optionality, Engine-owned lifetime, ordered shutdown, and order-independent exact dependency resolution are live. | **Keep, but narrow and make optional.** It is the type-erased app-to-runtime seam that lets Engine own optional responsibilities without importing their types. Deleting it today recreates equivalent erased callbacks, domain-specific Engine entry points, or `Engine&` app wiring, so its core complexity does not vanish. It is not a required wrapper for every cohort. `Name`, live registration, resolution, and shutdown now have production callers. | Add surface only when a named production responsibility needs it. `RUNTIME-185` still audits methods or branches left without production use. |
-| `EngineSetup` and shutdown context | Production modules use commands, events, jobs, worlds, services, shutdown, the editor generic phase-hook registrar, and Camera's typed viewport-input registrar without receiving `Engine&`. The typed registrar is wired during both registration and resolution. No production caller uses the sim-system registrar. | **Keep and simplify.** The capability context is load-bearing for D13 and concentrates validation. Its accepted surface contains only capabilities and registration operations used by production responsibilities; Camera's one-consumer context stays separate from the six generic phases, and the sim-system branch remains subject to `RUNTIME-185`'s deletion test. | Add scheduling surface only with the first production behavior that the frame loop must iterate; use the smallest consumer-coherent context and do not add a generic registrar for a roadmap noun. |
-| `ServiceRegistry` | Engine and composed modules publish exact borrowed capabilities. Sandbox resolves optional owners such as `SceneDocumentModule`, `EditorCommandHistory`, and camera/config services through `Find`, while `EditorUiModule::OnResolve` fail-closed requires the exact window, renderer, and input-action built-ins after all providers register. | **Keep the typed discovery core and two-phase resolution used by production modules.** `Provide`/`Find`/`Require`, null and duplicate rejection, provider identity diagnostics, exact withdrawal, and locking after boot avoid domain getters and make registration order irrelevant. A provision with no lookup consumer is still not evidence. | Expand only when a named production responsibility depends on another provider and registration order must remain irrelevant. |
+| `IRuntimeModule` | Clustering, async work, asset workflow, document, interaction, camera, config control, and editor UI are production implementors composed by the Sandbox. Stable name, registration, app optionality, Engine-owned lifetime, ordered shutdown, and order-independent exact dependency resolution are live. | **Keep, but narrow and make optional.** It is the type-erased app-to-runtime seam that lets Engine own optional responsibilities without importing their types. Deleting it today recreates equivalent erased callbacks, domain-specific Engine entry points, or `Engine&` app wiring, so its core complexity does not vanish. It is not a required wrapper for every cohort. `Name`, live registration, resolution, and shutdown now have production callers. | Add surface only when a named production responsibility needs it. `RUNTIME-185` still audits methods or branches left without production use. |
+| `EngineSetup` and shutdown context | Production modules use commands, events, jobs, worlds, services, the active recipe/config borrow, the read-only initialized-state borrow, shutdown, the editor generic phase-hook registrar, and Camera's typed viewport-input registrar without receiving `Engine&`. The typed registrar and state borrow are wired during both registration and resolution. No production caller uses the sim-system registrar. | **Keep and simplify.** The capability context is load-bearing for D13 and concentrates validation. Its accepted surface contains only capabilities and registration operations used by production responsibilities; Camera's one-consumer context stays separate from the six generic phases, and the sim-system branch remains subject to `RUNTIME-185`'s deletion test. | Add scheduling surface only with the first production behavior that the frame loop must iterate; use the smallest consumer-coherent context and do not add a generic registrar for a roadmap noun. |
+| `ServiceRegistry` | Engine and composed modules publish exact borrowed capabilities. Sandbox resolves optional asset, document/history, camera, and config services through `Find`; AssetWorkflow and EditorUi fail closed on missing exact built-ins/providers. | **Keep the typed discovery core and two-phase resolution used by production modules.** `Provide`/`Find`/`Require`, null and duplicate rejection, provider identity diagnostics, exact withdrawal, and locking after boot avoid domain getters and make registration order irrelevant. A provision with no lookup consumer is still not evidence. | Expand only when a named production responsibility depends on another provider and registration order must remain irrelevant. |
 | `RuntimeModuleSchedule` | Engine calls the schedule; optional `EditorUiModule` registers the production `UiBegin`, `UiBuild`, and `UiEndCapture` generic hooks, and optional `CameraModule` registers one typed viewport-input hook after capture/render-input initialization and before gizmo/picking/actions. Sim systems and their DAG behavior remain without a production registrant. | **Keep the demonstrated hook portions.** The two owners prove deterministic dispatch without domain-specific Engine callbacks. Typed viewport ordering shares the schedule's registration sequence but does not create a generic phase or widen every hook context. `RUNTIME-185` still removes or collapses the sim-system/DAG branches if no production system earns them. | A first real sim system justifies per-tick registration. General causal DAG ordering is justified only when real production systems declare interacting wait/signal labels. A second coherent viewport consumer may reuse the typed context; unrelated data does not broaden it. |
 | D10 extension-pass registry and insertion slots | Zero production extension registrations; built-in recipe kinds cover the current renderer. | **Defer the registry and slot taxonomy.** Keep a closed core pass vocabulary expressed as recipe data, with schema, capability, named-resource, and dependency validation. Point-splat lighting and order-dependent transparency remain design probes, not blockers. | A named production pass that cannot be expressed as an existing built-in kind must bring its resource contract, required insertion semantics, Null/CPU contract evidence, and capability-appropriate backend evidence. Only that pass's demonstrated slot is added. |
 | D11 priority input-capture filter chain | One ImGui producer records one snapshot; several viewport consumers read it. There is no competing claimant. | **Replace the chain target with the proven snapshot contract.** One data-only kernel capture value is owned by the frame loop for the duration of a frame and resets to “unclaimed” once at frame start. Each ephemeral frame-hook context borrows that same value by reference. The EditorUi owner runs `BeginFrame` in `UiBegin`, preserves the application variable tick, draws registered app panels in `UiBuild`, then runs `EndFrame` and writes capture in `UiEndCapture`; later viewport behavior, any later hooks, and kernel input-action dispatch read that completed value. This carrier adds no registry, callback facade, or ImGui import to Engine. | A second independent simultaneous capture producer must demonstrate an actual conflicting claim that cannot be represented by extending the single snapshot. Only then is an explicit arbitration policy or chain justified. |
@@ -227,7 +255,7 @@ state, commit, or consumer evidence disagrees.
 | Hypothesis | Present responsibility | Required state-scope decision |
 | --- | --- | --- |
 | Async work | `AsyncWorkService`, the persistent streaming executor, derived-job ownership, and maintenance draining | Global owner. Submitted work carries explicit cancellation/commit scope; no worker borrows a live world. |
-| Asset workflow | CPU asset service, GPU residency handoff, import pipeline, and object-space normal-bake orchestration | Global lifecycle owner. Active-world references are borrowed, rebound on world events, and never become hidden ECS ownership. Normal bake remains in this cohort only while its import/residency lifecycle and consumers are cohesive. |
+| Asset workflow | App-composed `AssetWorkflowModule` owns persistent import/bake objects plus per-boot CPU asset service, GPU residency/listener, and model handoffs | Global module object. Scene references carry an exact validated `{WorldHandle, Registry*, binding epoch}` and are rebound on active-world events or synchronous document replacement, never hidden ECS ownership. Shutdown announcement cancels and detaches borrows before providers; per-boot state dies only after generic GPU/async drain. Normal bake remains in this cohort while its import/residency lifecycle and consumers are cohesive. |
 | Scene document | App-composed `SceneDocumentModule`, command history, scene-file event identity, and synchronous replacement coordination | Global module object with durable document state bound to one exact live active `{WorldHandle, Registry*}`. Switch, retirement, shutdown, and recycled-handle reinitialization reset rather than cache state. Optional async adds queued IO but does not change the synchronous owner. |
 | Scene interaction | App-composed `SceneInteractionModule` owns selection, stable lookup/binding, pick readback/refinement, and gizmo state. Persistent mesh primitive-view authoring remains ECS component state. | Global module object with one exact validated active-world binding and interaction epoch. Replacement/switch/retirement/shutdown/reinitialize clear without resurrection; pointer-free snapshots are copied and world-tagged. |
 | Camera | App-composed `CameraModule` owns camera-controller/viewport state and active camera selection, publishes the exact registry, and contributes the typed viewport-input hook. | Global viewport owner with registry state bound to exactly one `WorldHandle`; reset clears slots/poses/transitions/seed even for equal handle bits, active change rebinds empty, destruction/shutdown invalidates, and away/back never resurrects. Reference-scene entity creation, owning-world retention, and optional initial seed handoff belong to app initial-world bootstrap. |
@@ -292,9 +320,11 @@ After `RUNTIME-180`, the historical exact intermediate snapshot was
 35 plain imports, 13 domain imports, two re-exports, and 25 public getter
 names. `RUNTIME-172` reduces the current exact snapshot to 33 plain imports,
 11 domain imports, two re-exports, and 22 public getter names. `RUNTIME-188`
-then reduces the current exact snapshot to 26 plain imports, 4 domain imports,
-2 re-exports, and 15 public getter names. These remain migration evidence, not
-the final allowed-surface budget.
+then reduces the snapshot to 26 plain imports, 4 domain imports,
+2 re-exports, and 15 public getter names. `RUNTIME-183` reduces the current
+snapshot to 22 plain imports, zero domain imports, 2 re-exports, and 10 public
+getter names. These remain migration evidence, not the final allowed-surface
+budget.
 
 ## Consequences
 

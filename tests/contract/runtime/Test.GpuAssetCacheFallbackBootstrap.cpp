@@ -5,9 +5,11 @@
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.AssetWorkflowModule;
+import Extrinsic.Runtime.SceneDocumentModule;
 
 // RUNTIME-070: contract surface around the
-// `Engine::Initialize()` → `GpuAssetCache::InitializeFallbackTexture()`
+// `AssetWorkflowModule::OnRegister()` → fallback texture bootstrap
 // bootstrap. These tests stay on the CPU/Null path: the Null backend hard-
 // codes `IDevice::IsOperational() == false`, so the bootstrap is gated off
 // and `FallbackTextureReady` must stay `false`. The "operational device"
@@ -16,6 +18,15 @@ import Extrinsic.Runtime.Engine;
 
 namespace
 {
+    template <typename T>
+    [[nodiscard]] T& RequiredEngineService(
+        Extrinsic::Runtime::Engine& engine)
+    {
+        T* const service = engine.Services().Find<T>();
+        EXPECT_NE(service, nullptr);
+        return *service;
+    }
+
     class StubApplication final : public Extrinsic::Runtime::IApplication
     {
     public:
@@ -40,9 +51,13 @@ TEST(GpuAssetCacheFallbackBootstrap, NullDeviceLeavesFallbackUnreadyDeterministi
     Extrinsic::Core::Config::EngineConfig config = SingleWorkerEngineConfig();
     Extrinsic::Runtime::Engine engine(config, std::make_unique<StubApplication>());
 
+    engine.EmplaceModule<
+        Extrinsic::Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<
+        Extrinsic::Runtime::AssetWorkflowModule>();
     engine.Initialize();
 
-    const auto diagnostics = engine.GetGpuAssetCache().GetDiagnostics();
+    const auto diagnostics = RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine).GetDiagnostics();
     EXPECT_FALSE(diagnostics.FallbackTextureReady)
         << "Null device must not back the fallback texture; bootstrap is "
            "gated on IDevice::IsOperational() per RUNTIME-070.";
@@ -57,13 +72,17 @@ TEST(GpuAssetCacheFallbackBootstrap, ReInitializeRebootstrapsExactlyOnce)
     Extrinsic::Core::Config::EngineConfig config = SingleWorkerEngineConfig();
     Extrinsic::Runtime::Engine engine(config, std::make_unique<StubApplication>());
 
+    engine.EmplaceModule<
+        Extrinsic::Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<
+        Extrinsic::Runtime::AssetWorkflowModule>();
     engine.Initialize();
-    const auto firstDiagnostics = engine.GetGpuAssetCache().GetDiagnostics();
+    const auto firstDiagnostics = RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine).GetDiagnostics();
     EXPECT_FALSE(firstDiagnostics.FallbackTextureReady);
     engine.Shutdown();
 
     engine.Initialize();
-    const auto secondDiagnostics = engine.GetGpuAssetCache().GetDiagnostics();
+    const auto secondDiagnostics = RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine).GetDiagnostics();
     EXPECT_FALSE(secondDiagnostics.FallbackTextureReady)
         << "Re-Initialize must rebuild the cache cleanly with the same Null-gated "
            "fallback state — no leftover lease, no double-bootstrap counter drift.";
