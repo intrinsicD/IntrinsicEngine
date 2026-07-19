@@ -16,10 +16,6 @@ Each active task should include:
   `codex/arch-014-kernel-convergence-program`; blocked on final leaf
   `RUNTIME-187`. Next gate: execute the unblocked ADR-0027 behavior-owner
   leaves and update the convergence scorecard after each retirement.
-- [`RUNTIME-179`](RUNTIME-179-extract-async-work-module.md) — app-composed
-  async-work ownership plus world-retirement hardening; owner: Codex team;
-  branch: `codex/runtime-179-async-work-module`. Next gate: four-axis cohesion
-  and live-caller inventory.
 
 ## History
 

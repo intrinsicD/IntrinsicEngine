@@ -9,7 +9,6 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/active/ARCH-014-kernel-convergence-tracking.md)
-- `RUNTIME-179` — Extract the async-work composition module (tasks/active/RUNTIME-179-extract-async-work-module.md)
 
 ## Theme B — Rendering modernization
 
@@ -36,7 +35,7 @@ the authoritative open/unblocked view.
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
 - blocked by `RUNTIME-172`: `RUNTIME-168` — Privatize Sandbox default-policy composition (tasks/backlog/runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
-- blocked by `RUNTIME-179`: `RUNTIME-172` — Extract the scene-editing composition module (tasks/backlog/runtime/RUNTIME-172-privatize-scene-document-surface.md)
+- unblocked: `RUNTIME-172` — Extract the scene-editing composition module (tasks/backlog/runtime/RUNTIME-172-privatize-scene-document-surface.md)
 - unblocked: `RUNTIME-180` — Extract the camera composition module (tasks/backlog/runtime/RUNTIME-180-extract-camera-module.md)
 - unblocked: `RUNTIME-181` — Extract the config-control composition module (tasks/backlog/runtime/RUNTIME-181-extract-config-control-module.md)
 - unblocked: `RUNTIME-182` — Extract the editor-UI composition module (tasks/backlog/runtime/RUNTIME-182-extract-editor-ui-module.md)

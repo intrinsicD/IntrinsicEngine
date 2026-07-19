@@ -5446,3 +5446,22 @@ aggregate changed. The live `IntrinsicTests` reconciliation passed with 36
 targets, 4,154 cases, and 338 assertion sources; all 19 synthetic fail-closed
 routing regressions and strict task/test-layout checks passed. Implementation
 checkpoint: `fdd466e4`.
+
+[`RUNTIME-179`](RUNTIME-179-extract-async-work-module.md) — async-work
+composition retired to `tasks/done/` on 2026-07-19 at `Operational`. One
+app-composed `AsyncWorkModule` now owns the persistent streaming executor,
+derived-job registry, maintenance hook, lifecycle, shutdown drain, and
+diagnostics; the interim service and Engine derived-job facades are gone.
+Every production task carries a generation-qualified world scope. World
+retirement cancels pending, running, readback, and ready-to-apply work, rejects
+new submissions for the retired handle, and rechecks before main-thread
+commit. Asset-import and scene-document apply gates freeze the exact world,
+scene, and binding epoch, while cancellation finalizers publish one terminal
+result outside queue locks and maintenance budgets. Module omission preserves
+the kernel's transfer-collection and asset-maintenance path. Focused
+reconciled coverage passed 238/238; the full CPU-supported selector passed
+4,121/4,121 with one expected GLFW/LSan capability skip; live routing covered
+36 targets, 4,175 cases, and 338 assertion sources. Strict kernel convergence,
+layering, task, docs, test-layout, root-hygiene, and diff checks passed.
+Implementation checkpoint: `0847ae0f`; repaired-main reconciliation:
+`e37202ec`; main merge: `b7b0f506`.

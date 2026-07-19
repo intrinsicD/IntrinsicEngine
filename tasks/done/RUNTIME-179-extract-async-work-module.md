@@ -36,11 +36,11 @@ maturity_target: Operational
   split; another job kind or internal execution mechanism alone does not.
 
 ## Status
-- Implementation complete; owner: Codex team; branch:
-  `codex/runtime-179-async-work-module`; activated 2026-07-18. Canonical
-  aggregate CPU verification completed before integration/retirement.
-- Four-axis cohesion and live-caller inventory completed 2026-07-18; the
-  implementation gate is open.
+- Completed and retired at `Operational` on 2026-07-19; owner: Codex team;
+  implementation branch: `codex/runtime-179-async-work-module`.
+- Implementation commit: `0847ae0f`; repaired-main reconciliation:
+  `e37202ec`; merged to `main` as `b7b0f506`.
+- Four-axis cohesion and live-caller inventory completed 2026-07-18.
 
 ## Four-axis cohesion and live-caller inventory
 
@@ -216,7 +216,7 @@ python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 ```
 
-Evidence recorded 2026-07-18:
+Evidence recorded 2026-07-18 through 2026-07-19:
 
 - `ci-fast` expanded runtime selection: 237/237 passed; targeted slow
   direct-mesh shutdown drain and Sandbox presentation seams: 2/2 passed.
@@ -236,7 +236,13 @@ Evidence recorded 2026-07-18:
   gate-routing baseline mismatch while preserving RUNTIME-179's scoped cases.
   The reconciled `ci-fast` runtime selection passed 238/238, and the live
   `IntrinsicTests` routing audit passed across 36 targets, 4172 cases, and
-  338 sources.
+  338 sources. Strict kernel convergence matched 41 plain imports, 19 domain
+  imports, two re-exports, and 30 public getter names; layering scanned 746
+  files with no violations.
+- After the `main` merge, the canonical incremental runtime build completed
+  918/918 steps and the focused selector passed 91/91. The main worktree's
+  live aggregate routing audit passed across 36 targets, 4175 cases, and
+  338 sources; all 19 kernel-checker regressions passed.
 
 ## Forbidden changes
 - Adding another executor, scheduler, registry, or wrapper service.

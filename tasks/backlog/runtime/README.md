@@ -140,9 +140,9 @@ an Engine-private `AssetResidencyService`.
 `RUNTIME-165` is retired; persistent `StreamingExecutor` /
 `DerivedJobRegistry` ownership, maintenance drains, shutdown reset, and
 derived-job facade delegation first moved behind
-`Extrinsic.Runtime.AsyncWorkService`. `RUNTIME-179` folds that interim service
-into the app-composed `AsyncWorkModule`, adds world-qualified retirement, and
-removes the Engine facades.
+`Extrinsic.Runtime.AsyncWorkService`. Retired `RUNTIME-179` folded that interim
+service into the app-composed `AsyncWorkModule`, added world-qualified
+retirement, and removed the Engine facades.
 
 ### ADR-0027 app-composition convergence (seeded 2026-07-18)
 
@@ -154,8 +154,8 @@ consumer or disappear. Extension-pass registration, a priority input chain,
 `InlineModule`, and `WorldSwitchModule` are deferred behind named real-consumer
 triggers. The implementation graph is:
 
-- [`RUNTIME-179`](../../active/RUNTIME-179-extract-async-work-module.md) — compose the
-  existing global streaming/derived-job owner and remove its Engine facades.
+- Retired `RUNTIME-179` composes the global streaming/derived-job owner and
+  removes its Engine facades.
 - [`RUNTIME-180`](RUNTIME-180-extract-camera-module.md) — compose global
   viewport/controller state with world-qualified targets and move initial
   reference content to app bootstrap.
@@ -204,6 +204,11 @@ independently after their respective owner prerequisites; both gate
 
 #### Retired decomposition entries
 
+- [`RUNTIME-179` — Extract the async-work composition module](../../done/RUNTIME-179-extract-async-work-module.md)
+  (done, 2026-07-19, `Operational`): one app-composed `AsyncWorkModule` owns
+  streaming/derived work, maintenance, shutdown drain, world-retirement
+  cancellation, and stale-commit rejection. Engine retains only the optional
+  domain-free maintenance-hook lookup.
 - [RUNTIME-165 — Extract async work service out of Engine](../../archive/RUNTIME-165-extract-async-work-service.md)
   (done, 2026-07-09, `Operational`): persistent `StreamingExecutor` /
   `DerivedJobRegistry` ownership, maintenance-lane completion/readback drains,
