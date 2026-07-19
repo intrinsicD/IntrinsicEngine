@@ -1782,13 +1782,32 @@ Concretely:
   material/texture base-color shading.
 - `GpuWorld::UpdateGeometryChannels(...)` is the partial-upload surface for
   runtime-authored SoA geometry. It validates that vertex/index counts still
-  match the resident allocation, writes only requested channel sub-ranges
-  (position, texcoord, normal, color) via `WriteBuffer(..., offset)`, and falls
-  back to caller-side full `UploadGeometry(...)` replacement when a channel
-  would need new storage.
+  match the resident allocation and that the submitted surface/line topology
+  is byte-identical, writes only requested channel sub-ranges (position,
+  texcoord, normal, color) via `WriteBuffer(..., offset)`, and falls back to
+  caller-side full `UploadGeometry(...)` replacement when topology changes or
+  a channel would need new storage.
   Pending channel writes are tracked by channel internally, then emitted as the
   managed vertex-buffer upload-to-shader-read barrier during
   `SubmitPendingUploadBarriers(...)`.
+- `GpuWorld::TryGetGeometryResidencyView(...)` exposes generation-checked
+  CPU metadata for the exact live managed allocation without expanding the
+  shader-facing `RHI::GpuGeometryRecord`. The view carries that current record,
+  the actual managed index-buffer handle, exact byte/count metadata,
+  deterministic position/surface-index/texcoord/normal fingerprints, and a
+  nonzero monotonic content revision. It also reports the current
+  `UniformSoA` lane with explicit `RGB32_FLOAT` position/normal,
+  `RG32_FLOAT` texcoord, and `R32_UINT` surface-index element/stride layouts.
+  Per-stream fingerprints use FNV-1a-64 (offset
+  `14695981039346656037`, prime `1099511628211`) with no domain prefix:
+  float streams normalize only the `0x80000000` negative-zero word to zero,
+  then feed each float32 word least-significant byte first; topology feeds each
+  uint32 index the same way. A zero digest is remapped to one, and only absent
+  optional texcoord/normal channels report fingerprint zero.
+  Upload seeds these facts; a successful partial channel update refreshes
+  fingerprints and advances the revision without changing the geometry handle,
+  while rejected/no-channel updates, compaction, and device-resource rebuild
+  preserve content identity. Free or stale handles fail and clear the output.
 - `GpuWorld::PlanGeometryStorage(...)` and
   `GpuWorld::PlanGeometryStoragePromotion(...)` are RUNTIME-125's planning-only
   contract for the optional static AoS fast lane. The current live storage path
@@ -2461,19 +2480,20 @@ Concretely:
   framesInFlight)`). Procedural sources never participate in
   `GpuAssetCache` generation tracking — `GpuSceneSlot::SourceAsset` stays
   default-constructed, and the existing `HasSourceAsset()` check is the
-  GRAPHICS-023C/D observation discriminator. No graphics-module surface
-  changes; `Extrinsic.Graphics.GpuWorld` continues to expose only its
-  existing `UploadGeometry`/`FreeGeometry`/`SetInstanceGeometry` API.
+  GRAPHICS-023C/D observation discriminator. That slice added no
+  graphics-module surface; the later read-only
+  `TryGetGeometryResidencyView(...)` contract reports retained allocation
+  facts without moving procedural residency ownership out of runtime.
 - Per
   [`GRAPHICS-034`](../../../tasks/archive/GRAPHICS-034-asset-backed-mesh-residency-bridge.md),
   asset-backed mesh residency is also runtime-owned. Runtime normalizes
   `AssetInstance::Source` to `Assets::AssetId`, owns the future
   `AssetGeometryCache`, requests CPU payloads through asset services, and
   drives the `NotRequested` / `CpuPending` / `GpuUploading` / `Ready` /
-  `Failed` state machine. Graphics exposes only the existing
-  `GpuWorld::UploadGeometry`, `SetInstanceGeometry`, and `FreeGeometry`
-  value-type seams; it does not import live ECS, `Asset.Service`, or runtime
-  sidecar state. Failed asset-backed meshes use a visible placeholder policy
+  `Failed` state machine. Graphics exposes value-type upload/lifetime seams
+  plus the read-only `GpuGeometryResidencyView`; it does not import live ECS,
+  `Asset.Service`, or runtime sidecar state. Failed asset-backed meshes use a
+  visible placeholder policy
   recorded by GRAPHICS-034 once the implementation child lands, with runtime
   diagnostics owning all failure and stuck-pending counters.
 - Per
