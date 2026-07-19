@@ -7,15 +7,23 @@ depends_on:
   - RUNTIME-181
   - RUNTIME-182
   - RUNTIME-183
+  - RUNTIME-188
 maturity_target: Operational
 ---
 # RUNTIME-168 — Privatize Sandbox default-policy composition
 
+## Status
+
+- 2026-07-19 contract amendment: Sandbox policy composition now resolves the
+  audited `SceneDocumentModule` and `SceneInteractionModule` split rather than
+  a combined scene-editing owner. Implementation remains open.
+
 ## Goal
 - Replace the exported, Engine-bound
   `Extrinsic.Runtime.SandboxDefaultPolicies` surface with private Sandbox app
-  composition glue over the resolved scene, camera, config, editor, and asset
-  module services.
+  composition glue over the resolved `SceneDocumentModule`,
+  `SceneInteractionModule`, camera, config, UI/editor, and asset module
+  services.
 
 ## Non-goals
 - No default import, input-action, camera-focus, selection, post-import, or
@@ -34,12 +42,19 @@ maturity_target: Operational
 - After the composition modules land, the defaults can bind their concrete
   existing service surfaces during app composition without an Engine facade or
   a new cross-domain wrapper.
+- Document/history policies resolve `SceneDocumentModule` or its exact
+  published `EditorCommandHistory`; selection, lookup, gizmo, and
+  primitive-view policies resolve `SceneInteractionModule` or its exact
+  published `SelectionController`. The app glue must not recombine them into a
+  scene-editing service bundle.
 - This task is app policy wiring, not a seventh durable runtime owner.
 
 ## Required changes
 - [ ] Inventory each default registration/unregistration and map it to the
-      owning module service: asset import/postprocess, camera focus, selection/
-      history, editor visibility/input, or config.
+      owning module service: asset import/postprocess, camera focus,
+      `SceneDocumentModule` history/document behavior,
+      `SceneInteractionModule` selection/gizmo/primitive-view behavior,
+      editor visibility/input, or config.
 - [ ] Move the exported policy declarations to private runtime/app composition
       glue, or fold each registration next to the Sandbox composition call
       that owns it.

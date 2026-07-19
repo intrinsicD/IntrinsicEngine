@@ -20,9 +20,17 @@ depends_on:
   - RUNTIME-173
   - RUNTIME-174
   - RUNTIME-177
+  - RUNTIME-188
   - PROC-027
 ---
 # REVIEW-003 — Architecture stability and right-sizing readiness audit
+
+## Status
+
+- 2026-07-19 dependency amendment: the scene-owner audit split
+  `SceneDocumentModule` (`RUNTIME-172`) from `SceneInteractionModule`
+  (`RUNTIME-188`). Both must retire before this readiness audit begins; the
+  audit remains open.
 
 ## Goal
 
@@ -50,6 +58,11 @@ depends_on:
   itself audit whole-tree complexity, premature abstraction, dead seams, or
   process-tool rent. The other static dependencies are the currently known
   ownership and right-sizing leaves that must retire before this audit runs.
+- `RUNTIME-172` and `RUNTIME-188` are separate gates because the audited scene
+  ownership split assigns document/history replacement authority and
+  frame-driven interaction/readback state to different concrete modules. The
+  readiness audit must verify both owners and must not accept a recombined
+  `SceneEditingModule` or Engine compatibility facade.
 - `BUG-087` is a gate because the documented repository-root task-validator
   invocation currently succeeds after discovering zero tasks; the readiness
   audit must use a fail-closed canonical task validator.
