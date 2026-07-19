@@ -351,12 +351,28 @@ triplet against MockDevice, non-operational skip path) run inside the default ga
 is the GRAPHICS-119 opt-in Vulkan check: it runs serial and parallel
 default-recipe frames with validation enabled, compares the captured readback
 bytes, and asserts the graphics-only parallel context plan was accepted without
-falling back to the serial path.
+falling back to the serial path. GRAPHICS-127 additionally enables the
+device-lifetime timestamp profiler before boot, resolves each candidate only
+after its exact cyclic slot is reused, and requires the serial/parallel scope
+sets to remain unique and identical on the accepted graphics queue.
 `DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialAsyncComputeReadbackWithValidation`
 is the companion non-graphics check: it keeps postprocess enabled, requires an
 operational async-compute queue profile, compares serial/parallel readback
 bytes, and asserts the accepted async-compute parallel context plan did not
-fall back to serial.
+fall back to serial. Its profiling extension requires
+`PostProcessHistogramPass` to retain `AsyncCompute` attribution while
+`SurfacePass` and its envelope remain on `Graphics`; neither fixture exposes a
+summed cross-queue duration.
+
+`DefaultRecipeSurfaceGpuSmoke.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse`
+is the GRAPHICS-127 operational proof. It enables profiling in config before
+device initialization, drives at least `2 * framesInFlight + 1` successful
+frames without a profiler-specific wait, and requires a fresh finite nonzero
+`NativeGpu` row for the recorded `SurfacePass` with an older submitted-frame
+number, exact reused slot, and sample age of at least `framesInFlight`.
+Established GLFW/Vulkan readiness failures skip before the run. Once the
+device is operational, zero timestamp-valid bits are an explicit
+`Unsupported` result with no native rows; loss of operation is a failure.
 
 The opt-in `IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests` executable (labels
 `gpu;vulkan;integration;runtime;graphics`, RUNTIME-095 Slice 3) drives

@@ -15,7 +15,8 @@ maturity_target: Operational
 
 - In progress as of 2026-07-19; owner: Codex team; implementation branch:
   `codex/graphics-127-gpu-profiler`.
-- The RHI lifecycle checkpoint is CPU-contracted on the implementation branch:
+- All five planned slices are implemented on the implementation branch. The
+  RHI lifecycle checkpoint is CPU-contracted:
   the repaired provenance contract, truthful Null adapter, checked timestamp
   helpers, and focused CPU coverage are complete. The native Vulkan checkpoint
   now owns a fixed device-lifetime query pool, resolves submitted metadata only
@@ -29,9 +30,15 @@ maturity_target: Operational
   default-off round-tripped hot field, synchronous Editor/AgentCli apply,
   one post-`UiEndCapture` immutable frame sample, and the existing Frame Graph
   panel's config and full profile projection. CPU contracts and current-state
-  cross-layer docs cover that slice. Native-GPU smoke evidence remains open.
+  cross-layer docs cover that slice.
+- The operational checkpoint passed non-skipped on 2026-07-19 on an NVIDIA
+  GeForce RTX 3050 with driver 590.48.01. The sanitizer-backed Vulkan smoke
+  resolved a named native pass after cyclic query-slot reuse and preserved
+  serial/parallel validation-readback parity on accepted graphics and
+  async-compute queues. The task remains active for final integration review;
+  this evidence slice does not retire it.
 - `RUNTIME-181` and `RUNTIME-182` are retired, so ConfigControl and EditorUi
-  are settled owners, not future blockers. Native-GPU evidence remains open.
+  are settled owners, not future blockers.
 - The 2026-07-19 activation audit found the exported profiler seam unused in
   production: the Vulkan adapter was not constructed, `EndFrame()` did not
   write its closing timestamp, and the Null adapter reported host-clock values
@@ -262,7 +269,7 @@ Each slice is a separately reviewable commit and must pass its focused CPU check
   status/source/frame/slot/age/queue/pass copying, read-only behavior when
   ConfigControl commands are absent, one preview/apply path, rejection
   diagnostics, and reuse of `view.frame_graph` with no second window.
-- [ ] Add
+- [x] Add
   `DefaultRecipeSurfaceGpuSmoke.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse`
   to
   `tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp`. Enable
@@ -275,7 +282,7 @@ Each slice is a separately reviewable commit and must pass its focused CPU check
   An operational device whose actual queue family has zero valid bits must
   instead pass with explicit `Unsupported` status and no native rows; do not
   skip or substitute CPU timing.
-- [ ] Extend
+- [x] Extend
   `DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation`
   and
   `DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialAsyncComputeReadbackWithValidation`
@@ -321,11 +328,11 @@ Each slice is a separately reviewable commit and must pass its focused CPU check
 
 ## Acceptance criteria
 
-- [ ] Enabling profiling on a supported Vulkan device produces correlated native pass timings from actual command recording after more than one slot-reuse cycle.
-- [ ] The steady-state render path adds no profiler-specific CPU/GPU wait and
+- [x] Enabling profiling on a supported Vulkan device produces correlated native pass timings from actual command recording after more than one slot-reuse cycle.
+- [x] The steady-state render path adds no profiler-specific CPU/GPU wait and
   query resolution never requests blocking or partial results.
-- [ ] Null/unsupported data cannot be mistaken for native GPU evidence.
-- [ ] Parallel and multi-queue recording remain race-free, scope each recorded
+- [x] Null/unsupported data cannot be mistaken for native GPU evidence.
+- [x] Parallel and multi-queue recording remain race-free, scope each recorded
   callback exactly once, and retain truthful accepted-queue attribution.
 - [x] Synchronous config apply is observable at the defined render-input
   snapshot boundary, and hot toggles never change query-pool lifetime.
@@ -351,6 +358,28 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check
 ```
 
+Operational evidence recorded on 2026-07-19:
+
+- `ci-vulkan` used Clang 23 with ASan+UBSan. The focused `gpu;vulkan`
+  selector passed all three non-skipped
+  `NativeGpuTimestampsResolveNamedPassesAfterSlotReuse` and
+  `ParallelRecordingMatchesSerial*WithValidation` cases (3/3).
+- Host: Vulkan 1.4.325 on NVIDIA GeForce RTX 3050, proprietary driver
+  590.48.01. Graphics and compute queue families reported
+  `timestampValidBits = 64`; `timestampPeriod = 1 ns`.
+- The native case completed 8 frames with 3 frames in flight. Its recorded
+  result was `NativeGpu`, submitted frame 4, slot 1, sample age 3; the known
+  recorded `SurfacePass` produced an available nonzero 47,104 ns diagnostic
+  sample and the same fresh value reached existing telemetry. The duration is
+  capability/correctness evidence only, not a performance claim.
+- Graphics-only and async-compute serial/parallel fixtures retained identical
+  readback bytes and stable validation counters. Exact candidate-frame
+  resolution, unique scope parity, graphics `SurfacePass`, async-compute
+  `PostProcessHistogramPass`, and independent queue envelopes all passed.
+- `VulkanFailClosedContract.Profiler*` passed 4/4. Strict layering, test
+  layout, documentation-link, task-policy/task-schema, and generated module
+  inventory checks passed.
+
 ## Forbidden changes
 
 - Blocking query resolution or using `VK_QUERY_RESULT_WAIT_BIT` in the frame path.
@@ -369,6 +398,9 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 ## Maturity
 
 - Target: `Operational` on Vulkan-capable hosts; `CPUContracted` everywhere else.
+- Achieved `Operational` on the 2026-07-19 NVIDIA/Vulkan host through the
+  non-skipped named-pass and slot-reuse smoke above; unsupported hosts retain
+  the explicit `CPUContracted`/fail-closed branch.
 - Operational evidence requires a non-skipped native-Vulkan smoke with named pass timing and slot reuse; CPU/Null lifecycle tests alone are insufficient.
 - Retirement evidence must cite the successful GPU-smoke host, Vulkan backend,
   physical GPU, driver, timestamp-valid-bit capability, frames-in-flight, and

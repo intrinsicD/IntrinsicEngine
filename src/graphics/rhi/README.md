@@ -10,6 +10,7 @@ This directory contains the `RHI` module/files.
 - `RHI.BufferTransfer.cppm` / `.cpp`
 - `RHI.Device.cppm`
 - `RHI.FrameHandle.cppm`
+- `RHI.Profiler.cppm` / `.cpp`
 - `RHI.QueueAffinity.cppm`
 - `RHI.TimelineSemaphore.cppm`
 
@@ -47,13 +48,32 @@ This directory contains the `RHI` module/files.
   primary context. The default `IDevice` implementation reports unsupported and
   declines the plan, preserving serial fallback. Null implements CPU
   bookkeeping contexts; Vulkan implements backend-local secondary command
-  buffers for graphics-queue plans and executes them from the primary context
-  without exposing `Vk*` handles through RHI. The renderer can dispatch accepted
-  recording work through `Core::Tasks` workers when the scheduler is live and
-  can join accepted non-graphics CPU/null contexts back through
-  `GetQueueSubmitContext(...)` batches. Vulkan still declines non-graphics
-  parallel context plans; Vulkan non-graphics secondary execution and the
-  opt-in Vulkan smoke remain later `GRAPHICS-119` slices.
+  buffers and executes them from the primary context without exposing `Vk*`
+  handles through RHI. The renderer can dispatch accepted recording work
+  through `Core::Tasks` workers when the scheduler is live and can join
+  accepted non-graphics CPU/null contexts back through
+  `GetQueueSubmitContext(...)` batches. Vulkan accepts graphics and
+  async-compute secondary execution when the corresponding actual queue
+  supports it; unsupported plans retain the serial graphics fallback.
+
+## GPU timestamp profiling
+
+- `RHI.Profiler.cppm` defines one optional, device-lifetime profiler contract.
+  `ProfilerFrameKey` separates the monotonically increasing submitted-frame
+  number from the cyclic frame slot, and immutable planned-scope descriptors
+  carry only ordinal, name, and accepted `QueueAffinity`. Callers plan tokens
+  before worker fan-out and explicitly seal, submit, discard, and later resolve
+  the exact frame key.
+- Status and provenance are value data. `NativeGpu` means an available native
+  timestamp pair; `ContractOnly` covers lifecycle-only Null/mock evidence; an
+  unavailable duration stays unavailable rather than using zero or a CPU clock
+  as a sentinel. Unsupported queues, exhaustion, invalid lifecycle, not-ready
+  reuse, discarded submissions, and device loss remain distinguishable.
+- Query resolution is nonblocking and tied to the backend's existing
+  frame-slot completion proof. The RHI contract does not expose native query
+  handles, add a profiler-specific wait, sum overlapping queue envelopes, or
+  define a cross-queue frame total. Native timing is default-off diagnostic
+  instrumentation, not a wall-clock or performance-claim surface.
 
 ## Timeline semaphores
 

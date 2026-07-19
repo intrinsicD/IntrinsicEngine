@@ -107,6 +107,22 @@ available through the Vulkan 1.2/1.3 feature chain.
   guarded live/safety prerequisites are ready (`PublicBindlessHeapExposed =
   true`, `PublicTransferQueueExposed = true`), while texture creation, command
   execution, and frame lifecycle still gate on `IDevice::IsOperational()`.
+- `VulkanDevice` constructs one device-lifetime `VulkanProfiler` after logical
+  device initialization, even when per-frame profiling is disabled. The
+  profiler allocates one fixed `VkQueryPool` only when an actual promoted
+  graphics or async-compute queue family has nonzero `timestampValidBits` and
+  the physical device reports a finite positive timestamp period. Unsupported
+  capability or query-pool creation failure changes profiler status only; it
+  does not make an otherwise operational device fail.
+- Reusing a frame slot preserves the native timestamp order: the existing
+  graphics/async/transfer fence proof completes first, the exact older
+  submitted key is resolved without `WAIT` or `PARTIAL`, its metadata is
+  retired, and command-recorded query resets precede the next writes outside
+  render passes. Graphics and async-compute use disjoint per-slot ranges.
+  Pass pairs bracket actual compiled callbacks, queue envelopes span only the
+  first-to-last profiled command on that queue, and timestamp masking,
+  single-wrap delta, availability, and checked period conversion use the
+  actual queue family's valid-bit width.
 - The internal `VulkanTransferQueue` path is hardened for future public handoff:
   command-buffer allocation/begin/end/submit and semaphore-query failures now log
   diagnostics and return invalid `RHI::TransferToken` values instead of aborting
@@ -613,6 +629,18 @@ postprocess enabled, requires an operational async-compute queue profile, and
 proves the accepted async-compute secondary path. Both assert
 `RenderGraphFrameStats::Execute.ParallelRecordingAccepted` with no serial
 fallback or validation-counter increment.
+
+GRAPHICS-127 adds
+`DefaultRecipeSurfaceGpuSmoke.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse`.
+The bounded fixture enables profiling before device boot, requires at least
+`2 * framesInFlight + 1` successful promoted-Vulkan frames, and verifies a
+fresh older-frame `NativeGpu` result for the known recorded `SurfacePass`
+only after its cyclic slot is reused. An operational queue family with zero
+valid timestamp bits must instead report explicit `Unsupported` status and no
+native rows. The two GRAPHICS-119 serial/parallel readback fixtures now also
+enable profiling: they retain validation and byte parity while asserting
+unique scope identity, exact resolved submitted-frame/slot correlation, and
+truthful accepted Graphics versus AsyncCompute attribution.
 
 GRAPHICS-077 and GRAPHICS-078 extend the same operational proof to the default
 recipe's post-lit overlay band. The opt-in `gpu;vulkan;graphics` fixtures
