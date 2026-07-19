@@ -13,6 +13,9 @@ maturity_target: Operational
 
 ## Status
 
+- Selectable as of 2026-07-19: `RUNTIME-172`, `RUNTIME-179`, `RUNTIME-180`,
+  `RUNTIME-181`, and `RUNTIME-188` are all retired. Implementation remains
+  open; the next gate is the bounded PImpl asset-owner slice below.
 - 2026-07-19 contract amendment: asset composition now resolves the audited
   `SceneDocumentModule` and `SceneInteractionModule` split and participates in
   document replacement through `RUNTIME-172`'s synchronous narrow contract.
@@ -26,8 +29,9 @@ maturity_target: Operational
   announcement; document quiescence permits exact-handle detachment before
   provider teardown.
 - 2026-07-19 readiness amendment: the retained/released `RUNTIME-172`
-  participant handle is now on `main`; implementation remains a hard no-go
-  until `RUNTIME-188` retires. The audited destination uses the existing
+  participant handle is on `main`, and retired `RUNTIME-188` supplies the exact
+  optional `SelectionController` service while leaving only this task's
+  implementation-local Engine borrow. The audited destination uses the existing
   shutdown event, `IAssetFrameHooks`, and `JobServiceGpuQueueBridge`; removes
   stale camera and config-control-wrapper dependencies; and fixes the exact
   post-`RUNTIME-188` convergence target below.
@@ -94,10 +98,10 @@ maturity_target: Operational
   pointer is retained. Missing streaming disables queued imports; missing
   selection disables import-completion selection UX without blocking
   materialization.
-- `RUNTIME-188` is a hard prerequisite because it removes Engine interaction
-  ownership and leaves only the named `RUNTIME-183` transition. This task
-  removes that transition, resolves the optional exact selection service, and
-  must not recreate an Engine-side interaction borrow.
+- `RUNTIME-188` removed Engine interaction ownership and left only the named
+  `RUNTIME-183` transition. This task removes that transition, resolves the
+  optional exact selection service, and must not recreate an Engine-side
+  interaction borrow.
 - Reverse name-sorted module teardown is not a safe lifetime dependency. Split
   the current announce-and-reverse-shutdown helper so the existing
   `RuntimeShutdownAnnounced` event is pumped after command discard and before

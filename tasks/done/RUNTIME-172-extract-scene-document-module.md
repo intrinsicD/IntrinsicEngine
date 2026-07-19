@@ -19,20 +19,27 @@ maturity_target: Operational
   back the first registration if the second fails, and releases both handles
   after the existing shutdown-announcement pump but before reverse module
   shutdown; it merged to `main` as `fc372b2f`. No document/history or other
-  domain state returned to Engine. `RUNTIME-188` and `RUNTIME-183` remain the
-  named removal owners for the two temporary fields.
+  domain state returned to Engine. Retired `RUNTIME-188` removed its temporary
+  interaction field; `RUNTIME-183` remains the named removal owner for the
+  asset-handoff field.
 - 2026-07-19 audit amendment: the implementation inventory disproved the
   proposed single `SceneEditingModule` owner. Document/history and editor
   interaction differ in dependencies, frame hooks, cancellation, published
   state, and omission behavior, so this task now owns only
   `SceneDocumentModule`; `RUNTIME-188` owns interaction. The split below is
   implemented and verified.
-- The implementation-only
-  `RUNTIME-188.EngineInteractionTransition` and
+- The former implementation-only
+  `RUNTIME-188.EngineInteractionTransition` and current
   `RUNTIME-183.EngineAssetHandoffTransition` callbacks are the bounded
-  independent-landing scope required below. They may import the exact document
-  and history services in `Runtime.Engine.cpp`; they add no public Engine
-  surface or durable document/history state and their named owners remove them.
+  independent-landing scope required below. Retired `RUNTIME-188` removed the
+  former; the latter may import the exact document/history services in
+  `Runtime.Engine.cpp`, adds no public Engine surface or durable
+  document/history state, and remains owned for removal by `RUNTIME-183`.
+- 2026-07-19 downstream closure: retired `RUNTIME-188`
+  replaces its temporary interaction callback with the
+  `SceneInteractionModule`-owned strong participant, leaving only
+  `RUNTIME-183.EngineAssetHandoffTransition`. The document module retains no
+  interaction state, and the resulting Engine snapshot is `26/4/2/15`.
 - Final-base verification built `IntrinsicTests`, passed the focused selector
   68/68, and passed the complete CPU-supported selector with 4,175 tests passed,
   zero failed, and the one expected GLFW/LSan capability skip. Strict

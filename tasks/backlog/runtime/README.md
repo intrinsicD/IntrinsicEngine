@@ -171,11 +171,11 @@ triggers. The implementation graph is:
   active-world binding, exact module/history publication, optional async file
   operations, and the narrow synchronous scene-replacement participant
   contract.
-- [`RUNTIME-188`](../../active/RUNTIME-188-extract-scene-interaction-module.md) — compose
-  selection/lookup/readback/gizmo ownership after the document, camera, and
-  editor-capture seams exist; copied world-tagged snapshots replace
-  Engine-owned interaction pointers, while obsolete mesh-view compatibility
-  facades/cache are deleted and ECS render-hint components remain authoritative.
+- Retired `RUNTIME-188` composes selection/lookup/readback/gizmo ownership
+  after the document, camera, and editor-capture seams; copied
+  world-tagged snapshots replace Engine-owned interaction pointers, while
+  obsolete mesh-view compatibility facades/cache are deleted and ECS
+  render-hint components remain authoritative.
 - [`RUNTIME-183`](RUNTIME-183-extract-asset-workflow-module.md) — compose the
   global asset/residency/import/bake owner after the hard document/interaction
   split; require exact document/history and built-in device/renderer/extraction
@@ -215,7 +215,8 @@ config and Frame Graph UI use the settled owners.
 Retired `RUNTIME-177` added no generic debug-draw producer seam because its
 consumer inventory was empty; existing spatial-debug and transform-gizmo
 paths remain typed. `RUNTIME-129` and `RUNTIME-184` may proceed independently
-after their respective prerequisites (`RUNTIME-183` remains for the bake;
+after their respective prerequisites (`RUNTIME-183` is now selectable and
+remains for the bake;
 `GRAPHICS-128` is retired); both gate `RUNTIME-185`.
 `ARCH-014` reaches this graph through `RUNTIME-187`; `REVIEW-003` reaches it
 transitively through `ARCH-014`.
@@ -292,18 +293,20 @@ main `Runtime.RenderExtraction` module slimming.
   while retaining its implementation under the existing
   `SandboxEditorFacades` surface; Sandbox privately owns exact provider
   borrows and typed handles, not another runtime owner.
-- [`RUNTIME-188`](../../active/RUNTIME-188-extract-scene-interaction-module.md) — extract
-  the separately audited interaction/readback/gizmo owner and remove its
-  Engine facade and borrowed render pointers.
-
 ### Retired module-surface diet work
 
+- [`RUNTIME-188`](../../done/RUNTIME-188-extract-scene-interaction-module.md)
+  retired the separately audited interaction/readback/gizmo owner at
+  `Operational`. Its Engine facade, obsolete mesh-view compatibility surface,
+  and borrowed render pointers are removed; copied one-world snapshots and
+  exact optional selection publication now carry the behavior.
 - [`RUNTIME-172`](../../done/RUNTIME-172-extract-scene-document-module.md)
   replaced the broad scene-document surface with one app-composed exact
   document/history owner, one validated active-world binding, optional
   generation-guarded async operations, and a narrow synchronous replacement
-  participant contract. Engine retains only two typed temporary participant
-  registrations whose named owners are `RUNTIME-188` and `RUNTIME-183`.
+  participant contract. The retired `RUNTIME-188` owner has absorbed its
+  participant registration; Engine retains only the typed temporary
+  `RUNTIME-183` asset-handoff registration.
 - [`RUNTIME-178`](../../done/RUNTIME-178-restore-engine-convergence-budget.md)
   restored and improved the fixed Engine convergence budget to 42 plain
   imports / 21 domain imports / 31 getter names with no temporary debt while

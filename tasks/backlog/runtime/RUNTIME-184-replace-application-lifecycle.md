@@ -13,6 +13,12 @@ maturity_target: Operational
   `SceneDocumentModule` and `SceneInteractionModule` as separate capabilities;
   it must not recreate the rejected combined scene-editing owner.
   Implementation remains open.
+- 2026-07-19 composition evidence: Sandbox now owns separate persistent
+  `SceneDocumentModule` and `SceneInteractionModule` values and registers both
+  through the ordinary module list. Interaction omission is supported without
+  an Engine facade. `RUNTIME-188` retired that exact interaction owner at
+  `Operational`; this task must preserve those exact references when it removes
+  `IApplication`.
 
 ## Goal
 - Remove the Engine-owned `IApplication` callback lifecycle and make each app

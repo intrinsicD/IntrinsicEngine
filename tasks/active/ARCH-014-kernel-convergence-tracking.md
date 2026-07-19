@@ -50,7 +50,10 @@ depends_on:
   snapshot to 35 plain imports, 13 domain imports, two re-exports, and 25
   public getter names. Retired `RUNTIME-172` removed document/history ownership
   and facades and reduced the checked snapshot to 33 plain imports, 11 domain
-  imports, two re-exports, and 22 public getter names.
+  imports, two re-exports, and 22 public getter names. Retired `RUNTIME-188`
+  removes interaction ownership/facades and the obsolete mesh-view
+  compatibility surface, reducing the checked snapshot to 26 plain imports,
+  4 domain imports, two re-exports, and 15 public getter names.
   Retired `HARDEN-085` delivered the authoritative exact-policy ratchet.
   `ARCH-012`
   retired on 2026-07-08 at `Operational`: Sandbox composes
@@ -73,7 +76,7 @@ depends_on:
 - The 2026-07-18 reconciliation audit measured the exact clean ratchet at
   42 plain imports, 21 then-classified domain imports, 2 re-exports, and 31
   public getter names. Subsequent behavior-backed extractions now measure
-  33 / 11 / 2 / 22. The audit also found that the literal scorecard would
+  26 / 4 / 2 / 15. The audit also found that the literal scorecard would
   require zero-consumer extension/input frameworks, an unused `InlineModule`,
   and mechanical `IRuntimeModule` wrappers while the right-sizing audit that
   owns that interface is itself blocked on this umbrella.
@@ -82,7 +85,7 @@ depends_on:
   mechanism-count outcomes with greppable ownership outcomes, re-scoped the
   contradictory `RUNTIME-172`, and seeded only behavior-carrying children.
   The implementation graph converges through `RUNTIME-179`..`187` plus the
-  audited `RUNTIME-188` scene-interaction split;
+  retired `RUNTIME-188` scene-interaction split;
   application lifecycle removal and `RUNTIME-129` operational bake may proceed
   once their respective owners land. Retired `GRAPHICS-128` closed the bake's
   shared-index-slice prerequisite, leaving `RUNTIME-183` as `RUNTIME-129`'s

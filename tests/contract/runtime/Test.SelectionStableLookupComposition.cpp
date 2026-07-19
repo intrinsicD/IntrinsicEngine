@@ -320,6 +320,9 @@ TEST(SelectionStableLookupComposition, EngineTracksStableIdEventsWithoutRunFrame
     Runtime::SceneInteractionModule& interaction =
         *engine.Services().Find<
             Runtime::SceneInteractionModule>();
+    const std::uint32_t rebuildsAfterInitialBind =
+        interaction.LookupDiagnostics().Rebuilds;
+    ASSERT_EQ(rebuildsAfterInitialBind, 1u);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const StableId firstId{0x145u, 0xA001u};
@@ -332,7 +335,8 @@ TEST(SelectionStableLookupComposition, EngineTracksStableIdEventsWithoutRunFrame
     ASSERT_TRUE(resolved.has_value());
     EXPECT_EQ(*resolved, entity);
     EXPECT_EQ(interaction.LookupDiagnostics().IncrementalTracks, 1u);
-    EXPECT_EQ(interaction.LookupDiagnostics().Rebuilds, 0u);
+    EXPECT_EQ(interaction.LookupDiagnostics().Rebuilds,
+              rebuildsAfterInitialBind);
 
     scene.Raw().emplace_or_replace<StableId>(entity, secondId);
     EXPECT_FALSE(
@@ -341,7 +345,8 @@ TEST(SelectionStableLookupComposition, EngineTracksStableIdEventsWithoutRunFrame
     ASSERT_TRUE(resolved.has_value());
     EXPECT_EQ(*resolved, entity);
     EXPECT_EQ(interaction.LookupDiagnostics().IncrementalTracks, 2u);
-    EXPECT_EQ(interaction.LookupDiagnostics().Rebuilds, 0u);
+    EXPECT_EQ(interaction.LookupDiagnostics().Rebuilds,
+              rebuildsAfterInitialBind);
 
     const std::uint32_t rebuildsBeforeFrame =
         interaction.LookupDiagnostics().Rebuilds;

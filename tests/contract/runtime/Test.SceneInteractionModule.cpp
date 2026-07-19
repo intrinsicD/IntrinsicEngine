@@ -15,7 +15,10 @@ import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Graphics.SelectionSystem;
+import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.Engine;
@@ -31,6 +34,8 @@ import Extrinsic.Runtime.SelectionReadback;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
+
+#include "MockRHI.hpp"
 
 namespace
 {
@@ -252,11 +257,6 @@ namespace
             Started = false;
         }
 
-        ~DirectHarness()
-        {
-            Stop();
-        }
-
         struct FrameHookRecord
         {
             Runtime::FramePhase Phase{
@@ -264,11 +264,75 @@ namespace
             Runtime::RuntimeFrameHook Hook{};
         };
 
+        void InitializeRendererForHooks()
+        {
+            if (RendererInitialized)
+                return;
+            Renderer->Initialize(Device);
+            RendererInitialized = true;
+        }
+
+        void InvokeViewportHook(
+            const std::size_t index,
+            Graphics::RenderFrameInput& renderInput,
+            const Runtime::EditorInputCaptureSnapshot&
+                capture = {},
+            const Platform::Extent2D viewport = {
+                .Width = 64,
+                .Height = 32})
+        {
+            const Core::Config::EngineConfig config =
+                HeadlessConfig();
+            const Platform::Input::Context input{};
+            Runtime::RuntimeViewportInputHookContext context{
+                .Config = config,
+                .ActiveWorldHandle =
+                    Worlds.ActiveWorld(),
+                .Input = input,
+                .Viewport = viewport,
+                .EditorCapture = capture,
+                .RenderInput = renderInput,
+            };
+            ViewportHooks.at(index)(context);
+        }
+
+        void InvokeFrameHook(
+            const std::size_t index,
+            Runtime::EditorInputCaptureSnapshot& capture,
+            Runtime::RuntimeFramePacingDiagnostics& pacing)
+        {
+            ECS::Scene::Registry* const scene =
+                Worlds.Get(Worlds.ActiveWorld());
+            ASSERT_NE(scene, nullptr);
+            Runtime::RuntimeFrameHookContext context{
+                .Phase = FrameHooks.at(index).Phase,
+                .ActiveWorld = *scene,
+                .ActiveWorldHandle =
+                    Worlds.ActiveWorld(),
+                .Commands = Commands,
+                .Events = Events,
+                .Jobs = Jobs,
+                .Worlds = Worlds,
+                .Services = Services,
+                .EditorCapture = capture,
+                .Pacing = pacing,
+            };
+            FrameHooks.at(index).Hook(context);
+        }
+
+        ~DirectHarness()
+        {
+            Stop();
+            if (RendererInitialized && Renderer)
+                Renderer->Shutdown();
+        }
+
         Runtime::CommandBus Commands{};
         Runtime::KernelEventBus Events{};
         Runtime::JobService Jobs{};
         Runtime::WorldRegistry Worlds{};
         Runtime::ServiceRegistry Services{};
+        Extrinsic::Tests::MockDevice Device{};
         std::unique_ptr<Platform::IWindow> Window{};
         std::unique_ptr<Graphics::IRenderer> Renderer{};
         Runtime::RenderExtractionCache Extraction{};
@@ -279,6 +343,7 @@ namespace
         std::vector<Runtime::RuntimeViewportInputHook>
             ViewportHooks{};
         Runtime::WorldHandle InitialWorld{};
+        bool RendererInitialized{false};
         bool Started{false};
         bool Announced{false};
         bool Stopped{false};
@@ -457,9 +522,66 @@ TEST(SceneInteractionModule,
         EXPECT_EQ(pacing.PreRenderSetupMicros, 0u);
 
         Runtime::EngineSetup valid = harness.MakeSetup();
-        EXPECT_TRUE(
+        ASSERT_TRUE(
             harness.Interaction.OnRegister(valid)
                 .has_value());
+        ASSERT_EQ(harness.FrameHooks.size(), 4u);
+        ASSERT_EQ(harness.ViewportHooks.size(), 1u);
+        EXPECT_EQ(
+            harness.FrameHooks[2].Phase,
+            Runtime::FramePhase::BeforeExtraction);
+        EXPECT_EQ(
+            harness.FrameHooks[3].Phase,
+            Runtime::FramePhase::Maintenance);
+
+        harness.InitializeRendererForHooks();
+        ASSERT_TRUE(harness.ProvideBuiltins().has_value());
+        harness.Services.BeginResolution();
+        ASSERT_TRUE(
+            harness.ResolveInteraction().has_value());
+        harness.Services.Lock();
+        harness.Started = true;
+
+        Runtime::SelectionController& selection =
+            *harness.Services
+                 .Find<Runtime::SelectionController>();
+        selection.RequestClickPick(12u, 18u);
+        Graphics::RenderFrameInput renderInput{};
+        harness.InvokeViewportHook(
+            0u, renderInput, capture);
+
+        // The registrar has no unregister surface. The failed attempt's two
+        // retained lambdas therefore remain in the harness, but their weak
+        // state expired during rollback and both are inert.
+        harness.InvokeFrameHook(0u, capture, pacing);
+        harness.InvokeFrameHook(1u, capture, pacing);
+        EXPECT_TRUE(selection.HasPendingPick());
+        EXPECT_EQ(
+            selection.GetDiagnostics().PicksDrained,
+            0u);
+        EXPECT_FALSE(renderInput.HasPendingPick);
+        EXPECT_EQ(
+            harness.Renderer->GetSelectionSystem()
+                .GetDiagnostics()
+                .PickRequestCount,
+            0u);
+
+        // Invoking the retry's live records produces exactly one effect: one
+        // controller drain and one renderer-side request, with no duplicate
+        // callback from the stale records.
+        harness.InvokeFrameHook(2u, capture, pacing);
+        harness.InvokeFrameHook(3u, capture, pacing);
+        EXPECT_FALSE(selection.HasPendingPick());
+        EXPECT_EQ(selection.InFlightPickCount(), 1u);
+        EXPECT_TRUE(renderInput.HasPendingPick);
+        EXPECT_EQ(
+            selection.GetDiagnostics().PicksDrained,
+            1u);
+        EXPECT_EQ(
+            harness.Renderer->GetSelectionSystem()
+                .GetDiagnostics()
+                .PickRequestCount,
+            1u);
     }
 
     {
@@ -517,6 +639,113 @@ TEST(SceneInteractionModule,
                     *conflict)
                 .has_value());
     }
+}
+
+TEST(SceneInteractionModule,
+     RegisteredHooksIssueCorrelateRefineAndResetSelection)
+{
+    DirectHarness harness;
+    harness.InitializeRendererForHooks();
+    ASSERT_TRUE(harness.Start().has_value());
+    ASSERT_EQ(harness.ViewportHooks.size(), 1u);
+    ASSERT_EQ(harness.FrameHooks.size(), 2u);
+    EXPECT_EQ(
+        harness.FrameHooks[0].Phase,
+        Runtime::FramePhase::BeforeExtraction);
+    EXPECT_EQ(
+        harness.FrameHooks[1].Phase,
+        Runtime::FramePhase::Maintenance);
+
+    Runtime::SelectionController& selection =
+        *harness.Services
+             .Find<Runtime::SelectionController>();
+    ECS::Scene::Registry& scene =
+        *harness.Worlds.Get(harness.InitialWorld);
+    const ECS::EntityHandle entity =
+        MakeSelectable(scene);
+    Graphics::SelectionSystem& selectionSystem =
+        harness.Renderer->GetSelectionSystem();
+    Runtime::EditorInputCaptureSnapshot capture{};
+    Runtime::RuntimeFramePacingDiagnostics pacing{};
+
+    selection.RequestClickPick(7u, 9u);
+    Graphics::RenderFrameInput hitInput{};
+    harness.InvokeViewportHook(
+        0u, hitInput, capture);
+    harness.InvokeFrameHook(0u, capture, pacing);
+
+    EXPECT_FALSE(selection.HasPendingPick());
+    EXPECT_EQ(selection.InFlightPickCount(), 1u);
+    ASSERT_TRUE(hitInput.HasPendingPick);
+    EXPECT_EQ(hitInput.Pick.X, 7u);
+    EXPECT_EQ(hitInput.Pick.Y, 9u);
+    ASSERT_NE(hitInput.Pick.Sequence, 0u);
+    const auto issuedHit =
+        selectionSystem.ConsumePick();
+    ASSERT_TRUE(issuedHit.has_value());
+    EXPECT_EQ(issuedHit->PixelX, 7u);
+    EXPECT_EQ(issuedHit->PixelY, 9u);
+
+    selectionSystem.PublishPickResult(
+        Graphics::PickReadbackResult{
+            .EncodedId =
+                Graphics::EncodeSelectionId(
+                    Graphics::
+                        SelectionPrimitiveDomain::Entity,
+                    1u),
+            .StableEntityId =
+                Runtime::SelectionController::
+                    ToStableEntityId(entity),
+            .Hit = true,
+            .Sequence = hitInput.Pick.Sequence,
+        });
+    harness.InvokeFrameHook(1u, capture, pacing);
+
+    EXPECT_TRUE(selection.IsSelected(entity));
+    EXPECT_EQ(selection.SelectedCount(), 1u);
+    EXPECT_EQ(selection.InFlightPickCount(), 0u);
+    ASSERT_TRUE(
+        harness.Interaction
+            .LastRefinedPrimitive()
+            .has_value());
+    EXPECT_EQ(
+        harness.Interaction
+            .LastRefinedPrimitiveGeneration(),
+        1u);
+
+    // A second frame proves the same hook chain correlates a background
+    // readback to its exact request and applies the default replacement reset.
+    selection.RequestClickPick(11u, 13u);
+    Graphics::RenderFrameInput missInput{};
+    harness.InvokeViewportHook(
+        0u, missInput, capture);
+    harness.InvokeFrameHook(0u, capture, pacing);
+    ASSERT_TRUE(missInput.HasPendingPick);
+    ASSERT_NE(missInput.Pick.Sequence, 0u);
+    EXPECT_GT(
+        missInput.Pick.Sequence,
+        hitInput.Pick.Sequence);
+    ASSERT_TRUE(
+        selectionSystem.ConsumePick().has_value());
+
+    selectionSystem.PublishPickResult(
+        Graphics::PickReadbackResult{
+            .Hit = false,
+            .Sequence = missInput.Pick.Sequence,
+        });
+    harness.InvokeFrameHook(1u, capture, pacing);
+
+    EXPECT_FALSE(selection.IsSelected(entity));
+    EXPECT_EQ(selection.SelectedCount(), 0u);
+    EXPECT_EQ(selection.InFlightPickCount(), 0u);
+    EXPECT_FALSE(
+        harness.Interaction
+            .LastRefinedPrimitive()
+            .has_value());
+    EXPECT_EQ(
+        harness.Interaction
+            .LastRefinedPrimitiveGeneration(),
+        2u);
 }
 
 TEST(SceneInteractionModule,

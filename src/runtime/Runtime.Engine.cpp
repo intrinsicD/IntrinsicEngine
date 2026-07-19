@@ -1012,11 +1012,11 @@ namespace Extrinsic::Runtime
         // ── 5. Runtime-module registration (ARCH-011/RUNTIME-179) ─────────
         // Registration precedes dependent subsystem wiring so app-composed
         // owners can publish narrow construction capabilities. The public
-        // Engine surface remains module-agnostic; the two explicitly tracked
-        // RUNTIME-183/RUNTIME-188 transition adapters below resolve the exact
-        // document capabilities in this implementation unit. Resolution/
-        // finalization remains at the pre-application boundary below, after
-        // every provider has registered.
+        // Engine surface remains module-agnostic; the explicitly tracked
+        // RUNTIME-183 transition adapter below resolves the exact document
+        // capabilities in this implementation unit. Resolution/finalization
+        // remains at the pre-application boundary below, after every provider
+        // has registered.
         RegisterRuntimeModulesForBoot(recipeActivation);
 
         // ── 6. Asset service ──────────────────────────────────────────────

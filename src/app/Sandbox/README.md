@@ -50,6 +50,17 @@ key/slot/age, per-queue envelopes, and named pass rows. It never presents a
 summed cross-queue duration, and the displayed timestamps are diagnostics
 rather than a performance claim.
 
+Sandbox separately composes optional `Runtime::SceneInteractionModule`. It
+owns one active-world interaction cohort—selection, stable lookup, pick
+readback/refinement, gizmo drag/undo/scratch/packets—and publishes the exact
+module plus exact `SelectionController`. The editor/default-policy facades
+resolve those services once; they never call an Engine interaction getter.
+Camera and completed UI capture reach interaction through deterministic typed
+viewport hooks. Render extraction receives only a copied, world-tagged
+selection/hover/gizmo snapshot and treats omission or mismatch as empty.
+Document New/Load/Close, active-world switch/retirement, and shutdown clear the
+cohort without resurrecting old state.
+
 The app-owned `Sandbox.Editor.Controller` owns `Sandbox.Editor.Shell` and all
 panel-family lifetimes behind one attach/detach interface. Sandbox composes the
 optional `Runtime.EditorUiModule`; the shell resolves its Engine-free
@@ -85,8 +96,9 @@ parameterless frame contribution and windows through the resolved host, reads
 scene and selection state through runtime APIs, emits selection and
 local-transform edit commands through
 runtime-owned seams, replaces runtime camera-controller slots through the
-optional service-registry lookup, toggles mesh edge/vertex primitive views through runtime
-extraction-cache settings, routes selected-entity spatial-debug options through
+optional service-registry lookup, toggles persistent mesh edge/vertex primitive
+views by authoring ECS `RenderEdges` / `RenderPoints` through runtime
+command/history seams, routes selected-entity spatial-debug options through
 `SpatialDebugBinding`, routes material/scalar/color visualization choices
 through `VisualizationConfig`, routes visualization adapter bindings through
 runtime extraction-cache state, and submits frame-driven file/import commands
@@ -200,11 +212,14 @@ durable `StableId`, `Selection::SelectableTag`, and white
 `VisualizationConfig`. Reference content renders without `CameraModule`.
 
 The default module list explicitly composes `AsyncWorkModule`, `CameraModule`,
-`ClusteringModule`, `EditorUiModule`, and `SceneDocumentModule`. Camera remains
-optional at the runtime contract: when omitted, Sandbox policy registration
-omits `F` and autofocus, editor camera controls report unavailable, and import
-auto-selection plus non-camera behavior continue. Scene document remains
-independently optional as described above.
+`ClusteringModule`, `EditorUiModule`, `SceneDocumentModule`, and
+`SceneInteractionModule`. Camera remains optional at the runtime contract:
+when omitted, Sandbox policy registration omits `F` and autofocus, editor
+camera controls report unavailable, and import auto-selection plus non-camera
+behavior continue. Scene document and scene interaction remain independently
+optional as described above; without interaction, generic input/rendering and
+component-driven primitive views continue while selection/gizmo surfaces report
+unavailable.
 
 ## Build presets
 

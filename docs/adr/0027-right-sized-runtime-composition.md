@@ -22,9 +22,10 @@ single Scene editing hypothesis:
   participant contract. A load parses first, then callbacks run deterministically
   before and after replacement; the document owner imports no selection,
   readback, extraction, asset, bake, or GPU owner;
-- temporary Engine adapters capture only the exact long-lived interaction and
+- temporary Engine adapters captured only the exact long-lived interaction and
   asset-handoff objects required by the two demonstrated consumers.
-  `RUNTIME-188` and `RUNTIME-183` own their removal; active-world Maintenance
+  `RUNTIME-188` subsequently removed the interaction adapter;
+  `RUNTIME-183` owns the remaining asset adapter. Active-world Maintenance
   remains a separate immediate rebind path;
 - queued callbacks use weak module state and validate module generation,
   binding epoch, world, and registry immediately before commit. Shutdown
@@ -40,6 +41,34 @@ The observed document and interaction cohorts differ in dependencies, frame
 hooks, cancellation, published state, and omission behavior. The corrected
 responsibility map therefore records `SceneDocument` and `SceneInteraction`
 separately rather than forcing them through a wrapper bundle.
+
+## Implementation update: RUNTIME-188
+
+`RUNTIME-188` applies the separate SceneInteraction hypothesis:
+
+- optional app-composed `SceneInteractionModule` privately owns selection,
+  stable lookup/binding, readback/refinement context, and gizmo state behind one
+  PImpl and publishes only the exact module and exact `SelectionController`;
+- one validated `{WorldHandle, Registry*, interaction epoch}` binding clears as
+  a unit on document replacement, active-world mismatch/retirement, shutdown,
+  and reinitialize. Pick issue sequences remain monotonic and completed results
+  must match a known nonzero sequence, world, and epoch;
+- deterministic typed viewport input runs after Camera and completed capture;
+  `BeforeExtraction` runs after transform flush/input actions and submits a
+  copied world-tagged selection/hover/gizmo snapshot; `Maintenance` drains
+  readbacks. No generic phase/context was added and extraction retains no
+  interaction pointer;
+- the module retains/releases its strong document participant. Engine retains
+  only the named `RUNTIME-183` optional selection borrow for asset-import
+  dependencies, replacing it with null after shutdown announcement and before
+  reverse module teardown; and
+- the zero-consumer Engine mesh primitive-view facade, translation module, and
+  extraction settings cache are deleted. Persistent ECS `RenderEdges` /
+  `RenderPoints`, component-driven packing/extraction, Sandbox history, and
+  scene serialization remain independent authoring state.
+
+The exact post-slice snapshot is 26 plain imports / 4 domain imports /
+2 re-exports / 15 public getter names.
 
 ## Implementation update: RUNTIME-180
 
@@ -200,7 +229,7 @@ state, commit, or consumer evidence disagrees.
 | Async work | `AsyncWorkService`, the persistent streaming executor, derived-job ownership, and maintenance draining | Global owner. Submitted work carries explicit cancellation/commit scope; no worker borrows a live world. |
 | Asset workflow | CPU asset service, GPU residency handoff, import pipeline, and object-space normal-bake orchestration | Global lifecycle owner. Active-world references are borrowed, rebound on world events, and never become hidden ECS ownership. Normal bake remains in this cohort only while its import/residency lifecycle and consumers are cohesive. |
 | Scene document | App-composed `SceneDocumentModule`, command history, scene-file event identity, and synchronous replacement coordination | Global module object with durable document state bound to one exact live active `{WorldHandle, Registry*}`. Switch, retirement, shutdown, and recycled-handle reinitialization reset rather than cache state. Optional async adds queued IO but does not change the synchronous owner. |
-| Scene interaction | Selection, stable lookup, pick readback/refinement, gizmo state, and mesh primitive-view controls | A distinct app-composed one-world owner under `RUNTIME-188`. It consumes the document replacement contract and viewport/capture hooks, publishes pointer-free snapshots, and never repackages document/history state. |
+| Scene interaction | App-composed `SceneInteractionModule` owns selection, stable lookup/binding, pick readback/refinement, and gizmo state. Persistent mesh primitive-view authoring remains ECS component state. | Global module object with one exact validated active-world binding and interaction epoch. Replacement/switch/retirement/shutdown/reinitialize clear without resurrection; pointer-free snapshots are copied and world-tagged. |
 | Camera | App-composed `CameraModule` owns camera-controller/viewport state and active camera selection, publishes the exact registry, and contributes the typed viewport-input hook. | Global viewport owner with registry state bound to exactly one `WorldHandle`; reset clears slots/poses/transitions/seed even for equal handle bits, active change rebinds empty, destruction/shutdown invalidates, and away/back never resurrects. Reference-scene entity creation, owning-world retention, and optional initial seed handoff belong to app initial-world bootstrap. |
 | Editor UI | ImGui adapter/overlay/host, window contribution state, and production of the single capture snapshot | Global and optional. `EditorUiModule` owns UI lifetime, publishes the Engine-free host, and writes the frame-loop-owned capture value through the borrowed `UiEndCapture` hook context after the paired begin/build/end bracket; it does not own camera, selection, scene, config, asset, or method state. |
 | Config control | `EngineConfigControl` and the app-section registry used by boot and live apply | Global owner. The app supplies section codecs before boot; preview remains side-effect-free and apply uses the existing validated commit path. |
@@ -262,8 +291,10 @@ becomes room for later regrowth.
 After `RUNTIME-180`, the historical exact intermediate snapshot was
 35 plain imports, 13 domain imports, two re-exports, and 25 public getter
 names. `RUNTIME-172` reduces the current exact snapshot to 33 plain imports,
-11 domain imports, two re-exports, and 22 public getter names. These remain
-migration evidence, not the final allowed-surface budget.
+11 domain imports, two re-exports, and 22 public getter names. `RUNTIME-188`
+then reduces the current exact snapshot to 26 plain imports, 4 domain imports,
+2 re-exports, and 15 public getter names. These remain migration evidence, not
+the final allowed-surface budget.
 
 ## Consequences
 

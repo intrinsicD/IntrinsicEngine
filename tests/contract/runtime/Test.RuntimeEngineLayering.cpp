@@ -382,6 +382,42 @@ TEST(RuntimeEngineLayering,
             "Gizmo.ClearSceneState(BoundRegistry)"),
         std::string::npos);
 
+    const auto unifiedClear =
+        SliceBetween(
+            interactionImpl,
+            "void ClearWorldBoundState()",
+            "void BindTo(");
+    const auto gizmoClear =
+        unifiedClear.find(
+            "Gizmo.ClearSceneState(BoundRegistry)");
+    const auto selectionClear =
+        unifiedClear.find(
+            "Selection.ClearSceneState(*BoundRegistry)");
+    const auto readbackClear =
+        unifiedClear.find("Readback.ClearSceneState()");
+    const auto lookupDetach =
+        unifiedClear.find(
+            "Selection.SetStableEntityLookup(nullptr)");
+    const auto lookupDisconnect =
+        unifiedClear.find("LookupBinding.Disconnect()");
+    const auto lookupClear =
+        unifiedClear.find("Lookup.Clear()");
+    const auto snapshotClear =
+        unifiedClear.find("PublishEmpty(BoundWorld)");
+    ASSERT_NE(gizmoClear, std::string::npos);
+    ASSERT_NE(selectionClear, std::string::npos);
+    ASSERT_NE(readbackClear, std::string::npos);
+    ASSERT_NE(lookupDetach, std::string::npos);
+    ASSERT_NE(lookupDisconnect, std::string::npos);
+    ASSERT_NE(lookupClear, std::string::npos);
+    ASSERT_NE(snapshotClear, std::string::npos);
+    EXPECT_LT(gizmoClear, selectionClear);
+    EXPECT_LT(selectionClear, readbackClear);
+    EXPECT_LT(readbackClear, lookupDetach);
+    EXPECT_LT(lookupDetach, lookupDisconnect);
+    EXPECT_LT(lookupDisconnect, lookupClear);
+    EXPECT_LT(lookupClear, snapshotClear);
+
     EXPECT_NE(serviceInterface.find("export module Extrinsic.Runtime.GizmoFrameService"),
               std::string::npos);
     EXPECT_NE(serviceInterface.find("export import Extrinsic.Runtime.GizmoInteraction"),

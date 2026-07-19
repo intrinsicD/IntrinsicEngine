@@ -78,9 +78,12 @@ getter names. `RUNTIME-180` removes Engine camera/reference imports and facades,
 reducing the current exact snapshot to 35 plain imports / 13 domain imports /
 2 re-exports / 25 public getter names. `RUNTIME-172` then removes document/
 history ownership and facades, reducing the current exact snapshot to 33 plain
-imports / 11 domain imports / 2 re-exports / 22 public getter names. The fixed
-reference remains historical comparison evidence; the current snapshot carries
-no temporary debt.
+imports / 11 domain imports / 2 re-exports / 22 public getter names.
+`RUNTIME-188` then removes interaction ownership/facades and the obsolete
+mesh-view compatibility surface, reducing the current exact snapshot to
+26 plain imports / 4 domain imports / 2 re-exports / 15 public getter names.
+The fixed reference remains historical comparison evidence; the current
+snapshot carries no temporary debt.
 
 ### Kernel seams exist (ADR-0024 D5–D11, amended by ADR-0027)
 
@@ -170,10 +173,14 @@ no temporary debt.
       retirement, shutdown, and recycled-handle reinitialize reset rather than
       cache state. Engine exposes no scene/document/history facade and omission
       leaves the active world operational.
-- [ ] SceneInteraction — `RUNTIME-188`; the separate
-      selection/lookup/readback/gizmo/mesh-view owner consumes document
-      replacement and viewport/capture seams. The transitional Engine
-      participant captures only its exact long-lived interaction objects.
+- [x] SceneInteraction — `RUNTIME-188`; app-composed
+      `SceneInteractionModule` privately owns one validated active-world cohort
+      for selection/lookup/readback/gizmo state, consumes document replacement
+      plus viewport/capture seams, and publishes copied world-tagged render
+      snapshots. Engine has no interaction owner/facade; only the named
+      `RUNTIME-183` optional selection borrow remains in implementation wiring.
+      Persistent mesh primitive-view authoring stays on ECS `RenderEdges` /
+      `RenderPoints`.
 - [x] Camera — `RUNTIME-180`; app-composed global `CameraModule` publishes the
       exact world-bound registry and contributes one typed viewport-input hook.
       Reset/change/retirement/shutdown clear slots, poses, transitions, and
