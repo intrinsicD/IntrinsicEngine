@@ -67,8 +67,9 @@ contract-first renderer/snapshot/recipe architecture sequence
 (`GRAPHICS-099..103`, `RUNTIME-127`, `UI-023`) and the object-space normal
 bake graphics dilation follow-up (`GRAPHICS-115`) are retired — see
 [`rendering/README.md`](rendering/README.md) and the retirement log. Current
-open Theme B leaves include the object-space normal bake runtime scheduling
-follow-up (`RUNTIME-129`), the profile-gated vertex attribute operational
+open Theme B leaves include the object-space normal bake shared-index
+prerequisite (`GRAPHICS-128`) followed by runtime scheduling/production
+provider closure (`RUNTIME-129`), the profile-gated vertex attribute operational
 follow-up (`RUNTIME-139`), and the 2026-07-03 render-graph review leaves —
 pass contribution seam (`GRAPHICS-116`), compile caching
 (`GRAPHICS-117`), placed transient aliasing (`GRAPHICS-118`), and parallel
@@ -265,7 +266,9 @@ extraction, `RUNTIME-163` as the render-extraction service extraction,
 as the async-work service extraction. All five additive ADR-0024 seams
 (`ARCH-007`..`ARCH-011`) and the collision sweep (`ARCH-013`) are retired;
 `ARCH-014` remains the open kernel-convergence umbrella.
-`RUNTIME-129` still owns the production Vulkan provider work.
+`GRAPHICS-128` owns the nonzero shared-index-slice prerequisite;
+`RUNTIME-129` still owns the production Vulkan provider work after that
+graphics contract and `RUNTIME-183` land.
 Provider resolution, population state, camera-seed caching, reference-scene
 teardown policy, input-action descriptor/state/dispatch policy, and
 runtime-module contribution ordering/dispatch, selection readback correlation
@@ -294,7 +297,8 @@ production consumer. The bounded implementation graph is
 `RUNTIME-188` SceneInteraction, `RUNTIME-180` Camera, `RUNTIME-181`
 ConfigControl, `RUNTIME-183` AssetWorkflow, retired `RUNTIME-182` EditorUi,
 re-scoped `RUNTIME-168` Sandbox composition, existing `RUNTIME-129`
-operational normal bake,
+operational normal bake after the independent `GRAPHICS-128` shared-index
+prerequisite,
 `RUNTIME-184` application-lifecycle removal, `RUNTIME-185` mechanism pruning,
 and `RUNTIME-186` residual auxiliary-surface cleanup followed by the
 `RUNTIME-187` exact Engine-surface ratchet. The bake and lifecycle leaves may
@@ -321,7 +325,8 @@ as a transitional composition accessor rather than a new cross-module pattern.
 `RUNTIME-151` is retired as the Engine-interface cleanup. `RUNTIME-137` is
 retired as the JobService `GpuQueue`/async readback substrate, satisfying that
 historical prerequisite for `RUNTIME-129`; the task is now gated on
-`RUNTIME-183` so the GPU submission lands in the accepted AssetWorkflow owner.
+`GRAPHICS-128` for nonzero managed-index slices and `RUNTIME-183` so the GPU
+submission lands in the accepted AssetWorkflow owner.
 The non-blocking TaskGraph substrate (`CORE-005`) and scheduler hardening
 (`CORE-007`) are retired, as is compiled-plan efficiency (`CORE-008`).
 
