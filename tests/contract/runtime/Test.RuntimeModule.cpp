@@ -25,6 +25,7 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Platform.Input;
+import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.JobService;
@@ -39,6 +40,7 @@ import Extrinsic.Runtime.WorldRegistry;
 namespace Core = Extrinsic::Core;
 namespace CoreConfig = Extrinsic::Core::Config;
 namespace Runtime = Extrinsic::Runtime;
+namespace RHI = Extrinsic::RHI;
 namespace Components = Extrinsic::ECS::Components;
 
 static_assert(
@@ -113,6 +115,14 @@ namespace
         bool CommandContextHadWorlds{false};
         bool CommandContextWorldWasActive{false};
         bool ShutdownAnnounced{false};
+        bool RegisterSawUninitialized{false};
+        bool ResolveSawUninitialized{false};
+        bool ApplicationInitializeSawUninitialized{false};
+        bool InitializedAfterInitialize{false};
+        bool AnnouncementSawUninitialized{false};
+        bool ApplicationShutdownSawAnnounce{false};
+        bool ApplicationShutdownSawUninitialized{false};
+        bool UninitializedAfterShutdown{false};
         bool ProviderShutdownSawAnnounce{false};
         bool ConsumerShutdownSawAnnounce{false};
         bool DelayedForFixedStep{false};
@@ -140,6 +150,7 @@ namespace
         std::array<int, 6> FirstHookCounts{};
         std::vector<std::string> SystemTrace{};
         std::vector<std::string> ShutdownTrace{};
+        const bool* InitializedState{};
     };
 
     void RecordHook(ModuleHarnessState& state,
@@ -288,6 +299,10 @@ namespace
         [[nodiscard]] Core::Result OnRegister(
             Runtime::EngineSetup& setup) override
         {
+            m_State.InitializedState = setup.InitializedState();
+            m_State.RegisterSawUninitialized =
+                m_State.InitializedState != nullptr &&
+                !*m_State.InitializedState;
             m_ProbeSubscription = setup.Subscribe<ProbeCommandHandled>(
                 [this](const ProbeCommandHandled& event)
                 {
@@ -299,6 +314,9 @@ namespace
                     [this](const Runtime::RuntimeShutdownAnnounced&)
                     {
                         m_State.ShutdownAnnounced = true;
+                        m_State.AnnouncementSawUninitialized =
+                            m_State.InitializedState != nullptr &&
+                            !*m_State.InitializedState;
                         m_State.ShutdownTrace.push_back("event:shutdown");
                     });
 
@@ -386,6 +404,10 @@ namespace
         [[nodiscard]] Core::Result OnResolve(
             Runtime::EngineSetup& setup) override
         {
+            m_State.ResolveSawUninitialized =
+                setup.InitializedState() == m_State.InitializedState &&
+                m_State.InitializedState != nullptr &&
+                !*m_State.InitializedState;
             auto required =
                 setup.Services().Require<SharedProbeService>(Name());
             if (!required.has_value())
@@ -515,6 +537,9 @@ namespace
 
         void OnInitialize(Runtime::Engine& engine) override
         {
+            m_State.ApplicationInitializeSawUninitialized =
+                m_State.InitializedState != nullptr &&
+                !*m_State.InitializedState;
             m_State.BaselineProbeEntity =
                 Extrinsic::ECS::Scene::CreateDefault(
                     *engine.Worlds().Get(engine.ActiveWorld()), "BaselineTransformProbe");
@@ -578,7 +603,14 @@ namespace
             }
         }
 
-        void OnShutdown(Runtime::Engine&) override {}
+        void OnShutdown(Runtime::Engine&) override
+        {
+            m_State.ApplicationShutdownSawAnnounce =
+                m_State.ShutdownAnnounced;
+            m_State.ApplicationShutdownSawUninitialized =
+                m_State.InitializedState != nullptr &&
+                !*m_State.InitializedState;
+        }
 
     private:
         ModuleHarnessState& m_State;
@@ -606,11 +638,16 @@ namespace
         }
 
         engine.Initialize();
+        state.InitializedAfterInitialize =
+            state.InitializedState != nullptr &&
+            *state.InitializedState;
         EXPECT_EQ(engine.Services().Phase(), Runtime::ServiceRegistryPhase::Locked);
         EXPECT_NE(engine.Services().Find<Runtime::CommandBus>(), nullptr);
         EXPECT_NE(engine.Services().Find<Runtime::KernelEventBus>(), nullptr);
         EXPECT_NE(engine.Services().Find<Runtime::JobService>(), nullptr);
         EXPECT_NE(engine.Services().Find<Runtime::WorldRegistry>(), nullptr);
+        EXPECT_EQ(engine.Services().Find<RHI::IDevice>(),
+                  &engine.GetDevice());
         Runtime::RenderExtractionCache* renderExtraction =
             engine.Services().Find<Runtime::RenderExtractionCache>();
         EXPECT_NE(renderExtraction, nullptr);
@@ -633,6 +670,11 @@ namespace
         }
         engine.Run();
         engine.Shutdown();
+        EXPECT_EQ(engine.Services().Find<RHI::IDevice>(), nullptr);
+        state.UninitializedAfterShutdown =
+            state.InitializedState != nullptr &&
+            !*state.InitializedState;
+        state.InitializedState = nullptr;
         return state;
     }
 
@@ -641,6 +683,16 @@ namespace
     {
         return haystack.find(needle) != std::string_view::npos;
     }
+
+    class PassiveApplication final : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine&, double, double) override {}
+        void OnShutdown(Runtime::Engine&) override {}
+    };
+
 }
 
 TEST(RuntimeServiceRegistry, ProvideRequireFindUseTwoPhaseContract)
@@ -781,10 +833,38 @@ TEST(RuntimeModule, EngineComposesTestModulesThroughSetupSurface)
     EXPECT_EQ(state.SystemTrace[1], "A.Consumer.Consumer");
 
     EXPECT_TRUE(state.ShutdownAnnounced);
+    EXPECT_TRUE(state.RegisterSawUninitialized);
+    EXPECT_TRUE(state.ResolveSawUninitialized);
+    EXPECT_TRUE(state.ApplicationInitializeSawUninitialized);
+    EXPECT_TRUE(state.InitializedAfterInitialize);
+    EXPECT_TRUE(state.AnnouncementSawUninitialized);
+    EXPECT_TRUE(state.ApplicationShutdownSawAnnounce);
+    EXPECT_TRUE(state.ApplicationShutdownSawUninitialized);
+    EXPECT_TRUE(state.UninitializedAfterShutdown);
     EXPECT_TRUE(state.ProviderShutdownSawAnnounce);
     EXPECT_TRUE(state.ConsumerShutdownSawAnnounce);
     ASSERT_FALSE(state.ShutdownTrace.empty());
     EXPECT_EQ(state.ShutdownTrace.front(), "event:shutdown");
+}
+
+TEST(RuntimeModule,
+     EnginePublishesExactDeviceAndWithdrawsAcrossReinitialize)
+{
+    Runtime::Engine engine(
+        NullWindowHeadlessConfig(),
+        std::make_unique<PassiveApplication>());
+
+    engine.Initialize();
+    EXPECT_EQ(engine.Services().Find<RHI::IDevice>(),
+              &engine.GetDevice());
+    engine.Shutdown();
+    EXPECT_EQ(engine.Services().Find<RHI::IDevice>(), nullptr);
+
+    engine.Initialize();
+    EXPECT_EQ(engine.Services().Find<RHI::IDevice>(),
+              &engine.GetDevice());
+    engine.Shutdown();
+    EXPECT_EQ(engine.Services().Find<RHI::IDevice>(), nullptr);
 }
 
 TEST(RuntimeModule, BaselineTransformConsumerObservesCurrentSubstepWorldMatrix)
@@ -1154,6 +1234,7 @@ TEST(RuntimeModuleViewportInput,
         [](Runtime::SimSystemDesc) {},
         [](Runtime::FramePhase,
            Runtime::RuntimeFrameHook) {});
+    EXPECT_EQ(missingRegistrar.InitializedState(), nullptr);
 
     const Core::Result empty =
         missingRegistrar.RegisterViewportInputHook({});
@@ -1167,6 +1248,7 @@ TEST(RuntimeModuleViewportInput,
     EXPECT_EQ(unavailable.error(), Core::ErrorCode::InvalidState);
 
     std::uint32_t registrations = 0u;
+    bool initialized = false;
     Runtime::EngineSetup available(
         commands,
         events,
@@ -1182,7 +1264,12 @@ TEST(RuntimeModuleViewportInput,
         {
             if (hook)
                 ++registrations;
-        });
+        },
+        &initialized);
+    ASSERT_EQ(available.InitializedState(), &initialized);
+    EXPECT_FALSE(*available.InitializedState());
+    initialized = true;
+    EXPECT_TRUE(*available.InitializedState());
     EXPECT_TRUE(
         available.RegisterViewportInputHook(
                      [](Runtime::RuntimeViewportInputHookContext&) {})

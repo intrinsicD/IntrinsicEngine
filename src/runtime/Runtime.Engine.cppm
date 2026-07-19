@@ -326,7 +326,8 @@ namespace Extrinsic::Runtime
             double alpha,
             EditorInputCaptureSnapshot& editorCapture,
             RuntimeFramePacingDiagnostics& pacing);
-        void AnnounceAndShutdownRuntimeModules();
+        void AnnounceRuntimeShutdown();
+        void ShutdownRuntimeModules();
         void RefreshActiveWorldScenePointer() noexcept;
         void ApplyWorldRegistryMaintenance();
         void BindActiveSceneAssetHandoffs();

@@ -445,6 +445,9 @@ namespace Extrinsic::Runtime
         requireProvide(m_ServiceRegistry.Provide<RenderExtractionCache>(
                            m_RenderExtractionService.Cache(), "Engine"),
                        "RenderExtractionCache");
+        requireProvide(m_ServiceRegistry.Provide<RHI::IDevice>(
+                           *m_Device, "Engine"),
+                       "RHI::IDevice");
         requireProvide(m_ServiceRegistry.Provide<Platform::IWindow>(
                            *m_Window, "Engine"),
                        "Platform::IWindow");
@@ -479,7 +482,8 @@ namespace Extrinsic::Runtime
                 {
                     m_RuntimeModuleSchedule.RegisterViewportInputHook(
                         moduleName, std::move(hook));
-                });
+                },
+                &m_Initialized);
 
             Core::Result result = module->OnRegister(setup);
             if (!result.has_value())
@@ -530,7 +534,8 @@ namespace Extrinsic::Runtime
                 {
                     m_RuntimeModuleSchedule.RegisterViewportInputHook(
                         moduleName, std::move(hook));
-                });
+                },
+                &m_Initialized);
 
             Core::Result result = module->OnResolve(setup);
             if (!result.has_value())
@@ -633,14 +638,18 @@ namespace Extrinsic::Runtime
             });
     }
 
-    void Engine::AnnounceAndShutdownRuntimeModules()
+    void Engine::AnnounceRuntimeShutdown()
     {
+        m_Initialized = false;
         m_KernelEvents.Publish(RuntimeShutdownAnnounced{});
         (void)m_KernelEvents.Pump();
+    }
 
-        // RUNTIME-183 transition: active imports were cancelled before this
-        // announcement. Detach the exact optional selection borrow before
-        // reverse module shutdown can destroy its provider.
+    void Engine::ShutdownRuntimeModules()
+    {
+        // RUNTIME-183 transition: active imports were cancelled after the
+        // earlier announcement and before this reverse module shutdown.
+        // Detach the exact optional selection borrow before its provider stops.
         if (m_AssetImportPipeline)
         {
             m_AssetImportPipeline->SetDependencies(
@@ -694,6 +703,8 @@ namespace Extrinsic::Runtime
             if (*it)
                 (*it)->OnShutdown(context);
         }
+        if (m_Device)
+            (void)m_ServiceRegistry.Withdraw<RHI::IDevice>(*m_Device);
         // Module-owned services may be destroyed during OnShutdown. Clear all
         // borrowed records before control returns to the remaining kernel
         // teardown so no post-shutdown lookup can observe a dangling service.
@@ -1064,6 +1075,7 @@ namespace Extrinsic::Runtime
         // is documented as reusable via Shutdown() + Initialize(); stale
         // commands must not replay into the next session's fresh scene.
         m_CommandBus.DiscardPending();
+        AnnounceRuntimeShutdown();
 
         if (m_AssetImportPipeline)
             m_AssetImportPipeline->CancelActiveAssetImportsForShutdown();
@@ -1132,11 +1144,10 @@ namespace Extrinsic::Runtime
             {
                 if (Application)
                     Application->OnShutdown(Owner);
-                Owner.AnnounceAndShutdownRuntimeModules();
             }
             void ShutdownStreaming() override
             {
-                // App-composed async work drains in module OnShutdown.
+                Owner.ShutdownRuntimeModules();
             }
             void DestroyScene() override
             {

@@ -145,7 +145,8 @@ namespace Extrinsic::Runtime
                     RuntimeRenderRecipeActivationKernel
                         renderRecipeActivation = {},
                     ViewportInputHookRegistrar
-                        viewportInputHookRegistrar = {})
+                        viewportInputHookRegistrar = {},
+                    const bool* initializedState = nullptr)
             : m_Commands(commands)
             , m_Events(events)
             , m_Jobs(jobs)
@@ -157,6 +158,7 @@ namespace Extrinsic::Runtime
                   std::move(renderRecipeActivation))
             , m_ViewportInputHookRegistrar(
                   std::move(viewportInputHookRegistrar))
+            , m_InitializedState(initializedState)
         {
         }
 
@@ -169,6 +171,10 @@ namespace Extrinsic::Runtime
         RenderRecipeActivation() const noexcept
         {
             return m_RenderRecipeActivation;
+        }
+        [[nodiscard]] const bool* InitializedState() const noexcept
+        {
+            return m_InitializedState;
         }
 
         template <typename TCommand>
@@ -228,6 +234,7 @@ namespace Extrinsic::Runtime
         FrameHookRegistrar m_FrameHookRegistrar{};
         RuntimeRenderRecipeActivationKernel m_RenderRecipeActivation{};
         ViewportInputHookRegistrar m_ViewportInputHookRegistrar{};
+        const bool* m_InitializedState{};
     };
 
     export class IRuntimeModule
