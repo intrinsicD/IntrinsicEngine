@@ -48,13 +48,13 @@ maturity_target: Operational
   ratchet that exact snapshot to 39/17/2/28.
 
 ## Status
-- Operational implementation checkpoint complete as of 2026-07-19; owner:
-  Codex team; branch:
-  `codex/runtime-182-editor-ui-module`.
+- Completed and retired at `Operational` on 2026-07-19; owner: Codex team;
+  implementation branch: `codex/runtime-182-editor-ui-module`.
+- Implementation commit: `27851914`; finalization commit: `05fda623`;
+  merged to `main` as `e19a7af9`.
 - The paired frame-hook/capture contract, concrete module lifecycle, Sandbox
   migration, Engine surface deletion, convergence ratchet, docs, and caller
-  migrations are implemented. The task intentionally remains active for
-  parent review, integration, and retirement.
+  migrations are complete.
 - Verification evidence:
   - `IntrinsicRuntimeContractTests`,
     `IntrinsicRuntimeIntegrationTests`, and
@@ -66,6 +66,8 @@ maturity_target: Operational
     `ci-vulkan` ASan+UBSan configuration.
   - `IntrinsicTests` built and the default CPU-supported selector passed
     4,143/4,143 with one expected GLFW/LSan capability skip.
+  - Live test-gate routing reconciled 36 targets, 4,194 cases, and 338
+    assertion sources after the main merge.
   - Strict layering and kernel convergence checks passed at 39/17/2/28.
 
 ## Required changes

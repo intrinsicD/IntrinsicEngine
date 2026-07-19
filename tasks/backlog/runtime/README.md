@@ -116,9 +116,9 @@ ImGui/render-graph counter-copy policy now live behind
 `RUNTIME-159` is retired; runtime-side Dear ImGui overlay/adapter/callback
 ownership, per-frame Begin/End bracketing, capture reads, diagnostics access,
 and renderer overlay attachment first moved into Engine-private
-`ImGuiEditorBridge` implementation glue. Active `RUNTIME-182` now absorbs and
-deletes that bridge in the app-composed `EditorUiModule`, preserving the paired
-frame bracket through runtime-module hooks.
+`ImGuiEditorBridge` implementation glue. Retired `RUNTIME-182` absorbed and
+deleted that bridge in the app-composed `EditorUiModule`, preserving the
+paired frame bracket through runtime-module hooks.
 `RUNTIME-160` is retired; the renderer frame-command hook token,
 `JobService::RecordGpuQueueFrameCommands(...)` delegation, and GPU-participant
 shutdown sequencing now live behind `Extrinsic.Runtime.JobServiceGpuQueueBridge`.
@@ -172,11 +172,9 @@ triggers. The implementation graph is:
   global asset/residency/import/bake owner after its async, scene, camera, and
   config capabilities exist; borrowed world handoffs never become hidden ECS
   ownership.
-- Active
-  [`RUNTIME-182`](../../active/RUNTIME-182-extract-editor-ui-module.md) —
-  compose the optional global ImGui/host owner, with one frame-local kernel
-  capture value, a preserved paired Begin/End bracket, and app-owned Sandbox
-  panels.
+- Retired `RUNTIME-182` composes the optional global ImGui/host owner, with
+  one frame-local kernel capture value, a preserved paired Begin/End bracket,
+  and app-owned Sandbox panels.
 - Re-scoped [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md)
   — make Sandbox defaults explicit app composition glue over the resolved
   owners, without `Engine&` or a new policy facade.
@@ -209,6 +207,13 @@ transitively through `ARCH-014`.
 
 #### Retired decomposition entries
 
+- [`RUNTIME-182` — Extract the editor-UI composition module](../../done/RUNTIME-182-extract-editor-ui-module.md)
+  (done, 2026-07-19, `Operational`): one app-composed `EditorUiModule` owns
+  the ImGui overlay/adapter, exact Engine-free editor host, global visibility
+  action, paired frame hooks, capture finalization, and adapter diagnostics.
+  Sandbox registers its app-owned frame contribution and windows explicitly;
+  Engine owns only the frame-local capture value and exact kernel built-ins.
+  The interim bridge and all Engine editor/ImGui facades are gone.
 - [`RUNTIME-181` — Extract the config-control composition module](../../done/RUNTIME-181-extract-config-control-module.md)
   (done, 2026-07-19, `Operational`): one app-composed
   `EngineConfigControl` owns validated live preview/apply and app-section

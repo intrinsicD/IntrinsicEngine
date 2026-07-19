@@ -16,11 +16,6 @@ Each active task should include:
   `codex/arch-014-kernel-convergence-program`; blocked on final leaf
   `RUNTIME-187`. Next gate: execute the unblocked ADR-0027 behavior-owner
   leaves and update the convergence scorecard after each retirement.
-- [`RUNTIME-182`](RUNTIME-182-extract-editor-ui-module.md) — editor-UI
-  composition owner; owner: Codex team; branch:
-  `codex/runtime-182-editor-ui-module`; in progress. Next gate: preserve the
-  paired ImGui bracket through named hooks, compose the exact host service,
-  and run focused CPU plus conditional GPU caller builds.
 
 ## History
 

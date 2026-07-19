@@ -8,6 +8,24 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-182`](RUNTIME-182-extract-editor-ui-module.md) — editor-UI
+composition retired to `tasks/done/` on 2026-07-19 at `Operational`. One
+app-composed `EditorUiModule` now owns the ImGui overlay/adapter, exact
+Engine-free editor host, global visibility action, paired frame hooks, capture
+finalization, and adapter-diagnostic mirroring. Sandbox explicitly registers
+its app-owned frame contribution and windows; Engine owns only the single
+frame-local capture snapshot plus exact window, renderer, and input-action
+built-ins. The interim `ImGuiEditorBridge` and all Engine editor/ImGui state,
+callbacks, and getters are gone. Focused coverage passed 235/235, corrected
+explicit-composition fixtures passed 5/5, the conditional Vulkan/GLFW callers
+linked under ASan+UBSan, and the merged default CPU selector passed
+4,143/4,143 with one expected GLFW/LSan capability skip. Live routing covered
+36 targets, 4,194 cases, and 338 assertion sources; exact convergence reached
+39 plain imports, 17 domain imports, two re-exports, and 28 getter names.
+Strict layering, task, docs, test-layout, root-hygiene, inventory, skill-sync,
+and diff checks passed. Implementation checkpoints: `27851914` and
+`05fda623`; main merge: `e19a7af9`.
+
 [`ARCH-015`](ARCH-015-runtime-module-scope-by-consumer-contract.md) —
 runtime-module scope retired on 2026-07-18 as accepted
 [ADR-0026](../../docs/adr/0026-runtime-module-scope-by-consumer-contract.md).

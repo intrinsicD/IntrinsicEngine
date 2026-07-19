@@ -44,7 +44,7 @@ depends_on:
   getter names, and two re-exports with no temporary debt. ADR-0027 then
   corrected `Runtime.WorldHandle` from domain to kernel substrate, making the
   exact-v2 snapshot 42 / 20 / 2 / 31 without changing the interface.
-  `RUNTIME-179`, `RUNTIME-181`, and active `RUNTIME-182` then reduce the
+  Retired `RUNTIME-179`, `RUNTIME-181`, and `RUNTIME-182` then reduce the
   current checked snapshot to 39 plain imports, 17 domain imports, two
   re-exports, and 28 public getter names.
   Retired `HARDEN-085` delivered the authoritative exact-policy ratchet.
