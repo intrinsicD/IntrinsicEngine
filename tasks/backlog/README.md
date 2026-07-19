@@ -296,9 +296,10 @@ production consumer. The bounded implementation graph is
 `RUNTIME-179` AsyncWork, retired `RUNTIME-172` SceneDocument,
 `RUNTIME-188` SceneInteraction, `RUNTIME-180` Camera, `RUNTIME-181`
 ConfigControl, `RUNTIME-183` AssetWorkflow, retired `RUNTIME-182` EditorUi,
-re-scoped `RUNTIME-168` Sandbox composition, existing `RUNTIME-129`
-operational normal bake after the now-retired independent `GRAPHICS-128`
-shared-index prerequisite,
+corrected post-`RUNTIME-188`/`RUNTIME-183` `RUNTIME-168` private Sandbox
+provider/handle composition on the existing editor-facade surface, existing
+`RUNTIME-129` operational normal bake after the now-retired independent
+`GRAPHICS-128` shared-index prerequisite,
 `RUNTIME-184` application-lifecycle removal, `RUNTIME-185` mechanism pruning,
 and `RUNTIME-186` residual auxiliary-surface cleanup followed by the
 `RUNTIME-187` exact Engine-surface ratchet. The bake and lifecycle leaves may

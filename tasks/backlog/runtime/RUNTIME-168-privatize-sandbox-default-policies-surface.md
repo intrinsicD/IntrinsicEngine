@@ -2,10 +2,6 @@
 id: RUNTIME-168
 theme: F
 depends_on:
-  - RUNTIME-172
-  - RUNTIME-180
-  - RUNTIME-181
-  - RUNTIME-182
   - RUNTIME-183
   - RUNTIME-188
 maturity_target: Operational
@@ -14,103 +10,265 @@ maturity_target: Operational
 
 ## Status
 
-- 2026-07-19 contract amendment: Sandbox policy composition now resolves the
-  audited `SceneDocumentModule` and `SceneInteractionModule` split rather than
-  a combined scene-editing owner. Implementation remains open.
-- 2026-07-19 readiness correction: primitive-view controls are authoritative
-  ECS `RenderEdges` / `RenderPoints` scene components, not
-  `SceneInteractionModule` state. Existing Sandbox commands continue to author
-  them through the scene/history path; this task must not resolve or invent an
-  interaction primitive-view capability.
+- 2026-07-19 readiness correction: implementation is hard-gated on
+  `RUNTIME-188` and `RUNTIME-183`. Delete the one-consumer exported policy
+  module, retain its `.cpp` as a private implementation unit of the existing
+  `Extrinsic.Runtime.SandboxEditorFacades` module, and let Sandbox own only the
+  exact provider borrows and typed registration handles described below.
+  Implementation remains open.
+- The corrected post-`RUNTIME-183` Engine target is `22` plain imports / `0`
+  domain imports / `2` re-exports / `10` public getter names. This task changes
+  none of those counts.
 
 ## Goal
-- Replace the exported, Engine-bound
-  `Extrinsic.Runtime.SandboxDefaultPolicies` surface with private Sandbox app
-  composition glue over the resolved `SceneDocumentModule`,
-  `SceneInteractionModule`, camera, config, UI/editor, and asset module
-  services.
+
+- Remove the exported, Engine-bound
+  `Extrinsic.Runtime.SandboxDefaultPolicies` surface and replace it with four
+  plain descriptor factories on the existing
+  `Extrinsic.Runtime.SandboxEditorFacades` surface plus private, transactional
+  install/uninstall wiring in `src/app/Sandbox/Sandbox.cpp`.
 
 ## Non-goals
-- No default import, input-action, camera-focus, selection, post-import, or
-  editor behavior change.
-- No new Sandbox policy module, registry, service bundle, or generic
-  application framework.
-- No movement of asset, ECS, graphics, or renderer ownership into `app`.
-- No `Engine&` in the replacement glue.
+
+- No default import-authoring, import-completed auto-selection/autofocus,
+  direct-mesh postprocessing, or `F` focus behavior change.
+- No new module, owner, registry, service, bundle, interface, dependency
+  aggregate, lifecycle abstraction, or compatibility facade.
+- No `Runtime.Engine` declaration, implementation, state, service publication,
+  getter, re-export, or convergence-policy change.
+- No Sandbox ownership of runtime, asset, ECS, graphics, renderer, GPU-cache,
+  editor, camera, selection, or gizmo state.
+- No production Vulkan normal-bake provider work; `RUNTIME-129` retains that
+  operational scope.
 
 ## Context
-- Owner/layer: runtime retains lower-layer policy implementations; the Sandbox
-  app visibly chooses and composes those defaults while depending on runtime
-  only.
-- The current 37-line exported module has one production consumer and forwards
-  a broad `Engine&` to install policies across several domain owners.
-- After the composition modules land, the defaults can bind their concrete
-  existing service surfaces during app composition without an Engine facade or
-  a new cross-domain wrapper.
-- Document/history policies resolve `SceneDocumentModule` or its exact
-  published `EditorCommandHistory`; selection, lookup, and gizmo policies
-  resolve `SceneInteractionModule` or its exact published
-  `SelectionController`. Primitive-view/render-hint commands author ECS
-  `RenderEdges` / `RenderPoints` through the resolved scene and command history,
-  not through an interaction service. The app glue must not recombine these
-  capabilities into a scene-editing service bundle.
-- This task is app policy wiring, not a seventh durable runtime owner.
+
+- Owner/layer: runtime retains the policy callback implementations; `app`
+  explicitly chooses the Sandbox defaults and retains only their registration
+  handles. App continues to import runtime only.
+- The current exported module has one production consumer and exists chiefly
+  to own a registration aggregate and forward a broad `Engine&`. That is
+  one-consumer composition ceremony, not a durable runtime capability.
+- The simplest replacement reuses the already-public
+  `Extrinsic.Runtime.SandboxEditorFacades` surface for four plain factories:
+  one fixed collection of exactly three import-authoring descriptors, one
+  import-completed descriptor, one direct-mesh postprocessor descriptor, and
+  one `F` focus-action descriptor. The existing
+  `Runtime.SandboxDefaultPolicies.cpp` keeps the non-trivial callback bodies as
+  a private implementation unit of that module; its `.cppm` and public CMake
+  module-file entry disappear.
+- `RUNTIME-183` publishes the exact persistent `AssetImportPipeline`;
+  `RuntimeInputActionRegistry` is already a persistent built-in service. Those
+  are the only required services this composition resolves directly.
+- `RUNTIME-188` publishes the exact optional `SelectionController` and removes
+  `SelectionController*` from generic `RuntimeInputActionServices`. The `F`
+  descriptor therefore captures exact `CameraControllerRegistry&` and
+  `SelectionController&` dependencies and is registered only when both
+  optional services exist.
+- Import auto-selection remains pipeline-provided. The import-completed
+  factory must not capture or resolve a selection controller: its callback
+  consumes `RuntimeImportCompletedServices::Selection` supplied by
+  `AssetImportPipeline`, preserves auto-selection when that service is present,
+  and permits materialization when it is absent. It may capture the optional
+  camera registry solely for the existing post-import autofocus.
+- The app-private aggregate retains non-owning pointers to the required
+  pipeline and input registry only so it can unregister typed handles. It is
+  not a service/dependency bundle and is never exported.
+- The shutdown announcement established by `RUNTIME-183` first cancels imports
+  and detaches provider borrows. Sandbox then unregisters its handles while the
+  persistent pipeline and input registry are still live. Module, GPU, async,
+  and provider teardown occurs only afterward.
+- Public-factory reuse by another caller is not a reason to recreate a
+  lifecycle owner. Reconsider a standalone policy owner only if a second
+  independent production application needs the same shared registration
+  lifetime and teardown contract.
 
 ## Required changes
-- [ ] Inventory each default registration/unregistration and map it to the
-      owning module service: asset import/postprocess, camera focus,
-      `SceneDocumentModule` history/document behavior,
-      `SceneInteractionModule` selection/gizmo behavior, ECS scene/history
-      render-hint authoring, editor visibility/input, or config.
-- [ ] Move the exported policy declarations to private runtime/app composition
-      glue, or fold each registration next to the Sandbox composition call
-      that owns it.
-- [ ] Replace `Engine&` with explicit resolved existing capabilities; do not
-      introduce a catch-all dependency struct or service locator facade.
-- [ ] Preserve registration order, returned-handle lifetime, reverse-order
-      unregister, and shutdown behavior.
-- [ ] Remove the `.cppm` module surface and CMake module-file entry when the
-      final consumer is migrated; leave no compatibility import.
-- [ ] Record before/after module/import/consumer counts.
+
+- [ ] Delete `src/runtime/Runtime.SandboxDefaultPolicies.cppm`, remove it from
+      the public `CXX_MODULES` file set in `src/runtime/CMakeLists.txt`, and
+      leave no compatibility module or import. Keep
+      `src/runtime/Runtime.SandboxDefaultPolicies.cpp` as a private target
+      source, changing it to an implementation unit of
+      `Extrinsic.Runtime.SandboxEditorFacades`.
+- [ ] Export exactly these four factory capabilities through the existing
+      `Runtime.SandboxEditorFacades.cppm`; add no registration/lifecycle
+      helper:
+      1. a fixed `std::array` of exactly three
+         `RuntimeImportEntityAuthoringPolicyDesc` values in Mesh, Graph,
+         PointCloud order;
+      2. one `RuntimeImportCompletedHandlerDesc`, parameterized only by a
+         nullable camera registry for the existing autofocus and otherwise
+         driven by pipeline-provided callback services;
+      3. one `RuntimePostImportProcessorDesc` for the existing direct-mesh
+         generated-normal/normal-bake behavior; and
+      4. one `RuntimeInputActionDesc` for `F` focus that captures exact
+         `CameraControllerRegistry&` and `SelectionController&`.
+- [ ] Preserve the current descriptor debug names, format/domain coverage,
+      authoring payloads, callback priorities, selection/autofocus semantics,
+      async direct-mesh processing, diagnostics, and normal-bake fallback
+      behavior. This is a composition migration, not a policy rewrite.
+- [ ] In `Sandbox.cpp`, resolve all required services before registering
+      anything: exact `AssetImportPipeline` and exact
+      `RuntimeInputActionRegistry`. Resolve optional exact
+      `CameraControllerRegistry` and `SelectionController` separately. Missing
+      either required service fails closed with no installed policy; missing
+      either optional service omits only `F`, while the import-completed
+      descriptor still installs and uses its pipeline-provided selection.
+- [ ] Add one file-local private handle aggregate containing only the two
+      required non-owning provider pointers, the fixed three authoring handles,
+      one import-completed handle, one direct-mesh postprocessor handle, and an
+      optional input-action handle. Do not export it, move it into runtime, or
+      turn it into an owner/service/dependency bundle.
+- [ ] Install in this exact order: Mesh/Graph/PointCloud authoring policies,
+      import-completed handler, direct-mesh postprocessor, then optional `F`
+      action. Treat every invalid registration handle as failure, roll back
+      only what was installed in exact reverse order, clear every handle and
+      provider borrow, and leave the aggregate reusable.
+- [ ] Uninstall once in the exact reverse order: optional `F`, direct-mesh
+      postprocessor, import-completed handler, then PointCloud/Graph/Mesh
+      authoring policies. Clear the aggregate afterward. Repeated shutdown is a
+      no-op; initialize → shutdown → initialize registers each descriptor
+      exactly once without stale callbacks or handles.
+- [ ] Preserve the `RUNTIME-183` lifetime boundary: shutdown announcement
+      cancels imports and detaches pipeline provider borrows first; application
+      shutdown unregisters every policy/action handle while the persistent
+      `AssetImportPipeline` and `RuntimeInputActionRegistry` are live; module,
+      GPU-participant, async, and provider teardown follows.
+- [ ] Migrate every remaining import of
+      `Extrinsic.Runtime.SandboxDefaultPolicies`: production Sandbox; contract
+      tests for asset-import format coverage (fast and slow), runtime input
+      actions, clustering methods, mesh methods, editor models, scene commands,
+      session lifecycle, and visualization; and integration tests for Sandbox
+      acceptance GPU smoke and editor presentation. Record the before/after
+      module, import, and production-consumer counts.
+- [ ] Keep the exact post-`RUNTIME-183` Engine snapshot at `22/0/2/10`; the
+      implementation must not touch `Runtime.Engine.cppm`,
+      `Runtime.Engine.cpp`, or its convergence policy.
 
 ## Tests
-- [ ] Preserve Sandbox default import formats, post-import processing, camera
-      focus, selection, input actions, and unregister/shutdown coverage.
-- [ ] Add a source/contract check proving the app glue contains no `Engine&`
-      and app still imports runtime only.
-- [ ] Run focused Sandbox policy/editor/import coverage, strict layering, and
-      the complete default CPU-supported gate.
+
+- [ ] Extend descriptor-level coverage to prove the authoring factory has
+      exactly three entries in the required order and that all four factories
+      preserve the existing debug names, priorities, payloads, callbacks, and
+      format/domain behavior.
+- [ ] Preserve
+      `DefaultImportPoliciesApplyAuthoringUxAndPostProcess`,
+      `UnregisteredImportPoliciesMaterializeMinimalGeometry`,
+      `PostImportProcessorsRunInOrderAndCanUnregister`, direct-mesh
+      postprocessing coverage, and
+      `ModelSceneCompletionSelectsAndFramesCreatedPrimitives` through the new
+      factories and app wiring.
+- [ ] Split import-completed omission coverage precisely: pipeline-provided
+      selection still auto-selects without a camera; absent pipeline selection
+      does not block materialization; autofocus occurs only with a camera. The
+      completed descriptor must not capture Sandbox's optional selection
+      service.
+- [ ] Update `DefaultFocusKeyDispatchesRegisteredAction` and
+      `NoDefaultInputActionsLeaveFocusKeyNoOp` to prove `F` registers only when
+      both optional exact services exist, captures both, and does not consume a
+      generic selection action service after `RUNTIME-188`.
+- [ ] Add app-composition regressions for each missing required service, each
+      missing optional service, failure at every registration stage, exact
+      reverse rollback/unregister order, repeated shutdown, and
+      initialize → shutdown → initialize exactly-once registration.
+- [ ] Extend the blocked-import shutdown regression to prove announcement
+      cancellation/provider detachment precedes app handle unregister, that
+      both persistent registries remain live during unregister, and that no
+      callback runs during later module/GPU/async teardown.
+- [ ] Add structural coverage proving the old `.cppm`, module declaration,
+      imports, and public CMake entry are absent; the retained `.cpp` is private
+      to `SandboxEditorFacades`; no replacement module/owner/bundle exists; and
+      the default-policy path contains no `Engine&` or forbidden direct
+      dependency.
+- [ ] Migrate/build the current GPU acceptance importer as well as the CPU
+      contract/integration callers; preserve the real Sandbox acceptance and
+      session-lifecycle paths rather than replacing them with factory-only
+      tests.
 
 ## Docs
-- [ ] Update Sandbox and runtime composition documentation with the private
-      app-policy ownership.
-- [ ] Regenerate the module inventory.
+
+- [ ] Update `src/runtime/README.md`,
+      `docs/architecture/runtime.md`, `src/app/Sandbox/README.md`,
+      `docs/architecture/kernel-target-state.md`, and ADR-0027 current-state
+      evidence with the existing-facade factories, app-private handles, exact
+      provider set, pipeline-provided auto-selection, optional `F` rule, and
+      announcement/unregister/teardown order.
+- [ ] Update current task/index wording that names the removed public module.
+      In particular,
+      `tasks/backlog/runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md`
+      currently says `AssetModelSceneHandoff` and `SandboxDefaultPolicies`
+      hardcode source generations; after privatization it must name the
+      retained private default-policy implementation/direct-mesh descriptor
+      path instead of the deleted module.
+- [ ] Regenerate `docs/api/generated/module_inventory.md` and record the
+      removal of one public module/BMI with no replacement module.
 
 ## Acceptance criteria
-- [ ] Sandbox default behavior and handle cleanup are unchanged.
-- [ ] No exported `SandboxDefaultPolicies` module, Engine facade, replacement
-      policy module, or catch-all service bundle remains.
-- [ ] App composition selects the defaults while all lower-layer behavior and
-      state stays in runtime-owned modules.
+
+- [ ] `Runtime.SandboxDefaultPolicies.cppm` and
+      `Extrinsic.Runtime.SandboxDefaultPolicies` are gone;
+      `Runtime.SandboxDefaultPolicies.cpp` remains a private implementation
+      unit of the existing `Extrinsic.Runtime.SandboxEditorFacades`.
+- [ ] The existing surface exports only the four plain descriptor factories;
+      Sandbox owns the private provider/handle aggregate and performs
+      transactional install plus strict reverse uninstall.
+- [ ] The only direct required services are `AssetImportPipeline` and
+      `RuntimeInputActionRegistry`; camera and selection are optional, `F`
+      requires both, and import auto-selection remains pipeline-provided.
+- [ ] There is no direct default-policy ownership or dependency on
+      `SceneDocumentModule`, `EditorCommandHistory`,
+      `SceneInteractionModule`, `EngineConfigControl`, an editor/UI host,
+      `AssetService`, `GpuAssetCache`, renderer/RHI, or gizmo state.
+- [ ] Partial failure, repeated shutdown, reinitialize, blocked-import
+      shutdown, and canonical Sandbox acceptance are covered; callbacks cannot
+      outlive their providers.
+- [ ] Engine remains at the exact post-`RUNTIME-183` convergence target:
+      `22` plain imports / `0` domain imports / `2` re-exports / `10` public
+      getter names.
 
 ## Verification
+
 ```bash
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/agents/check_task_state_links.py --root . --strict
+python3 tools/agents/generate_session_brief.py
+python3 tools/docs/check_doc_links.py --root .
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicRuntimeIntegrationTests IntrinsicSandboxEditorIntegrationTests
-ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|RuntimeInputActions|AssetImportFormatCoverage|RuntimeSandboxAcceptance|CameraFocus' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicRuntimeGraphicsCpuTests IntrinsicRuntimeIntegrationTests IntrinsicSandboxEditorIntegrationTests
+ctest --test-dir build/ci --output-on-failure -R 'SandboxDefault|RuntimeInputActions|AssetImportFormatCoverage|RuntimeSandboxAcceptance|SandboxEditor(SessionLifecycle|Presentation)' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests
+ctest --test-dir build/ci-vulkan --output-on-failure -R 'RuntimeSandboxAcceptance' -L 'gpu' -L 'vulkan' --timeout 120
+python3 tools/repo/check_kernel_convergence.py --root . --strict
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
-python3 tools/agents/check_task_policy.py --root . --strict
+git diff --check
 ```
 
 ## Forbidden changes
-- Adding a public compatibility module, Sandbox policy module, service bundle,
-  or `Engine&` adapter.
-- Reintroducing app ownership of assets, ECS, graphics, or renderer state.
-- Changing default behavior while changing composition shape.
+
+- Adding a public compatibility module, replacement policy module, lifecycle
+  owner, registry, service, bundle, interface, generic factory framework,
+  dependency struct, or `Engine&` adapter.
+- Directly resolving or owning `SceneDocumentModule`,
+  `EditorCommandHistory`, `SceneInteractionModule`, `EngineConfigControl`, an
+  editor/UI host, `AssetService`, `GpuAssetCache`, renderer/RHI, or gizmo
+  state.
+- Capturing Sandbox's optional selection service in the import-completed
+  descriptor, restoring selection to generic input-action services, or
+  installing `F` with only one of camera/selection.
+- Relying on reverse module-name order, unregistering after a provider is
+  destroyed, leaving partial registrations installed, or changing default
+  behavior while changing composition shape.
 
 ## Maturity
-- Target: `Operational`; the private policy composition must remain exercised
-  through the canonical Sandbox runtime path.
+
+- Target: `Operational`; the private policy composition remains exercised
+  through canonical Sandbox startup, shutdown, reinitialize, and acceptance
+  paths.
+- Production Vulkan object-space normal-bake operation remains owned by
+  `RUNTIME-129`.
