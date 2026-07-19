@@ -50,6 +50,7 @@ namespace Extrinsic::Backends::Vulkan
         std::uint32_t GraphicsQueueFamily = VK_QUEUE_FAMILY_IGNORED;
         bool AsyncComputeQueueAvailable = false;
         std::uint32_t AsyncComputeQueueFamily = VK_QUEUE_FAMILY_IGNORED;
+        std::uint32_t EngineRequestedApiVersion = VK_API_VERSION_1_0;
         VulkanDevice* Owner = nullptr;
         VulkanProfilerContextResolver ResolveContext = nullptr;
         VulkanProfilerDeviceLostNotifier NotifyDeviceLost = nullptr;

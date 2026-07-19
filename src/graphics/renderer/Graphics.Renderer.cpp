@@ -2306,10 +2306,21 @@ namespace Extrinsic::Graphics
             }
             else
             {
+                const RHI::IProfiler* profiler =
+                    m_Device->GetProfiler();
+                const RHI::ProfilerStatusSnapshot profilerStatus =
+                    profiler != nullptr
+                        ? profiler->GetStatus()
+                        : RHI::ProfilerStatusSnapshot{};
                 PublishStaleGpuProfileStatus(
-                    RenderGraphGpuProfileStatus::Unavailable,
-                    "GPU profile resolution is unavailable because frame "
-                    "acquisition failed.");
+                    profiler != nullptr
+                        ? ProfileStatusForBackend(profilerStatus.Status)
+                        : RenderGraphGpuProfileStatus::Unavailable,
+                    profiler != nullptr &&
+                            !profilerStatus.Diagnostic.empty()
+                        ? profilerStatus.Diagnostic
+                        : "GPU profile resolution is unavailable because "
+                          "frame acquisition failed.");
                 m_LastRenderGraphStats.GpuProfile =
                     m_CurrentGpuProfile;
             }
@@ -2999,9 +3010,26 @@ namespace Extrinsic::Graphics
             ResetCommandRecordStats();
             if (!renderWorld.EnableGpuProfiling)
             {
+                const RHI::IProfiler* profiler =
+                    m_Device != nullptr
+                        ? m_Device->GetProfiler()
+                        : nullptr;
+                const RHI::ProfilerStatusSnapshot profilerStatus =
+                    profiler != nullptr
+                        ? profiler->GetStatus()
+                        : RHI::ProfilerStatusSnapshot{};
+                const bool deviceLost =
+                    profiler != nullptr &&
+                    profilerStatus.Status ==
+                        RHI::ProfilerBackendStatus::DeviceLost;
                 PublishStaleGpuProfileStatus(
-                    RenderGraphGpuProfileStatus::Disabled,
-                    "GPU profiling is disabled for this render snapshot.");
+                    deviceLost
+                        ? RenderGraphGpuProfileStatus::DeviceLost
+                        : RenderGraphGpuProfileStatus::Disabled,
+                    deviceLost
+                        ? profilerStatus.Diagnostic
+                        : "GPU profiling is disabled for this render "
+                          "snapshot.");
             }
             else if (m_CurrentGpuProfile.Status ==
                      RenderGraphGpuProfileStatus::Disabled)

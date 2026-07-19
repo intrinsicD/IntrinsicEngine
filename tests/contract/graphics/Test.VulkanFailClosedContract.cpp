@@ -132,6 +132,70 @@ TEST(VulkanFailClosedContract, ProfilerQueryPoolFailureIsNonFatalToDeviceBootstr
     EXPECT_TRUE(decision.DeviceInitializationMayContinue);
 }
 
+TEST(VulkanFailClosedContract, ProfilerQueryPoolDeviceLossStopsDeviceBootstrap)
+{
+    namespace VK = Extrinsic::Backends::Vulkan;
+    namespace RHI = Extrinsic::RHI;
+
+    const VK::VulkanProfilerBootstrapDecision decision =
+        VK::EvaluateVulkanProfilerBootstrap(
+            VK::VulkanProfilerBootstrapInputs{
+                .TimestampPeriodNs = 1.0,
+                .GraphicsTimestampValidBits = 64u,
+                .AsyncComputeQueueAvailable = true,
+                .AsyncComputeTimestampValidBits = 64u,
+                .FramesInFlight = 3u,
+                .QueryPoolCreationSucceeded = false,
+                .QueryPoolCreationDeviceLost = true,
+            });
+
+    EXPECT_EQ(
+        decision.Status,
+        RHI::ProfilerBackendStatus::DeviceLost);
+    EXPECT_TRUE(decision.QueryPoolRequired);
+    EXPECT_GT(decision.TotalQueryCount, 0u);
+    EXPECT_FALSE(decision.DeviceInitializationMayContinue);
+}
+
+TEST(VulkanFailClosedContract,
+     ProfilerFrameRequiresTimestampSupportOnAnActuallyRequestedQueue)
+{
+    namespace VK = Extrinsic::Backends::Vulkan;
+
+    EXPECT_FALSE(VK::VulkanProfilerFrameHasSupportedTimestampQueue(
+        VK::VulkanProfilerFrameQueueSupportInputs{
+            .GraphicsQueueRequested = true,
+            .AsyncComputeQueueRequested = false,
+            .GraphicsTimestampsSupported = false,
+            .AsyncComputeTimestampsSupported = true,
+        }));
+    EXPECT_TRUE(VK::VulkanProfilerFrameHasSupportedTimestampQueue(
+        VK::VulkanProfilerFrameQueueSupportInputs{
+            .GraphicsQueueRequested = false,
+            .AsyncComputeQueueRequested = true,
+            .GraphicsTimestampsSupported = false,
+            .AsyncComputeTimestampsSupported = true,
+        }));
+    EXPECT_TRUE(VK::VulkanProfilerFrameHasSupportedTimestampQueue(
+        VK::VulkanProfilerFrameQueueSupportInputs{
+            .GraphicsQueueRequested = true,
+            .AsyncComputeQueueRequested = true,
+            .GraphicsTimestampsSupported = true,
+            .AsyncComputeTimestampsSupported = false,
+        }));
+}
+
+TEST(VulkanFailClosedContract,
+     DeviceBeginFrameStopsWhenProfilerRetirementObservesDeviceLoss)
+{
+    namespace VK = Extrinsic::Backends::Vulkan;
+
+    EXPECT_TRUE(
+        VK::ShouldContinueVulkanFrameAfterProfilerRetirement(false));
+    EXPECT_FALSE(
+        VK::ShouldContinueVulkanFrameAfterProfilerRetirement(true));
+}
+
 TEST(VulkanFailClosedContract, ProfilerContextOwnershipRejectsForeignDeviceContext)
 {
     namespace VK = Extrinsic::Backends::Vulkan;

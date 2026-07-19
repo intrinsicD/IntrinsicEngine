@@ -73,7 +73,8 @@ TEST(RHIProfiler, DurationResolutionRequiresBothAvailableValues)
         RHI::TimestampQueryValue{.Ticks = 10u, .Available = false},
         RHI::TimestampQueryValue{.Ticks = 20u, .Available = true},
         64u,
-        1.0);
+        1.0,
+        100u);
     ASSERT_FALSE(missingBegin.has_value());
     EXPECT_EQ(missingBegin.error(), RHI::ProfilerError::NotReady);
 
@@ -81,7 +82,8 @@ TEST(RHIProfiler, DurationResolutionRequiresBothAvailableValues)
         RHI::TimestampQueryValue{.Ticks = 10u, .Available = true},
         RHI::TimestampQueryValue{.Ticks = 20u, .Available = false},
         64u,
-        1.0);
+        1.0,
+        100u);
     ASSERT_FALSE(missingEnd.has_value());
     EXPECT_EQ(missingEnd.error(), RHI::ProfilerError::NotReady);
 
@@ -89,7 +91,8 @@ TEST(RHIProfiler, DurationResolutionRequiresBothAvailableValues)
         RHI::TimestampQueryValue{.Ticks = 10u, .Available = true},
         RHI::TimestampQueryValue{.Ticks = 20u, .Available = true},
         64u,
-        2.0);
+        2.0,
+        100u);
     ASSERT_TRUE(available.has_value());
     EXPECT_EQ(*available, 20u);
 }
@@ -115,7 +118,8 @@ TEST(RHIProfiler, DurationResolutionValidatesPeriodAndCheckedConversion)
             begin,
             end,
             64u,
-            invalidPeriod);
+            invalidPeriod,
+            100u);
         ASSERT_FALSE(invalid.has_value());
         EXPECT_EQ(invalid.error(), RHI::ProfilerError::InvalidArgument);
     }
@@ -127,9 +131,83 @@ TEST(RHIProfiler, DurationResolutionValidatesPeriodAndCheckedConversion)
             .Available = true,
         },
         64u,
-        2.0);
+        2.0,
+        100u);
     ASSERT_FALSE(overflow.has_value());
     EXPECT_EQ(overflow.error(), RHI::ProfilerError::Overflow);
+}
+
+TEST(RHIProfiler, DurationResolutionRejectsAmbiguousMultipleWrapEnvelope)
+{
+    constexpr RHI::TimestampQueryValue begin{
+        .Ticks = 0xf0u,
+        .Available = true,
+    };
+    constexpr RHI::TimestampQueryValue end{
+        .Ticks = 0x20u,
+        .Available = true,
+    };
+
+    const auto singleWrap = RHI::ResolveTimestampDurationNs(
+        begin,
+        end,
+        8u,
+        1.0,
+        255u);
+    ASSERT_TRUE(singleWrap.has_value());
+    EXPECT_EQ(*singleWrap, 48u);
+
+    const auto ambiguous = RHI::ResolveTimestampDurationNs(
+        begin,
+        end,
+        8u,
+        1.0,
+        256u);
+    ASSERT_FALSE(ambiguous.has_value());
+    EXPECT_EQ(ambiguous.error(), RHI::ProfilerError::Overflow);
+
+    const auto abovePeriod = RHI::ResolveTimestampDurationNs(
+        begin,
+        end,
+        8u,
+        1.0,
+        257u);
+    ASSERT_FALSE(abovePeriod.has_value());
+    EXPECT_EQ(abovePeriod.error(), RHI::ProfilerError::Overflow);
+
+    constexpr RHI::TimestampQueryValue begin32{
+        .Ticks = 0xfffffff0u,
+        .Available = true,
+    };
+    constexpr RHI::TimestampQueryValue end32{
+        .Ticks = 0x20u,
+        .Available = true,
+    };
+    constexpr std::uint64_t counterPeriod32 =
+        std::uint64_t{1} << 32u;
+    const auto singleWrap32 = RHI::ResolveTimestampDurationNs(
+        begin32,
+        end32,
+        32u,
+        1.0,
+        counterPeriod32 - 1u);
+    ASSERT_TRUE(singleWrap32.has_value());
+    EXPECT_EQ(*singleWrap32, 48u);
+
+    for (const std::uint64_t ambiguousUpperBound :
+         {counterPeriod32, counterPeriod32 + 1u})
+    {
+        const auto ambiguous32 = RHI::ResolveTimestampDurationNs(
+            begin32,
+            end32,
+            32u,
+            1.0,
+            ambiguousUpperBound);
+        ASSERT_FALSE(ambiguous32.has_value());
+        EXPECT_EQ(
+            ambiguous32.error(),
+            RHI::ProfilerError::Overflow);
+    }
 }
 
 TEST(RHIProfiler, OptionalDurationDistinguishesNativeZeroFromUnavailable)

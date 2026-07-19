@@ -31,11 +31,12 @@ maturity_target: Operational
   one post-`UiEndCapture` immutable frame sample, and the existing Frame Graph
   panel's config and full profile projection. CPU contracts and current-state
   cross-layer docs cover that slice.
-- The operational checkpoint passed non-skipped on 2026-07-19 on an NVIDIA
-  GeForce RTX 3050 with driver 590.48.01. The sanitizer-backed Vulkan smoke
-  resolved a named native pass after cyclic query-slot reuse and preserved
-  serial/parallel validation-readback parity on accepted graphics and
-  async-compute queues. The task remains active for final integration review;
+- A pre-audit operational checkpoint ran non-skipped on a host exposing an
+  NVIDIA GeForce RTX 3050 with driver 590.48.01. Its evidence is superseded by
+  the results-audit fixes for multi-wrap ambiguity, selected-device binding,
+  device-loss propagation, and per-frame unsupported queues. The task remains
+  active pending the held post-audit CPU/Vulkan verification and final
+  integration review;
   this evidence slice does not retire it.
 - `RUNTIME-181` and `RUNTIME-182` are retired, so ConfigControl and EditorUi
   are settled owners, not future blockers.
@@ -150,8 +151,10 @@ maturity_target: Operational
   pool once only when at least one promoted actual queue supports timestamps,
   for all frame slots and the bounded graphics/async-compute plan. Query-pool
   creation failure disables profiling with a diagnostic; it must not make an
-  otherwise operational render device fail. Destroy the pool after the normal
-  device idle during shutdown and before `VkDevice` destruction.
+  otherwise operational render device fail. `VK_ERROR_DEVICE_LOST` is not an
+  allocation-only degradation: notify the owning device, report `DeviceLost`,
+  and stop operational promotion. Destroy the pool after the normal device
+  idle during shutdown and before `VkDevice` destruction.
 - Keep the existing `kMaxTimestampScopes` (256) as the total pass-scope
   ceiling per frame, reserve one begin/end envelope pair per supported actual
   queue, and diagnose exhaustion. Do not resize or replace pools from the
@@ -160,7 +163,9 @@ maturity_target: Operational
   `VkQueueFamilyProperties::timestampValidBits > 0`, not only
   `timestampComputeAndGraphics`. Validate that `timestampPeriod` is finite and
   positive. Unsupported actual queues receive no query range and remain
-  explicit in the result.
+  explicit in the result. A globally ready backend must still return
+  per-frame `Unsupported` when every queue used by a nonempty accepted plan
+  lacks timestamp bits.
 - On slot reuse, preserve this order: existing slot-fence completion proof;
   nonblocking resolution of the prior successfully submitted metadata;
   metadata retirement; then command-recorded reset of the range about to be
@@ -178,10 +183,15 @@ maturity_target: Operational
   inspect both values of every pair. Mask each timestamp to its queue family's
   valid-bit width and compute the modular delta before checked
   `ticks * timestampPeriod` conversion. This supports at most one wrap;
-  multiple-wrap intervals are explicitly ambiguous and unavailable.
+  use `steady_clock` from frame planning through completed-slot resolution
+  only as a conservative upper-bound guard. When that envelope reaches the
+  counter's full period, multiple wraps are ambiguous and resolution fails
+  with `Overflow`; never substitute host time for GPU duration.
 - Device loss keeps the renderer's prior last-good UI cache marked stale and
   reports device-lost status. It must not publish a fresh telemetry row,
-  dereference a dead pool, or invent partial duration evidence.
+  dereference a dead pool, or invent partial duration evidence. If completed
+  slot retirement observes loss inside device `BeginFrame`, return before any
+  later reset, acquire, cleanup, or other Vulkan backend call.
 
 ## Publication semantics
 
@@ -236,8 +246,9 @@ Each slice is a separately reviewable commit and must pass its focused CPU check
 - [x] Add `tests/unit/graphics/Test.RHI.Profiler.cpp` to
   `IntrinsicGraphicsRhiCpuUnitTests`. Cover valid-bit widths 0 and 64,
   32-bit wrap (`0xfffffff0 -> 0x20 == 48` ticks), finite/zero/non-finite
-  period, checked nanosecond overflow, availability pairs, and slot-local
-  versus absolute query bounds.
+  period, checked nanosecond overflow, the host upper bound immediately below
+  versus at a full counter period, availability pairs, and slot-local versus
+  absolute query bounds.
 - [x] Add `tests/contract/graphics/Test.Profiler.cpp` to
   `IntrinsicGraphicsContractCpuTests`. Cover typed-token invalidity,
   frame-number versus slot reuse, begin/end/seal/discard ordering, duplicate
@@ -247,15 +258,20 @@ Each slice is a separately reviewable commit and must pass its focused CPU check
   `tests/contract/graphics/Test.VulkanFailClosedContract.cpp` in
   `IntrinsicGraphicsVulkanContractTests`. Cover the backend-local support
   decision for zero/nonzero queue-family valid bits, invalid timestamp period,
-  unsupported async queue, and query-pool creation failure degrading only
-  profiler status rather than device operational state.
+  unsupported actual-frame queues, ordinary query-pool creation failure
+  degrading only profiler status, query-pool device loss stopping device
+  bootstrap, and the post-retirement device-loss frame-continuation guard.
 - [x] Extend
   `tests/contract/graphics/Test.RendererFrameLifecycle.cpp` with exact cases
   for serial, accepted parallel, graphics/async multi-queue, requested-queue
   fallback, discarded submit, and absent profiler. Assert one scope per
   recorded callback, actual-queue attribution, deterministic preplanning,
   per-queue envelopes without summation, stale-cache status, and telemetry
-  clearing when no fresh native sample exists.
+  clearing when no fresh native sample exists. Cover per-frame `Unsupported`
+  planning, a successful device frame whose hot-disabled render snapshot must
+  not mask current profiler `DeviceLost`, and a failed device `BeginFrame`
+  that maps current profiler `DeviceLost`; both loss paths preserve the stale
+  last-good frame identity.
 - [x] Extend `tests/unit/core/Test.Core.EngineConfigLoad.cpp`,
   `tests/contract/runtime/Test.RuntimeConfigControlFacade.cpp`, and
   `tests/contract/runtime/Test.RuntimeEngineLayering.cpp`, plus the renderer
@@ -280,8 +296,10 @@ Each slice is a separately reviewable commit and must pass its focused CPU check
   produce a fresh finite nonzero `NativeGpu` row for a known recorded
   default-recipe pass, with an older submitted-frame number and reused slot.
   An operational device whose actual queue family has zero valid bits must
-  instead pass with explicit `Unsupported` status and no native rows; do not
-  skip or substitute CPU timing.
+  instead pass with explicit per-frame `Unsupported` status and no native
+  rows, even when the unused queue made the backend globally ready; do not
+  skip or substitute CPU timing. Record selected physical-device/API/driver/
+  UUID and queue timestamp metadata in GTest XML.
 - [x] Extend
   `DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation`
   and
@@ -358,20 +376,25 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check
 ```
 
-Operational evidence recorded on 2026-07-19:
+Pre-audit evidence recorded on 2026-07-19 (superseded by the audit-fix
+commit; not current-head completion evidence):
 
 - `ci-vulkan` used Clang 23 with ASan+UBSan. The focused `gpu;vulkan`
   selector passed all three non-skipped
   `NativeGpuTimestampsResolveNamedPassesAfterSlotReuse` and
   `ParallelRecordingMatchesSerial*WithValidation` cases (3/3).
-- Host: Vulkan 1.4.325 on NVIDIA GeForce RTX 3050, proprietary driver
-  590.48.01. Graphics and compute queue families reported
-  `timestampValidBits = 64`; `timestampPeriod = 1 ns`.
-- The native case completed 8 frames with 3 frames in flight. Its recorded
-  result was `NativeGpu`, submitted frame 4, slot 1, sample age 3; the known
-  recorded `SurfacePass` produced an available nonzero 47,104 ns diagnostic
-  sample and the same fresh value reached existing telemetry. The duration is
-  capability/correctness evidence only, not a performance claim.
+- Pre-audit host inspection distinguished loader instance Vulkan 1.4.309 and
+  engine-requested Vulkan 1.3, while host GPU0 / an observed NVIDIA GeForce RTX
+  3050 physical device reported API 1.4.325, proprietary driver 590.48.01,
+  `timestampValidBits = 64`, and `timestampPeriod = 1 ns`. That host-wide
+  observation did not prove which physical device the engine selected. The
+  post-audit smoke now records selected-device facts and UUID from the
+  engine-owned profiler diagnostic; refreshed binding evidence is pending the
+  held final rerun.
+- The earlier native case completed 8 frames with 3 frames in flight and
+  resolved an older `NativeGpu` `SurfacePass` sample into telemetry. Its exact
+  duration and frame metadata are intentionally not carried forward as
+  evidence for the post-audit head; the held final rerun must replace them.
 - Graphics-only and async-compute serial/parallel fixtures retained identical
   readback bytes and stable validation counters. Exact candidate-frame
   resolution, unique scope parity, graphics `SurfacePass`, async-compute

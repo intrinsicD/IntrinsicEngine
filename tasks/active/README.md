@@ -18,9 +18,9 @@ Each active task should include:
   leaves and update the convergence scorecard after each retirement.
 - [`GRAPHICS-127`](GRAPHICS-127-native-gpu-timestamp-profiler.md) — native GPU
   timestamp profiler; owner: Codex team; branch:
-  `codex/graphics-127-gpu-profiler`; in progress. Next gate: repair the RHI
-  lifecycle/provenance contract and focused CPU coverage before integrating
-  native Vulkan query pools and compiled-pass scopes.
+  `codex/graphics-127-gpu-profiler`; in progress. Next gate: run the held
+  post-audit CPU/Vulkan verification over the implemented multi-wrap,
+  selected-device, device-loss, and per-frame support closures.
 
 ## History
 

@@ -162,6 +162,12 @@ resolution clears telemetry GPU rows while retaining any last-good UI sample
 as stale. The renderer never sums overlapping queue envelopes or presents
 them as a cross-queue frame time.
 
+Device loss has precedence in both relevant control paths. A disabled render
+snapshot checks the profiler before publishing `Disabled`, and a failed device
+`BeginFrame()` maps the profiler's current backend status instead of hardcoding
+generic unavailability. Both paths preserve the last-good frame identity as
+stale, report `DeviceLost`, and clear telemetry without publishing a fresh row.
+
 Timestamp reset/write/query work can perturb the command stream, so these
 values are diagnostic measurements rather than performance claims. No
 profiler-specific wait, CPU-clock substitute, global-frame total, overhead

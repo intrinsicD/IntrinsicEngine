@@ -793,20 +793,21 @@ TEST(DefaultRecipeSurfaceGpuSmoke,
         std::to_string(
             static_cast<std::uint32_t>(profilerStatus.Status)));
     RecordProperty("ProfilerDiagnostic", profilerStatus.Diagnostic);
+    const auto& profile = run.Stats.GpuProfile;
+    RecordProperty(
+        "RenderGraphGpuProfileStatus",
+        std::to_string(static_cast<std::uint32_t>(profile.Status)));
 
-    if (profilerStatus.Status ==
-        Extrinsic::RHI::ProfilerBackendStatus::Unsupported)
+    if (profile.Status ==
+        Extrinsic::Graphics::RenderGraphGpuProfileStatus::Unsupported)
     {
         EXPECT_EQ(
-            run.Stats.GpuProfile.Status,
-            Extrinsic::Graphics::RenderGraphGpuProfileStatus::Unsupported);
-        EXPECT_EQ(
-            run.Stats.GpuProfile.Source,
+            profile.Source,
             Extrinsic::RHI::GpuTimestampSource::Unavailable);
-        EXPECT_FALSE(run.Stats.GpuProfile.Fresh);
-        EXPECT_FALSE(run.Stats.GpuProfile.HasResolvedFrame);
-        EXPECT_TRUE(run.Stats.GpuProfile.QueueEnvelopes.empty());
-        EXPECT_TRUE(run.Stats.GpuProfile.Passes.empty());
+        EXPECT_FALSE(profile.Fresh);
+        EXPECT_FALSE(profile.HasResolvedFrame);
+        EXPECT_TRUE(profile.QueueEnvelopes.empty());
+        EXPECT_TRUE(profile.Passes.empty());
         EXPECT_TRUE(
             Extrinsic::Core::Telemetry::TelemetrySystem::Get()
                 .GetPassTimings()
@@ -821,8 +822,29 @@ TEST(DefaultRecipeSurfaceGpuSmoke,
         << profilerStatus.Diagnostic;
     ASSERT_TRUE(profilerStatus.NativeTimestampsAvailable())
         << profilerStatus.Diagnostic;
+    for (const std::string_view field :
+         {"selectedDevice=\"",
+          "physicalDeviceApi=",
+          "loaderInstanceApi=",
+          "engineRequestedApi=1.3.0",
+          "driverName=\"",
+          "driverInfo=\"",
+          "driverVersion=",
+          "deviceUUID=",
+          "timestampPeriodNs=",
+          "graphicsFamily=",
+          "graphicsValidBits=",
+          "asyncAvailable=",
+          "asyncFamily=",
+          "asyncValidBits="})
+    {
+        EXPECT_NE(
+            profilerStatus.Diagnostic.find(field),
+            std::string::npos)
+            << "Selected-device profiler diagnostic omitted " << field
+            << ": " << profilerStatus.Diagnostic;
+    }
 
-    const auto& profile = run.Stats.GpuProfile;
     ASSERT_TRUE(profile.Fresh) << BuildGpuProfileSummary(profile);
     EXPECT_FALSE(profile.Stale) << BuildGpuProfileSummary(profile);
     EXPECT_EQ(

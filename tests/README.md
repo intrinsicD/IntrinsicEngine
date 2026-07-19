@@ -371,8 +371,12 @@ frames without a profiler-specific wait, and requires a fresh finite nonzero
 `NativeGpu` row for the recorded `SurfacePass` with an older submitted-frame
 number, exact reused slot, and sample age of at least `framesInFlight`.
 Established GLFW/Vulkan readiness failures skip before the run. Once the
-device is operational, zero timestamp-valid bits are an explicit
-`Unsupported` result with no native rows; loss of operation is a failure.
+device is operational, a frame whose actual queues all have zero
+timestamp-valid bits is an explicit per-frame `Unsupported` result with no
+native rows; loss of operation is a failure. Native runs record the
+engine-selected device name/UUID, physical-device and loader API versions,
+engine-requested API, driver name/info/version, timestamp period, and
+graphics/async queue-family valid-bit metadata in GTest XML.
 
 The opt-in `IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests` executable (labels
 `gpu;vulkan;integration;runtime;graphics`, RUNTIME-095 Slice 3) drives
