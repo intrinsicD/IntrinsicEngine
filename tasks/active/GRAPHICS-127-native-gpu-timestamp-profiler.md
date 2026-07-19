@@ -25,16 +25,18 @@ maturity_target: Operational
   serial/parallel and graphics/async lanes, submits only globally advanced
   candidates, resolves exact reused-slot keys, publishes fresh recorded native
   rows to existing telemetry, and retains detailed last-good frame stats as
-  stale on every nonfresh path. Config/control sampling, editor presentation,
-  native-GPU smoke evidence, and the remaining cross-layer docs remain open.
+  stale on every nonfresh path. The config/control checkpoint now owns a
+  default-off round-tripped hot field, synchronous Editor/AgentCli apply,
+  one post-`UiEndCapture` immutable frame sample, and the existing Frame Graph
+  panel's config and full profile projection. CPU contracts and current-state
+  cross-layer docs cover that slice. Native-GPU smoke evidence remains open.
 - `RUNTIME-181` and `RUNTIME-182` are retired, so ConfigControl and EditorUi
-  are settled owners, not future blockers. Documentation and native-GPU
-  evidence remain open.
-- The 2026-07-19 audit confirmed that the exported profiler seam is unused in
-  production: the Vulkan adapter is never constructed, `EndFrame()` never
-  writes its closing timestamp, and the Null adapter reports host-clock values
-  under `Gpu*` names. This task must repair that seam in place before
-  `REVIEW-003`; it must not add a parallel profiling architecture.
+  are settled owners, not future blockers. Native-GPU evidence remains open.
+- The 2026-07-19 activation audit found the exported profiler seam unused in
+  production: the Vulkan adapter was not constructed, `EndFrame()` did not
+  write its closing timestamp, and the Null adapter reported host-clock values
+  under `Gpu*` names. The completed implementation checkpoints repair that
+  seam in place; this task does not add a parallel profiling architecture.
 
 ## Goal
 
@@ -211,15 +213,15 @@ Each slice is a separately reviewable commit and must pass its focused CPU check
 
 - [x] Repair the existing RHI contract with explicit monotonic frame identity separate from frame slot, a typed invalid scope result, queue/source provenance, and deterministic invalid-pairing/overflow/unsupported diagnostics.
 - [x] Make Null/mock profiling validate lifecycle, names, frame-slot reuse, and not-ready behavior without labeling host-clock durations as native GPU time.
-- [ ] Add the one default-off config field, route editor and agent/CLI writes through synchronous `EngineConfigControl` preview/apply, and sample committed state once into `RenderFrameInput` after `UiEndCapture`.
-- [ ] Use the settled app-composed ConfigControl and existing EditorShell Frame Graph contribution; do not add a profiling-specific Engine getter, renderer setter, callback, staging queue, or UI path.
+- [x] Add the one default-off config field, route editor and agent/CLI writes through synchronous `EngineConfigControl` preview/apply, and sample committed state once into `RenderFrameInput` after `UiEndCapture`.
+- [x] Use the settled app-composed ConfigControl and existing EditorShell Frame Graph contribution; do not add a profiling-specific Engine getter, renderer setter, callback, staging queue, or UI path.
 - [x] Construct the device-lifetime Vulkan adapter after successful device initialization and its fixed query pool whenever a promoted actual queue supports native timestamps. Previously submitted metadata is retired only at its later slot-completion proof; adapter lifetime is independent of per-frame recording enablement.
 - [x] Bind reset/envelope/pass timestamp commands to the accepted graphics/compute primary and secondary contexts. Reset a reused slot only after its existing fence proof, outside render passes, and keep slot/queue/local/absolute query indexing coherent.
 - [x] Respect per-queue-family `timestampValidBits`, finite positive timestamp period, query exhaustion, availability bits, modular wrap, checked conversion, discarded submissions, device loss, and command-buffer lifetime. Resolution never uses `VK_QUERY_RESULT_WAIT_BIT` or adds a profiler-specific frame wait.
 - [x] Resolve only completed older frames before slot reuse and retain the last good resolved sample when the newest result is not ready.
 - [x] Preplan immutable tokens before worker fan-out and bracket the actual compiled pass callback by stable compiled pass name/ID and accepted queue in serial, parallel-recorded, graphics, fallback, and async-compute paths without locks or duplicate scopes.
 - [x] Publish only fresh recorded `NativeGpu` pass rows into existing `Core.Telemetry`; publish detailed current status plus stale last-good sample, per-queue envelopes, provenance, and frame correlation through `RenderGraphFrameStats`.
-- [ ] Copy the renderer GPU-profile snapshot into the existing Frame Graph model/window, including config-control availability and rejection diagnostics; do not add another presentation contribution.
+- [x] Copy the renderer GPU-profile snapshot into the existing Frame Graph model/window, including config-control availability and rejection diagnostics; do not add another presentation contribution.
 - [x] Define multi-queue frame timing solely as named per-queue envelopes; do not sum overlapping work or populate an ambiguous global GPU-frame total.
 
 ## Tests
@@ -247,14 +249,15 @@ Each slice is a separately reviewable commit and must pass its focused CPU check
   recorded callback, actual-queue attribution, deterministic preplanning,
   per-queue envelopes without summation, stale-cache status, and telemetry
   clearing when no fresh native sample exists.
-- [ ] Extend `tests/unit/core/Test.Core.EngineConfigLoad.cpp`,
+- [x] Extend `tests/unit/core/Test.Core.EngineConfigLoad.cpp`,
   `tests/contract/runtime/Test.RuntimeConfigControlFacade.cpp`, and
-  `tests/integration/runtime/Test.RuntimeFrameLoopContract.cpp`. Prove default
-  false plus JSON round-trip, synchronous Editor and AgentCli apply, rejected
-  preview leaves config unchanged, the committed value is sampled once in the
-  next render snapshot, hot disable records no new scopes, and toggles never
-  create/destroy profiler resources.
-- [ ] Extend `tests/contract/runtime/Test.SandboxEditorModels.cpp` and
+  `tests/contract/runtime/Test.RuntimeEngineLayering.cpp`, plus the renderer
+  lifecycle contract. Prove default false plus JSON round-trip, synchronous
+  Editor and AgentCli apply, rejected preview leaves config unchanged, the
+  committed value is sampled once in the same frame's render snapshot, hot
+  disable records no new scopes, and toggles never create/destroy profiler
+  resources.
+- [x] Extend `tests/contract/runtime/Test.SandboxEditorModels.cpp` and
   `tests/integration/runtime/Test.SandboxEditorPresentation.cpp`. Prove exact
   status/source/frame/slot/age/queue/pass copying, read-only behavior when
   ConfigControl commands are absent, one preview/apply path, rejection
@@ -283,20 +286,20 @@ Each slice is a separately reviewable commit and must pass its focused CPU check
 
 ## Docs
 
-- [ ] Update `src/graphics/rhi/README.md`,
+- [x] Update `src/graphics/rhi/README.md`,
   `src/graphics/vulkan/README.md`, and
   `src/graphics/renderer/README.md` with the repaired API, slot/submission
   lifecycle, per-queue support, reset/write/resolve ordering, availability and
   stale behavior, measured interval, and nonblocking limitations.
-- [ ] Update `docs/architecture/frame-graph.md`,
+- [x] Update `docs/architecture/frame-graph.md`,
   `docs/architecture/engine-config.md`,
   `docs/architecture/runtime-config-control.md`, and `src/runtime/README.md`
   with the synchronous commit plus immutable `RenderFrameInput` sampling lane
   and fresh-only telemetry publication.
-- [ ] Update `src/app/Sandbox/README.md` with the existing Frame Graph toggle,
+- [x] Update `src/app/Sandbox/README.md` with the existing Frame Graph toggle,
   read-only omission behavior, provenance/status display, and lack of a second
   EditorUi contribution.
-- [ ] If `.cppm` surfaces change, regenerate
+- [x] If `.cppm` surfaces change, regenerate
   `docs/api/generated/module_inventory.md`. At promotion/retirement, update
   the rendering/global indexes, `REVIEW-003` dependency state, retirement log,
   and `tasks/SESSION-BRIEF.md` through the normal task workflow; those
@@ -309,7 +312,7 @@ Each slice is a separately reviewable commit and must pass its focused CPU check
   perturb the command stream. This task adds correctness and capability
   evidence only: no benchmark manifest/result, overhead threshold, SLO, or
   performance improvement is claimed.
-- [ ] Treat raw pass timestamps and per-queue envelopes as diagnostic
+- [x] Treat raw pass timestamps and per-queue envelopes as diagnostic
   measurements, not wall-clock frame time or comparative performance
   evidence. Any future performance claim requires a stable benchmark ID,
   declared scene/config/warmup/measured-frame count, backend/GPU/driver
@@ -324,9 +327,9 @@ Each slice is a separately reviewable commit and must pass its focused CPU check
 - [ ] Null/unsupported data cannot be mistaken for native GPU evidence.
 - [ ] Parallel and multi-queue recording remain race-free, scope each recorded
   callback exactly once, and retain truthful accepted-queue attribution.
-- [ ] Synchronous config apply is observable at the defined render-input
+- [x] Synchronous config apply is observable at the defined render-input
   snapshot boundary, and hot toggles never change query-pool lifetime.
-- [ ] The existing Frame Graph panel shows current status and clearly aged
+- [x] The existing Frame Graph panel shows current status and clearly aged
   last-resolved timings without a new service, callback, or window.
 
 ## Verification

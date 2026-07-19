@@ -33,6 +33,7 @@ imports the application DTO or field vocabulary.
     "enable_promoted_vulkan_device": true,
     "enable_validation": true,
     "enable_vsync": true,
+    "enable_gpu_profiling": false,
     "frames_in_flight": 2,
     "default_recipe_config_path": "config/render-recipe.json",
     "synchronous_extraction": true
@@ -127,6 +128,7 @@ imports the application DTO or field vocabulary.
 | `render` | `enable_promoted_vulkan_device` | Boolean |
 | `render` | `enable_validation` | Boolean |
 | `render` | `enable_vsync` | Boolean |
+| `render` | `enable_gpu_profiling` | Boolean; default `false` |
 | `render` | `frames_in_flight` | Integer in `[1, 8]` |
 | `render` | `default_recipe_config_path` | String path; empty disables startup/live recipe loading |
 | `render` | `synchronous_extraction` | Boolean |
@@ -218,8 +220,8 @@ The schema is primarily a boot config. Runtime reads it before constructing
   Engine retains the config value but owns neither responsibility.
 
 The current live hot-apply subset is deliberately narrow:
-`render.default_recipe_config_path` and
-all registered `app.sections` records.
+`render.default_recipe_config_path`, `render.enable_gpu_profiling`, and all
+registered `app.sections` records.
 The app-composed
 `Runtime::EngineConfigControl::ApplyEngineConfigHotSubset` service previews a
 candidate document against the borrowed live Engine-owned config, rejects any
@@ -228,7 +230,11 @@ fields. A non-empty recipe path is loaded and activated through the same validat
 `RenderRecipeConfig` path used by startup and the editor; invalid recipe files
 reject the hot apply without disturbing the currently active recipe override. An
 empty path clears the active override and returns to the derived default frame
-recipe. The apply result reports lexically ordered names in
+recipe. GPU profiling is default-off diagnostic instrumentation. Runtime
+samples its committed value once after the editor `UiEndCapture` phase and
+copies it into the immutable `Graphics::RenderFrameInput` for that same frame;
+there is no deferred completed-frame config queue. The apply result reports
+lexically ordered names in
 `ChangedSectionNames`; `SectionChanged(name)` is the convenience query. After
 the entire apply has committed, each changed registered section callback fires
 exactly once. Preview, no-change, invalid, and boot-only-rejected candidates

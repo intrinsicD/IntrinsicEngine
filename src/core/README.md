@@ -237,6 +237,10 @@ token, so exactly one path can resume or destroy each frame.
 consumes at composition time. Per-field ownership is:
 
 - `Render`, `Simulation`, `Window` — see the per-partition modules.
+- `Render.EnableGpuProfiling` — default-off diagnostic control serialized as
+  `render.enable_gpu_profiling`. Core owns only the value and side-effect-free
+  JSON round trip; runtime owns synchronous hot apply and the immutable
+  per-frame sampling boundary, while graphics owns profiler behavior.
 - `Window.Backend` — defaults to `WindowBackend::Configured`, preserving the
   platform backend selected by CMake. Tests can set `WindowBackend::Null` to
   force the deterministic headless platform window without importing platform

@@ -14,12 +14,14 @@
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
+import Extrinsic.Core.Error;
 import Extrinsic.Graphics.CurrentRendererContractAdapter;
 import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.SandboxEditorFacades;
 
 namespace CoreConfig = Extrinsic::Core::Config;
@@ -38,6 +40,101 @@ namespace
             engine.RequestExit();
         }
         void OnShutdown(Runtime::Engine& /*engine*/) override {}
+    };
+
+    class TwoFrameApplication final : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            ++m_Frames;
+            if (m_Frames >= 2u)
+            {
+                engine.RequestExit();
+            }
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+
+    private:
+        std::uint32_t m_Frames{0u};
+    };
+
+    class GpuProfilingUiEndToggleModule final :
+        public Runtime::IRuntimeModule
+    {
+    public:
+        [[nodiscard]] std::string_view Name() const noexcept override
+        {
+            return "Test.GpuProfilingUiEndToggle";
+        }
+
+        [[nodiscard]] Extrinsic::Core::Result OnRegister(
+            Runtime::EngineSetup& setup) override
+        {
+            if (Extrinsic::Core::Result registered =
+                    setup.RegisterFrameHook(
+                        Runtime::FramePhase::UiEndCapture,
+                        [this](Runtime::RuntimeFrameHookContext& context)
+                        {
+                            Runtime::EngineConfigControl* control =
+                                context.Services.Find<
+                                    Runtime::EngineConfigControl>();
+                            if (control == nullptr)
+                            {
+                                return;
+                            }
+                            CoreConfig::EngineConfig candidate =
+                                control->GetEngineConfigControlState()
+                                    .ActiveConfig;
+                            candidate.Render.EnableGpuProfiling =
+                                m_ToggleCount == 0u;
+                            const CoreConfig::EngineConfigLoadResult preview =
+                                control
+                                    ->PreviewEngineConfigControlDocument(
+                                        CoreConfig::SerializeEngineConfig(
+                                            candidate),
+                                        "test.ui-end-gpu-profiling");
+                            ApplyResults.push_back(
+                                control->ApplyEngineConfigHotSubset(
+                                    preview,
+                                    Runtime::RuntimeConfigControlSource::
+                                        Editor));
+                            ++m_ToggleCount;
+                        });
+                !registered.has_value())
+            {
+                return registered;
+            }
+            return setup.RegisterFrameHook(
+                Runtime::FramePhase::Maintenance,
+                [this](Runtime::RuntimeFrameHookContext& context)
+                {
+                    const Graphics::IRenderer* renderer =
+                        context.Services.Find<Graphics::IRenderer>();
+                    if (renderer != nullptr)
+                    {
+                        ObservedStatuses.push_back(
+                            renderer->GetLastRenderGraphStats()
+                                .GpuProfile.Status);
+                    }
+                });
+        }
+
+        [[nodiscard]] Extrinsic::Core::Result OnResolve(
+            Runtime::EngineSetup&) override
+        {
+            return Extrinsic::Core::Ok();
+        }
+
+        void OnShutdown(Runtime::RuntimeModuleShutdownContext&) override {}
+
+        std::vector<Runtime::RuntimeEngineConfigApplyResult> ApplyResults{};
+        std::vector<Graphics::RenderGraphGpuProfileStatus> ObservedStatuses{};
+
+    private:
+        std::uint32_t m_ToggleCount{0u};
     };
 
     [[nodiscard]] CoreConfig::EngineConfig HeadlessConfig()
@@ -222,6 +319,7 @@ TEST(RuntimeConfigControlFacade, BootOnlyEngineConfigDifferencesAreRejected)
 
     CoreConfig::EngineConfig candidate = engine.GetEngineConfig();
     candidate.Window.Width += 1;
+    candidate.Render.EnableGpuProfiling = true;
     const CoreConfig::EngineConfigLoadResult configPreview =
         configControl.PreviewEngineConfigControlDocument(
             CoreConfig::SerializeEngineConfig(candidate),
@@ -238,6 +336,124 @@ TEST(RuntimeConfigControlFacade, BootOnlyEngineConfigDifferencesAreRejected)
     EXPECT_TRUE(ContainsField(configApply.RejectedBootOnlyFields, "window.width"));
     EXPECT_EQ(engine.GetEngineConfig().Window.Width,
               HeadlessConfig().Window.Width);
+    EXPECT_FALSE(engine.GetEngineConfig().Render.EnableGpuProfiling);
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeConfigControlFacade,
+     GpuProfilingHotApplyIsSynchronousForEditorAndAgentCli)
+{
+    Runtime::Engine engine(
+        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.EmplaceModule<Runtime::EngineConfigControl>();
+    engine.Initialize();
+    Runtime::EngineConfigControl* configControl =
+        engine.Services().Find<Runtime::EngineConfigControl>();
+    ASSERT_NE(configControl, nullptr);
+    EXPECT_FALSE(engine.GetEngineConfig().Render.EnableGpuProfiling);
+
+    const auto applyProfiling =
+        [&](const bool enabled,
+            const Runtime::RuntimeConfigControlSource source,
+            const std::string_view sourceId)
+        {
+            CoreConfig::EngineConfig candidate =
+                configControl->GetEngineConfigControlState().ActiveConfig;
+            candidate.Render.EnableGpuProfiling = enabled;
+            const CoreConfig::EngineConfigLoadResult preview =
+                configControl->PreviewEngineConfigControlDocument(
+                    CoreConfig::SerializeEngineConfig(candidate),
+                    std::string{sourceId});
+            EXPECT_TRUE(CoreConfig::IsConfigUsable(preview));
+            return configControl->ApplyEngineConfigHotSubset(
+                preview,
+                source);
+        };
+
+    const Runtime::RuntimeEngineConfigApplyResult editorApply =
+        applyProfiling(
+            true,
+            Runtime::RuntimeConfigControlSource::Editor,
+            "editor-gpu-profiling");
+    ASSERT_EQ(editorApply.Status,
+              Runtime::RuntimeEngineConfigApplyStatus::Applied);
+    EXPECT_EQ(editorApply.Source,
+              Runtime::RuntimeConfigControlSource::Editor);
+    EXPECT_TRUE(editorApply.EngineConfigApplied);
+    EXPECT_TRUE(editorApply.GpuProfilingChanged);
+    EXPECT_TRUE(engine.GetEngineConfig().Render.EnableGpuProfiling);
+    EXPECT_TRUE(configControl->GetEngineConfigControlState()
+                    .ActiveConfig.Render.EnableGpuProfiling);
+
+    const Runtime::RuntimeEngineConfigApplyResult agentApply =
+        applyProfiling(
+            false,
+            Runtime::RuntimeConfigControlSource::AgentCli,
+            "agent-gpu-profiling");
+    ASSERT_EQ(agentApply.Status,
+              Runtime::RuntimeEngineConfigApplyStatus::Applied);
+    EXPECT_EQ(agentApply.Source,
+              Runtime::RuntimeConfigControlSource::AgentCli);
+    EXPECT_TRUE(agentApply.GpuProfilingChanged);
+    EXPECT_FALSE(engine.GetEngineConfig().Render.EnableGpuProfiling);
+
+    const Runtime::RuntimeEngineConfigApplyResult noChange =
+        applyProfiling(
+            false,
+            Runtime::RuntimeConfigControlSource::AgentCli,
+            "agent-gpu-profiling-no-change");
+    EXPECT_EQ(noChange.Status,
+              Runtime::RuntimeEngineConfigApplyStatus::NoChange);
+    EXPECT_FALSE(noChange.GpuProfilingChanged);
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeConfigControlFacade,
+     BootGpuProfilingConfigReachesRendererWithoutControlOrEditor)
+{
+    CoreConfig::EngineConfig config = HeadlessConfig();
+    config.Render.EnableGpuProfiling = true;
+    Runtime::Engine engine(
+        std::move(config), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+    EXPECT_EQ(
+        engine.Services().Find<Runtime::EngineConfigControl>(),
+        nullptr);
+
+    engine.Run();
+
+    EXPECT_NE(
+        engine.GetRenderer().GetLastRenderGraphStats().GpuProfile.Status,
+        Graphics::RenderGraphGpuProfileStatus::Disabled);
+    engine.Shutdown();
+}
+
+TEST(RuntimeConfigControlFacade,
+     UiEndHotToggleControlsTheSameFramesImmutableRenderSnapshot)
+{
+    Runtime::Engine engine(
+        HeadlessConfig(), std::make_unique<TwoFrameApplication>());
+    engine.EmplaceModule<Runtime::EngineConfigControl>();
+    GpuProfilingUiEndToggleModule& toggle =
+        engine.EmplaceModule<GpuProfilingUiEndToggleModule>();
+    engine.Initialize();
+    engine.Run();
+
+    ASSERT_EQ(toggle.ApplyResults.size(), 2u);
+    ASSERT_TRUE(toggle.ApplyResults[0].Succeeded());
+    ASSERT_TRUE(toggle.ApplyResults[1].Succeeded());
+    EXPECT_TRUE(toggle.ApplyResults[0].GpuProfilingChanged);
+    EXPECT_TRUE(toggle.ApplyResults[1].GpuProfilingChanged);
+    ASSERT_EQ(toggle.ObservedStatuses.size(), 2u);
+    EXPECT_NE(
+        toggle.ObservedStatuses[0],
+        Graphics::RenderGraphGpuProfileStatus::Disabled);
+    EXPECT_EQ(
+        toggle.ObservedStatuses[1],
+        Graphics::RenderGraphGpuProfileStatus::Disabled);
+    EXPECT_FALSE(engine.GetEngineConfig().Render.EnableGpuProfiling);
 
     engine.Shutdown();
 }

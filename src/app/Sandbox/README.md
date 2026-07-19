@@ -37,6 +37,19 @@ still work without it, while queued operations return `InvalidState`.
 Omitting `SceneDocumentModule` leaves Engine and the active world operational
 and makes the document/history callbacks explicitly unavailable.
 
+The existing `view.frame_graph` window owns GPU-profiling presentation; no
+profiling-specific window or editor contribution is registered. Its default-off
+toggle copies the active engine config, sets
+`render.enable_gpu_profiling`, serializes and previews the candidate, and then
+uses the existing hot-apply callback with the Editor source. Rejection
+preserves the committed value and displays config-control diagnostics. If the
+optional control state or either preview/apply callback is unavailable, the
+toggle is disabled while renderer statistics remain readable. The same panel
+shows the profiler status/source, fresh or stale state, resolved submitted-frame
+key/slot/age, per-queue envelopes, and named pass rows. It never presents a
+summed cross-queue duration, and the displayed timestamps are diagnostics
+rather than a performance claim.
+
 The app-owned `Sandbox.Editor.Controller` owns `Sandbox.Editor.Shell` and all
 panel-family lifetimes behind one attach/detach interface. Sandbox composes the
 optional `Runtime.EditorUiModule`; the shell resolves its Engine-free

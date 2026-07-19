@@ -2250,6 +2250,71 @@ namespace Extrinsic::Sandbox::Editor
             if (windowId == "view.frame_graph" &&
                 BeginFixedWindow("Frame Graph", open, ImVec2(0.0f, 0.0f)))
             {
+                bool gpuProfilingEnabled =
+                    frame.RenderGraph.GpuProfilingEnabled;
+                const bool gpuProfilingToggleAvailable =
+                    context != nullptr &&
+                    frame.RenderGraph.GpuProfilingToggleAvailable;
+                std::optional<SandboxEditorGpuProfilingConfigResult>
+                    gpuProfilingConfigResult{};
+                if (!gpuProfilingToggleAvailable)
+                    ImGui::BeginDisabled();
+                if (ImGui::Checkbox("Enable GPU profiling",
+                                    &gpuProfilingEnabled) &&
+                    gpuProfilingToggleAvailable)
+                {
+                    gpuProfilingConfigResult =
+                        ApplySandboxEditorGpuProfilingConfigCommand(
+                            *context,
+                            gpuProfilingEnabled);
+                }
+                if (!gpuProfilingToggleAvailable)
+                {
+                    ImGui::EndDisabled();
+                    DrawDisabledReasonTooltip(
+                        frame.RenderGraph
+                            .GpuProfilingToggleDisabledReason);
+                }
+                if (gpuProfilingConfigResult.has_value() &&
+                    !gpuProfilingConfigResult->Message.empty())
+                {
+                    ImGui::TextWrapped(
+                        "%s",
+                        gpuProfilingConfigResult->Message.c_str());
+                    for (const auto& diagnostic :
+                         gpuProfilingConfigResult->Preview.Diagnostics)
+                    {
+                        const std::string text =
+                            diagnostic.Subject.empty()
+                                ? diagnostic.Message
+                                : diagnostic.Subject + ": " +
+                                    diagnostic.Message;
+                        ImGui::BulletText("%s", text.c_str());
+                    }
+                    for (const std::string& field :
+                         gpuProfilingConfigResult->Apply
+                             .RejectedBootOnlyFields)
+                    {
+                        ImGui::BulletText(
+                            "Boot-only field rejected: %s",
+                            field.c_str());
+                    }
+                }
+                if (!frame.RenderGraph
+                         .GpuProfilingControlStatusText.empty())
+                {
+                    ImGui::TextWrapped(
+                        "%s",
+                        frame.RenderGraph
+                            .GpuProfilingControlStatusText.c_str());
+                }
+                for (const std::string& diagnostic :
+                     frame.RenderGraph.GpuProfilingControlDiagnostics)
+                {
+                    ImGui::BulletText("%s", diagnostic.c_str());
+                }
+                ImGui::Separator();
+
                 if (!frame.RenderGraph.Enabled)
                 {
                     ImGui::TextDisabled("Renderer frame graph diagnostics are unavailable.");
@@ -2289,6 +2354,102 @@ namespace Extrinsic::Sandbox::Editor
                                 frame.RenderGraph.CommandPassesSkippedUnavailable);
                     ImGui::Text("Async compute frames: %u",
                                 frame.RenderGraph.AsyncComputeUtilizedFrames);
+                    if (ImGui::CollapsingHeader(
+                            "GPU Profile",
+                            ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        const SandboxEditorGpuProfileModel& profile =
+                            frame.RenderGraph.GpuProfile;
+                        ImGui::Text(
+                            "Status: %s, source=%s, fresh=%s, stale=%s",
+                            profile.Status.c_str(),
+                            profile.Source.c_str(),
+                            profile.Fresh ? "yes" : "no",
+                            profile.Stale ? "yes" : "no");
+                        if (profile.HasResolvedFrame)
+                        {
+                            ImGui::Text(
+                                "Resolved submission: frame=%llu slot=%u age=%llu frame(s)",
+                                static_cast<unsigned long long>(
+                                    profile.ResolvedSubmittedFrameNumber),
+                                profile.ResolvedFrameSlot,
+                                static_cast<unsigned long long>(
+                                    profile.SampleAgeFrames));
+                        }
+                        else
+                        {
+                            ImGui::TextDisabled(
+                                "No resolved submission key.");
+                        }
+                        if (!profile.Diagnostic.empty())
+                        {
+                            ImGui::TextWrapped(
+                                "Profile diagnostic: %s",
+                                profile.Diagnostic.c_str());
+                        }
+
+                        ImGui::Text("Queue envelopes:");
+                        if (profile.QueueEnvelopes.empty())
+                        {
+                            ImGui::TextDisabled(
+                                "No queue envelope samples.");
+                        }
+                        for (const SandboxEditorGpuProfileQueueModel& queue :
+                             profile.QueueEnvelopes)
+                        {
+                            if (queue.DurationNs.has_value())
+                            {
+                                ImGui::BulletText(
+                                    "%s - %llu ns (%s)",
+                                    queue.Queue.c_str(),
+                                    static_cast<unsigned long long>(
+                                        *queue.DurationNs),
+                                    queue.Source.c_str());
+                            }
+                            else
+                            {
+                                ImGui::BulletText(
+                                    "%s - unavailable (%s)",
+                                    queue.Queue.c_str(),
+                                    queue.Source.c_str());
+                            }
+                        }
+
+                        ImGui::Text("Pass samples:");
+                        if (profile.Passes.empty())
+                        {
+                            ImGui::TextDisabled("No pass samples.");
+                        }
+                        for (const SandboxEditorGpuProfilePassModel& pass :
+                             profile.Passes)
+                        {
+                            const std::string typedId = pass.HasTypedId
+                                ? " [" + std::to_string(pass.TypedId) + "]"
+                                : std::string{};
+                            if (pass.DurationNs.has_value())
+                            {
+                                ImGui::BulletText(
+                                    "%s%s - %llu ns, queue=%s, command=%s, source=%s",
+                                    pass.Name.c_str(),
+                                    typedId.c_str(),
+                                    static_cast<unsigned long long>(
+                                        *pass.DurationNs),
+                                    pass.Queue.c_str(),
+                                    pass.CommandStatus.c_str(),
+                                    pass.Source.c_str());
+                            }
+                            else
+                            {
+                                ImGui::BulletText(
+                                    "%s%s - unavailable, queue=%s, command=%s, source=%s",
+                                    pass.Name.c_str(),
+                                    typedId.c_str(),
+                                    pass.Queue.c_str(),
+                                    pass.CommandStatus.c_str(),
+                                    pass.Source.c_str());
+                            }
+                        }
+                    }
                     if (!frame.RenderGraph.LifecycleDiagnostic.empty())
                     {
                         ImGui::TextWrapped("Lifecycle: %s",
