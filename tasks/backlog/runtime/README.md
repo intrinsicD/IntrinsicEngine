@@ -185,9 +185,12 @@ triggers. The implementation graph is:
 - Retired `RUNTIME-182` composes the optional global ImGui/host owner, with
   one frame-local kernel capture value, a preserved paired Begin/End bracket,
   and app-owned Sandbox panels.
-- Re-scoped [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md)
-  — make Sandbox defaults explicit app composition glue over the resolved
-  owners, without `Engine&` or a new policy facade.
+- Corrected [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md)
+  — after `RUNTIME-188` and `RUNTIME-183`, delete the one-consumer exported
+  policy module, retain its `.cpp` as a private implementation unit of the
+  existing Sandbox editor-facade module, and let Sandbox own transactional
+  typed handles over only the published import pipeline/input registry plus
+  optional exact camera/selection for focus.
 - Existing [`RUNTIME-129`](RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
   completes the operational Vulkan bake inside `AssetWorkflowModule` after
   retired `GRAPHICS-128` made the shared managed-index subrange selectable.
@@ -287,7 +290,10 @@ compile cost. They preserve behavior and ownership; they are not feature tasks.
 main `Runtime.RenderExtraction` module slimming.
 
 - [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md) —
-  privatize the Sandbox default policy module after `RUNTIME-144`.
+  after `RUNTIME-188` and `RUNTIME-183`, remove the one-consumer public module
+  while retaining its implementation under the existing
+  `SandboxEditorFacades` surface; Sandbox privately owns exact provider
+  borrows and typed handles, not another runtime owner.
 - [`RUNTIME-188`](RUNTIME-188-extract-scene-interaction-module.md) — extract
   the separately audited interaction/readback/gizmo owner and remove its
   Engine facade and borrowed render pointers.

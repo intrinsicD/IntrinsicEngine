@@ -35,13 +35,15 @@ maturity_target: Operational
 - Production Sandbox `OnSimTick` and `OnVariableTick` are no-ops, while tests
   use the unrestricted callbacks heavily. Keeping the production interface for
   test convenience violates ADR-0027's present-consumer test.
-- `RUNTIME-168` leaves Sandbox defaults as app-owned composition glue over
-  concrete module capabilities, including distinct `SceneDocumentModule` and
-  `SceneInteractionModule` services. Normal-bake Vulkan operation does not
-  need to precede this callback-interface removal. `RUNTIME-129` and this task
-  may land in either order; whichever lands second migrates and reruns their
-  shared Vulkan fixtures, and `RUNTIME-185` waits for both before auditing
-  final production mechanism consumers.
+- `RUNTIME-168` leaves Sandbox defaults as app-owned typed handles over the
+  exact published `AssetImportPipeline` and `RuntimeInputActionRegistry`, with
+  optional exact camera/selection only for focus behavior. It does not retain
+  document, interaction, editor, config, asset-service, GPU-cache, renderer,
+  or gizmo owners. Normal-bake Vulkan operation does not need to precede this
+  callback-interface removal. `RUNTIME-129` and this task may land in either
+  order; whichever lands second migrates and reruns their shared Vulkan
+  fixtures, and `RUNTIME-185` waits for both before auditing final production
+  mechanism consumers.
 - The source/test/doc inventory for `IApplication`, `OnSimTick`, and
   `OnVariableTick` spans roughly 55 files. This dedicated slice keeps that
   migration separate from the final Engine PImpl and exact policy ratchet.
@@ -70,10 +72,11 @@ maturity_target: Operational
       delete the `IApplication` interface.
 - [ ] Make Sandbox construct Engine, compose concrete modules before
       initialization—including separate `SceneDocumentModule` and
-      `SceneInteractionModule` instances—retain only the narrow module
-      references its app glue needs, install initial-world/default policy
-      through those capabilities, then explicitly run and tear down in the
-      documented order.
+      `SceneInteractionModule` instances—retain the narrow module references
+      needed for their own app composition, install initial-world state, and
+      preserve `RUNTIME-168`'s separate private default-policy provider/handle
+      aggregate over exact published services; then explicitly run and tear
+      down in the documented order.
 - [ ] Move any real per-frame production behavior to the owning module's
       smallest existing frame hook/system; delete the no-op Sandbox tick
       callbacks rather than replacing them.
