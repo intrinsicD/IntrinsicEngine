@@ -9,6 +9,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TEST_MODULE = REPO_ROOT / "cmake" / "IntrinsicTest.cmake"
+ROOT_CMAKE = REPO_ROOT / "CMakeLists.txt"
+TESTS_CMAKE = REPO_ROOT / "tests" / "CMakeLists.txt"
 
 
 def _configure_fixture(
@@ -55,6 +57,40 @@ def _read_inventory(build: Path, name: str) -> set[str]:
 
 
 class TestBuildAggregateTests(unittest.TestCase):
+    def test_sandbox_process_tests_are_built_by_applicable_aggregates(self) -> None:
+        tests_cmake = TESTS_CMAKE.read_text(encoding="utf-8")
+        for test_name in (
+            "ExtrinsicSandbox.FramePacingDiagnosticCapture",
+            "ExtrinsicSandbox.VulkanShutdownLsanContract",
+        ):
+            registration_start = tests_cmake.find(f"add_test(NAME {test_name}")
+            self.assertNotEqual(registration_start, -1, msg=test_name)
+            registration_end = tests_cmake.find(
+                "set_tests_properties(",
+                registration_start,
+            )
+            self.assertNotEqual(registration_end, -1, msg=test_name)
+            self.assertIn(
+                "-DSANDBOX_EXE=$<TARGET_FILE:ExtrinsicSandbox>",
+                tests_cmake[registration_start:registration_end],
+                msg=test_name,
+            )
+
+        root_cmake = ROOT_CMAKE.read_text(encoding="utf-8")
+        self.assertIn(
+            (
+                "    if(TARGET ExtrinsicSandbox\n"
+                "       AND INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN\n"
+                '       AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")\n'
+                "        add_dependencies(IntrinsicTests ExtrinsicSandbox)\n"
+                "        if(TARGET IntrinsicGpuVulkanTests)\n"
+                "            add_dependencies(IntrinsicGpuVulkanTests ExtrinsicSandbox)\n"
+                "        endif()\n"
+                "    endif()\n"
+            ),
+            root_cmake,
+        )
+
     def test_aggregate_inventories_match_independent_label_selection(self) -> None:
         registrations = {
             "UnitCpu": {"unit", "core"},

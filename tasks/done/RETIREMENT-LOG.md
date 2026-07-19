@@ -8,6 +8,18 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-116`](BUG-116-sandbox-process-test-aggregate-dependency.md) — Sandbox
+process-test aggregate dependencies retired to `tasks/done/` on 2026-07-19 at
+`Operational`. The canonical and Vulkan-only test aggregates now depend
+directly on `ExtrinsicSandbox` under the exact promoted-Vulkan + GLFW condition
+that registers the two manual process CTests. A focused structural regression
+pins both registrations and prerequisites without adding a generic registry.
+The repaired aggregate materialized the previously absent executable; the
+frame-pacing and five-frame shutdown/LeakSanitizer contracts passed 2/2 with
+zero skips, while a fresh ordinary `ci` graph retained no Sandbox executable
+dependency. Strict test-layout, layering, root-hygiene, task, docs-link,
+session-brief, and whitespace checks passed.
+
 [`GRAPHICS-128`](GRAPHICS-128-object-space-normal-bake-shared-index-slice.md) —
 shared-index object-space normal baking retired to `tasks/done/` on
 2026-07-19 at `Operational`. The graphics bake descriptor and plan now carry
