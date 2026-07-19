@@ -4,6 +4,8 @@ theme: F
 depends_on:
   - HARDEN-086
   - RUNTIME-179
+  - RUNTIME-180
+  - RUNTIME-182
 maturity_target: Operational
 ---
 # RUNTIME-172 — Extract the scene-editing composition module
@@ -40,6 +42,10 @@ maturity_target: Operational
   history/editor state with the promoted all-or-nothing ECS query contract.
 - Queued scene save/load consumes the async capability from `RUNTIME-179`;
   it does not own another executor.
+- `RUNTIME-182` first establishes the frame-owned completed editor-capture
+  snapshot; `RUNTIME-180` then establishes the pre-gizmo/picking viewport
+  phase and published camera registry. Scene editing consumes those settled
+  capabilities rather than retaining Engine-owned ImGui/camera access.
 
 ## Required changes
 - [ ] Add one concrete `SceneEditingModule` owning `SceneDocument`,
