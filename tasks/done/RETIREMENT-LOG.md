@@ -5465,3 +5465,21 @@ reconciled coverage passed 238/238; the full CPU-supported selector passed
 layering, task, docs, test-layout, root-hygiene, and diff checks passed.
 Implementation checkpoint: `0847ae0f`; repaired-main reconciliation:
 `e37202ec`; main merge: `b7b0f506`.
+
+[`RUNTIME-181`](RUNTIME-181-extract-config-control-module.md) — config-control
+composition retired to `tasks/done/` on 2026-07-19 at `Operational`. The
+existing `EngineConfigControl` is now one app-composed module and exact
+published service owning live preview/validation/apply plus the sole
+app-section registry. Plain shared recipe-activation functions keep configured
+frame-zero startup behavior in the kernel when the optional module is omitted;
+Engine no longer imports, owns, or exposes the control domain. Hot apply
+remains synchronous, invalid candidates preserve prior state, shutdown
+withdraws the exact service, and reinitialize binds the newly created
+renderer without replay or stale override state. Focused coverage passed
+94/94; the full CPU-supported selector passed 4,137/4,137 with one expected
+GLFW/LSan capability skip; live routing covered 36 targets, 4,188 cases, and
+338 assertion sources. Exact convergence reached 40 plain imports, 18 domain
+imports, two re-exports, and 29 getter names. Strict layering, task, docs,
+test-layout, root-hygiene, clean-workshop, inventory, and diff checks passed.
+Implementation checkpoint: `bc90ed71`; main merge: `763505dc`; research trace:
+`9f6370dc`.

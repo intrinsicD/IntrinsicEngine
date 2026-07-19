@@ -159,8 +159,9 @@ triggers. The implementation graph is:
 - [`RUNTIME-180`](RUNTIME-180-extract-camera-module.md) — compose global
   viewport/controller state with world-qualified targets and move initial
   reference content to app bootstrap.
-- [`RUNTIME-181`](../../active/RUNTIME-181-extract-config-control-module.md) — compose the
-  one global validated config preview/apply and app-section owner.
+- Retired `RUNTIME-181` composes the one global validated config
+  preview/apply and app-section owner while kernel startup remains
+  omission-safe.
 - Re-scoped [`RUNTIME-172`](RUNTIME-172-privatize-scene-document-surface.md) —
   compose the cohesive SceneEditing owner after `RUNTIME-179` and
   `HARDEN-086`; document/history/selection/lookup/readback/gizmo records are
@@ -204,6 +205,12 @@ independently after their respective owner prerequisites; both gate
 
 #### Retired decomposition entries
 
+- [`RUNTIME-181` — Extract the config-control composition module](../../done/RUNTIME-181-extract-config-control-module.md)
+  (done, 2026-07-19, `Operational`): one app-composed
+  `EngineConfigControl` owns validated live preview/apply and app-section
+  callbacks; shared plain recipe activation preserves configured frame-zero
+  behavior when the optional module is omitted. Engine has no control facade,
+  registry, or accessor.
 - [`RUNTIME-179` — Extract the async-work composition module](../../done/RUNTIME-179-extract-async-work-module.md)
   (done, 2026-07-19, `Operational`): one app-composed `AsyncWorkModule` owns
   streaming/derived work, maintenance, shutdown drain, world-retirement

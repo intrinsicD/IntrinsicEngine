@@ -9,7 +9,6 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/active/ARCH-014-kernel-convergence-tracking.md)
-- `RUNTIME-181` — Extract the config-control composition module (tasks/active/RUNTIME-181-extract-config-control-module.md)
 
 ## Theme B — Rendering modernization
 
@@ -21,10 +20,10 @@ the authoritative open/unblocked view.
 - blocked by `REVIEW-003`: `GRAPHICS-124` — Slughorn world-space vector annotation proof (tasks/backlog/rendering/GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md)
 - blocked by `REVIEW-003`: `GRAPHICS-125` — Memory-priced cluster hierarchy evidence (tasks/backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md)
 - blocked by `REVIEW-003`: `GRAPHICS-126` — Bandwidth-priced frame-recipe trace model (tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
-- blocked by `RUNTIME-181`: `GRAPHICS-127` — Native GPU timestamp profiler and frame-recipe timing integration (tasks/backlog/rendering/GRAPHICS-127-native-gpu-timestamp-profiler.md)
+- blocked by `RUNTIME-182`: `GRAPHICS-127` — Native GPU timestamp profiler and frame-recipe timing integration (tasks/backlog/rendering/GRAPHICS-127-native-gpu-timestamp-profiler.md)
 - blocked by `RUNTIME-183`: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
 - unblocked: `RUNTIME-139` — Static AoS storage and shader operational path (tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md)
-- blocked by `RUNTIME-181`: `RUNTIME-177` — Immediate-mode debug-draw seam for runtime integrations (tasks/backlog/runtime/RUNTIME-177-immediate-mode-debug-draw-seam.md)
+- unblocked: `RUNTIME-177` — Immediate-mode debug-draw seam for runtime integrations (tasks/backlog/runtime/RUNTIME-177-immediate-mode-debug-draw-seam.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
@@ -37,7 +36,7 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
 - blocked by `RUNTIME-172`: `RUNTIME-168` — Privatize Sandbox default-policy composition (tasks/backlog/runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
 - blocked by `RUNTIME-180`: `RUNTIME-172` — Extract the scene-editing composition module (tasks/backlog/runtime/RUNTIME-172-privatize-scene-document-surface.md)
-- blocked by `RUNTIME-181`: `RUNTIME-180` — Extract the camera composition module (tasks/backlog/runtime/RUNTIME-180-extract-camera-module.md)
+- blocked by `RUNTIME-182`: `RUNTIME-180` — Extract the camera composition module (tasks/backlog/runtime/RUNTIME-180-extract-camera-module.md)
 - unblocked: `RUNTIME-182` — Extract the editor-UI composition module (tasks/backlog/runtime/RUNTIME-182-extract-editor-ui-module.md)
 - blocked by `RUNTIME-172`: `RUNTIME-183` — Extract the asset-workflow composition module (tasks/backlog/runtime/RUNTIME-183-extract-asset-workflow-module.md)
 - blocked by `RUNTIME-168`: `RUNTIME-184` — Replace IApplication with explicit app composition (tasks/backlog/runtime/RUNTIME-184-replace-application-lifecycle.md)

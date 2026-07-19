@@ -59,12 +59,13 @@ maturity_target: Operational
   the resolved module service.
 
 ## Status
-- Implementation complete at the review checkpoint; owner: Codex team; branch:
-  `codex/runtime-181-config-control-module`; activated 2026-07-19.
+- Completed and retired at `Operational` on 2026-07-19; owner: Codex team;
+  implementation branch: `codex/runtime-181-config-control-module`.
+- Implementation commit: `bc90ed71`; merged to `main` as `763505dc`;
+  research trace recorded on `main` as `9f6370dc`.
 - Omission, lifecycle, caller, and test inventories completed 2026-07-19.
-  Focused behavior, app compilation, and strict structural gates are recorded
-  below; the complete default CPU-supported gate remains for integration
-  verification before retirement.
+  Focused behavior, app compilation, the complete default CPU-supported gate,
+  and strict structural gates are recorded below.
 
 ## Required changes
 - [x] Make the existing `EngineConfigControl` itself `final : IRuntimeModule`;
@@ -112,7 +113,7 @@ maturity_target: Operational
 - [x] Add an Engine-layering regression for module ownership and update exact
       convergence/gate-routing ratchets.
 - [x] Run focused config/recipe/control coverage and strict layering.
-- [ ] Run the complete default CPU-supported gate before retirement.
+- [x] Run the complete default CPU-supported gate before retirement.
 
 ## Docs
 - [x] Update runtime config-control, frame-graph, and Sandbox control-surface
@@ -142,17 +143,20 @@ python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 ```
 
-Checkpoint evidence (2026-07-19):
+Retirement evidence (2026-07-19):
 
-- Canonical `ci-fast` built `IntrinsicRuntimeContractTests`,
+- Canonical `ci` built `IntrinsicRuntimeContractTests`,
   `IntrinsicRuntimeIntegrationTests`, and
-  `IntrinsicSandboxEditorIntegrationTests` successfully.
-- A temporary sandbox-capable `ci-fast` configure built and linked
-  `ExtrinsicSandbox`, including the app-owned preboot composition in
-  `main.cpp`; the build tree was then restored to the canonical Null/headless
-  `ci-fast` identity.
-- Focused config-control, recipe-activation, optional-editor,
-  app-section, and parameterization coverage passed 52/52 CTest cases.
+  `IntrinsicSandboxEditorIntegrationTests`; focused config-control,
+  recipe-activation, optional-editor, app-section, profiler, and
+  parameterization coverage passed 94/94 CTest cases.
+- A sandbox-capable non-headless build linked `ExtrinsicSandbox`, including the
+  app-owned preboot composition in `main.cpp`.
+- `IntrinsicTests` built 1,163/1,163 targets, including conditional GPU smoke
+  callers. The complete default CPU-supported selector passed 4,137/4,137
+  cases with one expected GLFW/LSan capability skip.
+- Live test-gate reconciliation covered 36 targets, 4,188 cases, and 338
+  assertion sources.
 - Strict kernel convergence observed 40 plain imports, 18 domain imports, two
   re-exports, and 29 public getter names; strict layering scanned 748 files and
   6,589 references with zero violations.
@@ -160,8 +164,6 @@ Checkpoint evidence (2026-07-19):
   2,916 relative links with no breakage; test layout and root hygiene passed.
 - Kernel-convergence and test-gate-routing regression suites each passed
   19/19 self-tests; the generated inventory contains 389 modules.
-- The complete default CPU-supported CTest gate is intentionally left open for
-  integration verification before this task is retired.
 
 ## Forbidden changes
 - Adding a second config-control class, registry, or application-only apply
