@@ -71,7 +71,13 @@ set has been collected. The seam returns validation errors for direct contract
 testing; `Engine::Initialize()` logs the error and terminates boot under the
 engine's fail-closed initialization policy, so an invalid schedule cannot
 execute even once (BUG-070, BUG-071). Module shutdown runs after
-`RuntimeShutdownAnnounced` has been published and pumped.
+`RuntimeShutdownAnnounced` has been published and pumped. A module that owns a
+published service withdraws that exact borrowed instance before destroying it.
+`ServiceRegistry::Withdraw(...)` is owner-only and phase-independent so it can
+serve both partial-registration rollback and locked shutdown; an expected
+missing rollback entry returns an error without adding a boot diagnostic.
+Later module shutdown callbacks therefore observe absence rather than a
+dangling pointer.
 
 [ADR-0027](../adr/0027-right-sized-runtime-composition.md) distinguishes that
 current mechanism from the accepted ownership target. `IRuntimeModule` remains
@@ -113,6 +119,18 @@ injection, while the queue class is private implementation glue attached to that
 module. Its Sandbox-owned `JobService` `GpuQueue` participant still records and
 drains Vulkan K-Means work inside the normal renderer frame context.
 
+`Extrinsic.Runtime.AsyncWorkModule` is the global app-composed owner for the
+persistent `StreamingExecutor` and `DerivedJobRegistry`. Sandbox explicitly
+composes it; Engine never imports or names the concrete module. Registration
+runs after the boot world exists and before asset/document dependencies borrow
+the module's `StreamingExecutor` and `DerivedJobRegistry` services. The module
+also provides the existing domain-free `Core::IStreamingFrameHooks` capability,
+which lets Engine preserve the core Maintenance contract's exact transfer
+collect → async drain/apply → asset tick → async submit/pump order without a
+module-specific branch or forwarding object. The capability is optional: an
+application that omits the module still performs transfer collection followed
+by the asset tick.
+
 The frame order is:
 
 1. poll platform events and handle minimized/resize skip paths;
@@ -153,10 +171,11 @@ The frame order is:
 9. execute the render-frame contract: begin frame, runtime render extraction,
    renderer world extraction, prepare, execute, and end frame;
 10. present the completed frame;
-11. execute maintenance: transfer retirement, streaming drain/apply/submit/pump,
-   asset-service tick, GPU asset cache tick, material texture re-resolution, and
-   render-extraction deferred-retire ticks, terminal `JobService` reaping, and
-   runtime-module `Maintenance` hooks;
+11. execute maintenance: transfer retirement, optional app-provided streaming
+   drain/apply, asset-service tick, optional streaming submit/pump, GPU asset
+   cache tick, material texture re-resolution, and render-extraction
+   deferred-retire ticks, terminal `JobService` reaping, and runtime-module
+   `Maintenance` hooks;
 12. drain completed pick readbacks through the incrementally maintained
    stable-entity lookup, release the consumed `RenderWorldPool` slot, apply
    deferred `WorldRegistry` active/destroy operations, and finalize the frame
@@ -303,6 +322,43 @@ destruction pass; if no active scene exists, the borrowers and lookups are
 detached. Higher-level preview/readiness/switch UX policy is deliberately not in
 the registry; later runtime modules compose those behaviors through the kernel
 events, jobs, and explicit world handles.
+
+The global `AsyncWorkModule` reacts to `WorldWillBeDestroyed` at the next
+main-thread event pump. Every production streaming/derived descriptor carries
+the actual owning `WorldHandle`; the module first cancels matching derived
+records and then retires the same generation-qualified scope in the executor.
+Retirement cancels queued, running, readback-waiting, and apply-ready records,
+rejects later submissions to that retired handle, and is checked again
+immediately before a main-thread apply callback is removed from the queue.
+Workers retain only copied task inputs plus the handle value and never borrow
+`WorldRegistry` or an ECS registry. Reinitializing the module creates a fresh
+executor lifetime and clears the retired-scope set; recycling a world index
+with a newer generation never inherits retirement state.
+
+Normal apply remains suppressed for every cancelled task. A descriptor whose
+consumer owns separate visible control state may opt into
+`FinalizeCancellationOnMainThread`; the executor queues that callback exactly
+once, drains it outside the executor lock before normal bounded applies, and
+does not charge it to the result-apply budget. Asset ingest uses the callback
+only to transition its queue record to `Cancelled` and publish the terminal
+`RuntimeAssetImportEvent`; scene IO uses it only to publish a terminal failure
+event. Neither callback owns decoded payload commit or borrows the retiring
+world.
+
+Active-world asset-import and scene-document operations additionally capture
+the submission `{WorldHandle, Scene::Registry*}` pair on the main thread.
+Their apply callbacks use that captured registry only after confirming the
+same generation-qualified world is still active, `WorldRegistry::Get(world)`
+still resolves to the captured registry, and the active-scene binding epoch
+has not changed. The epoch makes an away-and-back switch observable even when
+the world handle and scene address are equal again. An active-world switch
+without retirement therefore fails the operation with `InvalidState`; decoded
+work cannot be redirected into the new active scene or mutate its selection,
+handoff, focus, lookup, or document history sidecars.
+
+Derived-job cancellation is terminal and authoritative. If a running worker
+returns an error after cancellation, neither worker-result bookkeeping nor the
+main-thread apply path may replace `Cancelled` with `Failed` or `Complete`.
 
 ### Camera focus command
 

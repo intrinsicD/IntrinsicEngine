@@ -13,6 +13,7 @@ export module Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.StrongHandle;
+import Extrinsic.Runtime.WorldHandle;
 
 export namespace Extrinsic::Runtime
 {
@@ -73,9 +74,15 @@ export namespace Extrinsic::Runtime
         Core::Dag::TaskPriority Priority = Core::Dag::TaskPriority::Normal;
         std::uint32_t EstimatedCost = 1;
         std::uint64_t CancellationGeneration = 0;
+        WorldHandle Scope{DefaultWorldHandle};
         std::vector<StreamingTaskHandle> DependsOn{};
         std::move_only_function<StreamingResult()> Execute{};
         std::move_only_function<void(StreamingResult&&)> ApplyOnMainThread{};
+        // Optional control-state reconciliation for cancellation. The
+        // executor never routes a cancelled result through the normal apply
+        // callback; instead it invokes this finalizer exactly once from
+        // ApplyMainThreadResults(), outside the executor lock.
+        std::move_only_function<void()> FinalizeCancellationOnMainThread{};
     };
 
     struct StreamingExecutorDiagnostics
@@ -99,6 +106,8 @@ export namespace Extrinsic::Runtime
 
         [[nodiscard]] StreamingTaskHandle Submit(StreamingTaskDesc desc);
         void Cancel(StreamingTaskHandle handle);
+        [[nodiscard]] std::uint32_t RetireWorld(WorldHandle world);
+        [[nodiscard]] bool IsWorldRetired(WorldHandle world) const;
         void PumpBackground(std::uint32_t maxLaunches);
         void DrainCompletions();
         [[nodiscard]] bool ResumeReadback(StreamingTaskHandle handle);

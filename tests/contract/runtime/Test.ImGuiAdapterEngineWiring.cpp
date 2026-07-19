@@ -39,6 +39,7 @@ import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
+import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.Engine;
@@ -111,6 +112,9 @@ namespace
 
         void OnInitialize(Engine& engine) override
         {
+            Jobs = engine.Services().Find<Runtime::DerivedJobRegistry>();
+            ASSERT_NE(Jobs, nullptr);
+
             Runtime::DerivedJobDesc desc{
                 .Key = Runtime::DerivedJobKey{
                     .EntityId = 141u,
@@ -120,6 +124,7 @@ namespace
                     .OutputName = "runtime_141_slow_job_probe",
                 },
                 .Name = "RUNTIME-141 slow editor method job",
+                .Scope = engine.ActiveWorld(),
                 .Execute =
                     [this]() -> Runtime::DerivedJobWorkerResult
                     {
@@ -141,7 +146,7 @@ namespace
                         return Core::Ok();
                     },
             };
-            Handle = engine.SubmitDerivedJob(std::move(desc));
+            Handle = Jobs->Submit(std::move(desc));
         }
 
         void OnSimTick(Engine&, double) override {}
@@ -183,6 +188,7 @@ namespace
         void OnShutdown(Engine&) override {}
 
         Runtime::DerivedJobHandle Handle{};
+        Runtime::DerivedJobRegistry* Jobs{};
         std::atomic<std::uint32_t> WorkerRuns{0u};
         std::atomic<std::uint32_t> ApplyRuns{0u};
         std::uint32_t VariableTicks{0u};
@@ -191,10 +197,12 @@ namespace
 
     private:
         [[nodiscard]] Runtime::DerivedJobStatus CurrentStatus(
-            Engine& engine) const
+            Engine&) const
         {
+            if (Jobs == nullptr)
+                return Runtime::DerivedJobStatus::Cancelled;
             const Runtime::DerivedJobQueueSnapshot snapshot =
-                engine.GetDerivedJobQueueSnapshot();
+                Jobs->SnapshotAll();
             for (const Runtime::DerivedJobSnapshot& entry : snapshot.Entries)
             {
                 if (entry.Handle == Handle)
@@ -564,6 +572,7 @@ TEST(ImGuiAdapterEngineWiring,
     auto app = std::make_unique<SlowDerivedJobApplication>();
     SlowDerivedJobApplication* appPtr = app.get();
     Engine engine(NullWindowHeadlessConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.Initialize();
 
     std::uint32_t callbacksWhileWorkerRunning = 0u;
@@ -598,8 +607,8 @@ TEST(ImGuiAdapterEngineWiring,
 
     engine.Run();
 
-    const Runtime::DerivedJobQueueSnapshot jobs =
-        engine.GetDerivedJobQueueSnapshot();
+    ASSERT_NE(appPtr->Jobs, nullptr);
+    const Runtime::DerivedJobQueueSnapshot jobs = appPtr->Jobs->SnapshotAll();
     ASSERT_EQ(jobs.Entries.size(), 1u);
     EXPECT_EQ(jobs.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
     EXPECT_EQ(appPtr->WorkerRuns.load(std::memory_order_relaxed), 1u);

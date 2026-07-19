@@ -6897,6 +6897,7 @@ namespace Extrinsic::Runtime
                     1u,
                     static_cast<std::uint32_t>(
                         (state->WorkCloud.VertexCount() + 1023u) / 1024u)),
+                .Scope = context.World,
                 .Execute =
                     [state]() -> DerivedJobWorkerResult
                     {
@@ -7713,6 +7714,7 @@ namespace Extrinsic::Runtime
                 .Kind = RuntimeTaskKinds::GeometryProcess,
                 .Priority = Core::Dag::TaskPriority::Normal,
                 .EstimatedCost = estimatedCost,
+                .Scope = context.World,
                 .Execute =
                     [state]() -> DerivedJobWorkerResult
                     {
@@ -8884,6 +8886,7 @@ namespace Extrinsic::Runtime
                 .Kind = RuntimeTaskKinds::GeometryProcess,
                 .Priority = Core::Dag::TaskPriority::Normal,
                 .EstimatedCost = estimatedCost,
+                .Scope = context.World,
                 .Execute =
                     [state]() -> DerivedJobWorkerResult
                     {
@@ -9602,6 +9605,7 @@ namespace Extrinsic::Runtime
                 .Kind = RuntimeTaskKinds::GeometryProcess,
                 .Priority = Core::Dag::TaskPriority::Normal,
                 .EstimatedCost = estimatedCost,
+                .Scope = context.World,
                 .Execute =
                     [state]() -> DerivedJobWorkerResult
                     {
@@ -10863,8 +10867,27 @@ namespace Extrinsic::Runtime
         {
             const RenderExtractionCache* renderExtraction =
                 engine.Services().Find<RenderExtractionCache>();
+            DerivedJobRegistry* derivedJobs =
+                engine.Services().Find<DerivedJobRegistry>();
+            const auto activeWorld = engine.ActiveWorld();
+            SandboxEditorDerivedJobCommandSurface derivedJobCommands{};
+            if (derivedJobs != nullptr)
+            {
+                derivedJobCommands.Submit =
+                    [derivedJobs, activeWorld](DerivedJobDesc desc)
+                    {
+                        desc.Scope = activeWorld;
+                        return derivedJobs->Submit(std::move(desc));
+                    };
+                derivedJobCommands.Cancel =
+                    [derivedJobs](const DerivedJobHandle handle)
+                    {
+                        derivedJobs->Cancel(handle);
+                    };
+            }
             return SandboxEditorContext{
                 .Scene = &engine.GetScene(),
+                .World = activeWorld,
                 .Selection = &engine.GetSelectionController(),
                 .CommandHistory = &engine.GetEditorCommandHistory(),
                 .AssetService = &engine.GetAssetService(),
@@ -11111,18 +11134,7 @@ namespace Extrinsic::Runtime
                 },
                 .VisualizationAdapterBindingRevision =
                     engine.GetVisualizationAdapterBindingRevision(),
-                .DerivedJobCommands = SandboxEditorDerivedJobCommandSurface{
-                    .Submit =
-                        [&engine](DerivedJobDesc desc)
-                        {
-                            return engine.SubmitDerivedJob(std::move(desc));
-                        },
-                    .Cancel =
-                        [&engine](const DerivedJobHandle handle)
-                        {
-                            engine.CancelDerivedJob(handle);
-                        },
-                },
+                .DerivedJobCommands = std::move(derivedJobCommands),
                 .AssetImportQueue = engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot(),
                 .RenderGraphStats = &engine.GetRenderer().GetLastRenderGraphStats(),
                 .RenderRecipeRuntimeState =
@@ -11319,19 +11331,25 @@ namespace Extrinsic::Runtime
                     [](const std::uint32_t)
                     {
                     });
-            context.DerivedJobCommands.Submit = GuardAttachmentCommand(
-                std::move(context.DerivedJobCommands.Submit),
-                epoch,
-                [](DerivedJobDesc)
-                {
-                    return DerivedJobHandle{};
-                });
-            context.DerivedJobCommands.Cancel = GuardAttachmentCommand(
-                std::move(context.DerivedJobCommands.Cancel),
-                epoch,
-                [](const DerivedJobHandle)
-                {
-                });
+            if (context.DerivedJobCommands.Submit)
+            {
+                context.DerivedJobCommands.Submit = GuardAttachmentCommand(
+                    std::move(context.DerivedJobCommands.Submit),
+                    epoch,
+                    [](DerivedJobDesc)
+                    {
+                        return DerivedJobHandle{};
+                    });
+            }
+            if (context.DerivedJobCommands.Cancel)
+            {
+                context.DerivedJobCommands.Cancel = GuardAttachmentCommand(
+                    std::move(context.DerivedJobCommands.Cancel),
+                    epoch,
+                    [](const DerivedJobHandle)
+                    {
+                    });
+            }
             context.PreviewRenderRecipeDocument = GuardAttachmentCommand(
                 std::move(context.PreviewRenderRecipeDocument),
                 epoch,
@@ -13639,6 +13657,7 @@ namespace Extrinsic::Runtime
             ApplySelectedMeshTextureBakeCommand(
                 SelectedMeshTextureBakeContext{
                     .Scene = context.Scene,
+                    .World = context.World,
                     .AssetService = context.AssetService,
                     .CommandHistory = context.CommandHistory,
                 },
@@ -14029,6 +14048,7 @@ namespace Extrinsic::Runtime
                               state->Soup.Mesh.FaceCount()) +
                      1023u) /
                     1024u)),
+            .Scope = context.World,
             .Execute =
                 [state]() -> DerivedJobWorkerResult
                 {
@@ -16049,8 +16069,16 @@ namespace Extrinsic::Runtime
                         *completed);
             }
         }
-        m_DerivedJobSnapshot =
-            m_Engine->GetDerivedJobQueueSnapshot();
+        if (const DerivedJobRegistry* derivedJobs =
+                m_Engine->Services().Find<DerivedJobRegistry>();
+            derivedJobs != nullptr)
+        {
+            m_DerivedJobSnapshot = derivedJobs->SnapshotAll();
+        }
+        else
+        {
+            m_DerivedJobSnapshot = {};
+        }
         context.DerivedJobs = &m_DerivedJobSnapshot;
         context.MethodResultSinks.KMeans =
             [epoch = m_AttachmentEpoch, this](

@@ -8,6 +8,7 @@ namespace Extrinsic::Runtime
 {
     struct AssetResidencySceneHandoffOptions
     {
+        WorldHandle World{DefaultWorldHandle};
         RuntimeObjectSpaceNormalBakeQueue* ObjectSpaceNormalBakeQueue{};
         bool ObjectSpaceNormalBakeGraphicsBackendOperational{false};
     };

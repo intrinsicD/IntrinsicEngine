@@ -66,6 +66,7 @@ import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
+import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -703,6 +704,12 @@ class RecordingImportCameraController final : public Runtime::ICameraController
         config.Camera.Enabled = false;
         config.Window.Backend = Core::Config::WindowBackend::Null;
         return config;
+    }
+
+void ComposeAsyncWorkAndInitialize(Runtime::Engine& engine)
+    {
+        engine.EmplaceModule<Runtime::AsyncWorkModule>();
+        engine.Initialize();
     }
 
 [[nodiscard]] bool MeshHasVertexProperty(
@@ -1706,7 +1713,7 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesNonManifoldObjAsRenderableMe
                 return meshEntity.has_value() &&
                     DirectMeshPostProcessReady(runningEngine, *meshEntity);
             }));
-    engine.Initialize();
+    ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
     auto mesh = engine.GetAssetImportPipeline().ImportAssetFromPath(
@@ -1772,7 +1779,7 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesObjWithoutAuthoredTexcoordsA
                 return meshEntity.has_value() &&
                     DirectMeshPostProcessReady(runningEngine, *meshEntity);
             }));
-    engine.Initialize();
+    ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
     auto mesh = engine.GetAssetImportPipeline().ImportAssetFromPath(
@@ -1869,7 +1876,7 @@ TEST(SandboxEditorUi, QueuedManualGeometryImportsRemainResponsiveAndApplyOnce)
         Core::Config::EngineConfig config = HeadlessConfig();
         config.Camera.Enabled = true;
         Runtime::Engine engine(config, std::move(application));
-        engine.Initialize();
+        ComposeAsyncWorkAndInitialize(engine);
         InstallSandboxDefaultRuntimePolicies(engine);
         decodeState->BaselineLiveAssetCount =
             engine.GetAssetService().LiveAssetCount();
@@ -2028,7 +2035,7 @@ TEST(SandboxEditorUi, QueuedManualGeometryCancellationPreventsApply)
     Core::Config::EngineConfig config = HeadlessConfig();
     config.Camera.Enabled = true;
     Runtime::Engine engine(config, std::move(application));
-    engine.Initialize();
+    ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
     decodeState->BaselineLiveAssetCount =
         engine.GetAssetService().LiveAssetCount();
@@ -2168,7 +2175,7 @@ TEST(SandboxEditorUi, ShutdownCancelsBlockedManualGeometryBeforePolicyUnregister
     Core::Config::EngineConfig config = HeadlessConfig();
     config.Camera.Enabled = true;
     Runtime::Engine engine(config, std::move(application));
-    engine.Initialize();
+    ComposeAsyncWorkAndInitialize(engine);
     ASSERT_EQ(shutdownState->InitializeCalls, 1u);
     ASSERT_TRUE(shutdownState->PoliciesRegistered);
     shutdownState->BaselineLiveAssetCount =
@@ -2322,7 +2329,7 @@ TEST(SandboxEditorUi, QueuedManualGeometryDecodeFailureIsFailClosed)
     Runtime::Engine engine(
         config,
         std::make_unique<WaitForAssetImportEventApplication>(128u));
-    engine.Initialize();
+    ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
     const std::size_t baselineLiveAssetCount =
         engine.GetAssetService().LiveAssetCount();
@@ -2434,7 +2441,7 @@ TEST(SandboxEditorUi, DuplicateDroppedGeometryImportUsesSingleIngestRecord)
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<FixedFrameApplication>(128u));
-    engine.Initialize();
+    ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
     const std::vector<std::string> droppedPaths{
@@ -2496,7 +2503,7 @@ TEST(SandboxEditorUi, DroppedFileQueuePreservesOrderDiagnosticsAndClearCompleted
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<FixedFrameApplication>(128u));
-    engine.Initialize();
+    ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
     const std::vector<std::string> droppedPaths{
@@ -2551,7 +2558,7 @@ TEST(SandboxEditorUi, DroppedGeometryQueueCancellationPreventsMainThreadApply)
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<FixedFrameApplication>(16u));
-    engine.Initialize();
+    ComposeAsyncWorkAndInitialize(engine);
 
     const std::vector<std::string> droppedPaths{meshFile.Path.string()};
     engine.GetAssetImportPipeline().ImportDroppedFilePaths(droppedPaths);
@@ -2590,7 +2597,7 @@ TEST(SandboxEditorUi, DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplica
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<WaitForAssetImportEventApplication>(128u));
-    engine.Initialize();
+    ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
     const std::vector<std::string> droppedPaths{meshFile.Path.string()};
@@ -2676,7 +2683,7 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderCo
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<WaitForAssetImportEventApplication>(128u));
-    engine.Initialize();
+    ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
     engine.DispatchPlatformEventForTest(Plat::WindowDropEvent{
@@ -2763,7 +2770,7 @@ TEST(SandboxEditorUi, PlatformDropNoUvObjUploadsRawSurfaceBeforeDeferredPostProc
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<WaitForAssetImportEventApplication>(128u));
-    engine.Initialize();
+    ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
     engine.DispatchPlatformEventForTest(Plat::WindowDropEvent{
@@ -2807,7 +2814,7 @@ TEST(SandboxEditorUi, DroppedFileImportFailureLogsDiagnostics)
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<WaitForAssetImportEventApplication>(128u));
-    engine.Initialize();
+    ComposeAsyncWorkAndInitialize(engine);
 
     Core::Log::ClearEntries();
 
@@ -2857,7 +2864,7 @@ TEST(SandboxEditorUi, PlatformDropEventImportsOffMesh)
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<WaitForAssetImportEventApplication>(128u));
-    engine.Initialize();
+    ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
     engine.DispatchPlatformEventForTest(Plat::WindowDropEvent{

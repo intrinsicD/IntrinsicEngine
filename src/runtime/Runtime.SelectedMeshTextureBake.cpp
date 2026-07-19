@@ -1553,6 +1553,7 @@ namespace Extrinsic::Runtime
         desc.EstimatedCost = std::max<std::uint32_t>(
             1u,
             request.Width * request.Height / 1024u);
+        desc.Scope = context.World;
         desc.HasPreviousOutput = previousOutputRetained;
         desc.Execute =
             [snapshot = std::move(snapshot),

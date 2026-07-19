@@ -77,6 +77,18 @@ namespace Extrinsic::Runtime
             return static_cast<TService*>(record->Instance);
         }
 
+        // Owner-only lifetime operation. Withdrawal is phase-independent so a
+        // provider can roll back partial registration or remove a borrowed
+        // entry during locked shutdown. Missing/mismatched entries return an
+        // error without adding a boot diagnostic; exact instance identity is
+        // required before the record is erased.
+        template <typename TService>
+        [[nodiscard]] Core::Result Withdraw(TService& expected)
+        {
+            return WithdrawErased(
+                Core::TypeToken<TService>(), &expected);
+        }
+
         template <typename TService>
         [[nodiscard]] Core::Expected<std::reference_wrapper<TService>> Require(
             std::string_view requester)
@@ -108,6 +120,9 @@ namespace Extrinsic::Runtime
                                                  std::string_view typeName,
                                                  void* instance,
                                                  std::string_view provider);
+        [[nodiscard]] Core::Result WithdrawErased(
+            ServiceTypeKey type,
+            void* expected);
         [[nodiscard]] const ServiceRecord* FindErased(
             ServiceTypeKey type) const noexcept;
         void RecordMissingRequirement(std::string_view requester,

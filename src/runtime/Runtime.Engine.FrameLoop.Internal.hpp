@@ -237,32 +237,6 @@ namespace Extrinsic::Runtime
         }
     };
 
-    struct StreamingHooks final : Core::IStreamingFrameHooks
-    {
-        static constexpr std::uint32_t kApplyBudgetPerFrame = 8u;
-
-        AsyncWorkService& AsyncWork;
-
-        explicit StreamingHooks(AsyncWorkService& asyncWork)
-            : AsyncWork(asyncWork)
-        {
-        }
-
-        void DrainCompletions() override
-        {
-            AsyncWork.DrainCompletions();
-        }
-        void ApplyMainThreadResults() override
-        {
-            (void)AsyncWork.ApplyMainThreadResults(kApplyBudgetPerFrame);
-        }
-        void SubmitFrameWork() override {}
-        void PumpBackground(std::uint32_t maxLaunches) override
-        {
-            AsyncWork.PumpBackground(maxLaunches);
-        }
-    };
-
     struct AssetHooks final : Core::IAssetFrameHooks
     {
         Assets::AssetService&     AssetService;

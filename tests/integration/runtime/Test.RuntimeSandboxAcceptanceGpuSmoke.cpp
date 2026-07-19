@@ -78,6 +78,7 @@ import Extrinsic.RHI.Types;
 import Extrinsic.Sandbox.Editor.Controller;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
+import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
@@ -776,6 +777,7 @@ struct AcceptanceBootstrap
         config,
         std::make_unique<SandboxDefaultPolicyApp>(std::move(app)),
         std::move(sectionRegistry));
+    enginePtr->EmplaceModule<Extrinsic::Runtime::AsyncWorkModule>();
     enginePtr->Initialize();
 
     const auto initInputs = GetVulkanDeviceOperationalInputs(&enginePtr->GetDevice());

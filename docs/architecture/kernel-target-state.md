@@ -149,9 +149,12 @@ comparison evidence; the current snapshot carries no temporary debt.
       composes `Runtime::ClusteringModule`, and `Runtime.Engine.cppm` / `.cpp`
       contain no `KMeans` or `Runtime.ClusteringModule` tokens; the module
       object is global and its jobs/commits are qualified by `WorldHandle`)
-- [ ] AsyncWork — `RUNTIME-179`; global streaming/derived-job owner with
-      world-qualified cancellation/commit records and retired-world
-      stale-result rejection
+- [x] AsyncWork — `RUNTIME-179`; app-composed global `AsyncWorkModule` owns
+      `StreamingExecutor` plus `DerivedJobRegistry`, publishes their narrow
+      services and the existing Maintenance hook capability, and cancels
+      generation-qualified queued/running/readback/apply work on
+      `WorldWillBeDestroyed`. Engine never names the concrete module; omitted
+      composition retains transfer collection followed by the asset tick.
 - [ ] SceneEditing — re-scoped `RUNTIME-172`; one app-composed editor/document
       owner today, with document/history/selection/lookup/readback/gizmo state
       keyed or reset by active `WorldHandle` on switch and destruction; the

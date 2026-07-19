@@ -49,6 +49,7 @@ import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.WorldRegistry;
 import Geometry.Graph;
 import Geometry.Graph.IO;
 import Geometry.HalfedgeMesh;
@@ -1023,6 +1024,7 @@ namespace Extrinsic::Runtime
             RenderExtractionCache& extraction,
             ECS::Scene::Registry& scene,
             StreamingExecutor* streamingExecutor,
+            const WorldHandle world,
             const std::span<const RuntimeImportEntityAuthoringPolicyRecord>
                 importEntityPolicies,
             const std::span<const RuntimePostImportProcessorRecord> postImportProcessors,
@@ -1035,6 +1037,7 @@ namespace Extrinsic::Runtime
             };
             RuntimePostImportProcessorServices postImportServices{
                 .Streaming = streamingExecutor,
+                .World = world,
                 .AssetService = &assetService,
                 .GpuAssetCache = &gpuAssetCache,
                 .RenderExtraction = &extraction,
@@ -1451,9 +1454,18 @@ namespace Extrinsic::Runtime
     void AssetImportPipeline::SetDependencies(
         AssetImportPipelineDependencies dependencies) noexcept
     {
+        // Active-scene handoffs are replaced on every world switch. The world
+        // handle and scene address can both become equal again after an
+        // away-and-back switch, so pointer identity alone cannot prove that a
+        // queued active-only operation still owns the binding it captured.
+        ++m_TargetBindingEpoch;
+        if (m_TargetBindingEpoch == 0u)
+            m_TargetBindingEpoch = 1u;
         m_Initialized = BorrowedBool{dependencies.Initialized};
         m_Config = BorrowedSubsystem<const Core::Config::EngineConfig>{dependencies.Config};
         m_StreamingExecutor = BorrowedSubsystem<StreamingExecutor>{dependencies.Streaming};
+        m_WorldRegistry = BorrowedSubsystem<WorldRegistry>{dependencies.Worlds};
+        m_World = dependencies.World;
         m_AssetService = BorrowedSubsystem<Assets::AssetService>{dependencies.AssetService};
         m_GpuAssetCache = BorrowedSubsystem<Graphics::GpuAssetCache>{dependencies.GpuAssetCache};
         m_AssetModelTextureHandoff =
@@ -1473,6 +1485,21 @@ namespace Extrinsic::Runtime
             BorrowedSubsystem<RuntimeObjectSpaceNormalBakeQueue>{
                 dependencies.ObjectSpaceNormalBakeQueue};
         m_Device = BorrowedSubsystem<const RHI::IDevice>{dependencies.Device};
+    }
+
+    bool AssetImportPipeline::IsCurrentSubmissionTarget(
+        const WorldHandle world,
+        const ECS::Scene::Registry* const scene,
+        const std::uint64_t bindingEpoch) const noexcept
+    {
+        return bindingEpoch == m_TargetBindingEpoch &&
+            world.IsValid() &&
+            scene != nullptr &&
+            m_WorldRegistry != nullptr &&
+            m_World == world &&
+            m_Scene.get() == scene &&
+            m_WorldRegistry->ActiveWorld() == world &&
+            m_WorldRegistry->Get(world) == scene;
     }
 
     RuntimePostImportProcessorHandle AssetImportPipeline::RegisterPostImportProcessor(
@@ -1848,6 +1875,30 @@ namespace Extrinsic::Runtime
         return Core::Ok();
     }
 
+    void AssetImportPipeline::FinalizeCancelledStreamingImport(
+        const RuntimeAssetIngestHandle operation,
+        RuntimeAssetImportRequest request)
+    {
+        const std::optional<RuntimeAssetIngestRecord> record =
+            m_AssetIngestStateMachine.Snapshot(operation);
+        if (!record.has_value() || IsTerminal(record->Phase))
+            return;
+
+        RuntimeAssetIngestTransition cancelled =
+            m_AssetIngestStateMachine.Cancel(operation);
+        if (!cancelled.Mutated ||
+            cancelled.Diagnostic != RuntimeAssetIngestDiagnostic::Cancelled)
+        {
+            return;
+        }
+
+        RecordAssetImportEvent(
+            request,
+            Core::Err<RuntimeAssetImportResult>(
+                Core::ErrorCode::InvalidState),
+            cancelled.Diagnostic);
+    }
+
     void AssetImportPipeline::ImportDroppedFilePaths(std::span<const std::string> paths)
     {
         for (const std::string& path : paths)
@@ -1982,13 +2033,19 @@ namespace Extrinsic::Runtime
                 ErrorFromIngestTransition(submit));
         }
 
+        const WorldHandle submissionWorld = m_World;
+        ECS::Scene::Registry* const submissionScene = m_Scene.get();
+        const std::uint64_t submissionBindingEpoch = m_TargetBindingEpoch;
         if (!m_Initialized ||
             !m_StreamingExecutor ||
             !m_AssetService ||
             !m_GpuAssetCache ||
             !m_RenderExtraction ||
-            !m_Scene ||
             !m_EditorCommandHistory ||
+            !IsCurrentSubmissionTarget(
+                submissionWorld,
+                submissionScene,
+                submissionBindingEpoch) ||
             request.Path.empty() ||
             payloadKinds.empty())
         {
@@ -2070,6 +2127,7 @@ namespace Extrinsic::Runtime
                 .Kind = RuntimeTaskKinds::AssetDecode,
                 .Priority = Core::Dag::TaskPriority::Normal,
                 .EstimatedCost = 4u,
+                .Scope = submissionWorld,
                 .Execute = [
                     state,
                     path = request.Path,
@@ -2101,7 +2159,12 @@ namespace Extrinsic::Runtime
                     return StreamingResult{
                         StreamingCpuPayloadReady{.PayloadToken = 0u}};
                 },
-                .ApplyOnMainThread = [this, state](StreamingResult&& streamingResult) mutable
+                .ApplyOnMainThread = [
+                    this,
+                    state,
+                    submissionWorld,
+                    submissionScene,
+                    submissionBindingEpoch](StreamingResult&& streamingResult) mutable
                 {
                     Core::Expected<RuntimeAssetImportResult> result =
                         Core::Err<RuntimeAssetImportResult>(
@@ -2157,12 +2220,32 @@ namespace Extrinsic::Runtime
                         return;
                     }
 
+                    if (!IsCurrentSubmissionTarget(
+                            submissionWorld,
+                            submissionScene,
+                            submissionBindingEpoch))
+                    {
+                        result = Core::Err<RuntimeAssetImportResult>(
+                            Core::ErrorCode::InvalidState);
+                        const RuntimeAssetIngestTransition failed =
+                            m_AssetIngestStateMachine.FailApply(
+                                state->IngestHandle,
+                                state->IngestHandle.Generation,
+                                Core::ErrorCode::InvalidState);
+                        RecordAssetImportEvent(
+                            state->Request,
+                            result,
+                            failed.Diagnostic);
+                        return;
+                    }
+
                     auto materialized = MaterializeDecodedGeometryImport(
                         *m_AssetService,
                         *m_GpuAssetCache,
                         m_RenderExtraction,
-                        *m_Scene,
+                        *submissionScene,
                         m_StreamingExecutor.get(),
+                        submissionWorld,
                         m_ImportEntityAuthoringPolicies,
                         m_PostImportProcessors,
                         m_ObjectSpaceNormalBakeQueue.get(),
@@ -2173,7 +2256,7 @@ namespace Extrinsic::Runtime
                         const ECS::EntityHandle createdEntity =
                             materialized->Entity;
                         RuntimeImportCompletedServices completedServices{
-                            .Scene = m_Scene,
+                            .Scene = submissionScene,
                             .CameraControllers = m_CameraControllers.get(),
                             .Selection = m_SelectionController.get(),
                             .Config = m_Config.get(),
@@ -2239,6 +2322,15 @@ namespace Extrinsic::Runtime
                         state->Request,
                         result,
                         eventDiagnostic);
+                },
+                .FinalizeCancellationOnMainThread = [
+                    this,
+                    operation = state->IngestHandle,
+                    cancelledRequest = request]() mutable
+                {
+                    FinalizeCancelledStreamingImport(
+                        operation,
+                        std::move(cancelledRequest));
                 },
             });
 
@@ -2345,13 +2437,19 @@ namespace Extrinsic::Runtime
                 ErrorFromIngestTransition(submit));
         }
 
+        const WorldHandle submissionWorld = m_World;
+        ECS::Scene::Registry* const submissionScene = m_Scene.get();
+        const std::uint64_t submissionBindingEpoch = m_TargetBindingEpoch;
         if (!m_Initialized ||
             !m_StreamingExecutor ||
             !m_AssetService ||
             !m_GpuAssetCache ||
             !m_AssetModelTextureHandoff ||
             !m_AssetModelSceneHandoff ||
-            !m_Scene ||
+            !IsCurrentSubmissionTarget(
+                submissionWorld,
+                submissionScene,
+                submissionBindingEpoch) ||
             request.Path.empty() ||
             !IsModelTextureImportPayload(request.PayloadKind))
         {
@@ -2427,6 +2525,7 @@ namespace Extrinsic::Runtime
                 .Kind = RuntimeTaskKinds::AssetDecode,
                 .Priority = Core::Dag::TaskPriority::Normal,
                 .EstimatedCost = 4u,
+                .Scope = submissionWorld,
                 .Execute = [
                     state,
                     ioBackendFactory = std::move(ioBackendFactory),
@@ -2491,7 +2590,13 @@ namespace Extrinsic::Runtime
                     return StreamingResult{
                         StreamingCpuPayloadReady{.PayloadToken = 0u}};
                 },
-                .ApplyOnMainThread = [this, state, existingAsset](StreamingResult&& streamingResult) mutable
+                .ApplyOnMainThread = [
+                    this,
+                    state,
+                    existingAsset,
+                    submissionWorld,
+                    submissionScene,
+                    submissionBindingEpoch](StreamingResult&& streamingResult) mutable
                 {
                     Core::Expected<RuntimeAssetImportResult> result =
                         Core::Err<RuntimeAssetImportResult>(
@@ -2558,13 +2663,32 @@ namespace Extrinsic::Runtime
                         return;
                     }
 
+                    if (!IsCurrentSubmissionTarget(
+                            submissionWorld,
+                            submissionScene,
+                            submissionBindingEpoch))
+                    {
+                        result = Core::Err<RuntimeAssetImportResult>(
+                            Core::ErrorCode::InvalidState);
+                        const RuntimeAssetIngestTransition failed =
+                            m_AssetIngestStateMachine.FailApply(
+                                state->IngestHandle,
+                                state->IngestHandle.Generation,
+                                Core::ErrorCode::InvalidState);
+                        RecordAssetImportEvent(
+                            state->Request,
+                            result,
+                            failed.Diagnostic);
+                        return;
+                    }
+
                     if (state->Decoded->PayloadKind ==
                         Assets::AssetPayloadKind::ModelScene)
                     {
                         result = MaterializeDecodedModelSceneImport(
                             *m_AssetService,
                             *m_AssetModelSceneHandoff,
-                            *m_Scene,
+                            *submissionScene,
                             m_ImportEntityAuthoringPolicies,
                             m_ImportCompletedHandlers,
                             m_CameraControllers.get(),
@@ -2637,6 +2761,15 @@ namespace Extrinsic::Runtime
                         state->Request,
                         result,
                         eventDiagnostic);
+                },
+                .FinalizeCancellationOnMainThread = [
+                    this,
+                    operation = state->IngestHandle,
+                    cancelledRequest = request]() mutable
+                {
+                    FinalizeCancelledStreamingImport(
+                        operation,
+                        std::move(cancelledRequest));
                 },
             });
 
@@ -2995,6 +3128,7 @@ namespace Extrinsic::Runtime
                 m_RenderExtraction,
                 *m_Scene,
                 m_StreamingExecutor.get(),
+                m_World,
                 m_ImportEntityAuthoringPolicies,
                 m_PostImportProcessors,
                 m_ObjectSpaceNormalBakeQueue.get(),

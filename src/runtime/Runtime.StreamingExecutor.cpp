@@ -13,6 +13,7 @@ module;
 #include <mutex>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 #include <variant>
@@ -111,12 +112,28 @@ namespace Extrinsic::Runtime
         std::deque<Completion> Completions{};
         std::array<std::deque<ReadyEntry>, kPriorityQueueCount> ReadyQueues{};
         std::deque<ReadyEntry> ReadyForApply{};
+        std::deque<std::move_only_function<void()>>
+            CancellationFinalizers{};
+        std::unordered_set<std::uint64_t> RetiredWorlds{};
         std::uint32_t RunningCount = 0;
         bool IsShutdown = false;
 
         [[nodiscard]] static std::uint64_t HandleKey(const StreamingTaskHandle handle)
         {
             return (static_cast<std::uint64_t>(handle.Generation) << 32u) | handle.Index;
+        }
+
+        [[nodiscard]] static std::uint64_t WorldKey(
+            const WorldHandle world) noexcept
+        {
+            return (static_cast<std::uint64_t>(world.Generation) << 32u) |
+                   world.Index;
+        }
+
+        [[nodiscard]] bool IsWorldRetiredLocked(
+            const WorldHandle world) const noexcept
+        {
+            return RetiredWorlds.contains(WorldKey(world));
         }
 
         [[nodiscard]] std::optional<std::uint32_t> Resolve(StreamingTaskHandle handle) const
@@ -282,6 +299,33 @@ namespace Extrinsic::Runtime
             }
         }
 
+        [[nodiscard]] bool CancelTaskLocked(const std::uint32_t index)
+        {
+            if (index >= Tasks.size())
+                return false;
+
+            TaskRecord& task = Tasks[index];
+            if (task.Reusable ||
+                task.State == StreamingTaskState::Complete ||
+                task.State == StreamingTaskState::Failed ||
+                task.State == StreamingTaskState::Cancelled)
+            {
+                return false;
+            }
+
+            task.State = StreamingTaskState::Cancelled;
+            task.Result = CancelledResult();
+            ++task.CancellationGeneration;
+            if (task.Desc.FinalizeCancellationOnMainThread)
+            {
+                CancellationFinalizers.push_back(
+                    std::move(
+                        task.Desc.FinalizeCancellationOnMainThread));
+            }
+            FinalizeTaskLocked(index);
+            return true;
+        }
+
         [[nodiscard]] std::uint32_t AllocateSlotLocked(TaskRecord& record)
         {
             if (FreeList.empty())
@@ -321,13 +365,14 @@ namespace Extrinsic::Runtime
 
     StreamingTaskHandle StreamingExecutor::Submit(StreamingTaskDesc desc)
     {
-        if (!desc.Execute)
+        if (!desc.Execute || !desc.Scope.IsValid())
         {
             return {};
         }
 
         std::scoped_lock lock(m_Impl->Mutex);
-        if (m_Impl->IsShutdown)
+        if (m_Impl->IsShutdown ||
+            m_Impl->IsWorldRetiredLocked(desc.Scope))
         {
             return {};
         }
@@ -378,17 +423,39 @@ namespace Extrinsic::Runtime
             return;
         }
 
-        auto& task = m_Impl->Tasks[*index];
-        if (task.State == StreamingTaskState::Complete || task.State == StreamingTaskState::Failed ||
-            task.State == StreamingTaskState::Cancelled)
-        {
-            return;
-        }
+        (void)m_Impl->CancelTaskLocked(*index);
+    }
 
-        task.State = StreamingTaskState::Cancelled;
-        task.Result = CancelledResult();
-        ++task.CancellationGeneration;
-        m_Impl->FinalizeTaskLocked(*index);
+    std::uint32_t StreamingExecutor::RetireWorld(const WorldHandle world)
+    {
+        if (!world.IsValid())
+            return 0u;
+
+        std::scoped_lock lock(m_Impl->Mutex);
+        m_Impl->RetiredWorlds.insert(Impl::WorldKey(world));
+
+        std::uint32_t cancelled = 0u;
+        for (std::uint32_t index = 0u;
+             index < static_cast<std::uint32_t>(m_Impl->Tasks.size());
+             ++index)
+        {
+            const auto& task = m_Impl->Tasks[index];
+            if (!task.Reusable &&
+                task.Desc.Scope == world &&
+                m_Impl->CancelTaskLocked(index))
+            {
+                ++cancelled;
+            }
+        }
+        return cancelled;
+    }
+
+    bool StreamingExecutor::IsWorldRetired(const WorldHandle world) const
+    {
+        if (!world.IsValid())
+            return false;
+        std::scoped_lock lock(m_Impl->Mutex);
+        return m_Impl->IsWorldRetiredLocked(world);
     }
 
     void StreamingExecutor::PumpBackground(const std::uint32_t maxLaunches)
@@ -416,6 +483,11 @@ namespace Extrinsic::Runtime
                 }
 
                 auto& task = m_Impl->Tasks[*next];
+                if (m_Impl->IsWorldRetiredLocked(task.Desc.Scope))
+                {
+                    (void)m_Impl->CancelTaskLocked(*next);
+                    continue;
+                }
                 launchIndex = *next;
                 launchGeneration = task.Generation;
                 launchCancellationGeneration = task.CancellationGeneration;
@@ -512,6 +584,12 @@ namespace Extrinsic::Runtime
                 continue;
             }
 
+            if (m_Impl->IsWorldRetiredLocked(task.Desc.Scope))
+            {
+                (void)m_Impl->CancelTaskLocked(completion.Index);
+                continue;
+            }
+
             task.Result = std::move(completion.Result);
             if (!task.Result->has_value())
             {
@@ -576,9 +654,13 @@ namespace Extrinsic::Runtime
     std::uint32_t StreamingExecutor::ApplyMainThreadResults(
         const std::uint32_t maxApplyCount)
     {
+        std::deque<std::move_only_function<void()>>
+            cancellationFinalizers{};
         std::deque<Impl::ReadyEntry> ready{};
         {
             std::scoped_lock lock(m_Impl->Mutex);
+            cancellationFinalizers.swap(
+                m_Impl->CancellationFinalizers);
             const auto count = std::min<std::size_t>(
                 maxApplyCount,
                 m_Impl->ReadyForApply.size());
@@ -587,6 +669,17 @@ namespace Extrinsic::Runtime
                 ready.push_back(m_Impl->ReadyForApply.front());
                 m_Impl->ReadyForApply.pop_front();
             }
+        }
+
+        // Cancellation never invokes ApplyOnMainThread. Consumers that own
+        // visible control state may opt into this separate main-thread
+        // finalizer so retirement can terminalize that state without allowing
+        // a stale domain commit. Cancellation finalizers are not apply work
+        // and therefore do not consume the normal per-frame result budget.
+        for (auto& finalize : cancellationFinalizers)
+        {
+            if (finalize)
+                finalize();
         }
 
         std::uint32_t applied = 0u;
@@ -608,6 +701,12 @@ namespace Extrinsic::Runtime
                     task.Reusable ||
                     !task.Result.has_value())
                 {
+                    continue;
+                }
+
+                if (m_Impl->IsWorldRetiredLocked(task.Desc.Scope))
+                {
+                    (void)m_Impl->CancelTaskLocked(entry.Index);
                     continue;
                 }
 
@@ -659,9 +758,7 @@ namespace Extrinsic::Runtime
                 auto& task = m_Impl->Tasks[index];
                 if (task.State == StreamingTaskState::Pending)
                 {
-                    task.State = StreamingTaskState::Cancelled;
-                    task.Result = CancelledResult();
-                    m_Impl->FinalizeTaskLocked(index);
+                    (void)m_Impl->CancelTaskLocked(index);
                 }
             }
         }

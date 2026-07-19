@@ -139,8 +139,10 @@ binding re-resolution, and asset-residency teardown ordering now live behind
 an Engine-private `AssetResidencyService`.
 `RUNTIME-165` is retired; persistent `StreamingExecutor` /
 `DerivedJobRegistry` ownership, maintenance drains, shutdown reset, and
-derived-job facade delegation now live behind
-`Extrinsic.Runtime.AsyncWorkService`.
+derived-job facade delegation first moved behind
+`Extrinsic.Runtime.AsyncWorkService`. `RUNTIME-179` folds that interim service
+into the app-composed `AsyncWorkModule`, adds world-qualified retirement, and
+removes the Engine facades.
 
 ### ADR-0027 app-composition convergence (seeded 2026-07-18)
 

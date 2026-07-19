@@ -277,9 +277,10 @@ interlock, and transform-gizmo packet production now live outside
 `Runtime.Engine.cpp`; render-extraction cache/pool/stats/frame-index ownership
 now lives in an Engine-private `RenderExtractionService`, and GPU asset
 cache/model-handoff residency ownership now lives in an Engine-private
-`AssetResidencyService`; persistent streaming executor,
-derived-job registry, maintenance drains, and derived-job facade delegation now
-live behind `Extrinsic.Runtime.AsyncWorkService`.
+`AssetResidencyService`; the persistent streaming executor, derived-job
+registry, world-retirement gate, maintenance drains, and shutdown now live in
+the app-composed `Extrinsic.Runtime.AsyncWorkModule`, while the Engine derived
+facades have been removed.
 Accepted
 [`ADR-0027`](../../docs/adr/0027-right-sized-runtime-composition.md)
 corrects the literal destination: domain responsibilities must be explicitly

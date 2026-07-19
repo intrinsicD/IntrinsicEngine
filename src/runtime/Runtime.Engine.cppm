@@ -27,7 +27,6 @@ import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
-import Extrinsic.Runtime.AsyncWorkService;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.AssetImportPipeline;
@@ -116,8 +115,7 @@ namespace Extrinsic::Runtime
     //
     // Owns: Window, IDevice, IRenderer, FrameClock,
     //       Tasks::Scheduler (static — initialized/shutdown here),
-    //       AssetService, Scene::Registry, FrameGraph (CPU),
-    //       AsyncWorkService.
+    //       AssetService, Scene::Registry, FrameGraph (CPU).
     //
     // Scheduling surfaces:
     //   CPU     — Core::FrameGraph wrapping a Dag::TaskGraph(Cpu).
@@ -128,10 +126,8 @@ namespace Extrinsic::Runtime
     //   GPU     — Owned internally by IRenderer.
     //             Engine drives it via BeginFrame / ExecuteFrame / EndFrame.
     //
-    //   Streaming — Runtime.AsyncWorkService owned by Engine.
-    //               Asset IO / geometry processing tasks borrow the service's
-    //               persistent executor and publish main-thread apply callbacks
-    //               in Phase 10 (maintenance lane) each frame.
+    //   Streaming — an app-composed runtime module may publish the existing
+    //               streaming Maintenance hook and executor capabilities.
     //
     // Frame shape (executed inside Run()):
     //
@@ -331,10 +327,6 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::uint64_t
             GetVisualizationAdapterBindingRevision() const noexcept;
 
-        [[nodiscard]] DerivedJobHandle SubmitDerivedJob(DerivedJobDesc desc);
-        void CancelDerivedJob(DerivedJobHandle handle);
-        [[nodiscard]] DerivedJobQueueSnapshot GetDerivedJobQueueSnapshot() const;
-
         // ── RUNTIME-090 Slice B — Dear ImGui editor hook ──────────────────
         // Registers the per-frame editor callback invoked between the
         // adapter's BeginFrame and EndFrame so editor/UI code can issue ImGui
@@ -401,10 +393,6 @@ namespace Extrinsic::Runtime
 
         // CPU task graph — ECS system scheduling
         std::unique_ptr<Core::FrameGraph>      m_FrameGraph;
-        // RUNTIME-165 — runtime async work ownership. Engine keeps lifecycle
-        // ordering and compatibility facades; the service owns the persistent
-        // streaming executor plus derived-job registry and maintenance drains.
-        AsyncWorkService                        m_AsyncWorkService{};
         // Asset service — CPU payload authority
         std::unique_ptr<Assets::AssetService>  m_AssetService;
         // RUNTIME-164 — GPU-side asset residency owner state. Engine keeps

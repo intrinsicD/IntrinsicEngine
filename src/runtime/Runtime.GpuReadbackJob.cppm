@@ -18,6 +18,7 @@ import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.DerivedJobGraph;
+import Extrinsic.Runtime.WorldHandle;
 import Geometry.Properties;
 
 export namespace Extrinsic::Runtime
@@ -49,6 +50,7 @@ export namespace Extrinsic::Runtime
         Core::Dag::TaskPriority Priority{Core::Dag::TaskPriority::Normal};
         std::uint32_t EstimatedCost{1u};
         std::uint64_t CancellationGeneration{0u};
+        WorldHandle Scope{DefaultWorldHandle};
         bool HasPreviousOutput{false};
         std::vector<DerivedJobDependency> DependsOn{};
 

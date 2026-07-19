@@ -48,6 +48,7 @@ import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.WorldHandle;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.IO;
 import Geometry.Properties;
@@ -437,6 +438,7 @@ namespace Extrinsic::Runtime
 
         void QueueDirectMeshPostProcess(
             StreamingExecutor* streamingExecutor,
+            const WorldHandle world,
             Assets::AssetService& assetService,
             Graphics::GpuAssetCache& gpuAssetCache,
             RenderExtractionCache& extraction,
@@ -465,6 +467,7 @@ namespace Extrinsic::Runtime
                     .Kind = RuntimeTaskKinds::AssetDecode,
                     .Priority = Core::Dag::TaskPriority::Low,
                     .EstimatedCost = 8u,
+                    .Scope = world,
                     .Execute =
                         [
                             state,
@@ -807,6 +810,7 @@ namespace Extrinsic::Runtime
 
                                 QueueDirectMeshPostProcess(
                                     services.Streaming,
+                                    services.World,
                                     *services.AssetService,
                                     *services.GpuAssetCache,
                                     *services.RenderExtraction,

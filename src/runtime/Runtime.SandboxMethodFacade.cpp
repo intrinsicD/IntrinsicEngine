@@ -993,6 +993,7 @@ namespace Extrinsic::Runtime
                     1u,
                     static_cast<std::uint32_t>(
                         (state->Points.size() + 1023u) / 1024u)),
+                .Scope = context.World,
                 .Execute =
                     [state]() -> DerivedJobWorkerResult
                     {
@@ -2041,6 +2042,7 @@ namespace Extrinsic::Runtime
                 .EstimatedCost = std::max<std::uint32_t>(
                     1u,
                     (inputCount + 1023u) / 1024u),
+                .Scope = context.World,
                 .Execute =
                     [state]() -> DerivedJobWorkerResult
                     {

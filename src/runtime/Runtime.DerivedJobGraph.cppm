@@ -17,6 +17,7 @@ import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.StrongHandle;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.WorldHandle;
 
 export namespace Extrinsic::Runtime
 {
@@ -93,6 +94,7 @@ export namespace Extrinsic::Runtime
         Core::Dag::TaskPriority Priority{Core::Dag::TaskPriority::Normal};
         std::uint32_t EstimatedCost{1u};
         std::uint64_t CancellationGeneration{0u};
+        WorldHandle Scope{DefaultWorldHandle};
         bool HasPreviousOutput{false};
         bool IsReadbackJob{false};
         std::uint64_t ReadbackByteSize{0u};
@@ -141,6 +143,7 @@ export namespace Extrinsic::Runtime
     {
         DerivedJobHandle Handle{};
         DerivedJobKey Key{};
+        WorldHandle Scope{DefaultWorldHandle};
         std::string Name{};
         ProgressiveJobDomain RequestedJobDomain{ProgressiveJobDomain::Cpu};
         ProgressiveJobDomain ResolvedJobDomain{ProgressiveJobDomain::Cpu};
@@ -183,6 +186,7 @@ export namespace Extrinsic::Runtime
 
         void Cancel(DerivedJobHandle handle);
         std::uint32_t CancelForEntity(std::uint32_t entityId);
+        std::uint32_t CancelAllForWorld(WorldHandle world);
         void Pump(std::uint32_t maxLaunches);
         void DrainCompletions();
         void DrainReadbacks();
