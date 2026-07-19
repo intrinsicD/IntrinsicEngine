@@ -158,7 +158,7 @@ namespace
         void OnInitialize(Runtime::Engine& engine) override
         {
             InitActive = engine.ActiveWorld();
-            InitScene = &engine.GetScene();
+            InitScene = &*engine.Worlds().Get(engine.ActiveWorld());
             InitRegistryScene = engine.Worlds().Get(InitActive);
             CreatedWorld = engine.Worlds().CreateWorld("secondary");
             RequestResult = engine.Worlds().RequestSetActiveWorld(CreatedWorld);
@@ -172,14 +172,14 @@ namespace
             if (VariableTicks == 1u)
             {
                 FirstVariableActive = engine.ActiveWorld();
-                FirstVariableScene = &engine.GetScene();
+                FirstVariableScene = &*engine.Worlds().Get(engine.ActiveWorld());
                 return;
             }
 
             if (VariableTicks == 2u)
             {
                 SecondVariableActive = engine.ActiveWorld();
-                SecondVariableScene = &engine.GetScene();
+                SecondVariableScene = &*engine.Worlds().Get(engine.ActiveWorld());
                 return;
             }
 
@@ -248,7 +248,7 @@ namespace
 
             if (VariableTicks == 3u)
             {
-                EntityCountAfterReady = CountLiveEntities(engine.GetScene());
+                EntityCountAfterReady = CountLiveEntities(*engine.Worlds().Get(engine.ActiveWorld()));
                 ReloadBeforeDestroySucceeded =
                     ModelAsset.IsValid() &&
                     engine.GetAssetService().Reload(ModelAsset).has_value();
@@ -266,7 +266,7 @@ namespace
             {
                 OldWorldDestroyed = !engine.Worlds().Contains(FirstWorld);
                 EntityCountAfterFirstReload =
-                    CountLiveEntities(engine.GetScene());
+                    CountLiveEntities(*engine.Worlds().Get(engine.ActiveWorld()));
                 ReloadAfterDestroySucceeded =
                     ModelAsset.IsValid() &&
                     engine.GetAssetService().Reload(ModelAsset).has_value();
@@ -522,7 +522,7 @@ TEST(RuntimeWorldRegistry, EngineRebindsSceneBorrowersBeforeRetiringPreviousWorl
     EXPECT_FALSE(engine.Worlds().Contains(appPtr->FirstWorld));
     EXPECT_EQ(appPtr->EntityCountAfterReady, 2u);
     EXPECT_EQ(appPtr->EntityCountAfterFirstReload, 2u);
-    EXPECT_EQ(CountLiveEntities(engine.GetScene()), 2u);
+    EXPECT_EQ(CountLiveEntities(*engine.Worlds().Get(engine.ActiveWorld())), 2u);
 
     engine.Shutdown();
 }

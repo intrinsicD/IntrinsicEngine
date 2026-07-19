@@ -10,15 +10,29 @@ maturity_target: Operational
 
 ## Status
 
+- 2026-07-19 implementation and verification are complete on
+  `codex/runtime-172-scene-document-module` at implementation commit
+  `1d48444b`, rebased onto corrected `RUNTIME-188` contract base `83554c6a`.
+  The task remains active for review/integration; the root owner controls
+  retirement.
 - 2026-07-19 audit amendment: the implementation inventory disproved the
   proposed single `SceneEditingModule` owner. Document/history and editor
   interaction differ in dependencies, frame hooks, cancellation, published
   state, and omission behavior, so this task now owns only
-  `SceneDocumentModule`; `RUNTIME-188` owns interaction. All implementation
-  checkboxes remain open.
-- Current-state indexes, architecture docs, and `tasks/SESSION-BRIEF.md` are
-  intentionally deferred to the atomic integration after `RUNTIME-180`
-  retires.
+  `SceneDocumentModule`; `RUNTIME-188` owns interaction. The split below is
+  implemented and verified.
+- The implementation-only
+  `RUNTIME-188.EngineInteractionTransition` and
+  `RUNTIME-183.EngineAssetHandoffTransition` callbacks are the bounded
+  independent-landing scope required below. They may import the exact document
+  and history services in `Runtime.Engine.cpp`; they add no public Engine
+  surface or durable document/history state and their named owners remove them.
+- Final-base verification built `IntrinsicTests`, passed the focused selector
+  68/68, and passed the complete CPU-supported selector with 4,175 tests passed,
+  zero failed, and the one expected GLFW/LSan capability skip. Strict
+  convergence reports `33/11/2/22`; task policy, task-state links, layering,
+  documentation links, test layout, root hygiene, and generated-file checks
+  pass on the final documentation state.
 
 ## Goal
 
@@ -73,32 +87,32 @@ maturity_target: Operational
 
 ## Required changes
 
-- [ ] Add
+- [x] Add
       `src/runtime/Scene/Runtime.SceneDocumentModule.cppm` and matching `.cpp`
       as one concrete `SceneDocumentModule final : IRuntimeModule` with a
       PImpl. Fold the existing `Runtime.SceneDocument.cppm/.cpp` API and
       implementation into it and delete that broad standalone module surface.
-- [ ] Own one active binding
+- [x] Own one active binding
       `{WorldHandle, ECS::Scene::Registry*, binding epoch}` plus document path,
       last file event/sequence, queued-operation state, and one
       `EditorCommandHistory`. Bind the current active world at registration;
       on any world mismatch reset history, path, and last event, advance the
       epoch, and bind only the new live registry. Never retain a per-world map.
-- [ ] Publish the exact `SceneDocumentModule` and its exact owned
+- [x] Publish the exact `SceneDocumentModule` and its exact owned
       `EditorCommandHistory` through `ServiceRegistry`. Do not add a document
       service wrapper, history wrapper, or forwarding facade. Omission means
       document/history/file-operation services are unavailable while Engine
       and the active world remain operational.
-- [ ] Preserve the existing synchronous and queued save/load plus new/close
+- [x] Preserve the existing synchronous and queued save/load plus new/close
       operations and the existing last-file-event result shape. During
       `OnResolve`, optionally find the `StreamingExecutor`; synchronous
       operations remain available without it and queued operations return
       `InvalidState`.
-- [ ] Before every public operation, validate the cached binding against both
+- [x] Before every public operation, validate the cached binding against both
       `WorldRegistry::ActiveWorld()` and `WorldRegistry::Get(handle)`. Fail
       closed or rebind/reset as appropriate before touching the registry;
       delayed lifecycle events must never be the sole validity guard.
-- [ ] Replace the current cross-owner cleanup aggregate with these plain
+- [x] Replace the current cross-owner cleanup aggregate with these plain
       synchronous declarations owned by the document module:
 
       ```cpp
@@ -129,38 +143,41 @@ maturity_target: Operational
       participation. Reject empty/duplicate names, order callbacks
       deterministically by name then registration sequence, and invoke them
       synchronously rather than publishing queued replacement events.
-- [ ] Parse a load into temporary state before invoking any participant or
+- [x] Parse a load into temporary state before invoking any participant or
       mutating the active registry. On parse failure invoke no callback and
       leave registry, path, event, and history unchanged. On successful new,
       load, or close, run every `BeforeReplace` callback while the outgoing
       registry is still live, perform the replacement, run every
       `AfterReplace` callback against the rebound registry, and reset history
       only after the complete replacement succeeds.
-- [ ] Have queued completions capture weak/shared operation state rather than
+- [x] Have queued completions capture weak/shared operation state rather than
       raw `this`. Commit only when module generation, binding epoch,
       `WorldHandle`, and registry identity still match. On
       `RuntimeShutdownAnnounced`, invalidate the generation/epoch, cancel all
       owned task handles, and prevent every late callback from committing
       before reverse module shutdown begins.
-- [ ] Subscribe to active-world and retirement events for prompt cleanup, but
+- [x] Subscribe to active-world and retirement events for prompt cleanup, but
       retain the direct binding validation above. Unsubscribe, withdraw
       services/participants, cancel tasks, and destroy state safely on partial
       registration failure and shutdown; reinitialize starts empty even when
       recreated handle bits match a prior run.
-- [ ] Remove Engine document/history state, the
+- [x] Remove Engine document/history durable state, the
       `Extrinsic.Runtime.SceneDocument` and
-      `Extrinsic.Runtime.EditorCommandHistory` imports, and
+      `Extrinsic.Runtime.EditorCommandHistory` imports from the public
+      `Runtime.Engine.cppm` surface, and
       `GetSceneDocument`, `GetEditorCommandHistory`, and `GetScene`.
       Callers needing the active registry resolve `WorldRegistry`; callers
       needing document/history behavior resolve the published exact services.
-- [ ] Ratchet the exact post-task Engine snapshot to
+      The two implementation-only transition adapters below may resolve/import
+      those exact services until their named removal tasks land.
+- [x] Ratchet the exact post-task Engine snapshot to
       `33` plain imports / `11` domain imports / `2` re-exports /
       `22` public getter names. The two removed imports are
       `Extrinsic.Runtime.SceneDocument` and
       `Extrinsic.Runtime.EditorCommandHistory`; the three counted getter
       removals are `GetScene`, `GetSceneDocument`, and
       `GetEditorCommandHistory`.
-- [ ] Support an independent landing by having Engine/app composition register
+- [x] Support an independent landing by having Engine/app composition register
       narrow participant adapters for (a) the still-Engine-owned interaction
       cleanup, removed by `RUNTIME-188`, and (b) the current asset,
       render-extraction, and object-space-normal-bake handoff cleanup, removed
@@ -172,56 +189,58 @@ maturity_target: Operational
 
 ## Tests
 
-- [ ] Add focused module contract coverage for exact publication and
+- [x] Add focused module contract coverage for exact publication and
       withdrawal of `SceneDocumentModule` and `EditorCommandHistory`,
       duplicate-publication conflict, partial-registration rollback,
       shutdown/reinitialize, optional omission, and a real Operational
       `Engine::Run()`.
-- [ ] Preserve synchronous save/load/new/close, dirty/history, last-event, and
+- [x] Preserve synchronous save/load/new/close, dirty/history, last-event, and
       queued save/load behavior. Prove missing async service leaves
       synchronous operations operational while queued operations return
       `InvalidState`.
-- [ ] Cover replacement-participant registration lifetime, deterministic
+- [x] Cover replacement-participant registration lifetime, deterministic
       order, exact before/after order, and proof that parse failure invokes no
       callbacks and mutates no registry/path/event/history state.
-- [ ] Cover active-world switch, destruction of the former world after the
+- [x] Cover active-world switch, destruction of the former world after the
       switch, unrelated inactive-world destruction, away/back without state
       resurrection, and shutdown/reinitialize with recycled handle bits.
       Do not encode active-world destruction as a reachable success case;
       assert the existing `ResourceBusy` contract where relevant.
-- [ ] Prove a world switch resets history, path, and last event, and that a
+- [x] Prove a world switch resets history, path, and last event, and that a
       stale queued callback targeting the old world, old registry, old epoch,
       or shut-down module cannot mutate the replacement or a retired world.
       Include a lifetime test that completes a queued callback after the
       module object has been destroyed.
-- [ ] Migrate existing scene-document, scene-serialization,
+- [x] Migrate existing scene-document, scene-serialization,
       editor-command-history, hierarchy, runtime-module, and Sandbox callers
       to exact service resolution and run the focused and complete
       CPU-supported gates.
 
 ## Docs
 
-- [ ] Update the runtime README, runtime architecture, ADR-0027 current-state
+- [x] Update the runtime README, runtime architecture, ADR-0027 current-state
       notes, kernel target-state, task graph/indexes, and Sandbox documentation
       with `SceneDocumentModule`, its one-world binding, optional async
       capability, and replacement-participant contract.
-- [ ] Update the `RUNTIME-188` and `RUNTIME-183` composition descriptions when
+- [x] Update the `RUNTIME-188` and `RUNTIME-183` composition descriptions when
       the participant seam lands; regenerate `tasks/SESSION-BRIEF.md`.
-- [ ] Regenerate the module inventory.
+- [x] Regenerate the module inventory.
 
 ## Acceptance criteria
 
-- [ ] Engine owns no scene-document/history state, import, initialization,
-      teardown, callback, or public facade.
-- [ ] The module owns exactly one validated active-world binding; every world
+- [x] Engine's public interface and durable state are document/history-free,
+      with no scene/document/history getter. The only implementation callbacks
+      or exact imports are the bounded `RUNTIME-183`/`RUNTIME-188` transition
+      adapters required for independent landing and named for removal.
+- [x] The module owns exactly one validated active-world binding; every world
       switch, replacement, retirement, shutdown, and recycled-handle
       reinitialize deterministically clears or rebinds all durable state.
-- [ ] New/load/close coordinate the two real external owners through one plain,
+- [x] New/load/close coordinate the two real external owners through one plain,
       synchronous, lifetime-safe participant contract with no queued-event
       ordering gap.
-- [ ] Synchronous document behavior remains Operational without async;
+- [x] Synchronous document behavior remains Operational without async;
       queued work cannot outlive or target a superseded module/world binding.
-- [ ] The exact convergence snapshot is `33/11/2/22`.
+- [x] The exact convergence snapshot is `33/11/2/22`.
 
 ## Verification
 ```bash

@@ -80,6 +80,7 @@ import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
@@ -562,12 +563,12 @@ class WaitForConditionApplication final : public Runtime::IApplication
         const ECS::EntityHandle entity,
         const std::string_view propertyName)
     {
-        if (!engine.GetScene().IsValid(entity))
+        if (!engine.Worlds().Get(engine.ActiveWorld())->IsValid(entity))
         {
             return false;
         }
 
-        auto& raw = engine.GetScene().Raw();
+        auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
         const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
         return view.Valid() &&
             view.ActiveDomain == GS::Domain::Mesh &&
@@ -590,8 +591,8 @@ void ExpectMeshVertexNormalsNear(
         const ECS::EntityHandle entity,
         const std::span<const glm::vec3> expected)
     {
-        ASSERT_TRUE(engine.GetScene().IsValid(entity));
-        auto& raw = engine.GetScene().Raw();
+        ASSERT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(entity));
+        auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
         const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
         ASSERT_TRUE(view.Valid());
         ASSERT_EQ(view.ActiveDomain, GS::Domain::Mesh);
@@ -2935,6 +2936,7 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProce
             },
             128u));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
     InstallSandboxDefaultRuntimePolicies(engine);
 
@@ -2944,7 +2946,7 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProce
     });
     ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
 
-    meshEntity = FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    meshEntity = FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
     stableId = Runtime::SelectionController::ToStableEntityId(*meshEntity);
 
@@ -2958,7 +2960,7 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProce
         });
 
     Runtime::SandboxEditorContext context =
-        MakeContext(engine.GetScene(), engine.GetSelectionController());
+        MakeContext(*engine.Worlds().Get(engine.ActiveWorld()), engine.GetSelectionController());
     const Runtime::SandboxEditorMeshVertexNormalsResult recomputed =
         Runtime::ApplySandboxEditorMeshVertexNormalsCommand(
             context,

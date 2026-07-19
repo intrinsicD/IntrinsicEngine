@@ -76,8 +76,11 @@ re-exports. ADR-0027's 2026-07-18 classifier correction recognizes
 snapshot to 39 plain imports / 17 domain imports / 2 re-exports / 28 public
 getter names. `RUNTIME-180` removes Engine camera/reference imports and facades,
 reducing the current exact snapshot to 35 plain imports / 13 domain imports /
-2 re-exports / 25 public getter names. The fixed reference remains historical
-comparison evidence; the current snapshot carries no temporary debt.
+2 re-exports / 25 public getter names. `RUNTIME-172` then removes document/
+history ownership and facades, reducing the current exact snapshot to 33 plain
+imports / 11 domain imports / 2 re-exports / 22 public getter names. The fixed
+reference remains historical comparison evidence; the current snapshot carries
+no temporary debt.
 
 ### Kernel seams exist (ADR-0024 D5–D11, amended by ADR-0027)
 
@@ -118,12 +121,12 @@ comparison evidence; the current snapshot carries no temporary debt.
 
 - [ ] `Runtime.Engine.cppm` contains only the exact imports required by its
       accepted kernel public surface and no unused plain imports
-      (**baseline 45; 2026-07-13 reference 43; current checked snapshot 35**).
+      (**baseline 45; 2026-07-13 reference 43; current checked snapshot 33**).
       ADR-0027 records the present final-surface candidate of 12 exact imports;
       that is an auditable allowlist derived from the remaining API, not a
       numerical budget or room for unrelated imports.
 - [ ] Domain (non-substrate) imports in `Runtime.Engine.cppm` = 0
-      (**baseline 27; 2026-07-13 reference 23; current checked snapshot 13**).
+      (**baseline 27; 2026-07-13 reference 23; current checked snapshot 11**).
       Measure by
       **allowlist**, not
       a blocklist of names:
@@ -136,7 +139,7 @@ comparison evidence; the current snapshot carries no temporary debt.
       kernel-substrate allowlist; the final checker measures the complement of
       exact allowed kernel getter names rather than treating all `GetX()` names
       alike (**baseline estimate 13 domain facades; current guard snapshots all
-      25 names pending that classifier**)
+      22 names pending that classifier**)
 - [ ] Domain re-exports from `Runtime.Engine.cppm` = 0; a retained re-export
       must be explicitly classified as kernel public surface
 - [x] No `entt::dispatcher::trigger` or direct dispatcher use in module code
@@ -160,10 +163,17 @@ comparison evidence; the current snapshot carries no temporary debt.
       generation-qualified queued/running/readback/apply work on
       `WorldWillBeDestroyed`. Engine never names the concrete module; omitted
       composition retains transfer collection followed by the asset tick.
-- [ ] SceneEditing — re-scoped `RUNTIME-172`; one app-composed editor/document
-      owner today, with document/history/selection/lookup/readback/gizmo state
-      keyed or reset by active `WorldHandle` on switch and destruction; the
-      implementation must split if any ADR-0026 cohesion axis diverges
+- [x] SceneDocument — `RUNTIME-172`; app-composed `SceneDocumentModule`
+      publishes its exact history and owns one validated active-world binding
+      for path, file event/sequence, history, and optional queued scene IO.
+      New/load/close use the one synchronous participant contract; switch,
+      retirement, shutdown, and recycled-handle reinitialize reset rather than
+      cache state. Engine exposes no scene/document/history facade and omission
+      leaves the active world operational.
+- [ ] SceneInteraction — `RUNTIME-188`; the separate
+      selection/lookup/readback/gizmo/mesh-view owner consumes document
+      replacement and viewport/capture seams. The transitional Engine
+      participant captures only its exact long-lived interaction objects.
 - [x] Camera — `RUNTIME-180`; app-composed global `CameraModule` publishes the
       exact world-bound registry and contributes one typed viewport-input hook.
       Reset/change/retirement/shutdown clear slots, poses, transitions, and
@@ -222,7 +232,9 @@ comparison evidence; the current snapshot carries no temporary debt.
    it through a narrow service; the rows above now record every decision.
    `RUNTIME-180` closes Camera's decision: the module object is global, while
    the exact registry's complete state is bound to one handle and reset rather
-   than cached across worlds.
+   than cached across worlds. `RUNTIME-172` closes SceneDocument's distinct
+   decision the same way: the global module owns one active binding, resets all
+   durable document state on mismatch, and retains no per-world map.
 
 ## How this doc is used
 

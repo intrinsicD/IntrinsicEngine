@@ -21,6 +21,13 @@ maturity_target: Operational
   facade and render-extraction settings cache have no production consumer; this
   task deletes that compatibility residue instead of moving or clearing it as
   interaction state.
+- 2026-07-19 `RUNTIME-172` landing evidence: the temporary
+  `RUNTIME-188.EngineInteractionTransition` captures only the exact
+  long-lived selection, selection-readback, stable-lookup, and stable-binding
+  objects. It clears/disconnects before document replacement and rebuilds/
+  rebinds afterward. This task replaces that callback with its module-owned
+  strong participant handle; the corrected mesh-view deletion and narrow
+  snapshot contract remain authoritative.
 - `RUNTIME-180` and `RUNTIME-182` are retired. Implementation remains blocked
   only on the `RUNTIME-172` scene-document/participant contract.
 

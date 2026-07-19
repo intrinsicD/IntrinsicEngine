@@ -83,6 +83,7 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorUiModule;
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -94,6 +95,7 @@ import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxConfigSections;
 import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Sandbox.ConfigSections;
@@ -804,6 +806,8 @@ struct AcceptanceBootstrap
         config, std::make_unique<ExitAfterFramesApp>(kTargetFrames));
     enginePtr->EmplaceModule<Extrinsic::Runtime::CameraModule>();
     enginePtr->EmplaceModule<Extrinsic::Runtime::EditorUiModule>();
+    enginePtr->EmplaceModule<
+        Extrinsic::Runtime::SceneDocumentModule>();
     enginePtr->Initialize();
 
     const auto initInputs = GetVulkanDeviceOperationalInputs(&enginePtr->GetDevice());
@@ -817,7 +821,7 @@ struct AcceptanceBootstrap
         };
     }
 
-    SeedAcceptanceScene(enginePtr->GetScene());
+    SeedAcceptanceScene(*enginePtr->Worlds().Get(enginePtr->ActiveWorld()));
     return AcceptanceBootstrap{.EnginePtr = std::move(enginePtr), .Skipped = false, .SkipReason = {}};
 }
 
@@ -848,6 +852,8 @@ struct AcceptanceBootstrap
     enginePtr->EmplaceModule<Extrinsic::Runtime::AsyncWorkModule>();
     enginePtr->EmplaceModule<Extrinsic::Runtime::CameraModule>();
     enginePtr->EmplaceModule<Extrinsic::Runtime::EditorUiModule>();
+    enginePtr->EmplaceModule<
+        Extrinsic::Runtime::SceneDocumentModule>();
     enginePtr->Initialize();
 
     const auto initInputs = GetVulkanDeviceOperationalInputs(&enginePtr->GetDevice());
@@ -1475,11 +1481,11 @@ public:
         }
 
         const EntityHandle triangle =
-            FindEntityByName(engine.GetScene(), "ReferenceTriangle");
+            FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle");
         m_State->ReferenceTriangleSelected =
-            IsReferenceTriangleEntityValid(engine.GetScene(), triangle) &&
+            IsReferenceTriangleEntityValid(*engine.Worlds().Get(engine.ActiveWorld()), triangle) &&
             engine.GetSelectionController().SetSelectedEntity(
-                engine.GetScene(), triangle);
+                *engine.Worlds().Get(engine.ActiveWorld()), triangle);
 
         m_EditorShell.Attach(engine);
         m_MethodPanels.Register(m_EditorShell);
@@ -1627,7 +1633,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ProgressiveRenderDataReachesOperationalFr
     }
     Engine& engine = *bootstrap.EnginePtr;
 
-    Registry& scene = engine.GetScene();
+    Registry& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle mesh = SeedProgressiveMeshScene(scene);
     const EntityHandle graph = SeedProgressiveGraphScene(scene);
 
@@ -1935,10 +1941,10 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigPresentsRefe
     }
     Engine& engine = *bootstrap.EnginePtr;
 
-    const EntityHandle triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
-    ASSERT_TRUE(IsReferenceTriangleEntityValid(engine.GetScene(), triangle))
+    const EntityHandle triangle = FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle");
+    ASSERT_TRUE(IsReferenceTriangleEntityValid(*engine.Worlds().Get(engine.ActiveWorld()), triangle))
         << "ReferenceTriangle is not a valid first-class mesh renderable entity: "
-        << BuildReferenceTriangleEntityDiagnostic(engine.GetScene(), triangle);
+        << BuildReferenceTriangleEntityDiagnostic(*engine.Worlds().Get(engine.ActiveWorld()), triangle);
 
     auto& renderer = engine.GetRenderer();
     auto& device = engine.GetDevice();
@@ -2071,12 +2077,12 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleVertexColorStreamShadesD
     }
     Engine& engine = *bootstrap.EnginePtr;
 
-    const EntityHandle triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
-    ASSERT_TRUE(IsReferenceTriangleEntityValid(engine.GetScene(), triangle))
+    const EntityHandle triangle = FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle");
+    ASSERT_TRUE(IsReferenceTriangleEntityValid(*engine.Worlds().Get(engine.ActiveWorld()), triangle))
         << "ReferenceTriangle is not a valid first-class mesh renderable entity: "
-        << BuildReferenceTriangleEntityDiagnostic(engine.GetScene(), triangle);
+        << BuildReferenceTriangleEntityDiagnostic(*engine.Worlds().Get(engine.ActiveWorld()), triangle);
 
-    auto& raw = engine.GetScene().Raw();
+    auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
     auto& vertices = raw.get<gs::Vertices>(triangle);
     vertices.Properties
         .GetOrAdd<glm::vec4>("v:color", glm::vec4{1.0f})
@@ -2220,7 +2226,7 @@ public:
         ++m_Frames;
         if (m_Frames == m_MutateFrame)
         {
-            Registry& scene = engine.GetScene();
+            Registry& scene = *engine.Worlds().Get(engine.ActiveWorld());
             const EntityHandle triangle = FindEntityByName(scene, "ReferenceTriangle");
             if (IsReferenceTriangleEntityValid(scene, triangle))
             {
@@ -2275,12 +2281,12 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, VertexColorDirtyChannelPartiallyUploadsAn
     }
     Engine& engine = *bootstrap.EnginePtr;
 
-    const EntityHandle triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
-    ASSERT_TRUE(IsReferenceTriangleEntityValid(engine.GetScene(), triangle))
+    const EntityHandle triangle = FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle");
+    ASSERT_TRUE(IsReferenceTriangleEntityValid(*engine.Worlds().Get(engine.ActiveWorld()), triangle))
         << "ReferenceTriangle is not a valid first-class mesh renderable entity: "
-        << BuildReferenceTriangleEntityDiagnostic(engine.GetScene(), triangle);
+        << BuildReferenceTriangleEntityDiagnostic(*engine.Worlds().Get(engine.ActiveWorld()), triangle);
 
-    auto& raw = engine.GetScene().Raw();
+    auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
     auto& vertices = raw.get<gs::Vertices>(triangle);
     vertices.Properties
         .GetOrAdd<glm::vec4>("v:color", glm::vec4{1.0f})
@@ -2490,12 +2496,12 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
     }
     Engine& engine = *bootstrap.EnginePtr;
 
-    const EntityHandle triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
-    ASSERT_TRUE(IsReferenceTriangleEntityValid(engine.GetScene(), triangle))
+    const EntityHandle triangle = FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle");
+    ASSERT_TRUE(IsReferenceTriangleEntityValid(*engine.Worlds().Get(engine.ActiveWorld()), triangle))
         << "ReferenceTriangle is not a valid first-class mesh renderable entity: "
-        << BuildReferenceTriangleEntityDiagnostic(engine.GetScene(), triangle);
+        << BuildReferenceTriangleEntityDiagnostic(*engine.Worlds().Get(engine.ActiveWorld()), triangle);
 
-    auto& raw = engine.GetScene().Raw();
+    auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
     G::RenderEdges edges{};
     edges.WidthSource = kReferenceTriangleLineWidthSmokePx;
     raw.emplace_or_replace<G::RenderEdges>(triangle, edges);
@@ -2946,12 +2952,12 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldColormapResol
     }
     Engine& engine = *bootstrap.EnginePtr;
 
-    const EntityHandle triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
-    ASSERT_TRUE(IsReferenceTriangleEntityValid(engine.GetScene(), triangle))
+    const EntityHandle triangle = FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle");
+    ASSERT_TRUE(IsReferenceTriangleEntityValid(*engine.Worlds().Get(engine.ActiveWorld()), triangle))
         << "ReferenceTriangle is not a valid first-class mesh renderable entity: "
-        << BuildReferenceTriangleEntityDiagnostic(engine.GetScene(), triangle);
+        << BuildReferenceTriangleEntityDiagnostic(*engine.Worlds().Get(engine.ActiveWorld()), triangle);
 
-    auto& raw = engine.GetScene().Raw();
+    auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
 
     // Author a uniform per-vertex scalar at the colormap range maximum: the whole
     // line/point geometry then resolves to one predictable colour (the LUT
@@ -3172,12 +3178,12 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldSurfaceAndIso
     }
     Engine& engine = *bootstrap.EnginePtr;
 
-    const EntityHandle triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
-    ASSERT_TRUE(IsReferenceTriangleEntityValid(engine.GetScene(), triangle))
+    const EntityHandle triangle = FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle");
+    ASSERT_TRUE(IsReferenceTriangleEntityValid(*engine.Worlds().Get(engine.ActiveWorld()), triangle))
         << "ReferenceTriangle is not a valid first-class mesh renderable entity: "
-        << BuildReferenceTriangleEntityDiagnostic(engine.GetScene(), triangle);
+        << BuildReferenceTriangleEntityDiagnostic(*engine.Worlds().Get(engine.ActiveWorld()), triangle);
 
-    auto& raw = engine.GetScene().Raw();
+    auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
     auto& vertices = raw.get<gs::Vertices>(triangle);
     vertices.Properties
         .GetOrAdd<float>(std::string{kScalarFieldSmokeProperty}, 0.0f)
@@ -3352,13 +3358,15 @@ public:
         if (m_Frames == kBug024EditFrame)
         {
             const EntityHandle triangle =
-                FindEntityByName(engine.GetScene(), "ReferenceTriangle");
+                FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle");
             if (triangle != Extrinsic::ECS::InvalidEntityHandle)
             {
                 const Extrinsic::Runtime::SandboxEditorContext context{
-                    .Scene = &engine.GetScene(),
+                    .Scene = &*engine.Worlds().Get(engine.ActiveWorld()),
                     .Selection = &engine.GetSelectionController(),
-                    .CommandHistory = &engine.GetEditorCommandHistory(),
+                    .CommandHistory =
+                        &*engine.Services()
+                              .Find<RT::EditorCommandHistory>(),
                 };
                 EditStatus = Extrinsic::Runtime::ApplySandboxEditorTransformEdit(
                     context,
@@ -3408,7 +3416,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, InspectorTransformEditShiftsReferenceTria
     }
     Engine& engine = *bootstrap.EnginePtr;
 
-    const EntityHandle triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
+    const EntityHandle triangle = FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle");
     ASSERT_NE(triangle, Extrinsic::ECS::InvalidEntityHandle);
 
     auto& renderer = engine.GetRenderer();
@@ -3458,7 +3466,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, InspectorTransformEditShiftsReferenceTria
     // The CPU-side contract from BUG-024 must hold on the live engine: the
     // edited local position reached the world matrix and the dirty tags were
     // flushed + drained within the run.
-    auto& raw = engine.GetScene().Raw();
+    auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
     const glm::mat4& world = raw.get<ECSC::Transform::WorldMatrix>(triangle).Matrix;
     EXPECT_FLOAT_EQ(world[3].x, kBug024Shift.x);
     EXPECT_FLOAT_EQ(world[3].y, kBug024Shift.y);
@@ -3544,8 +3552,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedOffOriginObjTriangleAutoFramesAtC
     // backed OBJ import contributes pixels. The imported OBJ is deliberately
     // outside the default camera frustum; this test requires import-time bounds
     // plus the one-shot camera focus path to make it visible.
-    SetEntityPosition(engine.GetScene(),
-                      FindEntityByName(engine.GetScene(), "ReferenceTriangle"),
+    SetEntityPosition(*engine.Worlds().Get(engine.ActiveWorld()),
+                      FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle"),
                       glm::vec3{4.0f, 0.0f, 0.0f});
 
     TempObjFile obj{
@@ -3569,11 +3577,11 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedOffOriginObjTriangleAutoFramesAtC
     EXPECT_EQ(imported->PrimitiveEntitiesCreated, 1u);
 
     const EntityHandle importedEntity =
-        FindEntityByName(engine.GetScene(), obj.Path.filename().string());
+        FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), obj.Path.filename().string());
     ASSERT_NE(importedEntity, Extrinsic::ECS::InvalidEntityHandle);
-    ASSERT_TRUE(engine.GetScene().IsValid(importedEntity));
+    ASSERT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(importedEntity));
 
-    auto& raw = engine.GetScene().Raw();
+    auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
     ASSERT_TRUE((raw.all_of<ECSC::Transform::Component,
                             ECSC::Transform::WorldMatrix,
                             ECSC::Culling::Local::Bounds,
@@ -3728,8 +3736,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
     }
     Engine& engine = *bootstrap.EnginePtr;
 
-    SetEntityPosition(engine.GetScene(),
-                      FindEntityByName(engine.GetScene(), "ReferenceTriangle"),
+    SetEntityPosition(*engine.Worlds().Get(engine.ActiveWorld()),
+                      FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle"),
                       glm::vec3{4.0f, 0.0f, 0.0f});
 
     TempObjFile obj{
@@ -3750,11 +3758,11 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
     EXPECT_EQ(imported->PrimitiveEntitiesCreated, 1u);
 
     const EntityHandle importedEntity =
-        FindEntityByName(engine.GetScene(), obj.Path.filename().string());
+        FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), obj.Path.filename().string());
     ASSERT_NE(importedEntity, Extrinsic::ECS::InvalidEntityHandle);
-    ASSERT_TRUE(engine.GetScene().IsValid(importedEntity));
+    ASSERT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(importedEntity));
 
-    auto& raw = engine.GetScene().Raw();
+    auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
     ASSERT_TRUE((raw.all_of<G::RenderSurface,
                             G::VisualizationConfig,
                             gs::Vertices,
@@ -3955,7 +3963,7 @@ public:
         m_EditorUi.Attach(engine);
         if (m_Triangle == Extrinsic::ECS::InvalidEntityHandle)
         {
-            m_Triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
+            m_Triangle = FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle");
         }
     }
 
@@ -3965,7 +3973,7 @@ public:
     {
         ++m_Frames;
         if (m_Triangle == Extrinsic::ECS::InvalidEntityHandle ||
-            !engine.GetScene().IsValid(m_Triangle))
+            !engine.Worlds().Get(engine.ActiveWorld())->IsValid(m_Triangle))
         {
             FailureReason = m_TargetName +
                 " was not present while driving the click-pick smoke.";
@@ -4095,7 +4103,7 @@ private:
 
     [[nodiscard]] bool ObserveTriangleHit(Engine& engine)
     {
-        auto& scene = engine.GetScene();
+        auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
         auto& selection = engine.GetSelectionController();
         const std::uint32_t triangleId =
             Extrinsic::Runtime::SelectionController::ToStableEntityId(m_Triangle);
@@ -4142,7 +4150,7 @@ private:
         const auto diagnostics = selection.GetDiagnostics();
         return diagnostics.NoHits > m_NoHitsBeforeBackground &&
                selection.SelectedCount() == 0u &&
-               !engine.GetScene().Raw().all_of<ECSC::Selection::SelectedTag>(m_Triangle) &&
+               !engine.Worlds().Get(engine.ActiveWorld())->Raw().all_of<ECSC::Selection::SelectedTag>(m_Triangle) &&
                !engine.GetLastRefinedPrimitiveSelection().has_value();
     }
 
@@ -4170,10 +4178,10 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ClickPickReadbackSelectsReferenceTriangle
     }
     Engine& engine = *bootstrap.EnginePtr;
 
-    const EntityHandle triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
-    ASSERT_TRUE(IsReferenceTriangleEntityValid(engine.GetScene(), triangle))
+    const EntityHandle triangle = FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle");
+    ASSERT_TRUE(IsReferenceTriangleEntityValid(*engine.Worlds().Get(engine.ActiveWorld()), triangle))
         << "ReferenceTriangle is not a valid first-class mesh renderable entity: "
-        << BuildReferenceTriangleEntityDiagnostic(engine.GetScene(), triangle);
+        << BuildReferenceTriangleEntityDiagnostic(*engine.Worlds().Get(engine.ActiveWorld()), triangle);
 
     const Extrinsic::Core::Extent2D extent = engine.GetDevice().GetBackbufferExtent();
     if (extent.Width == 0u || extent.Height == 0u)
@@ -4227,7 +4235,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ClickPickReadbackSelectsReferenceTriangle
     EXPECT_EQ(diagnostics.Hits, 1u);
     EXPECT_EQ(diagnostics.NoHits, 1u);
     EXPECT_EQ(engine.GetSelectionController().SelectedCount(), 0u);
-    EXPECT_FALSE(engine.GetScene().Raw().all_of<ECSC::Selection::SelectedTag>(triangle));
+    EXPECT_FALSE(engine.Worlds().Get(engine.ActiveWorld())->Raw().all_of<ECSC::Selection::SelectedTag>(triangle));
     EXPECT_FALSE(engine.GetLastRefinedPrimitiveSelection().has_value());
     EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(run.Stats);
@@ -4272,7 +4280,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedModelSceneIsVisibleAndClickPickab
     EXPECT_TRUE(imported->MaterializedModelScene);
     EXPECT_EQ(imported->PrimitiveEntitiesCreated, 2u);
 
-    auto& raw = engine.GetScene().Raw();
+    auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
     std::vector<EntityHandle> instances{};
     raw.view<ECSC::MetaData>().each(
         [&](const EntityHandle entity, const ECSC::MetaData& metadata)
@@ -4301,7 +4309,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedModelSceneIsVisibleAndClickPickab
 
     for (const EntityHandle instance : instances)
     {
-        ASSERT_TRUE(engine.GetScene().IsValid(instance));
+        ASSERT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(instance));
         ASSERT_TRUE((raw.all_of<
             ECSC::Transform::Component,
             ECSC::Transform::WorldMatrix,
@@ -4510,9 +4518,9 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, HierarchySelectionKeepsDefaultSandboxVisi
     }
     Engine& engine = *bootstrap.EnginePtr;
 
-    EntityHandle triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
+    EntityHandle triangle = FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle");
     ASSERT_NE(triangle, Extrinsic::ECS::InvalidEntityHandle);
-    ASSERT_TRUE(engine.GetSelectionController().SetSelectedEntity(engine.GetScene(), triangle));
+    ASSERT_TRUE(engine.GetSelectionController().SetSelectedEntity(*engine.Worlds().Get(engine.ActiveWorld()), triangle));
     ASSERT_EQ(engine.GetSelectionController().SelectedCount(), 1u);
     ASSERT_EQ(engine.GetSelectionController().SelectedStableIds().size(), 1u);
     EXPECT_EQ(engine.GetSelectionController().SelectedStableIds()[0],

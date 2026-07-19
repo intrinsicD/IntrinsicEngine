@@ -60,7 +60,7 @@ target_sources(${target_name}
         Runtime.KMeansGpuBackend.cppm
         Runtime.RegistrationAlignment.cppm
         Runtime.PhysicsBridge.cppm
-        Runtime.SceneDocument.cppm
+        Scene/Runtime.SceneDocumentModule.cppm
         Runtime.SceneSerialization.cppm
         Cameras/Runtime.CameraModule.cppm
         Cameras/Runtime.CameraControllers.cppm
@@ -145,7 +145,7 @@ target_sources(${target_name}
         Runtime.KMeansGpuJobQueue.cpp
         Runtime.RegistrationAlignment.cpp
         Runtime.PhysicsBridge.cpp
-        Runtime.SceneDocument.cpp
+        Scene/Runtime.SceneDocumentModule.cpp
         Runtime.SceneSerialization.cpp
         Cameras/Runtime.CameraModule.cpp
         Cameras/Runtime.CameraControllers.cpp

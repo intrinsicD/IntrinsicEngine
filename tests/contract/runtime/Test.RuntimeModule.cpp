@@ -517,7 +517,7 @@ namespace
         {
             m_State.BaselineProbeEntity =
                 Extrinsic::ECS::Scene::CreateDefault(
-                    engine.GetScene(), "BaselineTransformProbe");
+                    *engine.Worlds().Get(engine.ActiveWorld()), "BaselineTransformProbe");
             engine.Commands().Enqueue(ProbeCommand{23});
         }
 
@@ -527,7 +527,7 @@ namespace
             m_State.CurrentSubstepExpectedX =
                 10.0f + static_cast<float>(m_State.SimTickMutations);
 
-            auto& raw = engine.GetScene().Raw();
+            auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
             raw.get<Components::Transform::Component>(
                    m_State.BaselineProbeEntity)
                 .Position = glm::vec3(

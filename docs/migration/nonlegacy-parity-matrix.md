@@ -124,6 +124,27 @@ service lifetime, typed-hook ordering, optional omission, and original-world
 reference teardown; Null Engine/Sandbox integration supplies the operational
 first-frame camera proof.
 
+### RUNTIME-172 scene-document composition amendment
+
+The runtime/app rows and the scene-serializer row below are further narrowed by
+`RUNTIME-172`; this amendment is the controlling current-state text where the
+long historical rows still name `Extrinsic.Runtime.SceneDocument` or
+`Engine::GetSceneDocument()`. The optional app-composed
+`Extrinsic.Runtime.SceneDocumentModule` now publishes itself and its exact
+owned `EditorCommandHistory`, owns one validated active-world document binding,
+and preserves synchronous plus optional queued save/load and new/close. Sandbox
+scene commands resolve those exact services; Engine has no scene,
+scene-document, or history getter and owns no document/history state; its public
+module interface imports neither document nor history. Successful new/load/
+close uses one deterministic synchronous replacement-participant contract,
+while parse failure leaves registry, path, event, and history unchanged.
+Implementation-only interaction and asset-handoff participants preserve
+cleanup/rebind behavior until `RUNTIME-188` and `RUNTIME-183` absorb those
+owners. Contract coverage includes exact service lifetime and rollback,
+omission, real Null `Engine::Run`, one-world reset/non-resurrection,
+participant order and shutdown detach, parse failure, and stale async completion
+after module destruction.
+
 ### Runtime Editor Mesh Simplification Workflow
 
 `UI-028` retires the promoted Sandbox EditorUI mesh simplification workflow at

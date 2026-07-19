@@ -131,7 +131,7 @@ TEST(RenderExtractionContract, WorldMatrixWithoutRenderHintPublishesNoDrawCandid
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = scene.Create();
     scene.Raw().emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
 
@@ -161,7 +161,7 @@ TEST(RenderExtractionContract, FailedMeshPackPublishesNoDrawCandidate)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
@@ -202,7 +202,7 @@ TEST(RenderExtractionContract, SnapshotSurvivesLiveEcsMutationAndDestruction)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     glm::mat4 model{1.f};

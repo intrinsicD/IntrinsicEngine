@@ -17,6 +17,14 @@ maturity_target: Operational
   `SceneDocumentModule` and `SceneInteractionModule` split and participates in
   document replacement through `RUNTIME-172`'s synchronous narrow contract.
   Implementation remains open.
+- 2026-07-19 composition evidence: `RUNTIME-172` lands the temporary
+  `RUNTIME-183.EngineAssetHandoffTransition`. It captures only the exact
+  long-lived residency, asset, renderer/device, extraction, bake, import,
+  world, selection, async/config, initialized-state, and history objects; its
+  registry/world come only from the replacement context. This task must absorb
+  that participant and release its retained handle during shutdown
+  announcement; document quiescence permits exact-handle detachment before
+  provider teardown.
 
 ## Goal
 - Move CPU asset authority, GPU residency, import orchestration, scene

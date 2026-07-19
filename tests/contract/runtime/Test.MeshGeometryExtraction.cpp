@@ -187,7 +187,7 @@ TEST(MeshGeometryExtraction, SingleMeshEntityUploadsOnceAndBindsInstanceGeometry
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -473,7 +473,7 @@ TEST(MeshGeometryExtraction, RepeatedExtractionReusesMeshHandleWithoutReupload)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
     (void)entity;
 
@@ -515,7 +515,7 @@ TEST(MeshGeometryExtraction, TwoMeshEntitiesAllocateIndependentMeshUploads)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     (void)MakeMeshRenderable(scene);
     (void)MakeMeshRenderable(scene);
 
@@ -544,7 +544,7 @@ TEST(MeshGeometryExtraction, EntityDestructionRetiresMeshGeometryAfterDeferredWi
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -597,7 +597,7 @@ TEST(MeshGeometryExtraction, ShutdownReleasesPendingMeshResidency)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     (void)MakeMeshRenderable(scene);
     (void)MakeMeshRenderable(scene);
 
@@ -626,7 +626,7 @@ TEST(MeshGeometryExtraction, ProceduralRefPreemptsMeshPathOnSameEntity)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
@@ -664,7 +664,7 @@ TEST(MeshGeometryExtraction, AssetSourcePresentPreemptsMeshPathOnSameEntity)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
@@ -698,7 +698,7 @@ TEST(MeshGeometryExtraction, MissingPositionsIncrementsMissingPositionsCounter)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
@@ -738,7 +738,7 @@ TEST(MeshGeometryExtraction, MissingTexcoordsUploadsWithDefaultUvFallback)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = MakeMeshRenderable(scene);
 
@@ -770,7 +770,7 @@ TEST(MeshGeometryExtraction, NonFiniteTexcoordsUploadWithDefaultUvFallback)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = MakeMeshRenderable(scene);
 
@@ -804,7 +804,7 @@ TEST(MeshGeometryExtraction, InvalidTopologyIncrementsInvalidTopologyCounter)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
@@ -855,7 +855,7 @@ TEST(MeshGeometryExtraction, DegenerateAllFacesIncrementsFailedPackCounter)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
@@ -907,7 +907,7 @@ TEST(MeshGeometryExtraction, AddingProceduralRefAfterMeshUploadReleasesMeshResid
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -969,7 +969,7 @@ TEST(MeshGeometryExtraction, AddingAssetSourceAfterMeshUploadReleasesMeshResiden
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -1027,7 +1027,7 @@ TEST(MeshGeometryExtraction, LosingMeshDomainTopologyReleasesMeshResidency)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -1086,7 +1086,7 @@ TEST(MeshGeometryExtraction, NonMeshDomainEntityIsIgnoredByMeshPath)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
@@ -1147,7 +1147,7 @@ TEST_P(MeshGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = MakeMeshRenderable(scene);
 
@@ -1271,7 +1271,7 @@ TEST(MeshGeometryExtraction, MultipleDirtyTagsCoalesceIntoSingleReupload)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = MakeMeshRenderable(scene);
 
@@ -1320,7 +1320,7 @@ TEST(MeshGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesDi
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = MakeMeshRenderable(scene);
 

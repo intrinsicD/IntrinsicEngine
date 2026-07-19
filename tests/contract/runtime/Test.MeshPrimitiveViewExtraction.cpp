@@ -230,7 +230,7 @@ TEST(MeshPrimitiveViewExtraction, EnableEdgeViewUploadsSeparateEdgeRenderable)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
@@ -282,7 +282,7 @@ TEST(MeshPrimitiveViewExtraction, EdgeViewWidthConfigUpdateReusesGeometry)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
@@ -332,7 +332,7 @@ TEST(MeshPrimitiveViewExtraction, EnableVertexViewUploadsSeparatePointRenderable
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
@@ -381,7 +381,7 @@ TEST(MeshPrimitiveViewExtraction, MeshVertexPointLaneDoesNotRequireSurfaceTopolo
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshVertexOnlyRenderable(scene);
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
@@ -428,7 +428,7 @@ TEST(MeshPrimitiveViewExtraction, VertexViewConfigUpdateReusesGeometry)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
@@ -486,7 +486,7 @@ TEST(MeshPrimitiveViewExtraction, EnableBothViewsAllocatesThreeIndependentRender
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
@@ -547,7 +547,7 @@ TEST(MeshPrimitiveViewExtraction, EdgeAndPointComponentsDoNotRequireRenderSurfac
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
     scene.Raw().remove<G::RenderSurface>(entity);
     EnableEdgeView(scene, entity);
@@ -595,7 +595,7 @@ TEST(MeshPrimitiveViewExtraction, LaneOverridesColorEdgeAndVertexViewsIndependen
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
     EnableEdgeView(scene, entity, 3.0f);
     EnableVertexView(
@@ -651,7 +651,7 @@ TEST(MeshPrimitiveViewExtraction, RepeatedExtractionReusesViewsWithoutReupload)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
@@ -695,7 +695,7 @@ TEST(MeshPrimitiveViewExtraction, VertexPositionDirtyRepacksBothViews)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = MakeMeshRenderable(scene);
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
@@ -761,7 +761,7 @@ TEST(MeshPrimitiveViewExtraction, DisablingEdgeViewReleasesItsGeometryAfterWindo
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
@@ -808,7 +808,7 @@ TEST(MeshPrimitiveViewExtraction, EntityDestructionReleasesViewsAfterWindow)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -849,7 +849,7 @@ TEST(MeshPrimitiveViewExtraction, ShutdownReleasesViewResidency)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -878,7 +878,7 @@ TEST(MeshPrimitiveViewExtraction, ProceduralRefFlipReleasesViews)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeMeshRenderable(scene);
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
@@ -918,7 +918,7 @@ TEST(MeshPrimitiveViewExtraction, EdgeViewDerivesWireframeWithoutExplicitEdges)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     // Triangle mesh whose `Edges` PropertySet is empty (no explicit edges).
     const EntityHandle entity = MakeMeshRenderable(scene, /*withEdges=*/false);
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
@@ -958,7 +958,7 @@ TEST(MeshPrimitiveViewExtraction, OutOfRangeEdgeEndpointIncrementsInvalidEdgesCo
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = MakeMeshRenderable(scene);
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
@@ -997,7 +997,7 @@ TEST(MeshPrimitiveViewExtraction, NonMeshEntityWithRenderComponentsCreatesNoMesh
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<Extrinsic::ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};

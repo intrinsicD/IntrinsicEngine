@@ -85,7 +85,7 @@ import Extrinsic.Runtime.RegistrationAlignment;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.SandboxConfigSections;
-import Extrinsic.Runtime.SceneDocument;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
@@ -10866,6 +10866,12 @@ namespace Extrinsic::Runtime
             EngineConfigControl* configControl =
                 engine.Services().Find<EngineConfigControl>();
             const auto activeWorld = engine.ActiveWorld();
+            ECS::Scene::Registry* const activeScene =
+                engine.Worlds().Get(activeWorld);
+            EditorCommandHistory* const commandHistory =
+                engine.Services().Find<EditorCommandHistory>();
+            SceneDocumentModule* const sceneDocuments =
+                engine.Services().Find<SceneDocumentModule>();
             SandboxEditorDerivedJobCommandSurface derivedJobCommands{};
             if (derivedJobs != nullptr)
             {
@@ -10882,10 +10888,10 @@ namespace Extrinsic::Runtime
                     };
             }
             SandboxEditorContext context{
-                .Scene = &engine.GetScene(),
+                .Scene = activeScene,
                 .World = activeWorld,
                 .Selection = &engine.GetSelectionController(),
-                .CommandHistory = &engine.GetEditorCommandHistory(),
+                .CommandHistory = commandHistory,
                 .AssetService = &engine.GetAssetService(),
                 .LastRefinedPrimitive = &engine.GetLastRefinedPrimitiveSelection(),
                 .LastRefinedPrimitiveGeneration =
@@ -10994,10 +11000,21 @@ namespace Extrinsic::Runtime
                 },
                 .SceneFileCommands = SandboxEditorSceneFileCommandSurface{
                     .New =
-                        [&engine]()
+                        [sceneDocuments]()
                         {
+                            if (sceneDocuments == nullptr)
+                            {
+                                return SandboxEditorSceneFileResult{
+                                    .Status = SandboxEditorCommandStatus::SceneNewFailed,
+                                    .Operation = SandboxEditorSceneFileOperation::New,
+                                    .Error = Core::ErrorCode::InvalidState,
+                                    .Message = BuildSceneFileFailureMessage(
+                                        SandboxEditorSceneFileOperation::New,
+                                        Core::ErrorCode::InvalidState),
+                                };
+                            }
                             Core::Result created =
-                                engine.GetSceneDocument().NewSceneDocument();
+                                sceneDocuments->NewSceneDocument();
                             if (!created.has_value())
                             {
                                 return SandboxEditorSceneFileResult{
@@ -11017,10 +11034,22 @@ namespace Extrinsic::Runtime
                             return result;
                         },
                     .Save =
-                        [&engine](const SandboxEditorSceneFileCommand& command)
+                        [sceneDocuments](
+                            const SandboxEditorSceneFileCommand& command)
                         {
+                            if (sceneDocuments == nullptr)
+                            {
+                                return SandboxEditorSceneFileResult{
+                                    .Status = SandboxEditorCommandStatus::SceneSaveFailed,
+                                    .Operation = SandboxEditorSceneFileOperation::Save,
+                                    .Error = Core::ErrorCode::InvalidState,
+                                    .Message = BuildSceneFileFailureMessage(
+                                        SandboxEditorSceneFileOperation::Save,
+                                        Core::ErrorCode::InvalidState),
+                                };
+                            }
                             auto queued =
-                                engine.GetSceneDocument().QueueSceneSaveToPath(
+                                sceneDocuments->QueueSceneSaveToPath(
                                     command.Path);
                             if (!queued.has_value())
                             {
@@ -11045,10 +11074,22 @@ namespace Extrinsic::Runtime
                             return result;
                         },
                     .Load =
-                        [&engine](const SandboxEditorSceneFileCommand& command)
+                        [sceneDocuments](
+                            const SandboxEditorSceneFileCommand& command)
                         {
+                            if (sceneDocuments == nullptr)
+                            {
+                                return SandboxEditorSceneFileResult{
+                                    .Status = SandboxEditorCommandStatus::SceneLoadFailed,
+                                    .Operation = SandboxEditorSceneFileOperation::Load,
+                                    .Error = Core::ErrorCode::InvalidState,
+                                    .Message = BuildSceneFileFailureMessage(
+                                        SandboxEditorSceneFileOperation::Load,
+                                        Core::ErrorCode::InvalidState),
+                                };
+                            }
                             auto queued =
-                                engine.GetSceneDocument().QueueSceneLoadFromPath(
+                                sceneDocuments->QueueSceneLoadFromPath(
                                     command.Path);
                             if (!queued.has_value())
                             {
@@ -11073,10 +11114,21 @@ namespace Extrinsic::Runtime
                             return result;
                         },
                     .Close =
-                        [&engine]()
+                        [sceneDocuments]()
                         {
+                            if (sceneDocuments == nullptr)
+                            {
+                                return SandboxEditorSceneFileResult{
+                                    .Status = SandboxEditorCommandStatus::SceneCloseFailed,
+                                    .Operation = SandboxEditorSceneFileOperation::Close,
+                                    .Error = Core::ErrorCode::InvalidState,
+                                    .Message = BuildSceneFileFailureMessage(
+                                        SandboxEditorSceneFileOperation::Close,
+                                        Core::ErrorCode::InvalidState),
+                                };
+                            }
                             Core::Result closed =
-                                engine.GetSceneDocument().CloseSceneDocument();
+                                sceneDocuments->CloseSceneDocument();
                             if (!closed.has_value())
                             {
                                 return SandboxEditorSceneFileResult{
@@ -16032,16 +16084,22 @@ namespace Extrinsic::Runtime
                 BuildFileImportResultFromRuntimeEvent(*runtimeImport);
             m_LastObservedRuntimeImportSequence = runtimeImport->Sequence;
         }
-        const std::optional<RuntimeSceneFileEvent>& runtimeSceneFile =
-            m_Engine->GetSceneDocument().GetLastSceneFileEvent();
-        if (runtimeSceneFile.has_value() &&
-            runtimeSceneFile->Sequence !=
+        SceneDocumentModule* const sceneDocuments =
+            m_Engine->Services().Find<SceneDocumentModule>();
+        const std::optional<RuntimeSceneFileEvent>* runtimeSceneFile =
+            sceneDocuments != nullptr
+                ? &sceneDocuments->GetLastSceneFileEvent()
+                : nullptr;
+        if (runtimeSceneFile != nullptr &&
+            runtimeSceneFile->has_value() &&
+            (*runtimeSceneFile)->Sequence !=
                 m_LastObservedRuntimeSceneFileSequence)
         {
             m_LastSceneFileResult =
-                BuildSceneFileResultFromRuntimeEvent(*runtimeSceneFile);
+                BuildSceneFileResultFromRuntimeEvent(
+                    **runtimeSceneFile);
             m_LastObservedRuntimeSceneFileSequence =
-                runtimeSceneFile->Sequence;
+                (*runtimeSceneFile)->Sequence;
         }
         m_Context = BuildContextFromEngine(*m_Engine);
         SandboxEditorContext& context = m_Context;

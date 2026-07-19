@@ -949,7 +949,7 @@ TEST(SandboxEditorUi, RenderHintCommandRepackagesGraphLaneResidency)
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<PassiveApplication>());
     engine.Initialize();
 
-    ECS::Scene::Registry& scene = engine.GetScene();
+    ECS::Scene::Registry& scene = *engine.Worlds().Get(engine.ActiveWorld());
     Runtime::SelectionController& selection = engine.GetSelectionController();
     const ECS::EntityHandle graph = MakeSelectable(scene, "Graph");
     AddGraphSource(scene, graph);

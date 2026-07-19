@@ -106,7 +106,7 @@ namespace
             }
 
             Entity = AddPointCloud(
-                engine.GetScene(),
+                *engine.Worlds().Get(engine.ActiveWorld()),
                 {
                     {0.0f, 0.0f, 0.0f},
                     {0.1f, 0.0f, 0.0f},
@@ -145,10 +145,10 @@ namespace
             Ticks += 1u;
             const bool committed =
                 Entity != ECS::InvalidEntityHandle &&
-                HasPointLabels(engine.GetScene(), Entity);
+                HasPointLabels(*engine.Worlds().Get(engine.ActiveWorld()), Entity);
             const bool dirty =
                 Entity != ECS::InvalidEntityHandle &&
-                engine.GetScene().Raw().all_of<Dirty::DirtyVertexAttributes>(
+                engine.Worlds().Get(engine.ActiveWorld())->Raw().all_of<Dirty::DirtyVertexAttributes>(
                     Entity);
             if (Completion.has_value() &&
                 LabelsChanged.has_value() &&
@@ -202,7 +202,7 @@ namespace
             }
 
             SubmittedWorld = engine.ActiveWorld();
-            SubmittedScene = &engine.GetScene();
+            SubmittedScene = &*engine.Worlds().Get(engine.ActiveWorld());
             Entity = AddPointCloud(
                 *SubmittedScene,
                 {
@@ -301,7 +301,7 @@ namespace
         void OnInitialize(Runtime::Engine& engine) override
         {
             Entity = AddPointCloud(
-                engine.GetScene(),
+                *engine.Worlds().Get(engine.ActiveWorld()),
                 {
                     {0.0f, 0.0f, 0.0f},
                     {0.1f, 0.0f, 0.0f},
@@ -327,7 +327,7 @@ namespace
             if (Ticks >= 2u)
             {
                 CommandStats = engine.Commands().Stats();
-                LabelsCommitted = HasPointLabels(engine.GetScene(), Entity);
+                LabelsCommitted = HasPointLabels(*engine.Worlds().Get(engine.ActiveWorld()), Entity);
                 engine.RequestExit();
             }
         }
@@ -370,8 +370,8 @@ TEST(ClusteringModule, EngineRunCommitsLabelsAndPublishesChangeEvent)
     EXPECT_EQ(appPtr->LabelsChanged->StableEntityId, appPtr->StableEntityId);
     EXPECT_EQ(appPtr->LabelsChanged->LabelCount, 4u);
     EXPECT_EQ(appPtr->LabelsChangedThread, appPtr->MainThread);
-    EXPECT_EQ(PointLabelCount(engine.GetScene(), appPtr->Entity), 4u);
-    EXPECT_TRUE(engine.GetScene().Raw().all_of<Dirty::DirtyVertexAttributes>(
+    EXPECT_EQ(PointLabelCount(*engine.Worlds().Get(engine.ActiveWorld()), appPtr->Entity), 4u);
+    EXPECT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->Raw().all_of<Dirty::DirtyVertexAttributes>(
         appPtr->Entity));
     EXPECT_EQ(appPtr->Stats.LabelsCommitted, 1u);
     EXPECT_EQ(appPtr->Stats.VisualizationRefreshReactions, 1u);

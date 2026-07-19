@@ -273,7 +273,7 @@ TEST(ReferenceSceneOwnership,
         std::make_unique<StubApplication>());
     engine.Initialize();
 
-    EXPECT_EQ(EntityCount(engine.GetScene()), 0u);
+    EXPECT_EQ(EntityCount(*engine.Worlds().Get(engine.ActiveWorld())), 0u);
     EXPECT_EQ(
         engine.Services()
             .Find<Runtime::CameraControllerRegistry>(),
@@ -296,7 +296,7 @@ TEST(ReferenceSceneOwnership,
     ASSERT_TRUE(appPtr->Population.has_value());
     ASSERT_TRUE(appPtr->LastSeed.has_value());
     EXPECT_TRUE(appPtr->LastSeed->Valid);
-    EXPECT_EQ(EntityCount(engine.GetScene()), 1u);
+    EXPECT_EQ(EntityCount(*engine.Worlds().Get(engine.ActiveWorld())), 1u);
     EXPECT_EQ(
         engine.Services()
             .Find<Runtime::CameraControllerRegistry>(),
@@ -305,7 +305,7 @@ TEST(ReferenceSceneOwnership,
     Runtime::RenderExtractionCache extraction;
     const Runtime::RuntimeRenderExtractionStats stats =
         extraction.ExtractAndSubmit(
-            engine.GetScene(),
+            *engine.Worlds().Get(engine.ActiveWorld()),
             engine.GetRenderer(),
             &engine.GetGpuAssetCache());
     EXPECT_EQ(stats.CandidateRenderableCount, 1u);
@@ -321,7 +321,7 @@ TEST(ReferenceSceneOwnership,
     engine.Initialize();
     EXPECT_EQ(appPtr->InitializeCalls, 2u);
     EXPECT_EQ(appPtr->BootstrapCalls, 2u);
-    EXPECT_EQ(EntityCount(engine.GetScene()), 1u);
+    EXPECT_EQ(EntityCount(*engine.Worlds().Get(engine.ActiveWorld())), 1u);
     engine.Shutdown();
     EXPECT_EQ(appPtr->ShutdownCalls, 2u);
 }
@@ -336,7 +336,7 @@ TEST(ReferenceSceneOwnership, DisabledAppBootstrapCreatesNothing)
 
     EXPECT_EQ(appPtr->InitializeCalls, 1u);
     EXPECT_EQ(appPtr->BootstrapCalls, 0u);
-    EXPECT_EQ(EntityCount(engine.GetScene()), 0u);
+    EXPECT_EQ(EntityCount(*engine.Worlds().Get(engine.ActiveWorld())), 0u);
 
     engine.Shutdown();
     EXPECT_EQ(appPtr->ShutdownCalls, 1u);
@@ -429,7 +429,7 @@ TEST(ReferenceSceneOwnership,
         HeadlessConfig(true), std::move(app));
     engine.Initialize();
 
-    auto view = engine.GetScene().Raw().view<
+    auto view = engine.Worlds().Get(engine.ActiveWorld())->Raw().view<
         E::MetaData,
         G::RenderSurface,
         GS::Vertices,
@@ -442,10 +442,10 @@ TEST(ReferenceSceneOwnership,
     Runtime::SelectionController& selection =
         engine.GetSelectionController();
     ASSERT_TRUE(selection.SetSelectedEntity(
-        engine.GetScene(), entity));
+        *engine.Worlds().Get(engine.ActiveWorld()), entity));
 
     const Runtime::SandboxEditorContext context{
-        .Scene = &engine.GetScene(),
+        .Scene = &*engine.Worlds().Get(engine.ActiveWorld()),
         .Selection = &selection,
         .ImGuiAdapterAvailable = true,
         .AssetImportCommandsAvailable = false,
