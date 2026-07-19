@@ -936,6 +936,41 @@ TEST(SandboxEditorPresentation, EditorShellStartsWithOnlyBuiltinWindows)
     engine.Shutdown();
 }
 
+TEST(SandboxEditorPresentation,
+     GpuProfilingControlsReuseTheExistingFrameGraphWindow)
+{
+    const std::string shell = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp");
+    ASSERT_FALSE(shell.empty());
+
+    const std::size_t frameGraphBegin =
+        shell.find("windowId == \"view.frame_graph\"");
+    const std::size_t frameGraphEnd =
+        shell.find("windowId == \"view.render_recipes\"", frameGraphBegin);
+    ASSERT_NE(frameGraphBegin, std::string::npos);
+    ASSERT_NE(frameGraphEnd, std::string::npos);
+    ASSERT_LT(frameGraphBegin, frameGraphEnd);
+
+    const std::string_view frameGraphPanel{
+        shell.data() + frameGraphBegin,
+        frameGraphEnd - frameGraphBegin};
+    const std::string compactPanel =
+        WithoutAsciiWhitespace(frameGraphPanel);
+    EXPECT_NE(
+        frameGraphPanel.find("Enable GPU profiling"),
+        std::string_view::npos);
+    EXPECT_NE(frameGraphPanel.find("\"GPU Profile\""),
+              std::string_view::npos);
+    EXPECT_NE(
+        compactPanel.find(
+            "ApplySandboxEditorGpuProfilingConfigCommand(*context,gpuProfilingEnabled)"),
+        std::string::npos);
+    EXPECT_NE(frameGraphPanel.find("Queue envelopes:"),
+              std::string_view::npos);
+    EXPECT_NE(frameGraphPanel.find("Pass samples:"),
+              std::string_view::npos);
+}
+
 TEST(SandboxEditorPresentation, ExternalWindowContributionNeedsNoLegacySwitchEntry)
 {
     Runtime::Engine engine(

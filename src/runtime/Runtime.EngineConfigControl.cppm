@@ -46,6 +46,7 @@ namespace Extrinsic::Runtime
         RuntimeRenderRecipeApplyResult RecipeApply{};
         bool EngineConfigApplied{false};
         bool DefaultRecipeConfigPathChanged{false};
+        bool GpuProfilingChanged{false};
         std::vector<std::string> ChangedSectionNames{};
         std::vector<std::string> RejectedBootOnlyFields{};
 

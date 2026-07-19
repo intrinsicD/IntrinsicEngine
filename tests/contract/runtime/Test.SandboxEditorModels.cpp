@@ -62,6 +62,8 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.Profiler;
+import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
@@ -107,6 +109,7 @@ namespace GS = Extrinsic::ECS::Components::GeometrySources;
 namespace Sel = Extrinsic::ECS::Components::Selection;
 namespace G = Extrinsic::Graphics::Components;
 namespace Graphics = Extrinsic::Graphics;
+namespace RHI = Extrinsic::RHI;
 namespace Plat = Extrinsic::Platform;
 namespace PN = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
 namespace GN = Geometry::HalfedgeMesh::VertexNormals;
@@ -610,6 +613,20 @@ TEST(SandboxEditorUi, RenderGraphPanelModelCopiesRendererStats)
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::RuntimeEngineConfigControlState configControlState{};
+    configControlState.ActiveConfig.Render.EnableGpuProfiling = true;
+    context.EngineConfigControlState = &configControlState;
+    context.PreviewEngineConfigDocument =
+        [](const std::string&, const std::string&)
+        {
+            return Core::Config::EngineConfigLoadResult{};
+        };
+    context.ApplyEngineConfigHotSubset =
+        [](const Core::Config::EngineConfigLoadResult&)
+        {
+            return Runtime::RuntimeEngineConfigApplyResult{};
+        };
+    context.EngineConfigCommandsAvailable = true;
 
     Graphics::RenderGraphFrameStats stats{};
     stats.Compile.Succeeded = true;
@@ -644,6 +661,46 @@ TEST(SandboxEditorUi, RenderGraphPanelModelCopiesRendererStats)
             .Status = Graphics::RenderCommandPassStatus::SkippedUnavailable,
         });
     stats.AsyncComputeUtilizedFrames = 1u;
+    stats.GpuProfile = Graphics::RenderGraphGpuProfileStats{
+        .Status = Graphics::RenderGraphGpuProfileStatus::Resolved,
+        .Source = RHI::GpuTimestampSource::NativeGpu,
+        .Diagnostic = "Resolved native timestamp sample.",
+        .Fresh = true,
+        .Stale = false,
+        .HasResolvedFrame = true,
+        .ResolvedSubmittedFrameNumber = 41u,
+        .ResolvedFrameSlot = 1u,
+        .SampleAgeFrames = 2u,
+        .QueueEnvelopes = {
+            Graphics::RenderGraphGpuProfileQueueStats{
+                .Queue = RHI::QueueAffinity::Graphics,
+                .Source = RHI::GpuTimestampSource::NativeGpu,
+                .DurationNs = 900u,
+            },
+            Graphics::RenderGraphGpuProfileQueueStats{
+                .Queue = RHI::QueueAffinity::AsyncCompute,
+                .Source = RHI::GpuTimestampSource::Unavailable,
+            },
+        },
+        .Passes = {
+            Graphics::RenderGraphGpuProfilePassStats{
+                .Name = "DepthPrepass",
+                .Id = Graphics::FramePassId{11u},
+                .Queue = RHI::QueueAffinity::Graphics,
+                .CommandStatus =
+                    Graphics::RenderCommandPassStatus::Recorded,
+                .Source = RHI::GpuTimestampSource::NativeGpu,
+                .DurationNs = 300u,
+            },
+            Graphics::RenderGraphGpuProfilePassStats{
+                .Name = "DebugViewPass",
+                .Queue = RHI::QueueAffinity::Graphics,
+                .CommandStatus =
+                    Graphics::RenderCommandPassStatus::SkippedUnavailable,
+                .Source = RHI::GpuTimestampSource::Unavailable,
+            },
+        },
+    };
     stats.DebugDump = "passes:\\n  DepthPrepass -> DebugViewPass";
     stats.Diagnostic = "Frame graph diagnostic.";
     stats.LifecycleDiagnostic = "Renderer lifecycle diagnostic.";
@@ -653,6 +710,10 @@ TEST(SandboxEditorUi, RenderGraphPanelModelCopiesRendererStats)
         Runtime::BuildSandboxEditorPanelFrame(context);
 
     EXPECT_TRUE(frame.RenderGraph.Enabled);
+    EXPECT_TRUE(frame.RenderGraph.GpuProfilingEnabled);
+    EXPECT_TRUE(frame.RenderGraph.GpuProfilingToggleAvailable);
+    EXPECT_TRUE(
+        frame.RenderGraph.GpuProfilingToggleDisabledReason.empty());
     EXPECT_TRUE(frame.RenderGraph.CompileSucceeded);
     EXPECT_TRUE(frame.RenderGraph.ExecuteSucceeded);
     EXPECT_TRUE(frame.RenderGraph.DeviceOperational);
@@ -678,6 +739,54 @@ TEST(SandboxEditorUi, RenderGraphPanelModelCopiesRendererStats)
     EXPECT_EQ(frame.RenderGraph.StatusText, "Frame graph diagnostic.");
     EXPECT_EQ(frame.RenderGraph.LifecycleDiagnostic,
               "Renderer lifecycle diagnostic.");
+    EXPECT_EQ(frame.RenderGraph.GpuProfile.Status, "Resolved");
+    EXPECT_EQ(frame.RenderGraph.GpuProfile.Source, "NativeGpu");
+    EXPECT_EQ(frame.RenderGraph.GpuProfile.Diagnostic,
+              "Resolved native timestamp sample.");
+    EXPECT_TRUE(frame.RenderGraph.GpuProfile.Fresh);
+    EXPECT_FALSE(frame.RenderGraph.GpuProfile.Stale);
+    EXPECT_TRUE(frame.RenderGraph.GpuProfile.HasResolvedFrame);
+    EXPECT_EQ(
+        frame.RenderGraph.GpuProfile.ResolvedSubmittedFrameNumber,
+        41u);
+    EXPECT_EQ(frame.RenderGraph.GpuProfile.ResolvedFrameSlot, 1u);
+    EXPECT_EQ(frame.RenderGraph.GpuProfile.SampleAgeFrames, 2u);
+    ASSERT_EQ(frame.RenderGraph.GpuProfile.QueueEnvelopes.size(), 2u);
+    EXPECT_EQ(
+        frame.RenderGraph.GpuProfile.QueueEnvelopes[0].Queue,
+        "graphics");
+    EXPECT_EQ(
+        frame.RenderGraph.GpuProfile.QueueEnvelopes[0].Source,
+        "NativeGpu");
+    ASSERT_TRUE(
+        frame.RenderGraph.GpuProfile.QueueEnvelopes[0]
+            .DurationNs.has_value());
+    EXPECT_EQ(
+        *frame.RenderGraph.GpuProfile.QueueEnvelopes[0].DurationNs,
+        900u);
+    EXPECT_EQ(
+        frame.RenderGraph.GpuProfile.QueueEnvelopes[1].Queue,
+        "async_compute");
+    EXPECT_FALSE(
+        frame.RenderGraph.GpuProfile.QueueEnvelopes[1]
+            .DurationNs.has_value());
+    ASSERT_EQ(frame.RenderGraph.GpuProfile.Passes.size(), 2u);
+    EXPECT_EQ(frame.RenderGraph.GpuProfile.Passes[0].Name,
+              "DepthPrepass");
+    EXPECT_TRUE(frame.RenderGraph.GpuProfile.Passes[0].HasTypedId);
+    EXPECT_EQ(frame.RenderGraph.GpuProfile.Passes[0].TypedId, 11u);
+    EXPECT_EQ(frame.RenderGraph.GpuProfile.Passes[0].Queue,
+              "graphics");
+    EXPECT_EQ(frame.RenderGraph.GpuProfile.Passes[0].CommandStatus,
+              "Recorded");
+    EXPECT_EQ(frame.RenderGraph.GpuProfile.Passes[0].Source,
+              "NativeGpu");
+    ASSERT_TRUE(
+        frame.RenderGraph.GpuProfile.Passes[0].DurationNs.has_value());
+    EXPECT_EQ(*frame.RenderGraph.GpuProfile.Passes[0].DurationNs,
+              300u);
+    EXPECT_FALSE(
+        frame.RenderGraph.GpuProfile.Passes[1].DurationNs.has_value());
     ASSERT_EQ(frame.RenderGraph.CommandPasses.size(), 2u);
     EXPECT_EQ(frame.RenderGraph.CommandPasses[0].Name, "DepthPrepass");
     EXPECT_TRUE(frame.RenderGraph.CommandPasses[0].HasTypedId);
@@ -687,6 +796,149 @@ TEST(SandboxEditorUi, RenderGraphPanelModelCopiesRendererStats)
     EXPECT_FALSE(frame.RenderGraph.CommandPasses[1].HasTypedId);
     EXPECT_EQ(frame.RenderGraph.CommandPasses[1].Status,
               "SkippedUnavailable");
+}
+
+TEST(SandboxEditorUi,
+     GpuProfilingToggleUsesConfigPreviewApplyAndPreservesRejectedState)
+{
+    Runtime::RuntimeEngineConfigControlState state{};
+    Runtime::SandboxEditorContext context{};
+    context.EngineConfigControlState = &state;
+    context.EngineConfigCommandsAvailable = true;
+    context.PreviewEngineConfigDocument =
+        [](const std::string& document, const std::string& sourceId)
+        {
+            return Core::Config::PreviewEngineConfig(
+                document,
+                Core::Config::EngineConfigParseOptions{
+                    .SourceId = sourceId,
+                });
+        };
+
+    std::uint32_t applyCalls = 0u;
+    context.ApplyEngineConfigHotSubset =
+        [&state, &applyCalls](
+            const Core::Config::EngineConfigLoadResult& preview)
+        {
+            ++applyCalls;
+            state.ActiveConfig = preview.Preview.Config;
+            return Runtime::RuntimeEngineConfigApplyResult{
+                .Status =
+                    Runtime::RuntimeEngineConfigApplyStatus::Applied,
+                .Source = Runtime::RuntimeConfigControlSource::Editor,
+                .LoadResult = preview,
+                .EngineConfigApplied = true,
+                .GpuProfilingChanged = true,
+            };
+        };
+
+    const Runtime::SandboxEditorGpuProfilingConfigResult applied =
+        Runtime::ApplySandboxEditorGpuProfilingConfigCommand(
+            context,
+            true);
+    ASSERT_TRUE(applied.Succeeded());
+    EXPECT_EQ(
+        applied.Status,
+        Runtime::SandboxEditorGpuProfilingConfigStatus::Applied);
+    EXPECT_EQ(applyCalls, 1u);
+    EXPECT_TRUE(state.ActiveConfig.Render.EnableGpuProfiling);
+    EXPECT_EQ(applied.Preview.SourceId,
+              "sandbox.frame_graph.gpu_profiling");
+
+    context.PreviewEngineConfigDocument =
+        [](const std::string&, const std::string& sourceId)
+        {
+            return Core::Config::EngineConfigLoadResult{
+                .State = Core::Config::EngineConfigState::Invalid,
+                .SourceId = sourceId,
+                .Diagnostics = {
+                    Core::Config::EngineConfigDiagnostic{
+                        .Code =
+                            Core::Config::EngineConfigDiagnosticCode::
+                                ParseError,
+                        .Subject = "render.enable_gpu_profiling",
+                        .Message = "Rejected test preview.",
+                    },
+                },
+            };
+        };
+    const Runtime::SandboxEditorGpuProfilingConfigResult previewRejected =
+        Runtime::ApplySandboxEditorGpuProfilingConfigCommand(
+            context,
+            false);
+    EXPECT_EQ(
+        previewRejected.Status,
+        Runtime::SandboxEditorGpuProfilingConfigStatus::PreviewRejected);
+    EXPECT_EQ(applyCalls, 1u);
+    EXPECT_TRUE(state.ActiveConfig.Render.EnableGpuProfiling);
+    ASSERT_EQ(previewRejected.Preview.Diagnostics.size(), 1u);
+
+    context.PreviewEngineConfigDocument =
+        [](const std::string& document, const std::string& sourceId)
+        {
+            return Core::Config::PreviewEngineConfig(
+                document,
+                Core::Config::EngineConfigParseOptions{
+                    .SourceId = sourceId,
+                });
+        };
+    context.ApplyEngineConfigHotSubset =
+        [&applyCalls](
+            const Core::Config::EngineConfigLoadResult& preview)
+        {
+            ++applyCalls;
+            return Runtime::RuntimeEngineConfigApplyResult{
+                .Status =
+                    Runtime::RuntimeEngineConfigApplyStatus::Rejected,
+                .Source = Runtime::RuntimeConfigControlSource::Editor,
+                .LoadResult = preview,
+            };
+        };
+    const Runtime::SandboxEditorGpuProfilingConfigResult rejected =
+        Runtime::ApplySandboxEditorGpuProfilingConfigCommand(
+            context,
+            false);
+    EXPECT_FALSE(rejected.Succeeded());
+    EXPECT_EQ(
+        rejected.Status,
+        Runtime::SandboxEditorGpuProfilingConfigStatus::ApplyRejected);
+    EXPECT_EQ(applyCalls, 2u);
+    EXPECT_TRUE(state.ActiveConfig.Render.EnableGpuProfiling);
+
+    context.EngineConfigCommandsAvailable = false;
+    const Runtime::SandboxEditorGpuProfilingConfigResult unavailable =
+        Runtime::ApplySandboxEditorGpuProfilingConfigCommand(
+            context,
+            false);
+    EXPECT_EQ(
+        unavailable.Status,
+        Runtime::SandboxEditorGpuProfilingConfigStatus::
+            MissingConfigFacade);
+    EXPECT_EQ(applyCalls, 2u);
+    const Runtime::SandboxEditorPanelFrame unavailableFrame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    EXPECT_FALSE(
+        unavailableFrame.RenderGraph.GpuProfilingToggleAvailable);
+    EXPECT_FALSE(
+        unavailableFrame.RenderGraph
+            .GpuProfilingToggleDisabledReason.empty());
+
+    state.HasLastApply = true;
+    state.LastApply = rejected.Apply;
+    state.LastApply.RejectedBootOnlyFields = {"window.width"};
+    context.EngineConfigCommandsAvailable = true;
+    const Runtime::SandboxEditorPanelFrame rejectedFrame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    EXPECT_TRUE(rejectedFrame.RenderGraph.GpuProfilingEnabled);
+    EXPECT_EQ(
+        rejectedFrame.RenderGraph.GpuProfilingControlStatusText,
+        "GPU profiling config hot-apply was rejected.");
+    ASSERT_EQ(
+        rejectedFrame.RenderGraph.GpuProfilingControlDiagnostics.size(),
+        1u);
+    EXPECT_EQ(
+        rejectedFrame.RenderGraph.GpuProfilingControlDiagnostics[0],
+        "Boot-only field rejected: window.width");
 }
 TEST(SandboxEditorUi, AssetImportQueueModelCopiesRowsProgressAndCommands)
 {

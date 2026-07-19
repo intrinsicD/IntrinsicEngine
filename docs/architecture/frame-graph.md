@@ -87,8 +87,8 @@ There are three current edit lanes over the same preview/apply contract:
   and fail-closed apply path to agents, CLI tools, tests, and application code
   after resolving the optional service through `Engine::Services()`.
 
-Runtime config control also exposes `render.default_recipe_config_path` and
-registered `app.sections` records (currently
+Runtime config control also exposes `render.default_recipe_config_path`,
+`render.enable_gpu_profiling`, and registered `app.sections` records (currently
 `sandbox.progressive_poisson` and `sandbox.parameterization`) through the
 separate engine-config lane.
 `Engine::Initialize()` attempts the configured boot recipe after renderer
@@ -129,6 +129,42 @@ reports per-frame compile attempt/cache-hit counters through
 `RenderGraphFrameStats::Compile`. The multi-KB compiler debug dump is lazy:
 default frames leave `RenderGraphFrameStats::DebugDump` empty, and explicit
 renderer debug-dump enablement builds it from the current compiled graph.
+
+## GPU Timestamp Diagnostics
+
+`render.enable_gpu_profiling` is a default-off hot control. Runtime samples the
+committed value exactly once after `UiEndCapture` into the immutable
+`RenderFrameInput`; renderer extraction copies it into `RenderWorld`. Boot,
+agent/CLI, and editor applies therefore use the same config lane, and omitting
+the editor does not remove programmatic control. A hot toggle changes only
+whether the existing device-owned profiler records that frame. It does not
+recreate profiler or render resources.
+
+When enabled, the renderer preplans bounded scope tokens for accepted compiled
+passes before worker fan-out. Each recorded interval brackets only the actual
+pass command callback on its accepted graphics or async-compute context.
+Compiler work, inter-pass barriers, queue waits, submit, present, and CPU
+executor time are outside the interval. Previously submitted queries resolve
+nonblocking only after the normal reused-slot completion proof; profiling adds
+no query wait, queue idle, or device idle.
+
+`RenderGraphFrameStats::GpuProfile` reports current status/source/diagnostic,
+fresh versus stale state, resolved submitted-frame key and slot, sample age,
+per-queue envelopes, and named pass rows. A queue envelope covers recorded
+profile work on that queue only. Unsynchronized queue clocks are not compared
+or summed into a global frame duration. The renderer retains the last resolved
+sample as explicitly stale while a newer frame is disabled, unsupported,
+priming, not ready, exhausted, invalid, or device-lost. Existing
+`Core::Telemetry` pass timing rows are populated only for a fresh recorded
+`NativeGpu` resolution and are cleared on every nonfresh path; Null and
+contract-only backends never synthesize native durations.
+
+The existing Sandbox `view.frame_graph` model/window copies this snapshot and
+shows status, provenance, resolved key/slot/age, queue envelopes, and pass
+rows. These timestamps are diagnostic measurements, not calibrated wall-clock
+frame time or comparative performance evidence. Timestamp reset/write/query
+work can perturb the command stream, so this capability makes no performance
+or overhead claim.
 
 ## Retained UV View Pass
 

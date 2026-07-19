@@ -18,6 +18,9 @@ namespace Extrinsic::Core::Config
         bool EnablePromotedVulkanDevice{false};
         bool EnableValidation{true};
         bool EnableVSync{true};
+        // Runtime samples this hot-applied control once per frame after editor
+        // UI capture and copies it into the immutable RenderFrameInput.
+        bool EnableGpuProfiling{false};
         std::uint32_t FramesInFlight{2};
         std::string DefaultRecipeConfigPath{"config/render-recipe.json"};
         // GRAPHICS-036 decision 6 — when true (the default) the runtime drives a

@@ -60,6 +60,8 @@ import Extrinsic.Graphics.UvView;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.Profiler;
+import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
@@ -10357,10 +10359,154 @@ namespace Extrinsic::Runtime
             return "Unknown";
         }
 
+        [[nodiscard]] const char* GpuProfileStatusName(
+            const Graphics::RenderGraphGpuProfileStatus status) noexcept
+        {
+            switch (status)
+            {
+            case Graphics::RenderGraphGpuProfileStatus::Disabled:
+                return "Disabled";
+            case Graphics::RenderGraphGpuProfileStatus::Unavailable:
+                return "Unavailable";
+            case Graphics::RenderGraphGpuProfileStatus::Unsupported:
+                return "Unsupported";
+            case Graphics::RenderGraphGpuProfileStatus::Recording:
+                return "Recording";
+            case Graphics::RenderGraphGpuProfileStatus::Submitted:
+                return "Submitted";
+            case Graphics::RenderGraphGpuProfileStatus::NotReady:
+                return "NotReady";
+            case Graphics::RenderGraphGpuProfileStatus::Resolved:
+                return "Resolved";
+            case Graphics::RenderGraphGpuProfileStatus::Exhausted:
+                return "Exhausted";
+            case Graphics::RenderGraphGpuProfileStatus::InvalidLifecycle:
+                return "InvalidLifecycle";
+            case Graphics::RenderGraphGpuProfileStatus::DeviceLost:
+                return "DeviceLost";
+            }
+            return "Unknown";
+        }
+
+        [[nodiscard]] const char* GpuTimestampSourceName(
+            const RHI::GpuTimestampSource source) noexcept
+        {
+            switch (source)
+            {
+            case RHI::GpuTimestampSource::Unavailable:
+                return "Unavailable";
+            case RHI::GpuTimestampSource::ContractOnly:
+                return "ContractOnly";
+            case RHI::GpuTimestampSource::NativeGpu:
+                return "NativeGpu";
+            }
+            return "Unknown";
+        }
+
+        [[nodiscard]] SandboxEditorGpuProfileModel BuildGpuProfileModel(
+            const Graphics::RenderGraphGpuProfileStats& stats)
+        {
+            SandboxEditorGpuProfileModel model{
+                .Status = GpuProfileStatusName(stats.Status),
+                .Source = GpuTimestampSourceName(stats.Source),
+                .Diagnostic = stats.Diagnostic,
+                .Fresh = stats.Fresh,
+                .Stale = stats.Stale,
+                .HasResolvedFrame = stats.HasResolvedFrame,
+                .ResolvedSubmittedFrameNumber =
+                    stats.ResolvedSubmittedFrameNumber,
+                .ResolvedFrameSlot = stats.ResolvedFrameSlot,
+                .SampleAgeFrames = stats.SampleAgeFrames,
+            };
+            model.QueueEnvelopes.reserve(stats.QueueEnvelopes.size());
+            for (const Graphics::RenderGraphGpuProfileQueueStats& queue :
+                 stats.QueueEnvelopes)
+            {
+                model.QueueEnvelopes.push_back(
+                    SandboxEditorGpuProfileQueueModel{
+                        .Queue = RHI::QueueAffinityName(queue.Queue),
+                        .Source = GpuTimestampSourceName(queue.Source),
+                        .DurationNs = queue.DurationNs,
+                    });
+            }
+            model.Passes.reserve(stats.Passes.size());
+            for (const Graphics::RenderGraphGpuProfilePassStats& pass :
+                 stats.Passes)
+            {
+                model.Passes.push_back(
+                    SandboxEditorGpuProfilePassModel{
+                        .Name = pass.Name,
+                        .HasTypedId = pass.Id.IsValid(),
+                        .TypedId = pass.Id.Value,
+                        .Queue = RHI::QueueAffinityName(pass.Queue),
+                        .CommandStatus =
+                            RenderCommandStatusName(pass.CommandStatus),
+                        .Source = GpuTimestampSourceName(pass.Source),
+                        .DurationNs = pass.DurationNs,
+                    });
+            }
+            return model;
+        }
+
         [[nodiscard]] SandboxEditorRenderGraphModel BuildRenderGraphModel(
             const SandboxEditorContext& context)
         {
             SandboxEditorRenderGraphModel model{};
+            model.GpuProfilingToggleAvailable =
+                context.EngineConfigCommandsAvailable &&
+                context.EngineConfigControlState != nullptr &&
+                context.PreviewEngineConfigDocument &&
+                context.ApplyEngineConfigHotSubset;
+            if (context.EngineConfigControlState != nullptr)
+            {
+                const RuntimeEngineConfigControlState& controlState =
+                    *context.EngineConfigControlState;
+                model.GpuProfilingEnabled =
+                    controlState.ActiveConfig.Render.EnableGpuProfiling;
+                if (controlState.HasLastApply &&
+                    controlState.LastApply.LoadResult.SourceId ==
+                        "sandbox.frame_graph.gpu_profiling")
+                {
+                    switch (controlState.LastApply.Status)
+                    {
+                    case RuntimeEngineConfigApplyStatus::Applied:
+                        model.GpuProfilingControlStatusText =
+                            "GPU profiling config applied.";
+                        break;
+                    case RuntimeEngineConfigApplyStatus::NoChange:
+                        model.GpuProfilingControlStatusText =
+                            "GPU profiling config unchanged.";
+                        break;
+                    case RuntimeEngineConfigApplyStatus::Rejected:
+                        model.GpuProfilingControlStatusText =
+                            "GPU profiling config hot-apply was rejected.";
+                        break;
+                    case RuntimeEngineConfigApplyStatus::None:
+                        break;
+                    }
+                    for (const Core::Config::EngineConfigDiagnostic&
+                             diagnostic :
+                         controlState.LastApply.LoadResult.Diagnostics)
+                    {
+                        model.GpuProfilingControlDiagnostics.push_back(
+                            diagnostic.Subject.empty()
+                                ? diagnostic.Message
+                                : diagnostic.Subject + ": " +
+                                    diagnostic.Message);
+                    }
+                    for (const std::string& field :
+                         controlState.LastApply.RejectedBootOnlyFields)
+                    {
+                        model.GpuProfilingControlDiagnostics.push_back(
+                            "Boot-only field rejected: " + field);
+                    }
+                }
+            }
+            if (!model.GpuProfilingToggleAvailable)
+            {
+                model.GpuProfilingToggleDisabledReason =
+                    "Engine config-control preview/apply commands are unavailable.";
+            }
             if (context.RenderGraphStats == nullptr)
             {
                 model.StatusText =
@@ -10405,6 +10551,7 @@ namespace Extrinsic::Runtime
             model.Diagnostic = stats.Diagnostic;
             model.LifecycleDiagnostic = stats.LifecycleDiagnostic;
             model.DebugDump = stats.DebugDump;
+            model.GpuProfile = BuildGpuProfileModel(stats.GpuProfile);
             model.StatusText = model.CompileSucceeded
                 ? "Frame graph compile succeeded."
                 : "Frame graph compile has not succeeded yet.";
@@ -12390,6 +12537,65 @@ namespace Extrinsic::Runtime
             return "Point-to-plane";
         }
         return "Unknown";
+    }
+
+    SandboxEditorGpuProfilingConfigResult
+    ApplySandboxEditorGpuProfilingConfigCommand(
+        const SandboxEditorContext& context,
+        const bool enabled,
+        std::string sourceId)
+    {
+        SandboxEditorGpuProfilingConfigResult result{};
+        if (context.EngineConfigControlState == nullptr ||
+            !context.PreviewEngineConfigDocument ||
+            !context.ApplyEngineConfigHotSubset ||
+            !context.EngineConfigCommandsAvailable)
+        {
+            result.Status =
+                SandboxEditorGpuProfilingConfigStatus::MissingConfigFacade;
+            result.Message =
+                "GPU profiling config requires the engine config-control facade.";
+            return result;
+        }
+
+        Core::Config::EngineConfig candidate =
+            context.EngineConfigControlState->ActiveConfig;
+        candidate.Render.EnableGpuProfiling = enabled;
+        if (sourceId.empty())
+        {
+            sourceId = "sandbox.frame_graph.gpu_profiling";
+        }
+        result.Preview = context.PreviewEngineConfigDocument(
+            Core::Config::SerializeEngineConfig(candidate),
+            sourceId);
+        if (!Core::Config::IsConfigUsable(result.Preview))
+        {
+            result.Status =
+                SandboxEditorGpuProfilingConfigStatus::PreviewRejected;
+            result.Message =
+                "GPU profiling config preview was rejected.";
+            return result;
+        }
+
+        result.Apply = context.ApplyEngineConfigHotSubset(result.Preview);
+        if (!result.Apply.Succeeded())
+        {
+            result.Status =
+                SandboxEditorGpuProfilingConfigStatus::ApplyRejected;
+            result.Message =
+                "GPU profiling config hot-apply was rejected.";
+            return result;
+        }
+
+        result.Status =
+            result.Apply.Status == RuntimeEngineConfigApplyStatus::NoChange
+                ? SandboxEditorGpuProfilingConfigStatus::NoChange
+                : SandboxEditorGpuProfilingConfigStatus::Applied;
+        result.Message =
+            result.Status == SandboxEditorGpuProfilingConfigStatus::NoChange
+                ? "GPU profiling config unchanged."
+                : "GPU profiling config applied.";
+        return result;
     }
 
     SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(

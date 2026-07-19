@@ -1724,9 +1724,72 @@ export namespace Extrinsic::Runtime
         std::string Status{};
     };
 
+    struct SandboxEditorGpuProfileQueueModel
+    {
+        std::string Queue{};
+        std::string Source{};
+        std::optional<std::uint64_t> DurationNs{};
+    };
+
+    struct SandboxEditorGpuProfilePassModel
+    {
+        std::string Name{};
+        bool HasTypedId{false};
+        std::uint32_t TypedId{0u};
+        std::string Queue{};
+        std::string CommandStatus{};
+        std::string Source{};
+        std::optional<std::uint64_t> DurationNs{};
+    };
+
+    struct SandboxEditorGpuProfileModel
+    {
+        std::string Status{};
+        std::string Source{};
+        std::string Diagnostic{};
+        bool Fresh{false};
+        bool Stale{false};
+        bool HasResolvedFrame{false};
+        std::uint64_t ResolvedSubmittedFrameNumber{0u};
+        std::uint32_t ResolvedFrameSlot{0u};
+        std::uint64_t SampleAgeFrames{0u};
+        std::vector<SandboxEditorGpuProfileQueueModel> QueueEnvelopes{};
+        std::vector<SandboxEditorGpuProfilePassModel> Passes{};
+    };
+
+    enum class SandboxEditorGpuProfilingConfigStatus : std::uint8_t
+    {
+        None = 0,
+        Applied,
+        NoChange,
+        MissingConfigFacade,
+        PreviewRejected,
+        ApplyRejected,
+    };
+
+    struct SandboxEditorGpuProfilingConfigResult
+    {
+        SandboxEditorGpuProfilingConfigStatus Status{
+            SandboxEditorGpuProfilingConfigStatus::None};
+        Core::Config::EngineConfigLoadResult Preview{};
+        RuntimeEngineConfigApplyResult Apply{};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorGpuProfilingConfigStatus::Applied ||
+                Status == SandboxEditorGpuProfilingConfigStatus::NoChange;
+        }
+    };
+
     struct SandboxEditorRenderGraphModel
     {
         bool Enabled{false};
+        bool GpuProfilingEnabled{false};
+        bool GpuProfilingToggleAvailable{false};
+        std::string GpuProfilingToggleDisabledReason{};
+        std::string GpuProfilingControlStatusText{};
+        std::vector<std::string> GpuProfilingControlDiagnostics{};
         bool CompileSucceeded{false};
         bool ExecuteSucceeded{false};
         bool DeviceOperational{false};
@@ -1751,6 +1814,7 @@ export namespace Extrinsic::Runtime
         std::string Diagnostic{};
         std::string LifecycleDiagnostic{};
         std::string DebugDump{};
+        SandboxEditorGpuProfileModel GpuProfile{};
         std::vector<SandboxEditorRenderGraphPassModel> CommandPasses{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
@@ -2906,6 +2970,12 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(
         const SandboxEditorContext& context,
         const SandboxEditorModelBuildRequest& request);
+
+    [[nodiscard]] SandboxEditorGpuProfilingConfigResult
+    ApplySandboxEditorGpuProfilingConfigCommand(
+        const SandboxEditorContext& context,
+        bool enabled,
+        std::string sourceId = "sandbox.frame_graph.gpu_profiling");
 
     [[nodiscard]] SandboxEditorDomainWindowModel BuildSandboxEditorDomainWindowModel(
         const SandboxEditorContext& context,
