@@ -59,7 +59,8 @@ maturity_target: CPUContracted
 - [ ] All correctness tests pass in the default CPU gate, including torus, hollow-shell, thin-plate, and open-surface fail-closed cases.
 - [ ] Oriented-correct fraction meets documented bounds on clean fixtures and is ≥ the MST baseline on torus and thin plate (or the delta is documented with analysis).
 - [ ] Benchmark smoke manifest validates and runs with quality metrics.
-- [ ] `method.yaml` validates; public API exposes only `std`/`glm`/scalar types.
+- [ ] `method.yaml` validates.
+- [ ] Public API type discipline: the exported surface uses only `std`/`glm`/scalar types plus the engine's own point-cloud types — the `Cloud&` overload is explicitly in-contract (it captures any vertex `PropertySet`, matching the `Geometry.PointCloud.Normals` span + `Cloud&` house pattern), and vertex-`Property` handles may appear in results; no third-party types and no method-internal types (Morton lattice, union–find state) are exported.
 
 ## Verification
 ```bash
