@@ -563,6 +563,7 @@ namespace Extrinsic::Tests
         RHI::TextureHandle BackbufferHandle{100u, 1u};
         RHI::Format BackbufferFormat = RHI::Format::RGBA8_UNORM;
         std::uint64_t GlobalFrameNumber = 0;
+        bool AdvanceGlobalFrameOnEndFrame = true;
         // Default mirrors a typical double-buffered swapchain (matches the
         // RHI's historical fixed value); tests that need to exercise
         // frame-count-dependent allocations (e.g. picking readback buffer
@@ -620,6 +621,7 @@ namespace Extrinsic::Tests
         MockCommandContext TransferContext;
         std::vector<MockCommandContext> ParallelCommandContexts;
         MockTransferQueue  TransferQueue;
+        RHI::IProfiler* Profiler = nullptr;
 
         // ---- IDevice -------------------------------------------------------
         [[nodiscard]] bool IsOperational() const noexcept override { return Operational; }
@@ -642,7 +644,10 @@ namespace Extrinsic::Tests
         void EndFrame(const RHI::FrameHandle&) override
         {
             ++EndFrameCount;
-            ++GlobalFrameNumber;
+            if (AdvanceGlobalFrameOnEndFrame)
+            {
+                ++GlobalFrameNumber;
+            }
         }
         void Present(const RHI::FrameHandle&) override { ++PresentCount; }
         void Resize(std::uint32_t, std::uint32_t) override { ++ResizeCount; }
@@ -924,7 +929,7 @@ namespace Extrinsic::Tests
         void DestroyPipeline(RHI::PipelineHandle) override { ++DestroyPipelineCount; }
 
         RHI::IBindlessHeap& GetBindlessHeap() override { return Bindless; }
-        RHI::IProfiler* GetProfiler() override { return nullptr; }
+        RHI::IProfiler* GetProfiler() override { return Profiler; }
 
         [[nodiscard]] std::uint32_t GetFramesInFlight()    const override { return FramesInFlight; }
         [[nodiscard]] std::uint64_t GetGlobalFrameNumber() const override { return GlobalFrameNumber; }
