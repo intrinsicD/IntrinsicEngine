@@ -89,11 +89,13 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
+import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxConfigSections;
 import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Sandbox.ConfigSections;
 import Extrinsic.Sandbox.Editor.MethodPanels;
 import Extrinsic.Sandbox.Editor.Shell;
@@ -183,21 +185,55 @@ private:
     std::uint32_t m_Frames{0u};
 };
 
-class SandboxDefaultPolicyApp final : public IApplication
+// Test-only wrapper that mirrors the application-owned initialization order in
+// `Extrinsic.Sandbox.App`: reference bootstrap/seed, default policies, then
+// the caller-specific inner application. Keeping that order is load-bearing
+// for inner applications that select or edit ReferenceTriangle in
+// `OnInitialize`.
+class SandboxCompositionApp final : public IApplication
 {
 public:
-    explicit SandboxDefaultPolicyApp(std::unique_ptr<IApplication> inner) noexcept
+    explicit SandboxCompositionApp(std::unique_ptr<IApplication> inner) noexcept
         : m_Inner(std::move(inner))
     {
     }
 
     void OnInitialize(Engine& engine) override
     {
+        m_CameraControllers =
+            engine.Services().Find<
+                Extrinsic::Runtime::CameraControllerRegistry>();
+        const auto& referenceConfig =
+            engine.GetEngineConfig().ReferenceScene;
+        if (referenceConfig.Enabled &&
+            !m_ReferenceBootstrap.has_value())
+        {
+            const Extrinsic::Runtime::WorldHandle world =
+                engine.ActiveWorld();
+            if (Registry* scene = engine.Worlds().Get(world);
+                scene != nullptr)
+            {
+                Extrinsic::Runtime::ReferenceScenePopulation population =
+                    Extrinsic::Runtime::BootstrapReferenceScene(
+                        referenceConfig.Selector,
+                        *scene);
+                if (m_CameraControllers != nullptr)
+                {
+                    (void)m_CameraControllers->SetWorldSeed(
+                        world,
+                        population.Camera);
+                }
+                m_ReferenceBootstrap = ReferenceBootstrap{
+                    .World = world,
+                    .Population = std::move(population),
+                };
+            }
+        }
+
         m_DefaultPolicies =
             Extrinsic::Runtime::RegisterSandboxDefaultRuntimePolicies(
                 engine,
-                engine.Services().Find<
-                    Extrinsic::Runtime::CameraControllerRegistry>());
+                m_CameraControllers);
         if (m_Inner)
         {
             m_Inner->OnInitialize(engine);
@@ -229,11 +265,33 @@ public:
         Extrinsic::Runtime::UnregisterSandboxDefaultRuntimePolicies(
             engine,
             m_DefaultPolicies);
+        if (m_ReferenceBootstrap.has_value())
+        {
+            if (Registry* scene =
+                    engine.Worlds().Get(
+                        m_ReferenceBootstrap->World);
+                scene != nullptr)
+            {
+                Extrinsic::Runtime::TeardownReferenceScene(
+                    *scene,
+                    m_ReferenceBootstrap->Population);
+            }
+            m_ReferenceBootstrap.reset();
+        }
+        m_CameraControllers = nullptr;
     }
 
 private:
+    struct ReferenceBootstrap
+    {
+        Extrinsic::Runtime::WorldHandle World{};
+        Extrinsic::Runtime::ReferenceScenePopulation Population{};
+    };
+
     std::unique_ptr<IApplication> m_Inner{};
     Extrinsic::Runtime::RuntimeSandboxDefaultPolicyRegistration m_DefaultPolicies{};
+    Extrinsic::Runtime::CameraControllerRegistry* m_CameraControllers{nullptr};
+    std::optional<ReferenceBootstrap> m_ReferenceBootstrap{};
 };
 
 Counters::Snapshot ToCounterSnapshot(
@@ -785,7 +843,7 @@ struct AcceptanceBootstrap
             configControl->SectionRegistry());
     auto enginePtr = std::make_unique<Engine>(
         config,
-        std::make_unique<SandboxDefaultPolicyApp>(std::move(app)));
+        std::make_unique<SandboxCompositionApp>(std::move(app)));
     enginePtr->AddModule(std::move(configControl));
     enginePtr->EmplaceModule<Extrinsic::Runtime::AsyncWorkModule>();
     enginePtr->EmplaceModule<Extrinsic::Runtime::CameraModule>();
