@@ -210,10 +210,8 @@ triggers. The implementation graph is:
   representation-only PImpl plus exact Engine import/getter/type/re-export
   checker ratchet.
 
-Active
-[`GRAPHICS-127`](../../active/GRAPHICS-127-native-gpu-timestamp-profiler.md)
-follows retired `RUNTIME-181`/`RUNTIME-182` so its profiling config and Frame
-Graph UI use the settled owners.
+Retired `GRAPHICS-127` followed `RUNTIME-181`/`RUNTIME-182`, so its profiling
+config and Frame Graph UI use the settled owners.
 Retired `RUNTIME-177` added no generic debug-draw producer seam because its
 consumer inventory was empty; existing spatial-debug and transform-gizmo
 paths remain typed. `RUNTIME-129` and `RUNTIME-184` may proceed independently

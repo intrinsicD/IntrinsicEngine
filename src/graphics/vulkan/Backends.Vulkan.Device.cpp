@@ -65,6 +65,8 @@ namespace
     std::atomic<std::uint64_t> g_SuccessfulPipelineCreations{0};
 
     constexpr const char* kValidationLayerName = "VK_LAYER_KHRONOS_validation";
+    constexpr std::uint32_t kEngineRequestedVulkanApiVersion =
+        VK_API_VERSION_1_3;
 
     [[nodiscard]] std::uint64_t ElapsedMicros(
         const std::chrono::steady_clock::time_point start) noexcept
@@ -851,6 +853,25 @@ VulkanOperationalInputs GetVulkanDeviceOperationalInputs(
     return vulkanDevice.BuildOperationalInputs();
 }
 
+bool IsVulkanProfilerCommandContextOwned(
+    const RHI::IDevice* device,
+    const RHI::ICommandContext* context) noexcept
+{
+    if (device == nullptr || context == nullptr)
+    {
+        return false;
+    }
+    auto& vulkanDevice =
+        const_cast<VulkanDevice&>(
+            static_cast<const VulkanDevice&>(*device));
+    auto& borrowedContext =
+        const_cast<RHI::ICommandContext&>(*context);
+    return VulkanDevice::ResolveProfilerCommandContext(
+               vulkanDevice,
+               borrowedContext)
+        .Owned;
+}
+
 VulkanBootstrapDiagnosticsSnapshot GetVulkanBootstrapDiagnosticsSnapshot() noexcept
 {
     std::scoped_lock lock{g_BootstrapDiagnosticsMutex};
@@ -1073,6 +1094,10 @@ void VulkanDevice::NoteDeviceLostIfNeeded(const VkResult result) noexcept
     if (result == VK_ERROR_DEVICE_LOST)
     {
         m_DeviceLost = true;
+        if (m_Profiler)
+        {
+            m_Profiler->NotifyDeviceLost();
+        }
         // GRAPHICS-033B: record the operational→non-operational drop exactly
         // once per transition; a stuck-lost device should not keep bumping
         // the counter on every subsequent VK_ERROR_DEVICE_LOST observation.
@@ -1456,7 +1481,7 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
     appInfo.applicationVersion = VK_MAKE_VERSION(0, 1, 0);
     appInfo.pEngineName = "IntrinsicEngine";
     appInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_3;
+    appInfo.apiVersion = kEngineRequestedVulkanApiVersion;
 
     const char* enabledLayer = kValidationLayerName;
     VkInstanceCreateInfo instanceInfo{};
@@ -2204,6 +2229,28 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
         }
         serviceDiagnostics.CommandContextsRebound =
             serviceDiagnostics.CommandContextRebindCount == kMaxFramesInFlight;
+
+        // Device-lifetime diagnostic resource. Query-pool creation is
+        // intentionally outside the Vulkan operational predicate: unsupported
+        // timestamps or allocation failure degrade only profiler status.
+        m_Profiler = std::make_unique<VulkanProfiler>(
+            VulkanProfilerCreateInfo{
+                .Device = m_Device,
+                .PhysicalDevice = m_PhysDevice,
+                .FramesInFlight = kMaxFramesInFlight,
+                .GraphicsQueueFamily = m_GraphicsFamily,
+                .AsyncComputeQueueAvailable =
+                    m_AsyncComputeQueue != VK_NULL_HANDLE,
+                .AsyncComputeQueueFamily = m_AsyncComputeFamily,
+                .EngineRequestedApiVersion =
+                    kEngineRequestedVulkanApiVersion,
+                .Owner = this,
+                .ResolveContext =
+                    &VulkanDevice::ResolveProfilerCommandContext,
+                .NotifyDeviceLost =
+                    &VulkanDevice::NotifyProfilerDeviceLost,
+            });
+
         RefreshOperationalState();
         serviceDiagnostics.LiveOperationalPrerequisitesReady = HasLiveOperationalPrerequisites();
         // GRAPHICS-033F/RUNTIME-095: expose public services after raw Vulkan
@@ -2249,6 +2296,8 @@ void VulkanDevice::Shutdown()
         FlushDeletionQueue(frameSlot);
 
     m_TransferQueue.reset();
+    // WaitIdle above is the device-lifetime completion proof. Destroy the
+    // fixed profiler query pool before any command pools or VkDevice teardown.
     m_Profiler.reset();
     m_BindlessHeap.reset();
 
@@ -2561,6 +2610,43 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
             snapshot.LastAcquireNextImageMicros = 0;
         });
         Core::Log::Error("[VulkanDevice::BeginFrame] vkWaitForFences failed; guarded Vulkan frame acquire skipped");
+        return false;
+    }
+
+    // This slot is now complete across every queue accepted for the prior
+    // frame. Retire profiler results before any command context can reset and
+    // reuse the slot's fixed query range.
+    if (m_Profiler)
+    {
+        m_Profiler->NotifyFrameSlotComplete(m_FrameSlot);
+    }
+    if (!ShouldContinueVulkanFrameAfterProfilerRetirement(m_DeviceLost))
+    {
+        MutateFrameLifecycleDiagnostics(
+            [this, beginFrameBegin, fenceWaitMicros](
+                VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+            {
+                snapshot.BeginStatus =
+                    VulkanFrameBeginStatus::FailedAcquire;
+                snapshot.LastVkResult =
+                    static_cast<std::int32_t>(VK_ERROR_DEVICE_LOST);
+                snapshot.LastFrameIndex = m_FrameSlot;
+                snapshot.LastSwapchainImageIndex = 0u;
+                snapshot.DeviceOperational = m_Operational;
+                snapshot.SwapchainAvailable =
+                    m_Swapchain != VK_NULL_HANDLE;
+                snapshot.SwapchainImagesAvailable =
+                    !m_SwapchainHandles.empty();
+                snapshot.DeviceLost = true;
+                snapshot.ResizePending = m_HasPendingResize;
+                snapshot.LastBeginFrameMicros =
+                    ElapsedMicros(beginFrameBegin);
+                snapshot.LastFenceWaitMicros = fenceWaitMicros;
+                snapshot.LastAcquireNextImageMicros = 0u;
+            });
+        Core::Log::Error(
+            "[VulkanDevice::BeginFrame] profiler slot retirement observed "
+            "device loss; returning before slot reuse.");
         return false;
     }
 
@@ -3428,6 +3514,95 @@ RHI::TextureHandle VulkanDevice::GetBackbufferHandle(const RHI::FrameHandle& fra
 RHI::ICommandContext& VulkanDevice::GetGraphicsContext(uint32_t frameIndex)
 {
     return m_CmdContexts[frameIndex % kMaxFramesInFlight];
+}
+
+VulkanProfilerCommandContextView
+VulkanDevice::ResolveProfilerCommandContext(
+    VulkanDevice& device,
+    RHI::ICommandContext& context) noexcept
+{
+    const auto resolvedView =
+        [&context](
+            VulkanCommandContext& candidate,
+            const RHI::QueueAffinity queue,
+            const bool primary) noexcept
+        {
+            if (static_cast<RHI::ICommandContext*>(&candidate) != &context)
+            {
+                return VulkanProfilerCommandContextView{};
+            }
+            return VulkanProfilerCommandContextView{
+                .CommandBuffer = candidate.GetProfilerCommandBuffer(),
+                .Queue = queue,
+                .Owned = true,
+                .Recording = candidate.IsRecordingForProfiler(),
+                .Primary = primary,
+            };
+        };
+
+    for (VulkanCommandContext& candidate : device.m_CmdContexts)
+    {
+        VulkanProfilerCommandContextView view = resolvedView(
+            candidate,
+            RHI::QueueAffinity::Graphics,
+            true);
+        if (view.Owned)
+        {
+            return view;
+        }
+    }
+
+    // Frame planning materializes both vectors completely before command
+    // recording fan-out. From worker dispatch through join, no context
+    // acquisition or vector growth is permitted, so these address scans are
+    // immutable and lock-free.
+    for (std::uint32_t frameSlot = 0u;
+         frameSlot < kMaxFramesInFlight;
+         ++frameSlot)
+    {
+        std::vector<VulkanCommandContext>& contexts =
+            device.m_QueueSubmitContexts[frameSlot];
+        const std::vector<PendingQueueSubmitBatch>& batches =
+            device.m_QueueSubmitBatches[frameSlot];
+        const std::size_t count = std::min(contexts.size(), batches.size());
+        for (std::size_t index = 0u; index < count; ++index)
+        {
+            VulkanProfilerCommandContextView view = resolvedView(
+                contexts[index],
+                batches[index].Queue,
+                true);
+            if (view.Owned)
+            {
+                return view;
+            }
+        }
+
+        std::vector<VulkanCommandContext>& parallelContexts =
+            device.m_ParallelCommandContexts[frameSlot];
+        const std::vector<PendingParallelCommandContext>&
+            parallelBuffers =
+                device.m_ParallelCommandBuffers[frameSlot];
+        const std::size_t parallelCount =
+            std::min(parallelContexts.size(), parallelBuffers.size());
+        for (std::size_t index = 0u; index < parallelCount; ++index)
+        {
+            VulkanProfilerCommandContextView view = resolvedView(
+                parallelContexts[index],
+                parallelBuffers[index].Queue,
+                false);
+            if (view.Owned)
+            {
+                return view;
+            }
+        }
+    }
+    return {};
+}
+
+void VulkanDevice::NotifyProfilerDeviceLost(
+    VulkanDevice& device) noexcept
+{
+    device.NoteDeviceLostIfNeeded(VK_ERROR_DEVICE_LOST);
 }
 
 RHI::QueueCapabilityProfile VulkanDevice::GetQueueCapabilityProfile() const noexcept

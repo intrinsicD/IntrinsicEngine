@@ -1453,6 +1453,8 @@ namespace Extrinsic::Runtime
         frameContext.RenderInput = Graphics::RenderFrameInput{
             .Alpha    = alpha,
             .Viewport = viewport,
+            .EnableGpuProfiling =
+                m_Config.Render.EnableGpuProfiling,
         };
         Graphics::RenderFrameInput& renderInput = frameContext.RenderInput;
 

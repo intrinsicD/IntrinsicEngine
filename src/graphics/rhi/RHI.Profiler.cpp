@@ -84,7 +84,8 @@ namespace Extrinsic::RHI
     ResolveTimestampDurationNs(const TimestampQueryValue begin,
                                const TimestampQueryValue end,
                                const std::uint32_t validBits,
-                               const double timestampPeriodNs) noexcept
+                               const double timestampPeriodNs,
+                               const std::uint64_t intervalUpperBoundNs) noexcept
     {
         if (!begin.Available || !end.Available)
         {
@@ -100,6 +101,19 @@ namespace Extrinsic::RHI
         if (!ticks)
         {
             return std::unexpected(ticks.error());
+        }
+
+        const long double counterPeriodNs =
+            std::ldexp(1.0L, static_cast<int>(validBits)) *
+            static_cast<long double>(timestampPeriodNs);
+        if (!std::isfinite(counterPeriodNs) ||
+            static_cast<long double>(intervalUpperBoundNs) >=
+                counterPeriodNs)
+        {
+            // The modular tick delta cannot distinguish one wrap from two or
+            // more. The host-clock envelope is only an ambiguity guard; it is
+            // never substituted for the native GPU duration.
+            return std::unexpected(ProfilerError::Overflow);
         }
 
         const long double durationNs =

@@ -21,6 +21,8 @@ import Extrinsic.RHI.PipelineManager;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.FrameHandle;
+import Extrinsic.RHI.Profiler;
+import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.Graphics.GpuWorld;
 export import Extrinsic.Graphics.UvView;
 import Extrinsic.Graphics.MaterialSystem;
@@ -211,12 +213,64 @@ namespace Extrinsic::Graphics
         std::vector<FrameRecipeOverrideDiagnostic> Diagnostics{};
     };
 
+    export enum class RenderGraphGpuProfileStatus : std::uint8_t
+    {
+        Disabled = 0,
+        Unavailable,
+        Unsupported,
+        Recording,
+        Submitted,
+        NotReady,
+        Resolved,
+        Exhausted,
+        InvalidLifecycle,
+        DeviceLost,
+    };
+
+    export struct RenderGraphGpuProfileQueueStats
+    {
+        RHI::QueueAffinity Queue{RHI::QueueAffinity::Graphics};
+        RHI::GpuTimestampSource Source{
+            RHI::GpuTimestampSource::Unavailable};
+        std::optional<std::uint64_t> DurationNs{};
+    };
+
+    export struct RenderGraphGpuProfilePassStats
+    {
+        std::string Name{};
+        FramePassId Id{};
+        RHI::QueueAffinity Queue{RHI::QueueAffinity::Graphics};
+        RenderCommandPassStatus CommandStatus{
+            RenderCommandPassStatus::SkippedUnavailable};
+        RHI::GpuTimestampSource Source{
+            RHI::GpuTimestampSource::Unavailable};
+        std::optional<std::uint64_t> DurationNs{};
+    };
+
+    export struct RenderGraphGpuProfileStats
+    {
+        RenderGraphGpuProfileStatus Status{
+            RenderGraphGpuProfileStatus::Disabled};
+        RHI::GpuTimestampSource Source{
+            RHI::GpuTimestampSource::Unavailable};
+        std::string Diagnostic{};
+        bool Fresh{false};
+        bool Stale{false};
+        bool HasResolvedFrame{false};
+        std::uint64_t ResolvedSubmittedFrameNumber{0u};
+        std::uint32_t ResolvedFrameSlot{0u};
+        std::uint64_t SampleAgeFrames{0u};
+        std::vector<RenderGraphGpuProfileQueueStats> QueueEnvelopes{};
+        std::vector<RenderGraphGpuProfilePassStats> Passes{};
+    };
+
     export struct RenderGraphFrameStats
     {
         RenderGraphCompileStats Compile{};
         RenderGraphExecuteStats Execute{};
         RenderGraphCommandRecordStats CommandRecords{};
         RenderGraphContractIntegrationStats Contract{};
+        RenderGraphGpuProfileStats GpuProfile{};
         std::string DebugDump{};
         std::string Diagnostic{};
         std::string LifecycleDiagnostic{};

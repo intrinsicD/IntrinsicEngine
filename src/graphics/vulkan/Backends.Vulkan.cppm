@@ -9,6 +9,8 @@ module;
 export module Extrinsic.Backends.Vulkan;
 
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.QueueAffinity;
 
 // GRAPHICS-033C cleanup: the operational-status types are owned by the
@@ -94,6 +96,77 @@ namespace Extrinsic::Backends::Vulkan
             .Present = presentFamily,
         };
     }
+
+    // Backend-local, Vulkan-handle-free profiler bootstrap policy. The
+    // decision is shared by device initialization and CPU contract tests so a
+    // query-pool failure can be proven non-fatal without a live Vulkan device.
+    export struct VulkanProfilerBootstrapInputs
+    {
+        double TimestampPeriodNs = 0.0;
+        std::uint32_t GraphicsTimestampValidBits = 0u;
+        bool AsyncComputeQueueAvailable = false;
+        std::uint32_t AsyncComputeTimestampValidBits = 0u;
+        std::uint32_t FramesInFlight = 0u;
+        bool QueryPoolCreationSucceeded = true;
+        bool QueryPoolCreationDeviceLost = false;
+    };
+
+    export struct VulkanProfilerBootstrapDecision
+    {
+        RHI::ProfilerBackendStatus Status =
+            RHI::ProfilerBackendStatus::Unsupported;
+        bool GraphicsTimestampsSupported = false;
+        bool AsyncComputeTimestampsSupported = false;
+        bool QueryPoolRequired = false;
+        std::uint32_t TotalQueryCount = 0u;
+        // Native profiling is diagnostic instrumentation. Ordinary
+        // unsupported/allocation outcomes do not participate in VulkanDevice
+        // promotion; VK_ERROR_DEVICE_LOST is the fail-closed exception.
+        bool DeviceInitializationMayContinue = true;
+    };
+
+    export [[nodiscard]] VulkanProfilerBootstrapDecision
+    EvaluateVulkanProfilerBootstrap(
+        VulkanProfilerBootstrapInputs inputs) noexcept;
+
+    export struct VulkanProfilerFrameQueueSupportInputs
+    {
+        bool GraphicsQueueRequested = false;
+        bool AsyncComputeQueueRequested = false;
+        bool GraphicsTimestampsSupported = false;
+        bool AsyncComputeTimestampsSupported = false;
+    };
+
+    // Backend-local, Vulkan-handle-free frame policy used by the native
+    // adapter and CPU contract tests. A nonempty plan is unsupported when all
+    // queues it actually uses lack timestamp bits, even if another unused
+    // queue made the device-lifetime backend globally Ready.
+    export [[nodiscard]] constexpr bool
+    VulkanProfilerFrameHasSupportedTimestampQueue(
+        const VulkanProfilerFrameQueueSupportInputs inputs) noexcept
+    {
+        return
+            (inputs.GraphicsQueueRequested &&
+             inputs.GraphicsTimestampsSupported) ||
+            (inputs.AsyncComputeQueueRequested &&
+             inputs.AsyncComputeTimestampsSupported);
+    }
+
+    // A profiler retirement may observe VK_ERROR_DEVICE_LOST while resolving
+    // the just-completed slot. VulkanDevice must stop that BeginFrame before
+    // any reset, acquire, destruction, or other backend call.
+    export [[nodiscard]] constexpr bool
+    ShouldContinueVulkanFrameAfterProfilerRetirement(
+        const bool deviceLost) noexcept
+    {
+        return !deviceLost;
+    }
+
+    // Read-only backend contract seam used to prove the RTTI-free context
+    // ownership check. `device` must come from CreateVulkanDevice().
+    export [[nodiscard]] bool IsVulkanProfilerCommandContextOwned(
+        const RHI::IDevice* device,
+        const RHI::ICommandContext* context) noexcept;
 
     // Factory — creates the Vulkan backend IDevice.
     // Call once during engine initialization; the returned device owns all

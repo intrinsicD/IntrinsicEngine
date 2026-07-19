@@ -19,7 +19,7 @@ startup/shutdown.
 | `Extrinsic.Runtime.JobServiceGpuQueueBridge` | Runtime-owned bridge from `JobService` GPU-queue participants to the renderer runtime-frame command hook (`RUNTIME-160`). Owns the renderer hook handle, installs a hook that delegates command recording to `JobService::RecordGpuQueueFrameCommands(...)`, detaches the hook before participant shutdown, and forwards the Engine-provided device-idle wait callback into `JobService::ShutdownGpuQueueParticipants(...)`. `Engine` keeps lifecycle ordering and device ownership, while raw hook-token ownership and GPU-participant teardown sequencing no longer live in `Runtime.Engine.cppm` / `.cpp`. |
 | `Extrinsic.Runtime.WorldRegistry` | Runtime-kernel world lifetime mechanism from ADR-0024 D2/D4/D7. Owns `ECS::Scene::Registry` instances behind `WorldHandle`s, creates the boot world, tracks one active world, defers active-world changes and destroys to Maintenance, publishes `WorldWillBeDestroyed` / `ActiveWorldChanged`, and cancels world-scoped jobs before two-phase teardown. Destruction takes precedence over activation: destroy-pending/announced worlds reject activation, and queued activation is revalidated as `Live` at Maintenance. It does not own preview/readiness/switch UX policy. |
 | `Extrinsic.Runtime.EngineConfigBoot` | Free-standing boot-time config helper from `RUNTIME-146`, extended by `CORE-009`. Exports `CreateReferenceEngineConfig()`, registry-aware overloads, `EngineConfigBoot*` records, and `ResolveEngineConfigForBoot(...)`, preserving sandbox startup precedence (`--engine-config` → `INTRINSIC_ENGINE_CONFIG` → `config/engine.json` → reference defaults) without importing the full `Engine` interface. |
-| `Extrinsic.Runtime.EngineConfigControl` | App-composed live config-control module from `RUNTIME-181`, building on the `RUNTIME-149`/`CORE-009` facade. The `final IRuntimeModule` owns the application-section registry, exposes it before boot, and publishes/withdraws its exact instance through `ServiceRegistry`. It exports render-recipe preview/load/activate/apply/clear APIs and state, engine-config hot-subset preview/load/apply APIs and state, deterministic changed-section reporting, and the DTOs used by editor/agent callers. During registration it copies the Engine's already-applied startup recipe state, retargets the narrow borrowed activation capability to its persistent state, and fully binds before publication. It mutates only the borrowed Engine-owned `EngineConfig`, rejects boot-only differences, dispatches section callbacks only after commit, and clears all live bindings on shutdown so stale references fail closed. |
+| `Extrinsic.Runtime.EngineConfigControl` | App-composed live config-control module from `RUNTIME-181`, building on the `RUNTIME-149`/`CORE-009` facade. The `final IRuntimeModule` owns the application-section registry, exposes it before boot, and publishes/withdraws its exact instance through `ServiceRegistry`. It exports render-recipe preview/load/activate/apply/clear APIs and state, engine-config hot-subset preview/load/apply APIs and state, deterministic changed-section reporting, and the DTOs used by editor/agent callers. During registration it copies the Engine's already-applied startup recipe state, retargets the narrow borrowed activation capability to its persistent state, and fully binds before publication. It mutates only the borrowed Engine-owned `EngineConfig`, rejects boot-only differences, synchronously commits the default recipe path, default-off GPU-profiling bit, and registered application sections, dispatches section callbacks only after commit, and clears all live bindings on shutdown so stale references fail closed. |
 | `Extrinsic.Runtime.RenderRecipeActivation` | Plain shared recipe-activation kernel and free functions from `RUNTIME-181`. The capability contains only a borrowed active config/state plus framebuffer-extent and frame-recipe-override callbacks; it owns no window or renderer. `Engine::Initialize()` uses it for unconditional reset and optional boot-file activation even when live control is omitted, while `EngineConfigControl` uses the same preview/load/apply/clear functions for synchronous UI and agent control. |
 | `Extrinsic.Runtime.SandboxConfigSections` | Presentation-free typed DTO, canonical JSON codec/validator, lookup/update helper, and registration-factory surface for the `sandbox.progressive_poisson` and `sandbox.parameterization` application sections. It owns the Sandbox field vocabulary while Core sees only generic records; `app/Sandbox` composes the registrations before boot. |
 | `Extrinsic.Runtime.InputActions` | Runtime-owned input-action registry from `RUNTIME-155`. Exports the action binding/handle/context/service/descriptor API plus `RuntimeInputActionRegistry`, which owns handle allocation, registration/unregistration state, key-edge trigger checks, ImGui keyboard-capture suppression, callback failure logging, and per-frame dispatch after the pre-render transform flush. Its generic service aggregate carries config, selection, scene, and mutable render input but no camera registry; a camera-aware action captures the exact optional registry at app-policy registration time. `Runtime.Engine` re-exports the API for compatibility and delegates `RegisterInputAction(...)`, `UnregisterInputAction(...)`, and frame dispatch to the registry. |
@@ -816,12 +816,15 @@ Recipe preview/activation uses
 `ApplyRenderRecipeConfigPreview(...)`. Engine-config preview uses
 `PreviewEngineConfigControlDocument(...)` /
 `LoadEngineConfigControlFile(...)`; hot apply is intentionally limited to
-`render.default_recipe_config_path` and registered `app.sections` records
-through `ApplyEngineConfigHotSubset(...)`. Changed section names are lexical;
-callbacks fire once after commit and never during preview, rejection, or
-no-change. All other engine-config differences are reported as boot-only
-rejections and do not mutate the live engine; the active config authority
-remains the `Engine`-owned `EngineConfig` value borrowed by the subsystem.
+`render.default_recipe_config_path`, `render.enable_gpu_profiling`, and
+registered `app.sections` records through
+`ApplyEngineConfigHotSubset(...)`. The profiling bit defaults off and changes
+only per-frame recording enablement; hot toggles do not construct, destroy, or
+replace the device-owned profiler. Changed section names are lexical; callbacks
+fire once after commit and never during preview, rejection, or no-change. All
+other engine-config differences are reported as boot-only rejections and do
+not mutate the live engine; the active config authority remains the
+`Engine`-owned `EngineConfig` value borrowed by the subsystem.
 
 Runtime consumes `Extrinsic.Core.FrameLoop` for reusable platform/render/
 maintenance/shutdown phase contracts. The contract lives in `core` because it has
@@ -835,6 +838,10 @@ extraction stats, and the acquired `RenderWorldPool` front slot. This keeps the
 stage data explicit without exporting a runtime API or reviving legacy
 `Runtime.FrameLoop`, `Runtime.RenderOrchestrator`, or
 `Runtime.ResourceMaintenance` modules.
+After the `UiEndCapture` hook returns, `RunFrame()` reads the committed
+`Render.EnableGpuProfiling` value exactly once into that immutable
+`RenderFrameInput`. Editor/config applies at the hook therefore affect the
+same acquired frame; extraction and rendering never reread mutable config.
 Single-use frame-hook adapters, fixed-step/camera/input helpers, pick-context
 capture, and pick-readback refinement live as private `Runtime.Engine.cpp`
 helpers so `RunFrame` stays an ordered phase list while preserving the same

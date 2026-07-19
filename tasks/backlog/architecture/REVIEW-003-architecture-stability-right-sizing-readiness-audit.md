@@ -31,6 +31,10 @@ depends_on:
   `SceneDocumentModule` (`RUNTIME-172`) from `SceneInteractionModule`
   (`RUNTIME-188`). `RUNTIME-172` is retired; `RUNTIME-188` remains open, so
   the audit remains blocked.
+- 2026-07-19 dependency update: `GRAPHICS-127` retired at `Operational` on
+  native Vulkan and `CPUContracted` on Null/unsupported hosts. Its dead and
+  misleading profiler-seam gate is satisfied; the task remains in
+  `depends_on` as an auditable static prerequisite.
 
 ## Goal
 

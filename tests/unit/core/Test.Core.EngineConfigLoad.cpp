@@ -220,6 +220,7 @@ TEST(CoreEngineConfigLoad, CoreAndRegisteredSectionRoundTrip)
     config.Render.EnablePromotedVulkanDevice = true;
     config.Render.EnableValidation = false;
     config.Render.EnableVSync = false;
+    config.Render.EnableGpuProfiling = true;
     config.Render.FramesInFlight = 3u;
     config.Render.DefaultRecipeConfigPath = "config/test-recipe.json";
     config.Render.SynchronousExtraction = false;
@@ -250,10 +251,11 @@ TEST(CoreEngineConfigLoad, CoreAndRegisteredSectionRoundTrip)
     ASSERT_EQ(preview.State, EngineConfigState::Valid);
     EXPECT_FALSE(HasErrors(preview));
     EXPECT_TRUE(preview.Preview.SideEffectFree);
-    EXPECT_EQ(preview.Preview.ParsedFieldCount, 19u);
+    EXPECT_EQ(preview.Preview.ParsedFieldCount, 20u);
     EXPECT_EQ(preview.Preview.Config.Window.Title, "Generic Section Test");
     EXPECT_EQ(preview.Preview.Config.Window.Width, 1280);
     EXPECT_EQ(preview.Preview.Config.Render.FramesInFlight, 3u);
+    EXPECT_TRUE(preview.Preview.Config.Render.EnableGpuProfiling);
     EXPECT_EQ(
         preview.Preview.Config.Render.DefaultRecipeConfigPath,
         "config/test-recipe.json");
@@ -273,6 +275,27 @@ TEST(CoreEngineConfigLoad, CoreAndRegisteredSectionRoundTrip)
     ASSERT_EQ(loaded.State, EngineConfigState::Valid);
     EXPECT_EQ(loaded.SchemaVersion, kEngineConfigSchemaVersion);
     EXPECT_EQ(RequireSection(loaded.Preview.Config).PayloadJson, kFakeChangedPayload);
+}
+
+TEST(CoreEngineConfigLoad, GpuProfilingDefaultsFalseWhenOmitted)
+{
+    const EngineConfig defaults{};
+    EXPECT_FALSE(defaults.Render.EnableGpuProfiling);
+
+    const EngineConfigLoadResult preview = PreviewEngineConfig(
+        R"json({
+            "schema": "intrinsic.core.engine-config",
+            "version": 1,
+            "render": {}
+        })json");
+
+    ASSERT_EQ(preview.State, EngineConfigState::Valid);
+    EXPECT_FALSE(preview.Preview.Config.Render.EnableGpuProfiling);
+    EXPECT_EQ(preview.Preview.ParsedFieldCount, 0u);
+    EXPECT_NE(
+        SerializeEngineConfig(preview.Preview.Config).find(
+            "\"enable_gpu_profiling\": false"),
+        std::string::npos);
 }
 
 TEST(CoreEngineConfigLoad, UnknownSectionFallsBackWithOrWithoutRegistry)

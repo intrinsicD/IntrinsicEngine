@@ -20,6 +20,7 @@
 
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Telemetry;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
@@ -28,6 +29,7 @@ import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.RHI.TextureUpload;
 import Extrinsic.Runtime.Engine;
@@ -150,7 +152,8 @@ struct DefaultRecipeBootstrap
 [[nodiscard]] DefaultRecipeBootstrap BootstrapEngineForDefaultRecipe(
     const std::uint32_t targetFrames = 4u,
     const char* const windowTitle = "Intrinsic Default-recipe gpu;vulkan smoke",
-    const bool enableValidation = false)
+    const bool enableValidation = false,
+    const bool enableGpuProfiling = false)
 {
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
     {
@@ -170,6 +173,7 @@ struct DefaultRecipeBootstrap
     config.Window.Resizable = false;
     config.Render.EnableValidation = enableValidation;
     config.Render.EnableVSync = false;
+    config.Render.EnableGpuProfiling = enableGpuProfiling;
     auto enginePtr = std::make_unique<Engine>(
         config, std::make_unique<ExitAfterFramesApp>(targetFrames));
     enginePtr->Initialize();
@@ -195,6 +199,9 @@ struct DefaultRecipeRunCapture
     Extrinsic::Backends::Vulkan::VulkanOperationalStatus Status{};
     Extrinsic::Graphics::RenderGraphFrameStats Stats{};
     bool DeviceOperational{false};
+    bool ProfileCandidateSubmitted{false};
+    std::uint64_t ProfileCandidateFrameNumber{0u};
+    std::uint32_t ProfileCandidateFrameSlot{0u};
 };
 
 [[nodiscard]] DefaultRecipeRunCapture DriveDefaultRecipeAndCapture(Engine& engine)
@@ -213,7 +220,8 @@ struct DefaultRecipeRunCapture
 
 [[nodiscard]] DefaultRecipeRunCapture DriveDefaultRecipeDebugViewFrameAndCapture(
     Engine& engine,
-    const bool seedReadbackTriangle = false)
+    const bool seedReadbackTriangle = false,
+    const bool enableGpuProfiling = false)
 {
     DefaultRecipeRunCapture capture;
     auto& renderer = engine.GetRenderer();
@@ -223,6 +231,7 @@ struct DefaultRecipeRunCapture
     capture.Before = ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
 
     Extrinsic::RHI::FrameHandle frame{};
+    capture.ProfileCandidateFrameNumber = device.GetGlobalFrameNumber();
     if (!renderer.BeginFrame(frame))
     {
         capture.Status = EvaluateVulkanDeviceOperationalStatus(&device);
@@ -231,6 +240,7 @@ struct DefaultRecipeRunCapture
         capture.After = ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
         return capture;
     }
+    capture.ProfileCandidateFrameSlot = frame.FrameIndex;
 
     if (seedReadbackTriangle)
     {
@@ -241,11 +251,15 @@ struct DefaultRecipeRunCapture
         .Viewport = {.Width = Readback::kFramebufferWidth,
                      .Height = Readback::kFramebufferHeight},
         .DebugOverlayEnabled = true,
+        .EnableGpuProfiling = enableGpuProfiling,
     };
     Extrinsic::Graphics::RenderWorld world = renderer.ExtractRenderWorld(input);
     renderer.PrepareFrame(world);
     renderer.ExecuteFrame(frame, world);
-    (void)renderer.EndFrame(frame);
+    const std::uint64_t completedFrameNumber =
+        renderer.EndFrame(frame);
+    capture.ProfileCandidateSubmitted =
+        completedFrameNumber > capture.ProfileCandidateFrameNumber;
     device.Present(frame);
 
     capture.Status = EvaluateVulkanDeviceOperationalStatus(&device);
@@ -483,19 +497,180 @@ struct ReadbackRunCapture
     Engine& engine,
     const Extrinsic::RHI::BufferHandle readbackBuffer,
     const std::uint64_t readbackSize,
-    const bool parallelRecordingEnabled)
+    const bool parallelRecordingEnabled,
+    const bool enableGpuProfiling = false)
 {
     auto& renderer = engine.GetRenderer();
     renderer.SetParallelRenderGraphRecordingEnabled(parallelRecordingEnabled);
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
 
     ReadbackRunCapture capture{};
-    capture.Run = DriveDefaultRecipeDebugViewFrameAndCapture(engine, true);
+    capture.Run = DriveDefaultRecipeDebugViewFrameAndCapture(
+        engine,
+        true,
+        enableGpuProfiling);
     if (capture.Run.DeviceOperational)
     {
         capture.Bytes = ReadBackbufferBytes(engine.GetDevice(), readbackBuffer, readbackSize);
     }
     return capture;
+}
+
+[[nodiscard]] const Extrinsic::Graphics::RenderGraphGpuProfilePassStats*
+FindGpuProfilePass(
+    const Extrinsic::Graphics::RenderGraphGpuProfileStats& profile,
+    const std::string_view passName) noexcept
+{
+    const auto found = std::find_if(
+        profile.Passes.begin(),
+        profile.Passes.end(),
+        [passName](
+            const Extrinsic::Graphics::RenderGraphGpuProfilePassStats& pass)
+        {
+            return pass.Name == passName;
+        });
+    return found != profile.Passes.end() ? &*found : nullptr;
+}
+
+[[nodiscard]] std::string BuildGpuProfileSummary(
+    const Extrinsic::Graphics::RenderGraphGpuProfileStats& profile)
+{
+    std::string summary =
+        "status=" +
+        std::to_string(static_cast<std::uint32_t>(profile.Status)) +
+        " source=" +
+        std::to_string(static_cast<std::uint32_t>(profile.Source)) +
+        " fresh=" + (profile.Fresh ? "true" : "false") +
+        " stale=" + (profile.Stale ? "true" : "false") +
+        " resolvedFrame=" +
+        std::to_string(profile.ResolvedSubmittedFrameNumber) +
+        " resolvedSlot=" + std::to_string(profile.ResolvedFrameSlot) +
+        " age=" + std::to_string(profile.SampleAgeFrames) +
+        " diagnostic=" + profile.Diagnostic + " passes=[";
+    for (const auto& pass : profile.Passes)
+    {
+        if (summary.back() != '[')
+        {
+            summary += ", ";
+        }
+        summary += pass.Name + "@" +
+            std::string{Extrinsic::RHI::QueueAffinityName(pass.Queue)} +
+            ":" +
+            std::to_string(static_cast<std::uint32_t>(pass.Source));
+        if (pass.DurationNs.has_value())
+        {
+            summary += "=" + std::to_string(*pass.DurationNs) + "ns";
+        }
+        else
+        {
+            summary += "=unavailable";
+        }
+    }
+    summary += "]";
+    return summary;
+}
+
+void ExpectGpuProfileRowsUnique(
+    const Extrinsic::Graphics::RenderGraphGpuProfileStats& profile)
+{
+    for (const auto& pass : profile.Passes)
+    {
+        EXPECT_TRUE(pass.Id.IsValid())
+            << "Native GPU profile row has no compiled pass identity: "
+            << pass.Name;
+    }
+    for (std::size_t left = 0u; left < profile.Passes.size(); ++left)
+    {
+        for (std::size_t right = left + 1u;
+             right < profile.Passes.size();
+             ++right)
+        {
+            const auto& first = profile.Passes[left];
+            const auto& second = profile.Passes[right];
+            EXPECT_FALSE(first.Name == second.Name);
+            EXPECT_NE(first.Id, second.Id);
+        }
+    }
+}
+
+void ExpectResolvedNativeGpuProfile(
+    const DefaultRecipeRunCapture& capture,
+    const Extrinsic::RHI::IDevice& device,
+    const std::uint64_t submittedFrameNumber,
+    const std::uint32_t submittedFrameSlot)
+{
+    const auto& profile = capture.Stats.GpuProfile;
+    ASSERT_TRUE(capture.DeviceOperational);
+    EXPECT_TRUE(profile.Fresh) << BuildGpuProfileSummary(profile);
+    EXPECT_FALSE(profile.Stale) << BuildGpuProfileSummary(profile);
+    EXPECT_EQ(profile.Source, Extrinsic::RHI::GpuTimestampSource::NativeGpu)
+        << BuildGpuProfileSummary(profile);
+    EXPECT_TRUE(profile.HasResolvedFrame) << BuildGpuProfileSummary(profile);
+    EXPECT_EQ(profile.ResolvedSubmittedFrameNumber, submittedFrameNumber)
+        << BuildGpuProfileSummary(profile);
+    EXPECT_EQ(profile.ResolvedFrameSlot, submittedFrameSlot)
+        << BuildGpuProfileSummary(profile);
+    EXPECT_LT(
+        profile.ResolvedSubmittedFrameNumber,
+        device.GetGlobalFrameNumber());
+    EXPECT_GE(profile.SampleAgeFrames, device.GetFramesInFlight())
+        << "The sample resolved before its cyclic frame slot was reused.";
+    ExpectGpuProfileRowsUnique(profile);
+}
+
+[[nodiscard]] DefaultRecipeRunCapture DriveUntilGpuProfileResolvesFrame(
+    Engine& engine,
+    const std::uint64_t submittedFrameNumber,
+    const std::uint32_t submittedFrameSlot)
+{
+    DefaultRecipeRunCapture capture{};
+    const std::uint32_t frameBudget =
+        engine.GetDevice().GetFramesInFlight() + 1u;
+    for (std::uint32_t frameIndex = 0u;
+         frameIndex < frameBudget;
+         ++frameIndex)
+    {
+        capture = DriveDefaultRecipeDebugViewFrameAndCapture(
+            engine,
+            true,
+            true);
+        EXPECT_TRUE(Counters::IsStable(capture.Before, capture.After))
+            << "Vulkan fallback/validation counters changed while resolving "
+               "a submitted native GPU profile.";
+        if (!capture.DeviceOperational)
+        {
+            return capture;
+        }
+        const auto& profile = capture.Stats.GpuProfile;
+        if (profile.HasResolvedFrame &&
+            profile.ResolvedSubmittedFrameNumber ==
+                submittedFrameNumber &&
+            profile.ResolvedFrameSlot == submittedFrameSlot)
+        {
+            return capture;
+        }
+    }
+    return capture;
+}
+
+void ExpectGpuProfileScopeParity(
+    const Extrinsic::Graphics::RenderGraphGpuProfileStats& serial,
+    const Extrinsic::Graphics::RenderGraphGpuProfileStats& parallel)
+{
+    ExpectGpuProfileRowsUnique(serial);
+    ExpectGpuProfileRowsUnique(parallel);
+    ASSERT_EQ(serial.Passes.size(), parallel.Passes.size())
+        << "Serial profile: " << BuildGpuProfileSummary(serial)
+        << "\nParallel profile: " << BuildGpuProfileSummary(parallel);
+    for (std::size_t index = 0u; index < serial.Passes.size(); ++index)
+    {
+        EXPECT_EQ(serial.Passes[index].Name, parallel.Passes[index].Name);
+        EXPECT_EQ(serial.Passes[index].Id, parallel.Passes[index].Id);
+        EXPECT_EQ(serial.Passes[index].Queue, parallel.Passes[index].Queue);
+        EXPECT_EQ(
+            serial.Passes[index].CommandStatus,
+            parallel.Passes[index].CommandStatus);
+    }
 }
 } // namespace
 
@@ -556,6 +731,193 @@ TEST(DefaultRecipeSurfaceGpuSmoke, RecipeSelectorReachesOperationalVulkanCommand
         << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
         << ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
         << ", gateFailure " << run.Before.OperationalGateFailure << " -> " << run.After.OperationalGateFailure;
+
+    engine.Shutdown();
+}
+
+TEST(DefaultRecipeSurfaceGpuSmoke,
+     NativeGpuTimestampsResolveNamedPassesAfterSlotReuse)
+{
+    constexpr std::uint32_t kTargetFrames = 8u;
+    auto bootstrap = BootstrapEngineForDefaultRecipe(
+        kTargetFrames,
+        "Intrinsic native GPU timestamp slot-reuse smoke",
+        false,
+        true);
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+    auto& device = engine.GetDevice();
+    Extrinsic::RHI::IProfiler* profiler = device.GetProfiler();
+    ASSERT_NE(profiler, nullptr);
+
+    const std::uint64_t firstSubmittedFrameNumber =
+        device.GetGlobalFrameNumber();
+    const auto run = DriveDefaultRecipeAndCapture(engine);
+    const std::uint64_t completedFrameNumber =
+        device.GetGlobalFrameNumber();
+    const std::uint64_t successfulFrameCount =
+        completedFrameNumber - firstSubmittedFrameNumber;
+
+    if (!run.DeviceOperational)
+    {
+        engine.Shutdown();
+        ADD_FAILURE()
+            << "Promoted Vulkan operational gate did not remain active "
+               "during native timestamp slot-reuse smoke: status="
+            << ToString(run.Status.Code)
+            << " reason=" << ToString(run.Status.Reason)
+            << ". Host readiness passed before the run, so this is a "
+               "GRAPHICS-127 regression rather than a capability skip.";
+        return;
+    }
+
+    const std::uint32_t framesInFlight = device.GetFramesInFlight();
+    ASSERT_GT(framesInFlight, 0u);
+    EXPECT_GE(
+        successfulFrameCount,
+        2u * static_cast<std::uint64_t>(framesInFlight) + 1u)
+        << "The smoke did not cross two complete query-slot reuse windows.";
+    EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
+        << "Vulkan fallback/validation counters changed during native "
+           "timestamp profiling.";
+
+    const Extrinsic::RHI::ProfilerStatusSnapshot profilerStatus =
+        profiler->GetStatus();
+    RecordProperty("SuccessfulFrames", std::to_string(successfulFrameCount));
+    RecordProperty("FramesInFlight", std::to_string(framesInFlight));
+    RecordProperty(
+        "ProfilerBackendStatus",
+        std::to_string(
+            static_cast<std::uint32_t>(profilerStatus.Status)));
+    RecordProperty("ProfilerDiagnostic", profilerStatus.Diagnostic);
+    const auto& profile = run.Stats.GpuProfile;
+    RecordProperty(
+        "RenderGraphGpuProfileStatus",
+        std::to_string(static_cast<std::uint32_t>(profile.Status)));
+
+    if (profile.Status ==
+        Extrinsic::Graphics::RenderGraphGpuProfileStatus::Unsupported)
+    {
+        EXPECT_EQ(
+            profile.Source,
+            Extrinsic::RHI::GpuTimestampSource::Unavailable);
+        EXPECT_FALSE(profile.Fresh);
+        EXPECT_FALSE(profile.HasResolvedFrame);
+        EXPECT_TRUE(profile.QueueEnvelopes.empty());
+        EXPECT_TRUE(profile.Passes.empty());
+        EXPECT_TRUE(
+            Extrinsic::Core::Telemetry::TelemetrySystem::Get()
+                .GetPassTimings()
+                .empty());
+        engine.Shutdown();
+        return;
+    }
+
+    ASSERT_EQ(
+        profilerStatus.Status,
+        Extrinsic::RHI::ProfilerBackendStatus::Ready)
+        << profilerStatus.Diagnostic;
+    ASSERT_TRUE(profilerStatus.NativeTimestampsAvailable())
+        << profilerStatus.Diagnostic;
+    for (const std::string_view field :
+         {"selectedDevice=\"",
+          "physicalDeviceApi=",
+          "loaderInstanceApi=",
+          "engineRequestedApi=1.3.0",
+          "driverName=\"",
+          "driverInfo=\"",
+          "driverVersion=",
+          "deviceUUID=",
+          "timestampPeriodNs=",
+          "graphicsFamily=",
+          "graphicsValidBits=",
+          "asyncAvailable=",
+          "asyncFamily=",
+          "asyncValidBits="})
+    {
+        EXPECT_NE(
+            profilerStatus.Diagnostic.find(field),
+            std::string::npos)
+            << "Selected-device profiler diagnostic omitted " << field
+            << ": " << profilerStatus.Diagnostic;
+    }
+
+    ASSERT_TRUE(profile.Fresh) << BuildGpuProfileSummary(profile);
+    EXPECT_FALSE(profile.Stale) << BuildGpuProfileSummary(profile);
+    EXPECT_EQ(
+        profile.Source,
+        Extrinsic::RHI::GpuTimestampSource::NativeGpu)
+        << BuildGpuProfileSummary(profile);
+    ASSERT_TRUE(profile.HasResolvedFrame)
+        << BuildGpuProfileSummary(profile);
+    EXPECT_LT(
+        profile.ResolvedSubmittedFrameNumber,
+        completedFrameNumber);
+    EXPECT_LT(profile.ResolvedFrameSlot, framesInFlight);
+    EXPECT_GE(profile.SampleAgeFrames, framesInFlight)
+        << "Native timestamps were published before the submitted query "
+           "slot's reuse proof.";
+    ExpectGpuProfileRowsUnique(profile);
+
+    const auto* surfacePass = FindGpuProfilePass(profile, "SurfacePass");
+    ASSERT_NE(surfacePass, nullptr) << BuildGpuProfileSummary(profile);
+    EXPECT_EQ(
+        surfacePass->CommandStatus,
+        RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(
+        surfacePass->Source,
+        Extrinsic::RHI::GpuTimestampSource::NativeGpu);
+    ASSERT_TRUE(surfacePass->DurationNs.has_value());
+    EXPECT_GT(*surfacePass->DurationNs, 0u);
+    EXPECT_TRUE(std::isfinite(
+        static_cast<double>(*surfacePass->DurationNs)));
+
+    const auto graphicsEnvelope = std::find_if(
+        profile.QueueEnvelopes.begin(),
+        profile.QueueEnvelopes.end(),
+        [](const auto& envelope)
+        {
+            return envelope.Queue ==
+                Extrinsic::RHI::QueueAffinity::Graphics;
+        });
+    ASSERT_NE(graphicsEnvelope, profile.QueueEnvelopes.end());
+    EXPECT_EQ(
+        graphicsEnvelope->Source,
+        Extrinsic::RHI::GpuTimestampSource::NativeGpu);
+    ASSERT_TRUE(graphicsEnvelope->DurationNs.has_value());
+    EXPECT_GT(*graphicsEnvelope->DurationNs, 0u);
+
+    const auto& telemetry =
+        Extrinsic::Core::Telemetry::TelemetrySystem::Get()
+            .GetPassTimings();
+    const auto surfaceTelemetry = std::find_if(
+        telemetry.begin(),
+        telemetry.end(),
+        [](const auto& timing)
+        {
+            return timing.Name == "SurfacePass";
+        });
+    ASSERT_NE(surfaceTelemetry, telemetry.end());
+    EXPECT_EQ(
+        surfaceTelemetry->GpuTimeNs,
+        *surfacePass->DurationNs);
+    EXPECT_EQ(surfaceTelemetry->CpuTimeNs, 0u);
+
+    RecordProperty(
+        "ResolvedSubmittedFrameNumber",
+        std::to_string(profile.ResolvedSubmittedFrameNumber));
+    RecordProperty(
+        "ResolvedFrameSlot",
+        std::to_string(profile.ResolvedFrameSlot));
+    RecordProperty(
+        "SampleAgeFrames",
+        std::to_string(profile.SampleAgeFrames));
+    RecordProperty(
+        "SurfacePassGpuTimeNs",
+        std::to_string(*surfacePass->DurationNs));
 
     engine.Shutdown();
 }
@@ -665,6 +1027,7 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialReadbackWithVal
     auto bootstrap = BootstrapEngineForDefaultRecipe(
         4u,
         "Intrinsic Default-recipe gpu;vulkan parallel-recording smoke",
+        true,
         true);
     if (bootstrap.Skipped)
     {
@@ -680,6 +1043,23 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialReadbackWithVal
 
     auto& renderer = engine.GetRenderer();
     auto& device = engine.GetDevice();
+    const Extrinsic::RHI::IProfiler* profiler = device.GetProfiler();
+    ASSERT_NE(profiler, nullptr);
+    const Extrinsic::RHI::ProfilerStatusSnapshot profilerStatus =
+        profiler->GetStatus();
+    if (profilerStatus.Status ==
+        Extrinsic::RHI::ProfilerBackendStatus::Unsupported)
+    {
+        engine.Shutdown();
+        GTEST_SKIP()
+            << "Native timestamps are unavailable before the graphics "
+               "serial/parallel profiling run: "
+            << profilerStatus.Diagnostic;
+    }
+    ASSERT_EQ(
+        profilerStatus.Status,
+        Extrinsic::RHI::ProfilerBackendStatus::Ready)
+        << profilerStatus.Diagnostic;
     renderer.SetActiveFrameRecipeOverride(
         std::make_optional(MakeGraphicsOnlyFrameRecipeOverride()));
 
@@ -725,7 +1105,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialReadbackWithVal
         engine,
         readbackBuffer,
         readbackSize,
-        false);
+        false,
+        true);
     if (!serial.Run.DeviceOperational)
     {
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
@@ -757,11 +1138,23 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialReadbackWithVal
                                         bytesPerPixel,
                                         backbufferFormat,
                                         serialStats);
+    ASSERT_TRUE(serial.Run.ProfileCandidateSubmitted);
+    const DefaultRecipeRunCapture resolvedSerial =
+        DriveUntilGpuProfileResolvesFrame(
+            engine,
+            serial.Run.ProfileCandidateFrameNumber,
+            serial.Run.ProfileCandidateFrameSlot);
+    ExpectResolvedNativeGpuProfile(
+        resolvedSerial,
+        device,
+        serial.Run.ProfileCandidateFrameNumber,
+        serial.Run.ProfileCandidateFrameSlot);
 
     const ReadbackRunCapture parallel = CaptureDefaultRecipeReadbackFrame(
         engine,
         readbackBuffer,
         readbackSize,
+        true,
         true);
     if (!parallel.Run.DeviceOperational)
     {
@@ -804,6 +1197,32 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialReadbackWithVal
         bytesPerPixel,
         serialStats.DebugDump,
         parallelStats.DebugDump);
+    ASSERT_TRUE(parallel.Run.ProfileCandidateSubmitted);
+    const DefaultRecipeRunCapture resolvedParallel =
+        DriveUntilGpuProfileResolvesFrame(
+            engine,
+            parallel.Run.ProfileCandidateFrameNumber,
+            parallel.Run.ProfileCandidateFrameSlot);
+    ExpectResolvedNativeGpuProfile(
+        resolvedParallel,
+        device,
+        parallel.Run.ProfileCandidateFrameNumber,
+        parallel.Run.ProfileCandidateFrameSlot);
+    ExpectGpuProfileScopeParity(
+        resolvedSerial.Stats.GpuProfile,
+        resolvedParallel.Stats.GpuProfile);
+    for (const auto& pass : resolvedParallel.Stats.GpuProfile.Passes)
+    {
+        EXPECT_EQ(pass.Queue, Extrinsic::RHI::QueueAffinity::Graphics)
+            << pass.Name;
+    }
+    for (const auto& envelope :
+         resolvedParallel.Stats.GpuProfile.QueueEnvelopes)
+    {
+        EXPECT_EQ(
+            envelope.Queue,
+            Extrinsic::RHI::QueueAffinity::Graphics);
+    }
 
     renderer.SetParallelRenderGraphRecordingEnabled(false);
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
@@ -817,6 +1236,7 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialAsyncComputeRea
     auto bootstrap = BootstrapEngineForDefaultRecipe(
         4u,
         "Intrinsic Default-recipe gpu;vulkan parallel async-compute smoke",
+        true,
         true);
     if (bootstrap.Skipped)
     {
@@ -837,6 +1257,23 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialAsyncComputeRea
         engine.Shutdown();
         GTEST_SKIP() << "Promoted Vulkan framegraph async-compute queue is unavailable; GRAPHICS-119 async smoke is opt-in.";
     }
+    const Extrinsic::RHI::IProfiler* profiler = device.GetProfiler();
+    ASSERT_NE(profiler, nullptr);
+    const Extrinsic::RHI::ProfilerStatusSnapshot profilerStatus =
+        profiler->GetStatus();
+    if (profilerStatus.Status ==
+        Extrinsic::RHI::ProfilerBackendStatus::Unsupported)
+    {
+        engine.Shutdown();
+        GTEST_SKIP()
+            << "Native timestamps are unavailable before the async-compute "
+               "serial/parallel profiling run: "
+            << profilerStatus.Diagnostic;
+    }
+    ASSERT_EQ(
+        profilerStatus.Status,
+        Extrinsic::RHI::ProfilerBackendStatus::Ready)
+        << profilerStatus.Diagnostic;
 
     const auto warmup = DriveDefaultRecipeAndCapture(engine);
     if (!warmup.DeviceOperational)
@@ -878,7 +1315,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialAsyncComputeRea
         engine,
         readbackBuffer,
         readbackSize,
-        false);
+        false,
+        true);
     if (!serial.Run.DeviceOperational)
     {
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
@@ -908,11 +1346,23 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialAsyncComputeRea
                                         bytesPerPixel,
                                         backbufferFormat,
                                         serialStats);
+    ASSERT_TRUE(serial.Run.ProfileCandidateSubmitted);
+    const DefaultRecipeRunCapture resolvedSerial =
+        DriveUntilGpuProfileResolvesFrame(
+            engine,
+            serial.Run.ProfileCandidateFrameNumber,
+            serial.Run.ProfileCandidateFrameSlot);
+    ExpectResolvedNativeGpuProfile(
+        resolvedSerial,
+        device,
+        serial.Run.ProfileCandidateFrameNumber,
+        serial.Run.ProfileCandidateFrameSlot);
 
     const ReadbackRunCapture parallel = CaptureDefaultRecipeReadbackFrame(
         engine,
         readbackBuffer,
         readbackSize,
+        true,
         true);
     if (!parallel.Run.DeviceOperational)
     {
@@ -955,6 +1405,79 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialAsyncComputeRea
         bytesPerPixel,
         serialStats.DebugDump,
         parallelStats.DebugDump);
+    ASSERT_TRUE(parallel.Run.ProfileCandidateSubmitted);
+    const DefaultRecipeRunCapture resolvedParallel =
+        DriveUntilGpuProfileResolvesFrame(
+            engine,
+            parallel.Run.ProfileCandidateFrameNumber,
+            parallel.Run.ProfileCandidateFrameSlot);
+    ExpectResolvedNativeGpuProfile(
+        resolvedParallel,
+        device,
+        parallel.Run.ProfileCandidateFrameNumber,
+        parallel.Run.ProfileCandidateFrameSlot);
+    ExpectGpuProfileScopeParity(
+        resolvedSerial.Stats.GpuProfile,
+        resolvedParallel.Stats.GpuProfile);
+
+    const auto* histogramProfile = FindGpuProfilePass(
+        resolvedParallel.Stats.GpuProfile,
+        "PostProcessHistogramPass");
+    ASSERT_NE(histogramProfile, nullptr)
+        << BuildGpuProfileSummary(
+               resolvedParallel.Stats.GpuProfile);
+    EXPECT_EQ(
+        histogramProfile->Queue,
+        Extrinsic::RHI::QueueAffinity::AsyncCompute);
+    EXPECT_EQ(
+        histogramProfile->CommandStatus,
+        RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(
+        histogramProfile->Source,
+        Extrinsic::RHI::GpuTimestampSource::NativeGpu);
+    ASSERT_TRUE(histogramProfile->DurationNs.has_value());
+
+    const auto* surfaceProfile = FindGpuProfilePass(
+        resolvedParallel.Stats.GpuProfile,
+        "SurfacePass");
+    ASSERT_NE(surfaceProfile, nullptr)
+        << BuildGpuProfileSummary(
+               resolvedParallel.Stats.GpuProfile);
+    EXPECT_EQ(
+        surfaceProfile->Queue,
+        Extrinsic::RHI::QueueAffinity::Graphics);
+    EXPECT_EQ(
+        surfaceProfile->Source,
+        Extrinsic::RHI::GpuTimestampSource::NativeGpu);
+
+    const auto graphicsEnvelope = std::find_if(
+        resolvedParallel.Stats.GpuProfile.QueueEnvelopes.begin(),
+        resolvedParallel.Stats.GpuProfile.QueueEnvelopes.end(),
+        [](const auto& envelope)
+        {
+            return envelope.Queue ==
+                Extrinsic::RHI::QueueAffinity::Graphics;
+        });
+    const auto asyncEnvelope = std::find_if(
+        resolvedParallel.Stats.GpuProfile.QueueEnvelopes.begin(),
+        resolvedParallel.Stats.GpuProfile.QueueEnvelopes.end(),
+        [](const auto& envelope)
+        {
+            return envelope.Queue ==
+                Extrinsic::RHI::QueueAffinity::AsyncCompute;
+        });
+    ASSERT_NE(
+        graphicsEnvelope,
+        resolvedParallel.Stats.GpuProfile.QueueEnvelopes.end());
+    ASSERT_NE(
+        asyncEnvelope,
+        resolvedParallel.Stats.GpuProfile.QueueEnvelopes.end());
+    EXPECT_EQ(
+        graphicsEnvelope->Source,
+        Extrinsic::RHI::GpuTimestampSource::NativeGpu);
+    EXPECT_EQ(
+        asyncEnvelope->Source,
+        Extrinsic::RHI::GpuTimestampSource::NativeGpu);
 
     renderer.SetParallelRenderGraphRecordingEnabled(false);
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});

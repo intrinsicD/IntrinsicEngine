@@ -465,6 +465,7 @@ namespace Extrinsic::Core::Config
                  "enable_promoted_vulkan_device",
                  "enable_validation",
                  "enable_vsync",
+                 "enable_gpu_profiling",
                  "frames_in_flight",
                  "default_recipe_config_path",
                  "synchronous_extraction"});
@@ -502,6 +503,13 @@ namespace Extrinsic::Core::Config
                 enabled.has_value())
             {
                 config.EnableVSync = *enabled;
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<bool> enabled =
+                    ReadBool(result, *object, "enable_gpu_profiling", "render");
+                enabled.has_value())
+            {
+                config.EnableGpuProfiling = *enabled;
                 ++result.Preview.ParsedFieldCount;
             }
             if (const std::optional<std::int64_t> frames = ReadInteger(
@@ -1347,6 +1355,7 @@ namespace Extrinsic::Core::Config
              config.Render.EnablePromotedVulkanDevice},
             {"enable_validation", config.Render.EnableValidation},
             {"enable_vsync", config.Render.EnableVSync},
+            {"enable_gpu_profiling", config.Render.EnableGpuProfiling},
             {"frames_in_flight", config.Render.FramesInFlight},
             {"default_recipe_config_path",
              config.Render.DefaultRecipeConfigPath},

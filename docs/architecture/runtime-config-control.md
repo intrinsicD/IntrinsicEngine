@@ -53,6 +53,7 @@ Engine-config control:
 The live engine-config fields in the current subset are:
 
 - `render.default_recipe_config_path`
+- `render.enable_gpu_profiling`
 - registered `app.sections` records
 
 Applying a non-empty path first loads and validates the referenced render recipe
@@ -86,12 +87,20 @@ the same view state when it submits the optional renderer request. There is no
 second UI-only parameter path, and the GPU view selector is not a
 parameterization solver-backend selector.
 
+`render.enable_gpu_profiling` defaults to `false`. A changed value commits
+synchronously with the rest of the hot subset; it does not construct, destroy,
+or replace the device-owned profiler. `Engine::RunFrame()` samples the
+committed value once after `UiEndCapture` and copies it into that frame's
+immutable `Graphics::RenderFrameInput`, so a UI-end apply affects the same
+acquired frame while later work reads only the snapshot.
+
 Section records are compared by canonical name/schema/version/payload.
 `RuntimeEngineConfigApplyResult::ChangedSectionNames` is lexically ordered and
 `SectionChanged(name)` queries it. Apply first rejects boot-only differences
 and preflights a changed render-recipe path. It then commits the recipe path
-and complete section vector, records the live snapshot/result, and invokes each
-changed registration's optional callback exactly once. Callbacks are
+and profiling bit plus the complete section vector, records the live
+snapshot/result, and invokes each changed registration's optional callback
+exactly once. Callbacks are
 non-failing post-commit notifications and must not re-enter config control.
 Preview, rejected, and no-change operations invoke none.
 
@@ -124,13 +133,21 @@ session resolves `EngineConfigControl` from `Engine::Services()`:
   `RuntimeConfigControlSource::Editor` after
   `SetParameterizationConfig`; the configured parameterization facade and
   UV-view request path consume the resulting live config.
+- The existing `view.frame_graph` panel reads
+  `render.enable_gpu_profiling` from the control state and routes its toggle
+  through `PreviewEngineConfigControlDocument` followed by
+  `ApplyEngineConfigHotSubset` with `RuntimeConfigControlSource::Editor`.
+  Rejection preserves the committed value and the panel shows the recorded
+  diagnostics. If the optional config-control state or either callback is
+  absent, the toggle is read-only.
 
 Agent/CLI callers use the same `EngineConfigControl` methods with
 `RuntimeConfigControlSource::AgentCli` or
 `RuntimeRenderRecipeActivationSource::AgentCli`. The facade is CPU/headless and
 does not require any ImGui frame. If the module is omitted, editor recipe and
 engine-config states are null, their command callbacks remain empty, and both
-availability flags are false.
+availability flags are false. Boot or programmatic profiling config remains
+effective without composing the editor UI.
 
 ## Parameterization Editor Facade
 

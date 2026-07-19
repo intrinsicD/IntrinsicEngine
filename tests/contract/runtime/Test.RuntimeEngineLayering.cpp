@@ -390,6 +390,40 @@ TEST(RuntimeEngineLayering, RunFrameCarriesDataOnlyFrameContext)
     EXPECT_NE(content.find("frameContext.PooledFrontSlot"), std::string::npos);
 }
 
+TEST(RuntimeEngineLayering,
+     GpuProfilingConfigIsSampledOnceAfterUiCaptureBeforeExtraction)
+{
+    const auto content =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto runFrame = SliceBetween(
+        content,
+        "void Engine::RunFrame()",
+        "bool Engine::IsRunning() const noexcept");
+
+    const auto uiEndCapture =
+        runFrame.find("FramePhase::UiEndCapture");
+    const auto sample =
+        runFrame.find(".EnableGpuProfiling =");
+    const auto beforeExtraction =
+        runFrame.find("FramePhase::BeforeExtraction");
+    const auto renderContract =
+        runFrame.find("Core::ExecuteRenderFrameContract(renderHooks)");
+
+    ASSERT_NE(uiEndCapture, std::string::npos);
+    ASSERT_NE(sample, std::string::npos);
+    ASSERT_NE(beforeExtraction, std::string::npos);
+    ASSERT_NE(renderContract, std::string::npos);
+    EXPECT_LT(uiEndCapture, sample);
+    EXPECT_LT(sample, beforeExtraction);
+    EXPECT_LT(sample, renderContract);
+    EXPECT_EQ(
+        CountOccurrences(runFrame, ".EnableGpuProfiling ="),
+        1u);
+    EXPECT_NE(
+        runFrame.find("m_Config.Render.EnableGpuProfiling", sample),
+        std::string::npos);
+}
+
 TEST(RuntimeEngineLayering, PromotedFrameLoopContractPreservesRendererAndMaintenanceOrder)
 {
     const auto content = ReadFile(RepoRoot() / "src/core/Core.FrameLoop.cpp");

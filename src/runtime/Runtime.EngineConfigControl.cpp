@@ -408,9 +408,14 @@ namespace Extrinsic::Runtime
             config->Render.DefaultRecipeConfigPath !=
             candidate.Render.DefaultRecipeConfigPath;
         result.DefaultRecipeConfigPathChanged = recipePathChanged;
+        const bool gpuProfilingChanged =
+            config->Render.EnableGpuProfiling !=
+            candidate.Render.EnableGpuProfiling;
+        result.GpuProfilingChanged = gpuProfilingChanged;
         result.ChangedSectionNames =
             FindChangedSectionNames(config->AppSections, candidate.AppSections);
-        if (!recipePathChanged && result.ChangedSectionNames.empty())
+        if (!recipePathChanged && !gpuProfilingChanged &&
+            result.ChangedSectionNames.empty())
         {
             result.Status = RuntimeEngineConfigApplyStatus::NoChange;
             m_ConfigControlState.ActiveConfig = *config;
@@ -457,6 +462,11 @@ namespace Extrinsic::Runtime
             {
                 ClearActiveRenderRecipeOverride();
             }
+        }
+        if (gpuProfilingChanged)
+        {
+            config->Render.EnableGpuProfiling =
+                candidate.Render.EnableGpuProfiling;
         }
         config->AppSections = candidate.AppSections;
         m_ConfigControlState.ActiveConfig = *config;

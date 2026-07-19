@@ -101,13 +101,10 @@ those broad umbrellas. Historical FetchContent instructions in the archived
 plans are superseded by the current vcpkg-manifest-only contract.
 
 The 2026-07-16 old-engine consolidation opened one immediately actionable
-Theme B remediation: active
-[`GRAPHICS-127`](../active/GRAPHICS-127-native-gpu-timestamp-profiler.md)
-completes the already-exported RHI GPU
-timestamp profiler across native Vulkan pass recording, truthful Null
-provenance, telemetry, and the existing Frame Graph panel. It is also a
-dependency of `REVIEW-003` because the dead/misleading public seam must close
-before architecture readiness can be accepted. The conditional
+Theme B remediation. `GRAPHICS-127` is now retired after completing the
+already-exported RHI GPU timestamp profiler across native Vulkan pass
+recording, truthful Null provenance, telemetry, and the existing Frame Graph
+panel. Its `REVIEW-003` dependency edge is therefore satisfied. The conditional
 `GRAPHICS-041` hot-reload watcher child remains unopened until its Slang
 compile/reflection prerequisites and a live consumer exist.
 
@@ -474,10 +471,10 @@ are preserved in the retirement log.
 - **Issue 445 incubations ⇐ REVIEW-003.** The deferred Theme B/Theme I tasks
   created from the 2026-07-15 literature scan remain blocked until the
   commit-scoped architecture stability and right-sizing audit retires cleanly.
-- **REVIEW-003 ⇐ GRAPHICS-127 / HARDEN-086.** Architecture readiness remains
-  blocked until the exported-but-unwired GPU profiler has truthful backend
-  provenance and an operational native-Vulkan consumer path, and duplicated
-  runtime hierarchy walks converge on the promoted checked ECS query contract.
+- **REVIEW-003 ⇐ HARDEN-086.** The retired `GRAPHICS-127` dependency has
+  satisfied the truthful GPU-profiler gate; architecture readiness remains
+  blocked here until duplicated runtime hierarchy walks converge on the
+  promoted checked ECS query contract.
 - **GEOM-061 ⇐ BUG-109.** Grid reduction strategies build only on the repaired
   fail-closed quantization and deterministic cell ordering baseline.
 
