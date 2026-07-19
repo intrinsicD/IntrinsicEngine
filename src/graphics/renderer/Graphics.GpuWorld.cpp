@@ -26,6 +26,10 @@ namespace Extrinsic::Graphics
         constexpr std::uint32_t kTexcoordElementBytes = sizeof(float) * 2u;
         constexpr std::uint32_t kNormalElementBytes = sizeof(float) * 3u;
         constexpr std::uint32_t kColorElementBytes = sizeof(std::uint32_t);
+        constexpr std::uint32_t kPhysicalStorageScalarAddressAlignment =
+            sizeof(float);
+        constexpr std::uint32_t kPhysicalStorageTexcoordAddressAlignment =
+            sizeof(float) * 2u;
         constexpr std::uint64_t kFnv1aOffset64 = 14695981039346656037ull;
         constexpr std::uint64_t kFnv1aPrime64 = 1099511628211ull;
 
@@ -459,6 +463,7 @@ namespace Extrinsic::Graphics
             std::vector<std::byte>& dst,
             const std::span<const std::byte> src,
             std::uint64_t cursor,
+            const std::uint32_t addressAlignment,
             std::uint64_t& outByteOffset,
             std::uint64_t& outByteCount)
         {
@@ -469,7 +474,8 @@ namespace Extrinsic::Graphics
                 return cursor;
             }
 
-            const std::uint64_t offset = AlignUp(cursor, alignof(float));
+            const std::uint64_t offset =
+                AlignUp(cursor, addressAlignment);
             outByteOffset = offset;
             const std::uint64_t end = offset + outByteCount;
             dst.resize(static_cast<std::size_t>(end));
@@ -1269,18 +1275,21 @@ namespace Extrinsic::Graphics
             managedVertexBytes,
             positionBytes,
             cursor,
+            kPhysicalStorageScalarAddressAlignment,
             positionOffset,
             positionByteCount);
         cursor = AppendChannelBytes(
             managedVertexBytes,
             texcoordBytes,
             cursor,
+            kPhysicalStorageTexcoordAddressAlignment,
             texcoordOffset,
             texcoordByteCount);
         cursor = AppendChannelBytes(
             managedVertexBytes,
             normalBytes,
             cursor,
+            kPhysicalStorageScalarAddressAlignment,
             normalOffset,
             normalByteCount);
         if (!desc.PackedVertexColors.empty())

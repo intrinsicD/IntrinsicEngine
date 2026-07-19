@@ -688,7 +688,11 @@ namespace Extrinsic::Graphics
         if (!request.Pipeline.IsValid() ||
             !request.Geometry.IndexBuffer.IsValid() ||
             request.Geometry.TexcoordBDA == 0u ||
-            request.Geometry.NormalBDA == 0u)
+            request.Geometry.NormalBDA == 0u ||
+            (request.Geometry.TexcoordBDA %
+             kObjectSpaceNormalBakeTexcoordAddressAlignment) != 0u ||
+            (request.Geometry.NormalBDA %
+             kObjectSpaceNormalBakeNormalAddressAlignment) != 0u)
         {
             return fail(ObjectSpaceNormalTextureBakeStatus::InvalidGpuResource);
         }
@@ -798,6 +802,10 @@ namespace Extrinsic::Graphics
             !desc.IndexBuffer.IsValid() ||
             desc.TexcoordBDA == 0u ||
             desc.NormalBDA == 0u ||
+            (desc.TexcoordBDA %
+             kObjectSpaceNormalBakeTexcoordAddressAlignment) != 0u ||
+            (desc.NormalBDA %
+             kObjectSpaceNormalBakeNormalAddressAlignment) != 0u ||
             desc.IndexCount == 0u ||
             desc.Width == 0u ||
             desc.Height == 0u ||

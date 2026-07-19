@@ -256,12 +256,12 @@ TEST(GpuWorldLifetimeContract, MixedVertexStridesAreAlignedForChannelBlocks)
 
     const auto diagnostics = world.GetDiagnostics();
     EXPECT_EQ(diagnostics.VertexBytesUsed,
-              64u + SurfaceVertexBytes().size_bytes())
-        << "32-byte surface vertices uploaded after a 20-byte primitive view "
-           "must start a separately aligned managed channel block";
+              64u + sizeof(float) + SurfaceVertexBytes().size_bytes())
+        << "RG32 texcoords must begin at an eight-byte-aligned address in "
+           "each separately aligned managed channel block";
 
     const auto managed = world.GetManagedBufferDiagnostics();
-    EXPECT_EQ(managed.Vertex.FragmentedBytes, 4u);
+    EXPECT_EQ(managed.Vertex.FragmentedBytes, 0u);
 }
 
 TEST(GpuWorldLifetimeContract, UpdatingSingleVertexChannelWritesOnlyThatChannel)
@@ -309,9 +309,8 @@ TEST(GpuWorldLifetimeContract, UpdatingSingleVertexChannelWritesOnlyThatChannel)
     ASSERT_EQ(device.BufferWrites.size(), 1u);
     const auto& write = device.BufferWrites.front();
     EXPECT_EQ(write.Handle, world.GetManagedVertexBuffer());
-    EXPECT_EQ(write.Offset,
-              std::as_bytes(std::span<const glm::vec3>{kSoaPositions}).size_bytes() +
-                  std::as_bytes(std::span<const glm::vec2>{kSoaTexcoords}).size_bytes());
+    EXPECT_EQ(write.Offset, 64u)
+        << "the normal stream follows the eight-byte-aligned RG32 texcoord stream";
     const std::span<const std::byte> expectedNormalBytes =
         std::as_bytes(std::span<const glm::vec3>{updatedNormals});
     EXPECT_EQ(write.Data.size(), expectedNormalBytes.size_bytes());
@@ -389,9 +388,16 @@ TEST(GpuWorldLifetimeContract, ResidencyViewTracksCanonicalSoaContentAndSharedIn
     EXPECT_EQ(before.TexcoordFormat, Extrinsic::RHI::Format::RG32_FLOAT);
     EXPECT_EQ(before.TexcoordElementBytes, sizeof(float) * 2u);
     EXPECT_EQ(before.TexcoordStrideBytes, sizeof(float) * 2u);
+    EXPECT_EQ(
+        before.Record.TexcoordBufferBDA %
+            (sizeof(float) * 2u),
+        0u);
     EXPECT_EQ(before.NormalFormat, Extrinsic::RHI::Format::RGB32_FLOAT);
     EXPECT_EQ(before.NormalElementBytes, sizeof(float) * 3u);
     EXPECT_EQ(before.NormalStrideBytes, sizeof(float) * 3u);
+    EXPECT_EQ(
+        before.Record.NormalBufferBDA % alignof(float),
+        0u);
     EXPECT_EQ(before.SurfaceIndexFormat, Extrinsic::RHI::Format::R32_UINT);
     EXPECT_EQ(before.SurfaceIndexElementBytes, sizeof(std::uint32_t));
     EXPECT_EQ(before.SurfaceIndexStrideBytes, sizeof(std::uint32_t));

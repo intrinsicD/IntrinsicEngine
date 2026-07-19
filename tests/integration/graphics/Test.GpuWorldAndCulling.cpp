@@ -57,9 +57,13 @@ namespace
             static_cast<std::uint64_t>(kTriangleVerts.size()) * sizeof(float) * 2u;
         constexpr std::uint64_t kColorBytes =
             static_cast<std::uint64_t>(kTriangleColors.size()) * sizeof(std::uint32_t);
+        constexpr std::uint64_t kTexcoordOffset =
+            (kPositionBytes + 7u) & ~std::uint64_t{7u};
+        constexpr std::uint64_t kColorOffset =
+            kTexcoordOffset + kTexcoordBytes;
 
         std::vector<std::byte> out(
-            static_cast<std::size_t>(kPositionBytes + kTexcoordBytes +
+            static_cast<std::size_t>(kColorOffset +
                                      (includeColors ? kColorBytes : 0u)));
         std::byte* cursor = out.data();
         for (const PackedVertex& v : kTriangleVerts)
@@ -68,6 +72,7 @@ namespace
             std::memcpy(cursor, position, sizeof(position));
             cursor += sizeof(position);
         }
+        cursor = out.data() + static_cast<std::ptrdiff_t>(kTexcoordOffset);
         for (const PackedVertex& v : kTriangleVerts)
         {
             const float texcoord[2] = {v.U, v.V};
@@ -285,7 +290,7 @@ TEST(GraphicsGpuWorld, GeometryUploadPublishesOptionalVertexColorStreamBda)
 
     const RHI::BufferHandle vertexBuffer = world.GetManagedVertexBuffer();
     constexpr std::uint64_t colorOffset =
-        static_cast<std::uint64_t>(kTriangleVerts.size()) * sizeof(float) * 5u;
+        64u;
     const std::vector<std::byte> expectedVertexBytes =
         ExpectedTriangleSoaVertexBytes(/*includeColors=*/true);
     bool foundVertexWrite = false;
@@ -332,8 +337,8 @@ TEST(GraphicsGpuWorld, GeometryUploadPublishesOptionalVertexColorStreamBda)
             EXPECT_EQ(records[i].VertexBufferBDA,
                       device.GetBufferDeviceAddress(vertexBuffer));
             EXPECT_EQ(records[i].TexcoordBufferBDA,
-                      device.GetBufferDeviceAddress(vertexBuffer) +
-                          static_cast<std::uint64_t>(kTriangleVerts.size()) * sizeof(float) * 3u);
+                      device.GetBufferDeviceAddress(vertexBuffer) + 40u);
+            EXPECT_EQ(records[i].TexcoordBufferBDA % 8u, 0u);
             EXPECT_EQ(records[i].NormalBufferBDA, 0u);
             EXPECT_EQ(records[i].ColorBufferBDA,
                       device.GetBufferDeviceAddress(vertexBuffer) + colorOffset);

@@ -772,6 +772,20 @@ TEST(ObjectSpaceNormalTextureBake, BuildGpuProducedTexturePlanFailsClosed)
     EXPECT_FALSE(plan.Succeeded());
     EXPECT_EQ(plan.Status,
               Graphics::ObjectSpaceNormalTextureBakeStatus::InvalidGpuResource);
+
+    request = MakeValidPlanRequest();
+    request.Geometry.TexcoordBDA += 4u;
+    plan = Graphics::BuildObjectSpaceNormalTextureBakePlan(request);
+    EXPECT_FALSE(plan.Succeeded());
+    EXPECT_EQ(plan.Status,
+              Graphics::ObjectSpaceNormalTextureBakeStatus::InvalidGpuResource);
+
+    request = MakeValidPlanRequest();
+    request.Geometry.NormalBDA += 2u;
+    plan = Graphics::BuildObjectSpaceNormalTextureBakePlan(request);
+    EXPECT_FALSE(plan.Succeeded());
+    EXPECT_EQ(plan.Status,
+              Graphics::ObjectSpaceNormalTextureBakeStatus::InvalidGpuResource);
 }
 
 TEST(ObjectSpaceNormalTextureBake, RecordGpuBakeCommandsPinsRasterExtentAndDraw)
@@ -1008,6 +1022,40 @@ TEST(ObjectSpaceNormalTextureBake, RecordGpuBakeRejectsInvalidResourcesBeforeCom
 
     ASSERT_FALSE(result.has_value());
     EXPECT_EQ(result.error(), Core::ErrorCode::InvalidArgument);
+    EXPECT_TRUE(cmd.Events.empty());
+
+    const auto misalignedTexcoord =
+        Graphics::RecordObjectSpaceNormalTextureBake(
+            cmd,
+            Graphics::ObjectSpaceNormalTextureBakeGpuRecordDesc{
+                .Pipeline = RHI::PipelineHandle{5u, 1u},
+                .OutputTexture = RHI::TextureHandle{6u, 1u},
+                .IndexBuffer = RHI::BufferHandle{7u, 1u},
+                .TexcoordBDA = 0x1004u,
+                .NormalBDA = 0x2000u,
+                .IndexCount = 3u,
+                .Width = 16u,
+                .Height = 16u,
+            });
+    ASSERT_FALSE(misalignedTexcoord.has_value());
+    EXPECT_EQ(misalignedTexcoord.error(), Core::ErrorCode::InvalidArgument);
+    EXPECT_TRUE(cmd.Events.empty());
+
+    const auto misalignedNormal =
+        Graphics::RecordObjectSpaceNormalTextureBake(
+            cmd,
+            Graphics::ObjectSpaceNormalTextureBakeGpuRecordDesc{
+                .Pipeline = RHI::PipelineHandle{5u, 1u},
+                .OutputTexture = RHI::TextureHandle{6u, 1u},
+                .IndexBuffer = RHI::BufferHandle{7u, 1u},
+                .TexcoordBDA = 0x1000u,
+                .NormalBDA = 0x2002u,
+                .IndexCount = 3u,
+                .Width = 16u,
+                .Height = 16u,
+            });
+    ASSERT_FALSE(misalignedNormal.has_value());
+    EXPECT_EQ(misalignedNormal.error(), Core::ErrorCode::InvalidArgument);
     EXPECT_TRUE(cmd.Events.empty());
 
     const auto missingDilation = Graphics::RecordObjectSpaceNormalTextureBake(

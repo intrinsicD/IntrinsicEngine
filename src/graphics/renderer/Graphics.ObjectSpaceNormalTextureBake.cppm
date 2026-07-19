@@ -24,6 +24,10 @@ export namespace Extrinsic::Graphics
     inline constexpr std::uint32_t kObjectSpaceNormalBakeMaxPaddingTexels = 32u;
     inline constexpr std::uint32_t kObjectSpaceNormalBakeDilationOutputDescriptorSlot = 4u;
     inline constexpr std::uint32_t kObjectSpaceNormalBakeDilationScratchDescriptorSlot = 5u;
+    inline constexpr std::uint32_t
+        kObjectSpaceNormalBakeTexcoordAddressAlignment = sizeof(float) * 2u;
+    inline constexpr std::uint32_t
+        kObjectSpaceNormalBakeNormalAddressAlignment = sizeof(float);
 
     enum class NormalTextureSpace : std::uint8_t
     {
