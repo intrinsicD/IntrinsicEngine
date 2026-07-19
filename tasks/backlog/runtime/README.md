@@ -170,9 +170,11 @@ triggers. The implementation graph is:
   global asset/residency/import/bake owner after its async, scene, camera, and
   config capabilities exist; borrowed world handoffs never become hidden ECS
   ownership.
-- [`RUNTIME-182`](RUNTIME-182-extract-editor-ui-module.md) — compose the
-  optional global ImGui/host owner, with one frame-local kernel capture value
-  and app-owned Sandbox panels.
+- Active
+  [`RUNTIME-182`](../../active/RUNTIME-182-extract-editor-ui-module.md) —
+  compose the optional global ImGui/host owner, with one frame-local kernel
+  capture value, a preserved paired Begin/End bracket, and app-owned Sandbox
+  panels.
 - Re-scoped [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md)
   — make Sandbox defaults explicit app composition glue over the resolved
   owners, without `Engine&` or a new policy facade.

@@ -291,13 +291,17 @@ priority chain, extension slot, or experiment builder is created without a
 production consumer. The bounded implementation graph is
 `RUNTIME-179` AsyncWork, re-scoped `RUNTIME-172` SceneEditing,
 `RUNTIME-180` Camera, `RUNTIME-181` ConfigControl, `RUNTIME-183`
-AssetWorkflow, `RUNTIME-182` EditorUi, re-scoped `RUNTIME-168` Sandbox
+AssetWorkflow, active `RUNTIME-182` EditorUi, re-scoped `RUNTIME-168` Sandbox
 composition, existing `RUNTIME-129` operational normal bake,
 `RUNTIME-184` application-lifecycle removal, `RUNTIME-185` mechanism pruning,
 and `RUNTIME-186` residual auxiliary-surface cleanup followed by the
 `RUNTIME-187` exact Engine-surface ratchet. The bake and lifecycle leaves may
 proceed independently, then both gate mechanism pruning. The detailed graph
 and state scopes live in the [runtime backlog index](runtime/README.md).
+The current implementation slice is
+[`RUNTIME-182`](../active/RUNTIME-182-extract-editor-ui-module.md): it extracts
+the optional global ImGui/host owner while preserving the existing paired
+frame bracket and one completed capture snapshot.
 Sequencing note: tasks whose deliverable ADR-0024 supersedes are
 front-matter gated on their seam dependencies — `RUNTIME-150` on
 `ARCH-007`/`ARCH-008`, `RUNTIME-151` additionally on `ARCH-011`, `ARCH-006`
