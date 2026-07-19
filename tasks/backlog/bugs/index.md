@@ -36,6 +36,12 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
 
+- Closed 2026-07-19: [`BUG-115` — Test-gate routing case baseline drift](../../done/BUG-115-test-gate-routing-case-baseline-drift.md).
+  The exact `BUG-106` affected-case baseline now names the four current
+  `TaskPlanGraph` contracts plus the stable streaming task-kind contract and
+  carries matching `105`/`234` count ratchets. The live 4,154-case aggregate
+  and all 19 synthetic fail-closed routing regressions pass.
+
 - Closed 2026-07-18: [`BUG-114` — Release architecture SLOs used mismatched metrics and uncalibrated budgets](../../done/BUG-114-ci-release-architecture-slo-calibration.md).
   The repaired Release contract forces worker-local steals, measures direct
   signal-to-resume latency, removes the false critical-path timing claim, and

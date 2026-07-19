@@ -1,33 +1,14 @@
 module;
 
-#include <algorithm>
+#include <cstddef>
 #include <cstdint>
-#include <string>
-#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
-#include <unordered_map>
-#include <unordered_set>
-#include <utility>
-#include <vector>
-
-#include <entt/entity/entity.hpp>
-#include <entt/entity/registry.hpp>
-#include <glm/glm.hpp>
 
 export module Extrinsic.Runtime.RenderExtraction;
 
 import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.ECS.Components.AssetInstance;
-import Extrinsic.ECS.Components.GeometrySources;
-import Extrinsic.ECS.Component.DirtyTags;
-import Extrinsic.ECS.Component.ProceduralGeometryRef;
-import Extrinsic.ECS.Component.SpatialDebugBinding;
-import Extrinsic.ECS.Component.Transform;
-import Extrinsic.ECS.Component.Transform.WorldMatrix;
-import Extrinsic.ECS.Component.Culling.World;
-import Extrinsic.ECS.Component.Light;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
@@ -35,22 +16,10 @@ import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.RenderWorld;
-import Extrinsic.Graphics.TransformSyncSystem;
-import Extrinsic.Graphics.LightSystem;
-import Extrinsic.Graphics.VisualizationSyncSystem;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
-import Extrinsic.Graphics.Component.Material;
-import Extrinsic.Graphics.Component.RenderGeometry;
-import Extrinsic.Graphics.Component.VisualizationConfig;
-import Extrinsic.RHI.Types;
-import Extrinsic.Runtime.GraphGeometryPacker;
 export import Extrinsic.Runtime.GeometryAvailability;
-import Extrinsic.Runtime.MeshGeometryPacker;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
-import Extrinsic.Runtime.PointCloudGeometryPacker;
-import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProceduralGeometry;
-import Extrinsic.Runtime.ProceduralGeometryPacker;
 import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SpatialDebugAdapters;
@@ -623,286 +592,8 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] std::uint64_t GetVisualizationAdapterBindingRevision() const noexcept;
 
     private:
-        struct RenderableSidecar
-        {
-            Graphics::GpuInstanceHandle Instance{};
-            Graphics::Components::GpuSceneSlot GpuSlot{};
-            Graphics::Components::MaterialInstance Material{};
-            Graphics::Components::VisualizationConfig Visualization{};
-            bool HasVisualization{false};
-            Graphics::Components::VisualizationLaneOverrides VisualizationOverrides{};
-            bool HasVisualizationOverrides{false};
-            Graphics::GpuGeometryHandle Geometry{};
-            std::optional<ProceduralGeometryKey> ProceduralKey{};
-            // RUNTIME-085 Slice B — owned mesh-source residency handle.
-            // Distinct from `Geometry` (which mirrors the currently bound
-            // instance geometry) so retirement can free the runtime-owned
-            // upload even after a Slice C reupload swaps `Geometry`.
-            Graphics::GpuGeometryHandle MeshGeometry{};
-            // RUNTIME-086 Slice B — owned graph-source residency handle.
-            // Mesh and graph domains are mutually exclusive per entity, but
-            // the handles are tracked separately so an entity that flips
-            // domain releases the stale handle while the other path uploads.
-            Graphics::GpuGeometryHandle GraphGeometry{};
-            // RUNTIME-086 — the render-lane hints (`RenderEdges` /
-            // `RenderPoints`) the resident `GraphGeometry` upload was packed
-            // for. The line lane's presence changes the packed upload (line
-            // indices), so a change in requested lanes must force a repack even
-            // when no geometry dirty tag is set — otherwise a points-only graph
-            // that later gains `RenderEdges` would rebind a lineless upload and
-            // draw no lines until an unrelated dirty tag forced a repack.
-            bool GraphPackedLines{false};
-            bool GraphPackedPoints{false};
-            Graphics::GpuInstanceHandle GraphPointLaneInstance{};
-            // RUNTIME-087 Slice B — owned point-cloud-source residency handle.
-            // Mesh, graph, and point-cloud domains are mutually exclusive per
-            // entity, but the handles are tracked separately so an entity that
-            // flips domain releases the stale handle while the other path
-            // uploads. Point clouds carry no lane mask (positions only), so no
-            // packed-lane tracking is needed.
-            Graphics::GpuGeometryHandle PointCloudGeometry{};
-            // RUNTIME-088 Slice B — optional mesh edge/vertex primitive view
-            // sidecars attached to this mesh renderable. Each enabled view owns
-            // its own `GpuWorld` instance (rendered as an extra line/point lane
-            // with the same transform/bounds as the parent surface) plus a
-            // single-owner geometry handle the cache frees on retirement.
-            // Mutually independent of the surface `MeshGeometry`; both views
-            // are released whenever the entity stops being a mesh-domain
-            // renderable or drops the matching render component.
-            Graphics::GpuInstanceHandle MeshEdgeViewInstance{};
-            Graphics::GpuGeometryHandle MeshEdgeViewGeometry{};
-            Graphics::GpuInstanceHandle MeshVertexViewInstance{};
-            Graphics::GpuGeometryHandle MeshVertexViewGeometry{};
-        };
+        struct State;
+        std::unique_ptr<State> m_State;
 
-        // RUNTIME-088 Slice B — selects which primitive view a reconcile/release
-        // call operates on. The lifecycle is identical for both; the kind only
-        // changes the pack function, the render-lane flag, the sidecar
-        // instance/geometry fields, and which counters move.
-        enum class MeshPrimitiveViewKind : std::uint8_t
-        {
-            Edge,
-            Vertex,
-        };
-
-        [[nodiscard]] RenderableSidecar* EnsureRenderable(std::uint32_t stableId,
-                                                          Graphics::IRenderer& renderer,
-                                                          RuntimeRenderExtractionStats& stats);
-        void ApplyMaterialTextureBindings(std::uint32_t stableId,
-                                          RenderableSidecar& sidecar,
-                                          Graphics::IRenderer& renderer,
-                                          Graphics::GpuAssetCache* gpuAssets,
-                                          RuntimeRenderExtractionStats& stats);
-        void ApplyProgressivePresentationBindings(
-            entt::registry& registry,
-            entt::entity entity,
-            const ECS::Components::GeometrySources::ConstSourceView& view,
-            RenderableSidecar& sidecar,
-            Graphics::IRenderer& renderer,
-            Graphics::GpuAssetCache* gpuAssets,
-            RuntimeRenderExtractionStats& stats);
-        void RetireMissingRenderables(const std::unordered_set<std::uint32_t>& liveKeys,
-                                      Graphics::IRenderer& renderer,
-                                      RuntimeRenderExtractionStats& stats);
-        [[nodiscard]] bool BindProceduralGeometry(const ECS::Components::ProceduralGeometryRef& ref,
-                                                   RenderableSidecar& sidecar,
-                                                   Graphics::IRenderer& renderer,
-                                                   RuntimeRenderExtractionStats& stats);
-        [[nodiscard]] bool BindMeshGeometry(entt::registry& registry,
-                                             entt::entity entity,
-                                             const ECS::Components::GeometrySources::ConstSourceView& view,
-                                             RenderableSidecar& sidecar,
-                                             Graphics::IRenderer& renderer,
-                                             RuntimeRenderExtractionStats& stats);
-        [[nodiscard]] bool BindGraphGeometry(entt::registry& registry,
-                                             entt::entity entity,
-                                             const ECS::Components::GeometrySources::ConstSourceView& view,
-                                             RenderableSidecar& sidecar,
-                                             Graphics::IRenderer& renderer,
-                                             RuntimeRenderExtractionStats& stats);
-        [[nodiscard]] bool EnsureGraphPointLaneInstance(RenderableSidecar& sidecar,
-                                                        std::uint32_t stableId,
-                                                        Graphics::IRenderer& renderer,
-                                                        RuntimeRenderExtractionStats& stats);
-        void ReleaseGraphPointLaneInstance(RenderableSidecar& sidecar,
-                                           Graphics::IRenderer& renderer,
-                                           RuntimeRenderExtractionStats& stats);
-        [[nodiscard]] bool BindPointCloudGeometry(entt::registry& registry,
-                                                  entt::entity entity,
-                                                  const ECS::Components::GeometrySources::ConstSourceView& view,
-                                                  RenderableSidecar& sidecar,
-                                                  Graphics::IRenderer& renderer,
-                                                  RuntimeRenderExtractionStats& stats);
-
-        // RUNTIME-106 — reconcile one mesh primitive view against the ECS
-        // render component set for the frame. `desired` is the matching
-        // `RenderEdges` / `RenderPoints` component presence; when true the view
-        // is created/reused/repacked (driven by `meshDirty`) and a
-        // `TransformSyncRecord` is appended so it renders as an extra line/point
-        // lane. `view` must resolve `Domain::Mesh`. `model`/`bounds`/
-        // `materialSlot` mirror the domain entity transform/material so the
-        // view tracks the same entity even when no `RenderSurface` lane exists.
-        [[nodiscard]] bool ReconcileMeshPrimitiveView(MeshPrimitiveViewKind kind,
-                                        const ECS::Components::GeometrySources::ConstSourceView& view,
-                                        RenderableSidecar& sidecar,
-                                        const glm::mat4& model,
-                                        std::uint32_t materialSlot,
-                                        const RHI::GpuBounds& bounds,
-                                        std::uint32_t stableId,
-                                        bool desired,
-            const Graphics::Components::RenderEdges* edges,
-            const Graphics::Components::RenderPoints* points,
-            const Graphics::Components::VisualizationConfig* visualization,
-            bool meshDirty,
-            Graphics::IRenderer& renderer,
-            RuntimeRenderExtractionStats& stats);
-
-        // RUNTIME-088 Slice B — release one mesh primitive view sidecar: enqueue
-        // its geometry handle for deferred retire, free its instance, reset the
-        // sidecar fields, and (when a handle was live) bump the view's
-        // `Releases`. No-op when the view is not resident.
-        void ReleaseMeshPrimitiveView(MeshPrimitiveViewKind kind,
-                                      RenderableSidecar& sidecar,
-                                      Graphics::IRenderer& renderer,
-                                      RuntimeRenderExtractionStats& stats);
-        void AppendVisualizationAdapters(std::uint32_t stableId,
-                                         const RenderableSidecar& sidecar,
-                                         RuntimeRenderExtractionStats& stats);
-
-        // Extraction phases — private, non-virtual decomposition of
-        // `ExtractAndSubmit` in frame order. Each phase reads live ECS state
-        // and writes only cache-owned scratch/sidecar storage; no phase hands
-        // ECS references to graphics.
-        void ExtractLightsForEntity(entt::registry& registry,
-                                    entt::entity entity,
-                                    const glm::mat4& worldMatrix);
-        // Reconcile one renderable-hinted entity for the frame: validate its
-        // render hints, geometry/asset/material sources and transform, ensure
-        // the persistent GPU sidecar, reconcile geometry residency
-        // (procedural/mesh/graph/point-cloud incl. eligibility-flip releases),
-        // and append dense TransformSync/VisualizationSync records. Entities
-        // whose sources are not renderable or not yet resident are counted in
-        // `stats` but publish no draw candidate; their sidecars may persist so
-        // a later frame can recover residency without a full re-upload.
-        void ReconcileRenderableEntity(entt::registry& registry,
-                                       entt::entity entity,
-                                       const glm::mat4& worldMatrix,
-                                       Graphics::IRenderer& renderer,
-                                       Graphics::GpuAssetCache* gpuAssets,
-                                       RuntimeRenderExtractionStats& stats);
-        // Spatial-debug adapter pump (RUNTIME-082 Slice D): walk
-        // `SpatialDebugBinding` entities independently of renderable hints and
-        // accumulate the shared `SpatialDebugSnapshotBatch`.
-        void ExtractSpatialDebug(entt::registry& registry,
-                                 RuntimeRenderExtractionStats& stats);
-        // Final phase: fold per-frame counters and per-tick retire deltas into
-        // `stats`, assemble the `RuntimeRenderSnapshotBatch` from cache-owned
-        // spans, and submit it. The renderer copies the batch during
-        // `SubmitRuntimeSnapshots`, so the spans only need to stay valid for
-        // the duration of that call.
-        void FinalizeAndSubmitSnapshot(
-            Graphics::IRenderer& renderer,
-            const SelectionController* selection,
-            std::uint32_t runtimeSnapshotStorageSlot,
-            std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos,
-            RuntimeRenderExtractionStats& stats);
-
-        // RUNTIME-085 Slice C — runtime-owned deferred-retire queue for mesh
-        // upload handles. Mirrors the shape of
-        // `ProceduralGeometryCache::RetireRecord` but without a refcounted key
-        // because mesh uploads are not shared across entities. A record is
-        // enqueued with `DeadlineSet = false`; the next `TickMeshGeometry`
-        // anchors `Deadline = currentFrame + framesInFlight` and frees the
-        // handle once `Deadline <= currentFrame`.
-        // A record is enqueued with `DeadlineSet = false`; the next
-        // `TickMeshGeometry` / `TickGraphGeometry` anchors
-        // `Deadline = currentFrame + framesInFlight` and frees the handle once
-        // `Deadline <= currentFrame`. The record is domain-agnostic (handle +
-        // deadline only), so the graph-residency retire queue reuses it.
-        struct GeometryRetireRecord
-        {
-            Graphics::GpuGeometryHandle Handle{};
-            std::uint64_t Deadline = 0;
-            bool DeadlineSet = false;
-        };
-
-        void EnqueueMeshRetire(Graphics::GpuGeometryHandle handle);
-        // RUNTIME-086 Slice B — graph-residency retire enqueue, mirroring
-        // `EnqueueMeshRetire`.
-        void EnqueueGraphRetire(Graphics::GpuGeometryHandle handle);
-        // RUNTIME-087 — point-cloud-residency retire enqueue, mirroring
-        // `EnqueueGraphRetire`.
-        void EnqueuePointCloudRetire(Graphics::GpuGeometryHandle handle);
-        // RUNTIME-088 Slice B — mesh-primitive-view retire enqueue. Edge and
-        // vertex view geometry share one queue (both are mesh-domain residency
-        // freed on the same `framesInFlight` window), mirroring the per-domain
-        // enqueues above.
-        void EnqueueMeshPrimitiveViewRetire(Graphics::GpuGeometryHandle handle);
-
-        std::unordered_map<std::uint32_t, RenderableSidecar> m_Renderables{};
-        std::unordered_set<std::uint32_t> m_LiveRenderableKeys{};
-        std::vector<Graphics::TransformSyncRecord> m_Transforms{};
-        std::vector<Graphics::VisualizationSyncRecord> m_Visualizations{};
-        std::vector<Graphics::LightSnapshot> m_Lights{};
-        ProceduralGeometryCache m_ProceduralGeometry{};
-        ProceduralGeometryPackBuffer m_ProceduralPack{};
-        ProceduralGeometryCacheStats m_PrevProceduralStats{};
-        MeshPackBuffer m_MeshPack{};
-
-        // RUNTIME-085 Slice C — deferred-retire queue + running FreeRetires
-        // accumulator. `m_PrevMeshFreeRetires` lets `ExtractAndSubmit` emit
-        // `MeshGeometryFreeRetires` as a per-tick delta, matching the
-        // `ProceduralGeometryFreeRetires` accounting path.
-        std::vector<GeometryRetireRecord> m_MeshRetire{};
-        std::uint32_t m_MeshFreeRetires{0};
-        std::uint32_t m_PrevMeshFreeRetires{0};
-
-        // RUNTIME-086 Slices B/C — graph-residency scratch buffer + deferred-
-        // retire queue, mirroring the mesh-residency members above.
-        GraphPackBuffer m_GraphPack{};
-        std::vector<GeometryRetireRecord> m_GraphRetire{};
-        std::uint32_t m_GraphFreeRetires{0};
-        std::uint32_t m_PrevGraphFreeRetires{0};
-
-        // RUNTIME-087 — point-cloud-residency scratch buffer + deferred-retire
-        // queue, mirroring the graph-residency members above.
-        PointCloudPackBuffer m_PointCloudPack{};
-        std::vector<GeometryRetireRecord> m_PointCloudRetire{};
-        std::uint32_t m_PointCloudFreeRetires{0};
-        std::uint32_t m_PrevPointCloudFreeRetires{0};
-
-        // RUNTIME-088 Slice B — mesh-primitive-view scratch buffer (reused
-        // serially across the edge then vertex pack each frame), shared
-        // deferred-retire queue for both view lanes, and the FreeRetires
-        // accumulator/prev-snapshot the per-tick delta is derived from.
-        // `m_MeshPrimitiveViewSettings` is retained as a temporary compatibility
-        // shim for older editor/tests APIs; RUNTIME-106 extraction uses ECS
-        // `RenderEdges` / `RenderPoints` components as the authority.
-        MeshPrimitiveViewBuffer m_MeshPrimitiveViewPack{};
-        std::vector<GeometryRetireRecord> m_MeshPrimitiveViewRetire{};
-        std::uint32_t m_MeshPrimitiveViewFreeRetires{0};
-        std::uint32_t m_PrevMeshPrimitiveViewFreeRetires{0};
-        std::unordered_map<std::uint32_t, MeshPrimitiveViewSettings> m_MeshPrimitiveViewSettings{};
-        std::unordered_map<std::uint32_t, Graphics::MaterialTextureAssetBindings> m_MaterialTextureBindings{};
-
-        // RUNTIME-082 Slice D — owned adapter instances + a registry mirror
-        // resolved per-entity by `ExtractAndSubmit`. The batch buffer is
-        // cleared per frame and its spans are attached to
-        // `RuntimeRenderSnapshotBatch::SpatialDebug*` for the renderer.
-        std::unordered_map<std::uint64_t, std::unique_ptr<ISpatialDebugAdapter>> m_SpatialDebugAdapters{};
-        SpatialDebugAdapterRegistry m_SpatialDebugRegistry{};
-        SpatialDebugSnapshotBatch m_SpatialDebugBatch{};
-
-        struct VisualizationAdapterState;
-        // RUNTIME-083 Slices B/E — owned visualization adapter instances,
-        // non-owning registry mirror, per-renderable binding table, and a
-        // frame-local packet batch attached to `RuntimeRenderSnapshotBatch`.
-        // This is intentionally hidden behind implementation state: the
-        // binding API is public, but the heavy adapter/batch storage imports
-        // visualization packet internals that should not expand this exported
-        // cache object's layout in every importing module.
-        std::unique_ptr<VisualizationAdapterState> m_VisualizationState{};
-
-        RuntimeRenderExtractionStats m_LastStats{};
     };
 }

@@ -9,8 +9,6 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/active/ARCH-014-kernel-convergence-tracking.md)
-- `HARDEN-086` — Guarded hierarchy query helpers (tasks/active/HARDEN-086-guarded-hierarchy-query-helpers.md)
-- `RUNTIME-166` — Slim and partition the RenderExtraction module (tasks/active/RUNTIME-166-slim-render-extraction-module.md)
 - `RUNTIME-179` — Extract the async-work composition module (tasks/active/RUNTIME-179-extract-async-work-module.md)
 
 ## Theme B — Rendering modernization
@@ -26,7 +24,7 @@ the authoritative open/unblocked view.
 - blocked by `RUNTIME-181`: `GRAPHICS-127` — Native GPU timestamp profiler and frame-recipe timing integration (tasks/backlog/rendering/GRAPHICS-127-native-gpu-timestamp-profiler.md)
 - blocked by `RUNTIME-183`: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
 - unblocked: `RUNTIME-139` — Static AoS storage and shader operational path (tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md)
-- blocked by `RUNTIME-166`: `RUNTIME-177` — Immediate-mode debug-draw seam for runtime integrations (tasks/backlog/runtime/RUNTIME-177-immediate-mode-debug-draw-seam.md)
+- blocked by `RUNTIME-181`: `RUNTIME-177` — Immediate-mode debug-draw seam for runtime integrations (tasks/backlog/runtime/RUNTIME-177-immediate-mode-debug-draw-seam.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
@@ -38,7 +36,7 @@ the authoritative open/unblocked view.
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
 - blocked by `RUNTIME-172`: `RUNTIME-168` — Privatize Sandbox default-policy composition (tasks/backlog/runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
-- blocked by `HARDEN-086`: `RUNTIME-172` — Extract the scene-editing composition module (tasks/backlog/runtime/RUNTIME-172-privatize-scene-document-surface.md)
+- blocked by `RUNTIME-179`: `RUNTIME-172` — Extract the scene-editing composition module (tasks/backlog/runtime/RUNTIME-172-privatize-scene-document-surface.md)
 - unblocked: `RUNTIME-180` — Extract the camera composition module (tasks/backlog/runtime/RUNTIME-180-extract-camera-module.md)
 - unblocked: `RUNTIME-181` — Extract the config-control composition module (tasks/backlog/runtime/RUNTIME-181-extract-config-control-module.md)
 - unblocked: `RUNTIME-182` — Extract the editor-UI composition module (tasks/backlog/runtime/RUNTIME-182-extract-editor-ui-module.md)

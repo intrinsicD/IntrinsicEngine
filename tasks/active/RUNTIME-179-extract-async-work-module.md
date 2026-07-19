@@ -232,13 +232,11 @@ Evidence recorded 2026-07-18:
   `IntrinsicTests` aggregate build completed 1562/1562, and the complete
   CPU-supported CTest selector passed 4121/4121 selected tests with one
   expected GLFW/LSan capability skip.
-- The additional live `IntrinsicTests` gate-routing audit exposed a
-  pre-existing baseline mismatch also present on `main`: four retired
-  `CoreGraphInterfaces` case names remain in the baseline while the registry
-  exposes their `TaskPlanGraph` replacements, and
-  `RuntimeStreamingExecutor.RuntimeTaskKindTokensRemainStable` is absent.
-  RUNTIME-179 keeps only its scoped routing additions; the coordinator is
-  tracking the shared baseline repair separately before integration.
+- Integration with repaired `main` through `82ba8272` resolved the shared
+  gate-routing baseline mismatch while preserving RUNTIME-179's scoped cases.
+  The reconciled `ci-fast` runtime selection passed 238/238, and the live
+  `IntrinsicTests` routing audit passed across 36 targets, 4172 cases, and
+  338 sources.
 
 ## Forbidden changes
 - Adding another executor, scheduler, registry, or wrapper service.

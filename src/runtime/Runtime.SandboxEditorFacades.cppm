@@ -166,6 +166,7 @@ export namespace Extrinsic::Runtime
         GeometryProcessingFailed,
         RenderGraphStatsUnavailable,
         EditorCommandHistoryUnavailable,
+        CorruptHierarchy,
     };
 
     enum class SandboxEditorCommandStatus : std::uint8_t

@@ -9,6 +9,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -33,6 +34,19 @@ namespace pn = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
 
 using Extrinsic::ECS::EntityHandle;
 using Extrinsic::ECS::Scene::Registry;
+
+static_assert(
+    std::is_default_constructible_v<
+        Extrinsic::Runtime::RenderExtractionCache>);
+static_assert(
+    std::is_destructible_v<
+        Extrinsic::Runtime::RenderExtractionCache>);
+static_assert(
+    !std::is_copy_constructible_v<
+        Extrinsic::Runtime::RenderExtractionCache>);
+static_assert(
+    !std::is_move_constructible_v<
+        Extrinsic::Runtime::RenderExtractionCache>);
 
 namespace
 {

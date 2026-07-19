@@ -5402,3 +5402,47 @@ PImpl/checker ratchet. Strict task/state/docs/layering/root/workshop checks,
 the live convergence checker, and all 19 checker regressions passed; three
 independent adversarial reviews found no residual scope, reference, metric, or
 dependency-cycle issue. Decision checkpoint: `b62005e4`.
+
+[`HARDEN-086`](HARDEN-086-guarded-hierarchy-query-helpers.md) — guarded
+hierarchy queries retired to `tasks/done/` on 2026-07-18 at `CPUContracted`.
+The existing `Extrinsic.ECS.Hierarchy.Structure` module now exposes two
+right-sized free queries for exact immediate-child order and iterative
+descendant preorder. A shared checked child-chain implementation validates
+root/link/component/parent/backlink/count/cycle and 65,536-entity bound
+invariants; every failure clears collected output. Runtime editor delete
+planning therefore fails before publishing a partial command, while
+progressive composition reports corrupt hierarchy instead of a truncated
+summary. No iterator framework, service, registry, recursion, or new layer edge
+was introduced. Focused coverage passed 28/28, the complete CPU-supported
+selector passed 4,110/4,110 with one expected GLFW/LSan capability skip, and
+strict layering, test-layout, documentation-link, task-policy, and module
+inventory checks passed. Implementation checkpoint: `f310e872`; main merge:
+`b983f7c3`.
+
+[`RUNTIME-166`](RUNTIME-166-slim-render-extraction-module.md) —
+RenderExtraction interface slimming retired to `tasks/done/` on 2026-07-19 at
+`Operational`. `RenderExtractionCache` now exposes one opaque implementation
+object while its state has exactly one definition in a non-exported
+implementation partition; base extraction, geometry residency/retirement, and
+visualization/spatial adapters compile as separate ordinary implementation
+units. The primary interface fell from 908 to 599 lines, 38 to 17 module
+dependency statements, and 14 to 5 global-fragment includes without changing
+the public token stream or runtime behavior. A geometry-only touch compiled
+only its implementation object plus the runtime archive. Five alternating,
+same-host Clang 20 direct compiler-edge pairs with ccache disabled measured a
+bounded primary-interface median reduction from 40.87s to 20.72s (49.3%);
+this is not a cold-build, full-gate, or whole-tree claim. Focused extraction
+coverage passed 145/145, the full CPU-supported selector passed 4,104/4,104
+with one expected GLFW/LSan capability skip, and strict structural checks
+passed. Implementation checkpoint: `c02eb142`; main merge: `66f5f7b9`.
+
+[`BUG-115`](BUG-115-test-gate-routing-case-baseline-drift.md) — test-gate
+routing baseline drift retired on 2026-07-19. The exact `BUG-106`
+affected-case baseline replaced four retired Core graph names with their
+current `TaskPlanGraph` contracts, added the stable runtime streaming
+task-kind-token contract, and ratcheted the paired per-target/total counts from
+104/233 to 105/234. No production source, test body, ownership, label, or
+aggregate changed. The live `IntrinsicTests` reconciliation passed with 36
+targets, 4,154 cases, and 338 assertion sources; all 19 synthetic fail-closed
+routing regressions and strict task/test-layout checks passed. Implementation
+checkpoint: `fdd466e4`.

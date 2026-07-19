@@ -37,7 +37,6 @@ import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.MetaData;
-import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
@@ -46,6 +45,7 @@ import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Components.Selection;
+import Extrinsic.ECS.Hierarchy.Structure;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.CameraSnapshots;
@@ -3195,17 +3195,8 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] ProgressiveEntityShape InferProgressiveEntityShape(
-            const entt::registry& raw,
-            const ECS::EntityHandle entity,
             const GS::ConstSourceView& view)
         {
-            if (const auto* hierarchy =
-                    raw.try_get<ECSC::Hierarchy::Component>(entity);
-                hierarchy != nullptr && hierarchy->ChildCount > 0u)
-            {
-                return ProgressiveEntityShape::Composition;
-            }
-
             const GS::SourceAvailability availability =
                 GS::BuildSourceAvailability(view);
             switch (availability.ProvenanceDomain)
@@ -3370,30 +3361,31 @@ namespace Extrinsic::Runtime
 
         void AccumulateProgressiveCompositionSummary(
             const entt::registry& raw,
-            SandboxEditorProgressiveCompositionSummary& summary,
+            SandboxEditorProgressiveRenderDataModel& model,
             const ECS::EntityHandle entity,
             const DerivedJobQueueSnapshot* jobs)
         {
-            const auto* hierarchy =
-                raw.try_get<ECSC::Hierarchy::Component>(entity);
-            if (hierarchy == nullptr || hierarchy->ChildCount == 0u)
+            const ECS::Hierarchy::Structure::HierarchyQueryResult children =
+                ECS::Hierarchy::Structure::CollectChildren(raw, entity);
+            if (!children.Succeeded())
+            {
+                AddDiagnostic(
+                    model.Diagnostics,
+                    SandboxEditorDiagnosticCode::CorruptHierarchy,
+                    std::string{"Progressive composition hierarchy query failed: "} +
+                        ECS::Hierarchy::Structure::
+                            DebugNameForHierarchyQueryStatus(children.Status) +
+                        ".");
+                return;
+            }
+            if (children.Entities.empty())
                 return;
 
+            SandboxEditorProgressiveCompositionSummary& summary =
+                model.Composition;
             summary.HasChildren = true;
-            ECS::EntityHandle child = hierarchy->FirstChild;
-            std::uint32_t guard = 0u;
-            while (child != ECS::InvalidEntityHandle &&
-                   raw.valid(child) &&
-                   guard < hierarchy->ChildCount)
-            {
+            for (const ECS::EntityHandle child : children.Entities)
                 AccumulateProgressiveChildSummary(raw, summary, child, jobs);
-                const auto* childHierarchy =
-                    raw.try_get<ECSC::Hierarchy::Component>(child);
-                child = childHierarchy != nullptr
-                    ? childHierarchy->NextSibling
-                    : ECS::InvalidEntityHandle;
-                ++guard;
-            }
         }
 
         [[nodiscard]] SandboxEditorProgressiveRenderDataModel
@@ -3408,7 +3400,7 @@ namespace Extrinsic::Runtime
             }
             SandboxEditorProgressiveRenderDataModel model{};
             const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
-            model.Shape = InferProgressiveEntityShape(raw, entity, view);
+            model.Shape = InferProgressiveEntityShape(view);
 
             const std::uint32_t stableEntityId =
                 SelectionController::ToStableEntityId(entity);
@@ -3418,9 +3410,11 @@ namespace Extrinsic::Runtime
                 stableEntityId);
             AccumulateProgressiveCompositionSummary(
                 raw,
-                model.Composition,
+                model,
                 entity,
                 context.DerivedJobs);
+            if (model.Composition.HasChildren)
+                model.Shape = ProgressiveEntityShape::Composition;
 
             const auto* bindings =
                 raw.try_get<ProgressivePresentationBindings>(entity);
@@ -11476,6 +11470,8 @@ namespace Extrinsic::Runtime
             return "InvalidVertexChannelBinding";
         case SandboxEditorDiagnosticCode::GeometryProcessingFailed:
             return "GeometryProcessingFailed";
+        case SandboxEditorDiagnosticCode::CorruptHierarchy:
+            return "CorruptHierarchy";
         case SandboxEditorDiagnosticCode::RenderGraphStatsUnavailable:
             return "RenderGraphStatsUnavailable";
         case SandboxEditorDiagnosticCode::EditorCommandHistoryUnavailable:
