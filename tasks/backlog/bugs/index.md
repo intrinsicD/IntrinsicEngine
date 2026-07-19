@@ -5,6 +5,12 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-117` — Dropped-geometry reimport test exhausts a frame-count wait budget](BUG-117-dropped-geometry-reimport-frame-budget-flake.md):
+  the real asynchronous dropped-import/reimport contract exhausted `128`
+  tight Null/headless frames before observing its completion event during one
+  full CPU run, then passed in isolation and in an unchanged complete rerun;
+  diagnose and replace the scheduling-sensitive wait without a RUNTIME-188
+  timing workaround.
 - [`BUG-110` — Implicit smoothing applies boundary pins after rather than during solve](BUG-110-implicit-smoothing-boundary-dirichlet-solve.md):
   `PreserveBoundary` currently solves an all-free shifted system and only then
   overwrites boundary entries, so interior vertices do not satisfy the claimed
