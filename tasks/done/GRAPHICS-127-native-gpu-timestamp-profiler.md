@@ -13,31 +13,23 @@ maturity_target: Operational
 
 ## Status
 
-- In progress as of 2026-07-19; owner: Codex team; implementation branch:
-  `codex/graphics-127-gpu-profiler`.
-- All five planned slices are implemented on the implementation branch. The
-  RHI lifecycle checkpoint is CPU-contracted:
-  the repaired provenance contract, truthful Null adapter, checked timestamp
-  helpers, and focused CPU coverage are complete. The native Vulkan checkpoint
-  now owns a fixed device-lifetime query pool, resolves submitted metadata only
-  after the reused slot's existing fence proof, and degrades unsupported or
-  failed timestamp setup without affecting device operation. The graphics-only
-  compiled-pass checkpoint now preplans immutable scopes for accepted
-  serial/parallel and graphics/async lanes, submits only globally advanced
-  candidates, resolves exact reused-slot keys, publishes fresh recorded native
-  rows to existing telemetry, and retains detailed last-good frame stats as
-  stale on every nonfresh path. The config/control checkpoint now owns a
-  default-off round-tripped hot field, synchronous Editor/AgentCli apply,
-  one post-`UiEndCapture` immutable frame sample, and the existing Frame Graph
-  panel's config and full profile projection. CPU contracts and current-state
-  cross-layer docs cover that slice.
-- A pre-audit operational checkpoint ran non-skipped on a host exposing an
-  NVIDIA GeForce RTX 3050 with driver 590.48.01. Its evidence is superseded by
-  the results-audit fixes for multi-wrap ambiguity, selected-device binding,
-  device-loss propagation, and per-frame unsupported queues. The task remains
-  active pending the held post-audit CPU/Vulkan verification and final
-  integration review;
-  this evidence slice does not retire it.
+- Completed on 2026-07-19 at `Operational` maturity on Vulkan-capable hosts
+  and `CPUContracted` on Null/unsupported hosts. Integrated implementation
+  commit: `9dedc656`; integration branch:
+  `codex/graphics-127-gpu-profiler-integrated`.
+- All five slices are complete. The repaired RHI provenance contract, truthful
+  Null adapter, fixed device-lifetime Vulkan query pool, exact submitted-frame
+  and reused-slot retirement, immutable compiled-pass planning, accepted-queue
+  serial/parallel instrumentation, fresh-only telemetry publication,
+  last-good stale presentation, default-off config lane, synchronous
+  Editor/AgentCli apply, and existing Frame Graph panel projection are all
+  integrated.
+- The held post-audit verification passed on the integrated head after the
+  multi-wrap, selected-device, device-loss, and per-frame unsupported-queue
+  closures. A non-skipped named-pass smoke crossed two complete slot-reuse
+  windows on an NVIDIA GeForce RTX 3050 with driver 590.48.01, and the
+  complete ASan+UBSan `gpu` + `vulkan` intersection passed 46/46 with zero
+  skips. The detailed completion evidence is recorded under `## Verification`.
 - `RUNTIME-181` and `RUNTIME-182` are retired, so ConfigControl and EditorUi
   are settled owners, not future blockers.
 - The 2026-07-19 activation audit found the exported profiler seam unused in
@@ -391,13 +383,14 @@ commit; not current-head completion evidence):
   3050 physical device reported API 1.4.325, proprietary driver 590.48.01,
   `timestampValidBits = 64`, and `timestampPeriod = 1 ns`. That host-wide
   observation did not prove which physical device the engine selected. The
-  post-audit smoke now records selected-device facts and UUID from the
-  engine-owned profiler diagnostic; refreshed binding evidence is pending the
-  held final rerun.
+  later post-audit smoke recorded selected-device facts and UUID from the
+  engine-owned profiler diagnostic; the integrated completion evidence below
+  contains that refreshed binding.
 - The earlier native case completed 8 frames with 3 frames in flight and
   resolved an older `NativeGpu` `SurfacePass` sample into telemetry. Its exact
   duration and frame metadata are intentionally not carried forward as
-  evidence for the post-audit head; the held final rerun must replace them.
+  evidence for the post-audit head; the integrated completion evidence below
+  replaced them.
 - Graphics-only and async-compute serial/parallel fixtures retained identical
   readback bytes and stable validation counters. Exact candidate-frame
   resolution, unique scope parity, graphics `SurfacePass`, async-compute
@@ -405,6 +398,45 @@ commit; not current-head completion evidence):
 - `VulkanFailClosedContract.Profiler*` passed 4/4. Strict layering, test
   layout, documentation-link, task-policy/task-schema, and generated module
   inventory checks passed.
+
+Integrated completion evidence recorded on 2026-07-19 at `9dedc656` on the
+current-main base `3d60750e`:
+
+- `ci` configured with Clang 23 and sanitizers disabled, and
+  `cmake --build --preset ci --target IntrinsicTests` passed. The focused
+  config/profiler/telemetry/renderer/runtime/editor selector passed 322/322.
+  The canonical CPU-supported selector selected 4,207 cases: 4,206 passed,
+  the expected GLFW/LSan capability case skipped, and none failed.
+- `ci-vulkan` configured with Clang 23 and ASan+UBSan. The canonical
+  `IntrinsicTests` aggregate built `ExtrinsicSandbox` directly through the
+  retired `BUG-116` dependency repair; no separate Sandbox build was needed.
+  The focused profiler/device-loss contracts passed 7/7, and the
+  `NativeGpuTimestamps|ParallelRecordingMatchesSerial` selector passed all
+  three cases non-skipped. The complete `gpu` + `vulkan` intersection then
+  passed 46/46 with zero skips and zero failures, including both Sandbox
+  process contracts.
+- A direct run under the exact CTest environment and working directory wrote
+  one GTest XML case with one test, zero failures, zero errors, and zero
+  skips. The selected-device diagnostic recorded NVIDIA GeForce RTX 3050,
+  physical-device Vulkan 1.4.325, loader Vulkan 1.4.309, engine-requested
+  Vulkan 1.3.0, NVIDIA driver 590.48.01 (`2475425856`), device UUID
+  `4cee065aaab797b840be55d516d2a53c`, `timestampPeriodNs=1`, graphics family
+  0 with 64 valid timestamp bits, and async-compute family 2 with 64 valid
+  bits.
+- The native case completed 8 successful frames with 3 frames in flight,
+  reported profiler `Ready` and render-graph profile `Resolved`, and
+  correlated submitted frame 4 to reused slot 1 at sample age 3. Its recorded
+  `SurfacePass` row was `Recorded`, `NativeGpu`, finite, and positive. The
+  observed 5,120 ns duration is diagnostic data only; it is not a wall-clock,
+  overhead, comparison, or performance claim.
+- The strict clean-workshop bundle passed layering over 749 files, 6,651
+  source references, and 85 CMake links with zero violations or allowlist
+  entries. Its manual rows also passed: exported types remain within allowed
+  layers, the renderer-owned cache is the task's narrow existing-owner seam,
+  typed `FramePassId` routing remains intact, and no recipe dependency was
+  added. Strict task policy/schema/state-link, test-layout, 2,932-link docs,
+  module-inventory, session-brief, whitespace, and no-`ara` diff checks also
+  passed.
 
 ## Forbidden changes
 
@@ -424,16 +456,16 @@ commit; not current-head completion evidence):
 ## Maturity
 
 - Target: `Operational` on Vulkan-capable hosts; `CPUContracted` everywhere else.
-- The prior non-skipped NVIDIA/Vulkan `Operational` observation is superseded
-  by the post-audit code changes. Current-head Vulkan maturity remains pending
-  until the held exact-head named-pass and slot-reuse smoke reruns non-skipped;
-  unsupported hosts retain the explicit `CPUContracted`/fail-closed branch.
-- Operational evidence requires a non-skipped native-Vulkan smoke with named pass timing and slot reuse; CPU/Null lifecycle tests alone are insufficient.
-- Retirement evidence must cite the successful GPU-smoke host, Vulkan backend,
-  physical GPU, driver, timestamp-valid-bit capability, frames-in-flight, and
-  resolved submitted-frame/slot correlation. An unsupported operational
-  device proves only the fail-closed branch, not native `Operational`
-  maturity.
+- Reached: `Operational` on the integrated native-Vulkan path at `9dedc656`.
+  The non-skipped named-pass smoke proved actual timestamp resolution after
+  two slot-reuse windows, while the complete sanitizer-instrumented
+  capability cohort passed with zero skips.
+- Null and unsupported devices remain intentionally `CPUContracted` with
+  explicit fail-closed provenance. No separate `Operational` follow-up is
+  owed because the supported native-Vulkan path reached that maturity here.
+- The exact GPU, driver, Vulkan API identities, timestamp-valid-bit
+  capabilities, frames-in-flight count, and resolved submitted-frame/slot
+  correlation are recorded in the integrated completion evidence above.
 
 ## Native API references
 

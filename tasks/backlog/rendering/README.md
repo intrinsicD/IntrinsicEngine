@@ -26,16 +26,6 @@ without requiring them to read every file.
 
 - The 2026-07-03 review R13 follow-up `GRAPHICS-119` retired parallel
   render-pass command recording via the task scheduler on 2026-07-07.
-- Active
-  [`GRAPHICS-127`](../../active/GRAPHICS-127-native-gpu-timestamp-profiler.md) —
-  make the
-  already-exported RHI profiler truthful and operational: nonblocking native
-  Vulkan timestamps around actual compiled passes, honest Null provenance,
-  and reuse of current telemetry/Frame Graph presentation. Its Vulkan,
-  multi-queue, and parallel-recording prerequisites are satisfied; ADR-0027
-  additionally gated it on now-retired `RUNTIME-181`/`RUNTIME-182`, so config
-  and UI land through app-composed owners rather than transitional Engine
-  facades. The task is in progress.
 - The following Theme B incubation leaves are deliberately blocked by the
   architecture-stability gate `REVIEW-003`; they are not eligible for
   implementation during the current convergence/right-sizing phase:
@@ -67,6 +57,12 @@ or CPU-clock profiler behavior.
 
 ## Retired cross-domain rendering leaves
 
+- [`GRAPHICS-127`](../../done/GRAPHICS-127-native-gpu-timestamp-profiler.md) —
+  retired 2026-07-19 at `Operational` on native Vulkan and `CPUContracted` on
+  Null/unsupported hosts. The existing RHI profiler now owns truthful
+  nonblocking timestamps around actual compiled passes, exact slot/submission
+  correlation, fresh-only telemetry, and the existing Frame Graph config and
+  presentation path.
 - [`GRAPHICS-128`](../../done/GRAPHICS-128-object-space-normal-bake-shared-index-slice.md) —
   retired 2026-07-19 at `Operational`; the object-space normal bake now
   selects a nonzero surface slice from the managed shared index buffer while
@@ -102,11 +98,12 @@ The following list is the minimum dependency order for the rendering backlog.
 Each entry lists the upstream tasks that must be complete (or explicitly
 out-of-scope) before the entry is eligible for "in-progress" selection.
 
-- [GRAPHICS-127 — Native GPU timestamp profiler and frame-recipe timing integration](../../active/GRAPHICS-127-native-gpu-timestamp-profiler.md):
-  depends on retired `GRAPHICS-033` (operational Vulkan), `GRAPHICS-037D`
+- [GRAPHICS-127 — Native GPU timestamp profiler and frame-recipe timing integration](../../done/GRAPHICS-127-native-gpu-timestamp-profiler.md):
+  retired after `GRAPHICS-033` (operational Vulkan), `GRAPHICS-037D`
   (multi-queue recording), and `GRAPHICS-119` (parallel pass recording), plus
   retired `RUNTIME-181` (ConfigControl owner) and `RUNTIME-182` (EditorUi
-  owner). All prerequisites are satisfied.
+  owner). Native timestamps are operational; Null/unsupported provenance is
+  CPU-contracted.
 - [GRAPHICS-128 — Object-space normal bake shared index slice](../../done/GRAPHICS-128-object-space-normal-bake-shared-index-slice.md):
   retired after `GRAPHICS-104`. It closes the plan/command and
   `gpu;vulkan` readback contract for a nonzero surface slice of the managed

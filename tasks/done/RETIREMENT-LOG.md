@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`GRAPHICS-127`](GRAPHICS-127-native-gpu-timestamp-profiler.md) — native GPU
+timestamp profiling retired to `tasks/done/` on 2026-07-19 at `Operational`
+on supported Vulkan and `CPUContracted` on Null/unsupported hosts. The existing
+RHI seam now owns truthful provenance, fixed device-lifetime queries,
+nonblocking exact-slot resolution, device-loss propagation, and immutable
+compiled-pass scopes across serial/parallel graphics and async-compute lanes.
+The default-off config round-trips through the shared synchronous control lane,
+and fresh native rows plus aged last-good state reuse existing telemetry and
+the Frame Graph panel. The integrated Clang 23 CPU selector passed 4,206 cases
+with one expected GLFW/LSan skip; the ASan+UBSan `gpu` + `vulkan` selector
+passed 46/46 with zero skips after the canonical aggregate built its own
+Sandbox dependency. A non-skipped RTX 3050 / NVIDIA 590.48.01 smoke crossed
+two three-slot reuse windows and resolved submitted frame 4 from slot 1.
+Observed pass durations remain diagnostic data, not performance claims.
+Integrated implementation head: `9dedc656`.
+
 [`BUG-116`](BUG-116-sandbox-process-test-aggregate-dependency.md) — Sandbox
 process-test aggregate dependencies retired to `tasks/done/` on 2026-07-19 at
 `Operational`. The canonical and Vulkan-only test aggregates now depend

@@ -9,7 +9,6 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/active/ARCH-014-kernel-convergence-tracking.md)
-- `GRAPHICS-127` — Native GPU timestamp profiler and frame-recipe timing integration (tasks/active/GRAPHICS-127-native-gpu-timestamp-profiler.md)
 
 ## Theme B — Rendering modernization
 
