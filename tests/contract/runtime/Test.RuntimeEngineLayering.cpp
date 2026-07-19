@@ -871,8 +871,8 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
         ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxEditorFacades.cpp");
     const auto readback =
         ReadFile(RepoRoot() / "src/runtime/Runtime.GpuReadbackJob.cpp");
-    const auto engine =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto assetWorkflow =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.AssetWorkflowModule.cpp");
 
     EXPECT_EQ(CountOccurrences(assetImport, "StreamingTaskDesc{"), 2u);
     EXPECT_EQ(
@@ -898,8 +898,8 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     EXPECT_EQ(CountOccurrences(readback, "DerivedJobDesc derived"), 1u);
     EXPECT_EQ(CountOccurrences(readback, ".Scope = desc.Scope"), 1u);
 
-    EXPECT_GE(CountOccurrences(engine, ".World = ActiveWorld()"), 2u);
-    EXPECT_NE(engine.find(".Worlds = &m_WorldRegistry"), std::string::npos);
+    EXPECT_EQ(CountOccurrences(assetWorkflow, ".World = BoundWorld"), 2u);
+    EXPECT_EQ(CountOccurrences(assetWorkflow, ".Worlds = Worlds"), 1u);
 }
 
 TEST(RuntimeEngineLayering, FrameLoopContractDoesNotBecomeCompositionRoot)

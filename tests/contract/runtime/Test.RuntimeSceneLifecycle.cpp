@@ -24,6 +24,7 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Runtime.AsyncWorkModule;
+import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
@@ -360,6 +361,7 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
+    engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     engine.Initialize();
     Runtime::SelectionController& selection =
         *engine.Services().Find<Runtime::SelectionController>();
