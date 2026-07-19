@@ -9,6 +9,8 @@ module;
 export module Extrinsic.Backends.Vulkan;
 
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.QueueAffinity;
 
 // GRAPHICS-033C cleanup: the operational-status types are owned by the
@@ -94,6 +96,42 @@ namespace Extrinsic::Backends::Vulkan
             .Present = presentFamily,
         };
     }
+
+    // Backend-local, Vulkan-handle-free profiler bootstrap policy. The
+    // decision is shared by device initialization and CPU contract tests so a
+    // query-pool failure can be proven non-fatal without a live Vulkan device.
+    export struct VulkanProfilerBootstrapInputs
+    {
+        double TimestampPeriodNs = 0.0;
+        std::uint32_t GraphicsTimestampValidBits = 0u;
+        bool AsyncComputeQueueAvailable = false;
+        std::uint32_t AsyncComputeTimestampValidBits = 0u;
+        std::uint32_t FramesInFlight = 0u;
+        bool QueryPoolCreationSucceeded = true;
+    };
+
+    export struct VulkanProfilerBootstrapDecision
+    {
+        RHI::ProfilerBackendStatus Status =
+            RHI::ProfilerBackendStatus::Unsupported;
+        bool GraphicsTimestampsSupported = false;
+        bool AsyncComputeTimestampsSupported = false;
+        bool QueryPoolRequired = false;
+        std::uint32_t TotalQueryCount = 0u;
+        // Native profiling is diagnostic instrumentation. Its initialization
+        // outcome never participates in VulkanDevice operational promotion.
+        bool DeviceInitializationMayContinue = true;
+    };
+
+    export [[nodiscard]] VulkanProfilerBootstrapDecision
+    EvaluateVulkanProfilerBootstrap(
+        VulkanProfilerBootstrapInputs inputs) noexcept;
+
+    // Read-only backend contract seam used to prove the RTTI-free context
+    // ownership check. `device` must come from CreateVulkanDevice().
+    export [[nodiscard]] bool IsVulkanProfilerCommandContextOwned(
+        const RHI::IDevice* device,
+        const RHI::ICommandContext* context) noexcept;
 
     // Factory — creates the Vulkan backend IDevice.
     // Call once during engine initialization; the returned device owns all

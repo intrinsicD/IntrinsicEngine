@@ -59,6 +59,20 @@ namespace Extrinsic::Backends::Vulkan
                    m_BindlessSet  != VK_NULL_HANDLE;
         }
 
+        // Backend-local profiler bridge. VulkanDevice first proves that a
+        // borrowed RHI context is one of its owned contexts, then reads this
+        // state; no native handle crosses the RHI interface.
+        [[nodiscard]] VkCommandBuffer
+        GetProfilerCommandBuffer() const noexcept
+        {
+            return m_Cmd;
+        }
+
+        [[nodiscard]] bool IsRecordingForProfiler() const noexcept
+        {
+            return m_Recording;
+        }
+
         void Begin() override;
         void End()   override;
         void ExecuteSecondary(VulkanCommandContext& secondary);

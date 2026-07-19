@@ -119,22 +119,34 @@ TEST(ProfilerContract, NullReportsContractOnlyScopeAndAcceptedQueueProvenance)
     EXPECT_EQ(
         resolved->QueueEnvelopes[0].Queue,
         RHI::QueueAffinity::Graphics);
+    EXPECT_EQ(
+        resolved->QueueEnvelopes[0].Source,
+        RHI::GpuTimestampSource::ContractOnly);
     EXPECT_FALSE(resolved->QueueEnvelopes[0].DurationNs.has_value());
     EXPECT_EQ(
         resolved->QueueEnvelopes[1].Queue,
         RHI::QueueAffinity::AsyncCompute);
+    EXPECT_EQ(
+        resolved->QueueEnvelopes[1].Source,
+        RHI::GpuTimestampSource::ContractOnly);
     EXPECT_FALSE(resolved->QueueEnvelopes[1].DurationNs.has_value());
 
     ASSERT_EQ(resolved->Scopes.size(), scopes.size());
     EXPECT_EQ(resolved->Scopes[0].Ordinal, 7u);
     EXPECT_EQ(resolved->Scopes[0].Name, "Opaque");
     EXPECT_EQ(resolved->Scopes[0].Queue, RHI::QueueAffinity::Graphics);
+    EXPECT_EQ(
+        resolved->Scopes[0].Source,
+        RHI::GpuTimestampSource::ContractOnly);
     EXPECT_FALSE(resolved->Scopes[0].DurationNs.has_value());
     EXPECT_EQ(resolved->Scopes[1].Ordinal, 9u);
     EXPECT_EQ(resolved->Scopes[1].Name, "Lighting");
     EXPECT_EQ(
         resolved->Scopes[1].Queue,
         RHI::QueueAffinity::AsyncCompute);
+    EXPECT_EQ(
+        resolved->Scopes[1].Source,
+        RHI::GpuTimestampSource::ContractOnly);
     EXPECT_FALSE(resolved->Scopes[1].DurationNs.has_value());
 }
 

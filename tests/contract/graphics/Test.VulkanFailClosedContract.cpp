@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <span>
 
@@ -15,10 +17,150 @@ import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
+
+TEST(VulkanFailClosedContract, ProfilerSupportUsesPerQueueTimestampValidBits)
+{
+    namespace VK = Extrinsic::Backends::Vulkan;
+    namespace RHI = Extrinsic::RHI;
+
+    const VK::VulkanProfilerBootstrapDecision graphicsOnly =
+        VK::EvaluateVulkanProfilerBootstrap(
+            VK::VulkanProfilerBootstrapInputs{
+                .TimestampPeriodNs = 1.0,
+                .GraphicsTimestampValidBits = 64u,
+                .AsyncComputeQueueAvailable = false,
+                .AsyncComputeTimestampValidBits = 64u,
+                .FramesInFlight = 3u,
+                .QueryPoolCreationSucceeded = true,
+            });
+    EXPECT_EQ(graphicsOnly.Status, RHI::ProfilerBackendStatus::Ready);
+    EXPECT_TRUE(graphicsOnly.GraphicsTimestampsSupported);
+    EXPECT_FALSE(graphicsOnly.AsyncComputeTimestampsSupported);
+    EXPECT_TRUE(graphicsOnly.QueryPoolRequired);
+    EXPECT_EQ(
+        graphicsOnly.TotalQueryCount,
+        3u * 2u * (2u + 2u * RHI::kMaxTimestampScopesPerFrame));
+    EXPECT_TRUE(graphicsOnly.DeviceInitializationMayContinue);
+
+    const VK::VulkanProfilerBootstrapDecision asyncOnly =
+        VK::EvaluateVulkanProfilerBootstrap(
+            VK::VulkanProfilerBootstrapInputs{
+                .TimestampPeriodNs = 0.5,
+                .GraphicsTimestampValidBits = 0u,
+                .AsyncComputeQueueAvailable = true,
+                .AsyncComputeTimestampValidBits = 32u,
+                .FramesInFlight = 2u,
+                .QueryPoolCreationSucceeded = true,
+            });
+    EXPECT_EQ(asyncOnly.Status, RHI::ProfilerBackendStatus::Ready);
+    EXPECT_FALSE(asyncOnly.GraphicsTimestampsSupported);
+    EXPECT_TRUE(asyncOnly.AsyncComputeTimestampsSupported);
+
+    const VK::VulkanProfilerBootstrapDecision unsupported =
+        VK::EvaluateVulkanProfilerBootstrap(
+            VK::VulkanProfilerBootstrapInputs{
+                .TimestampPeriodNs = 1.0,
+                .GraphicsTimestampValidBits = 0u,
+                .AsyncComputeQueueAvailable = true,
+                .AsyncComputeTimestampValidBits = 0u,
+                .FramesInFlight = 3u,
+                .QueryPoolCreationSucceeded = true,
+            });
+    EXPECT_EQ(
+        unsupported.Status,
+        RHI::ProfilerBackendStatus::Unsupported);
+    EXPECT_FALSE(unsupported.QueryPoolRequired);
+    EXPECT_EQ(unsupported.TotalQueryCount, 0u);
+    EXPECT_TRUE(unsupported.DeviceInitializationMayContinue);
+}
+
+TEST(VulkanFailClosedContract, ProfilerRejectsInvalidTimestampPeriod)
+{
+    namespace VK = Extrinsic::Backends::Vulkan;
+    namespace RHI = Extrinsic::RHI;
+
+    const std::array invalidPeriods{
+        0.0,
+        -1.0,
+        std::numeric_limits<double>::infinity(),
+        std::numeric_limits<double>::quiet_NaN(),
+    };
+    for (const double period : invalidPeriods)
+    {
+        const VK::VulkanProfilerBootstrapDecision decision =
+            VK::EvaluateVulkanProfilerBootstrap(
+                VK::VulkanProfilerBootstrapInputs{
+                    .TimestampPeriodNs = period,
+                    .GraphicsTimestampValidBits = 64u,
+                    .FramesInFlight = 3u,
+                    .QueryPoolCreationSucceeded = true,
+                });
+        EXPECT_EQ(
+            decision.Status,
+            RHI::ProfilerBackendStatus::Unsupported);
+        EXPECT_FALSE(decision.QueryPoolRequired);
+        EXPECT_TRUE(decision.DeviceInitializationMayContinue);
+    }
+}
+
+TEST(VulkanFailClosedContract, ProfilerQueryPoolFailureIsNonFatalToDeviceBootstrap)
+{
+    namespace VK = Extrinsic::Backends::Vulkan;
+    namespace RHI = Extrinsic::RHI;
+
+    const VK::VulkanProfilerBootstrapDecision decision =
+        VK::EvaluateVulkanProfilerBootstrap(
+            VK::VulkanProfilerBootstrapInputs{
+                .TimestampPeriodNs = 1.0,
+                .GraphicsTimestampValidBits = 64u,
+                .AsyncComputeQueueAvailable = true,
+                .AsyncComputeTimestampValidBits = 64u,
+                .FramesInFlight = 3u,
+                .QueryPoolCreationSucceeded = false,
+            });
+
+    EXPECT_EQ(
+        decision.Status,
+        RHI::ProfilerBackendStatus::InitializationFailed);
+    EXPECT_TRUE(decision.QueryPoolRequired);
+    EXPECT_GT(decision.TotalQueryCount, 0u);
+    EXPECT_TRUE(decision.DeviceInitializationMayContinue);
+}
+
+TEST(VulkanFailClosedContract, ProfilerContextOwnershipRejectsForeignDeviceContext)
+{
+    namespace VK = Extrinsic::Backends::Vulkan;
+
+    std::unique_ptr<Extrinsic::RHI::IDevice> owner =
+        VK::CreateVulkanDevice();
+    std::unique_ptr<Extrinsic::RHI::IDevice> foreign =
+        VK::CreateVulkanDevice();
+    ASSERT_NE(owner, nullptr);
+    ASSERT_NE(foreign, nullptr);
+
+    Extrinsic::RHI::ICommandContext& ownedContext =
+        owner->GetGraphicsContext(0u);
+    Extrinsic::RHI::ICommandContext& foreignContext =
+        foreign->GetGraphicsContext(0u);
+
+    EXPECT_TRUE(VK::IsVulkanProfilerCommandContextOwned(
+        owner.get(),
+        &ownedContext));
+    EXPECT_FALSE(VK::IsVulkanProfilerCommandContextOwned(
+        owner.get(),
+        &foreignContext));
+    EXPECT_FALSE(VK::IsVulkanProfilerCommandContextOwned(
+        nullptr,
+        &ownedContext));
+    EXPECT_FALSE(VK::IsVulkanProfilerCommandContextOwned(
+        owner.get(),
+        nullptr));
+}
 
 TEST(VulkanFailClosedContract, QueueFamilyTokenResolverMapsAffinityTokens)
 {

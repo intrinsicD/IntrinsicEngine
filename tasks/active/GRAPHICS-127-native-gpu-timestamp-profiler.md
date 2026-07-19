@@ -15,13 +15,17 @@ maturity_target: Operational
 
 - In progress as of 2026-07-19; owner: Codex team; implementation branch:
   `codex/graphics-127-gpu-profiler`.
-- Slice 1 is CPU-contracted on the implementation branch: the repaired RHI
-  lifecycle/provenance contract, truthful Null adapter, checked timestamp
-  helpers, and focused CPU coverage are complete. Next gate: native Vulkan
-  query-pool lifecycle and slot-reuse resolution.
+- The RHI lifecycle checkpoint is CPU-contracted on the implementation branch:
+  the repaired provenance contract, truthful Null adapter, checked timestamp
+  helpers, and focused CPU coverage are complete. The native Vulkan checkpoint
+  now owns a fixed device-lifetime query pool, resolves submitted metadata only
+  after the reused slot's existing fence proof, and degrades unsupported or
+  failed timestamp setup without affecting device operation. Compiled-pass
+  invocation, config/control sampling, publication, and presentation remain
+  open.
 - `RUNTIME-181` and `RUNTIME-182` are retired, so ConfigControl and EditorUi
-  are settled owners, not future blockers. All implementation, test,
-  documentation, and native-GPU evidence checkboxes remain open.
+  are settled owners, not future blockers. Documentation and native-GPU
+  evidence remain open.
 - The 2026-07-19 audit confirmed that the exported profiler seam is unused in
   production: the Vulkan adapter is never constructed, `EndFrame()` never
   writes its closing timestamp, and the Null adapter reports host-clock values
@@ -224,7 +228,7 @@ Each slice is a separately reviewable commit and must pass its focused CPU check
   frame-number versus slot reuse, begin/end/seal/discard ordering, duplicate
   end, exhaustion, not-ready last-good retention, source/queue provenance,
   and Null lifecycle results with no available native duration.
-- [ ] Extend
+- [x] Extend
   `tests/contract/graphics/Test.VulkanFailClosedContract.cpp` in
   `IntrinsicGraphicsVulkanContractTests`. Cover the backend-local support
   decision for zero/nonzero queue-family valid bits, invalid timestamp period,

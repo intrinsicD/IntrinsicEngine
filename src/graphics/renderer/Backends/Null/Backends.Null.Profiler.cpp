@@ -261,6 +261,8 @@ namespace Extrinsic::Backends::Null
                     resolved.QueueEnvelopes.push_back(
                         RHI::GpuTimestampQueueEnvelope{
                             .Queue = QueueFromIndex(queueIndex),
+                            .Source =
+                                RHI::GpuTimestampSource::ContractOnly,
                             .DurationNs = std::nullopt,
                         });
                 }
@@ -277,6 +279,7 @@ namespace Extrinsic::Backends::Null
                         .Ordinal = scope.Ordinal,
                         .Name = scope.Name,
                         .Queue = scope.Queue,
+                        .Source = RHI::GpuTimestampSource::ContractOnly,
                         .DurationNs = std::nullopt,
                     });
                 }
