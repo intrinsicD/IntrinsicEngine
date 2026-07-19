@@ -5,12 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-117` — Dropped-geometry reimport test exhausts a frame-count wait budget](BUG-117-dropped-geometry-reimport-frame-budget-flake.md):
-  the real asynchronous dropped-import/reimport contract exhausted `128`
-  tight Null/headless frames before observing its completion event during one
-  full CPU run, then passed in isolation and in an unchanged complete rerun;
-  diagnose and replace the scheduling-sensitive wait without a RUNTIME-188
-  timing workaround.
 - [`BUG-110` — Implicit smoothing applies boundary pins after rather than during solve](BUG-110-implicit-smoothing-boundary-dirichlet-solve.md):
   `PreserveBoundary` currently solves an all-free shifted system and only then
   overwrites boundary entries, so interior vertices do not satisfy the claimed
@@ -41,6 +35,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-07-19: [`BUG-117` — Dropped-import tests exhausted frame-count wait budgets](../../done/BUG-117-dropped-geometry-reimport-frame-budget-flake.md).
+  Both test-local asynchronous completion helpers now use ten-second
+  steady-clock deadlines and yield one millisecond between unsuccessful
+  polls. Real-worker regressions prove the old `128`-frame ceiling can expire
+  while the worker remains pending in `Decoding`, report timeout/cancellation
+  phases directly, and retain the exact reimport and ambiguous-PLY assertions.
 
 - Closed 2026-07-19: [`BUG-116` — Sandbox process tests lacked aggregate build dependencies](../../done/BUG-116-sandbox-process-test-aggregate-dependency.md).
   The canonical and Vulkan-only aggregates now build `ExtrinsicSandbox` only

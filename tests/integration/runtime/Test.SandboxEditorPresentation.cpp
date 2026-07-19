@@ -12,6 +12,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -81,8 +82,9 @@ namespace
     class WaitForAssetImportEventApplication final : public Runtime::IApplication
     {
     public:
-        explicit WaitForAssetImportEventApplication(const std::uint32_t maxFrames)
-            : m_MaxFrames(maxFrames)
+        explicit WaitForAssetImportEventApplication(
+            const std::chrono::milliseconds timeout = std::chrono::seconds(10))
+            : m_Timeout(timeout)
         {
         }
 
@@ -90,18 +92,55 @@ namespace
         void OnSimTick(Runtime::Engine&, double) override {}
         void OnVariableTick(Runtime::Engine& engine, double, double) override
         {
-            ++m_ObservedFrames;
-            if (engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value() ||
-                m_ObservedFrames >= m_MaxFrames)
+            const auto now = std::chrono::steady_clock::now();
+            if (!m_Started)
             {
-                engine.RequestExit();
+                m_Started = true;
+                m_StartedAt = now;
+                m_Deadline = now + m_Timeout;
             }
+            ++m_ObservedFrames;
+            if (engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value())
+            {
+                m_EventObserved = true;
+                m_Elapsed = now - m_StartedAt;
+                engine.RequestExit();
+                return;
+            }
+            if (now >= m_Deadline)
+            {
+                m_TimedOut = true;
+                m_Elapsed = now - m_StartedAt;
+                engine.RequestExit();
+                return;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
         void OnShutdown(Runtime::Engine&) override {}
 
+        [[nodiscard]] std::string Describe() const
+        {
+            return "event_observed=" +
+                std::string{m_EventObserved ? "true" : "false"} +
+                ", timed_out=" +
+                std::string{m_TimedOut ? "true" : "false"} +
+                ", frames=" + std::to_string(m_ObservedFrames) +
+                ", elapsed_ms=" +
+                std::to_string(
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        m_Elapsed)
+                        .count());
+        }
+
     private:
-        std::uint32_t m_MaxFrames{1u};
+        std::chrono::milliseconds m_Timeout{std::chrono::seconds(10)};
+        std::chrono::steady_clock::time_point m_StartedAt{};
+        std::chrono::steady_clock::time_point m_Deadline{};
+        std::chrono::steady_clock::duration m_Elapsed{};
         std::uint32_t m_ObservedFrames{0u};
+        bool m_EventObserved{false};
+        bool m_TimedOut{false};
+        bool m_Started{false};
     };
 
     struct TmpFile
@@ -773,9 +812,13 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
         "1 0 0\n"
         "2 0 0\n");
 
+    auto waitForImport =
+        std::make_unique<WaitForAssetImportEventApplication>();
+    WaitForAssetImportEventApplication* waitDiagnostics =
+        waitForImport.get();
     Runtime::Engine engine(
         HeadlessConfig(),
-        std::make_unique<WaitForAssetImportEventApplication>(128u));
+        std::move(waitForImport));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     ComposeEditorUiAndInitialize(engine);
@@ -794,7 +837,7 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
 
     const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
         engine.GetAssetImportPipeline().GetLastAssetImportEvent();
-    ASSERT_TRUE(lastEvent.has_value());
+    ASSERT_TRUE(lastEvent.has_value()) << waitDiagnostics->Describe();
     EXPECT_TRUE(lastEvent->Succeeded());
     ASSERT_TRUE(lastEvent->Result.has_value());
     EXPECT_EQ(lastEvent->Result->PayloadKind,

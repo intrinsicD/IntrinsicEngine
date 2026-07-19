@@ -5,6 +5,15 @@ depends_on: []
 ---
 # BUG-117 — Dropped-geometry reimport test exhausts a frame-count wait budget
 
+## Status
+- Completed on 2026-07-19 at maturity `CPUContracted`; owner: Codex; branch:
+  `bug-117-dropped-reimport-wait-aggregate`; retirement commit: this commit.
+- The correction is confined to the two test-local completion helpers and
+  their diagnostics/regressions; production import/runtime behavior is
+  unchanged.
+- No broader test-harness policy changed, so no architecture or agent-process
+  documentation update is required.
+
 ## Goal
 - Make the dropped-geometry reimport contract wait for asynchronous import
   completion with a deterministic, wall-clock-bounded test seam that remains
@@ -21,9 +30,10 @@ depends_on: []
   interaction ownership and its focused cohort is clean.
 
 ## Context
-- Owner: runtime contract-test asynchronous completion harness around
+- Owner: the two runtime test-local asynchronous completion helpers named
   `WaitForAssetImportEventApplication` in
-  `tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp`.
+  `tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp` and
+  `tests/integration/runtime/Test.SandboxEditorPresentation.cpp`.
 - Symptom: on 2026-07-19, after a successful `IntrinsicTests` build, the
   canonical sequential CPU selector failed only
   `SandboxEditorUi.DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplicateEntity`.
@@ -36,6 +46,12 @@ depends_on: []
   `GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl` capability skip was
   expected and unrelated. The original full run completed in `52.59 s` with
   `4,196` passes, this one failure, and the same expected skip.
+- A later focused CPU rerun after `GRAPHICS-127` independently failed
+  `SandboxEditorUi.DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacade`
+  at its copied `128`-frame helper with an empty event and shutdown
+  cancellation; that exact integration case also passed unchanged in
+  isolation in `0.05 s`. This sibling evidence is owned here because the
+  helper shape and failure are identical; no graphics source participates.
 - The helper counts tight Null/headless frames rather than elapsed time and
   does not yield when the event is absent. A fast main thread can therefore
   consume all `128` frames before the streaming worker publishes completion.
@@ -52,61 +68,98 @@ depends_on: []
 - `RUNTIME-184` will remove the production `IApplication` callback lifecycle
   and must migrate this fixture if it lands first, but neither task is an
   artificial prerequisite for the other.
+- Controlled diagnosis used the existing real queued-geometry
+  before-decode hook. With the old helper intact, the exact reimport contract
+  exhausted frame `128` after `30,511 us`; operation `0:1` was still
+  `Decoding`, its worker had started at `1,202 us`, the gate had not released,
+  no apply/event timestamp existed, and shutdown then cancelled the request.
+  This deterministically proves that a frame-count ceiling is not a valid
+  completion budget for the real asynchronous path.
+- The controlled gate does not by itself prove that ordinary CPU starvation
+  was the unique mechanism behind either historical flake. The two loaded-run
+  failures, immediate isolated passes, and cancellation-only teardown are
+  consistent with host scheduling contention; the precise historical worker
+  phase was not retained. The narrower confirmed cause is the harness
+  contract: tight Null frames can expire independently of valid worker
+  latency. No lost event, dependency failure, or production lifecycle defect
+  was reproduced.
+- The selected correction is test-only. Both helper copies use a ten-second
+  `steady_clock` deadline that begins on the first completion poll and sleep
+  one millisecond after each unsuccessful poll. The primary helper reports
+  operation, frames, elapsed time, queue stage, worker/apply/event timestamps,
+  timeout, and cancellation state. A stuck-worker regression first allows a
+  separately bounded ten-second worker-start handshake, then proves a
+  `250 ms` blocked-decode deadline and terminal cancellation.
+- The exact reimport regression deliberately withholds decode until after
+  frame `128`, then completes through the real worker, main-thread apply, and
+  event publication. It preserved same-asset identity, one mesh entity, and
+  payload-ticket generation advancement in `100/100` runs (`19.87 s` total).
+  The ambiguous-PLY sibling passed `100/100` (`2.48 s` total), and the combined
+  contract/integration drop/import cohort passed `8/8`.
+- With the fixed test process and a competing busy loop pinned to the same
+  single CPU, the exact real-worker regression passed `20/20` in `5.21 s`.
+  The complete `IntrinsicTests` aggregate then built successfully and the
+  default CPU-supported selector passed `4,180/4,180` in `55.32 s`; the one
+  GLFW/LSan capability skip was expected and unrelated.
 
 ## Required changes
-- [ ] Add test-local diagnostics that distinguish event observed, frame budget
+- [x] Add test-local diagnostics that distinguish event observed, frame budget
       exhausted, worker completion pending, main-thread apply pending, and
       terminal cancellation; preserve the import operation identifier in
       failure output.
-- [ ] Reproduce under controlled CPU/filesystem contention and record elapsed
+- [x] Reproduce under controlled CPU/filesystem contention and record elapsed
       time plus frame count from request through worker completion, apply, and
       event publication.
-- [ ] Confirm or reject main-thread frame-loop starvation as the cause before
+- [x] Confirm or reject main-thread frame-loop starvation as the cause before
       changing the wait contract.
-- [ ] If confirmed, replace the fixed-frame-only helper with the smallest
+- [x] If confirmed, replace the fixed-frame-only helper with the smallest
       steady-clock-bounded completion wait that yields between unsuccessful
       polls and fails with the instrumented state. Keep the existing Engine
       path and real streaming worker; do not mock away the asynchronous seam.
-- [ ] If a production lifecycle or publication defect is instead proven,
+- [x] If a production lifecycle or publication defect is instead proven,
       scope that correction separately and preserve the deterministic harness
       evidence here.
 
 ## Tests
-- [ ] Add a regression that drives the exact dropped import → event → reimport
+- [x] Add a regression that drives the exact dropped import → event → reimport
       → same-asset/no-duplicate-entity path under forced scheduling contention.
-- [ ] Prove the old frame-count helper can exhaust before a valid completion,
+- [x] Prove the old frame-count helper can exhaust before a valid completion,
       or record sufficient repeated evidence to reject that hypothesis.
-- [ ] Run the repaired exact case at least `100` consecutive times without a
+- [x] Run the repaired exact case at least `100` consecutive times without a
       retry wrapper, then run its neighboring dropped-file/import cohort.
-- [ ] Run the complete default CPU-supported selector and preserve the exact
+- [x] Run the complete default CPU-supported selector and preserve the exact
       payload-ticket generation and one-entity assertions.
 
 ## Docs
-- [ ] Update this task with the diagnosed cause and measured budget evidence.
-- [ ] Update the bug index and retirement log when the correction is verified;
+- [x] Update this task with the diagnosed cause and measured budget evidence.
+- [x] Update the bug index and retirement log when the correction is verified;
       update test-harness documentation only if the supported waiting policy
       changes.
 
 ## Acceptance criteria
-- [ ] The original missing-event failure is deterministically reproduced or
+- [x] The original missing-event failure is deterministically reproduced or
       rejected by bounded evidence that identifies a different cause.
-- [ ] The exact test no longer depends on how many zero-work frames the main
+- [x] The exact test no longer depends on how many zero-work frames the main
       thread can execute before the worker is scheduled.
-- [ ] A genuinely stuck import fails within a declared wall-clock budget and
+- [x] A genuinely stuck import fails within a declared wall-clock budget and
       reports its operation phase rather than only `droppedEvent == nullopt`.
-- [ ] Reimport still reuses the same `AssetId`, advances the payload ticket,
+- [x] Reimport still reuses the same `AssetId`, advances the payload ticket,
       and creates no duplicate mesh entity.
-- [ ] No RUNTIME-188 source, lifecycle, or timing workaround is introduced.
+- [x] No RUNTIME-188 source, lifecycle, or timing workaround is introduced.
 
 ## Verification
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicRuntimeContractTests
+cmake --build --preset ci --target \
+  IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests
 build/ci/bin/IntrinsicRuntimeContractTests \
   --gtest_filter='SandboxEditorUi.DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplicateEntity' \
   --gtest_repeat=100 --gtest_break_on_failure
+build/ci/bin/IntrinsicSandboxEditorIntegrationTests \
+  --gtest_filter='SandboxEditorUi.DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacade' \
+  --gtest_repeat=100 --gtest_break_on_failure
 ctest --test-dir build/ci --output-on-failure \
-  -R 'SandboxEditorUi\.(DroppedGeometryAssetReimport|DuplicateDroppedGeometryImport|DroppedFileQueue|PlatformDrop)' \
+  -R 'SandboxEditorUi\.(DroppedGeometryAssetReimport|DuplicateDroppedGeometryImport|DroppedFileQueue|PlatformDrop|DroppedFilePathsRouteAmbiguousPly)' \
   -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure \

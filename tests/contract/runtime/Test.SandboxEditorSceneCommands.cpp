@@ -401,11 +401,200 @@ class PassiveApplication final : public Runtime::IApplication
         void OnShutdown(Runtime::Engine&) override {}
     };
 
+enum class AssetImportEventWaitExitReason : std::uint8_t
+    {
+        Running,
+        EventObserved,
+        DeadlineExceeded,
+    };
+
+struct AssetImportEventWaitDiagnostics
+    {
+        std::atomic_uint32_t ObservedFrames{0u};
+        std::atomic_bool WorkerStarted{false};
+        std::atomic_bool ReleaseWorker{false};
+        std::atomic_bool FormerFrameBudgetCrossed{false};
+        std::atomic_bool WorkerStartDeadlineExceeded{false};
+        std::atomic<std::int64_t> WorkerStartedAtMicros{-1};
+        std::atomic<std::int64_t> WorkerGateReleasedAtMicros{-1};
+        std::atomic<std::int64_t> MainThreadApplyAtMicros{-1};
+        std::atomic<std::int64_t> EventObservedAtMicros{-1};
+        Runtime::RuntimeAssetIngestHandle Operation{};
+        Runtime::RuntimeAssetImportQueueStage LastStage{
+            Runtime::RuntimeAssetImportQueueStage::Queued};
+        Runtime::RuntimeAssetImportQueueTerminalStatus LastTerminalStatus{
+            Runtime::RuntimeAssetImportQueueTerminalStatus::None};
+        std::string LastStageText{"not observed"};
+        std::string LastDiagnosticText{};
+        AssetImportEventWaitExitReason ExitReason{
+            AssetImportEventWaitExitReason::Running};
+        std::chrono::steady_clock::time_point RequestedAt{};
+        bool Armed{false};
+        bool QueueEntryObserved{false};
+
+        void Arm() noexcept
+        {
+            ObservedFrames.store(0u, std::memory_order_release);
+            WorkerStarted.store(false, std::memory_order_release);
+            ReleaseWorker.store(false, std::memory_order_release);
+            FormerFrameBudgetCrossed.store(false, std::memory_order_release);
+            WorkerStartDeadlineExceeded.store(false, std::memory_order_release);
+            WorkerStartedAtMicros.store(-1, std::memory_order_release);
+            WorkerGateReleasedAtMicros.store(-1, std::memory_order_release);
+            MainThreadApplyAtMicros.store(-1, std::memory_order_release);
+            EventObservedAtMicros.store(-1, std::memory_order_release);
+            Operation = {};
+            LastStage = Runtime::RuntimeAssetImportQueueStage::Queued;
+            LastTerminalStatus =
+                Runtime::RuntimeAssetImportQueueTerminalStatus::None;
+            LastStageText = "not observed";
+            LastDiagnosticText.clear();
+            ExitReason = AssetImportEventWaitExitReason::Running;
+            RequestedAt = std::chrono::steady_clock::now();
+            Armed = true;
+            QueueEntryObserved = false;
+        }
+
+        [[nodiscard]] std::int64_t ElapsedMicros() const noexcept
+        {
+            if (!Armed)
+                return -1;
+            return std::chrono::duration_cast<std::chrono::microseconds>(
+                       std::chrono::steady_clock::now() - RequestedAt)
+                .count();
+        }
+
+        [[nodiscard]] std::string Describe() const
+        {
+            const auto exitName = [this]() -> std::string_view
+            {
+                switch (ExitReason)
+                {
+                case AssetImportEventWaitExitReason::Running:
+                    return "running";
+                case AssetImportEventWaitExitReason::EventObserved:
+                    return "event-observed";
+                case AssetImportEventWaitExitReason::DeadlineExceeded:
+                    return "deadline-exceeded";
+                }
+                return "unknown";
+            }();
+            const bool workerCompletionPending =
+                QueueEntryObserved &&
+                (LastStage == Runtime::RuntimeAssetImportQueueStage::DecodeQueued ||
+                 LastStage == Runtime::RuntimeAssetImportQueueStage::Decoding);
+            const bool mainThreadApplyPending =
+                QueueEntryObserved &&
+                LastStage == Runtime::RuntimeAssetImportQueueStage::MainThreadApply;
+            const bool terminalCancellation =
+                LastTerminalStatus ==
+                Runtime::RuntimeAssetImportQueueTerminalStatus::Cancelled;
+
+            std::string description{"exit="};
+            description += exitName;
+            description += ", operation=";
+            description += Operation.IsValid()
+                ? std::to_string(Operation.Index) + ":" +
+                      std::to_string(Operation.Generation)
+                : "invalid";
+            description += ", frames=" +
+                std::to_string(ObservedFrames.load(std::memory_order_acquire));
+            description += ", elapsed_us=" + std::to_string(ElapsedMicros());
+            description += ", stage=";
+            description += QueueEntryObserved
+                ? Runtime::DebugNameForRuntimeAssetImportQueueStage(LastStage)
+                : "not-observed";
+            description += ", terminal=";
+            description += QueueEntryObserved
+                ? Runtime::DebugNameForRuntimeAssetImportQueueTerminalStatus(
+                      LastTerminalStatus)
+                : "not-observed";
+            description += ", event_observed=";
+            description +=
+                EventObservedAtMicros.load(std::memory_order_acquire) >= 0
+                    ? "true"
+                    : "false";
+            description += ", former_frame_budget_crossed=";
+            description += FormerFrameBudgetCrossed.load(
+                               std::memory_order_acquire)
+                ? "true"
+                : "false";
+            description += ", worker_start_deadline_exceeded=";
+            description += WorkerStartDeadlineExceeded.load(
+                               std::memory_order_acquire)
+                ? "true"
+                : "false";
+            description += ", worker_completion_pending=";
+            description += workerCompletionPending ? "true" : "false";
+            description += ", main_thread_apply_pending=";
+            description += mainThreadApplyPending ? "true" : "false";
+            description += ", terminal_cancellation=";
+            description += terminalCancellation ? "true" : "false";
+            description += ", worker_started_us=" +
+                std::to_string(
+                    WorkerStartedAtMicros.load(std::memory_order_acquire));
+            description += ", worker_gate_released_us=" +
+                std::to_string(
+                    WorkerGateReleasedAtMicros.load(std::memory_order_acquire));
+            description += ", main_apply_us=" +
+                std::to_string(
+                    MainThreadApplyAtMicros.load(std::memory_order_acquire));
+            description += ", event_us=" +
+                std::to_string(
+                    EventObservedAtMicros.load(std::memory_order_acquire));
+            description += ", stage_text='" + LastStageText + "'";
+            description += ", diagnostic='" + LastDiagnosticText + "'";
+            return description;
+        }
+    };
+
+void CaptureAssetImportEventWaitPhase(
+    Runtime::Engine& engine,
+    AssetImportEventWaitDiagnostics& diagnostics)
+    {
+        const Runtime::RuntimeAssetImportQueueSnapshot snapshot =
+            engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+        const auto entry = std::find_if(
+            snapshot.Entries.begin(),
+            snapshot.Entries.end(),
+            [&diagnostics](const Runtime::RuntimeAssetImportQueueEntry& candidate)
+            {
+                return !diagnostics.Operation.IsValid() ||
+                    candidate.Operation == diagnostics.Operation;
+            });
+        if (entry == snapshot.Entries.end())
+            return;
+
+        if (!diagnostics.Operation.IsValid())
+            diagnostics.Operation = entry->Operation;
+        diagnostics.QueueEntryObserved = true;
+        diagnostics.LastStage = entry->Stage;
+        diagnostics.LastTerminalStatus = entry->TerminalStatus;
+        diagnostics.LastStageText = entry->StageText;
+        diagnostics.LastDiagnosticText = entry->DiagnosticText;
+        if (entry->Stage == Runtime::RuntimeAssetImportQueueStage::MainThreadApply)
+        {
+            std::int64_t expected = -1;
+            (void)diagnostics.MainThreadApplyAtMicros.compare_exchange_strong(
+                expected,
+                diagnostics.ElapsedMicros(),
+                std::memory_order_acq_rel);
+        }
+    }
+
 class WaitForAssetImportEventApplication final : public Runtime::IApplication
     {
     public:
-        explicit WaitForAssetImportEventApplication(std::uint32_t maxFrames)
-            : m_MaxFrames(maxFrames)
+        explicit WaitForAssetImportEventApplication(
+            std::chrono::milliseconds timeout = std::chrono::seconds(10),
+            std::shared_ptr<AssetImportEventWaitDiagnostics> diagnostics = {},
+            bool waitForWorkerStart = false)
+            : m_Timeout(timeout)
+            , m_Diagnostics(
+                  diagnostics
+                      ? std::move(diagnostics)
+                      : std::make_shared<AssetImportEventWaitDiagnostics>())
+            , m_WaitForWorkerStart(waitForWorkerStart)
         {
         }
 
@@ -413,18 +602,74 @@ class WaitForAssetImportEventApplication final : public Runtime::IApplication
         void OnSimTick(Runtime::Engine&, double) override {}
         void OnVariableTick(Runtime::Engine& engine, double, double) override
         {
-            ++m_ObservedFrames;
-            if (engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value() ||
-                m_ObservedFrames >= m_MaxFrames)
+            const auto now = std::chrono::steady_clock::now();
+            if (!m_Diagnostics->Armed)
+                m_Diagnostics->Arm();
+            CaptureAssetImportEventWaitPhase(engine, *m_Diagnostics);
+            if (engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value())
             {
+                m_Diagnostics->EventObservedAtMicros.store(
+                    m_Diagnostics->ElapsedMicros(),
+                    std::memory_order_release);
+                m_Diagnostics->ExitReason =
+                    AssetImportEventWaitExitReason::EventObserved;
                 engine.RequestExit();
+                return;
             }
+            if (!m_WaitStarted)
+            {
+                if (!m_WorkerStartWindowStarted)
+                {
+                    m_WorkerStartDeadline = now + std::chrono::seconds(10);
+                    m_WorkerStartWindowStarted = true;
+                }
+                if (m_WaitForWorkerStart &&
+                    !m_Diagnostics->WorkerStarted.load(
+                        std::memory_order_acquire))
+                {
+                    if (now >= m_WorkerStartDeadline)
+                    {
+                        m_Diagnostics->WorkerStartDeadlineExceeded.store(
+                            true,
+                            std::memory_order_release);
+                        m_Diagnostics->ExitReason =
+                            AssetImportEventWaitExitReason::DeadlineExceeded;
+                        engine.RequestExit();
+                        return;
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                    return;
+                }
+                m_Deadline = now + m_Timeout;
+                m_WaitStarted = true;
+            }
+
+            (void)m_Diagnostics->ObservedFrames.fetch_add(
+                1u,
+                std::memory_order_acq_rel);
+            if (now >= m_Deadline)
+            {
+                m_Diagnostics->ExitReason =
+                    AssetImportEventWaitExitReason::DeadlineExceeded;
+                engine.RequestExit();
+                return;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void OnShutdown(Runtime::Engine& engine) override
+        {
+            CaptureAssetImportEventWaitPhase(engine, *m_Diagnostics);
+            m_Diagnostics->ReleaseWorker.store(true, std::memory_order_release);
+        }
 
     private:
-        std::uint32_t m_MaxFrames{1u};
-        std::uint32_t m_ObservedFrames{0u};
+        std::chrono::milliseconds m_Timeout{std::chrono::seconds(10)};
+        std::shared_ptr<AssetImportEventWaitDiagnostics> m_Diagnostics{};
+        bool m_WaitForWorkerStart{false};
+        bool m_WaitStarted{false};
+        bool m_WorkerStartWindowStarted{false};
+        std::chrono::steady_clock::time_point m_Deadline{};
+        std::chrono::steady_clock::time_point m_WorkerStartDeadline{};
     };
 
 class FixedFrameApplication final : public Runtime::IApplication
@@ -2356,7 +2601,7 @@ TEST(SandboxEditorUi, QueuedManualGeometryDecodeFailureIsFailClosed)
     config.Camera.Enabled = true;
     Runtime::Engine engine(
         config,
-        std::make_unique<WaitForAssetImportEventApplication>(128u));
+        std::make_unique<WaitForAssetImportEventApplication>());
     ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
     const std::size_t baselineLiveAssetCount =
@@ -2615,6 +2860,91 @@ TEST(SandboxEditorUi, DroppedGeometryQueueCancellationPreventsMainThreadApply)
 
     engine.Shutdown();
 }
+TEST(SandboxEditorUi, DroppedGeometryAssetReimportWaitReportsDeadlineAndCancellationPhase)
+{
+    TmpFile meshFile(
+        "runtime_drop_reimport_wait_timeout.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    auto waitDiagnostics =
+        std::make_shared<AssetImportEventWaitDiagnostics>();
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForAssetImportEventApplication>(
+            std::chrono::milliseconds(250),
+            waitDiagnostics,
+            true));
+    ComposeAsyncWorkAndInitialize(engine);
+
+    waitDiagnostics->Arm();
+    engine.GetAssetImportPipeline()
+        .SetQueuedGeometryImportBeforeDecodeHookForTest(
+            [waitDiagnostics](const Runtime::RuntimeAssetImportRequest&)
+            {
+                waitDiagnostics->WorkerStartedAtMicros.store(
+                    waitDiagnostics->ElapsedMicros(),
+                    std::memory_order_release);
+                waitDiagnostics->WorkerStarted.store(
+                    true,
+                    std::memory_order_release);
+                while (!waitDiagnostics->ReleaseWorker.load(
+                    std::memory_order_acquire))
+                {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+                waitDiagnostics->WorkerGateReleasedAtMicros.store(
+                    waitDiagnostics->ElapsedMicros(),
+                    std::memory_order_release);
+            });
+
+    const std::vector<std::string> droppedPaths{meshFile.Path.string()};
+    engine.GetAssetImportPipeline().ImportDroppedFilePaths(droppedPaths);
+    const Runtime::RuntimeAssetImportQueueSnapshot queuedImport =
+        engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+    if (queuedImport.Entries.size() != 1u)
+        waitDiagnostics->ReleaseWorker.store(true, std::memory_order_release);
+    ASSERT_EQ(queuedImport.Entries.size(), 1u);
+    waitDiagnostics->Operation = queuedImport.Entries.front().Operation;
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+    engine.Run();
+
+    EXPECT_EQ(
+        waitDiagnostics->ExitReason,
+        AssetImportEventWaitExitReason::DeadlineExceeded)
+        << waitDiagnostics->Describe();
+    EXPECT_FALSE(
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value())
+        << waitDiagnostics->Describe();
+    EXPECT_TRUE(
+        waitDiagnostics->WorkerStarted.load(std::memory_order_acquire))
+        << waitDiagnostics->Describe();
+    EXPECT_EQ(
+        waitDiagnostics->LastStage,
+        Runtime::RuntimeAssetImportQueueStage::Decoding)
+        << waitDiagnostics->Describe();
+    EXPECT_GE(
+        waitDiagnostics->ElapsedMicros() -
+            waitDiagnostics->WorkerStartedAtMicros.load(
+                std::memory_order_acquire),
+        250'000)
+        << waitDiagnostics->Describe();
+
+    engine.Shutdown();
+
+    EXPECT_EQ(
+        waitDiagnostics->LastStage,
+        Runtime::RuntimeAssetImportQueueStage::Cancelled)
+        << waitDiagnostics->Describe();
+    EXPECT_EQ(
+        waitDiagnostics->LastTerminalStatus,
+        Runtime::RuntimeAssetImportQueueTerminalStatus::Cancelled)
+        << waitDiagnostics->Describe();
+}
 TEST(SandboxEditorUi, DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplicateEntity)
 {
     TmpFile meshFile(
@@ -2624,23 +2954,116 @@ TEST(SandboxEditorUi, DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplica
         "v 0 1 0\n"
         "f 1 2 3\n");
 
+    auto waitDiagnostics =
+        std::make_shared<AssetImportEventWaitDiagnostics>();
     Runtime::Engine engine(
         HeadlessConfig(),
-        std::make_unique<WaitForAssetImportEventApplication>(128u));
+        std::make_unique<WaitForAssetImportEventApplication>(
+            std::chrono::seconds(10),
+            waitDiagnostics));
     ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
+    const Runtime::RuntimeImportCompletedHandlerHandle applyProbe =
+        engine.GetAssetImportPipeline().RegisterImportCompletedHandler(
+            Runtime::RuntimeImportCompletedHandlerDesc{
+                .DebugName = "BUG-117 main-thread apply probe",
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+                .Handle =
+                    [waitDiagnostics](
+                        const Runtime::RuntimeImportCompletedContext&,
+                        Runtime::RuntimeImportCompletedServices&)
+                    {
+                        waitDiagnostics->MainThreadApplyAtMicros.store(
+                            waitDiagnostics->ElapsedMicros(),
+                            std::memory_order_release);
+                        return Core::Ok();
+                    },
+            });
+    ASSERT_TRUE(applyProbe.IsValid());
+
+    constexpr std::uint32_t formerFrameBudget = 128u;
+    waitDiagnostics->Arm();
+    engine.GetAssetImportPipeline()
+        .SetQueuedGeometryImportBeforeDecodeHookForTest(
+            [waitDiagnostics](const Runtime::RuntimeAssetImportRequest&)
+            {
+                waitDiagnostics->WorkerStartedAtMicros.store(
+                    waitDiagnostics->ElapsedMicros(),
+                    std::memory_order_release);
+                waitDiagnostics->WorkerStarted.store(
+                    true,
+                    std::memory_order_release);
+                while (
+                    waitDiagnostics->ObservedFrames.load(
+                        std::memory_order_acquire) <= formerFrameBudget &&
+                    !waitDiagnostics->ReleaseWorker.load(
+                        std::memory_order_acquire))
+                {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+                if (waitDiagnostics->ObservedFrames.load(
+                        std::memory_order_acquire) > formerFrameBudget)
+                {
+                    waitDiagnostics->FormerFrameBudgetCrossed.store(
+                        true,
+                        std::memory_order_release);
+                }
+                waitDiagnostics->WorkerGateReleasedAtMicros.store(
+                    waitDiagnostics->ElapsedMicros(),
+                    std::memory_order_release);
+            });
+
     const std::vector<std::string> droppedPaths{meshFile.Path.string()};
     engine.GetAssetImportPipeline().ImportDroppedFilePaths(droppedPaths);
+    const Runtime::RuntimeAssetImportQueueSnapshot queuedImport =
+        engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+    if (queuedImport.Entries.size() != 1u)
+        waitDiagnostics->ReleaseWorker.store(true, std::memory_order_release);
+    ASSERT_EQ(queuedImport.Entries.size(), 1u);
+    waitDiagnostics->Operation = queuedImport.Entries.front().Operation;
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
         << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
 
     engine.Run();
+    waitDiagnostics->ReleaseWorker.store(true, std::memory_order_release);
+    engine.GetAssetImportPipeline()
+        .SetQueuedGeometryImportBeforeDecodeHookForTest({});
 
     const std::optional<Runtime::RuntimeAssetImportEvent>& droppedEvent =
         engine.GetAssetImportPipeline().GetLastAssetImportEvent();
-    ASSERT_TRUE(droppedEvent.has_value());
+    ASSERT_TRUE(droppedEvent.has_value()) << waitDiagnostics->Describe();
+    EXPECT_EQ(
+        waitDiagnostics->ExitReason,
+        AssetImportEventWaitExitReason::EventObserved)
+        << waitDiagnostics->Describe();
+    EXPECT_GT(
+        waitDiagnostics->ObservedFrames.load(std::memory_order_acquire),
+        formerFrameBudget)
+        << "the regression must cross the former frame-only exit";
+    EXPECT_TRUE(
+        waitDiagnostics->FormerFrameBudgetCrossed.load(
+            std::memory_order_acquire));
+    EXPECT_TRUE(
+        waitDiagnostics->WorkerStarted.load(std::memory_order_acquire));
+    const std::int64_t workerGateReleasedAt =
+        waitDiagnostics->WorkerGateReleasedAtMicros.load(
+            std::memory_order_acquire);
+    const std::int64_t mainThreadApplyAt =
+        waitDiagnostics->MainThreadApplyAtMicros.load(
+            std::memory_order_acquire);
+    const std::int64_t eventObservedAt =
+        waitDiagnostics->EventObservedAtMicros.load(
+            std::memory_order_acquire);
+    EXPECT_GE(workerGateReleasedAt, 0) << waitDiagnostics->Describe();
+    EXPECT_GE(mainThreadApplyAt, workerGateReleasedAt)
+        << waitDiagnostics->Describe();
+    EXPECT_GE(eventObservedAt, mainThreadApplyAt)
+        << waitDiagnostics->Describe();
+    EXPECT_LT(eventObservedAt, std::chrono::seconds(10).count() * 1'000'000)
+        << waitDiagnostics->Describe();
+    engine.GetAssetImportPipeline().UnregisterImportCompletedHandler(applyProbe);
     ASSERT_TRUE(droppedEvent->Succeeded());
     ASSERT_TRUE(droppedEvent->Result.has_value());
     const Assets::AssetId droppedAsset = droppedEvent->Result->Asset;
@@ -2712,7 +3135,7 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderCo
 
     Runtime::Engine engine(
         HeadlessConfig(),
-        std::make_unique<WaitForAssetImportEventApplication>(128u));
+        std::make_unique<WaitForAssetImportEventApplication>());
     ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
@@ -2801,7 +3224,7 @@ TEST(SandboxEditorUi, PlatformDropNoUvObjUploadsRawSurfaceBeforeDeferredPostProc
 
     Runtime::Engine engine(
         HeadlessConfig(),
-        std::make_unique<WaitForAssetImportEventApplication>(128u));
+        std::make_unique<WaitForAssetImportEventApplication>());
     ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
@@ -2845,7 +3268,7 @@ TEST(SandboxEditorUi, DroppedFileImportFailureLogsDiagnostics)
 
     Runtime::Engine engine(
         HeadlessConfig(),
-        std::make_unique<WaitForAssetImportEventApplication>(128u));
+        std::make_unique<WaitForAssetImportEventApplication>());
     ComposeAsyncWorkAndInitialize(engine);
 
     Core::Log::ClearEntries();
@@ -2895,7 +3318,7 @@ TEST(SandboxEditorUi, PlatformDropEventImportsOffMesh)
 
     Runtime::Engine engine(
         HeadlessConfig(),
-        std::make_unique<WaitForAssetImportEventApplication>(128u));
+        std::make_unique<WaitForAssetImportEventApplication>());
     ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 

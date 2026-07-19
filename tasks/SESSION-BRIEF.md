@@ -50,7 +50,6 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-108` — Fibonacci sphere sampling small-count and endpoint safety (tasks/backlog/bugs/BUG-108-fibonacci-sphere-small-count-endpoints.md)
 - unblocked: `BUG-109` — Voxel downsampling invalid-input and deterministic-cell ordering (tasks/backlog/bugs/BUG-109-voxel-downsample-invalid-input-ordering.md)
 - unblocked: `BUG-110` — Implicit smoothing applies boundary pins after rather than during solve (tasks/backlog/bugs/BUG-110-implicit-smoothing-boundary-dirichlet-solve.md)
-- unblocked: `BUG-117` — Dropped-geometry reimport test exhausts a frame-count wait budget (tasks/backlog/bugs/BUG-117-dropped-geometry-reimport-frame-budget-flake.md)
 
 ## Theme I — Research method implementation
 

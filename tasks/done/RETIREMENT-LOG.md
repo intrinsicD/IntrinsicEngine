@@ -8,6 +8,44 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-117`](BUG-117-dropped-geometry-reimport-frame-budget-flake.md) —
+dropped-import frame-budget flake retired to `tasks/done/` on 2026-07-19 at
+`CPUContracted`. The two test-local asynchronous completion helpers now use
+ten-second steady-clock deadlines beginning at their first poll and yield one
+millisecond between unsuccessful polls. A real queued-geometry worker held at
+the existing before-decode hook made the old helper fail at frame 128 after
+30.5 ms with operation `0:1` still decoding; the fixed regression crosses that
+threshold before real decode, main-thread apply, event publication, same-asset
+reimport, payload-ticket advancement, and the single-entity assertion. A
+separate worker-start-bounded regression proves a stuck decode exits after its
+250 ms deadline and records terminal cancellation. The exact reimport and
+ambiguous-PLY sibling each passed 100/100, the combined drop/import cohort
+passed 8/8, a single-core contention run passed 20/20, and the default CPU
+selector passed 4,180/4,180 with one expected GLFW/LSan capability skip. No
+production runtime or RUNTIME-188 source changed.
+
+[`RUNTIME-188`](RUNTIME-188-extract-scene-interaction-module.md) —
+scene-interaction composition retired on 2026-07-19 at `Operational`. One
+optional app-composed PImpl owns the exact active-world selection, stable
+lookup/binding, readback/refinement, and gizmo cohort; publishes only the exact
+module and controller; validates its world/registry/epoch at every typed
+viewport, BeforeExtraction, and Maintenance callback; and submits copied,
+world-tagged interaction snapshots. A retained document-replacement
+participant, active-world mismatch/retirement, shutdown announcement, and
+reinitialize all use the same fail-closed reset without state resurrection.
+Pick sequences remain monotonic, while zero, unknown, wrong-world, and
+wrong-epoch results cannot mutate current selection/refinement. Engine no
+longer owns or exposes interaction or mesh primitive-view compatibility state;
+only the named `RUNTIME-183` implementation-local selection borrow remains.
+The post-review focused selector passed 214/214; the canonical CPU-supported
+selector reported 4,225 passed plus one expected GLFW/LSan capability skip out
+of 4,226 selected cases with zero failures. Narrow `ci-vulkan` Sandbox,
+selection, gizmo, and shutdown evidence passed after explicitly building the
+shutdown helper producer. Exact Engine convergence is 26 plain imports, 4
+domain imports, 2 re-exports, and 15 public getter names; strict structural and
+generated-state checks passed. Implementation checkpoints: `b0dfdbe9` and
+`8c8bb5d2`.
+
 [`GRAPHICS-127`](GRAPHICS-127-native-gpu-timestamp-profiler.md) — native GPU
 timestamp profiling retired to `tasks/done/` on 2026-07-19 at `Operational`
 on supported Vulkan and `CPUContracted` on Null/unsupported hosts. The existing
@@ -5592,25 +5630,3 @@ strict layering, task, docs, test-layout, root-hygiene, generated-inventory,
 and clean-workshop checks passed. Implementation checkpoint: `1d48444b`;
 initial main merge: `39585780`; retained-handle fix: `064336f2`; final fix
 merge: `fc372b2f`; research trace: `0ccb94a0`.
-
-[`RUNTIME-188`](RUNTIME-188-extract-scene-interaction-module.md) —
-scene-interaction composition retired on 2026-07-19 at `Operational`. One
-optional app-composed PImpl owns the exact active-world selection, stable
-lookup/binding, readback/refinement, and gizmo cohort; publishes only the exact
-module and controller; validates its world/registry/epoch at every typed
-viewport, BeforeExtraction, and Maintenance callback; and submits copied,
-world-tagged interaction snapshots. A retained document-replacement
-participant, active-world mismatch/retirement, shutdown announcement, and
-reinitialize all use the same fail-closed reset without state resurrection.
-Pick sequences remain monotonic, while zero, unknown, wrong-world, and
-wrong-epoch results cannot mutate current selection/refinement. Engine no
-longer owns or exposes interaction or mesh primitive-view compatibility state;
-only the named `RUNTIME-183` implementation-local selection borrow remains.
-The post-review focused selector passed 214/214; the canonical CPU-supported
-selector reported 4,225 passed plus one expected GLFW/LSan capability skip out
-of 4,226 selected cases with zero failures. Narrow `ci-vulkan` Sandbox,
-selection, gizmo, and shutdown evidence passed after explicitly building the
-shutdown helper producer. Exact Engine convergence is 26 plain imports, 4
-domain imports, 2 re-exports, and 15 public getter names; strict structural and
-generated-state checks passed. Implementation checkpoints: `b0dfdbe9` and
-`8c8bb5d2`.
