@@ -31,6 +31,12 @@ maturity_target: Operational
   shutdown event, `IAssetFrameHooks`, and `JobServiceGpuQueueBridge`; removes
   stale camera and config-control-wrapper dependencies; and fixes the exact
   post-`RUNTIME-188` convergence target below.
+- 2026-07-19 implementation-preflight amendment: persistent PImpl construction
+  is distinguished from per-boot provider-dependent construction; direct
+  imports and model-scene handoff callbacks receive explicit binding
+  validation; rollback is specified as a no-partial-state invariant; provider
+  omission diagnostics use real production instances; and the one production
+  shutdown order is separated from direct-lifecycle order-safety probes.
 
 ## Goal
 - Move CPU asset authority, GPU residency, import orchestration, scene
@@ -57,13 +63,22 @@ maturity_target: Operational
 - The module object, `AssetImportPipeline`, import queue/terminal records, and
   `ObjectSpaceNormalBakeService` have app-global scope across an Engine
   shutdown/reinitialize cycle. Per-boot `AssetService`, GPU cache/listener, and
-  borrowed scene handoffs are rebuilt and withdrawn each boot. Keeping the
-  pipeline object alive also keeps its raw-`this` streaming apply/cancellation
-  callbacks valid until the optional async owner finishes its drain.
+  borrowed scene handoffs are rebuilt and withdrawn each boot. The persistent
+  pipeline and bake service are constructed dependency-empty with the module
+  PImpl; required-provider validation precedes only construction/publication of
+  per-boot provider-dependent state. Keeping the pipeline object alive also
+  keeps its raw-`this` streaming apply/cancellation callbacks valid until the
+  optional async owner finishes its drain.
 - Scene handoffs are borrowed active-world attachments. Active-world events are
   delayed until the next pump, so handoff/import operations also validate the
   cached `{WorldHandle, Registry*, binding epoch}` directly against
-  `WorldRegistry` before use. Document new/load/close is a different,
+  `WorldRegistry` before use. `AssetService` may flush a model-scene event
+  outside `IAssetFrameHooks::TickAssets()`, so module-only pre-tick validation
+  is insufficient: the existing model-scene handoff options receive one
+  optional narrow binding-validity predicate, and the handoff checks it before
+  every callback/materialize/resolve use. The direct import path performs the
+  same current-target check before scene mutation; queued apply retains its
+  existing frozen-epoch check. Document new/load/close is a different,
   same-registry replacement boundary and uses `RUNTIME-172`'s synchronous
   participant contract.
 - Required Engine-lifetime construction capabilities are `JobService`,
@@ -90,6 +105,12 @@ maturity_target: Operational
   device teardown. The AssetWorkflow listener first stops/cancels imports, then
   invalidates scene bindings, releases its document participant, and detaches
   provider borrows. It does not destroy bake/cache state at announcement.
+  With the fixed production names, ascending registration order places
+  `Runtime.AssetWorkflowModule` before `Runtime.AsyncWorkModule`, so the one
+  real Engine reverse-shutdown order is AsyncWork then AssetWorkflow. Safety in
+  the opposite ordinary-callback order is a direct lifecycle-harness proof
+  after the same announcement/GPU-participant boundary, not a second claimed
+  Engine order and not something app insertion order can change.
 - `ObjectSpaceNormalBakeService` remains one `JobService` `GpuQueue`
   participant. The module owns registration and callback state; the existing
   Engine/kernel `JobServiceGpuQueueBridge` remains the sole renderer command
@@ -110,18 +131,25 @@ maturity_target: Operational
       `AssetService`, GPU cache/listener, and model texture/scene handoffs;
       preserve cancelled import records and keep the pipeline object alive
       through optional `StreamingExecutor::ShutdownAndDrain()` independent of
-      module-name order.
+      ordinary callback order. Construct the persistent objects dependency-empty
+      with the PImpl; do not defer their object lifetime to per-boot provider
+      discovery.
 - [ ] Publish the exact existing `RHI::IDevice` as an Engine built-in service
       before module registration, alongside the existing renderer and
       render-extraction services. Consume `JobService`, `WorldRegistry`, active
       config, and initialization state through declared Engine-lifetime
       `EngineSetup` construction borrows; add no wrapper service for them.
 - [ ] During registration, validate the required built-in device, renderer, and
-      render-extraction services before constructing/publishing owned state.
-      During order-independent `OnResolve`, `Require` the exact
-      `SceneDocumentModule` and `EditorCommandHistory`. Add real missing-device
-      and missing-document/history boot tests rather than manufacturing
-      test-only providers.
+      render-extraction services before constructing/publishing per-boot
+      provider-dependent state. During order-independent `OnResolve`, `Require`
+      the exact `SceneDocumentModule` and `EditorCommandHistory`. Cover omission
+      diagnostics through three direct module boot-lifecycle cases: omit the
+      device while using the real remaining built-ins; omit
+      `SceneDocumentModule`; then register/publish the real
+      `SceneDocumentModule` and exact-withdraw its real
+      `EditorCommandHistory` instance before `AssetWorkflowModule::OnResolve`
+      to exercise the independent missing-history diagnostic. Do not add a
+      test-only provider, Engine suppression switch, or wrapper service.
 - [ ] During `OnResolve`, optionally `Find<StreamingExecutor>()` and
       `Find<SelectionController>()`. Direct imports remain Operational without
       streaming; queued imports fail closed. Import materialization remains
@@ -136,8 +164,14 @@ maturity_target: Operational
 - [ ] Publish the existing `AssetService`, `AssetImportPipeline`,
       `GpuAssetCache`, and `Core::IAssetFrameHooks` capabilities directly
       through `ServiceRegistry`; withdraw the same exact instances on rollback
-      and shutdown. Do not publish the private normal-bake service/queue or the
-      module itself solely for tests or future `RUNTIME-129` callers.
+      and shutdown. Duplicate-conflict preflight and every later
+      registration/resolution failure must leave no partial publication,
+      subscription, document participant, or GPU participant. Keep reverse
+      exact-withdraw/unregister cleanup for unexpected late failures; do not
+      manufacture a mid-`Provide` race that cannot occur during the current
+      single-threaded boot merely to exercise a branch. Do not publish the
+      private normal-bake service/queue or the module itself solely for tests or
+      future `RUNTIME-129` callers.
 - [ ] Implement `Core::IAssetFrameHooks::TickAssets()` with the existing
       `AssetService::Tick`, GPU-cache retirement, and pending material-texture
       binding work. Engine resolves that hook in the existing
@@ -157,8 +191,11 @@ maturity_target: Operational
 - [ ] Subscribe to active-world/retirement events and perform the same
       destroy/rebind operation for a real world switch, but retain direct
       world/registry/epoch validation before every tick, handoff callback, and
-      queued-import apply. Do not route active-world switching through the
-      document replacement participant.
+      direct-import or queued-import apply. Extend only the existing
+      `AssetModelSceneHandoffOptions` with the optional narrow validity
+      predicate needed to guard direct `AssetService` flushes; add no handoff
+      wrapper or third workflow file. Do not route active-world switching
+      through the document replacement participant.
 - [ ] Split shutdown announcement from ordinary reverse module shutdown. Pump
       the existing `RuntimeShutdownAnnounced` before application/provider/GPU
       teardown. In the AssetWorkflow listener, cancel every active import before
@@ -199,10 +236,11 @@ maturity_target: Operational
 
 ## Tests
 - [ ] Add `tests/contract/runtime/Test.AssetWorkflowModule.cpp` for exact
-      publication/withdrawal, duplicate conflicts, partial-register rollback,
-      required-provider diagnostics, registration-order independence, optional
-      streaming/selection omission, initialized-state gating, module omission,
-      one real `Engine::Run()`, shutdown, and reinitialize.
+      publication/withdrawal, duplicate conflicts, failure cleanup with no
+      partial boot state, real-provider omission diagnostics,
+      registration-order independence, optional streaming/selection omission,
+      initialized-state gating, module omission, one real `Engine::Run()`,
+      shutdown, and reinitialize.
 - [ ] Preserve asset import, residency, model handoff, generated-texture,
       non-operational normal-bake, stale-generation, platform-drop,
       import-selection/history, GPU-cache fallback, shutdown, and reinitialize
@@ -227,8 +265,12 @@ maturity_target: Operational
 - [ ] Extend the blocked-import shutdown regression so cancellation occurs
       before app policy unregister and every provider teardown, no late apply
       mutates assets/scene/history/selection, the persistent pipeline remains
-      valid through async drain, and both AssetWorkflow-before-AsyncWork and
-      AsyncWork-before-AssetWorkflow ordinary shutdown orders are safe.
+      valid through async drain, and the real reverse-sorted Engine shutdown
+      proves AsyncWork-before-AssetWorkflow. After the same shutdown
+      announcement and GPU-participant boundary, use a direct lifecycle harness
+      to invoke ordinary `OnShutdown` in both callback orders and prove the
+      opposite AssetWorkflow-before-AsyncWork order is also safe; do not present
+      app insertion order as changing production order.
 - [ ] Preserve `RuntimeJobService` participant record/drain/reverse-shutdown
       tests and add composed registration-exactly-once/reinitialize coverage for
       normal bake. Prove idle wait and service-private cleanup precede cache,
@@ -262,7 +304,8 @@ maturity_target: Operational
       and the global JobService GPU bridge retain no asset ownership.
 - [ ] Global owners and borrowed per-world handoffs have explicit, tested
       lifetimes across document replacement, world switch, early shutdown
-      announcement, either ordinary module shutdown order, and reinitialize.
+      announcement, the production reverse-sorted shutdown order, both direct
+      lifecycle callback-order probes, and reinitialize.
 - [ ] Existing import-to-render behavior remains Operational; normal-bake GPU
       `Operational` is still owned by `RUNTIME-129`.
 - [ ] Exact Engine convergence is `22` plain imports / `0` domain imports / `2`
