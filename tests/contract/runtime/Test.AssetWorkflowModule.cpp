@@ -31,6 +31,7 @@ import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
@@ -1491,10 +1492,106 @@ TEST(AssetWorkflowModule,
         nullptr);
 
     harness.Stop();
-    ASSERT_TRUE(harness.Start().has_value());
-    EXPECT_FALSE(
+
+    // Rebuild the next boot manually and recycle the same slot index before
+    // the current AssetWorkflow participant claims it. Participant
+    // generations must remain monotonic across the document module's per-boot
+    // state reset so the old complete handle cannot become valid again.
+    harness.Services.BeginRegistration();
+    ASSERT_TRUE(harness.ProvideBuiltins().has_value());
+    Runtime::EngineSetup nextSetup = harness.MakeSetup();
+    ASSERT_TRUE(
+        harness.Asset.OnRegister(nextSetup).has_value());
+    harness.AssetRegistered = true;
+    ASSERT_TRUE(
+        harness.Document.OnRegister(nextSetup).has_value());
+    harness.DocumentRegistered = true;
+    harness.Services.BeginResolution();
+    ASSERT_TRUE(
+        harness.Document.OnResolve(nextSetup).has_value());
+
+    auto generationSeed =
+        harness.Document.RegisterReplacementParticipant(
+            Runtime::SceneReplacementParticipantDesc{
+                .Name = "Runtime.AssetWorkflowGenerationSeed",
+                .BeforeReplace = {},
+                .AfterReplace = {},
+            });
+    ASSERT_TRUE(generationSeed.has_value());
+    ASSERT_EQ(generationSeed->Index, recycledHandle.Index);
+    EXPECT_NE(
+        generationSeed->Generation,
+        recycledHandle.Generation);
+    ASSERT_TRUE(
         harness.Document
-            .UnregisterReplacementParticipant(recycledHandle)
+            .UnregisterReplacementParticipant(
+                *generationSeed)
+            .has_value());
+
+    ASSERT_TRUE(
+        harness.Asset.OnResolve(nextSetup).has_value());
+    harness.AssetResolved = true;
+    harness.Services.Lock();
+    harness.Initialized = true;
+
+    // AssetWorkflow consumes the same free index with another module-lifetime
+    // generation. A stale first-boot teardown must not detach this boot's
+    // participant, and its callback must still run.
+    const auto duplicateCurrentName =
+        harness.Document.RegisterReplacementParticipant(
+            Runtime::SceneReplacementParticipantDesc{
+                .Name = "Runtime.AssetWorkflowModule",
+                .BeforeReplace = {},
+                .AfterReplace = {},
+            });
+    EXPECT_FALSE(duplicateCurrentName.has_value());
+
+    Graphics::GpuAssetCache* const cache =
+        harness.Services.Find<Graphics::GpuAssetCache>();
+    ASSERT_NE(cache, nullptr);
+    ECS::Scene::Registry* const scene =
+        harness.Worlds.Get(harness.InitialWorld);
+    ASSERT_NE(scene, nullptr);
+    (void)MakeProceduralRenderable(*scene);
+    const auto extracted =
+        harness.Extraction.ExtractAndSubmit(
+            *scene, *harness.Renderer, cache);
+    ASSERT_GT(extracted.CandidateRenderableCount, 0u);
+    ASSERT_GT(
+        harness.Extraction.GetTrackedRenderableCount(),
+        0u);
+
+    bool observerCalled = false;
+    bool observerSawAssetCallback = false;
+    auto observer =
+        harness.Document.RegisterReplacementParticipant(
+            Runtime::SceneReplacementParticipantDesc{
+                .Name = "Runtime.AssetWorkflowObserver",
+                .BeforeReplace =
+                    [&](const Runtime::
+                            SceneReplacementContext&)
+                    {
+                        observerCalled = true;
+                        observerSawAssetCallback =
+                            harness.Extraction
+                                .GetTrackedRenderableCount() ==
+                            0u;
+                    },
+                .AfterReplace = {},
+            });
+    ASSERT_TRUE(observer.has_value());
+
+    const Core::Result staleDetach =
+        harness.Document.UnregisterReplacementParticipant(
+            recycledHandle);
+    EXPECT_FALSE(staleDetach.has_value());
+    ASSERT_TRUE(
+        harness.Document.NewSceneDocument().has_value());
+    EXPECT_TRUE(observerCalled);
+    EXPECT_TRUE(observerSawAssetCallback);
+    EXPECT_TRUE(
+        harness.Document
+            .UnregisterReplacementParticipant(*observer)
             .has_value());
 }
 
@@ -1897,6 +1994,66 @@ TEST(AssetWorkflowModule,
     EXPECT_TRUE(observation.StreamingWithdrawn);
     EXPECT_TRUE(
         observation.AssetServicesStillPublished);
+}
+
+TEST(AssetWorkflowModule,
+     OmittedAssetWorkflowPlatformDropFailsClosedWithoutStreamingOrSceneMutation)
+{
+    TempObjFile mesh{"runtime183-omitted-drop.obj"};
+    auto application =
+        std::make_unique<FixedFrameApplication>(2u);
+    Runtime::Engine engine(
+        HeadlessConfig(), std::move(application));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    engine.Initialize();
+
+    EXPECT_EQ(
+        engine.Services().Find<Assets::AssetService>(),
+        nullptr);
+    EXPECT_EQ(
+        engine.Services()
+            .Find<Runtime::AssetImportPipeline>(),
+        nullptr);
+    EXPECT_EQ(
+        engine.Services().Find<Graphics::GpuAssetCache>(),
+        nullptr);
+    EXPECT_EQ(
+        engine.Services().Find<Core::IAssetFrameHooks>(),
+        nullptr);
+
+    Runtime::StreamingExecutor* const streaming =
+        engine.Services().Find<Runtime::StreamingExecutor>();
+    ASSERT_NE(streaming, nullptr);
+    ECS::Scene::Registry* const scene =
+        engine.Worlds().Get(engine.ActiveWorld());
+    ASSERT_NE(scene, nullptr);
+    const auto beforeStreaming =
+        streaming->GetDiagnostics();
+    const std::size_t beforeEntities =
+        EntityCount(*scene);
+
+    engine.DispatchPlatformEventForTest(
+        Extrinsic::Platform::WindowDropEvent{
+            .Paths = {mesh.Path.string()},
+        });
+    engine.Run();
+
+    const auto afterStreaming =
+        streaming->GetDiagnostics();
+    EXPECT_EQ(
+        afterStreaming.SlotCount,
+        beforeStreaming.SlotCount);
+    EXPECT_EQ(
+        afterStreaming.ActiveSlotCount,
+        beforeStreaming.ActiveSlotCount);
+    EXPECT_EQ(
+        afterStreaming.ReadyTaskCount,
+        beforeStreaming.ReadyTaskCount);
+    EXPECT_EQ(
+        afterStreaming.ReadyForApplyCount,
+        beforeStreaming.ReadyForApplyCount);
+    EXPECT_EQ(EntityCount(*scene), beforeEntities);
+    engine.Shutdown();
 }
 
 TEST(AssetWorkflowModule,

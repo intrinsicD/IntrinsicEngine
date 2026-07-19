@@ -1482,7 +1482,7 @@ TEST(RuntimeEngineLayering,
     const auto moduleShutdown = SliceBetween(
         engineImpl,
         "void Engine::ShutdownRuntimeModules()",
-        "// ── Construction / destruction");
+        "void Engine::RefreshActiveWorldScenePointer()");
     const auto shutdown = SliceBetween(
         engineImpl,
         "void Engine::Shutdown()",
