@@ -5,6 +5,10 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-115` — Test-gate routing case baseline drift](../../active/BUG-115-test-gate-routing-case-baseline-drift.md):
+  the exact `BUG-106` affected-case baseline retains four retired graph case
+  names and omits one current streaming token contract, so the live aggregate
+  reconciler rejects the otherwise green configured inventory.
 - [`BUG-110` — Implicit smoothing applies boundary pins after rather than during solve](BUG-110-implicit-smoothing-boundary-dirichlet-solve.md):
   `PreserveBoundary` currently solves an all-free shifted system and only then
   overwrites boundary entries, so interior vertices do not satisfy the claimed
