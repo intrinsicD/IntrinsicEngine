@@ -1,0 +1,51 @@
+session:
+  id: "2026-07-19_001"
+  date: "2026-07-19"
+  started: "2026-07-19T04:02+02:00"
+  last_turn: "2026-07-19T04:02+02:00"
+  turn_count: 1
+  summary: "Implemented, verified, documented, and checkpoint-committed RUNTIME-181's app-composed config-control module while leaving the full CPU integration gate and retirement open."
+
+events_logged:
+  - turn: 1
+    type: experiment
+    id: "N266"
+    routing: direct
+    provenance: ai-executed
+    summary: "Extracted Engine config control into an optional exact-instance runtime module and passed app compilation, 52 focused tests, and strict structural gates."
+
+ai_actions:
+  - turn: 1
+    action: "Implemented RUNTIME-181's shared recipe-activation kernel, exact app-composed config-control module, Engine/Sandbox/editor migration, lifecycle regressions, docs, generated inventory, and policy ratchets; built the app and touched test targets and committed the clean checkpoint."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.RenderRecipeActivation.cppm"
+      - "src/runtime/Runtime.EngineConfigControl.cppm"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.SandboxEditorFacades.cpp"
+      - "src/app/Sandbox/main.cpp"
+      - "tests/contract/runtime/Test.RuntimeConfigControlFacade.cpp"
+      - "tests/contract/runtime/Test.RuntimeRenderRecipeActivation.cpp"
+      - "docs/architecture/runtime-config-control.md"
+      - "tasks/active/RUNTIME-181-extract-config-control-module.md"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "RUNTIME-181 requires Engine to retain boot recipe substrate without owning the optional live-control facade, while Sandbox composes and resolves one exact control module/service."
+
+open_threads:
+  - "An owner may externalize the candidate stable contexts through branch protection, rulesets, or a merge queue; none is currently configured."
+  - "Reopen larger-runner evaluation only when a comparable runner exists and the recorded queue or total-time thresholds are crossed."
+  - "Adjudicate O08 and O09 when the module-surface diet is selected or rejected by a committed implementation."
+  - "Resolve whether model training means GEOM-058 or a new neural/LLM workflow."
+  - "Adjudicate O38 by correcting Progressive Poisson capability wording or collecting actual-Vulkan dispatch/readback parity evidence."
+  - "Keep Issue 445 candidates gated behind REVIEW-003 until its architecture-stability and right-sizing audit passes."
+  - "Recover provenance and redistribution rights before publishing the excluded local model datasets."
+  - "Land the bounded CORE-008 benchmark report with the task's final verification and retirement evidence."
+  - "Finish CORE-009 documentation, full CPU verification, and task retirement."
+  - "Run RUNTIME-181's complete default CPU-supported integration gate, then review and retire the still-active task."
+
+ai_suggestions_pending:
+  - "Let StructSplat and Prospect owners merge the pushed refresh branches through each repository's normal integration policy."

@@ -6286,3 +6286,37 @@ tree:
       and the Null Engine::Run/live-callback Sandbox integration passed 1/1.
       Final source grep and diff checks were clean.
     status: resolved
+  - id: N266
+    type: experiment
+    title: "Extract and verify the RUNTIME-181 config-control module"
+    provenance: ai-executed
+    timestamp: "2026-07-19T04:02+02:00"
+    also_depends_on: [N265]
+    evidence:
+      - "commit bc90ed7193512a72d7ed9c7fa539df4cdaf72f5b"
+      - "src/runtime/Runtime.EngineConfigControl.cppm"
+      - "src/runtime/Runtime.RenderRecipeActivation.cppm"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/app/Sandbox/main.cpp"
+      - "tests/contract/runtime/Test.RuntimeConfigControlFacade.cpp"
+      - "tests/contract/runtime/Test.RuntimeRenderRecipeActivation.cpp"
+      - "cmake --build --preset ci-fast --target IntrinsicRuntimeContractTests IntrinsicRuntimeIntegrationTests IntrinsicSandboxEditorIntegrationTests -j 4"
+      - "ci-fast focused config/recipe/editor/section/parameterization CTest selector"
+      - "python3 tools/repo/check_kernel_convergence.py --root . --strict"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+    result: >
+      Promoted EngineConfigControl itself to the optional app-composed runtime
+      module and exact published service, moved shared startup/live recipe work
+      behind a plain borrowed activation capability, removed config-control
+      ownership and accessors from Engine, and made Sandbox compose the exact
+      control object before boot. Startup recipe behavior remains operational
+      when the live-control module is omitted, while editor command surfaces
+      fail closed when the service is absent. A sandbox-capable configure built
+      and linked ExtrinsicSandbox; the restored canonical ci-fast identity
+      built all three touched test targets. The expanded focused selector
+      passed 52 of 52 tests. Strict convergence observed 40 plain imports, 18
+      domain imports, two re-exports, and 29 getter names; strict layering
+      scanned 748 files and 6,589 references with zero violations. The active
+      task retains the complete default CPU-supported gate as integration
+      evidence required before retirement.
+    status: resolved
