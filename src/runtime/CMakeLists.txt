@@ -62,6 +62,7 @@ target_sources(${target_name}
         Runtime.PhysicsBridge.cppm
         Runtime.SceneDocument.cppm
         Runtime.SceneSerialization.cppm
+        Cameras/Runtime.CameraModule.cppm
         Cameras/Runtime.CameraControllers.cppm
         Cameras/Runtime.CameraFocusCommand.cppm
         Runtime.SandboxEditorFacades.cppm
@@ -76,7 +77,6 @@ target_sources(${target_name}
         Runtime.ProceduralGeometry.cppm
         Runtime.ProceduralGeometryPacker.cppm
         Runtime.ReferenceScene.cppm
-        Runtime.ReferenceSceneControl.cppm
         Runtime.RenderRecipeActivation.cppm
         Runtime.RenderExtraction.cppm
         Runtime.RenderWorldPool.cppm
@@ -147,6 +147,7 @@ target_sources(${target_name}
         Runtime.PhysicsBridge.cpp
         Runtime.SceneDocument.cpp
         Runtime.SceneSerialization.cpp
+        Cameras/Runtime.CameraModule.cpp
         Cameras/Runtime.CameraControllers.cpp
         Cameras/Runtime.CameraFocusCommand.cpp
         Runtime.SandboxMethodFacade.cpp
@@ -164,7 +165,6 @@ target_sources(${target_name}
         Runtime.ProceduralGeometry.cpp
         Runtime.ProceduralGeometryPacker.cpp
         Runtime.ReferenceScene.cpp
-        Runtime.ReferenceSceneControl.cpp
         Runtime.RenderRecipeActivation.cpp
         Runtime.RenderExtraction.cpp
         Runtime.RenderExtraction.Adapters.cpp

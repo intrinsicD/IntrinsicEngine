@@ -9,6 +9,32 @@
   D10, D11, D12, and D13
 - **Uses:** [ADR-0026](0026-runtime-module-scope-by-consumer-contract.md)
 
+## Implementation update: RUNTIME-180
+
+`RUNTIME-180` applies the Camera hypothesis without widening the generic
+schedule:
+
+- the app-composed `CameraModule` publishes the exact
+  `CameraControllerRegistry`, whose controller/pose/transition/seed state is
+  bound to one `WorldHandle` and always cleared on reset;
+- `Runtime.Module` adds one narrow `RuntimeViewportInputHookContext` and
+  callback registrar at the established post-capture, pre-gizmo insertion
+  point; `FramePhase` remains six values and `RuntimeFrameHookContext` remains
+  unchanged;
+- `RuntimeModuleSchedule` deterministically orders those typed hooks by module
+  name and shared registration sequence and clears them with the other
+  contribution records;
+- Sandbox owns the exactly-once initial-world reference-content bootstrap,
+  original-world teardown, and optional camera-seed handoff; generic Engine
+  has no camera/reference ownership or facade; and
+- the exact post-slice convergence snapshot is
+  35 plain imports / 13 domain imports / 2 re-exports / 25 public getter
+  names.
+
+This is the deletion test in action: one production viewport consumer earns
+one typed callback context, not a seventh generic phase, widened generic
+context, camera wrapper service, or reference-provider framework.
+
 ## Context
 
 ADR-0024 correctly requires a domain-free Engine, explicit application
@@ -117,9 +143,9 @@ The amended target retains all of these outcomes:
 | Mechanism | Present evidence | Verdict and deletion test | Reintroduction or expansion trigger |
 | --- | --- | --- | --- |
 | `IRuntimeModule` | Clustering, async work, config control, and editor UI are production implementors composed by the Sandbox. Stable name, registration, app optionality, Engine-owned lifetime, ordered shutdown, and EditorUi's order-independent exact dependency resolution are live. | **Keep, but narrow and make optional.** It is the type-erased app-to-runtime seam that lets Engine own optional responsibilities without importing their types. Deleting it today recreates equivalent erased callbacks, domain-specific Engine entry points, or `Engine&` app wiring, so its core complexity does not vanish. It is not a required wrapper for every cohort. `Name`, live registration, resolution, and shutdown now have production callers. | Add surface only when a named production responsibility needs it. `RUNTIME-185` still audits methods or branches left without production use. |
-| `EngineSetup` and shutdown context | Production modules use commands, events, jobs, worlds, services, shutdown, and the editor phase-hook registrar without receiving `Engine&`. No production caller uses the sim-system registrar. | **Keep and simplify.** The capability context is load-bearing for D13 and concentrates validation. Its accepted surface contains only capabilities and registration operations used by production responsibilities; the sim-system branch remains subject to `RUNTIME-185`'s deletion test. | Add scheduling surface only with the first production behavior that the frame loop must iterate; do not add a generic registrar for a roadmap noun. |
+| `EngineSetup` and shutdown context | Production modules use commands, events, jobs, worlds, services, shutdown, the editor generic phase-hook registrar, and Camera's typed viewport-input registrar without receiving `Engine&`. The typed registrar is wired during both registration and resolution. No production caller uses the sim-system registrar. | **Keep and simplify.** The capability context is load-bearing for D13 and concentrates validation. Its accepted surface contains only capabilities and registration operations used by production responsibilities; Camera's one-consumer context stays separate from the six generic phases, and the sim-system branch remains subject to `RUNTIME-185`'s deletion test. | Add scheduling surface only with the first production behavior that the frame loop must iterate; use the smallest consumer-coherent context and do not add a generic registrar for a roadmap noun. |
 | `ServiceRegistry` | Engine and composed modules publish exact borrowed capabilities. Sandbox resolves optional owners through `Find`, while `EditorUiModule::OnResolve` fail-closed requires the exact window, renderer, and input-action built-ins after all providers register. | **Keep the typed discovery core and two-phase resolution used by EditorUi.** `Provide`/`Find`/`Require`, null and duplicate rejection, provider identity diagnostics, exact withdrawal, and locking after boot avoid domain getters and make registration order irrelevant. A provision with no lookup consumer is still not evidence. | Expand only when a named production responsibility depends on another provider and registration order must remain irrelevant. |
-| `RuntimeModuleSchedule` | Engine calls the schedule, and the optional `EditorUiModule` now registers the production `UiBegin`, `UiBuild`, and `UiEndCapture` hooks that preserve the established application-tick bracket. Sim systems and their DAG behavior remain without a production registrant. | **Keep the demonstrated phase-hook portion.** The editor owner proves deterministic phase dispatch without a domain-specific Engine callback. `RUNTIME-185` still removes or collapses the sim-system/DAG branches if no production system earns them. | A first real sim system justifies per-tick registration. General causal DAG ordering is justified only when real production systems declare interacting wait/signal labels. |
+| `RuntimeModuleSchedule` | Engine calls the schedule; optional `EditorUiModule` registers the production `UiBegin`, `UiBuild`, and `UiEndCapture` generic hooks, and optional `CameraModule` registers one typed viewport-input hook after capture/render-input initialization and before gizmo/picking/actions. Sim systems and their DAG behavior remain without a production registrant. | **Keep the demonstrated hook portions.** The two owners prove deterministic dispatch without domain-specific Engine callbacks. Typed viewport ordering shares the schedule's registration sequence but does not create a generic phase or widen every hook context. `RUNTIME-185` still removes or collapses the sim-system/DAG branches if no production system earns them. | A first real sim system justifies per-tick registration. General causal DAG ordering is justified only when real production systems declare interacting wait/signal labels. A second coherent viewport consumer may reuse the typed context; unrelated data does not broaden it. |
 | D10 extension-pass registry and insertion slots | Zero production extension registrations; built-in recipe kinds cover the current renderer. | **Defer the registry and slot taxonomy.** Keep a closed core pass vocabulary expressed as recipe data, with schema, capability, named-resource, and dependency validation. Point-splat lighting and order-dependent transparency remain design probes, not blockers. | A named production pass that cannot be expressed as an existing built-in kind must bring its resource contract, required insertion semantics, Null/CPU contract evidence, and capability-appropriate backend evidence. Only that pass's demonstrated slot is added. |
 | D11 priority input-capture filter chain | One ImGui producer records one snapshot; several viewport consumers read it. There is no competing claimant. | **Replace the chain target with the proven snapshot contract.** One data-only kernel capture value is owned by the frame loop for the duration of a frame and resets to “unclaimed” once at frame start. Each ephemeral frame-hook context borrows that same value by reference. The EditorUi owner runs `BeginFrame` in `UiBegin`, preserves the application variable tick, draws registered app panels in `UiBuild`, then runs `EndFrame` and writes capture in `UiEndCapture`; later viewport behavior, any later hooks, and kernel input-action dispatch read that completed value. This carrier adds no registry, callback facade, or ImGui import to Engine. | A second independent simultaneous capture producer must demonstrate an actual conflicting claim that cannot be represented by extending the single snapshot. Only then is an explicit arbitration policy or chain justified. |
 | D12 `InlineModule` builder | No symbol, production experiment app, or first consumer. | **Defer.** A one-file experiment may first use a concrete app-owned responsibility and the existing narrow composition seam. | A named one-file experiment that needs runtime lifecycle, scheduling, removal, and headless testing may justify the smallest builder. Extract an experiment-app template only after bootstrap is repeated by a second production experiment app. |
@@ -142,7 +168,7 @@ state, commit, or consumer evidence disagrees.
 | Async work | `AsyncWorkService`, the persistent streaming executor, derived-job ownership, and maintenance draining | Global owner. Submitted work carries explicit cancellation/commit scope; no worker borrows a live world. |
 | Asset workflow | CPU asset service, GPU residency handoff, import pipeline, and object-space normal-bake orchestration | Global lifecycle owner. Active-world references are borrowed, rebound on world events, and never become hidden ECS ownership. Normal bake remains in this cohort only while its import/residency lifecycle and consumers are cohesive. |
 | Scene editing | `SceneDocument`, command history, selection, stable lookup, pick readback/refinement, and gizmo state | One module-global owner with durable document/editing records keyed by or explicitly reset for `WorldHandle`. World switch and destruction behavior is part of its interface. `RUNTIME-172` must move this owner out of Engine rather than make it Engine-private. |
-| Camera | Camera-controller/viewport state and active camera selection | Global viewport owner whose scene targets are world-qualified and reset or rebound on active-world change. Reference-scene entity creation and the initial camera seed belong to app initial-world bootstrap. |
+| Camera | App-composed `CameraModule` owns camera-controller/viewport state and active camera selection, publishes the exact registry, and contributes the typed viewport-input hook. | Global viewport owner with registry state bound to exactly one `WorldHandle`; reset clears slots/poses/transitions/seed even for equal handle bits, active change rebinds empty, destruction/shutdown invalidates, and away/back never resurrects. Reference-scene entity creation, owning-world retention, and optional initial seed handoff belong to app initial-world bootstrap. |
 | Editor UI | ImGui adapter/overlay/host, window contribution state, and production of the single capture snapshot | Global and optional. `EditorUiModule` owns UI lifetime, publishes the Engine-free host, and writes the frame-loop-owned capture value through the borrowed `UiEndCapture` hook context after the paired begin/build/end bracket; it does not own camera, selection, scene, config, asset, or method state. |
 | Config control | `EngineConfigControl` and the app-section registry used by boot and live apply | Global owner. The app supplies section codecs before boot; preview remains side-effect-free and apply uses the existing validated commit path. |
 
@@ -199,6 +225,10 @@ than wrapper counts:
 The exact ratchet continues to fail on stale snapshots as well as growth.
 Every reduction updates the snapshot in the same change, so the budget never
 becomes room for later regrowth.
+
+After `RUNTIME-180`, the current exact intermediate snapshot is
+35 plain imports, 13 domain imports, two re-exports, and 25 public getter
+names. This remains migration evidence, not the final allowed-surface budget.
 
 ## Consequences
 

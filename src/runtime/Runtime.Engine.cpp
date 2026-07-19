@@ -49,7 +49,6 @@ import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
-import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.AssetGeometryIO;
 import Extrinsic.Runtime.AssetImportPipeline;
@@ -57,8 +56,6 @@ import Extrinsic.Runtime.AssetMeshNormals;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.AssetModelTextureIO;
-import Extrinsic.Runtime.CameraControllers;
-import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.DeviceBootstrap;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.FramePacingDiagnostics;
@@ -75,8 +72,6 @@ import Extrinsic.Core.FrameLoop;
 import Extrinsic.Runtime.EcsSystemBundle;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ProgressiveRenderData;
-import Extrinsic.Runtime.ReferenceScene;
-import Extrinsic.Runtime.ReferenceSceneControl;
 import Extrinsic.Runtime.SceneDocument;
 import Extrinsic.Runtime.SelectionReadback;
 import Extrinsic.Runtime.ServiceRegistry;
@@ -465,7 +460,12 @@ namespace Extrinsic::Runtime
                     m_RuntimeModuleSchedule.RegisterFrameHook(
                         moduleName, phase, std::move(hook));
                 },
-                recipeActivation);
+                recipeActivation,
+                [this, moduleName](RuntimeViewportInputHook hook)
+                {
+                    m_RuntimeModuleSchedule.RegisterViewportInputHook(
+                        moduleName, std::move(hook));
+                });
 
             Core::Result result = module->OnRegister(setup);
             if (!result.has_value())
@@ -511,7 +511,12 @@ namespace Extrinsic::Runtime
                     m_RuntimeModuleSchedule.RegisterFrameHook(
                         moduleName, phase, std::move(hook));
                 },
-                recipeActivation);
+                recipeActivation,
+                [this, moduleName](RuntimeViewportInputHook hook)
+                {
+                    m_RuntimeModuleSchedule.RegisterViewportInputHook(
+                        moduleName, std::move(hook));
+                });
 
             Core::Result result = module->OnResolve(setup);
             if (!result.has_value())
@@ -707,7 +712,6 @@ namespace Extrinsic::Runtime
                     m_AssetResidencyService->ModelSceneHandoff(),
                 .RenderExtraction = &m_RenderExtractionService.Cache(),
                 .Scene = m_Scene,
-                .CameraControllers = &m_CameraControllers,
                 .Selection = &m_SelectionController,
                 .CommandHistory = &m_EditorCommandHistory,
                 .ObjectSpaceNormalBakeQueue =
@@ -870,13 +874,10 @@ namespace Extrinsic::Runtime
         // maintained incrementally from StableId component events.
         m_SelectionController.SetStableEntityLookup(&m_StableEntityLookup);
 
-        // ── 7. Reference scene bootstrap (GRAPHICS-029A/B) ────────────────
-        m_ReferenceSceneControl.InstallIfEnabled(m_Config.ReferenceScene, *m_Scene);
-
-        // ── 8. Runtime-module resolution/finalization (ARCH-011) ──────────
+        // ── 7. Runtime-module resolution/finalization (ARCH-011) ──────────
         ResolveRuntimeModulesForBoot(recipeActivation);
 
-        // ── 9. Application ────────────────────────────────────────────────
+        // ── 8. Application ────────────────────────────────────────────────
         m_Application->OnInitialize(*this);
 
         m_Initialized = true;
@@ -927,9 +928,6 @@ namespace Extrinsic::Runtime
             AssetResidencyService& AssetResidency;
             WorldRegistry& Worlds;
             ECS::Scene::Registry*& Scene;
-            ReferenceSceneControl& ReferenceScene;
-            CameraControllerRegistry& CameraControllers;
-            const Core::Config::ReferenceSceneConfig& ReferenceConfig;
 
             ShutdownHooks(Engine& owner,
                           bool& running,
@@ -942,10 +940,7 @@ namespace Extrinsic::Runtime
                           std::unique_ptr<Assets::AssetService>& assetService,
                           AssetResidencyService& assetResidency,
                           WorldRegistry& worlds,
-                          ECS::Scene::Registry*& scene,
-                          ReferenceSceneControl& referenceScene,
-                          CameraControllerRegistry& cameraControllers,
-                          const Core::Config::ReferenceSceneConfig& referenceConfig)
+                          ECS::Scene::Registry*& scene)
                 : Owner(owner)
                 , Running(running)
                 , Initialized(initialized)
@@ -958,9 +953,6 @@ namespace Extrinsic::Runtime
                 , AssetResidency(assetResidency)
                 , Worlds(worlds)
                 , Scene(scene)
-                , ReferenceScene(referenceScene)
-                , CameraControllers(cameraControllers)
-                , ReferenceConfig(referenceConfig)
             {
             }
 
@@ -987,8 +979,6 @@ namespace Extrinsic::Runtime
 
                 AssetResidency.DestroySceneBorrowers();
 
-                ReferenceScene.TeardownIfInstalled(ReferenceConfig, Scene);
-                CameraControllers = CameraControllerRegistry{};
                 Scene = nullptr;
                 Worlds.Clear();
             }
@@ -1040,10 +1030,7 @@ namespace Extrinsic::Runtime
                             m_AssetService,
                             *m_AssetResidencyService,
                             m_WorldRegistry,
-                            m_Scene,
-                            m_ReferenceSceneControl,
-                            m_CameraControllers,
-                            m_Config.ReferenceScene);
+                            m_Scene);
         Core::ExecuteShutdownContract(hooks);
         m_ObjectSpaceNormalBakeService.ClearDependencies();
         if (m_AssetImportPipeline)
@@ -1265,14 +1252,16 @@ namespace Extrinsic::Runtime
         Graphics::RenderFrameInput& renderInput = frameContext.RenderInput;
 
         const Platform::IWindow& inputWindow = *m_Window;
-        PopulateMainCameraForFrame(m_Config,
-                                   m_CameraControllers,
-                                   m_ReferenceSceneControl.CameraSeed(),
-                                   inputWindow,
-                                   viewport,
-                                   frameDt,
-                                   imguiCapturesInput,
-                                   renderInput);
+        m_RuntimeModuleSchedule.RunViewportInputHooks(
+            RuntimeViewportInputHookContext{
+                .Config = m_Config,
+                .ActiveWorldHandle = ActiveWorld(),
+                .Input = inputWindow.GetInput(),
+                .Viewport = viewport,
+                .EditorCapture = editorCapture,
+                .RenderInput = renderInput,
+                .FrameDeltaSeconds = frameDt,
+            });
         m_GizmoFrameService.DriveInputForFrame(
             GizmoFrameServiceInput{
                 .Scene = *m_Scene,
@@ -1325,7 +1314,6 @@ namespace Extrinsic::Runtime
         // building and render extraction this same frame.
         const auto postFlushSetupBegin = std::chrono::steady_clock::now();
         m_InputActions.DispatchForFrame(m_Config,
-                                        m_CameraControllers,
                                         m_SelectionController,
                                         *m_Scene,
                                         inputWindow.GetInput(),
@@ -1659,26 +1647,6 @@ namespace Extrinsic::Runtime
         return m_SelectionReadback.LastRefinedPrimitiveGeneration();
     }
     Core::FrameGraph&     Engine::GetFrameGraph()    noexcept { return *m_FrameGraph;    }
-
-    ReferenceSceneRegistry& Engine::GetReferenceSceneRegistry() noexcept
-    {
-        return m_ReferenceSceneControl.Registry();
-    }
-
-    bool Engine::IsReferenceSceneInstalled() const noexcept
-    {
-        return m_ReferenceSceneControl.IsInstalled();
-    }
-
-    const std::optional<Graphics::CameraViewInput>& Engine::GetReferenceCameraSeed() const noexcept
-    {
-        return m_ReferenceSceneControl.CameraSeed();
-    }
-
-    CameraControllerRegistry& Engine::GetCameraControllerRegistry() noexcept
-    {
-        return m_CameraControllers;
-    }
 
     void Engine::SetMeshPrimitiveViewSettings(
         const std::uint32_t stableEntityId,

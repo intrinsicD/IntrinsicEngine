@@ -7,7 +7,9 @@ engine runtime. The canonical entry point is `Sandbox`.
 
 - `Sandbox/` — reference integration target. Links to `Runtime`, opens a window,
   drives the frame loop with the runtime-owned reference configuration, and owns
-  Sandbox-specific editor presentation registered through runtime facades.
+  Sandbox-specific editor presentation registered through runtime facades. Its
+  default composition explicitly adds the optional runtime camera module and
+  owns initial-world reference-content bootstrap/teardown policy.
   Method command/config/result implementations remain private runtime units, so
   app panels do not import their geometry, ECS, graphics, or RHI dependencies.
 
@@ -54,6 +56,14 @@ attach/detach interface. `EditorShell` owns the ten core Sandbox windows,
 menus, ImGui state, and frame presentation; runtime exposes only generic editor
 hosting plus data/model/command facades. The Sandbox executable no longer
 composes those panel families individually.
+
+The concrete Sandbox application resolves the exact optional
+`Runtime::CameraControllerRegistry` once after module registration. It passes
+that pointer to default import/input policies and, when reference content is
+enabled, seeds the registry only for the initial owning world. The app retains
+the matching reference population and tears it down only through that world.
+Generic Engine neither composes `CameraModule` nor interprets
+`ReferenceSceneConfig`.
 
 `Sandbox.Editor.MethodPanels` also owns the registered
 `Mesh > Processing > Parameterize (UV)` window. The window offers only LSCM,

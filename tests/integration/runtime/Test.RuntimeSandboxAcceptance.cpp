@@ -46,6 +46,7 @@ import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
@@ -316,6 +317,37 @@ TEST(RuntimeSandboxAcceptance, CameraControllerProducesFiniteInvertibleFrameCame
     for (int c = 0; c < 4; ++c)
         for (int r = 0; r < 4; ++r)
             EXPECT_NEAR(product[c][r], c == r ? 1.f : 0.f, 1.0e-3f);
+}
+
+TEST(RuntimeSandboxAcceptance,
+     ComposedCameraModuleDrivesFiniteFirstFrame)
+{
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<IdleFrameAndExitApplication>());
+    engine.EmplaceModule<Runtime::CameraModule>();
+    engine.Initialize();
+    Runtime::CameraControllerRegistry* registry =
+        engine.Services()
+            .Find<Runtime::CameraControllerRegistry>();
+    ASSERT_NE(registry, nullptr);
+    EXPECT_EQ(registry->BoundWorld(), engine.ActiveWorld());
+
+    engine.Run();
+
+    Runtime::ICameraController* controller =
+        registry->ResolveOrNull(
+            Runtime::CameraControllerSlot::Main);
+    ASSERT_NE(controller, nullptr);
+    const Graphics::CameraViewInput view =
+        controller->GetView(Core::Extent2D{1280, 720});
+    EXPECT_TRUE(view.Valid);
+    const Graphics::CameraViewSnapshot snapshot =
+        Graphics::BuildCameraViewSnapshot(
+            view, Core::Extent2D{1280, 720});
+    EXPECT_TRUE(snapshot.Valid);
+
+    engine.Shutdown();
 }
 
 // Runtime selection works for an entity of each geometry family.

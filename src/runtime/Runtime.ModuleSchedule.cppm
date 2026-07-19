@@ -62,6 +62,9 @@ namespace Extrinsic::Runtime
         void RegisterFrameHook(std::string moduleName,
                                FramePhase phase,
                                RuntimeFrameHook hook);
+        void RegisterViewportInputHook(
+            std::string moduleName,
+            RuntimeViewportInputHook hook);
         // `externalSignals` are signal labels provided by producers registered
         // outside this schedule (e.g. the promoted baseline ECS bundle, which is
         // appended to the fixed-step FrameGraph directly). A sim-system waiting
@@ -74,6 +77,8 @@ namespace Extrinsic::Runtime
             RuntimeModuleSimSystemScheduleContext context) const;
         void RunFrameHooks(
             RuntimeModuleFrameHookDispatchContext context) const;
+        void RunViewportInputHooks(
+            RuntimeViewportInputHookContext context) const;
 
     private:
         struct RuntimeModuleSimSystemRecord
@@ -91,8 +96,17 @@ namespace Extrinsic::Runtime
             std::uint64_t Sequence{0};
         };
 
+        struct RuntimeModuleViewportInputHookRecord
+        {
+            std::string ModuleName{};
+            RuntimeViewportInputHook Hook{};
+            std::uint64_t Sequence{0};
+        };
+
         std::vector<RuntimeModuleSimSystemRecord> m_SimSystems{};
         std::vector<RuntimeModuleFrameHookRecord> m_FrameHooks{};
+        std::vector<RuntimeModuleViewportInputHookRecord>
+            m_ViewportInputHooks{};
         std::uint64_t m_NextRegistrationSequence{0};
 
         [[nodiscard]] static bool SimSystemLess(
@@ -101,5 +115,8 @@ namespace Extrinsic::Runtime
         [[nodiscard]] static bool FrameHookLess(
             const RuntimeModuleFrameHookRecord& lhs,
             const RuntimeModuleFrameHookRecord& rhs);
+        [[nodiscard]] static bool ViewportInputHookLess(
+            const RuntimeModuleViewportInputHookRecord& lhs,
+            const RuntimeModuleViewportInputHookRecord& rhs);
     };
 }

@@ -211,7 +211,11 @@ The schema is primarily a boot config. Runtime reads it before constructing
 - validation and VSync toggles;
 - scheduler worker-thread count;
 - window title, size, resizable flag, and platform backend override;
-- reference-scene and initial camera-controller selection.
+- reference-content and initial camera-controller selection. Both are
+  boot-only values, but ownership is app-composed: Sandbox interprets
+  `reference_scene` for exactly-once initial-world bootstrap, while optional
+  `CameraModule` reads `camera` from its typed viewport-input hook. Generic
+  Engine retains the config value but owns neither responsibility.
 
 The current live hot-apply subset is deliberately narrow:
 `render.default_recipe_config_path` and

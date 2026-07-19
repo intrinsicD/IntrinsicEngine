@@ -292,6 +292,7 @@ if(TARGET ExtrinsicRuntime)
         Test.PrimitiveSelectionRefinementWiring.cpp
         Test.ProceduralGeometryCache.cpp
         Test.ProceduralGeometryExtraction.cpp
+        Test.CameraModule.cpp
         Test.RuntimeCameraControllers.cpp
         Test.RuntimeConfigControlFacade.cpp
         Test.RuntimeEngineConfigBoot.cpp

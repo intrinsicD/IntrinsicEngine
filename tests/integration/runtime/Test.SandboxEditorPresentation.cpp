@@ -777,7 +777,8 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
         std::make_unique<WaitForAssetImportEventApplication>(128u));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     ComposeEditorUiAndInitialize(engine);
-    (void)Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
+    (void)Runtime::RegisterSandboxDefaultRuntimePolicies(
+        engine, nullptr);
 
     SandboxEditor::EditorShell shell;
     shell.Attach(engine);

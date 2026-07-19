@@ -740,6 +740,7 @@ namespace Extrinsic::Runtime
 
         void RegisterSandboxDefaultImportCompletedHandler(
             Engine& engine,
+            CameraControllerRegistry* const cameraControllers,
             RuntimeSandboxDefaultPolicyRegistration& registration)
         {
             const RuntimeImportCompletedHandlerHandle handle =
@@ -748,23 +749,26 @@ namespace Extrinsic::Runtime
                         .DebugName = "Sandbox.DefaultImportCompletedUx",
                         .PayloadKind = Assets::AssetPayloadKind::Unknown,
                         .Handle =
-                            [](const RuntimeImportCompletedContext& context,
-                               RuntimeImportCompletedServices& services)
+                            [cameraControllers](
+                                const RuntimeImportCompletedContext& context,
+                                RuntimeImportCompletedServices& services)
                             {
                                 if (services.Scene == nullptr ||
-                                    services.CameraControllers == nullptr ||
-                                    services.Selection == nullptr ||
-                                    services.Config == nullptr)
+                                    services.Selection == nullptr)
                                 {
                                     return Core::Err(
                                         Core::ErrorCode::InvalidState);
                                 }
 
-                                FocusMainCameraOnImportTarget(
-                                    *services.CameraControllers,
-                                    services.Config->Camera.Controller,
-                                    services.Config->Camera.Enabled,
-                                    context.FocusTarget);
+                                if (cameraControllers != nullptr &&
+                                    services.Config != nullptr)
+                                {
+                                    FocusMainCameraOnImportTarget(
+                                        *cameraControllers,
+                                        services.Config->Camera.Controller,
+                                        services.Config->Camera.Enabled,
+                                        context.FocusTarget);
+                                }
 
                                 for (const ECS::EntityHandle entity :
                                      context.CreatedEntities)
@@ -829,8 +833,12 @@ namespace Extrinsic::Runtime
 
         void RegisterSandboxDefaultInputActions(
             Engine& engine,
+            CameraControllerRegistry* const cameraControllers,
             RuntimeSandboxDefaultPolicyRegistration& registration)
         {
+            if (cameraControllers == nullptr)
+                return;
+
             const RuntimeInputActionHandle handle = engine.RegisterInputAction(
                 RuntimeInputActionDesc{
                     .DebugName = "Sandbox.DefaultFocusCameraOnSelection",
@@ -841,11 +849,11 @@ namespace Extrinsic::Runtime
                             .SuppressWhenImGuiCapturesKeyboard = true,
                         },
                     .Execute =
-                        [](const RuntimeInputActionContext& context,
-                           RuntimeInputActionServices& services)
+                        [cameraControllers](
+                            const RuntimeInputActionContext& context,
+                            RuntimeInputActionServices& services)
                         {
                             if (services.Scene == nullptr ||
-                                services.CameraControllers == nullptr ||
                                 services.Selection == nullptr ||
                                 services.RenderInput == nullptr ||
                                 services.Config == nullptr)
@@ -857,7 +865,7 @@ namespace Extrinsic::Runtime
                                 return Core::Ok();
 
                             if (!FocusCameraOnSelection(
-                                    *services.CameraControllers,
+                                    *cameraControllers,
                                     *services.Selection,
                                     *services.Scene,
                                     CameraControllerSlot::Main))
@@ -866,15 +874,14 @@ namespace Extrinsic::Runtime
                             }
 
                             if (ICameraController* focused =
-                                    services.CameraControllers->ResolveOrNull(
+                                    cameraControllers->ResolveOrNull(
                                         CameraControllerSlot::Main))
                             {
                                 services.RenderInput->Camera =
                                     focused->GetView(context.Viewport);
                                 services.RenderInput->Camera
                                     .ExplicitCameraTransition =
-                                    services.CameraControllers
-                                        ->ConsumeCameraTransition(
+                                    cameraControllers->ConsumeCameraTransition(
                                             CameraControllerSlot::Main);
                             }
                             return Core::Ok();
@@ -885,14 +892,18 @@ namespace Extrinsic::Runtime
         }
     }
 
-    RuntimeSandboxDefaultPolicyRegistration RegisterSandboxDefaultRuntimePolicies(
-        Engine& engine)
+    RuntimeSandboxDefaultPolicyRegistration
+    RegisterSandboxDefaultRuntimePolicies(
+        Engine& engine,
+        CameraControllerRegistry* const cameraControllers)
     {
         RuntimeSandboxDefaultPolicyRegistration registration{};
         RegisterSandboxDefaultImportAuthoringPolicies(engine, registration);
-        RegisterSandboxDefaultImportCompletedHandler(engine, registration);
+        RegisterSandboxDefaultImportCompletedHandler(
+            engine, cameraControllers, registration);
         RegisterSandboxDefaultDirectMeshPostProcessor(engine, registration);
-        RegisterSandboxDefaultInputActions(engine, registration);
+        RegisterSandboxDefaultInputActions(
+            engine, cameraControllers, registration);
         return registration;
     }
 

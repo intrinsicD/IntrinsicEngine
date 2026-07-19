@@ -49,15 +49,17 @@ result presentation. K-Means and Progressive Poisson command/config/result
 implementations compile in a private runtime facade unit; all other panel
 models, processing commands, history/jobs, validation, and result sinks likewise
 remain runtime-owned, so app panels expose no geometry, ECS, graphics, or RHI
-dependencies. The app also installs the sandbox default runtime policy bundle through
-`Runtime::RegisterSandboxDefaultRuntimePolicies(engine)`.
+dependencies. The app also resolves the optional exact
+`Runtime::CameraControllerRegistry` once and installs the sandbox default
+runtime policy bundle through
+`Runtime::RegisterSandboxDefaultRuntimePolicies(engine, cameraRegistry)`.
 It unregisters the returned handles during shutdown before the engine tears down.
 The app remains a runtime-only consumer: `EditorShell` registers its
 parameterless frame contribution and windows through the resolved host, reads
 scene and selection state through runtime APIs, emits selection and
 local-transform edit commands through
 runtime-owned seams, replaces runtime camera-controller slots through the
-engine-owned registry, toggles mesh edge/vertex primitive views through runtime
+optional service-registry lookup, toggles mesh edge/vertex primitive views through runtime
 extraction-cache settings, routes selected-entity spatial-debug options through
 `SpatialDebugBinding`, routes material/scalar/color visualization choices
 through `VisualizationConfig`, routes visualization adapter bindings through
@@ -160,11 +162,22 @@ a material. Both render modes remain derived views of the selected mesh, not
 new ECS entities or scene cameras; see
 [ADR-0025](../../../docs/adr/0025-parameterization-uv-view-and-split-view.md).
 
-With the standard reference configuration, runtime creates `ReferenceTriangle`
-through `Extrinsic.Runtime.ReferenceScene::TriangleProvider` as an ordinary
-ECS mesh-domain `GeometrySources` entity with `RenderSurface`, durable
-`StableId`, `Selection::SelectableTag`, and white `VisualizationConfig`.
-The sandbox app does not create, render, select, or special-case the triangle.
+With the standard reference configuration, Sandbox calls the plain
+`Runtime::BootstrapReferenceScene(...)` function exactly once during
+application initialization. It retains the original `{WorldHandle,
+ReferenceScenePopulation}` for teardown, optionally hands the population's
+camera seed to the composed camera registry, and never tears it down through a
+replacement world. If the original world has retired, shutdown is a safe
+no-op. The private triangle implementation creates `ReferenceTriangle` as an
+ordinary ECS mesh-domain `GeometrySources` entity with `RenderSurface`,
+durable `StableId`, `Selection::SelectableTag`, and white
+`VisualizationConfig`. Reference content renders without `CameraModule`.
+
+The default module list explicitly composes `AsyncWorkModule`, `CameraModule`,
+`ClusteringModule`, and `EditorUiModule`. Camera remains optional at the
+runtime contract: when omitted, Sandbox policy registration omits `F` and
+autofocus, editor camera controls report unavailable, and import auto-selection
+plus non-camera behavior continue.
 
 ## Build presets
 

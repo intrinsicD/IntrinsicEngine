@@ -369,7 +369,7 @@ TEST(PrimitiveSelectionRefinementWiring, UnprojectPickDepthLandsOnCameraPickRay)
     const glm::vec3 eye{0.0f, 0.0f, 3.0f};
     const glm::mat4 view = glm::lookAt(eye, glm::vec3{0.0f}, glm::vec3{0.0f, 1.0f, 0.0f});
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), 4.0f / 3.0f, 0.1f, 100.0f);
-    projection[1][1] *= -1.0f; // Vulkan Y flip, mirroring BuildReferenceCameraViewInput.
+    projection[1][1] *= -1.0f; // Vulkan Y flip, matching runtime camera controllers.
     const glm::mat4 viewProjection = projection * view;
     const glm::mat4 inverseViewProjection = glm::inverse(viewProjection);
 

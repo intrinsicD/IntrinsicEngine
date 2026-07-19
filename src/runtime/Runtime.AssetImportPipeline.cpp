@@ -429,7 +429,6 @@ namespace Extrinsic::Runtime
                 importEntityPolicies,
             const std::span<const RuntimeImportCompletedHandlerRecord>
                 completedHandlers,
-            CameraControllerRegistry* cameraControllers,
             SelectionController* selection,
             const Core::Config::EngineConfig* config,
             const std::string_view path,
@@ -484,7 +483,6 @@ namespace Extrinsic::Runtime
 
             RuntimeImportCompletedServices completedServices{
                 .Scene = &scene,
-                .CameraControllers = cameraControllers,
                 .Selection = selection,
                 .Config = config,
             };
@@ -519,7 +517,6 @@ namespace Extrinsic::Runtime
                 importEntityPolicies,
             const std::span<const RuntimeImportCompletedHandlerRecord>
                 completedHandlers,
-            CameraControllerRegistry* cameraControllers,
             SelectionController* selection,
             const Core::Config::EngineConfig* config,
             const RuntimeAssetImportRequest& request,
@@ -594,7 +591,6 @@ namespace Extrinsic::Runtime
                     scene,
                     importEntityPolicies,
                     completedHandlers,
-                    cameraControllers,
                     selection,
                     config,
                     request.Path,
@@ -670,7 +666,6 @@ namespace Extrinsic::Runtime
                 scene,
                 importEntityPolicies,
                 completedHandlers,
-                cameraControllers,
                 selection,
                 config,
                 request.Path,
@@ -1475,8 +1470,6 @@ namespace Extrinsic::Runtime
         m_RenderExtraction =
             BorrowedSubsystem<RenderExtractionCache>{dependencies.RenderExtraction};
         m_Scene = BorrowedSubsystem<ECS::Scene::Registry>{dependencies.Scene};
-        m_CameraControllers =
-            BorrowedSubsystem<CameraControllerRegistry>{dependencies.CameraControllers};
         m_SelectionController =
             BorrowedSubsystem<SelectionController>{dependencies.Selection};
         m_EditorCommandHistory =
@@ -2257,7 +2250,6 @@ namespace Extrinsic::Runtime
                             materialized->Entity;
                         RuntimeImportCompletedServices completedServices{
                             .Scene = submissionScene,
-                            .CameraControllers = m_CameraControllers.get(),
                             .Selection = m_SelectionController.get(),
                             .Config = m_Config.get(),
                         };
@@ -2691,7 +2683,6 @@ namespace Extrinsic::Runtime
                             *submissionScene,
                             m_ImportEntityAuthoringPolicies,
                             m_ImportCompletedHandlers,
-                            m_CameraControllers.get(),
                             m_SelectionController.get(),
                             m_Config.get(),
                             state->Request,
@@ -3142,7 +3133,6 @@ namespace Extrinsic::Runtime
             const ECS::EntityHandle createdEntity = materialized->Entity;
             RuntimeImportCompletedServices completedServices{
                 .Scene = m_Scene,
-                .CameraControllers = m_CameraControllers.get(),
                 .Selection = m_SelectionController.get(),
                 .Config = m_Config.get(),
             };
@@ -3188,7 +3178,6 @@ namespace Extrinsic::Runtime
                 *m_Scene,
                 m_ImportEntityAuthoringPolicies,
                 m_ImportCompletedHandlers,
-                m_CameraControllers.get(),
                 m_SelectionController.get(),
                 m_Config.get(),
                 request,

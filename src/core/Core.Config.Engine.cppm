@@ -15,11 +15,11 @@ import Extrinsic.Core.Config.Window;
 
 namespace Extrinsic::Core::Config
 {
-        // Selector for the reference-scene provider installed by
-        // Runtime::Engine when ReferenceSceneConfig::Enabled is true. The
-        // implementation surface lives under Extrinsic.Runtime.ReferenceScene
-        // (per GRAPHICS-029 Decisions 1, 8); core only carries the value-type
-        // enum so EngineConfig stays free of runtime/graphics imports.
+        // Selector for app-owned initial reference content. Applications such
+        // as Sandbox interpret ReferenceSceneConfig through the plain
+        // Extrinsic.Runtime.ReferenceScene bootstrap functions; generic Engine
+        // deliberately does not. Core carries only the value-type enum so
+        // EngineConfig stays free of runtime/graphics imports.
         export enum class ReferenceSceneSelector : std::uint32_t
         {
             Triangle = 0,

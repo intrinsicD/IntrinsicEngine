@@ -6,6 +6,7 @@ module;
 #include <exception>
 #include <memory>
 #include <numbers>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -641,6 +642,46 @@ namespace Extrinsic::Runtime
             return std::make_unique<OrbitCameraController>(seed);
         }
         return std::make_unique<OrbitCameraController>(seed);
+    }
+
+    void CameraControllerRegistry::ResetForWorld(
+        const WorldHandle world) noexcept
+    {
+        m_Slots.clear();
+        m_WorldSeed.reset();
+        m_BoundWorld = world;
+    }
+
+    Core::Result CameraControllerRegistry::SetWorldSeed(
+        const WorldHandle world,
+        std::optional<Graphics::CameraViewInput> seed) noexcept
+    {
+        if (!world.IsValid() ||
+            !m_BoundWorld.IsValid() ||
+            world != m_BoundWorld)
+        {
+            return Core::Err(Core::ErrorCode::InvalidState);
+        }
+        m_WorldSeed = std::move(seed);
+        return Core::Ok();
+    }
+
+    WorldHandle CameraControllerRegistry::BoundWorld() const noexcept
+    {
+        return m_BoundWorld;
+    }
+
+    std::optional<Graphics::CameraViewInput>
+    CameraControllerRegistry::WorldSeedFor(
+        const WorldHandle world) const noexcept
+    {
+        if (!world.IsValid() ||
+            !m_BoundWorld.IsValid() ||
+            world != m_BoundWorld)
+        {
+            return std::nullopt;
+        }
+        return m_WorldSeed;
     }
 
     void CameraControllerRegistry::Register(CameraControllerSlot slot,

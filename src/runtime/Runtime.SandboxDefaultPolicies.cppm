@@ -5,6 +5,7 @@ module;
 export module Extrinsic.Runtime.SandboxDefaultPolicies;
 
 import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
 
 export namespace Extrinsic::Runtime
@@ -28,7 +29,9 @@ export namespace Extrinsic::Runtime
     };
 
     [[nodiscard]] RuntimeSandboxDefaultPolicyRegistration
-        RegisterSandboxDefaultRuntimePolicies(Engine& engine);
+        RegisterSandboxDefaultRuntimePolicies(
+            Engine& engine,
+            CameraControllerRegistry* cameraControllers);
 
     void UnregisterSandboxDefaultRuntimePolicies(
         Engine& engine,

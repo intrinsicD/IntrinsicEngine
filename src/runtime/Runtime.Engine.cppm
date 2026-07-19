@@ -22,11 +22,9 @@ import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
-import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
-import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -39,8 +37,6 @@ import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ModuleSchedule;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeService;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
-import Extrinsic.Runtime.ReferenceScene;
-import Extrinsic.Runtime.ReferenceSceneControl;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SceneDocument;
@@ -285,27 +281,10 @@ namespace Extrinsic::Runtime
         // Zero-initialized until the first frame extracts.
         [[nodiscard]] const RuntimeRenderExtractionStats&
             GetLastRenderExtractionStats() const noexcept;
-        // ── Reference scene seam (GRAPHICS-029A/B) ────────────────────────
-        // Accessible before Initialize() so tests and downstream impl
-        // children register providers prior to subsystem wiring. After
-        // Initialize() runs, the registry is locked to its installed
-        // contents — Register() before Initialize(), Resolve() after.
-        [[nodiscard]] ReferenceSceneRegistry& GetReferenceSceneRegistry() noexcept;
-        [[nodiscard]] bool IsReferenceSceneInstalled() const noexcept;
-        // GRAPHICS-029B/RUNTIME-081A: the optional CameraViewInput seed captured
-        // from the installed reference-scene provider. Empty when the reference
-        // scene is disabled or the provider returned no camera. The promoted
-        // camera-controller surface consumes this as initial state; it is
-        // retained as a test seam and no longer directly fills
-        // RenderFrameInput::Camera.
-        [[nodiscard]] const std::optional<Graphics::CameraViewInput>&
-            GetReferenceCameraSeed() const noexcept;
         // UI-001 Slice C / RUNTIME-106 — editor/runtime command seams. The
-        // engine remains the owner of camera-controller slots. The legacy mesh
-        // primitive-view accessors are compatibility shims that translate to
-        // ECS `RenderEdges` / `RenderPoints`; render components are the
-        // authoritative view toggles.
-        [[nodiscard]] CameraControllerRegistry& GetCameraControllerRegistry() noexcept;
+        // legacy mesh primitive-view accessors are compatibility shims that
+        // translate to ECS `RenderEdges` / `RenderPoints`; render components
+        // are the authoritative view toggles.
         void SetMeshPrimitiveViewSettings(std::uint32_t stableEntityId,
                                           MeshPrimitiveViewSettings settings);
         void ClearMeshPrimitiveViewSettings(std::uint32_t stableEntityId) noexcept;
@@ -402,12 +381,6 @@ namespace Extrinsic::Runtime
         // scene registries are destroyed during fallback/destructor unwinding.
         StableEntityLookupSceneBinding         m_StableEntityLookupBinding{};
         RuntimeModuleSchedule                  m_RuntimeModuleSchedule{};
-
-        // Reference-scene seam (GRAPHICS-029A/B): constructed empty so
-        // tests/impl-B can Register() before Initialize(); install and teardown
-        // policy lives behind ReferenceSceneControl.
-        ReferenceSceneControl                  m_ReferenceSceneControl{};
-        CameraControllerRegistry                m_CameraControllers{};
 
         Core::FrameClock m_FrameClock{};
 

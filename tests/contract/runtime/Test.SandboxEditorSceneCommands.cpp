@@ -68,6 +68,7 @@ import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorPropertyWidgets;
@@ -125,7 +126,9 @@ namespace
 {
 void InstallSandboxDefaultRuntimePolicies(Runtime::Engine& engine)
     {
-        (void)Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
+        (void)Runtime::RegisterSandboxDefaultRuntimePolicies(
+            engine,
+            engine.Services().Find<Runtime::CameraControllerRegistry>());
     }
 
 [[nodiscard]] bool HasDiagnostic(
@@ -613,7 +616,10 @@ class ShutdownWhileGeometryImportBlockedApplication final
             m_ObservedFrames = 0u;
             m_ExitRequested = false;
             m_DefaultPolicies =
-                Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
+                Runtime::RegisterSandboxDefaultRuntimePolicies(
+                    engine,
+                    engine.Services()
+                        .Find<Runtime::CameraControllerRegistry>());
             m_State->PoliciesRegistered = !m_DefaultPolicies.IsEmpty();
             m_Editor.Attach(engine);
         }
@@ -713,6 +719,7 @@ class RecordingImportCameraController final : public Runtime::ICameraController
 void ComposeAsyncWorkAndInitialize(Runtime::Engine& engine)
     {
         engine.EmplaceModule<Runtime::AsyncWorkModule>();
+        engine.EmplaceModule<Runtime::CameraModule>();
         engine.EmplaceModule<Runtime::EditorUiModule>();
         engine.Initialize();
     }
@@ -1906,7 +1913,9 @@ TEST(SandboxEditorUi, QueuedManualGeometryImportsRemainResponsiveAndApplyOnce)
         auto recordingController =
             std::make_unique<RecordingImportCameraController>();
         RecordingImportCameraController* recorder = recordingController.get();
-        engine.GetCameraControllerRegistry().Replace(
+        engine.Services()
+            .Find<Runtime::CameraControllerRegistry>()
+            ->Replace(
             Runtime::CameraControllerSlot::Main,
             std::move(recordingController));
 
@@ -2047,7 +2056,9 @@ TEST(SandboxEditorUi, QueuedManualGeometryCancellationPreventsApply)
 
     auto recordingController = std::make_unique<RecordingImportCameraController>();
     RecordingImportCameraController* recorder = recordingController.get();
-    engine.GetCameraControllerRegistry().Replace(
+    engine.Services()
+        .Find<Runtime::CameraControllerRegistry>()
+        ->Replace(
         Runtime::CameraControllerSlot::Main,
         std::move(recordingController));
 
@@ -2341,7 +2352,9 @@ TEST(SandboxEditorUi, QueuedManualGeometryDecodeFailureIsFailClosed)
 
     auto recordingController = std::make_unique<RecordingImportCameraController>();
     RecordingImportCameraController* recorder = recordingController.get();
-    engine.GetCameraControllerRegistry().Replace(
+    engine.Services()
+        .Find<Runtime::CameraControllerRegistry>()
+        ->Replace(
         Runtime::CameraControllerSlot::Main,
         std::move(recordingController));
 

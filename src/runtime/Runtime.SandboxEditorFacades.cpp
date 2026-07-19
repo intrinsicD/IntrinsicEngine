@@ -10890,7 +10890,8 @@ namespace Extrinsic::Runtime
                 .LastRefinedPrimitive = &engine.GetLastRefinedPrimitiveSelection(),
                 .LastRefinedPrimitiveGeneration =
                     engine.GetLastRefinedPrimitiveSelectionGeneration(),
-                .CameraControllers = &engine.GetCameraControllerRegistry(),
+                .CameraControllers =
+                    engine.Services().Find<CameraControllerRegistry>(),
                 .CameraViewport = Core::Extent2D{
                     engine.GetWindow().GetFramebufferExtent().Width,
                     engine.GetWindow().GetFramebufferExtent().Height},

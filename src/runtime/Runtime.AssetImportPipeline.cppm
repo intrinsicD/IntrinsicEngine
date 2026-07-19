@@ -156,7 +156,6 @@ namespace Extrinsic::Runtime
     export struct RuntimeImportCompletedServices
     {
         ECS::Scene::Registry* Scene{};
-        CameraControllerRegistry* CameraControllers{};
         SelectionController* Selection{};
         const Core::Config::EngineConfig* Config{};
     };
@@ -223,7 +222,6 @@ namespace Extrinsic::Runtime
         AssetModelSceneHandoff* ModelSceneHandoff{};
         RenderExtractionCache* RenderExtraction{};
         ECS::Scene::Registry* Scene{};
-        CameraControllerRegistry* CameraControllers{};
         SelectionController* Selection{};
         EditorCommandHistory* CommandHistory{};
         RuntimeObjectSpaceNormalBakeQueue* ObjectSpaceNormalBakeQueue{};
@@ -359,7 +357,6 @@ namespace Extrinsic::Runtime
         BorrowedSubsystem<AssetModelSceneHandoff> m_AssetModelSceneHandoff{};
         BorrowedSubsystem<RenderExtractionCache> m_RenderExtraction{};
         BorrowedSubsystem<ECS::Scene::Registry> m_Scene{};
-        BorrowedSubsystem<CameraControllerRegistry> m_CameraControllers{};
         BorrowedSubsystem<SelectionController> m_SelectionController{};
         BorrowedSubsystem<EditorCommandHistory> m_EditorCommandHistory{};
         BorrowedSubsystem<RuntimeObjectSpaceNormalBakeQueue> m_ObjectSpaceNormalBakeQueue{};
