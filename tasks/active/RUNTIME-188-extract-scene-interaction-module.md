@@ -11,6 +11,10 @@ maturity_target: Operational
 
 ## Status
 
+- In progress as of 2026-07-19; owner: Codex team; implementation branch:
+  `codex/runtime-188-scene-interaction`.
+- Next gate: land the exact PImpl module and deletion contract with focused
+  runtime contract coverage before broad CPU/static verification.
 - 2026-07-19 audit: split from `RUNTIME-172` after the ownership inventory
   showed that selection, stable lookup/readback, and gizmo state share
   viewport/extraction/maintenance hooks and omission behavior that

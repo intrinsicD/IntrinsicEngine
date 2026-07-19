@@ -171,7 +171,7 @@ triggers. The implementation graph is:
   active-world binding, exact module/history publication, optional async file
   operations, and the narrow synchronous scene-replacement participant
   contract.
-- [`RUNTIME-188`](RUNTIME-188-extract-scene-interaction-module.md) — compose
+- [`RUNTIME-188`](../../active/RUNTIME-188-extract-scene-interaction-module.md) — compose
   selection/lookup/readback/gizmo ownership after the document, camera, and
   editor-capture seams exist; copied world-tagged snapshots replace
   Engine-owned interaction pointers, while obsolete mesh-view compatibility
@@ -292,7 +292,7 @@ main `Runtime.RenderExtraction` module slimming.
   while retaining its implementation under the existing
   `SandboxEditorFacades` surface; Sandbox privately owns exact provider
   borrows and typed handles, not another runtime owner.
-- [`RUNTIME-188`](RUNTIME-188-extract-scene-interaction-module.md) — extract
+- [`RUNTIME-188`](../../active/RUNTIME-188-extract-scene-interaction-module.md) — extract
   the separately audited interaction/readback/gizmo owner and remove its
   Engine facade and borrowed render pointers.
 

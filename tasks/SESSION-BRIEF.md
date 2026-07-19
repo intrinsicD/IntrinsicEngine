@@ -9,6 +9,7 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/active/ARCH-014-kernel-convergence-tracking.md)
+- `RUNTIME-188` — Extract the scene-interaction module (tasks/active/RUNTIME-188-extract-scene-interaction-module.md)
 
 ## Theme B — Rendering modernization
 
@@ -38,7 +39,6 @@ the authoritative open/unblocked view.
 - blocked by `RUNTIME-184`: `RUNTIME-185` — Prune unproven runtime-composition mechanisms (tasks/backlog/runtime/RUNTIME-185-prune-runtime-composition-mechanisms.md)
 - blocked by `RUNTIME-185`: `RUNTIME-186` — Retire residual Engine auxiliary surface (tasks/backlog/runtime/RUNTIME-186-retire-engine-auxiliary-surface.md)
 - blocked by `RUNTIME-186`: `RUNTIME-187` — Finalize the exact domain-free Engine surface (tasks/backlog/runtime/RUNTIME-187-finalize-domain-free-engine-surface.md)
-- unblocked: `RUNTIME-188` — Extract the scene-interaction module (tasks/backlog/runtime/RUNTIME-188-extract-scene-interaction-module.md)
 - blocked by `BUG-096`: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
 - unblocked: `UI-038` — Progressive Poisson destructive-conversion safety (tasks/backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md)
 

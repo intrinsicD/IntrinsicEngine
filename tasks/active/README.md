@@ -16,6 +16,12 @@ Each active task should include:
   `codex/arch-014-kernel-convergence-program`; blocked on final leaf
   `RUNTIME-187`. Next gate: execute the unblocked ADR-0027 behavior-owner
   leaves and update the convergence scorecard after each retirement.
+- [`RUNTIME-188`](RUNTIME-188-extract-scene-interaction-module.md) — scene
+  interaction module; owner: Codex team; branch:
+  `codex/runtime-188-scene-interaction-integrated`; in progress. Next gate:
+  integrate the completed PImpl module and deletion contract with current
+  main, then run focused, CPU, and Vulkan retirement verification.
+
 ## History
 
 Retirement narratives live in the append-only
