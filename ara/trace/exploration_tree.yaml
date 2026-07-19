@@ -6320,3 +6320,36 @@ tree:
       task retains the complete default CPU-supported gate as integration
       evidence required before retirement.
     status: resolved
+  - id: N267
+    type: experiment
+    title: "Extract and verify the RUNTIME-172 scene-document module"
+    provenance: ai-executed
+    timestamp: "2026-07-19T09:41+02:00"
+    evidence:
+      - "commits 573318cbe2f6dbc94f979b654b2dc1cecff4f09c and 1d48444b0d069b8972588e60e169a584aefe4f56"
+      - "src/runtime/Scene/Runtime.SceneDocumentModule.cppm"
+      - "src/runtime/Scene/Runtime.SceneDocumentModule.cpp"
+      - "tests/contract/runtime/Test.SceneDocumentModule.cpp"
+      - "ctest focused SceneDocument/SceneSerialization/EditorCommandHistory/RuntimeModule/RuntimeSandboxAcceptance/ECSHierarchy selector"
+      - "ctest complete CPU-supported selector"
+      - "python3 tools/repo/check_kernel_convergence.py --root . --strict"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+    result: >
+      Extracted document path, file-event identity, queued scene IO, and exact
+      EditorCommandHistory ownership into an optional app-composed
+      SceneDocumentModule bound to one validated active world and registry.
+      New/load/close now use deterministic strong-handle replacement
+      participants; queued callbacks validate generation, epoch, world, and
+      registry through weak shared state before commit. Engine lost its public
+      scene/document/history facades and durable ownership while two named,
+      task-owned implementation adapters preserve interaction and asset-handoff
+      replacement behavior for independent landing. A final-base IntrinsicTests
+      build passed; the focused selector passed 68 of 68 and the complete
+      CPU-supported selector passed 4,175 tests with zero failures and one
+      expected GLFW/LSan capability skip. Strict convergence measured
+      33/11/2/22, and layering plus repository structural gates were clean.
+      Five raw-Engine import fixtures initially failed after the ownership move;
+      adding the now-explicit SceneDocumentModule composition, without changing
+      expectations or production behavior, made all five deterministic reruns
+      pass.
+    status: resolved

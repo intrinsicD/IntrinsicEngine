@@ -134,8 +134,8 @@ sessions:
     open_threads: 9
   - id: "2026-07-19_001"
     date: "2026-07-19"
-    summary: "Implemented, verified, documented, and checkpoint-committed RUNTIME-181's app-composed config-control module while leaving the full CPU integration gate and retirement open."
-    turn_count: 1
-    events_count: 1
+    summary: "Implemented and verified the app-composed RUNTIME-181 config-control and RUNTIME-172 scene-document modules; RUNTIME-172 remains active for root-owned integration and retirement."
+    turn_count: 2
+    events_count: 2
     claims_touched: []
-    open_threads: 10
+    open_threads: 11

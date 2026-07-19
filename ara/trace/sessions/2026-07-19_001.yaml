@@ -2,9 +2,9 @@ session:
   id: "2026-07-19_001"
   date: "2026-07-19"
   started: "2026-07-19T04:02+02:00"
-  last_turn: "2026-07-19T04:02+02:00"
-  turn_count: 1
-  summary: "Implemented, verified, documented, and checkpoint-committed RUNTIME-181's app-composed config-control module while leaving the full CPU integration gate and retirement open."
+  last_turn: "2026-07-19T09:41+02:00"
+  turn_count: 2
+  summary: "Implemented and verified the app-composed RUNTIME-181 config-control and RUNTIME-172 scene-document modules; RUNTIME-172 remains active for root-owned integration and retirement."
 
 events_logged:
   - turn: 1
@@ -13,6 +13,12 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Extracted Engine config control into an optional exact-instance runtime module and passed app compilation, 52 focused tests, and strict structural gates."
+  - turn: 2
+    type: experiment
+    id: "N267"
+    routing: direct
+    provenance: ai-executed
+    summary: "Extracted exact one-world scene-document/history ownership, passed 68 focused and 4,175 complete CPU tests with one capability skip, and reached the 33/11/2/22 Engine ratchet."
 
 ai_actions:
   - turn: 1
@@ -28,12 +34,26 @@ ai_actions:
       - "tests/contract/runtime/Test.RuntimeRenderRecipeActivation.cpp"
       - "docs/architecture/runtime-config-control.md"
       - "tasks/active/RUNTIME-181-extract-config-control-module.md"
+  - turn: 2
+    action: "Implemented RUNTIME-172's app-composed scene-document module, exact history publication, synchronous replacement-participant contract, weak-state queued completion guards, Engine/Sandbox/caller migration, focused Operational coverage, documentation, task evidence, generated inventory, and strict verification."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Scene/Runtime.SceneDocumentModule.cppm"
+      - "src/runtime/Scene/Runtime.SceneDocumentModule.cpp"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/app/Sandbox/main.cpp"
+      - "tests/contract/runtime/Test.SceneDocumentModule.cpp"
+      - "docs/architecture/runtime.md"
+      - "tasks/active/RUNTIME-172-extract-scene-document-module.md"
 
 claims_touched: []
 
 key_context:
   - turn: 1
     excerpt: "RUNTIME-181 requires Engine to retain boot recipe substrate without owning the optional live-control facade, while Sandbox composes and resolves one exact control module/service."
+  - turn: 2
+    excerpt: "RUNTIME-172 keeps document/history ownership in one optional active-world-bound module while narrow named participants preserve interaction and asset-handoff replacement ordering until their owning tasks land."
 
 open_threads:
   - "An owner may externalize the candidate stable contexts through branch protection, rulesets, or a merge queue; none is currently configured."
@@ -46,6 +66,7 @@ open_threads:
   - "Land the bounded CORE-008 benchmark report with the task's final verification and retirement evidence."
   - "Finish CORE-009 documentation, full CPU verification, and task retirement."
   - "Run RUNTIME-181's complete default CPU-supported integration gate, then review and retire the still-active task."
+  - "Integrate and review the clean RUNTIME-172 branch, then let the root owner retire the still-active task."
 
 ai_suggestions_pending:
   - "Let StructSplat and Prospect owners merge the pushed refresh branches through each repository's normal integration policy."
