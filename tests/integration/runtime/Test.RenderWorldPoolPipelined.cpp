@@ -97,7 +97,6 @@ TEST(RenderWorldPoolPipelined, ConsumesRenderNMinusOneWhileExtractionWritesN)
             scene,
             *fixture.Renderer,
             nullptr,
-            nullptr,
             backSlot);
         ASSERT_EQ(stats.SubmittedTransformCount, 1u) << "frame " << frameIndex;
 

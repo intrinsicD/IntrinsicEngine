@@ -58,8 +58,6 @@ namespace Extrinsic::Runtime
         void ReleaseFrontSlot(std::uint32_t slot) noexcept;
         void Shutdown(Graphics::IRenderer& renderer);
 
-        void ClearMeshPrimitiveViewSettings(std::uint32_t stableEntityId) noexcept;
-
         void SetVisualizationAdapterBinding(
             std::uint32_t stableEntityId,
             RenderExtractionCache::VisualizationAdapterBinding binding);

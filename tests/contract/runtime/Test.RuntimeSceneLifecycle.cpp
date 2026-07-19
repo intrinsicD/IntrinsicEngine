@@ -29,10 +29,10 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneDocumentModule;
+import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StreamingExecutor;
@@ -359,28 +359,31 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
+    Runtime::SelectionController& selection =
+        *engine.Services().Find<Runtime::SelectionController>();
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const ECS::EntityHandle entity = scene.Create();
     scene.Raw().emplace<Sel::SelectableTag>(entity);
     const std::uint32_t stableId = Runtime::SelectionController::ToStableEntityId(entity);
 
-    engine.GetSelectionController().SetSelectedEntity(scene, entity);
-    engine.GetSelectionController().RequestHoverPick(4u, 5u);
-    ASSERT_TRUE(engine.GetSelectionController().ConsumePendingPick().has_value());
-    engine.GetSelectionController().ConsumeHit(scene, stableId);
-    engine.GetSelectionController().RequestClickPick(6u, 7u);
-    ASSERT_TRUE(engine.GetSelectionController().ConsumePendingPick().has_value());
-    ASSERT_EQ(engine.GetSelectionController().InFlightPickCount(), 1u);
+    selection.SetSelectedEntity(scene, entity);
+    selection.RequestHoverPick(4u, 5u);
+    ASSERT_TRUE(selection.ConsumePendingPick().has_value());
+    selection.ConsumeHit(scene, stableId);
+    selection.RequestClickPick(6u, 7u);
+    ASSERT_TRUE(selection.ConsumePendingPick().has_value());
+    ASSERT_EQ(selection.InFlightPickCount(), 1u);
 
-    Runtime::MeshPrimitiveViewSettings primitiveSettings{};
-    primitiveSettings.EnableEdgeView = true;
-    primitiveSettings.EnableVertexView = true;
-    primitiveSettings.VertexRenderMode =
-        Runtime::MeshVertexViewRenderMode::SurfaceAlignedCircle;
-    primitiveSettings.VertexPointRadiusPx = 4.0f;
-    engine.SetMeshPrimitiveViewSettings(stableId, primitiveSettings);
+    scene.Raw().emplace<G::RenderEdges>(entity);
+    scene.Raw().emplace<G::RenderPoints>(
+        entity,
+        G::RenderPoints{
+            .Type = G::RenderPoints::RenderType::Surfel,
+            .SizeSource = 4.0f,
+        });
     engine.SetVisualizationAdapterBinding(
         stableId,
         Runtime::RenderExtractionCache::VisualizationAdapterBinding{
@@ -390,7 +393,6 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
     const std::uint64_t bindingRevisionBeforeReset =
         engine.GetVisualizationAdapterBindingRevision();
     EXPECT_EQ(bindingRevisionBeforeReset, 1u);
-    ASSERT_TRUE(engine.GetMeshPrimitiveViewSettings(stableId).AnyEnabled());
     ASSERT_TRUE(scene.Raw().all_of<G::RenderEdges>(entity));
     ASSERT_TRUE(scene.Raw().all_of<G::RenderPoints>(entity));
     const G::RenderPoints& translatedPoints =
@@ -404,11 +406,10 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
     ASSERT_TRUE(reset.has_value()) << static_cast<int>(reset.error());
 
     EXPECT_FALSE(scene.Raw().valid(entity));
-    EXPECT_EQ(engine.GetSelectionController().SelectedCount(), 0u);
-    EXPECT_FALSE(engine.GetSelectionController().HasHovered());
-    EXPECT_FALSE(engine.GetSelectionController().HasPendingPick());
-    EXPECT_EQ(engine.GetSelectionController().InFlightPickCount(), 0u);
-    EXPECT_FALSE(engine.GetMeshPrimitiveViewSettings(stableId).AnyEnabled());
+    EXPECT_EQ(selection.SelectedCount(), 0u);
+    EXPECT_FALSE(selection.HasHovered());
+    EXPECT_FALSE(selection.HasPendingPick());
+    EXPECT_EQ(selection.InFlightPickCount(), 0u);
     EXPECT_FALSE(engine.GetVisualizationAdapterBinding(stableId).has_value());
     EXPECT_GT(engine.GetVisualizationAdapterBindingRevision(),
               bindingRevisionBeforeReset);
@@ -511,12 +512,15 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadInvalidDocumentFailsClosed)
     Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
+    Runtime::SelectionController& selection =
+        *engine.Services().Find<Runtime::SelectionController>();
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const ECS::EntityHandle original = scene.Create();
     scene.Raw().emplace<Sel::SelectableTag>(original);
-    engine.GetSelectionController().SetSelectedEntity(scene, original);
+    selection.SetSelectedEntity(scene, original);
 
     auto queued =
         engine.Services().Find<Runtime::SceneDocumentModule>()->QueueSceneLoadFromPath(
@@ -545,7 +549,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadInvalidDocumentFailsClosed)
     EXPECT_FALSE(event->LoadResult.has_value());
 
     EXPECT_TRUE(scene.Raw().valid(original));
-    EXPECT_EQ(engine.GetSelectionController().SelectedCount(), 1u);
+    EXPECT_EQ(selection.SelectedCount(), 1u);
 
     engine.Shutdown();
 }
@@ -567,7 +571,10 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadAppliesParsedSceneOnMainThread)
     Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
+    Runtime::SelectionController& selection =
+        *engine.Services().Find<Runtime::SelectionController>();
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const ECS::EntityHandle original = scene.Create();
@@ -575,7 +582,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadAppliesParsedSceneOnMainThread)
         original,
         ECSC::MetaData{.EntityName = "Original Scene Entity"});
     scene.Raw().emplace<Sel::SelectableTag>(original);
-    engine.GetSelectionController().SetSelectedEntity(scene, original);
+    selection.SetSelectedEntity(scene, original);
 
     auto queued =
         engine.Services().Find<Runtime::SceneDocumentModule>()->QueueSceneLoadFromPath(
@@ -601,7 +608,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadAppliesParsedSceneOnMainThread)
     EXPECT_EQ(event->Task, queued->Task);
     EXPECT_TRUE(SceneContainsNamedEntity(scene, "Loaded Scene Entity"));
     EXPECT_FALSE(SceneContainsNamedEntity(scene, "Original Scene Entity"));
-    EXPECT_EQ(engine.GetSelectionController().SelectedCount(), 0u);
+    EXPECT_EQ(selection.SelectedCount(), 0u);
 
     engine.Shutdown();
 }

@@ -42,7 +42,6 @@ import Extrinsic.Runtime.PointCloudGeometryPacker;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
 import Extrinsic.Runtime.RenderWorldPool;
-import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SpatialDebugAdapters;
 import Extrinsic.Runtime.VisualizationAdapters;
 import Extrinsic.Runtime.WorldHandle;
@@ -119,10 +118,10 @@ namespace Extrinsic::Runtime
             ECS::Scene::Registry& scene,
             Graphics::IRenderer& renderer,
             Graphics::GpuAssetCache* gpuAssets,
-            const SelectionController* selection,
             std::uint32_t runtimeSnapshotStorageSlot,
-            std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos,
             WorldHandle world);
+        void SubmitSceneInteractionSnapshot(
+            const RuntimeSceneInteractionRenderSnapshot& snapshot);
         void ClearSceneState(Graphics::IRenderer& renderer);
         void Shutdown(Graphics::IRenderer& renderer);
 
@@ -141,12 +140,6 @@ namespace Extrinsic::Runtime
         void TickMeshPrimitiveViewGeometry(std::uint64_t currentFrame,
                                            std::uint32_t framesInFlight,
                                            Graphics::IRenderer& renderer);
-
-        void SetMeshPrimitiveViewSettings(std::uint32_t stableEntityId,
-                                          MeshPrimitiveViewSettings settings);
-        void ClearMeshPrimitiveViewSettings(std::uint32_t stableEntityId) noexcept;
-        [[nodiscard]] MeshPrimitiveViewSettings GetMeshPrimitiveViewSettings(
-            std::uint32_t stableEntityId) const noexcept;
 
         void SetMaterialTextureAssetBindings(
             std::uint32_t stableEntityId,
@@ -332,9 +325,7 @@ namespace Extrinsic::Runtime
             RuntimeRenderExtractionStats& stats);
         void FinalizeAndSubmitSnapshot(
             Graphics::IRenderer& renderer,
-            const SelectionController* selection,
             std::uint32_t runtimeSnapshotStorageSlot,
-            std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos,
             RuntimeRenderExtractionStats& stats);
 
         void EnqueueMeshRetire(Graphics::GpuGeometryHandle handle);
@@ -371,8 +362,6 @@ namespace Extrinsic::Runtime
         std::vector<GeometryRetireRecord> m_MeshPrimitiveViewRetire{};
         std::uint32_t m_MeshPrimitiveViewFreeRetires{0};
         std::uint32_t m_PrevMeshPrimitiveViewFreeRetires{0};
-        std::unordered_map<std::uint32_t, MeshPrimitiveViewSettings>
-            m_MeshPrimitiveViewSettings{};
         std::unordered_map<
             std::uint32_t,
             Graphics::MaterialTextureAssetBindings>
@@ -401,6 +390,7 @@ namespace Extrinsic::Runtime
         };
         std::unique_ptr<VisualizationAdapterState> m_VisualizationState{};
 
+        RuntimeSceneInteractionRenderSnapshot m_SceneInteraction{};
         RuntimeRenderExtractionStats m_LastStats{};
     };
 }

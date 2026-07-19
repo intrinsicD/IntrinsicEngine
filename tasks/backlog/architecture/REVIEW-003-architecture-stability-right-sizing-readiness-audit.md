@@ -29,12 +29,17 @@ depends_on:
 
 - 2026-07-19 dependency amendment: the scene-owner audit split
   `SceneDocumentModule` (`RUNTIME-172`) from `SceneInteractionModule`
-  (`RUNTIME-188`). `RUNTIME-172` is retired; `RUNTIME-188` remains open, so
-  the audit remains blocked.
+  (`RUNTIME-188`). Both are retired at `Operational`, satisfying this specific
+  gate; the audit remains blocked on its other open dependencies.
 - 2026-07-19 dependency update: `GRAPHICS-127` retired at `Operational` on
   native Vulkan and `CPUContracted` on Null/unsupported hosts. Its dead and
   misleading profiler-seam gate is satisfied; the task remains in
   `depends_on` as an auditable static prerequisite.
+- Retired `RUNTIME-188` implements the separate
+  interaction owner, pointer-free extraction snapshot, exact optional
+  selection service, one-world replacement participant, and Engine facade
+  deletion. Readiness evidence must keep that boundary separate from
+  `SceneDocumentModule`; the remaining audit dependencies are unchanged.
 
 ## Goal
 

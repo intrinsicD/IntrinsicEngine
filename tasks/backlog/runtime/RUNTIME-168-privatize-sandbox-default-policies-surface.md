@@ -10,12 +10,16 @@ maturity_target: Operational
 
 ## Status
 
-- 2026-07-19 readiness correction: implementation is hard-gated on
-  `RUNTIME-188` and `RUNTIME-183`. Delete the one-consumer exported policy
+- 2026-07-19 readiness correction: with `RUNTIME-188` retired, this task
+  remains hard-gated only on `RUNTIME-183`. Delete the one-consumer exported policy
   module, retain its `.cpp` as a private implementation unit of the existing
   `Extrinsic.Runtime.SandboxEditorFacades` module, and let Sandbox own only the
   exact provider borrows and typed registration handles described below.
   Implementation remains open.
+- Retired `RUNTIME-188` publishes the exact optional `SelectionController`, keeps
+  it out of generic `RuntimeInputActionServices`, and leaves generic action
+  dispatch operational when interaction is omitted. This task can therefore
+  capture camera/selection only in the optional `F` descriptor as specified.
 - The corrected post-`RUNTIME-183` Engine target is `22` plain imports / `0`
   domain imports / `2` re-exports / `10` public getter names. This task changes
   none of those counts.

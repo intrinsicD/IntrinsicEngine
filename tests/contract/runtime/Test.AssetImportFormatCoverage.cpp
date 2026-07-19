@@ -58,6 +58,7 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SceneDocumentModule;
+import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StableEntityLookup;
@@ -836,6 +837,7 @@ namespace
         engine.EmplaceModule<Runtime::AsyncWorkModule>();
         engine.EmplaceModule<Runtime::CameraModule>();
         engine.EmplaceModule<Runtime::SceneDocumentModule>();
+        engine.EmplaceModule<Runtime::SceneInteractionModule>();
         engine.Initialize();
     }
 
@@ -1087,10 +1089,18 @@ namespace
             EXPECT_GT(world.WorldBoundingSphere.Radius, 0.0f);
         }
 
-        EXPECT_EQ(engine.GetSelectionController().SelectedCount(), 1u);
-        EXPECT_TRUE(engine.GetSelectionController().IsSelected(
+        EXPECT_EQ(
+            engine.Services()
+                .Find<Runtime::SelectionController>()
+                ->SelectedCount(),
+            1u);
+        EXPECT_TRUE(engine.Services()
+                        .Find<Runtime::SelectionController>()
+                        ->IsSelected(
             probe.CompletedEntities[0]));
-        EXPECT_FALSE(engine.GetSelectionController().IsSelected(
+        EXPECT_FALSE(engine.Services()
+                         .Find<Runtime::SelectionController>()
+                         ->IsSelected(
             probe.CompletedEntities[1]));
 
         EXPECT_EQ(recorder->FocusCalls, 1u);
@@ -1374,8 +1384,15 @@ TEST(RuntimeAssetImportFormatCoverage, DefaultImportPoliciesApplyAuthoringUxAndP
     ASSERT_TRUE(raw.all_of<G::VisualizationConfig>(*meshEntity));
     EXPECT_EQ(raw.get<G::VisualizationConfig>(*meshEntity).Source,
               G::VisualizationConfig::ColorSource::Material);
-    EXPECT_TRUE(engine.GetSelectionController().IsSelected(*meshEntity));
-    EXPECT_EQ(engine.GetSelectionController().SelectedCount(), 1u);
+    EXPECT_TRUE(
+        engine.Services()
+            .Find<Runtime::SelectionController>()
+            ->IsSelected(*meshEntity));
+    EXPECT_EQ(
+        engine.Services()
+            .Find<Runtime::SelectionController>()
+            ->SelectedCount(),
+        1u);
     auto* cameraControllers =
         engine.Services().Find<Runtime::CameraControllerRegistry>();
     ASSERT_NE(cameraControllers, nullptr);
@@ -1439,8 +1456,15 @@ TEST(RuntimeAssetImportFormatCoverage, UnregisteredImportPoliciesMaterializeMini
     EXPECT_FALSE(raw.all_of<G::RenderEdges>(*meshEntity));
     EXPECT_FALSE(raw.all_of<G::RenderPoints>(*meshEntity));
     EXPECT_FALSE(raw.all_of<G::VisualizationConfig>(*meshEntity));
-    EXPECT_FALSE(engine.GetSelectionController().IsSelected(*meshEntity));
-    EXPECT_EQ(engine.GetSelectionController().SelectedCount(), 0u);
+    EXPECT_FALSE(
+        engine.Services()
+            .Find<Runtime::SelectionController>()
+            ->IsSelected(*meshEntity));
+    EXPECT_EQ(
+        engine.Services()
+            .Find<Runtime::SelectionController>()
+            ->SelectedCount(),
+        0u);
     auto* cameraControllers =
         engine.Services().Find<Runtime::CameraControllerRegistry>();
     ASSERT_NE(cameraControllers, nullptr);
@@ -1471,6 +1495,7 @@ TEST(RuntimeAssetImportFormatCoverage,
         HeadlessConfig(),
         std::make_unique<OneFrameApplication>());
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
     ASSERT_EQ(
         engine.Services()
@@ -1495,10 +1520,15 @@ TEST(RuntimeAssetImportFormatCoverage,
         FindFirstEntityWithDomain(
             *engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
-    EXPECT_TRUE(engine.GetSelectionController().IsSelected(
-        *meshEntity));
+    EXPECT_TRUE(
+        engine.Services()
+            .Find<Runtime::SelectionController>()
+            ->IsSelected(*meshEntity));
     EXPECT_EQ(
-        engine.GetSelectionController().SelectedCount(), 1u);
+        engine.Services()
+            .Find<Runtime::SelectionController>()
+            ->SelectedCount(),
+        1u);
 
     engine.Shutdown();
 }

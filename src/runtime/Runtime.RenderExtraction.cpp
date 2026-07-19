@@ -78,19 +78,21 @@ namespace Extrinsic::Runtime
         ECS::Scene::Registry& scene,
         Graphics::IRenderer& renderer,
         Graphics::GpuAssetCache* gpuAssets,
-        const SelectionController* selection,
         const std::uint32_t runtimeSnapshotStorageSlot,
-        std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos,
         const WorldHandle world)
     {
         return m_State->ExtractAndSubmit(
             scene,
             renderer,
             gpuAssets,
-            selection,
             runtimeSnapshotStorageSlot,
-            transformGizmos,
             world);
+    }
+
+    void RenderExtractionCache::SubmitSceneInteractionSnapshot(
+        const RuntimeSceneInteractionRenderSnapshot& snapshot)
+    {
+        m_State->SubmitSceneInteractionSnapshot(snapshot);
     }
 
     void RenderExtractionCache::ClearSceneState(Graphics::IRenderer& renderer)
@@ -150,26 +152,6 @@ namespace Extrinsic::Runtime
             currentFrame,
             framesInFlight,
             renderer);
-    }
-
-    void RenderExtractionCache::SetMeshPrimitiveViewSettings(
-        const std::uint32_t stableEntityId,
-        const MeshPrimitiveViewSettings settings)
-    {
-        m_State->SetMeshPrimitiveViewSettings(stableEntityId, settings);
-    }
-
-    void RenderExtractionCache::ClearMeshPrimitiveViewSettings(
-        const std::uint32_t stableEntityId) noexcept
-    {
-        m_State->ClearMeshPrimitiveViewSettings(stableEntityId);
-    }
-
-    MeshPrimitiveViewSettings
-    RenderExtractionCache::GetMeshPrimitiveViewSettings(
-        const std::uint32_t stableEntityId) const noexcept
-    {
-        return m_State->GetMeshPrimitiveViewSettings(stableEntityId);
     }
 
     void RenderExtractionCache::SetMaterialTextureAssetBindings(
@@ -1417,9 +1399,7 @@ namespace Extrinsic::Runtime
         ECS::Scene::Registry& scene,
         Graphics::IRenderer& renderer,
         Graphics::GpuAssetCache* gpuAssets,
-        const SelectionController* selection,
         const std::uint32_t runtimeSnapshotStorageSlot,
-        std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos,
         WorldHandle world)
     {
         RuntimeRenderExtractionStats stats{};
@@ -1464,13 +1444,26 @@ namespace Extrinsic::Runtime
         ExtractSpatialDebug(registry, stats);
 
         FinalizeAndSubmitSnapshot(renderer,
-                                  selection,
                                   runtimeSnapshotStorageSlot,
-                                  transformGizmos,
                                   stats);
 
         m_LastStats = stats;
         return m_LastStats;
+    }
+
+    void RenderExtractionCache::State::SubmitSceneInteractionSnapshot(
+        const RuntimeSceneInteractionRenderSnapshot& snapshot)
+    {
+        m_SceneInteraction.World = snapshot.World;
+        m_SceneInteraction.SelectedRenderIds.assign(
+            snapshot.SelectedRenderIds.begin(),
+            snapshot.SelectedRenderIds.end());
+        m_SceneInteraction.HasHovered = snapshot.HasHovered;
+        m_SceneInteraction.HoveredRenderId =
+            snapshot.HoveredRenderId;
+        m_SceneInteraction.GizmoDrawPackets.assign(
+            snapshot.GizmoDrawPackets.begin(),
+            snapshot.GizmoDrawPackets.end());
     }
 
     void RenderExtractionCache::State::ExtractLightsForEntity(
@@ -2129,9 +2122,7 @@ namespace Extrinsic::Runtime
 
     void RenderExtractionCache::State::FinalizeAndSubmitSnapshot(
         Graphics::IRenderer& renderer,
-        const SelectionController* selection,
         const std::uint32_t runtimeSnapshotStorageSlot,
-        std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos,
         RuntimeRenderExtractionStats& stats)
     {
         stats.SpatialDebugBoundsCount =
@@ -2211,11 +2202,9 @@ namespace Extrinsic::Runtime
             m_MeshPrimitiveViewFreeRetires - m_PrevMeshPrimitiveViewFreeRetires;
         m_PrevMeshPrimitiveViewFreeRetires = m_MeshPrimitiveViewFreeRetires;
 
-        // RUNTIME-089 Slice B — attach the runtime selection snapshot when a
-        // controller is wired. The controller owns the backing storage for
-        // `SelectedStableIds()`; the renderer copies it during
-        // `SubmitRuntimeSnapshots`, so the span only needs to be valid for the
-        // duration of this call.
+        const bool interactionMatches =
+            m_SceneInteraction.World.IsValid() &&
+            m_SceneInteraction.World == stats.World;
         Graphics::RuntimeRenderSnapshotBatch batch{
             .Transforms                     = m_Transforms,
             .Lights                         = m_Lights,
@@ -2228,7 +2217,10 @@ namespace Extrinsic::Runtime
             .VisualizationIsolines          = m_VisualizationState->Batch.Isolines,
             .VisualizationHtexAtlases       = m_VisualizationState->Batch.HtexAtlases,
             .VisualizationFragmentBakeAtlases = m_VisualizationState->Batch.FragmentBakeAtlases,
-            .TransformGizmos                = transformGizmos,
+            .TransformGizmos                = interactionMatches
+                ? std::span<const Graphics::TransformGizmoRenderPacket>{
+                      m_SceneInteraction.GizmoDrawPackets}
+                : std::span<const Graphics::TransformGizmoRenderPacket>{},
             .SpatialDebugBounds             = m_SpatialDebugBatch.Bounds,
             .SpatialDebugHierarchyNodes     = m_SpatialDebugBatch.HierarchyNodes,
             .SpatialDebugSplitPlanes        = m_SpatialDebugBatch.SplitPlanes,
@@ -2236,11 +2228,14 @@ namespace Extrinsic::Runtime
             .SpatialDebugConvexHullEdges    = m_SpatialDebugBatch.ConvexHullEdges,
             .SpatialDebugPointMarkers       = m_SpatialDebugBatch.PointMarkers,
         };
-        if (selection != nullptr)
+        if (interactionMatches)
         {
-            batch.SelectionSelectedStableIds = selection->SelectedStableIds();
-            batch.SelectionHoveredStableId   = selection->HoveredStableId();
-            batch.SelectionHasHovered        = selection->HasHovered();
+            batch.SelectionSelectedStableIds =
+                m_SceneInteraction.SelectedRenderIds;
+            batch.SelectionHoveredStableId =
+                m_SceneInteraction.HoveredRenderId;
+            batch.SelectionHasHovered =
+                m_SceneInteraction.HasHovered;
         }
         renderer.SubmitRuntimeSnapshots(batch, runtimeSnapshotStorageSlot);
     }
@@ -2361,7 +2356,6 @@ namespace Extrinsic::Runtime
             }
         }
         m_MeshPrimitiveViewRetire.clear();
-        m_MeshPrimitiveViewSettings.clear();
         m_MaterialTextureBindings.clear();
         m_PrevMeshFreeRetires = m_MeshFreeRetires;
         m_PrevGraphFreeRetires = m_GraphFreeRetires;
@@ -2379,6 +2373,7 @@ namespace Extrinsic::Runtime
         }
         m_VisualizationState->Bindings.clear();
         m_VisualizationState->Batch.Clear();
+        m_SceneInteraction = {};
 
         renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{});
         m_LastStats = stats;

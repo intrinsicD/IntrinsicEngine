@@ -46,6 +46,7 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.WorldHandle;
@@ -753,8 +754,7 @@ namespace Extrinsic::Runtime
                                 const RuntimeImportCompletedContext& context,
                                 RuntimeImportCompletedServices& services)
                             {
-                                if (services.Scene == nullptr ||
-                                    services.Selection == nullptr)
+                                if (services.Scene == nullptr)
                                 {
                                     return Core::Err(
                                         Core::ErrorCode::InvalidState);
@@ -775,9 +775,13 @@ namespace Extrinsic::Runtime
                                 {
                                     if (!services.Scene->IsValid(entity))
                                         continue;
-                                    (void)services.Selection->SetSelectedEntity(
-                                        *services.Scene,
-                                        entity);
+                                    if (services.Selection != nullptr)
+                                    {
+                                        (void)services.Selection->
+                                            SetSelectedEntity(
+                                                *services.Scene,
+                                                entity);
+                                    }
                                     break;
                                 }
                                 return Core::Ok();
@@ -839,6 +843,8 @@ namespace Extrinsic::Runtime
             if (cameraControllers == nullptr)
                 return;
 
+            SelectionController* const selection =
+                engine.Services().Find<SelectionController>();
             const RuntimeInputActionHandle handle = engine.RegisterInputAction(
                 RuntimeInputActionDesc{
                     .DebugName = "Sandbox.DefaultFocusCameraOnSelection",
@@ -849,12 +855,11 @@ namespace Extrinsic::Runtime
                             .SuppressWhenImGuiCapturesKeyboard = true,
                         },
                     .Execute =
-                        [cameraControllers](
+                        [cameraControllers, selection](
                             const RuntimeInputActionContext& context,
                             RuntimeInputActionServices& services)
                         {
                             if (services.Scene == nullptr ||
-                                services.Selection == nullptr ||
                                 services.RenderInput == nullptr ||
                                 services.Config == nullptr)
                             {
@@ -863,10 +868,12 @@ namespace Extrinsic::Runtime
 
                             if (!services.Config->Camera.Enabled)
                                 return Core::Ok();
+                            if (selection == nullptr)
+                                return Core::Ok();
 
                             if (!FocusCameraOnSelection(
                                     *cameraControllers,
-                                    *services.Selection,
+                                    *selection,
                                     *services.Scene,
                                     CameraControllerSlot::Main))
                             {

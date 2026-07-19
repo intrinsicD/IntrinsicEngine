@@ -94,6 +94,14 @@ TEST(RuntimeEnginePrivateGlue,
         root / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
     const std::string moduleInterface =
         ReadFile(root / "src/runtime/Runtime.Module.cppm");
+    const std::string interactionImpl = ReadFile(
+        root /
+        "src/runtime/Scene/Runtime.SceneInteractionModule.cpp");
+    const std::string cameraImpl = ReadFile(
+        root /
+        "src/runtime/Cameras/Runtime.CameraModule.cpp");
+    const std::string scheduleImpl = ReadFile(
+        root / "src/runtime/Runtime.ModuleSchedule.cpp");
 
     EXPECT_EQ(engineImpl.find("PopulateMainCameraForFrame"),
               std::string::npos);
@@ -106,23 +114,68 @@ TEST(RuntimeEnginePrivateGlue,
         "frameContext.RenderInput = Graphics::RenderFrameInput{");
     const auto viewportDispatch = engineImpl.find(
         "m_RuntimeModuleSchedule.RunViewportInputHooks(");
-    const auto gizmoInput = engineImpl.find(
-        "m_GizmoFrameService.DriveInputForFrame(");
+    const auto transformFlush = engineImpl.find(
+        "FlushPreRenderTransformState(*m_Scene)");
     const auto inputActions = engineImpl.find(
         "m_InputActions.DispatchForFrame(");
-    const auto picking = engineImpl.find(
-        "m_SelectionReadback.DrainPendingPickForFrame(");
+    const auto beforeExtraction = engineImpl.find(
+        "FramePhase::BeforeExtraction");
     ASSERT_NE(uiEndCapture, std::string::npos);
     ASSERT_NE(renderInputInitialization, std::string::npos);
     ASSERT_NE(viewportDispatch, std::string::npos);
-    ASSERT_NE(gizmoInput, std::string::npos);
+    ASSERT_NE(transformFlush, std::string::npos);
     ASSERT_NE(inputActions, std::string::npos);
-    ASSERT_NE(picking, std::string::npos);
+    ASSERT_NE(beforeExtraction, std::string::npos);
     EXPECT_LT(uiEndCapture, renderInputInitialization);
     EXPECT_LT(renderInputInitialization, viewportDispatch);
-    EXPECT_LT(viewportDispatch, gizmoInput);
+    EXPECT_LT(viewportDispatch, transformFlush);
+    EXPECT_LT(transformFlush, inputActions);
     EXPECT_LT(viewportDispatch, inputActions);
-    EXPECT_LT(viewportDispatch, picking);
+    EXPECT_LT(inputActions, beforeExtraction);
+    EXPECT_EQ(
+        engineImpl.find(
+            "m_GizmoFrameService.DriveInputForFrame("),
+        std::string::npos);
+    EXPECT_EQ(
+        engineImpl.find(
+            "m_SelectionReadback.DrainPendingPickForFrame("),
+        std::string::npos);
+
+    const auto interactionViewport =
+        interactionImpl.find("void RunViewportInput(");
+    const auto gizmoInput = interactionImpl.find(
+        "Gizmo.DriveInputForFrame(", interactionViewport);
+    const auto interactionExtraction =
+        interactionImpl.find("void RunBeforeExtraction(");
+    const auto picking = interactionImpl.find(
+        "Readback.DrainPendingPickForFrame(",
+        interactionExtraction);
+    const auto gizmoPackets = interactionImpl.find(
+        "Gizmo.BuildRenderPackets(", interactionExtraction);
+    ASSERT_NE(interactionViewport, std::string::npos);
+    ASSERT_NE(gizmoInput, std::string::npos);
+    ASSERT_NE(interactionExtraction, std::string::npos);
+    ASSERT_NE(picking, std::string::npos);
+    ASSERT_NE(gizmoPackets, std::string::npos);
+    EXPECT_LT(interactionViewport, gizmoInput);
+    EXPECT_LT(gizmoInput, interactionExtraction);
+    EXPECT_LT(picking, gizmoPackets);
+    EXPECT_NE(
+        interactionImpl.find(
+            ".CapturesViewportInput()"),
+        std::string::npos);
+
+    EXPECT_NE(
+        cameraImpl.find("return \"Runtime.CameraModule\";"),
+        std::string::npos);
+    EXPECT_NE(
+        interactionImpl.find(
+            "return \"Runtime.SceneInteractionModule\";"),
+        std::string::npos);
+    EXPECT_NE(
+        scheduleImpl.find(
+            "return lhs.ModuleName < rhs.ModuleName;"),
+        std::string::npos);
 
     std::size_t registrarWiringCount = 0u;
     std::size_t cursor = 0u;

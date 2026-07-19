@@ -81,6 +81,7 @@ import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneDocumentModule;
+import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
@@ -2937,6 +2938,7 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProce
             128u));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
     InstallSandboxDefaultRuntimePolicies(engine);
 
@@ -2960,7 +2962,10 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProce
         });
 
     Runtime::SandboxEditorContext context =
-        MakeContext(*engine.Worlds().Get(engine.ActiveWorld()), engine.GetSelectionController());
+        MakeContext(
+            *engine.Worlds().Get(engine.ActiveWorld()),
+            *engine.Services().Find<
+                Runtime::SelectionController>());
     const Runtime::SandboxEditorMeshVertexNormalsResult recomputed =
         Runtime::ApplySandboxEditorMeshVertexNormalsCommand(
             context,

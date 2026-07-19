@@ -16,6 +16,7 @@ Each active task should include:
   `codex/arch-014-kernel-convergence-program`; blocked on final leaf
   `RUNTIME-187`. Next gate: execute the unblocked ADR-0027 behavior-owner
   leaves and update the convergence scorecard after each retirement.
+
 ## History
 
 Retirement narratives live in the append-only

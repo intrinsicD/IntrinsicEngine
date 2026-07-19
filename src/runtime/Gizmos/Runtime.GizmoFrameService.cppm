@@ -39,6 +39,9 @@ export namespace Extrinsic::Runtime
         void DriveInputForFrame(const GizmoFrameServiceInput& input);
         [[nodiscard]] std::span<const Graphics::TransformGizmoRenderPacket>
             BuildRenderPackets(const ECS::Scene::Registry& scene);
+        // Clear every world-bound interaction record. App-global tuning,
+        // operation mode, and orientation intentionally survive a bind.
+        void ClearSceneState(ECS::Scene::Registry* scene);
 
         [[nodiscard]] GizmoInteraction& Interaction() noexcept;
         [[nodiscard]] const GizmoInteraction& Interaction() const noexcept;

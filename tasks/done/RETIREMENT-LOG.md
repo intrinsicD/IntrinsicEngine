@@ -5592,3 +5592,25 @@ strict layering, task, docs, test-layout, root-hygiene, generated-inventory,
 and clean-workshop checks passed. Implementation checkpoint: `1d48444b`;
 initial main merge: `39585780`; retained-handle fix: `064336f2`; final fix
 merge: `fc372b2f`; research trace: `0ccb94a0`.
+
+[`RUNTIME-188`](RUNTIME-188-extract-scene-interaction-module.md) —
+scene-interaction composition retired on 2026-07-19 at `Operational`. One
+optional app-composed PImpl owns the exact active-world selection, stable
+lookup/binding, readback/refinement, and gizmo cohort; publishes only the exact
+module and controller; validates its world/registry/epoch at every typed
+viewport, BeforeExtraction, and Maintenance callback; and submits copied,
+world-tagged interaction snapshots. A retained document-replacement
+participant, active-world mismatch/retirement, shutdown announcement, and
+reinitialize all use the same fail-closed reset without state resurrection.
+Pick sequences remain monotonic, while zero, unknown, wrong-world, and
+wrong-epoch results cannot mutate current selection/refinement. Engine no
+longer owns or exposes interaction or mesh primitive-view compatibility state;
+only the named `RUNTIME-183` implementation-local selection borrow remains.
+The post-review focused selector passed 214/214; the canonical CPU-supported
+selector reported 4,225 passed plus one expected GLFW/LSan capability skip out
+of 4,226 selected cases with zero failures. Narrow `ci-vulkan` Sandbox,
+selection, gizmo, and shutdown evidence passed after explicitly building the
+shutdown helper producer. Exact Engine convergence is 26 plain imports, 4
+domain imports, 2 re-exports, and 15 public getter names; strict structural and
+generated-state checks passed. Implementation checkpoints: `b0dfdbe9` and
+`8c8bb5d2`.

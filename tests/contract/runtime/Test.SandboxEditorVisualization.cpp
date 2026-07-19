@@ -79,6 +79,7 @@ import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
@@ -947,10 +948,12 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
 TEST(SandboxEditorUi, RenderHintCommandRepackagesGraphLaneResidency)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<PassiveApplication>());
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
 
     ECS::Scene::Registry& scene = *engine.Worlds().Get(engine.ActiveWorld());
-    Runtime::SelectionController& selection = engine.GetSelectionController();
+    Runtime::SelectionController& selection =
+        *engine.Services().Find<Runtime::SelectionController>();
     const ECS::EntityHandle graph = MakeSelectable(scene, "Graph");
     AddGraphSource(scene, graph);
     auto& raw = scene.Raw();

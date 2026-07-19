@@ -27,25 +27,18 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.AssetImportPipeline;
-import Extrinsic.Runtime.GizmoFrameService;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.JobServiceGpuQueueBridge;
 import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ModuleSchedule;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeService;
-import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
-import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.RenderWorldPool;
-import Extrinsic.Runtime.SelectionReadback;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Asset.Service;
-import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Scene.Registry;
 
 #include "Runtime.RenderExtractionService.Internal.hpp"
@@ -219,40 +212,6 @@ namespace Extrinsic::Runtime
         // Contract-test seam: replay a platform event through the same runtime
         // handler installed as the window listener during Initialize().
         void DispatchPlatformEventForTest(const Platform::Event& event);
-        // RUNTIME-089 Slice B — runtime/editor-owned selection authority.
-        // Input ports / editor tools submit hover/click picks here; RunFrame
-        // drains the coalesced pick into the renderer's SelectionSystem before
-        // extraction, consumes the readback after present, and mirrors the
-        // controller snapshot into RenderWorld::Selection.
-        [[nodiscard]] SelectionController&    GetSelectionController() noexcept;
-        // RUNTIME-145 Slice A — expose the engine-owned durable-id lookup for
-        // editor/runtime consumers and contract tests. The lookup itself stays
-        // owned by Engine; this API resolves through the maintained sidecar and
-        // updates lookup diagnostics in the same way direct sidecar use does.
-        [[nodiscard]] std::optional<ECS::EntityHandle>
-            ResolveEntityByStableId(ECS::Components::StableId id);
-        [[nodiscard]] const StableEntityLookupDiagnostics&
-            GetStableEntityLookupDiagnostics() const noexcept;
-        // RUNTIME-084 Slice B — runtime/editor-owned transform-gizmo authority.
-        // Engine reads platform input and the active camera snapshot each frame,
-        // drives hit-test / drag tick / commit against selected ECS authoring
-        // transforms, and submits only render-safe TransformGizmoRenderPacket
-        // spans to graphics through RenderExtractionCache.
-        [[nodiscard]] GizmoInteraction&       GetGizmoInteraction() noexcept;
-        [[nodiscard]] const GizmoInteraction& GetGizmoInteraction() const noexcept;
-        [[nodiscard]] GizmoUndoStack&         GetGizmoUndoStack() noexcept;
-        [[nodiscard]] const GizmoUndoStack&   GetGizmoUndoStack() const noexcept;
-        // RUNTIME-093 Slice B2 — editor-facing refined-primitive selection cache.
-        // RunFrame refines each pick readback's encoded primitive hint against the
-        // hit entity's authoritative `GeometrySources` (newest pick wins; a
-        // background readback clears it; an empty-drain frame retains the prior
-        // value). Tracks the sub-primitive under the last pick hit, keyed by render
-        // id for correlation with the controller's selection; empty until the first
-        // pick resolves. Graphics never reads this — it only produced the hint.
-        [[nodiscard]] const std::optional<PrimitiveSelectionResult>&
-            GetLastRefinedPrimitiveSelection() const noexcept;
-        [[nodiscard]] std::uint64_t
-            GetLastRefinedPrimitiveSelectionGeneration() const noexcept;
         [[nodiscard]] Core::FrameGraph&       GetFrameGraph()    noexcept;
 
         // ── GRAPHICS-036C — pipelined-frames render-world pool ────────────
@@ -271,15 +230,6 @@ namespace Extrinsic::Runtime
         // Zero-initialized until the first frame extracts.
         [[nodiscard]] const RuntimeRenderExtractionStats&
             GetLastRenderExtractionStats() const noexcept;
-        // UI-001 Slice C / RUNTIME-106 — editor/runtime command seams. The
-        // legacy mesh primitive-view accessors are compatibility shims that
-        // translate to ECS `RenderEdges` / `RenderPoints`; render components
-        // are the authoritative view toggles.
-        void SetMeshPrimitiveViewSettings(std::uint32_t stableEntityId,
-                                          MeshPrimitiveViewSettings settings);
-        void ClearMeshPrimitiveViewSettings(std::uint32_t stableEntityId) noexcept;
-        [[nodiscard]] MeshPrimitiveViewSettings GetMeshPrimitiveViewSettings(
-            std::uint32_t stableEntityId) const noexcept;
         void SetVisualizationAdapterBinding(
             std::uint32_t stableEntityId,
             RenderExtractionCache::VisualizationAdapterBinding binding);
@@ -316,24 +266,6 @@ namespace Extrinsic::Runtime
         // Engine keeps frame ordering and dependent-subsystem wiring; the service
         // owns the cache, pool, last stats, and frame-index counter.
         RenderExtractionService               m_RenderExtractionService{};
-        // RUNTIME-089 Slice B — selection authority; persists across frames so
-        // in-flight picks correlate with their later readbacks.
-        SelectionController                   m_SelectionController{};
-        // RUNTIME-162 — runtime/editor transform-gizmo frame service. Engine
-        // keeps frame order and public facades; the service owns interaction
-        // state, undo stack, selected-entity scratch, and packet production.
-        GizmoFrameService                    m_GizmoFrameService{};
-        // RUNTIME-092 Slice B — runtime-owned StableId/render-id lookup sidecar.
-        // Maintained incrementally from StableId component construct/update/
-        // destroy events and attached to the controller in Initialize() so
-        // selection resolves durable ids through the single runtime authority
-        // (ECS/graphics hold no lookup state). Whole-scene replacement still
-        // uses Rebuild() once at the replacement boundary.
-        StableEntityLookup                    m_StableEntityLookup{};
-        // RUNTIME-157 — runtime-owned bridge for graphics pick readbacks,
-        // controller mutation, and editor-facing primitive refinement cache.
-        SelectionReadbackState                  m_SelectionReadback{};
-
         // CPU task graph — ECS system scheduling
         std::unique_ptr<Core::FrameGraph>      m_FrameGraph;
         // Asset service — CPU payload authority
@@ -361,11 +293,6 @@ namespace Extrinsic::Runtime
         // sites until later module extractions carry WorldHandle explicitly.
         WorldRegistry                          m_WorldRegistry{};
         ECS::Scene::Registry*                  m_Scene{};
-        // RUNTIME-151 — owns StableId signal connections outside the Engine
-        // interface so EnTT plumbing stays behind StableEntityLookup.
-        // Declared after m_WorldRegistry so scoped disconnection runs before
-        // scene registries are destroyed during fallback/destructor unwinding.
-        StableEntityLookupSceneBinding         m_StableEntityLookupBinding{};
         RuntimeModuleSchedule                  m_RuntimeModuleSchedule{};
 
         Core::FrameClock m_FrameClock{};
@@ -402,7 +329,6 @@ namespace Extrinsic::Runtime
         void AnnounceAndShutdownRuntimeModules();
         void RefreshActiveWorldScenePointer() noexcept;
         void ApplyWorldRegistryMaintenance();
-        void RebuildStableEntityLookupAfterSceneReplacement();
         void BindActiveSceneAssetHandoffs();
         void RegisterSceneReplacementParticipants();
     };

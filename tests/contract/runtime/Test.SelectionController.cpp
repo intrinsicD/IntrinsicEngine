@@ -280,7 +280,8 @@ TEST(SelectionController, ClearSceneStateDropsSelectionHoverAndPickQueues)
     controller.ConsumeHit(registry, StableId(hovered));
     controller.RequestClickPick(5u, 6u);
     ASSERT_TRUE(controller.HasPendingPick());
-    ASSERT_TRUE(controller.ConsumePendingPick().has_value());
+    const auto beforeClear = controller.ConsumePendingPick();
+    ASSERT_TRUE(beforeClear.has_value());
     ASSERT_EQ(controller.InFlightPickCount(), 1u);
 
     controller.ClearSceneState(registry);
@@ -292,6 +293,11 @@ TEST(SelectionController, ClearSceneStateDropsSelectionHoverAndPickQueues)
     EXPECT_FALSE(HasHoveredTag(registry, hovered));
     EXPECT_FALSE(controller.HasPendingPick());
     EXPECT_EQ(controller.InFlightPickCount(), 0u);
+
+    controller.RequestClickPick(7u, 8u);
+    const auto afterClear = controller.ConsumePendingPick();
+    ASSERT_TRUE(afterClear.has_value());
+    EXPECT_GT(afterClear->Sequence, beforeClear->Sequence);
 }
 
 // --- background click ----------------------------------------------------
@@ -625,11 +631,18 @@ TEST(SelectionController, InFlightCapacityEvictsOldestUnresolved)
     EXPECT_EQ(controller.GetDiagnostics().InFlightPicksDropped, 1u);
     // The first (oldest) pick was evicted; resolving its sequence is untracked.
     const EntityHandle a = MakeSelectable(registry);
-    controller.ConsumeHit(registry, StableId(a), first->Sequence);
+    const bool consumed =
+        controller.ConsumeHit(
+            registry, StableId(a), first->Sequence);
+    EXPECT_FALSE(consumed);
+    EXPECT_FALSE(controller.IsSelected(a));
+    EXPECT_FALSE(HasSelectedTag(registry, a));
     EXPECT_EQ(controller.GetDiagnostics().UntrackedReadbacks, 1u);
+    EXPECT_EQ(controller.GetDiagnostics().ReadbacksConsumed, 0u);
+    EXPECT_EQ(controller.GetDiagnostics().Hits, 0u);
 }
 
-TEST(SelectionController, UntrackedReadbackAppliesAsClick)
+TEST(SelectionController, StandaloneUnsequencedReadbackAppliesAsClick)
 {
     Registry           registry;
     SelectionController controller;

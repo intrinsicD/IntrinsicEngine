@@ -311,6 +311,7 @@ if(TARGET ExtrinsicRuntime)
         Test.RuntimeReferenceScene.cpp
         Test.RuntimeSceneLifecycle.cpp
         Test.SceneDocumentModule.cpp
+        Test.SceneInteractionModule.cpp
         Test.RuntimeSceneSerialization.cpp
         Test.RuntimeVulkanBreadcrumb.cpp
         Test.SandboxEditorModels.cpp

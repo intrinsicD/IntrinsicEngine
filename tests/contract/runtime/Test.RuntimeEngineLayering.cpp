@@ -298,37 +298,44 @@ TEST(RuntimeEngineLayering, ObjectSpaceNormalBakeServiceKeepsGpuQueueComposition
               std::string::npos);
 }
 
-TEST(RuntimeEngineLayering, GizmoFrameServiceKeepsInteractionStateOutOfEngine)
+TEST(RuntimeEngineLayering,
+     SceneInteractionModuleOwnsGizmoFrameServiceOutOfEngine)
 {
+    const auto root = RepoRoot();
     const auto engineInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(root / "src/runtime/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
     const auto frameLoop =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
+        ReadFile(
+            root /
+            "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
+    const auto interactionInterface =
+        ReadFile(
+            root /
+            "src/runtime/Scene/Runtime.SceneInteractionModule.cppm");
+    const auto interactionImpl =
+        ReadFile(
+            root /
+            "src/runtime/Scene/Runtime.SceneInteractionModule.cpp");
     const auto serviceInterface =
-        ReadFile(RepoRoot() / "src/runtime/Gizmos/Runtime.GizmoFrameService.cppm");
+        ReadFile(
+            root /
+            "src/runtime/Gizmos/Runtime.GizmoFrameService.cppm");
     const auto serviceImpl =
-        ReadFile(RepoRoot() / "src/runtime/Gizmos/Runtime.GizmoFrameService.cpp");
+        ReadFile(
+            root /
+            "src/runtime/Gizmos/Runtime.GizmoFrameService.cpp");
 
-    EXPECT_NE(engineInterface.find("import Extrinsic.Runtime.GizmoFrameService"),
+    EXPECT_EQ(engineInterface.find("GizmoFrameService"),
               std::string::npos);
-    EXPECT_NE(engineInterface.find("GizmoFrameService                    m_GizmoFrameService"),
+    EXPECT_EQ(engineImpl.find("GizmoFrameService"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_GizmoFrameService.DriveInputForFrame("),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("m_GizmoFrameService.BuildRenderPackets("),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("m_GizmoFrameService.Interaction()"),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("m_GizmoFrameService.UndoStack()"),
-              std::string::npos);
-
     EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.GizmoInteraction"),
               std::string::npos);
-    EXPECT_EQ(engineInterface.find("GizmoInteraction                      m_GizmoInteraction"),
+    EXPECT_EQ(engineInterface.find("GizmoInteraction"),
               std::string::npos);
-    EXPECT_EQ(engineInterface.find("GizmoUndoStack                        m_GizmoUndoStack"),
+    EXPECT_EQ(engineInterface.find("GizmoUndoStack"),
               std::string::npos);
     EXPECT_EQ(engineInterface.find("TransformGizmoRenderPacketBuilder"),
               std::string::npos);
@@ -348,6 +355,68 @@ TEST(RuntimeEngineLayering, GizmoFrameServiceKeepsInteractionStateOutOfEngine)
               std::string::npos);
     EXPECT_EQ(frameLoop.find("DriveGizmoInteractionForFrame"),
               std::string::npos);
+
+    EXPECT_NE(
+        interactionInterface.find(
+            "class SceneInteractionModule final : public IRuntimeModule"),
+        std::string::npos);
+    EXPECT_NE(interactionInterface.find("struct Impl;"),
+              std::string::npos);
+    EXPECT_NE(
+        interactionImpl.find(
+            "import Extrinsic.Runtime.GizmoFrameService;"),
+        std::string::npos);
+    EXPECT_NE(
+        interactionImpl.find("GizmoFrameService Gizmo{}"),
+        std::string::npos);
+    EXPECT_NE(
+        interactionImpl.find(
+            "Gizmo.DriveInputForFrame("),
+        std::string::npos);
+    EXPECT_NE(
+        interactionImpl.find(
+            "Gizmo.BuildRenderPackets("),
+        std::string::npos);
+    EXPECT_NE(
+        interactionImpl.find(
+            "Gizmo.ClearSceneState(BoundRegistry)"),
+        std::string::npos);
+
+    const auto unifiedClear =
+        SliceBetween(
+            interactionImpl,
+            "void ClearWorldBoundState()",
+            "void BindTo(");
+    const auto gizmoClear =
+        unifiedClear.find(
+            "Gizmo.ClearSceneState(BoundRegistry)");
+    const auto selectionClear =
+        unifiedClear.find(
+            "Selection.ClearSceneState(*BoundRegistry)");
+    const auto readbackClear =
+        unifiedClear.find("Readback.ClearSceneState()");
+    const auto lookupDetach =
+        unifiedClear.find(
+            "Selection.SetStableEntityLookup(nullptr)");
+    const auto lookupDisconnect =
+        unifiedClear.find("LookupBinding.Disconnect()");
+    const auto lookupClear =
+        unifiedClear.find("Lookup.Clear()");
+    const auto snapshotClear =
+        unifiedClear.find("PublishEmpty(BoundWorld)");
+    ASSERT_NE(gizmoClear, std::string::npos);
+    ASSERT_NE(selectionClear, std::string::npos);
+    ASSERT_NE(readbackClear, std::string::npos);
+    ASSERT_NE(lookupDetach, std::string::npos);
+    ASSERT_NE(lookupDisconnect, std::string::npos);
+    ASSERT_NE(lookupClear, std::string::npos);
+    ASSERT_NE(snapshotClear, std::string::npos);
+    EXPECT_LT(gizmoClear, selectionClear);
+    EXPECT_LT(selectionClear, readbackClear);
+    EXPECT_LT(readbackClear, lookupDetach);
+    EXPECT_LT(lookupDetach, lookupDisconnect);
+    EXPECT_LT(lookupDisconnect, lookupClear);
+    EXPECT_LT(lookupClear, snapshotClear);
 
     EXPECT_NE(serviceInterface.find("export module Extrinsic.Runtime.GizmoFrameService"),
               std::string::npos);
@@ -867,19 +936,36 @@ TEST(RuntimeEngineLayering, DeviceBootstrapKeepsBackendAndFallbackPolicyOutOfEng
     EXPECT_NE(bootstrap.find("CreateRuntimeDevice"), std::string::npos);
 }
 
-TEST(RuntimeEngineLayering, MeshPrimitiveViewControlsKeepRenderComponentPolicyOutOfEngine)
+TEST(RuntimeEngineLayering, ObsoleteMeshPrimitiveViewControlsAreDeleted)
 {
+    const auto root = RepoRoot();
+    const auto engineInterface =
+        ReadFile(root / "src/runtime/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
-    const auto controls =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.MeshPrimitiveViewControls.cpp");
+        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+    const auto extractionInterface =
+        ReadFile(root / "src/runtime/Runtime.RenderExtraction.cppm");
+    const auto extractionInternal =
+        ReadFile(
+            root /
+            "src/runtime/Runtime.RenderExtraction.Internal.cpp");
 
-    EXPECT_NE(engineImpl.find("import Extrinsic.Runtime.MeshPrimitiveViewControls"),
+    EXPECT_FALSE(std::filesystem::exists(
+        root /
+        "src/runtime/Runtime.MeshPrimitiveViewControls.cppm"));
+    EXPECT_FALSE(std::filesystem::exists(
+        root /
+        "src/runtime/Runtime.MeshPrimitiveViewControls.cpp"));
+    EXPECT_EQ(engineInterface.find("MeshPrimitiveViewSettings"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("ApplyMeshPrimitiveViewSettings(*m_Scene"),
+    EXPECT_EQ(engineImpl.find("MeshPrimitiveViewSettings"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("ReadMeshPrimitiveViewSettings(*m_Scene"),
-              std::string::npos);
+    EXPECT_EQ(
+        extractionInterface.find("MeshPrimitiveViewSettings"),
+        std::string::npos);
+    EXPECT_EQ(
+        extractionInternal.find("MeshPrimitiveViewSettings"),
+        std::string::npos);
 
     EXPECT_EQ(engineImpl.find("import Extrinsic.Graphics.Component.RenderGeometry"),
               std::string::npos);
@@ -889,10 +975,6 @@ TEST(RuntimeEngineLayering, MeshPrimitiveViewControlsKeepRenderComponentPolicyOu
     EXPECT_EQ(engineImpl.find("ToMeshVertexViewRenderMode"), std::string::npos);
     EXPECT_EQ(engineImpl.find("entt::registry"), std::string::npos);
 
-    EXPECT_NE(controls.find("import Extrinsic.Graphics.Component.RenderGeometry"),
-              std::string::npos);
-    EXPECT_NE(controls.find("RenderEdges"), std::string::npos);
-    EXPECT_NE(controls.find("RenderPoints"), std::string::npos);
 }
 
 TEST(RuntimeEngineLayering,
@@ -1151,45 +1233,73 @@ TEST(RuntimeEngineLayering, RuntimeModuleScheduleKeepsContributionPolicyOutOfEng
 
 TEST(RuntimeEngineLayering, SelectionReadbackKeepsPickCorrelationCacheOutOfEngine)
 {
+    const auto root = RepoRoot();
     const auto engineInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(root / "src/runtime/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
     const auto frameLoop =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
+        ReadFile(
+            root /
+            "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
+    const auto interactionInterface =
+        ReadFile(
+            root /
+            "src/runtime/Scene/Runtime.SceneInteractionModule.cppm");
+    const auto interactionImpl =
+        ReadFile(
+            root /
+            "src/runtime/Scene/Runtime.SceneInteractionModule.cpp");
     const auto sceneDocumentInterface =
         ReadFile(
-            RepoRoot() /
+            root /
             "src/runtime/Scene/Runtime.SceneDocumentModule.cppm");
     const auto sceneDocumentImpl =
         ReadFile(
-            RepoRoot() /
+            root /
             "src/runtime/Scene/Runtime.SceneDocumentModule.cpp");
     const auto readbackInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.SelectionReadback.cppm");
+        ReadFile(root / "src/runtime/Runtime.SelectionReadback.cppm");
     const auto readbackImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.SelectionReadback.cpp");
+        ReadFile(root / "src/runtime/Runtime.SelectionReadback.cpp");
 
-    EXPECT_NE(engineInterface.find("import Extrinsic.Runtime.SelectionReadback"),
+    EXPECT_EQ(engineInterface.find("SelectionReadback"),
               std::string::npos);
-    EXPECT_NE(engineInterface.find("SelectionReadbackState                  m_SelectionReadback"),
+    EXPECT_EQ(engineImpl.find("SelectionReadback"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_SelectionReadback.DrainPendingPickForFrame("),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("m_SelectionReadback.DrainCompletedReadbacksForFrame("),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("m_SelectionReadback.LastRefinedPrimitive()"),
+    EXPECT_EQ(engineInterface.find("GetLastRefinedPrimitive"),
               std::string::npos);
     EXPECT_EQ(sceneDocumentInterface.find("SelectionReadback"),
               std::string::npos);
     EXPECT_EQ(sceneDocumentImpl.find("SelectionReadback"),
               std::string::npos);
-    const auto interactionTransition =
-        engineImpl.find("RUNTIME-188.EngineInteractionTransition");
-    ASSERT_NE(interactionTransition, std::string::npos);
-    EXPECT_NE(engineImpl.find("->ClearRefinedPrimitiveCache();",
-                              interactionTransition),
+    EXPECT_EQ(
+        engineImpl.find(
+            "RUNTIME-188.EngineInteractionTransition"),
+        std::string::npos);
+
+    EXPECT_NE(
+        interactionInterface.find(
+            "class SceneInteractionModule final : public IRuntimeModule"),
+        std::string::npos);
+    EXPECT_NE(interactionInterface.find("struct Impl;"),
               std::string::npos);
+    EXPECT_NE(
+        interactionImpl.find(
+            "SelectionReadbackState Readback{}"),
+        std::string::npos);
+    EXPECT_NE(
+        interactionImpl.find(
+            "Readback.DrainPendingPickForFrame("),
+        std::string::npos);
+    EXPECT_NE(
+        interactionImpl.find(
+            "Readback.DrainCompletedReadbacksForFrame("),
+        std::string::npos);
+    EXPECT_NE(
+        interactionImpl.find(
+            "RegisterReplacementParticipant("),
+        std::string::npos);
 
     EXPECT_EQ(engineInterface.find("struct InFlightPickContext"),
               std::string::npos);
@@ -1228,11 +1338,17 @@ TEST(RuntimeEngineLayering, SelectionReadbackKeepsPickCorrelationCacheOutOfEngin
               std::string::npos);
     EXPECT_NE(readbackImpl.find("BuildPickReadbackContextForFrame"),
               std::string::npos);
-    EXPECT_NE(readbackImpl.find("ApplySelectionReadbackToController"),
-              std::string::npos);
     EXPECT_NE(readbackImpl.find("selectionSystem.PopPickResult()"),
               std::string::npos);
-    EXPECT_NE(readbackImpl.find("RefinePickReadbackResult(scene"),
+    EXPECT_NE(readbackImpl.find("result->Sequence == 0u"),
+              std::string::npos);
+    EXPECT_NE(readbackImpl.find("context.World != world"),
+              std::string::npos);
+    EXPECT_NE(
+        readbackImpl.find(
+            "context.InteractionEpoch != interactionEpoch"),
+        std::string::npos);
+    EXPECT_NE(readbackImpl.find("RefinePickReadbackResult("),
               std::string::npos);
 }
 
@@ -1312,7 +1428,7 @@ TEST(RuntimeEngineLayering, EditorUiModulePrivatelyMirrorsImGuiFramePacingDiagno
 }
 
 TEST(RuntimeEngineLayering,
-     SceneReplacementTransitionsRetainTypedHandlesAndDetachBeforeModules)
+     AssetHandoffTransitionBorrowsOptionalSelectionAndDetachesBeforeModules)
 {
     const auto engineInterface =
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
@@ -1328,11 +1444,26 @@ TEST(RuntimeEngineLayering,
             engineImpl,
             "void Engine::RegisterSceneReplacementParticipants()",
             "// ── Lifecycle");
-    const auto shutdown =
+    const auto announcementShutdown =
         SliceBetween(
             engineImpl,
             "void Engine::AnnounceAndShutdownRuntimeModules()",
             "void Engine::RefreshActiveWorldScenePointer()");
+    const auto bind =
+        SliceBetween(
+            engineImpl,
+            "void Engine::BindActiveSceneAssetHandoffs()",
+            "void Engine::RegisterSceneReplacementParticipants()");
+    const auto initialize =
+        SliceBetween(
+            engineImpl,
+            "void Engine::Initialize()",
+            "void Engine::Shutdown()");
+    const auto shutdown =
+        SliceBetween(
+            engineImpl,
+            "void Engine::Shutdown()",
+            "// ── Main loop");
 
     EXPECT_EQ(
         engineInterface.find(
@@ -1355,21 +1486,21 @@ TEST(RuntimeEngineLayering,
         CountOccurrences(
             retention,
             "SceneReplacementParticipantHandle"),
-        2u);
+        1u);
     EXPECT_NE(
         retention.find(
             "UnregisterReplacementParticipant(\n"
             "                    AssetHandoffs)"),
         std::string::npos);
-    EXPECT_NE(
+    EXPECT_EQ(
         retention.find(
             "UnregisterReplacementParticipant(\n"
             "                    Interaction)"),
         std::string::npos);
 
-    EXPECT_NE(
+    EXPECT_EQ(
         registration.find(
-            "transitions->Interaction = *interaction;"),
+            "RUNTIME-188.EngineInteractionTransition"),
         std::string::npos);
     EXPECT_NE(
         registration.find(
@@ -1389,22 +1520,110 @@ TEST(RuntimeEngineLayering,
     EXPECT_LT(assetRegistrationFailure, rollback);
     EXPECT_LT(rollback, termination);
 
-    const auto announcement =
+    EXPECT_EQ(
+        engineInterface.find("SelectionController"),
+        std::string::npos);
+    EXPECT_EQ(
+        engineImpl.find("&m_SelectionController"),
+        std::string::npos);
+    EXPECT_EQ(
+        CountOccurrences(
+            engineImpl,
+            "m_ServiceRegistry.Find<SelectionController>()"),
+        2u);
+
+    const auto moduleRegistration =
+        initialize.find("RegisterRuntimeModulesForBoot(");
+    const auto initialBorrowBind =
+        initialize.find("BindActiveSceneAssetHandoffs();");
+    ASSERT_NE(moduleRegistration, std::string::npos);
+    ASSERT_NE(initialBorrowBind, std::string::npos);
+    EXPECT_LT(moduleRegistration, initialBorrowBind);
+
+    const auto initialLookup =
+        bind.find(
+            "SelectionController* const importSelection =");
+    const auto initialOptionalFind =
+        bind.find(
+            "m_ServiceRegistry.Find<SelectionController>()",
+            initialLookup);
+    const auto initialAssignment =
+        bind.find(
+            ".Selection = importSelection",
+            initialOptionalFind);
+    ASSERT_NE(initialLookup, std::string::npos);
+    ASSERT_NE(initialOptionalFind, std::string::npos);
+    ASSERT_NE(initialAssignment, std::string::npos);
+    EXPECT_LT(initialLookup, initialOptionalFind);
+    EXPECT_LT(initialOptionalFind, initialAssignment);
+
+    const auto replacementLookup =
+        registration.find(
+            "SelectionController* const importSelection =");
+    const auto replacementOptionalFind =
+        registration.find(
+            "m_ServiceRegistry.Find<SelectionController>()",
+            replacementLookup);
+    const auto replacementCapture =
+        registration.find(
+            "importSelection,",
+            replacementOptionalFind);
+    const auto replacementAssignment =
+        registration.find(
+            ".Selection = importSelection",
+            replacementCapture);
+    ASSERT_NE(replacementLookup, std::string::npos);
+    ASSERT_NE(replacementOptionalFind, std::string::npos);
+    ASSERT_NE(replacementCapture, std::string::npos);
+    ASSERT_NE(replacementAssignment, std::string::npos);
+    EXPECT_LT(replacementLookup, replacementOptionalFind);
+    EXPECT_LT(replacementOptionalFind, replacementCapture);
+    EXPECT_LT(replacementCapture, replacementAssignment);
+
+    const auto cancelActiveImports =
         shutdown.find(
+            "CancelActiveAssetImportsForShutdown()");
+    const auto shutdownApplication =
+        shutdown.find(
+            "void ShutdownApplication() override");
+    const auto invokeAnnouncementShutdown =
+        shutdown.find(
+            "Owner.AnnounceAndShutdownRuntimeModules();",
+            shutdownApplication);
+    const auto executeShutdown =
+        shutdown.find(
+            "Core::ExecuteShutdownContract(hooks)");
+    ASSERT_NE(cancelActiveImports, std::string::npos);
+    ASSERT_NE(shutdownApplication, std::string::npos);
+    ASSERT_NE(invokeAnnouncementShutdown, std::string::npos);
+    ASSERT_NE(executeShutdown, std::string::npos);
+    EXPECT_LT(cancelActiveImports, shutdownApplication);
+    EXPECT_LT(shutdownApplication, invokeAnnouncementShutdown);
+    EXPECT_LT(invokeAnnouncementShutdown, executeShutdown);
+
+    const auto announcement =
+        announcementShutdown.find(
             "m_KernelEvents.Publish(RuntimeShutdownAnnounced{});");
     const auto announcementPump =
-        shutdown.find("(void)m_KernelEvents.Pump();");
+        announcementShutdown.find(
+            "(void)m_KernelEvents.Pump();");
+    const auto detachSelection =
+        announcementShutdown.find(
+            ".Selection = nullptr");
     const auto release =
-        shutdown.find(
+        announcementShutdown.find(
             "m_SceneReplacementTransitions->Release();");
     const auto moduleShutdown =
-        shutdown.find("m_RuntimeModules.rbegin()");
+        announcementShutdown.find(
+            "m_RuntimeModules.rbegin()");
     ASSERT_NE(announcement, std::string::npos);
     ASSERT_NE(announcementPump, std::string::npos);
+    ASSERT_NE(detachSelection, std::string::npos);
     ASSERT_NE(release, std::string::npos);
     ASSERT_NE(moduleShutdown, std::string::npos);
     EXPECT_LT(announcement, announcementPump);
-    EXPECT_LT(announcementPump, release);
+    EXPECT_LT(announcementPump, detachSelection);
+    EXPECT_LT(detachSelection, release);
     EXPECT_LT(release, moduleShutdown);
 }
 

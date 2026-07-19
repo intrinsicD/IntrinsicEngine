@@ -88,6 +88,7 @@ import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.SandboxConfigSections;
 import Extrinsic.Runtime.SceneDocumentModule;
+import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
@@ -11019,6 +11020,10 @@ namespace Extrinsic::Runtime
                 engine.Services().Find<EditorCommandHistory>();
             SceneDocumentModule* const sceneDocuments =
                 engine.Services().Find<SceneDocumentModule>();
+            SceneInteractionModule* const interaction =
+                engine.Services().Find<SceneInteractionModule>();
+            SelectionController* const selection =
+                engine.Services().Find<SelectionController>();
             SandboxEditorDerivedJobCommandSurface derivedJobCommands{};
             if (derivedJobs != nullptr)
             {
@@ -11037,12 +11042,17 @@ namespace Extrinsic::Runtime
             SandboxEditorContext context{
                 .Scene = activeScene,
                 .World = activeWorld,
-                .Selection = &engine.GetSelectionController(),
+                .Selection = selection,
                 .CommandHistory = commandHistory,
                 .AssetService = &engine.GetAssetService(),
-                .LastRefinedPrimitive = &engine.GetLastRefinedPrimitiveSelection(),
+                .LastRefinedPrimitive = interaction != nullptr
+                    ? &interaction->LastRefinedPrimitive()
+                    : nullptr,
                 .LastRefinedPrimitiveGeneration =
-                    engine.GetLastRefinedPrimitiveSelectionGeneration(),
+                    interaction != nullptr
+                        ? interaction->
+                            LastRefinedPrimitiveGeneration()
+                        : 0u,
                 .CameraControllers =
                     engine.Services().Find<CameraControllerRegistry>(),
                 .CameraViewport = Core::Extent2D{

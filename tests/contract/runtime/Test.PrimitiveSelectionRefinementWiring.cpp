@@ -5,7 +5,7 @@
 // fallback (Slice B1) into the runtime frame loop: RunFrame drains each pick
 // readback and refines its encoded primitive hint against the hit entity's
 // authoritative GeometrySources via `RefinePickReadbackResult`, caching the
-// result for the editor (`Engine::GetLastRefinedPrimitiveSelection`).
+// result for the editor (`SceneInteractionModule::LastRefinedPrimitive`).
 //
 // These tests drive `RefinePickReadbackResult` against a live Scene::Registry —
 // the exact bridge RunFrame calls — and a small loop mirroring the readback

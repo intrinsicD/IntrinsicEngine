@@ -138,9 +138,10 @@ scene-document, or history getter and owns no document/history state; its public
 module interface imports neither document nor history. Successful new/load/
 close uses one deterministic synchronous replacement-participant contract,
 while parse failure leaves registry, path, event, and history unchanged.
-Implementation-only interaction and asset-handoff participants preserve
-cleanup/rebind behavior until `RUNTIME-188` and `RUNTIME-183` absorb those
-owners. Contract coverage includes exact service lifetime and rollback,
+Retired `RUNTIME-188` absorbs the interaction participant in its exact
+one-world owner; the implementation-only asset-handoff participant preserves
+cleanup/rebind behavior until `RUNTIME-183` absorbs that remaining owner.
+Contract coverage includes exact service lifetime and rollback,
 omission, real Null `Engine::Run`, one-world reset/non-resurrection,
 participant order and shutdown detach, parse failure, and stale async completion
 after module destruction.

@@ -82,7 +82,6 @@ namespace Extrinsic::Runtime
         ECS::Scene::Registry& Scene;
         RenderExtractionCache& Extraction;
         Graphics::GpuAssetCache* GpuAssetCache;
-        const SelectionController& Selection;
         RenderWorldPool& Pool;
         bool SynchronousExtraction;
         RuntimeRenderExtractionStats& Stats;
@@ -91,7 +90,6 @@ namespace Extrinsic::Runtime
         RHI::FrameHandle& Frame;
         const Graphics::RenderFrameInput& Input;
         WorldHandle ActiveWorld;
-        std::span<const Graphics::TransformGizmoRenderPacket> TransformGizmos;
         Graphics::RenderWorld& World;
         RuntimeFramePacingDiagnostics* Pacing;
 
@@ -99,7 +97,6 @@ namespace Extrinsic::Runtime
                                 ECS::Scene::Registry& scene,
                                 RenderExtractionCache& extraction,
                                 Graphics::GpuAssetCache* gpuAssetCache,
-                                const SelectionController& selection,
                                 RenderWorldPool& pool,
                                 const bool synchronousExtraction,
                                 RuntimeRenderExtractionStats& stats,
@@ -108,14 +105,12 @@ namespace Extrinsic::Runtime
                                 RHI::FrameHandle& frame,
                                 const Graphics::RenderFrameInput& input,
                                 WorldHandle activeWorld,
-                                std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos,
                                 Graphics::RenderWorld& world,
                                 RuntimeFramePacingDiagnostics* pacing)
             : Renderer(renderer)
             , Scene(scene)
             , Extraction(extraction)
             , GpuAssetCache(gpuAssetCache)
-            , Selection(selection)
             , Pool(pool)
             , SynchronousExtraction(synchronousExtraction)
             , Stats(stats)
@@ -124,7 +119,6 @@ namespace Extrinsic::Runtime
             , Frame(frame)
             , Input(input)
             , ActiveWorld(activeWorld)
-            , TransformGizmos(transformGizmos)
             , World(world)
             , Pacing(pacing)
         {
@@ -161,9 +155,7 @@ namespace Extrinsic::Runtime
                 Stats = Extraction.ExtractAndSubmit(Scene,
                                                      Renderer,
                                                      GpuAssetCache,
-                                                     &Selection,
                                                      submitSlot,
-                                                     TransformGizmos,
                                                      ActiveWorld);
                 Pool.PublishFront(backSlot);
             }

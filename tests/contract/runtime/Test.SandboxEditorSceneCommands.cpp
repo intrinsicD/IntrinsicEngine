@@ -86,6 +86,7 @@ import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneDocumentModule;
+import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
@@ -131,6 +132,13 @@ void InstallSandboxDefaultRuntimePolicies(Runtime::Engine& engine)
             engine,
             engine.Services().Find<Runtime::CameraControllerRegistry>());
     }
+
+[[nodiscard]] Runtime::SelectionController& Selection(
+    Runtime::Engine& engine)
+{
+    return *engine.Services()
+        .Find<Runtime::SelectionController>();
+}
 
 [[nodiscard]] bool HasDiagnostic(
         const std::vector<Runtime::SandboxEditorDiagnostic>& diagnostics,
@@ -532,7 +540,7 @@ class DriveBlockedGeometryImportApplication final : public Runtime::IApplication
                 m_State->ImGuiFramesProducedWhileBlocked = framesProduced;
 
                 if (engine.Services().Find<Runtime::EditorCommandHistory>()->IsDirty() ||
-                    !engine.GetSelectionController().SelectedStableIds().empty() ||
+                    !Selection(engine).SelectedStableIds().empty() ||
                     engine.GetAssetService().LiveAssetCount() !=
                         m_State->BaselineLiveAssetCount)
                 {
@@ -723,6 +731,7 @@ void ComposeAsyncWorkAndInitialize(Runtime::Engine& engine)
         engine.EmplaceModule<Runtime::CameraModule>();
         engine.EmplaceModule<Runtime::EditorUiModule>();
         engine.EmplaceModule<Runtime::SceneDocumentModule>();
+        engine.EmplaceModule<Runtime::SceneInteractionModule>();
         engine.Initialize();
     }
 
@@ -1962,7 +1971,7 @@ TEST(SandboxEditorUi, QueuedManualGeometryImportsRemainResponsiveAndApplyOnce)
         EXPECT_EQ(commandResult->PayloadKind, importCase.PayloadKind);
         decodeState->Operation = commandResult->Operation;
         EXPECT_FALSE(engine.Services().Find<Runtime::EditorCommandHistory>()->IsDirty());
-        EXPECT_TRUE(engine.GetSelectionController().SelectedStableIds().empty());
+        EXPECT_TRUE(Selection(engine).SelectedStableIds().empty());
         EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), importCase.Domain), 0u);
 
         Runtime::RuntimeAssetImportQueueSnapshot queue =
@@ -1998,7 +2007,7 @@ TEST(SandboxEditorUi, QueuedManualGeometryImportsRemainResponsiveAndApplyOnce)
         EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), importCase.Domain), 1u);
         EXPECT_TRUE(engine.Services().Find<Runtime::EditorCommandHistory>()->IsDirty());
         EXPECT_EQ(engine.Services().Find<Runtime::EditorCommandHistory>()->Snapshot().Revision, 1u);
-        EXPECT_EQ(engine.GetSelectionController().SelectedStableIds().size(), 1u);
+        EXPECT_EQ(Selection(engine).SelectedStableIds().size(), 1u);
         EXPECT_EQ(recorder->FocusCalls, 1u);
         EXPECT_TRUE(recorder->LastFocus.has_value());
         EXPECT_EQ(completionCalls, 1u);
@@ -2007,7 +2016,7 @@ TEST(SandboxEditorUi, QueuedManualGeometryImportsRemainResponsiveAndApplyOnce)
             FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), importCase.Domain);
         ASSERT_TRUE(importedEntity.has_value());
         EXPECT_EQ(
-            engine.GetSelectionController().SelectedStableIds().front(),
+            Selection(engine).SelectedStableIds().front(),
             Runtime::SelectionController::ToStableEntityId(*importedEntity));
 
         const std::vector<Runtime::RuntimeAssetIngestRecord> records =
@@ -2166,7 +2175,7 @@ TEST(SandboxEditorUi, QueuedManualGeometryCancellationPreventsApply)
               decodeState->BaselineLiveAssetCount);
     EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh), 0u);
     EXPECT_EQ(engine.Services().Find<Runtime::EditorCommandHistory>()->Snapshot().Revision, 0u);
-    EXPECT_TRUE(engine.GetSelectionController().SelectedStableIds().empty());
+    EXPECT_TRUE(Selection(engine).SelectedStableIds().empty());
     EXPECT_EQ(recorder->FocusCalls, 0u);
     EXPECT_EQ(completionCalls, 0u);
 
@@ -2260,7 +2269,7 @@ TEST(SandboxEditorUi, ShutdownCancelsBlockedManualGeometryBeforePolicyUnregister
               shutdownState->BaselineLiveAssetCount);
     EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh), 0u);
     EXPECT_EQ(engine.Services().Find<Runtime::EditorCommandHistory>()->Snapshot().Revision, 0u);
-    EXPECT_TRUE(engine.GetSelectionController().SelectedStableIds().empty());
+    EXPECT_TRUE(Selection(engine).SelectedStableIds().empty());
     EXPECT_EQ(shutdownState->CompletionCalls, 0u);
 
     const Runtime::RuntimeAssetImportQueueSnapshot activeQueue =
@@ -2316,7 +2325,7 @@ TEST(SandboxEditorUi, ShutdownCancelsBlockedManualGeometryBeforePolicyUnregister
     EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh), 0u);
     EXPECT_EQ(engine.Services().Find<Runtime::EditorCommandHistory>()->Snapshot().Revision, 0u);
     EXPECT_FALSE(engine.Services().Find<Runtime::EditorCommandHistory>()->IsDirty());
-    EXPECT_TRUE(engine.GetSelectionController().SelectedStableIds().empty());
+    EXPECT_TRUE(Selection(engine).SelectedStableIds().empty());
 
     const Runtime::RuntimeAssetImportQueueSnapshot reinitializedQueue =
         engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
@@ -2404,7 +2413,7 @@ TEST(SandboxEditorUi, QueuedManualGeometryDecodeFailureIsFailClosed)
     EXPECT_EQ(engine.GetAssetService().LiveAssetCount(), baselineLiveAssetCount);
     EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh), 0u);
     EXPECT_EQ(engine.Services().Find<Runtime::EditorCommandHistory>()->Snapshot().Revision, 0u);
-    EXPECT_TRUE(engine.GetSelectionController().SelectedStableIds().empty());
+    EXPECT_TRUE(Selection(engine).SelectedStableIds().empty());
 
     engine.Run();
 
@@ -2442,7 +2451,7 @@ TEST(SandboxEditorUi, QueuedManualGeometryDecodeFailureIsFailClosed)
     EXPECT_EQ(engine.GetAssetService().LiveAssetCount(), baselineLiveAssetCount);
     EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh), 0u);
     EXPECT_EQ(engine.Services().Find<Runtime::EditorCommandHistory>()->Snapshot().Revision, 0u);
-    EXPECT_TRUE(engine.GetSelectionController().SelectedStableIds().empty());
+    EXPECT_TRUE(Selection(engine).SelectedStableIds().empty());
     EXPECT_EQ(recorder->FocusCalls, 0u);
     EXPECT_EQ(completionCalls, 0u);
 
@@ -2729,12 +2738,14 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderCo
     ASSERT_TRUE(meshEntity.has_value());
     const std::uint32_t stableId =
         Runtime::SelectionController::ToStableEntityId(*meshEntity);
-    const auto selectedIds = engine.GetSelectionController().SelectedStableIds();
+    const auto selectedIds = Selection(engine).SelectedStableIds();
     ASSERT_EQ(selectedIds.size(), 1u);
     EXPECT_EQ(selectedIds[0], stableId);
 
     Runtime::SandboxEditorContext commandContext =
-        MakeContext(*engine.Worlds().Get(engine.ActiveWorld()), engine.GetSelectionController());
+        MakeContext(
+            *engine.Worlds().Get(engine.ActiveWorld()),
+            Selection(engine));
 
     EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
                   commandContext,
@@ -2908,7 +2919,7 @@ TEST(SandboxEditorUi, PlatformDropEventImportsOffMesh)
     const std::optional<ECS::EntityHandle> meshEntity =
         FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
-    const auto selectedIds = engine.GetSelectionController().SelectedStableIds();
+    const auto selectedIds = Selection(engine).SelectedStableIds();
     ASSERT_EQ(selectedIds.size(), 1u);
     EXPECT_EQ(selectedIds[0],
               Runtime::SelectionController::ToStableEntityId(*meshEntity));

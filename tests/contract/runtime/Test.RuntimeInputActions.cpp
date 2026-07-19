@@ -23,6 +23,7 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
+import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
 
 namespace
@@ -96,7 +97,9 @@ namespace
             bounds.WorldBoundingSphere.Radius = 2.5f;
             engine.Worlds().Get(engine.ActiveWorld())->Raw().emplace<World::Bounds>(Entity, bounds);
             SelectionApplied =
-                engine.GetSelectionController().SetSelectedEntity(
+                engine.Services()
+                    .Find<Runtime::SelectionController>()
+                    ->SetSelectedEntity(
                     *engine.Worlds().Get(engine.ActiveWorld()),
                     Entity);
 
@@ -163,6 +166,7 @@ TEST(RuntimeInputActions, DefaultFocusKeyDispatchesRegisteredAction)
     auto* appPtr = app.get();
     Runtime::Engine engine(InputActionConfig(), std::move(app));
     engine.EmplaceModule<Runtime::CameraModule>();
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
     (void)Runtime::RegisterSandboxDefaultRuntimePolicies(
         engine,
@@ -193,6 +197,7 @@ TEST(RuntimeInputActions, NoDefaultInputActionsLeaveFocusKeyNoOp)
     auto* appPtr = app.get();
     Runtime::Engine engine(InputActionConfig(), std::move(app));
     engine.EmplaceModule<Runtime::CameraModule>();
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())

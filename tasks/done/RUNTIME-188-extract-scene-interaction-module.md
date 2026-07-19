@@ -11,10 +11,41 @@ maturity_target: Operational
 
 ## Status
 
+- Completed and retired at `Operational` on 2026-07-19; owner: Codex team;
+  implementation branch:
+  `codex/runtime-188-scene-interaction-integrated`.
+- Implementation checkpoints: task promotion `b0dfdbe9`; scene-interaction
+  implementation `8c8bb5d2`.
+- Commit reference: this retirement commit records final tests, documentation,
+  generated state, and lifecycle closure.
+- One app-composed PImpl now owns the exact one-world selection/lookup/
+  readback/gizmo cohort, exact service publication, typed viewport plus
+  `BeforeExtraction`/`Maintenance` hooks, strong document-replacement
+  participation, copied render snapshots, fail-closed readback correlation,
+  and announcement-first teardown. Engine retains only the named
+  `RUNTIME-183` implementation-local selection borrow.
+- Verification evidence:
+  - strict kernel convergence passes at exactly `26/4/2/15`;
+  - the four focused CPU producers built 1,116/1,116 steps, the post-review
+    focused runtime selector passed 214/214, and direct module behavior passed
+    11/11 including registered-hook issue/correlation/refinement/background
+    reset and stale-versus-live retry callback proof;
+  - `IntrinsicTests` built 1,250/1,250 steps and the post-review canonical
+    CPU-supported selector reported 4,225 passed plus one expected GLFW/LSan
+    capability skip out of 4,226 selected cases, with zero failures;
+  - the narrowed `ci-vulkan` Sandbox/interaction producers built 729/729
+    steps. Seventeen functional `gpu;vulkan` Sandbox/selection/gizmo cases
+    passed in the first invocation; that invocation exposed only an omitted
+    `IntrinsicGlfwLifecycleLsanProcess` producer for the shutdown contract.
+    After building the exact helper 77/77, the five-frame shutdown leak-clean
+    and synthetic engine-leak control passed 1/1 in 103.97 seconds;
+  - strict layering, task policy, documentation links, test layout, root
+    hygiene, generated inventory/session brief, and diff checks pass on the
+    retirement state.
 - 2026-07-19 audit: split from `RUNTIME-172` after the ownership inventory
   showed that selection, stable lookup/readback, and gizmo state share
   viewport/extraction/maintenance hooks and omission behavior that
-  document/history state does not. All implementation checkboxes remain open.
+  document/history state does not.
 - 2026-07-19 readiness correction: `RUNTIME-106` made ECS `RenderEdges` /
   `RenderPoints` the authoritative primitive-view controls, and `RUNTIME-172`
   preserves those components through scene serialization. The remaining Engine
@@ -112,20 +143,20 @@ maturity_target: Operational
 
 ## Required changes
 
-- [ ] Add
+- [x] Add
       `src/runtime/Scene/Runtime.SceneInteractionModule.cppm` and matching
       `.cpp` as one concrete `SceneInteractionModule final : IRuntimeModule`
       with a PImpl. Own `SelectionController`, `StableEntityLookup`,
       `StableEntityLookupSceneBinding`, `SelectionReadbackState`,
       and `GizmoFrameService` with its interaction/undo/scratch/packet state.
-- [ ] Publish the exact `SceneInteractionModule` and exact owned
+- [x] Publish the exact `SceneInteractionModule` and exact owned
       `SelectionController` through `ServiceRegistry`. Do not publish raw
       `SelectionReadbackState`, `GizmoFrameService`, or
       `StableEntityLookupSceneBinding`. Expose stable-id resolution and
       read-only lookup diagnostics through the module; publish the raw
       `StableEntityLookup` only if the implementation inventory identifies a
       present production consumer rather than test-only access.
-- [ ] Replace Engine's temporary
+- [x] Replace Engine's temporary
       `RUNTIME-188.EngineInteractionTransition` with the module-owned strong
       `RUNTIME-172` participant handle. Keep
       `RUNTIME-183.EngineAssetHandoffTransition` until `RUNTIME-183`, but source
@@ -136,37 +167,37 @@ maturity_target: Operational
       borrow: it is non-owning, implementation-only, never cached in an Engine
       member, null when the module is omitted, and owned for removal by
       `RUNTIME-183`.
-- [ ] Own one interaction binding
+- [x] Own one interaction binding
       `{WorldHandle, ECS::Scene::Registry*, interaction epoch}`. App-global
       configuration may retain selection-controller and gizmo configuration,
       mode, and orientation; clear all world-bound state on every bind:
       selected/hovered entities and ECS tags, pending/in-flight picks, lookup
       map/binding, refined-result cache, drag state/axis/modifiers, selected
       scratch, gizmo undo, packets, and the published render snapshot.
-- [ ] Keep the pick sequence monotonically increasing across world and
+- [x] Keep the pick sequence monotonically increasing across world and
       document replacements and across binding epochs. Never reuse an old
       sequence in a way that can let a completed GPU readback collide with a
       request in the new world.
-- [ ] Resolve and retain a strong `RUNTIME-172` scene-replacement participant
+- [x] Resolve and retain a strong `RUNTIME-172` scene-replacement participant
       handle. In `BeforeReplace`, while the outgoing registry is live, cancel
       any gizmo drag, clear selection/hover tags and all pick/readback/refined/
       undo/scratch/packet state, and disconnect stable lookup tracking. In
       `AfterReplace`, bind the current registry, rebuild/connect stable lookup,
       attach it to `SelectionController`, and publish an empty render
       snapshot.
-- [ ] Subscribe to active-world and world-retirement signals for prompt
+- [x] Subscribe to active-world and world-retirement signals for prompt
       cleanup, but before every input, extraction, and maintenance action also
       validate the cached handle and registry pointer against
       `WorldRegistry`. A mismatch advances the interaction epoch and performs
       the same fail-closed reset/rebind; an invalid or missing world publishes
       empty state.
-- [ ] Register on `RUNTIME-180`'s typed viewport-input hook after camera
+- [x] Register on `RUNTIME-180`'s typed viewport-input hook after camera
       population and completed capture. Preserve the current ordering:
       completed UI capture gates gizmo and pick input; valid camera/render
       input drives gizmo first and click handling afterward. Missing camera or
       UI remains a supported omission, produces no unsafe dereference, and
       leaves viewport capture unclaimed when no interaction consumes it.
-- [ ] Preserve the pre-render transform flush before constructing gizmo
+- [x] Preserve the pre-render transform flush before constructing gizmo
       packets. In `BeforeExtraction`, after input actions and the flush, drain
       one pending pick into the final `Graphics::RenderFrameInput`, build gizmo
       packets, and submit a copied interaction render snapshot. In
@@ -174,7 +205,7 @@ maturity_target: Operational
       typed viewport hook plus the existing `BeforeExtraction` and
       `Maintenance` phases; add neither a seventh `FramePhase` nor viewport
       fields to `RuntimeFrameHookContext`.
-- [ ] Add a pointer-free
+- [x] Add a pointer-free
       `RuntimeSceneInteractionRenderSnapshot` on
       `Extrinsic.Runtime.RenderExtraction` containing only its `WorldHandle`,
       copied selected render IDs, copied hover presence/render ID, and copied
@@ -184,32 +215,32 @@ maturity_target: Operational
       editor-facing state on the exact interaction module; no refinement result,
       pick context, or other zero-consumer payload belongs in the render
       snapshot.
-- [ ] Remove `SelectionController*`, gizmo spans, and every other borrowed
+- [x] Remove `SelectionController*`, gizmo spans, and every other borrowed
       interaction pointer from `ExtractAndSubmit` and the Engine frame hook.
       Render extraction must not retain a module-owned pointer beyond the
       snapshot submission call.
-- [ ] Remove `SelectionController*` from generic
+- [x] Remove `SelectionController*` from generic
       `RuntimeInputActionServices` and generic input-action dispatch.
       Selection-specific Sandbox actions resolve the exact published
       `SelectionController` once and capture that narrow pointer in their
       registered callback, following the camera-action shape from
       `RUNTIME-180`. Generic actions remain operational when this module is
       omitted.
-- [ ] Extend each in-flight pick record to include
+- [x] Extend each in-flight pick record to include
       `{sequence, WorldHandle, interaction epoch, optional
       PickReadbackContext}` even when the issuing frame has no valid camera.
       On production drain, discard unknown or zero sequence, wrong-world, and
       wrong-epoch results before calling `SelectionController` or refinement.
       Remove the unmatched-readback fallback that currently mutates selection,
       and clear every context record at reset.
-- [ ] Delete the obsolete Engine mesh primitive-view `Set`, `Clear`, and `Get`
+- [x] Delete the obsolete Engine mesh primitive-view `Set`, `Clear`, and `Get`
       facade; the zero-consumer `Runtime.MeshPrimitiveViewControls` translation
       module and CMake entries; and the unused `RenderExtractionCache`
       `Set`/`Clear`/`Get` settings API, backing map, and private-service
       forwarding. Do not remove `MeshPrimitiveViewPacker`, component-driven
       extraction/sidecars, ECS `RenderEdges` / `RenderPoints`, Sandbox
       component authoring/history, or `RUNTIME-172` serialization coverage.
-- [ ] On `RuntimeShutdownAnnounced`, cancel drag/input, invalidate the binding
+- [x] On `RuntimeShutdownAnnounced`, cancel drag/input, invalidate the binding
       epoch, clear readback/context/snapshot state, unregister the document
       participant, and detach every borrowed service while providers are still
       live. Engine must already have cancelled active imports, then detach the
@@ -222,13 +253,13 @@ maturity_target: Operational
       dereferencing the controller. Ordinary shutdown then unsubscribes
       hooks/events, withdraws exact services, and destroys state. Partial
       registration and reinitialize with recycled handle bits must start empty
-      and leak no callback.
-- [ ] Compose the module in Sandbox as an optional interaction capability.
+      and leak no live callback.
+- [x] Compose the module in Sandbox as an optional interaction capability.
       Omission produces an empty render snapshot and no selection, pick,
       stable lookup, or gizmo behavior while scene document, camera, rendering,
       generic input actions, component-driven `RenderEdges` / `RenderPoints`,
       and Engine remain operational.
-- [ ] Remove Engine interaction state, initialization, hooks, imports, and
+- [x] Remove Engine interaction state, initialization, hooks, imports, and
       facades: `GetSelectionController`,
       `GetStableEntityLookupDiagnostics`, `ResolveEntityByStableId`,
       `GetGizmoInteraction`, `GetGizmoUndoStack`,
@@ -238,7 +269,7 @@ maturity_target: Operational
       `GetMeshPrimitiveViewSettings`. Remove all owned interaction members and
       helpers; the named `RUNTIME-183` implementation-only selection borrow
       above is the sole temporary exception.
-- [ ] Ratchet the exact final Engine snapshot to
+- [x] Ratchet the exact final Engine snapshot to
       `26` plain imports / `4` domain imports / `2` re-exports /
       `15` public getter names. The seven removed imports are
       `Extrinsic.ECS.Component.StableId`,
@@ -256,47 +287,47 @@ maturity_target: Operational
 
 ## Tests
 
-- [ ] Add focused module contract coverage for exact publication/withdrawal,
+- [x] Add focused module contract coverage for exact publication/withdrawal,
       duplicate-publication conflict, partial-register rollback,
       shutdown/reinitialize, optional omission, and an Operational real
       `Engine::Run()`.
-- [ ] Cover the typed viewport hook and completed-capture ordering: capture
+- [x] Cover the typed viewport hook and completed-capture ordering: capture
       gates selection/gizmo input, camera population precedes gizmo/picking,
       selection input actions precede
       `BeforeExtraction`, transform flush precedes packet construction, and
       completed readbacks drain in `Maintenance`.
-- [ ] Cover active-world switch, destruction of the former world after the
+- [x] Cover active-world switch, destruction of the former world after the
       switch, unrelated inactive-world destruction, away/back with no state
       resurrection, direct mismatch detection before delayed events, and
       shutdown/reinitialize with recycled handle bits.
-- [ ] Cover scene new/load/close through the real document participant: drag
+- [x] Cover scene new/load/close through the real document participant: drag
       cancellation occurs while the old registry is live; selection/hover
       tags, pending/in-flight picks, contexts, refined cache, gizmo undo/
       scratch/packets clear; lookup disconnects before replacement and
       rebuilds/reattaches afterward. Prove serialized ECS `RenderEdges` /
       `RenderPoints` survive the document round trip independently of
       interaction reset.
-- [ ] Cover stale-readback rejection for zero, unknown, wrong-world, and
+- [x] Cover stale-readback rejection for zero, unknown, wrong-world, and
       wrong-epoch sequences; prove an old GPU result cannot select or refine in
       a replacement world and prove the issue sequence remains monotonic
       across replacement.
-- [ ] Cover missing camera, missing UI/capture adapter, missing document
+- [x] Cover missing camera, missing UI/capture adapter, missing document
       participant during boot, and full module omission. Prove empty/mismatched
       render snapshots fail closed and generic input/rendering plus component-
       driven primitive views continue.
-- [ ] Cover the `RUNTIME-183` transition explicitly: the Engine implementation
+- [x] Cover the `RUNTIME-183` transition explicitly: the Engine implementation
       resolves the published controller for initial and replacement asset
       dependencies, omission supplies null, active imports cancel before the
       borrow detaches on shutdown announcement, and no callback dereferences it
       during reverse teardown.
-- [ ] Migrate existing selection, stable-lookup, selection-readback,
+- [x] Migrate existing selection, stable-lookup, selection-readback,
       primitive-refinement, gizmo, render-extraction, input-action, Sandbox
       acceptance, and GPU-smoke fixtures. Replace Engine compatibility tests
       with structural deletion checks while preserving existing component-
       driven mesh primitive-view extraction and serialization fixtures. Build
       the existing Vulkan/GPU smoke callers against the new composition and
       run the opt-in cohort on a capable host without adding a new GPU feature.
-- [ ] Add structural checks for the exact Engine import/getter ratchet, no
+- [x] Add structural checks for the exact Engine import/getter ratchet, no
       interaction pointer in extraction/input aggregates, no seventh generic
       frame phase/context widening, no obsolete Engine facade/settings cache,
       and no Engine interaction borrow beyond the exact `RUNTIME-183`
@@ -304,42 +335,42 @@ maturity_target: Operational
 
 ## Docs
 
-- [ ] Update the runtime README, runtime architecture, ADR-0027 current-state
+- [x] Update the runtime README, runtime architecture, ADR-0027 current-state
       notes, kernel target-state, and Sandbox README with
       `SceneInteractionModule`, its one-world state scope, hook order,
       replacement participant, omission behavior, and pointer-free render
       snapshot. Record ECS `RenderEdges` / `RenderPoints` as persistent
       scene-authoring state, not interaction-module state.
-- [ ] Update task graph/indexes and the `RUNTIME-172`, `RUNTIME-168`,
+- [x] Update task graph/indexes and the `RUNTIME-172`, `RUNTIME-168`,
       `RUNTIME-183`, `RUNTIME-184`, and `REVIEW-003` composition descriptions;
       regenerate `tasks/SESSION-BRIEF.md`.
-- [ ] Regenerate the module inventory and update the exact Engine convergence
+- [x] Regenerate the module inventory and update the exact Engine convergence
       policy snapshot.
 
 ## Acceptance criteria
 
-- [ ] `Runtime.Engine.cppm` owns no selection/lookup/readback/gizmo/mesh-view
+- [x] `Runtime.Engine.cppm` owns no selection/lookup/readback/gizmo/mesh-view
       state, import, initialization, teardown, frame work, borrowed extraction
       pointer, or public facade. `Runtime.Engine.cpp` contains only the named
       non-owning `RUNTIME-183` asset-import transition, detached on shutdown
       announcement and removed by `RUNTIME-183`.
-- [ ] Every interaction record belongs to exactly one validated active-world
+- [x] Every interaction record belongs to exactly one validated active-world
       binding and clears on world/document replacement, retirement, shutdown,
       and recycled-handle reinitialize without state resurrection.
-- [ ] Old, unknown, or mismatched GPU readbacks cannot mutate selection or
+- [x] Old, unknown, or mismatched GPU readbacks cannot mutate selection or
       refined output in the current world; pick sequencing remains monotonic.
-- [ ] Render extraction consumes only a copied, world-tagged, pointer-free
+- [x] Render extraction consumes only a copied, world-tagged, pointer-free
       snapshot of selected render IDs, hover, and gizmo packets; it behaves as
       empty when the module is absent or mismatched and receives no refinement
       payload.
-- [ ] No Engine/interaction mesh primitive-view compatibility facade, settings
+- [x] No Engine/interaction mesh primitive-view compatibility facade, settings
       cache, or translation module remains. ECS `RenderEdges` / `RenderPoints`,
       their component-driven extraction, Sandbox authoring/history, and
       `RUNTIME-172` serialization remain authoritative and operational.
-- [ ] Sandbox interaction remains Operational through the canonical Engine
+- [x] Sandbox interaction remains Operational through the canonical Engine
       path, while omission leaves document, camera, generic input, and
       rendering operational.
-- [ ] The exact final convergence snapshot is `26/4/2/15`.
+- [x] The exact final convergence snapshot is `26/4/2/15`.
 
 ## Verification
 

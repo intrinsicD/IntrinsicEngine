@@ -234,6 +234,25 @@ namespace Extrinsic::Runtime
                                      m_Interaction.Config().AxisLength);
     }
 
+    void GizmoFrameService::ClearSceneState(
+        ECS::Scene::Registry* const scene)
+    {
+        const GizmoConfig config = m_Interaction.Config();
+        const GizmoMode mode = m_Interaction.Mode();
+        const GizmoOrientation orientation =
+            m_Interaction.Orientation();
+
+        if (scene != nullptr && m_Interaction.IsDragging())
+            m_Interaction.DragCancel(*scene);
+
+        m_Interaction = GizmoInteraction{config};
+        m_Interaction.SetMode(mode);
+        m_Interaction.SetOrientation(orientation);
+        m_UndoStack.Clear();
+        m_SelectedEntities.clear();
+        m_PacketBuilder = TransformGizmoRenderPacketBuilder{};
+    }
+
     GizmoInteraction& GizmoFrameService::Interaction() noexcept
     {
         return m_Interaction;

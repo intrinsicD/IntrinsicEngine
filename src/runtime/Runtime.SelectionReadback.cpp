@@ -49,25 +49,6 @@ namespace Extrinsic::Runtime
             return context;
         }
 
-        void ApplySelectionReadbackToController(
-            SelectionController& selection,
-            ECS::Scene::Registry& scene,
-            const Graphics::PickReadbackResult& result)
-        {
-            if (result.Sequence != 0u)
-            {
-                if (result.Hit)
-                    selection.ConsumeHit(scene, result.StableEntityId, result.Sequence);
-                else
-                    selection.ConsumeNoHit(scene, result.Sequence);
-                return;
-            }
-
-            if (result.Hit)
-                selection.ConsumeHit(scene, result.StableEntityId);
-            else
-                selection.ConsumeNoHit(scene);
-        }
     }
 
     const std::optional<PrimitiveSelectionResult>&
@@ -87,11 +68,19 @@ namespace Extrinsic::Runtime
         ++m_LastRefinedPrimitiveGeneration;
     }
 
+    void SelectionReadbackState::ClearSceneState()
+    {
+        m_InFlightPickContexts.clear();
+        ClearRefinedPrimitiveCache();
+    }
+
     void SelectionReadbackState::DrainPendingPickForFrame(
         SelectionController& selection,
         Graphics::SelectionSystem& selectionSystem,
         const Platform::Extent2D& viewport,
-        Graphics::RenderFrameInput& renderInput)
+        Graphics::RenderFrameInput& renderInput,
+        const WorldHandle world,
+        const std::uint64_t interactionEpoch)
     {
         const std::optional<PendingSelectionPick> pick =
             selection.ConsumePendingPick();
@@ -110,48 +99,75 @@ namespace Extrinsic::Runtime
             .PixelY = pick->PixelY,
         });
 
-        if (const std::optional<PickReadbackContext> context =
-                BuildPickReadbackContextForFrame(renderInput, viewport))
+        constexpr std::size_t kMaxInFlightPickContexts = 32u;
+        if (m_InFlightPickContexts.size() >= kMaxInFlightPickContexts)
         {
-            constexpr std::size_t kMaxInFlightPickContexts = 32u;
-            if (m_InFlightPickContexts.size() >= kMaxInFlightPickContexts)
-                m_InFlightPickContexts.erase(m_InFlightPickContexts.begin());
-
-            m_InFlightPickContexts.push_back(InFlightPickContext{
-                .Sequence = pick->Sequence,
-                .Context = *context,
-            });
+            (void)selection.DiscardInFlightPick(
+                m_InFlightPickContexts.front().Sequence);
+            m_InFlightPickContexts.erase(m_InFlightPickContexts.begin());
         }
+
+        m_InFlightPickContexts.push_back(InFlightPickContext{
+            .Sequence = pick->Sequence,
+            .World = world,
+            .InteractionEpoch = interactionEpoch,
+            .Context =
+                BuildPickReadbackContextForFrame(renderInput, viewport),
+        });
     }
 
     void SelectionReadbackState::DrainCompletedReadbacksForFrame(
         Graphics::SelectionSystem& selectionSystem,
         SelectionController& selection,
-        ECS::Scene::Registry& scene)
+        ECS::Scene::Registry& scene,
+        const WorldHandle world,
+        const std::uint64_t interactionEpoch)
     {
         while (const std::optional<Graphics::PickReadbackResult> result =
                    selectionSystem.PopPickResult())
         {
-            ApplySelectionReadbackToController(selection, scene, *result);
+            // Production correlation is fail-closed. In particular, never
+            // forward zero/unknown sequences into SelectionController's
+            // standalone convenience fallback, which intentionally treats an
+            // untracked result as a configured click.
+            if (result->Sequence == 0u)
+                continue;
 
-            const PickReadbackContext* pickContext = nullptr;
-            auto contextIt = m_InFlightPickContexts.end();
-            if (result->Sequence != 0u)
+            const auto contextIt = std::find_if(
+                m_InFlightPickContexts.begin(),
+                m_InFlightPickContexts.end(),
+                [seq = result->Sequence](const InFlightPickContext& entry)
+                { return entry.Sequence == seq; });
+            if (contextIt == m_InFlightPickContexts.end())
+                continue;
+
+            InFlightPickContext context = std::move(*contextIt);
+            m_InFlightPickContexts.erase(contextIt);
+            if (context.World != world ||
+                context.InteractionEpoch != interactionEpoch)
             {
-                contextIt = std::find_if(
-                    m_InFlightPickContexts.begin(),
-                    m_InFlightPickContexts.end(),
-                    [seq = result->Sequence](const InFlightPickContext& entry)
-                    { return entry.Sequence == seq; });
-                if (contextIt != m_InFlightPickContexts.end())
-                    pickContext = &contextIt->Context;
+                (void)selection.DiscardInFlightPick(
+                    result->Sequence);
+                continue;
             }
 
+            const bool consumed = result->Hit
+                ? selection.ConsumeHit(
+                      scene,
+                      result->StableEntityId,
+                      result->Sequence)
+                : selection.ConsumeNoHit(
+                      scene,
+                      result->Sequence);
+            if (!consumed)
+                continue;
+
             m_LastRefinedPrimitive =
-                RefinePickReadbackResult(scene, *result, pickContext);
+                RefinePickReadbackResult(
+                    scene,
+                    *result,
+                    context.Context ? &*context.Context : nullptr);
             ++m_LastRefinedPrimitiveGeneration;
-            if (contextIt != m_InFlightPickContexts.end())
-                m_InFlightPickContexts.erase(contextIt);
         }
     }
 }

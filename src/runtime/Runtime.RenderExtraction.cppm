@@ -5,6 +5,7 @@ module;
 #include <memory>
 #include <optional>
 #include <span>
+#include <vector>
 
 export module Extrinsic.Runtime.RenderExtraction;
 
@@ -21,7 +22,6 @@ export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.RenderWorldPool;
-import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SpatialDebugAdapters;
 import Extrinsic.Runtime.WorldHandle;
 export import Extrinsic.Runtime.VisualizationAdapters;
@@ -313,6 +313,18 @@ export namespace Extrinsic::Runtime
         std::uint32_t ProgressiveMaterialTextureBindingResolveFailureCount{0};
     };
 
+    // RUNTIME-188 — copied, world-tagged interaction data consumed by render
+    // extraction. The value owns all of its storage so Graphics never borrows
+    // pointers into an optional runtime module.
+    struct RuntimeSceneInteractionRenderSnapshot
+    {
+        WorldHandle World{};
+        std::vector<std::uint32_t> SelectedRenderIds{};
+        bool HasHovered{false};
+        std::uint32_t HoveredRenderId{0u};
+        std::vector<Graphics::TransformGizmoRenderPacket> GizmoDrawPackets{};
+    };
+
     // GRAPHICS-036B — copy the authoritative `RenderWorldPool` diagnostics
     // (`GRAPHICS-036A`) into the runtime extraction stats mirror. Pure and
     // side-effect-free apart from writing the three `RenderWorld*` fields, so the
@@ -348,19 +360,17 @@ export namespace Extrinsic::Runtime
         // culling is not extraction's job — it stays on the graphics side in
         // `Graphics::CullingSystem`.
         //
-        // `selection`, when non-null, supplies the runtime-owned selection
-        // snapshot (RUNTIME-089 Slice B): its `SelectedStableIds()` /
-        // `HoveredStableId()` / `HasHovered()` are attached to the submitted
-        // `RuntimeRenderSnapshotBatch` so the renderer surfaces them on
-        // `RenderWorld::Selection`. Null leaves the selection snapshot empty.
+        // Optional interaction state is submitted separately as a copied,
+        // world-tagged value. Omission or a world mismatch leaves selection,
+        // hover, and gizmo lanes empty.
         [[nodiscard]] RuntimeRenderExtractionStats ExtractAndSubmit(
             ECS::Scene::Registry& scene,
             Graphics::IRenderer& renderer,
             Graphics::GpuAssetCache* gpuAssets = nullptr,
-            const SelectionController* selection = nullptr,
             std::uint32_t runtimeSnapshotStorageSlot = 0u,
-            std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos = {},
             WorldHandle world = DefaultWorldHandle);
+        void SubmitSceneInteractionSnapshot(
+            const RuntimeSceneInteractionRenderSnapshot& snapshot);
         // Scene replacement boundary: free scene-owned renderable sidecars,
         // collapse deferred retire queues, clear per-entity extraction settings
         // and bindings, and submit an empty snapshot. Adapter registrations stay
@@ -420,20 +430,6 @@ export namespace Extrinsic::Runtime
         void TickMeshPrimitiveViewGeometry(std::uint64_t currentFrame,
                                            std::uint32_t framesInFlight,
                                            Graphics::IRenderer& renderer);
-
-        // RUNTIME-088 Slice B — runtime/editor control surface for optional
-        // mesh edge/vertex primitive views. The settings live here (cache-owned
-        // runtime state), never in ECS components and never carrying graphics
-        // handles; `ExtractAndSubmit` consults them when a mesh entity is
-        // resident. `Set` upserts, `Clear` removes (disabling both views on the
-        // next extraction), and `Get` returns the stored settings or a
-        // both-disabled default when none are recorded. Keyed by the same
-        // stable entity id the renderable sidecars use.
-        void SetMeshPrimitiveViewSettings(std::uint32_t stableEntityId,
-                                          MeshPrimitiveViewSettings settings);
-        void ClearMeshPrimitiveViewSettings(std::uint32_t stableEntityId) noexcept;
-        [[nodiscard]] MeshPrimitiveViewSettings GetMeshPrimitiveViewSettings(
-            std::uint32_t stableEntityId) const noexcept;
 
         // ASSETIO-007 — data-only texture binding surface for renderables
         // whose material sidecar is owned by extraction. Callers key bindings

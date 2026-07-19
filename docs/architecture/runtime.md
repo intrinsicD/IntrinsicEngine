@@ -210,11 +210,12 @@ The frame order is:
    `EditorUiModule` opens the ImGui frame in `UiBegin`, draws registered
    contributions in `UiBuild`, and closes the frame plus writes capture in
    `UiEndCapture`;
-8. build `Graphics::RenderFrameInput`, dispatch deterministic typed
-   viewport-input hooks (Camera when composed), then drive gizmo/picking and
-   dispatch registered generic input actions before runtime-module
-   `BeforeExtraction` hooks. The typed dispatch runs after the completed
-   editor-capture snapshot and before every viewport consumer; it is not a
+8. build `Graphics::RenderFrameInput`, then dispatch deterministic typed
+   viewport-input hooks. Module-name order places optional Camera population
+   before optional SceneInteraction gizmo/pick input; both see completed editor
+   capture. Flush pre-render transforms, dispatch generic input actions, then
+   run `BeforeExtraction`, where SceneInteraction drains one pending pick,
+   builds gizmo packets, and submits its copied render snapshot. This is not a
    seventh generic frame phase;
 9. execute the render-frame contract: begin frame, runtime render extraction,
    renderer world extraction, prepare, execute, and end frame;
@@ -222,12 +223,12 @@ The frame order is:
 11. execute maintenance: transfer retirement, optional app-provided streaming
    drain/apply, asset-service tick, optional streaming submit/pump, GPU asset
    cache tick, material texture re-resolution, and render-extraction
-   deferred-retire ticks, terminal `JobService` reaping, and runtime-module
-   `Maintenance` hooks;
-12. drain completed pick readbacks through the incrementally maintained
-   stable-entity lookup, release the consumed `RenderWorldPool` slot, apply
-   deferred `WorldRegistry` active/destroy operations, and finalize the frame
-   clock.
+   deferred-retire ticks and terminal `JobService` reaping, then runtime-module
+   `Maintenance` hooks. SceneInteraction drains completed readbacks here and
+   rejects zero/unknown/wrong-world/wrong-epoch sequences before controller or
+   refinement work;
+12. release the consumed `RenderWorldPool` slot, apply deferred
+   `WorldRegistry` active/destroy operations, and finalize the frame clock.
 
 Editor UI contribution is data-driven through
 `Extrinsic.Runtime.EditorWindowRegistry`: contributors provide stable ids,
@@ -249,11 +250,19 @@ merged into the menu tree without a fixed runtime enum or draw-switch table.
 The frame loop owns one `EditorInputCaptureSnapshot`, resets it at frame
 start, and lends the same value by reference to every hook context.
 `EditorUiModule` copies the adapter's completed capture into that value only
-after `EndFrame`; the typed camera hook, gizmo, picking, input actions, and
+after `EndFrame`; typed Camera and SceneInteraction hooks, input actions, and
 later hooks consume the same snapshot rather than reading ImGui capture flags
 independently.
 Omitting the module leaves the value unclaimed and all ImGui pacing counters
 zero. Its ImGui context owns a paired ImPlot context.
+
+The interaction-to-render boundary is one
+`RuntimeSceneInteractionRenderSnapshot`: a world handle plus owned vectors for
+selected render ids and gizmo packets and copied hover identity. Submission
+copies caller storage into reusable extraction-owned storage. Extraction
+accepts it only for the current world and otherwise supplies empty interaction
+data. No controller, module pointer, pick/refinement context, or ECS handle is
+retained by graphics.
 `Extrinsic.Runtime.EditorPropertyWidgets` keeps scalar-property selector and
 finite-sample histogram models CPU-testable while its ImGui/ImPlot draw code and
 the manifest-managed `implot` dependency remain private to runtime.
@@ -493,22 +502,31 @@ against the rebound registry, and only then resets the exact owned history.
 The callbacks are synchronous `void` functions: no queued replacement event or
 invented rollback protocol exists.
 
-Two transitional participants preserve independently landing ownership slices.
-`RUNTIME-188.EngineInteractionTransition` clears selection and refined readback
-state and disconnects stable lookup before replacement, then rebuilds/rebinds
-the lookup afterward. `RUNTIME-183.EngineAssetHandoffTransition` clears render
-extraction, bake, and residency borrowers before replacement, then reconstructs
-the exact active-world handoffs and import dependencies. Each callback captures
-only its named long-lived objects, never `Engine`, `EngineSetup`, a dependency
-aggregate, or a raw scene pointer. `RUNTIME-188` and `RUNTIME-183` retire these
-adapters when those owners become composed modules.
+`SceneInteractionModule` retains its own strong participant handle. Before
+replacement it cancels any drag while the registry is live and clears
+selection/hover tags, pending and in-flight picks, readback contexts/refined
+output, gizmo undo/scratch/packets, stable lookup binding, and its copied render
+snapshot. After replacement it rebuilds lookup against the rebound registry and
+publishes empty interaction data. The module owns one validated
+`{WorldHandle, Registry*, interaction epoch}` binding; pick sequences remain
+monotonic while old-world/old-epoch results fail closed.
+
+`RUNTIME-183.EngineAssetHandoffTransition` is the sole remaining transitional
+participant. It clears render extraction, bake, and residency borrowers before
+replacement, then reconstructs the exact active-world handoffs and import
+dependencies. Engine resolves the optional exact `SelectionController` only at
+the initial and replacement dependency wiring sites; omission supplies null.
+Active imports cancel before shutdown announcement, and the selection borrow is
+replaced with null after the announcement pump and before reverse module
+teardown. `RUNTIME-183` owns removal of that implementation-only transition.
 
 Active-world Maintenance is not a document replacement. Engine immediately
-clears the same narrow outgoing sidecars, refreshes the active scene pointer,
-and rebinds its current borrowers in that Maintenance pass. Separately, every
-public document operation validates the module's cached world and registry
-against `WorldRegistry`; a mismatch resets the one document binding without
-resurrecting state from the former world.
+clears/rebinds its remaining asset/extraction borrowers in that pass.
+`SceneInteractionModule` independently validates the active handle and registry
+before every input, extraction, maintenance, and lookup action; a mismatch
+performs the same reset/rebind before delayed events arrive and never
+resurrects state from the former world. Document operations retain their
+separate validated binding.
 
 Scene JSON remains backend-neutral. Supported persistence is limited to current
 sandbox-authoring CPU state: metadata names, stable ids, transforms, hierarchy,

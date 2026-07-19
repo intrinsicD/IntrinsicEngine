@@ -5,6 +5,7 @@
 // standalone-cache harness used by the other *Extraction tests.
 
 #include <cstdint>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -18,6 +19,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.WorldHandle;
 
 using Extrinsic::ECS::EntityHandle;
 using Extrinsic::ECS::Scene::Registry;
@@ -64,13 +66,35 @@ namespace
         Extrinsic::Runtime::Engine&             engine,
         Extrinsic::Runtime::RenderExtractionCache& extraction,
         Registry&                               scene,
-        const SelectionController*              selection)
+        const Extrinsic::Runtime::
+            RuntimeSceneInteractionRenderSnapshot* snapshot = nullptr)
     {
+        if (snapshot != nullptr)
+            extraction.SubmitSceneInteractionSnapshot(*snapshot);
         (void)extraction.ExtractAndSubmit(scene,
                                           engine.GetRenderer(),
                                           &engine.GetGpuAssetCache(),
-                                          selection);
+                                          0u,
+                                          engine.ActiveWorld());
         return engine.GetRenderer().ExtractRenderWorld(Extrinsic::Graphics::RenderFrameInput{});
+    }
+
+    [[nodiscard]] Extrinsic::Runtime::
+        RuntimeSceneInteractionRenderSnapshot SnapshotFrom(
+            const SelectionController& controller,
+            const Extrinsic::Runtime::WorldHandle world)
+    {
+        return Extrinsic::Runtime::
+            RuntimeSceneInteractionRenderSnapshot{
+                .World = world,
+                .SelectedRenderIds =
+                    std::vector<std::uint32_t>(
+                        controller.SelectedStableIds().begin(),
+                        controller.SelectedStableIds().end()),
+                .HasHovered = controller.HasHovered(),
+                .HoveredRenderId =
+                    controller.HoveredStableId(),
+            };
     }
 }
 
@@ -90,7 +114,10 @@ TEST(SelectionSnapshotExtraction, SelectedEntityMirrorsIntoRenderWorldSelection)
     ASSERT_TRUE(controller.IsSelected(entity));
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    const Extrinsic::Graphics::RenderWorld world = ExtractWorld(engine, extraction, scene, &controller);
+    const auto snapshot =
+        SnapshotFrom(controller, engine.ActiveWorld());
+    const Extrinsic::Graphics::RenderWorld world =
+        ExtractWorld(engine, extraction, scene, &snapshot);
 
     ASSERT_EQ(world.Selection.SelectedStableIds.size(), 1u);
     EXPECT_EQ(world.Selection.SelectedStableIds[0], StableId(entity));
@@ -120,7 +147,10 @@ TEST(SelectionSnapshotExtraction, HoveredEntityMirrorsIntoRenderWorldSelection)
     ASSERT_EQ(controller.SelectedCount(), 0u);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    const Extrinsic::Graphics::RenderWorld world = ExtractWorld(engine, extraction, scene, &controller);
+    const auto snapshot =
+        SnapshotFrom(controller, engine.ActiveWorld());
+    const Extrinsic::Graphics::RenderWorld world =
+        ExtractWorld(engine, extraction, scene, &snapshot);
 
     EXPECT_TRUE(world.Selection.HasHovered);
     EXPECT_EQ(world.Selection.HoveredStableId, StableId(entity));
@@ -149,7 +179,10 @@ TEST(SelectionSnapshotExtraction, AdditiveSelectionMirrorsAllSelectedIds)
     ASSERT_EQ(controller.SelectedCount(), 2u);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    const Extrinsic::Graphics::RenderWorld world = ExtractWorld(engine, extraction, scene, &controller);
+    const auto snapshot =
+        SnapshotFrom(controller, engine.ActiveWorld());
+    const Extrinsic::Graphics::RenderWorld world =
+        ExtractWorld(engine, extraction, scene, &snapshot);
 
     ASSERT_EQ(world.Selection.SelectedStableIds.size(), 2u);
     EXPECT_EQ(world.Selection.SelectedStableIds[0], StableId(first));
@@ -161,14 +194,15 @@ TEST(SelectionSnapshotExtraction, AdditiveSelectionMirrorsAllSelectedIds)
 
 // Without a wired controller the selection snapshot is empty, so existing
 // extraction callers are unaffected.
-TEST(SelectionSnapshotExtraction, NullControllerLeavesSelectionEmpty)
+TEST(SelectionSnapshotExtraction, OmittedInteractionSnapshotLeavesSelectionEmpty)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    const Extrinsic::Graphics::RenderWorld world = ExtractWorld(engine, extraction, scene, nullptr);
+    const Extrinsic::Graphics::RenderWorld world =
+        ExtractWorld(engine, extraction, scene);
 
     EXPECT_TRUE(world.Selection.SelectedStableIds.empty());
     EXPECT_FALSE(world.Selection.HasHovered);
@@ -192,12 +226,131 @@ TEST(SelectionSnapshotExtraction, ClearedSelectionMirrorsEmptyOnNextExtraction)
     controller.ConsumeHit(scene, StableId(entity));
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    Extrinsic::Graphics::RenderWorld world = ExtractWorld(engine, extraction, scene, &controller);
+    auto snapshot =
+        SnapshotFrom(controller, engine.ActiveWorld());
+    Extrinsic::Graphics::RenderWorld world =
+        ExtractWorld(engine, extraction, scene, &snapshot);
     ASSERT_EQ(world.Selection.SelectedStableIds.size(), 1u);
 
     controller.ClearSelection(scene);
-    world = ExtractWorld(engine, extraction, scene, &controller);
+    snapshot = SnapshotFrom(controller, engine.ActiveWorld());
+    world = ExtractWorld(engine, extraction, scene, &snapshot);
     EXPECT_TRUE(world.Selection.SelectedStableIds.empty());
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(SelectionSnapshotExtraction,
+     SubmissionCopiesCallerOwnedVectorsBeforeExtraction)
+{
+    Extrinsic::Runtime::Engine engine(
+        HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const EntityHandle entity = MakeSelectable(scene);
+
+    Extrinsic::Runtime::RuntimeSceneInteractionRenderSnapshot snapshot{
+        .World = engine.ActiveWorld(),
+        .SelectedRenderIds = {StableId(entity)},
+        .HasHovered = true,
+        .HoveredRenderId = StableId(entity),
+    };
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    extraction.SubmitSceneInteractionSnapshot(snapshot);
+
+    snapshot.World = {};
+    snapshot.SelectedRenderIds.clear();
+    snapshot.HasHovered = false;
+    snapshot.HoveredRenderId = 0u;
+
+    const Extrinsic::Graphics::RenderWorld world =
+        ExtractWorld(engine, extraction, scene);
+    ASSERT_EQ(world.Selection.SelectedStableIds.size(), 1u);
+    EXPECT_EQ(
+        world.Selection.SelectedStableIds.front(),
+        StableId(entity));
+    EXPECT_TRUE(world.Selection.HasHovered);
+    EXPECT_EQ(world.Selection.HoveredStableId, StableId(entity));
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(SelectionSnapshotExtraction,
+     MismatchedWorldSnapshotFailsClosed)
+{
+    Extrinsic::Runtime::Engine engine(
+        HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const EntityHandle entity = MakeSelectable(scene);
+
+    const Extrinsic::Runtime::
+        RuntimeSceneInteractionRenderSnapshot snapshot{
+            .World = Extrinsic::Runtime::WorldHandle{19u, 4u},
+            .SelectedRenderIds = {StableId(entity)},
+            .HasHovered = true,
+            .HoveredRenderId = StableId(entity),
+        };
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    const Extrinsic::Graphics::RenderWorld world =
+        ExtractWorld(engine, extraction, scene, &snapshot);
+
+    EXPECT_TRUE(world.Selection.SelectedStableIds.empty());
+    EXPECT_FALSE(world.Selection.HasHovered);
+    EXPECT_EQ(world.Selection.HoveredStableId, 0u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(SelectionSnapshotExtraction,
+     EmptyWorldSnapshotClearsPriorSelectionHoverAndGizmoPackets)
+{
+    Extrinsic::Runtime::Engine engine(
+        HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+    auto& scene =
+        *engine.Worlds().Get(engine.ActiveWorld());
+    const EntityHandle entity = MakeSelectable(scene);
+    const std::uint32_t stableId = StableId(entity);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    const Extrinsic::Runtime::
+        RuntimeSceneInteractionRenderSnapshot populated{
+            .World = engine.ActiveWorld(),
+            .SelectedRenderIds = {stableId},
+            .HasHovered = true,
+            .HoveredRenderId = stableId,
+            .GizmoDrawPackets = {
+                Extrinsic::Graphics::
+                    TransformGizmoRenderPacket{
+                        .StableId = stableId,
+                    }},
+        };
+    Extrinsic::Graphics::RenderWorld world =
+        ExtractWorld(
+            engine, extraction, scene, &populated);
+    ASSERT_EQ(
+        world.Selection.SelectedStableIds.size(),
+        1u);
+    ASSERT_TRUE(world.Selection.HasHovered);
+    ASSERT_EQ(world.Gizmos.TransformGizmoCount, 1u);
+
+    const Extrinsic::Runtime::
+        RuntimeSceneInteractionRenderSnapshot empty{
+            .World = engine.ActiveWorld(),
+        };
+    world = ExtractWorld(
+        engine, extraction, scene, &empty);
+    EXPECT_TRUE(
+        world.Selection.SelectedStableIds.empty());
+    EXPECT_FALSE(world.Selection.HasHovered);
+    EXPECT_EQ(world.Selection.HoveredStableId, 0u);
+    EXPECT_FALSE(world.Gizmos.HasGizmos);
+    EXPECT_EQ(world.Gizmos.TransformGizmoCount, 0u);
+    EXPECT_TRUE(world.Gizmos.TransformGizmos.empty());
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

@@ -13,6 +13,7 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.WorldHandle;
 
 namespace Extrinsic::Runtime
 {
@@ -24,21 +25,28 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::uint64_t LastRefinedPrimitiveGeneration() const noexcept;
 
         void ClearRefinedPrimitiveCache();
+        void ClearSceneState();
         void DrainPendingPickForFrame(
             SelectionController& selection,
             Graphics::SelectionSystem& selectionSystem,
             const Platform::Extent2D& viewport,
-            Graphics::RenderFrameInput& renderInput);
+            Graphics::RenderFrameInput& renderInput,
+            WorldHandle world,
+            std::uint64_t interactionEpoch);
         void DrainCompletedReadbacksForFrame(
             Graphics::SelectionSystem& selectionSystem,
             SelectionController& selection,
-            ECS::Scene::Registry& scene);
+            ECS::Scene::Registry& scene,
+            WorldHandle world,
+            std::uint64_t interactionEpoch);
 
     private:
         struct InFlightPickContext
         {
             std::uint64_t Sequence{0u};
-            PickReadbackContext Context{};
+            WorldHandle World{};
+            std::uint64_t InteractionEpoch{0u};
+            std::optional<PickReadbackContext> Context{};
         };
 
         std::vector<InFlightPickContext> m_InFlightPickContexts{};
