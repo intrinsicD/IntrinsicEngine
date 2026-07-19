@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-180`](RUNTIME-180-extract-camera-module.md) — camera composition
+retired to `tasks/done/` on 2026-07-19 at `Operational`. One app-composed
+`CameraModule` now owns the exact world-bound controller registry and the
+typed post-editor-capture viewport-input hook; Engine owns no camera or
+reference-scene state, import, lifecycle policy, or facade. Sandbox owns plain
+exactly-once reference bootstrap and original-world teardown, while generic
+input/import/editor callers remain omission-safe. The merged CPU aggregate
+built 1,568 objects, live routing covered 36 targets / 4,219 cases / 341
+producers, and the supported CPU gate passed 4,168/4,168. A capable-host run
+then found and repaired the GPU fixture's omitted app bootstrap at `368130e5`;
+the exact ASan+UBSan `gpu` + `vulkan` Sandbox selector passed 16/16 with zero
+skips on an RTX 3050 / driver 590.48.01 / Vulkan 1.4.325. Exact convergence is
+35 plain imports, 13 domain imports, two re-exports, and 25 getter names.
+Implementation checkpoints: `07bbd159` and `ee926992`; main merge:
+`295bdc0c`.
+
 [`RUNTIME-182`](RUNTIME-182-extract-editor-ui-module.md) — editor-UI
 composition retired to `tasks/done/` on 2026-07-19 at `Operational`. One
 app-composed `EditorUiModule` now owns the ImGui overlay/adapter, exact

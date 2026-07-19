@@ -306,8 +306,9 @@ proceed independently, then both gate mechanism pruning. The detailed graph
 and state scopes live in the [runtime backlog index](runtime/README.md).
 Retired `RUNTIME-182` extracted the optional global ImGui/host owner while
 preserving the existing paired frame bracket and one completed capture
-snapshot. [`RUNTIME-180`](../active/RUNTIME-180-extract-camera-module.md) is
-the active camera-owner slice; the corrected
+snapshot. Retired
+`RUNTIME-180` extracted the
+camera owner and app-owned reference bootstrap; the corrected
 [`RUNTIME-172`](runtime/RUNTIME-172-extract-scene-document-module.md)
 document-owner contract is independently unblocked and precedes
 `RUNTIME-188`.
@@ -332,7 +333,7 @@ The non-blocking TaskGraph substrate (`CORE-005`) and scheduler hardening
 
 Open members (kernel-seam priority set first):
 - [`../active/ARCH-014-kernel-convergence-tracking.md`](../active/ARCH-014-kernel-convergence-tracking.md) (active umbrella north-star; not a slice).
-- [`../active/RUNTIME-180-extract-camera-module.md`](../active/RUNTIME-180-extract-camera-module.md) (active camera-owner slice), [`runtime/RUNTIME-172-extract-scene-document-module.md`](runtime/RUNTIME-172-extract-scene-document-module.md) and [`runtime/RUNTIME-188-extract-scene-interaction-module.md`](runtime/RUNTIME-188-extract-scene-interaction-module.md) (split document/interaction owners), then [`runtime/RUNTIME-183-extract-asset-workflow-module.md`](runtime/RUNTIME-183-extract-asset-workflow-module.md) through [`runtime/RUNTIME-187-finalize-domain-free-engine-surface.md`](runtime/RUNTIME-187-finalize-domain-free-engine-surface.md) (remaining ADR-0027 behavior-owner, app-lifecycle, mechanism-pruning, semantic auxiliary-surface, and final-ratchet graph; see the runtime index for exact dependencies).
+- [`runtime/RUNTIME-172-extract-scene-document-module.md`](runtime/RUNTIME-172-extract-scene-document-module.md) and [`runtime/RUNTIME-188-extract-scene-interaction-module.md`](runtime/RUNTIME-188-extract-scene-interaction-module.md) (split document/interaction owners), then [`runtime/RUNTIME-183-extract-asset-workflow-module.md`](runtime/RUNTIME-183-extract-asset-workflow-module.md) through [`runtime/RUNTIME-187-finalize-domain-free-engine-surface.md`](runtime/RUNTIME-187-finalize-domain-free-engine-surface.md) (remaining ADR-0027 behavior-owner, app-lifecycle, mechanism-pruning, semantic auxiliary-surface, and final-ratchet graph; see the runtime index for exact dependencies).
 - [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) (one-shot post-convergence admission gate; blocked until known architecture/right-sizing/tool-rent work retires).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).

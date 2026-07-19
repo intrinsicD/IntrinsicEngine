@@ -11,11 +11,12 @@ maturity_target: Operational
 
 ## Status
 
-- Implementation and local verification complete as of 2026-07-19; owner:
-  Codex team; implementation branch:
-  `codex/runtime-180-camera-module`; code/tests checkpoint: `07bbd159`.
-- The slice is pending integration and retirement on the coordinating branch.
-  No Engine compatibility facade or lifecycle exception remains.
+- Completed and retired at `Operational` on 2026-07-19; owner: Codex team;
+  implementation branch: `codex/runtime-180-camera-module`.
+- Implementation commit: `07bbd159`; documentation commit: `ee926992`;
+  merge commit: `295bdc0c`. The capable-host acceptance-fixture repair commit
+  is `368130e5`.
+- No Engine compatibility facade or lifecycle exception remains.
 - 2026-07-19 amendment: rebased the implementation contract on the merged
   `RUNTIME-182` editor-capture seam. The camera insertion point is now a
   dedicated typed viewport-input hook rather than a seventh generic frame
@@ -356,6 +357,31 @@ ctest --test-dir build/ci-vulkan --output-on-failure -R 'RuntimeSandboxAcceptanc
   links, routing self-tests (`19/19`), module-inventory regeneration, and
   whitespace checks passed. The retired camera/reference compatibility-symbol
   scan was empty outside the intentional structural ratchet test.
+
+### 2026-07-19 merged and Operational evidence
+
+- On merged `main`, the canonical `ci` configuration used Clang 23 and the
+  complete `IntrinsicTests` aggregate built `1568/1568`.
+- Live route reconciliation reported `36` targets, `4219` cases, and `341`
+  source producers with no mismatch. The complete default CPU-supported gate
+  passed `4168/4168` in `65.83s`; the one GLFW/LSan capability control was the
+  expected explicit skip.
+- The `ci-vulkan` ASan+UBSan target
+  `IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests` built on an NVIDIA GeForce
+  RTX 3050 with driver `590.48.01` and Vulkan device API `1.4.325`.
+- The first capable run exposed a test-fixture regression: the wrapper copied
+  Sandbox default-policy registration but omitted the newly app-owned
+  reference bootstrap, so ten reference-content cases observed an invalid
+  entity before rendering. `368130e5` made the fixture mirror production
+  ordering—bootstrap/seed, default policies, then inner app—and retain
+  original-world teardown. The focused center-pixel regression then passed.
+- After refreshing three stale test-discovery executables in the existing
+  build tree, the exact intersected `gpu` + `vulkan`
+  `RuntimeSandboxAcceptanceGpuSmoke` CTest selector executed and passed all
+  `16/16` cases in `109.00s`, with zero skips. This includes reference-camera,
+  parameterization/editor texture, visible triangle, vertex-channel,
+  line/point/scalar/isolines, transform edit, import, picking, model-scene,
+  and hierarchy/outline paths.
 
 ## Forbidden changes
 

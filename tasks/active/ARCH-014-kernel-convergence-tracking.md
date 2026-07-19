@@ -44,9 +44,11 @@ depends_on:
   getter names, and two re-exports with no temporary debt. ADR-0027 then
   corrected `Runtime.WorldHandle` from domain to kernel substrate, making the
   exact-v2 snapshot 42 / 20 / 2 / 31 without changing the interface.
-  Retired `RUNTIME-179`, `RUNTIME-181`, and `RUNTIME-182` then reduce the
-  current checked snapshot to 39 plain imports, 17 domain imports, two
-  re-exports, and 28 public getter names.
+  Retired `RUNTIME-179`, `RUNTIME-181`, and `RUNTIME-182` reduced the checked
+  snapshot to 39 plain imports, 17 domain imports, two re-exports, and 28
+  public getter names. Retired `RUNTIME-180` then reduced the current checked
+  snapshot to 35 plain imports, 13 domain imports, two re-exports, and 25
+  public getter names.
   Retired `HARDEN-085` delivered the authoritative exact-policy ratchet.
   `ARCH-012`
   retired on 2026-07-08 at `Operational`: Sandbox composes
@@ -69,10 +71,10 @@ depends_on:
 - The 2026-07-18 reconciliation audit measured the exact clean ratchet at
   42 plain imports, 21 then-classified domain imports, 2 re-exports, and 31
   public getter names. Subsequent behavior-backed extractions now measure
-  39 / 17 / 2 / 28. The audit also found that the literal scorecard would require zero-consumer
-  extension/input frameworks, an unused `InlineModule`, and mechanical
-  `IRuntimeModule` wrappers while the right-sizing audit that owns that
-  interface is itself blocked on this umbrella.
+  35 / 13 / 2 / 25. The audit also found that the literal scorecard would
+  require zero-consumer extension/input frameworks, an unused `InlineModule`,
+  and mechanical `IRuntimeModule` wrappers while the right-sizing audit that
+  owns that interface is itself blocked on this umbrella.
 - Retired `ARCH-016` accepted ADR-0027, corrected `WorldHandle` to substrate,
   replaced
   mechanism-count outcomes with greppable ownership outcomes, re-scoped the

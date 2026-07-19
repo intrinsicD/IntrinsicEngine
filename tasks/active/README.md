@@ -16,11 +16,6 @@ Each active task should include:
   `codex/arch-014-kernel-convergence-program`; blocked on final leaf
   `RUNTIME-187`. Next gate: execute the unblocked ADR-0027 behavior-owner
   leaves and update the convergence scorecard after each retirement.
-- [`RUNTIME-180`](RUNTIME-180-extract-camera-module.md) — camera composition
-  owner; owner: Codex team; branch:
-  `codex/runtime-180-camera-module`; in progress. Next gate: add the dedicated
-  typed viewport-input schedule, publish the exact world-bound registry, and
-  migrate app-owned reference bootstrap plus omission-safe callers.
 - [`GRAPHICS-127`](GRAPHICS-127-native-gpu-timestamp-profiler.md) — native GPU
   timestamp profiler; owner: Codex team; branch:
   `codex/graphics-127-gpu-profiler`; in progress. Next gate: repair the RHI

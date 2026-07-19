@@ -11,7 +11,6 @@ the authoritative open/unblocked view.
 - `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/active/ARCH-014-kernel-convergence-tracking.md)
 - `GRAPHICS-127` — Native GPU timestamp profiler and frame-recipe timing integration (tasks/active/GRAPHICS-127-native-gpu-timestamp-profiler.md)
 - `GRAPHICS-128` — Object-space normal bake shared index slice (tasks/active/GRAPHICS-128-object-space-normal-bake-shared-index-slice.md)
-- `RUNTIME-180` — Extract the camera composition module (tasks/active/RUNTIME-180-extract-camera-module.md)
 
 ## Theme B — Rendering modernization
 
