@@ -509,4 +509,12 @@ if(INTRINSIC_BUILD_TESTS AND BUILD_TESTING)
         INCLUDE_ALL integration runtime graphics
         EXCLUDE_ANY gpu vulkan slow flaky-quarantine
     )
+    if(TARGET ExtrinsicSandbox
+       AND INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN
+       AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
+        add_dependencies(IntrinsicTests ExtrinsicSandbox)
+        if(TARGET IntrinsicGpuVulkanTests)
+            add_dependencies(IntrinsicGpuVulkanTests ExtrinsicSandbox)
+        endif()
+    endif()
 endif()

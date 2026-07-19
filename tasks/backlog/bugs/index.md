@@ -36,6 +36,12 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
 
+- Closed 2026-07-19: [`BUG-116` — Sandbox process tests lacked aggregate build dependencies](../../done/BUG-116-sandbox-process-test-aggregate-dependency.md).
+  The canonical and Vulkan-only aggregates now build `ExtrinsicSandbox` only
+  when the promoted-Vulkan + GLFW process contracts are registered. Both real
+  process tests pass, while the ordinary CPU aggregate retains no Sandbox
+  executable dependency.
+
 - Closed 2026-07-19: [`BUG-115` — Test-gate routing case baseline drift](../../done/BUG-115-test-gate-routing-case-baseline-drift.md).
   The exact `BUG-106` affected-case baseline now names the four current
   `TaskPlanGraph` contracts plus the stable streaming task-kind contract and
