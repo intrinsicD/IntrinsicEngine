@@ -68,7 +68,7 @@ outside `Runtime.Engine.cpp`.
 `RUNTIME-129` remains the owner of production Vulkan bake plan-provider wiring.
 Retired `GRAPHICS-128` supplies the nonzero shared-index-slice command
 contract; retired `RUNTIME-183` supplies the accepted app-composed
-AssetWorkflow owner, so `RUNTIME-129` is selectable.
+AssetWorkflow owner, so `RUNTIME-129` is active.
 `RUNTIME-154` keeps the existing reference-scene public facade while moving
 provider resolution, population state, camera-seed caching, and teardown policy
 into `Extrinsic.Runtime.ReferenceSceneControl`. `RUNTIME-155` keeps the
@@ -195,7 +195,7 @@ triggers. The implementation graph is:
   Sandbox transactional typed handles over only the exact import pipeline/input
   registry plus optional exact camera/selection for focus. CPU and capable-host
   Vulkan acceptance verification are complete.
-- Existing [`RUNTIME-129`](RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
+- Active [`RUNTIME-129`](../../active/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
   completes the operational Vulkan bake inside `AssetWorkflowModule` after
   retired `GRAPHICS-128` made the shared managed-index subrange selectable.
 - [`RUNTIME-184`](RUNTIME-184-replace-application-lifecycle.md) — remove

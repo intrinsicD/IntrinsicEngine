@@ -260,7 +260,7 @@ maturity_target: Operational
       announcement/unregister/teardown order.
 - [x] Update current task/index wording that names the removed public module.
       In particular,
-      `tasks/backlog/runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md`
+      `tasks/active/RUNTIME-129-schedule-gpu-normal-bake-after-import.md`
       currently says `AssetModelSceneHandoff` and `SandboxDefaultPolicies`
       hardcode source generations; after privatization it must name the
       retained private default-policy implementation/direct-mesh descriptor
