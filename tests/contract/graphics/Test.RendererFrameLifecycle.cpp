@@ -6818,8 +6818,44 @@ TEST(RendererFrameLifecycle,
     Extrinsic::Core::Telemetry::TelemetrySystem::Get()
         .SetPassGpuTimings({
             Extrinsic::Core::Telemetry::PassTimingEntry{
-                .Name = "must-clear-on-device-loss",
+                .Name = "must-clear-on-failed-begin",
                 .GpuTimeNs = 77u,
+                .CpuTimeNs = 0u,
+            },
+        });
+    device.BeginFrameResult = false;
+
+    Extrinsic::RHI::FrameHandle unavailableFrame{};
+    EXPECT_FALSE(renderer->BeginFrame(unavailableFrame));
+    const auto& unavailable =
+        renderer->GetLastRenderGraphStats().GpuProfile;
+    EXPECT_EQ(
+        unavailable.Status,
+        Extrinsic::Graphics::
+            RenderGraphGpuProfileStatus::Unavailable);
+    EXPECT_EQ(
+        unavailable.Diagnostic,
+        "GPU profile resolution is unavailable because frame acquisition "
+        "failed.");
+    EXPECT_FALSE(unavailable.Fresh);
+    EXPECT_TRUE(unavailable.Stale);
+    EXPECT_TRUE(unavailable.HasResolvedFrame);
+    EXPECT_EQ(
+        unavailable.ResolvedSubmittedFrameNumber,
+        resolved.ResolvedSubmittedFrameNumber);
+    EXPECT_EQ(
+        unavailable.ResolvedFrameSlot,
+        resolved.ResolvedFrameSlot);
+    EXPECT_TRUE(
+        Extrinsic::Core::Telemetry::TelemetrySystem::Get()
+            .GetPassTimings()
+            .empty());
+
+    Extrinsic::Core::Telemetry::TelemetrySystem::Get()
+        .SetPassGpuTimings({
+            Extrinsic::Core::Telemetry::PassTimingEntry{
+                .Name = "must-clear-on-device-loss",
+                .GpuTimeNs = 88u,
                 .CpuTimeNs = 0u,
             },
         });
@@ -6830,7 +6866,6 @@ TEST(RendererFrameLifecycle,
             Extrinsic::RHI::GpuTimestampSource::Unavailable,
         .Diagnostic = "test device lost during BeginFrame",
     };
-    device.BeginFrameResult = false;
 
     Extrinsic::RHI::FrameHandle lostFrame{};
     EXPECT_FALSE(renderer->BeginFrame(lostFrame));

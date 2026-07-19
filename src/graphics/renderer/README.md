@@ -164,9 +164,10 @@ them as a cross-queue frame time.
 
 Device loss has precedence in both relevant control paths. A disabled render
 snapshot checks the profiler before publishing `Disabled`, and a failed device
-`BeginFrame()` maps the profiler's current backend status instead of hardcoding
-generic unavailability. Both paths preserve the last-good frame identity as
-stale, report `DeviceLost`, and clear telemetry without publishing a fresh row.
+`BeginFrame()` projects current profiler `DeviceLost` instead of generic
+unavailability. Other failed-acquisition states remain `Unavailable`. Both
+loss paths preserve the last-good frame identity as stale, report `DeviceLost`,
+and clear telemetry without publishing a fresh row.
 
 Timestamp reset/write/query work can perturb the command stream, so these
 values are diagnostic measurements rather than performance claims. No

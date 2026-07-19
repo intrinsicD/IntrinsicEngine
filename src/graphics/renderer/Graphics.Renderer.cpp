@@ -2312,11 +2312,15 @@ namespace Extrinsic::Graphics
                     profiler != nullptr
                         ? profiler->GetStatus()
                         : RHI::ProfilerStatusSnapshot{};
-                PublishStaleGpuProfileStatus(
-                    profiler != nullptr
-                        ? ProfileStatusForBackend(profilerStatus.Status)
-                        : RenderGraphGpuProfileStatus::Unavailable,
+                const bool deviceLost =
                     profiler != nullptr &&
+                    profilerStatus.Status ==
+                        RHI::ProfilerBackendStatus::DeviceLost;
+                PublishStaleGpuProfileStatus(
+                    deviceLost
+                        ? RenderGraphGpuProfileStatus::DeviceLost
+                        : RenderGraphGpuProfileStatus::Unavailable,
+                    deviceLost &&
                             !profilerStatus.Diagnostic.empty()
                         ? profilerStatus.Diagnostic
                         : "GPU profile resolution is unavailable because "
