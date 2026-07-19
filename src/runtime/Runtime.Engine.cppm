@@ -53,6 +53,7 @@ import Extrinsic.ECS.Scene.Registry;
 namespace Extrinsic::Runtime
 {
     class AssetResidencyService;
+    class EngineSceneReplacementTransitions;
 
     export class Engine;
 
@@ -306,6 +307,8 @@ namespace Extrinsic::Runtime
         Core::Config::EngineConfig           m_Config;
         std::unique_ptr<IApplication>        m_Application;
         std::vector<std::unique_ptr<IRuntimeModule>> m_RuntimeModules{};
+        std::unique_ptr<EngineSceneReplacementTransitions>
+            m_SceneReplacementTransitions{};
         std::unique_ptr<Platform::IWindow>   m_Window;
         std::unique_ptr<RHI::IDevice>        m_Device;
         std::unique_ptr<Graphics::IRenderer> m_Renderer;

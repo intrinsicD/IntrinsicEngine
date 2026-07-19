@@ -1277,6 +1277,103 @@ TEST(RuntimeEngineLayering, EditorUiModulePrivatelyMirrorsImGuiFramePacingDiagno
               std::string::npos);
 }
 
+TEST(RuntimeEngineLayering,
+     SceneReplacementTransitionsRetainTypedHandlesAndDetachBeforeModules)
+{
+    const auto engineInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto retention =
+        SliceBetween(
+            engineImpl,
+            "class EngineSceneReplacementTransitions final",
+            "// ── Construction / destruction");
+    const auto registration =
+        SliceBetween(
+            engineImpl,
+            "void Engine::RegisterSceneReplacementParticipants()",
+            "// ── Lifecycle");
+    const auto shutdown =
+        SliceBetween(
+            engineImpl,
+            "void Engine::AnnounceAndShutdownRuntimeModules()",
+            "void Engine::RefreshActiveWorldScenePointer()");
+
+    EXPECT_EQ(
+        engineInterface.find(
+            "import Extrinsic.Runtime.SceneDocumentModule"),
+        std::string::npos);
+    EXPECT_EQ(
+        engineInterface.find(
+            "import Extrinsic.Runtime.EditorCommandHistory"),
+        std::string::npos);
+    EXPECT_NE(
+        engineInterface.find(
+            "class EngineSceneReplacementTransitions;"),
+        std::string::npos);
+    EXPECT_NE(
+        engineInterface.find(
+            "m_SceneReplacementTransitions{};"),
+        std::string::npos);
+
+    EXPECT_EQ(
+        CountOccurrences(
+            retention,
+            "SceneReplacementParticipantHandle"),
+        2u);
+    EXPECT_NE(
+        retention.find(
+            "UnregisterReplacementParticipant(\n"
+            "                    AssetHandoffs)"),
+        std::string::npos);
+    EXPECT_NE(
+        retention.find(
+            "UnregisterReplacementParticipant(\n"
+            "                    Interaction)"),
+        std::string::npos);
+
+    EXPECT_NE(
+        registration.find(
+            "transitions->Interaction = *interaction;"),
+        std::string::npos);
+    EXPECT_NE(
+        registration.find(
+            "transitions->AssetHandoffs = *assetHandoffs;"),
+        std::string::npos);
+    const auto assetRegistrationFailure =
+        registration.find("if (!assetHandoffs.has_value())");
+    const auto rollback =
+        registration.find(
+            "transitions->Release();",
+            assetRegistrationFailure);
+    const auto termination =
+        registration.find("std::terminate();", rollback);
+    ASSERT_NE(assetRegistrationFailure, std::string::npos);
+    ASSERT_NE(rollback, std::string::npos);
+    ASSERT_NE(termination, std::string::npos);
+    EXPECT_LT(assetRegistrationFailure, rollback);
+    EXPECT_LT(rollback, termination);
+
+    const auto announcement =
+        shutdown.find(
+            "m_KernelEvents.Publish(RuntimeShutdownAnnounced{});");
+    const auto announcementPump =
+        shutdown.find("(void)m_KernelEvents.Pump();");
+    const auto release =
+        shutdown.find(
+            "m_SceneReplacementTransitions->Release();");
+    const auto moduleShutdown =
+        shutdown.find("m_RuntimeModules.rbegin()");
+    ASSERT_NE(announcement, std::string::npos);
+    ASSERT_NE(announcementPump, std::string::npos);
+    ASSERT_NE(release, std::string::npos);
+    ASSERT_NE(moduleShutdown, std::string::npos);
+    EXPECT_LT(announcement, announcementPump);
+    EXPECT_LT(announcementPump, release);
+    EXPECT_LT(release, moduleShutdown);
+}
+
 TEST(RuntimeEngineLayering, RenderGraphStaysOutOfECSAndCoreStaysOutOfGpuBarriers)
 {
     const std::vector<std::filesystem::path> renderGraphFiles{
