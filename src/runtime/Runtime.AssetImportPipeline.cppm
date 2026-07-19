@@ -32,6 +32,8 @@ import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.WorldHandle;
+import Extrinsic.Runtime.WorldRegistry;
 import Geometry.HalfedgeMesh.IO;
 
 namespace Extrinsic::Runtime
@@ -72,6 +74,7 @@ namespace Extrinsic::Runtime
     export struct RuntimePostImportProcessorServices
     {
         StreamingExecutor* Streaming{};
+        WorldHandle World{DefaultWorldHandle};
         Assets::AssetService* AssetService{};
         Graphics::GpuAssetCache* GpuAssetCache{};
         RenderExtractionCache* RenderExtraction{};
@@ -212,6 +215,8 @@ namespace Extrinsic::Runtime
         const bool* Initialized{};
         const Core::Config::EngineConfig* Config{};
         StreamingExecutor* Streaming{};
+        WorldRegistry* Worlds{};
+        WorldHandle World{DefaultWorldHandle};
         Assets::AssetService* AssetService{};
         Graphics::GpuAssetCache* GpuAssetCache{};
         AssetModelTextureHandoff* ModelTextureHandoff{};
@@ -330,14 +335,24 @@ namespace Extrinsic::Runtime
         [[nodiscard]] Core::Result CancelAssetImportImpl(
             RuntimeAssetIngestHandle operation,
             bool allowWaitingForMainThreadApply);
+        void FinalizeCancelledStreamingImport(
+            RuntimeAssetIngestHandle operation,
+            RuntimeAssetImportRequest request);
         void RecordAssetImportEvent(
             const RuntimeAssetImportRequest& request,
             const Core::Expected<RuntimeAssetImportResult>& result,
             RuntimeAssetIngestDiagnostic ingestDiagnostic);
+        [[nodiscard]] bool IsCurrentSubmissionTarget(
+            WorldHandle world,
+            const ECS::Scene::Registry* scene,
+            std::uint64_t bindingEpoch) const noexcept;
 
         BorrowedBool m_Initialized{};
         BorrowedSubsystem<const Core::Config::EngineConfig> m_Config{};
         BorrowedSubsystem<StreamingExecutor> m_StreamingExecutor{};
+        BorrowedSubsystem<WorldRegistry> m_WorldRegistry{};
+        WorldHandle m_World{DefaultWorldHandle};
+        std::uint64_t m_TargetBindingEpoch{0u};
         BorrowedSubsystem<Assets::AssetService> m_AssetService{};
         BorrowedSubsystem<Graphics::GpuAssetCache> m_GpuAssetCache{};
         BorrowedSubsystem<AssetModelTextureHandoff> m_AssetModelTextureHandoff{};

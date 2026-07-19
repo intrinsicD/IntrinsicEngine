@@ -52,7 +52,6 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Component.VisualizationConfig;
-import Extrinsic.Runtime.AsyncWorkService;
 import Extrinsic.Runtime.AssetGeometryIO;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetMeshNormals;
@@ -85,6 +84,7 @@ import Extrinsic.Runtime.SceneDocument;
 import Extrinsic.Runtime.SelectionReadback;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StableEntityLookup;
+import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Asset.EventBus;
@@ -275,6 +275,7 @@ namespace Extrinsic::Runtime
             std::make_unique<AssetModelTextureHandoff>(assets, Cache());
 
         AssetModelSceneHandoffOptions modelSceneOptions{};
+        modelSceneOptions.World = options.World;
         modelSceneOptions.ObjectSpaceNormalBakeQueue =
             options.ObjectSpaceNormalBakeQueue;
         modelSceneOptions.ObjectSpaceNormalBakeGraphicsBackendOperational =
@@ -664,6 +665,10 @@ namespace Extrinsic::Runtime
             if (*it)
                 (*it)->OnShutdown(context);
         }
+        // Module-owned services may be destroyed during OnShutdown. Clear all
+        // borrowed records before control returns to the remaining kernel
+        // teardown so no post-shutdown lookup can observe a dangling service.
+        m_ServiceRegistry.Reset();
     }
 
     void Engine::RefreshActiveWorldScenePointer() noexcept
@@ -710,6 +715,7 @@ namespace Extrinsic::Runtime
                 *m_Scene,
                 *m_Renderer,
                 AssetResidencySceneHandoffOptions{
+                    .World = ActiveWorld(),
                     .ObjectSpaceNormalBakeQueue =
                         &m_ObjectSpaceNormalBakeService.Queue(),
                     .ObjectSpaceNormalBakeGraphicsBackendOperational =
@@ -721,7 +727,10 @@ namespace Extrinsic::Runtime
             AssetImportPipelineDependencies{
                 .Initialized = &m_Initialized,
                 .Config = &m_Config,
-                .Streaming = m_AsyncWorkService.Streaming(),
+                .Streaming =
+                    m_ServiceRegistry.Find<StreamingExecutor>(),
+                .Worlds = &m_WorldRegistry,
+                .World = ActiveWorld(),
                 .AssetService = m_AssetService.get(),
                 .GpuAssetCache = m_AssetResidencyService->CachePtr(),
                 .ModelTextureHandoff =
@@ -838,13 +847,27 @@ namespace Extrinsic::Runtime
         // ── 3. CPU task graph (ECS system scheduling) ─────────────────────
         m_FrameGraph = std::make_unique<Core::FrameGraph>();
 
-        // ── 4. Streaming executor (asset IO / geometry processing) ────────
-        m_AsyncWorkService.Initialize();
+        // ── 4. World registry / boot ECS scene ────────────────────────────
+        // Create the boot world before module registration so every
+        // EngineSetup observes the same live kernel substrate as before.
+        m_WorldRegistry.Clear();
+        const WorldHandle bootWorld = m_WorldRegistry.CreateWorld("Main");
+        m_Scene = m_WorldRegistry.Get(bootWorld);
+        if (m_Scene != nullptr)
+            m_StableEntityLookupBinding.Connect(m_StableEntityLookup, *m_Scene);
 
-        // ── 5. Asset service ──────────────────────────────────────────────
+        // ── 5. Runtime-module registration (ARCH-011/RUNTIME-179) ─────────
+        // Registration precedes dependent subsystem wiring so app-composed
+        // owners can publish narrow construction capabilities. Engine looks
+        // up those capabilities by type and never imports a concrete module.
+        // Resolution/finalization remains at the pre-application boundary
+        // below, after every provider has registered.
+        RegisterRuntimeModulesForBoot();
+
+        // ── 6. Asset service ──────────────────────────────────────────────
         m_AssetService = std::make_unique<Assets::AssetService>();
 
-        // ── 5b. GPU asset residency ───────────────────────────────────────
+        // ── 6b. GPU asset residency ───────────────────────────────────────
         m_AssetResidencyService->InitializeGpuCache(
             *m_AssetService,
             *m_Renderer,
@@ -859,19 +882,14 @@ namespace Extrinsic::Runtime
         (void)m_ObjectSpaceNormalBakeService.RegisterGpuQueueParticipant(
             m_JobService);
 
-        // ── 6. World registry / boot ECS scene ───────────────────────────
-        m_WorldRegistry.Clear();
-        const WorldHandle bootWorld = m_WorldRegistry.CreateWorld("Main");
-        m_Scene = m_WorldRegistry.Get(bootWorld);
-        if (m_Scene != nullptr)
-            m_StableEntityLookupBinding.Connect(m_StableEntityLookup, *m_Scene);
-
         BindActiveSceneAssetHandoffs();
         m_SceneDocument->SetDependencies(
             SceneDocumentDependencies{
                 .Initialized = &m_Initialized,
                 .Scene = &m_Scene,
-                .Streaming = m_AsyncWorkService.Streaming(),
+                .Streaming =
+                    m_ServiceRegistry.Find<StreamingExecutor>(),
+                .Worlds = &m_WorldRegistry,
                 .CommandHistory = &m_EditorCommandHistory,
                 .Renderer = m_Renderer.get(),
                 .RenderExtraction = &m_RenderExtractionService.Cache(),
@@ -890,14 +908,13 @@ namespace Extrinsic::Runtime
         // maintained incrementally from StableId component events.
         m_SelectionController.SetStableEntityLookup(&m_StableEntityLookup);
 
-        // ── 6b. Reference scene bootstrap (GRAPHICS-029A/B) ───────────────
+        // ── 7. Reference scene bootstrap (GRAPHICS-029A/B) ────────────────
         m_ReferenceSceneControl.InstallIfEnabled(m_Config.ReferenceScene, *m_Scene);
 
-        // ── 7. Runtime modules (ARCH-011) ────────────────────────────────
-        RegisterRuntimeModulesForBoot();
+        // ── 8. Runtime-module resolution/finalization (ARCH-011) ──────────
         ResolveRuntimeModulesForBoot();
 
-        // ── 8. Application ────────────────────────────────────────────────
+        // ── 9. Application ────────────────────────────────────────────────
         m_Application->OnInitialize(*this);
 
         m_Initialized = true;
@@ -945,7 +962,6 @@ namespace Extrinsic::Runtime
             std::unique_ptr<RHI::IDevice>& Device;
             std::unique_ptr<Graphics::IRenderer>& Renderer;
             std::unique_ptr<Core::FrameGraph>& FrameGraph;
-            AsyncWorkService& AsyncWork;
             std::unique_ptr<Assets::AssetService>& AssetService;
             AssetResidencyService& AssetResidency;
             WorldRegistry& Worlds;
@@ -962,7 +978,6 @@ namespace Extrinsic::Runtime
                           std::unique_ptr<RHI::IDevice>& device,
                           std::unique_ptr<Graphics::IRenderer>& renderer,
                           std::unique_ptr<Core::FrameGraph>& frameGraph,
-                          AsyncWorkService& asyncWork,
                           std::unique_ptr<Assets::AssetService>& assetService,
                           AssetResidencyService& assetResidency,
                           WorldRegistry& worlds,
@@ -978,7 +993,6 @@ namespace Extrinsic::Runtime
                 , Device(device)
                 , Renderer(renderer)
                 , FrameGraph(frameGraph)
-                , AsyncWork(asyncWork)
                 , AssetService(assetService)
                 , AssetResidency(assetResidency)
                 , Worlds(worlds)
@@ -1003,7 +1017,7 @@ namespace Extrinsic::Runtime
             }
             void ShutdownStreaming() override
             {
-                AsyncWork.ShutdownAndDrain();
+                // App-composed async work drains in module OnShutdown.
             }
             void DestroyScene() override
             {
@@ -1024,7 +1038,7 @@ namespace Extrinsic::Runtime
             }
             void DestroyStreamingState() override
             {
-                AsyncWork.Reset();
+                // App-composed async work resets in module OnShutdown.
             }
             void DestroyFrameGraph() override { FrameGraph.reset(); }
             void ShutdownRenderer() override
@@ -1062,7 +1076,6 @@ namespace Extrinsic::Runtime
                             m_Device,
                             m_Renderer,
                             m_FrameGraph,
-                            m_AsyncWorkService,
                             m_AssetService,
                             *m_AssetResidencyService,
                             m_WorldRegistry,
@@ -1435,14 +1448,26 @@ namespace Extrinsic::Runtime
 
         // ── Phase 10: Maintenance ─────────────────────────────────────────
         TransferHooks transferHooks(*m_Device);
-        StreamingHooks streamingHooks(m_AsyncWorkService);
         AssetHooks assetHooks(*m_AssetService,
                               *m_AssetResidencyService,
                               *m_Device,
                               m_RenderExtractionService.Cache(),
                               *m_Renderer);
         const auto maintenanceBegin = std::chrono::steady_clock::now();
-        Core::ExecuteMaintenanceContract(transferHooks, streamingHooks, assetHooks, 8);
+        if (Core::IStreamingFrameHooks* streamingHooks =
+                m_ServiceRegistry.Find<Core::IStreamingFrameHooks>();
+            streamingHooks != nullptr)
+        {
+            Core::ExecuteMaintenanceContract(
+                transferHooks, *streamingHooks, assetHooks, 8u);
+        }
+        else
+        {
+            // Async work is app-optional. Preserve the non-async portions of
+            // the Maintenance lane without installing a fake hook provider.
+            transferHooks.CollectCompletedTransfers();
+            assetHooks.TickAssets();
+        }
         // ARCH-009 — drop terminal job records after the frame has observed
         // their completion/cancellation state. Does not wait on workers.
         (void)m_JobService.ReapCompleted();
@@ -1764,21 +1789,6 @@ namespace Extrinsic::Runtime
     Engine::GetVisualizationAdapterBindingRevision() const noexcept
     {
         return m_RenderExtractionService.GetVisualizationAdapterBindingRevision();
-    }
-
-    DerivedJobHandle Engine::SubmitDerivedJob(DerivedJobDesc desc)
-    {
-        return m_AsyncWorkService.SubmitDerivedJob(std::move(desc));
-    }
-
-    void Engine::CancelDerivedJob(const DerivedJobHandle handle)
-    {
-        m_AsyncWorkService.CancelDerivedJob(handle);
-    }
-
-    DerivedJobQueueSnapshot Engine::GetDerivedJobQueueSnapshot() const
-    {
-        return m_AsyncWorkService.SnapshotDerivedJobs();
     }
 
     void Engine::SetImGuiEditorCallback(std::function<void()> callback)

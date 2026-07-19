@@ -65,6 +65,7 @@ import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.WorldHandle;
 import Geometry.KMeans;
 import Geometry.Graph.Vertex.Normals;
 import Geometry.HalfedgeMesh.Vertices.Normals;
@@ -2460,6 +2461,7 @@ export namespace Extrinsic::Runtime
     struct SandboxEditorContext
     {
         ECS::Scene::Registry* Scene{nullptr};
+        WorldHandle World{DefaultWorldHandle};
         SelectionController*  Selection{nullptr};
         EditorCommandHistory* CommandHistory{nullptr};
         Assets::AssetService* AssetService{nullptr};

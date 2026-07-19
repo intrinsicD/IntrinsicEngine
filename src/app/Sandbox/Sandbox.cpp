@@ -5,6 +5,7 @@ module;
 module Extrinsic.Sandbox;
 
 import Extrinsic.Sandbox.Editor.Controller;
+import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 
@@ -39,6 +40,7 @@ private:
 };
 
 void RegisterSandboxRuntimeModules(Runtime::Engine &engine) {
+  engine.EmplaceModule<Runtime::AsyncWorkModule>();
   engine.EmplaceModule<Runtime::ClusteringModule>();
 }
 

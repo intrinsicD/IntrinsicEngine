@@ -28,6 +28,7 @@ import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Geometry.HalfedgeMesh.IO;
@@ -248,6 +249,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsGeneratedG
         Runtime::Engine closingEngine(
             HeadlessConfig(),
             std::make_unique<OneFrameApplication>());
+        closingEngine.EmplaceModule<Runtime::AsyncWorkModule>();
         closingEngine.Initialize();
         InstallSandboxDefaultRuntimePolicies(closingEngine);
 
@@ -282,6 +284,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsGeneratedG
                         runningEngine, *completedEntity);
             },
             4096u));
+    completedEngine.EmplaceModule<Runtime::AsyncWorkModule>();
     completedEngine.Initialize();
     InstallSandboxDefaultRuntimePolicies(completedEngine);
 

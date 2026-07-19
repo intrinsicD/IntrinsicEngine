@@ -64,6 +64,7 @@ import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
+import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -216,6 +217,7 @@ TEST(SandboxEditorSession, AttachPrepareDetachBoundsPreparedFrameLifetime)
         [&sawPreparedContext](Runtime::SandboxEditorPreparedFrameView frame)
         {
             sawPreparedContext = frame.Context.Scene != nullptr;
+            EXPECT_FALSE(frame.Context.DerivedJobCommands.Available());
             frame.LastAssetImportResult =
                 Runtime::SandboxEditorFileImportResult{
                     .Status = Runtime::SandboxEditorCommandStatus::Applied,
@@ -262,6 +264,7 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<PassiveApplication>());
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.Initialize();
 
     Runtime::SandboxEditorSession session;
@@ -274,6 +277,8 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
         staleImportCommand{};
     Runtime::SandboxEditorKMeansGpuCommandSurface staleGpuCommands{};
     Runtime::SandboxEditorParameterizationUvViewCommandSurface staleUvCommands{};
+    Runtime::SandboxEditorDerivedJobCommandSurface staleDerivedJobCommands{};
+    Runtime::DerivedJobHandle submittedDerivedJob{};
     ASSERT_TRUE(session.VisitPreparedFrame(
         [&](Runtime::SandboxEditorPreparedFrameView frame)
         {
@@ -281,11 +286,31 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
             staleImportCommand = frame.Context.AssetImportCommands.Import;
             staleGpuCommands = frame.Context.KMeansGpuCommands;
             staleUvCommands = frame.Context.ParameterizationUvViewCommands;
+            staleDerivedJobCommands = frame.Context.DerivedJobCommands;
+            submittedDerivedJob = frame.Context.DerivedJobCommands.Submit(
+                Runtime::DerivedJobDesc{
+                    .Name = "session world-scoped derived job",
+                    .Execute = []() -> Runtime::DerivedJobWorkerResult
+                    {
+                        return Runtime::DerivedJobOutput{
+                            .PayloadToken = 17u,
+                        };
+                    },
+                });
         }));
     ASSERT_TRUE(staleResultSink);
     ASSERT_TRUE(staleImportCommand);
     ASSERT_TRUE(staleGpuCommands.Available());
     ASSERT_TRUE(staleUvCommands.Available());
+    ASSERT_TRUE(staleDerivedJobCommands.Available());
+    ASSERT_TRUE(submittedDerivedJob.IsValid());
+    const Runtime::DerivedJobRegistry* derivedJobs =
+        engine.Services().Find<Runtime::DerivedJobRegistry>();
+    ASSERT_NE(derivedJobs, nullptr);
+    const std::optional<Runtime::DerivedJobSnapshot> submittedSnapshot =
+        derivedJobs->Snapshot(submittedDerivedJob);
+    ASSERT_TRUE(submittedSnapshot.has_value());
+    EXPECT_EQ(submittedSnapshot->Scope, engine.ActiveWorld());
     const Runtime::SandboxEditorFileImportResult activeImport =
         staleImportCommand(Runtime::SandboxEditorFileImportCommand{
             .Path = "/tmp/intrinsic-session-active-command.obj",
@@ -311,6 +336,16 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
     ASSERT_TRUE(currentResultSink);
     ASSERT_TRUE(currentGpuCommands.Available());
 
+    EXPECT_FALSE(
+        staleDerivedJobCommands
+            .Submit(Runtime::DerivedJobDesc{
+                .Name = "expired session derived job",
+                .Execute = []() -> Runtime::DerivedJobWorkerResult
+                {
+                    return Runtime::DerivedJobOutput{};
+                },
+            })
+            .IsValid());
     currentResultSink(Runtime::SandboxEditorKMeansResult{
         .Message = "current attachment result",
     });

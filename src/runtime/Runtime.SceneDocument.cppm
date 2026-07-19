@@ -17,6 +17,7 @@ import Extrinsic.Runtime.SelectionReadback;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.WorldRegistry;
 
 namespace Extrinsic::Runtime
 {
@@ -54,6 +55,7 @@ namespace Extrinsic::Runtime
         bool* Initialized{};
         ECS::Scene::Registry** Scene{};
         StreamingExecutor* Streaming{};
+        WorldRegistry* Worlds{};
         EditorCommandHistory* CommandHistory{};
         Graphics::IRenderer* Renderer{};
         RenderExtractionCache* RenderExtraction{};
@@ -100,5 +102,6 @@ namespace Extrinsic::Runtime
         SceneDocumentDependencies m_Dependencies{};
         std::optional<RuntimeSceneFileEvent> m_LastSceneFileEvent{};
         std::uint64_t m_SceneFileEventSequence{0};
+        std::uint64_t m_TargetBindingEpoch{1u};
     };
 }

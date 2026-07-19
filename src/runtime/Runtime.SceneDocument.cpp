@@ -37,6 +37,8 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.WorldHandle;
+import Extrinsic.Runtime.WorldRegistry;
 
 namespace Extrinsic::Runtime
 {
@@ -326,6 +328,11 @@ namespace Extrinsic::Runtime
 
     void SceneDocument::SetDependencies(SceneDocumentDependencies dependencies)
     {
+        // A dependency rebind invalidates active-only queued operations even
+        // when the replacement eventually points back at the same scene.
+        ++m_TargetBindingEpoch;
+        if (m_TargetBindingEpoch == 0u)
+            m_TargetBindingEpoch = 1u;
         m_Dependencies = std::move(dependencies);
     }
 
@@ -408,6 +415,12 @@ namespace Extrinsic::Runtime
 
     void SceneDocument::ClearSceneRuntimeState()
     {
+        // Engine calls this before replacing the active scene binding. Advance
+        // first so an away-and-back switch cannot make a queued operation's
+        // captured {world, scene} pair appear current again.
+        ++m_TargetBindingEpoch;
+        if (m_TargetBindingEpoch == 0u)
+            m_TargetBindingEpoch = 1u;
         if (m_Dependencies.Renderer != nullptr &&
             m_Dependencies.RenderExtraction != nullptr)
         {
@@ -448,7 +461,8 @@ namespace Extrinsic::Runtime
     {
         ECS::Scene::Registry* scene = CurrentScene();
         if (!IsInitialized() || scene == nullptr ||
-            m_Dependencies.Streaming == nullptr)
+            m_Dependencies.Streaming == nullptr ||
+            m_Dependencies.Worlds == nullptr)
         {
             return Core::Err<RuntimeQueuedSceneFileOperation>(
                 Core::ErrorCode::InvalidState);
@@ -459,9 +473,20 @@ namespace Extrinsic::Runtime
                 Core::ErrorCode::InvalidPath);
         }
 
+        const WorldHandle world = m_Dependencies.Worlds->ActiveWorld();
+        ECS::Scene::Registry* const submissionScene =
+            m_Dependencies.Worlds->Get(world);
+        const std::uint64_t submissionBindingEpoch = m_TargetBindingEpoch;
+        if (!world.IsValid() ||
+            submissionScene == nullptr ||
+            scene != submissionScene)
+        {
+            return Core::Err<RuntimeQueuedSceneFileOperation>(
+                Core::ErrorCode::InvalidState);
+        }
         auto state = std::make_shared<QueuedSceneSaveState>();
         state->Path = std::move(path);
-        SnapshotSerializableScene(*scene, state->Snapshot);
+        SnapshotSerializableScene(*submissionScene, state->Snapshot);
 
         const StreamingTaskHandle handle = m_Dependencies.Streaming->Submit(
             StreamingTaskDesc{
@@ -469,6 +494,7 @@ namespace Extrinsic::Runtime
                 .Kind = RuntimeTaskKinds::AssetDecode,
                 .Priority = Core::Dag::TaskPriority::Normal,
                 .EstimatedCost = 3u,
+                .Scope = world,
                 .Execute = [state]() mutable -> StreamingResult
                 {
                     Core::IO::FileIOBackend backend;
@@ -488,7 +514,12 @@ namespace Extrinsic::Runtime
                     return StreamingResult{
                         StreamingCpuPayloadReady{.PayloadToken = 0u}};
                 },
-                .ApplyOnMainThread = [this, state](StreamingResult&& result) mutable
+                .ApplyOnMainThread = [
+                    this,
+                    state,
+                    world,
+                    submissionScene,
+                    submissionBindingEpoch](StreamingResult&& result) mutable
                 {
                     Core::Expected<SceneSerializationResult> saved =
                         Core::Err<SceneSerializationResult>(
@@ -498,7 +529,12 @@ namespace Extrinsic::Runtime
                         state->Error == Core::ErrorCode::Success &&
                         state->Result.has_value())
                     {
-                        if (!IsInitialized())
+                        if (!IsInitialized() ||
+                            m_TargetBindingEpoch != submissionBindingEpoch ||
+                            m_Dependencies.Worlds == nullptr ||
+                            m_Dependencies.Worlds->ActiveWorld() != world ||
+                            m_Dependencies.Worlds->Get(world) != submissionScene ||
+                            CurrentScene() != submissionScene)
                         {
                             saved = Core::Err<SceneSerializationResult>(
                                 Core::ErrorCode::InvalidState);
@@ -527,6 +563,15 @@ namespace Extrinsic::Runtime
                         event.SaveResult = *saved;
                     }
                     RecordSceneFileEvent(std::move(event));
+                },
+                .FinalizeCancellationOnMainThread = [this, state]
+                {
+                    RecordSceneFileEvent(RuntimeSceneFileEvent{
+                        .Operation = RuntimeSceneFileOperation::Save,
+                        .Task = state->Task,
+                        .Path = state->Path,
+                        .Error = Core::ErrorCode::InvalidState,
+                    });
                 },
             });
 
@@ -578,7 +623,8 @@ namespace Extrinsic::Runtime
     {
         ECS::Scene::Registry* scene = CurrentScene();
         if (!IsInitialized() || scene == nullptr ||
-            m_Dependencies.Streaming == nullptr)
+            m_Dependencies.Streaming == nullptr ||
+            m_Dependencies.Worlds == nullptr)
         {
             return Core::Err<RuntimeQueuedSceneFileOperation>(
                 Core::ErrorCode::InvalidState);
@@ -589,6 +635,17 @@ namespace Extrinsic::Runtime
                 Core::ErrorCode::InvalidPath);
         }
 
+        const WorldHandle world = m_Dependencies.Worlds->ActiveWorld();
+        ECS::Scene::Registry* const submissionScene =
+            m_Dependencies.Worlds->Get(world);
+        const std::uint64_t submissionBindingEpoch = m_TargetBindingEpoch;
+        if (!world.IsValid() ||
+            submissionScene == nullptr ||
+            scene != submissionScene)
+        {
+            return Core::Err<RuntimeQueuedSceneFileOperation>(
+                Core::ErrorCode::InvalidState);
+        }
         auto state = std::make_shared<QueuedSceneLoadState>();
         state->Path = std::move(path);
 
@@ -598,6 +655,7 @@ namespace Extrinsic::Runtime
                 .Kind = RuntimeTaskKinds::AssetDecode,
                 .Priority = Core::Dag::TaskPriority::Normal,
                 .EstimatedCost = 4u,
+                .Scope = world,
                 .Execute = [state]() mutable -> StreamingResult
                 {
                     Core::IO::FileIOBackend backend;
@@ -617,18 +675,27 @@ namespace Extrinsic::Runtime
                     return StreamingResult{
                         StreamingCpuPayloadReady{.PayloadToken = 0u}};
                 },
-                .ApplyOnMainThread = [this, state](StreamingResult&& result) mutable
+                .ApplyOnMainThread = [
+                    this,
+                    state,
+                    world,
+                    submissionScene,
+                    submissionBindingEpoch](StreamingResult&& result) mutable
                 {
                     Core::Expected<SceneDeserializationResult> loaded =
                         Core::Err<SceneDeserializationResult>(
                             result.has_value() ? state->Error : result.error());
 
-                    ECS::Scene::Registry* currentScene = CurrentScene();
                     if (result.has_value() &&
                         state->Error == Core::ErrorCode::Success &&
                         state->Result.has_value())
                     {
-                        if (!IsInitialized() || currentScene == nullptr)
+                        if (!IsInitialized() ||
+                            m_TargetBindingEpoch != submissionBindingEpoch ||
+                            m_Dependencies.Worlds == nullptr ||
+                            m_Dependencies.Worlds->ActiveWorld() != world ||
+                            m_Dependencies.Worlds->Get(world) != submissionScene ||
+                            CurrentScene() != submissionScene)
                         {
                             loaded = Core::Err<SceneDeserializationResult>(
                                 Core::ErrorCode::InvalidState);
@@ -638,8 +705,8 @@ namespace Extrinsic::Runtime
                             loaded = *state->Result;
                             ClearSceneRuntimeState();
                             DisconnectStableEntityLookupTracking();
-                            currentScene->Clear();
-                            currentScene->Raw() =
+                            submissionScene->Clear();
+                            submissionScene->Raw() =
                                 std::move(state->LoadedScene.Raw());
                             RebuildStableEntityLookupAfterSceneReplacement();
                             if (m_Dependencies.CommandHistory != nullptr)
@@ -663,6 +730,15 @@ namespace Extrinsic::Runtime
                         event.LoadResult = *loaded;
                     }
                     RecordSceneFileEvent(std::move(event));
+                },
+                .FinalizeCancellationOnMainThread = [this, state]
+                {
+                    RecordSceneFileEvent(RuntimeSceneFileEvent{
+                        .Operation = RuntimeSceneFileOperation::Load,
+                        .Task = state->Task,
+                        .Path = state->Path,
+                        .Error = Core::ErrorCode::InvalidState,
+                    });
                 },
             });
 

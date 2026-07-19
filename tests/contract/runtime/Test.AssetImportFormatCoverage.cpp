@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <functional>
 #include <fstream>
+#include <initializer_list>
 #include <iterator>
 #include <memory>
 #include <optional>
@@ -49,6 +50,7 @@ import Extrinsic.Graphics.VisualizationSyncSystem;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
+import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.RenderExtraction;
@@ -56,6 +58,9 @@ import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StableEntityLookup;
+import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.WorldHandle;
+import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Platform.Input;
 import Geometry.HalfedgeMesh.IO;
 
@@ -113,6 +118,160 @@ namespace
         std::function<bool(Runtime::Engine&)> m_Ready{};
         std::uint32_t m_MaxFrames{1u};
         std::uint32_t m_ObservedFrames{0u};
+    };
+
+    class AwayAndBackImportApplication final : public Runtime::IApplication
+    {
+    public:
+        void Arm(Runtime::WorldHandle submissionWorld,
+                 Runtime::WorldHandle awayWorld,
+                 std::atomic<bool>& releaseWorker) noexcept
+        {
+            m_SubmissionWorld = submissionWorld;
+            m_AwayWorld = awayWorld;
+            m_ReleaseWorker = &releaseWorker;
+            m_Armed = true;
+        }
+
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            ++m_ObservedFrames;
+            if (!m_Armed)
+                return;
+
+            if (!m_ReturnRequested && engine.ActiveWorld() == m_AwayWorld)
+            {
+                EXPECT_TRUE(
+                    engine.Worlds()
+                        .RequestSetActiveWorld(m_SubmissionWorld)
+                        .has_value());
+                m_ReturnRequested = true;
+            }
+            else if (m_ReturnRequested &&
+                     !m_WorkerReleased &&
+                     engine.ActiveWorld() == m_SubmissionWorld)
+            {
+                m_ReleaseWorker->store(true, std::memory_order_release);
+                m_WorkerReleased = true;
+            }
+
+            const Runtime::RuntimeAssetImportQueueSnapshot queue =
+                engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+            if (m_WorkerReleased &&
+                queue.Entries.size() == 1u &&
+                queue.ActiveCount == 0u &&
+                queue.TerminalCount == 1u)
+            {
+                m_Satisfied = true;
+                engine.RequestExit();
+                return;
+            }
+
+            if (m_ObservedFrames >= 512u)
+            {
+                m_ReleaseWorker->store(true, std::memory_order_release);
+                m_TimedOut = true;
+                engine.RequestExit();
+                return;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        void OnShutdown(Runtime::Engine&) override
+        {
+            if (m_ReleaseWorker != nullptr)
+                m_ReleaseWorker->store(true, std::memory_order_release);
+        }
+
+        [[nodiscard]] bool Satisfied() const noexcept { return m_Satisfied; }
+        [[nodiscard]] bool TimedOut() const noexcept { return m_TimedOut; }
+
+    private:
+        Runtime::WorldHandle m_SubmissionWorld{};
+        Runtime::WorldHandle m_AwayWorld{};
+        std::atomic<bool>* m_ReleaseWorker{};
+        std::uint32_t m_ObservedFrames{0u};
+        bool m_Armed{false};
+        bool m_ReturnRequested{false};
+        bool m_WorkerReleased{false};
+        bool m_Satisfied{false};
+        bool m_TimedOut{false};
+    };
+
+    class RetireImportWorldApplication final : public Runtime::IApplication
+    {
+    public:
+        void Arm(Runtime::WorldHandle submissionWorld,
+                 Runtime::WorldHandle replacementWorld,
+                 std::atomic<bool>& releaseWorker) noexcept
+        {
+            m_SubmissionWorld = submissionWorld;
+            m_ReplacementWorld = replacementWorld;
+            m_ReleaseWorker = &releaseWorker;
+            m_Armed = true;
+        }
+
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            ++m_ObservedFrames;
+            if (!m_Armed)
+                return;
+
+            if (!m_DestroyRequested &&
+                engine.ActiveWorld() == m_ReplacementWorld)
+            {
+                EXPECT_TRUE(
+                    engine.Worlds()
+                        .RequestDestroyWorld(m_SubmissionWorld)
+                        .has_value());
+                m_DestroyRequested = true;
+            }
+
+            const Runtime::RuntimeAssetImportQueueSnapshot queue =
+                engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+            if (m_DestroyRequested &&
+                !engine.Worlds().Contains(m_SubmissionWorld) &&
+                queue.Entries.size() == 1u &&
+                queue.ActiveCount == 0u &&
+                queue.TerminalCount == 1u)
+            {
+                m_ReleaseWorker->store(true, std::memory_order_release);
+                m_Satisfied = true;
+                engine.RequestExit();
+                return;
+            }
+
+            if (m_ObservedFrames >= 512u)
+            {
+                m_ReleaseWorker->store(true, std::memory_order_release);
+                m_TimedOut = true;
+                engine.RequestExit();
+                return;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+
+        void OnShutdown(Runtime::Engine&) override
+        {
+            if (m_ReleaseWorker != nullptr)
+                m_ReleaseWorker->store(true, std::memory_order_release);
+        }
+
+        [[nodiscard]] bool Satisfied() const noexcept { return m_Satisfied; }
+        [[nodiscard]] bool TimedOut() const noexcept { return m_TimedOut; }
+
+    private:
+        Runtime::WorldHandle m_SubmissionWorld{};
+        Runtime::WorldHandle m_ReplacementWorld{};
+        std::atomic<bool>* m_ReleaseWorker{};
+        std::uint32_t m_ObservedFrames{0u};
+        bool m_Armed{false};
+        bool m_DestroyRequested{false};
+        bool m_Satisfied{false};
+        bool m_TimedOut{false};
     };
 
     class RecordingImportCameraController final : public Runtime::ICameraController
@@ -667,6 +826,12 @@ namespace
         (void)Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
     }
 
+    void InitializeAssetImportEngine(Runtime::Engine& engine)
+    {
+        engine.EmplaceModule<Runtime::AsyncWorkModule>();
+        engine.Initialize();
+    }
+
     struct ModelSceneRouteProbe
     {
         std::vector<ECS::EntityHandle> AuthoredEntities{};
@@ -720,7 +885,7 @@ namespace
         Core::Config::EngineConfig config = HeadlessConfig();
         config.Camera.Enabled = true;
         Runtime::Engine engine(config, std::move(application));
-        engine.Initialize();
+        InitializeAssetImportEngine(engine);
         InstallSandboxDefaultRuntimePolicies(engine);
 
         auto recordingController =
@@ -999,7 +1164,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
                 return meshEntity.has_value() &&
                     DirectMeshPostProcessReady(runningEngine, *meshEntity);
             }));
-    engine.Initialize();
+    InitializeAssetImportEngine(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
     auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
@@ -1060,7 +1225,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsSmallGener
         Runtime::Engine closingEngine(
             HeadlessConfig(),
             std::make_unique<OneFrameApplication>());
-        closingEngine.Initialize();
+        InitializeAssetImportEngine(closingEngine);
         InstallSandboxDefaultRuntimePolicies(closingEngine);
 
         auto imported =
@@ -1094,7 +1259,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsSmallGener
                         runningEngine, *completedEntity);
             },
             4096u));
-    completedEngine.Initialize();
+    InitializeAssetImportEngine(completedEngine);
     InstallSandboxDefaultRuntimePolicies(completedEngine);
 
     auto imported =
@@ -1138,7 +1303,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportDefaultsToMaterialDrivenSh
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<OneFrameApplication>());
-    engine.Initialize();
+    InitializeAssetImportEngine(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
     auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
@@ -1182,7 +1347,7 @@ TEST(RuntimeAssetImportFormatCoverage, DefaultImportPoliciesApplyAuthoringUxAndP
                     DirectMeshPostProcessReady(runningEngine, *meshEntity);
             },
             256u));
-    engine.Initialize();
+    InitializeAssetImportEngine(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
     auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
@@ -1244,7 +1409,7 @@ TEST(RuntimeAssetImportFormatCoverage, UnregisteredImportPoliciesMaterializeMini
                     HasGeneratedNormalTextureBinding(runningEngine, *meshEntity);
             },
             64u));
-    engine.Initialize();
+    InitializeAssetImportEngine(engine);
 
     auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
@@ -1287,7 +1452,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectImportCompletesIngestStateMachineRe
         "f 1 2 3\n");
 
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    engine.Initialize();
+    InitializeAssetImportEngine(engine);
 
     auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
@@ -1336,7 +1501,7 @@ TEST(RuntimeAssetImportFormatCoverage, AssetImportPipelineAccessorExposesQueueAn
                     queue.TerminalCount == 1u;
             },
             256u));
-    engine.Initialize();
+    InitializeAssetImportEngine(engine);
 
     Runtime::AssetImportPipeline& pipeline = engine.GetAssetImportPipeline();
 
@@ -1377,6 +1542,64 @@ TEST(RuntimeAssetImportFormatCoverage, AssetImportPipelineAccessorExposesQueueAn
     engine.Shutdown();
 }
 
+TEST(RuntimeAssetImportFormatCoverage, ExplicitCancelPublishesOneTerminalEvent)
+{
+    TempAssetFile meshFile(
+        "runtime179_explicit_cancel_import.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<OneFrameApplication>());
+    InitializeAssetImportEngine(engine);
+
+    Runtime::AssetImportPipeline& pipeline =
+        engine.GetAssetImportPipeline();
+    auto queued = pipeline.QueueGeometryImport(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = meshFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
+
+    ASSERT_TRUE(pipeline.CancelAssetImport(queued->Operation).has_value());
+    const std::optional<Runtime::RuntimeAssetImportEvent>& cancelledEvent =
+        pipeline.GetLastAssetImportEvent();
+    ASSERT_TRUE(cancelledEvent.has_value());
+    EXPECT_EQ(cancelledEvent->Sequence, 1u);
+    EXPECT_EQ(
+        cancelledEvent->IngestDiagnostic,
+        Runtime::RuntimeAssetIngestDiagnostic::Cancelled);
+
+    Runtime::StreamingExecutor* const streaming =
+        engine.Services().Find<Runtime::StreamingExecutor>();
+    ASSERT_NE(streaming, nullptr);
+    streaming->ApplyMainThreadResults();
+    streaming->ApplyMainThreadResults();
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& afterFinalizer =
+        pipeline.GetLastAssetImportEvent();
+    ASSERT_TRUE(afterFinalizer.has_value());
+    EXPECT_EQ(afterFinalizer->Sequence, 1u);
+
+    const Runtime::RuntimeAssetImportQueueSnapshot queue =
+        pipeline.GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 1u);
+    EXPECT_EQ(queue.ActiveCount, 0u);
+    EXPECT_EQ(queue.TerminalCount, 1u);
+    EXPECT_EQ(
+        queue.Entries[0].TerminalStatus,
+        Runtime::RuntimeAssetImportQueueTerminalStatus::Cancelled);
+    EXPECT_EQ(
+        CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh),
+        0u);
+
+    engine.Shutdown();
+}
+
 TEST(RuntimeAssetImportFormatCoverage, AssetImportPipelinePreservesImportDirtyState)
 {
     TempAssetFile meshFile(
@@ -1393,7 +1616,7 @@ TEST(RuntimeAssetImportFormatCoverage, AssetImportPipelinePreservesImportDirtySt
     std::filesystem::remove(missingPath, ignored);
 
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    engine.Initialize();
+    InitializeAssetImportEngine(engine);
     Runtime::AssetImportPipeline& pipeline = engine.GetAssetImportPipeline();
 
     EXPECT_FALSE(engine.GetEditorCommandHistory().IsDirty());
@@ -1454,7 +1677,7 @@ TEST(RuntimeAssetImportFormatCoverage, PostImportProcessorsRunInOrderAndCanUnreg
         "1 2 1.0 edge\n");
 
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    engine.Initialize();
+    InitializeAssetImportEngine(engine);
 
     std::vector<int> observedOrder{};
     const Runtime::RuntimePostImportProcessorHandle first =
@@ -1557,7 +1780,7 @@ TEST(RuntimeAssetImportFormatCoverage, ReimportExistingMeshReloadsAssetWithoutDu
         "f 1 2 3\n");
 
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    engine.Initialize();
+    InitializeAssetImportEngine(engine);
 
     auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
@@ -1638,7 +1861,7 @@ TEST(RuntimeAssetImportFormatCoverage, ImportAssetFromPathDoesNotWaitForUnrelate
     Core::Config::EngineConfig config = HeadlessConfig();
     config.Simulation.WorkerThreadCount = 1u;
     Runtime::Engine engine(config, std::make_unique<OneFrameApplication>());
-    engine.Initialize();
+    InitializeAssetImportEngine(engine);
 
     std::atomic<bool> blockerStarted{false};
     std::atomic<bool> blockerFinished{false};
@@ -1680,7 +1903,7 @@ TEST(RuntimeAssetImportFormatCoverage, ImportAssetFromPathDoesNotWaitForUnrelate
 TEST(RuntimeAssetImportFormatCoverage, ReimportInvalidAssetReportsDeterministicIngestDiagnostic)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    engine.Initialize();
+    InitializeAssetImportEngine(engine);
 
     auto reimported = engine.GetAssetImportPipeline().ReimportAsset(Runtime::RuntimeAssetReimportRequest{
         .Asset = Assets::AssetId{999u, 1u},
@@ -1732,7 +1955,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportQueuesGeneratedNormalBakeF
                 return meshEntity.has_value() &&
                     DirectMeshPostProcessReady(runningEngine, *meshEntity);
             }));
-    engine.Initialize();
+    InitializeAssetImportEngine(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
     auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
@@ -1783,7 +2006,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenM
                 return meshEntity.has_value() &&
                     DirectMeshPostProcessReady(runningEngine, *meshEntity);
             }));
-    engine.Initialize();
+    InitializeAssetImportEngine(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
     auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
@@ -1848,7 +2071,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesNormalsAndQueuesGe
                 return meshEntity.has_value() &&
                     DirectMeshPostProcessReady(runningEngine, *meshEntity);
             }));
-    engine.Initialize();
+    InitializeAssetImportEngine(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
     auto imported = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
@@ -1930,7 +2153,7 @@ TEST(RuntimeAssetImportFormatCoverage, RepresentativePromotedFormatsMaterializeD
         std::span<const std::byte>(pngBytes.data(), pngBytes.size()));
 
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    engine.Initialize();
+    InitializeAssetImportEngine(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
     auto mesh = engine.GetAssetImportPipeline().ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
@@ -2016,6 +2239,296 @@ TEST(RuntimeAssetImportFormatCoverage, ModelSceneCompletionSelectsAndFramesCreat
     ExpectModelSceneCompletionRoute(true);
 }
 
+TEST(RuntimeAssetImportFormatCoverage, QueuedImportsRejectActiveWorldSwitchBeforeApply)
+{
+    TempAssetFile meshFile(
+        "runtime179_world_scoped_import.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+    const std::vector<std::byte> binBytes = TriangleBufferBytes();
+    constexpr std::string_view modelBinName =
+        "runtime179_world_scoped_import.bin";
+    TempAssetFile modelBin(
+        modelBinName,
+        std::span<const std::byte>(binBytes.data(), binBytes.size()));
+    TempAssetFile modelFile(
+        "runtime179_world_scoped_import.gltf",
+        TriangleGltfJson(modelBinName));
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(
+            [](Runtime::Engine& runningEngine)
+            {
+                const Runtime::RuntimeAssetImportQueueSnapshot queue =
+                    runningEngine.GetAssetImportPipeline()
+                        .GetAssetImportQueueSnapshot();
+                return queue.Entries.size() == 2u &&
+                    queue.ActiveCount == 0u &&
+                    queue.TerminalCount == 2u;
+            },
+            512u));
+    InitializeAssetImportEngine(engine);
+
+    const Runtime::WorldHandle submissionWorld = engine.ActiveWorld();
+    ECS::Scene::Registry* const submissionScene =
+        engine.Worlds().Get(submissionWorld);
+    ASSERT_NE(submissionScene, nullptr);
+    const Runtime::WorldHandle replacementWorld =
+        engine.Worlds().CreateWorld("Import replacement");
+    ECS::Scene::Registry* const replacementScene =
+        engine.Worlds().Get(replacementWorld);
+    ASSERT_NE(replacementScene, nullptr);
+
+    auto geometryQueued =
+        engine.GetAssetImportPipeline().QueueGeometryImport(
+            Runtime::RuntimeAssetImportRequest{
+                .Path = meshFile.Path.string(),
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+            });
+    ASSERT_TRUE(geometryQueued.has_value())
+        << static_cast<int>(geometryQueued.error());
+    auto modelQueued =
+        engine.GetAssetImportPipeline().QueueModelTextureImport(
+            Runtime::RuntimeAssetImportRequest{
+                .Path = modelFile.Path.string(),
+                .PayloadKind = Assets::AssetPayloadKind::ModelScene,
+            });
+    ASSERT_TRUE(modelQueued.has_value())
+        << static_cast<int>(modelQueued.error());
+    ASSERT_TRUE(
+        engine.Worlds().RequestSetActiveWorld(replacementWorld).has_value());
+
+    engine.Run();
+
+    EXPECT_EQ(engine.ActiveWorld(), replacementWorld);
+    ASSERT_EQ(engine.Worlds().Get(submissionWorld), submissionScene);
+    ASSERT_EQ(engine.Worlds().Get(replacementWorld), replacementScene);
+    EXPECT_EQ(CountEntitiesWithDomain(*submissionScene, GS::Domain::Mesh), 0u);
+    EXPECT_EQ(CountEntitiesWithDomain(*replacementScene, GS::Domain::Mesh), 0u);
+
+    const Runtime::RuntimeAssetImportQueueSnapshot queue =
+        engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 2u);
+    EXPECT_EQ(queue.ActiveCount, 0u);
+    EXPECT_EQ(queue.TerminalCount, 2u);
+    EXPECT_TRUE(std::all_of(
+        queue.Entries.begin(),
+        queue.Entries.end(),
+        [](const Runtime::RuntimeAssetImportQueueEntry& entry)
+        {
+            return entry.TerminalStatus ==
+                Runtime::RuntimeAssetImportQueueTerminalStatus::Failed;
+        }));
+
+    const std::vector<Runtime::RuntimeAssetIngestRecord> records =
+        engine.GetAssetImportPipeline().GetAssetIngestRecordsForTest();
+    ASSERT_EQ(records.size(), 2u);
+    for (const Runtime::RuntimeAssetIngestHandle handle :
+         {geometryQueued->Operation, modelQueued->Operation})
+    {
+        const auto record = std::find_if(
+            records.begin(),
+            records.end(),
+            [handle](const Runtime::RuntimeAssetIngestRecord& candidate)
+            {
+                return candidate.Handle == handle;
+            });
+        ASSERT_NE(record, records.end());
+        EXPECT_EQ(record->Phase, Runtime::RuntimeAssetIngestPhase::Failed);
+        EXPECT_EQ(
+            record->Diagnostic,
+            Runtime::RuntimeAssetIngestDiagnostic::MaterializationFailed);
+        EXPECT_EQ(record->Error, Core::ErrorCode::InvalidState);
+        EXPECT_FALSE(record->Result.has_value());
+    }
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& event =
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
+    ASSERT_TRUE(event.has_value());
+    EXPECT_FALSE(event->Succeeded());
+    EXPECT_EQ(event->Error, Core::ErrorCode::InvalidState);
+    EXPECT_EQ(
+        event->IngestDiagnostic,
+        Runtime::RuntimeAssetIngestDiagnostic::MaterializationFailed);
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, QueuedImportRejectsAwayAndBackBindingEpoch)
+{
+    TempAssetFile meshFile(
+        "runtime179_world_binding_epoch_import.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    auto application = std::make_unique<AwayAndBackImportApplication>();
+    AwayAndBackImportApplication* const app = application.get();
+    std::atomic<bool> workerEntered{false};
+    std::atomic<bool> releaseWorker{false};
+    Core::Config::EngineConfig config = HeadlessConfig();
+    // One worker is held behind the decode hook while two frame-maintenance
+    // boundaries apply the away-and-back switch. Keep another worker available
+    // for the frame graph so the test cannot self-deadlock.
+    config.Simulation.WorkerThreadCount = 2u;
+    Runtime::Engine engine(config, std::move(application));
+    InitializeAssetImportEngine(engine);
+
+    const Runtime::WorldHandle submissionWorld = engine.ActiveWorld();
+    ECS::Scene::Registry* const submissionScene =
+        engine.Worlds().Get(submissionWorld);
+    ASSERT_NE(submissionScene, nullptr);
+    const Runtime::WorldHandle awayWorld =
+        engine.Worlds().CreateWorld("Import binding epoch away");
+    ASSERT_NE(engine.Worlds().Get(awayWorld), nullptr);
+
+    engine.GetAssetImportPipeline()
+        .SetQueuedGeometryImportBeforeDecodeHookForTest(
+            [&workerEntered, &releaseWorker](
+                const Runtime::RuntimeAssetImportRequest&)
+            {
+                workerEntered.store(true, std::memory_order_release);
+                while (!releaseWorker.load(std::memory_order_acquire))
+                    std::this_thread::yield();
+            });
+
+    auto queued = engine.GetAssetImportPipeline().QueueGeometryImport(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = meshFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
+    app->Arm(submissionWorld, awayWorld, releaseWorker);
+    ASSERT_TRUE(engine.Worlds().RequestSetActiveWorld(awayWorld).has_value());
+
+    engine.Run();
+
+    EXPECT_TRUE(workerEntered.load(std::memory_order_acquire));
+    EXPECT_TRUE(app->Satisfied());
+    EXPECT_FALSE(app->TimedOut());
+    EXPECT_EQ(engine.ActiveWorld(), submissionWorld);
+    EXPECT_EQ(CountEntitiesWithDomain(*submissionScene, GS::Domain::Mesh), 0u);
+
+    const std::vector<Runtime::RuntimeAssetIngestRecord> records =
+        engine.GetAssetImportPipeline().GetAssetIngestRecordsForTest();
+    const auto record = std::find_if(
+        records.begin(),
+        records.end(),
+        [operation = queued->Operation](
+            const Runtime::RuntimeAssetIngestRecord& candidate)
+        {
+            return candidate.Handle == operation;
+        });
+    ASSERT_NE(record, records.end());
+    EXPECT_EQ(record->Phase, Runtime::RuntimeAssetIngestPhase::Failed);
+    EXPECT_EQ(
+        record->Diagnostic,
+        Runtime::RuntimeAssetIngestDiagnostic::MaterializationFailed);
+    EXPECT_EQ(record->Error, Core::ErrorCode::InvalidState);
+    EXPECT_FALSE(record->Result.has_value());
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, RetiredWorldImportTerminalizesQueueState)
+{
+    TempAssetFile meshFile(
+        "runtime179_retired_world_import.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    auto application = std::make_unique<RetireImportWorldApplication>();
+    RetireImportWorldApplication* const app = application.get();
+    std::atomic<bool> workerEntered{false};
+    std::atomic<bool> releaseWorker{false};
+    Core::Config::EngineConfig config = HeadlessConfig();
+    config.Simulation.WorkerThreadCount = 2u;
+    Runtime::Engine engine(config, std::move(application));
+    InitializeAssetImportEngine(engine);
+
+    const Runtime::WorldHandle submissionWorld = engine.ActiveWorld();
+    ECS::Scene::Registry* const submissionScene =
+        engine.Worlds().Get(submissionWorld);
+    ASSERT_NE(submissionScene, nullptr);
+    const Runtime::WorldHandle replacementWorld =
+        engine.Worlds().CreateWorld("Import retirement replacement");
+    ECS::Scene::Registry* const replacementScene =
+        engine.Worlds().Get(replacementWorld);
+    ASSERT_NE(replacementScene, nullptr);
+
+    engine.GetAssetImportPipeline()
+        .SetQueuedGeometryImportBeforeDecodeHookForTest(
+            [&workerEntered, &releaseWorker](
+                const Runtime::RuntimeAssetImportRequest&)
+            {
+                workerEntered.store(true, std::memory_order_release);
+                while (!releaseWorker.load(std::memory_order_acquire))
+                    std::this_thread::yield();
+            });
+
+    auto queued = engine.GetAssetImportPipeline().QueueGeometryImport(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = meshFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
+    app->Arm(submissionWorld, replacementWorld, releaseWorker);
+    ASSERT_TRUE(
+        engine.Worlds().RequestSetActiveWorld(replacementWorld).has_value());
+
+    engine.Run();
+
+    EXPECT_TRUE(workerEntered.load(std::memory_order_acquire));
+    EXPECT_TRUE(app->Satisfied());
+    EXPECT_FALSE(app->TimedOut());
+    EXPECT_FALSE(engine.Worlds().Contains(submissionWorld));
+    EXPECT_EQ(
+        CountEntitiesWithDomain(*replacementScene, GS::Domain::Mesh),
+        0u);
+
+    const Runtime::RuntimeAssetImportQueueSnapshot queue =
+        engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 1u);
+    EXPECT_EQ(queue.ActiveCount, 0u);
+    EXPECT_EQ(queue.TerminalCount, 1u);
+    EXPECT_EQ(
+        queue.Entries[0].TerminalStatus,
+        Runtime::RuntimeAssetImportQueueTerminalStatus::Cancelled);
+
+    const std::vector<Runtime::RuntimeAssetIngestRecord> records =
+        engine.GetAssetImportPipeline().GetAssetIngestRecordsForTest();
+    const auto record = std::find_if(
+        records.begin(),
+        records.end(),
+        [operation = queued->Operation](
+            const Runtime::RuntimeAssetIngestRecord& candidate)
+        {
+            return candidate.Handle == operation;
+        });
+    ASSERT_NE(record, records.end());
+    EXPECT_EQ(record->Phase, Runtime::RuntimeAssetIngestPhase::Cancelled);
+    EXPECT_EQ(
+        record->Diagnostic,
+        Runtime::RuntimeAssetIngestDiagnostic::Cancelled);
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& event =
+        engine.GetAssetImportPipeline().GetLastAssetImportEvent();
+    ASSERT_TRUE(event.has_value());
+    EXPECT_EQ(event->Sequence, 1u);
+    EXPECT_FALSE(event->Succeeded());
+    EXPECT_EQ(
+        event->IngestDiagnostic,
+        Runtime::RuntimeAssetIngestDiagnostic::Cancelled);
+
+    engine.Shutdown();
+}
+
 TEST(RuntimeAssetImportFormatCoverage, DroppedModelSceneAndTextureImportThroughStreamingQueue)
 {
     const std::vector<std::byte> pngBytes = TinyPngBytes();
@@ -2045,7 +2558,7 @@ TEST(RuntimeAssetImportFormatCoverage, DroppedModelSceneAndTextureImportThroughS
                     queue.TerminalCount == 2u;
             },
             256u));
-    engine.Initialize();
+    InitializeAssetImportEngine(engine);
 
     const std::vector<std::string> droppedPaths{
         modelFile.Path.string(),
@@ -2168,7 +2681,7 @@ TEST(RuntimeAssetImportFormatCoverage, ManualModelSceneAndTextureImportQueueComp
                     queue.TerminalCount == 2u;
             },
             256u));
-    engine.Initialize();
+    InitializeAssetImportEngine(engine);
 
     auto modelQueued = engine.GetAssetImportPipeline().QueueModelTextureImport(
         Runtime::RuntimeAssetImportRequest{
@@ -2288,7 +2801,7 @@ TEST(RuntimeAssetImportFormatCoverage, SlowQueuedTextureReadDoesNotBlockRunFrame
     auto application = std::make_unique<SlowImportProbeApplication>(readState);
     SlowImportProbeApplication* app = application.get();
     Runtime::Engine engine(HeadlessConfig(), std::move(application));
-    engine.Initialize();
+    InitializeAssetImportEngine(engine);
     engine.GetAssetImportPipeline().SetModelTextureImportIOBackendFactoryForTest(
         [readState]()
         {

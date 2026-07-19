@@ -191,6 +191,7 @@ namespace Extrinsic::Runtime
         derived.Priority = desc.Priority;
         derived.EstimatedCost = std::max<std::uint32_t>(1u, desc.EstimatedCost);
         derived.CancellationGeneration = desc.CancellationGeneration;
+        derived.Scope = desc.Scope;
         derived.HasPreviousOutput = desc.HasPreviousOutput;
         derived.IsReadbackJob = true;
         derived.ReadbackByteSize = binding.SourceRange.SizeBytes;

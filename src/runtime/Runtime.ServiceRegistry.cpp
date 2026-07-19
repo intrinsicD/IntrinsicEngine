@@ -82,6 +82,25 @@ namespace Extrinsic::Runtime
         return Core::Ok();
     }
 
+    Core::Result ServiceRegistry::WithdrawErased(
+        const ServiceTypeKey type,
+        void* const expected)
+    {
+        if (expected == nullptr)
+            return Core::Err(Core::ErrorCode::InvalidArgument);
+
+        const auto existing = m_Services.find(type);
+        if (existing == m_Services.end())
+            return Core::Err(Core::ErrorCode::ResourceNotFound);
+        if (existing->second.Instance != expected)
+            return Core::Err(Core::ErrorCode::InvalidArgument);
+
+        m_Services.erase(existing);
+        m_Stats.ProvidedServices =
+            static_cast<std::uint32_t>(m_Services.size());
+        return Core::Ok();
+    }
+
     const ServiceRegistry::ServiceRecord* ServiceRegistry::FindErased(
         const ServiceTypeKey type) const noexcept
     {

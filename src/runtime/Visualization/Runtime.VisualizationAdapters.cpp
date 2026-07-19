@@ -534,6 +534,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] bool ScheduleHtexRecreate(
             StreamingExecutor* executor,
+            const WorldHandle world,
             const std::string& packetName,
             const VisualizationAdapterOptions& options,
             VisualizationAdapterStats& stats)
@@ -549,6 +550,7 @@ namespace Extrinsic::Runtime
                     ? std::string{"Visualization.HtexRecreate"}
                     : std::string{"Visualization.HtexRecreate."} + packetName,
                 .EstimatedCost = 1u,
+                .Scope = world,
                 .Execute = [payloadToken = options.HtexRecreatePayloadToken]()
                 {
                     return StreamingResult{
@@ -884,8 +886,11 @@ namespace Extrinsic::Runtime
         }
     }
 
-    HtexMetadataAdapter::HtexMetadataAdapter(StreamingExecutor* executor) noexcept
+    HtexMetadataAdapter::HtexMetadataAdapter(
+        StreamingExecutor* executor,
+        const WorldHandle world) noexcept
         : m_Executor(executor)
+        , m_World(world)
     {
     }
 
@@ -948,7 +953,8 @@ namespace Extrinsic::Runtime
             case Graphics::VisualizationFragmentBakeMapping::ExistingHtex:
                 break;
             case Graphics::VisualizationFragmentBakeMapping::RecreateHtex:
-                if (!ScheduleHtexRecreate(m_Executor, name, options, stats))
+                if (!ScheduleHtexRecreate(
+                        m_Executor, m_World, name, options, stats))
                     return;
                 break;
             default:

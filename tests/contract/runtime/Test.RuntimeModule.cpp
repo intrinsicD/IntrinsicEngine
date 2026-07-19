@@ -638,6 +638,36 @@ TEST(RuntimeServiceRegistry, ProvideRequireFindUseTwoPhaseContract)
     EXPECT_EQ(services.Stats().ProvidedServices, 1u);
 }
 
+TEST(RuntimeServiceRegistry, WithdrawRequiresExactInstanceAndWorksWhenLocked)
+{
+    Runtime::ServiceRegistry services;
+    SharedProbeService provided{.Value = 42};
+    SharedProbeService different{.Value = 17};
+
+    services.BeginRegistration();
+    ASSERT_TRUE(
+        services.Provide<SharedProbeService>(provided, "Provider").has_value());
+    services.BeginResolution();
+    services.Lock();
+
+    const Core::Result wrongInstance =
+        services.Withdraw<SharedProbeService>(different);
+    ASSERT_FALSE(wrongInstance.has_value());
+    EXPECT_EQ(wrongInstance.error(), Core::ErrorCode::InvalidArgument);
+    EXPECT_EQ(services.Find<SharedProbeService>(), &provided);
+    EXPECT_EQ(services.Stats().ProvidedServices, 1u);
+
+    EXPECT_TRUE(
+        services.Withdraw<SharedProbeService>(provided).has_value());
+    EXPECT_EQ(services.Find<SharedProbeService>(), nullptr);
+    EXPECT_EQ(services.Stats().ProvidedServices, 0u);
+
+    const Core::Result alreadyWithdrawn =
+        services.Withdraw<SharedProbeService>(provided);
+    ASSERT_FALSE(alreadyWithdrawn.has_value());
+    EXPECT_EQ(alreadyWithdrawn.error(), Core::ErrorCode::ResourceNotFound);
+}
+
 TEST(RuntimeServiceRegistry, MissingRequireNamesRequesterAndService)
 {
     Runtime::ServiceRegistry services;

@@ -17,6 +17,7 @@ import Extrinsic.Asset.Registry;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.WorldHandle;
 
 export namespace Extrinsic::Runtime
 {
@@ -186,7 +187,9 @@ export namespace Extrinsic::Runtime
     class HtexMetadataAdapter final : public IVisualizationAdapter
     {
     public:
-        explicit HtexMetadataAdapter(StreamingExecutor* executor = nullptr) noexcept;
+        explicit HtexMetadataAdapter(
+            StreamingExecutor* executor = nullptr,
+            WorldHandle world = DefaultWorldHandle) noexcept;
 
         void Append(VisualizationAdapterBatch& out,
                     const VisualizationAdapterOptions& options,
@@ -194,6 +197,7 @@ export namespace Extrinsic::Runtime
 
     private:
         StreamingExecutor* m_Executor{nullptr};
+        WorldHandle m_World{DefaultWorldHandle};
     };
 
     class VisualizationAdapterRegistry

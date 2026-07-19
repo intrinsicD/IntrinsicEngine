@@ -16,6 +16,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.WorldHandle;
 
 export namespace Extrinsic::Runtime
 {
@@ -106,6 +107,7 @@ export namespace Extrinsic::Runtime
     struct SelectedMeshTextureBakeContext
     {
         ECS::Scene::Registry* Scene{nullptr};
+        WorldHandle World{DefaultWorldHandle};
         Assets::AssetService* AssetService{nullptr};
         EditorCommandHistory* CommandHistory{nullptr};
         DerivedJobRegistry* DerivedJobs{nullptr};

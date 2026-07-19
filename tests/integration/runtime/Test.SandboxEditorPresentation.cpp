@@ -25,6 +25,7 @@ import Extrinsic.Platform.Backend.Null;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
@@ -745,6 +746,7 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<WaitForAssetImportEventApplication>(128u));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.Initialize();
     (void)Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
 

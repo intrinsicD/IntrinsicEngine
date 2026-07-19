@@ -64,6 +64,7 @@ import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
+import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -2931,6 +2932,7 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProce
                     DirectMeshPostProcessReady(runningEngine, *meshEntity);
             },
             128u));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.Initialize();
     InstallSandboxDefaultRuntimePolicies(engine);
 

@@ -8,7 +8,7 @@ option(INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN
 target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
-        Runtime.AsyncWorkService.cppm
+        Runtime.AsyncWorkModule.cppm
         Runtime.AsyncBufferReadback.cppm
         Runtime.AssetImportPipeline.cppm
         Runtime.AssetGeometryIO.cppm
@@ -92,7 +92,7 @@ target_sources(${target_name}
         FILE_SET render_extraction_impl TYPE CXX_MODULES FILES
         Runtime.RenderExtraction.Internal.cpp
         PRIVATE
-        Runtime.AsyncWorkService.cpp
+        Runtime.AsyncWorkModule.cpp
         Runtime.AsyncBufferReadback.cpp
         Runtime.AssetImportPipeline.cpp
         Runtime.AssetGeometryIO.cpp

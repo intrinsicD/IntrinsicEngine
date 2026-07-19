@@ -1700,6 +1700,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] DerivedJobHandle QueueProgressiveNoopJob(
             DerivedJobRegistry& jobs,
+            const WorldHandle world,
             const ECS::EntityHandle entity,
             const ProgressiveSlotSemantic semantic,
             std::string name,
@@ -1719,6 +1720,7 @@ namespace Extrinsic::Runtime
                 .OutputName = name,
             };
             desc.Name = std::move(name);
+            desc.Scope = world;
             desc.Execute = [payloadToken]() -> DerivedJobWorkerResult
             {
                 return DerivedJobOutput{.PayloadToken = payloadToken};
@@ -1752,6 +1754,7 @@ namespace Extrinsic::Runtime
             {
                 uvJob = QueueProgressiveNoopJob(
                     *options.ProgressiveJobs,
+                    options.World,
                     entity,
                     ProgressiveSlotSemantic::Normal,
                     "generate mesh uv atlas",
@@ -1775,6 +1778,7 @@ namespace Extrinsic::Runtime
             {
                 normalJob = QueueProgressiveNoopJob(
                     *options.ProgressiveJobs,
+                    options.World,
                     entity,
                     ProgressiveSlotSemantic::Normal,
                     "compute mesh vertex normals",
@@ -1825,6 +1829,7 @@ namespace Extrinsic::Runtime
                         .OutputName = "schedule normal GPU bake request",
                     };
                     schedule.Name = "schedule normal GPU bake request";
+                    schedule.Scope = options.World;
                     if (uvJob.IsValid())
                     {
                         schedule.DependsOn.push_back(DerivedJobDependency{
@@ -1945,6 +1950,7 @@ namespace Extrinsic::Runtime
                     .OutputName = "bake normal texture",
                 };
                 bake.Name = "bake normal texture";
+                bake.Scope = options.World;
                 if (uvJob.IsValid())
                 {
                     bake.DependsOn.push_back(DerivedJobDependency{
@@ -2007,6 +2013,7 @@ namespace Extrinsic::Runtime
                     .OutputName = "bake albedo texture",
                 };
                 albedoBake.Name = "bake albedo texture";
+                albedoBake.Scope = options.World;
                 if (uvJob.IsValid())
                 {
                     albedoBake.DependsOn.push_back(DerivedJobDependency{

@@ -131,6 +131,7 @@ namespace Extrinsic::Runtime
         {
             std::uint32_t Generation{1u};
             DerivedJobKey Key{};
+            WorldHandle Scope{DefaultWorldHandle};
             std::string Name{};
             ProgressiveJobDomain RequestedDomain{ProgressiveJobDomain::Cpu};
             ProgressiveJobDomain ResolvedDomain{ProgressiveJobDomain::Cpu};
@@ -350,6 +351,7 @@ namespace Extrinsic::Runtime
             return DerivedJobSnapshot{
                 .Handle = handle,
                 .Key = record.Key,
+                .Scope = record.Scope,
                 .Name = record.Name,
                 .RequestedJobDomain = record.RequestedDomain,
                 .ResolvedJobDomain = record.ResolvedDomain,
@@ -418,7 +420,7 @@ namespace Extrinsic::Runtime
 
     DerivedJobHandle DerivedJobRegistry::Submit(DerivedJobDesc desc)
     {
-        if (m_Impl == nullptr)
+        if (m_Impl == nullptr || !desc.Scope.IsValid())
         {
             return {};
         }
@@ -432,6 +434,7 @@ namespace Extrinsic::Runtime
             const std::uint32_t index = static_cast<std::uint32_t>(m_Impl->Records.size());
             Impl::Record record{};
             record.Key = std::move(desc.Key);
+            record.Scope = desc.Scope;
             record.Name = std::move(desc.Name);
             record.RequestedDomain = desc.RequestedJobDomain;
             record.ResolvedDomain = desc.RequestedJobDomain;
@@ -487,6 +490,7 @@ namespace Extrinsic::Runtime
             streaming.Priority = desc.Priority;
             streaming.EstimatedCost = std::max<std::uint32_t>(1u, desc.EstimatedCost);
             streaming.CancellationGeneration = desc.CancellationGeneration;
+            streaming.Scope = record.Scope;
             for (const DerivedJobDependency& dependency : record.Dependencies)
             {
                 const auto resolved = m_Impl->Resolve(dependency.Job);
@@ -522,6 +526,10 @@ namespace Extrinsic::Runtime
                 }
 
                 auto& record = impl->Records[*resolved];
+                if (record.Status == DerivedJobStatus::Cancelled)
+                {
+                    return std::unexpected(Core::ErrorCode::InvalidState);
+                }
                 for (const DerivedJobDependency& dependency : record.Dependencies)
                 {
                     const auto parent = impl->Resolve(dependency.Job);
@@ -553,6 +561,13 @@ namespace Extrinsic::Runtime
                 }
 
                 auto& record = impl->Records[*resolved];
+                if (record.Status == DerivedJobStatus::Cancelled)
+                {
+                    return std::unexpected(
+                        worker.has_value()
+                            ? Core::ErrorCode::InvalidState
+                            : worker.error());
+                }
                 if (!worker.has_value())
                 {
                     record.Status = DerivedJobStatus::Failed;
@@ -599,6 +614,10 @@ namespace Extrinsic::Runtime
                 }
 
                 auto& record = impl->Records[*resolved];
+                if (record.Status == DerivedJobStatus::Cancelled)
+                {
+                    return;
+                }
                 if (!result.has_value())
                 {
                     record.Status = DerivedJobStatus::Failed;
@@ -632,6 +651,10 @@ namespace Extrinsic::Runtime
                 if (resolved.has_value())
                 {
                     auto& record = impl->Records[*resolved];
+                    if (record.Status == DerivedJobStatus::Cancelled)
+                    {
+                        return;
+                    }
                     record.Status = StatusForValidation(validation);
                     record.PreviousOutputRetained = record.HasPreviousOutput;
                     record.Diagnostic = std::string{"apply discarded: "} +
@@ -660,6 +683,10 @@ namespace Extrinsic::Runtime
             }
 
             auto& record = impl->Records[*resolved];
+            if (record.Status == DerivedJobStatus::Cancelled)
+            {
+                return;
+            }
             if (!applyResult.has_value())
             {
                 record.Status = DerivedJobStatus::Failed;
@@ -777,6 +804,31 @@ namespace Extrinsic::Runtime
         {
             Cancel(handle);
         }
+        return static_cast<std::uint32_t>(handles.size());
+    }
+
+    std::uint32_t DerivedJobRegistry::CancelAllForWorld(
+        const WorldHandle world)
+    {
+        if (m_Impl == nullptr || !world.IsValid())
+            return 0u;
+
+        std::vector<DerivedJobHandle> handles{};
+        {
+            std::scoped_lock lock(m_Impl->Mutex);
+            for (std::uint32_t index = 0; index < m_Impl->Records.size(); ++index)
+            {
+                const auto& record = m_Impl->Records[index];
+                if (record.Scope == world && !IsTerminal(record.Status))
+                {
+                    handles.push_back(
+                        DerivedJobHandle{index, record.Generation});
+                }
+            }
+        }
+
+        for (const DerivedJobHandle handle : handles)
+            Cancel(handle);
         return static_cast<std::uint32_t>(handles.size());
     }
 

@@ -15,15 +15,20 @@ import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
+import Extrinsic.Core.FrameLoop;
 import Extrinsic.Core.IOBackend;
+import Extrinsic.Core.Tasks;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.RenderExtraction;
@@ -31,6 +36,8 @@ import Extrinsic.Runtime.SceneDocument;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.WorldHandle;
+import Extrinsic.Runtime.WorldRegistry;
 
 namespace Core = Extrinsic::Core;
 namespace Runtime = Extrinsic::Runtime;
@@ -55,6 +62,9 @@ namespace
     public:
         void OnInitialize(Runtime::Engine& engine) override
         {
+            Jobs = engine.Services().Find<Runtime::DerivedJobRegistry>();
+            ASSERT_NE(Jobs, nullptr);
+
             Runtime::DerivedJobDesc desc{
                 .Key = Runtime::DerivedJobKey{
                     .EntityId = 77u,
@@ -65,6 +75,7 @@ namespace
                 .Name = "Engine.Frame.DerivedJob",
                 .Kind = Runtime::RuntimeTaskKinds::GeometryProcess,
                 .Priority = Core::Dag::TaskPriority::Normal,
+                .Scope = engine.ActiveWorld(),
                 .Execute =
                     [this]() -> Runtime::DerivedJobWorkerResult
                     {
@@ -85,7 +96,7 @@ namespace
                         return Core::Ok();
                     },
             };
-            Handle = engine.SubmitDerivedJob(std::move(desc));
+            Handle = Jobs->Submit(std::move(desc));
         }
 
         void OnSimTick(Runtime::Engine&, double) override {}
@@ -100,6 +111,7 @@ namespace
         void OnShutdown(Runtime::Engine&) override {}
 
         Runtime::DerivedJobHandle Handle{};
+        Runtime::DerivedJobRegistry* Jobs{};
         std::atomic<std::uint32_t> WorkerRuns{0u};
         std::atomic<std::uint32_t> ApplyRuns{0u};
         std::uint32_t Frames{0u};
@@ -230,6 +242,7 @@ TEST(RuntimeDerivedJobEngineWiring, RunFrameAppliesSubmittedDerivedJob)
     auto application = std::make_unique<DerivedJobFrameApplication>();
     DerivedJobFrameApplication* app = application.get();
     Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.Initialize();
 
     EXPECT_TRUE(app->Handle.IsValid());
@@ -238,8 +251,8 @@ TEST(RuntimeDerivedJobEngineWiring, RunFrameAppliesSubmittedDerivedJob)
 
     engine.Run();
 
-    const Runtime::DerivedJobQueueSnapshot snapshot =
-        engine.GetDerivedJobQueueSnapshot();
+    ASSERT_NE(app->Jobs, nullptr);
+    const Runtime::DerivedJobQueueSnapshot snapshot = app->Jobs->SnapshotAll();
     ASSERT_EQ(snapshot.Entries.size(), 1u);
     EXPECT_EQ(snapshot.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
     EXPECT_EQ(app->WorkerRuns.load(std::memory_order_relaxed), 1u);
@@ -323,6 +336,25 @@ TEST(RuntimeSceneLifecycle, AsyncWaitReportsElapsedTimeout)
     engine.Shutdown();
 }
 
+TEST(RuntimeSceneLifecycle, EngineRunsWithoutOptionalAsyncWorkModule)
+{
+    auto application = std::make_unique<WaitForConditionApplication>(
+        [](Runtime::Engine&) { return true; });
+    WaitForConditionApplication* app = application.get();
+    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    engine.Initialize();
+
+    EXPECT_EQ(engine.Services().Find<Runtime::StreamingExecutor>(), nullptr);
+    EXPECT_EQ(engine.Services().Find<Runtime::DerivedJobRegistry>(), nullptr);
+    EXPECT_EQ(engine.Services().Find<Core::IStreamingFrameHooks>(), nullptr);
+
+    engine.Run();
+    EXPECT_TRUE(app->ConditionSatisfied());
+    EXPECT_FALSE(app->TimedOut());
+
+    engine.Shutdown();
+}
+
 TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSidecars)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
@@ -396,6 +428,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneSaveWritesSnapshotAndMarksHistoryOnComple
         });
     WaitForConditionApplication* app = application.get();
     Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.Initialize();
 
     auto& scene = engine.GetScene();
@@ -473,6 +506,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadInvalidDocumentFailsClosed)
         });
     WaitForConditionApplication* app = application.get();
     Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.Initialize();
 
     auto& scene = engine.GetScene();
@@ -527,6 +561,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadAppliesParsedSceneOnMainThread)
         });
     WaitForConditionApplication* app = application.get();
     Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.Initialize();
 
     auto& scene = engine.GetScene();
@@ -564,4 +599,188 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadAppliesParsedSceneOnMainThread)
     EXPECT_EQ(engine.GetSelectionController().SelectedCount(), 0u);
 
     engine.Shutdown();
+}
+
+TEST(RuntimeSceneLifecycle, QueuedSceneLoadRejectsActiveWorldSwitchBeforeApply)
+{
+    TempSceneFile validScene(
+        "runtime179_world_scoped_scene_load.json",
+        R"({"version":1,"entities":[{"id":0,"name":"Wrong World Load"}]})");
+    auto application = std::make_unique<WaitForConditionApplication>(
+        [](Runtime::Engine& runningEngine)
+        {
+            return runningEngine.GetSceneDocument()
+                .GetLastSceneFileEvent()
+                .has_value();
+        });
+    WaitForConditionApplication* app = application.get();
+    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    engine.Initialize();
+
+    const Runtime::WorldHandle submissionWorld = engine.ActiveWorld();
+    ECS::Scene::Registry* const submissionScene =
+        engine.Worlds().Get(submissionWorld);
+    ASSERT_NE(submissionScene, nullptr);
+    const ECS::EntityHandle submissionMarker = submissionScene->Create();
+    submissionScene->Raw().emplace<ECSC::MetaData>(
+        submissionMarker,
+        ECSC::MetaData{.EntityName = "Submission World Marker"});
+
+    const Runtime::WorldHandle replacementWorld =
+        engine.Worlds().CreateWorld("Replacement");
+    ECS::Scene::Registry* const replacementScene =
+        engine.Worlds().Get(replacementWorld);
+    ASSERT_NE(replacementScene, nullptr);
+    const ECS::EntityHandle replacementMarker = replacementScene->Create();
+    replacementScene->Raw().emplace<ECSC::MetaData>(
+        replacementMarker,
+        ECSC::MetaData{.EntityName = "Replacement World Marker"});
+
+    auto queued = engine.GetSceneDocument().QueueSceneLoadFromPath(
+        validScene.Path.string());
+    ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
+    ASSERT_TRUE(
+        engine.Worlds().RequestSetActiveWorld(replacementWorld).has_value());
+
+    engine.Run();
+
+    ASSERT_TRUE(app->ConditionSatisfied())
+        << "world-switched scene load timed out after "
+        << app->Elapsed().count() << " ms and " << app->Frames() << " frames";
+    EXPECT_FALSE(app->TimedOut());
+    EXPECT_EQ(engine.ActiveWorld(), replacementWorld);
+    ASSERT_EQ(engine.Worlds().Get(submissionWorld), submissionScene);
+    ASSERT_EQ(engine.Worlds().Get(replacementWorld), replacementScene);
+
+    const std::optional<Runtime::RuntimeSceneFileEvent>& event =
+        engine.GetSceneDocument().GetLastSceneFileEvent();
+    ASSERT_TRUE(event.has_value());
+    EXPECT_EQ(event->Task, queued->Task);
+    EXPECT_EQ(event->Error, Core::ErrorCode::InvalidState);
+    EXPECT_FALSE(event->LoadResult.has_value());
+
+    EXPECT_TRUE(SceneContainsNamedEntity(
+        *submissionScene,
+        "Submission World Marker"));
+    EXPECT_TRUE(SceneContainsNamedEntity(
+        *replacementScene,
+        "Replacement World Marker"));
+    EXPECT_FALSE(SceneContainsNamedEntity(*submissionScene, "Wrong World Load"));
+    EXPECT_FALSE(SceneContainsNamedEntity(*replacementScene, "Wrong World Load"));
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeSceneLifecycle, QueuedSceneLoadRejectsAwayAndBackBindingEpoch)
+{
+    TempSceneFile validScene(
+        "runtime179_world_binding_epoch_scene_load.json",
+        R"({"version":1,"entities":[{"id":0,"name":"Stale Epoch Load"}]})");
+
+    bool initialized = true;
+    Runtime::SceneDocument document{};
+    Runtime::WorldRegistry worlds{};
+    Runtime::KernelEventBus events{};
+    Runtime::JobService jobs{};
+    const Runtime::WorldHandle submissionWorld =
+        worlds.CreateWorld("Submission");
+    const Runtime::WorldHandle awayWorld = worlds.CreateWorld("Away");
+    ECS::Scene::Registry* activeScene = worlds.Get(submissionWorld);
+    ASSERT_NE(activeScene, nullptr);
+    // Declare the executor after every callback dependency so an early test
+    // return still drains/destroys queued callbacks before those borrows die.
+    Runtime::StreamingExecutor streaming{};
+
+    document.SetDependencies(
+        Runtime::SceneDocumentDependencies{
+            .Initialized = &initialized,
+            .Scene = &activeScene,
+            .Streaming = &streaming,
+            .Worlds = &worlds,
+        });
+    auto queued = document.QueueSceneLoadFromPath(validScene.Path.string());
+    ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
+
+    streaming.PumpBackground(1u);
+    if (Core::Tasks::Scheduler::IsInitialized())
+        Core::Tasks::Scheduler::WaitForAll();
+    streaming.DrainCompletions();
+    ASSERT_EQ(
+        streaming.GetState(queued->Task),
+        Runtime::StreamingTaskState::WaitingForMainThreadApply);
+
+    ASSERT_TRUE(worlds.RequestSetActiveWorld(awayWorld).has_value());
+    EXPECT_EQ(
+        worlds.ApplyMaintenance(events, jobs).AppliedActiveWorldChanges,
+        1u);
+    document.ClearSceneRuntimeState();
+    activeScene = worlds.Get(awayWorld);
+
+    ASSERT_TRUE(worlds.RequestSetActiveWorld(submissionWorld).has_value());
+    EXPECT_EQ(
+        worlds.ApplyMaintenance(events, jobs).AppliedActiveWorldChanges,
+        1u);
+    document.ClearSceneRuntimeState();
+    activeScene = worlds.Get(submissionWorld);
+
+    streaming.ApplyMainThreadResults();
+    const std::optional<Runtime::RuntimeSceneFileEvent>& event =
+        document.GetLastSceneFileEvent();
+    ASSERT_TRUE(event.has_value());
+    EXPECT_EQ(event->Task, queued->Task);
+    EXPECT_EQ(event->Error, Core::ErrorCode::InvalidState);
+    EXPECT_FALSE(event->LoadResult.has_value());
+    EXPECT_FALSE(SceneContainsNamedEntity(*activeScene, "Stale Epoch Load"));
+}
+
+TEST(RuntimeSceneLifecycle, RetiredQueuedSceneSavePublishesTerminalEvent)
+{
+    TempSceneFile savedScene(
+        "runtime179_retired_scene_save.json",
+        "");
+
+    bool initialized = true;
+    Runtime::SceneDocument document{};
+    Runtime::WorldRegistry worlds{};
+    const Runtime::WorldHandle world =
+        worlds.CreateWorld("Retired scene operation");
+    ECS::Scene::Registry* activeScene = worlds.Get(world);
+    ASSERT_NE(activeScene, nullptr);
+    // The executor owns callbacks that borrow the document, so it must be
+    // destroyed first on an early test return.
+    Runtime::StreamingExecutor streaming{};
+
+    document.SetDependencies(
+        Runtime::SceneDocumentDependencies{
+            .Initialized = &initialized,
+            .Scene = &activeScene,
+            .Streaming = &streaming,
+            .Worlds = &worlds,
+        });
+    auto queued =
+        document.QueueSceneSaveToPath(savedScene.Path.string());
+    ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
+    ASSERT_FALSE(document.GetLastSceneFileEvent().has_value());
+
+    EXPECT_EQ(streaming.RetireWorld(world), 1u);
+    EXPECT_EQ(
+        streaming.GetState(queued->Task),
+        Runtime::StreamingTaskState::Cancelled);
+    EXPECT_FALSE(document.GetLastSceneFileEvent().has_value());
+
+    streaming.ApplyMainThreadResults();
+    const std::optional<Runtime::RuntimeSceneFileEvent>& event =
+        document.GetLastSceneFileEvent();
+    ASSERT_TRUE(event.has_value());
+    EXPECT_EQ(event->Sequence, 1u);
+    EXPECT_EQ(event->Operation, Runtime::RuntimeSceneFileOperation::Save);
+    EXPECT_EQ(event->Task, queued->Task);
+    EXPECT_EQ(event->Path, savedScene.Path.string());
+    EXPECT_EQ(event->Error, Core::ErrorCode::InvalidState);
+    EXPECT_FALSE(event->SaveResult.has_value());
+
+    streaming.ApplyMainThreadResults();
+    ASSERT_TRUE(document.GetLastSceneFileEvent().has_value());
+    EXPECT_EQ(document.GetLastSceneFileEvent()->Sequence, 1u);
 }

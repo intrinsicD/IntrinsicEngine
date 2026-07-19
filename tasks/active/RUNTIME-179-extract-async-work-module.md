@@ -36,58 +36,171 @@ maturity_target: Operational
   split; another job kind or internal execution mechanism alone does not.
 
 ## Status
-- In progress; owner: Codex team; branch:
-  `codex/runtime-179-async-work-module`; activated 2026-07-18.
-- Next gate: complete the four-axis cohesion and live-caller inventory before
-  changing the Engine/module surface.
+- Implementation complete; owner: Codex team; branch:
+  `codex/runtime-179-async-work-module`; activated 2026-07-18. Canonical
+  aggregate CPU verification completed before integration/retirement.
+- Four-axis cohesion and live-caller inventory completed 2026-07-18; the
+  implementation gate is open.
+
+## Four-axis cohesion and live-caller inventory
+
+### 1. App composition and lifecycle
+
+- `AsyncWorkService` is currently constructed with `Engine`, initialized once
+  per `Engine::Initialize()`, driven once per rendered frame in Maintenance,
+  shut down and drained before scene/assets teardown, reset before FrameGraph
+  teardown, and initialized again on engine reuse. The `StreamingExecutor` and
+  `DerivedJobRegistry` never have independent enable/disable, boot, frame, or
+  shutdown paths.
+- Sandbox is the production composition point for optional runtime modules.
+  It currently composes `ClusteringModule`; it must compose
+  `AsyncWorkModule` beside it. Contract/integration applications that exercise
+  streaming or derived work must likewise compose the module explicitly.
+- The current Engine boot order initializes async work before it wires
+  `AssetImportPipeline` and `SceneDocument`, but invokes module registration
+  only afterward. The behavior-preserving extraction therefore moves the
+  generic module registration phase earlier: after the scheduler, renderer,
+  FrameGraph, and boot world exist, but before consumers borrow published
+  async capabilities. Engine then discovers `StreamingExecutor` and
+  `DerivedJobRegistry` through `ServiceRegistry`; it does not name or
+  special-case `AsyncWorkModule`. The existing all-providers-collected
+  resolution/finalization phase remains after dependent subsystem wiring and
+  before application initialization, preserving Clustering and two-phase boot
+  behavior.
+
+### 2. Durable state and scope
+
+- The executor, derived registry, queues, diagnostics, and maintenance budget
+  are one global owner spanning all live worlds. Individual tasks are the
+  scoped records: raw streaming and derived descriptors currently lack
+  `WorldHandle`, so queued/running/ready-to-apply work cannot be retired by
+  world identity.
+- Live worker callbacks already receive copied/shared snapshots rather than a
+  registry from the executor. World/asset/ECS references appear only in
+  main-thread apply/validation callbacks; GPU readback workers borrow
+  renderer-owned transfer/command resources, not a live ECS world. The
+  extraction adds a valid world scope to every descriptor and retains only
+  that value in executor/registry records. No retirement check runs on a
+  worker or borrows `WorldRegistry`.
+- `WorldWillBeDestroyed` is published during deferred world Maintenance and
+  delivered at the next kernel event pump, before the next async Maintenance
+  commit. `AsyncWorkModule` subscribes once per boot, retires that exact
+  generation-qualified handle, cancels its pending/running/readback/apply
+  records, rejects later submissions for the retired handle, and rechecks the
+  retired set immediately before main-thread apply. Reinitialization creates
+  a fresh executor/registry and therefore a fresh retirement set.
+- Active-world `AssetImportPipeline` and `SceneDocument` work freezes the
+  submission `{WorldHandle, Scene::Registry*}` pair plus its binding epoch.
+  Main-thread apply validates that exact target against both `WorldRegistry`
+  and the active member binding; the epoch also detects an away-and-back
+  switch whose final handle and address match. Switching worlds without
+  retiring the old world fails closed rather than redirecting decoded results
+  into the newly active scene.
+
+### 3. Dependency, cancellation, and commit ownership
+
+- `DerivedJobRegistry` is constructed over the one persistent
+  `StreamingExecutor`; it translates derived dependencies/readbacks into
+  streaming records and delegates launch, completion drain, and bounded apply
+  to that executor. Both paths share cancellation generations, shutdown join,
+  Maintenance cadence, and the same main-thread apply gate. A separate module
+  would duplicate or split one authoritative cancellation/commit boundary.
+- Cancellation is a terminal derived-job decision: late worker failure/success
+  and main-thread apply bookkeeping preserve `Cancelled` instead of overwriting
+  it with `Failed` or `Complete`.
+- The existing core Maintenance contract is ordered
+  transfer collect → async drain/apply → asset tick → async pump. A single
+  generic post-contract frame hook would silently move apply after asset tick.
+  `AsyncWorkModule` therefore directly implements and publishes the existing
+  domain-free `Core::IStreamingFrameHooks` seam; Engine borrows that optional
+  seam through `ServiceRegistry` and passes it to the unchanged Maintenance
+  contract. This is the module's registered Maintenance contribution, not a
+  forwarding object or duplicate/no-op schedule hook, and it preserves the
+  exact apply and pump order.
+- Raw streaming callers are `AssetImportPipeline`, `SceneDocument`, Sandbox
+  default direct-mesh post-processing, and visualization HTEX recreation.
+  Derived callers are the selected-mesh texture bake, Sandbox method/editor
+  facades, model-scene progressive enrichment, and GPU readback helper. The
+  Engine currently wires the raw executor into asset/document dependencies and
+  forwards three derived-job facade methods; those facades have one production
+  consumer (`SandboxEditorFacades`) plus contract tests.
+- The module will publish the concrete `StreamingExecutor` and
+  `DerivedJobRegistry` through `ServiceRegistry`, plus its own existing
+  `Core::IStreamingFrameHooks` base for the kernel's existing Maintenance
+  contract.
+  Callers submit/cancel/read snapshots on the concrete capabilities directly;
+  there is no retained forwarding service or Engine facade. The module alone
+  performs drain/readback/apply, background pump, shutdown-and-drain, and
+  reset.
+
+### 4. Published state and consumer reactions
+
+- Streaming publishes task state/diagnostics and optional main-thread apply
+  payloads to asset, scene-document, and visualization consumers. Derived work
+  publishes richer dependency/readback/apply status snapshots consumed by the
+  Sandbox editor and invokes method-specific commit callbacks. These records
+  intentionally retain different meanings and are not merged.
+- There is nevertheless no independent standing reaction or lifecycle split:
+  derived publication is an observable view over work scheduled and committed
+  by the same executor lane, and both capabilities must quiesce atomically
+  before their consumers tear down. The distinct public records justify two
+  narrow `ServiceRegistry` entries, not two composition units.
+
+### Cohesion verdict
+
+All four axes are cohesive. Fold `AsyncWorkService` into one concrete
+`AsyncWorkModule`; do not split the task and do not retain a wrapper. The only
+intentional semantic hardening is fail-closed world-retirement cancellation
+and stale-commit rejection.
 
 ## Required changes
-- [ ] Introduce one concrete `AsyncWorkModule` by folding the existing
+- [x] Introduce one concrete `AsyncWorkModule` by folding the existing
       `AsyncWorkService` state and behavior into the runtime-module owner.
-- [ ] Prove the streaming and derived-job responsibilities are cohesive on all
+- [x] Prove the streaming and derived-job responsibilities are cohesive on all
       four ADR-0026 axes above; split the implementation/task if the live
       inventory disproves that hypothesis.
-- [ ] Register the existing streaming/derived-job maintenance work at the
-      named Maintenance frame phase; preserve main-thread apply ordering.
-- [ ] Publish the existing narrow streaming and derived-job capabilities
+- [x] Register the existing streaming/derived-job maintenance work by directly
+      providing `Core::IStreamingFrameHooks` to the canonical Maintenance
+      contract; preserve main-thread apply ordering.
+- [x] Publish the existing narrow streaming and derived-job capabilities
       through `ServiceRegistry` without adding a forwarding facade.
-- [ ] Move initialization, shutdown-and-drain, and reset ordering from
+- [x] Move initialization, shutdown-and-drain, and reset ordering from
       `Engine` into the module lifecycle.
-- [ ] Keep every job snapshot-only and world-qualified. On world retirement,
+- [x] Keep every job snapshot-only and world-qualified. On world retirement,
       cancel scoped work and reject already-finished stale results at the
       main-thread commit gate without borrowing a live registry/world.
-- [ ] Remove `Engine::SubmitDerivedJob`, `Engine::CancelDerivedJob`, and
+- [x] Remove `Engine::SubmitDerivedJob`, `Engine::CancelDerivedJob`, and
       `Engine::GetDerivedJobQueueSnapshot` and migrate production/tests to the
       module service.
-- [ ] Remove `Extrinsic.Runtime.AsyncWorkService` from the Engine interface and
+- [x] Remove `Extrinsic.Runtime.AsyncWorkService` from the Engine interface and
       private state; do not leave a compatibility re-export.
 
 ## Tests
-- [ ] Preserve streaming cancellation, main-thread apply, derived-job queue,
+- [x] Preserve streaming cancellation, main-thread apply, derived-job queue,
       shutdown drain, and reinitialize coverage through the module surface.
-- [ ] Add world-retirement coverage proving queued/running/already-finished
+- [x] Add world-retirement coverage proving queued/running/already-finished
       scoped work cannot commit after retirement and no worker retains or
       borrows live world state.
-- [ ] Add an integration test proving the app-composed module executes its
+- [x] Add an integration test proving the app-composed module executes its
       maintenance path during `Engine::Run()`.
-- [ ] Run focused runtime async/job coverage, strict layering, and the complete
+- [x] Run focused runtime async/job coverage, strict layering, and the complete
       default CPU-supported gate.
 
 ## Docs
-- [ ] Update runtime module/lifecycle documentation and the kernel target-state
+- [x] Update runtime module/lifecycle documentation and the kernel target-state
       row with global state scope and the new owner.
-- [ ] Regenerate the module inventory after the public surface changes.
+- [x] Regenerate the module inventory after the public surface changes.
 
 ## Acceptance criteria
-- [ ] `Engine` owns no streaming executor, derived-job registry, or async-work
+- [x] `Engine` owns no streaming executor, derived-job registry, or async-work
       domain facade.
-- [ ] One concrete module owns lifecycle, maintenance, diagnostics, and
+- [x] One concrete module owns lifecycle, maintenance, diagnostics, and
       shutdown; no module-to-service forwarding layer is added.
-- [ ] The cohesion inventory covers all ADR-0026 axes, and world-retired work
+- [x] The cohesion inventory covers all ADR-0026 axes, and world-retired work
       is cancelled or dropped whole before commit.
-- [ ] Existing async behavior is exercised through the canonical app runtime
+- [x] Existing async behavior is exercised through the canonical app runtime
       path and remains deterministic.
-- [ ] The only intentional behavior change is fail-closed world-retirement
+- [x] The only intentional behavior change is fail-closed world-retirement
       cancellation/stale-commit rejection required by the accepted state-scope
       contract.
 
@@ -102,6 +215,28 @@ python3 tools/repo/check_kernel_convergence.py --root . --strict
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 ```
+
+Evidence recorded 2026-07-18:
+
+- `ci-fast` expanded runtime selection: 237/237 passed; targeted slow
+  direct-mesh shutdown drain and Sandbox presentation seams: 2/2 passed.
+- Fresh canonical `ci` configure and runtime contract/integration build:
+  1571/1571 build steps completed.
+- Canonical focused selector
+  `AsyncWork|DerivedJob|Streaming|RuntimeModule`: 86/86 passed.
+- Strict kernel convergence, layering, test layout, task policy, root hygiene,
+  documentation links, diff whitespace, and gate-routing self-tests (19/19)
+  passed. Kernel-convergence checker regressions also passed 19/19. The
+  generated module inventory contains 388 modules.
+- Independent source review reported no blocking findings. The canonical
+  `IntrinsicTests` aggregate build completed 1562/1562, and the complete
+  CPU-supported CTest selector passed 4121/4121 selected tests with one
+  expected GLFW/LSan capability skip.
+- Integration with repaired `main` through `82ba8272` resolved the shared
+  gate-routing baseline mismatch while preserving RUNTIME-179's scoped cases.
+  The reconciled `ci-fast` runtime selection passed 238/238, and the live
+  `IntrinsicTests` routing audit passed across 36 targets, 4172 cases, and
+  338 sources.
 
 ## Forbidden changes
 - Adding another executor, scheduler, registry, or wrapper service.
