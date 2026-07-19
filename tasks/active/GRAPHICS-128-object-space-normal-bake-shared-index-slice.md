@@ -9,11 +9,13 @@ maturity_target: Operational
 
 ## Status
 
-- In progress as of 2026-07-19; owner: Codex team; implementation branch:
-  `codex/graphics-128-shared-index-slice`.
-- Next gate: propagate `FirstIndex` through the graphics bake plan/record
-  contract, then prove the nonzero slice with the focused CPU contract and
-  decoy-plus-target Vulkan smoke.
+- Implementation and verification complete as of 2026-07-19; owner: Codex
+  team; implementation branch: `codex/graphics-128-shared-index-slice`;
+  implementation commit: `a42a57e8`.
+- The branch remains active for review/integration. The graphics slice reached
+  `CPUContracted` through the backend-neutral contract tests and `Operational`
+  on the recorded Vulkan-capable host; the end-to-end provider remains
+  `RUNTIME-129`.
 
 ## Goal
 - Make the graphics-owned object-space normal texture bake record the selected
@@ -47,48 +49,73 @@ maturity_target: Operational
   existing correct shared-index-slice precedent.
 
 ## Required changes
-- [ ] Add `FirstIndex` to
+- [x] Add `FirstIndex` to
       `ObjectSpaceNormalTextureBakeGeometryBuffers`,
       `ObjectSpaceNormalTextureBakeGpuRecordTemplate`, and
       `ObjectSpaceNormalTextureBakeGpuRecordDesc`.
-- [ ] Propagate `FirstIndex` through
+- [x] Propagate `FirstIndex` through
       `BuildObjectSpaceNormalTextureBakePlan(...)` and
       `MakeObjectSpaceNormalTextureBakeGpuRecordDesc(...)`, including every
       affected aggregate initializer.
-- [ ] Keep `BindIndexBuffer(IndexBuffer, 0, Uint32)` and record
+- [x] Keep `BindIndexBuffer(IndexBuffer, 0, Uint32)` and record
       `DrawIndexed(IndexCount, 1, FirstIndex, 0, 0)`.
-- [ ] Keep base vertex fixed at zero; do not export a base-vertex field or
+- [x] Keep base vertex fixed at zero; do not export a base-vertex field or
       reinterpret `GpuGeometryRecord::VertexOffset` for this bake.
 
 ## Tests
-- [ ] Extend
+- [x] Extend
       `tests/contract/graphics/Test.ObjectSpaceNormalTextureBake.cpp` with a
       nonzero `FirstIndex` plan/descriptor/command assertion, including
       `DrawVertexOffset == 0`.
-- [ ] Extend
+- [x] Extend
       `tests/integration/graphics/Test.ObjectSpaceNormalTextureBakeGpuSmoke.cpp`
       with one combined index buffer containing a decoy triangle before the
       target triangle; set a nonzero `FirstIndex` and prove readback samples the
       target triangle's encoded object-space normal rather than the decoy.
-- [ ] Preserve zero-first-index and padded-dilation coverage.
+- [x] Preserve zero-first-index and padded-dilation coverage.
 
 ## Docs
-- [ ] Update `src/graphics/renderer/README.md` with the shared-index-slice and
+- [x] Update `src/graphics/renderer/README.md` with the shared-index-slice and
       zero-base-vertex contract.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` after the `.cppm`
+- [x] Regenerate `docs/api/generated/module_inventory.md` after the `.cppm`
       descriptor surface changes.
 
 ## Acceptance criteria
-- [ ] Plan construction and descriptor materialization preserve a nonzero
+- [x] Plan construction and descriptor materialization preserve a nonzero
       selected surface first index.
-- [ ] Command recording binds the shared index buffer at byte offset zero and
+- [x] Command recording binds the shared index buffer at byte offset zero and
       passes the selected `FirstIndex` with vertex offset zero.
-- [ ] An actually-run `gpu;vulkan` readback smoke distinguishes the target
+- [x] An actually-run `gpu;vulkan` readback smoke distinguishes the target
       slice from preceding decoy indices.
-- [ ] No runtime, ECS, asset-service, Vulkan-native, or RHI interface knowledge
+- [x] No runtime, ECS, asset-service, Vulkan-native, or RHI interface knowledge
       is added to the graphics bake module.
 
 ## Verification
+
+Evidence recorded on 2026-07-19:
+
+- Strict task policy/schema, source layering, test-layout, root-hygiene,
+  documentation-link, and generated-module-inventory freshness checks passed.
+- The clean-workshop automated bundle passed. Manual scorecard row 3 passed:
+  the added graphics exports name only existing RHI and standard scalar types;
+  rows 4-6 are not applicable because this slice adds no renderer
+  member/subsystem, frame-graph pass, or recipe dependency. Rows 7-8 are not
+  applicable because the slice is Operational and adds no temporary exception.
+- The `ci` preset configured with Clang 23; both
+  `IntrinsicGraphicsContractTests` and `IntrinsicTests` built successfully.
+  The focused object-space-normal-bake selector passed 17/17 tests. The full
+  exclusion-only CPU selector reported 0 failures across 4,154 selected tests;
+  one unrelated GLFW LeakSanitizer control test was explicitly skipped.
+- The `ci-vulkan` preset configured and built `IntrinsicTests` with the required
+  ASan+UBSan instrumentation. On an NVIDIA GeForce RTX 3050 with driver
+  590.48.01 and Vulkan API 1.4.325, the intersected `gpu;vulkan` selector
+  actually ran
+  `ObjectSpaceNormalTextureBakeGpuSmoke.VulkanBakeMatchesCpuContractAtSelectedTexels`
+  and passed 1/1 in 5.23 seconds with zero skips. The fixture's combined index
+  buffer places a valid decoy slice before the selected nonzero-first-index
+  target slice and compares the readback against their distinguishable encoded
+  normals.
+
 ```bash
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/agents/validate_tasks.py --root tasks --strict
