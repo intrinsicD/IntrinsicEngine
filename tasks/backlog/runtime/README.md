@@ -165,14 +165,18 @@ triggers. The implementation graph is:
 - Retired `RUNTIME-181` composes the one global validated config
   preview/apply and app-section owner while kernel startup remains
   omission-safe.
-- Re-scoped [`RUNTIME-172`](RUNTIME-172-privatize-scene-document-surface.md) —
-  compose the cohesive SceneEditing owner after `RUNTIME-179` and
-  `HARDEN-086`; document/history/selection/lookup/readback/gizmo records are
-  keyed or reset by `WorldHandle`.
+- Re-scoped [`RUNTIME-172`](RUNTIME-172-extract-scene-document-module.md) —
+  compose the document/history owner after `RUNTIME-179` and `HARDEN-086`;
+  one active-world binding owns file operations, history, and the narrow
+  synchronous scene-replacement participant contract.
+- [`RUNTIME-188`](RUNTIME-188-extract-scene-interaction-module.md) — compose
+  selection/lookup/readback/gizmo/mesh-view ownership after the document,
+  camera, and editor-capture seams exist; copied world-tagged snapshots replace
+  Engine-owned interaction pointers.
 - [`RUNTIME-183`](RUNTIME-183-extract-asset-workflow-module.md) — compose the
-  global asset/residency/import/bake owner after its async, scene, camera, and
-  config capabilities exist; borrowed world handoffs never become hidden ECS
-  ownership.
+  global asset/residency/import/bake owner after its async, document,
+  interaction, camera, and config capabilities exist; borrowed world handoffs
+  never become hidden ECS ownership.
 - Retired `RUNTIME-182` composes the optional global ImGui/host owner, with
   one frame-local kernel capture value, a preserved paired Begin/End bracket,
   and app-owned Sandbox panels.
@@ -197,8 +201,10 @@ triggers. The implementation graph is:
   representation-only PImpl plus exact Engine import/getter/type/re-export
   checker ratchet.
 
-`GRAPHICS-127` follows `RUNTIME-181`/`RUNTIME-182` so its profiling config and
-Frame Graph UI use the settled owners.
+Active
+[`GRAPHICS-127`](../../active/GRAPHICS-127-native-gpu-timestamp-profiler.md)
+follows retired `RUNTIME-181`/`RUNTIME-182` so its profiling config and Frame
+Graph UI use the settled owners.
 Retired `RUNTIME-177` added no generic debug-draw producer seam because its
 consumer inventory was empty; existing spatial-debug and transform-gizmo
 paths remain typed. `RUNTIME-129` and `RUNTIME-184` may proceed independently
@@ -275,9 +281,12 @@ main `Runtime.RenderExtraction` module slimming.
 
 - [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md) —
   privatize the Sandbox default policy module after `RUNTIME-144`.
-- [`RUNTIME-172`](RUNTIME-172-privatize-scene-document-surface.md) —
-  reduce or retire the exported scene document orchestration surface after
-  `RUNTIME-148`.
+- [`RUNTIME-172`](RUNTIME-172-extract-scene-document-module.md) — replace the
+  exported scene-document orchestration surface with the exact composed
+  document/history owner.
+- [`RUNTIME-188`](RUNTIME-188-extract-scene-interaction-module.md) — extract
+  the separately audited interaction/readback/gizmo owner and remove its
+  Engine facade and borrowed render pointers.
 
 ### Retired module-surface diet work
 
