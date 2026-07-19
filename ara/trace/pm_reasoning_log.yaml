@@ -1032,3 +1032,11 @@ entries:
       - "Did not stage or crystallize a generalized observation: this slice implements the selected ADR-0026/ADR-0027 responsibility split and leaves the broader module posture in O08 and O09 unresolved."
       - "Kept O08, O09, O13, and O38 unpromoted and non-stale because current open threads still reference module posture, model-training interpretation, and actual Progressive Poisson Vulkan parity; no contradiction or closure signal appeared."
       - "Left integration and retirement to the root owner as explicitly required."
+  - turn: "2026-07-19_001#3"
+    notes:
+      - "Routed GRAPHICS-127 implementation plus exact-head CPU/Vulkan/XML evidence as experiment N268 because it produced bounded capability and correctness proof rather than a generalized performance claim."
+      - "Recorded the initial 44/46 cohort stop and approved unchanged recovery inside N268 rather than as a dead end: the executable prerequisite was absent, the two failures were exit-127 harness failures, and explicitly building the declared target made both unchanged cases pass."
+      - "Kept the 2,048 ns SurfacePass value diagnostic-only; one host/run cannot support an overhead or comparative performance claim."
+      - "Did not stage or crystallize a new observation: the experiment implements the already-committed GRAPHICS-127 contract and O51's selectively adopted profiler direction."
+      - "Kept O08, O09, O13, and O38 unpromoted and non-stale because current open threads still reference them and this turn supplies no contradiction or closure."
+      - "Left aggregate repair, current-main integration, evidence review, and task retirement to the root owner as explicitly required."

@@ -2,9 +2,9 @@ session:
   id: "2026-07-19_001"
   date: "2026-07-19"
   started: "2026-07-19T04:02+02:00"
-  last_turn: "2026-07-19T09:41+02:00"
-  turn_count: 2
-  summary: "Implemented and verified the app-composed RUNTIME-181 config-control and RUNTIME-172 scene-document modules; RUNTIME-172 remains active for root-owned integration and retirement."
+  last_turn: "2026-07-19T12:17+02:00"
+  turn_count: 3
+  summary: "Implemented and verified RUNTIME-181, RUNTIME-172, and GRAPHICS-127; native Vulkan timestamp evidence is complete while GRAPHICS-127 awaits aggregate repair, main integration, and retirement review."
 
 events_logged:
   - turn: 1
@@ -19,6 +19,12 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Extracted exact one-world scene-document/history ownership, passed 68 focused and 4,175 complete CPU tests with one capability skip, and reached the 33/11/2/22 Engine ratchet."
+  - turn: 3
+    type: experiment
+    id: "N268"
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented native Vulkan timestamp profiling and passed complete CPU, focused profiler/GPU, recovered 46-case Vulkan, and direct selected-device XML evidence."
 
 ai_actions:
   - turn: 1
@@ -46,6 +52,17 @@ ai_actions:
       - "tests/contract/runtime/Test.SceneDocumentModule.cpp"
       - "docs/architecture/runtime.md"
       - "tasks/active/RUNTIME-172-extract-scene-document-module.md"
+  - turn: 3
+    action: "Implemented GRAPHICS-127's native Vulkan timestamp lifecycle, render-graph profiling integration, synchronous config/editor control, audit-gap repairs, frame-end device-loss precedence, CPU/Vulkan regressions, documentation, and exact selected-device evidence."
+    provenance: ai-executed
+    files_changed:
+      - "src/graphics/rhi/RHI.Profiler.cppm"
+      - "src/graphics/rhi/RHI.Profiler.cpp"
+      - "src/graphics/vulkan/Backends.Vulkan.Profiler.cpp"
+      - "src/graphics/vulkan/Backends.Vulkan.Device.cpp"
+      - "src/graphics/renderer/Graphics.Renderer.cpp"
+      - "tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp"
+      - "tasks/active/GRAPHICS-127-native-gpu-timestamp-profiler.md"
 
 claims_touched: []
 
@@ -54,6 +71,8 @@ key_context:
     excerpt: "RUNTIME-181 requires Engine to retain boot recipe substrate without owning the optional live-control facade, while Sandbox composes and resolves one exact control module/service."
   - turn: 2
     excerpt: "RUNTIME-172 keeps document/history ownership in one optional active-world-bound module while narrow named participants preserve interaction and asset-handoff replacement ordering until their owning tasks land."
+  - turn: 3
+    excerpt: "GRAPHICS-127 may claim native Operational evidence only from a non-skipped exact-head slot-reuse smoke bound to the selected device; raw timestamp values remain diagnostics rather than performance claims."
 
 open_threads:
   - "An owner may externalize the candidate stable contexts through branch protection, rulesets, or a merge queue; none is currently configured."
@@ -67,6 +86,7 @@ open_threads:
   - "Finish CORE-009 documentation, full CPU verification, and task retirement."
   - "Run RUNTIME-181's complete default CPU-supported integration gate, then review and retire the still-active task."
   - "Integrate and review the clean RUNTIME-172 branch, then let the root owner retire the still-active task."
+  - "Repair the IntrinsicTests-to-ExtrinsicSandbox aggregate prerequisite, integrate current main, review the retained GRAPHICS-127 logs/XML, and only then retire GRAPHICS-127."
 
 ai_suggestions_pending:
   - "Let StructSplat and Prospect owners merge the pushed refresh branches through each repository's normal integration policy."

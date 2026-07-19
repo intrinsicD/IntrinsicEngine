@@ -6353,3 +6353,38 @@ tree:
       expectations or production behavior, made all five deterministic reruns
       pass.
     status: resolved
+  - id: N268
+    type: experiment
+    title: "Implement and prove native Vulkan timestamp profiling"
+    provenance: ai-executed
+    timestamp: "2026-07-19T12:17+02:00"
+    also_depends_on: [N240]
+    evidence:
+      - "commits efcd5cf4, bb9bedf6, 7a96b742, 6b63d4b9, d3f2c643, 77a34b99, and de6435e7"
+      - "src/graphics/rhi/RHI.Profiler.cppm"
+      - "src/graphics/vulkan/Backends.Vulkan.Profiler.cpp"
+      - "src/graphics/renderer/Graphics.Renderer.cpp"
+      - "tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp"
+      - "/tmp/graphics-127-final-ci-ctest.log"
+      - "/tmp/graphics-127-final-ci-vulkan-focused-gpu-ctest.log"
+      - "/tmp/graphics-127-final-ci-vulkan-full-gpu-rerun-ctest.log"
+      - "/tmp/graphics-127-current-head.xml"
+    result: >
+      Implemented device-lifetime Vulkan query pools, exact frame-slot
+      retirement, valid-bit/wrap-safe nonblocking resolution, selected-device
+      diagnostics, compiled-pass and accepted-queue attribution, fresh-only
+      telemetry, synchronous config/UI control, and fail-closed loss handling.
+      Final Clang 23 evidence passed 4,206 CPU cases with one expected
+      GLFW/LSan skip, seven profiler/retirement contracts, three required
+      non-skipped native/parallel GPU cases, and the recovered complete 46-case
+      gpu+vulkan cohort. The first full cohort stopped at 44/46 because the
+      prescribed IntrinsicTests aggregate omitted the separately registered
+      ExtrinsicSandbox prerequisite; explicitly building that approved target
+      made both unchanged process gates pass. Direct XML then passed one of one
+      with zero skips/failures on an NVIDIA GeForce RTX 3050, driver 590.48.01:
+      eight successful frames, three frames in flight, NativeGpu SurfacePass,
+      and resolved submitted frame 4 / slot 1 / age 3. The 2,048 ns pass value
+      is retained only as a correctness diagnostic, not a performance claim.
+      Task retirement remains held for the aggregate repair, current-main
+      integration, and root review.
+    status: resolved

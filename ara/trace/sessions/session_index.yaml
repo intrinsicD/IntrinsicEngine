@@ -134,8 +134,8 @@ sessions:
     open_threads: 9
   - id: "2026-07-19_001"
     date: "2026-07-19"
-    summary: "Implemented and verified the app-composed RUNTIME-181 config-control and RUNTIME-172 scene-document modules; RUNTIME-172 remains active for root-owned integration and retirement."
-    turn_count: 2
-    events_count: 2
+    summary: "Implemented and verified RUNTIME-181, RUNTIME-172, and GRAPHICS-127; native Vulkan timestamp evidence is complete while GRAPHICS-127 awaits aggregate repair, main integration, and retirement review."
+    turn_count: 3
+    events_count: 3
     claims_touched: []
-    open_threads: 11
+    open_threads: 12
