@@ -15,8 +15,10 @@ maturity_target: Operational
 
 - In progress as of 2026-07-19; owner: Codex team; implementation branch:
   `codex/graphics-127-gpu-profiler`.
-- Next gate: repair the RHI lifecycle/provenance contract and land its focused
-  CPU coverage before native Vulkan query-pool and compiled-pass integration.
+- Slice 1 is CPU-contracted on the implementation branch: the repaired RHI
+  lifecycle/provenance contract, truthful Null adapter, checked timestamp
+  helpers, and focused CPU coverage are complete. Next gate: native Vulkan
+  query-pool lifecycle and slot-reuse resolution.
 - `RUNTIME-181` and `RUNTIME-182` are retired, so ConfigControl and EditorUi
   are settled owners, not future blockers. All implementation, test,
   documentation, and native-GPU evidence checkboxes remain open.
@@ -198,8 +200,8 @@ Each slice is a separately reviewable commit and must pass its focused CPU check
 
 ## Required changes
 
-- [ ] Repair the existing RHI contract with explicit monotonic frame identity separate from frame slot, a typed invalid scope result, queue/source provenance, and deterministic invalid-pairing/overflow/unsupported diagnostics.
-- [ ] Make Null/mock profiling validate lifecycle, names, frame-slot reuse, and not-ready behavior without labeling host-clock durations as native GPU time.
+- [x] Repair the existing RHI contract with explicit monotonic frame identity separate from frame slot, a typed invalid scope result, queue/source provenance, and deterministic invalid-pairing/overflow/unsupported diagnostics.
+- [x] Make Null/mock profiling validate lifecycle, names, frame-slot reuse, and not-ready behavior without labeling host-clock durations as native GPU time.
 - [ ] Add the one default-off config field, route editor and agent/CLI writes through synchronous `EngineConfigControl` preview/apply, and sample committed state once into `RenderFrameInput` after `UiEndCapture`.
 - [ ] Use the settled app-composed ConfigControl and existing EditorShell Frame Graph contribution; do not add a profiling-specific Engine getter, renderer setter, callback, staging queue, or UI path.
 - [ ] Construct the device-lifetime Vulkan adapter after successful device initialization and its fixed query pool whenever a promoted actual queue supports native timestamps. The immutable `RenderFrameInput` sample gates new recording and fresh publication for that frame; previously submitted metadata is retired only at its later slot-completion proof. Hot disable marks any last-good sample stale and never destroys/recreates pools while frames are in flight.
@@ -212,12 +214,12 @@ Each slice is a separately reviewable commit and must pass its focused CPU check
 
 ## Tests
 
-- [ ] Add `tests/unit/graphics/Test.RHI.Profiler.cpp` to
+- [x] Add `tests/unit/graphics/Test.RHI.Profiler.cpp` to
   `IntrinsicGraphicsRhiCpuUnitTests`. Cover valid-bit widths 0 and 64,
   32-bit wrap (`0xfffffff0 -> 0x20 == 48` ticks), finite/zero/non-finite
   period, checked nanosecond overflow, availability pairs, and slot-local
   versus absolute query bounds.
-- [ ] Add `tests/contract/graphics/Test.Profiler.cpp` to
+- [x] Add `tests/contract/graphics/Test.Profiler.cpp` to
   `IntrinsicGraphicsContractCpuTests`. Cover typed-token invalidity,
   frame-number versus slot reuse, begin/end/seal/discard ordering, duplicate
   end, exhaustion, not-ready last-good retention, source/queue provenance,

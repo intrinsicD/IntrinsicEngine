@@ -2,10 +2,7 @@ module;
 
 #include <cstdint>
 #include <expected>
-#include <mutex>
-#include <string>
-#include <string_view>
-#include <vector>
+#include <span>
 
 #include "Vulkan.hpp"
 
@@ -13,6 +10,8 @@ export module Extrinsic.Backends.Vulkan:Diagnostics;
 
 export import Extrinsic.Core.Telemetry;
 export import Extrinsic.RHI.Profiler;
+import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.QueueAffinity;
 
 namespace Extrinsic::Backends::Vulkan
 {
@@ -23,40 +22,34 @@ namespace Extrinsic::Backends::Vulkan
     public:
         explicit VulkanProfiler(VkDevice device, VkPhysicalDevice physDevice,
                                  uint32_t framesInFlight);
-        ~VulkanProfiler() override;
+        ~VulkanProfiler() override = default;
 
-        void SetCommandBuffer(VkCommandBuffer cmd) { m_Cmd = cmd; }
-        void ResetFrame(uint32_t frameIndex, VkCommandBuffer cmd);
-
-        void BeginFrame(uint32_t frameIndex, uint32_t maxScopesHint) override;
-        void EndFrame() override;
-        [[nodiscard]] uint32_t BeginScope(std::string_view name) override;
-        void EndScope(uint32_t scopeHandle) override;
+        [[nodiscard]] std::expected<RHI::ProfilerFramePlan, RHI::ProfilerError>
+        BeginFrame(RHI::ProfilerFrameKey frame,
+                   std::span<const RHI::ProfilerScopeDesc> scopes) override;
+        [[nodiscard]] std::expected<void, RHI::ProfilerError>
+        BeginQueue(RHI::ICommandContext& context,
+                   RHI::QueueAffinity queue) override;
+        [[nodiscard]] std::expected<void, RHI::ProfilerError>
+        EndQueue(RHI::ICommandContext& context,
+                 RHI::QueueAffinity queue) override;
+        [[nodiscard]] std::expected<void, RHI::ProfilerError>
+        BeginScope(RHI::ICommandContext& context,
+                   RHI::ProfilerScopeToken scope) override;
+        [[nodiscard]] std::expected<void, RHI::ProfilerError>
+        EndScope(RHI::ICommandContext& context,
+                 RHI::ProfilerScopeToken scope) override;
+        [[nodiscard]] std::expected<void, RHI::ProfilerError>
+        EndFrame(RHI::ProfilerFrameKey frame,
+                 RHI::ProfilerFrameDisposition disposition) override;
         [[nodiscard]] std::expected<RHI::GpuTimestampFrame, RHI::ProfilerError>
-            Resolve(uint32_t frameIndex) const override;
+        Resolve(RHI::ProfilerFrameKey frame) const override;
+        [[nodiscard]] RHI::ProfilerStatusSnapshot GetStatus() const override;
         [[nodiscard]] uint32_t GetFramesInFlight() const override { return m_FramesInFlight; }
 
     private:
-        struct ScopeRecord { std::string Name; uint32_t BeginQuery, EndQuery; };
-        struct FrameState
-        {
-            uint32_t FrameIndex  = 0;
-            uint32_t QueryBase   = 0;
-            uint32_t QueryCount  = 0;
-            uint32_t FrameBegin  = ~0u;
-            uint32_t FrameEnd    = ~0u;
-            std::vector<ScopeRecord> Scopes;
-        };
-
-        VkDevice        m_Device    = VK_NULL_HANDLE;
-        VkQueryPool     m_Pool      = VK_NULL_HANDLE;
-        VkCommandBuffer m_Cmd       = VK_NULL_HANDLE;
-        double          m_PeriodNs  = 1.0;
-        bool            m_Supported = false;
-        uint32_t        m_FramesInFlight;
-        uint32_t        m_TotalQueries;
-        std::vector<FrameState> m_Frames;
-        mutable std::mutex m_Mutex;
+        VkDevice m_Device{VK_NULL_HANDLE};
+        VkPhysicalDevice m_PhysicalDevice{VK_NULL_HANDLE};
+        uint32_t m_FramesInFlight{0};
     };
 }
-

@@ -269,7 +269,9 @@ namespace Extrinsic::RHI
         [[nodiscard]] virtual IBindlessHeap& GetBindlessHeap() = 0;
 
         // ---- GPU profiler --------------------------------------------
-        // Returns nullptr when profiling is disabled (e.g. release without Tracy).
+        // The backend adapter, when present, has device lifetime. Runtime
+        // config controls recording/publication, never adapter lifetime.
+        // nullptr means this device exposes no profiling contract.
         [[nodiscard]] virtual IProfiler* GetProfiler() = 0;
 
         // ---- Frame utilities -----------------------------------------

@@ -1,18 +1,22 @@
 module;
 
-#include <chrono>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <vector>
+#include <array>
+#include <atomic>
+#include <cstddef>
+#include <cstdint>
 #include <expected>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
+#include <utility>
+#include <vector>
 
 module Extrinsic.Backends.Null;
 
-import Extrinsic.Core.Telemetry;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Profiler;
+import Extrinsic.RHI.QueueAffinity;
 
 namespace Extrinsic::Backends::Null
 {
@@ -21,110 +25,369 @@ namespace Extrinsic::Backends::Null
     public:
         explicit NullProfiler(std::uint32_t framesInFlight)
             : m_FramesInFlight(framesInFlight)
+            , m_ResolvedFrames(framesInFlight)
         {
         }
 
-        void BeginFrame(std::uint32_t frameIndex, std::uint32_t maxScopesHint) override
+        [[nodiscard]] std::expected<RHI::ProfilerFramePlan, RHI::ProfilerError>
+        BeginFrame(const RHI::ProfilerFrameKey frame,
+                   const std::span<const RHI::ProfilerScopeDesc> scopes) override
         {
-            [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"NullProfiler::BeginFrame", Extrinsic::Core::Telemetry::HashString("NullProfiler::BeginFrame")};
-            std::scoped_lock lock{m_Mutex};
-            m_ActiveFrame.FrameIndex = frameIndex;
-            m_ActiveFrame.FrameStart = Clock::now();
-            m_ActiveFrame.Scopes.clear();
-            m_ActiveFrame.Scopes.reserve(maxScopesHint);
-            m_FrameOpen = true;
-        }
-
-        void EndFrame() override
-        {
-            [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"NullProfiler::EndFrame", Extrinsic::Core::Telemetry::HashString("NullProfiler::EndFrame")};
-            std::scoped_lock lock{m_Mutex};
-            if (!m_FrameOpen)
-                return;
-
-            const auto now = Clock::now();
-            RHI::GpuTimestampFrame resolved{};
-            resolved.FrameNumber = m_ActiveFrame.FrameIndex;
-            resolved.CpuSubmitTimeNs = ToNs(now.time_since_epoch());
-            resolved.GpuFrameTimeNs = ToNs(now - m_ActiveFrame.FrameStart);
-
-            resolved.Scopes.reserve(m_ActiveFrame.Scopes.size());
-            for (const ScopeState& scope : m_ActiveFrame.Scopes)
+            if (m_ActiveFrame.has_value())
             {
-                RHI::GpuTimestampScope out{};
-                out.Name = scope.Name;
-                out.DurationNs = scope.Ended ? ToNs(scope.EndTime - scope.StartTime) : 0;
-                resolved.Scopes.push_back(std::move(out));
+                return std::unexpected(RHI::ProfilerError::InvalidState);
+            }
+            if (frame.FrameSlot >= m_FramesInFlight)
+            {
+                return std::unexpected(RHI::ProfilerError::InvalidArgument);
+            }
+            if (scopes.size() > RHI::kMaxTimestampScopesPerFrame)
+            {
+                return std::unexpected(RHI::ProfilerError::Exhausted);
+            }
+            for (std::size_t index = 0; index < scopes.size(); ++index)
+            {
+                if (scopes[index].Name.empty())
+                {
+                    return std::unexpected(RHI::ProfilerError::InvalidArgument);
+                }
+                if (const std::optional<RHI::ProfilerError> queueError =
+                        ValidateQueue(scopes[index].Queue);
+                    queueError.has_value())
+                {
+                    return std::unexpected(*queueError);
+                }
+                for (std::size_t prior = 0; prior < index; ++prior)
+                {
+                    if (scopes[prior].Ordinal == scopes[index].Ordinal)
+                    {
+                        return std::unexpected(
+                            RHI::ProfilerError::InvalidArgument);
+                    }
+                }
             }
 
-            m_ResolvedFrames[resolved.FrameNumber] = std::move(resolved);
-            m_FrameOpen = false;
+            m_ResolvedFrames[frame.FrameSlot].reset();
+            const std::uint64_t planGeneration = m_NextPlanGeneration;
+            ++m_NextPlanGeneration;
+            if (m_NextPlanGeneration ==
+                RHI::ProfilerScopeToken::InvalidGeneration)
+            {
+                m_NextPlanGeneration = 1;
+            }
+            ActiveFrameState active{
+                .Frame = frame,
+                .PlanGeneration = planGeneration,
+            };
+            active.Scopes.reserve(scopes.size());
+            active.ScopeLifecycles =
+                std::make_unique<std::atomic<ScopeLifecycle>[]>(scopes.size());
+
+            RHI::ProfilerFramePlan plan{
+                .Frame = frame,
+            };
+            plan.ScopeTokens.reserve(scopes.size());
+            for (std::uint32_t index = 0;
+                 index < static_cast<std::uint32_t>(scopes.size());
+                 ++index)
+            {
+                active.Scopes.push_back(scopes[index]);
+                active.ScopeLifecycles[index].store(
+                    ScopeLifecycle::Planned,
+                    std::memory_order_relaxed);
+                plan.ScopeTokens.push_back(RHI::ProfilerScopeToken{
+                    .PlanGeneration = active.PlanGeneration,
+                    .ScopeIndex = index,
+                });
+            }
+            m_ActiveFrame = std::move(active);
+            return plan;
         }
 
-        [[nodiscard]] std::uint32_t BeginScope(std::string_view name) override
+        [[nodiscard]] std::expected<void, RHI::ProfilerError>
+        BeginQueue(RHI::ICommandContext&,
+                   const RHI::QueueAffinity queue) override
         {
-            std::scoped_lock lock{m_Mutex};
-            if (!m_FrameOpen)
-                return 0;
-
-            ScopeState scope{};
-            scope.Name = std::string(name);
-            scope.StartTime = Clock::now();
-            m_ActiveFrame.Scopes.push_back(std::move(scope));
-            return static_cast<std::uint32_t>(m_ActiveFrame.Scopes.size() - 1);
+            if (const std::optional<RHI::ProfilerError> queueError =
+                    ValidateQueue(queue);
+                queueError.has_value())
+            {
+                return std::unexpected(*queueError);
+            }
+            ActiveFrameState* active = ActiveFrame();
+            if (active == nullptr)
+            {
+                return std::unexpected(RHI::ProfilerError::InvalidState);
+            }
+            QueueLifecycle& lifecycle = active->Queues[QueueIndex(queue)];
+            if (lifecycle != QueueLifecycle::Unused)
+            {
+                return std::unexpected(RHI::ProfilerError::InvalidState);
+            }
+            lifecycle = QueueLifecycle::Open;
+            return {};
         }
 
-        void EndScope(std::uint32_t scopeHandle) override
+        [[nodiscard]] std::expected<void, RHI::ProfilerError>
+        EndQueue(RHI::ICommandContext&,
+                 const RHI::QueueAffinity queue) override
         {
-            std::scoped_lock lock{m_Mutex};
-            if (!m_FrameOpen || scopeHandle >= m_ActiveFrame.Scopes.size())
-                return;
-            ScopeState& scope = m_ActiveFrame.Scopes[scopeHandle];
-            scope.EndTime = Clock::now();
-            scope.Ended = true;
+            if (const std::optional<RHI::ProfilerError> queueError =
+                    ValidateQueue(queue);
+                queueError.has_value())
+            {
+                return std::unexpected(*queueError);
+            }
+            ActiveFrameState* active = ActiveFrame();
+            if (active == nullptr)
+            {
+                return std::unexpected(RHI::ProfilerError::InvalidState);
+            }
+            QueueLifecycle& lifecycle = active->Queues[QueueIndex(queue)];
+            if (lifecycle != QueueLifecycle::Open)
+            {
+                return std::unexpected(RHI::ProfilerError::InvalidState);
+            }
+            for (std::size_t index = 0; index < active->Scopes.size(); ++index)
+            {
+                if (active->Scopes[index].Queue == queue &&
+                    active->ScopeLifecycles[index].load(
+                        std::memory_order_acquire) == ScopeLifecycle::Begun)
+                {
+                    return std::unexpected(RHI::ProfilerError::InvalidState);
+                }
+            }
+            lifecycle = QueueLifecycle::Closed;
+            return {};
+        }
+
+        [[nodiscard]] std::expected<void, RHI::ProfilerError>
+        BeginScope(RHI::ICommandContext&,
+                   const RHI::ProfilerScopeToken scope) override
+        {
+            ActiveFrameState* active = ActiveFrame();
+            if (active == nullptr || !ScopeBelongsToFrame(*active, scope) ||
+                active->Queues[QueueIndex(
+                    active->Scopes[scope.ScopeIndex].Queue)] !=
+                    QueueLifecycle::Open)
+            {
+                return std::unexpected(RHI::ProfilerError::InvalidState);
+            }
+
+            ScopeLifecycle expected = ScopeLifecycle::Planned;
+            if (!active->ScopeLifecycles[scope.ScopeIndex]
+                     .compare_exchange_strong(
+                         expected,
+                         ScopeLifecycle::Begun,
+                         std::memory_order_acq_rel,
+                         std::memory_order_acquire))
+            {
+                return std::unexpected(RHI::ProfilerError::InvalidState);
+            }
+            return {};
+        }
+
+        [[nodiscard]] std::expected<void, RHI::ProfilerError>
+        EndScope(RHI::ICommandContext&,
+                 const RHI::ProfilerScopeToken scope) override
+        {
+            ActiveFrameState* active = ActiveFrame();
+            if (active == nullptr || !ScopeBelongsToFrame(*active, scope))
+            {
+                return std::unexpected(RHI::ProfilerError::InvalidState);
+            }
+            if (active->Queues[QueueIndex(
+                    active->Scopes[scope.ScopeIndex].Queue)] !=
+                QueueLifecycle::Open)
+            {
+                return std::unexpected(RHI::ProfilerError::InvalidState);
+            }
+
+            ScopeLifecycle expected = ScopeLifecycle::Begun;
+            if (!active->ScopeLifecycles[scope.ScopeIndex]
+                     .compare_exchange_strong(
+                         expected,
+                         ScopeLifecycle::Ended,
+                         std::memory_order_acq_rel,
+                         std::memory_order_acquire))
+            {
+                return std::unexpected(RHI::ProfilerError::InvalidState);
+            }
+            return {};
+        }
+
+        [[nodiscard]] std::expected<void, RHI::ProfilerError>
+        EndFrame(const RHI::ProfilerFrameKey frame,
+                 const RHI::ProfilerFrameDisposition disposition) override
+        {
+            ActiveFrameState* active = ActiveFrame();
+            if (active == nullptr || active->Frame != frame)
+            {
+                return std::unexpected(RHI::ProfilerError::InvalidState);
+            }
+
+            if (disposition == RHI::ProfilerFrameDisposition::Discarded)
+            {
+                m_ActiveFrame.reset();
+                return {};
+            }
+
+            for (std::size_t index = 0; index < active->Scopes.size(); ++index)
+            {
+                if (active->ScopeLifecycles[index].load(
+                        std::memory_order_acquire) == ScopeLifecycle::Begun)
+                {
+                    return std::unexpected(RHI::ProfilerError::InvalidState);
+                }
+            }
+            for (const QueueLifecycle queue : active->Queues)
+            {
+                if (queue == QueueLifecycle::Open)
+                {
+                    return std::unexpected(RHI::ProfilerError::InvalidState);
+                }
+            }
+
+            RHI::GpuTimestampFrame resolved{
+                .Frame = frame,
+                .Source = RHI::GpuTimestampSource::ContractOnly,
+            };
+            for (std::uint32_t queueIndex = 0;
+                 queueIndex < active->Queues.size();
+                 ++queueIndex)
+            {
+                if (active->Queues[queueIndex] == QueueLifecycle::Closed)
+                {
+                    resolved.QueueEnvelopes.push_back(
+                        RHI::GpuTimestampQueueEnvelope{
+                            .Queue = QueueFromIndex(queueIndex),
+                            .DurationNs = std::nullopt,
+                        });
+                }
+            }
+            resolved.Scopes.reserve(active->Scopes.size());
+            for (std::size_t index = 0; index < active->Scopes.size(); ++index)
+            {
+                if (active->ScopeLifecycles[index].load(
+                        std::memory_order_acquire) == ScopeLifecycle::Ended)
+                {
+                    const RHI::ProfilerScopeDesc& scope =
+                        active->Scopes[index];
+                    resolved.Scopes.push_back(RHI::GpuTimestampScope{
+                        .Ordinal = scope.Ordinal,
+                        .Name = scope.Name,
+                        .Queue = scope.Queue,
+                        .DurationNs = std::nullopt,
+                    });
+                }
+            }
+
+            m_ResolvedFrames[frame.FrameSlot] = std::move(resolved);
+            m_ActiveFrame.reset();
+            return {};
         }
 
         [[nodiscard]] std::expected<RHI::GpuTimestampFrame, RHI::ProfilerError>
-        Resolve(std::uint32_t frameIndex) const override
+        Resolve(const RHI::ProfilerFrameKey frame) const override
         {
-            std::scoped_lock lock{m_Mutex};
-            const auto it = m_ResolvedFrames.find(frameIndex);
-            if (it == m_ResolvedFrames.end())
+            if (frame.FrameSlot >= m_ResolvedFrames.size())
+            {
+                return std::unexpected(RHI::ProfilerError::InvalidArgument);
+            }
+            const std::optional<RHI::GpuTimestampFrame>& resolved =
+                m_ResolvedFrames[frame.FrameSlot];
+            if (!resolved.has_value() || resolved->Frame != frame)
+            {
                 return std::unexpected(RHI::ProfilerError::NotReady);
-            return it->second;
+            }
+            return *resolved;
+        }
+
+        [[nodiscard]] RHI::ProfilerStatusSnapshot GetStatus() const override
+        {
+            return RHI::ProfilerStatusSnapshot{
+                .Status = RHI::ProfilerBackendStatus::ContractOnly,
+                .Source = RHI::GpuTimestampSource::ContractOnly,
+                .Diagnostic =
+                    "Null profiler validates lifecycle only; native GPU "
+                    "durations are unavailable.",
+            };
         }
 
         [[nodiscard]] std::uint32_t GetFramesInFlight() const override { return m_FramesInFlight; }
 
     private:
-        using Clock = std::chrono::steady_clock;
-
-        static std::uint64_t ToNs(Clock::duration duration)
+        enum class ScopeLifecycle : std::uint8_t
         {
-            return static_cast<std::uint64_t>(
-                std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count());
-        }
-
-        struct ScopeState
-        {
-            std::string Name{};
-            Clock::time_point StartTime{};
-            Clock::time_point EndTime{};
-            bool Ended = false;
+            Planned = 0,
+            Begun,
+            Ended,
         };
+
+        enum class QueueLifecycle : std::uint8_t
+        {
+            Unused = 0,
+            Open,
+            Closed,
+        };
+
+        static constexpr std::size_t kProfiledQueueCount = 2;
 
         struct ActiveFrameState
         {
-            std::uint32_t FrameIndex = 0;
-            Clock::time_point FrameStart{};
-            std::vector<ScopeState> Scopes{};
+            RHI::ProfilerFrameKey Frame{};
+            std::uint64_t PlanGeneration{0};
+            std::vector<RHI::ProfilerScopeDesc> Scopes{};
+            std::unique_ptr<std::atomic<ScopeLifecycle>[]> ScopeLifecycles{};
+            std::array<QueueLifecycle, kProfiledQueueCount> Queues{};
         };
 
-        mutable std::mutex m_Mutex;
-        ActiveFrameState m_ActiveFrame{};
-        std::unordered_map<std::uint32_t, RHI::GpuTimestampFrame> m_ResolvedFrames;
-        bool m_FrameOpen = false;
-        std::uint32_t m_FramesInFlight = 2;
+        [[nodiscard]] static constexpr std::optional<RHI::ProfilerError>
+        ValidateQueue(const RHI::QueueAffinity queue) noexcept
+        {
+            switch (queue)
+            {
+            case RHI::QueueAffinity::Graphics:
+            case RHI::QueueAffinity::AsyncCompute:
+                return std::nullopt;
+            case RHI::QueueAffinity::Transfer:
+                return RHI::ProfilerError::Unsupported;
+            }
+            return RHI::ProfilerError::InvalidArgument;
+        }
+
+        [[nodiscard]] static constexpr std::uint32_t
+        QueueIndex(const RHI::QueueAffinity queue) noexcept
+        {
+            return queue == RHI::QueueAffinity::Graphics ? 0u : 1u;
+        }
+
+        [[nodiscard]] static constexpr RHI::QueueAffinity
+        QueueFromIndex(const std::uint32_t queueIndex) noexcept
+        {
+            return queueIndex == 0u
+                       ? RHI::QueueAffinity::Graphics
+                       : RHI::QueueAffinity::AsyncCompute;
+        }
+
+        [[nodiscard]] ActiveFrameState* ActiveFrame() noexcept
+        {
+            return m_ActiveFrame.has_value() ? &*m_ActiveFrame : nullptr;
+        }
+
+        [[nodiscard]] static bool
+        ScopeBelongsToFrame(const ActiveFrameState& active,
+                            const RHI::ProfilerScopeToken token) noexcept
+        {
+            return token.IsValid() &&
+                   token.PlanGeneration == active.PlanGeneration &&
+                   token.ScopeIndex < active.Scopes.size();
+        }
+
+        std::uint32_t m_FramesInFlight{2};
+        std::optional<ActiveFrameState> m_ActiveFrame{};
+        std::vector<std::optional<RHI::GpuTimestampFrame>> m_ResolvedFrames{};
+        std::uint64_t m_NextPlanGeneration{1};
     };
 
     std::unique_ptr<RHI::IProfiler> CreateNullProfiler(std::uint32_t framesInFlight)
