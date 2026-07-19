@@ -270,8 +270,11 @@ Each slice is a separately reviewable commit and must pass its focused CPU check
   clearing when no fresh native sample exists. Cover per-frame `Unsupported`
   planning, a successful device frame whose hot-disabled render snapshot must
   not mask current profiler `DeviceLost`, and a failed device `BeginFrame`
-  that maps current profiler `DeviceLost`; both loss paths preserve the stale
-  last-good frame identity.
+  that maps current profiler `DeviceLost`. Also cover device loss observed
+  after device `EndFrame()` for both an active candidate and a hot-disabled
+  frame: loss overrides no-advance `InvalidLifecycle`/prior `Disabled`, while
+  generic non-loss no-advance remains `InvalidLifecycle`; all loss paths
+  preserve the stale last-good frame identity.
 - [x] Extend `tests/unit/core/Test.Core.EngineConfigLoad.cpp`,
   `tests/contract/runtime/Test.RuntimeConfigControlFacade.cpp`, and
   `tests/contract/runtime/Test.RuntimeEngineLayering.cpp`, plus the renderer
@@ -421,9 +424,10 @@ commit; not current-head completion evidence):
 ## Maturity
 
 - Target: `Operational` on Vulkan-capable hosts; `CPUContracted` everywhere else.
-- Achieved `Operational` on the 2026-07-19 NVIDIA/Vulkan host through the
-  non-skipped named-pass and slot-reuse smoke above; unsupported hosts retain
-  the explicit `CPUContracted`/fail-closed branch.
+- The prior non-skipped NVIDIA/Vulkan `Operational` observation is superseded
+  by the post-audit code changes. Current-head Vulkan maturity remains pending
+  until the held exact-head named-pass and slot-reuse smoke reruns non-skipped;
+  unsupported hosts retain the explicit `CPUContracted`/fail-closed branch.
 - Operational evidence requires a non-skipped native-Vulkan smoke with named pass timing and slot reuse; CPU/Null lifecycle tests alone are insufficient.
 - Retirement evidence must cite the successful GPU-smoke host, Vulkan backend,
   physical GPU, driver, timestamp-valid-bit capability, frames-in-flight, and
