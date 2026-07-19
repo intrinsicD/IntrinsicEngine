@@ -158,6 +158,16 @@ namespace Extrinsic::Backends::Vulkan
         // exposing them on `RHI::IDevice`.
         friend VulkanOperationalInputs GetVulkanDeviceOperationalInputs(
             const RHI::IDevice* device) noexcept;
+        friend bool IsVulkanProfilerCommandContextOwned(
+            const RHI::IDevice* device,
+            const RHI::ICommandContext* context) noexcept;
+
+        [[nodiscard]] static VulkanProfilerCommandContextView
+        ResolveProfilerCommandContext(
+            VulkanDevice& device,
+            RHI::ICommandContext& context) noexcept;
+        static void NotifyProfilerDeviceLost(
+            VulkanDevice& device) noexcept;
 
         class FallbackBindlessHeap final : public RHI::IBindlessHeap
         {

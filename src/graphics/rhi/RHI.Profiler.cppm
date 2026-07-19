@@ -124,12 +124,14 @@ export namespace Extrinsic::RHI
         std::uint32_t Ordinal{0};
         std::string Name{};
         QueueAffinity Queue{QueueAffinity::Graphics};
+        GpuTimestampSource Source{GpuTimestampSource::Unavailable};
         std::optional<std::uint64_t> DurationNs{};
     };
 
     struct GpuTimestampQueueEnvelope
     {
         QueueAffinity Queue{QueueAffinity::Graphics};
+        GpuTimestampSource Source{GpuTimestampSource::Unavailable};
         std::optional<std::uint64_t> DurationNs{};
     };
 
