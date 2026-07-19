@@ -80,7 +80,8 @@ depends_on:
   The implementation graph converges through `RUNTIME-179`..`187` plus the
   audited `RUNTIME-188` scene-interaction split;
   application lifecycle removal and `RUNTIME-129` operational bake may proceed
-  once their respective owners land; both gate the later mechanism deletion
+  once their respective owners land and `GRAPHICS-128` closes the bake's
+  shared-index-slice prerequisite; both gate the later mechanism deletion
   audit, semantic auxiliary-surface cleanup, and final
   representation/checker leaf.
 

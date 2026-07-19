@@ -65,7 +65,9 @@ pending material-binding re-resolution, and asset-residency teardown ordering,
 plus persistent `StreamingExecutor` / `DerivedJobRegistry` ownership,
 maintenance drains, shutdown reset, and derived-job facade delegation now live
 outside `Runtime.Engine.cpp`.
-`RUNTIME-129` remains the owner of production Vulkan bake plan-provider wiring.
+`RUNTIME-129` remains the owner of production Vulkan bake plan-provider wiring
+after `GRAPHICS-128` supplies the nonzero shared-index-slice command contract
+and `RUNTIME-183` supplies the accepted composition owner.
 `RUNTIME-154` keeps the existing reference-scene public facade while moving
 provider resolution, population state, camera-seed caching, and teardown policy
 into `Extrinsic.Runtime.ReferenceSceneControl`. `RUNTIME-155` keeps the
@@ -184,7 +186,9 @@ triggers. The implementation graph is:
   — make Sandbox defaults explicit app composition glue over the resolved
   owners, without `Engine&` or a new policy facade.
 - Existing [`RUNTIME-129`](RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
-  completes the operational Vulkan bake inside `AssetWorkflowModule`.
+  completes the operational Vulkan bake inside `AssetWorkflowModule` after
+  [`GRAPHICS-128`](../rendering/GRAPHICS-128-object-space-normal-bake-shared-index-slice.md)
+  makes the shared managed-index subrange selectable.
 - [`RUNTIME-184`](RUNTIME-184-replace-application-lifecycle.md) — remove
   `IApplication` and unrestricted app ticks through explicit Sandbox/module
   composition, isolated from residual API migration and the final
@@ -208,7 +212,8 @@ Graph UI use the settled owners.
 Retired `RUNTIME-177` added no generic debug-draw producer seam because its
 consumer inventory was empty; existing spatial-debug and transform-gizmo
 paths remain typed. `RUNTIME-129` and `RUNTIME-184` may proceed independently
-after their respective owner prerequisites; both gate `RUNTIME-185`.
+after their respective prerequisites (`GRAPHICS-128` plus `RUNTIME-183` for
+the bake); both gate `RUNTIME-185`.
 `ARCH-014` reaches this graph through `RUNTIME-187`; `REVIEW-003` reaches it
 transitively through `ARCH-014`.
 
@@ -405,8 +410,9 @@ This foundation is recorded in
 `RUNTIME-137` is retired; the async readback helper is the sanctioned compute
 backend drain path and `JobService` owns the `GpuQueue` participant registry.
 That historical prerequisite for `RUNTIME-129` is satisfied; the task is
-currently gated on `RUNTIME-183` so object-space normal bake GPU submission
-lands inside the accepted AssetWorkflow owner.
+currently gated on `GRAPHICS-128` for a nonzero shared managed-index slice and
+`RUNTIME-183` so object-space normal bake GPU submission lands inside the
+accepted AssetWorkflow owner.
 
 `RUNTIME-111` through `RUNTIME-115` are retired; additional progressive
 render-data follow-ups should open as value-gated tasks with a concrete
