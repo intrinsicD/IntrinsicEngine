@@ -10,11 +10,17 @@ maturity_target: Operational
 
 ## Status
 
-- 2026-07-19 implementation and verification are complete on
-  `codex/runtime-172-scene-document-module` at implementation commit
-  `1d48444b`, rebased onto corrected `RUNTIME-188` contract base `83554c6a`.
-  The task remains active for review/integration; the root owner controls
-  retirement.
+- Completed and retired at `Operational` on 2026-07-19; owner: Codex team.
+  Commit: implementation `1d48444b` merged to `main` as `39585780`;
+  documentation landed as `1c0bf434`, and the research trace as `0ccb94a0`.
+- The final adversarial audit found that Engine registered the two bounded
+  transition adapters but discarded their strong handles. Fix `064336f2`
+  retains only the exact provider pointer and registration metadata, rolls
+  back the first registration if the second fails, and releases both handles
+  after the existing shutdown-announcement pump but before reverse module
+  shutdown; it merged to `main` as `fc372b2f`. No document/history or other
+  domain state returned to Engine. `RUNTIME-188` and `RUNTIME-183` remain the
+  named removal owners for the two temporary fields.
 - 2026-07-19 audit amendment: the implementation inventory disproved the
   proposed single `SceneEditingModule` owner. Document/history and editor
   interaction differ in dependencies, frame hooks, cancellation, published
@@ -32,7 +38,10 @@ maturity_target: Operational
   zero failed, and the one expected GLFW/LSan capability skip. Strict
   convergence reports `33/11/2/22`; task policy, task-state links, layering,
   documentation links, test layout, root hygiene, and generated-file checks
-  pass on the final documentation state.
+  pass on the final documentation state. The retained-handle correction also
+  passed a fresh cache-disabled runtime-contract build, 35/35 focused
+  `SceneDocumentModule|RuntimeEngineLayering` cases, transactional rollback
+  and reinitialize regressions, and the strict clean-workshop review.
 
 ## Goal
 

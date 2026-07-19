@@ -48,8 +48,8 @@ depends_on:
   snapshot to 39 plain imports, 17 domain imports, two re-exports, and 28
   public getter names. Retired `RUNTIME-180` then reduced the current checked
   snapshot to 35 plain imports, 13 domain imports, two re-exports, and 25
-  public getter names. Active `RUNTIME-172` removes document/history ownership
-  and facades and reduces the checked snapshot to 33 plain imports, 11 domain
+  public getter names. Retired `RUNTIME-172` removed document/history ownership
+  and facades and reduced the checked snapshot to 33 plain imports, 11 domain
   imports, two re-exports, and 22 public getter names.
   Retired `HARDEN-085` delivered the authoritative exact-policy ratchet.
   `ARCH-012`
@@ -115,7 +115,7 @@ depends_on:
       world-scoped or global. `ARCH-010` supplied `WorldRegistry`; it did not
       make that policy decision for later domain modules. Track those decisions
       here rather than assigning the open work back to retired `ARCH-010`.
-      `RUNTIME-172` records a global document-module object whose complete
+      Retired `RUNTIME-172` records a global document-module object whose complete
       durable state is bound to one validated active world and reset, never
       cached, across world changes.
 - [x] Run a 2026-07-18 scorecard/right-sizing reconciliation and seed

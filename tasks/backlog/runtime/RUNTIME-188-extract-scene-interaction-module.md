@@ -28,8 +28,9 @@ maturity_target: Operational
   rebinds afterward. This task replaces that callback with its module-owned
   strong participant handle; the corrected mesh-view deletion and narrow
   snapshot contract remain authoritative.
-- `RUNTIME-180` and `RUNTIME-182` are retired. Implementation remains blocked
-  only on the `RUNTIME-172` scene-document/participant contract.
+- `RUNTIME-180`, `RUNTIME-182`, and `RUNTIME-172` are retired. The
+  scene-document participant contract and retained-handle shutdown lifecycle
+  are available on `main`; implementation is unblocked.
 
 ## Goal
 

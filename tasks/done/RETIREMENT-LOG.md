@@ -5543,3 +5543,24 @@ consumed backend-neutral renderer/test contract. No accumulator, service,
 module, config/UI field, CMake entry, source test, or inventory change landed.
 A future producer-owned slice may reopen the idea only when it names and lands
 the first real main-thread pre-extraction caller.
+
+[`RUNTIME-172`](RUNTIME-172-extract-scene-document-module.md) —
+scene-document composition retired on 2026-07-19 at `Operational`. One
+app-composed `SceneDocumentModule` now owns the exact published document and
+history services, one validated active-world binding, synchronous and
+generation-guarded optional asynchronous file operations, and one plain
+synchronous replacement-participant contract. Engine no longer owns or
+exposes document/history state. An adversarial dependency audit caught that
+the two bounded independent-landing participant handles had initially been
+discarded; the final correction retains only the provider and exact typed
+handles, rolls back partial registration, and releases them after the existing
+shutdown-announcement pump before reverse module shutdown. Their removal
+owners remain `RUNTIME-188` and `RUNTIME-183`. Focused coverage passed 68/68,
+the complete CPU-supported selector passed 4,175 tests with zero failures and
+one expected GLFW/LSan capability skip, and the handle correction passed a
+fresh cache-disabled build plus 35/35 focused cases. Exact Engine convergence
+is 33 plain imports, 11 domain imports, two re-exports, and 22 getter names;
+strict layering, task, docs, test-layout, root-hygiene, generated-inventory,
+and clean-workshop checks passed. Implementation checkpoint: `1d48444b`;
+initial main merge: `39585780`; retained-handle fix: `064336f2`; final fix
+merge: `fc372b2f`; research trace: `0ccb94a0`.

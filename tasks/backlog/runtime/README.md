@@ -88,7 +88,7 @@ extractions. `RUNTIME-146` is retired; boot-time config resolution now lives in
 the free-standing `Extrinsic.Runtime.EngineConfigBoot` module. `RUNTIME-147` is
 retired; asset import now lives in `Extrinsic.Runtime.AssetImportPipeline`.
 `RUNTIME-148` is retired; its first scene-persistence subsystem is superseded
-by active `RUNTIME-172`'s app-composed
+by retired `RUNTIME-172`'s app-composed
 `Extrinsic.Runtime.SceneDocumentModule`. `RUNTIME-149` is retired; render-recipe
 activation and hot-config control now live in
 `Extrinsic.Runtime.EngineConfigControl`. `RUNTIME-150` is retired, and
@@ -167,11 +167,10 @@ triggers. The implementation graph is:
 - Retired `RUNTIME-181` composes the one global validated config
   preview/apply and app-section owner while kernel startup remains
   omission-safe.
-- Active
-  [`RUNTIME-172`](../../active/RUNTIME-172-extract-scene-document-module.md) —
-  the document/history owner is composed with one active-world binding,
-  exact module/history publication, optional async file operations, and the
-  narrow synchronous scene-replacement participant contract.
+- Retired `RUNTIME-172` — the document/history owner is composed with one
+  active-world binding, exact module/history publication, optional async file
+  operations, and the narrow synchronous scene-replacement participant
+  contract.
 - [`RUNTIME-188`](RUNTIME-188-extract-scene-interaction-module.md) — compose
   selection/lookup/readback/gizmo ownership after the document, camera, and
   editor-capture seams exist; copied world-tagged snapshots replace
@@ -289,15 +288,18 @@ main `Runtime.RenderExtraction` module slimming.
 
 - [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md) —
   privatize the Sandbox default policy module after `RUNTIME-144`.
-- [`RUNTIME-172`](../../active/RUNTIME-172-extract-scene-document-module.md) — replace the
-  exported scene-document orchestration surface with the exact composed
-  document/history owner.
 - [`RUNTIME-188`](RUNTIME-188-extract-scene-interaction-module.md) — extract
   the separately audited interaction/readback/gizmo owner and remove its
   Engine facade and borrowed render pointers.
 
 ### Retired module-surface diet work
 
+- [`RUNTIME-172`](../../done/RUNTIME-172-extract-scene-document-module.md)
+  replaced the broad scene-document surface with one app-composed exact
+  document/history owner, one validated active-world binding, optional
+  generation-guarded async operations, and a narrow synchronous replacement
+  participant contract. Engine retains only two typed temporary participant
+  registrations whose named owners are `RUNTIME-188` and `RUNTIME-183`.
 - [`RUNTIME-178`](../../done/RUNTIME-178-restore-engine-convergence-budget.md)
   restored and improved the fixed Engine convergence budget to 42 plain
   imports / 21 domain imports / 31 getter names with no temporary debt while
@@ -509,7 +511,7 @@ split; narratives live in the retirement log.
   scene snapshots, and the replacement cleanup/rebuild ordering. `Engine` keeps
   only `GetSceneDocument()` for this surface; Sandbox editor UI and runtime
   scene lifecycle tests call the document subsystem directly. This is
-  historical intermediate evidence; active `RUNTIME-172` replaces that module
+  historical intermediate evidence; retired `RUNTIME-172` replaces that module
   and getter with the composed exact `SceneDocumentModule` service.
 - [RUNTIME-149 — Extract render-recipe and hot-config control out of Engine](../../archive/RUNTIME-149-extract-engine-config-control-subsystem.md)
   (done, 2026-07-08, `Operational`): runtime render-recipe activation and

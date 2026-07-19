@@ -25,12 +25,12 @@ maturity_target: Operational
   that participant and release its retained handle during shutdown
   announcement; document quiescence permits exact-handle detachment before
   provider teardown.
-- 2026-07-19 readiness amendment: implementation is a hard no-go until
-  `RUNTIME-188` retires and the `RUNTIME-172` transition retains/releases its
-  participant handle. The audited destination uses the existing shutdown event,
-  `IAssetFrameHooks`, and `JobServiceGpuQueueBridge`; removes stale camera and
-  config-control-wrapper dependencies; and fixes the exact post-`RUNTIME-188`
-  convergence target below.
+- 2026-07-19 readiness amendment: the retained/released `RUNTIME-172`
+  participant handle is now on `main`; implementation remains a hard no-go
+  until `RUNTIME-188` retires. The audited destination uses the existing
+  shutdown event, `IAssetFrameHooks`, and `JobServiceGpuQueueBridge`; removes
+  stale camera and config-control-wrapper dependencies; and fixes the exact
+  post-`RUNTIME-188` convergence target below.
 
 ## Goal
 - Move CPU asset authority, GPU residency, import orchestration, scene

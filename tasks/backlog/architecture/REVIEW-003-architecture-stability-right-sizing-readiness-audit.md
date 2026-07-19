@@ -29,8 +29,8 @@ depends_on:
 
 - 2026-07-19 dependency amendment: the scene-owner audit split
   `SceneDocumentModule` (`RUNTIME-172`) from `SceneInteractionModule`
-  (`RUNTIME-188`). Both must retire before this readiness audit begins; the
-  audit remains open.
+  (`RUNTIME-188`). `RUNTIME-172` is retired; `RUNTIME-188` remains open, so
+  the audit remains blocked.
 
 ## Goal
 

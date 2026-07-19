@@ -10,7 +10,6 @@ the authoritative open/unblocked view.
 
 - `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/active/ARCH-014-kernel-convergence-tracking.md)
 - `GRAPHICS-127` — Native GPU timestamp profiler and frame-recipe timing integration (tasks/active/GRAPHICS-127-native-gpu-timestamp-profiler.md)
-- `RUNTIME-172` — Extract the scene-document module (tasks/active/RUNTIME-172-extract-scene-document-module.md)
 
 ## Theme B — Rendering modernization
 
@@ -34,13 +33,13 @@ the authoritative open/unblocked view.
 - blocked by `ARCH-014`: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
-- blocked by `RUNTIME-172`: `RUNTIME-168` — Privatize Sandbox default-policy composition (tasks/backlog/runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
-- blocked by `RUNTIME-172`: `RUNTIME-183` — Extract the asset-workflow composition module (tasks/backlog/runtime/RUNTIME-183-extract-asset-workflow-module.md)
+- blocked by `RUNTIME-183`: `RUNTIME-168` — Privatize Sandbox default-policy composition (tasks/backlog/runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
+- blocked by `RUNTIME-188`: `RUNTIME-183` — Extract the asset-workflow composition module (tasks/backlog/runtime/RUNTIME-183-extract-asset-workflow-module.md)
 - blocked by `RUNTIME-168`: `RUNTIME-184` — Replace IApplication with explicit app composition (tasks/backlog/runtime/RUNTIME-184-replace-application-lifecycle.md)
 - blocked by `RUNTIME-184`: `RUNTIME-185` — Prune unproven runtime-composition mechanisms (tasks/backlog/runtime/RUNTIME-185-prune-runtime-composition-mechanisms.md)
 - blocked by `RUNTIME-185`: `RUNTIME-186` — Retire residual Engine auxiliary surface (tasks/backlog/runtime/RUNTIME-186-retire-engine-auxiliary-surface.md)
 - blocked by `RUNTIME-186`: `RUNTIME-187` — Finalize the exact domain-free Engine surface (tasks/backlog/runtime/RUNTIME-187-finalize-domain-free-engine-surface.md)
-- blocked by `RUNTIME-172`: `RUNTIME-188` — Extract the scene-interaction module (tasks/backlog/runtime/RUNTIME-188-extract-scene-interaction-module.md)
+- unblocked: `RUNTIME-188` — Extract the scene-interaction module (tasks/backlog/runtime/RUNTIME-188-extract-scene-interaction-module.md)
 - blocked by `BUG-096`: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
 - unblocked: `UI-038` — Progressive Poisson destructive-conversion safety (tasks/backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md)
 
