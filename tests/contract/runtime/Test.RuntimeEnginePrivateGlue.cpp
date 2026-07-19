@@ -594,7 +594,7 @@ TEST(RuntimeEnginePrivateGlue, AssetWorkflowCompositionIsModuleOwned)
             continue;
         }
         if (ReadFile(entry.path()).find(
-                "module Extrinsic.Runtime.AssetWorkflowModule;") !=
+                "module Extrinsic.Runtime.AssetWorkflowModule") !=
             std::string::npos)
         {
             workflowModuleUnits.push_back(entry.path());
@@ -606,10 +606,14 @@ TEST(RuntimeEnginePrivateGlue, AssetWorkflowCompositionIsModuleOwned)
     bool foundImplementation = false;
     for (const auto& owner : workflowModuleUnits)
     {
-        foundInterface |= owner.filename() ==
-                          "Runtime.AssetWorkflowModule.cppm";
-        foundImplementation |= owner.filename() ==
-                               "Runtime.AssetWorkflowModule.cpp";
+        foundInterface |=
+            owner ==
+            root /
+                "src/runtime/Runtime.AssetWorkflowModule.cppm";
+        foundImplementation |=
+            owner ==
+            root /
+                "src/runtime/Runtime.AssetWorkflowModule.cpp";
     }
     EXPECT_TRUE(foundInterface);
     EXPECT_TRUE(foundImplementation);
@@ -662,7 +666,6 @@ TEST(RuntimeEnginePrivateGlue, AssetWorkflowCompositionIsModuleOwned)
         "Provide<Core::IAssetFrameHooks>",
         "std::make_unique<AssetModelTextureHandoff>",
         "std::make_unique<AssetModelSceneHandoff>",
-        "InitializeRuntimeGpuAssetFallbackTexture(",
     };
     for (const auto token : ownedCompositionTokens)
     {
@@ -670,7 +673,36 @@ TEST(RuntimeEnginePrivateGlue, AssetWorkflowCompositionIsModuleOwned)
             << token;
         EXPECT_EQ(engineImpl.find(token), std::string::npos)
             << token;
+        for (const auto& entry :
+             std::filesystem::recursive_directory_iterator(
+                 root / "src/runtime"))
+        {
+            if (!entry.is_regular_file())
+                continue;
+            const auto extension = entry.path().extension();
+            if (extension != ".cpp" &&
+                extension != ".cppm" &&
+                extension != ".hpp" &&
+                extension != ".h")
+            {
+                continue;
+            }
+            if (entry.path() ==
+                root /
+                    "src/runtime/Runtime.AssetWorkflowModule.cpp")
+            {
+                continue;
+            }
+            EXPECT_EQ(
+                ReadFile(entry.path()).find(token),
+                std::string::npos)
+                << token << " in " << entry.path();
+        }
     }
+    EXPECT_NE(
+        workflowImpl.find(
+            "InitializeRuntimeGpuAssetFallbackTexture("),
+        std::string::npos);
 
     EXPECT_NE(workflowImpl.find(
                   "setup.Services().Find<StreamingExecutor>()"),

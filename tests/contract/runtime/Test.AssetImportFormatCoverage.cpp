@@ -57,6 +57,7 @@ import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
+import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SceneDocumentModule;
@@ -781,28 +782,77 @@ namespace
             view.VertexSource->Properties.Exists(propertyName);
     }
 
+    struct ComposedNormalBakeProbe
+    {
+        Runtime::RuntimeObjectSpaceNormalBakeQueue* Queue{
+            nullptr};
+        bool BackendOperational{true};
+        Runtime::RuntimePostImportProcessorHandle Handle{};
+    };
+
+    void InstallComposedNormalBakeProbe(
+        Runtime::Engine& engine,
+        ComposedNormalBakeProbe& probe)
+    {
+        probe.Handle =
+            RequiredEngineService<
+                Runtime::AssetImportPipeline>(engine)
+                .RegisterPostImportProcessor(
+                    Runtime::RuntimePostImportProcessorDesc{
+                        .DebugName =
+                            "RUNTIME-183 composed normal-bake probe",
+                        .PayloadKind =
+                            Assets::AssetPayloadKind::Mesh,
+                        .Process =
+                            [&probe](
+                                const Runtime::
+                                    RuntimePostImportProcessorContext&,
+                                Runtime::
+                                    RuntimePostImportProcessorServices&
+                                        services)
+                                -> Core::Result
+                            {
+                                probe.Queue =
+                                    services
+                                        .ObjectSpaceNormalBakeQueue;
+                                probe.BackendOperational =
+                                    services
+                                        .ObjectSpaceNormalBakeGraphicsBackendOperational;
+                                return probe.Queue != nullptr
+                                    ? Core::Ok()
+                                    : Core::Err(
+                                          Core::ErrorCode::
+                                              InvalidState);
+                            },
+                    });
+        EXPECT_TRUE(probe.Handle.IsValid());
+    }
+
     [[nodiscard]] bool DirectMeshPostProcessReady(
         Runtime::Engine& engine,
-        const ECS::EntityHandle entity)
+        const ECS::EntityHandle entity,
+        const ComposedNormalBakeProbe& probe)
     {
         return MeshHasVertexProperty(engine, entity, "v:texcoord") &&
             MeshHasVertexProperty(engine, entity, "v:normal") &&
-            RequiredEngineService<
-                Extrinsic::Runtime::AssetImportPipeline>(engine)
-                .GetLastAssetImportEvent()
-                .has_value();
+            probe.Queue != nullptr &&
+            probe.Queue->Diagnostics().NonOperationalNoOps >
+                0u;
     }
 
     void ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(
         Runtime::Engine& engine,
-        const ECS::EntityHandle entity)
+        const ECS::EntityHandle entity,
+        const ComposedNormalBakeProbe& probe)
     {
         EXPECT_FALSE(HasGeneratedNormalTextureBinding(engine, entity));
-        EXPECT_TRUE(
-            RequiredEngineService<
-                Extrinsic::Runtime::AssetImportPipeline>(engine)
-                .GetLastAssetImportEvent()
-                .has_value());
+        ASSERT_NE(probe.Queue, nullptr);
+        EXPECT_FALSE(probe.BackendOperational);
+        const auto& diagnostics =
+            probe.Queue->Diagnostics();
+        EXPECT_EQ(diagnostics.QueuedRequests, 0u);
+        EXPECT_EQ(diagnostics.NonOperationalNoOps, 1u);
+        EXPECT_EQ(probe.Queue->PendingCount(), 0u);
     }
 
     void ExpectMaterialDrivenImportedSurface(
@@ -1189,16 +1239,22 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
         "f 1//1 2//2 3//3\n");
 
     std::optional<ECS::EntityHandle> meshEntity{};
+    ComposedNormalBakeProbe bakeProbe{};
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<WaitForConditionApplication>(
-            [&meshEntity](Runtime::Engine& runningEngine)
+            [&meshEntity, &bakeProbe](
+                Runtime::Engine& runningEngine)
             {
                 return meshEntity.has_value() &&
-                    DirectMeshPostProcessReady(runningEngine, *meshEntity);
+                    DirectMeshPostProcessReady(
+                        runningEngine,
+                        *meshEntity,
+                        bakeProbe);
             }));
     InitializeAssetImportEngine(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
+    InstallComposedNormalBakeProbe(engine, bakeProbe);
 
     auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
@@ -1227,7 +1283,8 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
     engine.Run();
 
     EXPECT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(*meshEntity));
-    ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity));
+    ASSERT_TRUE(DirectMeshPostProcessReady(
+        engine, *meshEntity, bakeProbe));
     ExpectMeshVertexTexcoordsFinite(*engine.Worlds().Get(engine.ActiveWorld()), *meshEntity);
     ExpectMeshVertexNormals(
         *engine.Worlds().Get(engine.ActiveWorld()),
@@ -1237,7 +1294,8 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
             {0.0f, 1.0f, 0.0f},
             {0.0f, 0.0f, -1.0f},
         });
-    ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(engine, *meshEntity);
+    ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(
+        engine, *meshEntity, bakeProbe);
 
     engine.Shutdown();
 }
@@ -1282,18 +1340,24 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsSmallGener
     }
 
     std::optional<ECS::EntityHandle> completedEntity{};
+    ComposedNormalBakeProbe bakeProbe{};
     Runtime::Engine completedEngine(
         HeadlessConfig(),
         std::make_unique<WaitForConditionApplication>(
-            [&completedEntity](Runtime::Engine& runningEngine)
+            [&completedEntity, &bakeProbe](
+                Runtime::Engine& runningEngine)
             {
                 return completedEntity.has_value() &&
                     DirectMeshPostProcessReady(
-                        runningEngine, *completedEntity);
+                        runningEngine,
+                        *completedEntity,
+                        bakeProbe);
             },
             4096u));
     InitializeAssetImportEngine(completedEngine);
     InstallSandboxDefaultRuntimePolicies(completedEngine);
+    InstallComposedNormalBakeProbe(
+        completedEngine, bakeProbe);
 
     auto imported =
         RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(completedEngine).ImportAssetFromPath(
@@ -1309,7 +1373,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsSmallGener
     completedEngine.Run();
 
     ASSERT_TRUE(DirectMeshPostProcessReady(
-        completedEngine, *completedEntity));
+        completedEngine, *completedEntity, bakeProbe));
     const GS::ConstSourceView completed = GS::BuildConstView(
         completedEngine.Worlds().Get(completedEngine.ActiveWorld())->Raw(), *completedEntity);
     ASSERT_TRUE(completed.Valid());
@@ -1369,19 +1433,25 @@ TEST(RuntimeAssetImportFormatCoverage, DefaultImportPoliciesApplyAuthoringUxAndP
         "f 1/1/1 2/2/2 3/3/3\n");
 
     std::optional<ECS::EntityHandle> meshEntity{};
+    ComposedNormalBakeProbe bakeProbe{};
     Core::Config::EngineConfig config = HeadlessConfig();
     config.Camera.Enabled = true;
     Runtime::Engine engine(
         config,
         std::make_unique<WaitForConditionApplication>(
-            [&meshEntity](Runtime::Engine& runningEngine)
+            [&meshEntity, &bakeProbe](
+                Runtime::Engine& runningEngine)
             {
                 return meshEntity.has_value() &&
-                    DirectMeshPostProcessReady(runningEngine, *meshEntity);
+                    DirectMeshPostProcessReady(
+                        runningEngine,
+                        *meshEntity,
+                        bakeProbe);
             },
             256u));
     InitializeAssetImportEngine(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
+    InstallComposedNormalBakeProbe(engine, bakeProbe);
 
     auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
@@ -1419,8 +1489,10 @@ TEST(RuntimeAssetImportFormatCoverage, DefaultImportPoliciesApplyAuthoringUxAndP
 
     engine.Run();
 
-    ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity));
-    ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(engine, *meshEntity);
+    ASSERT_TRUE(DirectMeshPostProcessReady(
+        engine, *meshEntity, bakeProbe));
+    ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(
+        engine, *meshEntity, bakeProbe);
 
     engine.Shutdown();
 }
@@ -2053,16 +2125,22 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportQueuesGeneratedNormalBakeF
         "f 1/1/1 2/2/2 3/3/3\n");
 
     std::optional<ECS::EntityHandle> meshEntity{};
+    ComposedNormalBakeProbe bakeProbe{};
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<WaitForConditionApplication>(
-            [&meshEntity](Runtime::Engine& runningEngine)
+            [&meshEntity, &bakeProbe](
+                Runtime::Engine& runningEngine)
             {
                 return meshEntity.has_value() &&
-                    DirectMeshPostProcessReady(runningEngine, *meshEntity);
+                    DirectMeshPostProcessReady(
+                        runningEngine,
+                        *meshEntity,
+                        bakeProbe);
             }));
     InitializeAssetImportEngine(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
+    InstallComposedNormalBakeProbe(engine, bakeProbe);
 
     auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
@@ -2088,8 +2166,10 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportQueuesGeneratedNormalBakeF
     engine.Run();
 
     EXPECT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(*meshEntity));
-    ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity));
-    ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(engine, *meshEntity);
+    ASSERT_TRUE(DirectMeshPostProcessReady(
+        engine, *meshEntity, bakeProbe));
+    ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(
+        engine, *meshEntity, bakeProbe);
 
     engine.Shutdown();
 }
@@ -2104,16 +2184,22 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenM
         "f 1 2 3\n");
 
     std::optional<ECS::EntityHandle> meshEntity{};
+    ComposedNormalBakeProbe bakeProbe{};
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<WaitForConditionApplication>(
-            [&meshEntity](Runtime::Engine& runningEngine)
+            [&meshEntity, &bakeProbe](
+                Runtime::Engine& runningEngine)
             {
                 return meshEntity.has_value() &&
-                    DirectMeshPostProcessReady(runningEngine, *meshEntity);
+                    DirectMeshPostProcessReady(
+                        runningEngine,
+                        *meshEntity,
+                        bakeProbe);
             }));
     InitializeAssetImportEngine(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
+    InstallComposedNormalBakeProbe(engine, bakeProbe);
 
     auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
@@ -2141,7 +2227,8 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenM
     engine.Run();
 
     EXPECT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(*meshEntity));
-    ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity));
+    ASSERT_TRUE(DirectMeshPostProcessReady(
+        engine, *meshEntity, bakeProbe));
     ExpectMeshVertexTexcoordsFinite(*engine.Worlds().Get(engine.ActiveWorld()), *meshEntity);
     ExpectMeshVertexNormals(
         *engine.Worlds().Get(engine.ActiveWorld()),
@@ -2151,7 +2238,8 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenM
             {0.0f, 0.0f, 1.0f},
             {0.0f, 0.0f, 1.0f},
         });
-    ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(engine, *meshEntity);
+    ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(
+        engine, *meshEntity, bakeProbe);
 
     engine.Shutdown();
 }
@@ -2169,16 +2257,22 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesNormalsAndQueuesGe
         "f 1/1 2/2 3/3\n");
 
     std::optional<ECS::EntityHandle> meshEntity{};
+    ComposedNormalBakeProbe bakeProbe{};
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<WaitForConditionApplication>(
-            [&meshEntity](Runtime::Engine& runningEngine)
+            [&meshEntity, &bakeProbe](
+                Runtime::Engine& runningEngine)
             {
                 return meshEntity.has_value() &&
-                    DirectMeshPostProcessReady(runningEngine, *meshEntity);
+                    DirectMeshPostProcessReady(
+                        runningEngine,
+                        *meshEntity,
+                        bakeProbe);
             }));
     InitializeAssetImportEngine(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
+    InstallComposedNormalBakeProbe(engine, bakeProbe);
 
     auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = meshFile.Path.string(),
@@ -2204,7 +2298,8 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesNormalsAndQueuesGe
     engine.Run();
 
     EXPECT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(*meshEntity));
-    ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity));
+    ASSERT_TRUE(DirectMeshPostProcessReady(
+        engine, *meshEntity, bakeProbe));
     ExpectMeshVertexNormals(
         *engine.Worlds().Get(engine.ActiveWorld()),
         *meshEntity,
@@ -2213,7 +2308,8 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesNormalsAndQueuesGe
             {0.0f, 0.0f, 1.0f},
             {0.0f, 0.0f, 1.0f},
         });
-    ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(engine, *meshEntity);
+    ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(
+        engine, *meshEntity, bakeProbe);
 
     engine.Shutdown();
 }
