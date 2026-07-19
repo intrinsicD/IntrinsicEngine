@@ -48,6 +48,7 @@ import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
 
 using Extrinsic::Runtime::Engine;
@@ -662,6 +663,7 @@ TEST(ImGuiAdapterEngineWiring, UiCaptureSuppressesRuntimeInputConsumers)
     Engine engine(NullInputRoutingConfig(), std::move(app));
     engine.EmplaceModule<Runtime::CameraModule>();
     engine.EmplaceModule<Runtime::EditorUiModule>();
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
 
     Runtime::EditorUiHost* editorUi =
@@ -699,11 +701,22 @@ TEST(ImGuiAdapterEngineWiring, UiCaptureSuppressesRuntimeInputConsumers)
     EXPECT_EQ(appPtr->Controller->MouseClickUpdates, 0u);
 
     const auto selectionDiagnostics =
-        engine.GetSelectionController().GetDiagnostics();
+        engine.Services()
+            .Find<Runtime::SelectionController>()
+            ->GetDiagnostics();
     EXPECT_EQ(selectionDiagnostics.ClickRequestsSubmitted, 0u);
     EXPECT_EQ(selectionDiagnostics.PicksDrained, 0u);
-    EXPECT_EQ(engine.GetSelectionController().InFlightPickCount(), 0u);
-    EXPECT_EQ(engine.GetGizmoInteraction().ModifierMask(), 0u);
+    EXPECT_EQ(
+        engine.Services()
+            .Find<Runtime::SelectionController>()
+            ->InFlightPickCount(),
+        0u);
+    EXPECT_EQ(
+        engine.Services()
+            .Find<Runtime::SceneInteractionModule>()
+            ->Interaction()
+            .ModifierMask(),
+        0u);
 
     engine.Shutdown();
 }

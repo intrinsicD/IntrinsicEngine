@@ -24,7 +24,6 @@ target_sources(${target_name}
         Runtime.JobServiceGpuQueueBridge.cppm
         Modules/Clustering/Runtime.ClusteringModule.cppm
         Runtime.MeshAttributeTextureBake.cppm
-        Runtime.MeshPrimitiveViewControls.cppm
         Runtime.MethodFigureExport.cppm
         Runtime.ObjectSpaceNormalBakeBinding.cppm
         Runtime.ObjectSpaceNormalBakeQueue.cppm
@@ -61,6 +60,7 @@ target_sources(${target_name}
         Runtime.RegistrationAlignment.cppm
         Runtime.PhysicsBridge.cppm
         Scene/Runtime.SceneDocumentModule.cppm
+        Scene/Runtime.SceneInteractionModule.cppm
         Runtime.SceneSerialization.cppm
         Cameras/Runtime.CameraModule.cppm
         Cameras/Runtime.CameraControllers.cppm
@@ -110,7 +110,6 @@ target_sources(${target_name}
         Runtime.JobServiceGpuQueueBridge.cpp
         Modules/Clustering/Runtime.ClusteringModule.cpp
         Runtime.MeshAttributeTextureBake.cpp
-        Runtime.MeshPrimitiveViewControls.cpp
         Runtime.MethodFigureExport.cpp
         Runtime.ObjectSpaceNormalBakeBinding.cpp
         Runtime.ObjectSpaceNormalBakeQueue.cpp
@@ -146,6 +145,7 @@ target_sources(${target_name}
         Runtime.RegistrationAlignment.cpp
         Runtime.PhysicsBridge.cpp
         Scene/Runtime.SceneDocumentModule.cpp
+        Scene/Runtime.SceneInteractionModule.cpp
         Runtime.SceneSerialization.cpp
         Cameras/Runtime.CameraModule.cpp
         Cameras/Runtime.CameraControllers.cpp

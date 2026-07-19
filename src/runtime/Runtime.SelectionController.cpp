@@ -154,7 +154,8 @@ namespace Extrinsic::Runtime
         return pick;
     }
 
-    PendingSelectionPick SelectionController::TakeInFlightPick(
+    std::optional<PendingSelectionPick>
+    SelectionController::TakeInFlightPick(
         std::optional<std::uint64_t> pickSequence) noexcept
     {
         if (pickSequence.has_value())
@@ -168,6 +169,8 @@ namespace Extrinsic::Runtime
                 m_InFlightPicks.erase(it);
                 return pick;
             }
+            ++m_Diagnostics.UntrackedReadbacks;
+            return std::nullopt;
         }
         else if (!m_InFlightPicks.empty())
         {
@@ -176,8 +179,8 @@ namespace Extrinsic::Runtime
             return pick;
         }
 
-        // No tracked pick matched: treat as an untracked readback applied as a
-        // click in the configured mode.
+        // The unsequenced convenience path remains a direct click for
+        // standalone callers that never issue a correlation token.
         ++m_Diagnostics.UntrackedReadbacks;
         return PendingSelectionPick{
             .Sequence = 0u,
@@ -291,72 +294,106 @@ namespace Extrinsic::Runtime
 
     // --- readback consumption ----------------------------------------------
 
-    void SelectionController::ApplyHitReadback(Registry&                    registry,
-                                               std::uint32_t                stableEntityId,
-                                               std::optional<std::uint64_t> pickSequence)
+    bool SelectionController::ApplyHitReadback(
+        Registry& registry,
+        const std::uint32_t stableEntityId,
+        const std::optional<std::uint64_t> pickSequence)
     {
+        const std::optional<PendingSelectionPick> pick =
+            TakeInFlightPick(pickSequence);
+        if (!pick.has_value())
+            return false;
+
         ++m_Diagnostics.ReadbacksConsumed;
         ++m_Diagnostics.Hits;
-
-        const PendingSelectionPick pick = TakeInFlightPick(pickSequence);
 
         const EntityHandle entity = ResolveStableEntityId(registry, stableEntityId);
         if (!IsValidEntity(registry.Raw(), entity))
         {
             ++m_Diagnostics.StaleEntityHits;
-            return;
+            return true;
         }
         if (!registry.Raw().all_of<Sel::SelectableTag>(entity))
         {
             ++m_Diagnostics.NonSelectableHitsRejected;
-            return;
+            return true;
         }
 
-        if (pick.Kind == SelectionPickKind::Hover)
+        if (pick->Kind == SelectionPickKind::Hover)
             ApplyHover(registry, entity);
         else
-            ApplyClickSelection(registry, entity, pick.Mode);
+            ApplyClickSelection(registry, entity, pick->Mode);
+        return true;
     }
 
-    void SelectionController::ApplyNoHitReadback(Registry&                    registry,
-                                                 std::optional<std::uint64_t> pickSequence)
+    bool SelectionController::ApplyNoHitReadback(
+        Registry& registry,
+        const std::optional<std::uint64_t> pickSequence)
     {
+        const std::optional<PendingSelectionPick> pick =
+            TakeInFlightPick(pickSequence);
+        if (!pick.has_value())
+            return false;
+
         ++m_Diagnostics.ReadbacksConsumed;
         ++m_Diagnostics.NoHits;
 
-        const PendingSelectionPick pick = TakeInFlightPick(pickSequence);
-
-        if (pick.Kind == SelectionPickKind::Hover)
+        if (pick->Kind == SelectionPickKind::Hover)
         {
             if (m_Config.ClearHoverOnBackgroundHover)
                 ClearHover(registry);
-            return;
+            return true;
         }
 
-        if (pick.Mode == SelectionPickMode::Replace && m_Config.ClearSelectionOnBackgroundClick)
+        if (pick->Mode == SelectionPickMode::Replace &&
+            m_Config.ClearSelectionOnBackgroundClick)
             SetSelectionSet(registry, {});
+        return true;
     }
 
-    void SelectionController::ConsumeHit(Registry&     registry,
-                                         std::uint32_t stableEntityId,
-                                         std::uint64_t pickSequence)
+    bool SelectionController::ConsumeHit(
+        Registry& registry,
+        const std::uint32_t stableEntityId,
+        const std::uint64_t pickSequence)
     {
-        ApplyHitReadback(registry, stableEntityId, pickSequence);
+        return ApplyHitReadback(
+            registry, stableEntityId, pickSequence);
     }
 
     void SelectionController::ConsumeHit(Registry& registry, std::uint32_t stableEntityId)
     {
-        ApplyHitReadback(registry, stableEntityId, std::nullopt);
+        (void)ApplyHitReadback(
+            registry, stableEntityId, std::nullopt);
     }
 
-    void SelectionController::ConsumeNoHit(Registry& registry, std::uint64_t pickSequence)
+    bool SelectionController::ConsumeNoHit(
+        Registry& registry,
+        const std::uint64_t pickSequence)
     {
-        ApplyNoHitReadback(registry, pickSequence);
+        return ApplyNoHitReadback(registry, pickSequence);
     }
 
     void SelectionController::ConsumeNoHit(Registry& registry)
     {
-        ApplyNoHitReadback(registry, std::nullopt);
+        (void)ApplyNoHitReadback(registry, std::nullopt);
+    }
+
+    bool SelectionController::DiscardInFlightPick(
+        const std::uint64_t pickSequence) noexcept
+    {
+        if (pickSequence == 0u)
+            return false;
+        const auto it = std::find_if(
+            m_InFlightPicks.begin(),
+            m_InFlightPicks.end(),
+            [pickSequence](const PendingSelectionPick& pick)
+            {
+                return pick.Sequence == pickSequence;
+            });
+        if (it == m_InFlightPicks.end())
+            return false;
+        m_InFlightPicks.erase(it);
+        return true;
     }
 
     // --- programmatic selection -------------------------------------------

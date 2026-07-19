@@ -29,6 +29,7 @@ import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
@@ -427,6 +428,8 @@ TEST(ReferenceSceneOwnership,
     auto app = std::make_unique<AppOwnedReferenceApplication>();
     Runtime::Engine engine(
         HeadlessConfig(true), std::move(app));
+    engine.EmplaceModule<
+        Runtime::SceneInteractionModule>();
     engine.Initialize();
 
     auto view = engine.Worlds().Get(engine.ActiveWorld())->Raw().view<
@@ -440,7 +443,8 @@ TEST(ReferenceSceneOwnership,
     const ECS::EntityHandle entity = *view.begin();
 
     Runtime::SelectionController& selection =
-        engine.GetSelectionController();
+        *engine.Services().Find<
+            Runtime::SelectionController>();
     ASSERT_TRUE(selection.SetSelectedEntity(
         *engine.Worlds().Get(engine.ActiveWorld()), entity));
 

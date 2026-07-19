@@ -14,12 +14,17 @@
 #include <glm/gtc/quaternion.hpp>
 
 import Extrinsic.Core.Geometry2D;
+import Extrinsic.Core.Config.Window;
 import Extrinsic.ECS.Component.Transform;
+import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.Platform.Window;
+import Extrinsic.Runtime.GizmoFrameService;
 import Extrinsic.Runtime.GizmoInteraction;
+import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
 
 using Extrinsic::ECS::EntityHandle;
@@ -177,6 +182,97 @@ TEST(GizmoInteraction, DragCancelRestoresBeforeTransform)
     EXPECT_NEAR(restored.Position.x, 1.f, 1.0e-4f);
     EXPECT_NEAR(restored.Scale.x, 1.f, 1.0e-4f);
     EXPECT_NEAR(restored.Rotation.w, 1.f, 1.0e-4f);
+}
+
+TEST(GizmoFrameService,
+     SceneClearCancelsDragAndClearsUndoPacketsAndScratch)
+{
+    Registry registry{};
+    const EntityHandle entity =
+        MakeEntity(registry, glm::vec3{1.f, 0.f, 0.f});
+    registry.Raw().emplace<
+        Extrinsic::ECS::Components::Selection::
+            SelectableTag>(entity);
+    Extrinsic::Runtime::SelectionController selection;
+    ASSERT_TRUE(
+        selection.SetSelectedEntity(registry, entity));
+
+    Extrinsic::Core::Config::WindowConfig windowConfig{};
+    windowConfig.Backend =
+        Extrinsic::Core::Config::WindowBackend::Null;
+    auto window =
+        Extrinsic::Platform::CreateWindow(windowConfig);
+    ASSERT_NE(window, nullptr);
+
+    Extrinsic::Runtime::GizmoFrameService service;
+    service.Interaction().Config().AxisLength = 2.5f;
+    service.Interaction().SetMode(GizmoMode::Scale);
+    service.Interaction().SetOrientation(
+        GizmoOrientation::Local);
+    service.DriveInputForFrame(
+        Extrinsic::Runtime::GizmoFrameServiceInput{
+            .Scene = registry,
+            .Selection = selection,
+            .Window = *window,
+            .Viewport =
+                Extrinsic::Platform::Extent2D{
+                    .Width = 64,
+                    .Height = 64,
+                },
+            .Camera = CameraViewInput{},
+        });
+    ASSERT_EQ(
+        service.BuildRenderPackets(registry).size(),
+        1u);
+
+    service.UndoStack().Push(
+        Extrinsic::Runtime::GizmoTransformEdit{
+            .Entity = entity,
+        });
+    GizmoHitResult hit{
+        .Hit = true,
+        .Axis = GizmoAxis::X,
+        .Entity = entity,
+    };
+    const EntityHandle selected[] = {entity};
+    const PickRay startRay{
+        .Origin = {2.f, 0.f, 5.f},
+        .Direction = {0.f, 0.f, -1.f},
+    };
+    const PickRay currentRay{
+        .Origin = {3.f, 0.f, 5.f},
+        .Direction = {0.f, 0.f, -1.f},
+    };
+    ASSERT_TRUE(
+        service.Interaction().BeginDrag(
+            registry, hit, startRay, selected));
+    ASSERT_TRUE(
+        service.Interaction().DragTick(
+            registry, currentRay));
+    EXPECT_FLOAT_EQ(
+        registry.Raw()
+            .get<Tf::Component>(entity)
+            .Scale.x,
+        2.f);
+
+    service.ClearSceneState(&registry);
+
+    EXPECT_FALSE(service.Interaction().IsDragging());
+    EXPECT_FLOAT_EQ(
+        registry.Raw()
+            .get<Tf::Component>(entity)
+            .Scale.x,
+        1.f);
+    EXPECT_TRUE(service.UndoStack().Empty());
+    EXPECT_TRUE(
+        service.BuildRenderPackets(registry).empty());
+    EXPECT_EQ(service.Interaction().Mode(),
+              GizmoMode::Scale);
+    EXPECT_EQ(service.Interaction().Orientation(),
+              GizmoOrientation::Local);
+    EXPECT_FLOAT_EQ(
+        service.Interaction().Config().AxisLength,
+        2.5f);
 }
 
 TEST(GizmoInteraction, DragTickRotatesAroundAxisAndCommitEmitsUndoRecord)

@@ -537,17 +537,12 @@ TEST(RuntimeRenderExtraction, ClearSceneStateDropsSidecarsAndPerEntityBindings)
             .AdapterKey = kAdapterKey,
             .BufferBDA = 0xCAFE1000u,
         });
-    fixture.Extraction.SetMeshPrimitiveViewSettings(
-        stableId,
-        Runtime::MeshPrimitiveViewSettings{.EnableEdgeView = true});
-
     const auto stats = fixture.Extract(scene);
     EXPECT_EQ(stats.CandidateRenderableCount, 1u);
     EXPECT_EQ(fixture.Extraction.GetTrackedRenderableCount(), 1u);
     EXPECT_EQ(fixture.Renderer->GetGpuWorld().GetLiveInstanceCount(), 1u);
     EXPECT_EQ(fixture.Extraction.GetVisualizationAdapterCount(), 1u);
     ASSERT_TRUE(fixture.Extraction.GetVisualizationAdapterBinding(stableId).has_value());
-    EXPECT_TRUE(fixture.Extraction.GetMeshPrimitiveViewSettings(stableId).AnyEnabled());
 
     fixture.Extraction.ClearSceneState(*fixture.Renderer);
     const Graphics::RenderWorld world =
@@ -557,7 +552,6 @@ TEST(RuntimeRenderExtraction, ClearSceneStateDropsSidecarsAndPerEntityBindings)
     EXPECT_EQ(fixture.Renderer->GetGpuWorld().GetLiveInstanceCount(), 0u);
     EXPECT_EQ(fixture.Extraction.GetVisualizationAdapterCount(), 1u);
     EXPECT_FALSE(fixture.Extraction.GetVisualizationAdapterBinding(stableId).has_value());
-    EXPECT_FALSE(fixture.Extraction.GetMeshPrimitiveViewSettings(stableId).AnyEnabled());
     EXPECT_TRUE(world.Visualization.Scalars.empty());
     EXPECT_FALSE(world.Visualization.HasVisualizationPackets);
 }

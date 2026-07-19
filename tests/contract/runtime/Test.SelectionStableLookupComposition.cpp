@@ -33,6 +33,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.SceneDocumentModule;
+import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
 
@@ -314,7 +315,11 @@ TEST(SelectionStableLookupComposition, IncrementalDurableMapTracksRecycledStable
 TEST(SelectionStableLookupComposition, EngineTracksStableIdEventsWithoutRunFrameRebuild)
 {
     Engine engine(HeadlessConfig(), std::make_unique<ExitAfterOneFrameApplication>());
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
+    Runtime::SceneInteractionModule& interaction =
+        *engine.Services().Find<
+            Runtime::SceneInteractionModule>();
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const StableId firstId{0x145u, 0xA001u};
@@ -322,30 +327,33 @@ TEST(SelectionStableLookupComposition, EngineTracksStableIdEventsWithoutRunFrame
     const EntityHandle entity = scene.Create();
 
     scene.Raw().emplace<StableId>(entity, firstId);
-    std::optional<EntityHandle> resolved = engine.ResolveEntityByStableId(firstId);
+    std::optional<EntityHandle> resolved =
+        interaction.ResolveEntityByStableId(firstId);
     ASSERT_TRUE(resolved.has_value());
     EXPECT_EQ(*resolved, entity);
-    EXPECT_EQ(engine.GetStableEntityLookupDiagnostics().IncrementalTracks, 1u);
-    EXPECT_EQ(engine.GetStableEntityLookupDiagnostics().Rebuilds, 0u);
+    EXPECT_EQ(interaction.LookupDiagnostics().IncrementalTracks, 1u);
+    EXPECT_EQ(interaction.LookupDiagnostics().Rebuilds, 0u);
 
     scene.Raw().emplace_or_replace<StableId>(entity, secondId);
-    EXPECT_FALSE(engine.ResolveEntityByStableId(firstId).has_value());
-    resolved = engine.ResolveEntityByStableId(secondId);
+    EXPECT_FALSE(
+        interaction.ResolveEntityByStableId(firstId).has_value());
+    resolved = interaction.ResolveEntityByStableId(secondId);
     ASSERT_TRUE(resolved.has_value());
     EXPECT_EQ(*resolved, entity);
-    EXPECT_EQ(engine.GetStableEntityLookupDiagnostics().IncrementalTracks, 2u);
-    EXPECT_EQ(engine.GetStableEntityLookupDiagnostics().Rebuilds, 0u);
+    EXPECT_EQ(interaction.LookupDiagnostics().IncrementalTracks, 2u);
+    EXPECT_EQ(interaction.LookupDiagnostics().Rebuilds, 0u);
 
     const std::uint32_t rebuildsBeforeFrame =
-        engine.GetStableEntityLookupDiagnostics().Rebuilds;
+        interaction.LookupDiagnostics().Rebuilds;
     engine.Run();
-    EXPECT_EQ(engine.GetStableEntityLookupDiagnostics().Rebuilds,
+    EXPECT_EQ(interaction.LookupDiagnostics().Rebuilds,
               rebuildsBeforeFrame);
 
     scene.Destroy(entity);
-    EXPECT_FALSE(engine.ResolveEntityByStableId(secondId).has_value());
-    EXPECT_EQ(engine.GetStableEntityLookupDiagnostics().IncrementalForgets, 1u);
-    EXPECT_EQ(engine.GetStableEntityLookupDiagnostics().Rebuilds,
+    EXPECT_FALSE(
+        interaction.ResolveEntityByStableId(secondId).has_value());
+    EXPECT_EQ(interaction.LookupDiagnostics().IncrementalForgets, 1u);
+    EXPECT_EQ(interaction.LookupDiagnostics().Rebuilds,
               rebuildsBeforeFrame);
 
     engine.Shutdown();
@@ -356,7 +364,11 @@ TEST(SelectionStableLookupComposition, SceneLoadRebuildsStableLookupAtReplacemen
     TempSceneFile sceneFile("intrinsic-runtime145-stable-lookup-scene.json");
     Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
+    Runtime::SceneInteractionModule& interaction =
+        *engine.Services().Find<
+            Runtime::SceneInteractionModule>();
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const StableId durable{0x145u, 0xBEEF1u};
@@ -367,18 +379,19 @@ TEST(SelectionStableLookupComposition, SceneLoadRebuildsStableLookupAtReplacemen
         engine.Services().Find<Runtime::SceneDocumentModule>()->SaveSceneToPath(sceneFile.Path.string());
     ASSERT_TRUE(saved.has_value()) << static_cast<int>(saved.error());
     ASSERT_TRUE(engine.Services().Find<Runtime::SceneDocumentModule>()->NewSceneDocument().has_value());
-    EXPECT_FALSE(engine.ResolveEntityByStableId(durable).has_value());
+    EXPECT_FALSE(
+        interaction.ResolveEntityByStableId(durable).has_value());
 
     const std::uint32_t rebuildsBeforeLoad =
-        engine.GetStableEntityLookupDiagnostics().Rebuilds;
+        interaction.LookupDiagnostics().Rebuilds;
     const auto loaded =
         engine.Services().Find<Runtime::SceneDocumentModule>()->LoadSceneFromPath(sceneFile.Path.string());
     ASSERT_TRUE(loaded.has_value()) << static_cast<int>(loaded.error());
-    EXPECT_EQ(engine.GetStableEntityLookupDiagnostics().Rebuilds,
+    EXPECT_EQ(interaction.LookupDiagnostics().Rebuilds,
               rebuildsBeforeLoad + 1u);
 
     const std::optional<EntityHandle> loadedEntity =
-        engine.ResolveEntityByStableId(durable);
+        interaction.ResolveEntityByStableId(durable);
     ASSERT_TRUE(loadedEntity.has_value());
     EXPECT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(*loadedEntity));
 

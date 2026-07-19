@@ -45,7 +45,6 @@ import Extrinsic.Runtime.PointCloudGeometryPacker;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
 import Extrinsic.Runtime.RenderWorldPool;
-import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SpatialDebugAdapters;
 import Extrinsic.Runtime.VisualizationAdapters;
 import Extrinsic.Runtime.VertexChannelBindings;
@@ -914,31 +913,6 @@ namespace Extrinsic::Runtime
         return m_ProceduralGeometry;
     }
 
-    void RenderExtractionCache::State::SetMeshPrimitiveViewSettings(
-        const std::uint32_t stableEntityId,
-        const MeshPrimitiveViewSettings settings)
-    {
-        m_MeshPrimitiveViewSettings.insert_or_assign(
-            stableEntityId,
-            settings);
-    }
-
-    void RenderExtractionCache::State::ClearMeshPrimitiveViewSettings(
-        const std::uint32_t stableEntityId) noexcept
-    {
-        m_MeshPrimitiveViewSettings.erase(stableEntityId);
-    }
-
-    MeshPrimitiveViewSettings
-    RenderExtractionCache::State::GetMeshPrimitiveViewSettings(
-        const std::uint32_t stableEntityId) const noexcept
-    {
-        const auto it = m_MeshPrimitiveViewSettings.find(stableEntityId);
-        return it != m_MeshPrimitiveViewSettings.end()
-            ? it->second
-            : MeshPrimitiveViewSettings{};
-    }
-
     void RenderExtractionCache::State::SetMaterialTextureAssetBindings(
         const std::uint32_t stableEntityId,
         Graphics::MaterialTextureAssetBindings bindings)
@@ -1209,7 +1183,6 @@ namespace Extrinsic::Runtime
                 it->second,
                 renderer,
                 stats);
-            m_MeshPrimitiveViewSettings.erase(it->first);
             m_MaterialTextureBindings.erase(it->first);
             renderer.GetGpuWorld().FreeInstance(
                 it->second.Instance);

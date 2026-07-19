@@ -144,13 +144,14 @@ export namespace Extrinsic::Runtime
         // Apply a hit / miss readback for a specific in-flight pick identified by
         // its `pickSequence` (the value `ConsumePendingPick` returned). The
         // matching tracked pick supplies the kind / mode and is then released. A
-        // sequence that is not tracked (already resolved, evicted, or `0`) is
-        // treated as an untracked readback: the result is applied as a click in
-        // the configured `ClickMode` and `UntrackedReadbacks` is bumped. Hits
-        // resolve `stableEntityId` through the lookup seam; stale (no longer
-        // valid) and non-selectable hits are rejected without mutating state.
-        void ConsumeHit(Registry& registry, std::uint32_t stableEntityId, std::uint64_t pickSequence);
-        void ConsumeNoHit(Registry& registry, std::uint64_t pickSequence);
+        // A sequence that is not tracked (already resolved, evicted, or `0`) is
+        // rejected without applying a fallback click. The return value reports
+        // whether correlation succeeded so refinement can use the same guard.
+        bool ConsumeHit(Registry& registry, std::uint32_t stableEntityId,
+                        std::uint64_t pickSequence);
+        bool ConsumeNoHit(Registry& registry, std::uint64_t pickSequence);
+        // Release one tracked request without applying a hit/miss mutation.
+        bool DiscardInFlightPick(std::uint64_t pickSequence) noexcept;
         // Convenience overloads for callers with at most one pick outstanding (or
         // that resolve strictly in drain order): they consume the oldest tracked
         // in-flight pick. Prefer the sequence-correlated overloads whenever more
@@ -223,13 +224,15 @@ export namespace Extrinsic::Runtime
         void ClearHover(Registry& registry);
         void RebuildSnapshot();
         // Release the tracked in-flight pick matching `pickSequence` (or the
-        // oldest when `pickSequence` is empty) and return its kind / mode. Falls
-        // back to a click in the configured mode (bumping `UntrackedReadbacks`)
-        // when nothing matches.
-        [[nodiscard]] PendingSelectionPick TakeInFlightPick(std::optional<std::uint64_t> pickSequence) noexcept;
-        void ApplyHitReadback(Registry& registry, std::uint32_t stableEntityId,
+        // oldest when `pickSequence` is empty) and return its kind / mode.
+        // Sequenced misses fail closed; only the no-sequence standalone path
+        // retains its direct-click fallback.
+        [[nodiscard]] std::optional<PendingSelectionPick> TakeInFlightPick(
+            std::optional<std::uint64_t> pickSequence) noexcept;
+        bool ApplyHitReadback(Registry& registry, std::uint32_t stableEntityId,
                               std::optional<std::uint64_t> pickSequence);
-        void ApplyNoHitReadback(Registry& registry, std::optional<std::uint64_t> pickSequence);
+        bool ApplyNoHitReadback(Registry& registry,
+                                std::optional<std::uint64_t> pickSequence);
         // Resolve an incoming render/extraction stable id to a live entity
         // through the attached `StableEntityLookup` (if any), else via the bare
         // decode + the registry validity check. Returns `InvalidEntityHandle`

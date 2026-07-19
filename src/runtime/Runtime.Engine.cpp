@@ -59,23 +59,18 @@ import Extrinsic.Runtime.AssetModelTextureIO;
 import Extrinsic.Runtime.DeviceBootstrap;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.FramePacingDiagnostics;
-import Extrinsic.Runtime.GizmoFrameService;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobServiceGpuQueueBridge;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ModuleSchedule;
-import Extrinsic.Runtime.MeshPrimitiveViewControls;
-import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeService;
 import Extrinsic.Core.FrameLoop;
 import Extrinsic.Runtime.EcsSystemBundle;
-import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.SceneDocumentModule;
-import Extrinsic.Runtime.SelectionReadback;
+import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
-import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
@@ -95,7 +90,6 @@ import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.RigidBody;
 import Extrinsic.ECS.Component.ShadowCaster;
 import Extrinsic.ECS.Component.SpatialDebugBinding;
-import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Components.AssetInstance;
 import Extrinsic.ECS.Components.GeometrySources;
@@ -125,14 +119,12 @@ namespace Extrinsic::Runtime
     {
     }
 
-    // RUNTIME-172: Engine temporarily composes two scene-replacement
-    // transitions until RUNTIME-183/RUNTIME-188 move their owners into
-    // modules. Retain only the provider and the two exact typed handles.
+    // RUNTIME-183: Engine temporarily composes the asset-handoff replacement
+    // transition until the asset workflow becomes module-owned.
     class EngineSceneReplacementTransitions final
     {
     public:
         SceneDocumentModule* Documents{};
-        SceneReplacementParticipantHandle Interaction{};
         SceneReplacementParticipantHandle AssetHandoffs{};
 
         void Release() noexcept
@@ -141,7 +133,6 @@ namespace Extrinsic::Runtime
             Documents = nullptr;
             if (documents == nullptr)
             {
-                Interaction = {};
                 AssetHandoffs = {};
                 return;
             }
@@ -151,12 +142,6 @@ namespace Extrinsic::Runtime
                 (void)documents->UnregisterReplacementParticipant(
                     AssetHandoffs);
                 AssetHandoffs = {};
-            }
-            if (Interaction.IsValid())
-            {
-                (void)documents->UnregisterReplacementParticipant(
-                    Interaction);
-                Interaction = {};
             }
         }
     };
@@ -653,6 +638,42 @@ namespace Extrinsic::Runtime
         m_KernelEvents.Publish(RuntimeShutdownAnnounced{});
         (void)m_KernelEvents.Pump();
 
+        // RUNTIME-183 transition: active imports were cancelled before this
+        // announcement. Detach the exact optional selection borrow before
+        // reverse module shutdown can destroy its provider.
+        if (m_AssetImportPipeline)
+        {
+            m_AssetImportPipeline->SetDependencies(
+                AssetImportPipelineDependencies{
+                    .Initialized = &m_Initialized,
+                    .Config = &m_Config,
+                    .Streaming =
+                        m_ServiceRegistry.Find<
+                            StreamingExecutor>(),
+                    .Worlds = &m_WorldRegistry,
+                    .World = ActiveWorld(),
+                    .AssetService = m_AssetService.get(),
+                    .GpuAssetCache =
+                        m_AssetResidencyService->CachePtr(),
+                    .ModelTextureHandoff =
+                        m_AssetResidencyService->
+                            ModelTextureHandoff(),
+                    .ModelSceneHandoff =
+                        m_AssetResidencyService->
+                            ModelSceneHandoff(),
+                    .RenderExtraction =
+                        &m_RenderExtractionService.Cache(),
+                    .Scene = m_Scene,
+                    .Selection = nullptr,
+                    .CommandHistory =
+                        m_ServiceRegistry.Find<
+                            EditorCommandHistory>(),
+                    .ObjectSpaceNormalBakeQueue =
+                        &m_ObjectSpaceNormalBakeService.Queue(),
+                    .Device = m_Device.get(),
+                });
+        }
+
         if (m_SceneReplacementTransitions)
         {
             m_SceneReplacementTransitions->Release();
@@ -706,22 +727,12 @@ namespace Extrinsic::Runtime
                 *m_Renderer);
         }
         m_ObjectSpaceNormalBakeService.Queue().Clear();
-        if (m_Scene != nullptr)
-            m_SelectionController.ClearSceneState(*m_Scene);
-        m_SelectionReadback.ClearRefinedPrimitiveCache();
-        m_StableEntityLookupBinding.Disconnect();
         m_AssetResidencyService->DestroySceneBorrowers();
 
         RefreshActiveWorldScenePointer();
-        RebuildStableEntityLookupAfterSceneReplacement();
         // Scene handoffs borrow the registry by reference. Active-world changes
         // precede deferred destruction, so rebind before the old world retires.
         BindActiveSceneAssetHandoffs();
-    }
-
-    void Engine::RebuildStableEntityLookupAfterSceneReplacement()
-    {
-        m_StableEntityLookupBinding.Rebuild(m_StableEntityLookup, m_Scene);
     }
 
     void Engine::BindActiveSceneAssetHandoffs()
@@ -729,7 +740,6 @@ namespace Extrinsic::Runtime
         if (m_Scene == nullptr)
         {
             m_AssetResidencyService->DestroySceneBorrowers();
-            m_SelectionController.SetStableEntityLookup(nullptr);
         }
         else
         {
@@ -746,6 +756,8 @@ namespace Extrinsic::Runtime
                 });
         }
 
+        SelectionController* const importSelection =
+            m_ServiceRegistry.Find<SelectionController>();
         m_AssetImportPipeline->SetDependencies(
             AssetImportPipelineDependencies{
                 .Initialized = &m_Initialized,
@@ -762,7 +774,7 @@ namespace Extrinsic::Runtime
                     m_AssetResidencyService->ModelSceneHandoff(),
                 .RenderExtraction = &m_RenderExtractionService.Cache(),
                 .Scene = m_Scene,
-                .Selection = &m_SelectionController,
+                .Selection = importSelection,
                 .CommandHistory =
                     m_ServiceRegistry.Find<EditorCommandHistory>(),
                 .ObjectSpaceNormalBakeQueue =
@@ -791,57 +803,6 @@ namespace Extrinsic::Runtime
             std::make_unique<EngineSceneReplacementTransitions>();
         transitions->Documents = documents;
 
-        // RUNTIME-188 removes this transition adapter when editor interaction
-        // becomes module-owned. Captures name only the exact long-lived
-        // interaction objects; no Engine, setup aggregate, or scene pointer
-        // can survive a replacement boundary.
-        SelectionController* const selection =
-            &m_SelectionController;
-        SelectionReadbackState* const selectionReadback =
-            &m_SelectionReadback;
-        StableEntityLookup* const stableLookup =
-            &m_StableEntityLookup;
-        StableEntityLookupSceneBinding* const stableBinding =
-            &m_StableEntityLookupBinding;
-        auto interaction =
-            documents->RegisterReplacementParticipant(
-                SceneReplacementParticipantDesc{
-                    .Name =
-                        "RUNTIME-188.EngineInteractionTransition",
-                    .BeforeReplace =
-                        [selection,
-                         selectionReadback,
-                         stableBinding](
-                            const SceneReplacementContext& context)
-                        {
-                            selection->ClearSceneState(
-                                context.Registry);
-                            selectionReadback
-                                ->ClearRefinedPrimitiveCache();
-                            stableBinding->Disconnect();
-                        },
-                    .AfterReplace =
-                        [selection,
-                         stableLookup,
-                         stableBinding](
-                            const SceneReplacementContext& context)
-                        {
-                            stableBinding->Rebuild(
-                                *stableLookup,
-                                &context.Registry);
-                            selection->SetStableEntityLookup(
-                                stableLookup);
-                        },
-                });
-        if (!interaction.has_value())
-        {
-            Core::Log::Error(
-                "[Runtime] Failed to register RUNTIME-188 scene replacement transition: {}",
-                Core::Error::ToString(interaction.error()));
-            std::terminate();
-        }
-        transitions->Interaction = *interaction;
-
         // RUNTIME-183 removes this adapter when asset residency, extraction,
         // and bake handoffs become module-owned. Every capture is an exact
         // owner/capability with Engine lifetime; the callback receives its
@@ -862,7 +823,7 @@ namespace Extrinsic::Runtime
             m_AssetImportPipeline.get();
         WorldRegistry* const worlds = &m_WorldRegistry;
         SelectionController* const importSelection =
-            &m_SelectionController;
+            m_ServiceRegistry.Find<SelectionController>();
         StreamingExecutor* const streaming =
             m_ServiceRegistry.Find<StreamingExecutor>();
         Core::Config::EngineConfig* const config = &m_Config;
@@ -1048,9 +1009,6 @@ namespace Extrinsic::Runtime
         m_WorldRegistry.Clear();
         const WorldHandle bootWorld = m_WorldRegistry.CreateWorld("Main");
         m_Scene = m_WorldRegistry.Get(bootWorld);
-        if (m_Scene != nullptr)
-            m_StableEntityLookupBinding.Connect(m_StableEntityLookup, *m_Scene);
-
         // ── 5. Runtime-module registration (ARCH-011/RUNTIME-179) ─────────
         // Registration precedes dependent subsystem wiring so app-composed
         // owners can publish narrow construction capabilities. The public
@@ -1081,13 +1039,6 @@ namespace Extrinsic::Runtime
 
         BindActiveSceneAssetHandoffs();
         RegisterSceneReplacementParticipants();
-
-        // RUNTIME-092 Slice B — attach the runtime-owned stable-entity lookup
-        // to the selection authority so render-id resolution flows through the
-        // single runtime sidecar (which decodes + validates against the
-        // registry) rather than a bare cast. The durable-id winner map is
-        // maintained incrementally from StableId component events.
-        m_SelectionController.SetStableEntityLookup(&m_StableEntityLookup);
 
         // ── 7. Runtime-module resolution/finalization (ARCH-011) ──────────
         ResolveRuntimeModulesForBoot(recipeActivation);
@@ -1189,9 +1140,6 @@ namespace Extrinsic::Runtime
             }
             void DestroyScene() override
             {
-                Owner.m_StableEntityLookupBinding.Disconnect();
-                Owner.m_StableEntityLookup.Clear();
-
                 AssetResidency.DestroySceneBorrowers();
 
                 Scene = nullptr;
@@ -1440,12 +1388,8 @@ namespace Extrinsic::Runtime
 
         const EditorInputCaptureSnapshot& editorCapture =
             frameContext.EditorCapture;
-        const bool imguiCapturesMouse =
-            editorCapture.CapturedMouse || editorCapture.WidgetsActive;
         const bool imguiCapturesKeyboard =
             editorCapture.CapturedKeyboard || editorCapture.WidgetsActive;
-        const bool imguiCapturesInput =
-            editorCapture.CapturesViewportInput();
 
         // ── Phase 4: Build render snapshot ────────────────────────────────
         const auto preRenderSetupBegin = std::chrono::steady_clock::now();
@@ -1468,16 +1412,6 @@ namespace Extrinsic::Runtime
                 .EditorCapture = editorCapture,
                 .RenderInput = renderInput,
                 .FrameDeltaSeconds = frameDt,
-            });
-        m_GizmoFrameService.DriveInputForFrame(
-            GizmoFrameServiceInput{
-                .Scene = *m_Scene,
-                .Selection = m_SelectionController,
-                .Window = inputWindow,
-                .Viewport = viewport,
-                .ImGuiCapturesInput = imguiCapturesInput,
-                .ImGuiCapturesMouse = imguiCapturesMouse,
-                .Camera = renderInput.Camera,
             });
         preRenderTransformFlushNeeded =
             preRenderTransformFlushNeeded ||
@@ -1521,7 +1455,6 @@ namespace Extrinsic::Runtime
         // building and render extraction this same frame.
         const auto postFlushSetupBegin = std::chrono::steady_clock::now();
         m_InputActions.DispatchForFrame(m_Config,
-                                        m_SelectionController,
                                         *m_Scene,
                                         inputWindow.GetInput(),
                                         viewport,
@@ -1530,19 +1463,7 @@ namespace Extrinsic::Runtime
                                         frameContext.FrameIndex,
                                         renderInput);
 
-        const std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos =
-            m_GizmoFrameService.BuildRenderPackets(*m_Scene);
         pacing.PreRenderSetupMicros += ElapsedMicros(postFlushSetupBegin);
-
-        // ── RUNTIME-089 / BUG-026: drain coalesced selection pick ─────────
-        const auto selectionPickDrainBegin = std::chrono::steady_clock::now();
-        m_SelectionReadback.DrainPendingPickForFrame(
-            m_SelectionController,
-            m_Renderer->GetSelectionSystem(),
-            viewport,
-            renderInput);
-        pacing.SelectionPickDrainMicros =
-            ElapsedMicros(selectionPickDrainBegin);
 
         RunRuntimeModuleFrameHooks(
             FramePhase::BeforeExtraction,
@@ -1566,7 +1487,6 @@ namespace Extrinsic::Runtime
                                             *m_Scene,
                                             m_RenderExtractionService.Cache(),
                                             m_AssetResidencyService->CachePtr(),
-                                            m_SelectionController,
                                             m_RenderExtractionService.Pool(),
                                             m_Config.Render.SynchronousExtraction,
                                             frameContext.ExtractionStats,
@@ -1575,7 +1495,6 @@ namespace Extrinsic::Runtime
                                             frame,
                                             renderInput,
                                             ActiveWorld(),
-                                            transformGizmos,
                                             renderWorld,
                                             &pacing);
 
@@ -1632,20 +1551,6 @@ namespace Extrinsic::Runtime
             frameContext.EditorCapture,
             pacing);
         pacing.MaintenanceMicros = ElapsedMicros(maintenanceBegin);
-
-        // ── RUNTIME-092 / RUNTIME-145: completed selection readbacks ───────
-        // The durable StableId winner-map is maintained incrementally from
-        // scene StableId component events; this frame phase only drains pick
-        // readbacks. Render-id resolution still decodes + validates against the
-        // live registry through the attached runtime-owned lookup.
-        const auto readbackBegin = std::chrono::steady_clock::now();
-
-        // ── RUNTIME-089 / RUNTIME-093 / BUG-026: completed pick readbacks ──
-        m_SelectionReadback.DrainCompletedReadbacksForFrame(
-            m_Renderer->GetSelectionSystem(),
-            m_SelectionController,
-            *m_Scene);
-        pacing.SelectionReadbackMicros = ElapsedMicros(readbackBegin);
 
         // completedGpuValue is the renderer's per-frame timeline value.  The
         // GpuAssetCache currently retires on the CPU frame counter (which is
@@ -1739,26 +1644,6 @@ namespace Extrinsic::Runtime
         return m_ObjectSpaceNormalBakeService.PendingCount();
     }
 
-    GizmoInteraction& Engine::GetGizmoInteraction() noexcept
-    {
-        return m_GizmoFrameService.Interaction();
-    }
-
-    const GizmoInteraction& Engine::GetGizmoInteraction() const noexcept
-    {
-        return m_GizmoFrameService.Interaction();
-    }
-
-    GizmoUndoStack& Engine::GetGizmoUndoStack() noexcept
-    {
-        return m_GizmoFrameService.UndoStack();
-    }
-
-    const GizmoUndoStack& Engine::GetGizmoUndoStack() const noexcept
-    {
-        return m_GizmoFrameService.UndoStack();
-    }
-
     const RenderWorldPool& Engine::GetRenderWorldPool() const noexcept
     {
         return m_RenderExtractionService.Pool();
@@ -1811,65 +1696,7 @@ namespace Extrinsic::Runtime
         m_AssetImportPipeline->ImportDroppedFilePaths(event.Paths);
     }
 
-    SelectionController&  Engine::GetSelectionController() noexcept { return m_SelectionController; }
-    std::optional<ECS::EntityHandle>
-    Engine::ResolveEntityByStableId(ECS::Components::StableId id)
-    {
-        if (!m_Scene)
-            return std::nullopt;
-        return m_StableEntityLookup.ResolveByStableId(*m_Scene, id);
-    }
-    const StableEntityLookupDiagnostics&
-    Engine::GetStableEntityLookupDiagnostics() const noexcept
-    {
-        return m_StableEntityLookup.GetDiagnostics();
-    }
-    const std::optional<PrimitiveSelectionResult>&
-    Engine::GetLastRefinedPrimitiveSelection() const noexcept
-    {
-        return m_SelectionReadback.LastRefinedPrimitive();
-    }
-    std::uint64_t
-    Engine::GetLastRefinedPrimitiveSelectionGeneration() const noexcept
-    {
-        return m_SelectionReadback.LastRefinedPrimitiveGeneration();
-    }
     Core::FrameGraph&     Engine::GetFrameGraph()    noexcept { return *m_FrameGraph;    }
-
-    void Engine::SetMeshPrimitiveViewSettings(
-        const std::uint32_t stableEntityId,
-        const MeshPrimitiveViewSettings settings)
-    {
-        if (!m_Scene)
-        {
-            return;
-        }
-
-        ApplyMeshPrimitiveViewSettings(*m_Scene, stableEntityId, settings);
-        m_RenderExtractionService.ClearMeshPrimitiveViewSettings(stableEntityId);
-    }
-
-    void Engine::ClearMeshPrimitiveViewSettings(
-        const std::uint32_t stableEntityId) noexcept
-    {
-        if (m_Scene)
-        {
-            Extrinsic::Runtime::ClearMeshPrimitiveViewSettings(*m_Scene,
-                                                               stableEntityId);
-        }
-        m_RenderExtractionService.ClearMeshPrimitiveViewSettings(stableEntityId);
-    }
-
-    MeshPrimitiveViewSettings Engine::GetMeshPrimitiveViewSettings(
-        const std::uint32_t stableEntityId) const noexcept
-    {
-        if (!m_Scene)
-        {
-            return MeshPrimitiveViewSettings{};
-        }
-
-        return ReadMeshPrimitiveViewSettings(*m_Scene, stableEntityId);
-    }
 
     void Engine::SetVisualizationAdapterBinding(
         const std::uint32_t stableEntityId,

@@ -96,6 +96,7 @@ import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxConfigSections;
 import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneDocumentModule;
+import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Sandbox.ConfigSections;
@@ -127,6 +128,20 @@ using Extrinsic::Runtime::IApplication;
 
 constexpr std::uint32_t kInvalidIndex = std::numeric_limits<std::uint32_t>::max();
 constexpr std::uint32_t kTargetFrames = 4u;
+
+[[nodiscard]] RT::SelectionController& Selection(
+    Engine& engine)
+{
+    return *engine.Services()
+        .Find<RT::SelectionController>();
+}
+
+[[nodiscard]] RT::SceneInteractionModule& Interaction(
+    Engine& engine)
+{
+    return *engine.Services()
+        .Find<RT::SceneInteractionModule>();
+}
 
 class TempObjFile final
 {
@@ -808,6 +823,8 @@ struct AcceptanceBootstrap
     enginePtr->EmplaceModule<Extrinsic::Runtime::EditorUiModule>();
     enginePtr->EmplaceModule<
         Extrinsic::Runtime::SceneDocumentModule>();
+    enginePtr->EmplaceModule<
+        Extrinsic::Runtime::SceneInteractionModule>();
     enginePtr->Initialize();
 
     const auto initInputs = GetVulkanDeviceOperationalInputs(&enginePtr->GetDevice());
@@ -854,6 +871,8 @@ struct AcceptanceBootstrap
     enginePtr->EmplaceModule<Extrinsic::Runtime::EditorUiModule>();
     enginePtr->EmplaceModule<
         Extrinsic::Runtime::SceneDocumentModule>();
+    enginePtr->EmplaceModule<
+        Extrinsic::Runtime::SceneInteractionModule>();
     enginePtr->Initialize();
 
     const auto initInputs = GetVulkanDeviceOperationalInputs(&enginePtr->GetDevice());
@@ -1484,7 +1503,7 @@ public:
             FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle");
         m_State->ReferenceTriangleSelected =
             IsReferenceTriangleEntityValid(*engine.Worlds().Get(engine.ActiveWorld()), triangle) &&
-            engine.GetSelectionController().SetSelectedEntity(
+            Selection(engine).SetSelectedEntity(
                 *engine.Worlds().Get(engine.ActiveWorld()), triangle);
 
         m_EditorShell.Attach(engine);
@@ -3363,7 +3382,7 @@ public:
             {
                 const Extrinsic::Runtime::SandboxEditorContext context{
                     .Scene = &*engine.Worlds().Get(engine.ActiveWorld()),
-                    .Selection = &engine.GetSelectionController(),
+                    .Selection = &Selection(engine),
                     .CommandHistory =
                         &*engine.Services()
                               .Find<RT::EditorCommandHistory>(),
@@ -4015,7 +4034,7 @@ public:
                 TrianglePixel = ProjectReferenceCameraPixel(
                     glm::vec3{0.0f, 0.0f, 0.0f}, extent);
             }
-            engine.GetSelectionController().RequestClickPick(TrianglePixel.first, TrianglePixel.second);
+            Selection(engine).RequestClickPick(TrianglePixel.first, TrianglePixel.second);
             TriangleClickSubmitted = true;
             m_Phase = Phase::AwaitTriangleHit;
             break;
@@ -4023,10 +4042,11 @@ public:
         case Phase::AwaitTriangleHit:
             if (ObserveTriangleHit(engine))
             {
-                const auto diagnostics = engine.GetSelectionController().GetDiagnostics();
+                const auto diagnostics =
+                    Selection(engine).GetDiagnostics();
                 m_NoHitsBeforeBackground = diagnostics.NoHits;
                 BackgroundPixel = FarBackgroundPixel(extent);
-                engine.GetSelectionController().RequestClickPick(BackgroundPixel.first, BackgroundPixel.second);
+                Selection(engine).RequestClickPick(BackgroundPixel.first, BackgroundPixel.second);
                 BackgroundClickSubmitted = true;
                 m_Phase = Phase::AwaitBackgroundNoHit;
             }
@@ -4104,7 +4124,7 @@ private:
     [[nodiscard]] bool ObserveTriangleHit(Engine& engine)
     {
         auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
-        auto& selection = engine.GetSelectionController();
+        auto& selection = Selection(engine);
         const std::uint32_t triangleId =
             Extrinsic::Runtime::SelectionController::ToStableEntityId(m_Triangle);
 
@@ -4118,7 +4138,8 @@ private:
             return false;
         }
 
-        const auto& primitive = engine.GetLastRefinedPrimitiveSelection();
+        const auto& primitive =
+            Interaction(engine).LastRefinedPrimitive();
         if (!primitive.has_value())
         {
             return false;
@@ -4146,12 +4167,12 @@ private:
 
     [[nodiscard]] bool ObserveBackgroundNoHit(Engine& engine) const
     {
-        const auto& selection = engine.GetSelectionController();
+        const auto& selection = Selection(engine);
         const auto diagnostics = selection.GetDiagnostics();
         return diagnostics.NoHits > m_NoHitsBeforeBackground &&
                selection.SelectedCount() == 0u &&
                !engine.Worlds().Get(engine.ActiveWorld())->Raw().all_of<ECSC::Selection::SelectedTag>(m_Triangle) &&
-               !engine.GetLastRefinedPrimitiveSelection().has_value();
+               !Interaction(engine).LastRefinedPrimitive().has_value();
     }
 
     Extrinsic::Sandbox::Editor::SandboxEditorController m_EditorUi{};
@@ -4229,14 +4250,15 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ClickPickReadbackSelectsReferenceTriangle
     EXPECT_NEAR(hit.WorldCursor.z, 0.0f, kBug026PlaneTolerance);
     EXPECT_NEAR(hit.LocalCursor.z, 0.0f, kBug026PlaneTolerance);
 
-    const auto diagnostics = engine.GetSelectionController().GetDiagnostics();
+    const auto diagnostics = Selection(engine).GetDiagnostics();
     EXPECT_EQ(diagnostics.ClickRequestsSubmitted, 2u);
     EXPECT_EQ(diagnostics.PicksDrained, 2u);
     EXPECT_EQ(diagnostics.Hits, 1u);
     EXPECT_EQ(diagnostics.NoHits, 1u);
-    EXPECT_EQ(engine.GetSelectionController().SelectedCount(), 0u);
+    EXPECT_EQ(Selection(engine).SelectedCount(), 0u);
     EXPECT_FALSE(engine.Worlds().Get(engine.ActiveWorld())->Raw().all_of<ECSC::Selection::SelectedTag>(triangle));
-    EXPECT_FALSE(engine.GetLastRefinedPrimitiveSelection().has_value());
+    EXPECT_FALSE(
+        Interaction(engine).LastRefinedPrimitive().has_value());
     EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(run.Stats);
 
@@ -4340,8 +4362,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedModelSceneIsVisibleAndClickPickab
     EXPECT_NEAR(firstWorld[3].x, -1.0f, 0.0001f);
     EXPECT_NEAR(targetWorld[3].x, 1.0f, 0.0001f);
     EXPECT_NE(firstWorld[3].x, targetWorld[3].x);
-    EXPECT_TRUE(engine.GetSelectionController().IsSelected(firstInstance));
-    EXPECT_FALSE(engine.GetSelectionController().IsSelected(targetInstance));
+    EXPECT_TRUE(Selection(engine).IsSelected(firstInstance));
+    EXPECT_FALSE(Selection(engine).IsSelected(targetInstance));
 
     const glm::vec4 targetWorldPoint4 =
         targetWorld * glm::vec4{0.0f, 0.0f, 0.0f, 1.0f};
@@ -4436,13 +4458,13 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedModelSceneIsVisibleAndClickPickab
     EXPECT_LT(hit.Depth, 0.999f);
 
     const auto selectionDiagnostics =
-        engine.GetSelectionController().GetDiagnostics();
+        Selection(engine).GetDiagnostics();
     EXPECT_EQ(selectionDiagnostics.ClickRequestsSubmitted, 2u);
     EXPECT_EQ(selectionDiagnostics.PicksDrained, 2u);
     EXPECT_EQ(selectionDiagnostics.Hits, 1u);
     EXPECT_EQ(selectionDiagnostics.NoHits, 1u);
     EXPECT_EQ(selectionDiagnostics.NonSelectableHitsRejected, 0u);
-    EXPECT_EQ(engine.GetSelectionController().SelectedCount(), 0u);
+    EXPECT_EQ(Selection(engine).SelectedCount(), 0u);
     EXPECT_FALSE(raw.all_of<ECSC::Selection::SelectedTag>(targetInstance));
 
     const auto& extraction = engine.GetLastRenderExtractionStats();
@@ -4520,10 +4542,11 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, HierarchySelectionKeepsDefaultSandboxVisi
 
     EntityHandle triangle = FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle");
     ASSERT_NE(triangle, Extrinsic::ECS::InvalidEntityHandle);
-    ASSERT_TRUE(engine.GetSelectionController().SetSelectedEntity(*engine.Worlds().Get(engine.ActiveWorld()), triangle));
-    ASSERT_EQ(engine.GetSelectionController().SelectedCount(), 1u);
-    ASSERT_EQ(engine.GetSelectionController().SelectedStableIds().size(), 1u);
-    EXPECT_EQ(engine.GetSelectionController().SelectedStableIds()[0],
+    ASSERT_TRUE(Selection(engine).SetSelectedEntity(
+        *engine.Worlds().Get(engine.ActiveWorld()), triangle));
+    ASSERT_EQ(Selection(engine).SelectedCount(), 1u);
+    ASSERT_EQ(Selection(engine).SelectedStableIds().size(), 1u);
+    EXPECT_EQ(Selection(engine).SelectedStableIds()[0],
               Extrinsic::Runtime::SelectionController::ToStableEntityId(triangle));
 
     auto& renderer = engine.GetRenderer();

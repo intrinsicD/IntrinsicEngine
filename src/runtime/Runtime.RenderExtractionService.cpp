@@ -72,12 +72,6 @@ namespace Extrinsic::Runtime
         m_Cache.Shutdown(renderer);
     }
 
-    void RenderExtractionService::ClearMeshPrimitiveViewSettings(
-        const std::uint32_t stableEntityId) noexcept
-    {
-        m_Cache.ClearMeshPrimitiveViewSettings(stableEntityId);
-    }
-
     void RenderExtractionService::SetVisualizationAdapterBinding(
         const std::uint32_t stableEntityId,
         RenderExtractionCache::VisualizationAdapterBinding binding)

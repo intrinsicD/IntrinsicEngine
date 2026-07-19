@@ -26,6 +26,7 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.SelectionReadback;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.WorldHandle;
 
 using Extrinsic::ECS::EntityHandle;
 using Extrinsic::ECS::Scene::Registry;
@@ -37,6 +38,9 @@ namespace G = Extrinsic::Graphics;
 
 namespace
 {
+    constexpr Extrinsic::Runtime::WorldHandle kWorld{7u, 3u};
+    constexpr std::uint64_t kEpoch = 11u;
+
     [[nodiscard]] EntityHandle MakeSelectable(Registry& registry)
     {
         const EntityHandle entity = registry.Create();
@@ -74,9 +78,40 @@ namespace
     void DrainReadbacks(SelectionReadbackState& readbacks,
                         G::SelectionSystem& system,
                         SelectionController& controller,
-                        Registry& registry)
+                        Registry& registry,
+                        const Extrinsic::Runtime::WorldHandle world = kWorld,
+                        const std::uint64_t epoch = kEpoch)
     {
-        readbacks.DrainCompletedReadbacksForFrame(system, controller, registry);
+        readbacks.DrainCompletedReadbacksForFrame(
+            system, controller, registry, world, epoch);
+    }
+
+    [[nodiscard]] std::uint64_t IssuePendingPick(
+        SelectionReadbackState& readbacks,
+        G::SelectionSystem& system,
+        SelectionController& controller,
+        const Extrinsic::Runtime::WorldHandle world = kWorld,
+        const std::uint64_t epoch = kEpoch)
+    {
+        G::RenderFrameInput input{};
+        readbacks.DrainPendingPickForFrame(
+            controller,
+            system,
+            Extrinsic::Platform::Extent2D{
+                .Width = 64,
+                .Height = 32,
+            },
+            input,
+            world,
+            epoch);
+        if (!input.HasPendingPick ||
+            input.Pick.Sequence == 0u)
+        {
+            ADD_FAILURE() << "pending pick was not issued";
+            return 0u;
+        }
+        (void)system.ConsumePick();
+        return input.Pick.Sequence;
     }
 }
 
@@ -94,7 +129,9 @@ TEST(SelectionReadbackBridge, PendingDrainRequestsRendererPickAndTracksSequence)
     readbacks.DrainPendingPickForFrame(controller,
                                        system,
                                        Extrinsic::Platform::Extent2D{.Width = 64, .Height = 32},
-                                       input);
+                                       input,
+                                       kWorld,
+                                       kEpoch);
 
     EXPECT_FALSE(controller.HasPendingPick());
     EXPECT_EQ(controller.InFlightPickCount(), 1u);
@@ -113,7 +150,7 @@ TEST(SelectionReadbackBridge, PendingDrainRequestsRendererPickAndTracksSequence)
     system.Shutdown();
 }
 
-TEST(SelectionReadbackBridge, BackgroundReadbackAndClearBumpRefinedPrimitiveGeneration)
+TEST(SelectionReadbackBridge, ZeroSequenceBackgroundIsRejectedBeforeRefinement)
 {
     Registry registry;
     SelectionController controller;
@@ -122,14 +159,60 @@ TEST(SelectionReadbackBridge, BackgroundReadbackAndClearBumpRefinedPrimitiveGene
     system.Initialize();
 
     system.PublishNoHit();
-    readbacks.DrainCompletedReadbacksForFrame(system, controller, registry);
+    DrainReadbacks(readbacks, system, controller, registry);
     EXPECT_FALSE(readbacks.LastRefinedPrimitive().has_value());
-    EXPECT_EQ(readbacks.LastRefinedPrimitiveGeneration(), 1u);
+    EXPECT_EQ(readbacks.LastRefinedPrimitiveGeneration(), 0u);
+    EXPECT_EQ(controller.GetDiagnostics().ReadbacksConsumed, 0u);
 
     readbacks.ClearRefinedPrimitiveCache();
     EXPECT_FALSE(readbacks.LastRefinedPrimitive().has_value());
-    EXPECT_EQ(readbacks.LastRefinedPrimitiveGeneration(), 2u);
+    EXPECT_EQ(readbacks.LastRefinedPrimitiveGeneration(), 1u);
 
+    system.Shutdown();
+}
+
+TEST(SelectionReadbackBridge,
+     SceneClearDropsCorrelationContextBeforeLateReadback)
+{
+    Registry registry;
+    SelectionController controller;
+    G::SelectionSystem system;
+    SelectionReadbackState readbacks;
+    system.Initialize();
+    const EntityHandle target = MakeSelectable(registry);
+
+    controller.RequestClickPick(3u, 4u);
+    const std::uint64_t sequence =
+        IssuePendingPick(readbacks, system, controller);
+    ASSERT_NE(sequence, 0u);
+    ASSERT_EQ(controller.InFlightPickCount(), 1u);
+
+    // This isolates the readback half of the cohort: clearing its
+    // world-bound contexts must reject a late result even while the
+    // standalone controller deliberately retains its matching record.
+    // SceneInteractionModule::ClearWorldBoundState also calls
+    // SelectionController::ClearSceneState, so the composed reset leaves
+    // neither half in flight.
+    readbacks.ClearSceneState();
+    EXPECT_EQ(
+        readbacks.LastRefinedPrimitiveGeneration(),
+        1u);
+
+    PublishHit(system, target, sequence);
+    DrainReadbacks(
+        readbacks, system, controller, registry);
+
+    EXPECT_FALSE(controller.IsSelected(target));
+    EXPECT_FALSE(HasSelectedTag(registry, target));
+    EXPECT_EQ(controller.InFlightPickCount(), 1u);
+    EXPECT_EQ(controller.GetDiagnostics().ReadbacksConsumed, 0u);
+    EXPECT_FALSE(
+        readbacks.LastRefinedPrimitive().has_value());
+    EXPECT_EQ(
+        readbacks.LastRefinedPrimitiveGeneration(),
+        1u);
+
+    controller.ClearSceneState(registry);
     system.Shutdown();
 }
 
@@ -149,21 +232,21 @@ TEST(SelectionReadbackCorrelation, OutOfOrderReadbacksApplyToCorrectRequestBySeq
 
     // Frame N: issue a click pick.
     controller.RequestClickPick(1u, 1u);
-    const std::optional<Extrinsic::Runtime::PendingSelectionPick> clickPick =
-        controller.ConsumePendingPick();
-    ASSERT_TRUE(clickPick.has_value());
+    const std::uint64_t clickSequence =
+        IssuePendingPick(readbacks, system, controller);
+    ASSERT_NE(clickSequence, 0u);
 
     // Frame N+1: issue a hover pick. Both are now in flight.
     controller.RequestHoverPick(2u, 2u);
-    const std::optional<Extrinsic::Runtime::PendingSelectionPick> hoverPick =
-        controller.ConsumePendingPick();
-    ASSERT_TRUE(hoverPick.has_value());
+    const std::uint64_t hoverSequence =
+        IssuePendingPick(readbacks, system, controller);
+    ASSERT_NE(hoverSequence, 0u);
     ASSERT_EQ(controller.InFlightPickCount(), 2u);
-    ASSERT_NE(clickPick->Sequence, hoverPick->Sequence);
+    ASSERT_NE(clickSequence, hoverSequence);
 
     // The renderer publishes the hover result BEFORE the (older) click result.
-    PublishHit(system, hoverTarget, hoverPick->Sequence);
-    PublishHit(system, clickTarget, clickPick->Sequence);
+    PublishHit(system, hoverTarget, hoverSequence);
+    PublishHit(system, clickTarget, clickSequence);
 
     DrainReadbacks(readbacks, system, controller, registry);
 
@@ -199,19 +282,19 @@ TEST(SelectionReadbackCorrelation, MissingOldestReadbackDoesNotMisapplyNewerBySe
     const EntityHandle clickTarget = MakeSelectable(registry);
 
     controller.RequestHoverPick(1u, 1u);
-    const std::optional<Extrinsic::Runtime::PendingSelectionPick> hoverPick =
-        controller.ConsumePendingPick();
-    ASSERT_TRUE(hoverPick.has_value());
+    const std::uint64_t hoverSequence =
+        IssuePendingPick(readbacks, system, controller);
+    ASSERT_NE(hoverSequence, 0u);
 
     controller.RequestClickPick(2u, 2u);
-    const std::optional<Extrinsic::Runtime::PendingSelectionPick> clickPick =
-        controller.ConsumePendingPick();
-    ASSERT_TRUE(clickPick.has_value());
+    const std::uint64_t clickSequence =
+        IssuePendingPick(readbacks, system, controller);
+    ASSERT_NE(clickSequence, 0u);
     ASSERT_EQ(controller.InFlightPickCount(), 2u);
 
     // Only the click readback is published; the hover slot was recycled and its
     // result lost.
-    PublishHit(system, clickTarget, clickPick->Sequence);
+    PublishHit(system, clickTarget, clickSequence);
     DrainReadbacks(readbacks, system, controller, registry);
 
     // The click selected its own target (click semantics), not the hover target.
@@ -227,6 +310,122 @@ TEST(SelectionReadbackCorrelation, MissingOldestReadbackDoesNotMisapplyNewerBySe
     EXPECT_FALSE(controller.HasHovered());
 
     EXPECT_EQ(controller.InFlightPickCount(), 1u);
-    EXPECT_EQ(controller.OldestInFlightSequence(), hoverPick->Sequence);
+    EXPECT_EQ(controller.OldestInFlightSequence(), hoverSequence);
+    system.Shutdown();
+}
+
+TEST(SelectionReadbackCorrelation,
+     ControllerCapacityEvictionRejectsStillTrackedContext)
+{
+    Registry registry;
+    Extrinsic::Runtime::SelectionControllerConfig config{};
+    config.MaxTrackedInFlightPicks = 2u;
+    SelectionController controller(config);
+    G::SelectionSystem system;
+    SelectionReadbackState readbacks;
+    system.Initialize();
+    const EntityHandle target = MakeSelectable(registry);
+
+    controller.RequestClickPick(1u, 1u);
+    const std::uint64_t first =
+        IssuePendingPick(readbacks, system, controller);
+    controller.RequestClickPick(2u, 2u);
+    (void)IssuePendingPick(readbacks, system, controller);
+    controller.RequestClickPick(3u, 3u);
+    (void)IssuePendingPick(readbacks, system, controller);
+    ASSERT_EQ(controller.InFlightPickCount(), 2u);
+    ASSERT_EQ(controller.GetDiagnostics().InFlightPicksDropped, 1u);
+
+    PublishHit(system, target, first);
+    DrainReadbacks(readbacks, system, controller, registry);
+
+    EXPECT_FALSE(controller.IsSelected(target));
+    EXPECT_FALSE(HasSelectedTag(registry, target));
+    EXPECT_EQ(controller.InFlightPickCount(), 2u);
+    EXPECT_EQ(controller.GetDiagnostics().UntrackedReadbacks, 1u);
+    EXPECT_EQ(controller.GetDiagnostics().ReadbacksConsumed, 0u);
+    EXPECT_EQ(readbacks.LastRefinedPrimitiveGeneration(), 0u);
+    system.Shutdown();
+}
+
+TEST(SelectionReadbackCorrelation,
+     ContextCapacityEvictionDiscardsControllerRecord)
+{
+    Registry registry;
+    Extrinsic::Runtime::SelectionControllerConfig config{};
+    config.MaxTrackedInFlightPicks = 0u;
+    SelectionController controller(config);
+    G::SelectionSystem system;
+    SelectionReadbackState readbacks;
+    system.Initialize();
+    const EntityHandle target = MakeSelectable(registry);
+
+    std::uint64_t first = 0u;
+    for (std::uint32_t index = 0u; index < 33u; ++index)
+    {
+        controller.RequestClickPick(index, index);
+        const std::uint64_t sequence =
+            IssuePendingPick(readbacks, system, controller);
+        if (index == 0u)
+            first = sequence;
+    }
+    ASSERT_NE(first, 0u);
+    EXPECT_EQ(controller.InFlightPickCount(), 32u);
+
+    PublishHit(system, target, first);
+    DrainReadbacks(readbacks, system, controller, registry);
+
+    EXPECT_FALSE(controller.IsSelected(target));
+    EXPECT_FALSE(HasSelectedTag(registry, target));
+    EXPECT_EQ(controller.InFlightPickCount(), 32u);
+    EXPECT_EQ(controller.GetDiagnostics().UntrackedReadbacks, 0u);
+    EXPECT_EQ(controller.GetDiagnostics().ReadbacksConsumed, 0u);
+    EXPECT_EQ(readbacks.LastRefinedPrimitiveGeneration(), 0u);
+    system.Shutdown();
+}
+
+TEST(SelectionReadbackCorrelation,
+     UnknownWrongWorldAndWrongEpochResultsFailClosed)
+{
+    Registry registry;
+    SelectionController controller;
+    G::SelectionSystem system;
+    SelectionReadbackState readbacks;
+    system.Initialize();
+    const EntityHandle target = MakeSelectable(registry);
+
+    controller.RequestClickPick(1u, 1u);
+    const std::uint64_t wrongWorld =
+        IssuePendingPick(readbacks, system, controller);
+    PublishHit(system, target, wrongWorld);
+    DrainReadbacks(
+        readbacks,
+        system,
+        controller,
+        registry,
+        Extrinsic::Runtime::WorldHandle{8u, 3u},
+        kEpoch);
+
+    controller.RequestClickPick(2u, 2u);
+    const std::uint64_t wrongEpoch =
+        IssuePendingPick(readbacks, system, controller);
+    PublishHit(system, target, wrongEpoch);
+    DrainReadbacks(
+        readbacks,
+        system,
+        controller,
+        registry,
+        kWorld,
+        kEpoch + 1u);
+
+    PublishHit(system, target, wrongEpoch + 1000u);
+    DrainReadbacks(readbacks, system, controller, registry);
+
+    EXPECT_FALSE(controller.IsSelected(target));
+    EXPECT_FALSE(HasSelectedTag(registry, target));
+    EXPECT_EQ(controller.InFlightPickCount(), 0u);
+    EXPECT_EQ(controller.GetDiagnostics().ReadbacksConsumed, 0u);
+    EXPECT_EQ(controller.GetDiagnostics().UntrackedReadbacks, 0u);
+    EXPECT_EQ(readbacks.LastRefinedPrimitiveGeneration(), 0u);
     system.Shutdown();
 }

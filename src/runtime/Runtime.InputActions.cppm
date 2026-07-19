@@ -14,7 +14,6 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
-import Extrinsic.Runtime.SelectionController;
 
 namespace Extrinsic::Runtime
 {
@@ -53,7 +52,6 @@ namespace Extrinsic::Runtime
     export struct RuntimeInputActionServices
     {
         ECS::Scene::Registry*           Scene{nullptr};
-        SelectionController*            Selection{nullptr};
         Graphics::RenderFrameInput*     RenderInput{nullptr};
         const Core::Config::EngineConfig* Config{nullptr};
     };
@@ -81,7 +79,6 @@ namespace Extrinsic::Runtime
         void Unregister(RuntimeInputActionHandle handle);
 
         void DispatchForFrame(const Core::Config::EngineConfig& config,
-                              SelectionController& selection,
                               ECS::Scene::Registry& scene,
                               const Platform::Input::Context& input,
                               const Platform::Extent2D& viewport,

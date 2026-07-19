@@ -53,6 +53,7 @@ import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneDocumentModule;
+import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.Properties;
@@ -356,6 +357,7 @@ TEST(RuntimeSandboxAcceptance,
 TEST(RuntimeSandboxAcceptance, SelectionControllerSelectsEntityOfEachFamily)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
 
@@ -363,7 +365,8 @@ TEST(RuntimeSandboxAcceptance, SelectionControllerSelectsEntityOfEachFamily)
     const EntityHandle graph = MakeGraph(scene);
     const EntityHandle cloud = MakePointCloud(scene);
 
-    Runtime::SelectionController& selection = engine.GetSelectionController();
+    Runtime::SelectionController& selection =
+        *engine.Services().Find<Runtime::SelectionController>();
 
     for (const EntityHandle entity : {mesh, graph, cloud})
     {
@@ -383,6 +386,7 @@ TEST(RuntimeSandboxAcceptance, SelectionControllerSelectsEntityOfEachFamily)
 TEST(RuntimeSandboxAcceptance, EditorPanelFrameEnumeratesAcceptanceScene)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
 
@@ -390,7 +394,8 @@ TEST(RuntimeSandboxAcceptance, EditorPanelFrameEnumeratesAcceptanceScene)
     (void)MakeGraph(scene);
     (void)MakePointCloud(scene);
 
-    Runtime::SelectionController& selection = engine.GetSelectionController();
+    Runtime::SelectionController& selection =
+        *engine.Services().Find<Runtime::SelectionController>();
     ASSERT_TRUE(selection.SetSelectedEntity(scene, mesh));
 
     const Runtime::SandboxEditorContext context{
@@ -473,6 +478,7 @@ TEST(RuntimeSandboxAcceptance, PrimitiveRefinementResolvesOneDomainPerFamily)
 TEST(RuntimeSandboxAcceptance, SelectionOutlineSnapshotPopulatedForSelectedEntity)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
 
@@ -480,14 +486,24 @@ TEST(RuntimeSandboxAcceptance, SelectionOutlineSnapshotPopulatedForSelectedEntit
     (void)MakeGraph(scene);
     (void)MakePointCloud(scene);
 
-    Runtime::SelectionController& selection = engine.GetSelectionController();
+    Runtime::SelectionController& selection =
+        *engine.Services().Find<Runtime::SelectionController>();
     ASSERT_TRUE(selection.SetSelectedEntity(scene, mesh));
 
     Runtime::RenderExtractionCache extraction;
+    extraction.SubmitSceneInteractionSnapshot(
+        Runtime::RuntimeSceneInteractionRenderSnapshot{
+            .World = engine.ActiveWorld(),
+            .SelectedRenderIds =
+                std::vector<std::uint32_t>(
+                    selection.SelectedStableIds().begin(),
+                    selection.SelectedStableIds().end()),
+        });
     (void)extraction.ExtractAndSubmit(scene,
                                       engine.GetRenderer(),
                                       &engine.GetGpuAssetCache(),
-                                      &selection);
+                                      0u,
+                                      engine.ActiveWorld());
     const Graphics::RenderWorld world =
         engine.GetRenderer().ExtractRenderWorld(Graphics::RenderFrameInput{});
 
@@ -503,6 +519,7 @@ TEST(RuntimeSandboxAcceptance, SelectionOutlineSnapshotPopulatedForSelectedEntit
 TEST(RuntimeSandboxAcceptance, ViewportLeftClickSubmitsSelectionPick)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<InjectClickAndExitApplication>());
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
@@ -511,10 +528,16 @@ TEST(RuntimeSandboxAcceptance, ViewportLeftClickSubmitsSelectionPick)
     engine.Run();
 
     const Runtime::SelectionControllerDiagnostics diagnostics =
-        engine.GetSelectionController().GetDiagnostics();
+        engine.Services()
+            .Find<Runtime::SelectionController>()
+            ->GetDiagnostics();
     EXPECT_EQ(diagnostics.ClickRequestsSubmitted, 1u);
     EXPECT_EQ(diagnostics.PicksDrained, 1u);
-    EXPECT_EQ(engine.GetSelectionController().InFlightPickCount(), 1u);
+    EXPECT_EQ(
+        engine.Services()
+            .Find<Runtime::SelectionController>()
+            ->InFlightPickCount(),
+        1u);
 
     engine.Shutdown();
 }
@@ -590,7 +613,9 @@ namespace
         {
             const Runtime::SandboxEditorContext context{
                 .Scene = &*engine.Worlds().Get(engine.ActiveWorld()),
-                .Selection = &engine.GetSelectionController(),
+                .Selection =
+                    engine.Services()
+                        .Find<Runtime::SelectionController>(),
                 .CommandHistory = &*engine.Services().Find<Runtime::EditorCommandHistory>(),
             };
             LastStatus = Runtime::ApplySandboxEditorTransformEdit(
@@ -623,6 +648,7 @@ TEST(RuntimeSandboxAcceptance, InspectorTransformEditFlushedToRenderStateSameFra
     auto app = std::make_unique<EditTransformViaInspectorAndExitApplication>();
     auto* appPtr = app.get();
     Runtime::Engine engine(HeadlessConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())

@@ -63,7 +63,6 @@ namespace Extrinsic::Runtime
 
     void RuntimeInputActionRegistry::DispatchForFrame(
         const Core::Config::EngineConfig& config,
-        SelectionController& selection,
         ECS::Scene::Registry& scene,
         const Platform::Input::Context& input,
         const Platform::Extent2D& viewport,
@@ -74,7 +73,6 @@ namespace Extrinsic::Runtime
     {
         RuntimeInputActionServices services{
             .Scene = &scene,
-            .Selection = &selection,
             .RenderInput = &renderInput,
             .Config = &config,
         };
