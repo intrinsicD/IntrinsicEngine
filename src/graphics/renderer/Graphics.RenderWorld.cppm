@@ -181,6 +181,9 @@ namespace Extrinsic::Graphics
         /// Enables optional overlay/debug visualization chain.
         bool DebugOverlayEnabled{false};
 
+        /// Immutable profiling request sampled with this render snapshot.
+        bool EnableGpuProfiling{false};
+
         CameraViewSnapshot Camera{};
 
         /// Runtime-submitted renderable values copied by the renderer before

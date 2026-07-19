@@ -1,12 +1,14 @@
 module;
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <cstddef>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <functional>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -24,7 +26,9 @@ module;
 module Extrinsic.Graphics.Renderer;
 
 import Extrinsic.Core.Error;
+import Extrinsic.Core.Telemetry;
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.RHI.Types;
 import Extrinsic.RHI.BufferManager;
@@ -1637,6 +1641,33 @@ namespace Extrinsic::Graphics
             }
         };
 
+        struct GpuProfilePassMetadata
+        {
+            std::uint32_t Ordinal{0u};
+            std::string Name{};
+            FramePassId Id{};
+            RHI::QueueAffinity Queue{RHI::QueueAffinity::Graphics};
+            RenderCommandPassStatus CommandStatus{
+                RenderCommandPassStatus::SkippedUnavailable};
+            RHI::ProfilerScopeToken Token{};
+        };
+
+        struct ActiveGpuProfileFrame
+        {
+            RHI::IProfiler* Profiler{nullptr};
+            RHI::ProfilerFrameKey Frame{};
+            std::vector<GpuProfilePassMetadata> Passes{};
+            std::vector<std::uint32_t> MetadataIndexByPass{};
+            std::array<bool, 2u> OpenQueues{};
+            bool ExecuteSucceeded{false};
+        };
+
+        struct SubmittedGpuProfileFrame
+        {
+            RHI::ProfilerFrameKey Frame{};
+            std::vector<GpuProfilePassMetadata> Passes{};
+        };
+
         [[nodiscard]] static std::uint32_t NormalizeRuntimeSnapshotSlot(
             const std::uint32_t storageSlot) noexcept
         {
@@ -2183,6 +2214,11 @@ namespace Extrinsic::Graphics
             m_Subsystems.ResetStorage();
             m_RenderGraph.Reset();
             m_RenderGraphCompileCache.reset();
+            DiscardActiveGpuProfile();
+            m_SubmittedGpuProfiles.clear();
+            m_CurrentGpuProfile = {};
+            m_LastGoodGpuProfile.reset();
+            ClearGpuPassTelemetry();
             m_CullingOutputAvailable = false;
         }
 
@@ -2200,6 +2236,11 @@ namespace Extrinsic::Graphics
             if (m_Device == nullptr)
             {
                 m_LastRenderGraphStats.LifecycleDiagnostic = "BeginFrame requires a live device.";
+                PublishStaleGpuProfileStatus(
+                    RenderGraphGpuProfileStatus::Unavailable,
+                    "GPU profiling requires a live render device.");
+                m_LastRenderGraphStats.GpuProfile =
+                    m_CurrentGpuProfile;
                 Core::Log::Error("[Graphics] BeginFrame failed: device missing");
                 return false;
             }
@@ -2238,6 +2279,17 @@ namespace Extrinsic::Graphics
                 const std::uint32_t framesInFlight = m_Device->GetFramesInFlight() == 0u
                     ? 1u
                     : m_Device->GetFramesInFlight();
+                if (m_SubmittedGpuProfiles.size() < framesInFlight)
+                {
+                    m_SubmittedGpuProfiles.resize(framesInFlight);
+                }
+                // VulkanDevice has already completed this reused slot's
+                // fence set and retired its query metadata. Resolution here
+                // is exact-keyed and nonblocking; no other frame-path wait is
+                // introduced for profiling.
+                ResolveCompletedGpuProfile(outFrame.FrameIndex);
+                m_LastRenderGraphStats.GpuProfile =
+                    m_CurrentGpuProfile;
                 std::lock_guard<std::mutex> uploadLock(m_DynamicUploadMutex);
                 if (m_TransientDebugUploadHelper)
                 {
@@ -2251,6 +2303,15 @@ namespace Extrinsic::Graphics
                 {
                     m_ImGuiUploadHelper->BeginFrame(outFrame.FrameIndex, framesInFlight);
                 }
+            }
+            else
+            {
+                PublishStaleGpuProfileStatus(
+                    RenderGraphGpuProfileStatus::Unavailable,
+                    "GPU profile resolution is unavailable because frame "
+                    "acquisition failed.");
+                m_LastRenderGraphStats.GpuProfile =
+                    m_CurrentGpuProfile;
             }
             return began;
         }
@@ -2817,6 +2878,7 @@ namespace Extrinsic::Graphics
                 .Alpha          = input.Alpha,
                 .HasPendingPick = input.HasPendingPick,
                 .DebugOverlayEnabled = input.DebugOverlayEnabled,
+                .EnableGpuProfiling = input.EnableGpuProfiling,
                 .Camera = camera,
                 .Renderables = m_RenderableSnapshots,
                 .Lights = m_LightSnapshots,
@@ -2935,6 +2997,22 @@ namespace Extrinsic::Graphics
         {
             m_LastRenderGraphStats = {};
             ResetCommandRecordStats();
+            if (!renderWorld.EnableGpuProfiling)
+            {
+                PublishStaleGpuProfileStatus(
+                    RenderGraphGpuProfileStatus::Disabled,
+                    "GPU profiling is disabled for this render snapshot.");
+            }
+            else if (m_CurrentGpuProfile.Status ==
+                     RenderGraphGpuProfileStatus::Disabled)
+            {
+                UpdateCurrentGpuProfileStatus(
+                    RenderGraphGpuProfileStatus::NotReady,
+                    "GPU profiling is requested; compiled-pass planning "
+                    "has not started.");
+            }
+            m_LastRenderGraphStats.GpuProfile =
+                m_CurrentGpuProfile;
             m_LastRenderGraphStats.VisualizationPropertyBuffers =
                 renderWorld.Visualization.PropertyBufferDiagnostics;
             if (!m_HasPreparedFrame)
@@ -3419,7 +3497,42 @@ namespace Extrinsic::Graphics
                                 return batch.Queue == RenderQueue::AsyncCompute;
                             });
 
-            const auto recordPass =
+            std::vector<RHI::QueueAffinity> singleQueueByPass(
+                compiled->PassDeclarations.size(),
+                RHI::QueueAffinity::Graphics);
+            std::vector<RHI::QueueAffinity> submitQueueByPass =
+                singleQueueByPass;
+            if (useQueueSubmitPlan)
+            {
+                for (const QueueSubmitBatch& batch :
+                     queueSubmitPlan.Batches)
+                {
+                    for (const std::uint32_t passIndex :
+                         batch.PassIndices)
+                    {
+                        if (passIndex <
+                            submitQueueByPass.size())
+                        {
+                            submitQueueByPass[passIndex] =
+                                batch.Queue;
+                        }
+                    }
+                }
+            }
+            const auto beginGpuProfileForQueues =
+                [&](const std::vector<RHI::QueueAffinity>&
+                        actualQueues)
+                {
+                    if (renderWorld.EnableGpuProfiling)
+                    {
+                        (void)BeginGpuProfile(
+                            frame,
+                            *compiled,
+                            actualQueues);
+                    }
+                };
+
+            const auto recordPassBody =
                 [this, &passNameByIndex, &camera, &frame, &compiled,
                  defaultRecipeUsesDeferred, &renderWorld](RHI::ICommandContext& graphicsContext,
                                                            const std::uint32_t passIndex)
@@ -3558,6 +3671,23 @@ namespace Extrinsic::Graphics
                         AccumulateCommandRecordStatus(passName, passId, status);
                     }
                     EndActiveRenderPassForRoute(graphicsContext, routeContext);
+                };
+            const auto recordPass =
+                [this, &recordPassBody](
+                    RHI::ICommandContext& actualContext,
+                    const std::uint32_t passIndex)
+                {
+                    const bool scopeBegun =
+                        BeginGpuProfileScope(
+                            actualContext,
+                            passIndex);
+                    recordPassBody(actualContext, passIndex);
+                    if (scopeBegun)
+                    {
+                        EndGpuProfileScope(
+                            actualContext,
+                            passIndex);
+                    }
                 };
 
             const RHI::QueueCapabilityProfile frameGraphQueueProfile =
@@ -3733,8 +3863,12 @@ namespace Extrinsic::Graphics
 
             const auto executeSingleQueue = [&]() -> Core::Result
             {
+                beginGpuProfileForQueues(singleQueueByPass);
                 RHI::ICommandContext& graphicsContext = m_Device->GetGraphicsContext(frame.FrameIndex);
                 graphicsContext.Begin();
+                BeginGpuProfileQueue(
+                    graphicsContext,
+                    RHI::QueueAffinity::Graphics);
                 Core::Result result = m_RenderGraphExecutor.Execute(
                     *compiled,
                     {},
@@ -3746,6 +3880,9 @@ namespace Extrinsic::Graphics
                     {
                         submitBarriersForContext(graphicsContext, packet);
                     });
+                EndGpuProfileQueue(
+                    graphicsContext,
+                    RHI::QueueAffinity::Graphics);
                 recordPostGraphReadbacks(graphicsContext, result.has_value());
                 if (result.has_value())
                     InvokeRuntimeFrameCommandHooks(graphicsContext);
@@ -3766,8 +3903,12 @@ namespace Extrinsic::Graphics
                 m_LastRenderGraphStats.Execute.ParallelCommandContextCount =
                     static_cast<std::uint32_t>(parallelContextRequests.size());
 
+                beginGpuProfileForQueues(singleQueueByPass);
                 RHI::ICommandContext& primaryContext = m_Device->GetGraphicsContext(frame.FrameIndex);
                 primaryContext.Begin();
+                BeginGpuProfileQueue(
+                    primaryContext,
+                    RHI::QueueAffinity::Graphics);
                 ParallelRecordStats parallelRecordStats{};
                 Core::Result result = executeParallelRecordJoin(
                     [&](const std::uint32_t passIndex)
@@ -3791,6 +3932,9 @@ namespace Extrinsic::Graphics
                     },
                     parallelRecordStats);
                 publishParallelRecordStats(parallelRecordStats);
+                EndGpuProfileQueue(
+                    primaryContext,
+                    RHI::QueueAffinity::Graphics);
                 recordPostGraphReadbacks(primaryContext, result.has_value());
                 if (result.has_value())
                 {
@@ -3828,6 +3972,39 @@ namespace Extrinsic::Graphics
                     return barrierBounds;
                 }
 
+                beginGpuProfileForQueues(submitQueueByPass);
+                std::array<bool, 2u> profileQueueOpened{};
+                const auto profileQueueIndex =
+                    [](const RHI::QueueAffinity queue)
+                        -> std::optional<std::uint32_t>
+                    {
+                        if (queue ==
+                            RHI::QueueAffinity::Graphics)
+                        {
+                            return 0u;
+                        }
+                        if (queue ==
+                            RHI::QueueAffinity::AsyncCompute)
+                        {
+                            return 1u;
+                        }
+                        return std::nullopt;
+                    };
+                const auto isLastBatchForQueue =
+                    [&](const std::size_t batchIndex,
+                        const RHI::QueueAffinity queue)
+                    {
+                        return std::none_of(
+                            queueSubmitPlan.Batches.begin() +
+                                static_cast<std::ptrdiff_t>(
+                                    batchIndex + 1u),
+                            queueSubmitPlan.Batches.end(),
+                            [queue](
+                                const QueueSubmitBatch& candidate)
+                            {
+                                return candidate.Queue == queue;
+                            });
+                    };
                 for (std::size_t batchIndex = 0; batchIndex < queueSubmitPlan.Batches.size(); ++batchIndex)
                 {
                     const QueueSubmitBatch& batch = queueSubmitPlan.Batches[batchIndex];
@@ -3836,6 +4013,16 @@ namespace Extrinsic::Graphics
                                                         frame.FrameIndex,
                                                         static_cast<std::uint32_t>(batchIndex));
                     context.Begin();
+                    const std::optional<std::uint32_t> queueIndex =
+                        profileQueueIndex(batch.Queue);
+                    if (queueIndex.has_value() &&
+                        !profileQueueOpened[*queueIndex])
+                    {
+                        BeginGpuProfileQueue(
+                            context,
+                            batch.Queue);
+                        profileQueueOpened[*queueIndex] = true;
+                    }
                     for (const std::uint32_t passIndex : batch.PassIndices)
                     {
                         if (passIndex >= compiled->PassDeclarations.size())
@@ -3865,6 +4052,15 @@ namespace Extrinsic::Graphics
                             context.End();
                             return after;
                         }
+                    }
+                    if (queueIndex.has_value() &&
+                        isLastBatchForQueue(
+                            batchIndex,
+                            batch.Queue))
+                    {
+                        EndGpuProfileQueue(
+                            context,
+                            batch.Queue);
                     }
                     if (batchIndex + 1u == queueSubmitPlan.Batches.size())
                     {
@@ -3898,6 +4094,104 @@ namespace Extrinsic::Graphics
                 m_LastRenderGraphStats.Execute.ParallelCommandContextCount =
                     static_cast<std::uint32_t>(parallelContextRequests.size());
 
+                beginGpuProfileForQueues(submitQueueByPass);
+                std::vector<bool> profilePrimaryPreBegun(
+                    queueSubmitPlan.Batches.size(),
+                    false);
+                std::array<bool, 2u> profileQueueOpened{};
+                const auto profileQueueIndex =
+                    [](const RHI::QueueAffinity queue)
+                        -> std::optional<std::uint32_t>
+                    {
+                        if (queue ==
+                            RHI::QueueAffinity::Graphics)
+                        {
+                            return 0u;
+                        }
+                        if (queue ==
+                            RHI::QueueAffinity::AsyncCompute)
+                        {
+                            return 1u;
+                        }
+                        return std::nullopt;
+                    };
+                const auto isLastBatchForQueue =
+                    [&](const std::size_t batchIndex,
+                        const RHI::QueueAffinity queue)
+                    {
+                        return std::none_of(
+                            queueSubmitPlan.Batches.begin() +
+                                static_cast<std::ptrdiff_t>(
+                                    batchIndex + 1u),
+                            queueSubmitPlan.Batches.end(),
+                            [queue](
+                                const QueueSubmitBatch& candidate)
+                            {
+                                return candidate.Queue == queue;
+                            });
+                    };
+                if (m_ActiveGpuProfile.has_value())
+                {
+                    // Queue-submit and parallel-context vectors are both fully
+                    // materialized here. Open each queue's first primary and
+                    // record its reset/envelope before any worker can record a
+                    // secondary timestamp.
+                    for (std::size_t batchIndex = 0u;
+                         batchIndex <
+                         queueSubmitPlan.Batches.size();
+                         ++batchIndex)
+                    {
+                        const QueueSubmitBatch& batch =
+                            queueSubmitPlan.Batches[batchIndex];
+                        const std::optional<std::uint32_t>
+                            queueIndex =
+                                profileQueueIndex(batch.Queue);
+                        if (!queueIndex.has_value() ||
+                            profileQueueOpened[*queueIndex])
+                        {
+                            continue;
+                        }
+                        RHI::ICommandContext& primary =
+                            m_Device->GetQueueSubmitContext(
+                                batch.Queue,
+                                frame.FrameIndex,
+                                static_cast<std::uint32_t>(
+                                    batchIndex));
+                        primary.Begin();
+                        BeginGpuProfileQueue(
+                            primary,
+                            batch.Queue);
+                        profilePrimaryPreBegun[batchIndex] =
+                            true;
+                        profileQueueOpened[*queueIndex] = true;
+                    }
+                }
+                const auto closePreBegunProfilePrimaries =
+                    [&]()
+                    {
+                        for (std::size_t batchIndex = 0u;
+                             batchIndex <
+                             profilePrimaryPreBegun.size();
+                             ++batchIndex)
+                        {
+                            if (!profilePrimaryPreBegun[
+                                    batchIndex])
+                            {
+                                continue;
+                            }
+                            const QueueSubmitBatch& batch =
+                                queueSubmitPlan
+                                    .Batches[batchIndex];
+                            m_Device->GetQueueSubmitContext(
+                                batch.Queue,
+                                frame.FrameIndex,
+                                static_cast<std::uint32_t>(
+                                    batchIndex))
+                                .End();
+                            profilePrimaryPreBegun[
+                                batchIndex] = false;
+                        }
+                    };
                 ParallelRecordStats parallelRecordStats{};
                 Core::Result recordResult = executeParallelRecordJoin(
                     RenderGraphExecutor::PassObserver{},
@@ -3906,18 +4200,21 @@ namespace Extrinsic::Graphics
                 publishParallelRecordStats(parallelRecordStats);
                 if (!recordResult.has_value())
                 {
+                    closePreBegunProfilePrimaries();
                     m_Device->EndFrameParallelCommandContexts(frame);
                     return recordResult;
                 }
 
                 if (!AreBarrierPacketsSortedByPassAndStage(compiled->BarrierPackets))
                 {
+                    closePreBegunProfilePrimaries();
                     m_Device->EndFrameParallelCommandContexts(frame);
                     return Core::Err(Core::ErrorCode::InvalidState);
                 }
                 Core::Result barrierBounds = ValidateBarrierPacketBounds(*compiled);
                 if (!barrierBounds.has_value())
                 {
+                    closePreBegunProfilePrimaries();
                     m_Device->EndFrameParallelCommandContexts(frame);
                     return barrierBounds;
                 }
@@ -3929,13 +4226,18 @@ namespace Extrinsic::Graphics
                         m_Device->GetQueueSubmitContext(batch.Queue,
                                                         frame.FrameIndex,
                                                         static_cast<std::uint32_t>(batchIndex));
-                    context.Begin();
+                    if (!profilePrimaryPreBegun[batchIndex])
+                    {
+                        context.Begin();
+                    }
                     for (const std::uint32_t passIndex : batch.PassIndices)
                     {
                         if (passIndex >= compiled->PassDeclarations.size() ||
                             passIndex >= parallelContextIndexByPass.size())
                         {
                             context.End();
+                            profilePrimaryPreBegun[batchIndex] = false;
+                            closePreBegunProfilePrimaries();
                             m_Device->EndFrameParallelCommandContexts(frame);
                             return Core::Err(Core::ErrorCode::OutOfRange);
                         }
@@ -3944,6 +4246,8 @@ namespace Extrinsic::Graphics
                         if (declarations.PassIndex != passIndex)
                         {
                             context.End();
+                            profilePrimaryPreBegun[batchIndex] = false;
+                            closePreBegunProfilePrimaries();
                             m_Device->EndFrameParallelCommandContexts(frame);
                             return Core::Err(Core::ErrorCode::InvalidState);
                         }
@@ -3952,6 +4256,8 @@ namespace Extrinsic::Graphics
                         if (!before.has_value())
                         {
                             context.End();
+                            profilePrimaryPreBegun[batchIndex] = false;
+                            closePreBegunProfilePrimaries();
                             m_Device->EndFrameParallelCommandContexts(frame);
                             return before;
                         }
@@ -3960,6 +4266,8 @@ namespace Extrinsic::Graphics
                         if (contextIndex >= parallelContextRequests.size())
                         {
                             context.End();
+                            profilePrimaryPreBegun[batchIndex] = false;
+                            closePreBegunProfilePrimaries();
                             m_Device->EndFrameParallelCommandContexts(frame);
                             return Core::Err(Core::ErrorCode::InvalidState);
                         }
@@ -3972,9 +4280,19 @@ namespace Extrinsic::Graphics
                         if (!after.has_value())
                         {
                             context.End();
+                            profilePrimaryPreBegun[batchIndex] = false;
+                            closePreBegunProfilePrimaries();
                             m_Device->EndFrameParallelCommandContexts(frame);
                             return after;
                         }
+                    }
+                    if (isLastBatchForQueue(
+                            batchIndex,
+                            batch.Queue))
+                    {
+                        EndGpuProfileQueue(
+                            context,
+                            batch.Queue);
                     }
                     if (batchIndex + 1u == queueSubmitPlan.Batches.size())
                     {
@@ -3985,6 +4303,8 @@ namespace Extrinsic::Graphics
                         if (!finalBarriers.has_value())
                         {
                             context.End();
+                            profilePrimaryPreBegun[batchIndex] = false;
+                            closePreBegunProfilePrimaries();
                             m_Device->EndFrameParallelCommandContexts(frame);
                             return finalBarriers;
                         }
@@ -3992,8 +4312,10 @@ namespace Extrinsic::Graphics
                         InvokeRuntimeFrameCommandHooks(context);
                     }
                     context.End();
+                    profilePrimaryPreBegun[batchIndex] = false;
                 }
 
+                closePreBegunProfilePrimaries();
                 m_Device->EndFrameParallelCommandContexts(frame);
                 return Core::Ok();
             };
@@ -4014,6 +4336,10 @@ namespace Extrinsic::Graphics
             m_LastRenderGraphStats.Execute.TimeMicros = static_cast<std::uint64_t>(
                 std::chrono::duration_cast<std::chrono::microseconds>(executeEnd - executeBegin).count());
             PublishCommandRecordStats();
+            PublishActiveGpuProfileCommandStatuses(
+                executeResult.has_value());
+            m_LastRenderGraphStats.GpuProfile =
+                m_CurrentGpuProfile;
             const auto resetCacheAfterFallback = [&]()
             {
                 if (m_InvalidateRenderGraphCompileCacheAfterFrame)
@@ -4074,7 +4400,11 @@ namespace Extrinsic::Graphics
             }
 
             m_Device->EndFrame(frame);
-            return m_Device->GetGlobalFrameNumber();
+            const std::uint64_t completedFrameNumber =
+                m_Device->GetGlobalFrameNumber();
+            FinalizeGpuProfileAfterDeviceEnd(
+                completedFrameNumber);
+            return completedFrameNumber;
         }
 
         // ── Resource managers ─────────────────────────────────────────────
@@ -8089,6 +8419,701 @@ namespace Extrinsic::Graphics
             }
         }
 
+        [[nodiscard]] static std::uint64_t SaturatingProfileAge(
+            const std::uint64_t currentFrame,
+            const std::uint64_t sampledFrame) noexcept
+        {
+            return currentFrame >= sampledFrame
+                       ? currentFrame - sampledFrame
+                       : 0u;
+        }
+
+        static void ClearGpuPassTelemetry()
+        {
+            Core::Telemetry::TelemetrySystem::Get().SetPassGpuTimings({});
+        }
+
+        [[nodiscard]] static RenderGraphGpuProfileStatus
+        ProfileStatusForError(const RHI::ProfilerError error) noexcept
+        {
+            switch (error)
+            {
+            case RHI::ProfilerError::NotReady:
+                return RenderGraphGpuProfileStatus::NotReady;
+            case RHI::ProfilerError::DeviceLost:
+                return RenderGraphGpuProfileStatus::DeviceLost;
+            case RHI::ProfilerError::Unsupported:
+                return RenderGraphGpuProfileStatus::Unsupported;
+            case RHI::ProfilerError::Exhausted:
+            case RHI::ProfilerError::Overflow:
+                return RenderGraphGpuProfileStatus::Exhausted;
+            case RHI::ProfilerError::InvalidState:
+            case RHI::ProfilerError::InvalidArgument:
+                return RenderGraphGpuProfileStatus::InvalidLifecycle;
+            }
+            return RenderGraphGpuProfileStatus::InvalidLifecycle;
+        }
+
+        [[nodiscard]] static RenderGraphGpuProfileStatus
+        ProfileStatusForBackend(
+            const RHI::ProfilerBackendStatus status) noexcept
+        {
+            switch (status)
+            {
+            case RHI::ProfilerBackendStatus::Ready:
+                return RenderGraphGpuProfileStatus::Recording;
+            case RHI::ProfilerBackendStatus::ContractOnly:
+            case RHI::ProfilerBackendStatus::InitializationFailed:
+                return RenderGraphGpuProfileStatus::Unavailable;
+            case RHI::ProfilerBackendStatus::Unsupported:
+                return RenderGraphGpuProfileStatus::Unsupported;
+            case RHI::ProfilerBackendStatus::DeviceLost:
+                return RenderGraphGpuProfileStatus::DeviceLost;
+            }
+            return RenderGraphGpuProfileStatus::Unavailable;
+        }
+
+        [[nodiscard]] static std::optional<std::size_t>
+        GpuProfileQueueIndex(
+            const RHI::QueueAffinity queue) noexcept
+        {
+            if (queue == RHI::QueueAffinity::Graphics)
+            {
+                return 0u;
+            }
+            if (queue == RHI::QueueAffinity::AsyncCompute)
+            {
+                return 1u;
+            }
+            return std::nullopt;
+        }
+
+        void PublishStaleGpuProfileStatus(
+            const RenderGraphGpuProfileStatus status,
+            std::string diagnostic)
+        {
+            RenderGraphGpuProfileStats snapshot{};
+            if (m_LastGoodGpuProfile.has_value())
+            {
+                snapshot = *m_LastGoodGpuProfile;
+                snapshot.Fresh = false;
+                snapshot.Stale = true;
+                const std::uint64_t currentFrame =
+                    m_Device != nullptr
+                        ? m_Device->GetGlobalFrameNumber()
+                        : 0u;
+                snapshot.SampleAgeFrames = SaturatingProfileAge(
+                    currentFrame,
+                    snapshot.ResolvedSubmittedFrameNumber);
+            }
+            snapshot.Status = status;
+            snapshot.Diagnostic = std::move(diagnostic);
+            m_CurrentGpuProfile = std::move(snapshot);
+            ClearGpuPassTelemetry();
+        }
+
+        void UpdateCurrentGpuProfileStatus(
+            const RenderGraphGpuProfileStatus status,
+            std::string diagnostic)
+        {
+            m_CurrentGpuProfile.Status = status;
+            m_CurrentGpuProfile.Diagnostic = std::move(diagnostic);
+        }
+
+        void LatchGpuProfileFailure(
+            const RHI::ProfilerError error) noexcept
+        {
+            const std::uint8_t encoded =
+                static_cast<std::uint8_t>(error) + 1u;
+            std::uint8_t expected = 0u;
+            (void)m_GpuProfileFailure.compare_exchange_strong(
+                expected,
+                encoded,
+                std::memory_order_release,
+                std::memory_order_relaxed);
+        }
+
+        [[nodiscard]] std::optional<RHI::ProfilerError>
+        GpuProfileFailure() const noexcept
+        {
+            const std::uint8_t encoded =
+                m_GpuProfileFailure.load(std::memory_order_acquire);
+            if (encoded == 0u)
+            {
+                return std::nullopt;
+            }
+            return static_cast<RHI::ProfilerError>(encoded - 1u);
+        }
+
+        void ResolveCompletedGpuProfile(const std::uint32_t frameSlot)
+        {
+            ClearGpuPassTelemetry();
+            const std::uint64_t currentFrame =
+                m_Device != nullptr
+                    ? m_Device->GetGlobalFrameNumber()
+                    : 0u;
+            if (frameSlot >= m_SubmittedGpuProfiles.size() ||
+                !m_SubmittedGpuProfiles[frameSlot].has_value())
+            {
+                PublishStaleGpuProfileStatus(
+                    RenderGraphGpuProfileStatus::NotReady,
+                    "No completed native GPU profile resolved for this frame.");
+                return;
+            }
+
+            RHI::IProfiler* profiler =
+                m_Device != nullptr ? m_Device->GetProfiler() : nullptr;
+            if (profiler == nullptr)
+            {
+                m_SubmittedGpuProfiles[frameSlot].reset();
+                PublishStaleGpuProfileStatus(
+                    RenderGraphGpuProfileStatus::Unavailable,
+                    "The active render device does not expose a profiler.");
+                return;
+            }
+
+            SubmittedGpuProfileFrame& submitted =
+                *m_SubmittedGpuProfiles[frameSlot];
+            const auto resolved = profiler->Resolve(submitted.Frame);
+            if (!resolved)
+            {
+                const RHI::ProfilerError error = resolved.error();
+                if (error != RHI::ProfilerError::NotReady)
+                {
+                    m_SubmittedGpuProfiles[frameSlot].reset();
+                }
+                PublishStaleGpuProfileStatus(
+                    ProfileStatusForError(error),
+                    "GPU profile resolution failed: " +
+                        std::string{RHI::ProfilerErrorName(error)} + ".");
+                return;
+            }
+            if (resolved->Source != RHI::GpuTimestampSource::NativeGpu)
+            {
+                m_SubmittedGpuProfiles[frameSlot].reset();
+                PublishStaleGpuProfileStatus(
+                    RenderGraphGpuProfileStatus::Unavailable,
+                    "Resolved profiler data is not native GPU evidence.");
+                return;
+            }
+            if (resolved->Frame != submitted.Frame)
+            {
+                m_SubmittedGpuProfiles[frameSlot].reset();
+                PublishStaleGpuProfileStatus(
+                    RenderGraphGpuProfileStatus::InvalidLifecycle,
+                    "Resolved GPU profile did not match the exact "
+                    "submitted frame key.");
+                return;
+            }
+
+            RenderGraphGpuProfileStats snapshot{
+                .Status = RenderGraphGpuProfileStatus::Resolved,
+                .Source = RHI::GpuTimestampSource::NativeGpu,
+                .Diagnostic = "Native GPU timestamps resolved.",
+                .Fresh = true,
+                .Stale = false,
+                .HasResolvedFrame = true,
+                .ResolvedSubmittedFrameNumber =
+                    resolved->Frame.FrameNumber,
+                .ResolvedFrameSlot = resolved->Frame.FrameSlot,
+                .SampleAgeFrames = SaturatingProfileAge(
+                    currentFrame,
+                    resolved->Frame.FrameNumber),
+            };
+            snapshot.QueueEnvelopes.reserve(
+                resolved->QueueEnvelopes.size());
+            for (const RHI::GpuTimestampQueueEnvelope& queue :
+                 resolved->QueueEnvelopes)
+            {
+                snapshot.QueueEnvelopes.push_back(
+                    RenderGraphGpuProfileQueueStats{
+                        .Queue = queue.Queue,
+                        .Source = queue.Source,
+                        .DurationNs = queue.DurationNs,
+                    });
+            }
+
+            std::vector<bool> matched(submitted.Passes.size(), false);
+            snapshot.Passes.reserve(submitted.Passes.size());
+            std::vector<Core::Telemetry::PassTimingEntry> telemetry{};
+            telemetry.reserve(submitted.Passes.size());
+            for (const RHI::GpuTimestampScope& scope : resolved->Scopes)
+            {
+                const auto metadataIt = std::find_if(
+                    submitted.Passes.begin(),
+                    submitted.Passes.end(),
+                    [&scope](const GpuProfilePassMetadata& metadata)
+                    {
+                        return metadata.Ordinal == scope.Ordinal;
+                    });
+                if (metadataIt == submitted.Passes.end() ||
+                    metadataIt->Name != scope.Name ||
+                    metadataIt->Queue != scope.Queue)
+                {
+                    m_SubmittedGpuProfiles[frameSlot].reset();
+                    PublishStaleGpuProfileStatus(
+                        RenderGraphGpuProfileStatus::InvalidLifecycle,
+                        "Resolved GPU profile metadata did not match the "
+                        "submitted compiled-pass plan.");
+                    return;
+                }
+                const std::size_t metadataIndex =
+                    static_cast<std::size_t>(
+                        std::distance(
+                            submitted.Passes.begin(),
+                            metadataIt));
+                if (matched[metadataIndex])
+                {
+                    m_SubmittedGpuProfiles[frameSlot].reset();
+                    PublishStaleGpuProfileStatus(
+                        RenderGraphGpuProfileStatus::InvalidLifecycle,
+                        "Resolved GPU profile repeated a compiled-pass "
+                        "ordinal.");
+                    return;
+                }
+                matched[metadataIndex] = true;
+
+                const bool recorded =
+                    metadataIt->CommandStatus ==
+                        RenderCommandPassStatus::Recorded;
+                const bool nativeDuration =
+                    recorded &&
+                    scope.Source ==
+                        RHI::GpuTimestampSource::NativeGpu &&
+                    scope.DurationNs.has_value();
+                snapshot.Passes.push_back(
+                    RenderGraphGpuProfilePassStats{
+                        .Name = metadataIt->Name,
+                        .Id = metadataIt->Id,
+                        .Queue = metadataIt->Queue,
+                        .CommandStatus = metadataIt->CommandStatus,
+                        .Source =
+                            nativeDuration
+                                ? RHI::GpuTimestampSource::NativeGpu
+                                : RHI::GpuTimestampSource::Unavailable,
+                        .DurationNs =
+                            nativeDuration
+                                ? scope.DurationNs
+                                : std::optional<std::uint64_t>{},
+                    });
+                if (nativeDuration)
+                {
+                    telemetry.push_back(
+                        Core::Telemetry::PassTimingEntry{
+                            .Name = metadataIt->Name,
+                            .GpuTimeNs = *scope.DurationNs,
+                            .CpuTimeNs = 0u,
+                        });
+                }
+            }
+
+            if (std::any_of(
+                    matched.begin(),
+                    matched.end(),
+                    [](const bool value) { return !value; }))
+            {
+                m_SubmittedGpuProfiles[frameSlot].reset();
+                PublishStaleGpuProfileStatus(
+                    RenderGraphGpuProfileStatus::InvalidLifecycle,
+                    "Resolved GPU profile omitted a planned compiled pass.");
+                return;
+            }
+
+            m_SubmittedGpuProfiles[frameSlot].reset();
+            m_CurrentGpuProfile = snapshot;
+            m_LastGoodGpuProfile = std::move(snapshot);
+            Core::Telemetry::TelemetrySystem::Get().SetPassGpuTimings(
+                std::move(telemetry));
+        }
+
+        [[nodiscard]] bool BeginGpuProfile(
+            const RHI::FrameHandle& frame,
+            const CompiledRenderGraph& compiled,
+            const std::span<const RHI::QueueAffinity> actualQueues)
+        {
+            DiscardActiveGpuProfile();
+            RHI::IProfiler* profiler =
+                m_Device != nullptr ? m_Device->GetProfiler() : nullptr;
+            if (profiler == nullptr)
+            {
+                PublishStaleGpuProfileStatus(
+                    RenderGraphGpuProfileStatus::Unavailable,
+                    "The active render device does not expose a profiler.");
+                return false;
+            }
+
+            const RHI::ProfilerStatusSnapshot backend =
+                profiler->GetStatus();
+            if (backend.Status != RHI::ProfilerBackendStatus::Ready &&
+                backend.Status !=
+                    RHI::ProfilerBackendStatus::ContractOnly)
+            {
+                PublishStaleGpuProfileStatus(
+                    ProfileStatusForBackend(backend.Status),
+                    backend.Diagnostic);
+                return false;
+            }
+
+            std::vector<RHI::ProfilerScopeDesc> descriptors{};
+            descriptors.reserve(compiled.TopologicalOrder.size());
+            std::vector<GpuProfilePassMetadata> metadata{};
+            metadata.reserve(compiled.TopologicalOrder.size());
+            std::vector<std::uint32_t> metadataIndexByPass(
+                compiled.PassDeclarations.size(),
+                std::numeric_limits<std::uint32_t>::max());
+            for (const std::uint32_t passIndex :
+                 compiled.TopologicalOrder)
+            {
+                if (passIndex >= compiled.PassDeclarations.size() ||
+                    passIndex >= compiled.PassNames.size() ||
+                    passIndex >= compiled.PassIds.size() ||
+                    passIndex >= actualQueues.size() ||
+                    compiled.PassNames[passIndex].empty())
+                {
+                    PublishStaleGpuProfileStatus(
+                        RenderGraphGpuProfileStatus::InvalidLifecycle,
+                        "Compiled-pass profiling metadata is incomplete.");
+                    return false;
+                }
+                const std::uint32_t metadataIndex =
+                    static_cast<std::uint32_t>(metadata.size());
+                metadataIndexByPass[passIndex] = metadataIndex;
+                descriptors.push_back(RHI::ProfilerScopeDesc{
+                    .Ordinal = passIndex,
+                    .Name = compiled.PassNames[passIndex],
+                    .Queue = actualQueues[passIndex],
+                });
+                metadata.push_back(GpuProfilePassMetadata{
+                    .Ordinal = passIndex,
+                    .Name = compiled.PassNames[passIndex],
+                    .Id = compiled.PassIds[passIndex],
+                    .Queue = actualQueues[passIndex],
+                });
+            }
+
+            const RHI::ProfilerFrameKey key{
+                .FrameNumber = m_Device->GetGlobalFrameNumber(),
+                .FrameSlot = frame.FrameIndex,
+            };
+            auto plan = profiler->BeginFrame(key, descriptors);
+            if (!plan)
+            {
+                PublishStaleGpuProfileStatus(
+                    ProfileStatusForError(plan.error()),
+                    "GPU profile planning failed: " +
+                        std::string{
+                            RHI::ProfilerErrorName(plan.error())} +
+                        ".");
+                return false;
+            }
+            if (plan->Frame != key ||
+                plan->ScopeTokens.size() != metadata.size())
+            {
+                (void)profiler->EndFrame(
+                    key,
+                    RHI::ProfilerFrameDisposition::Discarded);
+                PublishStaleGpuProfileStatus(
+                    RenderGraphGpuProfileStatus::InvalidLifecycle,
+                    "GPU profiler returned a mismatched immutable plan.");
+                return false;
+            }
+            for (std::size_t index = 0u;
+                 index < metadata.size();
+                 ++index)
+            {
+                metadata[index].Token = plan->ScopeTokens[index];
+            }
+
+            m_ActiveGpuProfile = ActiveGpuProfileFrame{
+                .Profiler = profiler,
+                .Frame = key,
+                .Passes = std::move(metadata),
+                .MetadataIndexByPass =
+                    std::move(metadataIndexByPass),
+            };
+            if (backend.Source ==
+                RHI::GpuTimestampSource::ContractOnly)
+            {
+                ClearGpuPassTelemetry();
+            }
+            UpdateCurrentGpuProfileStatus(
+                RenderGraphGpuProfileStatus::Recording,
+                backend.Diagnostic);
+            return true;
+        }
+
+        void DiscardActiveGpuProfile() noexcept
+        {
+            if (m_ActiveGpuProfile.has_value() &&
+                m_ActiveGpuProfile->Profiler != nullptr)
+            {
+                (void)m_ActiveGpuProfile->Profiler->EndFrame(
+                    m_ActiveGpuProfile->Frame,
+                    RHI::ProfilerFrameDisposition::Discarded);
+            }
+            m_ActiveGpuProfile.reset();
+            m_GpuProfileFailure.store(
+                0u,
+                std::memory_order_release);
+        }
+
+        void BeginGpuProfileQueue(
+            RHI::ICommandContext& context,
+            const RHI::QueueAffinity queue)
+        {
+            if (!m_ActiveGpuProfile.has_value())
+            {
+                return;
+            }
+            const std::optional<std::size_t> queueIndex =
+                GpuProfileQueueIndex(queue);
+            if (!queueIndex.has_value() ||
+                m_ActiveGpuProfile->OpenQueues[*queueIndex])
+            {
+                LatchGpuProfileFailure(
+                    RHI::ProfilerError::InvalidState);
+                return;
+            }
+            const auto result =
+                m_ActiveGpuProfile->Profiler->BeginQueue(
+                    context,
+                    queue);
+            if (!result)
+            {
+                LatchGpuProfileFailure(result.error());
+                return;
+            }
+            m_ActiveGpuProfile->OpenQueues[*queueIndex] = true;
+        }
+
+        void EndGpuProfileQueue(
+            RHI::ICommandContext& context,
+            const RHI::QueueAffinity queue)
+        {
+            if (!m_ActiveGpuProfile.has_value())
+            {
+                return;
+            }
+            const std::optional<std::size_t> queueIndex =
+                GpuProfileQueueIndex(queue);
+            if (!queueIndex.has_value() ||
+                !m_ActiveGpuProfile->OpenQueues[*queueIndex])
+            {
+                if (!GpuProfileFailure().has_value())
+                {
+                    LatchGpuProfileFailure(
+                        RHI::ProfilerError::InvalidState);
+                }
+                return;
+            }
+            m_ActiveGpuProfile->OpenQueues[*queueIndex] = false;
+            const auto result =
+                m_ActiveGpuProfile->Profiler->EndQueue(
+                    context,
+                    queue);
+            if (!result)
+            {
+                LatchGpuProfileFailure(result.error());
+            }
+        }
+
+        [[nodiscard]] bool BeginGpuProfileScope(
+            RHI::ICommandContext& context,
+            const std::uint32_t passIndex)
+        {
+            if (!m_ActiveGpuProfile.has_value())
+            {
+                return false;
+            }
+            if (passIndex >=
+                m_ActiveGpuProfile->MetadataIndexByPass.size())
+            {
+                LatchGpuProfileFailure(
+                    RHI::ProfilerError::InvalidArgument);
+                return false;
+            }
+            const std::uint32_t metadataIndex =
+                m_ActiveGpuProfile
+                    ->MetadataIndexByPass[passIndex];
+            if (metadataIndex >=
+                m_ActiveGpuProfile->Passes.size())
+            {
+                LatchGpuProfileFailure(
+                    RHI::ProfilerError::InvalidState);
+                return false;
+            }
+            const auto result =
+                m_ActiveGpuProfile->Profiler->BeginScope(
+                    context,
+                    m_ActiveGpuProfile
+                        ->Passes[metadataIndex].Token);
+            if (!result)
+            {
+                LatchGpuProfileFailure(result.error());
+                return false;
+            }
+            return true;
+        }
+
+        void EndGpuProfileScope(
+            RHI::ICommandContext& context,
+            const std::uint32_t passIndex)
+        {
+            if (!m_ActiveGpuProfile.has_value() ||
+                passIndex >=
+                    m_ActiveGpuProfile
+                        ->MetadataIndexByPass.size())
+            {
+                LatchGpuProfileFailure(
+                    RHI::ProfilerError::InvalidState);
+                return;
+            }
+            const std::uint32_t metadataIndex =
+                m_ActiveGpuProfile
+                    ->MetadataIndexByPass[passIndex];
+            if (metadataIndex >=
+                m_ActiveGpuProfile->Passes.size())
+            {
+                LatchGpuProfileFailure(
+                    RHI::ProfilerError::InvalidState);
+                return;
+            }
+            const auto result =
+                m_ActiveGpuProfile->Profiler->EndScope(
+                    context,
+                    m_ActiveGpuProfile
+                        ->Passes[metadataIndex].Token);
+            if (!result)
+            {
+                LatchGpuProfileFailure(result.error());
+            }
+        }
+
+        void PublishActiveGpuProfileCommandStatuses(
+            const bool executeSucceeded)
+        {
+            if (!m_ActiveGpuProfile.has_value())
+            {
+                return;
+            }
+            const RenderGraphCommandRecordStats commandStats =
+                SnapshotCommandRecordStats();
+            for (GpuProfilePassMetadata& metadata :
+                 m_ActiveGpuProfile->Passes)
+            {
+                bool sawNonOperational = false;
+                bool sawRecorded = false;
+                for (const RenderGraphCommandPassStats& pass :
+                     commandStats.Passes)
+                {
+                    const bool matches =
+                        metadata.Id.IsValid()
+                            ? pass.Id == metadata.Id &&
+                                  pass.Name == metadata.Name
+                            : pass.Name == metadata.Name;
+                    if (!matches)
+                    {
+                        continue;
+                    }
+                    sawRecorded =
+                        sawRecorded ||
+                        pass.Status ==
+                            RenderCommandPassStatus::Recorded;
+                    sawNonOperational =
+                        sawNonOperational ||
+                        pass.Status ==
+                            RenderCommandPassStatus::
+                                SkippedNonOperational;
+                }
+                metadata.CommandStatus =
+                    sawRecorded
+                        ? RenderCommandPassStatus::Recorded
+                        : sawNonOperational
+                            ? RenderCommandPassStatus::
+                                  SkippedNonOperational
+                            : RenderCommandPassStatus::
+                                  SkippedUnavailable;
+            }
+            m_ActiveGpuProfile->ExecuteSucceeded =
+                executeSucceeded;
+        }
+
+        void FinalizeGpuProfileAfterDeviceEnd(
+            const std::uint64_t completedFrameNumber)
+        {
+            if (!m_ActiveGpuProfile.has_value())
+            {
+                m_LastRenderGraphStats.GpuProfile =
+                    m_CurrentGpuProfile;
+                return;
+            }
+
+            ActiveGpuProfileFrame& active =
+                *m_ActiveGpuProfile;
+            const std::optional<RHI::ProfilerError> failure =
+                GpuProfileFailure();
+            const bool globalFrameAdvanced =
+                completedFrameNumber > active.Frame.FrameNumber;
+            const bool submit =
+                active.ExecuteSucceeded &&
+                !failure.has_value() &&
+                globalFrameAdvanced;
+            auto endResult = active.Profiler->EndFrame(
+                active.Frame,
+                submit
+                    ? RHI::ProfilerFrameDisposition::Submitted
+                    : RHI::ProfilerFrameDisposition::Discarded);
+            if (submit && endResult)
+            {
+                if (active.Frame.FrameSlot >=
+                    m_SubmittedGpuProfiles.size())
+                {
+                    m_SubmittedGpuProfiles.resize(
+                        active.Frame.FrameSlot + 1u);
+                }
+                m_SubmittedGpuProfiles[
+                    active.Frame.FrameSlot] =
+                    SubmittedGpuProfileFrame{
+                        .Frame = active.Frame,
+                        .Passes = std::move(active.Passes),
+                    };
+                UpdateCurrentGpuProfileStatus(
+                    RenderGraphGpuProfileStatus::Submitted,
+                    "GPU profile candidate submitted; resolution waits for "
+                    "the reused slot's fence proof.");
+            }
+            else
+            {
+                if (submit && !endResult)
+                {
+                    (void)active.Profiler->EndFrame(
+                        active.Frame,
+                        RHI::ProfilerFrameDisposition::Discarded);
+                }
+                const RHI::ProfilerError error =
+                    failure.value_or(
+                        endResult
+                            ? RHI::ProfilerError::InvalidState
+                            : endResult.error());
+                PublishStaleGpuProfileStatus(
+                    failure.has_value() || !endResult
+                        ? ProfileStatusForError(error)
+                        : RenderGraphGpuProfileStatus::
+                              InvalidLifecycle,
+                    globalFrameAdvanced
+                        ? "GPU profile candidate was discarded."
+                        : "GPU profile candidate was discarded because "
+                          "device submission did not advance the global "
+                          "frame.");
+            }
+            m_ActiveGpuProfile.reset();
+            m_GpuProfileFailure.store(
+                0u,
+                std::memory_order_release);
+            m_LastRenderGraphStats.GpuProfile =
+                m_CurrentGpuProfile;
+        }
+
         void ResetFrameState()
         {
             m_ActiveRuntimeSnapshotReadSlot = 0u;
@@ -10014,6 +11039,15 @@ namespace Extrinsic::Graphics
         // `VisualizationOverlayPass` recording this frame.
         RHI::BufferHandle                    m_VisualizationOverlayReadbackBuffer{};
         RenderGraphFrameStats                m_LastRenderGraphStats;
+        std::optional<ActiveGpuProfileFrame> m_ActiveGpuProfile{};
+        std::vector<std::optional<SubmittedGpuProfileFrame>>
+            m_SubmittedGpuProfiles{};
+        RenderGraphGpuProfileStats m_CurrentGpuProfile{};
+        std::optional<RenderGraphGpuProfileStats>
+            m_LastGoodGpuProfile{};
+        // Only this failure latch is worker-writable. Candidate, per-slot,
+        // status, and last-good state stay render-thread-owned.
+        std::atomic<std::uint8_t> m_GpuProfileFailure{0u};
         // GRAPHICS-119 Slice C.3: pass callbacks can run from worker threads
         // once fan-out is enabled, so command-record diagnostics accumulate
         // behind this guard and publish to m_LastRenderGraphStats after join.

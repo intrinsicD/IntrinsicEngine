@@ -46,6 +46,11 @@ namespace Extrinsic::Graphics
         /// directly so optional debug visualization passes are culled.
         bool DebugOverlayEnabled{false};
 
+        /// Immutable per-frame request for native GPU timestamp recording.
+        /// Backends without native support keep this provenance-honest and
+        /// report unavailable/unsupported results rather than CPU substitutes.
+        bool EnableGpuProfiling{false};
+
         // Future expansion slots (zero-cost when unused):
         //   WorldSnapshot  World{};        — authoritative ECS snapshot
         //   InputSnapshot  Input{};        — input state at extraction time

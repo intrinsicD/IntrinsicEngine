@@ -135,6 +135,38 @@ path completes. Picking and histogram readback issue counters plus per-slot
 metadata route through guarded helpers before the render-thread `BeginFrame()`
 drains consume them.
 
+Native GPU pass profiling is default-off diagnostic instrumentation selected
+by the immutable `RenderFrameInput::EnableGpuProfiling` bit and copied into the
+matching `RenderWorld`. The renderer resolves the accepted queue lane first,
+then asks the existing `RHI::IProfiler` for one immutable token per live
+compiled-pass ordinal before any parallel recording worker starts. Every
+serial or parallel lane brackets the actual compiled pass callback once; queue
+envelopes open on the first accepted primary context for that graphics or
+async-compute queue and close after its final scope. A rejected multi-queue
+plan is profiled as the accepted graphics fallback, not the requested queue.
+Profiling failures latch a diagnostic and discard the whole candidate without
+changing pass recording or graph execution.
+
+The candidate key combines the device's pre-submit global frame number with
+the cyclic frame slot. `IRenderer::EndFrame()` marks it submitted only when
+the device advances the global frame number; failed recording or submission is
+discarded. On a later reuse of that slot, `BeginFrame()` runs nonblocking
+exact-key resolution after the device's existing slot-completion proof.
+`RenderGraphFrameStats::GpuProfile` exposes status, diagnostic, source,
+fresh/stale state and sample age, the original frame key, independent
+per-queue envelopes, and compiled pass rows joined by exact
+`(FramePassId, name)` identity. Only command-recorded rows with an available
+`NativeGpu` duration reach `Core::Telemetry::SetPassGpuTimings`; culled or
+skipped rows remain explicitly unavailable. Every path without a fresh native
+resolution clears telemetry GPU rows while retaining any last-good UI sample
+as stale. The renderer never sums overlapping queue envelopes or presents
+them as a cross-queue frame time.
+
+Timestamp reset/write/query work can perturb the command stream, so these
+values are diagnostic measurements rather than performance claims. No
+profiler-specific wait, CPU-clock substitute, global-frame total, overhead
+threshold, or SLO is part of this contract.
+
 `Extrinsic.Graphics.RenderingContract` is the CPU-only public contract vocabulary
 for the renderer/snapshot/recipe architecture introduced by `GRAPHICS-099`.
 It defines renderer descriptors, scoped snapshot envelopes, renderer-independent
