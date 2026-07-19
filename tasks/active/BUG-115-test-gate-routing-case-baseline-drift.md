@@ -37,22 +37,25 @@ depends_on:
   an async-work regression.
 
 ## Status
-- In progress on 2026-07-19; owner: Codex; branch: `main`.
-- Reproduction is deterministic. Next gate: replace only the five stale/missing
-  baseline rows and rerun the live and synthetic routing checks.
+- Implemented on 2026-07-19; owner: Codex; branch: `main`.
+- The live reconciler now accepts 4,154 cases across 36 targets and 338
+  assertion sources. Next gate: retire the task with the verified evidence
+  below.
 
 ## Required changes
-- [ ] Replace the four retired `CoreGraphInterfaces` case names with the four
+- [x] Replace the four retired `CoreGraphInterfaces` case names with the four
       current `TaskPlanGraph` names.
-- [ ] Add the current stable task-kind-token case under its canonical runtime
+- [x] Add the current stable task-kind-token case under its canonical runtime
       integration target.
-- [ ] Preserve every source-owner, label, aggregate, duplicate-case, and
+- [x] Ratchet the matching per-target and total affected-case counts from
+      `104`/`233` to `105`/`234`.
+- [x] Preserve every source-owner, label, aggregate, duplicate-case, and
       sanitizer-environment reconciliation rule.
 
 ## Tests
-- [ ] Reproduce the exact live aggregate failure before the correction.
-- [ ] Pass the live `IntrinsicTests` aggregate reconciliation afterward.
-- [ ] Pass the routing tool's complete synthetic self-test and strict test
+- [x] Reproduce the exact live aggregate failure before the correction.
+- [x] Pass the live `IntrinsicTests` aggregate reconciliation afterward.
+- [x] Pass the routing tool's complete synthetic self-test and strict test
       layout check.
 
 ## Docs
@@ -61,11 +64,24 @@ depends_on:
       behavior and test routing do not change.
 
 ## Acceptance criteria
-- [ ] The configured live inventory and checked-in affected-case baseline
+- [x] The configured live inventory and checked-in affected-case baseline
       reconcile exactly.
-- [ ] Synthetic missing/extra/duplicate/mislabel regressions remain fail
+- [x] Synthetic missing/extra/duplicate/mislabel regressions remain fail
       closed.
-- [ ] The patch changes only harness baseline and task-state documentation.
+- [x] The patch changes only harness baseline/count ratchets and task-state
+      documentation.
+
+## Evidence
+- Before the correction, the live reconciler reported the four retired graph
+  cases as missing and the four `TaskPlanGraph` replacements plus
+  `RuntimeTaskKindTokensRemainStable` as extra. After the row correction it
+  exposed the paired stale `104` per-target count, proving both baseline
+  representations failed closed independently.
+- After the correction,
+  `Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicTests`
+  passed with `targets=36 cases=4154 sources=338`.
+- All 19 synthetic routing regressions passed. Strict test layout, task policy,
+  task-state links, and diff-whitespace checks passed.
 
 ## Verification
 ```bash
