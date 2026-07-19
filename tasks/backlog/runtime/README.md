@@ -178,9 +178,11 @@ triggers. The implementation graph is:
   Engine-owned interaction pointers, while obsolete mesh-view compatibility
   facades/cache are deleted and ECS render-hint components remain authoritative.
 - [`RUNTIME-183`](RUNTIME-183-extract-asset-workflow-module.md) — compose the
-  global asset/residency/import/bake owner after its async, document,
-  interaction, camera, and config capabilities exist; borrowed world handoffs
-  never become hidden ECS ownership.
+  global asset/residency/import/bake owner after the hard document/interaction
+  split; require exact document/history and built-in device/renderer/extraction
+  services, optionally consume streaming/selection, and borrow kernel config/
+  initialized state without camera or config-control-module ownership. Borrowed
+  world handoffs never become hidden ECS ownership.
 - Retired `RUNTIME-182` composes the optional global ImGui/host owner, with
   one frame-local kernel capture value, a preserved paired Begin/End bracket,
   and app-owned Sandbox panels.
