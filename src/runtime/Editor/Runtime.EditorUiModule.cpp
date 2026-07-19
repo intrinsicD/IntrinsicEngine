@@ -119,6 +119,8 @@ namespace Extrinsic::Runtime
     {
         Graphics::ImGuiOverlaySystem Overlay{};
         EditorUiHost Host{};
+        EditorUiHostOwnerControl HostOwner{
+            Host.ClaimOwnerControl()};
         std::unique_ptr<ImGuiAdapter> Adapter{};
         Platform::IWindow* Window{nullptr};
         Graphics::IRenderer* Renderer{nullptr};
@@ -209,6 +211,7 @@ namespace Extrinsic::Runtime
             !renderer.has_value() ||
             !inputActions.has_value())
         {
+            ShutdownAndReset(&setup.Services());
             return Core::Err(Core::ErrorCode::ResourceNotFound);
         }
 
@@ -227,15 +230,18 @@ namespace Extrinsic::Runtime
             [this]
             {
                 if (m_Impl)
-                    (void)m_Impl->Host.DrawFrameContributions();
+                {
+                    (void)m_Impl->HostOwner
+                        .DrawFrameContributions();
+                }
             });
-        m_Impl->Host.SetVisibilityChangedCallback(
+        m_Impl->HostOwner.SetVisibilityChangedCallback(
             [this](const bool visible)
             {
                 if (m_Impl && m_Impl->Adapter)
                 {
                     m_Impl->Adapter->SetEditorVisible(visible);
-                    m_Impl->Host.PublishDiagnostics(
+                    m_Impl->HostOwner.PublishDiagnostics(
                         CopyEditorUiDiagnostics(
                             *m_Impl->Adapter));
                 }
@@ -272,8 +278,8 @@ namespace Extrinsic::Runtime
             return Core::Err(Core::ErrorCode::InvalidState);
         }
 
-        m_Impl->Host.SetOperational(true);
-        m_Impl->Host.PublishDiagnostics(
+        m_Impl->HostOwner.SetOperational(true);
+        m_Impl->HostOwner.PublishDiagnostics(
             CopyEditorUiDiagnostics(*m_Impl->Adapter));
         return Core::Ok();
     }
@@ -318,7 +324,7 @@ namespace Extrinsic::Runtime
         const ImGuiAdapterDiagnostics& diagnostics =
             m_Impl->Adapter->GetDiagnostics();
         MirrorImGuiDiagnostics(context.Pacing, diagnostics);
-        m_Impl->Host.PublishDiagnostics(
+        m_Impl->HostOwner.PublishDiagnostics(
             CopyEditorUiDiagnostics(*m_Impl->Adapter));
     }
 
@@ -328,8 +334,8 @@ namespace Extrinsic::Runtime
         if (!m_Impl)
             return;
 
-        m_Impl->Host.SetOperational(false);
-        m_Impl->Host.SetVisibilityChangedCallback({});
+        m_Impl->HostOwner.SetOperational(false);
+        m_Impl->HostOwner.SetVisibilityChangedCallback({});
         if (m_Impl->InputActions &&
             m_Impl->VisibilityAction.IsValid())
         {

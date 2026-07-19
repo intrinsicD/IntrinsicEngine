@@ -173,8 +173,11 @@ The frame order is:
    whole, and publishes completion events only for survivors per
    [ADR-0024](../adr/0024-kernel-module-architecture.md) D8 (ARCH-009);
 6. pump the queued kernel event bus post-simulation, before UI/extraction;
-7. ImGui begin-frame, variable application tick, runtime-module `UiBuild`
-   hooks, and ImGui end-frame;
+7. runtime-module `UiBegin` hooks, the variable application tick,
+   runtime-module `UiBuild` hooks, then `UiEndCapture` hooks. The optional
+   `EditorUiModule` opens the ImGui frame in `UiBegin`, draws registered
+   contributions in `UiBuild`, and closes the frame plus writes capture in
+   `UiEndCapture`;
 8. build `Graphics::RenderFrameInput`, update the active camera controller,
    dispatch registered input actions, drain one coalesced selection pick, and
    run runtime-module `BeforeExtraction` hooks;
@@ -194,19 +197,27 @@ The frame order is:
 Editor UI contribution is data-driven through
 `Extrinsic.Runtime.EditorWindowRegistry`: contributors provide stable ids,
 structured menu paths, open state, and draw callbacks, and closed or globally
-hidden windows receive no callback. `Extrinsic.Runtime.EditorUiHost` owns the
-generic Engine callback attachment, the registry, and the unsuppressed global
-`G` visibility action; its parameterless frame callback does not pass
-`Engine&` to contributors. The app-owned
-`Extrinsic.Sandbox.Editor.Shell` composes that host with the ten core Sandbox
-windows and app panel registrations. Sandbox-aware callbacks receive a
+hidden windows receive no callback. The app-composed
+`Extrinsic.Runtime.EditorUiModule` owns the ImGui adapter, graphics overlay,
+paired frame hooks, and unsuppressed global `G` visibility action. It requires
+only the exact built-in `Platform::IWindow`, `Graphics::IRenderer`, and
+`RuntimeInputActionRegistry` services, then publishes an Engine-free
+`Extrinsic.Runtime.EditorUiHost`. The host owns the registry and parameterless
+frame contributions; it passes neither `Engine&` nor application state to
+contributors. The app-owned `Extrinsic.Sandbox.Editor.Shell` resolves that
+host during attachment, registers one owned frame contribution plus the ten
+core Sandbox windows and app panel registrations, and unregisters them before
+detach. Sandbox-aware callbacks receive a
 frame-local `SandboxEditorContext` from
 `Extrinsic.Runtime.SandboxEditorFacades`, never `Engine&`; registered paths are
 merged into the menu tree without a fixed runtime enum or draw-switch table.
-`ImGuiAdapter` records one
-`EditorInputCaptureSnapshot` after the visible editor callback; camera, gizmo,
-picking, and viewport routing consume that snapshot rather than reading ImGui
-capture flags independently. Its ImGui context owns a paired ImPlot context.
+The frame loop owns one `EditorInputCaptureSnapshot`, resets it at frame
+start, and lends the same value by reference to every hook context.
+`EditorUiModule` copies the adapter's completed capture into that value only
+after `EndFrame`; camera, gizmo, picking, input actions, and later hooks consume
+the same snapshot rather than reading ImGui capture flags independently.
+Omitting the module leaves the value unclaimed and all ImGui pacing counters
+zero. Its ImGui context owns a paired ImPlot context.
 `Extrinsic.Runtime.EditorPropertyWidgets` keeps scalar-property selector and
 finite-sample histogram models CPU-testable while its ImGui/ImPlot draw code and
 the manifest-managed `implot` dependency remain private to runtime.

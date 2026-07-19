@@ -84,135 +84,202 @@ TEST(RuntimeEnginePrivateGlue, FrameLoopHelpersArePrivateTextualGlue)
               std::string::npos);
 }
 
-TEST(RuntimeEnginePrivateGlue, ImGuiEditorBridgeIsEnginePrivateImplementation)
+TEST(RuntimeEnginePrivateGlue, EditorUiModuleOwnsOptionalEditorUiComposition)
 {
     const auto root = RepoRoot();
     const auto engineInterface = ReadFile(root / "src/runtime/Runtime.Engine.cppm");
     const auto engineImpl = ReadFile(root / "src/runtime/Runtime.Engine.cpp");
-    const auto privateHeader = ReadFile(
-        root / "src/runtime/Runtime.ImGuiEditorBridge.Internal.hpp");
+    const auto moduleInterface = ReadFile(
+        root / "src/runtime/Editor/Runtime.EditorUiModule.cppm");
+    const auto moduleImpl = ReadFile(
+        root / "src/runtime/Editor/Runtime.EditorUiModule.cpp");
+    const auto hostInterface = ReadFile(
+        root / "src/runtime/Editor/Runtime.EditorUiHost.cppm");
+    const auto hostImpl = ReadFile(
+        root / "src/runtime/Editor/Runtime.EditorUiHost.cpp");
     const auto runtimeCMake = ReadFile(root / "src/runtime/CMakeLists.txt");
     const auto moduleInventory = ReadFile(
         root / "docs/api/generated/module_inventory.md");
-    constexpr std::string_view includeDirective =
-        "#include \"Runtime.ImGuiEditorBridge.Internal.hpp\"";
 
-    std::vector<std::filesystem::path> includeOwners;
-    std::vector<std::filesystem::path> implementationOwners;
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(
-             root / "src/runtime"))
-    {
-        if (!entry.is_regular_file())
-            continue;
-        const auto extension = entry.path().extension();
-        if (extension != ".cpp" && extension != ".cppm" &&
-            extension != ".hpp" && extension != ".h")
-            continue;
-        const auto content = ReadFile(entry.path());
-        if (content.find(includeDirective) != std::string::npos)
-            includeOwners.push_back(entry.path());
-        if (content.find("ImGuiEditorBridge::") != std::string::npos)
-            implementationOwners.push_back(entry.path());
-    }
-
+    EXPECT_FALSE(std::filesystem::exists(
+        root / "src/runtime/Runtime.ImGuiEditorBridge.Internal.hpp"));
     EXPECT_FALSE(std::filesystem::exists(
         root / "src/runtime/Runtime.ImGuiEditorBridge.cppm"));
     EXPECT_FALSE(std::filesystem::exists(
         root / "src/runtime/Runtime.ImGuiEditorBridge.cpp"));
-    ASSERT_EQ(includeOwners.size(), 1u);
-    EXPECT_EQ(includeOwners.front().filename(), "Runtime.Engine.cpp");
-    ASSERT_EQ(implementationOwners.size(), 1u);
-    EXPECT_EQ(implementationOwners.front().filename(), "Runtime.Engine.cpp");
-    EXPECT_EQ(engineInterface.find(includeDirective), std::string::npos);
-    EXPECT_NE(engineImpl.find(includeDirective), std::string::npos);
+    EXPECT_EQ(engineInterface.find("ImGuiEditorBridge"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("ImGuiEditorBridge"), std::string::npos);
     EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.ImGuiEditorBridge"),
               std::string::npos);
+    EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.ImGuiAdapter"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("import Extrinsic.Runtime.ImGuiAdapter"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("EditorUiHost"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("EditorUiHost"), std::string::npos);
+    EXPECT_EQ(engineInterface.find("EditorUiModule"), std::string::npos);
+    EXPECT_EQ(engineImpl.find("EditorUiModule"), std::string::npos);
     EXPECT_EQ(engineInterface.find(
                   "import Extrinsic.Graphics.ImGuiOverlaySystem;"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find(
+    EXPECT_EQ(engineImpl.find(
                   "import Extrinsic.Graphics.ImGuiOverlaySystem;"),
               std::string::npos);
-    EXPECT_FALSE(ContainsModuleDirective(privateHeader));
-    EXPECT_NE(privateHeader.find(
-                  "Runtime.Engine.cpp is the sole include"),
+    EXPECT_EQ(engineInterface.find("SetImGuiEditorCallback"),
               std::string::npos);
-    EXPECT_NE(engineInterface.find("class ImGuiEditorBridge;"),
+    EXPECT_EQ(engineInterface.find("SetImGuiEditorVisible"),
               std::string::npos);
-    EXPECT_NE(privateHeader.find("class ImGuiEditorBridge"), std::string::npos);
-    EXPECT_NE(privateHeader.find("Graphics::ImGuiOverlaySystem m_Overlay"),
+    EXPECT_EQ(engineInterface.find("GetImGuiAdapter"),
               std::string::npos);
-    EXPECT_NE(privateHeader.find("std::unique_ptr<ImGuiAdapter> m_Adapter"),
+    EXPECT_EQ(engineImpl.find("SetImGuiEditorCallback"),
               std::string::npos);
-    EXPECT_NE(engineInterface.find(
-                  "std::unique_ptr<ImGuiEditorBridge>   m_ImGuiEditorBridge"),
+    EXPECT_EQ(engineImpl.find("SetImGuiEditorVisible"),
               std::string::npos);
-    const auto rendererMember = engineInterface.find(
-        "std::unique_ptr<Graphics::IRenderer> m_Renderer");
-    const auto bridgeMember = engineInterface.find(
-        "std::unique_ptr<ImGuiEditorBridge>   m_ImGuiEditorBridge");
-    const auto extractionMember = engineInterface.find(
-        "RenderExtractionService               m_RenderExtractionService");
-    ASSERT_NE(rendererMember, std::string::npos);
-    ASSERT_NE(bridgeMember, std::string::npos);
-    ASSERT_NE(extractionMember, std::string::npos);
-    EXPECT_LT(rendererMember, bridgeMember);
-    EXPECT_LT(bridgeMember, extractionMember);
+    EXPECT_EQ(engineImpl.find("GetImGuiAdapter"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("m_ImGui"), std::string::npos);
 
-    EXPECT_NE(engineImpl.find("module Extrinsic.Runtime.Engine;"),
+    EXPECT_NE(moduleInterface.find(
+                  "export module Extrinsic.Runtime.EditorUiModule;"),
               std::string::npos);
-    EXPECT_EQ(engineImpl.find("module Extrinsic.Runtime.ImGuiEditorBridge;"),
+    EXPECT_NE(moduleInterface.find(
+                  "export import Extrinsic.Runtime.EditorUiHost;"),
+              std::string::npos);
+    EXPECT_NE(moduleInterface.find(
+                  "class EditorUiModule final : public IRuntimeModule"),
+              std::string::npos);
+    EXPECT_NE(moduleInterface.find("struct Impl;"), std::string::npos);
+    EXPECT_NE(moduleInterface.find("std::unique_ptr<Impl> m_Impl"),
+              std::string::npos);
+    EXPECT_EQ(moduleInterface.find("ImGuiAdapter"), std::string::npos);
+    EXPECT_EQ(moduleInterface.find("ImGuiOverlaySystem"), std::string::npos);
+
+    EXPECT_NE(moduleImpl.find(
+                  "import Extrinsic.Graphics.ImGuiOverlaySystem;"),
+              std::string::npos);
+    EXPECT_NE(moduleImpl.find("import Extrinsic.Runtime.ImGuiAdapter;"),
+              std::string::npos);
+    EXPECT_NE(moduleImpl.find("struct EditorUiModule::Impl"),
+              std::string::npos);
+    EXPECT_NE(moduleImpl.find("Graphics::ImGuiOverlaySystem Overlay{}"),
+              std::string::npos);
+    EXPECT_NE(moduleImpl.find("EditorUiHost Host{}"), std::string::npos);
+    EXPECT_NE(moduleImpl.find("EditorUiHostOwnerControl HostOwner"),
+              std::string::npos);
+    EXPECT_NE(moduleImpl.find("Host.ClaimOwnerControl()"),
+              std::string::npos);
+    EXPECT_NE(moduleImpl.find("std::unique_ptr<ImGuiAdapter> Adapter{}"),
+              std::string::npos);
+    EXPECT_NE(moduleImpl.find(
+                  "setup.Services().Provide<EditorUiHost>("),
+              std::string::npos);
+    EXPECT_NE(moduleImpl.find(
+                  "setup.Services().Require<Platform::IWindow>(Name())"),
+              std::string::npos);
+    EXPECT_NE(moduleImpl.find(
+                  "setup.Services().Require<Graphics::IRenderer>(Name())"),
+              std::string::npos);
+    EXPECT_NE(moduleImpl.find(
+                  "setup.Services().Require<RuntimeInputActionRegistry>(Name())"),
+              std::string::npos);
+    EXPECT_EQ(moduleImpl.find("Require<ECS::"), std::string::npos);
+    EXPECT_EQ(moduleImpl.find("Require<Assets::"), std::string::npos);
+
+    EXPECT_NE(hostInterface.find(
+                  "export module Extrinsic.Runtime.EditorUiHost;"),
+              std::string::npos);
+    EXPECT_NE(hostInterface.find("struct EditorUiDiagnostics"),
+              std::string::npos);
+    EXPECT_NE(hostInterface.find("RegisterFrameContribution("),
+              std::string::npos);
+    EXPECT_NE(hostInterface.find("class EditorUiHostOwnerControl final"),
+              std::string::npos);
+    EXPECT_NE(hostInterface.find("ClaimOwnerControl()"),
+              std::string::npos);
+    EXPECT_NE(hostInterface.find("RegisterWindow("), std::string::npos);
+    EXPECT_NE(hostInterface.find("ApplyVisibilityCommand("),
+              std::string::npos);
+    EXPECT_NE(hostInterface.find("struct Impl;"), std::string::npos);
+    EXPECT_NE(hostInterface.find("std::unique_ptr<Impl> m_Impl"),
+              std::string::npos);
+    EXPECT_EQ(hostInterface.find("Engine&"), std::string::npos);
+    EXPECT_EQ(hostInterface.find("import Extrinsic.Runtime.Engine"),
+              std::string::npos);
+    EXPECT_EQ(hostInterface.find("ImGuiAdapter"), std::string::npos);
+    EXPECT_EQ(hostInterface.find("EditorInputCaptureSnapshot"),
+              std::string::npos);
+    EXPECT_EQ(hostImpl.find("Engine&"), std::string::npos);
+
+    EXPECT_NE(engineImpl.find(
+                  "m_ServiceRegistry.Provide<Platform::IWindow>("),
               std::string::npos);
     EXPECT_NE(engineImpl.find(
-                  "m_ImGuiEditorBridge(std::make_unique<ImGuiEditorBridge>())"),
+                  "m_ServiceRegistry.Provide<Graphics::IRenderer>("),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_ImGuiEditorBridge->Initialize("),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("m_ImGuiEditorBridge->Shutdown("),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("m_ImGuiEditorBridge->BeginFrame("),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("m_ImGuiEditorBridge->EndFrame("),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("m_ImGuiEditorBridge->CaptureSnapshot()"),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("m_ImGuiEditorBridge->Diagnostics()"),
-              std::string::npos);
-
-    constexpr std::string_view methodDefinitions[] = {
-        "ImGuiEditorBridge::~ImGuiEditorBridge()",
-        "void ImGuiEditorBridge::Initialize(",
-        "void ImGuiEditorBridge::Shutdown(",
-        "void ImGuiEditorBridge::SetEditorCallback(",
-        "void ImGuiEditorBridge::SetEditorVisible(",
-        "void ImGuiEditorBridge::BeginFrame(",
-        "void ImGuiEditorBridge::EndFrame()",
-        "bool ImGuiEditorBridge::IsInitialized() const noexcept",
-        "ImGuiEditorBridge::CaptureSnapshot() const noexcept",
-        "ImGuiEditorBridge::Diagnostics() const noexcept",
-        "const ImGuiAdapter& ImGuiEditorBridge::Adapter() const noexcept",
-    };
-    for (const auto methodDefinition : methodDefinitions)
-        EXPECT_NE(engineImpl.find(methodDefinition), std::string::npos);
-
     EXPECT_NE(engineImpl.find(
-                  "std::make_unique<ImGuiAdapter>(window, m_Overlay)"),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("renderer.SetImGuiOverlaySystem(&m_Overlay)"),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("renderer->SetImGuiOverlaySystem(nullptr)"),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("m_Adapter->BeginFrame(deltaSeconds)"),
-              std::string::npos);
-    EXPECT_NE(engineImpl.find("m_Adapter->EndFrame()"), std::string::npos);
-    EXPECT_NE(engineImpl.find("m_Adapter->GetDiagnostics()"),
+                  "m_ServiceRegistry.Provide<RuntimeInputActionRegistry>("),
               std::string::npos);
 
-    EXPECT_EQ(runtimeCMake.find("Runtime.ImGuiEditorBridge.cpp"),
+    EXPECT_NE(moduleImpl.find("FramePhase::UiBegin"),
               std::string::npos);
-    EXPECT_EQ(runtimeCMake.find("Runtime.ImGuiEditorBridge.cppm"),
+    EXPECT_NE(moduleImpl.find("FramePhase::UiBuild"),
+              std::string::npos);
+    EXPECT_NE(moduleImpl.find("FramePhase::UiEndCapture"),
+              std::string::npos);
+    EXPECT_NE(moduleImpl.find(
+                  "m_Impl->Adapter->BeginFrame(context.FrameDeltaSeconds)"),
+              std::string::npos);
+    EXPECT_NE(moduleImpl.find("m_Impl->Adapter->BuildEditorFrame()"),
+              std::string::npos);
+    const auto uiBegin = engineImpl.find("FramePhase::UiBegin");
+    const auto variableTick = engineImpl.find(
+        "m_Application->OnVariableTick(*this, alpha, frameDt);");
+    const auto uiBuild = engineImpl.find("FramePhase::UiBuild");
+    const auto uiEndCapture =
+        engineImpl.find("FramePhase::UiEndCapture");
+    const auto completedCapture = engineImpl.find(
+        "const EditorInputCaptureSnapshot& editorCapture =");
+    ASSERT_NE(uiBegin, std::string::npos);
+    ASSERT_NE(variableTick, std::string::npos);
+    ASSERT_NE(uiBuild, std::string::npos);
+    ASSERT_NE(uiEndCapture, std::string::npos);
+    ASSERT_NE(completedCapture, std::string::npos);
+    EXPECT_LT(uiBegin, variableTick);
+    EXPECT_LT(variableTick, uiBuild);
+    EXPECT_LT(uiBuild, uiEndCapture);
+    EXPECT_LT(uiEndCapture, completedCapture);
+    const auto adapterEndFrame =
+        moduleImpl.find("m_Impl->Adapter->EndFrame();");
+    const auto captureWrite = moduleImpl.find(
+        "context.EditorCapture = m_Impl->Adapter->CaptureSnapshot();");
+    ASSERT_NE(adapterEndFrame, std::string::npos);
+    ASSERT_NE(captureWrite, std::string::npos);
+    EXPECT_LT(adapterEndFrame, captureWrite);
+
+    EXPECT_NE(moduleImpl.find(
+                  ".KeyCode = Platform::Input::Key::G"),
+              std::string::npos);
+    EXPECT_NE(moduleImpl.find(
+                  ".SuppressWhenImGuiCapturesKeyboard = false"),
+              std::string::npos);
+    EXPECT_NE(moduleImpl.find(
+                  "m_Impl->InputActions->Unregister("),
+              std::string::npos);
+    EXPECT_NE(moduleImpl.find(
+                  "m_Impl->Renderer->SetImGuiOverlaySystem(nullptr)"),
+              std::string::npos);
+    EXPECT_NE(moduleImpl.find(
+                  "services->Withdraw<EditorUiHost>(m_Impl->Host)"),
+              std::string::npos);
+    EXPECT_NE(moduleImpl.find("m_Impl.reset();"), std::string::npos);
+
+    EXPECT_NE(runtimeCMake.find("Editor/Runtime.EditorUiModule.cppm"),
+              std::string::npos);
+    EXPECT_NE(runtimeCMake.find("Editor/Runtime.EditorUiModule.cpp"),
               std::string::npos);
     EXPECT_EQ(moduleInventory.find("Extrinsic.Runtime.ImGuiEditorBridge"),
+              std::string::npos);
+    EXPECT_NE(moduleInventory.find("Extrinsic.Runtime.EditorUiModule"),
               std::string::npos);
 }
 

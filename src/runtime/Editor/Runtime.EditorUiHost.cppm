@@ -55,6 +55,37 @@ struct EditorUiFrameContributionHandle
         EditorUiFrameContributionHandle) noexcept = default;
 };
 
+class EditorUiHost;
+
+class EditorUiHostOwnerControl final
+{
+public:
+    EditorUiHostOwnerControl() = default;
+    ~EditorUiHostOwnerControl() = default;
+
+    EditorUiHostOwnerControl(
+        EditorUiHostOwnerControl&& other) noexcept;
+    EditorUiHostOwnerControl& operator=(
+        EditorUiHostOwnerControl&& other) noexcept;
+    EditorUiHostOwnerControl(
+        const EditorUiHostOwnerControl&) = delete;
+    EditorUiHostOwnerControl& operator=(
+        const EditorUiHostOwnerControl&) = delete;
+
+    [[nodiscard]] bool IsValid() const noexcept;
+    [[nodiscard]] std::size_t DrawFrameContributions();
+    void SetOperational(bool operational) noexcept;
+    void PublishDiagnostics(EditorUiDiagnostics diagnostics) noexcept;
+    void SetVisibilityChangedCallback(
+        std::function<void(bool)> callback);
+
+private:
+    friend class EditorUiHost;
+    explicit EditorUiHostOwnerControl(EditorUiHost& host) noexcept;
+
+    EditorUiHost* m_Host{nullptr};
+};
+
 class EditorUiHost final
 {
 public:
@@ -87,15 +118,20 @@ public:
     [[nodiscard]] EditorWindowRegistry& Windows() noexcept;
     [[nodiscard]] const EditorWindowRegistry& Windows() const noexcept;
 
-    // Owner controls. EditorUiModule is the sole production caller; these
-    // operations do not expose the adapter or frame-owned capture value.
+    // One control may be claimed before publication. EditorUiModule claims it
+    // while constructing fresh boot state, so service consumers cannot obtain
+    // owner mutation rights for the published host.
+    [[nodiscard]] EditorUiHostOwnerControl ClaimOwnerControl() noexcept;
+
+private:
+    friend class EditorUiHostOwnerControl;
+
     [[nodiscard]] std::size_t DrawFrameContributions();
     void SetOperational(bool operational) noexcept;
     void PublishDiagnostics(EditorUiDiagnostics diagnostics) noexcept;
     void SetVisibilityChangedCallback(
         std::function<void(bool)> callback);
 
-private:
     struct Impl;
     std::unique_ptr<Impl> m_Impl;
 };

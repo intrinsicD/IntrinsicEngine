@@ -48,19 +48,33 @@ maturity_target: Operational
   ratchet that exact snapshot to 39/17/2/28.
 
 ## Status
-- In progress as of 2026-07-19; owner: Codex team; branch:
+- Operational implementation checkpoint complete as of 2026-07-19; owner:
+  Codex team; branch:
   `codex/runtime-182-editor-ui-module`.
-- Intake, lifecycle, omission, caller, and right-sizing audits are complete.
-  Next gate: land the paired hook/context substrate and module lifecycle, then
-  build focused CPU and conditionally enabled GPU callers.
+- The paired frame-hook/capture contract, concrete module lifecycle, Sandbox
+  migration, Engine surface deletion, convergence ratchet, docs, and caller
+  migrations are implemented. The task intentionally remains active for
+  parent review, integration, and retirement.
+- Verification evidence:
+  - `IntrinsicRuntimeContractTests`,
+    `IntrinsicRuntimeIntegrationTests`, and
+    `IntrinsicSandboxEditorIntegrationTests` built with the `ci` preset.
+  - Focused editor/ImGui/input/Sandbox selection passed 235/235.
+  - Corrected explicit-composition Sandbox fixtures passed 5/5.
+  - `IntrinsicGraphicsVulkanSmokeTests` and
+    `IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests` linked with the
+    `ci-vulkan` ASan+UBSan configuration.
+  - `IntrinsicTests` built and the default CPU-supported selector passed
+    4,143/4,143 with one expected GLFW/LSan capability skip.
+  - Strict layering and kernel convergence checks passed at 39/17/2/28.
 
 ## Required changes
-- [ ] Define the three-boolean `EditorInputCaptureSnapshot` directly in
+- [x] Define the three-boolean `EditorInputCaptureSnapshot` directly in
       `Runtime.Module` before the frame-hook context. Add ordered `UiBegin`,
       `UiBuild`, and `UiEndCapture` phases, and let each ephemeral hook context
       borrow the same capture value and `RuntimeFramePacingDiagnostics` by
       reference.
-- [ ] Move the data-only capture type out of `Runtime.ImGuiAdapter` domain
+- [x] Move the data-only capture type out of `Runtime.ImGuiAdapter` domain
       surface. Own one value in the frame loop for the full frame, clear it to
       unclaimed once at frame start, and let every ephemeral frame-hook context
       borrow it by reference. Invoke `UiBegin` at the current
@@ -68,87 +82,87 @@ maturity_target: Operational
       `UiBuild`, then invoke `UiEndCapture` at the current
       `EndFrame`/capture callsite. Later viewport behavior and kernel input
       actions read that completed value.
-- [ ] Publish exact `Platform::IWindow`, `Graphics::IRenderer`, and
+- [x] Publish exact `Platform::IWindow`, `Graphics::IRenderer`, and
       `RuntimeInputActionRegistry` instances as built-in kernel services before
       module registration. Re-publish fresh live instances on reinitialize and
       leave omission behavior unchanged.
-- [ ] Add one concrete PImpl `EditorUiModule`. On registration it creates
+- [x] Add one concrete PImpl `EditorUiModule`. On registration it creates
       fresh boot state, publishes the exact Engine-free `EditorUiHost`, and
       registers the paired hooks; on resolution it requires only the three
       exact built-ins and initializes the existing adapter/overlay plus global
       `G` visibility action.
-- [ ] Make `EditorUiHost` the narrow window/frame-contribution/visibility
+- [x] Make `EditorUiHost` the narrow window/frame-contribution/visibility
       capability needed by app-owned content without storing or accepting
       `Engine&`. Keep the existing registry rather than adding a second
       registry or pass-through facade. The capture value travels through the
       hook context, not through the host service.
-- [ ] Move ImGui timing and adapter-diagnostic copying out of
+- [x] Move ImGui timing and adapter-diagnostic copying out of
       `Runtime.FramePacingDiagnostics` and into the module implementation so
       the generic pacing module no longer imports the ImGui adapter.
-- [ ] On reverse shutdown, unregister the exact visibility action, detach and
+- [x] On reverse shutdown, unregister the exact visibility action, detach and
       shut down adapter/overlay while window/renderer are live, withdraw the
       exact host instance, clear all contributions, and destroy the boot PImpl.
       Reinitialize must not replay a stale callback, handle, capture, or
       visibility state.
-- [ ] Migrate Sandbox to compose `EditorUiModule`, resolve the host during
+- [x] Migrate Sandbox to compose `EditorUiModule`, resolve the host during
       application attach, and explicitly register/unregister its frame
       contribution plus built-in/domain/method windows. `RUNTIME-168`
       separately owns construction of the domain-rich Sandbox session context
       from explicit module services.
-- [ ] Remove Engine ImGui state/imports plus
+- [x] Remove Engine ImGui state/imports plus
       `SetImGuiEditorCallback`, `SetImGuiEditorVisible`, and
       `GetImGuiAdapter`; delete `Runtime.ImGuiEditorBridge.Internal.hpp` rather
       than retaining a second wrapper.
-- [ ] Migrate every CPU and conditionally compiled GPU caller to explicit
+- [x] Migrate every CPU and conditionally compiled GPU caller to explicit
       module/host composition and observation without an Engine compatibility
       facade.
-- [ ] Ratchet the exact Engine convergence policy to 39 plain imports, 17
+- [x] Ratchet the exact Engine convergence policy to 39 plain imports, 17
       domain imports, two re-exports, and 28 public getter names.
 
 ## Tests
-- [ ] Preserve ImGui initialization, renderer overlay attachment, visibility,
+- [x] Preserve ImGui initialization, renderer overlay attachment, visibility,
       window registration, callback ordering, capture, and shutdown coverage.
-- [ ] Add an ordering contract proving `UiBegin` precedes the application
+- [x] Add an ordering contract proving `UiBegin` precedes the application
       variable tick, registered panel mutations occur in `UiBuild`,
       `UiEndCapture` closes the pair, capture is written only after
       `EndFrame`, and every later viewport consumer sees that same completed
       value.
-- [ ] Add an integration test proving the optional module can be omitted and a
+- [x] Add an integration test proving the optional module can be omitted and a
       composed module executes one UI frame during `Engine::Run()`.
-- [ ] Add lifecycle coverage for exact host publication/withdrawal,
+- [x] Add lifecycle coverage for exact host publication/withdrawal,
       contribution and action cleanup, reverse shutdown while renderer/window
       are live, and fresh shutdown/reinitialize state.
-- [ ] Compile `IntrinsicGraphicsVulkanSmokeTests` and
+- [x] Compile `IntrinsicGraphicsVulkanSmokeTests` and
       `IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests` in the conditional
       Vulkan/GLFW configuration after migrating their ImGui callers. Execution
       is not required for this ownership-only slice.
-- [ ] Update module-schedule, private-glue, Engine-layering,
+- [x] Update module-schedule, private-glue, Engine-layering,
       kernel-convergence, and test-gate-routing regressions for the new exact
       phases/surface.
-- [ ] Run focused editor/ImGui/input/Sandbox coverage, strict layering, and the
+- [x] Run focused editor/ImGui/input/Sandbox coverage, strict layering, and the
       complete default CPU-supported gate.
 
 ## Docs
-- [ ] Update runtime editor, Sandbox, and input-capture documentation with the
+- [x] Update runtime editor, Sandbox, and input-capture documentation with the
       module owner and single-snapshot contract.
-- [ ] Regenerate the module inventory.
+- [x] Regenerate the module inventory.
 
 ## Acceptance criteria
-- [ ] Engine contains no ImGui/editor-host domain state, imports, callbacks, or
+- [x] Engine contains no ImGui/editor-host domain state, imports, callbacks, or
       adapter getters.
-- [ ] Sandbox panels remain app-owned and consume runtime services only.
-- [ ] `EditorUiModule` can compose without scene, camera, config, asset, or
+- [x] Sandbox panels remain app-owned and consume runtime services only.
+- [x] `EditorUiModule` can compose without scene, camera, config, asset, or
       method owners.
-- [ ] Viewport input is gated by exactly one proven capture snapshot; no unused
+- [x] Viewport input is gated by exactly one proven capture snapshot; no unused
       filter framework is introduced.
-- [ ] Omitting EditorUi leaves the kernel capture value unclaimed, and
+- [x] Omitting EditorUi leaves the kernel capture value unclaimed, and
       `Runtime.Engine.cppm` needs no ImGui/capture-domain import.
-- [ ] The current
+- [x] The current
       `UiBegin → IApplication::OnVariableTick → UiBuild → UiEndCapture →
       viewport input` order is unchanged.
-- [ ] Shutdown/reinitialize exposes no stale host, contribution, input action,
+- [x] Shutdown/reinitialize exposes no stale host, contribution, input action,
       capture, adapter diagnostics, visibility, renderer, or window reference.
-- [ ] Strict kernel convergence reports exactly 39/17/2/28.
+- [x] Strict kernel convergence reports exactly 39/17/2/28.
 
 ## Verification
 ```bash

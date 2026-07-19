@@ -28,7 +28,65 @@ struct EditorUiHost::Impl
     std::function<void(bool)> VisibilityChanged{};
     std::uint64_t NextContributionHandle{1u};
     bool Operational{false};
+    bool OwnerControlClaimed{false};
 };
+
+EditorUiHostOwnerControl::EditorUiHostOwnerControl(
+    EditorUiHost& host) noexcept
+    : m_Host(&host)
+{
+}
+
+EditorUiHostOwnerControl::EditorUiHostOwnerControl(
+    EditorUiHostOwnerControl&& other) noexcept
+    : m_Host(std::exchange(other.m_Host, nullptr))
+{
+}
+
+EditorUiHostOwnerControl&
+EditorUiHostOwnerControl::operator=(
+    EditorUiHostOwnerControl&& other) noexcept
+{
+    if (this != &other)
+        m_Host = std::exchange(other.m_Host, nullptr);
+    return *this;
+}
+
+bool EditorUiHostOwnerControl::IsValid() const noexcept
+{
+    return m_Host != nullptr;
+}
+
+std::size_t EditorUiHostOwnerControl::DrawFrameContributions()
+{
+    return m_Host != nullptr
+        ? m_Host->DrawFrameContributions()
+        : 0u;
+}
+
+void EditorUiHostOwnerControl::SetOperational(
+    const bool operational) noexcept
+{
+    if (m_Host != nullptr)
+        m_Host->SetOperational(operational);
+}
+
+void EditorUiHostOwnerControl::PublishDiagnostics(
+    EditorUiDiagnostics diagnostics) noexcept
+{
+    if (m_Host != nullptr)
+        m_Host->PublishDiagnostics(std::move(diagnostics));
+}
+
+void EditorUiHostOwnerControl::SetVisibilityChangedCallback(
+    std::function<void(bool)> callback)
+{
+    if (m_Host != nullptr)
+    {
+        m_Host->SetVisibilityChangedCallback(
+            std::move(callback));
+    }
+}
 
 EditorUiHost::EditorUiHost() : m_Impl(std::make_unique<Impl>()) {}
 
@@ -124,6 +182,15 @@ EditorWindowRegistry& EditorUiHost::Windows() noexcept
 const EditorWindowRegistry& EditorUiHost::Windows() const noexcept
 {
     return m_Impl->WindowRegistry;
+}
+
+EditorUiHostOwnerControl
+EditorUiHost::ClaimOwnerControl() noexcept
+{
+    if (m_Impl->OwnerControlClaimed)
+        return {};
+    m_Impl->OwnerControlClaimed = true;
+    return EditorUiHostOwnerControl{*this};
 }
 
 std::size_t EditorUiHost::DrawFrameContributions()

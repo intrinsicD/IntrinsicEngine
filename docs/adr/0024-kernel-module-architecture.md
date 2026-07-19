@@ -206,9 +206,10 @@ is added.
 kernel. The proven kernel primitive is one coherent
 frame-loop-owned capture value that resets once at frame start. Every
 ephemeral hook context borrows the same value by reference. The optional
-EditorUi owner writes it during `UiBuild`; later camera,
-scene-editing, and picking behavior hooks plus kernel input-action dispatch
-consume it. The value clears to
+EditorUi owner brackets the application tick through ordered `UiBegin`,
+`UiBuild`, and `UiEndCapture` hooks, then writes the value only after the
+adapter's `EndFrame`; later viewport behavior, any later hooks, and kernel
+input-action dispatch consume it. The value clears to
 unclaimed every frame, so omitting EditorUi remains deterministic. There is no
 priority filter chain or ImGui import in Engine. Introduce arbitration only
 after a second simultaneous, independent capture producer demonstrates a

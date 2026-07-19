@@ -25,10 +25,13 @@ but editor recipe and engine-config command surfaces truthfully remain
 unavailable with null state and empty callbacks.
 
 The app-owned `Sandbox.Editor.Controller` owns `Sandbox.Editor.Shell` and all
-panel-family lifetimes behind one attach/detach interface. The shell owns the
-ten core Sandbox windows, menu composition, ImGui state, and frame
-presentation while delegating generic callback/registry/visibility lifecycle
-to `Runtime.EditorUiHost`. Runtime exposes the presentation-free
+panel-family lifetimes behind one attach/detach interface. Sandbox composes the
+optional `Runtime.EditorUiModule`; the shell resolves its Engine-free
+`Runtime.EditorUiHost` after attachment, owns one frame contribution and every
+registered window handle, and unregisters them before detach. The shell owns
+the ten core Sandbox windows, menu composition, ImGui state, and frame
+presentation while the module owns adapter/overlay/action/hook lifecycle.
+Runtime exposes the presentation-free
 `Runtime.SandboxEditorFacades` models, commands, result sinks, and attached
 session. `Sandbox.Editor.MethodPanels` owns the K-Means, Progressive Poisson,
 and parameterization ImGui controls and registers six domain windows through
@@ -49,9 +52,10 @@ remain runtime-owned, so app panels expose no geometry, ECS, graphics, or RHI
 dependencies. The app also installs the sandbox default runtime policy bundle through
 `Runtime::RegisterSandboxDefaultRuntimePolicies(engine)`.
 It unregisters the returned handles during shutdown before the engine tears down.
-The app remains a runtime-only consumer: `EditorShell` registers with
-`Engine::SetImGuiEditorCallback`, reads scene and selection state through
-runtime APIs, emits selection and local-transform edit commands through
+The app remains a runtime-only consumer: `EditorShell` registers its
+parameterless frame contribution and windows through the resolved host, reads
+scene and selection state through runtime APIs, emits selection and
+local-transform edit commands through
 runtime-owned seams, replaces runtime camera-controller slots through the
 engine-owned registry, toggles mesh edge/vertex primitive views through runtime
 extraction-cache settings, routes selected-entity spatial-debug options through

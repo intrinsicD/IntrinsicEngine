@@ -46,7 +46,7 @@ this table. If it does not fit a row, that is a signal to revisit ADR-0024,
 | Per-frame / per-substep data-dependent work (ECS query, extraction, a pump) | the cohesive behavior owner | Register the smallest real phase hook/system the frame loop must iterate; add signal/DAG machinery only when interacting production systems require it (D1/ADR-0027) |
 | Background multi-frame compute (remesh, k-means, bake, readback) | a **job** | `Jobs().Submit(JobDesc{...})`; snapshot in, result committed at a pump (D8) |
 | A new render technique (overlay, fullscreen analysis, compute fill) | a built-in recipe pass while the vocabulary remains sufficient | Add validated recipe data and the graphics-owned implementation; propose extension registration only with the first real pass the built-in vocabulary cannot express (D10/ADR-0027) |
-| Deciding whether a click belongs to UI or the viewport | one frame-loop-owned capture value borrowed by each ephemeral hook context | Reset it once at frame start; EditorUi writes it during `UiBuild`; later behavior hooks and kernel input-action dispatch read the same value. Add precedence only after a second independent simultaneous claimant proves a conflict (D11/ADR-0027) |
+| Deciding whether a click belongs to UI or the viewport | one frame-loop-owned capture value borrowed by each ephemeral hook context | Reset it once at frame start; EditorUi brackets the application tick with `UiBegin`/`UiBuild`/`UiEndCapture` and writes the value after `EndFrame`; later viewport behavior, any later hooks, and kernel input-action dispatch read the same value. Add precedence only after a second independent simultaneous claimant proves a conflict (D11/ADR-0027) |
 | A keybinding/chord that triggers an action | an **input action** | `RegisterInputAction(...)` (usually enqueues a command) |
 | Always-present infrastructure another composed responsibility needs (asset service, GPU cache) | a typed service or explicit narrow non-owning construction capability with a declared lifetime | Use the current `Provide<T>()` / `Find<T>()` registry for optional or order-independent discovery; `Require`/`OnResolve` survives only if a production dependency proves it. Never create hidden ownership or a mutable peer backreference (D3/ADR-0027) |
 | A *domain-specific* extension point (post-import processors, camera controllers, visualization adapters, editor panels) | a **module-provided service**, **not** a kernel knob | the owning module `Provide`s its own registry; others `Find` it |
@@ -71,9 +71,11 @@ prefix; the exact v1 classifier intentionally does not rewrite that historical
 record. After `RUNTIME-178`, the checked 2026-07-16 exact-policy snapshot was
 42 / 21 with 31 distinct public `Engine::GetX()` names and two existing
 re-exports. ADR-0027's 2026-07-18 classifier correction recognizes
-`Extrinsic.Runtime.WorldHandle` as kernel substrate, so the current exact
-snapshot is 42 / 20 / 2 / 31. The fixed reference remains historical
-comparison evidence; the current snapshot carries no temporary debt.
+`Extrinsic.Runtime.WorldHandle` as kernel substrate. The `RUNTIME-179`,
+`RUNTIME-181`, and `RUNTIME-182` extractions then reduce the current exact
+snapshot to 39 plain imports / 17 domain imports / 2 re-exports / 28 public
+getter names. The fixed reference remains historical comparison evidence; the
+current snapshot carries no temporary debt.
 
 ### Kernel seams exist (ADR-0024 D5–D11, amended by ADR-0027)
 
@@ -113,12 +115,12 @@ comparison evidence; the current snapshot carries no temporary debt.
 
 - [ ] `Runtime.Engine.cppm` contains only the exact imports required by its
       accepted kernel public surface and no unused plain imports
-      (**baseline 45; 2026-07-13 reference 43; current checked snapshot 42**).
+      (**baseline 45; 2026-07-13 reference 43; current checked snapshot 39**).
       ADR-0027 records the present final-surface candidate of 12 exact imports;
       that is an auditable allowlist derived from the remaining API, not a
       numerical budget or room for unrelated imports.
 - [ ] Domain (non-substrate) imports in `Runtime.Engine.cppm` = 0
-      (**baseline 27; 2026-07-13 reference 23; current checked snapshot 20**).
+      (**baseline 27; 2026-07-13 reference 23; current checked snapshot 17**).
       Measure by
       **allowlist**, not
       a blocklist of names:
@@ -131,7 +133,7 @@ comparison evidence; the current snapshot carries no temporary debt.
       kernel-substrate allowlist; the final checker measures the complement of
       exact allowed kernel getter names rather than treating all `GetX()` names
       alike (**baseline estimate 13 domain facades; current guard snapshots all
-      31 names pending that classifier**)
+      28 names pending that classifier**)
 - [ ] Domain re-exports from `Runtime.Engine.cppm` = 0; a retained re-export
       must be explicitly classified as kernel public surface
 - [x] No `entt::dispatcher::trigger` or direct dispatcher use in module code

@@ -70,6 +70,27 @@ namespace
         return config;
     }
 
+    struct EditorUiShellHarness
+    {
+        Runtime::Engine Kernel{
+            HeadlessConfig(),
+            std::make_unique<OneFrameApplication>()};
+        SandboxEditor::EditorShell Shell{};
+
+        EditorUiShellHarness()
+        {
+            Kernel.EmplaceModule<Runtime::EditorUiModule>();
+            Kernel.Initialize();
+            Shell.Attach(Kernel);
+        }
+
+        ~EditorUiShellHarness()
+        {
+            Shell.Detach();
+            Kernel.Shutdown();
+        }
+    };
+
     [[nodiscard]] Geometry::HalfedgeMesh::Mesh MakeGridMesh()
     {
         Geometry::HalfedgeMesh::Mesh mesh{};
@@ -212,12 +233,12 @@ namespace
 
 TEST(SandboxParameterizationPanel, RegistrationIsStableAndIdempotent)
 {
-    SandboxEditor::EditorShell shell;
+    EditorUiShellHarness harness;
     SandboxEditor::MethodPanels panels;
-    panels.Register(shell);
-    panels.Register(shell);
+    panels.Register(harness.Shell);
+    panels.Register(harness.Shell);
 
-    auto menu = shell.BuildEditorWindowMenuModel();
+    auto menu = harness.Shell.BuildEditorWindowMenuModel();
     const Runtime::EditorWindowMenuEntry* entry =
         FindWindow(menu, "mesh.processing.parameterize_uv");
     ASSERT_NE(entry, nullptr);
@@ -236,7 +257,7 @@ TEST(SandboxParameterizationPanel, RegistrationIsStableAndIdempotent)
         1);
 
     panels.Unregister();
-    menu = shell.BuildEditorWindowMenuModel();
+    menu = harness.Shell.BuildEditorWindowMenuModel();
     EXPECT_EQ(FindWindow(menu, "mesh.processing.parameterize_uv"), nullptr);
 }
 

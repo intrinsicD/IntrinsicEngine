@@ -19,9 +19,10 @@ import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.TextureUpload;
+import Extrinsic.Runtime.EditorUiHost;
+import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
-import Extrinsic.Runtime.ImGuiAdapter;
 
 namespace
 {
@@ -96,6 +97,7 @@ Counters::Snapshot ToCounterSnapshot(
 struct ImGuiSmokeBootstrap
 {
     std::unique_ptr<Engine> EnginePtr;
+    Extrinsic::Runtime::EditorUiHost* EditorUi{nullptr};
     bool Skipped{false};
     std::string SkipReason;
 };
@@ -122,7 +124,10 @@ struct ImGuiSmokeBootstrap
 
     auto enginePtr = std::make_unique<Engine>(
         config, std::make_unique<ExitAfterFramesApp>(targetFrames));
+    enginePtr->EmplaceModule<Extrinsic::Runtime::EditorUiModule>();
     enginePtr->Initialize();
+    auto* const editorUi =
+        enginePtr->Services().Find<Extrinsic::Runtime::EditorUiHost>();
 
     const auto initInputs = GetVulkanDeviceOperationalInputs(&enginePtr->GetDevice());
     if (!initInputs.LogicalDeviceReady || !initInputs.SwapchainReady || !initInputs.CommandSyncReady)
@@ -135,7 +140,12 @@ struct ImGuiSmokeBootstrap
         };
     }
 
-    return ImGuiSmokeBootstrap{.EnginePtr = std::move(enginePtr), .Skipped = false, .SkipReason = {}};
+    return ImGuiSmokeBootstrap{
+        .EnginePtr = std::move(enginePtr),
+        .EditorUi = editorUi,
+        .Skipped = false,
+        .SkipReason = {},
+    };
 }
 
 struct Rgba8Pixel
@@ -233,8 +243,11 @@ TEST(ImGuiSurfaceGpuSmoke, UserTextureImageRecordsOnOperationalVulkanCommandStre
         GTEST_SKIP() << bootstrap.SkipReason;
     }
     Engine& engine = *bootstrap.EnginePtr;
+    ASSERT_NE(bootstrap.EditorUi, nullptr);
+    ASSERT_TRUE(bootstrap.EditorUi->IsOperational());
 
-    engine.SetImGuiEditorCallback(
+    const auto contribution =
+        bootstrap.EditorUi->RegisterFrameContribution(
         []
         {
             ImGui::SetNextWindowPos(ImVec2(10.0f, 10.0f));
@@ -243,6 +256,7 @@ TEST(ImGuiSurfaceGpuSmoke, UserTextureImageRecordsOnOperationalVulkanCommandStre
             ImGui::Image(static_cast<ImTextureID>(77u), ImVec2(16.0f, 16.0f));
             ImGui::End();
         });
+    ASSERT_TRUE(contribution.IsValid());
 
     const Counters::Snapshot before =
         ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
@@ -253,6 +267,8 @@ TEST(ImGuiSurfaceGpuSmoke, UserTextureImageRecordsOnOperationalVulkanCommandStre
     const auto status = EvaluateVulkanDeviceOperationalStatus(&engine.GetDevice());
     if (!engine.GetDevice().IsOperational())
     {
+        EXPECT_TRUE(
+            bootstrap.EditorUi->UnregisterFrameContribution(contribution));
         engine.Shutdown();
         ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during ImGui frame: status="
                       << ToString(status.Code) << " reason=" << ToString(status.Reason);
@@ -262,7 +278,7 @@ TEST(ImGuiSurfaceGpuSmoke, UserTextureImageRecordsOnOperationalVulkanCommandStre
     EXPECT_EQ(status.Code, Extrinsic::Backends::Vulkan::VulkanOperationalStatusCode::Operational);
     EXPECT_EQ(status.Reason, Extrinsic::Backends::Vulkan::VulkanOperationalReason::None);
 
-    const auto& diag = engine.GetImGuiAdapter().GetDiagnostics();
+    const auto& diag = bootstrap.EditorUi->GetDiagnostics();
     EXPECT_GE(diag.FramesProduced, 1u);
     EXPECT_TRUE(diag.LastFrameUsedUserTexture);
     EXPECT_GE(diag.LastDrawListCount, 1u);
@@ -288,6 +304,8 @@ TEST(ImGuiSurfaceGpuSmoke, UserTextureImageRecordsOnOperationalVulkanCommandStre
         << ", validationError " << before.ValidationError << " -> " << after.ValidationError
         << ", gateFailure " << before.OperationalGateFailure << " -> " << after.OperationalGateFailure;
 
+    EXPECT_TRUE(
+        bootstrap.EditorUi->UnregisterFrameContribution(contribution));
     engine.Shutdown();
 }
 
@@ -299,8 +317,13 @@ TEST(ImGuiSurfaceGpuSmoke, LargeSelectedEntityPayloadRetainsAtlasOnOperationalVu
         GTEST_SKIP() << bootstrap.SkipReason;
     }
     Engine& engine = *bootstrap.EnginePtr;
+    ASSERT_NE(bootstrap.EditorUi, nullptr);
+    ASSERT_TRUE(bootstrap.EditorUi->IsOperational());
 
-    engine.SetImGuiEditorCallback(DrawLargeSelectedEntityInspectorPayload);
+    const auto contribution =
+        bootstrap.EditorUi->RegisterFrameContribution(
+            DrawLargeSelectedEntityInspectorPayload);
+    ASSERT_TRUE(contribution.IsValid());
 
     const Counters::Snapshot before =
         ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
@@ -311,6 +334,8 @@ TEST(ImGuiSurfaceGpuSmoke, LargeSelectedEntityPayloadRetainsAtlasOnOperationalVu
     const auto status = EvaluateVulkanDeviceOperationalStatus(&engine.GetDevice());
     if (!engine.GetDevice().IsOperational())
     {
+        EXPECT_TRUE(
+            bootstrap.EditorUi->UnregisterFrameContribution(contribution));
         engine.Shutdown();
         ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during large selected-entity ImGui frame: status="
                       << ToString(status.Code) << " reason=" << ToString(status.Reason);
@@ -320,7 +345,7 @@ TEST(ImGuiSurfaceGpuSmoke, LargeSelectedEntityPayloadRetainsAtlasOnOperationalVu
     EXPECT_EQ(status.Code, Extrinsic::Backends::Vulkan::VulkanOperationalStatusCode::Operational);
     EXPECT_EQ(status.Reason, Extrinsic::Backends::Vulkan::VulkanOperationalReason::None);
 
-    const auto& diag = engine.GetImGuiAdapter().GetDiagnostics();
+    const auto& diag = bootstrap.EditorUi->GetDiagnostics();
     EXPECT_GE(diag.FramesProduced, 6u);
     EXPECT_EQ(diag.FontAtlasCopyCount, 1u);
     EXPECT_GE(diag.FontAtlasReuseCount, 5u);
@@ -364,6 +389,8 @@ TEST(ImGuiSurfaceGpuSmoke, LargeSelectedEntityPayloadRetainsAtlasOnOperationalVu
         << ", validationError " << before.ValidationError << " -> " << after.ValidationError
         << ", gateFailure " << before.OperationalGateFailure << " -> " << after.OperationalGateFailure;
 
+    EXPECT_TRUE(
+        bootstrap.EditorUi->UnregisterFrameContribution(contribution));
     engine.Shutdown();
 }
 
@@ -375,6 +402,8 @@ TEST(ImGuiSurfaceGpuSmoke, DrawListPixelsReachBackbufferOnOperationalVulkan)
         GTEST_SKIP() << bootstrap.SkipReason;
     }
     Engine& engine = *bootstrap.EnginePtr;
+    ASSERT_NE(bootstrap.EditorUi, nullptr);
+    ASSERT_TRUE(bootstrap.EditorUi->IsOperational());
 
     auto& renderer = engine.GetRenderer();
     auto& device = engine.GetDevice();
@@ -403,7 +432,8 @@ TEST(ImGuiSurfaceGpuSmoke, DrawListPixelsReachBackbufferOnOperationalVulkan)
     }
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
 
-    engine.SetImGuiEditorCallback(
+    const auto contribution =
+        bootstrap.EditorUi->RegisterFrameContribution(
         []
         {
             unsigned char* pixels = nullptr;
@@ -446,6 +476,7 @@ TEST(ImGuiSurfaceGpuSmoke, DrawListPixelsReachBackbufferOnOperationalVulkan)
                 g_LastCpuFontAtlasProbe.DrawVertexColor = vertex.col;
             }
         });
+    ASSERT_TRUE(contribution.IsValid());
 
     engine.Run();
 
@@ -454,6 +485,8 @@ TEST(ImGuiSurfaceGpuSmoke, DrawListPixelsReachBackbufferOnOperationalVulkan)
     {
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
+        EXPECT_TRUE(
+            bootstrap.EditorUi->UnregisterFrameContribution(contribution));
         engine.Shutdown();
         ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during ImGui visible-pixel frame: status="
                       << ToString(status.Code) << " reason=" << ToString(status.Reason);
@@ -472,7 +505,7 @@ TEST(ImGuiSurfaceGpuSmoke, DrawListPixelsReachBackbufferOnOperationalVulkan)
     EXPECT_EQ(pass->Status, RenderCommandPassStatus::Recorded)
         << "ImGuiPass did not record on the operational Vulkan command stream.";
 
-    const auto& diag = engine.GetImGuiAdapter().GetDiagnostics();
+    const auto& diag = bootstrap.EditorUi->GetDiagnostics();
     EXPECT_GE(diag.FramesProduced, 1u);
     EXPECT_GT(diag.LastVertexCount, 0u);
     EXPECT_GT(diag.LastIndexCount, 0u);
@@ -579,5 +612,7 @@ TEST(ImGuiSurfaceGpuSmoke, DrawListPixelsReachBackbufferOnOperationalVulkan)
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);
+    EXPECT_TRUE(
+        bootstrap.EditorUi->UnregisterFrameContribution(contribution));
     engine.Shutdown();
 }
