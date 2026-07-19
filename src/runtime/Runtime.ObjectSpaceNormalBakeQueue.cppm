@@ -3,6 +3,8 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <optional>
+#include <span>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -14,6 +16,93 @@ import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 
 export namespace Extrinsic::Runtime
 {
+    inline constexpr std::uint32_t
+        kRuntimeObjectSpaceNormalBakeIdentitySchemaVersion = 1u;
+
+    enum class RuntimeObjectSpaceNormalBakeIdentityBuildStatus : std::uint8_t
+    {
+        Success,
+        EmptyInput,
+        InvalidPositionByteCount,
+        InvalidSurfaceIndexCount,
+        InvalidSurfaceIndexByteCount,
+        InvalidSurfaceIndex,
+        InvalidTexcoordByteCount,
+        InvalidNormalByteCount,
+        UnsupportedNormalTextureSpace,
+    };
+
+    struct RuntimeObjectSpaceNormalBakeIdentityInput
+    {
+        std::span<const std::byte> PackedPositionBytes{};
+        std::span<const std::byte> SurfaceIndexBytes{};
+        std::span<const std::byte> ResolvedTexcoordBytes{};
+        std::span<const std::byte> ResolvedNormalBytes{};
+        std::uint32_t VertexCount = 0u;
+        std::uint32_t SurfaceIndexCount = 0u;
+        Graphics::ObjectSpaceNormalTextureBakeOptions Options{};
+    };
+
+    struct RuntimeObjectSpaceNormalBakeIdentity
+    {
+        std::uint32_t SchemaVersion =
+            kRuntimeObjectSpaceNormalBakeIdentitySchemaVersion;
+        std::vector<std::byte> PackedPositionBytes{};
+        std::vector<std::byte> SurfaceIndexBytes{};
+        std::vector<std::byte> ResolvedTexcoordBytes{};
+        std::vector<std::byte> ResolvedNormalBytes{};
+        std::uint32_t VertexCount = 0u;
+        std::uint32_t SurfaceIndexCount = 0u;
+        std::uint32_t Width = 0u;
+        std::uint32_t Height = 0u;
+        std::uint32_t PaddingTexels = 0u;
+        Graphics::NormalTextureSpace Space =
+            Graphics::NormalTextureSpace::ObjectSpaceNormal;
+        std::uint32_t AtlasUvEpsilonBits = 0u;
+        std::uint32_t DegenerateUvAreaEpsilonBits = 0u;
+        std::uint32_t DegenerateNormalLengthEpsilonBits = 0u;
+
+        // The builder populates these nonzero derived fingerprints so
+        // producers can migrate source-generation keys without weakening
+        // exact identity equality. GeometryFingerprint covers both positions
+        // and surface-index order.
+        std::uint64_t PositionFingerprint = 0u;
+        std::uint64_t SurfaceIndexFingerprint = 0u;
+        std::uint64_t GeometryFingerprint = 0u;
+        std::uint64_t TexcoordFingerprint = 0u;
+        std::uint64_t NormalFingerprint = 0u;
+        std::uint64_t CombinedFingerprint = 0u;
+
+        friend bool operator==(
+            const RuntimeObjectSpaceNormalBakeIdentity& lhs,
+            const RuntimeObjectSpaceNormalBakeIdentity& rhs) noexcept;
+    };
+
+    struct RuntimeObjectSpaceNormalBakeIdentityBuildResult
+    {
+        RuntimeObjectSpaceNormalBakeIdentityBuildStatus Status{
+            RuntimeObjectSpaceNormalBakeIdentityBuildStatus::EmptyInput};
+        std::optional<RuntimeObjectSpaceNormalBakeIdentity> Identity{};
+        std::string Diagnostic{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status ==
+                       RuntimeObjectSpaceNormalBakeIdentityBuildStatus::Success &&
+                   Identity.has_value();
+        }
+    };
+
+    struct RuntimeObjectSpaceNormalBakeIdentityHash
+    {
+        [[nodiscard]] std::size_t operator()(
+            const RuntimeObjectSpaceNormalBakeIdentity& identity) const noexcept;
+    };
+
+    [[nodiscard]] RuntimeObjectSpaceNormalBakeIdentityBuildResult
+        BuildRuntimeObjectSpaceNormalBakeIdentity(
+            const RuntimeObjectSpaceNormalBakeIdentityInput& input);
+
     enum class RuntimeObjectSpaceNormalBakeStatus : std::uint8_t
     {
         Queued,
