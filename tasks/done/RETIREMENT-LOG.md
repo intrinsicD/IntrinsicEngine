@@ -5435,3 +5435,14 @@ this is not a cold-build, full-gate, or whole-tree claim. Focused extraction
 coverage passed 145/145, the full CPU-supported selector passed 4,104/4,104
 with one expected GLFW/LSan capability skip, and strict structural checks
 passed. Implementation checkpoint: `c02eb142`; main merge: `66f5f7b9`.
+
+[`BUG-115`](BUG-115-test-gate-routing-case-baseline-drift.md) — test-gate
+routing baseline drift retired on 2026-07-19. The exact `BUG-106`
+affected-case baseline replaced four retired Core graph names with their
+current `TaskPlanGraph` contracts, added the stable runtime streaming
+task-kind-token contract, and ratcheted the paired per-target/total counts from
+104/233 to 105/234. No production source, test body, ownership, label, or
+aggregate changed. The live `IntrinsicTests` reconciliation passed with 36
+targets, 4,154 cases, and 338 assertion sources; all 19 synthetic fail-closed
+routing regressions and strict task/test-layout checks passed. Implementation
+checkpoint: `fdd466e4`.

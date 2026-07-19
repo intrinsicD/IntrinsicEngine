@@ -9,7 +9,6 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/active/ARCH-014-kernel-convergence-tracking.md)
-- `BUG-115` — Test-gate routing case baseline drift (tasks/active/BUG-115-test-gate-routing-case-baseline-drift.md)
 - `RUNTIME-179` — Extract the async-work composition module (tasks/active/RUNTIME-179-extract-async-work-module.md)
 
 ## Theme B — Rendering modernization

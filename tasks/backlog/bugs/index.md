@@ -5,10 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-115` — Test-gate routing case baseline drift](../../active/BUG-115-test-gate-routing-case-baseline-drift.md):
-  the exact `BUG-106` affected-case baseline retains four retired graph case
-  names and omits one current streaming token contract, so the live aggregate
-  reconciler rejects the otherwise green configured inventory.
 - [`BUG-110` — Implicit smoothing applies boundary pins after rather than during solve](BUG-110-implicit-smoothing-boundary-dirichlet-solve.md):
   `PreserveBoundary` currently solves an all-free shifted system and only then
   overwrites boundary entries, so interior vertices do not satisfy the claimed
@@ -39,6 +35,12 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-07-19: [`BUG-115` — Test-gate routing case baseline drift](../../done/BUG-115-test-gate-routing-case-baseline-drift.md).
+  The exact `BUG-106` affected-case baseline now names the four current
+  `TaskPlanGraph` contracts plus the stable streaming task-kind contract and
+  carries matching `105`/`234` count ratchets. The live 4,154-case aggregate
+  and all 19 synthetic fail-closed routing regressions pass.
 
 - Closed 2026-07-18: [`BUG-114` — Release architecture SLOs used mismatched metrics and uncalibrated budgets](../../done/BUG-114-ci-release-architecture-slo-calibration.md).
   The repaired Release contract forces worker-local steals, measures direct

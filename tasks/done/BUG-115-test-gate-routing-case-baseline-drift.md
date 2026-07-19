@@ -37,10 +37,10 @@ depends_on:
   an async-work regression.
 
 ## Status
-- Implemented on 2026-07-19; owner: Codex; branch: `main`.
+- Completed and retired on 2026-07-19; owner: Codex; branch: `main`;
+  implementation commit: `fdd466e4`.
 - The live reconciler now accepts 4,154 cases across 36 targets and 338
-  assertion sources. Next gate: retire the task with the verified evidence
-  below.
+  assertion sources.
 
 ## Required changes
 - [x] Replace the four retired `CoreGraphInterfaces` case names with the four
@@ -59,7 +59,7 @@ depends_on:
       layout check.
 
 ## Docs
-- [ ] Record diagnosis and verification in this task, the bug index, and the
+- [x] Record diagnosis and verification in this task, the bug index, and the
       retirement log. No architecture documentation changes because production
       behavior and test routing do not change.
 

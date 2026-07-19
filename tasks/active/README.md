@@ -16,10 +16,6 @@ Each active task should include:
   `codex/arch-014-kernel-convergence-program`; blocked on final leaf
   `RUNTIME-187`. Next gate: execute the unblocked ADR-0027 behavior-owner
   leaves and update the convergence scorecard after each retirement.
-- [`BUG-115`](BUG-115-test-gate-routing-case-baseline-drift.md) — repair the
-  stale exact affected-case baseline exposed by the live `BUG-106` aggregate
-  reconciler; owner: Codex; branch: `main`. Next gate: update only the five
-  stale/missing rows and rerun live plus synthetic routing checks.
 - [`RUNTIME-179`](RUNTIME-179-extract-async-work-module.md) — app-composed
   async-work ownership plus world-retirement hardening; owner: Codex team;
   branch: `codex/runtime-179-async-work-module`. Next gate: four-axis cohesion
