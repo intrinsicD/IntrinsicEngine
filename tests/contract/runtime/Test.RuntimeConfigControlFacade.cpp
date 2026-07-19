@@ -150,8 +150,13 @@ TEST(RuntimeConfigControlFacade, AgentCliControlsRecipeAndEngineConfigWithoutUi)
                                   "runtime.agent.config-control"));
 
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.EmplaceModule<Runtime::EngineConfigControl>();
     engine.Initialize();
-    Runtime::EngineConfigControl& configControl = engine.GetConfigControl();
+    Runtime::EngineConfigControl* configControlService =
+        engine.Services().Find<Runtime::EngineConfigControl>();
+    ASSERT_NE(configControlService, nullptr);
+    Runtime::EngineConfigControl& configControl =
+        *configControlService;
 
     const Graphics::RenderRecipeConfigLoadResult preview =
         configControl.PreviewRenderRecipeConfigDocument(
@@ -207,8 +212,13 @@ TEST(RuntimeConfigControlFacade, AgentCliControlsRecipeAndEngineConfigWithoutUi)
 TEST(RuntimeConfigControlFacade, BootOnlyEngineConfigDifferencesAreRejected)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.EmplaceModule<Runtime::EngineConfigControl>();
     engine.Initialize();
-    Runtime::EngineConfigControl& configControl = engine.GetConfigControl();
+    Runtime::EngineConfigControl* configControlService =
+        engine.Services().Find<Runtime::EngineConfigControl>();
+    ASSERT_NE(configControlService, nullptr);
+    Runtime::EngineConfigControl& configControl =
+        *configControlService;
 
     CoreConfig::EngineConfig candidate = engine.GetEngineConfig();
     candidate.Window.Width += 1;
@@ -253,11 +263,16 @@ TEST(RuntimeConfigControlFacade,
                           engineAddress->GetEngineConfig().AppSections,
                           current.Name)
                     : nullptr;
+            const Runtime::EngineConfigControl* configControl =
+                engineAddress != nullptr
+                    ? engineAddress->Services()
+                          .Find<Runtime::EngineConfigControl>()
+                    : nullptr;
             callbacksObservedCommittedState &=
                 previous.PayloadJson == R"json({"value":0})json" &&
                 live != nullptr && *live == current &&
-                engineAddress->GetConfigControl()
-                    .GetEngineConfigControlState()
+                configControl != nullptr &&
+                configControl->GetEngineConfigControlState()
                     .LastApply.SectionChanged(current.Name);
         })));
     ASSERT_TRUE(registry.Register(MakeTestSectionRegistration(
@@ -273,21 +288,31 @@ TEST(RuntimeConfigControlFacade,
                           engineAddress->GetEngineConfig().AppSections,
                           current.Name)
                     : nullptr;
+            const Runtime::EngineConfigControl* configControl =
+                engineAddress != nullptr
+                    ? engineAddress->Services()
+                          .Find<Runtime::EngineConfigControl>()
+                    : nullptr;
             callbacksObservedCommittedState &=
                 previous.PayloadJson == R"json({"value":0})json" &&
                 live != nullptr && *live == current &&
-                engineAddress->GetConfigControl()
-                    .GetEngineConfigControlState()
+                configControl != nullptr &&
+                configControl->GetEngineConfigControlState()
                     .LastApply.SectionChanged(current.Name);
         })));
 
     Runtime::Engine engine(
         HeadlessConfig(),
-        std::make_unique<OneFrameApplication>(),
+        std::make_unique<OneFrameApplication>());
+    engine.EmplaceModule<Runtime::EngineConfigControl>(
         std::move(registry));
     engineAddress = &engine;
     engine.Initialize();
-    Runtime::EngineConfigControl& configControl = engine.GetConfigControl();
+    Runtime::EngineConfigControl* configControlService =
+        engine.Services().Find<Runtime::EngineConfigControl>();
+    ASSERT_NE(configControlService, nullptr);
+    Runtime::EngineConfigControl& configControl =
+        *configControlService;
 
     CoreConfig::EngineConfig candidate = engine.GetEngineConfig();
     CoreConfig::UpsertEngineConfigSection(
@@ -357,10 +382,15 @@ TEST(RuntimeConfigControlFacade,
 
     Runtime::Engine engine(
         HeadlessConfig(),
-        std::make_unique<OneFrameApplication>(),
+        std::make_unique<OneFrameApplication>());
+    engine.EmplaceModule<Runtime::EngineConfigControl>(
         std::move(registry));
     engine.Initialize();
-    Runtime::EngineConfigControl& configControl = engine.GetConfigControl();
+    Runtime::EngineConfigControl* configControlService =
+        engine.Services().Find<Runtime::EngineConfigControl>();
+    ASSERT_NE(configControlService, nullptr);
+    Runtime::EngineConfigControl& configControl =
+        *configControlService;
 
     CoreConfig::EngineConfig candidate = engine.GetEngineConfig();
     CoreConfig::UpsertEngineConfigSection(
@@ -387,6 +417,29 @@ TEST(RuntimeConfigControlFacade,
         configControl.ApplyEngineConfigHotSubset(preview);
     EXPECT_EQ(noChange.Status, Runtime::RuntimeEngineConfigApplyStatus::NoChange);
     EXPECT_EQ(callbackCount, 1u);
+
+    candidate = engine.GetEngineConfig();
+    candidate.AppSections.clear();
+    const CoreConfig::EngineConfigLoadResult omittedSectionPreview =
+        configControl.PreviewEngineConfigControlDocument(
+            CoreConfig::SerializeEngineConfig(candidate),
+            "agent-omitted-section.json");
+    ASSERT_TRUE(CoreConfig::IsConfigUsable(omittedSectionPreview));
+    const Runtime::RuntimeEngineConfigApplyResult omittedSectionApply =
+        configControl.ApplyEngineConfigHotSubset(
+            omittedSectionPreview);
+    EXPECT_EQ(
+        omittedSectionApply.Status,
+        Runtime::RuntimeEngineConfigApplyStatus::NoChange);
+    EXPECT_EQ(callbackCount, 1u);
+    const CoreConfig::EngineConfigSection* retainedSection =
+        CoreConfig::FindEngineConfigSection(
+            engine.GetEngineConfig().AppSections,
+            "test");
+    ASSERT_NE(retainedSection, nullptr);
+    EXPECT_EQ(
+        retainedSection->PayloadJson,
+        R"json({"value":1})json");
 
     candidate = engine.GetEngineConfig();
     candidate.Window.Width += 1;
@@ -419,8 +472,13 @@ TEST(RuntimeConfigControlFacade, InvalidHotRecipeConfigPreservesActiveOverride)
     WriteTextFile(invalidPath, InvalidRenderRecipeConfig());
 
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.EmplaceModule<Runtime::EngineConfigControl>();
     engine.Initialize();
-    Runtime::EngineConfigControl& configControl = engine.GetConfigControl();
+    Runtime::EngineConfigControl* configControlService =
+        engine.Services().Find<Runtime::EngineConfigControl>();
+    ASSERT_NE(configControlService, nullptr);
+    Runtime::EngineConfigControl& configControl =
+        *configControlService;
 
     const Runtime::RuntimeRenderRecipeApplyResult baselineApply =
         configControl.ActivateRenderRecipeConfigDocument(
@@ -458,11 +516,188 @@ TEST(RuntimeConfigControlFacade, InvalidHotRecipeConfigPreservesActiveOverride)
     engine.Shutdown();
 }
 
+TEST(RuntimeConfigControlFacade,
+     ShutdownAndReinitializeWithdrawRebindAndResetExactControl)
+{
+    const std::filesystem::path recipePath =
+        TempPath("intrinsic_runtime_config_control_reinitialize_recipe");
+    WriteTextFile(
+        recipePath,
+        RenderRecipeConfigDisablingPostprocess(
+            "runtime.reinitialize.recipe"));
+
+    std::uint32_t callbackCount = 0u;
+    CoreConfig::EngineConfigSectionRegistry registry{};
+    ASSERT_TRUE(registry.Register(MakeTestSectionRegistration(
+        "lifecycle",
+        R"json({"value":0})json",
+        [&](const CoreConfig::EngineConfigSection&,
+            const CoreConfig::EngineConfigSection&)
+        {
+            ++callbackCount;
+        })));
+
+    auto configControl =
+        std::make_unique<Runtime::EngineConfigControl>(
+            std::move(registry));
+    Runtime::EngineConfigControl* const exactControl =
+        configControl.get();
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<OneFrameApplication>());
+    engine.AddModule(std::move(configControl));
+    engine.Initialize();
+
+    ASSERT_EQ(
+        engine.Services().Find<Runtime::EngineConfigControl>(),
+        exactControl);
+    EXPECT_EQ(callbackCount, 0u);
+
+    CoreConfig::EngineConfig candidate = engine.GetEngineConfig();
+    candidate.Render.DefaultRecipeConfigPath = recipePath.string();
+    CoreConfig::UpsertEngineConfigSection(
+        candidate.AppSections,
+        CoreConfig::EngineConfigSection{
+            .Name = "lifecycle",
+            .SchemaId = "test.lifecycle",
+            .SchemaVersion = 1u,
+            .PayloadJson = R"json({"value":1})json",
+        });
+    const CoreConfig::EngineConfigLoadResult firstPreview =
+        exactControl->PreviewEngineConfigControlDocument(
+            CoreConfig::SerializeEngineConfig(candidate),
+            "lifecycle-first-apply.json");
+    ASSERT_TRUE(CoreConfig::IsConfigUsable(firstPreview));
+    const Runtime::RuntimeEngineConfigApplyResult firstApply =
+        exactControl->ApplyEngineConfigHotSubset(
+            firstPreview,
+            Runtime::RuntimeConfigControlSource::AgentCli);
+    ASSERT_TRUE(firstApply.Succeeded());
+    EXPECT_EQ(callbackCount, 1u);
+    ASSERT_TRUE(
+        exactControl->GetRenderRecipeState()
+            .ActiveOverride.has_value());
+    const Graphics::FrameRecipeOverride staleOverride =
+        *exactControl->GetRenderRecipeState().ActiveOverride;
+
+    candidate = engine.GetEngineConfig();
+    candidate.Render.DefaultRecipeConfigPath.clear();
+    const CoreConfig::EngineConfigLoadResult emptyPathPreview =
+        exactControl->PreviewEngineConfigControlDocument(
+            CoreConfig::SerializeEngineConfig(candidate),
+            "lifecycle-empty-path.json");
+    ASSERT_TRUE(CoreConfig::IsConfigUsable(emptyPathPreview));
+    const Runtime::RuntimeEngineConfigApplyResult emptyPathApply =
+        exactControl->ApplyEngineConfigHotSubset(
+            emptyPathPreview,
+            Runtime::RuntimeConfigControlSource::AgentCli);
+    ASSERT_TRUE(emptyPathApply.Succeeded());
+    EXPECT_TRUE(emptyPathApply.DefaultRecipeConfigPathChanged);
+    EXPECT_FALSE(
+        exactControl->GetRenderRecipeState()
+            .ActiveOverride.has_value());
+    EXPECT_FALSE(
+        engine.GetRenderer()
+            .GetActiveFrameRecipeOverride()
+            .has_value());
+    EXPECT_EQ(callbackCount, 1u);
+
+    engine.GetRenderer().SetActiveFrameRecipeOverride(
+        staleOverride);
+    ASSERT_TRUE(
+        engine.GetRenderer()
+            .GetActiveFrameRecipeOverride()
+            .has_value());
+    engine.Shutdown();
+
+    EXPECT_EQ(
+        engine.Services().Find<Runtime::EngineConfigControl>(),
+        nullptr);
+    EXPECT_FALSE(
+        exactControl->GetRenderRecipeState().HasLastApply);
+    EXPECT_FALSE(
+        exactControl->GetEngineConfigControlState()
+            .HasLastApply);
+    EXPECT_FALSE(
+        exactControl->GetRenderRecipeState()
+            .ActiveOverride.has_value());
+    const Runtime::RuntimeRenderRecipeApplyResult staleRecipeApply =
+        exactControl->ActivateRenderRecipeConfigDocument(
+            RenderRecipeConfigDisablingPostprocess(
+                "runtime.stale-control"),
+            "stale-control.json");
+    EXPECT_EQ(
+        staleRecipeApply.Status,
+        Runtime::RuntimeRenderRecipeApplyStatus::MissingRenderer);
+    const Runtime::RuntimeEngineConfigApplyResult staleConfigApply =
+        exactControl->ApplyEngineConfigHotSubset(
+            emptyPathPreview);
+    EXPECT_EQ(
+        staleConfigApply.Status,
+        Runtime::RuntimeEngineConfigApplyStatus::Rejected);
+
+    engine.Initialize();
+    ASSERT_EQ(
+        engine.Services().Find<Runtime::EngineConfigControl>(),
+        exactControl);
+    EXPECT_EQ(callbackCount, 1u);
+    EXPECT_TRUE(
+        engine.GetEngineConfig()
+            .Render.DefaultRecipeConfigPath.empty());
+    EXPECT_FALSE(
+        exactControl->GetRenderRecipeState().HasLastApply);
+    EXPECT_FALSE(
+        exactControl->GetEngineConfigControlState()
+            .HasLastApply);
+    EXPECT_FALSE(
+        exactControl->GetRenderRecipeState()
+            .ActiveOverride.has_value());
+    EXPECT_FALSE(
+        engine.GetRenderer()
+            .GetActiveFrameRecipeOverride()
+            .has_value());
+
+    candidate = engine.GetEngineConfig();
+    candidate.Render.DefaultRecipeConfigPath = recipePath.string();
+    const CoreConfig::EngineConfigLoadResult secondPreview =
+        exactControl->PreviewEngineConfigControlDocument(
+            CoreConfig::SerializeEngineConfig(candidate),
+            "lifecycle-second-apply.json");
+    ASSERT_TRUE(CoreConfig::IsConfigUsable(secondPreview));
+    const Runtime::RuntimeEngineConfigApplyResult secondApply =
+        exactControl->ApplyEngineConfigHotSubset(
+            secondPreview,
+            Runtime::RuntimeConfigControlSource::Programmatic);
+    ASSERT_TRUE(secondApply.Succeeded());
+    EXPECT_EQ(callbackCount, 1u);
+    ASSERT_TRUE(
+        engine.GetRenderer()
+            .GetActiveFrameRecipeOverride()
+            .has_value());
+
+    engine.Run();
+    const Graphics::RenderGraphFrameStats& stats =
+        engine.GetRenderer().GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.FrameRecipeOverrideActive);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessPass"), nullptr);
+
+    engine.Shutdown();
+    EXPECT_EQ(
+        engine.Services().Find<Runtime::EngineConfigControl>(),
+        nullptr);
+    std::filesystem::remove(recipePath);
+}
+
 TEST(RuntimeConfigControlFacade, EditorAndAgentPreviewUseSameFacadeResult)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.EmplaceModule<Runtime::EngineConfigControl>();
     engine.Initialize();
-    Runtime::EngineConfigControl& configControl = engine.GetConfigControl();
+    Runtime::EngineConfigControl* configControlService =
+        engine.Services().Find<Runtime::EngineConfigControl>();
+    ASSERT_NE(configControlService, nullptr);
+    Runtime::EngineConfigControl& configControl =
+        *configControlService;
 
     const std::string document =
         RenderRecipeConfigDisablingPostprocess("runtime.shared.config-control");

@@ -62,7 +62,6 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.DeviceBootstrap;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.GizmoFrameService;
 import Extrinsic.Runtime.ImGuiAdapter;
@@ -371,24 +370,14 @@ namespace Extrinsic::Runtime
     }
 
     Engine::Engine(Core::Config::EngineConfig config,
-                   std::unique_ptr<IApplication> application,
-                   RuntimeEngineConfigSectionRegistry sectionRegistry)
+                   std::unique_ptr<IApplication> application)
         : m_Config(std::move(config))
         , m_Application(std::move(application))
-        , m_ConfigSectionRegistry(std::move(sectionRegistry))
         , m_ImGuiEditorBridge(std::make_unique<ImGuiEditorBridge>())
         , m_AssetResidencyService(std::make_unique<AssetResidencyService>())
     {
         if (!m_Application)
             std::terminate();
-        Core::Config::PopulateEngineConfigSectionDefaults(
-            m_Config,
-            m_ConfigSectionRegistry);
-        m_ConfigControl = std::make_unique<EngineConfigControl>(
-            EngineConfigControlDependencies{
-                .Config = &m_Config,
-                .SectionRegistry = &m_ConfigSectionRegistry,
-            });
         m_AssetImportPipeline = std::make_unique<AssetImportPipeline>(
             AssetImportPipelineDependencies{
                 .Initialized = &m_Initialized,
@@ -407,6 +396,50 @@ namespace Extrinsic::Runtime
     {
         if (m_Initialized)
             Shutdown();
+    }
+
+    RuntimeRenderRecipeActivationKernel
+    Engine::MakeRenderRecipeActivationKernel(
+        RuntimeRenderRecipeState& state) noexcept
+    {
+        return RuntimeRenderRecipeActivationKernel{
+            .ActiveConfig = &m_Config,
+            .State = &state,
+            .ReadFramebufferExtent =
+                [this]()
+                {
+                    if (m_Window != nullptr)
+                    {
+                        const Platform::Extent2D extent =
+                            m_Window->GetFramebufferExtent();
+                        return Core::Extent2D{
+                            .Width = extent.Width,
+                            .Height = extent.Height,
+                        };
+                    }
+                    return Core::Extent2D{
+                        .Width = std::max(m_Config.Window.Width, 1),
+                        .Height = std::max(m_Config.Window.Height, 1),
+                    };
+                },
+            .SetFrameRecipeOverride =
+                [this](
+                    std::optional<Graphics::FrameRecipeOverride>
+                        recipeOverride)
+                {
+                    if (m_Renderer == nullptr)
+                        return;
+                    if (recipeOverride.has_value())
+                    {
+                        m_Renderer->SetActiveFrameRecipeOverride(
+                            std::move(recipeOverride));
+                    }
+                    else
+                    {
+                        m_Renderer->ClearActiveFrameRecipeOverride();
+                    }
+                },
+        };
     }
 
     void Engine::AddModule(std::unique_ptr<IRuntimeModule> module)
@@ -443,7 +476,8 @@ namespace Extrinsic::Runtime
         m_RuntimeModules.push_back(std::move(module));
     }
 
-    void Engine::RegisterRuntimeModulesForBoot()
+    void Engine::RegisterRuntimeModulesForBoot(
+        const RuntimeRenderRecipeActivationKernel& recipeActivation)
     {
         std::sort(
             m_RuntimeModules.begin(),
@@ -503,7 +537,8 @@ namespace Extrinsic::Runtime
                 {
                     m_RuntimeModuleSchedule.RegisterFrameHook(
                         moduleName, phase, std::move(hook));
-                });
+                },
+                recipeActivation);
 
             Core::Result result = module->OnRegister(setup);
             if (!result.has_value())
@@ -526,7 +561,8 @@ namespace Extrinsic::Runtime
 
     }
 
-    void Engine::ResolveRuntimeModulesForBoot()
+    void Engine::ResolveRuntimeModulesForBoot(
+        const RuntimeRenderRecipeActivationKernel& recipeActivation)
     {
         m_ServiceRegistry.BeginResolution();
         for (const std::unique_ptr<IRuntimeModule>& module : m_RuntimeModules)
@@ -547,7 +583,8 @@ namespace Extrinsic::Runtime
                 {
                     m_RuntimeModuleSchedule.RegisterFrameHook(
                         moduleName, phase, std::move(hook));
-                });
+                },
+                recipeActivation);
 
             Core::Result result = module->OnResolve(setup);
             if (!result.has_value())
@@ -815,17 +852,15 @@ namespace Extrinsic::Runtime
         m_Renderer = Graphics::CreateRenderer();
         m_Renderer->Initialize(*m_Device);
         m_RendererOperational = m_Device->IsOperational();
-        m_ConfigControl->SetDependencies(
-            EngineConfigControlDependencies{
-                .Config = &m_Config,
-                .SectionRegistry = &m_ConfigSectionRegistry,
-                .Window = m_Window.get(),
-                .Renderer = m_Renderer.get(),
-            });
+        RuntimeRenderRecipeState startupRecipeState{};
+        const RuntimeRenderRecipeActivationKernel recipeActivation =
+            MakeRenderRecipeActivationKernel(startupRecipeState);
+        ResetRuntimeRenderRecipeActivation(recipeActivation);
         m_JobServiceGpuQueueBridge.Install(*m_Renderer, m_JobService);
         if (!m_Config.Render.DefaultRecipeConfigPath.empty())
         {
-            (void)m_ConfigControl->LoadAndApplyRenderRecipeConfigFile(
+            (void)LoadAndApplyRuntimeRenderRecipeConfigFile(
+                recipeActivation,
                 m_Config.Render.DefaultRecipeConfigPath,
                 RuntimeRenderRecipeActivationSource::StartupConfigFile);
         }
@@ -862,7 +897,7 @@ namespace Extrinsic::Runtime
         // up those capabilities by type and never imports a concrete module.
         // Resolution/finalization remains at the pre-application boundary
         // below, after every provider has registered.
-        RegisterRuntimeModulesForBoot();
+        RegisterRuntimeModulesForBoot(recipeActivation);
 
         // ── 6. Asset service ──────────────────────────────────────────────
         m_AssetService = std::make_unique<Assets::AssetService>();
@@ -912,7 +947,7 @@ namespace Extrinsic::Runtime
         m_ReferenceSceneControl.InstallIfEnabled(m_Config.ReferenceScene, *m_Scene);
 
         // ── 8. Runtime-module resolution/finalization (ARCH-011) ──────────
-        ResolveRuntimeModulesForBoot();
+        ResolveRuntimeModulesForBoot(recipeActivation);
 
         // ── 9. Application ────────────────────────────────────────────────
         m_Application->OnInitialize(*this);
@@ -1085,14 +1120,6 @@ namespace Extrinsic::Runtime
                             m_Config.ReferenceScene);
         Core::ExecuteShutdownContract(hooks);
         m_ObjectSpaceNormalBakeService.ClearDependencies();
-        if (m_ConfigControl)
-        {
-            m_ConfigControl->SetDependencies(
-                EngineConfigControlDependencies{
-                    .Config = &m_Config,
-                    .SectionRegistry = &m_ConfigSectionRegistry,
-                });
-        }
         if (m_AssetImportPipeline)
         {
             m_AssetImportPipeline->SetDependencies(
@@ -1553,16 +1580,6 @@ namespace Extrinsic::Runtime
     const Core::Config::EngineConfig& Engine::GetEngineConfig() const noexcept
     {
         return m_Config;
-    }
-
-    EngineConfigControl& Engine::GetConfigControl() noexcept
-    {
-        return *m_ConfigControl;
-    }
-
-    const EngineConfigControl& Engine::GetConfigControl() const noexcept
-    {
-        return *m_ConfigControl;
     }
 
     Assets::AssetService& Engine::GetAssetService()  noexcept { return *m_AssetService;  }

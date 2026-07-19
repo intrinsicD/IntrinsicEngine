@@ -10863,6 +10863,8 @@ namespace Extrinsic::Runtime
                 engine.Services().Find<RenderExtractionCache>();
             DerivedJobRegistry* derivedJobs =
                 engine.Services().Find<DerivedJobRegistry>();
+            EngineConfigControl* configControl =
+                engine.Services().Find<EngineConfigControl>();
             const auto activeWorld = engine.ActiveWorld();
             SandboxEditorDerivedJobCommandSurface derivedJobCommands{};
             if (derivedJobs != nullptr)
@@ -10879,7 +10881,7 @@ namespace Extrinsic::Runtime
                         derivedJobs->Cancel(handle);
                     };
             }
-            return SandboxEditorContext{
+            SandboxEditorContext context{
                 .Scene = &engine.GetScene(),
                 .World = activeWorld,
                 .Selection = &engine.GetSelectionController(),
@@ -11131,29 +11133,38 @@ namespace Extrinsic::Runtime
                 .DerivedJobCommands = std::move(derivedJobCommands),
                 .AssetImportQueue = engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot(),
                 .RenderGraphStats = &engine.GetRenderer().GetLastRenderGraphStats(),
-                .RenderRecipeRuntimeState =
-                    &engine.GetConfigControl().GetRenderRecipeState(),
-                .PreviewRenderRecipeDocument =
-                    [&engine](const std::string& document,
-                              const std::string& sourceId)
-                    {
-                        return engine.GetConfigControl().PreviewRenderRecipeConfigDocument(
-                            document,
-                            sourceId);
-                    },
-                .ApplyRenderRecipePreview =
-                    [&engine](const Graphics::RenderRecipeConfigLoadResult& loadResult)
-                    {
-                        return engine.GetConfigControl().ApplyRenderRecipeConfigPreview(
-                            loadResult,
-                            RuntimeRenderRecipeActivationSource::Editor);
-                    },
                 .ImGuiAdapterAvailable = engine.GetImGuiAdapter().IsInitialized(),
                 .AssetImportCommandsAvailable = true,
                 .SceneFileCommandsAvailable = true,
                 .CameraRenderCommandsAvailable = true,
                 .VisualizationCommandsAvailable = true,
             };
+            if (configControl != nullptr)
+            {
+                context.RenderRecipeRuntimeState =
+                    &configControl->GetRenderRecipeState();
+                context.PreviewRenderRecipeDocument =
+                    [configControl](const std::string& document,
+                                    const std::string& sourceId)
+                    {
+                        return configControl
+                            ->PreviewRenderRecipeConfigDocument(
+                                document,
+                                sourceId);
+                    };
+                context.ApplyRenderRecipePreview =
+                    [configControl](
+                        const Graphics::RenderRecipeConfigLoadResult&
+                            loadResult)
+                    {
+                        return configControl
+                            ->ApplyRenderRecipeConfigPreview(
+                                loadResult,
+                                RuntimeRenderRecipeActivationSource::Editor);
+                    };
+                context.RenderRecipeCommandsAvailable = true;
+            }
+            return context;
         }
 
         [[nodiscard]] bool AttachmentEpochIsActive(
@@ -11344,22 +11355,36 @@ namespace Extrinsic::Runtime
                     {
                     });
             }
-            context.PreviewRenderRecipeDocument = GuardAttachmentCommand(
-                std::move(context.PreviewRenderRecipeDocument),
-                epoch,
-                [](const std::string&, const std::string&)
-                {
-                    return Graphics::RenderRecipeConfigLoadResult{};
-                });
-            context.ApplyRenderRecipePreview = GuardAttachmentCommand(
-                std::move(context.ApplyRenderRecipePreview),
-                epoch,
-                [](const Graphics::RenderRecipeConfigLoadResult&)
-                {
-                    return RuntimeRenderRecipeApplyResult{
-                        .Status = RuntimeRenderRecipeApplyStatus::Rejected,
-                    };
-                });
+            if (context.PreviewRenderRecipeDocument)
+            {
+                context.PreviewRenderRecipeDocument =
+                    GuardAttachmentCommand(
+                        std::move(
+                            context.PreviewRenderRecipeDocument),
+                        epoch,
+                        [](const std::string&, const std::string&)
+                        {
+                            return Graphics::
+                                RenderRecipeConfigLoadResult{};
+                        });
+            }
+            if (context.ApplyRenderRecipePreview)
+            {
+                context.ApplyRenderRecipePreview =
+                    GuardAttachmentCommand(
+                        std::move(
+                            context.ApplyRenderRecipePreview),
+                        epoch,
+                        [](const Graphics::
+                               RenderRecipeConfigLoadResult&)
+                        {
+                            return RuntimeRenderRecipeApplyResult{
+                                .Status =
+                                    RuntimeRenderRecipeApplyStatus::
+                                        Rejected,
+                            };
+                        });
+            }
         }
 
     }
@@ -16249,37 +16274,50 @@ namespace Extrinsic::Runtime
         context.RenderRecipeContext = &m_RenderRecipeContext;
         context.RenderRecipeEditorState = &m_RenderRecipeState;
         context.RenderArtifacts = &m_RenderArtifactRegistry;
-        context.RenderRecipeCommandsAvailable = true;
-        context.EngineConfigControlState =
-            &m_Engine->GetConfigControl().GetEngineConfigControlState();
-        context.PreviewEngineConfigDocument =
-            [epoch = m_AttachmentEpoch,
-             engine = m_Engine](const std::string& document,
+        EngineConfigControl* configControl =
+            m_Engine->Services().Find<EngineConfigControl>();
+        context.RenderRecipeCommandsAvailable =
+            configControl != nullptr &&
+            context.PreviewRenderRecipeDocument &&
+            context.ApplyRenderRecipePreview;
+        if (configControl != nullptr)
+        {
+            context.EngineConfigControlState =
+                &configControl->GetEngineConfigControlState();
+            context.PreviewEngineConfigDocument =
+                [epoch = m_AttachmentEpoch,
+                 configControl](const std::string& document,
                                 const std::string& sourceId)
-            {
-                if (!AttachmentEpochIsActive(epoch))
-                    return Core::Config::EngineConfigLoadResult{};
-                return engine->GetConfigControl().PreviewEngineConfigControlDocument(
-                    document,
-                    sourceId);
-            };
-        context.ApplyEngineConfigHotSubset =
-            [epoch = m_AttachmentEpoch,
-             engine = m_Engine](
-                const Core::Config::EngineConfigLoadResult& loadResult)
-            {
-                if (!AttachmentEpochIsActive(epoch))
                 {
-                    return RuntimeEngineConfigApplyResult{
-                        .Status = RuntimeEngineConfigApplyStatus::Rejected,
-                        .Source = RuntimeConfigControlSource::Editor,
-                    };
-                }
-                return engine->GetConfigControl().ApplyEngineConfigHotSubset(
-                    loadResult,
-                    RuntimeConfigControlSource::Editor);
-            };
-        context.EngineConfigCommandsAvailable = true;
+                    if (!AttachmentEpochIsActive(epoch))
+                        return Core::Config::EngineConfigLoadResult{};
+                    return configControl
+                        ->PreviewEngineConfigControlDocument(
+                            document,
+                            sourceId);
+                };
+            context.ApplyEngineConfigHotSubset =
+                [epoch = m_AttachmentEpoch,
+                 configControl](
+                    const Core::Config::EngineConfigLoadResult&
+                        loadResult)
+                {
+                    if (!AttachmentEpochIsActive(epoch))
+                    {
+                        return RuntimeEngineConfigApplyResult{
+                            .Status =
+                                RuntimeEngineConfigApplyStatus::
+                                    Rejected,
+                            .Source =
+                                RuntimeConfigControlSource::Editor,
+                        };
+                    }
+                    return configControl->ApplyEngineConfigHotSubset(
+                        loadResult,
+                        RuntimeConfigControlSource::Editor);
+                };
+            context.EngineConfigCommandsAvailable = true;
+        }
         m_LastFrame = BuildSandboxEditorPanelFrame(context, request);
         context.ModelBuildStats = &m_LastFrame.ModelBuildStats;
         m_FramePrepared = true;

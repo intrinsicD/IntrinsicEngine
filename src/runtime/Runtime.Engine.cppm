@@ -31,7 +31,6 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GizmoFrameService;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.JobService;
@@ -159,8 +158,7 @@ namespace Extrinsic::Runtime
     {
     public:
         Engine(Core::Config::EngineConfig config,
-               std::unique_ptr<IApplication> application,
-               RuntimeEngineConfigSectionRegistry sectionRegistry = {});
+               std::unique_ptr<IApplication> application);
         ~Engine();
 
         Engine(const Engine&)            = delete;
@@ -179,8 +177,6 @@ namespace Extrinsic::Runtime
         [[nodiscard]] Graphics::IRenderer&    GetRenderer()      noexcept;
         [[nodiscard]] const Core::Config::EngineConfig&
             GetEngineConfig() const noexcept;
-        [[nodiscard]] EngineConfigControl& GetConfigControl() noexcept;
-        [[nodiscard]] const EngineConfigControl& GetConfigControl() const noexcept;
         [[nodiscard]] Assets::AssetService&   GetAssetService()  noexcept;
         [[nodiscard]] Graphics::GpuAssetCache& GetGpuAssetCache() noexcept;
         [[nodiscard]] const RuntimeObjectSpaceNormalBakeQueueDiagnostics&
@@ -351,15 +347,16 @@ namespace Extrinsic::Runtime
         void HandlePlatformEvent(const Platform::Event& event);
         void RequestExitFromWindowClose(std::string_view source);
         void HandleWindowDropEvent(const Platform::WindowDropEvent& event);
+        [[nodiscard]] RuntimeRenderRecipeActivationKernel
+            MakeRenderRecipeActivationKernel(
+                RuntimeRenderRecipeState& state) noexcept;
 
         Core::Config::EngineConfig           m_Config;
         std::unique_ptr<IApplication>        m_Application;
-        RuntimeEngineConfigSectionRegistry m_ConfigSectionRegistry{};
         std::vector<std::unique_ptr<IRuntimeModule>> m_RuntimeModules{};
         std::unique_ptr<Platform::IWindow>   m_Window;
         std::unique_ptr<RHI::IDevice>        m_Device;
         std::unique_ptr<Graphics::IRenderer> m_Renderer;
-        std::unique_ptr<EngineConfigControl> m_ConfigControl;
         // RUNTIME-159 — runtime-side Dear ImGui overlay/adapter/callback
         // bridge. Declared after m_Renderer / before render extraction so the
         // borrowed renderer overlay attachment is cleared before teardown.
@@ -449,8 +446,10 @@ namespace Extrinsic::Runtime
         // RUNTIME-160 — runtime-owned bridge from JobService GPU queue
         // participants to the renderer frame-command hook.
         JobServiceGpuQueueBridge m_JobServiceGpuQueueBridge{};
-        void RegisterRuntimeModulesForBoot();
-        void ResolveRuntimeModulesForBoot();
+        void RegisterRuntimeModulesForBoot(
+            const RuntimeRenderRecipeActivationKernel& recipeActivation);
+        void ResolveRuntimeModulesForBoot(
+            const RuntimeRenderRecipeActivationKernel& recipeActivation);
         void RegisterRuntimeModuleSimSystemsForTick(
             Core::FrameGraph& graph,
             ECS::Scene::Registry& scene,

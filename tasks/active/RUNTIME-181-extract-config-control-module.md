@@ -59,73 +59,75 @@ maturity_target: Operational
   the resolved module service.
 
 ## Status
-- In progress; owner: Codex team; branch:
+- Implementation complete at the review checkpoint; owner: Codex team; branch:
   `codex/runtime-181-config-control-module`; activated 2026-07-19.
-- Omission, lifecycle, caller, and test inventories completed 2026-07-19; the
-  implementation gate is open.
+- Omission, lifecycle, caller, and test inventories completed 2026-07-19.
+  Focused behavior, app compilation, and strict structural gates are recorded
+  below; the complete default CPU-supported gate remains for integration
+  verification before retirement.
 
 ## Required changes
-- [ ] Make the existing `EngineConfigControl` itself `final : IRuntimeModule`;
+- [x] Make the existing `EngineConfigControl` itself `final : IRuntimeModule`;
       own one `RuntimeEngineConfigSectionRegistry`, expose it before boot, and
       publish/withdraw the exact control instance through `ServiceRegistry`.
-- [ ] Factor recipe context creation, preview/load, apply, clear, and
+- [x] Factor recipe context creation, preview/load, apply, clear, and
       initialize-reset into shared free functions over one plain narrow kernel
       capability. Engine startup and the control module must call the same
       functions; the control stores no raw `IWindow*` or `IRenderer*`.
-- [ ] Keep startup recipe activation in `Engine::Initialize()`, reset the
+- [x] Keep startup recipe activation in `Engine::Initialize()`, reset the
       entire activation state/override unconditionally each initialize, then
       conditionally load the configured path. Module omission must still
       produce the configured first frame or fail closed to defaults.
-- [ ] Bind the active config and current boot's narrow callbacks/state during
+- [x] Bind the active config and current boot's narrow callbacks/state during
       module registration/resolution. Preserve synchronous hot apply and
       post-commit lexical app-section callback order without a frame hook.
-- [ ] On shutdown, clear live bindings, withdraw the exact service instance,
+- [x] On shutdown, clear live bindings, withdraw the exact service instance,
       and ensure reinitialize rebinds/reprovides against the newly created
       window/renderer without replaying callbacks or stale activation state.
-- [ ] Remove the config-section-registry constructor argument, registry/control
+- [x] Remove the config-section-registry constructor argument, registry/control
       members, `Runtime.EngineConfigControl` import, and `GetConfigControl`
       accessors from Engine.
-- [ ] Migrate Sandbox and callers to preboot composition plus
+- [x] Migrate Sandbox and callers to preboot composition plus
       `Services().Find<EngineConfigControl>()`; moduleless editor paths must
       expose unavailable/null commands rather than dereference a missing
       service.
-- [ ] Ratchet the exact Engine convergence snapshot from 41/19/2/30 to
+- [x] Ratchet the exact Engine convergence snapshot from 41/19/2/30 to
       40 plain imports, 18 domain imports, two re-exports, and 29 getter names.
 
 ## Tests
-- [ ] Preserve parse/round-trip, invalid-preview no-mutation, hot apply,
+- [x] Preserve parse/round-trip, invalid-preview no-mutation, hot apply,
       immediate renderer/config mutation, app-section callback ordering, and
       Editor/AgentCli/Programmatic source-tag coverage.
-- [ ] Cover valid, invalid/missing, and empty startup paths with the module
+- [x] Cover valid, invalid/missing, and empty startup paths with the module
       both composed and omitted; a valid omitted-module path must affect frame
       zero, while invalid/empty paths use defaults.
-- [ ] Prove a composed module observes the kernel's already-applied startup
+- [x] Prove a composed module observes the kernel's already-applied startup
       state without loading twice; invalid hot candidates preserve a prior
       override, while a valid hot change to an empty path clears it
       synchronously.
-- [ ] Add shutdown/reinitialize coverage for exact withdrawal/republication,
+- [x] Add shutdown/reinitialize coverage for exact withdrawal/republication,
       no boot callback replay, stale direct-override clearing on an empty-path
       second boot, and apply targeting the newly created renderer.
-- [ ] Preserve an omitted app section's current value and emit no callback.
-- [ ] Add an Engine-layering regression for module ownership and update exact
+- [x] Preserve an omitted app section's current value and emit no callback.
+- [x] Add an Engine-layering regression for module ownership and update exact
       convergence/gate-routing ratchets.
-- [ ] Run focused config/recipe/profiler-control coverage, strict layering, and
-      the complete default CPU-supported gate.
+- [x] Run focused config/recipe/control coverage and strict layering.
+- [ ] Run the complete default CPU-supported gate before retirement.
 
 ## Docs
-- [ ] Update runtime config-control, frame-graph, and Sandbox control-surface
+- [x] Update runtime config-control, frame-graph, and Sandbox control-surface
       documentation.
-- [ ] Regenerate the module inventory.
+- [x] Regenerate the module inventory.
 
 ## Acceptance criteria
-- [ ] Engine retains `EngineConfig` and startup recipe-activation substrate
+- [x] Engine retains `EngineConfig` and startup recipe-activation substrate
       only; it imports/owns/exposes no config-control domain facade or
       app-section registry.
-- [ ] Exactly one config draft/validation/apply lane serves files, UI, and
+- [x] Exactly one config draft/validation/apply lane serves files, UI, and
       agent/CLI.
-- [ ] The optional module does not determine boot recipe semantics, and live
+- [x] The optional module does not determine boot recipe semantics, and live
       apply remains synchronous.
-- [ ] App-section defaults and callbacks remain deterministic across boot,
+- [x] App-section defaults and callbacks remain deterministic across boot,
       hot apply, shutdown, and reinitialize.
 
 ## Verification
@@ -139,6 +141,27 @@ python3 tools/repo/check_kernel_convergence.py --root . --strict
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 ```
+
+Checkpoint evidence (2026-07-19):
+
+- Canonical `ci-fast` built `IntrinsicRuntimeContractTests`,
+  `IntrinsicRuntimeIntegrationTests`, and
+  `IntrinsicSandboxEditorIntegrationTests` successfully.
+- A temporary sandbox-capable `ci-fast` configure built and linked
+  `ExtrinsicSandbox`, including the app-owned preboot composition in
+  `main.cpp`; the build tree was then restored to the canonical Null/headless
+  `ci-fast` identity.
+- Focused config-control, recipe-activation, optional-editor,
+  app-section, and parameterization coverage passed 52/52 CTest cases.
+- Strict kernel convergence observed 40 plain imports, 18 domain imports, two
+  re-exports, and 29 public getter names; strict layering scanned 748 files and
+  6,589 references with zero violations.
+- Strict task policy validated 143 tasks with zero findings; docs checked
+  2,916 relative links with no breakage; test layout and root hygiene passed.
+- Kernel-convergence and test-gate-routing regression suites each passed
+  19/19 self-tests; the generated inventory contains 389 modules.
+- The complete default CPU-supported CTest gate is intentionally left open for
+  integration verification before this task is retired.
 
 ## Forbidden changes
 - Adding a second config-control class, registry, or application-only apply

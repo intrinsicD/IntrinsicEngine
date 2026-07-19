@@ -564,6 +564,104 @@ TEST(RuntimeEngineLayering, AsyncWorkModuleOwnsAsyncServicesOutsideEngine)
               std::string::npos);
 }
 
+TEST(RuntimeEngineLayering,
+     EngineConfigControlIsAnAppComposedModuleOutsideEngine)
+{
+    const auto engineInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+    const auto engineImpl =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto controlInterface =
+        ReadFile(
+            RepoRoot() /
+            "src/runtime/Runtime.EngineConfigControl.cppm");
+    const auto controlImpl =
+        ReadFile(
+            RepoRoot() /
+            "src/runtime/Runtime.EngineConfigControl.cpp");
+    const auto activationInterface =
+        ReadFile(
+            RepoRoot() /
+            "src/runtime/Runtime.RenderRecipeActivation.cppm");
+    const auto sandbox =
+        ReadFile(RepoRoot() / "src/app/Sandbox/main.cpp");
+    const auto runtimeCMake =
+        ReadFile(RepoRoot() / "src/runtime/CMakeLists.txt");
+
+    EXPECT_EQ(
+        engineInterface.find("EngineConfigControl"),
+        std::string::npos);
+    EXPECT_EQ(
+        engineImpl.find("EngineConfigControl"),
+        std::string::npos);
+    EXPECT_EQ(
+        engineInterface.find("EngineConfigSectionRegistry"),
+        std::string::npos);
+    EXPECT_EQ(
+        engineImpl.find("EngineConfigSectionRegistry"),
+        std::string::npos);
+    EXPECT_EQ(
+        engineInterface.find("GetConfigControl"),
+        std::string::npos);
+
+    EXPECT_NE(
+        engineImpl.find(
+            "LoadAndApplyRuntimeRenderRecipeConfigFile("),
+        std::string::npos);
+    EXPECT_NE(
+        engineImpl.find(
+            "ResetRuntimeRenderRecipeActivation(recipeActivation)"),
+        std::string::npos);
+    EXPECT_NE(
+        controlInterface.find(
+            "EngineConfigControl final : public IRuntimeModule"),
+        std::string::npos);
+    EXPECT_NE(
+        controlInterface.find(
+            "RuntimeEngineConfigSectionRegistry m_SectionRegistry"),
+        std::string::npos);
+    EXPECT_NE(
+        controlImpl.find(
+            "Provide<EngineConfigControl>"),
+        std::string::npos);
+    EXPECT_NE(
+        controlImpl.find(
+            "Withdraw<EngineConfigControl>(*this)"),
+        std::string::npos);
+    EXPECT_EQ(
+        controlInterface.find("EngineConfigControlDependencies"),
+        std::string::npos);
+    EXPECT_EQ(
+        controlInterface.find("IWindow"),
+        std::string::npos);
+    EXPECT_EQ(
+        controlInterface.find("IRenderer"),
+        std::string::npos);
+    EXPECT_NE(
+        activationInterface.find(
+            "struct RuntimeRenderRecipeActivationKernel"),
+        std::string::npos);
+
+    EXPECT_NE(
+        sandbox.find(
+            "std::make_unique<Extrinsic::Runtime::EngineConfigControl>"),
+        std::string::npos);
+    EXPECT_NE(
+        sandbox.find("configControl->SectionRegistry()"),
+        std::string::npos);
+    EXPECT_NE(
+        sandbox.find("engine.AddModule(std::move(configControl))"),
+        std::string::npos);
+    EXPECT_NE(
+        runtimeCMake.find(
+            "Runtime.RenderRecipeActivation.cppm"),
+        std::string::npos);
+    EXPECT_NE(
+        runtimeCMake.find(
+            "Runtime.RenderRecipeActivation.cpp"),
+        std::string::npos);
+}
+
 TEST(RuntimeEngineLayering, OptionalAsyncMaintenancePreservesContractOrder)
 {
     const auto engineImpl =

@@ -194,9 +194,11 @@ This Theme F composition/right-sizing leaf did not reopen completed Theme D.
 config-control facade for render-recipe preview/activation and the current
 engine-config hot subset (`render.default_recipe_config_path`), with the
 Sandbox Editor routed through the same facade. After `RUNTIME-149`, that facade
-lives in `Extrinsic.Runtime.EngineConfigControl` behind
-`Engine::GetConfigControl()`. This satisfies the config-control dependency for
-`RUNTIME-134`, which is now retired at `CPUContracted`.
+lives in `Extrinsic.Runtime.EngineConfigControl`; active `RUNTIME-181` promotes
+that facade to an app-composed runtime module resolved through
+`Engine::Services()` and removes the transitional Engine accessor. This
+satisfies the config-control dependency for `RUNTIME-134`, which is now retired
+at `CPUContracted`.
 `RUNTIME-136` is also retired; operational progressive-Poisson GPU parity is now
 owned by `METHOD-014`.
 
