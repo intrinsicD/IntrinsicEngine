@@ -176,7 +176,7 @@ triggers. The implementation graph is:
   world-tagged snapshots replace Engine-owned interaction pointers, while
   obsolete mesh-view compatibility facades/cache are deleted and ECS
   render-hint components remain authoritative.
-- [`RUNTIME-183`](RUNTIME-183-extract-asset-workflow-module.md) — compose the
+- [`RUNTIME-183`](../../active/RUNTIME-183-extract-asset-workflow-module.md) — compose the
   global asset/residency/import/bake owner after the hard document/interaction
   split; require exact document/history and built-in device/renderer/extraction
   services, optionally consume streaming/selection, and borrow kernel config/
@@ -186,7 +186,7 @@ triggers. The implementation graph is:
   one frame-local kernel capture value, a preserved paired Begin/End bracket,
   and app-owned Sandbox panels.
 - Corrected [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md)
-  — after `RUNTIME-188` and `RUNTIME-183`, delete the one-consumer exported
+  — after `RUNTIME-188` and active `RUNTIME-183`, delete the one-consumer exported
   policy module, retain its `.cpp` as a private implementation unit of the
   existing Sandbox editor-facade module, and let Sandbox own transactional
   typed handles over only the published import pipeline/input registry plus
@@ -215,7 +215,7 @@ config and Frame Graph UI use the settled owners.
 Retired `RUNTIME-177` added no generic debug-draw producer seam because its
 consumer inventory was empty; existing spatial-debug and transform-gizmo
 paths remain typed. `RUNTIME-129` and `RUNTIME-184` may proceed independently
-after their respective prerequisites (`RUNTIME-183` is now selectable and
+after their respective prerequisites (`RUNTIME-183` is now active and
 remains for the bake;
 `GRAPHICS-128` is retired); both gate `RUNTIME-185`.
 `ARCH-014` reaches this graph through `RUNTIME-187`; `REVIEW-003` reaches it
@@ -289,7 +289,7 @@ compile cost. They preserve behavior and ownership; they are not feature tasks.
 main `Runtime.RenderExtraction` module slimming.
 
 - [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md) —
-  after `RUNTIME-188` and `RUNTIME-183`, remove the one-consumer public module
+  after `RUNTIME-188` and active `RUNTIME-183`, remove the one-consumer public module
   while retaining its implementation under the existing
   `SandboxEditorFacades` surface; Sandbox privately owns exact provider
   borrows and typed handles, not another runtime owner.

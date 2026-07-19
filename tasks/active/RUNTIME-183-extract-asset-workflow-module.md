@@ -13,6 +13,10 @@ maturity_target: Operational
 
 ## Status
 
+- In progress as of 2026-07-19; owner: Codex team; implementation branch:
+  `codex/runtime-183-asset-workflow`.
+- Next gate: land the bounded PImpl owner, exact service publication, and early
+  shutdown-announcement split with focused asset-workflow lifecycle coverage.
 - Selectable as of 2026-07-19: `RUNTIME-172`, `RUNTIME-179`, `RUNTIME-180`,
   `RUNTIME-181`, and `RUNTIME-188` are all retired. Implementation remains
   open; the next gate is the bounded PImpl asset-owner slice below.
