@@ -84,6 +84,80 @@ TEST(RuntimeEnginePrivateGlue, FrameLoopHelpersArePrivateTextualGlue)
               std::string::npos);
 }
 
+TEST(RuntimeEnginePrivateGlue,
+     TypedViewportInputDispatchKeepsCameraOutOfGenericFrameContext)
+{
+    const auto root = RepoRoot();
+    const std::string engineImpl =
+        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+    const std::string privateHeader = ReadFile(
+        root / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
+    const std::string moduleInterface =
+        ReadFile(root / "src/runtime/Runtime.Module.cppm");
+
+    EXPECT_EQ(engineImpl.find("PopulateMainCameraForFrame"),
+              std::string::npos);
+    EXPECT_EQ(privateHeader.find("PopulateMainCameraForFrame"),
+              std::string::npos);
+
+    const auto uiEndCapture =
+        engineImpl.find("FramePhase::UiEndCapture");
+    const auto renderInputInitialization = engineImpl.find(
+        "frameContext.RenderInput = Graphics::RenderFrameInput{");
+    const auto viewportDispatch = engineImpl.find(
+        "m_RuntimeModuleSchedule.RunViewportInputHooks(");
+    const auto gizmoInput = engineImpl.find(
+        "m_GizmoFrameService.DriveInputForFrame(");
+    const auto inputActions = engineImpl.find(
+        "m_InputActions.DispatchForFrame(");
+    const auto picking = engineImpl.find(
+        "m_SelectionReadback.DrainPendingPickForFrame(");
+    ASSERT_NE(uiEndCapture, std::string::npos);
+    ASSERT_NE(renderInputInitialization, std::string::npos);
+    ASSERT_NE(viewportDispatch, std::string::npos);
+    ASSERT_NE(gizmoInput, std::string::npos);
+    ASSERT_NE(inputActions, std::string::npos);
+    ASSERT_NE(picking, std::string::npos);
+    EXPECT_LT(uiEndCapture, renderInputInitialization);
+    EXPECT_LT(renderInputInitialization, viewportDispatch);
+    EXPECT_LT(viewportDispatch, gizmoInput);
+    EXPECT_LT(viewportDispatch, inputActions);
+    EXPECT_LT(viewportDispatch, picking);
+
+    std::size_t registrarWiringCount = 0u;
+    std::size_t cursor = 0u;
+    constexpr std::string_view registrarCall =
+        "m_RuntimeModuleSchedule.RegisterViewportInputHook(";
+    while ((cursor = engineImpl.find(registrarCall, cursor)) !=
+           std::string::npos)
+    {
+        ++registrarWiringCount;
+        cursor += registrarCall.size();
+    }
+    EXPECT_EQ(registrarWiringCount, 2u);
+
+    const auto frameContextBegin = moduleInterface.find(
+        "export struct RuntimeFrameHookContext");
+    const auto frameContextEnd = moduleInterface.find(
+        "};", frameContextBegin);
+    ASSERT_NE(frameContextBegin, std::string::npos);
+    ASSERT_NE(frameContextEnd, std::string::npos);
+    const std::string frameContext = moduleInterface.substr(
+        frameContextBegin,
+        frameContextEnd - frameContextBegin);
+    EXPECT_EQ(frameContext.find("Viewport"), std::string::npos);
+    EXPECT_EQ(frameContext.find("RenderInput"), std::string::npos);
+    EXPECT_EQ(frameContext.find("const Core::Config::EngineConfig&"),
+              std::string::npos);
+
+    EXPECT_NE(moduleInterface.find(
+                  "export struct RuntimeViewportInputHookContext"),
+              std::string::npos);
+    EXPECT_NE(moduleInterface.find(
+                  "using RuntimeViewportInputHook ="),
+              std::string::npos);
+}
+
 TEST(RuntimeEnginePrivateGlue, EditorUiModuleOwnsOptionalEditorUiComposition)
 {
     const auto root = RepoRoot();

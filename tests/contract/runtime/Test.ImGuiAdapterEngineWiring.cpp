@@ -41,6 +41,7 @@ import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorUiModule;
@@ -267,8 +268,11 @@ namespace
         {
             auto controller = std::make_unique<RecordingCameraController>();
             Controller = controller.get();
-            engine.GetCameraControllerRegistry().Register(Runtime::CameraControllerSlot::Main,
-                                                          std::move(controller));
+            auto* cameraControllers =
+                engine.Services().Find<Runtime::CameraControllerRegistry>();
+            ASSERT_NE(cameraControllers, nullptr);
+            cameraControllers->Register(Runtime::CameraControllerSlot::Main,
+                                        std::move(controller));
         }
 
         void OnSimTick(Engine& /*engine*/, double /*fixedDt*/) override {}
@@ -302,8 +306,11 @@ namespace
         {
             auto controller = std::make_unique<RecordingCameraController>();
             Controller = controller.get();
-            engine.GetCameraControllerRegistry().Register(Runtime::CameraControllerSlot::Main,
-                                                          std::move(controller));
+            auto* cameraControllers =
+                engine.Services().Find<Runtime::CameraControllerRegistry>();
+            ASSERT_NE(cameraControllers, nullptr);
+            cameraControllers->Register(Runtime::CameraControllerSlot::Main,
+                                        std::move(controller));
         }
 
         void OnSimTick(Engine& /*engine*/, double /*fixedDt*/) override {}
@@ -653,6 +660,7 @@ TEST(ImGuiAdapterEngineWiring, UiCaptureSuppressesRuntimeInputConsumers)
     auto app = std::make_unique<UiCapturedInputApplication>();
     auto* appPtr = app.get();
     Engine engine(NullInputRoutingConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::CameraModule>();
     engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.Initialize();
 
@@ -705,6 +713,7 @@ TEST(ImGuiAdapterEngineWiring, RunNormalizesNativeCloseBeforeFirstFrame)
     auto app = std::make_unique<UiCapturedInputApplication>();
     auto* appPtr = app.get();
     Engine engine(InputRoutingConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::CameraModule>();
     engine.Initialize();
 
     if (!RequestNativeWindowClose(engine.GetWindow()))
@@ -727,6 +736,7 @@ TEST(ImGuiAdapterEngineWiring, RunNormalizesNativeCloseAfterInteractiveInput)
     auto app = std::make_unique<CloseAfterInteractiveInputApplication>();
     auto* appPtr = app.get();
     Engine engine(InputRoutingConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::CameraModule>();
     engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.Initialize();
 

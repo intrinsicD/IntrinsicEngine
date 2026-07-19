@@ -1,12 +1,14 @@
-#include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <utility>
-#include <vector>
 
 #include <gtest/gtest.h>
 #include <glm/glm.hpp>
 
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.Window;
 import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
@@ -20,77 +22,52 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
-import Extrinsic.Platform.Window;
+import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.WorldHandle;
+import Extrinsic.Runtime.WorldRegistry;
 import Geometry.Properties;
 
-using Extrinsic::Core::Config::ReferenceSceneSelector;
-using Extrinsic::ECS::EntityHandle;
-using Extrinsic::ECS::Scene::Registry;
-using Extrinsic::Graphics::BuildCameraViewSnapshot;
-using Extrinsic::Graphics::CameraViewInput;
-using Extrinsic::Graphics::CameraViewSnapshot;
-using Extrinsic::Runtime::BuildReferenceCameraViewInput;
-using Extrinsic::Runtime::IReferenceSceneProvider;
-using Extrinsic::Runtime::MakeDefaultReferenceSceneRegistry;
-using Extrinsic::Runtime::ReferenceSceneEntity;
-using Extrinsic::Runtime::ReferenceScenePopulation;
-using Extrinsic::Runtime::ReferenceSceneRegistry;
-using Extrinsic::Runtime::RegisterDefaultReferenceProvidersIfAbsent;
-using Extrinsic::Runtime::TriangleProvider;
+namespace Core = Extrinsic::Core;
+namespace ECS = Extrinsic::ECS;
+namespace Graphics = Extrinsic::Graphics;
+namespace Runtime = Extrinsic::Runtime;
 
 namespace
 {
-    namespace E = Extrinsic::ECS::Components;
-    namespace G = Extrinsic::Graphics::Components;
-    namespace GS = Extrinsic::ECS::Components::GeometrySources;
+    namespace E = ECS::Components;
+    namespace G = Graphics::Components;
+    namespace GS = ECS::Components::GeometrySources;
 
-    class TrackingProvider final : public IReferenceSceneProvider
+    [[nodiscard]] std::size_t EntityCount(
+        ECS::Scene::Registry& scene)
     {
-    public:
-        ReferenceScenePopulation Populate(Registry& scene) override
-        {
-            ++PopulateCalls;
-            ReferenceScenePopulation pop;
-            const EntityHandle entity = scene.Create();
-            CreatedEntity = entity;
-            pop.Entities.push_back(ReferenceSceneEntity{entity});
-            CameraViewInput cam{};
-            cam.Valid = true;
-            pop.Camera = cam;
-            return pop;
-        }
-
-        void Teardown(Registry& scene,
-                      const std::vector<ReferenceSceneEntity>& entities) override
-        {
-            ++TeardownCalls;
-            for (const auto& e : entities)
+        std::size_t count = 0u;
+        scene.Raw().view<ECS::EntityHandle>().each(
+            [&count](const ECS::EntityHandle)
             {
-                if (scene.IsValid(e.Entity))
-                    scene.Destroy(e.Entity);
-            }
-        }
+                ++count;
+            });
+        return count;
+    }
 
-        int PopulateCalls{0};
-        int TeardownCalls{0};
-        EntityHandle CreatedEntity{Extrinsic::ECS::InvalidEntityHandle};
-    };
-
-    void ExpectReferenceTriangleEntityContract(Registry& scene,
-                                               const EntityHandle entity)
+    void ExpectReferenceTriangleEntityContract(
+        ECS::Scene::Registry& scene,
+        const ECS::EntityHandle entity)
     {
         ASSERT_TRUE(scene.IsValid(entity));
         auto& raw = scene.Raw();
 
         ASSERT_TRUE(raw.all_of<E::MetaData>(entity));
-        EXPECT_EQ(raw.get<E::MetaData>(entity).EntityName, "ReferenceTriangle");
-
+        EXPECT_EQ(raw.get<E::MetaData>(entity).EntityName,
+                  "ReferenceTriangle");
         EXPECT_TRUE((raw.all_of<E::Transform::Component,
                                 E::Transform::WorldMatrix,
                                 E::Hierarchy::Component>(entity)));
@@ -104,14 +81,15 @@ namespace
                   G::RenderSurface::SourceDomain::Vertex);
 
         ASSERT_TRUE(raw.all_of<G::VisualizationConfig>(entity));
-        const auto& visualization = raw.get<G::VisualizationConfig>(entity);
+        const auto& visualization =
+            raw.get<G::VisualizationConfig>(entity);
         EXPECT_EQ(visualization.Source,
                   G::VisualizationConfig::ColorSource::UniformColor);
         EXPECT_EQ(visualization.Color, glm::vec4(1.0f));
-
         EXPECT_FALSE(raw.all_of<E::ProceduralGeometryRef>(entity));
 
-        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        const GS::ConstSourceView view =
+            GS::BuildConstView(raw, entity);
         ASSERT_TRUE(view.Valid());
         EXPECT_EQ(view.ActiveDomain, GS::Domain::Mesh);
         EXPECT_EQ(view.VerticesAlive(), 3u);
@@ -119,112 +97,115 @@ namespace
         EXPECT_EQ(view.HalfedgesTotal(), 6u);
         EXPECT_EQ(view.FacesAlive(), 1u);
 
-        auto texcoords = view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+        auto texcoords =
+            view.VertexSource->Properties.Get<glm::vec2>(
+                "v:texcoord");
         ASSERT_TRUE(texcoords);
         ASSERT_EQ(texcoords.Vector().size(), 3u);
         EXPECT_EQ(texcoords.Vector()[0], glm::vec2(0.0f, 0.0f));
         EXPECT_EQ(texcoords.Vector()[1], glm::vec2(1.0f, 0.0f));
         EXPECT_EQ(texcoords.Vector()[2], glm::vec2(0.5f, 1.0f));
     }
+
+    [[nodiscard]] Core::Config::EngineConfig HeadlessConfig(
+        const bool referenceEnabled)
+    {
+        Core::Config::EngineConfig config{};
+        config.Simulation.WorkerThreadCount = 1u;
+        config.Window.Backend =
+            Core::Config::WindowBackend::Null;
+        config.ReferenceScene.Enabled = referenceEnabled;
+        config.ReferenceScene.Selector =
+            Core::Config::ReferenceSceneSelector::Triangle;
+        return config;
+    }
+
+    class StubApplication final : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(
+            Runtime::Engine&, double, double) override {}
+        void OnShutdown(Runtime::Engine&) override {}
+    };
+
+    class AppOwnedReferenceApplication final
+        : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine& engine) override
+        {
+            ++InitializeCalls;
+            if (!engine.GetEngineConfig().ReferenceScene.Enabled ||
+                Population.has_value())
+            {
+                return;
+            }
+
+            OwningWorld = engine.ActiveWorld();
+            ECS::Scene::Registry* scene =
+                engine.Worlds().Get(OwningWorld);
+            ASSERT_NE(scene, nullptr);
+            Population = Runtime::BootstrapReferenceScene(
+                engine.GetEngineConfig().ReferenceScene.Selector,
+                *scene);
+            ++BootstrapCalls;
+            LastSeed = Population->Camera;
+        }
+
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(
+            Runtime::Engine&, double, double) override {}
+
+        void OnShutdown(Runtime::Engine& engine) override
+        {
+            ++ShutdownCalls;
+            if (!Population.has_value())
+                return;
+
+            if (ECS::Scene::Registry* scene =
+                    engine.Worlds().Get(OwningWorld);
+                scene != nullptr)
+            {
+                Runtime::TeardownReferenceScene(
+                    *scene, *Population);
+                TeardownRemovedPopulation =
+                    EntityCount(*scene) == 0u;
+            }
+            Population.reset();
+            OwningWorld = {};
+        }
+
+        std::optional<Runtime::ReferenceScenePopulation> Population{};
+        std::optional<Graphics::CameraViewInput> LastSeed{};
+        Runtime::WorldHandle OwningWorld{};
+        std::uint32_t InitializeCalls{0u};
+        std::uint32_t BootstrapCalls{0u};
+        std::uint32_t ShutdownCalls{0u};
+        bool TeardownRemovedPopulation{false};
+    };
 }
 
-TEST(ReferenceSceneRegistry, ResolveOnUnregisteredSelectorFiresTerminateGuard)
+static_assert(noexcept(Runtime::TeardownReferenceScene(
+    std::declval<ECS::Scene::Registry&>(),
+    std::declval<const Runtime::ReferenceScenePopulation&>())));
+
+TEST(ReferenceSceneBootstrap,
+     TriangleCreatesVisibleSelectablePopulationAndDataOnlySeed)
 {
-    // GRAPHICS-029B closing cleanup from GRAPHICS-029A's Transition notice:
-    // selectors with no registered provider now std::terminate at Resolve()
-    // instead of falling back to the GRAPHICS-029A no-op default. The
-    // production resolve path is gated through
-    // RegisterDefaultReferenceProvidersIfAbsent so engines never reach this
-    // branch unintentionally.
-    ReferenceSceneRegistry registry;
-    EXPECT_EQ(registry.ResolveOrNull(ReferenceSceneSelector::Triangle), nullptr);
-    EXPECT_DEATH(
-        (void)registry.Resolve(ReferenceSceneSelector::Triangle),
-        "");
-}
+    ECS::Scene::Registry scene;
+    const Runtime::ReferenceScenePopulation population =
+        Runtime::BootstrapReferenceScene(
+            Core::Config::ReferenceSceneSelector::Triangle,
+            scene);
 
-TEST(ReferenceSceneRegistry, MakeDefaultReferenceSceneRegistryRegistersTriangleProvider)
-{
-    ReferenceSceneRegistry registry = MakeDefaultReferenceSceneRegistry();
-
-    IReferenceSceneProvider* provider =
-        registry.ResolveOrNull(ReferenceSceneSelector::Triangle);
-    ASSERT_NE(provider, nullptr);
-
-    // Identify the registered provider by behavior (the build uses
-    // -fno-rtti so dynamic_cast is unavailable): Populate must emit the
-    // canonical TriangleProvider entity contract.
-    Registry scene;
-    const ReferenceScenePopulation population = provider->Populate(scene);
     ASSERT_EQ(population.Entities.size(), 1u);
-    const EntityHandle entity = population.Entities.front().Entity;
-    ASSERT_TRUE(scene.IsValid(entity));
-    ExpectReferenceTriangleEntityContract(scene, entity);
-}
-
-TEST(ReferenceSceneRegistry, RegisterFollowedByResolveReturnsTheRegisteredProvider)
-{
-    ReferenceSceneRegistry registry;
-    auto provider = std::make_unique<TrackingProvider>();
-    TrackingProvider* providerRaw = provider.get();
-
-    registry.Register(ReferenceSceneSelector::Triangle, std::move(provider));
-
-    EXPECT_EQ(registry.ResolveOrNull(ReferenceSceneSelector::Triangle), providerRaw);
-    EXPECT_EQ(&registry.Resolve(ReferenceSceneSelector::Triangle), providerRaw);
-
-    Registry scene;
-    auto population = registry.Resolve(ReferenceSceneSelector::Triangle).Populate(scene);
-    EXPECT_EQ(providerRaw->PopulateCalls, 1);
-    ASSERT_EQ(population.Entities.size(), 1u);
-    EXPECT_TRUE(scene.IsValid(population.Entities.front().Entity));
-}
-
-TEST(ReferenceSceneRegistry, DoubleRegistrationFiresTerminateGuard)
-{
-    ReferenceSceneRegistry registry;
-    registry.Register(ReferenceSceneSelector::Triangle,
-                      std::make_unique<TrackingProvider>());
-
-    EXPECT_DEATH(
-        registry.Register(ReferenceSceneSelector::Triangle,
-                          std::make_unique<TrackingProvider>()),
-        "");
-}
-
-TEST(ReferenceSceneRegistry, NullProviderRegistrationFiresTerminateGuard)
-{
-    ReferenceSceneRegistry registry;
-    EXPECT_DEATH(
-        registry.Register(ReferenceSceneSelector::Triangle, nullptr),
-        "");
-}
-
-TEST(ReferenceSceneRegistry, RegisterDefaultsIfAbsentPreservesPreRegisteredProviders)
-{
-    ReferenceSceneRegistry registry;
-    auto provider = std::make_unique<TrackingProvider>();
-    TrackingProvider* providerRaw = provider.get();
-    registry.Register(ReferenceSceneSelector::Triangle, std::move(provider));
-
-    RegisterDefaultReferenceProvidersIfAbsent(registry);
-    EXPECT_EQ(registry.ResolveOrNull(ReferenceSceneSelector::Triangle), providerRaw);
-}
-
-TEST(TriangleProviderContract, PopulateCreatesNamedTriangleEntityWithExpectedComponents)
-{
-    Registry scene;
-    TriangleProvider provider;
-    const ReferenceScenePopulation population = provider.Populate(scene);
-
-    ASSERT_EQ(population.Entities.size(), 1u);
-    const EntityHandle entity = population.Entities.front().Entity;
-    ASSERT_TRUE(scene.IsValid(entity));
-
-    ExpectReferenceTriangleEntityContract(scene, entity);
+    ExpectReferenceTriangleEntityContract(
+        scene, population.Entities.front().Entity);
 
     ASSERT_TRUE(population.Camera.has_value());
-    const CameraViewInput& seed = *population.Camera;
+    const Graphics::CameraViewInput& seed = *population.Camera;
     EXPECT_TRUE(seed.Valid);
     EXPECT_EQ(seed.Position, glm::vec3(0.0f, 0.0f, 3.0f));
     EXPECT_EQ(seed.Forward, glm::vec3(0.0f, 0.0f, -1.0f));
@@ -233,269 +214,260 @@ TEST(TriangleProviderContract, PopulateCreatesNamedTriangleEntityWithExpectedCom
     EXPECT_FLOAT_EQ(seed.FarPlane, 100.0f);
 }
 
-TEST(TriangleProviderContract, AuthoredTriangleSceneDocumentRoundTripsFullRenderableContract)
+TEST(ReferenceSceneBootstrap,
+     AuthoredTriangleRoundTripsFullRenderableContract)
 {
-    Registry source;
-    TriangleProvider provider;
-    const ReferenceScenePopulation population = provider.Populate(source);
+    ECS::Scene::Registry source;
+    const Runtime::ReferenceScenePopulation population =
+        Runtime::BootstrapReferenceScene(
+            Core::Config::ReferenceSceneSelector::Triangle,
+            source);
     ASSERT_EQ(population.Entities.size(), 1u);
 
-    auto document = Extrinsic::Runtime::SerializeSceneDocument(source);
-    ASSERT_TRUE(document.has_value()) << static_cast<int>(document.error());
+    auto document = Runtime::SerializeSceneDocument(source);
+    ASSERT_TRUE(document.has_value())
+        << static_cast<int>(document.error());
 
-    Registry loaded;
-    auto loadedResult = Extrinsic::Runtime::DeserializeSceneDocument(loaded, *document);
-    ASSERT_TRUE(loadedResult.has_value()) << static_cast<int>(loadedResult.error());
+    ECS::Scene::Registry loaded;
+    auto loadedResult =
+        Runtime::DeserializeSceneDocument(loaded, *document);
+    ASSERT_TRUE(loadedResult.has_value())
+        << static_cast<int>(loadedResult.error());
     EXPECT_EQ(loadedResult->Stats.Entities, 1u);
     EXPECT_EQ(loadedResult->Stats.MeshEntities, 1u);
     EXPECT_EQ(loadedResult->Stats.RenderHintEntities, 1u);
 
-    auto& raw = loaded.Raw();
-    auto view = raw.view<E::MetaData,
-                         G::RenderSurface,
-                         G::VisualizationConfig,
-                         GS::Vertices,
-                         GS::Edges,
-                         GS::Halfedges,
-                         GS::Faces>();
+    auto view = loaded.Raw().view<
+        E::MetaData,
+        G::RenderSurface,
+        G::VisualizationConfig,
+        GS::Vertices,
+        GS::Edges,
+        GS::Halfedges,
+        GS::Faces>();
     ASSERT_EQ(view.size_hint(), 1u);
-    ExpectReferenceTriangleEntityContract(loaded, *view.begin());
+    ExpectReferenceTriangleEntityContract(
+        loaded, *view.begin());
 }
 
-TEST(TriangleProviderContract, TeardownDestroysAuthoredEntities)
+TEST(ReferenceSceneBootstrap, TeardownIsNoexceptAndIdempotent)
 {
-    Registry scene;
-    TriangleProvider provider;
-    ReferenceScenePopulation population = provider.Populate(scene);
+    ECS::Scene::Registry scene;
+    const Runtime::ReferenceScenePopulation population =
+        Runtime::BootstrapReferenceScene(
+            Core::Config::ReferenceSceneSelector::Triangle,
+            scene);
+    ASSERT_EQ(EntityCount(scene), 1u);
 
-    ASSERT_EQ(population.Entities.size(), 1u);
-    const EntityHandle entity = population.Entities.front().Entity;
-    ASSERT_TRUE(scene.IsValid(entity));
-
-    provider.Teardown(scene, population.Entities);
-    EXPECT_FALSE(scene.IsValid(entity));
+    Runtime::TeardownReferenceScene(scene, population);
+    EXPECT_EQ(EntityCount(scene), 0u);
+    Runtime::TeardownReferenceScene(scene, population);
+    EXPECT_EQ(EntityCount(scene), 0u);
 }
 
-TEST(ReferenceCameraBuildInput, ProducesSanitizerValidSnapshotWithViewportAspect)
+TEST(ReferenceSceneOwnership,
+     GenericEngineDoesNotInterpretEnabledReferenceConfig)
 {
-    Registry scene;
-    TriangleProvider provider;
-    const ReferenceScenePopulation population = provider.Populate(scene);
-    ASSERT_TRUE(population.Camera.has_value());
-
-    const int viewportWidth = 1600;
-    const int viewportHeight = 900;
-    const CameraViewInput finalized = BuildReferenceCameraViewInput(*population.Camera,
-                                                                     viewportWidth,
-                                                                     viewportHeight);
-    EXPECT_TRUE(finalized.Valid);
-
-    // Vulkan clip-space Y inversion: glm::perspective produces a positive
-    // Projection[1][1]; BuildReferenceCameraViewInput must flip it negative
-    // for parity with the legacy CameraComponent path
-    // (src/legacy/Graphics/Graphics.Camera.cpp:34-39). Without the flip, the
-    // promoted renderer would render the reference triangle vertically
-    // inverted.
-    EXPECT_LT(finalized.Projection[1][1], 0.0f);
-
-    // Aspect baked into the perspective matrix matches the viewport. Using
-    // glm::perspective(fovY, aspect, n, f) with the Vulkan Y flip:
-    // Projection[1][1] = -1 / tan(fovY/2), Projection[0][0] = (1 / tan(fovY/2)) / aspect,
-    // so |Projection[1][1] / Projection[0][0]| == aspect.
-    ASSERT_NE(finalized.Projection[0][0], 0.0f);
-    const float derivedAspect = std::abs(finalized.Projection[1][1] /
-                                         finalized.Projection[0][0]);
-    const float expectedAspect = static_cast<float>(viewportWidth) /
-                                  static_cast<float>(viewportHeight);
-    EXPECT_NEAR(derivedAspect, expectedAspect, 1e-4f);
-
-    const Extrinsic::Platform::Extent2D viewport{viewportWidth, viewportHeight};
-    const CameraViewSnapshot snapshot = BuildCameraViewSnapshot(finalized, viewport);
-    EXPECT_TRUE(snapshot.Valid);
-    EXPECT_EQ(snapshot.Position, finalized.Position);
-    EXPECT_EQ(snapshot.Forward, finalized.Forward);
-    EXPECT_EQ(snapshot.Up, finalized.Up);
-}
-
-TEST(ReferenceCameraBuildInput, ZeroViewportFallsBackToUnitAspectAndStaysValid)
-{
-    Registry scene;
-    TriangleProvider provider;
-    const ReferenceScenePopulation population = provider.Populate(scene);
-    ASSERT_TRUE(population.Camera.has_value());
-
-    const CameraViewInput finalized = BuildReferenceCameraViewInput(*population.Camera, 0, 0);
-    EXPECT_TRUE(finalized.Valid);
-
-    const CameraViewSnapshot snapshot = BuildCameraViewSnapshot(finalized, {1, 1});
-    EXPECT_TRUE(snapshot.Valid);
-}
-
-namespace
-{
-    class StubApplication final : public Extrinsic::Runtime::IApplication
-    {
-    public:
-        void OnInitialize(Extrinsic::Runtime::Engine& /*engine*/) override {}
-        void OnSimTick(Extrinsic::Runtime::Engine& /*engine*/, double /*fixedDt*/) override {}
-        void OnVariableTick(Extrinsic::Runtime::Engine& /*engine*/,
-                            double /*alpha*/,
-                            double /*dt*/) override {}
-        void OnShutdown(Extrinsic::Runtime::Engine& /*engine*/) override {}
-    };
-
-    [[nodiscard]] Extrinsic::Core::Config::EngineConfig SingleWorkerEngineConfig()
-    {
-        Extrinsic::Core::Config::EngineConfig config{};
-        config.Simulation.WorkerThreadCount = 1u;
-        return config;
-    }
-}
-
-TEST(EngineReferenceScene, DefaultEngineConfigKeepsReferenceSceneDisabledAndCreatesNoEntities)
-{
-    Extrinsic::Core::Config::EngineConfig config = SingleWorkerEngineConfig();
-    ASSERT_FALSE(config.ReferenceScene.Enabled);
-
-    Extrinsic::Runtime::Engine engine(config, std::make_unique<StubApplication>());
+    Runtime::Engine engine(
+        HeadlessConfig(true),
+        std::make_unique<StubApplication>());
     engine.Initialize();
 
-    EXPECT_FALSE(engine.IsReferenceSceneInstalled());
-    EXPECT_FALSE(engine.GetReferenceCameraSeed().has_value());
-    EXPECT_EQ(engine.GetScene().Raw().storage<EntityHandle>().size(), 0u);
+    EXPECT_EQ(EntityCount(engine.GetScene()), 0u);
+    EXPECT_EQ(
+        engine.Services()
+            .Find<Runtime::CameraControllerRegistry>(),
+        nullptr);
 
     engine.Shutdown();
-    EXPECT_FALSE(engine.IsReferenceSceneInstalled());
-    EXPECT_FALSE(engine.GetReferenceCameraSeed().has_value());
 }
 
-TEST(EngineReferenceScene, ReferenceEngineConfigInvokesPreRegisteredProviderOnce)
+TEST(ReferenceSceneOwnership,
+     AppBootstrapRunsOncePerInitializationWithoutCameraModule)
 {
-    Extrinsic::Core::Config::EngineConfig config = SingleWorkerEngineConfig();
-    config.ReferenceScene.Enabled = true;
-    config.ReferenceScene.Selector = ReferenceSceneSelector::Triangle;
-
-    Extrinsic::Runtime::Engine engine(config, std::make_unique<StubApplication>());
-
-    auto provider = std::make_unique<TrackingProvider>();
-    TrackingProvider* providerRaw = provider.get();
-    engine.GetReferenceSceneRegistry().Register(
-        ReferenceSceneSelector::Triangle, std::move(provider));
+    auto app = std::make_unique<AppOwnedReferenceApplication>();
+    AppOwnedReferenceApplication* appPtr = app.get();
+    Runtime::Engine engine(
+        HeadlessConfig(true), std::move(app));
 
     engine.Initialize();
+    ASSERT_EQ(appPtr->InitializeCalls, 1u);
+    ASSERT_EQ(appPtr->BootstrapCalls, 1u);
+    ASSERT_TRUE(appPtr->Population.has_value());
+    ASSERT_TRUE(appPtr->LastSeed.has_value());
+    EXPECT_TRUE(appPtr->LastSeed->Valid);
+    EXPECT_EQ(EntityCount(engine.GetScene()), 1u);
+    EXPECT_EQ(
+        engine.Services()
+            .Find<Runtime::CameraControllerRegistry>(),
+        nullptr);
 
-    EXPECT_TRUE(engine.IsReferenceSceneInstalled());
-    EXPECT_EQ(providerRaw->PopulateCalls, 1);
-    EXPECT_EQ(providerRaw->TeardownCalls, 0);
-    EXPECT_EQ(engine.GetScene().Raw().storage<EntityHandle>().size(), 1u);
-    EXPECT_TRUE(engine.GetReferenceCameraSeed().has_value());
-
-    engine.Shutdown();
-
-    EXPECT_FALSE(engine.IsReferenceSceneInstalled());
-    EXPECT_EQ(providerRaw->TeardownCalls, 1);
-    EXPECT_FALSE(engine.GetReferenceCameraSeed().has_value());
-}
-
-TEST(EngineReferenceScene, ReferenceEnabledInstallsDefaultTriangleProviderWhenAbsent)
-{
-    Extrinsic::Core::Config::EngineConfig config = SingleWorkerEngineConfig();
-    config.ReferenceScene.Enabled = true;
-    config.ReferenceScene.Selector = ReferenceSceneSelector::Triangle;
-
-    Extrinsic::Runtime::Engine engine(config, std::make_unique<StubApplication>());
-    engine.Initialize();
-
-    EXPECT_TRUE(engine.IsReferenceSceneInstalled());
-    ASSERT_EQ(engine.GetScene().Raw().storage<EntityHandle>().size(), 1u);
-
-    auto& raw = engine.GetScene().Raw();
-    auto view = raw.view<E::MetaData, G::RenderSurface, GS::Vertices, GS::Edges, GS::Halfedges, GS::Faces>();
-    ASSERT_EQ(view.size_hint(), 1u);
-    for (const auto entity : view)
-    {
-        ExpectReferenceTriangleEntityContract(engine.GetScene(), entity);
-    }
-
-    ASSERT_TRUE(engine.GetReferenceCameraSeed().has_value());
-    EXPECT_TRUE(engine.GetReferenceCameraSeed()->Valid);
-
-    engine.Shutdown();
-    EXPECT_FALSE(engine.IsReferenceSceneInstalled());
-}
-
-TEST(EngineReferenceScene, RenderExtractionReportsOneCandidateAndOneAllocatedInstance)
-{
-    Extrinsic::Core::Config::EngineConfig config = SingleWorkerEngineConfig();
-    config.ReferenceScene.Enabled = true;
-    config.ReferenceScene.Selector = ReferenceSceneSelector::Triangle;
-
-    Extrinsic::Runtime::Engine engine(config, std::make_unique<StubApplication>());
-    engine.Initialize();
-    ASSERT_TRUE(engine.IsReferenceSceneInstalled());
-
-    Extrinsic::Runtime::RenderExtractionCache extraction;
-    const auto stats = extraction.ExtractAndSubmit(engine.GetScene(),
-                                                    engine.GetRenderer(),
-                                                    &engine.GetGpuAssetCache());
+    Runtime::RenderExtractionCache extraction;
+    const Runtime::RuntimeRenderExtractionStats stats =
+        extraction.ExtractAndSubmit(
+            engine.GetScene(),
+            engine.GetRenderer(),
+            &engine.GetGpuAssetCache());
     EXPECT_EQ(stats.CandidateRenderableCount, 1u);
     EXPECT_EQ(stats.AllocatedInstanceCount, 1u);
     EXPECT_EQ(stats.MeshGeometryUploads, 1u);
-    EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
-    EXPECT_EQ(stats.ProceduralRenderablesEnumerated, 0u);
-    EXPECT_EQ(stats.ProceduralGeometryUploads, 0u);
-    EXPECT_EQ(stats.ProceduralGeometryReuseHits, 0u);
-
     extraction.Shutdown(engine.GetRenderer());
+
     engine.Shutdown();
+    EXPECT_EQ(appPtr->ShutdownCalls, 1u);
+    EXPECT_TRUE(appPtr->TeardownRemovedPopulation);
+    EXPECT_FALSE(appPtr->Population.has_value());
+
+    engine.Initialize();
+    EXPECT_EQ(appPtr->InitializeCalls, 2u);
+    EXPECT_EQ(appPtr->BootstrapCalls, 2u);
+    EXPECT_EQ(EntityCount(engine.GetScene()), 1u);
+    engine.Shutdown();
+    EXPECT_EQ(appPtr->ShutdownCalls, 2u);
 }
 
-TEST(EngineReferenceScene, DefaultTriangleIsSelectableAndVisibleToSandboxEditorModels)
+TEST(ReferenceSceneOwnership, DisabledAppBootstrapCreatesNothing)
 {
-    Extrinsic::Core::Config::EngineConfig config = SingleWorkerEngineConfig();
-    config.ReferenceScene.Enabled = true;
-    config.ReferenceScene.Selector = ReferenceSceneSelector::Triangle;
-
-    Extrinsic::Runtime::Engine engine(config, std::make_unique<StubApplication>());
+    auto app = std::make_unique<AppOwnedReferenceApplication>();
+    AppOwnedReferenceApplication* appPtr = app.get();
+    Runtime::Engine engine(
+        HeadlessConfig(false), std::move(app));
     engine.Initialize();
-    ASSERT_TRUE(engine.IsReferenceSceneInstalled());
 
-    auto& raw = engine.GetScene().Raw();
-    auto view = raw.view<E::MetaData, G::RenderSurface, GS::Vertices, GS::Edges, GS::Halfedges, GS::Faces>();
+    EXPECT_EQ(appPtr->InitializeCalls, 1u);
+    EXPECT_EQ(appPtr->BootstrapCalls, 0u);
+    EXPECT_EQ(EntityCount(engine.GetScene()), 0u);
+
+    engine.Shutdown();
+    EXPECT_EQ(appPtr->ShutdownCalls, 1u);
+}
+
+TEST(ReferenceSceneOwnership,
+     TeardownUsesStoredOriginalWorldAndDoesNotMutateReplacement)
+{
+    Runtime::WorldRegistry worlds;
+    Runtime::KernelEventBus events;
+    Runtime::JobService jobs;
+    const Runtime::WorldHandle original =
+        worlds.CreateWorld("Original");
+    const Runtime::WorldHandle replacement =
+        worlds.CreateWorld("Replacement");
+    ECS::Scene::Registry* originalScene = worlds.Get(original);
+    ECS::Scene::Registry* replacementScene =
+        worlds.Get(replacement);
+    ASSERT_NE(originalScene, nullptr);
+    ASSERT_NE(replacementScene, nullptr);
+
+    const Runtime::ReferenceScenePopulation population =
+        Runtime::BootstrapReferenceScene(
+            Core::Config::ReferenceSceneSelector::Triangle,
+            *originalScene);
+    const ECS::EntityHandle replacementSentinel =
+        replacementScene->Create();
+
+    ASSERT_TRUE(
+        worlds.RequestSetActiveWorld(replacement).has_value());
+    (void)worlds.ApplyMaintenance(events, jobs);
+
+    ECS::Scene::Registry* storedOriginal = worlds.Get(original);
+    ASSERT_NE(storedOriginal, nullptr);
+    Runtime::TeardownReferenceScene(
+        *storedOriginal, population);
+
+    EXPECT_EQ(EntityCount(*storedOriginal), 0u);
+    EXPECT_TRUE(replacementScene->IsValid(replacementSentinel));
+    EXPECT_EQ(EntityCount(*replacementScene), 1u);
+}
+
+TEST(ReferenceSceneOwnership,
+     RetiredOriginalWorldMakesStoredTeardownASafeNoOp)
+{
+    Runtime::WorldRegistry worlds;
+    Runtime::KernelEventBus events;
+    Runtime::JobService jobs;
+    const Runtime::WorldHandle original =
+        worlds.CreateWorld("Original");
+    const Runtime::WorldHandle replacement =
+        worlds.CreateWorld("Replacement");
+    ECS::Scene::Registry* originalScene = worlds.Get(original);
+    ECS::Scene::Registry* replacementScene =
+        worlds.Get(replacement);
+    ASSERT_NE(originalScene, nullptr);
+    ASSERT_NE(replacementScene, nullptr);
+
+    const Runtime::ReferenceScenePopulation population =
+        Runtime::BootstrapReferenceScene(
+            Core::Config::ReferenceSceneSelector::Triangle,
+            *originalScene);
+    const ECS::EntityHandle replacementSentinel =
+        replacementScene->Create();
+
+    ASSERT_TRUE(
+        worlds.RequestSetActiveWorld(replacement).has_value());
+    (void)worlds.ApplyMaintenance(events, jobs);
+    ASSERT_TRUE(
+        worlds.RequestDestroyWorld(original).has_value());
+    (void)worlds.ApplyMaintenance(events, jobs);
+    (void)worlds.ApplyMaintenance(events, jobs);
+    ASSERT_EQ(worlds.Get(original), nullptr);
+
+    if (ECS::Scene::Registry* retired = worlds.Get(original);
+        retired != nullptr)
+    {
+        Runtime::TeardownReferenceScene(*retired, population);
+    }
+
+    EXPECT_TRUE(replacementScene->IsValid(replacementSentinel));
+    EXPECT_EQ(EntityCount(*replacementScene), 1u);
+}
+
+TEST(ReferenceSceneOwnership,
+     AppOwnedTriangleRemainsVisibleToSandboxEditorModels)
+{
+    auto app = std::make_unique<AppOwnedReferenceApplication>();
+    Runtime::Engine engine(
+        HeadlessConfig(true), std::move(app));
+    engine.Initialize();
+
+    auto view = engine.GetScene().Raw().view<
+        E::MetaData,
+        G::RenderSurface,
+        GS::Vertices,
+        GS::Edges,
+        GS::Halfedges,
+        GS::Faces>();
     ASSERT_EQ(view.size_hint(), 1u);
-    const EntityHandle entity = *view.begin();
+    const ECS::EntityHandle entity = *view.begin();
 
-    Extrinsic::Runtime::SelectionController& selection =
+    Runtime::SelectionController& selection =
         engine.GetSelectionController();
-    ASSERT_TRUE(selection.SetSelectedEntity(engine.GetScene(), entity));
+    ASSERT_TRUE(selection.SetSelectedEntity(
+        engine.GetScene(), entity));
 
-    const Extrinsic::Runtime::SandboxEditorContext context{
+    const Runtime::SandboxEditorContext context{
         .Scene = &engine.GetScene(),
         .Selection = &selection,
         .ImGuiAdapterAvailable = true,
         .AssetImportCommandsAvailable = false,
-        .CameraRenderCommandsAvailable = true,
+        .CameraRenderCommandsAvailable = false,
         .VisualizationCommandsAvailable = true,
     };
-    const Extrinsic::Runtime::SandboxEditorPanelFrame frame =
-        Extrinsic::Runtime::BuildSandboxEditorPanelFrame(context);
+    const Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
 
     ASSERT_EQ(frame.Hierarchy.size(), 1u);
     EXPECT_EQ(frame.Hierarchy[0].Name, "ReferenceTriangle");
     EXPECT_TRUE(frame.Hierarchy[0].Selectable);
     EXPECT_TRUE(frame.Hierarchy[0].Selected);
     EXPECT_TRUE(frame.Hierarchy[0].HasDurableStableId);
-
     ASSERT_TRUE(frame.Inspector.HasEntity);
-    EXPECT_EQ(frame.Inspector.Entity.Name, "ReferenceTriangle");
-    EXPECT_EQ(frame.Inspector.Geometry.Domain, GS::Domain::Mesh);
+    EXPECT_EQ(frame.Inspector.Entity.Name,
+              "ReferenceTriangle");
+    EXPECT_EQ(frame.Inspector.Geometry.Domain,
+              GS::Domain::Mesh);
     EXPECT_TRUE(frame.Inspector.RenderHints.HasRenderSurface);
     EXPECT_EQ(frame.Inspector.Geometry.VertexCount, 3u);
-    EXPECT_EQ(frame.Inspector.Geometry.EdgeCount, 3u);
-    EXPECT_EQ(frame.Inspector.Geometry.HalfedgeCount, 6u);
     EXPECT_EQ(frame.Inspector.Geometry.FaceCount, 1u);
-    ASSERT_EQ(frame.Selection.SelectedEntities.size(), 1u);
-    EXPECT_EQ(frame.Selection.SelectedEntities[0].Name, "ReferenceTriangle");
 
     engine.Shutdown();
 }

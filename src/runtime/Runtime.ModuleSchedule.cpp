@@ -49,10 +49,20 @@ namespace Extrinsic::Runtime
         return lhs.Sequence < rhs.Sequence;
     }
 
+    bool RuntimeModuleSchedule::ViewportInputHookLess(
+        const RuntimeModuleViewportInputHookRecord& lhs,
+        const RuntimeModuleViewportInputHookRecord& rhs)
+    {
+        if (lhs.ModuleName != rhs.ModuleName)
+            return lhs.ModuleName < rhs.ModuleName;
+        return lhs.Sequence < rhs.Sequence;
+    }
+
     void RuntimeModuleSchedule::Clear()
     {
         m_SimSystems.clear();
         m_FrameHooks.clear();
+        m_ViewportInputHooks.clear();
         m_NextRegistrationSequence = 0;
     }
 
@@ -78,6 +88,18 @@ namespace Extrinsic::Runtime
             .Hook = std::move(hook),
             .Sequence = m_NextRegistrationSequence++,
         });
+    }
+
+    void RuntimeModuleSchedule::RegisterViewportInputHook(
+        std::string moduleName,
+        RuntimeViewportInputHook hook)
+    {
+        m_ViewportInputHooks.push_back(
+            RuntimeModuleViewportInputHookRecord{
+                .ModuleName = std::move(moduleName),
+                .Hook = std::move(hook),
+                .Sequence = m_NextRegistrationSequence++,
+            });
     }
 
     Core::Result RuntimeModuleSchedule::FinalizeForBoot(
@@ -205,6 +227,9 @@ namespace Extrinsic::Runtime
         std::sort(m_FrameHooks.begin(),
                   m_FrameHooks.end(),
                   FrameHookLess);
+        std::sort(m_ViewportInputHooks.begin(),
+                  m_ViewportInputHooks.end(),
+                  ViewportInputHookLess);
 
         return Core::Ok();
     }
@@ -298,6 +323,17 @@ namespace Extrinsic::Runtime
         {
             if (hook.Phase == context.Phase && hook.Hook)
                 hook.Hook(hookContext);
+        }
+    }
+
+    void RuntimeModuleSchedule::RunViewportInputHooks(
+        RuntimeViewportInputHookContext context) const
+    {
+        for (const RuntimeModuleViewportInputHookRecord& hook :
+             m_ViewportInputHooks)
+        {
+            if (hook.Hook)
+                hook.Hook(context);
         }
     }
 }

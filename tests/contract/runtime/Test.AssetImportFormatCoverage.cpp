@@ -52,6 +52,7 @@ import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
@@ -823,12 +824,15 @@ namespace
 
     void InstallSandboxDefaultRuntimePolicies(Runtime::Engine& engine)
     {
-        (void)Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
+        (void)Runtime::RegisterSandboxDefaultRuntimePolicies(
+            engine,
+            engine.Services().Find<Runtime::CameraControllerRegistry>());
     }
 
     void InitializeAssetImportEngine(Runtime::Engine& engine)
     {
         engine.EmplaceModule<Runtime::AsyncWorkModule>();
+        engine.EmplaceModule<Runtime::CameraModule>();
         engine.Initialize();
     }
 
@@ -891,7 +895,9 @@ namespace
         auto recordingController =
             std::make_unique<RecordingImportCameraController>();
         RecordingImportCameraController* recorder = recordingController.get();
-        engine.GetCameraControllerRegistry().Replace(
+        engine.Services()
+            .Find<Runtime::CameraControllerRegistry>()
+            ->Replace(
             Runtime::CameraControllerSlot::Main,
             std::move(recordingController));
 
@@ -1367,10 +1373,13 @@ TEST(RuntimeAssetImportFormatCoverage, DefaultImportPoliciesApplyAuthoringUxAndP
               G::VisualizationConfig::ColorSource::Material);
     EXPECT_TRUE(engine.GetSelectionController().IsSelected(*meshEntity));
     EXPECT_EQ(engine.GetSelectionController().SelectedCount(), 1u);
-    EXPECT_NE(engine.GetCameraControllerRegistry().ResolveOrNull(
+    auto* cameraControllers =
+        engine.Services().Find<Runtime::CameraControllerRegistry>();
+    ASSERT_NE(cameraControllers, nullptr);
+    EXPECT_NE(cameraControllers->ResolveOrNull(
                   Runtime::CameraControllerSlot::Main),
               nullptr);
-    EXPECT_TRUE(engine.GetCameraControllerRegistry().ConsumeCameraTransition(
+    EXPECT_TRUE(cameraControllers->ConsumeCameraTransition(
         Runtime::CameraControllerSlot::Main));
     EXPECT_FALSE(HasGeneratedNormalTextureBinding(engine, *meshEntity));
 
@@ -1429,7 +1438,10 @@ TEST(RuntimeAssetImportFormatCoverage, UnregisteredImportPoliciesMaterializeMini
     EXPECT_FALSE(raw.all_of<G::VisualizationConfig>(*meshEntity));
     EXPECT_FALSE(engine.GetSelectionController().IsSelected(*meshEntity));
     EXPECT_EQ(engine.GetSelectionController().SelectedCount(), 0u);
-    EXPECT_EQ(engine.GetCameraControllerRegistry().ResolveOrNull(
+    auto* cameraControllers =
+        engine.Services().Find<Runtime::CameraControllerRegistry>();
+    ASSERT_NE(cameraControllers, nullptr);
+    EXPECT_EQ(cameraControllers->ResolveOrNull(
                   Runtime::CameraControllerSlot::Main),
               nullptr);
     EXPECT_FALSE(HasGeneratedNormalTextureBinding(engine, *meshEntity));
@@ -1438,6 +1450,51 @@ TEST(RuntimeAssetImportFormatCoverage, UnregisteredImportPoliciesMaterializeMini
 
     EXPECT_TRUE(engine.GetScene().IsValid(*meshEntity));
     EXPECT_FALSE(HasGeneratedNormalTextureBinding(engine, *meshEntity));
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage,
+     DefaultImportSelectionDoesNotRequireCameraModule)
+{
+    TempAssetFile meshFile(
+        "runtime180_import_without_camera.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+    ASSERT_EQ(
+        engine.Services()
+            .Find<Runtime::CameraControllerRegistry>(),
+        nullptr);
+    const Runtime::RuntimeSandboxDefaultPolicyRegistration
+        policies =
+            Runtime::RegisterSandboxDefaultRuntimePolicies(
+                engine, nullptr);
+    EXPECT_TRUE(policies.InputActions.empty());
+
+    auto imported =
+        engine.GetAssetImportPipeline().ImportAssetFromPath(
+            Runtime::RuntimeAssetImportRequest{
+                .Path = meshFile.Path.string(),
+                .PayloadKind =
+                    Assets::AssetPayloadKind::Mesh,
+            });
+    ASSERT_TRUE(imported.has_value())
+        << static_cast<int>(imported.error());
+    const std::optional<ECS::EntityHandle> meshEntity =
+        FindFirstEntityWithDomain(
+            engine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+    EXPECT_TRUE(engine.GetSelectionController().IsSelected(
+        *meshEntity));
+    EXPECT_EQ(
+        engine.GetSelectionController().SelectedCount(), 1u);
 
     engine.Shutdown();
 }

@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -10,9 +11,11 @@ module;
 export module Extrinsic.Runtime.CameraControllers;
 
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Platform.Input;
+import Extrinsic.Runtime.WorldHandle;
 
 namespace Extrinsic::Runtime
 {
@@ -165,6 +168,14 @@ namespace Extrinsic::Runtime
     export class CameraControllerRegistry
     {
     public:
+        void ResetForWorld(WorldHandle world) noexcept;
+        [[nodiscard]] Core::Result SetWorldSeed(
+            WorldHandle world,
+            std::optional<Graphics::CameraViewInput> seed) noexcept;
+        [[nodiscard]] WorldHandle BoundWorld() const noexcept;
+        [[nodiscard]] std::optional<Graphics::CameraViewInput>
+            WorldSeedFor(WorldHandle world) const noexcept;
+
         void Register(CameraControllerSlot slot, std::unique_ptr<ICameraController> controller);
         void Replace(CameraControllerSlot slot, std::unique_ptr<ICameraController> controller);
         void MarkCameraTransition(CameraControllerSlot slot) noexcept;
@@ -181,5 +192,7 @@ namespace Extrinsic::Runtime
         };
 
         std::vector<Slot> m_Slots;
+        WorldHandle m_BoundWorld{};
+        std::optional<Graphics::CameraViewInput> m_WorldSeed{};
     };
 }

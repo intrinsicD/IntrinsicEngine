@@ -229,7 +229,8 @@ namespace
 
     void InstallSandboxDefaultRuntimePolicies(Runtime::Engine& engine)
     {
-        (void)Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
+        (void)Runtime::RegisterSandboxDefaultRuntimePolicies(
+            engine, nullptr);
     }
 }
 

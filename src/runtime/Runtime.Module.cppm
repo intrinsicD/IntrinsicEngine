@@ -13,9 +13,13 @@ export module Extrinsic.Runtime.Module;
 export import Extrinsic.Runtime.RenderRecipeActivation;
 
 import Extrinsic.Core.Error;
+import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.Core.Hash;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.RenderFrameInput;
+import Extrinsic.Platform.Input;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.JobService;
@@ -72,6 +76,20 @@ namespace Extrinsic::Runtime
     export using RuntimeFrameHook =
         std::function<void(RuntimeFrameHookContext&)>;
 
+    export struct RuntimeViewportInputHookContext
+    {
+        const Core::Config::EngineConfig& Config;
+        WorldHandle ActiveWorldHandle{};
+        const Platform::Input::Context& Input;
+        Core::Extent2D Viewport{};
+        const EditorInputCaptureSnapshot& EditorCapture;
+        Graphics::RenderFrameInput& RenderInput;
+        double FrameDeltaSeconds{0.0};
+    };
+
+    export using RuntimeViewportInputHook =
+        std::function<void(RuntimeViewportInputHookContext&)>;
+
     export struct SimSystemContext
     {
         ECS::Scene::Registry& ActiveWorld;
@@ -114,6 +132,8 @@ namespace Extrinsic::Runtime
         using SimSystemRegistrar = std::function<void(SimSystemDesc)>;
         using FrameHookRegistrar =
             std::function<void(FramePhase, RuntimeFrameHook)>;
+        using ViewportInputHookRegistrar =
+            std::function<void(RuntimeViewportInputHook)>;
 
         EngineSetup(CommandBus& commands,
                     KernelEventBus& events,
@@ -123,7 +143,9 @@ namespace Extrinsic::Runtime
                     SimSystemRegistrar simSystemRegistrar,
                     FrameHookRegistrar frameHookRegistrar,
                     RuntimeRenderRecipeActivationKernel
-                        renderRecipeActivation = {})
+                        renderRecipeActivation = {},
+                    ViewportInputHookRegistrar
+                        viewportInputHookRegistrar = {})
             : m_Commands(commands)
             , m_Events(events)
             , m_Jobs(jobs)
@@ -133,6 +155,8 @@ namespace Extrinsic::Runtime
             , m_FrameHookRegistrar(std::move(frameHookRegistrar))
             , m_RenderRecipeActivation(
                   std::move(renderRecipeActivation))
+            , m_ViewportInputHookRegistrar(
+                  std::move(viewportInputHookRegistrar))
         {
         }
 
@@ -183,6 +207,17 @@ namespace Extrinsic::Runtime
             return Core::Ok();
         }
 
+        [[nodiscard]] Core::Result RegisterViewportInputHook(
+            RuntimeViewportInputHook hook)
+        {
+            if (!hook)
+                return Core::Err(Core::ErrorCode::InvalidArgument);
+            if (!m_ViewportInputHookRegistrar)
+                return Core::Err(Core::ErrorCode::InvalidState);
+            m_ViewportInputHookRegistrar(std::move(hook));
+            return Core::Ok();
+        }
+
     private:
         CommandBus& m_Commands;
         KernelEventBus& m_Events;
@@ -192,6 +227,7 @@ namespace Extrinsic::Runtime
         SimSystemRegistrar m_SimSystemRegistrar{};
         FrameHookRegistrar m_FrameHookRegistrar{};
         RuntimeRenderRecipeActivationKernel m_RenderRecipeActivation{};
+        ViewportInputHookRegistrar m_ViewportInputHookRegistrar{};
     };
 
     export class IRuntimeModule

@@ -125,7 +125,9 @@ constexpr std::uint32_t kInvalidIndex =
 
 void InstallSandboxDefaultRuntimePolicies(Runtime::Engine& engine)
     {
-        (void)Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
+        (void)Runtime::RegisterSandboxDefaultRuntimePolicies(
+            engine,
+            engine.Services().Find<Runtime::CameraControllerRegistry>());
     }
 
 [[nodiscard]] bool HasDiagnostic(

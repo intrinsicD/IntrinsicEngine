@@ -12,6 +12,7 @@
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
+import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.ECS.Scene.Handle;
@@ -19,6 +20,7 @@ import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SelectionController;
@@ -100,7 +102,10 @@ namespace
 
             auto controller = std::make_unique<RecordingCameraController>();
             Controller = controller.get();
-            engine.GetCameraControllerRegistry().Register(
+            Runtime::CameraControllerRegistry* cameraControllers =
+                engine.Services().Find<Runtime::CameraControllerRegistry>();
+            ASSERT_NE(cameraControllers, nullptr);
+            cameraControllers->Register(
                 Runtime::CameraControllerSlot::Main,
                 std::move(controller));
         }
@@ -126,6 +131,30 @@ namespace
         bool SelectionApplied{false};
         std::uint32_t VariableTicks{0u};
     };
+
+    class PressGenericKeyApplication final
+        : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(
+            Runtime::Engine& engine, double, double) override
+        {
+            ++VariableTicks;
+            const Extrinsic::Platform::IWindow& window =
+                engine.GetWindow();
+            auto& input =
+                const_cast<Extrinsic::Platform::Input::Context&>(
+                    window.GetInput());
+            input.SetKeyState(
+                Extrinsic::Platform::Input::Key::G, true);
+            engine.RequestExit();
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+
+        std::uint32_t VariableTicks{0u};
+    };
 }
 
 TEST(RuntimeInputActions, DefaultFocusKeyDispatchesRegisteredAction)
@@ -133,8 +162,11 @@ TEST(RuntimeInputActions, DefaultFocusKeyDispatchesRegisteredAction)
     auto app = std::make_unique<PressFocusKeyApplication>();
     auto* appPtr = app.get();
     Runtime::Engine engine(InputActionConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::CameraModule>();
     engine.Initialize();
-    (void)Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
+    (void)Runtime::RegisterSandboxDefaultRuntimePolicies(
+        engine,
+        engine.Services().Find<Runtime::CameraControllerRegistry>());
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
         << "Null window backend should keep Engine::Run() drivable";
@@ -160,6 +192,7 @@ TEST(RuntimeInputActions, NoDefaultInputActionsLeaveFocusKeyNoOp)
     auto app = std::make_unique<PressFocusKeyApplication>();
     auto* appPtr = app.get();
     Runtime::Engine engine(InputActionConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::CameraModule>();
     engine.Initialize();
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
@@ -174,5 +207,57 @@ TEST(RuntimeInputActions, NoDefaultInputActionsLeaveFocusKeyNoOp)
     EXPECT_EQ(appPtr->Controller->FocusCalls, 0u);
     EXPECT_FALSE(appPtr->Controller->LastFocus.has_value());
 
+    engine.Shutdown();
+}
+
+TEST(RuntimeInputActions,
+     MissingCameraOmitsSandboxFocusActionButGenericActionsRun)
+{
+    auto app = std::make_unique<PressGenericKeyApplication>();
+    auto* appPtr = app.get();
+    Runtime::Engine engine(
+        InputActionConfig(), std::move(app));
+    engine.Initialize();
+    ASSERT_EQ(
+        engine.Services()
+            .Find<Runtime::CameraControllerRegistry>(),
+        nullptr);
+
+    Runtime::RuntimeSandboxDefaultPolicyRegistration policies =
+        Runtime::RegisterSandboxDefaultRuntimePolicies(
+            engine, nullptr);
+    EXPECT_TRUE(policies.InputActions.empty());
+
+    std::uint32_t genericExecutions = 0u;
+    const Runtime::RuntimeInputActionHandle generic =
+        engine.RegisterInputAction(
+            Runtime::RuntimeInputActionDesc{
+                .DebugName = "RuntimeInputActions.GenericWithoutCamera",
+                .Binding =
+                    Runtime::RuntimeInputActionBinding{
+                        .KeyCode =
+                            Extrinsic::Platform::Input::Key::G,
+                        .Trigger =
+                            Runtime::RuntimeInputActionTrigger::
+                                KeyJustPressed,
+                    },
+                .Execute =
+                    [&genericExecutions](
+                        const Runtime::RuntimeInputActionContext&,
+                        Runtime::RuntimeInputActionServices&)
+                    {
+                        ++genericExecutions;
+                        return Extrinsic::Core::Ok();
+                    },
+            });
+    ASSERT_TRUE(generic.IsValid());
+
+    engine.Run();
+
+    EXPECT_EQ(appPtr->VariableTicks, 1u);
+    EXPECT_EQ(genericExecutions, 1u);
+    Runtime::UnregisterSandboxDefaultRuntimePolicies(
+        engine, policies);
+    engine.UnregisterInputAction(generic);
     engine.Shutdown();
 }

@@ -356,40 +356,4 @@ namespace Extrinsic::Runtime
         }
     }
 
-    void PopulateMainCameraForFrame(
-        const Core::Config::EngineConfig& config,
-        CameraControllerRegistry& cameras,
-        const std::optional<Graphics::CameraViewInput>& referenceCamera,
-        const Platform::IWindow& window,
-        const Platform::Extent2D& viewport,
-        const double frameDt,
-        const bool imguiCapturesInput,
-        Graphics::RenderFrameInput& renderInput)
-    {
-        if (!config.Camera.Enabled)
-            return;
-
-        ICameraController* controller = cameras.ResolveOrNull(CameraControllerSlot::Main);
-        if (controller == nullptr)
-        {
-            const Graphics::CameraViewInput seed = referenceCamera.has_value()
-                ? BuildReferenceCameraViewInput(*referenceCamera, viewport.Width, viewport.Height)
-                : Graphics::CameraViewInput{};
-            cameras.Register(
-                CameraControllerSlot::Main,
-                CreateCameraController(config.Camera.Controller, seed));
-            controller = cameras.ResolveOrNull(CameraControllerSlot::Main);
-        }
-
-        if (controller == nullptr)
-            return;
-
-        if (!imguiCapturesInput)
-            controller->Update(window.GetInput(), frameDt);
-
-        renderInput.Camera = controller->GetView(viewport);
-        renderInput.Camera.ExplicitCameraTransition =
-            cameras.ConsumeCameraTransition(CameraControllerSlot::Main);
-    }
-
 }

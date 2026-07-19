@@ -16,12 +16,15 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.Core.Hash;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Scene.Bootstrap;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.RenderFrameInput;
+import Extrinsic.Platform.Input;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.JobService;
@@ -37,6 +40,24 @@ namespace Core = Extrinsic::Core;
 namespace CoreConfig = Extrinsic::Core::Config;
 namespace Runtime = Extrinsic::Runtime;
 namespace Components = Extrinsic::ECS::Components;
+
+static_assert(
+    static_cast<std::uint8_t>(
+        Runtime::FramePhase::Maintenance) == 5u);
+template <typename T>
+concept HasViewportMember = requires(T value)
+{
+    value.Viewport;
+};
+template <typename T>
+concept HasRenderInputMember = requires(T value)
+{
+    value.RenderInput;
+};
+static_assert(
+    !HasViewportMember<Runtime::RuntimeFrameHookContext>);
+static_assert(
+    !HasRenderInputMember<Runtime::RuntimeFrameHookContext>);
 
 namespace
 {
@@ -1112,4 +1133,234 @@ TEST(RuntimeModuleSchedule, WaitOnExternalBaselineSignalIsSatisfied)
     const Core::Result result = bare.FinalizeForBoot({});
     ASSERT_FALSE(result.has_value());
     EXPECT_EQ(result.error(), Core::ErrorCode::InvalidState);
+}
+
+TEST(RuntimeModuleViewportInput,
+     EngineSetupRejectsEmptyHookAndMissingRegistrar)
+{
+    Runtime::CommandBus commands;
+    Runtime::KernelEventBus events;
+    Runtime::JobService jobs;
+    Runtime::WorldRegistry worlds;
+    Runtime::ServiceRegistry services;
+    (void)worlds.CreateWorld("Viewport setup");
+
+    Runtime::EngineSetup missingRegistrar(
+        commands,
+        events,
+        jobs,
+        worlds,
+        services,
+        [](Runtime::SimSystemDesc) {},
+        [](Runtime::FramePhase,
+           Runtime::RuntimeFrameHook) {});
+
+    const Core::Result empty =
+        missingRegistrar.RegisterViewportInputHook({});
+    ASSERT_FALSE(empty.has_value());
+    EXPECT_EQ(empty.error(), Core::ErrorCode::InvalidArgument);
+
+    const Core::Result unavailable =
+        missingRegistrar.RegisterViewportInputHook(
+            [](Runtime::RuntimeViewportInputHookContext&) {});
+    ASSERT_FALSE(unavailable.has_value());
+    EXPECT_EQ(unavailable.error(), Core::ErrorCode::InvalidState);
+
+    std::uint32_t registrations = 0u;
+    Runtime::EngineSetup available(
+        commands,
+        events,
+        jobs,
+        worlds,
+        services,
+        [](Runtime::SimSystemDesc) {},
+        [](Runtime::FramePhase,
+           Runtime::RuntimeFrameHook) {},
+        {},
+        [&registrations](
+            Runtime::RuntimeViewportInputHook hook)
+        {
+            if (hook)
+                ++registrations;
+        });
+    EXPECT_TRUE(
+        available.RegisterViewportInputHook(
+                     [](Runtime::RuntimeViewportInputHookContext&) {})
+            .has_value());
+    EXPECT_EQ(registrations, 1u);
+}
+
+TEST(RuntimeModuleViewportInput,
+     ScheduleSortsByModuleThenSharedSequenceAndClearRemovesHooks)
+{
+    Runtime::RuntimeModuleSchedule schedule;
+    std::vector<std::string> trace;
+    schedule.RegisterViewportInputHook(
+        "Z.Module",
+        [&trace](Runtime::RuntimeViewportInputHookContext&)
+        {
+            trace.emplace_back("Z:first");
+        });
+    schedule.RegisterViewportInputHook(
+        "A.Module",
+        [&trace](Runtime::RuntimeViewportInputHookContext&)
+        {
+            trace.emplace_back("A:first");
+        });
+    schedule.RegisterViewportInputHook(
+        "A.Module",
+        [&trace](Runtime::RuntimeViewportInputHookContext&)
+        {
+            trace.emplace_back("A:second");
+        });
+    ASSERT_TRUE(schedule.FinalizeForBoot({}).has_value());
+
+    CoreConfig::EngineConfig config =
+        NullWindowHeadlessConfig();
+    Extrinsic::Platform::Input::Context input;
+    Runtime::EditorInputCaptureSnapshot capture{};
+    Extrinsic::Graphics::RenderFrameInput renderInput{};
+    const auto dispatch =
+        [&]()
+        {
+            schedule.RunViewportInputHooks(
+                Runtime::RuntimeViewportInputHookContext{
+                    .Config = config,
+                    .ActiveWorldHandle =
+                        Runtime::DefaultWorldHandle,
+                    .Input = input,
+                    .Viewport = Core::Extent2D{640, 480},
+                    .EditorCapture = capture,
+                    .RenderInput = renderInput,
+                    .FrameDeltaSeconds = 1.0 / 60.0,
+                });
+        };
+    dispatch();
+    EXPECT_EQ(
+        trace,
+        (std::vector<std::string>{
+            "A:first", "A:second", "Z:first"}));
+
+    schedule.Clear();
+    dispatch();
+    EXPECT_EQ(trace.size(), 3u);
+
+    schedule.RegisterViewportInputHook(
+        "Same.Module",
+        [&trace](Runtime::RuntimeViewportInputHookContext&)
+        {
+            trace.emplace_back("same:first");
+        });
+    schedule.RegisterViewportInputHook(
+        "Same.Module",
+        [&trace](Runtime::RuntimeViewportInputHookContext&)
+        {
+            trace.emplace_back("same:second");
+        });
+    ASSERT_TRUE(schedule.FinalizeForBoot({}).has_value());
+    dispatch();
+    ASSERT_EQ(trace.size(), 5u);
+    EXPECT_EQ(trace[3], "same:first");
+    EXPECT_EQ(trace[4], "same:second");
+}
+
+namespace
+{
+    struct DualViewportHookState
+    {
+        std::vector<std::string> Trace{};
+        std::uint32_t VariableTicks{0u};
+    };
+
+    class DualPhaseViewportHookModule final
+        : public Runtime::IRuntimeModule
+    {
+    public:
+        explicit DualPhaseViewportHookModule(
+            DualViewportHookState& state)
+            : m_State(state)
+        {
+        }
+
+        [[nodiscard]] std::string_view Name()
+            const noexcept override
+        {
+            return "Viewport.DualPhase";
+        }
+
+        [[nodiscard]] Core::Result OnRegister(
+            Runtime::EngineSetup& setup) override
+        {
+            return setup.RegisterViewportInputHook(
+                [this](
+                    Runtime::RuntimeViewportInputHookContext&)
+                {
+                    m_State.Trace.emplace_back("registration");
+                });
+        }
+
+        [[nodiscard]] Core::Result OnResolve(
+            Runtime::EngineSetup& setup) override
+        {
+            return setup.RegisterViewportInputHook(
+                [this](
+                    Runtime::RuntimeViewportInputHookContext&)
+                {
+                    m_State.Trace.emplace_back("resolution");
+                });
+        }
+
+        void OnShutdown(
+            Runtime::RuntimeModuleShutdownContext&) override {}
+
+    private:
+        DualViewportHookState& m_State;
+    };
+
+    class DualViewportHookApplication final
+        : public Runtime::IApplication
+    {
+    public:
+        explicit DualViewportHookApplication(
+            DualViewportHookState& state)
+            : m_State(state)
+        {
+        }
+
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(
+            Runtime::Engine& engine, double, double) override
+        {
+            ++m_State.VariableTicks;
+            engine.RequestExit();
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+
+    private:
+        DualViewportHookState& m_State;
+    };
+}
+
+TEST(RuntimeModuleViewportInput,
+     EngineWiresRegistrationAndResolutionRegistrars)
+{
+    DualViewportHookState state;
+    Runtime::Engine engine(
+        NullWindowHeadlessConfig(),
+        std::make_unique<DualViewportHookApplication>(
+            state));
+    engine.AddModule(
+        std::make_unique<DualPhaseViewportHookModule>(
+            state));
+    engine.Initialize();
+    engine.Run();
+
+    EXPECT_EQ(state.VariableTicks, 1u);
+    EXPECT_EQ(
+        state.Trace,
+        (std::vector<std::string>{
+            "registration", "resolution"}));
+
+    engine.Shutdown();
 }

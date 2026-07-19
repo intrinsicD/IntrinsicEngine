@@ -859,46 +859,132 @@ TEST(RuntimeEngineLayering, MeshPrimitiveViewControlsKeepRenderComponentPolicyOu
     EXPECT_NE(controls.find("RenderPoints"), std::string::npos);
 }
 
-TEST(RuntimeEngineLayering, ReferenceSceneControlKeepsProviderLifecycleOutOfEngine)
+TEST(RuntimeEngineLayering,
+     CameraModuleAndAppOwnedReferenceBootstrapStayOutOfEngine)
 {
+    const auto root = RepoRoot();
     const auto engineInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
+        ReadFile(root / "src/runtime/Runtime.Engine.cppm");
     const auto engineImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
-    const auto controlInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.ReferenceSceneControl.cppm");
-    const auto controlImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.ReferenceSceneControl.cpp");
+        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+    const auto cameraModuleInterface = ReadFile(
+        root / "src/runtime/Cameras/Runtime.CameraModule.cppm");
+    const auto cameraModuleImpl = ReadFile(
+        root / "src/runtime/Cameras/Runtime.CameraModule.cpp");
+    const auto referenceInterface =
+        ReadFile(root / "src/runtime/Runtime.ReferenceScene.cppm");
+    const auto referenceImpl =
+        ReadFile(root / "src/runtime/Runtime.ReferenceScene.cpp");
+    const auto sandbox =
+        ReadFile(root / "src/app/Sandbox/Sandbox.cpp");
+    const auto runtimeCMake =
+        ReadFile(root / "src/runtime/CMakeLists.txt");
 
-    EXPECT_NE(engineInterface.find("import Extrinsic.Runtime.ReferenceSceneControl"),
+    EXPECT_FALSE(std::filesystem::exists(
+        root / "src/runtime/Runtime.ReferenceSceneControl.cppm"));
+    EXPECT_FALSE(std::filesystem::exists(
+        root / "src/runtime/Runtime.ReferenceSceneControl.cpp"));
+    EXPECT_EQ(engineInterface.find(
+                  "import Extrinsic.Runtime.ReferenceScene"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("import Extrinsic.Runtime.ReferenceSceneControl"),
+    EXPECT_EQ(engineImpl.find(
+                  "import Extrinsic.Runtime.ReferenceScene"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_ReferenceSceneControl.InstallIfEnabled("),
+    EXPECT_EQ(engineInterface.find(
+                  "import Extrinsic.Runtime.CameraControllers"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("ReferenceScene.TeardownIfInstalled("),
+    EXPECT_EQ(engineImpl.find(
+                  "import Extrinsic.Runtime.CameraControllers"),
               std::string::npos);
-
+    EXPECT_EQ(engineInterface.find(
+                  "import Extrinsic.Graphics.CameraSnapshots"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find(
+                  "import Extrinsic.Graphics.CameraSnapshots"),
+              std::string::npos);
     EXPECT_EQ(engineInterface.find("ReferenceScenePopulation"),
               std::string::npos);
-    EXPECT_EQ(engineInterface.find("m_ReferenceCamera"),
+    EXPECT_EQ(engineInterface.find("CameraControllerRegistry"),
               std::string::npos);
-    EXPECT_EQ(engineInterface.find("m_ReferenceSceneInstalled"),
+    EXPECT_EQ(engineInterface.find("GetReferenceSceneRegistry"),
               std::string::npos);
-    EXPECT_EQ(engineImpl.find("IReferenceSceneProvider"), std::string::npos);
-    EXPECT_EQ(engineImpl.find("RegisterDefaultReferenceProvidersIfAbsent"),
+    EXPECT_EQ(engineInterface.find("GetReferenceCameraSeed"),
               std::string::npos);
-    EXPECT_EQ(engineImpl.find("ReferenceScenePopulation"), std::string::npos);
-    EXPECT_EQ(engineImpl.find("provider.Populate"), std::string::npos);
-    EXPECT_EQ(engineImpl.find("provider->Teardown"), std::string::npos);
+    EXPECT_EQ(engineInterface.find("IsReferenceSceneInstalled"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("GetCameraControllerRegistry"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("ReferenceScenePopulation"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find("CameraControllerRegistry"),
+              std::string::npos);
 
-    EXPECT_NE(controlInterface.find("ReferenceScenePopulation m_Population"),
+    EXPECT_NE(cameraModuleInterface.find(
+                  "class CameraModule final : public IRuntimeModule"),
               std::string::npos);
-    EXPECT_NE(controlImpl.find("RegisterDefaultReferenceProvidersIfAbsent"),
+    EXPECT_NE(cameraModuleInterface.find(
+                  "CameraControllerRegistry m_Registry"),
               std::string::npos);
-    EXPECT_NE(controlImpl.find("IReferenceSceneProvider"), std::string::npos);
-    EXPECT_NE(controlImpl.find("provider.Populate"), std::string::npos);
-    EXPECT_NE(controlImpl.find("provider->Teardown"), std::string::npos);
+    EXPECT_NE(cameraModuleImpl.find(
+                  "Provide<CameraControllerRegistry>("),
+              std::string::npos);
+    EXPECT_NE(cameraModuleImpl.find(
+                  "Withdraw<CameraControllerRegistry>("),
+              std::string::npos);
+    EXPECT_NE(cameraModuleImpl.find(
+                  "setup.Subscribe<ActiveWorldChanged>"),
+              std::string::npos);
+    EXPECT_NE(cameraModuleImpl.find(
+                  "setup.Subscribe<WorldWillBeDestroyed>"),
+              std::string::npos);
+    EXPECT_NE(cameraModuleImpl.find(
+                  "setup.RegisterViewportInputHook("),
+              std::string::npos);
+    EXPECT_NE(cameraModuleImpl.find(
+                  "context.ActiveWorldHandle != m_Registry.BoundWorld()"),
+              std::string::npos);
+
+    EXPECT_NE(referenceInterface.find(
+                  "BootstrapReferenceScene("),
+              std::string::npos);
+    EXPECT_NE(referenceInterface.find(
+                  "TeardownReferenceScene("),
+              std::string::npos);
+    EXPECT_EQ(referenceInterface.find("IReferenceSceneProvider"),
+              std::string::npos);
+    EXPECT_EQ(referenceInterface.find("ReferenceSceneRegistry"),
+              std::string::npos);
+    EXPECT_EQ(referenceInterface.find("TriangleProvider"),
+              std::string::npos);
+    EXPECT_EQ(referenceImpl.find("IReferenceSceneProvider"),
+              std::string::npos);
+    EXPECT_EQ(referenceImpl.find("ReferenceSceneRegistry"),
+              std::string::npos);
+
+    EXPECT_NE(sandbox.find(
+                  "engine.EmplaceModule<Runtime::CameraModule>()"),
+              std::string::npos);
+    EXPECT_NE(sandbox.find(
+                  "Runtime::BootstrapReferenceScene("),
+              std::string::npos);
+    EXPECT_NE(sandbox.find(
+                  "Runtime::TeardownReferenceScene("),
+              std::string::npos);
+    EXPECT_NE(sandbox.find(
+                  "Runtime::WorldHandle World"),
+              std::string::npos);
+    EXPECT_NE(sandbox.find(
+                  "Services().Find<Runtime::CameraControllerRegistry>()"),
+              std::string::npos);
+
+    EXPECT_NE(runtimeCMake.find(
+                  "Cameras/Runtime.CameraModule.cppm"),
+              std::string::npos);
+    EXPECT_NE(runtimeCMake.find(
+                  "Cameras/Runtime.CameraModule.cpp"),
+              std::string::npos);
+    EXPECT_EQ(runtimeCMake.find("Runtime.ReferenceSceneControl"),
+              std::string::npos);
 }
 
 TEST(RuntimeEngineLayering, InputActionsKeepRegistryAndDispatchOutOfEngine)
@@ -972,10 +1058,16 @@ TEST(RuntimeEngineLayering, RuntimeModuleScheduleKeepsContributionPolicyOutOfEng
               std::string::npos);
     EXPECT_NE(engineImpl.find("m_RuntimeModuleSchedule.RunFrameHooks("),
               std::string::npos);
+    EXPECT_NE(engineImpl.find(
+                  "m_RuntimeModuleSchedule.RunViewportInputHooks("),
+              std::string::npos);
 
     EXPECT_EQ(engineInterface.find("RuntimeModuleSimSystemRecord"),
               std::string::npos);
     EXPECT_EQ(engineInterface.find("RuntimeModuleFrameHookRecord"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find(
+                  "RuntimeModuleViewportInputHookRecord"),
               std::string::npos);
     EXPECT_EQ(engineInterface.find("m_RuntimeModuleSimSystems"),
               std::string::npos);
@@ -1001,6 +1093,9 @@ TEST(RuntimeEngineLayering, RuntimeModuleScheduleKeepsContributionPolicyOutOfEng
               std::string::npos);
     EXPECT_NE(scheduleInterface.find("RuntimeModuleFrameHookRecord"),
               std::string::npos);
+    EXPECT_NE(scheduleInterface.find(
+                  "RuntimeModuleViewportInputHookRecord"),
+              std::string::npos);
     EXPECT_NE(scheduleImpl.find("std::vector<std::vector<std::size_t>> edges"),
               std::string::npos);
     EXPECT_NE(scheduleImpl.find("waits for unprovided signal"),
@@ -1012,6 +1107,9 @@ TEST(RuntimeEngineLayering, RuntimeModuleScheduleKeepsContributionPolicyOutOfEng
     EXPECT_NE(scheduleImpl.find("RuntimeFrameHookContext hookContext"),
               std::string::npos);
     EXPECT_NE(scheduleImpl.find("for (const RuntimeModuleFrameHookRecord& hook"),
+              std::string::npos);
+    EXPECT_NE(scheduleImpl.find(
+                  "RuntimeModuleSchedule::RunViewportInputHooks("),
               std::string::npos);
 }
 

@@ -80,6 +80,7 @@ import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.Engine;
@@ -193,7 +194,10 @@ public:
     void OnInitialize(Engine& engine) override
     {
         m_DefaultPolicies =
-            Extrinsic::Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
+            Extrinsic::Runtime::RegisterSandboxDefaultRuntimePolicies(
+                engine,
+                engine.Services().Find<
+                    Extrinsic::Runtime::CameraControllerRegistry>());
         if (m_Inner)
         {
             m_Inner->OnInitialize(engine);
@@ -740,6 +744,7 @@ struct AcceptanceBootstrap
     config.Render.EnableVSync = false;
     auto enginePtr = std::make_unique<Engine>(
         config, std::make_unique<ExitAfterFramesApp>(kTargetFrames));
+    enginePtr->EmplaceModule<Extrinsic::Runtime::CameraModule>();
     enginePtr->EmplaceModule<Extrinsic::Runtime::EditorUiModule>();
     enginePtr->Initialize();
 
@@ -783,6 +788,7 @@ struct AcceptanceBootstrap
         std::make_unique<SandboxDefaultPolicyApp>(std::move(app)));
     enginePtr->AddModule(std::move(configControl));
     enginePtr->EmplaceModule<Extrinsic::Runtime::AsyncWorkModule>();
+    enginePtr->EmplaceModule<Extrinsic::Runtime::CameraModule>();
     enginePtr->EmplaceModule<Extrinsic::Runtime::EditorUiModule>();
     enginePtr->Initialize();
 
@@ -2328,7 +2334,8 @@ constexpr std::uint32_t kBug024TotalFrames = 8u;
 
 // Project a world point on the z=0 plane through the reference camera
 // (position (0,0,3), forward -z, fovy 45 deg, Vulkan Y-flip) to pixel
-// coordinates, mirroring Runtime.ReferenceScene's BuildReferenceCameraViewInput.
+// coordinates, matching the canonical reference seed after the orbit
+// controller constructs its viewport-dependent matrices.
 [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> ProjectReferenceCameraPixel(
     const glm::vec3 world,
     const Extrinsic::Core::Extent2D extent) noexcept
@@ -2366,8 +2373,16 @@ ProjectMainCameraPixel(
     }
 
     const Extrinsic::Runtime::ICameraController* controller =
-        engine.GetCameraControllerRegistry().ResolveOrNull(
-            Extrinsic::Runtime::CameraControllerSlot::Main);
+        [&engine]()
+        {
+            auto* registry =
+                engine.Services().Find<
+                    Extrinsic::Runtime::CameraControllerRegistry>();
+            return registry == nullptr
+                ? nullptr
+                : registry->ResolveOrNull(
+                      Extrinsic::Runtime::CameraControllerSlot::Main);
+        }();
     if (controller == nullptr)
     {
         return std::nullopt;
