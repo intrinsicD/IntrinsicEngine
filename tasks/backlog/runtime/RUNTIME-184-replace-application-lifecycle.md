@@ -7,6 +7,13 @@ maturity_target: Operational
 ---
 # RUNTIME-184 — Replace IApplication with explicit app composition
 
+## Status
+
+- 2026-07-19 contract amendment: explicit app composition names
+  `SceneDocumentModule` and `SceneInteractionModule` as separate capabilities;
+  it must not recreate the rejected combined scene-editing owner.
+  Implementation remains open.
+
 ## Goal
 - Remove the Engine-owned `IApplication` callback lifecycle and make each app
   explicitly compose modules, initial content, defaults, run, and teardown
@@ -29,11 +36,12 @@ maturity_target: Operational
   use the unrestricted callbacks heavily. Keeping the production interface for
   test convenience violates ADR-0027's present-consumer test.
 - `RUNTIME-168` leaves Sandbox defaults as app-owned composition glue over
-  concrete module capabilities. Normal-bake Vulkan operation does not need to
-  precede this callback-interface removal. `RUNTIME-129` and this task may land
-  in either order; whichever lands second migrates and reruns their shared
-  Vulkan fixtures, and `RUNTIME-185` waits for both before auditing final
-  production mechanism consumers.
+  concrete module capabilities, including distinct `SceneDocumentModule` and
+  `SceneInteractionModule` services. Normal-bake Vulkan operation does not
+  need to precede this callback-interface removal. `RUNTIME-129` and this task
+  may land in either order; whichever lands second migrates and reruns their
+  shared Vulkan fixtures, and `RUNTIME-185` waits for both before auditing
+  final production mechanism consumers.
 - The source/test/doc inventory for `IApplication`, `OnSimTick`, and
   `OnVariableTick` spans roughly 55 files. This dedicated slice keeps that
   migration separate from the final Engine PImpl and exact policy ratchet.
@@ -61,9 +69,11 @@ maturity_target: Operational
 - [ ] Remove `std::unique_ptr<IApplication>` from Engine construction and
       delete the `IApplication` interface.
 - [ ] Make Sandbox construct Engine, compose concrete modules before
-      initialization, retain only the narrow module references its app glue
-      needs, install initial-world/default policy through those capabilities,
-      then explicitly run and tear down in the documented order.
+      initialization—including separate `SceneDocumentModule` and
+      `SceneInteractionModule` instances—retain only the narrow module
+      references its app glue needs, install initial-world/default policy
+      through those capabilities, then explicitly run and tear down in the
+      documented order.
 - [ ] Move any real per-frame production behavior to the owning module's
       smallest existing frame hook/system; delete the no-op Sandbox tick
       callbacks rather than replacing them.

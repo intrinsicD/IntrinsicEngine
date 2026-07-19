@@ -6,9 +6,17 @@ depends_on:
   - RUNTIME-179
   - RUNTIME-180
   - RUNTIME-181
+  - RUNTIME-188
 maturity_target: Operational
 ---
 # RUNTIME-183 — Extract the asset-workflow composition module
+
+## Status
+
+- 2026-07-19 contract amendment: asset composition now resolves the audited
+  `SceneDocumentModule` and `SceneInteractionModule` split and participates in
+  document replacement through `RUNTIME-172`'s synchronous narrow contract.
+  Implementation remains open.
 
 ## Goal
 - Move CPU asset authority, GPU residency, import orchestration, scene
@@ -29,16 +37,23 @@ maturity_target: Operational
 - Durable asset, residency, import-queue, and bake-request state is global.
   Scene handoffs are borrowed active-world attachments and must be destroyed
   before a world leaves service, then rebound to the new active world.
-- The module resolves `AsyncWorkModule`, `SceneEditingModule`, `CameraModule`,
-  and `ConfigControlModule`; scene replacement exposes a reaction instead of
-  reaching back into Engine-private cleanup.
+- The module resolves `AsyncWorkModule`, `SceneDocumentModule`,
+  `SceneInteractionModule`, `CameraModule`, and `ConfigControlModule`.
+  `SceneDocumentModule` exposes the synchronous replacement-participant
+  contract; interaction services are resolved separately and never repackaged
+  with document/history state.
+- Reverse name-sorted module teardown is not a safe lifetime dependency. On
+  `RuntimeShutdownAnnounced`, this module releases its document replacement
+  participant and detaches scene-interaction borrows while providers are still
+  live, before ordinary reverse shutdown.
 
 ## Required changes
 - [ ] Add one concrete `AssetWorkflowModule` owning `AssetService`, private
       asset residency state, `AssetImportPipeline`, and
       `ObjectSpaceNormalBakeService`.
-- [ ] Resolve async, scene-editing, camera, config, device, renderer,
-      render-extraction, and `JobService` capabilities during module boot.
+- [ ] Resolve async, scene-document, scene-interaction, camera, config, device,
+      renderer, render-extraction, and `JobService` capabilities during module
+      boot.
 - [ ] For each cross-owner dependency, choose either an explicit narrow
       non-owning construction capability with a declared lifetime or typed
       service discovery. If `Require`/`OnResolve` is used, add a real
@@ -49,8 +64,11 @@ maturity_target: Operational
       one-line forwarding services.
 - [ ] Move asset ticks, handoff maintenance, import cancellation, GPU
       participant registration/drain, and teardown into module hooks/lifecycle.
-- [ ] Rebind or clear active-world handoffs deterministically on world/document
-      replacement events.
+- [ ] Register one narrow `SceneDocumentModule` replacement participant that
+      destroys asset/render-extraction/bake handoffs while the outgoing
+      registry is live and rebinds them after successful replacement. Release
+      the strong participant handle during shutdown announcement; do not rely
+      on delayed replacement events or module-name teardown order.
 - [ ] Remove Engine asset/import/cache/normal-bake state and
       `GetAssetService`, `GetGpuAssetCache`, `GetAssetImportPipeline`, and
       object-space-normal diagnostic test getters.
