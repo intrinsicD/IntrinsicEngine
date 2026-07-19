@@ -188,13 +188,13 @@ triggers. The implementation graph is:
 - Retired `RUNTIME-182` composes the optional global ImGui/host owner, with
   one frame-local kernel capture value, a preserved paired Begin/End bracket,
   and app-owned Sandbox panels.
-- Active [`RUNTIME-168`](../../active/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
-  — after retired `RUNTIME-188` and `RUNTIME-183`, its implementation deletes
+- Retired `RUNTIME-168` — after retired `RUNTIME-188` and `RUNTIME-183`, its
+  implementation deletes
   the one-consumer exported policy module, retains its `.cpp` as a private
   implementation unit of the existing Sandbox editor-facade module, and gives
   Sandbox transactional typed handles over only the exact import pipeline/input
-  registry plus optional exact camera/selection for focus. Final verification
-  and retirement remain on the active task.
+  registry plus optional exact camera/selection for focus. CPU and capable-host
+  Vulkan acceptance verification are complete.
 - Existing [`RUNTIME-129`](RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
   completes the operational Vulkan bake inside `AssetWorkflowModule` after
   retired `GRAPHICS-128` made the shared managed-index subrange selectable.
@@ -219,7 +219,7 @@ config and Frame Graph UI use the settled owners.
 Retired `RUNTIME-177` added no generic debug-draw producer seam because its
 consumer inventory was empty; existing spatial-debug and transform-gizmo
 paths remain typed. `RUNTIME-129` and `RUNTIME-184` may proceed independently
-after retired `RUNTIME-183` and the intervening `RUNTIME-168` lifecycle-policy
+after retired `RUNTIME-183` and retired `RUNTIME-168` lifecycle-policy
 privatization respectively; both gate `RUNTIME-185`.
 `ARCH-014` reaches this graph through `RUNTIME-187`; `REVIEW-003` reaches it
 transitively through `ARCH-014`.
@@ -290,21 +290,14 @@ owned by `RUNTIME-151` after the mechanical `RUNTIME-146..150` splits) and
   same-host Clang 20 direct-edge samples measured a bounded primary-interface
   median reduction from 40.87s to 20.72s; no whole-build claim is made.
 
-### Module-surface diet candidates (seeded 2026-07-10)
-
-Opened from the `.cppm` compile-time triage. These tasks target low-fanout
-module surfaces whose public build-graph value is lower than their interface
-compile cost. They preserve behavior and ownership; they are not feature tasks.
-`ARCH-006` owns the top Sandbox editor/app hot path, and `RUNTIME-166` owns the
-main `Runtime.RenderExtraction` module slimming.
-
-- [`RUNTIME-168`](../../active/RUNTIME-168-privatize-sandbox-default-policies-surface.md) —
-  the implementation removes the one-consumer public module while retaining
-  its callback bodies under the existing `SandboxEditorFacades` surface;
-  Sandbox privately owns exact provider borrows and typed handles, not another
-  runtime owner. The active task still owns final verification and retirement.
 ### Retired module-surface diet work
 
+- [`RUNTIME-168`](../../done/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
+  retired the one-consumer public policy module at `Operational` while
+  retaining its callback bodies under the existing `SandboxEditorFacades`
+  surface. Sandbox privately owns exact provider borrows and typed handles,
+  and real CPU plus Vulkan acceptance paths exercise the composition without
+  another runtime lifecycle owner.
 - [`RUNTIME-188`](../../done/RUNTIME-188-extract-scene-interaction-module.md)
   retired the separately audited interaction/readback/gizmo owner at
   `Operational`. Its Engine facade, obsolete mesh-view compatibility surface,

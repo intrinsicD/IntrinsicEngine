@@ -293,7 +293,7 @@ production consumer. The bounded implementation graph is
 `RUNTIME-179` AsyncWork, retired `RUNTIME-172` SceneDocument, retired
 `RUNTIME-188` SceneInteraction, `RUNTIME-180` Camera, `RUNTIME-181`
 ConfigControl, `RUNTIME-183` AssetWorkflow, retired `RUNTIME-182` EditorUi,
-corrected post-`RUNTIME-188`/`RUNTIME-183` `RUNTIME-168` private Sandbox
+retired post-`RUNTIME-188`/`RUNTIME-183` `RUNTIME-168` private Sandbox
 provider/handle composition on the existing editor-facade surface, existing
 `RUNTIME-129` operational normal bake after the now-retired independent
 `GRAPHICS-128` shared-index prerequisite,
@@ -310,8 +310,9 @@ camera owner and app-owned reference bootstrap; the corrected `RUNTIME-172`
 document owner is retired with exact service publication. `RUNTIME-188` now
 is retired with the separate interaction owner, exact optional selection
 service, and `26/4/2/15` Engine ratchet. `RUNTIME-183` is retired with the
-app-composed AssetWorkflow owner and `22/0/2/10` Engine ratchet, making
-`RUNTIME-168` is active and `RUNTIME-129` remains selectable.
+app-composed AssetWorkflow owner and `22/0/2/10` Engine ratchet.
+`RUNTIME-168` is retired. `RUNTIME-129` remains selectable, and `RUNTIME-184`
+is now unblocked.
 Sequencing note: tasks whose deliverable ADR-0024 supersedes are
 front-matter gated on their seam dependencies — `RUNTIME-150` on
 `ARCH-007`/`ARCH-008`, `RUNTIME-151` additionally on `ARCH-011`, `ARCH-006`
@@ -333,7 +334,7 @@ The non-blocking TaskGraph substrate (`CORE-005`) and scheduler hardening
 
 Open members (kernel-seam priority set first):
 - [`../active/ARCH-014-kernel-convergence-tracking.md`](../active/ARCH-014-kernel-convergence-tracking.md) (active umbrella north-star; not a slice).
-- [`RUNTIME-168`](../active/RUNTIME-168-privatize-sandbox-default-policies-surface.md) is the active policy-privatization leaf, while [`runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md`](runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md) remains independently selectable; `RUNTIME-168` unlocks [`runtime/RUNTIME-184-replace-application-lifecycle.md`](runtime/RUNTIME-184-replace-application-lifecycle.md), and those paths converge through `RUNTIME-185`..`187` (see the runtime index for exact dependencies).
+- [`runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md`](runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md) remains independently selectable; retired `RUNTIME-168` unlocked [`runtime/RUNTIME-184-replace-application-lifecycle.md`](runtime/RUNTIME-184-replace-application-lifecycle.md), and those paths converge through `RUNTIME-185`..`187` (see the runtime index for exact dependencies).
 - [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) (one-shot post-convergence admission gate; blocked until known architecture/right-sizing/tool-rent work retires).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).

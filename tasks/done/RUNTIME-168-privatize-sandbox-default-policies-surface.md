@@ -10,11 +10,17 @@ maturity_target: Operational
 
 ## Status
 
-- Implementation and verification completed on 2026-07-19 at `Operational`;
-  owner: Codex team; implementation branch:
+- Completed and retired on 2026-07-19 at `Operational`; owner: Codex team;
+  implementation branch:
   `codex/runtime-168-policy-surface`.
+- Implementation checkpoints: task promotion `f45e3441`; policy
+  privatization and acceptance coverage `842de246`; final review test-fidelity
+  closure `bd405e5c`. Commit reference: this retirement commit records final
+  lifecycle state, dependency unblocking, and generated task inventory.
 - Verification evidence:
   - the focused CPU selector passed 64/64;
+  - the post-review real-app composition selector passed 6/6 after pinning
+    the exact `App::OnShutdown` uninstall invocation;
   - the direct-mesh slow regression passed 1/1;
   - the full CPU-supported selector completed 4,247 selected cases with zero
     failures and one expected GLFW/LSan capability skip;
