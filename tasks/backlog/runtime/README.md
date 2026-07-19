@@ -187,7 +187,7 @@ triggers. The implementation graph is:
   owners, without `Engine&` or a new policy facade.
 - Existing [`RUNTIME-129`](RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
   completes the operational Vulkan bake inside `AssetWorkflowModule` after
-  [`GRAPHICS-128`](../rendering/GRAPHICS-128-object-space-normal-bake-shared-index-slice.md)
+  [`GRAPHICS-128`](../../active/GRAPHICS-128-object-space-normal-bake-shared-index-slice.md)
   makes the shared managed-index subrange selectable.
 - [`RUNTIME-184`](RUNTIME-184-replace-application-lifecycle.md) — remove
   `IApplication` and unrestricted app ticks through explicit Sandbox/module

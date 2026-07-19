@@ -26,6 +26,11 @@ Each active task should include:
   `codex/graphics-127-gpu-profiler`; in progress. Next gate: repair the RHI
   lifecycle/provenance contract and focused CPU coverage before integrating
   native Vulkan query pools and compiled-pass scopes.
+- [`GRAPHICS-128`](GRAPHICS-128-object-space-normal-bake-shared-index-slice.md) —
+  object-space normal bake shared-index slice; owner: Codex team; branch:
+  `codex/graphics-128-shared-index-slice`; in progress. Next gate: propagate
+  nonzero `FirstIndex` with zero base vertex and run the focused CPU/Vulkan
+  evidence.
 
 ## History
 

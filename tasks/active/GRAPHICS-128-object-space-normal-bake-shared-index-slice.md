@@ -7,6 +7,14 @@ maturity_target: Operational
 ---
 # GRAPHICS-128 — Object-space normal bake shared index slice
 
+## Status
+
+- In progress as of 2026-07-19; owner: Codex team; implementation branch:
+  `codex/graphics-128-shared-index-slice`.
+- Next gate: propagate `FirstIndex` through the graphics bake plan/record
+  contract, then prove the nonzero slice with the focused CPU contract and
+  decoy-plus-target Vulkan smoke.
+
 ## Goal
 - Make the graphics-owned object-space normal texture bake record the selected
   surface slice of a shared index buffer, including a nonzero first index,
