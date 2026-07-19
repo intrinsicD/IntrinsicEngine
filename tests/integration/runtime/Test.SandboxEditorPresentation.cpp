@@ -26,6 +26,8 @@ import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AsyncWorkModule;
+import Extrinsic.Runtime.EditorUiHost;
+import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
@@ -126,12 +128,21 @@ namespace
         void OnSimTick(Runtime::Engine&, double) override {}
         void OnVariableTick(Runtime::Engine& engine, double, double) override
         {
+            ++m_Frames;
+            if (m_Frames == 1u)
+            {
+                ImGui::SetNextFrameWantCaptureKeyboard(true);
+                return;
+            }
             const Plat::IWindow& window = engine.GetWindow();
             auto& input = const_cast<Plat::Input::Context&>(window.GetInput());
             input.SetKeyState(Plat::Input::Key::G, true);
             engine.RequestExit();
         }
         void OnShutdown(Runtime::Engine&) override {}
+
+    private:
+        std::uint32_t m_Frames{0u};
     };
 
     [[nodiscard]] Core::Config::EngineConfig HeadlessConfig()
@@ -142,6 +153,12 @@ namespace
         config.Camera.Enabled = false;
         config.Window.Backend = Core::Config::WindowBackend::Null;
         return config;
+    }
+
+    void ComposeEditorUiAndInitialize(Runtime::Engine& engine)
+    {
+        engine.EmplaceModule<Runtime::EditorUiModule>();
+        engine.Initialize();
     }
 
     [[nodiscard]] std::string ReadRepositoryTextFile(
@@ -240,14 +257,14 @@ TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
 {
     Runtime::Engine engine(
         HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    engine.Initialize();
+    ComposeEditorUiAndInitialize(engine);
 
     SandboxEditor::EditorShell shell;
+    shell.Attach(engine);
     SandboxEditor::MethodPanels methodPanels;
     SandboxEditor::MeshProcessingPanels meshProcessingPanels;
     SandboxEditor::DomainPanels domainPanels;
     RegisterAllAppPanels(shell, methodPanels, meshProcessingPanels, domainPanels);
-    shell.Attach(engine);
 
     engine.Run();
 
@@ -299,7 +316,11 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         {"view.registration", {"View"}},
     }};
 
+    Runtime::Engine engine(
+        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    ComposeEditorUiAndInitialize(engine);
     SandboxEditor::EditorShell shell;
+    shell.Attach(engine);
     SandboxEditor::MethodPanels methodPanels;
     SandboxEditor::MeshProcessingPanels meshProcessingPanels;
     SandboxEditor::DomainPanels domainPanels;
@@ -316,6 +337,11 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
             << expectedWindow.Id;
         EXPECT_FALSE(entry->Open) << expectedWindow.Id;
     }
+    domainPanels.Unregister();
+    meshProcessingPanels.Unregister();
+    methodPanels.Unregister();
+    shell.Detach();
+    engine.Shutdown();
 }
 
 TEST(SandboxEditorPresentation, DomainPanelsPreserveLifetimeCacheAndResultPublication)
@@ -536,13 +562,16 @@ TEST(SandboxEditorPresentation, AdapterCallbackDrawsDeterministicMenuOnlyFrame)
 {
     Runtime::Engine engine(
         HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    engine.Initialize();
+    ComposeEditorUiAndInitialize(engine);
     SandboxEditor::EditorShell shell;
     shell.Attach(engine);
 
     engine.Run();
 
-    const auto& diagnostics = engine.GetImGuiAdapter().GetDiagnostics();
+    const Runtime::EditorUiHost* editorUi =
+        engine.Services().Find<Runtime::EditorUiHost>();
+    ASSERT_NE(editorUi, nullptr);
+    const auto& diagnostics = editorUi->GetDiagnostics();
     EXPECT_GE(diagnostics.EditorCallbackInvocations, 1u);
     EXPECT_GE(diagnostics.FramesProduced, 1u);
     EXPECT_GE(diagnostics.LastDrawListCount, 1u);
@@ -558,9 +587,10 @@ TEST(SandboxEditorPresentation,
 {
     Runtime::Engine engine(
         HeadlessConfig(), std::make_unique<TooltipDelayApplication>());
-    engine.Initialize();
+    ComposeEditorUiAndInitialize(engine);
 
     SandboxEditor::EditorShell shell;
+    shell.Attach(engine);
     ASSERT_TRUE(shell.SetEditorWindowOpen("file.import", true));
 
     std::uint32_t observerFrames = 0u;
@@ -641,7 +671,6 @@ TEST(SandboxEditorPresentation,
         (productionTooltipHoverFlags & ImGuiHoveredFlags_Stationary) != 0);
     ASSERT_TRUE(
         (productionTooltipHoverFlags & ImGuiHoveredFlags_DelayShort) != 0);
-    shell.Attach(engine);
     engine.Run();
 
     ASSERT_GE(observerFrames, 3u);
@@ -701,7 +730,7 @@ TEST(SandboxEditorPresentation, RuntimeImportEventIsReflectedByAppFilePanel)
 {
     Runtime::Engine engine(
         HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    engine.Initialize();
+    ComposeEditorUiAndInitialize(engine);
     SandboxEditor::EditorShell shell;
     shell.Attach(engine);
 
@@ -747,7 +776,7 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
         HeadlessConfig(),
         std::make_unique<WaitForAssetImportEventApplication>(128u));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
-    engine.Initialize();
+    ComposeEditorUiAndInitialize(engine);
     (void)Runtime::RegisterSandboxDefaultRuntimePolicies(engine);
 
     SandboxEditor::EditorShell shell;
@@ -785,15 +814,17 @@ TEST(SandboxEditorPresentation, EngineAttachmentRegistersEditorCallback)
 {
     Runtime::Engine engine(
         HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    engine.Initialize();
+    ComposeEditorUiAndInitialize(engine);
     SandboxEditor::EditorShell shell;
     shell.Attach(engine);
     EXPECT_TRUE(shell.IsAttached());
 
     engine.Run();
 
-    EXPECT_GE(engine.GetImGuiAdapter().GetDiagnostics().EditorCallbackInvocations,
-              1u);
+    const Runtime::EditorUiHost* editorUi =
+        engine.Services().Find<Runtime::EditorUiHost>();
+    ASSERT_NE(editorUi, nullptr);
+    EXPECT_GE(editorUi->GetDiagnostics().EditorCallbackInvocations, 1u);
     EXPECT_TRUE(shell.GetLastFrame().FileImport.Enabled);
     EXPECT_FALSE(HasDiagnostic(
         shell.GetLastFrame().FileImport.Diagnostics,
@@ -809,7 +840,7 @@ TEST(SandboxEditorPresentation, ControllerReattachPinsPanelAttachmentResetPolicy
 
     Runtime::Engine firstEngine(
         HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    firstEngine.Initialize();
+    ComposeEditorUiAndInitialize(firstEngine);
     controller.Attach(firstEngine);
     ASSERT_TRUE(controller.IsAttached());
     firstEngine.Run();
@@ -819,7 +850,7 @@ TEST(SandboxEditorPresentation, ControllerReattachPinsPanelAttachmentResetPolicy
 
     Runtime::Engine secondEngine(
         HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    secondEngine.Initialize();
+    ComposeEditorUiAndInitialize(secondEngine);
     controller.Attach(secondEngine);
     ASSERT_TRUE(controller.IsAttached());
     secondEngine.Run();
@@ -875,7 +906,11 @@ TEST(SandboxEditorPresentation, ControllerReattachPinsPanelAttachmentResetPolicy
 
 TEST(SandboxEditorPresentation, EditorShellStartsWithOnlyBuiltinWindows)
 {
+    Runtime::Engine engine(
+        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    ComposeEditorUiAndInitialize(engine);
     SandboxEditor::EditorShell shell;
+    shell.Attach(engine);
     const auto menu = shell.BuildEditorWindowMenuModel();
     ASSERT_EQ(menu.size(), 10u);
     for (const std::string_view id :
@@ -894,11 +929,17 @@ TEST(SandboxEditorPresentation, EditorShellStartsWithOnlyBuiltinWindows)
     }
     EXPECT_EQ(FindWindow(menu, "mesh.appearance"), nullptr);
     EXPECT_EQ(FindWindow(menu, "pointcloud.processing.kmeans"), nullptr);
+    shell.Detach();
+    engine.Shutdown();
 }
 
 TEST(SandboxEditorPresentation, ExternalWindowContributionNeedsNoLegacySwitchEntry)
 {
+    Runtime::Engine engine(
+        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    ComposeEditorUiAndInitialize(engine);
     SandboxEditor::EditorShell shell;
+    shell.Attach(engine);
     int drawCalls = 0;
     const Runtime::EditorWindowHandle handle = shell.RegisterEditorWindow(
         SandboxEditor::EditorWindowDescriptor{
@@ -925,15 +966,18 @@ TEST(SandboxEditorPresentation, ExternalWindowContributionNeedsNoLegacySwitchEnt
 
     EXPECT_TRUE(shell.UnregisterEditorWindow(handle));
     EXPECT_EQ(shell.BuildEditorWindowMenuModel().size(), 10u);
+    shell.Detach();
+    engine.Shutdown();
 }
 
 TEST(SandboxEditorPresentation, ContextWindowContributionReceivesRuntimeFacade)
 {
     Runtime::Engine engine(
         HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    engine.Initialize();
+    ComposeEditorUiAndInitialize(engine);
 
     SandboxEditor::EditorShell shell;
+    shell.Attach(engine);
     int drawCalls = 0;
     bool receivedScene = false;
     const Runtime::EditorWindowHandle handle = shell.RegisterEditorWindow(
@@ -953,7 +997,6 @@ TEST(SandboxEditorPresentation, ContextWindowContributionReceivesRuntimeFacade)
         });
     ASSERT_TRUE(handle.IsValid());
 
-    shell.Attach(engine);
     engine.Run();
 
     EXPECT_EQ(drawCalls, 1);
@@ -968,7 +1011,7 @@ TEST(SandboxEditorPresentation, GlobalVisibilityHotkeyUsesTheVisibilityCommandPa
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<ToggleEditorVisibilityApplication>());
-    engine.Initialize();
+    ComposeEditorUiAndInitialize(engine);
 
     SandboxEditor::EditorShell shell;
     shell.Attach(engine);
@@ -977,8 +1020,10 @@ TEST(SandboxEditorPresentation, GlobalVisibilityHotkeyUsesTheVisibilityCommandPa
     engine.Run();
 
     EXPECT_FALSE(shell.IsEditorVisible());
-    EXPECT_FALSE(
-        engine.GetImGuiAdapter().CaptureSnapshot().CapturesViewportInput());
+    const Runtime::EditorUiHost* editorUi =
+        engine.Services().Find<Runtime::EditorUiHost>();
+    ASSERT_NE(editorUi, nullptr);
+    EXPECT_FALSE(editorUi->GetDiagnostics().CapturesViewportInput);
     const Runtime::EditorUiVisibilityCommandResult restored =
         shell.ApplyEditorUiVisibilityCommand(
             Runtime::EditorUiVisibilityCommand{

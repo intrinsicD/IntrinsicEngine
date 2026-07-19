@@ -42,9 +42,10 @@ import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.DerivedJobGraph;
+import Extrinsic.Runtime.EditorUiHost;
+import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.GizmoInteraction;
-import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.SelectionController;
 
@@ -386,10 +387,14 @@ namespace
 TEST(ImGuiAdapterEngineWiring, AdapterInitializedAfterEngineInitialize)
 {
     Engine engine(HeadlessConfig(), std::make_unique<BoundedRunApplication>(1u));
+    engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.Initialize();
 
-    const auto& diag = engine.GetImGuiAdapter().GetDiagnostics();
-    EXPECT_TRUE(engine.GetImGuiAdapter().IsInitialized());
+    const Runtime::EditorUiHost* editorUi =
+        engine.Services().Find<Runtime::EditorUiHost>();
+    ASSERT_NE(editorUi, nullptr);
+    const auto& diag = editorUi->GetDiagnostics();
+    EXPECT_TRUE(editorUi->IsOperational());
     EXPECT_TRUE(diag.Initialized);
     EXPECT_EQ(diag.FramesProduced, 0u);
     EXPECT_TRUE(engine.GetRenderer().HasImGuiOverlaySystem());
@@ -403,21 +408,25 @@ TEST(ImGuiAdapterEngineWiring, RunProducesOneOverlayFramePerEngineFrame)
 {
     constexpr std::uint32_t kFrames = 3u;
     Engine engine(HeadlessConfig(), std::make_unique<BoundedRunApplication>(kFrames));
+    engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.Initialize();
+    const Runtime::EditorUiHost* editorUi =
+        engine.Services().Find<Runtime::EditorUiHost>();
+    ASSERT_NE(editorUi, nullptr);
 
     if (engine.GetWindow().ShouldClose())
     {
         // No live window backend (e.g. headless CI with no display):
         // Engine::Run() would execute zero frames. The static wiring is still
         // asserted; the per-frame loop assertion needs a real window.
-        EXPECT_TRUE(engine.GetImGuiAdapter().IsInitialized());
+        EXPECT_TRUE(editorUi->IsOperational());
         engine.Shutdown();
         GTEST_SKIP() << "window backend unavailable; per-frame loop coverage requires a display";
     }
 
     engine.Run();
 
-    EXPECT_EQ(engine.GetImGuiAdapter().GetDiagnostics().FramesProduced, kFrames);
+    EXPECT_EQ(editorUi->GetDiagnostics().FramesProduced, kFrames);
 
     engine.Shutdown();
 }
@@ -429,10 +438,15 @@ TEST(ImGuiAdapterEngineWiring, EditorHookInvokedOncePerFrameAndProducesDrawLists
 {
     constexpr std::uint32_t kFrames = 3u;
     Engine engine(HeadlessConfig(), std::make_unique<BoundedRunApplication>(kFrames));
+    engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.Initialize();
 
+    Runtime::EditorUiHost* editorUi =
+        engine.Services().Find<Runtime::EditorUiHost>();
+    ASSERT_NE(editorUi, nullptr);
     std::uint32_t editorCalls = 0u;
-    engine.SetImGuiEditorCallback(
+    const Runtime::EditorUiFrameContributionHandle contribution =
+        editorUi->RegisterFrameContribution(
         [&editorCalls]
         {
             ++editorCalls;
@@ -444,6 +458,7 @@ TEST(ImGuiAdapterEngineWiring, EditorHookInvokedOncePerFrameAndProducesDrawLists
             ImGui::Text("hello engine imgui");
             ImGui::End();
         });
+    ASSERT_TRUE(contribution.IsValid());
 
     if (engine.GetWindow().ShouldClose())
     {
@@ -453,7 +468,7 @@ TEST(ImGuiAdapterEngineWiring, EditorHookInvokedOncePerFrameAndProducesDrawLists
 
     engine.Run();
 
-    const auto& diag = engine.GetImGuiAdapter().GetDiagnostics();
+    const auto& diag = editorUi->GetDiagnostics();
     EXPECT_EQ(editorCalls, kFrames);
     EXPECT_EQ(diag.EditorCallbackInvocations, kFrames);
     EXPECT_EQ(diag.FramesProduced, kFrames);
@@ -481,10 +496,15 @@ TEST(ImGuiAdapterEngineWiring, FramePacingDiagnosticsPopulateOnNullBackend)
     constexpr std::uint32_t kFrames = 2u;
     Engine engine(NullWindowHeadlessConfig(),
                   std::make_unique<BoundedRunApplication>(kFrames));
+    engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.Initialize();
 
+    Runtime::EditorUiHost* editorUi =
+        engine.Services().Find<Runtime::EditorUiHost>();
+    ASSERT_NE(editorUi, nullptr);
     std::uint32_t editorCalls = 0u;
-    engine.SetImGuiEditorCallback(
+    const Runtime::EditorUiFrameContributionHandle contribution =
+        editorUi->RegisterFrameContribution(
         [&editorCalls]
         {
             ++editorCalls;
@@ -494,6 +514,7 @@ TEST(ImGuiAdapterEngineWiring, FramePacingDiagnosticsPopulateOnNullBackend)
             ImGui::Text("frame pacing diagnostics");
             ImGui::End();
         });
+    ASSERT_TRUE(contribution.IsValid());
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
         << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
@@ -502,8 +523,7 @@ TEST(ImGuiAdapterEngineWiring, FramePacingDiagnosticsPopulateOnNullBackend)
 
     const Runtime::RuntimeFramePacingDiagnostics& pacing =
         engine.GetLastFramePacingDiagnostics();
-    const Runtime::ImGuiAdapterDiagnostics& imgui =
-        engine.GetImGuiAdapter().GetDiagnostics();
+    const auto& imgui = editorUi->GetDiagnostics();
     const Graphics::RenderGraphFrameStats& graph =
         engine.GetRenderer().GetLastRenderGraphStats();
 
@@ -573,11 +593,16 @@ TEST(ImGuiAdapterEngineWiring,
     SlowDerivedJobApplication* appPtr = app.get();
     Engine engine(NullWindowHeadlessConfig(), std::move(app));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.Initialize();
 
+    Runtime::EditorUiHost* editorUi =
+        engine.Services().Find<Runtime::EditorUiHost>();
+    ASSERT_NE(editorUi, nullptr);
     std::uint32_t callbacksWhileWorkerRunning = 0u;
     std::uint64_t maxCallbackMicros = 0u;
-    engine.SetImGuiEditorCallback(
+    const Runtime::EditorUiFrameContributionHandle contribution =
+        editorUi->RegisterFrameContribution(
         [appPtr, &callbacksWhileWorkerRunning, &maxCallbackMicros]
         {
             const auto begin = std::chrono::steady_clock::now();
@@ -600,6 +625,7 @@ TEST(ImGuiAdapterEngineWiring,
                 maxCallbackMicros,
                 static_cast<std::uint64_t>(elapsed.count()));
         });
+    ASSERT_TRUE(contribution.IsValid());
 
     ASSERT_TRUE(appPtr->Handle.IsValid());
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
@@ -627,10 +653,15 @@ TEST(ImGuiAdapterEngineWiring, UiCaptureSuppressesRuntimeInputConsumers)
     auto app = std::make_unique<UiCapturedInputApplication>();
     auto* appPtr = app.get();
     Engine engine(NullInputRoutingConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.Initialize();
 
+    Runtime::EditorUiHost* editorUi =
+        engine.Services().Find<Runtime::EditorUiHost>();
+    ASSERT_NE(editorUi, nullptr);
     std::uint32_t editorFrames = 0u;
-    engine.SetImGuiEditorCallback(
+    const Runtime::EditorUiFrameContributionHandle contribution =
+        editorUi->RegisterFrameContribution(
         [&editorFrames]
         {
             ++editorFrames;
@@ -640,6 +671,7 @@ TEST(ImGuiAdapterEngineWiring, UiCaptureSuppressesRuntimeInputConsumers)
                 ImGui::SetNextFrameWantCaptureKeyboard(true);
             }
         });
+    ASSERT_TRUE(contribution.IsValid());
 
     if (engine.GetWindow().ShouldClose())
     {
@@ -652,10 +684,7 @@ TEST(ImGuiAdapterEngineWiring, UiCaptureSuppressesRuntimeInputConsumers)
     ASSERT_NE(appPtr->Controller, nullptr);
     EXPECT_EQ(appPtr->VariableTicks, 2u);
     EXPECT_EQ(editorFrames, 2u);
-    const Runtime::EditorInputCaptureSnapshot capture =
-        engine.GetImGuiAdapter().CaptureSnapshot();
-    EXPECT_TRUE(capture.CapturedMouse);
-    EXPECT_TRUE(capture.CapturedKeyboard);
+    EXPECT_EQ(editorUi->GetDiagnostics().CaptureSnapshots, 2u);
 
     EXPECT_EQ(appPtr->Controller->Updates, 1u);
     EXPECT_EQ(appPtr->Controller->KeyboardUpdates, 0u);
@@ -698,10 +727,15 @@ TEST(ImGuiAdapterEngineWiring, RunNormalizesNativeCloseAfterInteractiveInput)
     auto app = std::make_unique<CloseAfterInteractiveInputApplication>();
     auto* appPtr = app.get();
     Engine engine(InputRoutingConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.Initialize();
 
+    Runtime::EditorUiHost* editorUi =
+        engine.Services().Find<Runtime::EditorUiHost>();
+    ASSERT_NE(editorUi, nullptr);
     std::uint32_t editorFrames = 0u;
-    engine.SetImGuiEditorCallback(
+    const Runtime::EditorUiFrameContributionHandle contribution =
+        editorUi->RegisterFrameContribution(
         [&editorFrames]
         {
             ++editorFrames;
@@ -711,6 +745,7 @@ TEST(ImGuiAdapterEngineWiring, RunNormalizesNativeCloseAfterInteractiveInput)
                 ImGui::SetNextFrameWantCaptureKeyboard(true);
             }
         });
+    ASSERT_TRUE(contribution.IsValid());
 
     if (engine.GetWindow().ShouldClose() ||
         engine.GetWindow().GetNativeHandle() == nullptr ||

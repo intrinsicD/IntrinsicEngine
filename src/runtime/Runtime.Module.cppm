@@ -17,6 +17,7 @@ import Extrinsic.Core.FrameGraph;
 import Extrinsic.Core.Hash;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.CommandBus;
+import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.ServiceRegistry;
@@ -28,13 +29,27 @@ namespace Extrinsic::Runtime
     export enum class FramePhase : std::uint8_t
     {
         AfterCommandDrain,
+        UiBegin,
         UiBuild,
+        UiEndCapture,
         BeforeExtraction,
         Maintenance,
     };
 
     export struct RuntimeShutdownAnnounced
     {
+    };
+
+    export struct EditorInputCaptureSnapshot
+    {
+        bool CapturedKeyboard{false};
+        bool CapturedMouse{false};
+        bool WidgetsActive{false};
+
+        [[nodiscard]] bool CapturesViewportInput() const noexcept
+        {
+            return CapturedKeyboard || CapturedMouse || WidgetsActive;
+        }
     };
 
     export struct RuntimeFrameHookContext
@@ -47,6 +62,8 @@ namespace Extrinsic::Runtime
         JobService& Jobs;
         WorldRegistry& Worlds;
         ServiceRegistry& Services;
+        EditorInputCaptureSnapshot& EditorCapture;
+        RuntimeFramePacingDiagnostics& Pacing;
         std::uint64_t FrameIndex{0};
         double FrameDeltaSeconds{0.0};
         double FixedStepAlpha{0.0};

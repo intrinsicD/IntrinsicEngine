@@ -5,7 +5,6 @@ module;
 export module Extrinsic.Runtime.FramePacingDiagnostics;
 
 import Extrinsic.Graphics.Renderer;
-import Extrinsic.Runtime.ImGuiAdapter;
 
 namespace Extrinsic::Runtime
 {
@@ -60,10 +59,6 @@ namespace Extrinsic::Runtime
         std::uint64_t SelectionReadbackMicros{0u};
         std::uint64_t ReleaseRenderWorldMicros{0u};
     };
-
-    export void MirrorImGuiFramePacingDiagnostics(
-        RuntimeFramePacingDiagnostics& pacing,
-        const ImGuiAdapterDiagnostics& imgui) noexcept;
 
     export void MirrorRenderGraphFramePacingDiagnostics(
         RuntimeFramePacingDiagnostics& pacing,

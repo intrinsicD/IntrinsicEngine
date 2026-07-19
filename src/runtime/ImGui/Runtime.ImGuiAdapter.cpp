@@ -320,6 +320,7 @@ namespace Extrinsic::Runtime
 
     void ImGuiAdapter::BeginFrame(double deltaSeconds)
     {
+        m_Diagnostics.LastEditorCallbackMicros = 0u;
         if (m_Context == nullptr)
             return;
 
@@ -386,17 +387,12 @@ namespace Extrinsic::Runtime
         }
     }
 
-    void ImGuiAdapter::EndFrame()
+    void ImGuiAdapter::BuildEditorFrame()
     {
         if (m_Context == nullptr || !m_FrameStarted)
             return;
 
-        const auto endFrameBegin = std::chrono::steady_clock::now();
         m_Diagnostics.LastEditorCallbackMicros = 0u;
-        m_Diagnostics.LastImGuiRenderMicros = 0u;
-        m_Diagnostics.LastDrawDataCopyMicros = 0u;
-        m_Diagnostics.LastEndFrameMicros = 0u;
-
         ImGui::SetCurrentContext(m_Context);
         if (m_EditorVisible && m_EditorCallback)
         {
@@ -405,6 +401,19 @@ namespace Extrinsic::Runtime
             m_Diagnostics.LastEditorCallbackMicros = ElapsedMicros(callbackBegin);
             ++m_Diagnostics.EditorCallbackInvocations;
         }
+    }
+
+    void ImGuiAdapter::EndFrame()
+    {
+        if (m_Context == nullptr || !m_FrameStarted)
+            return;
+
+        const auto endFrameBegin = std::chrono::steady_clock::now();
+        m_Diagnostics.LastImGuiRenderMicros = 0u;
+        m_Diagnostics.LastDrawDataCopyMicros = 0u;
+        m_Diagnostics.LastEndFrameMicros = 0u;
+
+        ImGui::SetCurrentContext(m_Context);
 
         if (m_EditorVisible)
         {

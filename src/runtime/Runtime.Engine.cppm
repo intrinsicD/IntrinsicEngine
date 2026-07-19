@@ -1,7 +1,6 @@
 module;
 
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -32,7 +31,6 @@ import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GizmoFrameService;
-import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.JobServiceGpuQueueBridge;
 import Extrinsic.Runtime.KernelEvents;
@@ -61,7 +59,6 @@ import Extrinsic.ECS.Scene.Registry;
 namespace Extrinsic::Runtime
 {
     class AssetResidencyService;
-    class ImGuiEditorBridge;
 
     export class Engine;
 
@@ -323,19 +320,6 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::uint64_t
             GetVisualizationAdapterBindingRevision() const noexcept;
 
-        // ── RUNTIME-090 Slice B — Dear ImGui editor hook ──────────────────
-        // Registers the per-frame editor callback invoked between the
-        // adapter's BeginFrame and EndFrame so editor/UI code can issue ImGui
-        // panel draws without modifying the adapter. May be called before or
-        // after Initialize(); the stored callback is applied to the adapter
-        // when it is constructed. RunFrame brackets OnVariableTick with the
-        // adapter so one ImGuiOverlayFrame is produced per engine frame.
-        void SetImGuiEditorCallback(std::function<void()> callback);
-        void SetImGuiEditorVisible(bool visible) noexcept;
-        // Read-only access to the runtime-side ImGui adapter (valid after
-        // Initialize()). Exposes the produce-path diagnostics for tests; the
-        // Engine owns the BeginFrame/EndFrame cadence.
-        [[nodiscard]] const ImGuiAdapter& GetImGuiAdapter() const noexcept;
         // UI-030 — last frame-loop pacing sample. Runtime owns the cross-layer
         // phase boundaries; renderer/backend-specific diagnostics remain on
         // their owning surfaces and are mirrored here only as copied counters.
@@ -357,10 +341,6 @@ namespace Extrinsic::Runtime
         std::unique_ptr<Platform::IWindow>   m_Window;
         std::unique_ptr<RHI::IDevice>        m_Device;
         std::unique_ptr<Graphics::IRenderer> m_Renderer;
-        // RUNTIME-159 — runtime-side Dear ImGui overlay/adapter/callback
-        // bridge. Declared after m_Renderer / before render extraction so the
-        // borrowed renderer overlay attachment is cleared before teardown.
-        std::unique_ptr<ImGuiEditorBridge>   m_ImGuiEditorBridge;
         // RUNTIME-163 — render extraction owner state and compatibility facades.
         // Engine keeps frame ordering and dependent-subsystem wiring; the service
         // owns the cache, pool, last stats, and frame-index counter.
@@ -457,7 +437,9 @@ namespace Extrinsic::Runtime
         void RunRuntimeModuleFrameHooks(
             FramePhase phase,
             double frameDt,
-            double alpha);
+            double alpha,
+            EditorInputCaptureSnapshot& editorCapture,
+            RuntimeFramePacingDiagnostics& pacing);
         void AnnounceAndShutdownRuntimeModules();
         void RefreshActiveWorldScenePointer() noexcept;
         void ApplyWorldRegistryMaintenance();

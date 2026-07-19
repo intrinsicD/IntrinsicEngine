@@ -2548,8 +2548,10 @@ namespace Extrinsic::Sandbox::Editor
     struct EditorShell::Impl
     {
         Runtime::SandboxEditorSession Session{};
-        Runtime::EditorUiHost Host{};
+        Runtime::EditorUiHost* Host{nullptr};
+        Runtime::EditorUiFrameContributionHandle FrameContribution{};
         BuiltinWindowHandles BuiltinHandles{};
+        std::vector<Runtime::EditorWindowHandle> RegisteredWindows{};
         std::array<char, 1024> ImportPathBuffer{};
         std::array<char, 1024> ScenePathBuffer{};
         Runtime::SandboxEditorAssetPayloadKind ImportPayloadKind{
@@ -2568,12 +2570,14 @@ namespace Extrinsic::Sandbox::Editor
         const Runtime::SandboxEditorPreparedFrameView* ActivePreparedFrame{
             nullptr};
 
-        Impl()
+        void RegisterBuiltinWindows()
         {
+            if (Host == nullptr)
+                return;
             for (std::size_t index = 0u; index < kBuiltinWindows.size(); ++index)
             {
                 const BuiltinWindowSpec& spec = kBuiltinWindows[index];
-                BuiltinHandles[index] = Host.RegisterWindow(
+                BuiltinHandles[index] = Host->RegisterWindow(
                     Runtime::EditorWindowDescriptor{
                         .Id = std::string{spec.Id},
                         .MenuPath = {"View"},
@@ -2586,6 +2590,26 @@ namespace Extrinsic::Sandbox::Editor
                             },
                     });
             }
+        }
+
+        void UnregisterAllWindows()
+        {
+            if (Host != nullptr)
+            {
+                for (const Runtime::EditorWindowHandle handle :
+                     RegisteredWindows)
+                {
+                    (void)Host->UnregisterWindow(handle);
+                }
+                for (const Runtime::EditorWindowHandle handle :
+                     BuiltinHandles)
+                {
+                    if (handle.IsValid())
+                        (void)Host->UnregisterWindow(handle);
+                }
+            }
+            RegisteredWindows.clear();
+            BuiltinHandles = {};
         }
 
         void DrawBuiltinWindow(
@@ -2625,11 +2649,11 @@ namespace Extrinsic::Sandbox::Editor
 
         void DrawFrame()
         {
-            if (!Session.IsAttached())
+            if (!Session.IsAttached() || Host == nullptr)
                 return;
 
             if (!Session.PrepareFrame(
-                    BuildModelRequest(Host.Windows(), BuiltinHandles),
+                    BuildModelRequest(Host->Windows(), BuiltinHandles),
                     std::string{ImportPathBuffer.data()},
                     ImportPayloadKind,
                     std::string{ScenePathBuffer.data()}))
@@ -2641,8 +2665,8 @@ namespace Extrinsic::Sandbox::Editor
                 [this](Runtime::SandboxEditorPreparedFrameView frame)
                 {
                     ActivePreparedFrame = &frame;
-                    DrawMainMenuBar(&Host.Windows());
-                    (void)Host.Windows().DrawOpenWindows();
+                    DrawMainMenuBar(&Host->Windows());
+                    (void)Host->Windows().DrawOpenWindows();
                     ActivePreparedFrame = nullptr;
                 });
         }
@@ -2650,8 +2674,11 @@ namespace Extrinsic::Sandbox::Editor
         Runtime::EditorWindowHandle RegisterEditorWindow(
             EditorWindowDescriptor descriptor)
         {
+            if (Host == nullptr)
+                return {};
             auto draw = std::move(descriptor.Draw);
-            return Host.RegisterWindow(
+            const Runtime::EditorWindowHandle handle =
+                Host->RegisterWindow(
                 Runtime::EditorWindowDescriptor{
                     .Id = std::move(descriptor.Id),
                     .MenuPath = std::move(descriptor.MenuPath),
@@ -2668,29 +2695,45 @@ namespace Extrinsic::Sandbox::Editor
                     .OpenStateChanged =
                         std::move(descriptor.OpenStateChanged),
                 });
+            if (handle.IsValid())
+                RegisteredWindows.push_back(handle);
+            return handle;
         }
 
         void Attach(Runtime::Engine& engine)
         {
             Detach();
+            Host = engine.Services().Find<Runtime::EditorUiHost>();
+            if (Host == nullptr || !Host->IsOperational())
+            {
+                Host = nullptr;
+                return;
+            }
+
+            RegisterBuiltinWindows();
             Session.Attach(engine);
-            Host.Attach(
-                engine,
-                Runtime::EditorUiHostDescriptor{
-                    .ToggleActionDebugName =
-                        "Sandbox.Editor.ToggleVisibility",
-                    .DrawFrame =
-                        [this]
-                        {
-                            DrawFrame();
-                        },
+            if (!Session.IsAttached())
+            {
+                Detach();
+                return;
+            }
+            FrameContribution = Host->RegisterFrameContribution(
+                [this]
+                {
+                    DrawFrame();
                 });
+            if (!FrameContribution.IsValid())
+                Detach();
         }
 
         void Detach()
         {
             ActivePreparedFrame = nullptr;
-            Host.Detach();
+            if (Host != nullptr && FrameContribution.IsValid())
+                (void)Host->UnregisterFrameContribution(FrameContribution);
+            FrameContribution = {};
+            UnregisterAllWindows();
+            Host = nullptr;
             Session.Detach();
         }
     };
@@ -2724,37 +2767,52 @@ namespace Extrinsic::Sandbox::Editor
     bool EditorShell::UnregisterEditorWindow(
         const Runtime::EditorWindowHandle handle)
     {
-        return m_Impl->Host.UnregisterWindow(handle);
+        if (m_Impl->Host == nullptr)
+            return false;
+        const bool removed = m_Impl->Host->UnregisterWindow(handle);
+        if (removed)
+        {
+            std::erase(m_Impl->RegisteredWindows, handle);
+        }
+        return removed;
     }
 
     Runtime::EditorUiVisibilityCommandResult
     EditorShell::ApplyEditorUiVisibilityCommand(
         const Runtime::EditorUiVisibilityCommand command) noexcept
     {
-        return m_Impl->Host.ApplyVisibilityCommand(command);
+        if (m_Impl->Host == nullptr)
+            return {};
+        return m_Impl->Host->ApplyVisibilityCommand(command);
     }
 
     bool EditorShell::IsEditorVisible() const noexcept
     {
-        return m_Impl->Host.IsVisible();
+        return m_Impl->Host != nullptr && m_Impl->Host->IsVisible();
     }
 
     std::vector<Runtime::EditorWindowMenuEntry>
     EditorShell::BuildEditorWindowMenuModel() const
     {
-        return m_Impl->Host.BuildWindowMenuModel();
+        if (m_Impl->Host == nullptr)
+            return {};
+        return m_Impl->Host->BuildWindowMenuModel();
     }
 
     bool EditorShell::SetEditorWindowOpen(
         const std::string_view id,
         const bool open)
     {
-        return m_Impl->Host.SetWindowOpen(id, open);
+        return m_Impl->Host != nullptr &&
+               m_Impl->Host->SetWindowOpen(id, open);
     }
 
     bool EditorShell::IsAttached() const noexcept
     {
-        return m_Impl->Host.IsAttached();
+        return m_Impl->Host != nullptr &&
+               m_Impl->FrameContribution.IsValid() &&
+               m_Impl->Host->IsOperational() &&
+               m_Impl->Session.IsAttached();
     }
 
     const Runtime::SandboxEditorPanelFrame&

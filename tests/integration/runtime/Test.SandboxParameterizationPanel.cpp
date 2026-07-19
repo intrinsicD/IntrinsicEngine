@@ -23,6 +23,8 @@ import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorUiHost;
+import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
@@ -522,11 +524,12 @@ TEST(SandboxParameterizationPanel, RealWindowAndTypedActionAreOperational)
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<OneFrameApplication>());
+    engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.Initialize();
     SandboxEditor::EditorShell shell;
+    shell.Attach(engine);
     SandboxEditor::MethodPanels panels;
     panels.Register(shell);
-    shell.Attach(engine);
     ASSERT_TRUE(shell.SetEditorWindowOpen(
         "mesh.processing.parameterize_uv",
         true));
@@ -538,12 +541,15 @@ TEST(SandboxParameterizationPanel, RealWindowAndTypedActionAreOperational)
             "Mesh / Processing / Parameterize (UV)"),
         nullptr);
     const auto& imguiDiagnostics =
-        engine.GetImGuiAdapter().GetDiagnostics();
+        engine.Services()
+            .Find<Runtime::EditorUiHost>()
+            ->GetDiagnostics();
     EXPECT_GE(imguiDiagnostics.FramesProduced, 1u);
     EXPECT_FALSE(imguiDiagnostics.LastFrameUsedUserTexture)
         << "Configured CpuLayout must use the panel ImDrawList path without a user texture.";
     EXPECT_GT(imguiDiagnostics.LastVertexCount, 0u);
     EXPECT_GT(imguiDiagnostics.LastIndexCount, 0u);
+    panels.Unregister();
     shell.Detach();
     engine.Shutdown();
 }

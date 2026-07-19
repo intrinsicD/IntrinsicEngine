@@ -7,6 +7,7 @@ module Extrinsic.Sandbox;
 import Extrinsic.Sandbox.Editor.Controller;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 
 namespace Extrinsic::Sandbox {
@@ -42,6 +43,7 @@ private:
 void RegisterSandboxRuntimeModules(Runtime::Engine &engine) {
   engine.EmplaceModule<Runtime::AsyncWorkModule>();
   engine.EmplaceModule<Runtime::ClusteringModule>();
+  engine.EmplaceModule<Runtime::EditorUiModule>();
 }
 
 std::unique_ptr<Runtime::IApplication> CreateSandboxApp() {

@@ -8,7 +8,6 @@ module;
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
-#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -64,7 +63,6 @@ import Extrinsic.Runtime.DeviceBootstrap;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.GizmoFrameService;
-import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobServiceGpuQueueBridge;
 import Extrinsic.Runtime.Module;
@@ -94,7 +92,6 @@ import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
 import Extrinsic.Graphics.GpuAssetCache;
-import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.ECS.Component.Collider;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.Hierarchy;
@@ -125,7 +122,6 @@ import Geometry.Properties;
 import Geometry.Sphere;
 
 #include "Runtime.AssetResidencyService.Internal.hpp"
-#include "Runtime.ImGuiEditorBridge.Internal.hpp"
 #include "Runtime.Engine.FrameLoop.Internal.hpp"
 
 namespace Extrinsic::Runtime
@@ -141,83 +137,6 @@ namespace Extrinsic::Runtime
     // class in multiple Engine implementation units would not qualify for the
     // ordinary header ODR exception because the definitions are attached to a
     // named module.
-
-    ImGuiEditorBridge::~ImGuiEditorBridge() = default;
-
-    void ImGuiEditorBridge::Initialize(
-        Platform::IWindow& window,
-        Graphics::IRenderer& renderer)
-    {
-        if (m_Adapter)
-            return;
-
-        m_Adapter = std::make_unique<ImGuiAdapter>(window, m_Overlay);
-        m_Adapter->Initialize();
-        m_Adapter->SetEditorVisible(m_EditorVisible);
-        if (m_EditorCallback)
-            m_Adapter->SetEditorCallback(m_EditorCallback);
-        renderer.SetImGuiOverlaySystem(&m_Overlay);
-    }
-
-    void ImGuiEditorBridge::Shutdown(Graphics::IRenderer* renderer) noexcept
-    {
-        if (renderer)
-            renderer->SetImGuiOverlaySystem(nullptr);
-        m_Adapter.reset();
-    }
-
-    void ImGuiEditorBridge::SetEditorCallback(
-        std::function<void()> callback)
-    {
-        m_EditorCallback = std::move(callback);
-        if (m_Adapter)
-            m_Adapter->SetEditorCallback(m_EditorCallback);
-    }
-
-    void ImGuiEditorBridge::SetEditorVisible(const bool visible) noexcept
-    {
-        m_EditorVisible = visible;
-        if (m_Adapter)
-            m_Adapter->SetEditorVisible(visible);
-    }
-
-    void ImGuiEditorBridge::BeginFrame(const double deltaSeconds)
-    {
-        if (m_Adapter)
-            m_Adapter->BeginFrame(deltaSeconds);
-    }
-
-    void ImGuiEditorBridge::EndFrame()
-    {
-        if (m_Adapter)
-            m_Adapter->EndFrame();
-    }
-
-    bool ImGuiEditorBridge::IsInitialized() const noexcept
-    {
-        return m_Adapter != nullptr && m_Adapter->IsInitialized();
-    }
-
-    EditorInputCaptureSnapshot
-    ImGuiEditorBridge::CaptureSnapshot() const noexcept
-    {
-        return m_Adapter != nullptr
-            ? m_Adapter->CaptureSnapshot()
-            : EditorInputCaptureSnapshot{};
-    }
-
-    const ImGuiAdapterDiagnostics*
-    ImGuiEditorBridge::Diagnostics() const noexcept
-    {
-        if (!m_Adapter)
-            return nullptr;
-        return &m_Adapter->GetDiagnostics();
-    }
-
-    const ImGuiAdapter& ImGuiEditorBridge::Adapter() const noexcept
-    {
-        return *m_Adapter;
-    }
 
     AssetResidencyService::~AssetResidencyService() = default;
 
@@ -373,7 +292,6 @@ namespace Extrinsic::Runtime
                    std::unique_ptr<IApplication> application)
         : m_Config(std::move(config))
         , m_Application(std::move(application))
-        , m_ImGuiEditorBridge(std::make_unique<ImGuiEditorBridge>())
         , m_AssetResidencyService(std::make_unique<AssetResidencyService>())
     {
         if (!m_Application)
@@ -518,6 +436,15 @@ namespace Extrinsic::Runtime
         requireProvide(m_ServiceRegistry.Provide<RenderExtractionCache>(
                            m_RenderExtractionService.Cache(), "Engine"),
                        "RenderExtractionCache");
+        requireProvide(m_ServiceRegistry.Provide<Platform::IWindow>(
+                           *m_Window, "Engine"),
+                       "Platform::IWindow");
+        requireProvide(m_ServiceRegistry.Provide<Graphics::IRenderer>(
+                           *m_Renderer, "Engine"),
+                       "Graphics::IRenderer");
+        requireProvide(m_ServiceRegistry.Provide<RuntimeInputActionRegistry>(
+                           m_InputActions, "Engine"),
+                       "RuntimeInputActionRegistry");
 
         for (const std::unique_ptr<IRuntimeModule>& module : m_RuntimeModules)
         {
@@ -662,7 +589,9 @@ namespace Extrinsic::Runtime
     void Engine::RunRuntimeModuleFrameHooks(
         const FramePhase phase,
         const double frameDt,
-        const double alpha)
+        const double alpha,
+        EditorInputCaptureSnapshot& editorCapture,
+        RuntimeFramePacingDiagnostics& pacing)
     {
         if (!m_Scene)
             return;
@@ -677,6 +606,8 @@ namespace Extrinsic::Runtime
                 .Jobs = m_JobService,
                 .Worlds = m_WorldRegistry,
                 .Services = m_ServiceRegistry,
+                .EditorCapture = editorCapture,
+                .Pacing = pacing,
                 .FrameIndex = m_RenderExtractionService.CurrentFrameIndex(),
                 .FrameDeltaSeconds = frameDt,
                 .FixedStepAlpha = alpha,
@@ -865,10 +796,6 @@ namespace Extrinsic::Runtime
                 RuntimeRenderRecipeActivationSource::StartupConfigFile);
         }
 
-        // RUNTIME-159: Dear ImGui overlay/adapter ownership lives behind the
-        // bridge; Engine keeps only composition order and frame phase calls.
-        m_ImGuiEditorBridge->Initialize(*m_Window, *m_Renderer);
-
         // ── 2d. Render-world pool (GRAPHICS-036C) ─────────────────────────
         // Size the runtime-owned slot pool from the render config: one logical
         // buffer in the default synchronous mode (serial extraction/render,
@@ -977,7 +904,6 @@ namespace Extrinsic::Runtime
         if (m_Window)
             m_Window->Listen({});
 
-        m_ImGuiEditorBridge->Shutdown(m_Renderer.get());
         (void)m_JobServiceGpuQueueBridge.ShutdownParticipants(
             m_Renderer.get(),
             m_JobService,
@@ -1160,11 +1086,6 @@ namespace Extrinsic::Runtime
         const auto framePacingBegin = std::chrono::steady_clock::now();
         const auto publishPacingSample = [&]()
         {
-            if (const ImGuiAdapterDiagnostics* imguiDiagnostics =
-                    m_ImGuiEditorBridge->Diagnostics())
-            {
-                MirrorImGuiFramePacingDiagnostics(pacing, *imguiDiagnostics);
-            }
             if (m_Renderer)
                 MirrorRenderGraphFramePacingDiagnostics(
                     pacing, m_Renderer->GetLastRenderGraphStats());
@@ -1236,7 +1157,11 @@ namespace Extrinsic::Runtime
                            });
 
         RunRuntimeModuleFrameHooks(
-            FramePhase::AfterCommandDrain, 0.0, 0.0);
+            FramePhase::AfterCommandDrain,
+            0.0,
+            0.0,
+            frameContext.EditorCapture,
+            pacing);
 
         // ── Event pump A (post-drain; ARCH-008 / ADR-0024 D7) ─────────────
         // Command-published events become visible before simulation. Events
@@ -1284,43 +1209,45 @@ namespace Extrinsic::Runtime
         bool preRenderTransformFlushNeeded =
             HasPendingPreRenderTransformFlush(*m_Scene);
 
-        // ── RUNTIME-090 Slice B: open the Dear ImGui frame ────────────────
-        // BeginFrame runs after Window::PollEvents (Phase 1) and the
-        // minimize/resize early returns, immediately before the variable tick,
-        // so the editor hook and any ImGui draws issued during OnVariableTick
-        // run inside the NewFrame()/Render() scope. Minimized frames return
-        // before this point, so a NewFrame is never left without a matching
-        // Render() in EndFrame.
-        const auto imguiBegin = std::chrono::steady_clock::now();
-        m_ImGuiEditorBridge->BeginFrame(frameDt);
-        pacing.ImGuiBeginMicros = ElapsedMicros(imguiBegin);
+        // Optional editor UI modules open their frame immediately before the
+        // variable tick. Minimized frames return before this point, so a
+        // UiBegin hook is never left without its paired UiEndCapture hook.
+        RunRuntimeModuleFrameHooks(
+            FramePhase::UiBegin,
+            frameDt,
+            alpha,
+            frameContext.EditorCapture,
+            pacing);
 
         // ── Phase 3: Variable tick ────────────────────────────────────────
         const auto variableTickBegin = std::chrono::steady_clock::now();
         m_Application->OnVariableTick(*this, alpha, frameDt);
-        RunRuntimeModuleFrameHooks(FramePhase::UiBuild, frameDt, alpha);
+        RunRuntimeModuleFrameHooks(
+            FramePhase::UiBuild,
+            frameDt,
+            alpha,
+            frameContext.EditorCapture,
+            pacing);
         pacing.VariableTickMicros = ElapsedMicros(variableTickBegin);
         preRenderTransformFlushNeeded =
             preRenderTransformFlushNeeded ||
             HasPendingPreRenderTransformFlush(*m_Scene);
 
-        // ── RUNTIME-090 Slice B: close the Dear ImGui frame ───────────────
-        // EndFrame runs after the variable tick and before the render
-        // contract's IRenderer::PrepareFrame(): it invokes the editor hook,
-        // calls ImGui::Render(), walks ImDrawData, and submits one
-        // ImGuiOverlayFrame to the overlay system (per GRAPHICS-013CQ). The
-        // renderer consumer is attached in Initialize(); graphics-side
-        // draw upload + recorded Pass.ImGui execution remain later GRAPHICS-079
-        // slices.
-        const auto imguiEnd = std::chrono::steady_clock::now();
-        m_ImGuiEditorBridge->EndFrame();
-        pacing.ImGuiEndMicros = ElapsedMicros(imguiEnd);
+        // Optional editor UI modules close, publish overlay data, and write the
+        // single frame-owned capture snapshot at the existing pre-render
+        // boundary.
+        RunRuntimeModuleFrameHooks(
+            FramePhase::UiEndCapture,
+            frameDt,
+            alpha,
+            frameContext.EditorCapture,
+            pacing);
         preRenderTransformFlushNeeded =
             preRenderTransformFlushNeeded ||
             HasPendingPreRenderTransformFlush(*m_Scene);
 
-        const EditorInputCaptureSnapshot editorCapture =
-            m_ImGuiEditorBridge->CaptureSnapshot();
+        const EditorInputCaptureSnapshot& editorCapture =
+            frameContext.EditorCapture;
         const bool imguiCapturesMouse =
             editorCapture.CapturedMouse || editorCapture.WidgetsActive;
         const bool imguiCapturesKeyboard =
@@ -1423,7 +1350,11 @@ namespace Extrinsic::Runtime
             ElapsedMicros(selectionPickDrainBegin);
 
         RunRuntimeModuleFrameHooks(
-            FramePhase::BeforeExtraction, frameDt, alpha);
+            FramePhase::BeforeExtraction,
+            frameDt,
+            alpha,
+            frameContext.EditorCapture,
+            pacing);
 
         // ── Phases 5–9: promoted render-frame contract ───────────────────
         RHI::FrameHandle frame{};
@@ -1499,7 +1430,12 @@ namespace Extrinsic::Runtime
         // their completion/cancellation state. Does not wait on workers.
         (void)m_JobService.ReapCompleted();
         (void)m_JobService.DrainGpuQueueCompletedTransfers();
-        RunRuntimeModuleFrameHooks(FramePhase::Maintenance, frameDt, alpha);
+        RunRuntimeModuleFrameHooks(
+            FramePhase::Maintenance,
+            frameDt,
+            alpha,
+            frameContext.EditorCapture,
+            pacing);
         pacing.MaintenanceMicros = ElapsedMicros(maintenanceBegin);
 
         // ── RUNTIME-092 / RUNTIME-145: completed selection readbacks ───────
@@ -1808,18 +1744,4 @@ namespace Extrinsic::Runtime
         return m_RenderExtractionService.GetVisualizationAdapterBindingRevision();
     }
 
-    void Engine::SetImGuiEditorCallback(std::function<void()> callback)
-    {
-        m_ImGuiEditorBridge->SetEditorCallback(std::move(callback));
-    }
-
-    void Engine::SetImGuiEditorVisible(const bool visible) noexcept
-    {
-        m_ImGuiEditorBridge->SetEditorVisible(visible);
-    }
-
-    const ImGuiAdapter& Engine::GetImGuiAdapter() const noexcept
-    {
-        return m_ImGuiEditorBridge->Adapter();
-    }
 }

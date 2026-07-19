@@ -287,6 +287,8 @@ namespace Extrinsic::Runtime
             .Jobs = context.Jobs,
             .Worlds = context.Worlds,
             .Services = context.Services,
+            .EditorCapture = context.EditorCapture,
+            .Pacing = context.Pacing,
             .FrameIndex = context.FrameIndex,
             .FrameDeltaSeconds = context.FrameDeltaSeconds,
             .FixedStepAlpha = context.FixedStepAlpha,

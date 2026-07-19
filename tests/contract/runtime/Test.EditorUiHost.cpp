@@ -6,6 +6,7 @@
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Runtime.EditorUiHost;
+import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.Engine;
 
 namespace Core = Extrinsic::Core;
@@ -32,26 +33,38 @@ public:
 }
 } // namespace
 
-TEST(EditorUiHost, AttachedVisibleHostRunsTheEditorFrameCallback) {
+TEST(EditorUiHost, ComposedModulePublishesHostAndRunsFrameContribution) {
+  Runtime::Engine engine(HeadlessConfig(),
+                         std::make_unique<OneFrameApplication>());
+  engine.EmplaceModule<Runtime::EditorUiModule>();
+  engine.Initialize();
+
+  std::size_t frameCallbacks = 0u;
+  Runtime::EditorUiHost *host =
+      engine.Services().Find<Runtime::EditorUiHost>();
+  ASSERT_NE(host, nullptr);
+  ASSERT_TRUE(host->IsOperational());
+  const Runtime::EditorUiFrameContributionHandle contribution =
+      host->RegisterFrameContribution(
+          [&frameCallbacks] { ++frameCallbacks; });
+  ASSERT_TRUE(contribution.IsValid());
+
+  EXPECT_TRUE(host->IsVisible());
+  engine.Run();
+  EXPECT_EQ(frameCallbacks, 1u);
+  EXPECT_EQ(host->GetDiagnostics().FramesProduced, 1u);
+  EXPECT_TRUE(host->UnregisterFrameContribution(contribution));
+
+  engine.Shutdown();
+}
+
+TEST(EditorUiHost, OmittedModuleLeavesEditorHostUnpublished) {
   Runtime::Engine engine(HeadlessConfig(),
                          std::make_unique<OneFrameApplication>());
   engine.Initialize();
 
-  std::size_t frameCallbacks = 0u;
-  Runtime::EditorUiHost host;
-  host.Attach(engine,
-              Runtime::EditorUiHostDescriptor{
-                  .ToggleActionDebugName = "Test.Editor.ToggleVisibility",
-                  .DrawFrame = [&frameCallbacks] { ++frameCallbacks; },
-              });
-
-  EXPECT_TRUE(host.IsAttached());
-  EXPECT_TRUE(host.IsVisible());
+  EXPECT_EQ(engine.Services().Find<Runtime::EditorUiHost>(), nullptr);
   engine.Run();
-  EXPECT_EQ(frameCallbacks, 1u);
-
-  host.Detach();
-  EXPECT_FALSE(host.IsAttached());
   engine.Shutdown();
 }
 

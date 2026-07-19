@@ -22,6 +22,8 @@ namespace Extrinsic::Sandbox::Editor
         {
             Detach();
             Shell.Attach(engine);
+            if (!Shell.IsAttached())
+                return;
             Method.Register(Shell);
             MeshProcessing.Register(Shell);
             Domain.Register(Shell);
