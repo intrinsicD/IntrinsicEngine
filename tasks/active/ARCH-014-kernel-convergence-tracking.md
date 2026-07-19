@@ -54,6 +54,9 @@ depends_on:
   removes interaction ownership/facades and the obsolete mesh-view
   compatibility surface, reducing the checked snapshot to 26 plain imports,
   4 domain imports, two re-exports, and 15 public getter names.
+  `RUNTIME-183` removes the remaining asset/import/cache/bake ownership and
+  facade surface, reducing the checked snapshot to 22 plain imports, zero
+  domain imports, two re-exports, and 10 public getter names.
   Retired `HARDEN-085` delivered the authoritative exact-policy ratchet.
   `ARCH-012`
   retired on 2026-07-08 at `Operational`: Sandbox composes
@@ -76,7 +79,7 @@ depends_on:
 - The 2026-07-18 reconciliation audit measured the exact clean ratchet at
   42 plain imports, 21 then-classified domain imports, 2 re-exports, and 31
   public getter names. Subsequent behavior-backed extractions now measure
-  26 / 4 / 2 / 15. The audit also found that the literal scorecard would
+  22 / 0 / 2 / 10. The audit also found that the literal scorecard would
   require zero-consumer extension/input frameworks, an unused `InlineModule`,
   and mechanical `IRuntimeModule` wrappers while the right-sizing audit that
   owns that interface is itself blocked on this umbrella.
@@ -86,10 +89,11 @@ depends_on:
   contradictory `RUNTIME-172`, and seeded only behavior-carrying children.
   The implementation graph converges through `RUNTIME-179`..`187` plus the
   retired `RUNTIME-188` scene-interaction split;
-  application lifecycle removal and `RUNTIME-129` operational bake may proceed
-  once their respective owners land. Retired `GRAPHICS-128` closed the bake's
-  shared-index-slice prerequisite, leaving `RUNTIME-183` as `RUNTIME-129`'s
-  remaining composition blocker. The lifecycle and bake leaves both gate the
+  application lifecycle removal and `RUNTIME-129` operational bake may now
+  proceed inside their accepted owners. Retired `GRAPHICS-128` closed the
+  bake's shared-index-slice prerequisite, and `RUNTIME-183` supplies the
+  accepted private AssetWorkflow composition owner. The lifecycle and bake
+  leaves both gate the
   later mechanism deletion audit, semantic auxiliary-surface cleanup, and
   final representation/checker leaf.
 
@@ -121,6 +125,10 @@ depends_on:
       Retired `RUNTIME-172` records a global document-module object whose complete
       durable state is bound to one validated active world and reset, never
       cached, across world changes.
+      `RUNTIME-183` records a global asset-workflow module with persistent
+      import/bake objects, per-boot asset/cache/handoffs, and exact borrowed
+      `{WorldHandle, Registry*, binding epoch}` scene state that resets rather
+      than resurrects across replacement, switch, retirement, and reinitialize.
 - [x] Run a 2026-07-18 scorecard/right-sizing reconciliation and seed
       `ARCH-016` instead of manufacturing wrappers for zero-consumer or
       one-consumer mechanisms.

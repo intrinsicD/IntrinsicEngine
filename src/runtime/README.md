@@ -24,19 +24,20 @@ startup/shutdown.
 | `Extrinsic.Runtime.SandboxConfigSections` | Presentation-free typed DTO, canonical JSON codec/validator, lookup/update helper, and registration-factory surface for the `sandbox.progressive_poisson` and `sandbox.parameterization` application sections. It owns the Sandbox field vocabulary while Core sees only generic records; `app/Sandbox` composes the registrations before boot. |
 | `Extrinsic.Runtime.InputActions` | Runtime-owned input-action registry from `RUNTIME-155`. Exports the action binding/handle/context/service/descriptor API plus `RuntimeInputActionRegistry`, which owns handle allocation, registration/unregistration state, key-edge trigger checks, ImGui keyboard-capture suppression, callback failure logging, and per-frame dispatch after the pre-render transform flush. Its generic service aggregate carries config, scene, and mutable render input; camera- and selection-aware actions capture their exact optional services when app policy registers them. `Runtime.Engine` re-exports the API for compatibility and delegates `RegisterInputAction(...)`, `UnregisterInputAction(...)`, and frame dispatch to the registry. |
 | `Extrinsic.Runtime.AsyncWorkModule` | App-composed global async-work owner from `RUNTIME-179`. Owns the persistent `StreamingExecutor` and `DerivedJobRegistry`, publishes both concrete capabilities plus the existing `Core::IStreamingFrameHooks` contract through `ServiceRegistry`, and drives completion/readback drain, count-limited main-thread apply, and background pumping in the canonical Maintenance order. It subscribes to `WorldWillBeDestroyed`, cancels generation-qualified queued/running/readback/apply work for that world, rejects later submissions to the retired handle, and relies on the executor's final pre-apply retirement check to suppress stale commits. Derived cancellation is terminal: a late success/error from a running worker and the apply path both preserve `Cancelled`. Shutdown joins executor work, applies readbacks already ready at the boundary, terminally cancels unresolved derived records, withdraws all three exact borrowed service entries, and only then destroys both owned services. Sandbox and tests that need async work compose the module explicitly; `Runtime.Engine` neither imports nor names it. |
-| `Extrinsic.Runtime.Engine` | Composition root, frame loop, subsystem construction/wiring, and remaining transitional subsystem accessors such as `GetAssetImportPipeline()` plus input-action facade methods. Its public interface owns no scene-document/history, scene-interaction, camera, async, config-control, editor-UI, reference-scene, selection, lookup, readback, gizmo, or mesh primitive-view capability. Optional owners publish exact services and contribute typed hooks through the module schedule. The implementation retains only the named `RUNTIME-183.EngineAssetHandoffTransition`: it resolves the optional exact `SelectionController` locally for initial/replacement import dependencies, cancels active imports before shutdown announcement, replaces that borrow with null after the announcement pump, then performs reverse module teardown. Active-world Maintenance remains a separate immediate asset-handoff rebind path. Before module registration Engine publishes the exact live `Platform::IWindow`, `Graphics::IRenderer`, and `RuntimeInputActionRegistry` built-ins; reinitialization republishes fresh window/renderer instances. Render-extraction cache/pool/stats/frame-index ownership stays in the Engine-private `RenderExtractionService`, and GPU asset cache/model-handoff residency stays in the Engine-private `AssetResidencyService`. The exact post-`RUNTIME-188` public-surface snapshot is 26 plain imports / 4 domain imports / 2 re-exports / 15 public getter names. |
+| `Extrinsic.Runtime.Engine` | Domain-free composition root and frame-loop owner. Its interface owns no asset/import/residency/bake, scene-document/history, scene-interaction, camera, async, config-control, editor-UI, reference-scene, selection, lookup, readback, gizmo, or mesh primitive-view capability. Optional owners publish exact services and contribute typed hooks through the module schedule. Before module registration Engine publishes the exact live `RHI::IDevice`, `Platform::IWindow`, `Graphics::IRenderer`, `RenderExtractionCache`, and `RuntimeInputActionRegistry` built-ins; reinitialization republishes fresh borrowed instances. Shutdown publishes and pumps the existing announcement after command discard and before application, GPU-participant, provider, renderer, or device teardown, then performs ordinary reverse module shutdown in the streaming phase. Render-extraction cache/pool/stats/frame-index ownership remains in the Engine-private `RenderExtractionService`; the local maintenance composite always advances its five geometry-retirement lanes and optionally invokes a published `Core::IAssetFrameHooks`. The exact post-`RUNTIME-183` surface is 22 plain imports / 0 domain imports / 2 re-exports / 10 public getter names. |
 | `Extrinsic.Runtime.FramePacingDiagnostics` | Runtime-owned frame-pacing diagnostics module from `RUNTIME-158`. Exports `RuntimeFramePacingDiagnostics` plus the pure helper that copies renderer `RenderGraphFrameStats` compile/execute timings into the current frame sample. `EditorUiModule` privately copies ImGui adapter timings/counters into the borrowed sample, so this generic module no longer imports the adapter. `Engine::RunFrame()` writes phase-boundary timings and publishes the last sample through `Engine::GetLastFramePacingDiagnostics()`. |
 | `Extrinsic.Runtime.SceneDocumentModule` | Optional app-composed document owner from `RUNTIME-172`. The concrete `final IRuntimeModule` publishes itself and its exact owned `EditorCommandHistory`, binds document path/event/sequence/history to one validated active `{WorldHandle, Scene::Registry*, binding epoch}`, and resets that complete durable state instead of retaining a per-world map. It preserves synchronous save/load/new/close without async; when `StreamingExecutor` is present it also queues snapshot saves and temporary-registry loads. Every completion captures weak operation state plus module generation, binding epoch, world, and registry identity and revalidates immediately before commit. New/load/close snapshot strong-handle participants in deterministic name/registration order, run every `BeforeReplace` callback while the outgoing registry is live, replace, run every `AfterReplace` callback against the rebound registry, then reset history. Parse failure invokes no participant and mutates no document state. Shutdown invalidates generation/epoch and cancels owned tasks before reverse module teardown; omission leaves Engine and the active world operational while document/history services are unavailable. |
 | `Extrinsic.Runtime.SceneInteractionModule` | Optional app-composed one-world interaction owner from `RUNTIME-188`. Its PImpl owns `SelectionController`, `StableEntityLookup` plus its scene binding, `SelectionReadbackState`, and `GizmoFrameService`; it publishes only the exact module and exact controller. Every input, `BeforeExtraction`, and `Maintenance` hook validates `{WorldHandle, Registry*, interaction epoch}` directly. The typed viewport hook runs after camera/capture, `BeforeExtraction` drains one pick and submits a copied world-tagged selection/hover/gizmo snapshot after input actions and transform flush, and `Maintenance` drains completed readbacks. A strong scene-document participant clears the complete cohort while the outgoing registry is live and rebuilds lookup on New/Load/Close; active-world mismatch, retirement, announcement, and recycled-handle reinitialize use the same reset. Pick sequences remain monotonic while zero, unknown, wrong-world, and wrong-epoch results fail closed. Announcement unregisters the document participant and detaches borrows before ordinary exact withdrawal. Omission leaves document, camera, generic input, component-driven primitive views, rendering, and Engine operational with empty interaction snapshots. |
-| `Extrinsic.Runtime.AssetImportPipeline` | Engine-owned asset import subsystem from `RUNTIME-147`. Exports runtime asset import/reimport requests, queued geometry/model/texture entry points and records, import result/event records, IO/backend decode-block test seams, and post-import processor/import-authoring/import-completed registry contracts. It owns the promoted ASSETIO geometry/model/texture decoder composition, ingest state-machine wiring, import event log, queue snapshot/cancel/clear facade, standalone geometry ECS materialization with local/world culling bounds, model/texture handoffs, dropped-file import routing, and the decode/materialize helpers previously in `Engine`. Platform drops enter through `Engine` and then call `AssetImportPipeline::ImportDroppedFilePaths(...)`. Queued imports freeze the active `{WorldHandle, Scene::Registry*}` target plus its binding epoch at submission and validate that exact active binding before materialization; a switch while decode is in flight, including away and back to the submitted world, produces a failed ingest record instead of applying through rebound scene/handoff members. Scene-changing successful imports mark the exact `EditorCommandHistory` service dirty when `SceneDocumentModule` is composed, preserving direct import, reimport, dropped-file apply, and queued apply document-state behavior without Engine ownership. Dropped ambiguous geometry extensions such as PLY try supported geometry payloads in import-router order before failing closed. Runtime logs dropped-file receipt, per-path routing/queue decisions, and shared import completion so failed drops remain diagnosable outside the editor panel. Direct mesh imports publish the decoded raw mesh entity with explicit or synthesized `v:normal` before derived materialization; derived UV/normal-bake work is owned by registered post-import processors instead of hardcoded materialization. Mesh imports that fail strict shared-topology conversion only for renderable non-manifold/inconsistent-winding diagnostics materialize through a disconnected render-only mesh fallback; geometry algorithms still use the strict converter as their topology contract. |
-| `Extrinsic.Runtime.SandboxDefaultPolicies` | Runtime-owned sandbox/default composition helper. `RegisterSandboxDefaultRuntimePolicies(Engine&, CameraControllerRegistry*)` installs the standard direct-mesh generated-normal post-import processor, import authoring defaults (`SelectableTag`, render lanes, visualization defaults), import-completed auto-select UX, optional autofocus, and the optional `F` focus-on-selection input action; `UnregisterSandboxDefaultRuntimePolicies(...)` removes the returned handles. The Sandbox resolves the exact camera registry once and passes it explicitly. With a null registry, the completed handler still registers and selects the first valid imported entity, while autofocus and `F` are omitted. Asset-import policies register through `Engine::GetAssetImportPipeline()`, while the input action registers through Engine's compatibility facade and is stored/dispatched by `Extrinsic.Runtime.InputActions`; generic action services carry no camera pointer. The helper keeps the default behavior opt-in for app/feature composition. When `RuntimePostImportProcessorServices` supplies a `RuntimeObjectSpaceNormalBakeQueue`, the direct-mesh post-processor resolves UVs/normals on the streaming lane, then schedules an object-space normal GPU-bake request on main-thread apply and leaves material binding deferred; non-operational backends record the queue's no-CPU-fallback diagnostic. Without that queue service, the legacy CPU generated-normal compatibility helper remains available for older isolated callers. |
+| `Extrinsic.Runtime.AssetWorkflowModule` | Optional app-composed global asset owner from `RUNTIME-183`. Its PImpl keeps one persistent dependency-empty `AssetImportPipeline` and `ObjectSpaceNormalBakeService` across Engine reinitialize, while each boot recreates `AssetService`, `GpuAssetCache`, the cache listener, and model texture/scene handoffs. It publishes exactly `AssetService`, `AssetImportPipeline`, `GpuAssetCache`, and `Core::IAssetFrameHooks`; the private bake service remains one retained `JobService` GPU-queue participant driven by Engine's generic bridge. Resolution requires the exact `SceneDocumentModule` and `EditorCommandHistory`, optionally borrows streaming and selection, and registers one strong document-replacement participant. Active-world and direct callback paths validate `{WorldHandle, Registry*, binding epoch}`. Shutdown announcement cancels imports, invalidates bindings, releases the participant, and detaches provider borrows before application/provider teardown; ordinary shutdown withdraws exact services and destroys per-boot state after the GPU bridge. Omission leaves generic Engine/render/world/transfer/async and render-extraction geometry retirement operational, with asset services absent and platform drops ignored. |
+| `Extrinsic.Runtime.AssetImportPipeline` | `AssetWorkflowModule`-owned asset import subsystem from `RUNTIME-147`. Exports runtime asset import/reimport requests, queued geometry/model/texture entry points and records, import result/event records, IO/backend decode-block test seams, and post-import processor/import-authoring/import-completed registry contracts. It owns the promoted ASSETIO geometry/model/texture decoder composition, ingest state-machine wiring, import event log, queue snapshot/cancel/clear facade, standalone geometry ECS materialization with local/world culling bounds, model/texture handoffs, dropped-file import routing, and the decode/materialize helpers previously in `Engine`. Platform drops resolve the optional exact service and call `ImportDroppedFilePaths(...)` only when present. Queued imports freeze the active `{WorldHandle, Scene::Registry*}` target plus its binding epoch at submission and validate that exact active binding before materialization; direct imports now perform the same current-binding check. A switch while decode is in flight, including away and back to the submitted world, produces a failed ingest record instead of applying through rebound scene/handoff members. Scene-changing successful imports mark the exact `EditorCommandHistory` service dirty, preserving direct import, reimport, dropped-file apply, and queued apply document-state behavior. Dropped ambiguous geometry extensions such as PLY try supported geometry payloads in import-router order before failing closed. Runtime logs dropped-file receipt, per-path routing/queue decisions, and shared import completion so failed drops remain diagnosable outside the editor panel. |
+| `Extrinsic.Runtime.SandboxDefaultPolicies` | Runtime-owned sandbox/default composition helper. `RegisterSandboxDefaultRuntimePolicies(Engine&, CameraControllerRegistry*)` installs the standard direct-mesh generated-normal post-import processor, import authoring defaults (`SelectableTag`, render lanes, visualization defaults), import-completed auto-select UX, optional autofocus, and the optional `F` focus-on-selection input action; `UnregisterSandboxDefaultRuntimePolicies(...)` removes the returned handles. The Sandbox resolves the exact camera registry once and passes it explicitly. With a null registry, the completed handler still registers and selects the first valid imported entity, while autofocus and `F` are omitted. Asset-import policies resolve the optional exact `AssetImportPipeline` service once; when it is absent, asset registrations are omitted while generic input actions remain available. The input action registers through Engine's compatibility facade and is stored/dispatched by `Extrinsic.Runtime.InputActions`; generic action services carry no camera pointer. When `RuntimePostImportProcessorServices` supplies a `RuntimeObjectSpaceNormalBakeQueue`, the direct-mesh post-processor resolves UVs/normals on the streaming lane, then schedules an object-space normal GPU-bake request on main-thread apply and leaves material binding deferred; non-operational backends record the queue's no-CPU-fallback diagnostic. |
 | `Extrinsic.Runtime.AssetIngestStateMachine` | Runtime-owned ingest request/result state machine (`RUNTIME-101`). Exports request sources for manual import, dropped files, and reimport; phases from `Queued` through route resolution, decode scheduling/execution, main-thread apply, `Complete`, `Failed`, and `Cancelled`; and a diagnostic taxonomy for missing path/file, route failures, invalid reimport target, duplicate active request, decode failure, callback failure, materialization failure, cancellation, stale completion, invalid transition, and unknown handles. The state machine is backend-neutral and owns no decoders, ECS mutation, `AssetService`, graphics, RHI, or worker threads. `AssetImportPipeline::ImportAssetFromPath(...)`, `QueueGeometryImport(...)`, `QueueModelTextureImport(...)`, `ReimportAsset(...)`, synchronous dropped non-promoted imports, and deferred dropped geometry/model-scene/texture imports submit records through this contract; deferred file reads and decodes run on `Runtime.StreamingExecutor` and complete/fail only from its main-thread apply lane. Reimport resolves the existing asset path and payload kind from `AssetService`, reloads the same `AssetId` transactionally, lets texture/model-scene handoffs consume `Reloaded`/`Ready` events, and does not revive ECS `AssetSourceRef` coupling; standalone geometry scene entities remain authoring snapshots and are not duplicated. |
 | `Extrinsic.Runtime.AssetGeometryIO` | Runtime-owned registration seam for `ASSETIO-001` Slice B. Exports `RegisterPromotedGeometryIOCallbacks(Assets::AssetGeometryIOBridge&)`, imports the promoted geometry IO modules in runtime, and registers OBJ/OFF/STL/PLY mesh importers, XYZ/PTS/XYZRGB/PCD/PLY point-cloud importers, TGF/edge-list graph importers, OBJ/STL/PLY mesh exporters, XYZ/PCD/PLY point-cloud exporters, and TGF/edge-list graph exporters. The adapter translates legacy geometry `Core.Error` decoder failures into promoted `Extrinsic.Core.Error` codes before they enter the asset bridge, keeping `src/assets` free of geometry/runtime/graphics imports. It does not construct ECS entities or GPU residency; later `ASSETIO-001` slices own model/texture payloads and runtime handoff. |
 | `Extrinsic.Runtime.AssetMeshNormals` | Runtime-owned mesh payload materialization helper for asset import paths. Exports `RuntimeMeshUvResolutionOptions`, `RuntimeMeshGeometryOnlyOptions`, `RuntimeMeshMaterializationDiagnostics`, `BuildRuntimeHalfedgeMeshGeometryOnly(...)`, `BuildRuntimeHalfedgeMeshMaterialization(...)`, the compatibility wrapper `BuildRuntimeHalfedgeMeshWithNormals(...)`, and `MeshPayloadHasValidVertexTexcoords(...)`. The geometry-only helper triangulates promoted `Geometry::MeshIO::MeshIOResult` payloads for immediate authoring publication without invoking UV atlas resolution or texture baking; it copies typed vertex properties and writes explicit `v:normal` vectors or deterministic area-weighted fallback normals so the first upload has count-matched normals. The full materialization helper validates authored UVs through `Geometry.UvAtlas`, preserves valid authored `v:texcoord` by default, invokes the selected atlas backend when UVs are missing/invalid or regeneration is forced, defaults to `UvAtlasMethod::FastStaged`, exposes explicit `Method` and `AllowXAtlasFallback` controls for compatibility/fail-closed tests, and fails closed under the default required-UV policy when no valid UVs can be produced. It copies explicit `v:normal` vectors or synthesizes deterministic area-weighted normals, preserves typed vertex payload properties such as `glm::vec3`/`glm::vec4` colors and scalar/vector algorithm results across seam-split output using source-vertex xrefs, records `v:source_vertex` / `f:source_face` provenance, and reports authored-vs-generated UV provenance, invalid-authored status, backend status, seam-split count, chart count, and atlas dimensions. Direct mesh imports may opt into the disconnected render-only fallback for non-manifold/inconsistent-winding payloads; model-scene materialization uses the strict topology path. |
 | `Extrinsic.Runtime.MeshAttributeTextureBake` | Runtime-owned CPU texture bake helper for mesh attributes over resolved UVs. Exports the generic `MeshAttributeTextureBakeRequest` / `BakeMeshAttributeTexture(...)` seam for `GeometrySources::ConstSourceView` and `Geometry::HalfedgeMesh::Mesh`, stable `BuildMeshAttributeTextureBakeAssetPath(...)` keys, status/result/diagnostic records, and compatibility wrappers `BakeMeshVertexNormalTexture(...)` and `BakeMeshVertexColorTexture(...)`. The generic path supports vertex and face source domains, finite scalar `float`/`double`, label `uint32`, and finite `glm::vec2`/`glm::vec3`/`glm::vec4` properties whose count matches the selected domain. Encoders cover scalar colormap, linear scalar R8, label palette RGBA8, vector2 RG8, vector3 RGB8, normal RGBA8, and RGBA color outputs; scalar ranges are either finite auto-ranges with flat-range expansion or explicit increasing manual ranges. The baker requires mesh-domain topology and count-matched finite vertex `v:texcoord`; missing UVs, unsupported domains/types, invalid ranges/resolutions, non-finite data, degenerate UV triangles, and zero-coverage bakes fail closed with diagnostics. It does not generate UVs and has no `AssetService`, graphics, RHI, or Vulkan dependency; runtime callers can use the stable generated path to reload the intended CPU texture payload when a dirty stamp changes. |
 | `Extrinsic.Runtime.ObjectSpaceNormalBakeBinding` | Runtime-owned bridge from a completed GPU object-space normal bake queue entry to extraction material binding. `TryBindReadyObjectSpaceNormalBake(...)` checks that the generated texture `AssetId` has a ready texture view in `Graphics::GpuAssetCache` before consuming the queue completion; pending cache entries leave the queue untouched, stale completions are rejected through `RuntimeObjectSpaceNormalBakeQueue`, and accepted completions install a data-only `MaterialTextureAssetBindings::Normal` binding with `MaterialNormalTextureSpace::ObjectSpaceNormal` on `RenderExtractionCache`. It performs no render-thread command recording, no Vulkan/backend calls, no CPU texture bake fallback, and no live `AssetService` mutation. |
 | `Extrinsic.Runtime.ObjectSpaceNormalBakeQueue` | Runtime-owned scheduling contract for GPU object-space normal bake requests. It selects the generated texture `AssetId` from a stable resolved geometry/UV/normal content key when available, falls back to an entity-scoped generated asset, records entity/geometry/UV/normal generation plus resolution/padding/normal-space stale keys, retains pending submissions for the service-owned GPU participant, no-ops deterministically when the graphics backend is non-operational without scheduling a CPU fallback, and rejects stale completions before a caller may mutate material bindings. It owns no ECS mutation, render-thread command recording, `GpuAssetCache` residency, Vulkan handles, or live `AssetService`; those remain in `ObjectSpaceNormalBakeService` private state and graphics-owned bake/cache modules. |
-| `Extrinsic.Runtime.ObjectSpaceNormalBakeService` | Engine-owned object-space normal bake composition service from `RUNTIME-161`, with its one-consumer GPU queue participant privatized by `RUNTIME-170`. Opaque service state owns the `RuntimeObjectSpaceNormalBakeQueue`, retained submissions, GPU diagnostics, plan-provider adaptation, borrowed `GpuAssetCache` / `RenderExtractionCache` / device-ready-frame dependencies, and `JobService` `GpuQueue` participant callbacks. The public service exposes the request queue to asset import/document/selected-mesh callers and clears dependencies during shutdown after GPU participants drain; an explicit test seam uses two test-named free functions to inject deterministic plans and record/ready-publication failures and to copy asserted counters without exposing direct record/drain methods. A graphics-recorded bake uses `ObjectSpaceNormalBakeReadyFrame(issueFrame, framesInFlight) = issueFrame + framesInFlight`: the cache cannot promote earlier, and binding cannot consume the texture until a ready view exists. Recording or ready-publication failure retires only the ticket's matching cache generation, so an explicit retry cannot enter a `ResourceBusy` livelock. CPU/null contracts cover three-frame readiness, command recording, promotion/binding, stale discard, content-key reuse, and both failure cleanup paths through the service plus `JobService`. `RUNTIME-129` still owns the production Vulkan plan provider and opt-in runtime smoke closure. |
+| `Extrinsic.Runtime.ObjectSpaceNormalBakeService` | `AssetWorkflowModule`-private object-space normal bake composition service from `RUNTIME-161`, with its one-consumer GPU queue participant privatized by `RUNTIME-170`. Opaque service state owns the `RuntimeObjectSpaceNormalBakeQueue`, retained submissions, GPU diagnostics, plan-provider adaptation, borrowed `GpuAssetCache` / `RenderExtractionCache` / device-ready-frame dependencies, and `JobService` `GpuQueue` participant callbacks. The module retains the exact participant handle for rollback; normal Engine shutdown lets the generic GPU bridge unregister and drain it before module cleanup clears dependencies and queue state. The service is not published merely for tests or future callers. An explicit test seam uses two test-named free functions to inject deterministic plans and copy asserted counters. `RUNTIME-129` still owns the production Vulkan plan provider and opt-in runtime smoke closure. |
 | `Extrinsic.Runtime.ObjectSpaceNormalBakeSubmission` | Runtime-owned GPU submission bridge for queued object-space normal bake work. `BeginObjectSpaceNormalBakeGpuSubmission(...)` validates a queue submission against a graphics `ObjectSpaceNormalTextureBakePlan`, rejects stale plan/completion mismatches and currently-unavailable padded dilation plans before cache allocation, registers the generated texture as a GPU-produced pending texture in `GpuAssetCache`, and returns an `ObjectSpaceNormalTextureBakeGpuRecordDesc` for render-thread command recording. `MarkObjectSpaceNormalBakeGpuSubmissionReady(...)` attaches the submitted-frame ready value to the cache entry; material binding remains deferred to `Runtime.ObjectSpaceNormalBakeBinding` after `GpuAssetCache` promotes the texture to `Ready`. It does not own Engine import scheduling, command-list submission, CPU texture fallback, or live `AssetService` mutation. |
 | `Extrinsic.Runtime.SelectedMeshTextureBake` | Runtime-owned selected-mesh texture bake command surface (`RUNTIME-115`). Exports selected-entity bake request/result/status DTOs, validates stable entity liveness, mesh `GeometrySources`, vertex/face source property compatibility, resolved finite `v:texcoord`, output resolution/range, and progressive target slot compatibility. Non-normal and compatibility bakes route through `MeshAttributeTextureBake` and `AssetService` generated texture payload loads/reloads. When the context carries a `RuntimeObjectSpaceNormalBakeQueue`, mesh-vertex normal outputs instead enqueue an object-space normal GPU-bake request with geometry/UV/normal content keys and stale generations, mark the progressive normal slot pending on operational backends, and no-op with the queue's no-CPU-fallback diagnostic on non-operational backends without creating a CPU texture. `Auto` encoder selection is material-slot aware: normal slots use normal-encoded vec3 textures, roughness/metallic slots bake scalar values and load them into the renderer's packed metallic-roughness texture layout, albedo accepts color/scalar/label encodings, and unsupported or mismatched slots fail closed before asset creation. Synchronous command execution can bind the generated texture through `EditorCommandHistory`; derived-job execution records observable CPU bake work through `DerivedJobRegistry`, preserves previous outputs while pending/failed, and discards stale apply results before mutating bindings. It owns no UI widgets, graphics resources, RHI/Vulkan objects, or GPU upload state. |
 | `Extrinsic.Runtime.ProgressiveRenderData` | Data-only progressive render-data contract accepted by ADR-0021 and implemented by `RUNTIME-111`. Exports entity shape, geometry-domain, lane, presentation-kind, slot semantic/source/readiness, generated-output policy/provenance, job-domain metadata, `ProgressivePresentationBindings`, property binding descriptors, property compatibility resolution, and compatible-first property option enumeration. Descriptors persist asset ids, names, value kinds, counts, defaults, readiness, and generated-output policy; they never persist raw property pointers, borrowed property views, transient worker/job state, graphics handles, RHI/Vulkan objects, or live `AssetService` ownership. |
@@ -100,7 +101,7 @@ Dropped geometry, model-scene, and texture imports now share the same
 thread, file read/decode runs on the worker lane, and only decoded CPU payloads
 cross back into the bounded main-thread apply drain for `AssetService`, ECS,
 handoff, selection, and document-history mutation. Sandbox editor geometry
-commands use `Engine::GetAssetImportPipeline().QueueGeometryImport(...)` while
+commands use the published `AssetImportPipeline::QueueGeometryImport(...)` while
 model-scene and texture commands use `QueueModelTextureImport(...)`; every
 supported File / Import command returns `Pending` with an ingest handle to the
 ImGui callback and publishes completion through the existing runtime import
@@ -125,7 +126,7 @@ Direct `AssetImportPipeline::ImportAssetFromPath(...)` /
 `AssetImportPipeline::ReimportAsset(...)` calls and
 `SceneDocumentModule::SaveSceneToPath(...)` / `LoadSceneFromPath(...)` calls
 are still synchronous APIs outside the frame-driven UI/drop routes.
-`Engine::GetAssetImportPipeline().SetModelTextureImportIOBackendFactoryForTest(...)`
+`AssetImportPipeline::SetModelTextureImportIOBackendFactoryForTest(...)`
 is a contract-test seam for injecting slow or fake model/texture IO backends
 into queued imports; production queued imports fall back to
 `Core::IO::FileIOBackend`. The queued-geometry before-decode test hook can hold
@@ -882,8 +883,11 @@ callbacks against the same rebound registry, and resets its exact owned
 contract. The module itself owns no selection, lookup, readback, extraction,
 asset, bake, or GPU object.
 
-`SceneInteractionModule` owns the interaction participant; only the
-`RUNTIME-183` asset-workflow participant remains transitional in Engine:
+`SceneInteractionModule` and `AssetWorkflowModule` own their respective
+interaction and asset-handoff replacement participants. The document module
+allocates participant generations across its full module lifetime rather than
+per boot, so recycling a slot index after reinitialize cannot make a stale
+participant handle valid again:
 
 - `SelectionController::ClearSceneState(...)` drops selected/hovered ECS tags,
   selected-id snapshots, pending picks, and in-flight pick correlation without
@@ -905,15 +909,17 @@ asset, bake, or GPU object.
   remains a wiring decision for the task that installs physics into the frame
   loop.
 
-Active-world Maintenance is deliberately distinct. Engine immediately clears
-the remaining asset/extraction outgoing sidecars, refreshes the active registry
-pointer, and rebinds asset borrowers during the same Maintenance pass; it does
-not synthesize a document new/load/close transition. `SceneInteractionModule`
-validates the active handle/registry before every input, extraction, lookup,
-and readback action, so it resets/rebinds before delayed world events can expose
-stale state and never resurrects interaction on away/back. `SceneDocumentModule`
-independently validates before document operations and resets path/event
-sequence/history on mismatch.
+Active-world Maintenance is deliberately distinct.
+`AssetWorkflowModule` validates its exact
+`{WorldHandle, Registry*, binding epoch}` before every tick, direct import, and
+model-scene callback; a mismatch destroys and rebinds its asset/bake handoffs
+without synthesizing a document new/load/close transition. The generic
+render-extraction lane independently retires its outgoing sidecars.
+`SceneInteractionModule` validates the active handle/registry before every
+input, extraction, lookup, and readback action, so it resets/rebinds before
+delayed world events can expose stale state and never resurrects interaction
+on away/back. `SceneDocumentModule` independently validates before document
+operations and resets path/event sequence/history on mismatch.
 
 Persistence support is intentionally narrow and explicit:
 
@@ -976,57 +982,24 @@ freshly-constructed subsystems):
    applies validate the referenced recipe before mutating
    `DefaultRecipeConfigPath`, so an invalid hot file preserves the current
    active recipe override.
-3. CPU `FrameGraph` and `StreamingExecutor`.
-4. `Assets::AssetService`.
-5. The Engine-private `AssetResidencyService` constructs
-   `Graphics::GpuAssetCache` with the
-   renderer's `BufferManager`, `TextureManager`, `SamplerManager`, and the
-   device's `TransferQueue`. Immediately after construction the service calls
-   `GpuAssetCache::InitializeFallbackTexture(...)` through
-   `Runtime.DeviceBootstrap` with the runtime-baked 4×4 magenta-and-black
-   `RGBA8_UNORM` checkerboard bytes and a nearest/clamp-to-edge sampler
-   descriptor (RUNTIME-070). The call is gated on `m_Device->IsOperational()`;
-   on the Null backend (or any non-operational device) the bootstrap is skipped
-   and `GpuAssetCacheDiagnostics::FallbackTextureReady` stays `false`, leaving
-   material code on its factor-only shading branch as documented in
-   `src/graphics/assets/README.md`. A non-`Ok` result from
-   `InitializeFallbackTexture` is logged as a single `Core::Log::Warn`
-   breadcrumb and otherwise treated as a graceful "fallback unavailable"
-   transition. The service registers the cache's `AssetEventBus` listener after
-   the bootstrap attempt so a failed bootstrap does not block event
-   subscription. Type-specific asset handoffs are still constructed after the
-   ECS scene exists so model-scene materialization can borrow the scene.
-6. ECS `Scene::Registry`, then the Engine-private `AssetResidencyService`
-   constructs
-   `AssetModelTextureHandoff` and `AssetModelSceneHandoff`. The texture handoff
-   subscribes to texture `Ready` events and requests `GpuAssetCache` texture
-   uploads from promoted CPU payloads. The model-scene handoff subscribes to
-   model-scene `Ready` events, materializes generated `GeometrySources`
-   entities, mints embedded texture child assets, and records material
-   `AssetId` bindings. `ObjectSpaceNormalBakeService` owns the single
-   `RuntimeObjectSpaceNormalBakeQueue`, registers its GPU queue participant
-   through `JobService`, passes the request queue to model-scene handoff options
-   and direct-mesh post-import services, and clears dependencies during shutdown
-   after GPU participants drain. The `RUNTIME-183` document-replacement
-   participant clears queue state at new/load/close boundaries so stale
-   generated-normal completions cannot survive a scene replacement. Shutdown
-   asks the Engine-private
-   `AssetResidencyService` to detach
-   the model-scene handoff before application shutdown or scene reset because
-   it borrows the scene and renderer; the service resets the texture
-   handoff before `AssetService` and resets `GpuAssetCache` before renderer
-   teardown so GPU leases unwind through live managers. Active-world changes
-   likewise rebuild the scene handoffs and import-pipeline dependencies during
-   the same Maintenance pass. World destruction is deferred, so this rebind
-   removes every borrowed reference to the previous registry before that
-   inactive world can be retired; a missing active scene detaches the borrowers
-   and stable-entity lookup instead.
-7. Runtime-module resolution/finalization, including optional
-   `SceneDocumentModule`/`EditorCommandHistory` publication, optional async
-   discovery for queued scene IO, `CameraModule` service publication, and
-   `SceneInteractionModule` publication plus its document participant and typed
-   viewport/extraction/maintenance contributions.
-8. `IApplication::OnInitialize`; Sandbox optionally bootstraps reference
+3. CPU `FrameGraph`.
+4. Boot `WorldRegistry` and its initial ECS registry.
+5. Runtime-module registration. Engine first publishes its exact borrowed
+   kernel/device/window/renderer/extraction/input services, then invokes every
+   name-sorted module's `OnRegister`. When composed, `AssetWorkflowModule`
+   validates the required built-ins before creating the per-boot
+   `AssetService` and `GpuAssetCache`, initializes the fallback texture, installs
+   the asset listener, and publishes the four exact asset capabilities. A
+   non-operational device skips fallback upload without disabling CPU asset
+   authority.
+6. Runtime-module resolution/finalization. `AssetWorkflowModule` requires the
+   already-published `SceneDocumentModule` and exact `EditorCommandHistory`,
+   optionally resolves streaming and selection, registers its document
+   replacement participant and GPU-queue participant, and binds the model
+   texture/scene handoffs to the exact active `{WorldHandle, Registry*, epoch}`.
+   Other optional modules resolve their own declared services, and the complete
+   schedule is validated and locked.
+7. `IApplication::OnInitialize`; Sandbox optionally bootstraps reference
    content in the initial world exactly once, retains that owning handle for
    teardown, and hands the population seed to the camera registry when present.
 
@@ -1200,7 +1173,7 @@ visualization/Htex baking, and heavy sandbox editor method commands submit
 persistent executor work directly or through that registry. Completed task
 slots are recycled with generation-checked handles, ready work is held in
 per-priority queues instead of rescanning every submitted record, and
-`Engine::GetAssetImportPipeline().GetAssetImportQueueSnapshot()` uses the
+`AssetImportPipeline::GetAssetImportQueueSnapshot()` uses the
 executor's batch state query when computing import-row cancellation.
 `Engine` no longer exposes a frame-recorded streaming `TaskGraph` bridge.
 Sandbox CPU K-Means requests route through `Extrinsic.Runtime.ClusteringModule`:
@@ -1226,7 +1199,7 @@ operation handles, source paths, payload kinds, asset ids when known,
 enqueue/start/finish timestamps, coarse stages (`Queued`, route/decode,
 main-thread apply, GPU upload, terminal states), determinate vs indeterminate
 progress, and terminal diagnostics.
-`Engine::GetAssetImportPipeline().GetAssetImportQueueSnapshot()` polls those
+`AssetImportPipeline::GetAssetImportQueueSnapshot()` polls those
 records for editor/UI consumers, marks only active deferred `StreamingExecutor`
 imports as cancellable, and exposes
 `AssetImportPipeline::CancelAssetImport(...)` /
@@ -1235,27 +1208,38 @@ graphics, or UI ownership below runtime. Sandbox manual File / Import commands
 and promoted dropped geometry/model/texture requests remain queued across the
 worker/apply boundary; explicit direct imports and reimports still use the same
 state-machine records but reach a terminal row inside their synchronous call.
-`Engine::Shutdown()` calls
-`AssetImportPipeline::CancelActiveAssetImportsForShutdown()` immediately after
-discarding pending engine commands and before ImGui or application policy
-teardown. The lifecycle call reuses the executor plus ingest-state cancellation
-path for pending, ready, running, and decoded work waiting for main-thread apply,
-so those records become `Cancelled` and their materialization callbacks cannot
-run after Sandbox unregisters its import policies. Interactive queue cancellation
-keeps its existing pre-apply boundary; the additional decoded-work allowance is
-shutdown-only. Worker execution is still joined by the normal async-work drain.
+`Engine::Shutdown()` discards pending commands, marks the initialization state
+false, and publishes/pumps `RuntimeShutdownAnnounced` before application,
+GPU-participant, module-provider, renderer, or device teardown. The
+`AssetWorkflowModule` listener calls
+`AssetImportPipeline::CancelActiveAssetImportsForShutdown()`, advances the
+binding epoch, releases its document participant, and detaches every provider
+borrow. Cancellation reuses the executor plus ingest-state path for pending,
+ready, running, and decoded work waiting for main-thread apply, so those records
+become `Cancelled` and their materialization callbacks cannot run after Sandbox
+unregisters its import policies. Interactive queue cancellation keeps its
+existing pre-apply boundary; the additional decoded-work allowance is
+shutdown-only.
 
 Shutdown order requirement:
 
-1. active asset-import cancellation before ImGui/application policy teardown
-2. application shutdown, which may unregister import policies and release a
+1. command discard and shutdown-announcement pump; asset imports cancel and all
+   scene/document/provider borrows detach in the listener
+2. generic `JobServiceGpuQueueBridge` participant shutdown and the required
+   device-idle coordination while asset cache/bake state remains live
+3. application shutdown, which unregisters import policies and may release a
    blocked decoder
-3. `AsyncWorkModule::OnShutdown()` over the live `StreamingExecutor` before
-   scene/assets reset. It first joins and drains executor work, then
+4. reverse name-sorted module shutdown:
+   `AsyncWorkModule::OnShutdown()` runs before
+   `AssetWorkflowModule::OnShutdown()` over the live `StreamingExecutor`. Async
+   first joins and drains executor work, then
    drains derived completions/readbacks, applies readbacks already ready at the
    shutdown boundary, and cancels every surviving derived record. Once it
-   returns, later readiness polling cannot run a derived main-thread callback.
-4. task scheduler teardown
+   returns, later readiness polling cannot run a derived main-thread callback;
+   AssetWorkflow then withdraws exact services, clears private bake state, and
+   destroys per-boot assets/cache/handoffs
+5. world, frame graph, renderer, device, window, and finally task-scheduler
+   teardown
 
 ## Stable entity lookup ownership and policy
 
@@ -1356,11 +1340,11 @@ owns the live cache instance, pool, last stats, and frame-index counter that
 `Engine` composes into the frame loop; it does not change the extraction
 algorithms or renderer-owned resource policy.
 
-`RUNTIME-178` keeps the remaining private-service declaration cost out of the
-Engine interface without changing lifecycle order. `AssetResidencyService`
-remains at its established Engine member position and is held as an opaque
-`std::unique_ptr` whose private definition is included only by
-`Runtime.Engine.cpp`. `RUNTIME-182` deletes the former private
+`RUNTIME-183` removes the former Engine-private asset-residency declaration and
+its include-only header. The same cache/listener/handoff implementation is
+folded into `AssetWorkflowModule`'s private PImpl, so the Engine interface and
+implementation carry no asset-domain owner, import, facade, or transition.
+`RUNTIME-182` deletes the former private
 `ImGuiEditorBridge`; the app-composed `EditorUiModule` now owns that optional
 lifetime without an Engine member or facade. `RenderExtractionService` stays
 by value because the Engine API independently requires its public extraction

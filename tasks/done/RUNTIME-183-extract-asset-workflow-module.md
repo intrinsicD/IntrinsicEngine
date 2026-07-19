@@ -13,17 +13,36 @@ maturity_target: Operational
 
 ## Status
 
-- In progress as of 2026-07-19; owner: Codex team; implementation branch:
+- Completed and retired at `Operational` on 2026-07-19; owner: Codex team;
+  implementation branch:
   `codex/runtime-183-asset-workflow`.
-- Next gate: land the bounded PImpl owner, exact service publication, and early
-  shutdown-announcement split with focused asset-workflow lifecycle coverage.
-- Selectable as of 2026-07-19: `RUNTIME-172`, `RUNTIME-179`, `RUNTIME-180`,
-  `RUNTIME-181`, and `RUNTIME-188` are all retired. Implementation remains
-  open; the next gate is the bounded PImpl asset-owner slice below.
+- Implementation checkpoints: task promotion `7375725b`; module extraction
+  `28a15808`; Engine delegation `0c5b0d23`; lifecycle/ABA closure
+  `cef5a7ce`; final ownership-aware contract repair `3521bfff`.
+- Commit reference: this retirement commit records final documentation,
+  generated state, and policy evidence.
+- One app-composed PImpl now owns the persistent import/bake objects and
+  per-boot asset/cache/listener/handoff state, publishes exactly four existing
+  capabilities, validates every borrowed world binding, and participates in
+  synchronous document replacement through a retained generation-safe handle.
+  Announcement-first cancellation/detachment precedes provider teardown;
+  Engine retains only generic frame, world, render, transfer, and GPU queue
+  coordination.
+- Verification evidence:
+  - the clean focused asset/runtime/graphics selector passed 215/215;
+  - the clean full CPU-supported selector passed 4,240/4,240 with one expected
+    GLFW/LSan capability skip and zero failures;
+  - the exact Engine convergence ratchet passes at `22/0/2/10`;
+  - strict task/state, documentation-link, layering, test-layout, root-hygiene,
+    generated inventory/session-brief, ARA YAML, and diff checks pass on the
+    retirement state.
+- `RUNTIME-172`, `RUNTIME-179`, `RUNTIME-180`, `RUNTIME-181`, and
+  `RUNTIME-188` are retired prerequisites. This retirement makes
+  `RUNTIME-168` and `RUNTIME-129` selectable.
 - 2026-07-19 contract amendment: asset composition now resolves the audited
   `SceneDocumentModule` and `SceneInteractionModule` split and participates in
   document replacement through `RUNTIME-172`'s synchronous narrow contract.
-  Implementation remains open.
+  The completed module owns that participant and its retained-handle lifetime.
 - 2026-07-19 composition evidence: `RUNTIME-172` lands the temporary
   `RUNTIME-183.EngineAssetHandoffTransition`. It captures only the exact
   long-lived residency, asset, renderer/device, extraction, bake, import,
@@ -45,6 +64,11 @@ maturity_target: Operational
   validation; rollback is specified as a no-partial-state invariant; provider
   omission diagnostics use real production instances; and the one production
   shutdown order is separated from direct-lifecycle order-safety probes.
+- 2026-07-19 acceptance-audit correction: a forced same-slot reinitialize
+  exposed that `SceneDocumentModule` reset replacement-participant generations
+  per boot. Participant generations now advance across the persistent module
+  lifetime, so a stale pre-shutdown handle cannot detach the live
+  AssetWorkflow participant after slot-index reuse.
 
 ## Goal
 - Move CPU asset authority, GPU residency, import orchestration, scene
@@ -128,13 +152,13 @@ maturity_target: Operational
   domain imports / `2` re-exports / `15` public getter names.
 
 ## Required changes
-- [ ] Add only `src/runtime/Runtime.AssetWorkflowModule.cppm` and matching
+- [x] Add only `src/runtime/Runtime.AssetWorkflowModule.cppm` and matching
       `.cpp` as one concrete
       `AssetWorkflowModule final : IRuntimeModule, Core::IAssetFrameHooks` with
       a PImpl. Fold `Runtime.AssetResidencyService.Internal.hpp` into that
       private implementation and delete it; add no exported residency service,
       constituent wrapper, or third workflow file.
-- [ ] Keep one persistent `AssetImportPipeline` and
+- [x] Keep one persistent `AssetImportPipeline` and
       `ObjectSpaceNormalBakeService` in the module PImpl. Recreate per-boot
       `AssetService`, GPU cache/listener, and model texture/scene handoffs;
       preserve cancelled import records and keep the pipeline object alive
@@ -142,12 +166,12 @@ maturity_target: Operational
       ordinary callback order. Construct the persistent objects dependency-empty
       with the PImpl; do not defer their object lifetime to per-boot provider
       discovery.
-- [ ] Publish the exact existing `RHI::IDevice` as an Engine built-in service
+- [x] Publish the exact existing `RHI::IDevice` as an Engine built-in service
       before module registration, alongside the existing renderer and
       render-extraction services. Consume `JobService`, `WorldRegistry`, active
       config, and initialization state through declared Engine-lifetime
       `EngineSetup` construction borrows; add no wrapper service for them.
-- [ ] During registration, validate the required built-in device, renderer, and
+- [x] During registration, validate the required built-in device, renderer, and
       render-extraction services before constructing/publishing per-boot
       provider-dependent state. During order-independent `OnResolve`, `Require`
       the exact `SceneDocumentModule` and `EditorCommandHistory`. Cover omission
@@ -158,18 +182,18 @@ maturity_target: Operational
       `EditorCommandHistory` instance before `AssetWorkflowModule::OnResolve`
       to exercise the independent missing-history diagnostic. Do not add a
       test-only provider, Engine suppression switch, or wrapper service.
-- [ ] During `OnResolve`, optionally `Find<StreamingExecutor>()` and
+- [x] During `OnResolve`, optionally `Find<StreamingExecutor>()` and
       `Find<SelectionController>()`. Direct imports remain Operational without
       streaming; queued imports fail closed. Import materialization remains
       Operational without selection/camera, while selection/focus policy
       callbacks degrade through their existing null-service contract.
-- [ ] Extend `EngineSetup` with the smallest read-only Engine-lifetime
+- [x] Extend `EngineSetup` with the smallest read-only Engine-lifetime
       initialized-state construction borrow. Continue using
       `RuntimeRenderRecipeActivationKernel::ActiveConfig` for the canonical
       config pointer. Preserve the current gate: import rejects during
       `IApplication::OnInitialize`, succeeds after `Engine::Initialize()`
       completes, and rejects after shutdown announcement.
-- [ ] Publish the existing `AssetService`, `AssetImportPipeline`,
+- [x] Publish the existing `AssetService`, `AssetImportPipeline`,
       `GpuAssetCache`, and `Core::IAssetFrameHooks` capabilities directly
       through `ServiceRegistry`; withdraw the same exact instances on rollback
       and shutdown. Duplicate-conflict preflight and every later
@@ -180,7 +204,7 @@ maturity_target: Operational
       single-threaded boot merely to exercise a branch. Do not publish the
       private normal-bake service/queue or the module itself solely for tests or
       future `RUNTIME-129` callers.
-- [ ] Implement `Core::IAssetFrameHooks::TickAssets()` with the existing
+- [x] Implement `Core::IAssetFrameHooks::TickAssets()` with the existing
       `AssetService::Tick`, GPU-cache retirement, and pending material-texture
       binding work. Engine resolves that hook in the existing
       `ExecuteMaintenanceContract` asset slot; its local generic composite runs
@@ -188,7 +212,7 @@ maturity_target: Operational
       afterward. Do not move asset work to the later generic
       `FramePhase::Maintenance`, and keep transfer/streaming ordering unchanged
       when either optional hook is absent.
-- [ ] Register one narrow `SceneDocumentModule` replacement participant that
+- [x] Register one narrow `SceneDocumentModule` replacement participant that
       destroys asset/render-extraction/bake handoffs while the outgoing
       registry is live and rebinds them after successful replacement. Release
       the retained strong participant handle explicitly during shutdown
@@ -196,7 +220,7 @@ maturity_target: Operational
       `RUNTIME-183.EngineAssetHandoffTransition` completely. Do not rely on
       delayed replacement events, discarded handle values, or module-name
       teardown order.
-- [ ] Subscribe to active-world/retirement events and perform the same
+- [x] Subscribe to active-world/retirement events and perform the same
       destroy/rebind operation for a real world switch, but retain direct
       world/registry/epoch validation before every tick, handoff callback, and
       direct-import or queued-import apply. Extend only the existing
@@ -204,7 +228,7 @@ maturity_target: Operational
       predicate needed to guard direct `AssetService` flushes; add no handoff
       wrapper or third workflow file. Do not route active-world switching
       through the document replacement participant.
-- [ ] Split shutdown announcement from ordinary reverse module shutdown. Pump
+- [x] Split shutdown announcement from ordinary reverse module shutdown. Pump
       the existing `RuntimeShutdownAnnounced` before application/provider/GPU
       teardown. In the AssetWorkflow listener, cancel every active import before
       app policy unregister/provider teardown, advance the pipeline target
@@ -212,24 +236,24 @@ maturity_target: Operational
       scene/streaming/config borrows. Keep the pipeline object alive, and defer
       owned bake/cache/asset destruction to ordinary module shutdown after the
       generic GPU-participant shutdown contract has run.
-- [ ] Register `ObjectSpaceNormalBakeService` once per boot with the existing
+- [x] Register `ObjectSpaceNormalBakeService` once per boot with the existing
       `JobService` `GpuQueue`. Keep `JobServiceGpuQueueBridge` Engine-owned as
       the global recorder/drainer/shutdown driver; module teardown only clears
       its participant/dependencies after that driver has unregistered the
       participant and waited idle when required. Add no second render hook,
       queue bridge, or GPU lifecycle.
-- [ ] Migrate platform-drop routing, render extraction, Sandbox policies/editor
+- [x] Migrate platform-drop routing, render extraction, Sandbox policies/editor
       facades, and tests to local typed service discovery or already-resolved
       narrow pointers. Engine may resolve the published hook/cache/pipeline at
       the exact generic call site, but stores no asset-domain member or facade.
-- [ ] Remove Engine asset/import/cache/normal-bake state and
+- [x] Remove Engine asset/import/cache/normal-bake state and
       `GetAssetService`, `GetGpuAssetCache`, `GetAssetImportPipeline`, and
       object-space-normal diagnostic test getters.
-- [ ] Compose the module explicitly in Sandbox after the hard `RUNTIME-188`
+- [x] Compose the module explicitly in Sandbox after the hard `RUNTIME-188`
       prerequisite. Module omission leaves generic Engine, world, rendering,
       transfer, async, and render-extraction geometry maintenance Operational;
       asset services are absent and platform drops fail closed.
-- [ ] Ratchet the exact final Engine snapshot to `22` plain imports / `0`
+- [x] Ratchet the exact final Engine snapshot to `22` plain imports / `0`
       domain imports / `2` re-exports / `10` public getter names. Relative to
       the post-`RUNTIME-188` baseline, remove
       `Extrinsic.Asset.Service`, `Extrinsic.Graphics.GpuAssetCache`,
@@ -239,51 +263,54 @@ maturity_target: Operational
       `GetAssetImportPipeline`,
       `GetObjectSpaceNormalBakeQueueDiagnosticsForTest`, and
       `GetPendingObjectSpaceNormalBakeCountForTest`.
-- [ ] Leave the production Vulkan plan provider and smoke explicitly to
+- [x] Leave the production Vulkan plan provider and smoke explicitly to
       `RUNTIME-129`, now owned inside this module.
 
 ## Tests
-- [ ] Add `tests/contract/runtime/Test.AssetWorkflowModule.cpp` for exact
+- [x] Add `tests/contract/runtime/Test.AssetWorkflowModule.cpp` for exact
       publication/withdrawal, duplicate conflicts, failure cleanup with no
       partial boot state, real-provider omission diagnostics,
       registration-order independence, optional streaming/selection omission,
       initialized-state gating, module omission, one real `Engine::Run()`,
       shutdown, and reinitialize.
-- [ ] Preserve asset import, residency, model handoff, generated-texture,
+- [x] Preserve asset import, residency, model handoff, generated-texture,
       non-operational normal-bake, stale-generation, platform-drop,
       import-selection/history, GPU-cache fallback, shutdown, and reinitialize
       behavior through direct published services. Do not replace removed Engine
       normal-bake diagnostics with another production facade; assert composed
       effects and keep exact service diagnostics in the existing service tests.
-- [ ] Add synchronous document new/load/close coverage proving `BeforeReplace`
+- [x] Add synchronous document new/load/close coverage proving `BeforeReplace`
       destroys handoffs while the outgoing registry is live and `AfterReplace`
       binds the replacement; parse failure invokes neither callback. Prove the
       retained participant is explicitly released during announcement and
-      recycled handle bits do not revive it after reinitialize.
-- [ ] Separately cover deferred active-world switch, away-and-back binding-epoch
+      a recycled slot index does not revive a stale handle after reinitialize;
+      the current participant callback must still run.
+- [x] Separately cover deferred active-world switch, away-and-back binding-epoch
       rejection, and destruction of the former world after the switch. Prove
       handoffs detach/rebind before the former registry leaves service; do not
       describe this as document replacement or attempt to destroy the active
       world.
-- [ ] Extend maintenance coverage for
+- [x] Extend maintenance coverage for
       transfer → streaming drain/apply → asset/cache tick → streaming
       submit/pump, followed by JobService GPU drain and generic module
       maintenance. Prove render-extraction geometry retirement still runs when
       AssetWorkflow or AsyncWork is omitted.
-- [ ] Extend the blocked-import shutdown regression so cancellation occurs
+- [x] Extend the blocked-import shutdown regression so cancellation occurs
       before app policy unregister and every provider teardown, no late apply
       mutates assets/scene/history/selection, the persistent pipeline remains
-      valid through async drain, and the real reverse-sorted Engine shutdown
-      proves AsyncWork-before-AssetWorkflow. After the same shutdown
+      valid through async drain. Separately prove the real reverse-sorted Engine
+      shutdown is AsyncWork-before-AssetWorkflow. After the same shutdown
       announcement and GPU-participant boundary, use a direct lifecycle harness
       to invoke ordinary `OnShutdown` in both callback orders and prove the
       opposite AssetWorkflow-before-AsyncWork order is also safe; do not present
       app insertion order as changing production order.
-- [ ] Preserve `RuntimeJobService` participant record/drain/reverse-shutdown
+- [x] Preserve `RuntimeJobService` participant record/drain/reverse-shutdown
       tests and add composed registration-exactly-once/reinitialize coverage for
       normal bake. Prove idle wait and service-private cleanup precede cache,
       renderer, and device destruction when work exists.
-- [ ] Update the owning regressions rather than creating parallel fixtures:
+- [x] Preserve the owning generic frame-loop/GPU-participant regressions and
+      place the new module-composition/lifecycle assertions in
+      `Test.AssetWorkflowModule.cpp`; migrate affected callers in:
       `Test.AssetImportFormatCoverage.cpp`,
       `Test.GpuAssetCacheFallbackBootstrap.cpp`,
       `Test.RuntimeWorldRegistry.cpp`,
@@ -295,28 +322,28 @@ maturity_target: Operational
       Migrate every current Engine asset/cache/pipeline getter caller to exact
       service discovery and add a source-contract assertion that only the two
       planned AssetWorkflow source files own the extracted composition.
-- [ ] Run focused asset/runtime/graphics CPU coverage, strict layering, and the
+- [x] Run focused asset/runtime/graphics CPU coverage, strict layering, and the
       complete default CPU-supported gate.
 
 ## Docs
-- [ ] Update runtime ownership/lifecycle documentation, Sandbox composition,
+- [x] Update runtime ownership/lifecycle documentation, Sandbox composition,
       ADR-0027 current-state evidence, and the kernel target-state state-scope
       row. Update assets/graphics documentation only where current ownership
       prose becomes false; do not imply a graphics API change owned by
       `RUNTIME-129`.
-- [ ] Regenerate the module inventory.
+- [x] Regenerate the module inventory.
 
 ## Acceptance criteria
-- [ ] Engine owns no asset/import/residency/normal-bake domain state, public
+- [x] Engine owns no asset/import/residency/normal-bake domain state, public
       import, getter, diagnostic, or facade; its exact generic service lookups
       and the global JobService GPU bridge retain no asset ownership.
-- [ ] Global owners and borrowed per-world handoffs have explicit, tested
+- [x] Global owners and borrowed per-world handoffs have explicit, tested
       lifetimes across document replacement, world switch, early shutdown
       announcement, the production reverse-sorted shutdown order, both direct
       lifecycle callback-order probes, and reinitialize.
-- [ ] Existing import-to-render behavior remains Operational; normal-bake GPU
+- [x] Existing import-to-render behavior remains Operational; normal-bake GPU
       `Operational` is still owned by `RUNTIME-129`.
-- [ ] Exact Engine convergence is `22` plain imports / `0` domain imports / `2`
+- [x] Exact Engine convergence is `22` plain imports / `0` domain imports / `2`
       re-exports / `10` public getter names.
 
 ## Verification

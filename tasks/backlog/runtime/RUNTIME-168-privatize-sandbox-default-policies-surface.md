@@ -10,9 +10,9 @@ maturity_target: Operational
 
 ## Status
 
-- 2026-07-19 readiness correction: with `RUNTIME-188` retired, this task
-  remains hard-gated only on `RUNTIME-183`. Delete the one-consumer exported policy
-  module, retain its `.cpp` as a private implementation unit of the existing
+- Selectable as of 2026-07-19: `RUNTIME-188` and `RUNTIME-183` are retired.
+  Delete the one-consumer exported policy module, retain its `.cpp` as a
+  private implementation unit of the existing
   `Extrinsic.Runtime.SandboxEditorFacades` module, and let Sandbox own only the
   exact provider borrows and typed registration handles described below.
   Implementation remains open.

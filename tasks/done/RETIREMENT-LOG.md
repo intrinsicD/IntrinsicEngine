@@ -8,6 +8,23 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-183`](RUNTIME-183-extract-asset-workflow-module.md) —
+asset-workflow composition retired on 2026-07-19 at `Operational`. One
+app-composed PImpl now owns persistent import/bake objects plus per-boot
+asset/cache/listener/handoff state, publishes exactly the existing
+`AssetService`, `AssetImportPipeline`, `GpuAssetCache`, and asset-frame hook,
+and validates every borrowed `{WorldHandle, Registry*, binding epoch}` before
+use. Synchronous document replacement, world switching/retirement, early
+shutdown announcement, both direct teardown orders, and reinitialize are
+covered, including a corrected module-lifetime participant generation that
+prevents stale-handle ABA after slot reuse. Engine owns no asset-domain state,
+facade, import, transition, or diagnostic and measures exactly `22/0/2/10`.
+The clean focused selector passed 215/215; the full supported CPU selector
+passed 4,240/4,240 with one expected GLFW/LSan capability skip. Strict
+layering, task/state, documentation, generated-state, ARA YAML, and whitespace
+checks passed. Implementation checkpoints: `28a15808`, `0c5b0d23`,
+`cef5a7ce`, and `3521bfff`.
+
 [`BUG-117`](BUG-117-dropped-geometry-reimport-frame-budget-flake.md) —
 dropped-import frame-budget flake retired to `tasks/done/` on 2026-07-19 at
 `CPUContracted`. The two test-local asynchronous completion helpers now use

@@ -1032,3 +1032,10 @@ entries:
       - "Did not stage or crystallize a generalized observation: this slice implements the selected ADR-0026/ADR-0027 responsibility split and leaves the broader module posture in O08 and O09 unresolved."
       - "Kept O08, O09, O13, and O38 unpromoted and non-stale because current open threads still reference module posture, model-training interpretation, and actual Progressive Poisson Vulkan parity; no contradiction or closure signal appeared."
       - "Left integration and retirement to the root owner as explicitly required."
+  - turn: "2026-07-19_001#3"
+    notes:
+      - "Routed the RUNTIME-183 existing-test migration and focused source-contract compilation as experiment N268 because it produced bounded committed compatibility and lifecycle evidence."
+      - "Staged O55 and crystallized it immediately to A15 via artifact commitment because the production AssetWorkflow source and commit 74a15419 now depend on exact-service module ownership."
+      - "Flagged A05 and A15 as conflicting, then resolved N269 after root-owned production/docs/task integration adopted A15; A05 remains explicitly marked as superseded historical evidence."
+      - "Recorded zero residual removed-getter spellings, explicit SceneDocument prerequisites, preserved module-omission fixtures, and the stable post-shutdown pipeline pointer as concrete test evidence."
+      - "Kept O08, O09, O13, and O38 unpromoted and non-stale because the open threads still reference their topics and this turn supplied no closure for them."

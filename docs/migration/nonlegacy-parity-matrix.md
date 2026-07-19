@@ -139,12 +139,35 @@ module interface imports neither document nor history. Successful new/load/
 close uses one deterministic synchronous replacement-participant contract,
 while parse failure leaves registry, path, event, and history unchanged.
 Retired `RUNTIME-188` absorbs the interaction participant in its exact
-one-world owner; the implementation-only asset-handoff participant preserves
-cleanup/rebind behavior until `RUNTIME-183` absorbs that remaining owner.
+one-world owner; retired `RUNTIME-183` subsequently absorbs the
+implementation-only asset-handoff participant.
 Contract coverage includes exact service lifetime and rollback,
 omission, real Null `Engine::Run`, one-world reset/non-resurrection,
 participant order and shutdown detach, parse failure, and stale async completion
 after module destruction.
+
+### RUNTIME-183 asset-workflow composition amendment
+
+The assets/runtime/app rows above and the graphics-IO row below are further
+narrowed by `RUNTIME-183`; this amendment is the controlling current-state text
+where those historical rows still name Engine asset/import/document getters.
+The optional app-composed `Extrinsic.Runtime.AssetWorkflowModule` owns the
+persistent import and normal-bake objects plus per-boot `AssetService`,
+`GpuAssetCache`, listener, and model handoffs. It publishes the exact asset,
+pipeline, cache, and existing maintenance-hook services; callers resolve those
+services locally, and Engine has no asset/import/cache/bake owner, import,
+facade, diagnostic getter, or replacement transition.
+
+One synchronous document participant and direct
+`{WorldHandle, Registry*, binding epoch}` checks protect document replacement,
+delayed active-world events, direct imports, queued applies, and asset-event
+callbacks. Early shutdown announcement cancels imports and releases document
+and provider borrows before application/provider teardown; the generic
+JobService GPU bridge drains the retained bake participant before ordinary
+module cleanup. Omission leaves generic Engine/world/render/transfer/async and
+render-extraction geometry maintenance operational while asset services and
+drop handling fail closed. The exact Engine snapshot is 22 plain imports,
+zero domain imports, two re-exports, and ten kernel getter names.
 
 ### Runtime Editor Mesh Simplification Workflow
 

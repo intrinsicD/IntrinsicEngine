@@ -16,12 +16,6 @@ Each active task should include:
   `codex/arch-014-kernel-convergence-program`; blocked on final leaf
   `RUNTIME-187`. Next gate: execute the unblocked ADR-0027 behavior-owner
   leaves and update the convergence scorecard after each retirement.
-- [`RUNTIME-183`](RUNTIME-183-extract-asset-workflow-module.md) — asset
-  workflow composition module; owner: Codex team; branch:
-  `codex/runtime-183-asset-workflow`; in progress. Next gate: extract the
-  persistent import/bake and per-boot asset/residency cohort with exact
-  publication, binding, rollback, and shutdown-announcement contracts.
-
 ## History
 
 Retirement narratives live in the append-only

@@ -67,7 +67,8 @@ maintenance drains, shutdown reset, and derived-job facade delegation now live
 outside `Runtime.Engine.cpp`.
 `RUNTIME-129` remains the owner of production Vulkan bake plan-provider wiring.
 Retired `GRAPHICS-128` supplies the nonzero shared-index-slice command
-contract; `RUNTIME-183` remains the accepted composition prerequisite.
+contract; retired `RUNTIME-183` supplies the accepted app-composed
+AssetWorkflow owner, so `RUNTIME-129` is selectable.
 `RUNTIME-154` keeps the existing reference-scene public facade while moving
 provider resolution, population state, camera-seed caching, and teardown policy
 into `Extrinsic.Runtime.ReferenceSceneControl`. `RUNTIME-155` keeps the
@@ -141,7 +142,9 @@ now live in an Engine-private `RenderExtractionService`.
 `AssetEventBus` listener token, `AssetModelTextureHandoff`,
 `AssetModelSceneHandoff`, fallback bootstrap delegation, pending material
 binding re-resolution, and asset-residency teardown ordering now live behind
-an Engine-private `AssetResidencyService`.
+an Engine-private `AssetResidencyService` at that historical intermediate
+slice. Retired `RUNTIME-183` subsequently folded the implementation into the
+app-composed `AssetWorkflowModule` PImpl and removed the Engine owner/facades.
 `RUNTIME-165` is retired; persistent `StreamingExecutor` /
 `DerivedJobRegistry` ownership, maintenance drains, shutdown reset, and
 derived-job facade delegation first moved behind
@@ -176,17 +179,17 @@ triggers. The implementation graph is:
   world-tagged snapshots replace Engine-owned interaction pointers, while
   obsolete mesh-view compatibility facades/cache are deleted and ECS
   render-hint components remain authoritative.
-- [`RUNTIME-183`](../../active/RUNTIME-183-extract-asset-workflow-module.md) — compose the
-  global asset/residency/import/bake owner after the hard document/interaction
-  split; require exact document/history and built-in device/renderer/extraction
-  services, optionally consume streaming/selection, and borrow kernel config/
-  initialized state without camera or config-control-module ownership. Borrowed
-  world handoffs never become hidden ECS ownership.
+- Retired `RUNTIME-183` composes the global asset/residency/import/bake owner
+  after the hard document/interaction split; it requires exact document/history
+  and built-in device/renderer/extraction services, optionally consumes
+  streaming/selection, and borrows kernel config/initialized state without
+  camera or config-control-module ownership. Borrowed world handoffs never
+  become hidden ECS ownership.
 - Retired `RUNTIME-182` composes the optional global ImGui/host owner, with
   one frame-local kernel capture value, a preserved paired Begin/End bracket,
   and app-owned Sandbox panels.
 - Corrected [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md)
-  — after `RUNTIME-188` and active `RUNTIME-183`, delete the one-consumer exported
+  — after retired `RUNTIME-188` and `RUNTIME-183`, delete the one-consumer exported
   policy module, retain its `.cpp` as a private implementation unit of the
   existing Sandbox editor-facade module, and let Sandbox own transactional
   typed handles over only the published import pipeline/input registry plus
@@ -215,14 +218,20 @@ config and Frame Graph UI use the settled owners.
 Retired `RUNTIME-177` added no generic debug-draw producer seam because its
 consumer inventory was empty; existing spatial-debug and transform-gizmo
 paths remain typed. `RUNTIME-129` and `RUNTIME-184` may proceed independently
-after their respective prerequisites (`RUNTIME-183` is now active and
-remains for the bake;
-`GRAPHICS-128` is retired); both gate `RUNTIME-185`.
+after retired `RUNTIME-183` and the intervening `RUNTIME-168` lifecycle-policy
+privatization respectively; both gate `RUNTIME-185`.
 `ARCH-014` reaches this graph through `RUNTIME-187`; `REVIEW-003` reaches it
 transitively through `ARCH-014`.
 
 #### Retired decomposition entries
 
+- [`RUNTIME-183` — Extract the asset-workflow composition module](../../done/RUNTIME-183-extract-asset-workflow-module.md)
+  (done, 2026-07-19, `Operational`): one app-composed `AssetWorkflowModule`
+  owns persistent import/bake objects plus per-boot asset/cache/listener/
+  handoff state, publishes four exact existing services, and validates every
+  borrowed scene target. Announcement-first cancellation/detachment plus
+  generic GPU/async drain makes shutdown order-safe; Engine has no asset-domain
+  owner, import, facade, transition, or diagnostic and measures `22/0/2/10`.
 - [`RUNTIME-182` — Extract the editor-UI composition module](../../done/RUNTIME-182-extract-editor-ui-module.md)
   (done, 2026-07-19, `Operational`): one app-composed `EditorUiModule` owns
   the ImGui overlay/adapter, exact Engine-free editor host, global visibility
@@ -289,7 +298,7 @@ compile cost. They preserve behavior and ownership; they are not feature tasks.
 main `Runtime.RenderExtraction` module slimming.
 
 - [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md) —
-  after `RUNTIME-188` and active `RUNTIME-183`, remove the one-consumer public module
+  after retired `RUNTIME-188` and `RUNTIME-183`, remove the one-consumer public module
   while retaining its implementation under the existing
   `SandboxEditorFacades` surface; Sandbox privately owns exact provider
   borrows and typed handles, not another runtime owner.
@@ -305,8 +314,9 @@ main `Runtime.RenderExtraction` module slimming.
   document/history owner, one validated active-world binding, optional
   generation-guarded async operations, and a narrow synchronous replacement
   participant contract. The retired `RUNTIME-188` owner has absorbed its
-  participant registration; Engine retains only the typed temporary
-  `RUNTIME-183` asset-handoff registration.
+  interaction participant registration; retired `RUNTIME-183` moved the asset
+  participant into `AssetWorkflowModule` and removed the temporary Engine
+  registration.
 - [`RUNTIME-178`](../../done/RUNTIME-178-restore-engine-convergence-budget.md)
   restored and improved the fixed Engine convergence budget to 42 plain
   imports / 21 domain imports / 31 getter names with no temporary debt while
@@ -422,8 +432,8 @@ This foundation is recorded in
 `RUNTIME-137` is retired; the async readback helper is the sanctioned compute
 backend drain path and `JobService` owns the `GpuQueue` participant registry.
 Those historical graphics and queue prerequisites for `RUNTIME-129` are
-satisfied; the task is currently gated only on `RUNTIME-183` so object-space
-normal bake GPU submission lands inside the accepted AssetWorkflow owner.
+satisfied; retired `RUNTIME-183` supplies the accepted AssetWorkflow owner, so
+the object-space-normal Vulkan provider task is selectable.
 
 `RUNTIME-111` through `RUNTIME-115` are retired; additional progressive
 render-data follow-ups should open as value-gated tasks with a concrete

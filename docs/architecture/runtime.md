@@ -479,14 +479,18 @@ resource rebuild success. Vulkan-specific diagnostics are recorded by the Vulkan
 backend/runtime breadcrumb path, but runtime frame control does not branch on
 Vulkan diagnostics.
 
-Shutdown is deterministic and runs through `ExecuteShutdownContract`: stop
-running, wait idle, application shutdown, then announce runtime shutdown and
-run reverse module teardown while dependencies are live; afterward destroy the
-scene, asset/GPU-asset handoffs, frame graph, render-extraction plus renderer,
-device, window, and scheduler, then clear initialized state. The announcement
-lets composed modules invalidate work and detach participant handles before
-ordinary reverse shutdown. The Dear ImGui adapter is detached before this
-contract while the window and overlay system are still live.
+Shutdown is deterministic. After pending-command discard, Engine first marks
+the initialized-state borrow false and publishes/pumps
+`RuntimeShutdownAnnounced` while application, GPU participants, module
+providers, renderer, device, and world are still live. Modules use that early
+boundary to cancel work, invalidate bindings, and release strong participant
+handles. Engine then detaches window callbacks, runs the one generic
+`JobServiceGpuQueueBridge` shutdown/idle boundary, and enters
+`ExecuteShutdownContract`: stop running, wait idle, shut down the application,
+run ordinary reverse name-sorted module teardown in the streaming phase, then
+destroy world, frame graph, render-extraction plus renderer, device, window,
+and scheduler. The Dear ImGui adapter remains an app-composed module and
+detaches through that ordinary reverse teardown.
 
 ## Scene Replacement Lifecycle
 
@@ -511,17 +515,22 @@ publishes empty interaction data. The module owns one validated
 `{WorldHandle, Registry*, interaction epoch}` binding; pick sequences remain
 monotonic while old-world/old-epoch results fail closed.
 
-`RUNTIME-183.EngineAssetHandoffTransition` is the sole remaining transitional
-participant. It clears render extraction, bake, and residency borrowers before
-replacement, then reconstructs the exact active-world handoffs and import
-dependencies. Engine resolves the optional exact `SelectionController` only at
-the initial and replacement dependency wiring sites; omission supplies null.
-Active imports cancel before shutdown announcement, and the selection borrow is
-replaced with null after the announcement pump and before reverse module
-teardown. `RUNTIME-183` owns removal of that implementation-only transition.
+`AssetWorkflowModule` retains its own strong participant handle. Before
+replacement it empties import dependencies, clears render-extraction and
+normal-bake scene state, and destroys the model-scene handoff while the outgoing
+registry remains live. After replacement it rebuilds the handoff and pipeline
+dependencies against the exact callback `{WorldHandle, Registry*}`. Its
+module-local binding epoch and optional narrow handoff predicate reject delayed
+callbacks, direct imports, and queued applies from an old or away-and-back
+binding. Shutdown announcement cancels imports, advances that epoch, destroys
+the scene handoff, releases the participant, and detaches optional streaming,
+selection, history, config, world, extraction, renderer, and device borrows
+before provider teardown.
 
-Active-world Maintenance is not a document replacement. Engine immediately
-clears/rebinds its remaining asset/extraction borrowers in that pass.
+Active-world Maintenance is not a document replacement. The asset module
+validates the current world/registry directly before asset ticks and callbacks;
+on mismatch it immediately clears/rebinds its own extraction, bake, handoff, and
+pipeline state without routing through the document participant.
 `SceneInteractionModule` independently validates the active handle and registry
 before every input, extraction, maintenance, and lookup action; a mismatch
 performs the same reset/rebind before delayed events arrive and never

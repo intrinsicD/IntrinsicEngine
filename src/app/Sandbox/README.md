@@ -61,6 +61,16 @@ selection/hover/gizmo snapshot and treats omission or mismatch as empty.
 Document New/Load/Close, active-world switch/retirement, and shutdown clear the
 cohort without resurrecting old state.
 
+Sandbox also explicitly composes optional `Runtime::AssetWorkflowModule` after
+the document and interaction owners. The module owns the per-boot asset
+authority, GPU residency, model handoffs, and exact published
+`AssetImportPipeline`, plus the persistent import and object-space-normal-bake
+objects that must survive async drain. Editor/default-policy consumers resolve
+the published asset services locally. Omitting the module leaves the generic
+Engine, world, renderer, transfer, async, and render-extraction geometry
+maintenance paths operational; asset commands are unavailable and platform
+drops fail closed.
+
 The app-owned `Sandbox.Editor.Controller` owns `Sandbox.Editor.Shell` and all
 panel-family lifetimes behind one attach/detach interface. Sandbox composes the
 optional `Runtime.EditorUiModule`; the shell resolves its Engine-free
@@ -102,7 +112,7 @@ command/history seams, routes selected-entity spatial-debug options through
 `SpatialDebugBinding`, routes material/scalar/color visualization choices
 through `VisualizationConfig`, routes visualization adapter bindings through
 runtime extraction-cache state, and submits frame-driven file/import commands
-through `Engine::GetAssetImportPipeline().QueueGeometryImport(...)` or
+through the exact published `AssetImportPipeline::QueueGeometryImport(...)` or
 `QueueModelTextureImport(...)`. Every supported `File / Import` payload is
 therefore queued before decode; the worker reads and decodes while bounded
 main-thread completion owns `AssetService`, ECS, selection, focus, and document
@@ -123,13 +133,14 @@ second extension or importer-capability table. The same disabled-tooltip
 convention is used by the AssetIO queue's clear and cancel commands.
 
 The `File / Import` editor window also polls
-`Engine::GetAssetImportPipeline().GetAssetImportQueueSnapshot()` for the
+`AssetImportPipeline::GetAssetImportQueueSnapshot()` through exact service
+discovery for the
 runtime-owned AssetIO queue. Rows show queued/running/apply/upload/terminal
 import stages, payload kind, path basename, elapsed time, determinate progress
 where available, indeterminate stage labels where decoder progress is unknown,
 and failure/cancellation diagnostics. Clear-completed and cancellable
 manual or dropped import commands route back to
-`Engine::GetAssetImportPipeline()`; the sandbox app and UI never own asset, ECS,
+that same published service; the sandbox app and UI never own asset, ECS,
 or graphics state.
 
 The promoted editor also exposes stable top-level ImGui menu slots for
@@ -213,13 +224,16 @@ durable `StableId`, `Selection::SelectableTag`, and white
 
 The default module list explicitly composes `AsyncWorkModule`, `CameraModule`,
 `ClusteringModule`, `EditorUiModule`, `SceneDocumentModule`, and
-`SceneInteractionModule`. Camera remains optional at the runtime contract:
+`SceneInteractionModule`, followed by `AssetWorkflowModule`. Camera remains
+optional at the runtime contract:
 when omitted, Sandbox policy registration omits `F` and autofocus, editor
 camera controls report unavailable, and import auto-selection plus non-camera
 behavior continue. Scene document and scene interaction remain independently
 optional as described above; without interaction, generic input/rendering and
 component-driven primitive views continue while selection/gizmo surfaces report
-unavailable.
+unavailable. Asset workflow is independently optional to generic Engine and
+render-extraction maintenance, but requires the document/history services when
+it is composed.
 
 ## Build presets
 

@@ -124,12 +124,14 @@ snapshot carries no temporary debt.
 
 - [ ] `Runtime.Engine.cppm` contains only the exact imports required by its
       accepted kernel public surface and no unused plain imports
-      (**baseline 45; 2026-07-13 reference 43; current checked snapshot 33**).
+      (**baseline 45; 2026-07-13 reference 43; post-`RUNTIME-183` checked
+      snapshot 22**).
       ADR-0027 records the present final-surface candidate of 12 exact imports;
       that is an auditable allowlist derived from the remaining API, not a
       numerical budget or room for unrelated imports.
-- [ ] Domain (non-substrate) imports in `Runtime.Engine.cppm` = 0
-      (**baseline 27; 2026-07-13 reference 23; current checked snapshot 11**).
+- [x] Domain (non-substrate) imports in `Runtime.Engine.cppm` = 0
+      (**baseline 27; 2026-07-13 reference 23; post-`RUNTIME-183` snapshot
+      0**).
       Measure by
       **allowlist**, not
       a blocklist of names:
@@ -137,12 +139,12 @@ snapshot carries no temporary debt.
       above). A name blocklist silently undercounts as new domain imports
       appear (e.g. `AssetIngestStateMachine`, `Asset.Service`,
       `Geometry.HalfedgeMesh.IO`); the allowlist cannot.
-- [ ] `Engine::GetX()` domain-facade accessors = 0. A domain facade is any
+- [x] `Engine::GetX()` domain-facade accessors = 0. A domain facade is any
       public `GetX()` whose return exposes a responsibility outside the exact
       kernel-substrate allowlist; the final checker measures the complement of
       exact allowed kernel getter names rather than treating all `GetX()` names
-      alike (**baseline estimate 13 domain facades; current guard snapshots all
-      22 names pending that classifier**)
+      alike (**baseline estimate 13 domain facades; the post-`RUNTIME-183`
+      exact guard contains 10 kernel getter names and no domain facade**)
 - [ ] Domain re-exports from `Runtime.Engine.cppm` = 0; a retained re-export
       must be explicitly classified as kernel public surface
 - [x] No `entt::dispatcher::trigger` or direct dispatcher use in module code
@@ -165,7 +167,8 @@ snapshot carries no temporary debt.
       services and the existing Maintenance hook capability, and cancels
       generation-qualified queued/running/readback/apply work on
       `WorldWillBeDestroyed`. Engine never names the concrete module; omitted
-      composition retains transfer collection followed by the asset tick.
+      composition retains transfer collection followed by the optional asset
+      hook and unconditional render-extraction geometry retirement.
 - [x] SceneDocument — `RUNTIME-172`; app-composed `SceneDocumentModule`
       publishes its exact history and owns one validated active-world binding
       for path, file event/sequence, history, and optional queued scene IO.
@@ -177,8 +180,8 @@ snapshot carries no temporary debt.
       `SceneInteractionModule` privately owns one validated active-world cohort
       for selection/lookup/readback/gizmo state, consumes document replacement
       plus viewport/capture seams, and publishes copied world-tagged render
-      snapshots. Engine has no interaction owner/facade; only the named
-      `RUNTIME-183` optional selection borrow remains in implementation wiring.
+      snapshots. Engine has no interaction owner/facade or asset-side selection
+      borrow.
       Persistent mesh primitive-view authoring stays on ECS `RenderEdges` /
       `RenderPoints`.
 - [x] Camera — `RUNTIME-180`; app-composed global `CameraModule` publishes the
@@ -188,12 +191,15 @@ snapshot carries no temporary debt.
       initial-world reference-content bootstrap and original-world teardown.
       Engine names neither responsibility and omission leaves generic input,
       import selection, and reference extraction operational
-- [ ] ConfigControl — `RUNTIME-181`; global validated preview/commit owner for
+- [x] ConfigControl — `RUNTIME-181`; global validated preview/commit owner for
       config and registered app sections
-- [ ] AssetWorkflow — `RUNTIME-183`; global service/residency/import/bake owner
-      whose borrowed scene/camera/selection handoffs are rebound or cleared by
-      world identity; `RUNTIME-129` supplies the operational Vulkan bake proof
-- [ ] EditorUi — `RUNTIME-182`; global optional adapter/host/contribution owner
+- [x] AssetWorkflow — `RUNTIME-183`; global service/residency/import/bake owner
+      with persistent import/bake objects and per-boot asset/cache/handoffs.
+      Exact `{WorldHandle, Registry*, epoch}` validation and the synchronous
+      document participant clear/rebind borrowed scene state; omission leaves
+      generic frame/world/render maintenance operational. `RUNTIME-129`
+      supplies the operational Vulkan bake proof
+- [x] EditorUi — `RUNTIME-182`; global optional adapter/host/contribution owner
       producing the single capture snapshot; Sandbox panel content stays
       app-owned
 - [ ] Sandbox composition glue — re-scoped `RUNTIME-168`; app parts and default

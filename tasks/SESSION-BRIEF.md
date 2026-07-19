@@ -9,7 +9,6 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/active/ARCH-014-kernel-convergence-tracking.md)
-- `RUNTIME-183` — Extract the asset-workflow composition module (tasks/active/RUNTIME-183-extract-asset-workflow-module.md)
 
 ## Theme B — Rendering modernization
 
@@ -21,7 +20,7 @@ the authoritative open/unblocked view.
 - blocked by `REVIEW-003`: `GRAPHICS-124` — Slughorn world-space vector annotation proof (tasks/backlog/rendering/GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md)
 - blocked by `REVIEW-003`: `GRAPHICS-125` — Memory-priced cluster hierarchy evidence (tasks/backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md)
 - blocked by `REVIEW-003`: `GRAPHICS-126` — Bandwidth-priced frame-recipe trace model (tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
-- blocked by `RUNTIME-183`: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
+- unblocked: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
 - unblocked: `RUNTIME-139` — Static AoS storage and shader operational path (tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
@@ -33,7 +32,7 @@ the authoritative open/unblocked view.
 - blocked by `ARCH-014`: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
-- blocked by `RUNTIME-183`: `RUNTIME-168` — Privatize Sandbox default-policy composition (tasks/backlog/runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
+- unblocked: `RUNTIME-168` — Privatize Sandbox default-policy composition (tasks/backlog/runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
 - blocked by `RUNTIME-168`: `RUNTIME-184` — Replace IApplication with explicit app composition (tasks/backlog/runtime/RUNTIME-184-replace-application-lifecycle.md)
 - blocked by `RUNTIME-184`: `RUNTIME-185` — Prune unproven runtime-composition mechanisms (tasks/backlog/runtime/RUNTIME-185-prune-runtime-composition-mechanisms.md)
 - blocked by `RUNTIME-185`: `RUNTIME-186` — Retire residual Engine auxiliary surface (tasks/backlog/runtime/RUNTIME-186-retire-engine-auxiliary-surface.md)
