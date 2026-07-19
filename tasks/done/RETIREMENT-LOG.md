@@ -8,6 +8,20 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`GRAPHICS-128`](GRAPHICS-128-object-space-normal-bake-shared-index-slice.md) —
+shared-index object-space normal baking retired to `tasks/done/` on
+2026-07-19 at `Operational`. The graphics bake descriptor and plan now carry
+the selected nonzero `FirstIndex`, bind the one shared index buffer at byte
+offset zero, and keep base vertex zero for allocation-local channel addresses.
+CPU contracts distinguish propagation and command recording, while the
+capable-host smoke places a valid decoy slice before the target and proves the
+target normal through Vulkan readback. The branch full CPU selector passed
+4,154 selected tests with one unrelated expected GLFW/LSan skip; combined-main
+focused coverage passed 17/17 and the ASan+UBSan `gpu` + `vulkan` selector
+passed 1/1 with zero skips on an RTX 3050 / driver 590.48.01 / Vulkan
+1.4.325. Implementation checkpoint: `a42a57e8`; verification record:
+`ec9cda96`; main merge: `ecbe4566`.
+
 [`RUNTIME-180`](RUNTIME-180-extract-camera-module.md) — camera composition
 retired to `tasks/done/` on 2026-07-19 at `Operational`. One app-composed
 `CameraModule` now owns the exact world-bound controller registry and the

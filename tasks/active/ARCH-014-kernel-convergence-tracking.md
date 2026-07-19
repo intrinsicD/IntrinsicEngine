@@ -82,10 +82,11 @@ depends_on:
   The implementation graph converges through `RUNTIME-179`..`187` plus the
   audited `RUNTIME-188` scene-interaction split;
   application lifecycle removal and `RUNTIME-129` operational bake may proceed
-  once their respective owners land and `GRAPHICS-128` closes the bake's
-  shared-index-slice prerequisite; both gate the later mechanism deletion
-  audit, semantic auxiliary-surface cleanup, and final
-  representation/checker leaf.
+  once their respective owners land. Retired `GRAPHICS-128` closed the bake's
+  shared-index-slice prerequisite, leaving `RUNTIME-183` as `RUNTIME-129`'s
+  remaining composition blocker. The lifecycle and bake leaves both gate the
+  later mechanism deletion audit, semantic auxiliary-surface cleanup, and
+  final representation/checker leaf.
 
 ## Required changes
 - [ ] After each child seam/extraction merges, update the target-state

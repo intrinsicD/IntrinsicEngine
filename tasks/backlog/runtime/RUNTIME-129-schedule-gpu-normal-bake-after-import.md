@@ -34,10 +34,10 @@ maturity_target: Operational
   and runtime queue/submission/binding helpers exist. `GRAPHICS-115` is retired
   at `Operational`: requested padding is submittable when the runtime provides
   graphics-owned dilation resources, and still fails closed when those resources
-  are unavailable. `GRAPHICS-128` is the remaining graphics prerequisite: it
-  must make the bake plan/record descriptors preserve
-  `GpuGeometryRecord::SurfaceFirstIndex` while keeping indexed-draw base vertex
-  zero.
+  are unavailable. Retired `GRAPHICS-128` now makes the bake plan/record
+  descriptors preserve `GpuGeometryRecord::SurfaceFirstIndex` while keeping
+  indexed-draw base vertex zero; `RUNTIME-183` is the remaining composition
+  prerequisite.
 - Current state: `Extrinsic.Runtime.ObjectSpaceNormalBakeQueue` owns the CPU-contract scheduling metadata for generated texture `AssetId` selection, content-key reuse, stale-key matching, retained pending submissions, and non-operational no-op behavior. `Extrinsic.Runtime.ObjectSpaceNormalBakeSubmission` validates queued stale keys against graphics bake plans, registers cache-owned GPU-produced textures, returns record descriptors for render-thread command recording, and attaches submitted ready-frame values without completing the queue early. `Extrinsic.Runtime.ObjectSpaceNormalBakeBinding` consumes completions only after `GpuAssetCache` exposes a ready generated texture view, rejects stale completions before material mutation, and installs data-only `ObjectSpaceNormal` material bindings through `RenderExtractionCache`. `Extrinsic.Runtime.ObjectSpaceNormalBakeService` privately owns the queue and registers its service-private state as a `JobService` `GpuQueue` participant: CPU/null contract tests inject a deterministic graphics plan through the explicit service test seam and prove pending-submission drain, command recording, cache ready-frame promotion, stale pending discard, and material binding without a standalone queue module. `Engine` composes this service and passes its request queue to model-scene handoff options, direct-mesh post-import services, and scene runtime-state cleanup. `AssetModelSceneHandoff` progressive raw mode can accept a `RuntimeObjectSpaceNormalBakeQueue`; when supplied, generated-normal work uses a dependency-only main-thread scheduling job to enqueue the runtime GPU-bake queue after UV/normal enrichment and leaves the progressive normal slot pending. The Sandbox default direct-mesh post-import processor schedules the same queue after deferred UV/normal materialization when Engine supplies it; on the default Null backend this records the no-CPU-fallback diagnostic and leaves the material normal binding unset. `SelectedMeshTextureBakeContext` can carry the same queue: mesh-vertex normal target commands enqueue object-space normal bake requests with geometry/UV/normal content keys, mark the progressive normal slot pending on operational backends, and return the queue's no-CPU-fallback diagnostic without creating a CPU texture on non-operational backends. The production Vulkan geometry-buffer/pipeline plan provider and opt-in GPU smoke are not wired yet. Callers that do not supply the queue still use CPU compatibility paths. The derived-job graph fail-closes any non-CPU domain: `IsUnsupportedJobDomain(domain) { return domain != ProgressiveJobDomain::Cpu; }` (`Runtime.DerivedJobGraph.cpp:36-47`, rejection at `:348-355`). `ProgressiveJobDomain` already reserves `GpuCompute`/`GpuGraphics`/`Auto` (`Runtime.ProgressiveRenderData.cppm:122`).
 - The shader fallback already exists: forward/deferred sample the object-space normal texture only when the material flag is set and `NormalID` is valid, otherwise use the vertex-normal attribute (`ResolveSurfaceNormal`). So "use texture when ready, else attribute" needs no shader work — only the runtime swap of the `Normal` binding once the cache entry is `Ready`.
 - A GPU graphics bake cannot run on the background streaming `Execute`
@@ -121,11 +121,12 @@ maturity_target: Operational
   `AssetWorkflowModule` queue and device-operational fact into this facade; a
   queue-backed mesh-vertex normal request must not require a CPU
   `AssetService`, while non-normal compatibility bakes still do.
-- **Implementation order.** Land `GRAPHICS-128`, then `RUNTIME-183`; inside
-  this task land full identity/stale/cache-generation CPU contracts before the
-  private production provider, remaining editor producer, and final GPU smoke.
-  Before `RUNTIME-183`, only the graphics prerequisite and task-contract
-  amendments may proceed; do not put the provider back on `Engine`.
+- **Implementation order.** Retired `GRAPHICS-128` closed the graphics
+  prerequisite; land `RUNTIME-183`, then inside this task land full
+  identity/stale/cache-generation CPU contracts before the private production
+  provider, remaining editor producer, and final GPU smoke. Before
+  `RUNTIME-183`, only task-contract amendments may proceed; do not put the
+  provider back on `Engine`.
 - **Right-sizing verdict.** Extending the existing
   `ObjectSpaceNormalBakeServiceDependencies` is justified by the runtime →
   graphics composition seam and render-thread/resource-lifetime correctness.
@@ -312,9 +313,9 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' --time
 
 ## Slice plan
 - **Slice A.1 (landed).** Add `Runtime.ObjectSpaceNormalBakeQueue` for generated-`AssetId`/content-key selection, stale-key records, stale-completion discard, and non-operational no-op diagnostics. Preserves CPU gate and does not mutate materials.
-- **Prerequisite order.** Land `GRAPHICS-128`, then `RUNTIME-183`. Before the
-  composition owner lands, do not add production provider state or callbacks
-  to `Engine`.
+- **Prerequisite order.** Retired `GRAPHICS-128` is satisfied; land
+  `RUNTIME-183`. Before the composition owner lands, do not add production
+  provider state or callbacks to `Engine`.
 - **Slice A.2.** Replace the CPU-domain hardcode with a GPU bake request for generated-normal primitives. Preserves CPU gate. Defers all render-thread submission to Slice B. Landed so far: optional `AssetModelSceneHandoff` queue scheduling, the pre-`RUNTIME-183` queue wiring, direct-mesh post-import queue scheduling, and selected-mesh command queue scheduling plus CPU/null tests for queued and non-operational backends. Remaining: Sandbox editor facade queue/operational wiring.
 - **Slice B.1.** Make full bake identity and exact cache-generation provenance
   authoritative across scheduling, stale matching, submission, completion,

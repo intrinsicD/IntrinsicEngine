@@ -9,13 +9,12 @@ maturity_target: Operational
 
 ## Status
 
-- Implementation and verification complete as of 2026-07-19; owner: Codex
-  team; implementation branch: `codex/graphics-128-shared-index-slice`;
-  implementation commit: `a42a57e8`.
-- The branch remains active for review/integration. The graphics slice reached
-  `CPUContracted` through the backend-neutral contract tests and `Operational`
-  on the recorded Vulkan-capable host; the end-to-end provider remains
-  `RUNTIME-129`.
+- Retired at `Operational` on 2026-07-19; owner: Codex team.
+  Implementation commit: `a42a57e8`; verification record: `ec9cda96`; main
+  merge: `ecbe4566`.
+- The graphics slice reached `CPUContracted` through the backend-neutral
+  contract tests and `Operational` on the recorded Vulkan-capable host; the
+  end-to-end provider remains `RUNTIME-129`.
 
 ## Goal
 - Make the graphics-owned object-space normal texture bake record the selected
@@ -115,6 +114,10 @@ Evidence recorded on 2026-07-19:
   buffer places a valid decoy slice before the selected nonzero-first-index
   target slice and compares the readback against their distinguishable encoded
   normals.
+- After the branch merged to main at `ecbe4566`, the focused CPU selector
+  passed 17/17 again. The combined-main ASan+UBSan Vulkan target rebuilt and
+  the exact intersected readback selector passed 1/1 in 7.71 seconds with zero
+  skips.
 
 ```bash
 python3 tools/agents/check_task_policy.py --root . --strict

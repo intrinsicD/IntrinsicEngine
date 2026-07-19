@@ -36,13 +36,6 @@ without requiring them to read every file.
   additionally gated it on now-retired `RUNTIME-181`/`RUNTIME-182`, so config
   and UI land through app-composed owners rather than transitional Engine
   facades. The task is in progress.
-- Active
-  [`GRAPHICS-128`](../../active/GRAPHICS-128-object-space-normal-bake-shared-index-slice.md) —
-  propagate a nonzero selected surface `FirstIndex` through the
-  graphics-owned object-space normal bake while keeping base vertex zero.
-  Retired `GRAPHICS-104` satisfies its only dependency; it is the narrow
-  graphics prerequisite for `RUNTIME-129`'s production `GpuWorld` provider
-  and is in progress.
 - The following Theme B incubation leaves are deliberately blocked by the
   architecture-stability gate `REVIEW-003`; they are not eligible for
   implementation during the current convergence/right-sizing phase:
@@ -74,6 +67,11 @@ or CPU-clock profiler behavior.
 
 ## Retired cross-domain rendering leaves
 
+- [`GRAPHICS-128`](../../done/GRAPHICS-128-object-space-normal-bake-shared-index-slice.md) —
+  retired 2026-07-19 at `Operational`; the object-space normal bake now
+  selects a nonzero surface slice from the managed shared index buffer while
+  preserving zero base vertex, with CPU command-contract and Vulkan readback
+  proof. `RUNTIME-129` consumes the result after `RUNTIME-183`.
 - [`GRAPHICS-122`](../../done/GRAPHICS-122-uv-view-offscreen-render-target.md) —
   retired 2026-07-15 at `Operational`; delivered the optional retained
   GPU-shaded UV target, typed recipe pass, runtime/editor presentation, and
@@ -109,8 +107,8 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   (multi-queue recording), and `GRAPHICS-119` (parallel pass recording), plus
   retired `RUNTIME-181` (ConfigControl owner) and `RUNTIME-182` (EditorUi
   owner). All prerequisites are satisfied.
-- [GRAPHICS-128 — Object-space normal bake shared index slice](../../active/GRAPHICS-128-object-space-normal-bake-shared-index-slice.md):
-  depends on retired `GRAPHICS-104`. It closes the plan/command and
+- [GRAPHICS-128 — Object-space normal bake shared index slice](../../done/GRAPHICS-128-object-space-normal-bake-shared-index-slice.md):
+  retired after `GRAPHICS-104`. It closes the plan/command and
   `gpu;vulkan` readback contract for a nonzero surface slice of the managed
   shared index buffer; downstream `RUNTIME-129` consumes that `FirstIndex`
   after `RUNTIME-183` owns asset-workflow composition.
