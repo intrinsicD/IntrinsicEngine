@@ -98,6 +98,35 @@ The exact post-slice snapshot was 26 plain imports / 4 domain imports /
 The exact post-slice snapshot is 22 plain imports / 0 domain imports /
 2 re-exports / 10 public getter names.
 
+## Implementation update: RUNTIME-168
+
+`RUNTIME-168` applies the one-consumer composition deletion test to Sandbox
+default policies:
+
+- the exported `Extrinsic.Runtime.SandboxDefaultPolicies` module and its
+  Engine-bound register/unregister lifecycle helper are deleted. The existing
+  `Extrinsic.Runtime.SandboxEditorFacades` module exports four plain descriptor
+  factories, while the callback bodies remain in its private
+  `Runtime.SandboxDefaultPolicies.cpp` implementation unit;
+- Sandbox requires the exact published `AssetImportPipeline` and exact built-in
+  `RuntimeInputActionRegistry` before registering anything. One file-local
+  record retains only those provider borrows and the typed handles, installs in
+  fixed order, rolls partial failure back in reverse order, and makes repeated
+  shutdown a no-op;
+- the import-completed descriptor captures only the optional camera registry.
+  Auto-selection consumes the `SelectionController` supplied by the pipeline's
+  completion services; the separate `F` descriptor captures exact camera and
+  selection references and is registered only when both optional services
+  exist; and
+- shutdown announcement cancels imports and detaches provider borrows, the
+  generic GPU bridge drains participants next, application shutdown unregisters
+  the app-private handles while both required registries remain live, and
+  reverse AsyncWork/AssetWorkflow teardown follows.
+
+No new owner, wrapper, registry, service, lifecycle abstraction, or Engine
+surface is introduced. The exact Engine snapshot remains 22 plain imports /
+0 domain imports / 2 re-exports / 10 public getter names.
+
 ## Implementation update: RUNTIME-180
 
 `RUNTIME-180` applies the Camera hypothesis without widening the generic

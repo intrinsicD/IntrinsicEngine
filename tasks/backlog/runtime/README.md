@@ -189,11 +189,12 @@ triggers. The implementation graph is:
   one frame-local kernel capture value, a preserved paired Begin/End bracket,
   and app-owned Sandbox panels.
 - Active [`RUNTIME-168`](../../active/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
-  — after retired `RUNTIME-188` and `RUNTIME-183`, delete the one-consumer exported
-  policy module, retain its `.cpp` as a private implementation unit of the
-  existing Sandbox editor-facade module, and let Sandbox own transactional
-  typed handles over only the published import pipeline/input registry plus
-  optional exact camera/selection for focus.
+  — after retired `RUNTIME-188` and `RUNTIME-183`, its implementation deletes
+  the one-consumer exported policy module, retains its `.cpp` as a private
+  implementation unit of the existing Sandbox editor-facade module, and gives
+  Sandbox transactional typed handles over only the exact import pipeline/input
+  registry plus optional exact camera/selection for focus. Final verification
+  and retirement remain on the active task.
 - Existing [`RUNTIME-129`](RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
   completes the operational Vulkan bake inside `AssetWorkflowModule` after
   retired `GRAPHICS-128` made the shared managed-index subrange selectable.
@@ -298,10 +299,10 @@ compile cost. They preserve behavior and ownership; they are not feature tasks.
 main `Runtime.RenderExtraction` module slimming.
 
 - [`RUNTIME-168`](../../active/RUNTIME-168-privatize-sandbox-default-policies-surface.md) —
-  after retired `RUNTIME-188` and `RUNTIME-183`, remove the one-consumer public module
-  while retaining its implementation under the existing
-  `SandboxEditorFacades` surface; Sandbox privately owns exact provider
-  borrows and typed handles, not another runtime owner.
+  the implementation removes the one-consumer public module while retaining
+  its callback bodies under the existing `SandboxEditorFacades` surface;
+  Sandbox privately owns exact provider borrows and typed handles, not another
+  runtime owner. The active task still owns final verification and retirement.
 ### Retired module-surface diet work
 
 - [`RUNTIME-188`](../../done/RUNTIME-188-extract-scene-interaction-module.md)
@@ -643,10 +644,10 @@ split; narratives live in the retirement log.
 - [RUNTIME-144 — Post-import processor and import UX-policy seam](../../archive/RUNTIME-144-post-import-processor-and-ux-policy-seam.md)
   (done, 2026-07-06, `Operational`): `Engine` now owns generic post-import
   processor, import-authoring, import-completed, and input-action dispatch
-  registries only; `Extrinsic.Runtime.SandboxDefaultPolicies` installs the
-  sandbox default direct-mesh generated-normal processor, authoring defaults,
-  focus/auto-select import UX, and `F` focus action from the app composition
-  side.
+  registries only; Sandbox installs the default direct-mesh generated-normal
+  processor, authoring defaults, focus/auto-select import UX, and `F` focus
+  action from four plain `SandboxEditorFacades` descriptor factories through
+  app-private transactional handles.
 - [RUNTIME-125 — Optional AoS fast lane for static geometry](../../archive/RUNTIME-125-aos-static-fast-lane.md)
   (done, 2026-07-02, `CPUContracted`): PR-fast SoA/probe benchmark evidence and
   planning-only storage-lane/promotion contracts landed without allocating an

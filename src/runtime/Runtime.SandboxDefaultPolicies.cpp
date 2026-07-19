@@ -1,7 +1,8 @@
 module;
 
-#include <cstdint>
+#include <array>
 #include <bit>
+#include <cstdint>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -13,7 +14,7 @@ module;
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 
-module Extrinsic.Runtime.SandboxDefaultPolicies;
+module Extrinsic.Runtime.SandboxEditorFacades;
 
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.ImportRouter;
@@ -42,7 +43,7 @@ import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraFocusCommand;
-import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.RenderExtraction;
@@ -621,27 +622,13 @@ namespace Extrinsic::Runtime
                     state->Path);
             }
         }
+    }
 
-        void RegisterSandboxDefaultImportAuthoringPolicies(
-            AssetImportPipeline* const pipeline,
-            RuntimeSandboxDefaultPolicyRegistration& registration)
-        {
-            if (pipeline == nullptr)
-                return;
-
-            const auto registerAuthoringPolicy =
-                [pipeline, &registration](
-                    RuntimeImportEntityAuthoringPolicyDesc desc)
-                {
-                    const RuntimeImportEntityAuthoringPolicyHandle handle =
-                        pipeline->RegisterImportEntityAuthoringPolicy(
-                            std::move(desc));
-                    if (handle.IsValid())
-                        registration.ImportEntityAuthoringPolicies.push_back(
-                            handle);
-                };
-
-            registerAuthoringPolicy(RuntimeImportEntityAuthoringPolicyDesc{
+    std::array<RuntimeImportEntityAuthoringPolicyDesc, 3>
+    MakeSandboxDefaultImportAuthoringPolicies()
+    {
+        return {
+            RuntimeImportEntityAuthoringPolicyDesc{
                 .DebugName = "Sandbox.DefaultMeshImportAuthoring",
                 .PayloadKind = Assets::AssetPayloadKind::Mesh,
                 .Apply =
@@ -672,9 +659,9 @@ namespace Extrinsic::Runtime
                             ImportedMeshVisualization());
                         return Core::Ok();
                     },
-            });
+            },
 
-            registerAuthoringPolicy(RuntimeImportEntityAuthoringPolicyDesc{
+            RuntimeImportEntityAuthoringPolicyDesc{
                 .DebugName = "Sandbox.DefaultGraphImportAuthoring",
                 .PayloadKind = Assets::AssetPayloadKind::Graph,
                 .Apply =
@@ -709,9 +696,9 @@ namespace Extrinsic::Runtime
                             ImportedGeometryVisualization());
                         return Core::Ok();
                     },
-            });
+            },
 
-            registerAuthoringPolicy(RuntimeImportEntityAuthoringPolicyDesc{
+            RuntimeImportEntityAuthoringPolicyDesc{
                 .DebugName = "Sandbox.DefaultPointCloudImportAuthoring",
                 .PayloadKind = Assets::AssetPayloadKind::PointCloud,
                 .Apply =
@@ -739,224 +726,145 @@ namespace Extrinsic::Runtime
                             ImportedGeometryVisualization());
                         return Core::Ok();
                     },
-            });
-        }
-
-        void RegisterSandboxDefaultImportCompletedHandler(
-            AssetImportPipeline* const pipeline,
-            CameraControllerRegistry* const cameraControllers,
-            RuntimeSandboxDefaultPolicyRegistration& registration)
-        {
-            if (pipeline == nullptr)
-                return;
-
-            const RuntimeImportCompletedHandlerHandle handle =
-                pipeline->RegisterImportCompletedHandler(
-                    RuntimeImportCompletedHandlerDesc{
-                        .DebugName = "Sandbox.DefaultImportCompletedUx",
-                        .PayloadKind = Assets::AssetPayloadKind::Unknown,
-                        .Handle =
-                            [cameraControllers](
-                                const RuntimeImportCompletedContext& context,
-                                RuntimeImportCompletedServices& services)
-                            {
-                                if (services.Scene == nullptr)
-                                {
-                                    return Core::Err(
-                                        Core::ErrorCode::InvalidState);
-                                }
-
-                                if (cameraControllers != nullptr &&
-                                    services.Config != nullptr)
-                                {
-                                    FocusMainCameraOnImportTarget(
-                                        *cameraControllers,
-                                        services.Config->Camera.Controller,
-                                        services.Config->Camera.Enabled,
-                                        context.FocusTarget);
-                                }
-
-                                for (const ECS::EntityHandle entity :
-                                     context.CreatedEntities)
-                                {
-                                    if (!services.Scene->IsValid(entity))
-                                        continue;
-                                    if (services.Selection != nullptr)
-                                    {
-                                        (void)services.Selection->
-                                            SetSelectedEntity(
-                                                *services.Scene,
-                                                entity);
-                                    }
-                                    break;
-                                }
-                                return Core::Ok();
-                            },
-                    });
-            if (handle.IsValid())
-                registration.ImportCompletedHandlers.push_back(handle);
-        }
-
-        void RegisterSandboxDefaultDirectMeshPostProcessor(
-            AssetImportPipeline* const pipeline,
-            RuntimeSandboxDefaultPolicyRegistration& registration)
-        {
-            if (pipeline == nullptr)
-                return;
-
-            const RuntimePostImportProcessorHandle handle =
-                pipeline->RegisterPostImportProcessor(
-                    RuntimePostImportProcessorDesc{
-                        .DebugName = "Sandbox.DirectMeshGeneratedNormal",
-                        .PayloadKind = Assets::AssetPayloadKind::Mesh,
-                        .Process =
-                            [](const RuntimePostImportProcessorContext& context,
-                               RuntimePostImportProcessorServices& services)
-                            {
-                                if (context.MeshPayload == nullptr)
-                                    return Core::Ok();
-                                if (services.Streaming == nullptr ||
-                                    services.AssetService == nullptr ||
-                                    services.GpuAssetCache == nullptr ||
-                                    services.RenderExtraction == nullptr ||
-                                    services.Scene == nullptr)
-                                {
-                                    return Core::Err(
-                                        Core::ErrorCode::InvalidState);
-                                }
-
-                                QueueDirectMeshPostProcess(
-                                    services.Streaming,
-                                    services.World,
-                                    *services.AssetService,
-                                    *services.GpuAssetCache,
-                                    *services.RenderExtraction,
-                                    *services.Scene,
-                                    services.ObjectSpaceNormalBakeQueue,
-                                    services.ObjectSpaceNormalBakeGraphicsBackendOperational,
-                                    std::string{context.Path},
-                                    *context.MeshPayload,
-                                    context.Entity);
-                                return Core::Ok();
-                            },
-                    });
-            if (handle.IsValid())
-                registration.PostImportProcessors.push_back(handle);
-        }
-
-        void RegisterSandboxDefaultInputActions(
-            Engine& engine,
-            CameraControllerRegistry* const cameraControllers,
-            RuntimeSandboxDefaultPolicyRegistration& registration)
-        {
-            if (cameraControllers == nullptr)
-                return;
-
-            SelectionController* const selection =
-                engine.Services().Find<SelectionController>();
-            const RuntimeInputActionHandle handle = engine.RegisterInputAction(
-                RuntimeInputActionDesc{
-                    .DebugName = "Sandbox.DefaultFocusCameraOnSelection",
-                    .Binding =
-                        RuntimeInputActionBinding{
-                            .KeyCode = Platform::Input::Key::F,
-                            .Trigger = RuntimeInputActionTrigger::KeyJustPressed,
-                            .SuppressWhenImGuiCapturesKeyboard = true,
-                        },
-                    .Execute =
-                        [cameraControllers, selection](
-                            const RuntimeInputActionContext& context,
-                            RuntimeInputActionServices& services)
-                        {
-                            if (services.Scene == nullptr ||
-                                services.RenderInput == nullptr ||
-                                services.Config == nullptr)
-                            {
-                                return Core::Err(Core::ErrorCode::InvalidState);
-                            }
-
-                            if (!services.Config->Camera.Enabled)
-                                return Core::Ok();
-                            if (selection == nullptr)
-                                return Core::Ok();
-
-                            if (!FocusCameraOnSelection(
-                                    *cameraControllers,
-                                    *selection,
-                                    *services.Scene,
-                                    CameraControllerSlot::Main))
-                            {
-                                return Core::Ok();
-                            }
-
-                            if (ICameraController* focused =
-                                    cameraControllers->ResolveOrNull(
-                                        CameraControllerSlot::Main))
-                            {
-                                services.RenderInput->Camera =
-                                    focused->GetView(context.Viewport);
-                                services.RenderInput->Camera
-                                    .ExplicitCameraTransition =
-                                    cameraControllers->ConsumeCameraTransition(
-                                            CameraControllerSlot::Main);
-                            }
-                            return Core::Ok();
-                        },
-                });
-            if (handle.IsValid())
-                registration.InputActions.push_back(handle);
-        }
+            },
+        };
     }
 
-    RuntimeSandboxDefaultPolicyRegistration
-    RegisterSandboxDefaultRuntimePolicies(
-        Engine& engine,
+    RuntimeImportCompletedHandlerDesc
+    MakeSandboxDefaultImportCompletedHandler(
         CameraControllerRegistry* const cameraControllers)
     {
-        RuntimeSandboxDefaultPolicyRegistration registration{};
-        AssetImportPipeline* const pipeline =
-            engine.Services().Find<AssetImportPipeline>();
-        RegisterSandboxDefaultImportAuthoringPolicies(
-            pipeline, registration);
-        RegisterSandboxDefaultImportCompletedHandler(
-            pipeline, cameraControllers, registration);
-        RegisterSandboxDefaultDirectMeshPostProcessor(
-            pipeline, registration);
-        RegisterSandboxDefaultInputActions(
-            engine, cameraControllers, registration);
-        return registration;
+        return RuntimeImportCompletedHandlerDesc{
+            .DebugName = "Sandbox.DefaultImportCompletedUx",
+            .PayloadKind = Assets::AssetPayloadKind::Unknown,
+            .Handle =
+                [cameraControllers](
+                    const RuntimeImportCompletedContext& context,
+                    RuntimeImportCompletedServices& services)
+                {
+                    if (services.Scene == nullptr)
+                    {
+                        return Core::Err(
+                            Core::ErrorCode::InvalidState);
+                    }
+
+                    if (cameraControllers != nullptr &&
+                        services.Config != nullptr)
+                    {
+                        FocusMainCameraOnImportTarget(
+                            *cameraControllers,
+                            services.Config->Camera.Controller,
+                            services.Config->Camera.Enabled,
+                            context.FocusTarget);
+                    }
+
+                    for (const ECS::EntityHandle entity :
+                         context.CreatedEntities)
+                    {
+                        if (!services.Scene->IsValid(entity))
+                            continue;
+                        if (services.Selection != nullptr)
+                        {
+                            (void)services.Selection->SetSelectedEntity(
+                                *services.Scene,
+                                entity);
+                        }
+                        break;
+                    }
+                    return Core::Ok();
+                },
+        };
     }
 
-    void UnregisterSandboxDefaultRuntimePolicies(
-        Engine& engine,
-        RuntimeSandboxDefaultPolicyRegistration& registration)
+    RuntimePostImportProcessorDesc
+    MakeSandboxDefaultDirectMeshPostProcessor()
     {
-        AssetImportPipeline* const pipeline =
-            engine.Services().Find<AssetImportPipeline>();
-        if (pipeline != nullptr)
-        {
-            for (const RuntimePostImportProcessorHandle handle :
-                 registration.PostImportProcessors)
-            {
-                pipeline->UnregisterPostImportProcessor(handle);
-            }
-            for (const RuntimeImportEntityAuthoringPolicyHandle handle :
-                 registration.ImportEntityAuthoringPolicies)
-            {
-                pipeline->UnregisterImportEntityAuthoringPolicy(
-                    handle);
-            }
-            for (const RuntimeImportCompletedHandlerHandle handle :
-                 registration.ImportCompletedHandlers)
-            {
-                pipeline->UnregisterImportCompletedHandler(
-                    handle);
-            }
-        }
-        for (const RuntimeInputActionHandle handle : registration.InputActions)
-        {
-            engine.UnregisterInputAction(handle);
-        }
-        registration = {};
+        return RuntimePostImportProcessorDesc{
+            .DebugName = "Sandbox.DirectMeshGeneratedNormal",
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+            .Process =
+                [](const RuntimePostImportProcessorContext& context,
+                   RuntimePostImportProcessorServices& services)
+                {
+                    if (context.MeshPayload == nullptr)
+                        return Core::Ok();
+                    if (services.Streaming == nullptr ||
+                        services.AssetService == nullptr ||
+                        services.GpuAssetCache == nullptr ||
+                        services.RenderExtraction == nullptr ||
+                        services.Scene == nullptr)
+                    {
+                        return Core::Err(
+                            Core::ErrorCode::InvalidState);
+                    }
+
+                    QueueDirectMeshPostProcess(
+                        services.Streaming,
+                        services.World,
+                        *services.AssetService,
+                        *services.GpuAssetCache,
+                        *services.RenderExtraction,
+                        *services.Scene,
+                        services.ObjectSpaceNormalBakeQueue,
+                        services.ObjectSpaceNormalBakeGraphicsBackendOperational,
+                        std::string{context.Path},
+                        *context.MeshPayload,
+                        context.Entity);
+                    return Core::Ok();
+                },
+        };
+    }
+
+    RuntimeInputActionDesc
+    MakeSandboxDefaultFocusInputAction(
+        CameraControllerRegistry& cameraControllers,
+        SelectionController& selection)
+    {
+        return RuntimeInputActionDesc{
+            .DebugName = "Sandbox.DefaultFocusCameraOnSelection",
+            .Binding =
+                RuntimeInputActionBinding{
+                    .KeyCode = Platform::Input::Key::F,
+                    .Trigger = RuntimeInputActionTrigger::KeyJustPressed,
+                    .SuppressWhenImGuiCapturesKeyboard = true,
+                },
+            .Execute =
+                [camera = &cameraControllers, selection = &selection](
+                    const RuntimeInputActionContext& context,
+                    RuntimeInputActionServices& services)
+                {
+                    if (services.Scene == nullptr ||
+                        services.RenderInput == nullptr ||
+                        services.Config == nullptr)
+                    {
+                        return Core::Err(Core::ErrorCode::InvalidState);
+                    }
+
+                    if (!services.Config->Camera.Enabled)
+                        return Core::Ok();
+
+                    if (!FocusCameraOnSelection(
+                            *camera,
+                            *selection,
+                            *services.Scene,
+                            CameraControllerSlot::Main))
+                    {
+                        return Core::Ok();
+                    }
+
+                    if (ICameraController* focused =
+                            camera->ResolveOrNull(
+                                CameraControllerSlot::Main))
+                    {
+                        services.RenderInput->Camera =
+                            focused->GetView(context.Viewport);
+                        services.RenderInput->Camera
+                            .ExplicitCameraTransition =
+                            camera->ConsumeCameraTransition(
+                                CameraControllerSlot::Main);
+                    }
+                    return Core::Ok();
+                },
+        };
     }
 }

@@ -9,6 +9,7 @@ if(INTRINSIC_BUILD_SANDBOX OR INTRINSIC_BUILD_TESTS)
             Editor/Sandbox.MethodPanels.cppm
             Editor/Sandbox.MeshProcessingPanels.cppm
             Sandbox.ConfigSections.cppm
+            Sandbox.cppm
             PRIVATE
             Editor/Sandbox.EditorController.cpp
             Editor/Sandbox.EditorShell.cpp
@@ -16,6 +17,7 @@ if(INTRINSIC_BUILD_SANDBOX OR INTRINSIC_BUILD_TESTS)
             Editor/Sandbox.MethodPanels.cpp
             Editor/Sandbox.MeshProcessingPanels.cpp
             Sandbox.ConfigSections.cpp
+            Sandbox.cpp
     )
     target_link_libraries(ExtrinsicSandboxEditor
             PUBLIC
@@ -33,11 +35,7 @@ if(INTRINSIC_BUILD_SANDBOX AND NOT INTRINSIC_HEADLESS_NO_GLFW)
     target_link_options(ExtrinsicSandbox PRIVATE ${INTRINSIC_LINK_FLAGS})
 
     target_sources(ExtrinsicSandbox
-        PUBLIC
-        FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
-        Sandbox.cppm
         PRIVATE
-        Sandbox.cpp
         main.cpp
     )
 

@@ -30,7 +30,6 @@ startup/shutdown.
 | `Extrinsic.Runtime.SceneInteractionModule` | Optional app-composed one-world interaction owner from `RUNTIME-188`. Its PImpl owns `SelectionController`, `StableEntityLookup` plus its scene binding, `SelectionReadbackState`, and `GizmoFrameService`; it publishes only the exact module and exact controller. Every input, `BeforeExtraction`, and `Maintenance` hook validates `{WorldHandle, Registry*, interaction epoch}` directly. The typed viewport hook runs after camera/capture, `BeforeExtraction` drains one pick and submits a copied world-tagged selection/hover/gizmo snapshot after input actions and transform flush, and `Maintenance` drains completed readbacks. A strong scene-document participant clears the complete cohort while the outgoing registry is live and rebuilds lookup on New/Load/Close; active-world mismatch, retirement, announcement, and recycled-handle reinitialize use the same reset. Pick sequences remain monotonic while zero, unknown, wrong-world, and wrong-epoch results fail closed. Announcement unregisters the document participant and detaches borrows before ordinary exact withdrawal. Omission leaves document, camera, generic input, component-driven primitive views, rendering, and Engine operational with empty interaction snapshots. |
 | `Extrinsic.Runtime.AssetWorkflowModule` | Optional app-composed global asset owner from `RUNTIME-183`. Its PImpl keeps one persistent dependency-empty `AssetImportPipeline` and `ObjectSpaceNormalBakeService` across Engine reinitialize, while each boot recreates `AssetService`, `GpuAssetCache`, the cache listener, and model texture/scene handoffs. It publishes exactly `AssetService`, `AssetImportPipeline`, `GpuAssetCache`, and `Core::IAssetFrameHooks`; the private bake service remains one retained `JobService` GPU-queue participant driven by Engine's generic bridge. Resolution requires the exact `SceneDocumentModule` and `EditorCommandHistory`, optionally borrows streaming and selection, and registers one strong document-replacement participant. Active-world and direct callback paths validate `{WorldHandle, Registry*, binding epoch}`. Shutdown announcement cancels imports, invalidates bindings, releases the participant, and detaches provider borrows before application/provider teardown; ordinary shutdown withdraws exact services and destroys per-boot state after the GPU bridge. Omission leaves generic Engine/render/world/transfer/async and render-extraction geometry retirement operational, with asset services absent and platform drops ignored. |
 | `Extrinsic.Runtime.AssetImportPipeline` | `AssetWorkflowModule`-owned asset import subsystem from `RUNTIME-147`. Exports runtime asset import/reimport requests, queued geometry/model/texture entry points and records, import result/event records, IO/backend decode-block test seams, and post-import processor/import-authoring/import-completed registry contracts. It owns the promoted ASSETIO geometry/model/texture decoder composition, ingest state-machine wiring, import event log, queue snapshot/cancel/clear facade, standalone geometry ECS materialization with local/world culling bounds, model/texture handoffs, dropped-file import routing, and the decode/materialize helpers previously in `Engine`. Platform drops resolve the optional exact service and call `ImportDroppedFilePaths(...)` only when present. Queued imports freeze the active `{WorldHandle, Scene::Registry*}` target plus its binding epoch at submission and validate that exact active binding before materialization; direct imports now perform the same current-binding check. A switch while decode is in flight, including away and back to the submitted world, produces a failed ingest record instead of applying through rebound scene/handoff members. Scene-changing successful imports mark the exact `EditorCommandHistory` service dirty, preserving direct import, reimport, dropped-file apply, and queued apply document-state behavior. Dropped ambiguous geometry extensions such as PLY try supported geometry payloads in import-router order before failing closed. Runtime logs dropped-file receipt, per-path routing/queue decisions, and shared import completion so failed drops remain diagnosable outside the editor panel. |
-| `Extrinsic.Runtime.SandboxDefaultPolicies` | Runtime-owned sandbox/default composition helper. `RegisterSandboxDefaultRuntimePolicies(Engine&, CameraControllerRegistry*)` installs the standard direct-mesh generated-normal post-import processor, import authoring defaults (`SelectableTag`, render lanes, visualization defaults), import-completed auto-select UX, optional autofocus, and the optional `F` focus-on-selection input action; `UnregisterSandboxDefaultRuntimePolicies(...)` removes the returned handles. The Sandbox resolves the exact camera registry once and passes it explicitly. With a null registry, the completed handler still registers and selects the first valid imported entity, while autofocus and `F` are omitted. Asset-import policies resolve the optional exact `AssetImportPipeline` service once; when it is absent, asset registrations are omitted while generic input actions remain available. The input action registers through Engine's compatibility facade and is stored/dispatched by `Extrinsic.Runtime.InputActions`; generic action services carry no camera pointer. When `RuntimePostImportProcessorServices` supplies a `RuntimeObjectSpaceNormalBakeQueue`, the direct-mesh post-processor resolves UVs/normals on the streaming lane, then schedules an object-space normal GPU-bake request on main-thread apply and leaves material binding deferred; non-operational backends record the queue's no-CPU-fallback diagnostic. |
 | `Extrinsic.Runtime.AssetIngestStateMachine` | Runtime-owned ingest request/result state machine (`RUNTIME-101`). Exports request sources for manual import, dropped files, and reimport; phases from `Queued` through route resolution, decode scheduling/execution, main-thread apply, `Complete`, `Failed`, and `Cancelled`; and a diagnostic taxonomy for missing path/file, route failures, invalid reimport target, duplicate active request, decode failure, callback failure, materialization failure, cancellation, stale completion, invalid transition, and unknown handles. The state machine is backend-neutral and owns no decoders, ECS mutation, `AssetService`, graphics, RHI, or worker threads. `AssetImportPipeline::ImportAssetFromPath(...)`, `QueueGeometryImport(...)`, `QueueModelTextureImport(...)`, `ReimportAsset(...)`, synchronous dropped non-promoted imports, and deferred dropped geometry/model-scene/texture imports submit records through this contract; deferred file reads and decodes run on `Runtime.StreamingExecutor` and complete/fail only from its main-thread apply lane. Reimport resolves the existing asset path and payload kind from `AssetService`, reloads the same `AssetId` transactionally, lets texture/model-scene handoffs consume `Reloaded`/`Ready` events, and does not revive ECS `AssetSourceRef` coupling; standalone geometry scene entities remain authoring snapshots and are not duplicated. |
 | `Extrinsic.Runtime.AssetGeometryIO` | Runtime-owned registration seam for `ASSETIO-001` Slice B. Exports `RegisterPromotedGeometryIOCallbacks(Assets::AssetGeometryIOBridge&)`, imports the promoted geometry IO modules in runtime, and registers OBJ/OFF/STL/PLY mesh importers, XYZ/PTS/XYZRGB/PCD/PLY point-cloud importers, TGF/edge-list graph importers, OBJ/STL/PLY mesh exporters, XYZ/PCD/PLY point-cloud exporters, and TGF/edge-list graph exporters. The adapter translates legacy geometry `Core.Error` decoder failures into promoted `Extrinsic.Core.Error` codes before they enter the asset bridge, keeping `src/assets` free of geometry/runtime/graphics imports. It does not construct ECS entities or GPU residency; later `ASSETIO-001` slices own model/texture payloads and runtime handoff. |
 | `Extrinsic.Runtime.AssetMeshNormals` | Runtime-owned mesh payload materialization helper for asset import paths. Exports `RuntimeMeshUvResolutionOptions`, `RuntimeMeshGeometryOnlyOptions`, `RuntimeMeshMaterializationDiagnostics`, `BuildRuntimeHalfedgeMeshGeometryOnly(...)`, `BuildRuntimeHalfedgeMeshMaterialization(...)`, the compatibility wrapper `BuildRuntimeHalfedgeMeshWithNormals(...)`, and `MeshPayloadHasValidVertexTexcoords(...)`. The geometry-only helper triangulates promoted `Geometry::MeshIO::MeshIOResult` payloads for immediate authoring publication without invoking UV atlas resolution or texture baking; it copies typed vertex properties and writes explicit `v:normal` vectors or deterministic area-weighted fallback normals so the first upload has count-matched normals. The full materialization helper validates authored UVs through `Geometry.UvAtlas`, preserves valid authored `v:texcoord` by default, invokes the selected atlas backend when UVs are missing/invalid or regeneration is forced, defaults to `UvAtlasMethod::FastStaged`, exposes explicit `Method` and `AllowXAtlasFallback` controls for compatibility/fail-closed tests, and fails closed under the default required-UV policy when no valid UVs can be produced. It copies explicit `v:normal` vectors or synthesizes deterministic area-weighted normals, preserves typed vertex payload properties such as `glm::vec3`/`glm::vec4` colors and scalar/vector algorithm results across seam-split output using source-vertex xrefs, records `v:source_vertex` / `f:source_face` provenance, and reports authored-vs-generated UV provenance, invalid-authored status, backend status, seam-split count, chart count, and atlas dimensions. Direct mesh imports may opt into the disconnected render-only fallback for non-manifold/inconsistent-winding payloads; model-scene materialization uses the strict topology path. |
@@ -154,13 +153,22 @@ defaults. After materialization, import-completed handlers receive the created
 entity span and optional focus target; the sandbox default handler always
 auto-selects the first valid entity when scene/selection are available and
 applies one-shot autofocus only when the app supplied an optional exact
-`CameraControllerRegistry`. Those default policies are installed by
-`RegisterSandboxDefaultRuntimePolicies(Engine&, CameraControllerRegistry*)`
-from `Extrinsic.Runtime.SandboxDefaultPolicies`, not by
-`Engine::Initialize()`. With no camera registry, selection still succeeds and
-the completed handler does not fail; with no policy registrations, geometry
-still materializes but receives no render/selection/visualization defaults, no
-focus/selection mutation, and no generated-normal post-process.
+`CameraControllerRegistry`. Sandbox obtains four plain descriptors from
+`Extrinsic.Runtime.SandboxEditorFacades`: the fixed Mesh/Graph/PointCloud
+authoring array, the camera-parameterized completed handler, the direct-mesh
+postprocessor, and the exact camera-plus-selection `F` action. Their callback
+bodies remain in a private implementation unit; the former exported
+`Extrinsic.Runtime.SandboxDefaultPolicies` module and Engine-bound lifecycle
+helper are absent. Sandbox resolves the exact required `AssetImportPipeline`
+and `RuntimeInputActionRegistry` before registering anything and retains only
+their app-private typed handles and provider borrows; any partial failure rolls
+back in reverse order. The completed descriptor captures only the optional
+camera registry. Auto-selection consumes the `SelectionController` supplied in
+`RuntimeImportCompletedServices` by the pipeline, so it remains available
+without a camera and materialization remains valid without selection. With no
+policy registrations, geometry still materializes but receives no
+render/selection/visualization defaults, no focus/selection mutation, and no
+generated-normal post-process.
 
 Model-scene materialization creates explicit ECS node entities and primitive
 leaves from the selected-scene payload. Node entities retain authored local TRS
@@ -1051,15 +1059,17 @@ execution should request `Core::Config::WindowBackend::Null` explicitly.
    `Transform::WorldMatrix`, world bounds, and `DirtyTags::DirtyTransform`
    before transform-gizmo packets are built and before render extraction
    observes the scene. Idle frames skip the redundant sweep. The runtime then
-   dispatches registered input actions. The sandbox default policy helper can
-   install an `F` key edge action that calls `FocusCameraOnSelection(...)` after
-   the bounds flush, suppresses it while ImGui owns the keyboard, and refreshes
-   `RenderFrameInput::Camera` after a successful focus so the snapped view
-   reaches extraction the same frame. Finally the `BeforeExtraction` module
-   hook drains the coalesced pick into `RenderFrameInput`, builds gizmo packets,
-   and submits one copied `RuntimeSceneInteractionRenderSnapshot`. This keeps
-   input actions and transform flush ahead of packet construction without
-   adding another generic frame phase.
+   dispatches registered input actions. Sandbox registers the `F` key-edge
+   descriptor only when both exact optional `CameraControllerRegistry` and
+   `SelectionController` services exist. Its callback calls
+   `FocusCameraOnSelection(...)` after the bounds flush, suppresses itself while
+   ImGui owns the keyboard, and refreshes `RenderFrameInput::Camera` after a
+   successful focus so the snapped view reaches extraction the same frame.
+   Finally the `BeforeExtraction` module hook drains the coalesced pick into
+   `RenderFrameInput`, builds gizmo packets, and submits one copied
+   `RuntimeSceneInteractionRenderSnapshot`. This keeps input actions and
+   transform flush ahead of packet construction without adding another generic
+   frame phase.
 9. Renderer begin frame. Runtime acquires the render frame through
    `IRenderer::BeginFrame()`. GRAPHICS-040A keeps camera extraction unchanged;
    temporal jitter remains graphics-side, and GRAPHICS-040C maps the renderer's
@@ -1121,15 +1131,16 @@ from ImGui producer-copy volume. Renderer-owned render-graph timing and ImGui
 adapter diagnostics are copied for observability only; they are not branching
 contracts for runtime behavior.
 
-Shutdown is also delegated through `Extrinsic.Core.FrameLoop`: runtime clears
-the platform listener, detaches and tears down the ImGui adapter while the window
-and overlay system are live, then executes `ExecuteShutdownContract` in this
-order: stop running, wait device idle, application shutdown (including
-app-owned reference-content teardown), streaming shutdown/drain, module
-shutdown (including optional camera-registry withdrawal), scene destruction,
-asset and GPU-asset handoff destruction, streaming state destruction, frame graph
-destruction, render-extraction shutdown plus renderer shutdown, device shutdown,
-window destruction, scheduler shutdown, and initialized-state clear.
+Shutdown is also delegated through `Extrinsic.Core.FrameLoop`. After command
+discard, Engine publishes and pumps the shutdown announcement so AssetWorkflow
+cancels imports and detaches provider borrows. The generic GPU-participant
+bridge then performs participant drain and any required device-idle wait.
+Application shutdown follows while the persistent `AssetImportPipeline` and
+`RuntimeInputActionRegistry` remain live, allowing Sandbox to unregister its
+private policy handles. Ordinary reverse module teardown then shuts down
+AsyncWork before AssetWorkflow, followed by world, frame graph,
+render-extraction/renderer, device, window, scheduler, and initialized-state
+cleanup.
 
 ### Pipelined render-world pool (`GRAPHICS-036C`/`GRAPHICS-036D`)
 
@@ -1787,10 +1798,10 @@ right- or middle-mouse drag rotates orbit/fly/free-look cameras, `WASD` moves or
 pans according to the active controller, `Shift` accelerates movement, and mouse
 wheel zooms orbit/top-down cameras. The sandbox `Camera / Render` window mirrors
 these bindings so controller replacement buttons are not the only visible UI.
-The sandbox default `F` focus-on-selection binding is installed as a runtime
-input action by `Extrinsic.Runtime.SandboxDefaultPolicies` only when Sandbox
-resolved a camera registry; generic input actions remain operational when the
-module is omitted.
+The sandbox default `F` focus-on-selection binding is installed from the
+`SandboxEditorFacades` descriptor factory only when Sandbox resolves both the
+exact camera registry and exact selection controller; generic input actions
+remain operational when either optional service is omitted.
 Viewport left-click selection is routed by `SceneInteractionModule` from the
 runtime input context into its published
 `SelectionController::RequestClickPick(...)`; it is suppressed while ImGui or

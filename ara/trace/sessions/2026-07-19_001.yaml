@@ -2,9 +2,9 @@ session:
   id: "2026-07-19_001"
   date: "2026-07-19"
   started: "2026-07-19T04:02+02:00"
-  last_turn: "2026-07-19T17:38+02:00"
-  turn_count: 3
-  summary: "Implemented and verified app-composed RUNTIME-181 config control and RUNTIME-172 scene documents, then migrated existing tests to RUNTIME-183's exact-service AssetWorkflow composition."
+  last_turn: "2026-07-19T19:59+02:00"
+  turn_count: 4
+  summary: "Implemented and verified app-composed RUNTIME-181 config control and RUNTIME-172 scene documents, migrated existing tests to RUNTIME-183's exact-service AssetWorkflow composition, and added real-Sandbox RUNTIME-168 policy lifecycle coverage."
 
 events_logged:
   - turn: 1
@@ -37,6 +37,12 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Resolved the superseded Engine-private asset residency A05 in favor of app-composed AssetWorkflow A15 while preserving A05 as historical evidence."
+  - turn: 4
+    type: experiment
+    id: "N270"
+    routing: direct
+    provenance: ai-executed
+    summary: "Added real-Sandbox default-policy, reinitialization, omission, and blocked-import shutdown coverage; the focused target built and all six composition tests passed."
 
 ai_actions:
   - turn: 1
@@ -74,6 +80,11 @@ ai_actions:
       - "tests/contract/runtime/Test.SceneDocumentModule.cpp"
       - "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp"
       - "tests/integration/runtime/Test.RuntimeSandboxAcceptance.cpp"
+  - turn: 4
+    action: "Implemented RUNTIME-168's real Sandbox default-policy composition and lifecycle integration coverage, including exact-service omission, reinitialization, focus dispatch, and blocked-import shutdown ordering; built and ran the focused target."
+    provenance: ai-executed
+    files_changed:
+      - "tests/integration/runtime/Test.SandboxAppComposition.cpp"
 
 claims_touched: []
 
@@ -84,6 +95,8 @@ key_context:
     excerpt: "RUNTIME-172 keeps document/history ownership in one optional active-world-bound module while narrow named participants preserve interaction and asset-handoff replacement ordering until their owning tasks land."
   - turn: 3
     excerpt: "RUNTIME-183 removes Engine asset/cache/import and bake-diagnostic getters; asset-dependent tests must compose SceneDocumentModule plus AssetWorkflowModule and resolve exact services from Engine.Services()."
+  - turn: 4
+    excerpt: "RUNTIME-168 acceptance requires the real Sandbox app to prove default policies register transactionally, survive clean reinitialization without duplication, and cancel a blocked import before exact service unregistration."
 
 open_threads:
   - "An owner may externalize the candidate stable contexts through branch protection, rulesets, or a merge queue; none is currently configured."
@@ -97,6 +110,7 @@ open_threads:
   - "Finish CORE-009 documentation, full CPU verification, and task retirement."
   - "Run RUNTIME-181's complete default CPU-supported integration gate, then review and retire the still-active task."
   - "Integrate and review the clean RUNTIME-172 branch, then let the root owner retire the still-active task."
+  - "Integrate the focused RUNTIME-168 real-Sandbox lifecycle test with its production, documentation, task, and coordinated full-gate slice."
 
 ai_suggestions_pending:
   - "Let StructSplat and Prospect owners merge the pushed refresh branches through each repository's normal integration policy."

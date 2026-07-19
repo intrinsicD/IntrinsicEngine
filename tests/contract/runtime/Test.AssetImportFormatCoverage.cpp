@@ -57,9 +57,10 @@ import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
+import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.SandboxDefaultPolicies;
+import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
@@ -890,9 +891,47 @@ namespace
 
     void InstallSandboxDefaultRuntimePolicies(Runtime::Engine& engine)
     {
-        (void)Runtime::RegisterSandboxDefaultRuntimePolicies(
-            engine,
-            engine.Services().Find<Runtime::CameraControllerRegistry>());
+        auto* const pipeline =
+            engine.Services().Find<Runtime::AssetImportPipeline>();
+        auto* const inputActions =
+            engine.Services().Find<Runtime::RuntimeInputActionRegistry>();
+        ASSERT_NE(pipeline, nullptr);
+        ASSERT_NE(inputActions, nullptr);
+
+        auto authoring =
+            Runtime::MakeSandboxDefaultImportAuthoringPolicies();
+        for (auto& desc : authoring)
+        {
+            ASSERT_TRUE(
+                pipeline->RegisterImportEntityAuthoringPolicy(
+                    std::move(desc))
+                    .IsValid());
+        }
+        ASSERT_TRUE(
+            pipeline->RegisterImportCompletedHandler(
+                Runtime::MakeSandboxDefaultImportCompletedHandler(
+                    engine.Services()
+                        .Find<Runtime::CameraControllerRegistry>()))
+                .IsValid());
+        ASSERT_TRUE(
+            pipeline->RegisterPostImportProcessor(
+                Runtime::MakeSandboxDefaultDirectMeshPostProcessor())
+                .IsValid());
+
+        auto* const cameraControllers =
+            engine.Services().Find<Runtime::CameraControllerRegistry>();
+        auto* const selection =
+            engine.Services().Find<Runtime::SelectionController>();
+        if (cameraControllers != nullptr && selection != nullptr)
+        {
+            ASSERT_TRUE(
+                inputActions
+                    ->Register(
+                        Runtime::MakeSandboxDefaultFocusInputAction(
+                            *cameraControllers,
+                            *selection))
+                    .IsValid());
+        }
     }
 
     void InitializeAssetImportEngine(Runtime::Engine& engine)
@@ -1417,6 +1456,76 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportDefaultsToMaterialDrivenSh
     engine.Shutdown();
 }
 
+TEST(RuntimeAssetImportFormatCoverage,
+     SandboxDefaultFactoriesDescribeCanonicalPolicies)
+{
+    auto authoring =
+        Runtime::MakeSandboxDefaultImportAuthoringPolicies();
+    ASSERT_EQ(authoring.size(), 3u);
+
+    EXPECT_EQ(
+        authoring[0].DebugName,
+        "Sandbox.DefaultMeshImportAuthoring");
+    EXPECT_EQ(
+        authoring[0].PayloadKind,
+        Assets::AssetPayloadKind::Mesh);
+    EXPECT_TRUE(authoring[0].Apply);
+
+    EXPECT_EQ(
+        authoring[1].DebugName,
+        "Sandbox.DefaultGraphImportAuthoring");
+    EXPECT_EQ(
+        authoring[1].PayloadKind,
+        Assets::AssetPayloadKind::Graph);
+    EXPECT_TRUE(authoring[1].Apply);
+
+    EXPECT_EQ(
+        authoring[2].DebugName,
+        "Sandbox.DefaultPointCloudImportAuthoring");
+    EXPECT_EQ(
+        authoring[2].PayloadKind,
+        Assets::AssetPayloadKind::PointCloud);
+    EXPECT_TRUE(authoring[2].Apply);
+
+    const Runtime::RuntimeImportCompletedHandlerDesc completed =
+        Runtime::MakeSandboxDefaultImportCompletedHandler(nullptr);
+    EXPECT_EQ(
+        completed.DebugName,
+        "Sandbox.DefaultImportCompletedUx");
+    EXPECT_EQ(
+        completed.PayloadKind,
+        Assets::AssetPayloadKind::Unknown);
+    EXPECT_TRUE(completed.Handle);
+
+    const Runtime::RuntimePostImportProcessorDesc postProcess =
+        Runtime::MakeSandboxDefaultDirectMeshPostProcessor();
+    EXPECT_EQ(
+        postProcess.DebugName,
+        "Sandbox.DirectMeshGeneratedNormal");
+    EXPECT_EQ(
+        postProcess.PayloadKind,
+        Assets::AssetPayloadKind::Mesh);
+    EXPECT_TRUE(postProcess.Process);
+
+    Runtime::CameraControllerRegistry cameras{};
+    Runtime::SelectionController selection{};
+    const Runtime::RuntimeInputActionDesc focus =
+        Runtime::MakeSandboxDefaultFocusInputAction(
+            cameras,
+            selection);
+    EXPECT_EQ(
+        focus.DebugName,
+        "Sandbox.DefaultFocusCameraOnSelection");
+    EXPECT_EQ(
+        focus.Binding.KeyCode,
+        Extrinsic::Platform::Input::Key::F);
+    EXPECT_EQ(
+        focus.Binding.Trigger,
+        Runtime::RuntimeInputActionTrigger::KeyJustPressed);
+    EXPECT_TRUE(focus.Binding.SuppressWhenImGuiCapturesKeyboard);
+    EXPECT_TRUE(focus.Execute);
+}
+
 TEST(RuntimeAssetImportFormatCoverage, DefaultImportPoliciesApplyAuthoringUxAndPostProcess)
 {
     TempAssetFile meshFile(
@@ -1588,11 +1697,7 @@ TEST(RuntimeAssetImportFormatCoverage,
         engine.Services()
             .Find<Runtime::CameraControllerRegistry>(),
         nullptr);
-    const Runtime::RuntimeSandboxDefaultPolicyRegistration
-        policies =
-            Runtime::RegisterSandboxDefaultRuntimePolicies(
-                engine, nullptr);
-    EXPECT_TRUE(policies.InputActions.empty());
+    InstallSandboxDefaultRuntimePolicies(engine);
 
     auto imported =
         RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(

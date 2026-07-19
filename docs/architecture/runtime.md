@@ -347,13 +347,19 @@ remains the only place that mutates imported ECS or asset state. Once the import
 is materialized, ordered import-completed handlers receive the created entity
 span plus an optional focus target. Sandbox/default composition installs the
 current direct-mesh generated-normal processor, import authoring defaults,
-auto-select behavior, optional focus-on-import, and optional `F` action through
-`Extrinsic.Runtime.SandboxDefaultPolicies`; a bare `Engine` with no
-registrations still materializes geometry without those policies. The app
-passes its one optional exact `CameraControllerRegistry` lookup into policy
-registration. Import-completed services contain no camera pointer: with the
-registry absent, the handler still selects the first valid entity and simply
-skips autofocus.
+auto-select behavior, optional focus-on-import, and optional `F` action from
+four plain descriptor factories on
+`Extrinsic.Runtime.SandboxEditorFacades`. The former exported
+`Extrinsic.Runtime.SandboxDefaultPolicies` module and Engine-bound lifecycle
+helper are absent. Sandbox requires the exact published `AssetImportPipeline`
+and built-in `RuntimeInputActionRegistry` before installing anything, retains
+their typed handles in one app-private transactional record, and rolls back in
+reverse order on failure. A bare `Engine` with no registrations still
+materializes geometry without those policies. The import-completed descriptor
+captures only the optional exact `CameraControllerRegistry`; its auto-selection
+uses the `SelectionController` supplied in `RuntimeImportCompletedServices` by
+the pipeline. The separate `F` descriptor is registered only when both optional
+exact camera and selection services exist.
 Model-scene imports use the same contract: every primitive leaf is authored as
 a mesh in deterministic scene order, then exactly one model-scene completion
 receives only those leaves and an aggregate focus target enclosing their finite
@@ -483,14 +489,18 @@ Shutdown is deterministic. After pending-command discard, Engine first marks
 the initialized-state borrow false and publishes/pumps
 `RuntimeShutdownAnnounced` while application, GPU participants, module
 providers, renderer, device, and world are still live. Modules use that early
-boundary to cancel work, invalidate bindings, and release strong participant
-handles. Engine then detaches window callbacks, runs the one generic
-`JobServiceGpuQueueBridge` shutdown/idle boundary, and enters
-`ExecuteShutdownContract`: stop running, wait idle, shut down the application,
-run ordinary reverse name-sorted module teardown in the streaming phase, then
-destroy world, frame graph, render-extraction plus renderer, device, window,
-and scheduler. The Dear ImGui adapter remains an app-composed module and
-detaches through that ordinary reverse teardown.
+boundary to cancel imports, invalidate bindings, detach provider borrows, and
+release strong participant handles. Engine then detaches window callbacks and
+runs the one generic `JobServiceGpuQueueBridge` participant-shutdown/device-idle
+boundary. Application shutdown follows while the persistent
+`AssetImportPipeline` and `RuntimeInputActionRegistry` still exist; Sandbox
+unregisters optional `F`, the direct-mesh postprocessor, the completed handler,
+and PointCloud/Graph/Mesh authoring policies in that reverse order. Ordinary
+reverse name-sorted module teardown then shuts down AsyncWork before
+AssetWorkflow and destroys providers, followed by world, frame graph,
+render-extraction plus renderer, device, window, and scheduler. The Dear ImGui
+adapter remains an app-composed module and detaches through ordinary reverse
+teardown.
 
 ## Scene Replacement Lifecycle
 
