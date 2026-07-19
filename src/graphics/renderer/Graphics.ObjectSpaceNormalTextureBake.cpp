@@ -177,7 +177,7 @@ namespace Extrinsic::Graphics
                 static_cast<std::uint32_t>(
                     sizeof(ObjectSpaceNormalTextureBakeGpuPushConstants)),
                 0u);
-            cmd.DrawIndexed(desc.IndexCount, 1u, 0u, 0, 0u);
+            cmd.DrawIndexed(desc.IndexCount, 1u, desc.FirstIndex, 0, 0u);
             cmd.EndRenderPass();
         }
 
@@ -737,6 +737,7 @@ namespace Extrinsic::Graphics
             .IndexBuffer = request.Geometry.IndexBuffer,
             .TexcoordBDA = request.Geometry.TexcoordBDA,
             .NormalBDA = request.Geometry.NormalBDA,
+            .FirstIndex = request.Geometry.FirstIndex,
             .IndexCount = request.Geometry.IndexCount,
             .Width = plan.Diagnostics.Options.Width,
             .Height = plan.Diagnostics.Options.Height,
@@ -778,6 +779,7 @@ namespace Extrinsic::Graphics
             .IndexBuffer = plan.RecordTemplate.IndexBuffer,
             .TexcoordBDA = plan.RecordTemplate.TexcoordBDA,
             .NormalBDA = plan.RecordTemplate.NormalBDA,
+            .FirstIndex = plan.RecordTemplate.FirstIndex,
             .IndexCount = plan.RecordTemplate.IndexCount,
             .Width = plan.RecordTemplate.Width,
             .Height = plan.RecordTemplate.Height,

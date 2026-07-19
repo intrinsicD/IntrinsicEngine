@@ -1840,8 +1840,12 @@ Concretely:
   API packages resolved index-buffer/texcoord-BDA/normal-BDA geometry, generated
   `AssetId`, resolved extent/padding, sampler policy, frame-readiness metadata,
   and a stale-completion key into a `GpuProducedTextureRequest` plus command
-  record template. The GPU recorder then binds a caller-provided raster
-  pipeline, index buffer, texcoord/normal BDAs, and output texture; it sets
+  record template. Shared index buffers remain bound at byte offset zero;
+  `FirstIndex` selects the requested surface slice, while the indexed draw's
+  vertex offset remains zero because the texcoord and normal BDAs already
+  address the selected allocation's local channel arrays. The GPU recorder then
+  binds a caller-provided raster pipeline, index buffer, texcoord/normal BDAs,
+  and output texture; it sets
   viewport and scissor to the exact target texture extent, clears to encoded
   `+Z` with alpha `0`, rasterizes UV triangles by mapping UV to clip space,
   writes normalized object-space normals with alpha `1`, and transitions to the

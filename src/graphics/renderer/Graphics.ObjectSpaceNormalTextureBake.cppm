@@ -204,6 +204,7 @@ export namespace Extrinsic::Graphics
         RHI::BufferHandle IndexBuffer{};
         std::uint64_t TexcoordBDA = 0u;
         std::uint64_t NormalBDA = 0u;
+        std::uint32_t FirstIndex = 0u;
         std::uint32_t IndexCount = 0u;
         std::uint32_t Width = 0u;
         std::uint32_t Height = 0u;
@@ -218,6 +219,7 @@ export namespace Extrinsic::Graphics
         std::uint64_t TexcoordBDA = 0u;
         std::uint64_t NormalBDA = 0u;
         std::uint32_t VertexCount = 0u;
+        std::uint32_t FirstIndex = 0u;
         std::uint32_t IndexCount = 0u;
     };
 
@@ -246,6 +248,7 @@ export namespace Extrinsic::Graphics
         RHI::BufferHandle IndexBuffer{};
         std::uint64_t TexcoordBDA = 0u;
         std::uint64_t NormalBDA = 0u;
+        std::uint32_t FirstIndex = 0u;
         std::uint32_t IndexCount = 0u;
         std::uint32_t Width = 0u;
         std::uint32_t Height = 0u;
