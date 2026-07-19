@@ -223,7 +223,7 @@ independently after their respective owner prerequisites; both gate
   Engine-private `RenderExtractionService`. `Engine` keeps render-frame phase
   ordering plus public render-extraction compatibility facades.
 
-### Compile-hotspot decomposition (seeded 2026-07-09)
+### Retired compile-hotspot decomposition (seeded 2026-07-09)
 
 The CI-latency audit retained in retired `CI-003` measured the runtime layer's
 three largest exported-interface hotspots. Retired `ARCH-006` removed the
