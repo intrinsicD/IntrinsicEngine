@@ -188,7 +188,7 @@ triggers. The implementation graph is:
 - Retired `RUNTIME-182` composes the optional global ImGui/host owner, with
   one frame-local kernel capture value, a preserved paired Begin/End bracket,
   and app-owned Sandbox panels.
-- Corrected [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md)
+- Active [`RUNTIME-168`](../../active/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
   — after retired `RUNTIME-188` and `RUNTIME-183`, delete the one-consumer exported
   policy module, retain its `.cpp` as a private implementation unit of the
   existing Sandbox editor-facade module, and let Sandbox own transactional
@@ -297,7 +297,7 @@ compile cost. They preserve behavior and ownership; they are not feature tasks.
 `ARCH-006` owns the top Sandbox editor/app hot path, and `RUNTIME-166` owns the
 main `Runtime.RenderExtraction` module slimming.
 
-- [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md) —
+- [`RUNTIME-168`](../../active/RUNTIME-168-privatize-sandbox-default-policies-surface.md) —
   after retired `RUNTIME-188` and `RUNTIME-183`, remove the one-consumer public module
   while retaining its implementation under the existing
   `SandboxEditorFacades` surface; Sandbox privately owns exact provider

@@ -10,12 +10,32 @@ maturity_target: Operational
 
 ## Status
 
-- Selectable as of 2026-07-19: `RUNTIME-188` and `RUNTIME-183` are retired.
-  Delete the one-consumer exported policy module, retain its `.cpp` as a
+- In progress as of 2026-07-19; owner: Codex team; implementation branch:
+  `codex/runtime-168-policy-surface`.
+- `RUNTIME-188` and `RUNTIME-183` are retired. The bounded implementation
+  deletes the one-consumer exported policy module, retains its `.cpp` as a
   private implementation unit of the existing
-  `Extrinsic.Runtime.SandboxEditorFacades` module, and let Sandbox own only the
-  exact provider borrows and typed registration handles described below.
-  Implementation remains open.
+  `Extrinsic.Runtime.SandboxEditorFacades` module, and lets Sandbox own only
+  the exact provider borrows and typed registration handles described below.
+- 2026-07-19 implementation-preflight correction: Engine shutdown runs the
+  announcement boundary, then the generic GPU-participant shutdown/idle
+  boundary, then application shutdown, followed by reverse module/provider
+  teardown. Policy unregister therefore precedes async/AssetWorkflow provider
+  destruction while both exact registries remain live, but does not precede
+  GPU-participant shutdown.
+- 2026-07-19 testability correction: the fixed production factories and live
+  registries deterministically return valid handles and expose no registration
+  failure injection or unregister observer. Invalid-handle fail-closed cleanup
+  and exact rollback/uninstall order are pinned structurally; behavioral tests
+  cover missing required providers, optional-provider combinations, repeated
+  shutdown, and reinitialize without adding test-only production seams.
+- 2026-07-19 build correction: move the existing `Sandbox.cppm` and
+  `Sandbox.cpp` into the already-built `ExtrinsicSandboxEditor` library while
+  leaving `main.cpp` on the optional executable. This makes the real app
+  lifecycle available to canonical CPU integration tests without introducing
+  a new target or changing app-to-runtime layering.
+- Next gate: land the four existing-facade factories, app-private
+  transactional handles, and real-app CPU lifecycle coverage.
 - Retired `RUNTIME-188` publishes the exact optional `SelectionController`, keeps
   it out of generic `RuntimeInputActionServices`, and leaves generic action
   dispatch operational when interaction is omitted. This task can therefore
@@ -79,9 +99,11 @@ maturity_target: Operational
   pipeline and input registry only so it can unregister typed handles. It is
   not a service/dependency bundle and is never exported.
 - The shutdown announcement established by `RUNTIME-183` first cancels imports
-  and detaches provider borrows. Sandbox then unregisters its handles while the
-  persistent pipeline and input registry are still live. Module, GPU, async,
-  and provider teardown occurs only afterward.
+  and detaches provider borrows. The generic GPU-participant bridge then drains
+  participants and performs any required device-idle wait. Sandbox unregisters
+  its handles during application shutdown while the persistent pipeline and
+  input registry are still live; reverse AsyncWork/AssetWorkflow module and
+  provider teardown occurs afterward.
 - Public-factory reuse by another caller is not a reason to recreate a
   lifecycle owner. Reconsider a standalone policy owner only if a second
   independent production application needs the same shared registration
@@ -128,17 +150,26 @@ maturity_target: Operational
       import-completed handler, direct-mesh postprocessor, then optional `F`
       action. Treat every invalid registration handle as failure, roll back
       only what was installed in exact reverse order, clear every handle and
-      provider borrow, and leave the aggregate reusable.
+      provider borrow, and leave the aggregate reusable. Pin the fail-closed
+      branches and exact order through source-contract coverage; do not add
+      failure injection to fixed registries solely to force an unreachable
+      production registration failure.
 - [ ] Uninstall once in the exact reverse order: optional `F`, direct-mesh
       postprocessor, import-completed handler, then PointCloud/Graph/Mesh
       authoring policies. Clear the aggregate afterward. Repeated shutdown is a
       no-op; initialize → shutdown → initialize registers each descriptor
       exactly once without stale callbacks or handles.
 - [ ] Preserve the `RUNTIME-183` lifetime boundary: shutdown announcement
-      cancels imports and detaches pipeline provider borrows first; application
-      shutdown unregisters every policy/action handle while the persistent
-      `AssetImportPipeline` and `RuntimeInputActionRegistry` are live; module,
-      GPU-participant, async, and provider teardown follows.
+      cancels imports and detaches pipeline provider borrows first; the generic
+      GPU-participant bridge drains next; application shutdown unregisters
+      every policy/action handle while the persistent `AssetImportPipeline` and
+      `RuntimeInputActionRegistry` are live; reverse async/AssetWorkflow module
+      and provider teardown follows.
+- [ ] Move the existing `Sandbox.cppm` and `Sandbox.cpp` into
+      `ExtrinsicSandboxEditor`'s public/private source sets so the real
+      `CreateSandboxApp()` lifecycle is built under ordinary `ci`; remove those
+      two sources from `ExtrinsicSandbox` and leave only `main.cpp` on the
+      optional executable. Do not rename or add a target.
 - [ ] Migrate every remaining import of
       `Extrinsic.Runtime.SandboxDefaultPolicies`: production Sandbox; contract
       tests for asset-import format coverage (fast and slow), runtime input
@@ -172,14 +203,17 @@ maturity_target: Operational
       `NoDefaultInputActionsLeaveFocusKeyNoOp` to prove `F` registers only when
       both optional exact services exist, captures both, and does not consume a
       generic selection action service after `RUNTIME-188`.
-- [ ] Add app-composition regressions for each missing required service, each
-      missing optional service, failure at every registration stage, exact
-      reverse rollback/unregister order, repeated shutdown, and
-      initialize → shutdown → initialize exactly-once registration.
+- [ ] Add real-app composition regressions for each missing required service,
+      each missing optional service, repeated shutdown, and
+      initialize → shutdown → initialize exactly-once registration. Pin every
+      invalid-handle cleanup branch and exact reverse rollback/unregister order
+      structurally because the fixed descriptors have no inducible
+      registration failure; add no test-only registry seam.
 - [ ] Extend the blocked-import shutdown regression to prove announcement
-      cancellation/provider detachment precedes app handle unregister, that
-      both persistent registries remain live during unregister, and that no
-      callback runs during later module/GPU/async teardown.
+      cancellation/provider detachment and GPU-participant drain precede app
+      handle unregister, that both persistent registries remain live during
+      unregister, and that no callback runs during later reverse
+      module/provider teardown.
 - [ ] Add structural coverage proving the old `.cppm`, module declaration,
       imports, and public CMake entry are absent; the retained `.cpp` is private
       to `SandboxEditorFacades`; no replacement module/owner/bundle exists; and
@@ -240,8 +274,9 @@ python3 tools/agents/check_task_state_links.py --root . --strict
 python3 tools/agents/generate_session_brief.py
 python3 tools/docs/check_doc_links.py --root .
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicRuntimeGraphicsCpuTests IntrinsicRuntimeIntegrationTests IntrinsicSandboxEditorIntegrationTests
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicRuntimeContractSlowTests IntrinsicRuntimeGraphicsCpuTests IntrinsicRuntimeIntegrationTests IntrinsicSandboxEditorIntegrationTests
 ctest --test-dir build/ci --output-on-failure -R 'SandboxDefault|RuntimeInputActions|AssetImportFormatCoverage|RuntimeSandboxAcceptance|SandboxEditor(SessionLifecycle|Presentation)' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+ctest --test-dir build/ci --output-on-failure -L slow -R '^RuntimeAssetImportFormatCoverage\.DirectMeshEnrichmentCloseDrainsGeneratedGridAndCompletesDeterministically$' --timeout 120
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 cmake --preset ci-vulkan

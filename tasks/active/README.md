@@ -16,6 +16,12 @@ Each active task should include:
   `codex/arch-014-kernel-convergence-program`; blocked on final leaf
   `RUNTIME-187`. Next gate: execute the unblocked ADR-0027 behavior-owner
   leaves and update the convergence scorecard after each retirement.
+- [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md) —
+  Sandbox default-policy surface privatization; owner: Codex team; branch:
+  `codex/runtime-168-policy-surface`; in progress. Next gate: replace the
+  one-consumer lifecycle helper with four existing-facade descriptor factories
+  and app-private transactional registration handles.
+
 ## History
 
 Retirement narratives live in the append-only
