@@ -207,17 +207,33 @@ TEST(ObjectSpaceNormalTextureBakeGpuSmoke, VulkanBakeMatchesCpuContractAtSelecte
         return;
     }
 
-    const std::array<glm::vec2, 3u> texcoords{{
+    constexpr std::uint32_t kTargetFirstIndex = 3u;
+    constexpr std::uint32_t kSelectedIndexCount = 3u;
+
+    const std::array<glm::vec2, 6u> texcoords{{
+        glm::vec2{0.0f, 0.0f},
+        glm::vec2{1.0f, 0.0f},
+        glm::vec2{0.0f, 1.0f},
         glm::vec2{0.0f, 0.0f},
         glm::vec2{1.0f, 0.0f},
         glm::vec2{0.0f, 1.0f},
     }};
-    const std::array<glm::vec3, 3u> normals{{
+    const std::array<glm::vec3, 6u> normals{{
         glm::vec3{1.0f, 0.0f, 0.0f},
         glm::vec3{0.0f, 1.0f, 0.0f},
         glm::vec3{0.0f, 0.0f, 1.0f},
+        glm::vec3{-1.0f, 0.0f, 0.0f},
+        glm::vec3{-1.0f, 0.0f, 0.0f},
+        glm::vec3{-1.0f, 0.0f, 0.0f},
     }};
-    const std::array<std::uint32_t, 3u> indices{{0u, 1u, 2u}};
+    const std::array<std::uint32_t, 6u> combinedIndices{{
+        0u,
+        1u,
+        2u,
+        3u,
+        4u,
+        5u,
+    }};
 
     Extrinsic::RHI::BufferHandle texcoordBuffer = device.CreateBuffer({
         .SizeBytes = sizeof(texcoords),
@@ -232,7 +248,7 @@ TEST(ObjectSpaceNormalTextureBakeGpuSmoke, VulkanBakeMatchesCpuContractAtSelecte
         .DebugName = "ObjectSpaceNormalBakeGpuSmoke.Normals",
     });
     Extrinsic::RHI::BufferHandle indexBuffer = device.CreateBuffer({
-        .SizeBytes = sizeof(indices),
+        .SizeBytes = sizeof(combinedIndices),
         .Usage = Extrinsic::RHI::BufferUsage::Index,
         .HostVisible = true,
         .DebugName = "ObjectSpaceNormalBakeGpuSmoke.Indices",
@@ -271,7 +287,11 @@ TEST(ObjectSpaceNormalTextureBakeGpuSmoke, VulkanBakeMatchesCpuContractAtSelecte
 
     device.WriteBuffer(texcoordBuffer, texcoords.data(), sizeof(texcoords), 0u);
     device.WriteBuffer(normalBuffer, normals.data(), sizeof(normals), 0u);
-    device.WriteBuffer(indexBuffer, indices.data(), sizeof(indices), 0u);
+    device.WriteBuffer(
+        indexBuffer,
+        combinedIndices.data(),
+        sizeof(combinedIndices),
+        0u);
 
     const std::uint64_t texcoordBDA = device.GetBufferDeviceAddress(texcoordBuffer);
     const std::uint64_t normalBDA = device.GetBufferDeviceAddress(normalBuffer);
@@ -340,7 +360,8 @@ TEST(ObjectSpaceNormalTextureBakeGpuSmoke, VulkanBakeMatchesCpuContractAtSelecte
             .IndexBuffer = indexBuffer,
             .TexcoordBDA = texcoordBDA,
             .NormalBDA = normalBDA,
-            .IndexCount = static_cast<std::uint32_t>(indices.size()),
+            .FirstIndex = kTargetFirstIndex,
+            .IndexCount = kSelectedIndexCount,
             .Width = kBakeWidth,
             .Height = kBakeHeight,
             .InitialLayout = Extrinsic::RHI::TextureLayout::Undefined,
@@ -368,13 +389,19 @@ TEST(ObjectSpaceNormalTextureBakeGpuSmoke, VulkanBakeMatchesCpuContractAtSelecte
 
     using BakeVertex = Extrinsic::Graphics::ObjectSpaceNormalTextureBakeVertex;
     using BakeTriangle = Extrinsic::Graphics::ObjectSpaceNormalTextureBakeTriangle;
-    const std::array<BakeVertex, 3u> vertices{{
+    const std::array<BakeVertex, 6u> vertices{{
         BakeVertex{.Uv = texcoords[0], .Normal = normals[0]},
         BakeVertex{.Uv = texcoords[1], .Normal = normals[1]},
         BakeVertex{.Uv = texcoords[2], .Normal = normals[2]},
+        BakeVertex{.Uv = texcoords[3], .Normal = normals[3]},
+        BakeVertex{.Uv = texcoords[4], .Normal = normals[4]},
+        BakeVertex{.Uv = texcoords[5], .Normal = normals[5]},
     }};
-    const std::array<BakeTriangle, 1u> triangles{{
+    const std::array<BakeTriangle, 1u> decoyTriangles{{
         BakeTriangle{.A = 0u, .B = 1u, .C = 2u},
+    }};
+    const std::array<BakeTriangle, 1u> targetTriangles{{
+        BakeTriangle{.A = 3u, .B = 4u, .C = 5u},
     }};
     const Extrinsic::Graphics::ObjectSpaceNormalTextureBakeOptions options{
         .Width = kBakeWidth,
@@ -383,7 +410,10 @@ TEST(ObjectSpaceNormalTextureBakeGpuSmoke, VulkanBakeMatchesCpuContractAtSelecte
     const auto resolved =
         Extrinsic::Graphics::ResolveObjectSpaceNormalTextureBakeOptions(options);
 
-    const auto expectSample = [&](const std::uint32_t x, const std::uint32_t y)
+    const auto sampleAt =
+        [&](const std::uint32_t x,
+            const std::uint32_t y,
+            const std::span<const BakeTriangle> triangles)
     {
         const glm::vec2 uv =
             Extrinsic::Graphics::UvForObjectSpaceNormalBakeTexelCenter(
@@ -393,17 +423,31 @@ TEST(ObjectSpaceNormalTextureBakeGpuSmoke, VulkanBakeMatchesCpuContractAtSelecte
         const auto sample =
             Extrinsic::Graphics::SampleObjectSpaceNormalTextureBakeAtUv(
                 std::span<const BakeVertex>{vertices},
-                std::span<const BakeTriangle>{triangles},
+                triangles,
                 uv,
                 options);
-        ASSERT_TRUE(sample.Succeeded())
+        EXPECT_TRUE(sample.Succeeded())
             << Extrinsic::Graphics::DebugNameForObjectSpaceNormalTextureBakeStatus(
                    sample.Status);
+        return sample;
+    };
+    const auto expectSample =
+        [&](const std::uint32_t x,
+            const std::uint32_t y,
+            const std::span<const BakeTriangle> triangles)
+    {
+        const auto sample = sampleAt(x, y, triangles);
         ExpectPixelNear(pixels, x, y, ToExpectedPixel(sample.EncodedRgba));
     };
 
-    expectSample(0u, 0u);
-    expectSample(1u, 1u);
+    const auto decoySample = sampleAt(0u, 0u, decoyTriangles);
+    const auto targetSample = sampleAt(0u, 0u, targetTriangles);
+    const ExpectedPixel decoyPixel = ToExpectedPixel(decoySample.EncodedRgba);
+    const ExpectedPixel targetPixel = ToExpectedPixel(targetSample.EncodedRgba);
+    EXPECT_NE(decoyPixel.R, targetPixel.R)
+        << "The decoy and target slices must encode distinguishable normals.";
+    ExpectPixelNear(pixels, 0u, 0u, targetPixel);
+    expectSample(1u, 1u, targetTriangles);
     ExpectPixelNear(pixels,
                     15u,
                     15u,
@@ -480,7 +524,8 @@ TEST(ObjectSpaceNormalTextureBakeGpuSmoke, VulkanBakeMatchesCpuContractAtSelecte
                 .IndexBuffer = indexBuffer,
                 .TexcoordBDA = texcoordBDA,
                 .NormalBDA = normalBDA,
-                .IndexCount = static_cast<std::uint32_t>(indices.size()),
+                .FirstIndex = 0u,
+                .IndexCount = kSelectedIndexCount,
                 .Width = kBakeWidth,
                 .Height = kBakeHeight,
                 .PaddingTexels = 1u,
@@ -505,13 +550,13 @@ TEST(ObjectSpaceNormalTextureBakeGpuSmoke, VulkanBakeMatchesCpuContractAtSelecte
 
     device.ReadBuffer(readbackBuffer, pixels.data(), pixels.size(), 0u);
 
-    expectSample(0u, 0u);
-    expectSample(1u, 1u);
+    expectSample(0u, 0u, decoyTriangles);
+    expectSample(1u, 1u, decoyTriangles);
 
     const auto outsideBeforeDilation =
         Extrinsic::Graphics::SampleObjectSpaceNormalTextureBakeAtUv(
             std::span<const BakeVertex>{vertices},
-            std::span<const BakeTriangle>{triangles},
+            std::span<const BakeTriangle>{decoyTriangles},
             Extrinsic::Graphics::UvForObjectSpaceNormalBakeTexelCenter(
                 8u,
                 8u,
@@ -523,7 +568,7 @@ TEST(ObjectSpaceNormalTextureBakeGpuSmoke, VulkanBakeMatchesCpuContractAtSelecte
     const auto gutterSource =
         Extrinsic::Graphics::SampleObjectSpaceNormalTextureBakeAtUv(
             std::span<const BakeVertex>{vertices},
-            std::span<const BakeTriangle>{triangles},
+            std::span<const BakeTriangle>{decoyTriangles},
             Extrinsic::Graphics::UvForObjectSpaceNormalBakeTexelCenter(
                 7u,
                 7u,

@@ -309,6 +309,7 @@ namespace
                 .TexcoordBDA = 0x1000u,
                 .NormalBDA = 0x2000u,
                 .VertexCount = 3u,
+                .FirstIndex = 6u,
                 .IndexCount = 3u,
             },
             .Options = Graphics::ObjectSpaceNormalTextureBakeOptions{
@@ -649,6 +650,7 @@ TEST(ObjectSpaceNormalTextureBake, BuildsGpuProducedTexturePlanWithCompletionKey
               Graphics::NormalTextureSpace::ObjectSpaceNormal);
     EXPECT_FALSE(plan.DilationRequested);
     EXPECT_FALSE(plan.DilationAvailable);
+    EXPECT_EQ(plan.RecordTemplate.FirstIndex, request.Geometry.FirstIndex);
 
     const RHI::TextureHandle outputTexture{9u, 2u};
     const auto record =
@@ -659,6 +661,7 @@ TEST(ObjectSpaceNormalTextureBake, BuildsGpuProducedTexturePlanWithCompletionKey
     EXPECT_EQ(record.IndexBuffer, request.Geometry.IndexBuffer);
     EXPECT_EQ(record.TexcoordBDA, request.Geometry.TexcoordBDA);
     EXPECT_EQ(record.NormalBDA, request.Geometry.NormalBDA);
+    EXPECT_EQ(record.FirstIndex, request.Geometry.FirstIndex);
     EXPECT_EQ(record.IndexCount, request.Geometry.IndexCount);
     EXPECT_EQ(record.Width, 32u);
     EXPECT_EQ(record.Height, 64u);
@@ -780,6 +783,7 @@ TEST(ObjectSpaceNormalTextureBake, RecordGpuBakeCommandsPinsRasterExtentAndDraw)
         .IndexBuffer = RHI::BufferHandle{7u, 1u},
         .TexcoordBDA = 0x1000u,
         .NormalBDA = 0x2000u,
+        .FirstIndex = 9u,
         .IndexCount = 3u,
         .Width = 16u,
         .Height = 8u,
@@ -835,7 +839,7 @@ TEST(ObjectSpaceNormalTextureBake, RecordGpuBakeCommandsPinsRasterExtentAndDraw)
     EXPECT_EQ(push.NormalBDA, desc.NormalBDA);
     EXPECT_EQ(cmd.DrawIndexCount, 3u);
     EXPECT_EQ(cmd.DrawInstanceCount, 1u);
-    EXPECT_EQ(cmd.DrawFirstIndex, 0u);
+    EXPECT_EQ(cmd.DrawFirstIndex, desc.FirstIndex);
     EXPECT_EQ(cmd.DrawVertexOffset, 0);
     EXPECT_EQ(cmd.DrawFirstInstance, 0u);
 }
@@ -981,6 +985,8 @@ TEST(ObjectSpaceNormalTextureBake, RecordGpuBakeCommandsPingPongDilationPasses)
     EXPECT_EQ(cmd.DrawRecords[1].VertexCount, 3u);
     EXPECT_EQ(cmd.DrawRecords[1].InstanceCount, 1u);
     EXPECT_EQ(cmd.DrawIndexCount, 3u);
+    EXPECT_EQ(cmd.DrawFirstIndex, 0u);
+    EXPECT_EQ(cmd.DrawVertexOffset, 0);
 }
 
 TEST(ObjectSpaceNormalTextureBake, RecordGpuBakeRejectsInvalidResourcesBeforeCommands)
