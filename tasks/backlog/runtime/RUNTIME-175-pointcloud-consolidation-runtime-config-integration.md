@@ -1,7 +1,7 @@
 ---
 id: RUNTIME-175
 theme: I
-depends_on: [METHOD-016, CORE-009]
+depends_on: [METHOD-016, CORE-009, RUNTIME-181]
 maturity_target: Operational
 ---
 # RUNTIME-175 — Point-cloud consolidation runtime facade, config lane, and backend adapter
@@ -19,7 +19,7 @@ maturity_target: Operational
   codec; `src/app/Sandbox` owns registration and presentation.
   `runtime -> all lower layers`; `app -> runtime` only.
 - Template to mirror: `RUNTIME-134` (progressive-Poisson interactive playground) — the first method wired through the full P3 config lane. CORE-009 migrates that value/config-control path to a registered app section; this task must consume the resulting generic section lane rather than reintroducing an engine-owned Sandbox aggregate.
-- Config lane (`AGENTS.md` §5 P3): reference model `Extrinsic.Graphics.RenderRecipeConfig` (schema-id + version + diagnostics, side-effect-free preview→validate→apply). CORE-009 owns generic named app-section records/registration in `Core.Config.EngineLoad`; the runtime facade remains `Extrinsic.Runtime.EngineConfigControl` via `Engine::GetConfigControl()`, whose `RuntimeConfigControlSource { Editor, AgentCli, Programmatic }` tag is the co-equal-surfaces mechanism.
+- Config lane (`AGENTS.md` §5 P3): reference model `Extrinsic.Graphics.RenderRecipeConfig` (schema-id + version + diagnostics, side-effect-free preview→validate→apply). CORE-009 owns generic named app-section records/registration in `Core.Config.EngineLoad`; the runtime facade remains the app-composed `Extrinsic.Runtime.EngineConfigControl` service resolved through `Engine::Services()`, whose `RuntimeConfigControlSource { Editor, AgentCli, Programmatic }` tag is the co-equal-surfaces mechanism.
 - Editor facade pattern: `ApplySandboxEditor<X>Command` in `Runtime.SandboxEditorFacades.cpp` / `Runtime.SandboxMethodFacade.cpp`, reading geometry via `GS::BuildConstView(raw, entity)` (require `Domain::PointCloud`), writing back via `PopulateFromCloud` + `Dirty::MarkVertexPositionsDirty`, wrapped in `EditorCommandHistory` for undo — mirror `ApplySandboxEditorPointCloudOutlierRemovalCommand`.
 - Backend adapter pattern: `Runtime.KMeansBackend` (RHI convenience overload,
   `IsOperational()` gate, honest fallback) plus the Sandbox editor's private
@@ -35,7 +35,7 @@ maturity_target: Operational
   seed), round-tripped through the generic engine-config section lane and
   applied as a hot subset.
 - UI: Sandbox editor consolidation panel (owned by `UI-035`) drives the same validated apply path.
-- Agent/CLI: `config/engine.json` + the `--engine-config <path>` boot flag, and programmatic `Engine::GetConfigControl().LoadAndApplyEngineConfigHotSubsetFile(...)` / `ApplyEngineConfigHotSubset(...)` tagged `AgentCli`/`Programmatic`.
+- Agent/CLI: `config/engine.json` + the `--engine-config <path>` boot flag, and programmatic `EngineConfigControl::LoadAndApplyEngineConfigHotSubsetFile(...)` / `ApplyEngineConfigHotSubset(...)` on the resolved service, tagged `AgentCli`/`Programmatic`.
 
 ## Backends
 - Backend axis: CPU adapter + honest fallback lands now on `METHOD-016`; the explicit GPU job-queue leg is gated on `METHOD-020` (`gpu_vulkan_compute`).

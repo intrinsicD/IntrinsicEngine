@@ -71,26 +71,30 @@ produce diagnostics instead of silently changing the graph.
 
 There are three current edit lanes over the same preview/apply contract:
 
-- **Config files.** `Engine::GetConfigControl().LoadRenderRecipeConfigPreviewFile(...)`
-  previews a recipe file.
-  `Engine::GetConfigControl().LoadAndApplyRenderRecipeConfigFile(...)` applies
-  a usable preview by installing a `FrameRecipeOverride` on the renderer.
+- **Config files.** A resolved
+  `Runtime::EngineConfigControl` service previews a recipe file with
+  `LoadRenderRecipeConfigPreviewFile(...)` and applies a usable preview with
+  `LoadAndApplyRenderRecipeConfigFile(...)`, installing a
+  `FrameRecipeOverride` on the renderer.
 - **Sandbox UI.** The `Render Recipes` sandbox editor panel validates, previews,
   activates, cancels, publishes, and applies recipe drafts through runtime-owned
   command helpers. The UI stores draft/presentation state only; it does not own
   renderer state.
 - **Agent/CLI/programmatic control.**
-  `Engine::GetConfigControl().PreviewRenderRecipeConfigDocument(...)`,
+  `EngineConfigControl::PreviewRenderRecipeConfigDocument(...)`,
   `ActivateRenderRecipeConfigDocument(...)`, and
   `ApplyRenderRecipeConfigPreview(...)` expose the same side-effect-free preview
-  and fail-closed apply path to agents, CLI tools, tests, and application code.
+  and fail-closed apply path to agents, CLI tools, tests, and application code
+  after resolving the optional service through `Engine::Services()`.
 
 Runtime config control also exposes `render.default_recipe_config_path` and
 registered `app.sections` records (currently
 `sandbox.progressive_poisson` and `sandbox.parameterization`) through the
 separate engine-config lane.
 `Engine::Initialize()` attempts the configured boot recipe after renderer
-initialization. Live hot-apply is deliberately limited to those fields:
+initialization through the shared `Runtime.RenderRecipeActivation` functions;
+this boot path does not depend on composing `EngineConfigControl`. Live
+hot-apply is deliberately limited to those fields:
 `ApplyEngineConfigHotSubset(...)` validates the referenced recipe before
 mutating the active engine config, commits canonical application-section
 records, and rejects boot-only field changes.

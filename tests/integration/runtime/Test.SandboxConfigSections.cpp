@@ -70,7 +70,7 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
 {
     std::uint32_t progressivePoissonChanges = 0u;
     std::uint32_t parameterizationChanges = 0u;
-    Runtime::EngineConfigSectionRegistry registry =
+    auto configControl = std::make_unique<Runtime::EngineConfigControl>(
         Sandbox::CreateSandboxConfigSectionRegistry(
             Sandbox::SandboxConfigSectionCallbacks{
                 .ProgressivePoisson =
@@ -83,10 +83,11 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
                     {
                         ++parameterizationChanges;
                     },
-            });
+            }));
 
     CoreConfig::EngineConfig fileConfig =
-        Runtime::CreateReferenceEngineConfig(registry);
+        Runtime::CreateReferenceEngineConfig(
+            configControl->SectionRegistry());
     fileConfig.Simulation.WorkerThreadCount = 1u;
     fileConfig.Window.Backend = CoreConfig::WindowBackend::Null;
     fileConfig.Render.EnablePromotedVulkanDevice = false;
@@ -114,7 +115,9 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
         filePath,
     };
     Runtime::EngineConfigBootResult boot =
-        Runtime::ResolveEngineConfigForBoot(args, registry);
+        Runtime::ResolveEngineConfigForBoot(
+            args,
+            configControl->SectionRegistry());
     ASSERT_TRUE(boot.LoadedFile);
     ASSERT_FALSE(boot.UsedReferenceFallback);
 
@@ -132,11 +135,16 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     EXPECT_EQ(progressivePoissonChanges, 0u);
     EXPECT_EQ(parameterizationChanges, 0u);
 
+    Runtime::EngineConfigControl* const expectedConfigControl =
+        configControl.get();
     Runtime::Engine engine{
         std::move(boot.Config),
-        std::make_unique<OneFrameApplication>(),
-        std::move(registry)};
+        std::make_unique<OneFrameApplication>()};
+    engine.AddModule(std::move(configControl));
     engine.Initialize();
+    Runtime::EngineConfigControl* const control =
+        engine.Services().Find<Runtime::EngineConfigControl>();
+    ASSERT_EQ(control, expectedConfigControl);
 
     CoreConfig::EngineConfig candidate = engine.GetEngineConfig();
     auto liveParameterization =
@@ -145,14 +153,13 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     liveParameterization->View.ShowDistortionHeatmap = true;
     Runtime::SetParameterizationConfig(candidate, *liveParameterization);
 
-    Runtime::EngineConfigControl& control = engine.GetConfigControl();
     const CoreConfig::EngineConfigLoadResult preview =
-        control.PreviewEngineConfigControlDocument(
+        control->PreviewEngineConfigControlDocument(
             CoreConfig::SerializeEngineConfig(candidate),
             "sandbox-config-sections-live.json");
     ASSERT_TRUE(CoreConfig::IsConfigUsable(preview));
     const Runtime::RuntimeEngineConfigApplyResult apply =
-        control.ApplyEngineConfigHotSubset(
+        control->ApplyEngineConfigHotSubset(
             preview,
             Runtime::RuntimeConfigControlSource::AgentCli);
     ASSERT_TRUE(apply.Succeeded());

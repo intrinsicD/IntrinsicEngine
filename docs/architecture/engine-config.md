@@ -216,10 +216,11 @@ The schema is primarily a boot config. Runtime reads it before constructing
 The current live hot-apply subset is deliberately narrow:
 `render.default_recipe_config_path` and
 all registered `app.sections` records.
-`Runtime::Engine::GetConfigControl().ApplyEngineConfigHotSubset` previews a
-candidate document against the live Engine-owned config, rejects any difference
-in the boot-only fields above, and then applies only those live fields. A
-non-empty recipe path is loaded and activated through the same validated
+The app-composed
+`Runtime::EngineConfigControl::ApplyEngineConfigHotSubset` service previews a
+candidate document against the borrowed live Engine-owned config, rejects any
+difference in the boot-only fields above, and then applies only those live
+fields. A non-empty recipe path is loaded and activated through the same validated
 `RenderRecipeConfig` path used by startup and the editor; invalid recipe files
 reject the hot apply without disturbing the currently active recipe override. An
 empty path clears the active override and returns to the derived default frame
@@ -267,6 +268,8 @@ then checks, in order:
 Usable load results replace the reference config with the preview config. Missing
 or invalid explicit paths preserve the reference config and keep the load
 diagnostics in the boot result. The sandbox app calls this resolver before
-constructing `Engine`, then moves the same registry into the Engine-owned live
-controller. The overloads without a registry remain available to hosts that
+constructing `Engine`: it first constructs the app-composed
+`EngineConfigControl`, resolves through that control's owned registry, and then
+moves the same control object into `Engine::AddModule(...)`. The overloads
+without a registry remain available to hosts that
 have no application sections.

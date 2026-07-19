@@ -1,12 +1,25 @@
 # Runtime Config Control
 
 `Extrinsic.Runtime.EngineConfigControl` owns the live config-control facade for
-non-ImGui callers and the Sandbox Editor. `Engine` constructs the subsystem,
-keeps ownership of the active `EngineConfig` value, and exposes the facade
-through `Engine::GetConfigControl()`. The Engine also owns the application
-section registry created before boot and lends the same stable registry to
-preview, file load, and live apply. The facade is a set of typed subsystem
-methods and DTOs, not a command bus.
+non-ImGui callers and the Sandbox Editor. It is an app-composed
+`IRuntimeModule`, owns the application-section registry, and publishes its exact
+instance through `ServiceRegistry`. Sandbox constructs the control before boot,
+resolves boot config through `control.SectionRegistry()`, then moves that same
+object into `Engine::AddModule(...)`. Live callers resolve the optional service
+with `engine.Services().Find<EngineConfigControl>()`.
+
+`Engine` retains the active `EngineConfig` value and the boot-critical recipe
+activation substrate. `Engine::Initialize()` resets recipe activation and
+conditionally loads `render.default_recipe_config_path` through the shared
+`Runtime.RenderRecipeActivation` free functions even when the live-control
+module is omitted. When composed, `EngineConfigControl::OnRegister` copies that
+already-applied startup state into its persistent state, retargets the borrowed
+activation capability, and fully binds before publishing the service.
+`OnResolve` validates the publication without replaying startup apply.
+Shutdown resets the active override, withdraws the exact service instance, and
+clears all borrowed bindings so stale direct references fail closed.
+
+The facade is a set of typed subsystem methods and DTOs, not a command bus.
 
 ## Entry Points
 
@@ -92,16 +105,17 @@ unchanged.
 state. Its `Runtime::SandboxEditorSession` prepares an attachment-guarded
 `SandboxEditorContext` through
 `Extrinsic.Runtime.SandboxEditorFacades`; the shell's preview and
-activation handlers call the same facade callbacks carried by that context:
+activation handlers call the same callbacks carried by that context after the
+session resolves `EngineConfigControl` from `Engine::Services()`:
 
 - preview routes to
-  `Engine::GetConfigControl().PreviewRenderRecipeConfigDocument`;
+  `EngineConfigControl::PreviewRenderRecipeConfigDocument`;
 - activation routes to
-  `Engine::GetConfigControl().ApplyRenderRecipeConfigPreview` with
+  `EngineConfigControl::ApplyRenderRecipeConfigPreview` with
   `RuntimeRenderRecipeActivationSource::Editor`.
 - progressive-Poisson knob edits route to
-  `Engine::GetConfigControl().PreviewEngineConfigControlDocument` and
-  `Engine::GetConfigControl().ApplyEngineConfigHotSubset` with
+  `EngineConfigControl::PreviewEngineConfigControlDocument` and
+  `EngineConfigControl::ApplyEngineConfigHotSubset` with
   `RuntimeConfigControlSource::Editor`; the facade updates the typed draft
   through `SetProgressivePoissonPlaygroundConfig`.
 - The parameterization panel delivered by retired `UI-036` routes strategy,
@@ -114,7 +128,9 @@ activation handlers call the same facade callbacks carried by that context:
 Agent/CLI callers use the same `EngineConfigControl` methods with
 `RuntimeConfigControlSource::AgentCli` or
 `RuntimeRenderRecipeActivationSource::AgentCli`. The facade is CPU/headless and
-does not require any ImGui frame.
+does not require any ImGui frame. If the module is omitted, editor recipe and
+engine-config states are null, their command callbacks remain empty, and both
+availability flags are false.
 
 ## Parameterization Editor Facade
 

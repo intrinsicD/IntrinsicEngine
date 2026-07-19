@@ -100,7 +100,7 @@ surfaces can drive the behavior:
 ## Control surfaces
 - Config: `EngineConfig.render.default_recipe_config_path`
 - UI: Sandbox editor recipe panel
-- Agent/CLI: `Engine::GetConfigControl().LoadAndApplyRenderRecipeConfigFile(...)`
+- Agent/CLI: resolved `EngineConfigControl::LoadAndApplyRenderRecipeConfigFile(...)` service
 ```
 
 Use `N/A` only when the task cannot be externally controlled by design, for

@@ -218,6 +218,24 @@ TEST(SandboxEditorSession, AttachPrepareDetachBoundsPreparedFrameLifetime)
         {
             sawPreparedContext = frame.Context.Scene != nullptr;
             EXPECT_FALSE(frame.Context.DerivedJobCommands.Available());
+            EXPECT_FALSE(
+                frame.Context.RenderRecipeCommandsAvailable);
+            EXPECT_FALSE(
+                frame.Context.EngineConfigCommandsAvailable);
+            EXPECT_EQ(
+                frame.Context.RenderRecipeRuntimeState,
+                nullptr);
+            EXPECT_EQ(
+                frame.Context.EngineConfigControlState,
+                nullptr);
+            EXPECT_FALSE(
+                frame.Context.PreviewRenderRecipeDocument);
+            EXPECT_FALSE(
+                frame.Context.ApplyRenderRecipePreview);
+            EXPECT_FALSE(
+                frame.Context.PreviewEngineConfigDocument);
+            EXPECT_FALSE(
+                frame.Context.ApplyEngineConfigHotSubset);
             frame.LastAssetImportResult =
                 Runtime::SandboxEditorFileImportResult{
                     .Status = Runtime::SandboxEditorCommandStatus::Applied,

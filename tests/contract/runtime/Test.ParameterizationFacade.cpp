@@ -14,12 +14,15 @@
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
+import Extrinsic.Core.Config.Window;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.SandboxConfigSections;
 import Extrinsic.Runtime.SandboxEditorFacades;
@@ -35,6 +38,66 @@ namespace Runtime = Extrinsic::Runtime;
 
 namespace
 {
+    class OneFrameApplication final : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            engine.RequestExit();
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+    };
+
+    class ConfigControlHarness final
+    {
+    public:
+        explicit ConfigControlHarness(
+            Runtime::EngineConfigSectionRegistry sectionRegistry)
+        {
+            Config::EngineConfig config =
+                Runtime::CreateReferenceEngineConfig(sectionRegistry);
+            config.Simulation.WorkerThreadCount = 1u;
+            config.ReferenceScene.Enabled = false;
+            config.Camera.Enabled = false;
+            config.Window.Backend = Config::WindowBackend::Null;
+            config.Render.EnablePromotedVulkanDevice = false;
+            config.Render.DefaultRecipeConfigPath.clear();
+            m_Engine = std::make_unique<Runtime::Engine>(
+                std::move(config),
+                std::make_unique<OneFrameApplication>());
+            m_Engine->EmplaceModule<Runtime::EngineConfigControl>(
+                std::move(sectionRegistry));
+            m_Engine->Initialize();
+            m_Control =
+                m_Engine->Services().Find<Runtime::EngineConfigControl>();
+            EXPECT_NE(m_Control, nullptr);
+        }
+
+        ~ConfigControlHarness()
+        {
+            if (m_Engine)
+            {
+                m_Engine->Shutdown();
+            }
+        }
+
+        [[nodiscard]] Runtime::EngineConfigControl& Control() const
+        {
+            return *m_Control;
+        }
+
+        [[nodiscard]] const Config::EngineConfig& ActiveConfig() const
+        {
+            return m_Engine->GetEngineConfig();
+        }
+
+    private:
+        std::unique_ptr<Runtime::Engine> m_Engine{};
+        Runtime::EngineConfigControl* m_Control{};
+    };
+
     [[nodiscard]] Geometry::HalfedgeMesh::Mesh MakeGridMesh()
     {
         Geometry::HalfedgeMesh::Mesh mesh{};
@@ -313,16 +376,11 @@ TEST(ParameterizationFacade, ConfiguredPathReadsActiveEngineConfig)
 TEST(ParameterizationFacade, EditorConfigHelperUsesValidatedHotApplyLane)
 {
     ParameterizationHarness harness{};
-    Config::EngineConfig active{};
     Runtime::EngineConfigSectionRegistry registry{};
     ASSERT_TRUE(registry.Register(
         Runtime::MakeParameterizationConfigSectionRegistration()));
-    Config::PopulateEngineConfigSectionDefaults(active, registry);
-    Runtime::EngineConfigControl control{
-        Runtime::EngineConfigControlDependencies{
-            .Config = &active,
-            .SectionRegistry = &registry,
-        }};
+    ConfigControlHarness controlHarness{std::move(registry)};
+    Runtime::EngineConfigControl& control = controlHarness.Control();
     harness.Context.EngineConfigControlState =
         &control.GetEngineConfigControlState();
     harness.Context.EngineConfigCommandsAvailable = true;
@@ -376,17 +434,12 @@ TEST(ParameterizationFacade, ConfigSourcesProduceIdenticalStateAndUvs)
     for (const Runtime::RuntimeConfigControlSource source : sources)
     {
         ParameterizationHarness harness{};
-        Config::EngineConfig active{};
         Runtime::EngineConfigSectionRegistry registry{};
         ASSERT_TRUE(registry.Register(
             Runtime::MakeParameterizationConfigSectionRegistration()));
-        Config::PopulateEngineConfigSectionDefaults(active, registry);
-        Runtime::EngineConfigControl control{
-            Runtime::EngineConfigControlDependencies{
-                .Config = &active,
-                .SectionRegistry = &registry,
-            }};
-        Config::EngineConfig candidate = active;
+        ConfigControlHarness controlHarness{std::move(registry)};
+        Runtime::EngineConfigControl& control = controlHarness.Control();
+        Config::EngineConfig candidate = controlHarness.ActiveConfig();
         Runtime::SetParameterizationConfig(candidate, parameterization);
         const Config::EngineConfigLoadResult preview =
             control.PreviewEngineConfigControlDocument(

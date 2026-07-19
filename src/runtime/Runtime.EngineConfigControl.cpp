@@ -1,7 +1,6 @@
 module;
 
 #include <algorithm>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -11,12 +10,10 @@ module Extrinsic.Runtime.EngineConfigControl;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
-import Extrinsic.Core.Geometry2D;
-import Extrinsic.Graphics.CameraSnapshots;
-import Extrinsic.Graphics.CurrentRendererContractAdapter;
-import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderRecipeConfig;
-import Extrinsic.Platform.Window;
+import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.RenderRecipeActivation;
+import Extrinsic.Runtime.ServiceRegistry;
 
 namespace Extrinsic::Runtime
 {
@@ -159,37 +156,118 @@ namespace Extrinsic::Runtime
     }
 
     EngineConfigControl::EngineConfigControl(
-        EngineConfigControlDependencies dependencies)
+        RuntimeEngineConfigSectionRegistry sectionRegistry)
+        : m_SectionRegistry(std::move(sectionRegistry))
     {
-        SetDependencies(std::move(dependencies));
     }
 
-    void EngineConfigControl::SetDependencies(
-        EngineConfigControlDependencies dependencies)
+    RuntimeEngineConfigSectionRegistry&
+    EngineConfigControl::SectionRegistry() noexcept
     {
-        m_Dependencies = std::move(dependencies);
-        if (m_Dependencies.Config)
+        return m_SectionRegistry;
+    }
+
+    const RuntimeEngineConfigSectionRegistry&
+    EngineConfigControl::SectionRegistry() const noexcept
+    {
+        return m_SectionRegistry;
+    }
+
+    std::string_view EngineConfigControl::Name() const noexcept
+    {
+        return "Runtime.EngineConfigControl";
+    }
+
+    Core::Result EngineConfigControl::Bind(
+        const RuntimeRenderRecipeActivationKernel& kernel)
+    {
+        if (kernel.ActiveConfig == nullptr || kernel.State == nullptr ||
+            !kernel.SetFrameRecipeOverride)
         {
-            if (m_Dependencies.SectionRegistry)
-            {
-                Core::Config::PopulateEngineConfigSectionDefaults(
-                    *m_Dependencies.Config,
-                    *m_Dependencies.SectionRegistry);
-            }
-            m_ConfigControlState.ActiveConfig = *m_Dependencies.Config;
+            return Core::Err(Core::ErrorCode::InvalidArgument);
         }
+
+        m_RenderRecipeState = *kernel.State;
+        m_RecipeActivation = kernel;
+        m_RecipeActivation.State = &m_RenderRecipeState;
+        Core::Config::PopulateEngineConfigSectionDefaults(
+            *m_RecipeActivation.ActiveConfig,
+            m_SectionRegistry);
+        m_ConfigControlState = RuntimeEngineConfigControlState{
+            .ActiveConfig = *m_RecipeActivation.ActiveConfig,
+        };
+        return Core::Ok();
+    }
+
+    void EngineConfigControl::ClearBinding() noexcept
+    {
+        m_RecipeActivation = {};
+        m_RenderRecipeState = {};
+        m_ConfigControlState = {};
+    }
+
+    Core::Result EngineConfigControl::OnRegister(EngineSetup& setup)
+    {
+        if (m_Published ||
+            setup.Services().Phase() !=
+                ServiceRegistryPhase::Registration ||
+            setup.Services().Find<EngineConfigControl>() != nullptr)
+        {
+            return Core::Err(Core::ErrorCode::InvalidState);
+        }
+        if (Core::Result bound = Bind(setup.RenderRecipeActivation());
+            !bound.has_value())
+        {
+            ClearBinding();
+            return bound;
+        }
+        if (Core::Result provided =
+                setup.Services().Provide<EngineConfigControl>(
+                    *this,
+                    Name());
+            !provided.has_value())
+        {
+            ClearBinding();
+            return provided;
+        }
+        m_Published = true;
+        return Core::Ok();
+    }
+
+    Core::Result EngineConfigControl::OnResolve(EngineSetup& setup)
+    {
+        if (!m_Published ||
+            setup.Services().Find<EngineConfigControl>() != this)
+        {
+            return Core::Err(Core::ErrorCode::InvalidState);
+        }
+        return Core::Ok();
+    }
+
+    void EngineConfigControl::OnShutdown(
+        RuntimeModuleShutdownContext& context)
+    {
+        ResetRuntimeRenderRecipeActivation(m_RecipeActivation);
+        if (m_Published)
+        {
+            (void)context.Services.Withdraw<EngineConfigControl>(*this);
+        }
+        m_Published = false;
+        ClearBinding();
     }
 
     const Core::Config::EngineConfig& EngineConfigControl::CurrentConfig()
         const noexcept
     {
         static const Core::Config::EngineConfig kFallbackConfig{};
-        return m_Dependencies.Config ? *m_Dependencies.Config : kFallbackConfig;
+        return m_RecipeActivation.ActiveConfig
+            ? *m_RecipeActivation.ActiveConfig
+            : kFallbackConfig;
     }
 
     Core::Config::EngineConfig* EngineConfigControl::MutableConfig() const noexcept
     {
-        return m_Dependencies.Config;
+        return m_RecipeActivation.ActiveConfig;
     }
 
     void EngineConfigControl::RecordConfigApply(
@@ -202,35 +280,8 @@ namespace Extrinsic::Runtime
     Graphics::RenderRecipeConfigContext
     EngineConfigControl::CreateRenderRecipeConfigContext() const
     {
-        const Core::Config::EngineConfig& config = CurrentConfig();
-        Core::Extent2D viewport{
-            .Width = std::max(config.Window.Width, 1),
-            .Height = std::max(config.Window.Height, 1),
-        };
-        if (m_Dependencies.Window)
-        {
-            const Platform::Extent2D extent =
-                m_Dependencies.Window->GetFramebufferExtent();
-            if (extent.Width > 0 && extent.Height > 0)
-            {
-                viewport = Core::Extent2D{
-                    .Width = extent.Width,
-                    .Height = extent.Height,
-                };
-            }
-        }
-
-        const Graphics::RenderFrameInput recipeInput{
-            .Viewport = viewport,
-            .Camera = Graphics::CameraViewInput{.Valid = true},
-        };
-        return Graphics::RenderRecipeConfigContext{
-            .Renderer = Graphics::MakeCurrentRendererDescriptor(),
-            .BaseRecipe = Graphics::MakeCurrentRendererRecipeDescriptor(),
-            .BaseViewOutput =
-                Graphics::MakeCurrentRendererViewOutputRecipe(recipeInput),
-            .BaseBindings = Graphics::MakeCurrentRendererBindingSet(),
-        };
+        return CreateRuntimeRenderRecipeConfigContext(
+            m_RecipeActivation);
     }
 
     Graphics::RenderRecipeConfigLoadResult
@@ -238,24 +289,18 @@ namespace Extrinsic::Runtime
         const std::string_view document,
         std::string sourceId) const
     {
-        return Graphics::PreviewRenderRecipeConfig(
+        return PreviewRuntimeRenderRecipeConfigDocument(
+            m_RecipeActivation,
             document,
-            CreateRenderRecipeConfigContext(),
-            Graphics::RenderRecipeConfigParseOptions{
-                .SourceId = std::move(sourceId),
-            });
+            std::move(sourceId));
     }
 
     Graphics::RenderRecipeConfigLoadResult
     EngineConfigControl::LoadRenderRecipeConfigPreviewFile(std::string path) const
     {
-        const std::string sourceId = path;
-        return Graphics::LoadRenderRecipeConfigFile(
-            path,
-            CreateRenderRecipeConfigContext(),
-            Graphics::RenderRecipeConfigParseOptions{
-                .SourceId = sourceId,
-            });
+        return LoadRuntimeRenderRecipeConfigPreviewFile(
+            m_RecipeActivation,
+            std::move(path));
     }
 
     RuntimeRenderRecipeApplyResult
@@ -264,9 +309,11 @@ namespace Extrinsic::Runtime
         std::string sourceId,
         const RuntimeRenderRecipeActivationSource source)
     {
-        const Graphics::RenderRecipeConfigLoadResult loadResult =
-            PreviewRenderRecipeConfigDocument(document, std::move(sourceId));
-        return ApplyRenderRecipeConfigPreview(loadResult, source);
+        return ActivateRuntimeRenderRecipeConfigDocument(
+            m_RecipeActivation,
+            document,
+            std::move(sourceId),
+            source);
     }
 
     RuntimeRenderRecipeApplyResult
@@ -274,49 +321,10 @@ namespace Extrinsic::Runtime
         const Graphics::RenderRecipeConfigLoadResult& loadResult,
         const RuntimeRenderRecipeActivationSource source)
     {
-        RuntimeRenderRecipeApplyResult result{
-            .Source = source,
-            .LoadResult = loadResult,
-        };
-
-        if (!m_Dependencies.Renderer)
-        {
-            result.Status = RuntimeRenderRecipeApplyStatus::MissingRenderer;
-            m_RenderRecipeState.LastApply = result;
-            m_RenderRecipeState.HasLastApply = true;
-            return result;
-        }
-
-        if (!Graphics::IsConfigUsable(loadResult))
-        {
-            m_Dependencies.Renderer->ClearActiveFrameRecipeOverride();
-            m_RenderRecipeState.ActiveOverride.reset();
-            m_RenderRecipeState.ActiveConfig = Graphics::RenderRecipeConfigLoadResult{};
-            m_RenderRecipeState.HasActiveConfig = false;
-            m_RenderRecipeState.ActiveSource =
-                RuntimeRenderRecipeActivationSource::None;
-            result.Status = RuntimeRenderRecipeApplyStatus::Rejected;
-            m_RenderRecipeState.LastApply = result;
-            m_RenderRecipeState.HasLastApply = true;
-            return result;
-        }
-
-        Graphics::FrameRecipeOverride recipeOverride{
-            .Recipe = loadResult.Preview.Recipe,
-            .DisabledExtensionSlots = loadResult.Preview.DisabledExtensionSlots,
-            .SourceId = loadResult.SourceId,
-        };
-        m_Dependencies.Renderer->SetActiveFrameRecipeOverride(
-            std::make_optional(recipeOverride));
-        m_RenderRecipeState.ActiveOverride = recipeOverride;
-        m_RenderRecipeState.ActiveConfig = loadResult;
-        m_RenderRecipeState.HasActiveConfig = true;
-        m_RenderRecipeState.ActiveSource = source;
-        result.Status = RuntimeRenderRecipeApplyStatus::Applied;
-        result.RendererOverrideInstalled = true;
-        m_RenderRecipeState.LastApply = result;
-        m_RenderRecipeState.HasLastApply = true;
-        return result;
+        return ApplyRuntimeRenderRecipeConfigPreview(
+            m_RecipeActivation,
+            loadResult,
+            source);
     }
 
     RuntimeRenderRecipeApplyResult
@@ -324,27 +332,15 @@ namespace Extrinsic::Runtime
         std::string path,
         const RuntimeRenderRecipeActivationSource source)
     {
-        const std::string sourceId = path;
-        const Graphics::RenderRecipeConfigLoadResult loadResult =
-            Graphics::LoadRenderRecipeConfigFile(
-                path,
-                CreateRenderRecipeConfigContext(),
-                Graphics::RenderRecipeConfigParseOptions{
-                    .SourceId = sourceId,
-                });
-        return ApplyRenderRecipeConfigPreview(loadResult, source);
+        return LoadAndApplyRuntimeRenderRecipeConfigFile(
+            m_RecipeActivation,
+            std::move(path),
+            source);
     }
 
     void EngineConfigControl::ClearActiveRenderRecipeOverride() noexcept
     {
-        if (m_Dependencies.Renderer)
-        {
-            m_Dependencies.Renderer->ClearActiveFrameRecipeOverride();
-        }
-        m_RenderRecipeState.ActiveOverride.reset();
-        m_RenderRecipeState.ActiveConfig = Graphics::RenderRecipeConfigLoadResult{};
-        m_RenderRecipeState.HasActiveConfig = false;
-        m_RenderRecipeState.ActiveSource = RuntimeRenderRecipeActivationSource::None;
+        ClearRuntimeRenderRecipeOverride(m_RecipeActivation);
     }
 
     const RuntimeRenderRecipeState& EngineConfigControl::GetRenderRecipeState()
@@ -363,7 +359,7 @@ namespace Extrinsic::Runtime
             CurrentConfig(),
             Core::Config::EngineConfigParseOptions{
                 .SourceId = std::move(sourceId),
-                .SectionRegistry = m_Dependencies.SectionRegistry,
+                .SectionRegistry = &m_SectionRegistry,
             });
     }
 
@@ -376,7 +372,7 @@ namespace Extrinsic::Runtime
             CurrentConfig(),
             Core::Config::EngineConfigParseOptions{
                 .SourceId = sourceId,
-                .SectionRegistry = m_Dependencies.SectionRegistry,
+                .SectionRegistry = &m_SectionRegistry,
             });
     }
 
@@ -468,21 +464,20 @@ namespace Extrinsic::Runtime
         result.EngineConfigApplied = true;
         RecordConfigApply(result);
 
-        if (m_Dependencies.SectionRegistry)
+        for (const std::string& name : result.ChangedSectionNames)
         {
-            for (const std::string& name : result.ChangedSectionNames)
+            const Core::Config::EngineConfigSectionRegistration* registration =
+                m_SectionRegistry.Find(name);
+            const Core::Config::EngineConfigSection* previous =
+                Core::Config::FindEngineConfigSection(previousSections, name);
+            const Core::Config::EngineConfigSection* current =
+                Core::Config::FindEngineConfigSection(
+                    config->AppSections,
+                    name);
+            if (registration && registration->OnChanged &&
+                previous && current)
             {
-                const Core::Config::EngineConfigSectionRegistration* registration =
-                    m_Dependencies.SectionRegistry->Find(name);
-                const Core::Config::EngineConfigSection* previous =
-                    Core::Config::FindEngineConfigSection(previousSections, name);
-                const Core::Config::EngineConfigSection* current =
-                    Core::Config::FindEngineConfigSection(config->AppSections, name);
-                if (registration && registration->OnChanged &&
-                    previous && current)
-                {
-                    registration->OnChanged(*previous, *current);
-                }
+                registration->OnChanged(*previous, *current);
             }
         }
         return result;

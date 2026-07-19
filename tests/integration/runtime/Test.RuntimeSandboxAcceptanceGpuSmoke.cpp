@@ -769,14 +769,16 @@ struct AcceptanceBootstrap
         };
     }
 
-    auto sectionRegistry =
-        Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry();
+    auto configControl =
+        std::make_unique<Extrinsic::Runtime::EngineConfigControl>(
+            Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry());
     auto config =
-        Extrinsic::Runtime::CreateReferenceEngineConfig(sectionRegistry);
+        Extrinsic::Runtime::CreateReferenceEngineConfig(
+            configControl->SectionRegistry());
     auto enginePtr = std::make_unique<Engine>(
         config,
-        std::make_unique<SandboxDefaultPolicyApp>(std::move(app)),
-        std::move(sectionRegistry));
+        std::make_unique<SandboxDefaultPolicyApp>(std::move(app)));
+    enginePtr->AddModule(std::move(configControl));
     enginePtr->EmplaceModule<Extrinsic::Runtime::AsyncWorkModule>();
     enginePtr->Initialize();
 
@@ -1370,16 +1372,21 @@ public:
         parameterization->View.ShowDistortionHeatmap = false;
         RT::SetParameterizationConfig(candidate, *parameterization);
 
-        RT::EngineConfigControl& configControl = engine.GetConfigControl();
+        RT::EngineConfigControl* const configControl =
+            engine.Services().Find<RT::EngineConfigControl>();
+        if (configControl == nullptr)
+        {
+            return;
+        }
         const Config::EngineConfigLoadResult preview =
-            configControl.PreviewEngineConfigControlDocument(
+            configControl->PreviewEngineConfigControlDocument(
                 Config::SerializeEngineConfig(candidate),
                 "graphics-122-runtime-path-gpu-smoke.json");
         m_State->ConfigPreviewUsable = Config::IsConfigUsable(preview);
         if (m_State->ConfigPreviewUsable)
         {
             const RT::RuntimeEngineConfigApplyResult apply =
-                configControl.ApplyEngineConfigHotSubset(
+                configControl->ApplyEngineConfigHotSubset(
                     preview,
                     RT::RuntimeConfigControlSource::AgentCli);
             m_State->ConfigApplied = apply.Succeeded();
@@ -1389,7 +1396,7 @@ public:
                 apply.SectionChanged(RT::kParameterizationConfigSectionName);
             const auto active =
                 RT::GetParameterizationConfig(
-                    configControl.GetEngineConfigControlState().ActiveConfig);
+                    configControl->GetEngineConfigControlState().ActiveConfig);
             m_State->ActiveConfigMatchesRequest =
                 active.has_value() &&
                 active->View.RenderMode ==
@@ -1770,8 +1777,11 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         << "The real ReferenceTriangle was not selected through SelectionController.";
     EXPECT_TRUE(state->WindowOpened)
         << "The contributed mesh.processing.parameterize_uv window did not open.";
+    const RT::EngineConfigControl* const configControl =
+        engine.Services().Find<RT::EngineConfigControl>();
+    ASSERT_NE(configControl, nullptr);
     const RT::RuntimeEngineConfigControlState& configState =
-        engine.GetConfigControl().GetEngineConfigControlState();
+        configControl->GetEngineConfigControlState();
     const auto activeParameterization =
         RT::GetParameterizationConfig(configState.ActiveConfig);
     ASSERT_TRUE(activeParameterization.has_value());

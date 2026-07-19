@@ -1,33 +1,24 @@
 module;
 
 #include <cstdint>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 export module Extrinsic.Runtime.EngineConfigControl;
 
+export import Extrinsic.Runtime.RenderRecipeActivation;
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
-import Extrinsic.Graphics.RenderFrameInput;
+import Extrinsic.Core.Error;
 import Extrinsic.Graphics.RenderRecipeConfig;
-import Extrinsic.Graphics.Renderer;
-import Extrinsic.Platform.Window;
+import Extrinsic.Runtime.Module;
 
 namespace Extrinsic::Runtime
 {
     export using RuntimeEngineConfigSectionRegistry =
         Core::Config::EngineConfigSectionRegistry;
-
-    export enum class RuntimeRenderRecipeActivationSource : std::uint8_t
-    {
-        None = 0,
-        StartupConfigFile,
-        AgentCli,
-        Editor,
-        Programmatic,
-    };
 
     export enum class RuntimeConfigControlSource : std::uint8_t
     {
@@ -35,41 +26,6 @@ namespace Extrinsic::Runtime
         AgentCli,
         Editor,
         Programmatic,
-    };
-
-    export enum class RuntimeRenderRecipeApplyStatus : std::uint8_t
-    {
-        None = 0,
-        Applied,
-        Rejected,
-        MissingRenderer,
-    };
-
-    export struct RuntimeRenderRecipeApplyResult
-    {
-        RuntimeRenderRecipeApplyStatus Status{RuntimeRenderRecipeApplyStatus::None};
-        RuntimeRenderRecipeActivationSource Source{
-            RuntimeRenderRecipeActivationSource::None
-        };
-        Graphics::RenderRecipeConfigLoadResult LoadResult{};
-        bool RendererOverrideInstalled{false};
-
-        [[nodiscard]] bool Succeeded() const noexcept
-        {
-            return Status == RuntimeRenderRecipeApplyStatus::Applied;
-        }
-    };
-
-    export struct RuntimeRenderRecipeState
-    {
-        std::optional<Graphics::FrameRecipeOverride> ActiveOverride{};
-        Graphics::RenderRecipeConfigLoadResult ActiveConfig{};
-        bool HasActiveConfig{false};
-        RuntimeRenderRecipeActivationSource ActiveSource{
-            RuntimeRenderRecipeActivationSource::None
-        };
-        RuntimeRenderRecipeApplyResult LastApply{};
-        bool HasLastApply{false};
     };
 
     export enum class RuntimeEngineConfigApplyStatus : std::uint8_t
@@ -109,21 +65,22 @@ namespace Extrinsic::Runtime
         bool HasLastApply{false};
     };
 
-    export struct EngineConfigControlDependencies
-    {
-        Core::Config::EngineConfig* Config{};
-        const RuntimeEngineConfigSectionRegistry* SectionRegistry{};
-        const Platform::IWindow* Window{};
-        Graphics::IRenderer* Renderer{};
-    };
-
-    export class EngineConfigControl
+    export class EngineConfigControl final : public IRuntimeModule
     {
     public:
         EngineConfigControl() = default;
-        explicit EngineConfigControl(EngineConfigControlDependencies dependencies);
+        explicit EngineConfigControl(
+            RuntimeEngineConfigSectionRegistry sectionRegistry);
 
-        void SetDependencies(EngineConfigControlDependencies dependencies);
+        [[nodiscard]] RuntimeEngineConfigSectionRegistry&
+        SectionRegistry() noexcept;
+        [[nodiscard]] const RuntimeEngineConfigSectionRegistry&
+        SectionRegistry() const noexcept;
+
+        [[nodiscard]] std::string_view Name() const noexcept override;
+        [[nodiscard]] Core::Result OnRegister(EngineSetup& setup) override;
+        [[nodiscard]] Core::Result OnResolve(EngineSetup& setup) override;
+        void OnShutdown(RuntimeModuleShutdownContext& context) override;
 
         [[nodiscard]] Graphics::RenderRecipeConfigContext
         CreateRenderRecipeConfigContext() const;
@@ -173,9 +130,14 @@ namespace Extrinsic::Runtime
         [[nodiscard]] const Core::Config::EngineConfig& CurrentConfig() const noexcept;
         [[nodiscard]] Core::Config::EngineConfig* MutableConfig() const noexcept;
         void RecordConfigApply(RuntimeEngineConfigApplyResult result);
+        [[nodiscard]] Core::Result Bind(
+            const RuntimeRenderRecipeActivationKernel& kernel);
+        void ClearBinding() noexcept;
 
-        EngineConfigControlDependencies m_Dependencies{};
+        RuntimeEngineConfigSectionRegistry m_SectionRegistry{};
+        RuntimeRenderRecipeActivationKernel m_RecipeActivation{};
         RuntimeRenderRecipeState m_RenderRecipeState{};
         RuntimeEngineConfigControlState m_ConfigControlState{};
+        bool m_Published{false};
     };
 }

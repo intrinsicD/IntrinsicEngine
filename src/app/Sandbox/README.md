@@ -12,9 +12,17 @@ belong in `Runtime` or lower engine layers. The executable obtains its default
 configuration through `Runtime` and should not import lower layers directly.
 `Sandbox.ConfigSections` is the pre-boot composition surface for the current
 `sandbox.progressive_poisson` and `sandbox.parameterization` records. The
-runtime module owns their typed DTOs/codecs; this app module only registers both
-descriptors before `ResolveEngineConfigForBoot(...)` and passes the same
-registry into `Engine`.
+runtime module owns their typed DTOs/codecs. `main.cpp` constructs the
+app-composed `Runtime::EngineConfigControl` first, gives it the registered
+Sandbox section registry, resolves boot config through that exact control's
+`SectionRegistry()`, and then moves the same control object into
+`Engine::AddModule(...)`.
+
+The editor session resolves live recipe/config control through
+`Engine::Services().Find<EngineConfigControl>()`. When a host omits the optional
+module, startup recipe-file behavior remains active in `Engine::Initialize()`,
+but editor recipe and engine-config command surfaces truthfully remain
+unavailable with null state and empty callbacks.
 
 The app-owned `Sandbox.Editor.Controller` owns `Sandbox.Editor.Shell` and all
 panel-family lifetimes behind one attach/detach interface. The shell owns the

@@ -10,6 +10,8 @@ module;
 
 export module Extrinsic.Runtime.Module;
 
+export import Extrinsic.Runtime.RenderRecipeActivation;
+
 import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.Core.Hash;
@@ -102,7 +104,9 @@ namespace Extrinsic::Runtime
                     WorldRegistry& worlds,
                     ServiceRegistry& services,
                     SimSystemRegistrar simSystemRegistrar,
-                    FrameHookRegistrar frameHookRegistrar)
+                    FrameHookRegistrar frameHookRegistrar,
+                    RuntimeRenderRecipeActivationKernel
+                        renderRecipeActivation = {})
             : m_Commands(commands)
             , m_Events(events)
             , m_Jobs(jobs)
@@ -110,6 +114,8 @@ namespace Extrinsic::Runtime
             , m_Services(services)
             , m_SimSystemRegistrar(std::move(simSystemRegistrar))
             , m_FrameHookRegistrar(std::move(frameHookRegistrar))
+            , m_RenderRecipeActivation(
+                  std::move(renderRecipeActivation))
         {
         }
 
@@ -118,6 +124,11 @@ namespace Extrinsic::Runtime
         [[nodiscard]] JobService& Jobs() noexcept { return m_Jobs; }
         [[nodiscard]] WorldRegistry& Worlds() noexcept { return m_Worlds; }
         [[nodiscard]] ServiceRegistry& Services() noexcept { return m_Services; }
+        [[nodiscard]] const RuntimeRenderRecipeActivationKernel&
+        RenderRecipeActivation() const noexcept
+        {
+            return m_RenderRecipeActivation;
+        }
 
         template <typename TCommand>
         void RegisterCommandHandler(
@@ -163,6 +174,7 @@ namespace Extrinsic::Runtime
         ServiceRegistry& m_Services;
         SimSystemRegistrar m_SimSystemRegistrar{};
         FrameHookRegistrar m_FrameHookRegistrar{};
+        RuntimeRenderRecipeActivationKernel m_RenderRecipeActivation{};
     };
 
     export class IRuntimeModule

@@ -18,27 +18,37 @@
 
 ## Lifecycle Composition
 
-Sandbox startup creates its app-owned config-section registry and resolves
-engine configuration before `Engine` construction.
-`Runtime::ResolveEngineConfigForBoot(args, registry)` starts from
-`CreateReferenceEngineConfig(registry)`, then checks `--engine-config`, the
+Sandbox startup creates its app-owned `EngineConfigControl` module before
+`Engine` construction and resolves engine configuration through the module's
+owned section registry.
+`Runtime::ResolveEngineConfigForBoot(args, control.SectionRegistry())` starts from
+`CreateReferenceEngineConfig(control.SectionRegistry())`, then checks
+`--engine-config`, the
 `INTRINSIC_ENGINE_CONFIG` environment variable, and an existing
 `config/engine.json` default path. File parsing and generic record diagnostics
 remain in the core-owned [`engine config file`](engine-config.md) lane; typed
 Sandbox payload codecs live in runtime and the pre-boot registration
 composition lives in `Extrinsic.Sandbox.ConfigSections`. Runtime chooses the
 boot source, passes the resulting value-type `EngineConfig` into `Engine`, and
-the Engine owns the same registry for live control.
+moves the same control object into `Engine::AddModule(...)`.
 
-Live agent/CLI configuration uses the runtime-owned
-[`runtime config control`](runtime-config-control.md) subsystem exposed through
-`Engine::GetConfigControl()`. That facade previews render recipes and engine
+Live agent/CLI configuration uses the app-composed
+[`runtime config control`](runtime-config-control.md) module resolved through
+`Engine::Services()`. That facade previews render recipes and engine
 config documents without ImGui, activates recipes through the same renderer
 override path used by startup and the Sandbox Editor, and hot-applies only the current
 `render.default_recipe_config_path` plus registered `app.sections` records.
 Changed section names are deterministic and callbacks run only after a complete
 successful commit. Other engine-config differences remain boot-only and are
 reported without mutating the live engine.
+
+Recipe startup remains an Engine responsibility because it must affect frame
+zero even when the optional live-control module is absent. Engine builds a
+narrow borrowed activation capability after renderer initialization, resets it
+unconditionally, and uses shared free functions to apply a non-empty startup
+path. A composed control copies the resulting transient startup state during
+registration and then owns the persistent live state; omission leaves editor
+and agent control unavailable without changing the rendered boot result.
 
 `Engine::RunFrame()` is the promoted runtime lifecycle pipeline. Runtime owns the
 cross-layer composition, while reusable phase contracts live in

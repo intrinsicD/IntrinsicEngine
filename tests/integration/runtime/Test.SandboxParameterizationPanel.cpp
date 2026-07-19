@@ -107,21 +107,36 @@ namespace
         Runtime::SelectionController Selection{};
         Runtime::EditorCommandHistory History{};
         Runtime::SandboxEditorSelectedModelCache ModelCache{};
-        Runtime::EngineConfigSectionRegistry SectionRegistry{
-            Sandbox::CreateSandboxConfigSectionRegistry()};
-        Config::EngineConfig ActiveConfig{
-            Runtime::CreateReferenceEngineConfig(SectionRegistry)};
-        Runtime::EngineConfigControl ConfigControl{
-            Runtime::EngineConfigControlDependencies{
-                .Config = &ActiveConfig,
-                .SectionRegistry = &SectionRegistry,
-            }};
+        std::unique_ptr<Runtime::Engine> ConfigEngine{};
+        Runtime::EngineConfigControl* ConfigControl{};
         ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
         std::uint32_t StableEntityId{0u};
         Runtime::SandboxEditorContext Context{};
 
         ParameterizationPanelHarness()
         {
+            auto configControl =
+                std::make_unique<Runtime::EngineConfigControl>(
+                    Sandbox::CreateSandboxConfigSectionRegistry());
+            Config::EngineConfig config =
+                Runtime::CreateReferenceEngineConfig(
+                    configControl->SectionRegistry());
+            config.Simulation.WorkerThreadCount = 1u;
+            config.ReferenceScene.Enabled = false;
+            config.Camera.Enabled = false;
+            config.Window.Backend = Config::WindowBackend::Null;
+            config.Render.EnablePromotedVulkanDevice = false;
+            config.Render.DefaultRecipeConfigPath.clear();
+            ConfigEngine = std::make_unique<Runtime::Engine>(
+                std::move(config),
+                std::make_unique<OneFrameApplication>());
+            ConfigEngine->AddModule(std::move(configControl));
+            ConfigEngine->Initialize();
+            ConfigControl =
+                ConfigEngine->Services()
+                    .Find<Runtime::EngineConfigControl>();
+            EXPECT_NE(ConfigControl, nullptr);
+
             Entity = Scene.Create();
             Geometry::HalfedgeMesh::Mesh mesh = MakeGridMesh();
             GS::PopulateFromMesh(Scene.Raw(), Entity, mesh);
@@ -133,23 +148,34 @@ namespace
             Context.CommandHistory = &History;
             Context.SelectedModelCache = &ModelCache;
             Context.EngineConfigControlState =
-                &ConfigControl.GetEngineConfigControlState();
-            Context.EngineConfigCommandsAvailable = true;
+                ConfigControl != nullptr
+                    ? &ConfigControl->GetEngineConfigControlState()
+                    : nullptr;
+            Context.EngineConfigCommandsAvailable =
+                ConfigControl != nullptr;
             Context.PreviewEngineConfigDocument =
                 [this](const std::string& document,
                        const std::string& sourceId)
                 {
-                    return ConfigControl.PreviewEngineConfigControlDocument(
+                    return ConfigControl->PreviewEngineConfigControlDocument(
                         document,
                         sourceId);
                 };
             Context.ApplyEngineConfigHotSubset =
                 [this](const Config::EngineConfigLoadResult& preview)
                 {
-                    return ConfigControl.ApplyEngineConfigHotSubset(
+                    return ConfigControl->ApplyEngineConfigHotSubset(
                         preview,
                         Runtime::RuntimeConfigControlSource::Editor);
                 };
+        }
+
+        ~ParameterizationPanelHarness()
+        {
+            if (ConfigEngine)
+            {
+                ConfigEngine->Shutdown();
+            }
         }
 
         [[nodiscard]] bool HasFiniteUvs() const

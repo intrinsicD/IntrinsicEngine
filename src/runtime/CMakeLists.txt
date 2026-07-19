@@ -76,6 +76,7 @@ target_sources(${target_name}
         Runtime.ProceduralGeometryPacker.cppm
         Runtime.ReferenceScene.cppm
         Runtime.ReferenceSceneControl.cppm
+        Runtime.RenderRecipeActivation.cppm
         Runtime.RenderExtraction.cppm
         Runtime.RenderWorldPool.cppm
         Runtime.SelectionReadback.cppm
@@ -162,6 +163,7 @@ target_sources(${target_name}
         Runtime.ProceduralGeometryPacker.cpp
         Runtime.ReferenceScene.cpp
         Runtime.ReferenceSceneControl.cpp
+        Runtime.RenderRecipeActivation.cpp
         Runtime.RenderExtraction.cpp
         Runtime.RenderExtraction.Adapters.cpp
         Runtime.RenderExtraction.Geometry.cpp
