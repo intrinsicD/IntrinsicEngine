@@ -662,8 +662,11 @@ TEST(GraphicsUvViewContract, GeometryRecordLookupReturnsResidentDataAndRejectsFr
         fixture.World.GetManagedIndexBuffer());
     EXPECT_EQ(record.VertexBufferBDA, vertexBda);
     EXPECT_EQ(record.IndexBufferBDA, indexBda);
+    constexpr std::uint64_t texcoordOffset =
+        (sizeof(glm::vec3) * kPositions.size() + 7u) & ~std::uint64_t{7u};
     EXPECT_EQ(record.TexcoordBufferBDA,
-              vertexBda + sizeof(glm::vec3) * kPositions.size());
+              vertexBda + texcoordOffset);
+    EXPECT_EQ(record.TexcoordBufferBDA % 8u, 0u);
     EXPECT_EQ(record.NormalBufferBDA, 0u);
     EXPECT_EQ(record.VertexOffset, 0u);
     EXPECT_EQ(record.VertexCount, 3u);

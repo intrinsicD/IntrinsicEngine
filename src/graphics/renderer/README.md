@@ -1782,13 +1782,32 @@ Concretely:
   material/texture base-color shading.
 - `GpuWorld::UpdateGeometryChannels(...)` is the partial-upload surface for
   runtime-authored SoA geometry. It validates that vertex/index counts still
-  match the resident allocation, writes only requested channel sub-ranges
-  (position, texcoord, normal, color) via `WriteBuffer(..., offset)`, and falls
-  back to caller-side full `UploadGeometry(...)` replacement when a channel
-  would need new storage.
+  match the resident allocation and that the submitted surface/line topology
+  is byte-identical, writes only requested channel sub-ranges (position,
+  texcoord, normal, color) via `WriteBuffer(..., offset)`, and falls back to
+  caller-side full `UploadGeometry(...)` replacement when topology changes or
+  a channel would need new storage.
   Pending channel writes are tracked by channel internally, then emitted as the
   managed vertex-buffer upload-to-shader-read barrier during
   `SubmitPendingUploadBarriers(...)`.
+- `GpuWorld::TryGetGeometryResidencyView(...)` exposes generation-checked
+  CPU metadata for the exact live managed allocation without expanding the
+  shader-facing `RHI::GpuGeometryRecord`. The view carries that current record,
+  the actual managed index-buffer handle, exact byte/count metadata,
+  deterministic position/surface-index/texcoord/normal fingerprints, and a
+  nonzero monotonic content revision. It also reports the current
+  `UniformSoA` lane with explicit `RGB32_FLOAT` position/normal,
+  `RG32_FLOAT` texcoord, and `R32_UINT` surface-index element/stride layouts.
+  Per-stream fingerprints use FNV-1a-64 (offset
+  `14695981039346656037`, prime `1099511628211`) with no domain prefix:
+  float streams normalize only the `0x80000000` negative-zero word to zero,
+  then feed each float32 word least-significant byte first; topology feeds each
+  uint32 index the same way. A zero digest is remapped to one, and only absent
+  optional texcoord/normal channels report fingerprint zero.
+  Upload seeds these facts; a successful partial channel update refreshes
+  fingerprints and advances the revision without changing the geometry handle,
+  while rejected/no-channel updates, compaction, and device-resource rebuild
+  preserve content identity. Free or stale handles fail and clear the output.
 - `GpuWorld::PlanGeometryStorage(...)` and
   `GpuWorld::PlanGeometryStoragePromotion(...)` are RUNTIME-125's planning-only
   contract for the optional static AoS fast lane. The current live storage path
@@ -1908,10 +1927,22 @@ Concretely:
   `DilationUnavailable`/`InvalidArgument`, and there is no CPU dilation
   fallback. The bake shader uses the same vertical orientation as the CPU
   texel-center sampling contract so a point addressed by mesh UV samples the
-  same baked texel on Vulkan. Runtime job scheduling, stale-key rejection at the
-  runtime completion boundary and generated-normal import replacement remain
-  owned by `RUNTIME-129`. This graphics surface does not import ECS, runtime,
-  live `AssetService`, or Vulkan handles.
+  same baked texel on Vulkan. The recorder always consumes a caller-provided
+  already-open `RHI::ICommandContext`; it does not begin/end a frame, submit a
+  queue, acquire a swapchain image, or present. The production
+  `RUNTIME-129` provider records through the existing runtime-frame hook,
+  requests `TransferSrc` in addition to the required sampled/color-target
+  usage for acceptance readback, finishes the output in `ShaderReadOnly`, and
+  retains one raster pipeline plus bounded extent-keyed dilation leases rather
+  than creating resources per frame. Runtime owns identity/provenance,
+  live-residency revalidation, stale completion rejection, material merging,
+  and scene/shutdown lifetime; this graphics surface does not import ECS,
+  runtime, live `AssetService`, or Vulkan handles.
+  Managed uniform-SoA channel starts obey the physical-storage-buffer
+  alignment declared by the shaders: `RG32_FLOAT` texcoords begin at an
+  eight-byte-aligned BDA and `RGB32_FLOAT` normals at a four-byte-aligned BDA.
+  The graphics plan/recorder and runtime residency validation reject
+  misaligned addresses before command recording.
 - `Extrinsic.Graphics.ComputeParallelPrimitives` owns the generic
   scan/compaction primitive contract introduced by `GRAPHICS-108`. It exports
   deterministic CPU reference helpers for `uint32` exclusive/inclusive
@@ -2434,7 +2465,20 @@ Concretely:
   retained-buffer pressure, overflow, stale handles, invalid handles, and
   null-device mode. Geometry uploads carry per-channel position/texcoord/normal
   spans plus an optional packed unorm8 color stream; `GpuGeometryRecord`
-  publishes the retained channel BDAs for active GpuScene shaders.
+  publishes the retained channel BDAs for active GpuScene shaders. The separate
+  read-only `GpuGeometryResidencyView` reports the live record and managed
+  index buffer together with a monotonic content revision, canonical
+  position/surface-index/texcoord/normal fingerprints, exact byte and element
+  counts, storage lane, and format/element/stride metadata. Upload assigns a
+  fresh revision; a successful partial channel update refreshes the affected
+  fingerprint and advances the revision without changing the
+  `GpuGeometryHandle`. The runtime object-space normal-bake provider accepts
+  only a view whose retained bytes exactly match its canonical identity and
+  whose current lane advertises tightly packed bake-readable channels. The
+  planned optional static-AoS lane in `RUNTIME-139` must either preserve and
+  truthfully advertise equivalent separate bake-readable channels or produce
+  the deterministic unsupported-lane result; it must not expose interleaved
+  addresses as tightly packed SoA.
 - Per
   [`GRAPHICS-028`](../../../tasks/archive/GRAPHICS-028-ecs-renderable-residency-bridge.md),
   renderable ECS residency is a runtime-owned bridge. `Runtime.RenderExtraction`
@@ -2461,19 +2505,20 @@ Concretely:
   framesInFlight)`). Procedural sources never participate in
   `GpuAssetCache` generation tracking — `GpuSceneSlot::SourceAsset` stays
   default-constructed, and the existing `HasSourceAsset()` check is the
-  GRAPHICS-023C/D observation discriminator. No graphics-module surface
-  changes; `Extrinsic.Graphics.GpuWorld` continues to expose only its
-  existing `UploadGeometry`/`FreeGeometry`/`SetInstanceGeometry` API.
+  GRAPHICS-023C/D observation discriminator. That slice added no
+  graphics-module surface; the later read-only
+  `TryGetGeometryResidencyView(...)` contract reports retained allocation
+  facts without moving procedural residency ownership out of runtime.
 - Per
   [`GRAPHICS-034`](../../../tasks/archive/GRAPHICS-034-asset-backed-mesh-residency-bridge.md),
   asset-backed mesh residency is also runtime-owned. Runtime normalizes
   `AssetInstance::Source` to `Assets::AssetId`, owns the future
   `AssetGeometryCache`, requests CPU payloads through asset services, and
   drives the `NotRequested` / `CpuPending` / `GpuUploading` / `Ready` /
-  `Failed` state machine. Graphics exposes only the existing
-  `GpuWorld::UploadGeometry`, `SetInstanceGeometry`, and `FreeGeometry`
-  value-type seams; it does not import live ECS, `Asset.Service`, or runtime
-  sidecar state. Failed asset-backed meshes use a visible placeholder policy
+  `Failed` state machine. Graphics exposes value-type upload/lifetime seams
+  plus the read-only `GpuGeometryResidencyView`; it does not import live ECS,
+  `Asset.Service`, or runtime sidecar state. Failed asset-backed meshes use a
+  visible placeholder policy
   recorded by GRAPHICS-034 once the implementation child lands, with runtime
   diagnostics owning all failure and stuck-pending counters.
 - Per

@@ -23,6 +23,8 @@ import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StreamingExecutor;
 
+#include "MockRHI.hpp"
+
 namespace Assets = Extrinsic::Assets;
 namespace ECS = Extrinsic::ECS;
 namespace Graphics = Extrinsic::Graphics;
@@ -465,6 +467,7 @@ TEST(RuntimeSelectedMeshTextureBake, ObjectSpaceNormalQueueSchedulesSelectedMesh
     ECS::Scene::Registry scene{};
     const ECS::EntityHandle entity = MakeMeshEntity(scene);
     Runtime::RuntimeObjectSpaceNormalBakeQueue normalBakeQueue{};
+    Extrinsic::Tests::MockDevice device{};
 
     Runtime::SelectedMeshTextureBakeRequest request = MakeNormalRequest(entity);
     request.Width = 64u;
@@ -473,8 +476,9 @@ TEST(RuntimeSelectedMeshTextureBake, ObjectSpaceNormalQueueSchedulesSelectedMesh
     request.DirtyStamp = 34u;
     Runtime::SelectedMeshTextureBakeContext context{
         .Scene = &scene,
+        .BindingEpoch = 1u,
         .ObjectSpaceNormalBakeQueue = &normalBakeQueue,
-        .ObjectSpaceNormalBakeGraphicsBackendOperational = true,
+        .ObjectSpaceNormalBakeDevice = &device,
     };
 
     const Runtime::SelectedMeshTextureBakeResult result =
@@ -483,11 +487,11 @@ TEST(RuntimeSelectedMeshTextureBake, ObjectSpaceNormalQueueSchedulesSelectedMesh
     ASSERT_EQ(result.Status, Runtime::SelectedMeshTextureBakeStatus::Scheduled);
     EXPECT_EQ(result.ExecutionMode,
               Runtime::SelectedMeshTextureBakeExecutionMode::ObjectSpaceNormalBakeQueue);
-    EXPECT_EQ(result.GeneratedTexture, (Assets::AssetId{request.StableEntityId, 1u}));
-    EXPECT_TRUE(result.BoundGeneratedTexture);
+    EXPECT_FALSE(result.GeneratedTexture.IsValid());
+    EXPECT_FALSE(result.BoundGeneratedTexture);
     EXPECT_EQ(result.BindingGeneration, 8u);
     EXPECT_EQ(normalBakeQueue.PendingCount(), 1u);
-    EXPECT_EQ(normalBakeQueue.CachedContentKeyCount(), 1u);
+    EXPECT_GT(normalBakeQueue.PendingIdentityByteCount(), 0u);
     EXPECT_EQ(normalBakeQueue.Diagnostics().QueuedRequests, 1u);
 
     const auto& bindings =
@@ -499,24 +503,20 @@ TEST(RuntimeSelectedMeshTextureBake, ObjectSpaceNormalQueueSchedulesSelectedMesh
     EXPECT_EQ(slot->Readiness, Runtime::ProgressiveReadinessState::Pending);
     EXPECT_FALSE(slot->GeneratedTexture.IsValid());
 
-    const auto completion = normalBakeQueue.Complete(result.GeneratedTexture.IsValid()
-        ? Runtime::RuntimeObjectSpaceNormalBakeStaleKey{
-              .EntityGeneration = request.StableEntityId,
-              .Bake = {
-                  .GeneratedTextureAsset = result.GeneratedTexture,
-                  .Source = {
-                      .EntityKey = request.StableEntityId,
-                      .GeometryGeneration = 34u,
-                      .TexcoordGeneration = 12u,
-                      .NormalGeneration = 12u,
-                  },
-                  .Width = 64u,
-                  .Height = 128u,
-                  .PaddingTexels = 4u,
-                  .Space = Graphics::NormalTextureSpace::ObjectSpaceNormal,
-              },
-          }
-        : Runtime::RuntimeObjectSpaceNormalBakeStaleKey{});
+    auto pending = normalBakeQueue.TakePendingSubmissions();
+    ASSERT_EQ(pending.size(), 1u);
+    ASSERT_TRUE(pending.front().Identity.has_value());
+    EXPECT_EQ(pending.front().Target.Entity, entity);
+    EXPECT_EQ(pending.front().Target.StableEntityId, request.StableEntityId);
+    EXPECT_EQ(pending.front().Target.BindingEpoch, 1u);
+    EXPECT_EQ(pending.front().Target.PresentationKey, "mesh.surface");
+    EXPECT_EQ(pending.front().Target.ExpectedProgressiveBindingGeneration, 8u);
+    EXPECT_EQ(pending.front().Identity->Width, 64u);
+    EXPECT_EQ(pending.front().Identity->Height, 128u);
+    const auto completion = normalBakeQueue.Complete(
+        pending.front().StaleKey,
+        Assets::AssetId{71u, 1u},
+        Runtime::RuntimeObjectSpaceNormalBakeAssetSelection::IdentityInserted);
     EXPECT_EQ(completion.Status,
               Runtime::RuntimeObjectSpaceNormalBakeStatus::ReadyForBinding);
 }
@@ -532,8 +532,9 @@ TEST(RuntimeSelectedMeshTextureBake, ObjectSpaceNormalQueueNoOpsOnNonOperational
     request.Height = 64u;
     Runtime::SelectedMeshTextureBakeContext context{
         .Scene = &scene,
+        .BindingEpoch = 1u,
         .ObjectSpaceNormalBakeQueue = &normalBakeQueue,
-        .ObjectSpaceNormalBakeGraphicsBackendOperational = false,
+        .ObjectSpaceNormalBakeDevice = nullptr,
     };
 
     const Runtime::SelectedMeshTextureBakeResult result =
@@ -547,7 +548,7 @@ TEST(RuntimeSelectedMeshTextureBake, ObjectSpaceNormalQueueNoOpsOnNonOperational
     EXPECT_NE(result.Diagnostic.find("no CPU fallback"), std::string::npos);
     EXPECT_EQ(result.BindingGeneration, 0u);
     EXPECT_EQ(normalBakeQueue.PendingCount(), 0u);
-    EXPECT_EQ(normalBakeQueue.CachedContentKeyCount(), 0u);
+    EXPECT_EQ(normalBakeQueue.PendingIdentityByteCount(), 0u);
     EXPECT_EQ(normalBakeQueue.Diagnostics().NonOperationalNoOps, 1u);
 
     const auto& bindings =
@@ -839,7 +840,7 @@ TEST(RuntimeSelectedMeshTextureBake, DerivedJobAppliesGeneratedTextureOnMainThre
 
     ASSERT_EQ(scheduled.Status, Runtime::SelectedMeshTextureBakeStatus::Scheduled);
     ASSERT_TRUE(scheduled.Job.IsValid());
-    EXPECT_TRUE(scheduled.BoundGeneratedTexture);
+    EXPECT_FALSE(scheduled.BoundGeneratedTexture);
     EXPECT_TRUE(history.IsDirty());
 
     const auto& pendingBindings =

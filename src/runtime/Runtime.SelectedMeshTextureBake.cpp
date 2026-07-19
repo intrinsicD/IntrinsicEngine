@@ -1,11 +1,9 @@
 module;
 
 #include <algorithm>
-#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
-#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -25,12 +23,14 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
+import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Properties;
 
 namespace Extrinsic::Runtime
@@ -489,103 +489,6 @@ namespace Extrinsic::Runtime
             return key;
         }
 
-        [[nodiscard]] std::uint32_t NarrowBakeCount(
-            const std::size_t value) noexcept
-        {
-            return value > std::numeric_limits<std::uint32_t>::max()
-                ? std::numeric_limits<std::uint32_t>::max()
-                : static_cast<std::uint32_t>(value);
-        }
-
-        [[nodiscard]] std::uint64_t MixObjectSpaceNormalBakeKey(
-            std::uint64_t seed,
-            const std::uint64_t value) noexcept
-        {
-            seed ^= value + 0x9e3779b97f4a7c15ull + (seed << 6u) + (seed >> 2u);
-            return seed == 0u ? 1u : seed;
-        }
-
-        [[nodiscard]] std::uint64_t FloatKeyBits(const float value) noexcept
-        {
-            return static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(value));
-        }
-
-        [[nodiscard]] std::uint64_t HashVec2Property(
-            const Geometry::ConstProperty<glm::vec2>& property) noexcept
-        {
-            if (!property.IsValid())
-                return 0u;
-
-            std::uint64_t hash = 0xcbf29ce484222325ull;
-            hash = MixObjectSpaceNormalBakeKey(hash, property.Vector().size());
-            for (const glm::vec2& value : property.Vector())
-            {
-                hash = MixObjectSpaceNormalBakeKey(hash, FloatKeyBits(value.x));
-                hash = MixObjectSpaceNormalBakeKey(hash, FloatKeyBits(value.y));
-            }
-            return hash == 0u ? 1u : hash;
-        }
-
-        [[nodiscard]] std::uint64_t HashVec3Property(
-            const Geometry::ConstProperty<glm::vec3>& property) noexcept
-        {
-            if (!property.IsValid())
-                return 0u;
-
-            std::uint64_t hash = 0xcbf29ce484222325ull;
-            hash = MixObjectSpaceNormalBakeKey(hash, property.Vector().size());
-            for (const glm::vec3& value : property.Vector())
-            {
-                hash = MixObjectSpaceNormalBakeKey(hash, FloatKeyBits(value.x));
-                hash = MixObjectSpaceNormalBakeKey(hash, FloatKeyBits(value.y));
-                hash = MixObjectSpaceNormalBakeKey(hash, FloatKeyBits(value.z));
-            }
-            return hash == 0u ? 1u : hash;
-        }
-
-        [[nodiscard]] Geometry::ConstProperty<glm::vec3>
-        ResolveBakePositionProperty(
-            const Geometry::ConstPropertySet& vertexProperties)
-        {
-            auto positions = vertexProperties.Get<glm::vec3>("v:point");
-            if (!positions.IsValid())
-            {
-                positions = vertexProperties.Get<glm::vec3>(
-                    ECS::Components::GeometrySources::PropertyNames::kPosition);
-            }
-            return positions;
-        }
-
-        [[nodiscard]] RuntimeObjectSpaceNormalBakeContentKey
-        BuildSelectedMeshObjectSpaceNormalBakeContentKey(
-            const Geometry::ConstPropertySet& vertexProperties,
-            const SelectedMeshTextureBakeRequest& request,
-            const std::uint32_t vertexCount,
-            const std::uint32_t indexCount)
-        {
-            const auto positions = ResolveBakePositionProperty(vertexProperties);
-            const auto texcoords =
-                vertexProperties.Get<glm::vec2>(request.TexcoordPropertyName);
-            const auto normals =
-                vertexProperties.Get<glm::vec3>(request.SourcePropertyName);
-
-            std::uint64_t geometryKey = 0x84222325cbf29ce4ull;
-            geometryKey = MixObjectSpaceNormalBakeKey(geometryKey, vertexCount);
-            geometryKey = MixObjectSpaceNormalBakeKey(geometryKey, indexCount);
-            const std::uint64_t positionKey = HashVec3Property(positions);
-            geometryKey = MixObjectSpaceNormalBakeKey(
-                geometryKey,
-                positionKey != 0u ? positionKey : vertexCount);
-
-            return RuntimeObjectSpaceNormalBakeContentKey{
-                .GeometryKey = geometryKey,
-                .TexcoordKey = HashVec2Property(texcoords),
-                .NormalKey = HashVec3Property(normals),
-                .VertexCount = vertexCount,
-                .IndexCount = indexCount,
-            };
-        }
-
         [[nodiscard]] SelectedObjectSpaceNormalBakeRequestBuild
         FailureObjectSpaceNormalBakeRequestBuild(
             const SelectedMeshTextureBakeStatus status,
@@ -602,7 +505,8 @@ namespace Extrinsic::Runtime
         [[nodiscard]] SelectedObjectSpaceNormalBakeRequestBuild
         BuildSelectedMeshObjectSpaceNormalBakeRequest(
             const GS::ConstSourceView& view,
-            const SelectedMeshTextureBakeRequest& request)
+            const SelectedMeshTextureBakeRequest& request,
+            RuntimeObjectSpaceNormalBakeTarget target)
         {
             if (request.StableEntityId == 0u ||
                 view.VertexSource == nullptr)
@@ -613,6 +517,12 @@ namespace Extrinsic::Runtime
 
             const Geometry::ConstPropertySet vertexProperties{
                 view.VertexSource->Properties};
+            if (request.TexcoordPropertyName != "v:texcoord")
+            {
+                return FailureObjectSpaceNormalBakeRequestBuild(
+                    SelectedMeshTextureBakeStatus::MissingTexcoords,
+                    "selected mesh object-space normal bake must use the canonical v:texcoord channel");
+            }
             const auto texcoords =
                 vertexProperties.Get<glm::vec2>(request.TexcoordPropertyName);
             if (!texcoords.IsValid())
@@ -630,52 +540,37 @@ namespace Extrinsic::Runtime
                     "selected mesh object-space normal bake requires a vec3 normal property");
             }
 
-            const std::uint32_t vertexCount =
-                NarrowBakeCount(view.VerticesAlive());
-            const std::uint32_t indexCount =
-                NarrowBakeCount(view.FacesAlive() * 3u);
-            const RuntimeObjectSpaceNormalBakeContentKey contentKey =
-                BuildSelectedMeshObjectSpaceNormalBakeContentKey(
-                    vertexProperties,
-                    request,
-                    vertexCount,
-                    indexCount);
-
-            if (!contentKey.IsValid())
-            {
-                return FailureObjectSpaceNormalBakeRequestBuild(
-                    SelectedMeshTextureBakeStatus::BakeFailed,
-                    "selected mesh object-space normal bake has no stable geometry/uv/normal content key");
-            }
-
             Graphics::ObjectSpaceNormalTextureBakeOptions bakeOptions{};
             bakeOptions.Width = request.Width;
             bakeOptions.Height = request.Height;
             bakeOptions.Space = Graphics::NormalTextureSpace::ObjectSpaceNormal;
 
-            const std::uint64_t geometryGeneration =
-                request.DirtyStamp != 0u ? request.DirtyStamp : 1u;
-            const std::uint64_t propertyGeneration =
-                request.SourceGeneration != 0u
-                    ? request.SourceGeneration
-                    : geometryGeneration;
+            VertexChannelBindingSet channelBindings{};
+            const VertexChannelBindingSet* channelBindingsPtr = nullptr;
+            if (request.SourcePropertyName != GS::PropertyNames::kNormal)
+            {
+                channelBindings.Normal.Enabled = true;
+                channelBindings.Normal.SourceProperty =
+                    request.SourcePropertyName;
+                channelBindingsPtr = &channelBindings;
+            }
+
+            RuntimeObjectSpaceNormalBakeRequestBuildResult exact =
+                BuildRuntimeObjectSpaceNormalBakeRequest(
+                    view,
+                    std::move(target),
+                    bakeOptions,
+                    channelBindingsPtr);
+            if (!exact.Succeeded())
+            {
+                return FailureObjectSpaceNormalBakeRequestBuild(
+                    SelectedMeshTextureBakeStatus::BakeFailed,
+                    std::move(exact.Diagnostic));
+            }
 
             return SelectedObjectSpaceNormalBakeRequestBuild{
-                .Request = RuntimeObjectSpaceNormalBakeRequest{
-                    .EntityScopedGeneratedTextureAsset =
-                        Assets::AssetId{request.StableEntityId, 1u},
-                    .SourceKey =
-                        Graphics::ObjectSpaceNormalTextureBakeSourceKey{
-                            .EntityKey = request.StableEntityId,
-                            .GeometryGeneration = geometryGeneration,
-                            .TexcoordGeneration = propertyGeneration,
-                            .NormalGeneration = propertyGeneration,
-                        },
-                    .EntityGeneration = request.StableEntityId,
-                    .Options = bakeOptions,
-                    .ContentKey = contentKey,
-                    .HasStableContentKey = true,
-                },
+                .Request = std::move(*exact.Request),
+                .Diagnostic = std::move(exact.Diagnostic),
             };
         }
 
@@ -706,7 +601,7 @@ namespace Extrinsic::Runtime
             case RuntimeObjectSpaceNormalBakeStatus::UnsupportedNormalTextureSpace:
                 return SelectedMeshTextureBakeStatus::UnsupportedTargetSemantic;
             case RuntimeObjectSpaceNormalBakeStatus::InvalidRequest:
-            case RuntimeObjectSpaceNormalBakeStatus::MissingGeneratedTextureAsset:
+            case RuntimeObjectSpaceNormalBakeStatus::CapacityExceeded:
                 return SelectedMeshTextureBakeStatus::CommandFailed;
             }
             return SelectedMeshTextureBakeStatus::CommandFailed;
@@ -968,8 +863,46 @@ namespace Extrinsic::Runtime
             if (context.ObjectSpaceNormalBakeQueue == nullptr)
                 return FailureResult(SelectedMeshTextureBakeStatus::CommandFailed);
 
+            if (context.Scene == nullptr)
+                return FailureResult(SelectedMeshTextureBakeStatus::MissingScene);
+            const ECS::EntityHandle entity =
+                ResolveEntity(*context.Scene, request.StableEntityId);
+            if (entity == ECS::InvalidEntityHandle)
+                return FailureResult(SelectedMeshTextureBakeStatus::StaleEntity);
+            const auto* bindings =
+                context.Scene->Raw().try_get<ProgressivePresentationBindings>(
+                    entity);
+            if (bindings == nullptr)
+            {
+                return FailureResult(
+                    SelectedMeshTextureBakeStatus::MissingProgressiveBindings);
+            }
+            const ProgressivePresentationBinding* presentation =
+                ResolvePresentation(*bindings, request);
+            if (presentation == nullptr || presentation->Key.empty())
+            {
+                return FailureResult(
+                    SelectedMeshTextureBakeStatus::MissingPresentation);
+            }
+            std::uint64_t expectedBindingGeneration =
+                bindings->BindingGeneration + 1u;
+            if (expectedBindingGeneration == 0u)
+                expectedBindingGeneration = 1u;
+
             SelectedObjectSpaceNormalBakeRequestBuild queueBuild =
-                BuildSelectedMeshObjectSpaceNormalBakeRequest(view, request);
+                BuildSelectedMeshObjectSpaceNormalBakeRequest(
+                    view,
+                    request,
+                    RuntimeObjectSpaceNormalBakeTarget{
+                        .World = context.World,
+                        .BindingEpoch = context.BindingEpoch,
+                        .Entity = entity,
+                        .StableEntityId = request.StableEntityId,
+                        .PresentationKey = presentation->Key,
+                        .Semantic = ProgressiveSlotSemantic::Normal,
+                        .ExpectedProgressiveBindingGeneration =
+                            expectedBindingGeneration,
+                    });
             if (!queueBuild.Succeeded())
             {
                 SelectedMeshTextureBakeResult result =
@@ -978,7 +911,8 @@ namespace Extrinsic::Runtime
                 return result;
             }
 
-            if (!context.ObjectSpaceNormalBakeGraphicsBackendOperational)
+            if (context.ObjectSpaceNormalBakeDevice == nullptr ||
+                !context.ObjectSpaceNormalBakeDevice->IsOperational())
             {
                 RuntimeObjectSpaceNormalBakeResult queued =
                     context.ObjectSpaceNormalBakeQueue->Schedule(
@@ -1005,6 +939,12 @@ namespace Extrinsic::Runtime
                     previousOutputRetained);
             if (pendingStatus != SelectedMeshTextureBakeStatus::Success)
                 return FailureResult(pendingStatus);
+            if (bindingGeneration != expectedBindingGeneration)
+            {
+                return FailureResult(
+                    SelectedMeshTextureBakeStatus::StaleCompletion,
+                    "selected mesh progressive binding generation changed while scheduling object-space normal bake");
+            }
 
             RuntimeObjectSpaceNormalBakeResult queued =
                 context.ObjectSpaceNormalBakeQueue->Schedule(
@@ -1026,10 +966,10 @@ namespace Extrinsic::Runtime
 
             return SelectedMeshTextureBakeResult{
                 .Status = SelectedMeshTextureBakeStatus::Scheduled,
-                .GeneratedTexture = queued.Submission.GeneratedTextureAsset,
+                .GeneratedTexture = {},
                 .ExecutionMode =
                     SelectedMeshTextureBakeExecutionMode::ObjectSpaceNormalBakeQueue,
-                .BoundGeneratedTexture = request.BindGeneratedTexture,
+                .BoundGeneratedTexture = false,
                 .PreviousOutputRetained = previousOutputRetained,
                 .BindingGeneration = bindingGeneration,
                 .GeneratedAssetPath = build.GeneratedAssetPath,
@@ -1651,7 +1591,7 @@ namespace Extrinsic::Runtime
             .GeneratedTexture = request.ExistingGeneratedTexture,
             .Job = handle,
             .ExecutionMode = SelectedMeshTextureBakeExecutionMode::DerivedJob,
-            .BoundGeneratedTexture = request.BindGeneratedTexture,
+            .BoundGeneratedTexture = false,
             .PreviousOutputRetained = previousOutputRetained,
             .BindingGeneration = bindingGeneration,
             .GeneratedAssetPath = build.GeneratedAssetPath,

@@ -14,6 +14,7 @@ import Extrinsic.Core.StrongHandle;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Types;
@@ -22,6 +23,8 @@ export namespace Extrinsic::Graphics
 {
     using GpuInstanceHandle = Core::StrongHandle<GpuInstanceTag>;
     using GpuGeometryHandle = Core::StrongHandle<GpuGeometryTag>;
+
+    struct GpuGeometryResidencyView;
 
     class GpuWorld
     {
@@ -304,6 +307,9 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] bool TryGetGeometryRecord(
             GpuGeometryHandle geometry,
             RHI::GpuGeometryRecord& outRecord) const noexcept;
+        [[nodiscard]] bool TryGetGeometryResidencyView(
+            GpuGeometryHandle geometry,
+            GpuGeometryResidencyView& outView) const noexcept;
 
         [[nodiscard]] std::uint32_t GetLiveInstanceCount() const noexcept;
         [[nodiscard]] std::uint32_t GetInstanceCapacity() const noexcept;
@@ -317,5 +323,46 @@ export namespace Extrinsic::Graphics
     private:
         struct Impl;
         std::unique_ptr<Impl> m_Impl;
+    };
+
+    // CPU-visible facts for the exact bytes retained by GpuWorld. This keeps
+    // content/lane eligibility out of the shader-facing GpuGeometryRecord
+    // while allowing runtime providers to validate the live allocation before
+    // recording commands that read its managed buffers.
+    struct GpuGeometryResidencyView
+    {
+        RHI::GpuGeometryRecord Record{};
+        RHI::BufferHandle IndexBuffer{};
+
+        std::uint64_t ContentRevision = 0u;
+        // FNV-1a-64 over uint32 words in least-significant-byte-first order;
+        // float streams canonicalize -0 to +0. Only absent optional channels
+        // use fingerprint zero.
+        std::uint64_t PositionFingerprint = 0u;
+        std::uint64_t SurfaceIndexFingerprint = 0u;
+        std::uint64_t TexcoordFingerprint = 0u;
+        std::uint64_t NormalFingerprint = 0u;
+
+        std::uint64_t PositionByteCount = 0u;
+        std::uint64_t SurfaceIndexByteCount = 0u;
+        std::uint64_t TexcoordByteCount = 0u;
+        std::uint64_t NormalByteCount = 0u;
+        std::uint32_t VertexCount = 0u;
+        std::uint32_t SurfaceIndexCount = 0u;
+
+        GpuWorld::GeometryStorageLane StorageLane =
+            GpuWorld::GeometryStorageLane::UniformSoA;
+        RHI::Format PositionFormat = RHI::Format::Undefined;
+        RHI::Format TexcoordFormat = RHI::Format::Undefined;
+        RHI::Format NormalFormat = RHI::Format::Undefined;
+        RHI::Format SurfaceIndexFormat = RHI::Format::Undefined;
+        std::uint32_t PositionElementBytes = 0u;
+        std::uint32_t PositionStrideBytes = 0u;
+        std::uint32_t TexcoordElementBytes = 0u;
+        std::uint32_t TexcoordStrideBytes = 0u;
+        std::uint32_t NormalElementBytes = 0u;
+        std::uint32_t NormalStrideBytes = 0u;
+        std::uint32_t SurfaceIndexElementBytes = 0u;
+        std::uint32_t SurfaceIndexStrideBytes = 0u;
     };
 }

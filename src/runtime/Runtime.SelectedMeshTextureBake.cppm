@@ -11,6 +11,7 @@ import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
@@ -108,11 +109,12 @@ export namespace Extrinsic::Runtime
     {
         ECS::Scene::Registry* Scene{nullptr};
         WorldHandle World{DefaultWorldHandle};
+        std::uint64_t BindingEpoch{0u};
         Assets::AssetService* AssetService{nullptr};
         EditorCommandHistory* CommandHistory{nullptr};
         DerivedJobRegistry* DerivedJobs{nullptr};
         RuntimeObjectSpaceNormalBakeQueue* ObjectSpaceNormalBakeQueue{nullptr};
-        bool ObjectSpaceNormalBakeGraphicsBackendOperational{false};
+        const RHI::IDevice* ObjectSpaceNormalBakeDevice{nullptr};
     };
 
     struct SelectedMeshTextureBakeResult

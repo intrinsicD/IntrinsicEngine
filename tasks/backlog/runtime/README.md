@@ -65,10 +65,10 @@ pending material-binding re-resolution, and asset-residency teardown ordering,
 plus persistent `StreamingExecutor` / `DerivedJobRegistry` ownership,
 maintenance drains, shutdown reset, and derived-job facade delegation now live
 outside `Runtime.Engine.cpp`.
-`RUNTIME-129` remains the owner of production Vulkan bake plan-provider wiring.
+Retired `RUNTIME-129` supplies the production Vulkan bake plan-provider wiring.
 Retired `GRAPHICS-128` supplies the nonzero shared-index-slice command
 contract; retired `RUNTIME-183` supplies the accepted app-composed
-AssetWorkflow owner, so `RUNTIME-129` is selectable.
+AssetWorkflow owner.
 `RUNTIME-154` keeps the existing reference-scene public facade while moving
 provider resolution, population state, camera-seed caching, and teardown policy
 into `Extrinsic.Runtime.ReferenceSceneControl`. `RUNTIME-155` keeps the
@@ -129,8 +129,8 @@ shutdown sequencing now live behind `Extrinsic.Runtime.JobServiceGpuQueueBridge`
 `RUNTIME-161` is retired; object-space normal bake GPU-queue ownership,
 ready-frame dependency setup, JobService participant registration, queue
 diagnostics access, and shutdown dependency clearing now live behind
-`Extrinsic.Runtime.ObjectSpaceNormalBakeService` without closing the remaining
-production Vulkan work in `RUNTIME-129`.
+`Extrinsic.Runtime.ObjectSpaceNormalBakeService`; retired `RUNTIME-129`
+subsequently closed the production Vulkan work inside that owner.
 `RUNTIME-162` is retired; transform-gizmo frame state, selected-entity scratch,
 gizmo/selection pointer interlock, and transform-gizmo packet building now live
 behind `Extrinsic.Runtime.GizmoFrameService` while preserving the public Engine
@@ -195,9 +195,9 @@ triggers. The implementation graph is:
   Sandbox transactional typed handles over only the exact import pipeline/input
   registry plus optional exact camera/selection for focus. CPU and capable-host
   Vulkan acceptance verification are complete.
-- Existing [`RUNTIME-129`](RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
-  completes the operational Vulkan bake inside `AssetWorkflowModule` after
-  retired `GRAPHICS-128` made the shared managed-index subrange selectable.
+- Retired `RUNTIME-129` completes the operational Vulkan bake inside
+  `AssetWorkflowModule` after retired `GRAPHICS-128` made the shared
+  managed-index subrange selectable.
 - [`RUNTIME-184`](RUNTIME-184-replace-application-lifecycle.md) — remove
   `IApplication` and unrestricted app ticks through explicit Sandbox/module
   composition, isolated from residual API migration and the final
@@ -218,9 +218,10 @@ Retired `GRAPHICS-127` followed `RUNTIME-181`/`RUNTIME-182`, so its profiling
 config and Frame Graph UI use the settled owners.
 Retired `RUNTIME-177` added no generic debug-draw producer seam because its
 consumer inventory was empty; existing spatial-debug and transform-gizmo
-paths remain typed. `RUNTIME-129` and `RUNTIME-184` may proceed independently
-after retired `RUNTIME-183` and retired `RUNTIME-168` lifecycle-policy
-privatization respectively; both gate `RUNTIME-185`.
+paths remain typed. Retired `RUNTIME-129` satisfies the normal-bake gate;
+`RUNTIME-184` may proceed after retired `RUNTIME-168` lifecycle-policy
+privatization, and its retirement will satisfy the remaining `RUNTIME-185`
+gate.
 `ARCH-014` reaches this graph through `RUNTIME-187`; `REVIEW-003` reaches it
 transitively through `ARCH-014`.
 
@@ -337,8 +338,8 @@ owned by `RUNTIME-151` after the mechanical `RUNTIME-146..150` splits) and
   frame-loop body byte-for-byte while removing one module/BMI surface.
 - [`RUNTIME-170`](../../done/RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md)
   retired the one-consumer object-space normal bake GPU queue module into
-  service-owned private state at `CPUContracted`; production Vulkan wiring
-  remains owned by `RUNTIME-129`.
+  service-owned private state at `CPUContracted`; retired `RUNTIME-129`
+  subsequently supplied the production Vulkan wiring.
 
 ### bcg geometry-processing port integration (seeded 2026-06-26)
 
@@ -427,7 +428,7 @@ This foundation is recorded in
 backend drain path and `JobService` owns the `GpuQueue` participant registry.
 Those historical graphics and queue prerequisites for `RUNTIME-129` are
 satisfied; retired `RUNTIME-183` supplies the accepted AssetWorkflow owner, so
-the object-space-normal Vulkan provider task is selectable.
+retired `RUNTIME-129` now provides the object-space-normal Vulkan path.
 
 `RUNTIME-111` through `RUNTIME-115` are retired; additional progressive
 render-data follow-ups should open as value-gated tasks with a concrete
@@ -607,8 +608,9 @@ split; narratives live in the retirement log.
   ownership, dependency setup, ready-frame callback construction, JobService
   participant registration, diagnostics access, pending-count access, and
   dependency clearing now live in
-  `Extrinsic.Runtime.ObjectSpaceNormalBakeService`. `RUNTIME-129` remains open
-  for production Vulkan plan-provider and `gpu;vulkan` smoke closure.
+  `Extrinsic.Runtime.ObjectSpaceNormalBakeService`. Retired `RUNTIME-129`
+  subsequently supplied the production Vulkan plan-provider and
+  `gpu;vulkan` smoke closure.
 - [RUNTIME-162 — Extract gizmo frame service out of Engine](../../archive/RUNTIME-162-extract-gizmo-frame-service.md)
   (done, 2026-07-09, `Operational`): transform-gizmo interaction state, undo
   storage, selected-entity scratch, gizmo/selection pointer interlock, and

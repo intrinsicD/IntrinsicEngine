@@ -1,0 +1,46 @@
+session:
+  id: "2026-07-20_001"
+  date: "2026-07-20"
+  started: "2026-07-20T00:38+02:00"
+  last_turn: "2026-07-20T00:38+02:00"
+  turn_count: 1
+  summary: "Completed, verified, and retired RUNTIME-129 at Operational after live Vulkan readback exposed and closed a physical-storage texcoord alignment defect."
+
+events_logged:
+  - turn: 1
+    type: experiment
+    id: "N272"
+    routing: direct
+    provenance: ai-executed
+    summary: "Completed RUNTIME-129, fixed the live-GPU RG32 BDA alignment defect, passed 4,273 CPU and 47 ASan+UBSan Vulkan tests, and retired the task at Operational."
+  - turn: 1
+    type: constraint
+    id: "O56"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized shader-declared physical-storage alignment as K22 through the committed allocator, validator, and live readback evidence."
+
+ai_actions:
+  - turn: 1
+    action: "Implemented and verified RUNTIME-129's exact queue, generated-asset provenance, live residency/provider, retained resources, default/editor producers, transactional binding, physical-storage alignment, real-app Vulkan smoke, documentation, clean-workshop review, and retirement records."
+    provenance: ai-executed
+    files_changed:
+      - "src/graphics/renderer/Graphics.GpuWorld.cpp"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeQueue.cpp"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeService.cpp"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeBinding.cpp"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeSubmission.cpp"
+      - "src/runtime/Runtime.AssetModelSceneHandoff.cpp"
+      - "src/runtime/Runtime.SandboxEditorFacades.cpp"
+      - "tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp"
+      - "tasks/done/RUNTIME-129-schedule-gpu-normal-bake-after-import.md"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "A dynamic CPU witness must select the expected authored UV footprint; deriving the witness from GPU coverage would mask address-layout defects. The shader's Aligned 8 texcoord load makes BDA alignment part of residency correctness."
+
+open_threads: []
+
+ai_suggestions_pending: []

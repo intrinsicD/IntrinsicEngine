@@ -26,6 +26,58 @@ namespace Extrinsic::Graphics
         constexpr std::uint32_t kTexcoordElementBytes = sizeof(float) * 2u;
         constexpr std::uint32_t kNormalElementBytes = sizeof(float) * 3u;
         constexpr std::uint32_t kColorElementBytes = sizeof(std::uint32_t);
+        constexpr std::uint32_t kPhysicalStorageScalarAddressAlignment =
+            sizeof(float);
+        constexpr std::uint32_t kPhysicalStorageTexcoordAddressAlignment =
+            sizeof(float) * 2u;
+        constexpr std::uint64_t kFnv1aOffset64 = 14695981039346656037ull;
+        constexpr std::uint64_t kFnv1aPrime64 = 1099511628211ull;
+
+        void FingerprintUint32(
+            std::uint64_t& fingerprint,
+            const std::uint32_t value) noexcept
+        {
+            for (std::uint32_t shift = 0u; shift < 32u; shift += 8u)
+            {
+                fingerprint ^= static_cast<std::uint64_t>(
+                    static_cast<std::uint8_t>(value >> shift));
+                fingerprint *= kFnv1aPrime64;
+            }
+        }
+
+        [[nodiscard]] std::uint64_t FingerprintFloat32Bytes(
+            const std::span<const std::byte> bytes) noexcept
+        {
+            assert((bytes.size_bytes() % sizeof(std::uint32_t)) == 0u);
+            std::uint64_t fingerprint = kFnv1aOffset64;
+            for (std::size_t offset = 0u;
+                 offset < bytes.size_bytes();
+                 offset += sizeof(std::uint32_t))
+            {
+                std::uint32_t bits = 0u;
+                std::memcpy(
+                    &bits,
+                    bytes.data() + static_cast<std::ptrdiff_t>(offset),
+                    sizeof(bits));
+                if (bits == 0x8000'0000u)
+                {
+                    bits = 0u;
+                }
+                FingerprintUint32(fingerprint, bits);
+            }
+            return fingerprint == 0u ? 1u : fingerprint;
+        }
+
+        [[nodiscard]] std::uint64_t FingerprintUint32Stream(
+            const std::span<const std::uint32_t> values) noexcept
+        {
+            std::uint64_t fingerprint = kFnv1aOffset64;
+            for (const std::uint32_t value : values)
+            {
+                FingerprintUint32(fingerprint, value);
+            }
+            return fingerprint == 0u ? 1u : fingerprint;
+        }
 
         [[nodiscard]] std::uint64_t AlignUp(const std::uint64_t value, const std::uint32_t alignment) noexcept
         {
@@ -68,6 +120,13 @@ namespace Extrinsic::Graphics
             std::uint64_t LineIndexByteCount = 0;
             std::uint32_t VertexCount = 0;
             std::uint32_t VertexElementOffset = 0;
+            std::uint64_t ContentRevision = 0;
+            std::uint64_t PositionFingerprint = 0;
+            std::uint64_t SurfaceIndexFingerprint = 0;
+            std::uint64_t TexcoordFingerprint = 0;
+            std::uint64_t NormalFingerprint = 0;
+            GpuWorld::GeometryStorageLane StorageLane =
+                GpuWorld::GeometryStorageLane::UniformSoA;
             std::vector<std::byte> VertexBytes;
             std::vector<std::uint32_t> SurfaceIndices;
             std::vector<std::uint32_t> LineIndices;
@@ -77,6 +136,93 @@ namespace Extrinsic::Graphics
                 return SurfaceIndexByteCount + LineIndexByteCount;
             }
         };
+
+        [[nodiscard]] std::span<const std::byte> StoredChannelBytes(
+            const ManagedGeometryAllocation& allocation,
+            const std::uint64_t byteOffset,
+            const std::uint64_t byteCount) noexcept
+        {
+            if (byteCount == 0u)
+            {
+                return {};
+            }
+
+            assert(byteOffset + byteCount <= allocation.VertexBytes.size());
+            return std::span<const std::byte>{
+                allocation.VertexBytes.data() +
+                    static_cast<std::ptrdiff_t>(byteOffset),
+                static_cast<std::size_t>(byteCount),
+            };
+        }
+
+        void RefreshResidencyFingerprints(
+            ManagedGeometryAllocation& allocation) noexcept
+        {
+            const std::span<const std::byte> positionBytes =
+                StoredChannelBytes(
+                    allocation,
+                    allocation.PositionByteOffset,
+                    allocation.PositionByteCount);
+            const std::span<const std::byte> texcoordBytes =
+                StoredChannelBytes(
+                    allocation,
+                    allocation.TexcoordByteOffset,
+                    allocation.TexcoordByteCount);
+            const std::span<const std::byte> normalBytes =
+                StoredChannelBytes(
+                    allocation,
+                    allocation.NormalByteOffset,
+                    allocation.NormalByteCount);
+            allocation.PositionFingerprint =
+                FingerprintFloat32Bytes(positionBytes);
+            allocation.SurfaceIndexFingerprint =
+                FingerprintUint32Stream(
+                    std::span<const std::uint32_t>{
+                        allocation.SurfaceIndices});
+            allocation.TexcoordFingerprint = texcoordBytes.empty()
+                ? 0u
+                : FingerprintFloat32Bytes(texcoordBytes);
+            allocation.NormalFingerprint = normalBytes.empty()
+                ? 0u
+                : FingerprintFloat32Bytes(normalBytes);
+        }
+
+        void RefreshUpdatedResidencyFingerprints(
+            ManagedGeometryAllocation& allocation,
+            const GpuWorld::GeometryChannelUpdateMask channels) noexcept
+        {
+            if (channels.Position)
+            {
+                allocation.PositionFingerprint =
+                    FingerprintFloat32Bytes(
+                        StoredChannelBytes(
+                            allocation,
+                            allocation.PositionByteOffset,
+                            allocation.PositionByteCount));
+            }
+            if (channels.Texcoord)
+            {
+                const std::span<const std::byte> bytes =
+                    StoredChannelBytes(
+                        allocation,
+                        allocation.TexcoordByteOffset,
+                        allocation.TexcoordByteCount);
+                allocation.TexcoordFingerprint = bytes.empty()
+                    ? 0u
+                    : FingerprintFloat32Bytes(bytes);
+            }
+            if (channels.Normal)
+            {
+                const std::span<const std::byte> bytes =
+                    StoredChannelBytes(
+                        allocation,
+                        allocation.NormalByteOffset,
+                        allocation.NormalByteCount);
+                allocation.NormalFingerprint = bytes.empty()
+                    ? 0u
+                    : FingerprintFloat32Bytes(bytes);
+            }
+        }
 
         template <typename Tag>
         struct SlotAllocator
@@ -317,6 +463,7 @@ namespace Extrinsic::Graphics
             std::vector<std::byte>& dst,
             const std::span<const std::byte> src,
             std::uint64_t cursor,
+            const std::uint32_t addressAlignment,
             std::uint64_t& outByteOffset,
             std::uint64_t& outByteCount)
         {
@@ -327,7 +474,8 @@ namespace Extrinsic::Graphics
                 return cursor;
             }
 
-            const std::uint64_t offset = AlignUp(cursor, alignof(float));
+            const std::uint64_t offset =
+                AlignUp(cursor, addressAlignment);
             outByteOffset = offset;
             const std::uint64_t end = offset + outByteCount;
             dst.resize(static_cast<std::size_t>(end));
@@ -552,6 +700,7 @@ namespace Extrinsic::Graphics
         std::uint64_t ManagedCompactionBytesMoved = 0;
         std::uint32_t ManagedCompactionCount = 0;
         std::uint32_t StaleCompactionRelocationCount = 0;
+        std::uint64_t NextGeometryContentRevision = 1u;
 
         std::uint64_t VertexBumpOffset = 0;
         std::uint32_t VertexElementBumpOffset = 0;
@@ -569,6 +718,21 @@ namespace Extrinsic::Graphics
 
         RHI::BufferHandle MaterialBuffer{};
         std::uint32_t MaterialCapacity = 0;
+
+        [[nodiscard]] std::uint64_t IssueGeometryContentRevision() noexcept
+        {
+            const std::uint64_t revision = NextGeometryContentRevision++;
+            assert(revision != 0u &&
+                   "GpuWorld geometry content revision exhausted");
+            if (NextGeometryContentRevision == 0u)
+            {
+                // A wrap would break the monotonic residency contract. This is
+                // unreachable for practical world lifetimes; retain a nonzero
+                // sentinel in release builds rather than issuing revision 0.
+                NextGeometryContentRevision = revision;
+            }
+            return revision;
+        }
 
         [[nodiscard]] bool AllocateBuffer(RHI::BufferManager::BufferLease& outLease,
                                           const RHI::BufferDesc& desc)
@@ -878,6 +1042,7 @@ namespace Extrinsic::Graphics
         m_Impl->DirtyBounds.assign(desc.MaxInstances, true);
         m_Impl->DirtyGeometryRecord.assign(desc.MaxGeometryRecords, true);
         m_Impl->DirtyLights = true;
+        m_Impl->NextGeometryContentRevision = 1u;
 
         if (device.IsOperational() && !m_Impl->AllocateGpuResources())
         {
@@ -959,6 +1124,7 @@ namespace Extrinsic::Graphics
         m_Impl->ManagedCompactionBytesMoved = 0;
         m_Impl->ManagedCompactionCount = 0;
         m_Impl->StaleCompactionRelocationCount = 0;
+        m_Impl->NextGeometryContentRevision = 1u;
         m_Impl->MaterialBuffer = {};
         m_Impl->MaterialCapacity = 0;
 
@@ -1109,18 +1275,21 @@ namespace Extrinsic::Graphics
             managedVertexBytes,
             positionBytes,
             cursor,
+            kPhysicalStorageScalarAddressAlignment,
             positionOffset,
             positionByteCount);
         cursor = AppendChannelBytes(
             managedVertexBytes,
             texcoordBytes,
             cursor,
+            kPhysicalStorageTexcoordAddressAlignment,
             texcoordOffset,
             texcoordByteCount);
         cursor = AppendChannelBytes(
             managedVertexBytes,
             normalBytes,
             cursor,
+            kPhysicalStorageScalarAddressAlignment,
             normalOffset,
             normalByteCount);
         if (!desc.PackedVertexColors.empty())
@@ -1205,9 +1374,13 @@ namespace Extrinsic::Graphics
         allocation.LineIndexByteCount = lineSize;
         allocation.VertexCount = desc.VertexCount;
         allocation.VertexElementOffset = m_Impl->VertexElementBumpOffset;
+        allocation.StorageLane = GeometryStorageLane::UniformSoA;
         allocation.VertexBytes = std::move(managedVertexBytes);
         allocation.SurfaceIndices.assign(desc.SurfaceIndices.begin(), desc.SurfaceIndices.end());
         allocation.LineIndices.assign(desc.LineIndices.begin(), desc.LineIndices.end());
+        RefreshResidencyFingerprints(allocation);
+        allocation.ContentRevision =
+            m_Impl->IssueGeometryContentRevision();
 
         m_Impl->RewriteGeometryRecord(h.Index);
 
@@ -1247,6 +1420,18 @@ namespace Extrinsic::Graphics
         if (desc.VertexCount != allocation.VertexCount ||
             surfSize != allocation.SurfaceIndexByteCount ||
             lineSize != allocation.LineIndexByteCount)
+        {
+            result.Status = GeometryChannelUpdateStatus::FullUploadRequired;
+            return result;
+        }
+        if (!std::equal(
+                desc.SurfaceIndices.begin(),
+                desc.SurfaceIndices.end(),
+                allocation.SurfaceIndices.begin()) ||
+            !std::equal(
+                desc.LineIndices.begin(),
+                desc.LineIndices.end(),
+                allocation.LineIndices.begin()))
         {
             result.Status = GeometryChannelUpdateStatus::FullUploadRequired;
             return result;
@@ -1417,6 +1602,9 @@ namespace Extrinsic::Graphics
                 m_Impl->PendingManagedVertexChannelUploadBarriers.Color ||
                 result.UploadedChannels.Color;
         }
+        RefreshUpdatedResidencyFingerprints(allocation, channels);
+        allocation.ContentRevision =
+            m_Impl->IssueGeometryContentRevision();
         result.Status = GeometryChannelUpdateStatus::Updated;
         return result;
     }
@@ -1874,6 +2062,69 @@ namespace Extrinsic::Graphics
             return false;
         }
         outRecord = m_Impl->GeometryRecordsCpu[geometry.Index];
+        return true;
+    }
+
+    bool GpuWorld::TryGetGeometryResidencyView(
+        const GpuGeometryHandle geometry,
+        GpuGeometryResidencyView& outView) const noexcept
+    {
+        outView = {};
+        if (!m_Impl->GeometrySlots.Resolve(geometry) ||
+            geometry.Index >= m_Impl->GeometryRecordsCpu.size() ||
+            geometry.Index >= m_Impl->GeometryAllocations.size())
+        {
+            return false;
+        }
+
+        const ManagedGeometryAllocation& allocation =
+            m_Impl->GeometryAllocations[geometry.Index];
+        if (!allocation.Live ||
+            allocation.Generation != geometry.Generation)
+        {
+            return false;
+        }
+
+        outView.Record = m_Impl->GeometryRecordsCpu[geometry.Index];
+        outView.IndexBuffer = GetManagedIndexBuffer();
+        outView.ContentRevision = allocation.ContentRevision;
+        outView.PositionFingerprint = allocation.PositionFingerprint;
+        outView.SurfaceIndexFingerprint =
+            allocation.SurfaceIndexFingerprint;
+        outView.TexcoordFingerprint = allocation.TexcoordFingerprint;
+        outView.NormalFingerprint = allocation.NormalFingerprint;
+        outView.PositionByteCount = allocation.PositionByteCount;
+        outView.SurfaceIndexByteCount =
+            allocation.SurfaceIndexByteCount;
+        outView.TexcoordByteCount = allocation.TexcoordByteCount;
+        outView.NormalByteCount = allocation.NormalByteCount;
+        outView.VertexCount = allocation.VertexCount;
+        outView.SurfaceIndexCount =
+            static_cast<std::uint32_t>(
+                allocation.SurfaceIndices.size());
+        outView.StorageLane = allocation.StorageLane;
+        outView.SurfaceIndexFormat = RHI::Format::R32_UINT;
+        outView.SurfaceIndexElementBytes = sizeof(std::uint32_t);
+        outView.SurfaceIndexStrideBytes = sizeof(std::uint32_t);
+
+        if (allocation.PositionByteCount != 0u)
+        {
+            outView.PositionFormat = RHI::Format::RGB32_FLOAT;
+            outView.PositionElementBytes = kPositionElementBytes;
+            outView.PositionStrideBytes = kPositionElementBytes;
+        }
+        if (allocation.TexcoordByteCount != 0u)
+        {
+            outView.TexcoordFormat = RHI::Format::RG32_FLOAT;
+            outView.TexcoordElementBytes = kTexcoordElementBytes;
+            outView.TexcoordStrideBytes = kTexcoordElementBytes;
+        }
+        if (allocation.NormalByteCount != 0u)
+        {
+            outView.NormalFormat = RHI::Format::RGB32_FLOAT;
+            outView.NormalElementBytes = kNormalElementBytes;
+            outView.NormalStrideBytes = kNormalElementBytes;
+        }
         return true;
     }
 

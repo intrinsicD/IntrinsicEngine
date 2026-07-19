@@ -11031,6 +11031,12 @@ namespace Extrinsic::Runtime
                 engine.Services().Find<Assets::AssetService>();
             AssetImportPipeline* const assetImportPipeline =
                 engine.Services().Find<AssetImportPipeline>();
+            const RuntimeObjectSpaceNormalBakeProducerContext
+                objectSpaceNormalBake =
+                    assetImportPipeline != nullptr
+                        ? assetImportPipeline->
+                            GetObjectSpaceNormalBakeProducerContext()
+                        : RuntimeObjectSpaceNormalBakeProducerContext{};
             SandboxEditorDerivedJobCommandSurface derivedJobCommands{};
             if (derivedJobs != nullptr)
             {
@@ -11066,6 +11072,12 @@ namespace Extrinsic::Runtime
                     engine.GetWindow().GetFramebufferExtent().Width,
                     engine.GetWindow().GetFramebufferExtent().Height},
                 .Device = &engine.GetDevice(),
+                .ObjectSpaceNormalBakeQueue =
+                    objectSpaceNormalBake.Queue,
+                .ObjectSpaceNormalBakeBindingEpoch =
+                    objectSpaceNormalBake.BindingEpoch,
+                .ObjectSpaceNormalBakeDevice =
+                    objectSpaceNormalBake.Device,
                 .AssetImportCommands = SandboxEditorAssetImportCommandSurface{
                     .Import =
                         [assetImportPipeline](
@@ -13936,7 +13948,13 @@ namespace Extrinsic::Runtime
                 .Diagnostic = "Scene registry is unavailable.",
             };
         }
-        if (context.AssetService == nullptr)
+        const bool useObjectSpaceNormalBakeQueue =
+            context.ObjectSpaceNormalBakeQueue != nullptr &&
+            command.BindGeneratedTexture &&
+            command.TargetSemantic == ProgressiveSlotSemantic::Normal &&
+            command.SourceDomain == ProgressiveGeometryDomain::MeshVertex;
+        if (!useObjectSpaceNormalBakeQueue &&
+            context.AssetService == nullptr)
         {
             return SandboxEditorTextureBakeCommandResult{
                 .Status = SandboxEditorCommandStatus::AssetImportFailed,
@@ -13944,7 +13962,8 @@ namespace Extrinsic::Runtime
                 .Diagnostic = "Asset service is unavailable for generated texture payloads.",
             };
         }
-        if (context.Device == nullptr || !context.Device->IsOperational())
+        if (!useObjectSpaceNormalBakeQueue &&
+            (context.Device == nullptr || !context.Device->IsOperational()))
         {
             return SandboxEditorTextureBakeCommandResult{
                 .Status = SandboxEditorCommandStatus::InvalidVisualizationProperty,
@@ -13988,8 +14007,14 @@ namespace Extrinsic::Runtime
                 SelectedMeshTextureBakeContext{
                     .Scene = context.Scene,
                     .World = context.World,
+                    .BindingEpoch =
+                        context.ObjectSpaceNormalBakeBindingEpoch,
                     .AssetService = context.AssetService,
                     .CommandHistory = context.CommandHistory,
+                    .ObjectSpaceNormalBakeQueue =
+                        context.ObjectSpaceNormalBakeQueue,
+                    .ObjectSpaceNormalBakeDevice =
+                        context.ObjectSpaceNormalBakeDevice,
                 },
                 request);
 

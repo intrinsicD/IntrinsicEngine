@@ -25,13 +25,21 @@ Graphics-owned bridge between `Assets::AssetId` and GPU resources.
   generated `AssetId`, output `TextureDesc`, and sampler policy; the cache
   allocates the cache-owned texture/bindless view immediately, keeps the entry
   pending while GPU commands are in flight, and promotes it to `Ready` only when
-  `Tick(currentFrame, ...)` reaches the recorded ready frame. The texture
-  descriptor must include `Sampled | ColorTarget`; the future dilation path may
-  add `Storage` but the cache does not infer that usage.
-  `FailGpuProducedTexture(id, generation)` retires only the exact pending
-  generation opened by `BeginGpuProducedTexture`; it fails closed for absent,
-  already-promoted, transfer-owned, or mismatched generations, so late failure
-  cleanup cannot recreate a destroyed asset or retire a replacement.
+  `Tick(currentFrame, ...)` reaches the recorded ready frame. This is a
+  conservative frame contract rather than a fence: the runtime normal-bake
+  producer records `issueFrame + framesInFlight`. The texture descriptor must
+  include `Sampled | ColorTarget`; the production normal-bake path additionally
+  requests `TransferSrc` for acceptance readback, while dilation uses a separate
+  sampled/color-target scratch texture. The cache never infers either usage.
+  `SetGpuProducedTextureReadyFrame(id, generation, frame)` and
+  `FailGpuProducedTexture(id, generation)` affect only the exact pending
+  generation opened by `BeginGpuProducedTexture`; both fail closed for absent,
+  already-promoted, transfer-owned, or mismatched generations, so a late
+  renderer ticket cannot stamp or retire a replacement. During replacement an
+  older current view may remain readable for snapshot lifetime, but it does not
+  make the new pending generation ready; consumers must compare
+  `GpuAssetView::Generation` with the submitted/proven generation before
+  binding.
 - KTX/KTX2 is not a current promoted residency path. `Asset.ImportRouter`
   recognizes the extensions, but `Asset.ModelTexturePayload` and
   `Runtime.AssetModelTextureIO` reject KTX/KTX2 with

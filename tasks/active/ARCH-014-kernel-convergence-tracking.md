@@ -16,8 +16,8 @@ depends_on:
 
 ## Non-goals
 - No implementation of the seams or extractions here — child tasks own that
-  work. Retired children remain convergence evidence; open children such as
-  `RUNTIME-129` own their implementation. This task
+  work. Retired children, including `RUNTIME-129`, remain convergence
+  evidence; open children own their implementation. This task
   tracks and enforces; it does not do their work.
 - No re-litigation of ADR-0024/ADR-0027 decisions (that is an ADR amendment,
   not this task).
@@ -89,13 +89,12 @@ depends_on:
   contradictory `RUNTIME-172`, and seeded only behavior-carrying children.
   The implementation graph converges through `RUNTIME-179`..`187` plus the
   retired `RUNTIME-188` scene-interaction split;
-  application lifecycle removal and `RUNTIME-129` operational bake may now
-  proceed inside their accepted owners. Retired `GRAPHICS-128` closed the
-  bake's shared-index-slice prerequisite, and `RUNTIME-183` supplies the
-  accepted private AssetWorkflow composition owner. The lifecycle and bake
-  leaves both gate the
-  later mechanism deletion audit, semantic auxiliary-surface cleanup, and
-  final representation/checker leaf.
+  application lifecycle removal may now proceed inside its accepted owner.
+  Retired `GRAPHICS-128` closed the bake's shared-index-slice prerequisite,
+  retired `RUNTIME-183` supplied the accepted private AssetWorkflow composition
+  owner, and retired `RUNTIME-129` now supplies the operational bake evidence.
+  The remaining lifecycle leaf gates the later mechanism deletion audit,
+  semantic auxiliary-surface cleanup, and final representation/checker leaf.
 
 ## Required changes
 - [ ] After each child seam/extraction merges, update the target-state

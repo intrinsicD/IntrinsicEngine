@@ -6422,3 +6422,55 @@ tree:
       Sandbox editor integration target built successfully and all six
       SandboxAppComposition tests passed.
     status: resolved
+  - id: N271
+    type: experiment
+    title: "Validate exact object-space normal bake GPU residency"
+    provenance: ai-executed
+    timestamp: "2026-07-19T22:22+02:00"
+    evidence:
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeSubmission.cppm"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeSubmission.cpp"
+      - "ninja -C build/ci -j1 src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Runtime.ObjectSpaceNormalBakeSubmission.cpp.o"
+      - "tools/ci/run_clean_workshop_review.sh . --strict"
+    result: >
+      Added one compact runtime validation result and free function that
+      compares an authoritative object-space normal bake identity with a live
+      GpuGeometryResidencyView before provider recording or completion
+      binding. The validator rejects missing or stale content revisions,
+      fingerprint/byte/count mismatches, non-UniformSoA storage, loose or
+      incorrect position/texcoord/normal/index layouts, missing managed index
+      residency, missing texcoord/normal device addresses, and inconsistent
+      shader-record counts. The focused C++23 module object compiled with
+      Clang 23, and the strict clean-workshop bundle reported no layering,
+      allowlist, task-policy, maturity, or document-link findings.
+    status: resolved
+  - id: N272
+    type: experiment
+    title: "Close RUNTIME-129 with live object-space normal bake readback"
+    provenance: ai-executed
+    timestamp: "2026-07-20T00:38+02:00"
+    also_depends_on: [N271]
+    evidence:
+      - "commit d2f838f2"
+      - "commit f3aacda9"
+      - "src/graphics/renderer/Graphics.GpuWorld.cpp"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeService.cpp"
+      - "tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "DISPLAY=:1 ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 120"
+      - "docs/reviews/2026-07-19-runtime-129-clean-workshop-review.md"
+    result: >
+      Completed the existing private queue/service path with authoritative
+      identity, collision-safe generated assets, exact cache-generation
+      provenance, live GpuWorld residency, retained bake resources,
+      default/editor producers, and transactional normal binding. A dynamic
+      CPU UV witness made the real Vulkan smoke expose an RG32 texcoord address
+      at base+36 even though SPIR-V loaded it with Aligned 8; per-channel
+      allocation alignment and fail-closed graphics/runtime validation fixed
+      the shifted GPU footprint. The complete CPU-supported selector passed
+      4,273/4,273 with one expected self-skip. The ASan+UBSan gpu+vulkan
+      selector passed 47/47 with zero skips, including nonzero shared-index
+      import/readback and the shutdown LeakSanitizer contract. Strict
+      structural and clean-workshop checks passed, and RUNTIME-129 retired at
+      Operational.
+    status: resolved

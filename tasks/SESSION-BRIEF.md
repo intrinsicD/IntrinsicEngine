@@ -15,12 +15,11 @@ the authoritative open/unblocked view.
 - blocked by `REVIEW-003`: `ASSETIO-009` — Loss-aware MaterialX subset import (tasks/backlog/assets/ASSETIO-009-loss-aware-materialx-subset-import.md)
 - blocked by `REVIEW-003`: `GEOM-066` — meshoptimizer v1.2 geometry oracle and adoption evidence (tasks/backlog/geometry/GEOM-066-meshoptimizer-v1-2-geometry-oracle.md)
 - blocked by `REVIEW-003`: `GEOM-067` — Memory-aware BVH and merged-node evidence (tasks/backlog/geometry/GEOM-067-memory-aware-bvh-merged-node-evidence.md)
-- blocked by `RUNTIME-129`: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/rendering/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
+- unblocked: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/rendering/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
 - blocked by `REVIEW-003`: `GRAPHICS-123` — Slang single-kernel gradient pilot (tasks/backlog/rendering/GRAPHICS-123-slang-single-kernel-gradient-pilot.md)
 - blocked by `REVIEW-003`: `GRAPHICS-124` — Slughorn world-space vector annotation proof (tasks/backlog/rendering/GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md)
 - blocked by `REVIEW-003`: `GRAPHICS-125` — Memory-priced cluster hierarchy evidence (tasks/backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md)
 - blocked by `REVIEW-003`: `GRAPHICS-126` — Bandwidth-priced frame-recipe trace model (tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
-- unblocked: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
 - unblocked: `RUNTIME-139` — Static AoS storage and shader operational path (tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds

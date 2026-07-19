@@ -42,7 +42,12 @@ namespace
 
     [[nodiscard]] std::uint64_t TriangleVertexByteCount()
     {
-        return VertexBytes().size_bytes();
+        constexpr std::uint64_t positionBytes =
+            kTriangleVerts.size() * sizeof(float) * 3u;
+        constexpr std::uint64_t texcoordBytes =
+            kTriangleVerts.size() * sizeof(float) * 2u;
+        return AlignUp(positionBytes, sizeof(float) * 2u) +
+            texcoordBytes;
     }
 
     [[nodiscard]] std::uint64_t TriangleVertexOffset(const std::uint32_t allocationIndex)

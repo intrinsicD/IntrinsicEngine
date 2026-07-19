@@ -48,6 +48,7 @@ import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.VisualizationSyncSystem;
+import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
@@ -817,8 +818,10 @@ namespace
                                     services
                                         .ObjectSpaceNormalBakeQueue;
                                 probe.BackendOperational =
-                                    services
-                                        .ObjectSpaceNormalBakeGraphicsBackendOperational;
+                                    services.ObjectSpaceNormalBakeDevice !=
+                                        nullptr &&
+                                    services.ObjectSpaceNormalBakeDevice->
+                                        IsOperational();
                                 return probe.Queue != nullptr
                                     ? Core::Ok()
                                     : Core::Err(

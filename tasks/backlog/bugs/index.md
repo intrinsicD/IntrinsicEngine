@@ -256,7 +256,8 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   contract. A deterministic three-frame-in-flight regression proves the cache
   remains uploading and the material remains unbound through issue+1/+2, then
   promotes and binds at issue+3. The existing graphics Vulkan bake/readback
-  passed on an RTX 3050; runtime `Operational` closure remains `RUNTIME-129`.
+  passed on an RTX 3050; retired `RUNTIME-129` now supplies the runtime
+  `Operational` closure.
 
 - Closed 2026-07-13: [`BUG-071` — Sim-systems registered during OnResolve bypass FinalizeForBoot](../../archive/BUG-071-onresolve-sim-systems-bypass-finalizeforboot.md).
   The module schedule now remains mutable through every resolve callback and

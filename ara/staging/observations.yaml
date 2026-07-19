@@ -718,3 +718,25 @@ observations:
     promoted_to: "logic/solution/architecture.md:A15"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O56
+    timestamp: "2026-07-20T00:38+02:00"
+    provenance: ai-executed
+    content: >
+      A physical-storage-buffer address published to a shader must satisfy the
+      alignment declared by the shader load itself; element format, stride,
+      and a nonzero BDA are insufficient. The object-space normal bake requires
+      RG32_FLOAT texcoord addresses aligned to eight bytes and RGB32_FLOAT
+      normal addresses aligned to four bytes, with both construction and
+      consumer validation failing closed on mismatch.
+    context: >
+      RUNTIME-129's real Vulkan readback showed a shifted UV footprint when
+      three RGB32 positions placed the texcoord channel at base+36 while the
+      generated SPIR-V used an Aligned 8 vec2 load. Commit d2f838f2 aligned
+      managed channels and added graphics/runtime rejection contracts; the
+      complete GPU selector then passed.
+    potential_type: constraint
+    bound_to: [N272]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K22"
+    crystallized_via: artifact-commitment
+    stale: false
