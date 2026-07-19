@@ -2,9 +2,9 @@ session:
   id: "2026-07-19_001"
   date: "2026-07-19"
   started: "2026-07-19T04:02+02:00"
-  last_turn: "2026-07-19T09:41+02:00"
-  turn_count: 2
-  summary: "Implemented and verified the app-composed RUNTIME-181 config-control and RUNTIME-172 scene-document modules; RUNTIME-172 remains active for root-owned integration and retirement."
+  last_turn: "2026-07-19T10:22+02:00"
+  turn_count: 3
+  summary: "Implemented and verified the app-composed RUNTIME-181 config-control and RUNTIME-172 scene-document modules, then hardened RUNTIME-172's participant-handle lifetime; root-owned merge and retirement remain."
 
 events_logged:
   - turn: 1
@@ -19,6 +19,12 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Extracted exact one-world scene-document/history ownership, passed 68 focused and 4,175 complete CPU tests with one capability skip, and reached the 33/11/2/22 Engine ratchet."
+  - turn: 3
+    type: experiment
+    id: "N268"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retained two exact Engine replacement-participant handles, proved transactional rollback and reinitialize cleanup, and passed 35 focused tests plus strict structural gates."
 
 ai_actions:
   - turn: 1
@@ -46,6 +52,14 @@ ai_actions:
       - "tests/contract/runtime/Test.SceneDocumentModule.cpp"
       - "docs/architecture/runtime.md"
       - "tasks/active/RUNTIME-172-extract-scene-document-module.md"
+  - turn: 3
+    action: "Hardened RUNTIME-172's temporary Engine transition adapters with exact typed-handle retention, transactional partial-registration rollback, post-announcement detachment, clean reinitialize coverage, and strict verification."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "tests/contract/runtime/Test.SceneDocumentModule.cpp"
 
 claims_touched: []
 
@@ -54,6 +68,8 @@ key_context:
     excerpt: "RUNTIME-181 requires Engine to retain boot recipe substrate without owning the optional live-control facade, while Sandbox composes and resolves one exact control module/service."
   - turn: 2
     excerpt: "RUNTIME-172 keeps document/history ownership in one optional active-world-bound module while narrow named participants preserve interaction and asset-handoff replacement ordering until their owning tasks land."
+  - turn: 3
+    excerpt: "The temporary Engine adapters retain only their provider plus two exact strong handles, roll back the first handle if the second registration fails, and detach after the shutdown announcement pump before reverse module teardown."
 
 open_threads:
   - "An owner may externalize the candidate stable contexts through branch protection, rulesets, or a merge queue; none is currently configured."
@@ -66,7 +82,7 @@ open_threads:
   - "Land the bounded CORE-008 benchmark report with the task's final verification and retirement evidence."
   - "Finish CORE-009 documentation, full CPU verification, and task retirement."
   - "Run RUNTIME-181's complete default CPU-supported integration gate, then review and retire the still-active task."
-  - "Integrate and review the clean RUNTIME-172 branch, then let the root owner retire the still-active task."
+  - "Merge the verified RUNTIME-172 participant-retention commit, then let the root owner retire the still-active task."
 
 ai_suggestions_pending:
   - "Let StructSplat and Prospect owners merge the pushed refresh branches through each repository's normal integration policy."

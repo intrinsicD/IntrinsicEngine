@@ -6353,3 +6353,36 @@ tree:
       expectations or production behavior, made all five deterministic reruns
       pass.
     status: resolved
+  - id: N268
+    type: experiment
+    title: "Retain and release RUNTIME-172 replacement participants"
+    provenance: ai-executed
+    timestamp: "2026-07-19T10:22+02:00"
+    also_depends_on: [N267]
+    evidence:
+      - "commit 064336f292f387b8dbc2e27030bfd8a1d30e1a89"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "tests/contract/runtime/Test.SceneDocumentModule.cpp"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "cmake --build --preset ci --target IntrinsicRuntimeContractTests --parallel 4"
+      - "ctest --test-dir build/ci --output-on-failure -R 'SceneDocumentModule|RuntimeEngineLayering' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120"
+      - "tools/ci/run_clean_workshop_review.sh . --strict"
+      - "python3 tools/repo/check_kernel_convergence.py --root . --strict"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+    result: >
+      Replaced discarded Engine transition registrations with one
+      implementation-only owner holding the document provider and exactly two
+      typed participant handles. Registration is transactional: a rejected
+      asset-handoff participant releases the already-registered interaction
+      participant before fail-closed termination. Normal shutdown pumps
+      RuntimeShutdownAnnounced, releases both handles, resets retention, and
+      only then invokes reverse module shutdown. A real conflicting-name boot
+      proved rollback, a two-boot Engine test proved clean reinitialization,
+      and a structural contract fixed the announcement-to-release ordering
+      without adding public Engine imports or getters. Fresh and post-rebase
+      RuntimeContract builds passed; the focused CTest cohort passed 35 of 35.
+      Clean-workshop and structural gates passed, convergence stayed
+      33/11/2/22, and strict layering reported zero violations. RUNTIME-172
+      remains active for root-owned merge review and retirement.
+    status: resolved

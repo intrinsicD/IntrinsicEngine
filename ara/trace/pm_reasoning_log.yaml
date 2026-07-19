@@ -1032,3 +1032,11 @@ entries:
       - "Did not stage or crystallize a generalized observation: this slice implements the selected ADR-0026/ADR-0027 responsibility split and leaves the broader module posture in O08 and O09 unresolved."
       - "Kept O08, O09, O13, and O38 unpromoted and non-stale because current open threads still reference module posture, model-training interpretation, and actual Progressive Poisson Vulkan parity; no contradiction or closure signal appeared."
       - "Left integration and retirement to the root owner as explicitly required."
+  - turn: "2026-07-19_001#3"
+    notes:
+      - "Routed the RUNTIME-172 participant-retention correction and verification as experiment N268 because it produced bounded lifecycle, rollback, reinitialize, and structural evidence for the still-active task."
+      - "Recorded exact two-handle ownership, partial second-registration rollback, post-announcement release ordering, 35 focused CTest passes, the 33/11/2/22 snapshot, and zero layering violations."
+      - "Rejected a proposed post-announcement duplicate-name registration probe because SceneDocumentModule intentionally stops accepting registrations during the announcement pump; weakening quiescence or coupling tests to slot generations would be a worse contract."
+      - "Did not stage or crystallize a generalized observation: this is a bounded lifetime hardening of N267's already-selected participant contract."
+      - "Kept O08, O09, O13, and O38 unpromoted and non-stale; no closure, contradiction, or stale signal appeared."
+      - "Left merge review and RUNTIME-172 retirement to the root owner and did not start RUNTIME-188."
