@@ -24,6 +24,19 @@ module, startup recipe-file behavior remains active in `Engine::Initialize()`,
 but editor recipe and engine-config command surfaces truthfully remain
 unavailable with null state and empty callbacks.
 
+Sandbox also composes the optional `Runtime::SceneDocumentModule`. The
+presentation-free editor facade resolves that exact module and its exact owned
+`Runtime::EditorCommandHistory` through `Engine::Services()`; it never calls an
+Engine document/history/scene getter. `File / Scene` save/open/new/close,
+last-file-event presentation, dirty state, undo, and redo therefore share the
+module's one validated active-world binding. Sandbox also composes
+`AsyncWorkModule`, so save/open use queued snapshot/parse work and commit only
+after main-thread generation/world/registry revalidation. At the runtime
+contract the async capability remains optional: synchronous document operations
+still work without it, while queued operations return `InvalidState`.
+Omitting `SceneDocumentModule` leaves Engine and the active world operational
+and makes the document/history callbacks explicitly unavailable.
+
 The app-owned `Sandbox.Editor.Controller` owns `Sandbox.Editor.Shell` and all
 panel-family lifetimes behind one attach/detach interface. Sandbox composes the
 optional `Runtime.EditorUiModule`; the shell resolves its Engine-free
@@ -174,10 +187,11 @@ durable `StableId`, `Selection::SelectableTag`, and white
 `VisualizationConfig`. Reference content renders without `CameraModule`.
 
 The default module list explicitly composes `AsyncWorkModule`, `CameraModule`,
-`ClusteringModule`, and `EditorUiModule`. Camera remains optional at the
-runtime contract: when omitted, Sandbox policy registration omits `F` and
-autofocus, editor camera controls report unavailable, and import auto-selection
-plus non-camera behavior continue.
+`ClusteringModule`, `EditorUiModule`, and `SceneDocumentModule`. Camera remains
+optional at the runtime contract: when omitted, Sandbox policy registration
+omits `F` and autofocus, editor camera controls report unavailable, and import
+auto-selection plus non-camera behavior continue. Scene document remains
+independently optional as described above.
 
 ## Build presets
 

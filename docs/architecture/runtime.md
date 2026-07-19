@@ -145,6 +145,20 @@ module-specific branch or forwarding object. The capability is optional: an
 application that omits the module still performs transfer collection followed
 by the asset tick.
 
+`Extrinsic.Runtime.SceneDocumentModule` is the optional app-composed document
+owner. Registration binds the exact active `{WorldHandle, Registry*}` and
+publishes the concrete module plus its exact owned `EditorCommandHistory`;
+resolution optionally discovers `StreamingExecutor`. Document path, last file
+event and sequence, history, and queued-operation handles belong to one binding
+epoch. A direct active-handle or registry mismatch advances the epoch, cancels
+owned tasks, and resets that complete durable state before rebinding. There is
+no per-world cache, so switching away and back never restores path, history, or
+event identity. Shutdown announcement closes document operations, invalidates
+module generation and binding epoch, and drains task ownership while dependent
+participants may still release their exact registration handles before reverse
+module teardown. Omitting the module leaves Engine and the active world
+operational but publishes no document or history capability.
+
 `Extrinsic.Runtime.CameraModule` is the optional app-composed global viewport
 owner. During registration it binds `WorldRegistry::ActiveWorld()`, publishes
 the exact `CameraControllerRegistry`, subscribes to active-world change and
@@ -412,14 +426,16 @@ world.
 
 Active-world asset-import and scene-document operations additionally capture
 the submission `{WorldHandle, Scene::Registry*}` pair on the main thread.
-Their apply callbacks use that captured registry only after confirming the
-same generation-qualified world is still active, `WorldRegistry::Get(world)`
-still resolves to the captured registry, and the active-scene binding epoch
-has not changed. The epoch makes an away-and-back switch observable even when
+Asset-import apply validates the pipeline binding as before.
+`SceneDocumentModule` queued callbacks capture only weak shared module state
+plus owned operation state, module generation, binding epoch, world, and
+registry identity. They first forget their owned task and then directly compare
+`WorldRegistry::ActiveWorld()` and `WorldRegistry::Get(world)` immediately
+before any commit. The epoch makes an away-and-back switch observable even when
 the world handle and scene address are equal again. An active-world switch
-without retirement therefore fails the operation with `InvalidState`; decoded
-work cannot be redirected into the new active scene or mutate its selection,
-handoff, focus, lookup, or document history sidecars.
+without retirement therefore suppresses the stale scene callback; decoded work
+cannot be redirected into the new active scene or mutate its path, event, or
+history. No callback captures `this` or a raw document-state pointer.
 
 Derived-job cancellation is terminal and authoritative. If a running worker
 returns an error after cancellation, neither worker-result bookkeeping nor the
@@ -455,26 +471,44 @@ backend/runtime breadcrumb path, but runtime frame control does not branch on
 Vulkan diagnostics.
 
 Shutdown is deterministic and runs through `ExecuteShutdownContract`: stop
-running, wait idle, application shutdown, streaming shutdown/drain, scene
-teardown, asset/GPU-asset handoff teardown, streaming state teardown, frame graph
-teardown, render-extraction plus renderer shutdown, device shutdown, window
-destruction, scheduler shutdown, and initialized-state clear. The Dear ImGui
-adapter is detached before this contract while the window and overlay system are
-still live.
+running, wait idle, application shutdown, then announce runtime shutdown and
+run reverse module teardown while dependencies are live; afterward destroy the
+scene, asset/GPU-asset handoffs, frame graph, render-extraction plus renderer,
+device, window, and scheduler, then clear initialized state. The announcement
+lets composed modules invalidate work and detach participant handles before
+ordinary reverse shutdown. The Dear ImGui adapter is detached before this
+contract while the window and overlay system are still live.
 
 ## Scene Replacement Lifecycle
 
 Scene load/new/close operations are runtime-owned lifecycle transitions.
-`Engine::GetSceneDocument().LoadSceneFromPath(...)` deserializes into a
-temporary `ECS::Scene::Registry`; only a successful parse reaches the live
-scene. Before replacement, `Extrinsic.Runtime.SceneDocument` drains
-scene-local sidecars through
-`RenderExtractionCache::ClearSceneState(...)`, clears selected/hovered/pending
-pick state through `SelectionController::ClearSceneState(...)`, disconnects the
-stable-entity component-event hooks, and resets the refined-primitive cache.
-Load then swaps in the parsed registry, reconnects the hooks, and rebuilds
-`StableEntityLookup` once at the replacement boundary; new/close clear the live
-registry and lookup before reconnecting hooks on the empty registry.
+`SceneDocumentModule::LoadSceneFromPath(...)` deserializes into a temporary
+`ECS::Scene::Registry`; a parse failure invokes no participant and leaves the
+live registry, path, event, and history unchanged. For a successful load, new,
+or close, the module snapshots live strong-handle registrations in
+name-then-registration order. It advances the binding epoch, invokes every
+`BeforeReplace` callback while the outgoing registry is live, clears or moves
+the replacement into that registry, invokes every `AfterReplace` callback
+against the rebound registry, and only then resets the exact owned history.
+The callbacks are synchronous `void` functions: no queued replacement event or
+invented rollback protocol exists.
+
+Two transitional participants preserve independently landing ownership slices.
+`RUNTIME-188.EngineInteractionTransition` clears selection and refined readback
+state and disconnects stable lookup before replacement, then rebuilds/rebinds
+the lookup afterward. `RUNTIME-183.EngineAssetHandoffTransition` clears render
+extraction, bake, and residency borrowers before replacement, then reconstructs
+the exact active-world handoffs and import dependencies. Each callback captures
+only its named long-lived objects, never `Engine`, `EngineSetup`, a dependency
+aggregate, or a raw scene pointer. `RUNTIME-188` and `RUNTIME-183` retire these
+adapters when those owners become composed modules.
+
+Active-world Maintenance is not a document replacement. Engine immediately
+clears the same narrow outgoing sidecars, refreshes the active scene pointer,
+and rebinds its current borrowers in that Maintenance pass. Separately, every
+public document operation validates the module's cached world and registry
+against `WorldRegistry`; a mismatch resets the one document binding without
+resurrecting state from the former world.
 
 Scene JSON remains backend-neutral. Supported persistence is limited to current
 sandbox-authoring CPU state: metadata names, stable ids, transforms, hierarchy,
