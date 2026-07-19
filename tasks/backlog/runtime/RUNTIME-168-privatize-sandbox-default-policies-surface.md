@@ -17,6 +17,11 @@ maturity_target: Operational
 - 2026-07-19 contract amendment: Sandbox policy composition now resolves the
   audited `SceneDocumentModule` and `SceneInteractionModule` split rather than
   a combined scene-editing owner. Implementation remains open.
+- 2026-07-19 readiness correction: primitive-view controls are authoritative
+  ECS `RenderEdges` / `RenderPoints` scene components, not
+  `SceneInteractionModule` state. Existing Sandbox commands continue to author
+  them through the scene/history path; this task must not resolve or invent an
+  interaction primitive-view capability.
 
 ## Goal
 - Replace the exported, Engine-bound
@@ -43,18 +48,20 @@ maturity_target: Operational
   existing service surfaces during app composition without an Engine facade or
   a new cross-domain wrapper.
 - Document/history policies resolve `SceneDocumentModule` or its exact
-  published `EditorCommandHistory`; selection, lookup, gizmo, and
-  primitive-view policies resolve `SceneInteractionModule` or its exact
-  published `SelectionController`. The app glue must not recombine them into a
-  scene-editing service bundle.
+  published `EditorCommandHistory`; selection, lookup, and gizmo policies
+  resolve `SceneInteractionModule` or its exact published
+  `SelectionController`. Primitive-view/render-hint commands author ECS
+  `RenderEdges` / `RenderPoints` through the resolved scene and command history,
+  not through an interaction service. The app glue must not recombine these
+  capabilities into a scene-editing service bundle.
 - This task is app policy wiring, not a seventh durable runtime owner.
 
 ## Required changes
 - [ ] Inventory each default registration/unregistration and map it to the
       owning module service: asset import/postprocess, camera focus,
       `SceneDocumentModule` history/document behavior,
-      `SceneInteractionModule` selection/gizmo/primitive-view behavior,
-      editor visibility/input, or config.
+      `SceneInteractionModule` selection/gizmo behavior, ECS scene/history
+      render-hint authoring, editor visibility/input, or config.
 - [ ] Move the exported policy declarations to private runtime/app composition
       glue, or fold each registration next to the Sandbox composition call
       that owns it.
