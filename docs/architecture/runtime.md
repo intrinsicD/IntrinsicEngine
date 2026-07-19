@@ -63,8 +63,12 @@ Runtime modules compose through `Engine::AddModule(...)` before
 `IRuntimeModule::OnRegister(EngineSetup&)`, then invokes every
 `IRuntimeModule::OnResolve(EngineSetup&)` after the two-phase
 `ServiceRegistry` has all provided services. `EngineSetup` exposes only the
-kernel command, event, job, world, service, sim-system, and frame-hook seams; it
-does not expose `Engine&`. Module sim systems join the fixed-step `FrameGraph`
+kernel command, event, job, world, service, sim-system, generic frame-hook, and
+typed viewport-input-hook seams; it does not expose `Engine&`. The typed
+viewport context is separate from the six `FramePhase` values and from
+`RuntimeFrameHookContext`: it exists only at the stable post-`UiEndCapture`,
+post-render-input-initialization, pre-gizmo insertion point. Module sim systems
+join the fixed-step `FrameGraph`
 with declared wait/signal labels so registration order does not decide pass
 order. Because every `SimSystemContext` exposes the live active world, runtime
 also declares `StructuralRead()` for every module sim system. Baseline or
@@ -141,6 +145,20 @@ module-specific branch or forwarding object. The capability is optional: an
 application that omits the module still performs transfer collection followed
 by the asset tick.
 
+`Extrinsic.Runtime.CameraModule` is the optional app-composed global viewport
+owner. During registration it binds `WorldRegistry::ActiveWorld()`, publishes
+the exact `CameraControllerRegistry`, subscribes to active-world change and
+world-destruction events, and contributes one typed viewport-input hook.
+Registry slots, poses, pending transitions, and the optional seed are bound to
+exactly one valid `WorldHandle`; every reset clears them before rebinding, even
+when handle bits compare equal. The hook repeats the handle check before it
+reads config, seed, or controller state, then lazily constructs the configured
+main controller, applies capture-gated motion, writes
+`RenderFrameInput::Camera`, and consumes the one-shot transition. Shutdown
+withdraws the exact registry and resets it invalid. Omitting the module leaves
+camera output untouched and does not affect generic input actions, import
+selection, non-camera editor models, or reference-content extraction.
+
 The frame order is:
 
 1. poll platform events and handle minimized/resize skip paths;
@@ -178,9 +196,12 @@ The frame order is:
    `EditorUiModule` opens the ImGui frame in `UiBegin`, draws registered
    contributions in `UiBuild`, and closes the frame plus writes capture in
    `UiEndCapture`;
-8. build `Graphics::RenderFrameInput`, update the active camera controller,
-   dispatch registered input actions, drain one coalesced selection pick, and
-   run runtime-module `BeforeExtraction` hooks;
+8. build `Graphics::RenderFrameInput`, dispatch deterministic typed
+   viewport-input hooks (Camera when composed), then drive gizmo/picking and
+   dispatch registered generic input actions before runtime-module
+   `BeforeExtraction` hooks. The typed dispatch runs after the completed
+   editor-capture snapshot and before every viewport consumer; it is not a
+   seventh generic frame phase;
 9. execute the render-frame contract: begin frame, runtime render extraction,
    renderer world extraction, prepare, execute, and end frame;
 10. present the completed frame;
@@ -214,8 +235,9 @@ merged into the menu tree without a fixed runtime enum or draw-switch table.
 The frame loop owns one `EditorInputCaptureSnapshot`, resets it at frame
 start, and lends the same value by reference to every hook context.
 `EditorUiModule` copies the adapter's completed capture into that value only
-after `EndFrame`; camera, gizmo, picking, input actions, and later hooks consume
-the same snapshot rather than reading ImGui capture flags independently.
+after `EndFrame`; the typed camera hook, gizmo, picking, input actions, and
+later hooks consume the same snapshot rather than reading ImGui capture flags
+independently.
 Omitting the module leaves the value unclaimed and all ImGui pacing counters
 zero. Its ImGui context owns a paired ImPlot context.
 `Extrinsic.Runtime.EditorPropertyWidgets` keeps scalar-property selector and
@@ -302,9 +324,13 @@ remains the only place that mutates imported ECS or asset state. Once the import
 is materialized, ordered import-completed handlers receive the created entity
 span plus an optional focus target. Sandbox/default composition installs the
 current direct-mesh generated-normal processor, import authoring defaults,
-focus-on-import handler, and auto-select behavior through
+auto-select behavior, optional focus-on-import, and optional `F` action through
 `Extrinsic.Runtime.SandboxDefaultPolicies`; a bare `Engine` with no
-registrations still materializes geometry without those policies.
+registrations still materializes geometry without those policies. The app
+passes its one optional exact `CameraControllerRegistry` lookup into policy
+registration. Import-completed services contain no camera pointer: with the
+registry absent, the handler still selects the first valid entity and simply
+skips autofocus.
 Model-scene imports use the same contract: every primitive leaf is authored as
 a mesh in deterministic scene order, then exactly one model-scene completion
 receives only those leaves and an aggregate focus target enclosing their finite
@@ -343,6 +369,24 @@ destruction pass; if no active scene exists, the borrowers and lookups are
 detached. Higher-level preview/readiness/switch UX policy is deliberately not in
 the registry; later runtime modules compose those behaviors through the kernel
 events, jobs, and explicit world handles.
+
+Camera state is not one of those Engine rebinding paths. `CameraModule`
+observes `ActiveWorldChanged` and resets the exact published registry to an
+empty binding for the new handle; `WorldWillBeDestroyed` invalidates the
+binding when it names the current world. The viewport hook also compares its
+active handle with `BoundWorld()` before every config/seed/controller read, so
+delayed event pumping cannot retain an old pose. No per-world cache exists and
+switching away and back never restores state.
+
+Initial reference content is application policy. Sandbox reads the boot-time
+`ReferenceSceneConfig` during application initialization, calls the two plain
+`BootstrapReferenceScene` / `TeardownReferenceScene` functions, and retains
+the exact `{owning WorldHandle, population}` record. It creates content at
+most once per initialization, optionally gives that population's seed to the
+camera registry, and tears down only through the stored original world when
+still live. A retired original world is a safe no-op; the active replacement
+world is never used as a substitute. Generic Engine neither interprets this
+config section nor owns reference population/seed state.
 
 The global `AsyncWorkModule` reacts to `WorldWillBeDestroyed` at the next
 main-thread event pump. Every production streaming/derived descriptor carries
@@ -391,15 +435,18 @@ largest enclosing extent `max_i(|C − Cᵢ| + Rᵢ)`, so every target is contai
 then routes it to a controller slot via `ICameraController::Focus(...)` and marks
 an explicit camera transition. `FocusCameraOnEntities(...)` focuses any object
 set; `FocusCameraOnSelection(...)` focuses the current `SelectionController`
-selection. Phase 4 of `RunFrame` dispatches registered input actions after the
+selection. Phase 8 of `RunFrame` dispatches registered input actions after the
 pre-render transform/bounds flush (`FlushPreRenderTransformState`, BUG-024), so
 focus actions read `World::Bounds` already refreshed for this frame's transform
 edits. The sandbox default action binds the `F` ("focus") key edge to the
-selection wrapper for the `Main` slot when installed by sandbox/default
-composition, suppresses it while Dear ImGui owns the keyboard, and rebuilds the
-render camera after a successful focus so the reframed view reaches extraction
-the same frame. The per-controller framing distance math is unchanged and
-remains owned by the controllers
+selection wrapper for the `Main` slot only when Sandbox supplied an optional
+camera registry during policy registration. Its callback captures that exact
+registry; the generic `RuntimeInputActionServices` aggregate has no camera
+field. The action suppresses itself while Dear ImGui owns the keyboard and
+rebuilds the render camera after a successful focus so the reframed view
+reaches extraction the same frame. Without a camera module, `F` is absent
+while unrelated actions still dispatch. The per-controller framing distance
+math is unchanged and remains owned by the controllers
 (`Extrinsic.Runtime.CameraControllers`).
 
 Operational promotion is gated on `RHI::IDevice::IsOperational()` and renderer

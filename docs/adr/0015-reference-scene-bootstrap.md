@@ -1,13 +1,46 @@
 # ADR 0015 — Runtime Reference Scene Bootstrap
 
-- **Status:** Accepted
+- **Status:** Superseded in part by
+  [ADR-0027](0027-right-sized-runtime-composition.md) / `RUNTIME-180`
 - **Date:** 2026-05-17
-- **Owners:** Runtime composition (`Extrinsic.Runtime.ReferenceScene`, `Engine::Initialize` integration), App (`Sandbox` config selection)
-- **Related tasks:** [`tasks/done/GRAPHICS-029`](../../tasks/archive/GRAPHICS-029-runtime-reference-scene-bootstrap.md), [`GRAPHICS-029A`](../../tasks/archive/GRAPHICS-029A-reference-scene-skeleton.md), [`GRAPHICS-029B`](../../tasks/archive/GRAPHICS-029B-triangle-provider-and-camera.md), [`tasks/done/GRAPHICS-080`](../../tasks/archive/GRAPHICS-080-enable-promoted-vulkan-by-default.md)
+- **Owners:** Runtime content helper (`Extrinsic.Runtime.ReferenceScene`), App
+  (`Sandbox` bootstrap/teardown and optional camera-seed handoff)
+- **Related tasks:** [`tasks/done/GRAPHICS-029`](../../tasks/archive/GRAPHICS-029-runtime-reference-scene-bootstrap.md), [`GRAPHICS-029A`](../../tasks/archive/GRAPHICS-029A-reference-scene-skeleton.md), [`GRAPHICS-029B`](../../tasks/archive/GRAPHICS-029B-triangle-provider-and-camera.md), [`tasks/done/GRAPHICS-080`](../../tasks/archive/GRAPHICS-080-enable-promoted-vulkan-by-default.md), [`RUNTIME-180`](../../tasks/active/RUNTIME-180-extract-camera-module.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`src/runtime/README.md`](../../src/runtime/README.md), [`src/app/Sandbox/README.md`](../../src/app/Sandbox/README.md)
 - **Supersedes:** none. Extracted from the `## Reference scene bootstrap` section in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/archive/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0013](0013-ecs-renderable-residency-bridge.md) records the ECS-renderable residency bridge that the reference scene's entities feed into. [ADR-0014](0014-procedural-source-residency-bridge.md) records the procedural-source residency bridge that early `TriangleProvider` slices exercised. [ADR-0005](0005-vulkan-operational-readiness-gate.md) records the Vulkan operational truth table that governs which backend actually runs when the reference sandbox launches with `Render.EnablePromotedVulkanDevice = true`.
-- **Status update:** RUNTIME-097 (2026-06-07) supersedes the default triangle's procedural-source detail: `TriangleProvider` now authors the default `ReferenceTriangle` as selectable mesh-domain `GeometrySources` with a durable `StableId` and white `VisualizationConfig`. The runtime-owned provider, registry, camera seed, no-GPU-typed-ECS-state rule, and app/runtime boundary in this ADR remain in force.
+- **Status update:** RUNTIME-097 (2026-06-07) superseded the default
+  triangle's procedural-source detail. `RUNTIME-180` (2026-07-19) then
+  superseded the provider/registry, Engine-owned lifecycle, and rejection of
+  app-owned bootstrap. The content and layering contracts remain in force.
+
+## RUNTIME-180 amendment
+
+ADR-0027 classifies initial reference content as application bootstrap rather
+than kernel behavior. `RUNTIME-180` applies that decision:
+
+- `Extrinsic.Runtime.ReferenceScene` exports only
+  `ReferenceSceneEntity` / `ReferenceScenePopulation`,
+  `BootstrapReferenceScene(selector, scene)`, and
+  `TeardownReferenceScene(scene, population) noexcept`.
+- The triangle constructor is private. The public provider interface,
+  `TriangleProvider`, provider registry, default-registration helpers, camera
+  finalization helper, and `ReferenceSceneControl` are retired.
+- Generic `Engine` does not interpret `ReferenceSceneConfig`, retain an
+  installed flag/population/seed, or expose reference-scene facades.
+- Sandbox bootstraps enabled reference content at most once during application
+  initialization, retains the exact owning `WorldHandle`, and tears down only
+  through that original world when it is still live. A retired original world
+  is a safe no-op and a replacement world is never mutated.
+- Sandbox optionally hands `population.Camera` to the exact
+  app-composed `CameraControllerRegistry`. Reference content remains visible
+  and selectable when `CameraModule` is omitted.
+
+The remainder of this ADR records the historical GRAPHICS-029 decision. Where
+it assigns lifecycle to Engine, requires providers/registry, or rejects
+app-owned bootstrap, this amendment and ADR-0027 take precedence. The
+single-entity content shape, CPU-only ECS state, and strict no-RHI/no-renderer
+imports remain authoritative.
 
 ## Context
 
@@ -139,7 +172,10 @@ Follow-up tasks required: none from this ADR. `GRAPHICS-029-Impl-C` (additional 
 
 ## Alternatives Considered
 
-- **App-owned reference scene flip.** Rejected per §1: would force every app to know about `ReferenceScene::Enabled` and would defeat the runtime / app boundary. The helper that bundles the flips lives in runtime config (`CreateReferenceEngineConfig`) and apps choose whether to call it.
+- **App-owned reference scene flip.** Historically rejected per §1.
+  Superseded by ADR-0027/`RUNTIME-180`: the config value remains in the shared
+  boot schema, but the app that chooses reference content owns its bootstrap
+  and original-world teardown.
 - **Asset-backed reference geometry.** Rejected per §2: would couple the reference scene to `GpuAssetCache` lifetime and asset-event plumbing, neither of which is needed to produce a visible triangle. Procedural geometry through [ADR-0014](0014-procedural-source-residency-bridge.md) is simpler and exercises the same residency bridge skeleton.
 - **GPU-typed components on the reference entity.** Rejected per §2: violates the [ADR-0013](0013-ecs-renderable-residency-bridge.md) `ecs → core` invariant; residency state stays in the runtime sidecar.
 - **Direct camera-controller wiring at bootstrap.** Rejected per §3: the `CameraControllers` umbrella does not exist yet; the provider seeds a `CameraViewInput` value that the future umbrella can adopt without contract change.

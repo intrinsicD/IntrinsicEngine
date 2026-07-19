@@ -43,7 +43,7 @@ this table. If it does not fit a row, that is a signal to revisit ADR-0024,
 | --- | --- | --- |
 | A user/UI action that *changes state* (import, save, bake, switch world, apply config, run an algorithm) | a **command** handled by a module | `Commands().Enqueue(XRequested{...})`; drained pre-sim (D5) |
 | "When X happens, always do Y" (refresh a visualization after an attribute changes) | an **event reaction** in a module | `Events().Subscribe<XChanged>(...)` (D6); never a chain |
-| Per-frame / per-substep data-dependent work (ECS query, extraction, a pump) | the cohesive behavior owner | Register the smallest real phase hook/system the frame loop must iterate; add signal/DAG machinery only when interacting production systems require it (D1/ADR-0027) |
+| Per-frame / per-substep data-dependent work (ECS query, extraction, a pump) | the cohesive behavior owner | Register the smallest real phase hook/system the frame loop must iterate. `CameraModule` demonstrates a one-consumer typed viewport-input hook after capture/render-input setup and before gizmo/picking/actions; it does not widen the generic hook context or add a seventh phase. Add signal/DAG machinery only when interacting production systems require it (D1/ADR-0027) |
 | Background multi-frame compute (remesh, k-means, bake, readback) | a **job** | `Jobs().Submit(JobDesc{...})`; snapshot in, result committed at a pump (D8) |
 | A new render technique (overlay, fullscreen analysis, compute fill) | a built-in recipe pass while the vocabulary remains sufficient | Add validated recipe data and the graphics-owned implementation; propose extension registration only with the first real pass the built-in vocabulary cannot express (D10/ADR-0027) |
 | Deciding whether a click belongs to UI or the viewport | one frame-loop-owned capture value borrowed by each ephemeral hook context | Reset it once at frame start; EditorUi brackets the application tick with `UiBegin`/`UiBuild`/`UiEndCapture` and writes the value after `EndFrame`; later viewport behavior, any later hooks, and kernel input-action dispatch read the same value. Add precedence only after a second independent simultaneous claimant proves a conflict (D11/ADR-0027) |
@@ -74,8 +74,10 @@ re-exports. ADR-0027's 2026-07-18 classifier correction recognizes
 `Extrinsic.Runtime.WorldHandle` as kernel substrate. The `RUNTIME-179`,
 `RUNTIME-181`, and `RUNTIME-182` extractions then reduce the current exact
 snapshot to 39 plain imports / 17 domain imports / 2 re-exports / 28 public
-getter names. The fixed reference remains historical comparison evidence; the
-current snapshot carries no temporary debt.
+getter names. `RUNTIME-180` removes Engine camera/reference imports and facades,
+reducing the current exact snapshot to 35 plain imports / 13 domain imports /
+2 re-exports / 25 public getter names. The fixed reference remains historical
+comparison evidence; the current snapshot carries no temporary debt.
 
 ### Kernel seams exist (ADR-0024 D5–D11, amended by ADR-0027)
 
@@ -91,7 +93,8 @@ current snapshot carries no temporary debt.
       deliberately deferred until a non-expressible production pass exists
 - [x] One coherent input-capture snapshot — `UI-034` (done 2026-07-13 at
       `CPUContracted`; the completed editor-frame value gates camera, gizmo,
-      and registered actions; no priority chain exists)
+      and registered actions; `RUNTIME-180` routes optional camera work through
+      its typed post-capture viewport hook; no priority chain exists)
 
 ### Kernel is slim (measurable)
 
@@ -115,12 +118,12 @@ current snapshot carries no temporary debt.
 
 - [ ] `Runtime.Engine.cppm` contains only the exact imports required by its
       accepted kernel public surface and no unused plain imports
-      (**baseline 45; 2026-07-13 reference 43; current checked snapshot 39**).
+      (**baseline 45; 2026-07-13 reference 43; current checked snapshot 35**).
       ADR-0027 records the present final-surface candidate of 12 exact imports;
       that is an auditable allowlist derived from the remaining API, not a
       numerical budget or room for unrelated imports.
 - [ ] Domain (non-substrate) imports in `Runtime.Engine.cppm` = 0
-      (**baseline 27; 2026-07-13 reference 23; current checked snapshot 17**).
+      (**baseline 27; 2026-07-13 reference 23; current checked snapshot 13**).
       Measure by
       **allowlist**, not
       a blocklist of names:
@@ -133,7 +136,7 @@ current snapshot carries no temporary debt.
       kernel-substrate allowlist; the final checker measures the complement of
       exact allowed kernel getter names rather than treating all `GetX()` names
       alike (**baseline estimate 13 domain facades; current guard snapshots all
-      28 names pending that classifier**)
+      25 names pending that classifier**)
 - [ ] Domain re-exports from `Runtime.Engine.cppm` = 0; a retained re-export
       must be explicitly classified as kernel public surface
 - [x] No `entt::dispatcher::trigger` or direct dispatcher use in module code
@@ -161,8 +164,13 @@ current snapshot carries no temporary debt.
       owner today, with document/history/selection/lookup/readback/gizmo state
       keyed or reset by active `WorldHandle` on switch and destruction; the
       implementation must split if any ADR-0026 cohesion axis diverges
-- [ ] Camera — `RUNTIME-180`; global viewport/controller owner with
-      world-qualified target/reset state; reference content stays app bootstrap
+- [x] Camera — `RUNTIME-180`; app-composed global `CameraModule` publishes the
+      exact world-bound registry and contributes one typed viewport-input hook.
+      Reset/change/retirement/shutdown clear slots, poses, transitions, and
+      seed without per-world resurrection; Sandbox owns exactly-once
+      initial-world reference-content bootstrap and original-world teardown.
+      Engine names neither responsibility and omission leaves generic input,
+      import selection, and reference extraction operational
 - [ ] ConfigControl — `RUNTIME-181`; global validated preview/commit owner for
       config and registered app sections
 - [ ] AssetWorkflow — `RUNTIME-183`; global service/residency/import/bake owner
@@ -212,6 +220,9 @@ current snapshot carries no temporary debt.
    sets, undo history, or other domain state. Each extraction task must decide
    whether its durable composed state is world-scoped or global before exposing
    it through a narrow service; the rows above now record every decision.
+   `RUNTIME-180` closes Camera's decision: the module object is global, while
+   the exact registry's complete state is bound to one handle and reset rather
+   than cached across worlds.
 
 ## How this doc is used
 
