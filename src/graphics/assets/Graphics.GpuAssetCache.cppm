@@ -209,7 +209,11 @@ export namespace Extrinsic::Graphics
         Core::Result RequestUpload(const GpuTextureRequest& req);
         [[nodiscard]] Core::Expected<GpuProducedTexturePendingView>
             BeginGpuProducedTexture(const GpuProducedTextureRequest& req);
+        // Publish readiness only for the exact GPU-produced pending
+        // generation opened by BeginGpuProducedTexture. This never stamps a
+        // newer replacement from an older submission ticket.
         Core::Result SetGpuProducedTextureReadyFrame(Assets::AssetId id,
+                                                     std::uint64_t generation,
                                                      std::uint64_t readyFrame);
         // Fail only the exact GPU-produced pending generation. This never
         // creates a missing slot and never retires a newer replacement.

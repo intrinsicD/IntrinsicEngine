@@ -138,6 +138,7 @@ namespace Extrinsic::Runtime
 
         return gpuAssets.SetGpuProducedTextureReadyFrame(
             ticket.GeneratedTextureAsset,
+            ticket.CacheGeneration,
             readyFrame);
     }
 }

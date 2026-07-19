@@ -430,9 +430,10 @@ namespace Extrinsic::Graphics
 
     Core::Result GpuAssetCache::SetGpuProducedTextureReadyFrame(
         const Assets::AssetId id,
+        const std::uint64_t generation,
         const std::uint64_t readyFrame)
     {
-        if (!id.IsValid())
+        if (!id.IsValid() || generation == 0u)
             return Core::Err(Core::ErrorCode::InvalidArgument);
 
         std::lock_guard guard(m_Impl->Mutex);
@@ -444,6 +445,7 @@ namespace Extrinsic::Graphics
         if (slot.State != GpuAssetState::GpuUploading ||
             slot.Kind != GpuAssetKind::Texture ||
             !slot.PendingTexture.IsValid() ||
+            slot.PendingGeneration != generation ||
             slot.CompletionKind == PendingCompletionKind::TransferToken)
         {
             return Core::Err(Core::ErrorCode::InvalidState);
