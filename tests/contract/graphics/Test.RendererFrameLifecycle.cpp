@@ -6524,6 +6524,191 @@ TEST(RendererFrameLifecycle,
 }
 
 TEST(RendererFrameLifecycle,
+     DeviceLostAfterActiveProfileDeviceEndOverridesInvalidLifecycle)
+{
+    NativeTimestampProfiler profiler;
+    Extrinsic::Tests::MockDevice device;
+    device.FramesInFlight = 1u;
+    device.BackbufferHandle =
+        Extrinsic::RHI::TextureHandle{910u, 1u};
+    device.Profiler = &profiler;
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer =
+        Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320u, .Height = 240u},
+        .EnableGpuProfiling = true,
+    };
+    Extrinsic::RHI::FrameHandle submittedFrame{};
+    ASSERT_TRUE(renderer->BeginFrame(submittedFrame));
+    Extrinsic::Graphics::RenderWorld world =
+        renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(submittedFrame, world);
+    ASSERT_TRUE(
+        renderer->GetLastRenderGraphStats().Execute.Succeeded);
+    ASSERT_EQ(renderer->EndFrame(submittedFrame), 1u);
+
+    Extrinsic::RHI::FrameHandle reusedFrame{};
+    ASSERT_TRUE(renderer->BeginFrame(reusedFrame));
+    const auto resolved =
+        renderer->GetLastRenderGraphStats().GpuProfile;
+    ASSERT_EQ(
+        resolved.Status,
+        Extrinsic::Graphics::
+            RenderGraphGpuProfileStatus::Resolved);
+    ASSERT_TRUE(resolved.Fresh);
+    ASSERT_TRUE(resolved.HasResolvedFrame);
+
+    world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(reusedFrame, world);
+    ASSERT_TRUE(
+        renderer->GetLastRenderGraphStats().Execute.Succeeded);
+    ASSERT_EQ(profiler.EndFrameCalls.size(), 1u);
+    Extrinsic::Core::Telemetry::TelemetrySystem::Get()
+        .SetPassGpuTimings({
+            Extrinsic::Core::Telemetry::PassTimingEntry{
+                .Name = "must-clear-on-active-end-frame-loss",
+                .GpuTimeNs = 91u,
+                .CpuTimeNs = 0u,
+            },
+        });
+
+    device.AdvanceGlobalFrameOnEndFrame = false;
+    profiler.Status = Extrinsic::RHI::ProfilerStatusSnapshot{
+        .Status =
+            Extrinsic::RHI::ProfilerBackendStatus::DeviceLost,
+        .Source =
+            Extrinsic::RHI::GpuTimestampSource::Unavailable,
+        .Diagnostic = "test device lost after active device EndFrame",
+    };
+    EXPECT_EQ(renderer->EndFrame(reusedFrame), 1u);
+
+    ASSERT_EQ(profiler.EndFrameCalls.size(), 2u);
+    EXPECT_EQ(
+        profiler.EndFrameCalls.back().Disposition,
+        Extrinsic::RHI::ProfilerFrameDisposition::Discarded);
+    const auto& stale =
+        renderer->GetLastRenderGraphStats().GpuProfile;
+    EXPECT_EQ(
+        stale.Status,
+        Extrinsic::Graphics::
+            RenderGraphGpuProfileStatus::DeviceLost);
+    EXPECT_EQ(stale.Diagnostic, profiler.Status.Diagnostic);
+    EXPECT_FALSE(stale.Fresh);
+    EXPECT_TRUE(stale.Stale);
+    EXPECT_TRUE(stale.HasResolvedFrame);
+    EXPECT_EQ(
+        stale.ResolvedSubmittedFrameNumber,
+        resolved.ResolvedSubmittedFrameNumber);
+    EXPECT_EQ(stale.ResolvedFrameSlot, resolved.ResolvedFrameSlot);
+    EXPECT_EQ(stale.Source, resolved.Source);
+    EXPECT_TRUE(
+        Extrinsic::Core::Telemetry::TelemetrySystem::Get()
+            .GetPassTimings()
+            .empty());
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle,
+     DeviceLostAfterHotDisabledDeviceEndOverridesDisabledProfile)
+{
+    NativeTimestampProfiler profiler;
+    Extrinsic::Tests::MockDevice device;
+    device.FramesInFlight = 1u;
+    device.BackbufferHandle =
+        Extrinsic::RHI::TextureHandle{911u, 1u};
+    device.Profiler = &profiler;
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer =
+        Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::Graphics::RenderFrameInput enabledInput{
+        .Viewport = {.Width = 320u, .Height = 240u},
+        .EnableGpuProfiling = true,
+    };
+    Extrinsic::RHI::FrameHandle submittedFrame{};
+    ASSERT_TRUE(renderer->BeginFrame(submittedFrame));
+    Extrinsic::Graphics::RenderWorld world =
+        renderer->ExtractRenderWorld(enabledInput);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(submittedFrame, world);
+    ASSERT_TRUE(
+        renderer->GetLastRenderGraphStats().Execute.Succeeded);
+    ASSERT_EQ(renderer->EndFrame(submittedFrame), 1u);
+
+    Extrinsic::RHI::FrameHandle reusedFrame{};
+    ASSERT_TRUE(renderer->BeginFrame(reusedFrame));
+    const auto resolved =
+        renderer->GetLastRenderGraphStats().GpuProfile;
+    ASSERT_EQ(
+        resolved.Status,
+        Extrinsic::Graphics::
+            RenderGraphGpuProfileStatus::Resolved);
+    ASSERT_TRUE(resolved.Fresh);
+    ASSERT_TRUE(resolved.HasResolvedFrame);
+
+    const Extrinsic::Graphics::RenderFrameInput disabledInput{
+        .Viewport = {.Width = 320u, .Height = 240u},
+        .EnableGpuProfiling = false,
+    };
+    world = renderer->ExtractRenderWorld(disabledInput);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(reusedFrame, world);
+    ASSERT_TRUE(
+        renderer->GetLastRenderGraphStats().Execute.Succeeded);
+    ASSERT_EQ(
+        renderer->GetLastRenderGraphStats().GpuProfile.Status,
+        Extrinsic::Graphics::
+            RenderGraphGpuProfileStatus::Disabled);
+    ASSERT_EQ(profiler.EndFrameCalls.size(), 1u);
+    Extrinsic::Core::Telemetry::TelemetrySystem::Get()
+        .SetPassGpuTimings({
+            Extrinsic::Core::Telemetry::PassTimingEntry{
+                .Name = "must-clear-on-disabled-end-frame-loss",
+                .GpuTimeNs = 92u,
+                .CpuTimeNs = 0u,
+            },
+        });
+
+    device.AdvanceGlobalFrameOnEndFrame = false;
+    profiler.Status = Extrinsic::RHI::ProfilerStatusSnapshot{
+        .Status =
+            Extrinsic::RHI::ProfilerBackendStatus::DeviceLost,
+        .Source =
+            Extrinsic::RHI::GpuTimestampSource::Unavailable,
+        .Diagnostic = "test device lost after disabled device EndFrame",
+    };
+    EXPECT_EQ(renderer->EndFrame(reusedFrame), 1u);
+
+    EXPECT_EQ(profiler.EndFrameCalls.size(), 1u);
+    const auto& stale =
+        renderer->GetLastRenderGraphStats().GpuProfile;
+    EXPECT_EQ(
+        stale.Status,
+        Extrinsic::Graphics::
+            RenderGraphGpuProfileStatus::DeviceLost);
+    EXPECT_EQ(stale.Diagnostic, profiler.Status.Diagnostic);
+    EXPECT_FALSE(stale.Fresh);
+    EXPECT_TRUE(stale.Stale);
+    EXPECT_TRUE(stale.HasResolvedFrame);
+    EXPECT_EQ(
+        stale.ResolvedSubmittedFrameNumber,
+        resolved.ResolvedSubmittedFrameNumber);
+    EXPECT_EQ(stale.ResolvedFrameSlot, resolved.ResolvedFrameSlot);
+    EXPECT_EQ(stale.Source, resolved.Source);
+    EXPECT_TRUE(
+        Extrinsic::Core::Telemetry::TelemetrySystem::Get()
+            .GetPassTimings()
+            .empty());
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle,
      GpuProfilerScopeFailureDoesNotAbortRenderingAndDiscardsWholeCandidate)
 {
     NativeTimestampProfiler profiler;

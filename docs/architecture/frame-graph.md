@@ -169,7 +169,10 @@ resolving a completed slot stops Vulkan frame acquisition and is projected by
 the renderer while retaining only an explicitly stale last-good sample.
 `DeviceLost` also takes precedence over `Disabled` when the current immutable
 render snapshot has profiling off, and over generic unavailability when device
-`BeginFrame()` fails.
+`BeginFrame()` fails. Finalization resamples the profiler after device
+`EndFrame()` too: submission-time loss forces an active candidate to
+`Discarded` and overrides both no-advance `InvalidLifecycle` and a no-active
+frame's earlier `Disabled` projection.
 
 The existing Sandbox `view.frame_graph` model/window copies this snapshot and
 shows status, provenance, resolved key/slot/age, queue envelopes, and pass

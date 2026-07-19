@@ -169,6 +169,13 @@ unavailability. Other failed-acquisition states remain `Unavailable`. Both
 loss paths preserve the last-good frame identity as stale, report `DeviceLost`,
 and clear telemetry without publishing a fresh row.
 
+After device `EndFrame()`, finalization resamples the profiler for both active
+and hot-disabled/no-active candidates. Submission-time device loss forces an
+active candidate to `Discarded` and overrides generic no-advance
+`InvalidLifecycle`; it likewise overrides the earlier `Disabled` projection
+when no candidate was active. Both retain only stale last-good UI evidence and
+clear telemetry.
+
 Timestamp reset/write/query work can perturb the command stream, so these
 values are diagnostic measurements rather than performance claims. No
 profiler-specific wait, CPU-clock substitute, global-frame total, overhead

@@ -9075,6 +9075,22 @@ namespace Extrinsic::Graphics
         {
             if (!m_ActiveGpuProfile.has_value())
             {
+                const RHI::IProfiler* profiler =
+                    m_Device != nullptr
+                        ? m_Device->GetProfiler()
+                        : nullptr;
+                const RHI::ProfilerStatusSnapshot backend =
+                    profiler != nullptr
+                        ? profiler->GetStatus()
+                        : RHI::ProfilerStatusSnapshot{};
+                if (profiler != nullptr &&
+                    backend.Status ==
+                        RHI::ProfilerBackendStatus::DeviceLost)
+                {
+                    PublishStaleGpuProfileStatus(
+                        RenderGraphGpuProfileStatus::DeviceLost,
+                        backend.Diagnostic);
+                }
                 m_LastRenderGraphStats.GpuProfile =
                     m_CurrentGpuProfile;
                 return;
@@ -9084,11 +9100,17 @@ namespace Extrinsic::Graphics
                 *m_ActiveGpuProfile;
             const std::optional<RHI::ProfilerError> failure =
                 GpuProfileFailure();
+            const RHI::ProfilerStatusSnapshot backend =
+                active.Profiler->GetStatus();
+            const bool deviceLost =
+                backend.Status ==
+                RHI::ProfilerBackendStatus::DeviceLost;
             const bool globalFrameAdvanced =
                 completedFrameNumber > active.Frame.FrameNumber;
             const bool submit =
                 active.ExecuteSucceeded &&
                 !failure.has_value() &&
+                !deviceLost &&
                 globalFrameAdvanced;
             auto endResult = active.Profiler->EndFrame(
                 active.Frame,
@@ -9128,15 +9150,19 @@ namespace Extrinsic::Graphics
                             ? RHI::ProfilerError::InvalidState
                             : endResult.error());
                 PublishStaleGpuProfileStatus(
-                    failure.has_value() || !endResult
-                        ? ProfileStatusForError(error)
-                        : RenderGraphGpuProfileStatus::
-                              InvalidLifecycle,
-                    globalFrameAdvanced
-                        ? "GPU profile candidate was discarded."
-                        : "GPU profile candidate was discarded because "
-                          "device submission did not advance the global "
-                          "frame.");
+                    deviceLost
+                        ? RenderGraphGpuProfileStatus::DeviceLost
+                        : failure.has_value() || !endResult
+                            ? ProfileStatusForError(error)
+                            : RenderGraphGpuProfileStatus::
+                                  InvalidLifecycle,
+                    deviceLost
+                        ? backend.Diagnostic
+                        : globalFrameAdvanced
+                            ? "GPU profile candidate was discarded."
+                            : "GPU profile candidate was discarded because "
+                              "device submission did not advance the global "
+                              "frame.");
             }
             m_ActiveGpuProfile.reset();
             m_GpuProfileFailure.store(
