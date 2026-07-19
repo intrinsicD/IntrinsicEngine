@@ -10,6 +10,9 @@ maturity_target: Operational
 
 ## Status
 
+- 2026-07-19 implementation started on
+  `codex/runtime-172-scene-document-module` from the post-`RUNTIME-180`
+  baseline.
 - 2026-07-19 audit amendment: the implementation inventory disproved the
   proposed single `SceneEditingModule` owner. Document/history and editor
   interaction differ in dependencies, frame hooks, cancellation, published
