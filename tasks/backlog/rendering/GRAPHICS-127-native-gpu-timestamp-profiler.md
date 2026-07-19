@@ -11,17 +11,39 @@ maturity_target: Operational
 ---
 # GRAPHICS-127 — Native GPU timestamp profiler and frame-recipe timing integration
 
+## Status
+
+- Implementation-ready backlog contract as of 2026-07-19. `RUNTIME-181` and
+  `RUNTIME-182` are retired, so ConfigControl and EditorUi are settled owners,
+  not future blockers. All implementation, test, documentation, and native-GPU
+  evidence checkboxes remain open.
+- The 2026-07-19 audit confirmed that the exported profiler seam is unused in
+  production: the Vulkan adapter is never constructed, `EndFrame()` never
+  writes its closing timestamp, and the Null adapter reports host-clock values
+  under `Gpu*` names. This task must repair that seam in place before
+  `REVIEW-003`; it must not add a parallel profiling architecture.
+
 ## Goal
+
 - Make the existing `Extrinsic.RHI.Profiler` seam an honest, nonblocking native-Vulkan feature that timestamps actual compiled frame-recipe passes and exposes the last resolved frame through existing telemetry and the Sandbox Frame Graph panel.
 
 ## Non-goals
+
 - No new profiler service, interface, registry, database, trace exporter, or diagnostics window.
 - No Tracy/Perfetto integration, pipeline-statistics queries, calibrated CPU/GPU clocks, timestamp SLOs, or wall-clock performance claims.
 - No summing overlapping queue durations or inventing a calibrated cross-queue frame envelope.
+- No transfer-queue timestamp support in this slice. The promoted frame graph
+  currently records profiled work only on graphics and async-compute queues;
+  a future transfer path must prove legal timestamp/reset support for its
+  actual queue family before extending this contract.
 - No default-gate GPU requirement and no CPU-clock substitution presented as GPU evidence.
 - No barrier/wireframe/profiler architecture port from `Test`; IntrinsicEngine's RHI, frame graph, telemetry, and editor seams remain authoritative.
+- No profiler-owned thread pool, recording mutex, per-pass dynamic query
+  allocation, or virtual timestamp methods added to every
+  `RHI::ICommandContext` implementation.
 
 ## Context
+
 - Owners: `src/graphics/rhi`, `src/graphics/vulkan`, `src/graphics/renderer`, the existing runtime editor facade, and existing core telemetry. No live ECS ownership moves into graphics.
 - `VulkanDevice::m_Profiler` is publicly exposed by `GetProfiler()` but never constructed. `VulkanProfiler::EndFrame()` emits no end timestamp, and `SetCommandBuffer`/`ResetFrame` have no production callers.
 - `Resolve` mixes cyclic slot identity with monotonically increasing frame identity and compares absolute query indices with slot-local counts. Scope handle zero also doubles as failure.
@@ -29,24 +51,142 @@ maturity_target: Operational
 - There are no production `BeginFrame`/scope/end/resolve calls. Existing `Core.Telemetry` pass-timing storage, `Graphics::RenderGraphFrameStats`, and the Sandbox Frame Graph model/window are the consumers; reuse them.
 - `Test/engine/rendering/src/gpu_profiler.cpp` and its focused test supply useful lifecycle/test-case ideas only. Do not port its CPU-clock fallback or parallel architecture; IntrinsicEngine's native query, provenance, and compiled-pass contracts are stricter.
 - Satisfied `GRAPHICS-033`, `GRAPHICS-037D`, and `GRAPHICS-119` are the operational Vulkan, multi-queue, and parallel pass-recording contracts this integration must respect.
-- ADR-0027 places live config apply in the app-composed ConfigControl owner and
-  editor presentation in the optional EditorUi owner. `RUNTIME-181` and
-  `RUNTIME-182` therefore land first so this task adds the profiling flag and
-  Frame Graph presentation through their narrow service/contribution seams
-  rather than recreating `Engine::GetConfigControl()` or an ImGui facade.
+- `VulkanDevice::BeginFrame()` already waits the graphics, async-compute, and
+  transfer fences for the reused frame slot before resetting its per-slot
+  command resources. That existing wait is the completion proof: resolve the
+  prior submitted profile after it and before any query reset. Do not add a
+  query wait, fence wait, queue idle, or device idle for profiling.
+- Serial, parallel, and multi-queue renderer lanes all converge on the same
+  compiled-pass callback. The profiled interval is the GPU command sequence
+  immediately around `recordPass(actualContext, passIndex)`; compiler work,
+  inter-pass barrier packets, queue waits, submission, presentation, and CPU
+  executor time are outside the measurement.
+- ADR-0027 and retired `RUNTIME-181` place live config preview/validation and
+  synchronous commit in the app-composed `EngineConfigControl`. Retired
+  `RUNTIME-182` places presentation in app-owned `EditorUiHost`; the Sandbox
+  `EditorShell` already owns the one Frame Graph contribution.
 
 ## Control surfaces
-- Config: add `RenderConfig::EnableGpuProfiling`, default `false`, with parse/serialize/round-trip and completed-frame-boundary hot-apply through the existing config-control lane. The flag gates recording/publication, never device resource lifetime.
-- UI: the existing Frame Graph panel may toggle the same runtime-owned config path and display status/timings; do not add a second editor-owned flag.
-- Agent/CLI: use the existing engine-config control facade for the same field.
+
+- Config: add `RenderConfig::EnableGpuProfiling`, JSON key
+  `render.enable_gpu_profiling`, default `false`, and include it in the
+  existing parse/serialize/round-trip and hot subset. Preview/validate/commit
+  is synchronous. After `UiEndCapture`, `Engine::RunFrame()` samples the
+  committed value once into `Graphics::RenderFrameInput`; that immutable value
+  controls the acquired renderer frame. There is no completed-frame apply
+  queue.
+- UI: extend the existing Sandbox Frame Graph panel. Its toggle is enabled
+  only when `SandboxEditorContext::EngineConfigCommandsAvailable` and both
+  existing preview/apply callbacks are present. It edits a serialized active
+  config candidate and invokes the same preview then
+  `ApplyEngineConfigHotSubset(..., RuntimeConfigControlSource::Editor)` path;
+  rejection leaves committed state unchanged and displays the existing
+  diagnostics.
+- Agent/CLI: resolve the existing `EngineConfigControl` service and use the
+  same preview/apply path with `RuntimeConfigControlSource::AgentCli`.
+- Omitted optional owners: without ConfigControl commands the panel is
+  read-only; without EditorUi the renderer still honors boot/programmatic
+  config; neither omission may crash or create a second control path.
 
 ## Backends
+
 - Backend axis: native Vulkan timestamps are `Operational`; Null/mock backends are lifecycle/provenance `CPUContracted` only.
 - Unsupported devices expose a truthful disabled reason and never synthesize native GPU evidence.
 
+## Profiler data contract
+
+- Keep and repair `Extrinsic.RHI.Profiler`. Use plain value types on the
+  existing `IProfiler`: a frame key containing monotonically increasing
+  submitted-frame number plus cyclic frame slot, a typed scope token with a
+  distinct invalid value, immutable planned-scope descriptors, status/source
+  provenance, and per-scope/per-queue results. RHI descriptors carry only
+  ordinal, name, and resolved `RHI::QueueAffinity`; the renderer joins the
+  ordinal back to `Graphics::FramePassId`.
+- Replace ambiguous always-present `GpuFrameTimeNs`/`CpuSubmitTimeNs` values
+  with explicit availability. At minimum, results distinguish
+  `NativeGpu`, `ContractOnly`, and unavailable sources, and distinguish
+  disabled, unsupported, priming/not-ready, resolved, exhausted/overflow,
+  invalid lifecycle, and device-lost states. A zero duration is data only when
+  a native query pair was available; it is never the unsupported sentinel.
+- Plan query tokens deterministically on the caller thread after actual queue
+  resolution and before worker fan-out. Worker recording consumes immutable
+  tokens and borrowed actual command contexts. Replace the adapter's mutable
+  `SetCommandBuffer`/linear-scan allocation; do not add per-pass locking or
+  widen `ICommandContext` with profiler virtuals.
+- A candidate frame becomes resolvable only after successful submission. A
+  failed/discarded recording or submit is marked discarded, never published,
+  and its range is reset before later reuse. Use the existing pre-submit
+  `IDevice::GetGlobalFrameNumber()` plus `FrameHandle::FrameIndex` as the
+  candidate key. Mark it submitted only when `EndFrame` advances the global
+  number past that candidate; otherwise mark it discarded.
+
+## Native Vulkan lifecycle
+
+- Construct one device-lifetime Vulkan profiler adapter after successful
+  Vulkan device initialization even when config is off or timestamp support is
+  absent, so `GetProfiler()` can report explicit status. Allocate its query
+  pool once only when at least one promoted actual queue supports timestamps,
+  for all frame slots and the bounded graphics/async-compute plan. Query-pool
+  creation failure disables profiling with a diagnostic; it must not make an
+  otherwise operational render device fail. Destroy the pool after the normal
+  device idle during shutdown and before `VkDevice` destruction.
+- Keep the existing `kMaxTimestampScopes` (256) as the total pass-scope
+  ceiling per frame, reserve one begin/end envelope pair per supported actual
+  queue, and diagnose exhaustion. Do not resize or replace pools from the
+  frame path.
+- Determine support per actual queue family from
+  `VkQueueFamilyProperties::timestampValidBits > 0`, not only
+  `timestampComputeAndGraphics`. Validate that `timestampPeriod` is finite and
+  positive. Unsupported actual queues receive no query range and remain
+  explicit in the result.
+- On slot reuse, preserve this order: existing slot-fence completion proof;
+  nonblocking resolution of the prior successfully submitted metadata;
+  metadata retirement; then command-recorded reset of the range about to be
+  reused. Record `vkCmdResetQueryPool` into the accepted per-queue primary
+  submit context outside any render pass and before that queue's first
+  timestamp write. Use disjoint slot/queue ranges.
+- Use `vkCmdWriteTimestamp2` stages legal for the actual graphics or compute
+  queue. Record per-queue envelope begin/end in submit order and per-pass
+  begin/end immediately around the actual callback in every accepted serial,
+  parallel-secondary, single-queue, and multi-queue lane. If a requested
+  async/parallel plan falls back, report the accepted graphics context, not
+  the requested lane.
+- Resolve with `VK_QUERY_RESULT_64_BIT |
+  VK_QUERY_RESULT_WITH_AVAILABILITY_BIT`, without `WAIT` or `PARTIAL`, and
+  inspect both values of every pair. Mask each timestamp to its queue family's
+  valid-bit width and compute the modular delta before checked
+  `ticks * timestampPeriod` conversion. This supports at most one wrap;
+  multiple-wrap intervals are explicitly ambiguous and unavailable.
+- Device loss keeps the renderer's prior last-good UI cache marked stale and
+  reports device-lost status. It must not publish a fresh telemetry row,
+  dereference a dead pool, or invent partial duration evidence.
+
+## Publication semantics
+
+- Add one plain nested GPU-profile snapshot to
+  `Graphics::RenderGraphFrameStats`: current recording/resolution status and
+  diagnostic, source, stale flag/sample age in submitted frames, resolved
+  submitted-frame number/slot, per-queue envelopes, and pass rows containing
+  compiled name/ID, accepted queue, command-record status, availability, and
+  native duration.
+- A queue envelope means first recorded profiled timestamp to last recorded
+  profiled timestamp on that same queue for that resolved frame. Never sum
+  pass durations, compare unsynchronized queue clocks, or publish a
+  cross-queue total/critical path. A pass that was culled or whose command
+  status was skipped must not appear as recorded GPU work.
+- Keep a renderer-owned last-good resolved cache for the Frame Graph panel.
+  Disabled, unsupported, priming/not-ready, overflow, and device-lost states
+  may display that sample only with `Stale=true`, its original frame identity,
+  and age. Clear `Core::Telemetry` GPU pass rows whenever there is no fresh
+  `NativeGpu` resolution; publish only fresh recorded native pass rows through
+  the existing `SetPassGpuTimings`.
+- Extend `SandboxEditorRenderGraphModel` and the existing
+  `view.frame_graph` presentation to copy/show those fields and the config
+  toggle. Do not modify `EditorUiHost` ownership or register another window.
+
 ## Slice plan
 
-1. **RHI lifecycle, provenance, and control (`CPUContracted`).** Repair the existing profiler value/error contract, make Null/mock results provenance-honest, add the one config field plus preview/round-trip/frame-boundary hot-apply path, and pin lifecycle/config/editor-model behavior with CPU tests. Supported profiler resources are device-lifetime objects; the toggle controls only new recording/publication. Defer all native-duration claims.
+1. **RHI lifecycle, provenance, and control (`CPUContracted`).** Repair the existing profiler value/error contract, make Null/mock results provenance-honest, add the one config field plus synchronous preview/round-trip/apply and immutable frame-input sample, and pin lifecycle/config/editor-model behavior with CPU tests. Supported profiler resources are device-lifetime objects; the toggle controls only new recording/publication. Defer all native-duration claims.
 2. **Native Vulkan query lifecycle.** Construct the existing Vulkan adapter, bind query reset/write/resolve to real frame slots and command buffers, handle valid bits/period/capacity/device loss without waits, and pass focused conversion plus Vulkan lifecycle coverage. Defer compiled-pass publication until slot reuse is proven.
 3. **Compiled-pass integration and presentation.** Instrument actual serial/parallel and graphics/async-compute pass recording, correlate resolved queue/pass rows into existing telemetry and `RenderGraphFrameStats`, and display them in the existing Frame Graph model/window. No new profiler or presentation module may appear.
 4. **Operational proof and docs.** Run the non-skipped native smoke for more than `framesInFlight`, prove named-pass timing and truthful unsupported behavior, then land current-state RHI/Vulkan/renderer/editor documentation. Only this slice reaches the task's final `Operational` maturity.
@@ -54,65 +194,177 @@ maturity_target: Operational
 Each slice is a separately reviewable commit and must pass its focused CPU checks plus all earlier slice gates. Later slices may not weaken or replace earlier provenance/nonblocking contracts.
 
 ## Required changes
+
 - [ ] Repair the existing RHI contract with explicit monotonic frame identity separate from frame slot, a typed invalid scope result, queue/source provenance, and deterministic invalid-pairing/overflow/unsupported diagnostics.
 - [ ] Make Null/mock profiling validate lifecycle, names, frame-slot reuse, and not-ready behavior without labeling host-clock durations as native GPU time.
-- [ ] Add the one default-off config field and route config, editor, and agent/CLI writes through the canonical runtime config-control path.
-- [ ] Resolve config apply and Frame Graph presentation through the
-      app-composed owners delivered by `RUNTIME-181`/`RUNTIME-182`; do not add
-      a profiling-specific Engine getter, callback, or UI path.
-- [ ] Construct device-lifetime Vulkan profiler/query-pool resources during device initialization whenever native timestamps are supported. `EnableGpuProfiling` gates new recording/resolution/publication at a completed frame boundary; hot disable drains or retains the last resolved sample and never destroys/recreates pools while frames are in flight.
-- [ ] Bind resets and timestamp writes to the real graphics/compute command buffers. Reset a reused slot only after its fence/completion proof, emit frame begin/end, and keep per-slot absolute/local query indexing coherent.
-- [ ] Respect queue-family `timestampValidBits`, device timestamp period, query exhaustion, device loss, and command-buffer lifetime. Resolution must never use `VK_QUERY_RESULT_WAIT_BIT` or otherwise block the frame.
+- [ ] Add the one default-off config field, route editor and agent/CLI writes through synchronous `EngineConfigControl` preview/apply, and sample committed state once into `RenderFrameInput` after `UiEndCapture`.
+- [ ] Use the settled app-composed ConfigControl and existing EditorShell Frame Graph contribution; do not add a profiling-specific Engine getter, renderer setter, callback, staging queue, or UI path.
+- [ ] Construct the device-lifetime Vulkan adapter after successful device initialization and its fixed query pool whenever a promoted actual queue supports native timestamps. The immutable `RenderFrameInput` sample gates new recording and fresh publication for that frame; previously submitted metadata is retired only at its later slot-completion proof. Hot disable marks any last-good sample stale and never destroys/recreates pools while frames are in flight.
+- [ ] Bind reset/envelope/pass timestamp commands to the accepted graphics/compute primary and secondary contexts. Reset a reused slot only after its existing fence proof, outside render passes, and keep slot/queue/local/absolute query indexing coherent.
+- [ ] Respect per-queue-family `timestampValidBits`, finite positive timestamp period, query exhaustion, availability bits, modular wrap, checked conversion, discarded submissions, device loss, and command-buffer lifetime. Resolution must never use `VK_QUERY_RESULT_WAIT_BIT` or otherwise add a frame wait.
 - [ ] Resolve only completed older frames before slot reuse and retain the last good resolved sample when the newest result is not ready.
-- [ ] Bracket actual compiled pass command recording by stable compiled pass name/ID and resolved queue, including serial, parallel-recorded, graphics, and async-compute paths without data races.
-- [ ] Publish native frame/pass timings, source/queue provenance, and a frame-correlation number into existing `Core.Telemetry`, `RenderGraphFrameStats`, and the existing Frame Graph editor data model.
-- [ ] Give multi-queue frame timing an honest documented meaning (for example, a named per-queue envelope); do not sum overlapping work into a fake total.
+- [ ] Preplan immutable tokens before worker fan-out and bracket the actual compiled pass callback by stable compiled pass name/ID and accepted queue in serial, parallel-recorded, graphics, fallback, and async-compute paths without locks or duplicate scopes.
+- [ ] Publish only fresh recorded `NativeGpu` pass rows into existing `Core.Telemetry`; publish detailed current status plus stale last-good sample, per-queue envelopes, provenance, and frame correlation through `RenderGraphFrameStats` and the existing Frame Graph model.
+- [ ] Define multi-queue frame timing solely as named per-queue envelopes; do not sum overlapping work or populate an ambiguous global GPU-frame total.
 
 ## Tests
-- [ ] CPU contract tests cover frame identity versus slot reuse, invalid begin/end pairing, invalid handles, scope exhaustion, not-ready retention, queue/source provenance, and truthful Null behavior.
-- [ ] Add pure conversion tests for timestamp-period scaling, valid-bit masking/wrap handling, absolute/local query indices, and overflow guards.
-- [ ] Add config parse/round-trip/frame-boundary hot-enable/hot-disable and Frame Graph model-copy tests proving one control surface, fixed device-resource lifetime, and one existing presentation path.
-- [ ] Add an opt-in `gpu;vulkan` smoke that runs more than `framesInFlight`, resolves without waiting, and observes finite nonzero `NativeGpu` timing for at least one known named default-recipe pass.
-- [ ] Exercise the parallel-recording path and, when async compute is enabled/supported, assert queue attribution without overlapping-duration summation.
-- [ ] Unsupported timestamp hardware must produce a non-skipped truthful disabled result rather than CPU substitution.
+
+- [ ] Add `tests/unit/graphics/Test.RHI.Profiler.cpp` to
+  `IntrinsicGraphicsRhiCpuUnitTests`. Cover valid-bit widths 0 and 64,
+  32-bit wrap (`0xfffffff0 -> 0x20 == 48` ticks), finite/zero/non-finite
+  period, checked nanosecond overflow, availability pairs, and slot-local
+  versus absolute query bounds.
+- [ ] Add `tests/contract/graphics/Test.Profiler.cpp` to
+  `IntrinsicGraphicsContractCpuTests`. Cover typed-token invalidity,
+  frame-number versus slot reuse, begin/end/seal/discard ordering, duplicate
+  end, exhaustion, not-ready last-good retention, source/queue provenance,
+  and Null lifecycle results with no available native duration.
+- [ ] Extend
+  `tests/contract/graphics/Test.VulkanFailClosedContract.cpp` in
+  `IntrinsicGraphicsVulkanContractTests`. Cover the backend-local support
+  decision for zero/nonzero queue-family valid bits, invalid timestamp period,
+  unsupported async queue, and query-pool creation failure degrading only
+  profiler status rather than device operational state.
+- [ ] Extend
+  `tests/contract/graphics/Test.RendererFrameLifecycle.cpp` with exact cases
+  for serial, accepted parallel, graphics/async multi-queue, requested-queue
+  fallback, discarded submit, and absent profiler. Assert one scope per
+  recorded callback, actual-queue attribution, deterministic preplanning,
+  per-queue envelopes without summation, stale-cache status, and telemetry
+  clearing when no fresh native sample exists.
+- [ ] Extend `tests/unit/core/Test.Core.EngineConfigLoad.cpp`,
+  `tests/contract/runtime/Test.RuntimeConfigControlFacade.cpp`, and
+  `tests/integration/runtime/Test.RuntimeFrameLoopContract.cpp`. Prove default
+  false plus JSON round-trip, synchronous Editor and AgentCli apply, rejected
+  preview leaves config unchanged, the committed value is sampled once in the
+  next render snapshot, hot disable records no new scopes, and toggles never
+  create/destroy profiler resources.
+- [ ] Extend `tests/contract/runtime/Test.SandboxEditorModels.cpp` and
+  `tests/integration/runtime/Test.SandboxEditorPresentation.cpp`. Prove exact
+  status/source/frame/slot/age/queue/pass copying, read-only behavior when
+  ConfigControl commands are absent, one preview/apply path, rejection
+  diagnostics, and reuse of `view.frame_graph` with no second window.
+- [ ] Add
+  `DefaultRecipeSurfaceGpuSmoke.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse`
+  to
+  `tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp`. Enable
+  profiling in config before device boot, run at least
+  `2 * framesInFlight + 1` successful frames, and use no profiler-specific
+  waits. If the Vulkan device is not operational, use the established
+  pre-run capability skip. Once operational, timestamp-capable hardware must
+  produce a fresh finite nonzero `NativeGpu` row for a known recorded
+  default-recipe pass, with an older submitted-frame number and reused slot.
+  An operational device whose actual queue family has zero valid bits must
+  instead pass with explicit `Unsupported` status and no native rows; do not
+  skip or substitute CPU timing.
+- [ ] Extend
+  `DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation`
+  and
+  `DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialAsyncComputeReadbackWithValidation`
+  to assert profiling does not change the existing readback/validation
+  result, parallel scopes are not duplicated, accepted async work is labeled
+  `AsyncCompute`, fallback is labeled `Graphics`, and no cross-queue total is
+  exposed. The async test retains its existing capability skip.
 
 ## Docs
-- [ ] Update the RHI profiler contract and `src/graphics/renderer/README.md` with lifecycle, provenance, control, and nonblocking semantics.
-- [ ] Update `src/graphics/vulkan/README.md` with query-slot/fence ownership and the operational smoke.
-- [ ] Update the current-state graphics architecture and Sandbox Frame Graph documentation; regenerate the module inventory if `.cppm` surfaces change.
-- [ ] Add this leaf to the rendering/global backlog and as a readiness dependency of `REVIEW-003`.
+
+- [ ] Update `src/graphics/rhi/README.md`,
+  `src/graphics/vulkan/README.md`, and
+  `src/graphics/renderer/README.md` with the repaired API, slot/submission
+  lifecycle, per-queue support, reset/write/resolve ordering, availability and
+  stale behavior, measured interval, and nonblocking limitations.
+- [ ] Update `docs/architecture/frame-graph.md`,
+  `docs/architecture/engine-config.md`,
+  `docs/architecture/runtime-config-control.md`, and `src/runtime/README.md`
+  with the synchronous commit plus immutable `RenderFrameInput` sampling lane
+  and fresh-only telemetry publication.
+- [ ] Update `src/app/Sandbox/README.md` with the existing Frame Graph toggle,
+  read-only omission behavior, provenance/status display, and lack of a second
+  EditorUi contribution.
+- [ ] If `.cppm` surfaces change, regenerate
+  `docs/api/generated/module_inventory.md`. At promotion/retirement, update
+  the rendering/global indexes, `REVIEW-003` dependency state, retirement log,
+  and `tasks/SESSION-BRIEF.md` through the normal task workflow; those
+  lifecycle edits are not part of this backlog-contract amendment.
+
+## Benchmark and claim limits
+
+- [ ] Record in the implementation docs that profiling is default-off
+  diagnostic instrumentation which adds timestamp/reset/query work and can
+  perturb the command stream. This task adds correctness and capability
+  evidence only: no benchmark manifest/result, overhead threshold, SLO, or
+  performance improvement is claimed.
+- [ ] Treat raw pass timestamps and per-queue envelopes as diagnostic
+  measurements, not wall-clock frame time or comparative performance
+  evidence. Any future performance claim requires a stable benchmark ID,
+  declared scene/config/warmup/measured-frame count, backend/GPU/driver
+  metadata, validated machine-readable result, and comparable baseline under
+  the benchmark workflow.
 
 ## Acceptance criteria
+
 - [ ] Enabling profiling on a supported Vulkan device produces correlated native pass timings from actual command recording after more than one slot-reuse cycle.
-- [ ] The steady-state render path never waits for timestamp results.
+- [ ] The steady-state render path adds no profiler-specific CPU/GPU wait and
+  query resolution never requests blocking or partial results.
 - [ ] Null/unsupported data cannot be mistaken for native GPU evidence.
-- [ ] Parallel and multi-queue recording remain race-free and retain truthful queue attribution.
-- [ ] The existing Frame Graph panel shows last-resolved status/timings without a new service or window.
+- [ ] Parallel and multi-queue recording remain race-free, scope each recorded
+  callback exactly once, and retain truthful accepted-queue attribution.
+- [ ] Synchronous config apply is observable at the defined render-input
+  snapshot boundary, and hot toggles never change query-pool lifetime.
+- [ ] The existing Frame Graph panel shows current status and clearly aged
+  last-resolved timings without a new service, callback, or window.
 
 ## Verification
+
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicGraphicsRhiCpuUnitTests IntrinsicGraphicsRendererCpuUnitTests IntrinsicGraphicsContractTests IntrinsicGraphicsContractCpuTests IntrinsicRuntimeContractTests IntrinsicRuntimeGraphicsCpuTests IntrinsicSandboxEditorIntegrationTests
-ctest --test-dir build/ci --output-on-failure -R 'Profiler|Telemetry|RenderGraph|SandboxEditor' --timeout 120
+cmake --build --preset ci --target IntrinsicCoreTests IntrinsicGraphicsRhiCpuUnitTests IntrinsicGraphicsRendererCpuUnitTests IntrinsicGraphicsContractTests IntrinsicGraphicsContractCpuTests IntrinsicRuntimeContractTests IntrinsicRuntimeGraphicsCpuTests IntrinsicSandboxEditorIntegrationTests
+ctest --test-dir build/ci --output-on-failure -R 'CoreEngineConfigLoad|Profiler|Telemetry|RendererFrameLifecycle|RuntimeConfigControlFacade|RuntimeFrameLoopContract|SandboxEditor' --no-tests=error --timeout 120
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
 cmake --preset ci-vulkan
-cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanSmokeTests
-ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R 'Profiler|Timestamp' --no-tests=error --timeout 180
+cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanContractTests IntrinsicGraphicsVulkanSmokeTests
+ctest --test-dir build/ci-vulkan --output-on-failure -R 'VulkanFailClosedContract.*Profiler' --no-tests=error --timeout 120
+ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R 'NativeGpuTimestamps|ParallelRecordingMatchesSerial' --no-tests=error --timeout 180
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/docs/check_doc_links.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check
 ```
 
 ## Forbidden changes
+
 - Blocking query resolution or using `VK_QUERY_RESULT_WAIT_BIT` in the frame path.
 - Destroying or recreating profiler/query-pool resources in response to a hot toggle while frames may reference them.
 - Reporting host-clock or summed-overlap durations as native GPU frame time.
 - Adding another profiler abstraction, telemetry store, config flag, or editor window.
 - Reintroducing an Engine domain facade or bypassing the shared validated
   config/UI contribution paths to wire profiling.
+- Deferring config mutation to a completed-frame queue; apply commits
+  synchronously and only the renderer's immutable per-frame sample is
+  boundary-scoped.
 - Instrumenting CPU executor callbacks instead of the command-recording scopes they schedule.
+- Allocating scope/query IDs under worker-thread locks or reporting a requested
+  queue after the accepted execution lane fell back.
 
 ## Maturity
+
 - Target: `Operational` on Vulkan-capable hosts; `CPUContracted` everywhere else.
 - Operational evidence requires a non-skipped native-Vulkan smoke with named pass timing and slot reuse; CPU/Null lifecycle tests alone are insufficient.
+- Retirement evidence must cite the successful GPU-smoke host, Vulkan backend,
+  physical GPU, driver, timestamp-valid-bit capability, frames-in-flight, and
+  resolved submitted-frame/slot correlation. An unsupported operational
+  device proves only the fail-closed branch, not native `Operational`
+  maturity.
+
+## Native API references
+
+- [`vkCmdWriteTimestamp2`](https://docs.vulkan.org/refpages/latest/refpages/source/vkCmdWriteTimestamp2.html)
+  defines command-buffer and queue-stage requirements.
+- [`vkCmdResetQueryPool`](https://docs.vulkan.org/refpages/latest/refpages/source/vkCmdResetQueryPool.html)
+  requires command recording outside a render pass.
+- [`vkGetQueryPoolResults`](https://docs.vulkan.org/refpages/latest/refpages/source/vkGetQueryPoolResults.html)
+  defines nonblocking availability-result behavior.
+- [Vulkan timestamp-query specification](https://docs.vulkan.org/spec/latest/chapters/queries.html)
+  defines queue-family valid bits, timestamp period, and wrap semantics.
