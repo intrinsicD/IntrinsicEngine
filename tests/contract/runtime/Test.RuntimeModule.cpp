@@ -74,7 +74,9 @@ namespace
         switch (phase)
         {
         case Runtime::FramePhase::AfterCommandDrain: return "AfterCommandDrain";
+        case Runtime::FramePhase::UiBegin: return "UiBegin";
         case Runtime::FramePhase::UiBuild: return "UiBuild";
+        case Runtime::FramePhase::UiEndCapture: return "UiEndCapture";
         case Runtime::FramePhase::BeforeExtraction: return "BeforeExtraction";
         case Runtime::FramePhase::Maintenance: return "Maintenance";
         }
@@ -114,7 +116,7 @@ namespace
         SharedProbeService* ResolvedService{};
         int ResolvedServiceValue{0};
         std::vector<std::string> FirstHookTrace{};
-        std::array<int, 4> FirstHookCounts{};
+        std::array<int, 6> FirstHookCounts{};
         std::vector<std::string> SystemTrace{};
         std::vector<std::string> ShutdownTrace{};
     };
@@ -202,7 +204,9 @@ namespace
 
             for (const Runtime::FramePhase phase :
                  {Runtime::FramePhase::AfterCommandDrain,
+                  Runtime::FramePhase::UiBegin,
                   Runtime::FramePhase::UiBuild,
+                  Runtime::FramePhase::UiEndCapture,
                   Runtime::FramePhase::BeforeExtraction,
                   Runtime::FramePhase::Maintenance})
             {
@@ -337,7 +341,9 @@ namespace
 
             for (const Runtime::FramePhase phase :
                  {Runtime::FramePhase::AfterCommandDrain,
+                  Runtime::FramePhase::UiBegin,
                   Runtime::FramePhase::UiBuild,
+                  Runtime::FramePhase::UiEndCapture,
                   Runtime::FramePhase::BeforeExtraction,
                   Runtime::FramePhase::Maintenance})
             {

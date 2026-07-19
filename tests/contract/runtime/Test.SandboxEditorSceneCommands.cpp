@@ -71,10 +71,11 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorPropertyWidgets;
+import Extrinsic.Runtime.EditorUiHost;
+import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
-import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressiveRenderData;
@@ -515,7 +516,10 @@ class DriveBlockedGeometryImportApplication final : public Runtime::IApplication
                 !m_State->Release.load(std::memory_order_acquire))
             {
                 const std::uint32_t framesProduced =
-                    engine.GetImGuiAdapter().GetDiagnostics().FramesProduced;
+                    engine.Services()
+                        .Find<Runtime::EditorUiHost>()
+                        ->GetDiagnostics()
+                        .FramesProduced;
                 if (!m_State->ImGuiFrameBaselineCaptured)
                 {
                     m_State->ImGuiFramesProducedAtBlockStart = framesProduced;
@@ -709,6 +713,7 @@ class RecordingImportCameraController final : public Runtime::ICameraController
 void ComposeAsyncWorkAndInitialize(Runtime::Engine& engine)
     {
         engine.EmplaceModule<Runtime::AsyncWorkModule>();
+        engine.EmplaceModule<Runtime::EditorUiModule>();
         engine.Initialize();
     }
 

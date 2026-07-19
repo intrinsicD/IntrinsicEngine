@@ -15,6 +15,7 @@ export module Extrinsic.Runtime.ImGuiAdapter;
 
 import Extrinsic.Platform.Window;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
+import Extrinsic.Runtime.Module;
 
 export namespace Extrinsic::Runtime
 {
@@ -53,18 +54,6 @@ export namespace Extrinsic::Runtime
         std::uint64_t LastEndFrameMicros{0u};
     };
 
-    struct EditorInputCaptureSnapshot
-    {
-        bool CapturedKeyboard{false};
-        bool CapturedMouse{false};
-        bool WidgetsActive{false};
-
-        [[nodiscard]] bool CapturesViewportInput() const noexcept
-        {
-            return CapturedKeyboard || CapturedMouse || WidgetsActive;
-        }
-    };
-
     // Runtime-side Dear ImGui platform/renderer adapter (RUNTIME-090, the
     // producer half declared by GRAPHICS-013CQ). Owns the ImGui context
     // lifecycle, translates `Platform::Event` variants into ImGui IO, walks
@@ -95,10 +84,14 @@ export namespace Extrinsic::Runtime
         // `ImGui::NewFrame()`. No-op when not initialized.
         void BeginFrame(double deltaSeconds);
 
-        // Invokes the editor hook (between begin and end), calls
-        // `ImGui::Render()`, walks `ImDrawData`, builds one `ImGuiOverlayFrame`,
-        // and submits it to the overlay system. No-op when not initialized or
-        // when no frame was started.
+        // Invokes the editor hook inside a started frame. Kept separate from
+        // EndFrame so the runtime module can expose the existing UiBuild
+        // ordering explicitly.
+        void BuildEditorFrame();
+
+        // Calls `ImGui::Render()`, snapshots capture, walks `ImDrawData`,
+        // builds one `ImGuiOverlayFrame`, and submits it to the overlay system.
+        // No-op when not initialized or when no frame was started.
         void EndFrame();
 
         // Destroys the ImGui context and shuts down the overlay system. Safe to

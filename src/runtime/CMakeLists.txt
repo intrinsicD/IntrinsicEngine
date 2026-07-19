@@ -41,6 +41,7 @@ target_sources(${target_name}
         Runtime.EditorCommandHistory.cppm
         Editor/Runtime.EditorPropertyWidgets.cppm
         Editor/Runtime.EditorUiHost.cppm
+        Editor/Runtime.EditorUiModule.cppm
         Editor/Runtime.EditorWindowRegistry.cppm
         Runtime.Engine.cppm
         Runtime.EngineConfigBoot.cppm
@@ -126,6 +127,7 @@ target_sources(${target_name}
         Runtime.EditorCommandHistory.cpp
         Editor/Runtime.EditorPropertyWidgets.cpp
         Editor/Runtime.EditorUiHost.cpp
+        Editor/Runtime.EditorUiModule.cpp
         Editor/Runtime.EditorWindowRegistry.cpp
         Runtime.Engine.cpp
         Runtime.EngineConfigBoot.cpp

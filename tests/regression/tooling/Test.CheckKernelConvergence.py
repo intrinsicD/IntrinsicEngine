@@ -115,8 +115,8 @@ class KernelConvergenceTests(unittest.TestCase):
         result = run_checker(REPO_ROOT)
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn(
-            "plain_imports=40 domain_imports=18 export_imports=2 "
-            "public_getter_names=29",
+            "plain_imports=39 domain_imports=17 export_imports=2 "
+            "public_getter_names=28",
             result.stdout,
         )
         self.assertIn("Temporary debt: none", result.stdout)

@@ -1092,14 +1092,16 @@ TEST(RuntimeEngineLayering, SelectionReadbackKeepsPickCorrelationCacheOutOfEngin
               std::string::npos);
 }
 
-TEST(RuntimeEngineLayering, FramePacingDiagnosticsKeepsCounterMirroringOutOfEngine)
+TEST(RuntimeEngineLayering, EditorUiModulePrivatelyMirrorsImGuiFramePacingDiagnostics)
 {
     const auto engineInterface =
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
     const auto engineImpl =
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
-    const auto frameLoop =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
+    const auto editorUiModuleInterface =
+        ReadFile(RepoRoot() / "src/runtime/Editor/Runtime.EditorUiModule.cppm");
+    const auto editorUiModuleImpl =
+        ReadFile(RepoRoot() / "src/runtime/Editor/Runtime.EditorUiModule.cpp");
     const auto diagnosticsInterface =
         ReadFile(RepoRoot() / "src/runtime/Runtime.FramePacingDiagnostics.cppm");
     const auto diagnosticsImpl =
@@ -1109,7 +1111,7 @@ TEST(RuntimeEngineLayering, FramePacingDiagnosticsKeepsCounterMirroringOutOfEngi
               std::string::npos);
     EXPECT_NE(engineImpl.find("import Extrinsic.Runtime.FramePacingDiagnostics"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("MirrorImGuiFramePacingDiagnostics("),
+    EXPECT_EQ(engineImpl.find("MirrorImGuiFramePacingDiagnostics("),
               std::string::npos);
     EXPECT_NE(engineImpl.find("MirrorRenderGraphFramePacingDiagnostics("),
               std::string::npos);
@@ -1129,13 +1131,39 @@ TEST(RuntimeEngineLayering, FramePacingDiagnosticsKeepsCounterMirroringOutOfEngi
               std::string::npos);
     EXPECT_NE(diagnosticsInterface.find("export struct RuntimeFramePacingDiagnostics"),
               std::string::npos);
-    EXPECT_NE(diagnosticsInterface.find("MirrorImGuiFramePacingDiagnostics"),
+    EXPECT_EQ(diagnosticsInterface.find("import Extrinsic.Runtime.ImGuiAdapter"),
+              std::string::npos);
+    EXPECT_EQ(diagnosticsInterface.find("MirrorImGuiFramePacingDiagnostics"),
               std::string::npos);
     EXPECT_NE(diagnosticsInterface.find("MirrorRenderGraphFramePacingDiagnostics"),
               std::string::npos);
-    EXPECT_NE(diagnosticsImpl.find("pacing.ImGuiEditorCallbackMicros = imgui.LastEditorCallbackMicros"),
+    EXPECT_EQ(diagnosticsImpl.find("ImGuiAdapterDiagnostics"),
+              std::string::npos);
+    EXPECT_EQ(diagnosticsImpl.find("pacing.ImGuiEditorCallbackMicros ="),
               std::string::npos);
     EXPECT_NE(diagnosticsImpl.find("pacing.RenderGraphCompileMicros = stats.Compile.TimeMicros"),
+              std::string::npos);
+
+    EXPECT_EQ(editorUiModuleInterface.find("ImGuiAdapter"),
+              std::string::npos);
+    EXPECT_EQ(editorUiModuleInterface.find("MirrorImGuiDiagnostics"),
+              std::string::npos);
+    EXPECT_NE(editorUiModuleImpl.find(
+                  "import Extrinsic.Runtime.FramePacingDiagnostics;"),
+              std::string::npos);
+    EXPECT_NE(editorUiModuleImpl.find(
+                  "import Extrinsic.Runtime.ImGuiAdapter;"),
+              std::string::npos);
+    EXPECT_NE(editorUiModuleImpl.find("void MirrorImGuiDiagnostics("),
+              std::string::npos);
+    EXPECT_NE(editorUiModuleImpl.find(
+                  "pacing.ImGuiEditorCallbackMicros ="),
+              std::string::npos);
+    EXPECT_NE(editorUiModuleImpl.find(
+                  "pacing.ImGuiDrawDataCopyMicros ="),
+              std::string::npos);
+    EXPECT_NE(editorUiModuleImpl.find(
+                  "MirrorImGuiDiagnostics(context.Pacing, diagnostics);"),
               std::string::npos);
 }
 

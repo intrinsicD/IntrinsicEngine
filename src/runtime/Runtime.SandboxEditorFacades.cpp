@@ -67,10 +67,10 @@ import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryAvailability;
-import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.KMeansBackend;
@@ -11133,7 +11133,13 @@ namespace Extrinsic::Runtime
                 .DerivedJobCommands = std::move(derivedJobCommands),
                 .AssetImportQueue = engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot(),
                 .RenderGraphStats = &engine.GetRenderer().GetLastRenderGraphStats(),
-                .ImGuiAdapterAvailable = engine.GetImGuiAdapter().IsInitialized(),
+                .ImGuiAdapterAvailable =
+                    [&engine]
+                    {
+                        const EditorUiHost* host =
+                            engine.Services().Find<EditorUiHost>();
+                        return host != nullptr && host->IsOperational();
+                    }(),
                 .AssetImportCommandsAvailable = true,
                 .SceneFileCommandsAvailable = true,
                 .CameraRenderCommandsAvailable = true,

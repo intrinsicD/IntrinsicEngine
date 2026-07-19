@@ -80,6 +80,8 @@ import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.EditorUiHost;
+import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -738,6 +740,7 @@ struct AcceptanceBootstrap
     config.Render.EnableVSync = false;
     auto enginePtr = std::make_unique<Engine>(
         config, std::make_unique<ExitAfterFramesApp>(kTargetFrames));
+    enginePtr->EmplaceModule<Extrinsic::Runtime::EditorUiModule>();
     enginePtr->Initialize();
 
     const auto initInputs = GetVulkanDeviceOperationalInputs(&enginePtr->GetDevice());
@@ -780,6 +783,7 @@ struct AcceptanceBootstrap
         std::make_unique<SandboxDefaultPolicyApp>(std::move(app)));
     enginePtr->AddModule(std::move(configControl));
     enginePtr->EmplaceModule<Extrinsic::Runtime::AsyncWorkModule>();
+    enginePtr->EmplaceModule<Extrinsic::Runtime::EditorUiModule>();
     enginePtr->Initialize();
 
     const auto initInputs = GetVulkanDeviceOperationalInputs(&enginePtr->GetDevice());
@@ -1435,9 +1439,13 @@ public:
             m_State->ReadyRecordedPassCount = output.RecordedPassCount;
         }
 
+        const RT::EditorUiHost* const editorUi =
+            engine.Services().Find<RT::EditorUiHost>();
         m_State->SawImGuiUserTexture =
             m_State->SawImGuiUserTexture ||
-            engine.GetImGuiAdapter().GetDiagnostics().LastFrameUsedUserTexture;
+            (editorUi != nullptr &&
+             editorUi->IsOperational() &&
+             editorUi->GetDiagnostics().LastFrameUsedUserTexture);
 
         constexpr std::uint32_t kMaximumFrames = 12u;
         if (m_State->SawGpuReadyUvView && m_State->SawImGuiUserTexture)
@@ -1676,7 +1684,12 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigProducesVisi
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
 
     const auto run = DriveAcceptanceAndCapture(engine);
-    const auto adapterDiagnostics = engine.GetImGuiAdapter().GetDiagnostics();
+    const RT::EditorUiHost* const editorUi =
+        engine.Services().Find<RT::EditorUiHost>();
+    ASSERT_NE(editorUi, nullptr);
+    ASSERT_TRUE(editorUi->IsOperational());
+    const RT::EditorUiDiagnostics editorUiDiagnostics =
+        editorUi->GetDiagnostics();
 
     if (!run.DeviceOperational)
     {
@@ -1699,10 +1712,10 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigProducesVisi
         << BuildPassStatusSummary(run.Stats);
     EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
         << "Sandbox default-config readback triplet did not record on any operational frame.";
-    EXPECT_GT(adapterDiagnostics.FramesProduced, 0u);
-    EXPECT_GT(adapterDiagnostics.LastVertexCount, 0u);
-    EXPECT_GT(adapterDiagnostics.LastIndexCount, 0u);
-    EXPECT_GT(adapterDiagnostics.LastCommandCount, 0u);
+    EXPECT_GT(editorUiDiagnostics.FramesProduced, 0u);
+    EXPECT_GT(editorUiDiagnostics.LastVertexCount, 0u);
+    EXPECT_GT(editorUiDiagnostics.LastIndexCount, 0u);
+    EXPECT_GT(editorUiDiagnostics.LastCommandCount, 0u);
 
     const std::uint64_t nonBlackPixels =
         CountNonBlackRgbPixels(device, readbackBuffer, readbackSize, bytesPerPixel);
@@ -1710,12 +1723,12 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigProducesVisi
         static_cast<std::uint64_t>(extent.Width) * static_cast<std::uint64_t>(extent.Height);
     EXPECT_GT(nonBlackPixels, 0u)
         << "Sandbox default-config frame read back as entirely black despite recorded Present/ImGui passes. "
-        << "adapter frames=" << adapterDiagnostics.FramesProduced
-        << " drawLists=" << adapterDiagnostics.LastDrawListCount
-        << " vertices=" << adapterDiagnostics.LastVertexCount
-        << " indices=" << adapterDiagnostics.LastIndexCount
-        << " commands=" << adapterDiagnostics.LastCommandCount
-        << " display=" << adapterDiagnostics.DisplayWidth << "x" << adapterDiagnostics.DisplayHeight
+        << "editor UI frames=" << editorUiDiagnostics.FramesProduced
+        << " drawLists=" << editorUiDiagnostics.LastDrawListCount
+        << " vertices=" << editorUiDiagnostics.LastVertexCount
+        << " indices=" << editorUiDiagnostics.LastIndexCount
+        << " commands=" << editorUiDiagnostics.LastCommandCount
+        << " display=" << editorUiDiagnostics.DisplayWidth << "x" << editorUiDiagnostics.DisplayHeight
         << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
 
     // BUG-016: the operational default recipe must present the lit scene-color
@@ -1750,7 +1763,12 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
     const AcceptanceRunCapture run = DriveAcceptanceAndCapture(engine);
     const Extrinsic::Graphics::UvViewOutput output =
         engine.GetRenderer().GetUvViewOutput();
-    const auto adapterDiagnostics = engine.GetImGuiAdapter().GetDiagnostics();
+    const RT::EditorUiHost* const editorUi =
+        engine.Services().Find<RT::EditorUiHost>();
+    ASSERT_NE(editorUi, nullptr);
+    ASSERT_TRUE(editorUi->IsOperational());
+    const RT::EditorUiDiagnostics editorUiDiagnostics =
+        editorUi->GetDiagnostics();
 
     if (!run.DeviceOperational)
     {
@@ -1828,9 +1846,9 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
               RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(run.Stats);
 
-    EXPECT_TRUE(adapterDiagnostics.LastFrameUsedUserTexture);
-    EXPECT_GT(adapterDiagnostics.LastVertexCount, 0u);
-    EXPECT_GT(adapterDiagnostics.LastIndexCount, 0u);
+    EXPECT_TRUE(editorUiDiagnostics.LastFrameUsedUserTexture);
+    EXPECT_GT(editorUiDiagnostics.LastVertexCount, 0u);
+    EXPECT_GT(editorUiDiagnostics.LastIndexCount, 0u);
     EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
         << "Vulkan fallback counters incremented across the operational UV-view runtime path: "
         << "fallbackToNull " << run.Before.FallbackToNull << " -> "

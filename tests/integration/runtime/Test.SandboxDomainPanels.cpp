@@ -10,6 +10,7 @@
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
+import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Sandbox.Editor.DomainPanels;
@@ -42,6 +43,27 @@ namespace
         config.Window.Backend = Core::Config::WindowBackend::Null;
         return config;
     }
+
+    struct EditorUiShellHarness
+    {
+        Runtime::Engine Kernel{
+            HeadlessConfig(),
+            std::make_unique<OneFrameApplication>()};
+        SandboxEditor::EditorShell Shell{};
+
+        EditorUiShellHarness()
+        {
+            Kernel.EmplaceModule<Runtime::EditorUiModule>();
+            Kernel.Initialize();
+            Shell.Attach(Kernel);
+        }
+
+        ~EditorUiShellHarness()
+        {
+            Shell.Detach();
+            Kernel.Shutdown();
+        }
+    };
 
     [[nodiscard]] const Runtime::EditorWindowMenuEntry* FindWindow(
         const std::vector<Runtime::EditorWindowMenuEntry>& menu,
@@ -80,11 +102,11 @@ TEST(SandboxDomainPanels, RegistersTheTenAppOwnedWindowsWithStableMenuMetadata)
         {"mesh.selection", {"Mesh"}, "Selection details"},
     }};
 
-    SandboxEditor::EditorShell editorUi;
+    EditorUiShellHarness harness;
     SandboxEditor::DomainPanels panels;
-    panels.Register(editorUi);
+    panels.Register(harness.Shell);
 
-    const auto menu = editorUi.BuildEditorWindowMenuModel();
+    const auto menu = harness.Shell.BuildEditorWindowMenuModel();
     ASSERT_EQ(menu.size(), expected.size() + 10u);
     for (const ExpectedWindow& expectedWindow : expected)
     {
@@ -99,83 +121,67 @@ TEST(SandboxDomainPanels, RegistersTheTenAppOwnedWindowsWithStableMenuMetadata)
 
 TEST(SandboxDomainPanels, RegistrationIsIdempotentAndLifetimeUnregistersEveryWindow)
 {
-    SandboxEditor::EditorShell firstUi;
-    SandboxEditor::EditorShell secondUi;
+    EditorUiShellHarness first;
+    EditorUiShellHarness second;
 
     {
         SandboxEditor::DomainPanels panels;
-        panels.Register(firstUi);
-        ASSERT_EQ(firstUi.BuildEditorWindowMenuModel().size(), 20u);
+        panels.Register(first.Shell);
+        ASSERT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 20u);
 
-        panels.Register(firstUi);
-        EXPECT_EQ(firstUi.BuildEditorWindowMenuModel().size(), 20u);
+        panels.Register(first.Shell);
+        EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 20u);
 
-        panels.Register(secondUi);
-        EXPECT_EQ(firstUi.BuildEditorWindowMenuModel().size(), 10u);
-        EXPECT_EQ(secondUi.BuildEditorWindowMenuModel().size(), 20u);
+        panels.Register(second.Shell);
+        EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 10u);
+        EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 20u);
 
         panels.Unregister();
-        EXPECT_EQ(secondUi.BuildEditorWindowMenuModel().size(), 10u);
+        EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 10u);
 
-        panels.Register(secondUi);
-        ASSERT_EQ(secondUi.BuildEditorWindowMenuModel().size(), 20u);
+        panels.Register(second.Shell);
+        ASSERT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 20u);
     }
 
-    EXPECT_EQ(firstUi.BuildEditorWindowMenuModel().size(), 10u);
-    EXPECT_EQ(secondUi.BuildEditorWindowMenuModel().size(), 10u);
+    EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 10u);
+    EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 10u);
 }
 
 TEST(SandboxDomainPanels, ClosedRegisteredWindowsBuildNoDomainModels)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    engine.Initialize();
-
-    SandboxEditor::EditorShell editorUi;
+    EditorUiShellHarness harness;
     SandboxEditor::DomainPanels panels;
-    panels.Register(editorUi);
-    editorUi.Attach(engine);
-    engine.Run();
+    panels.Register(harness.Shell);
+    harness.Kernel.Run();
 
-    EXPECT_EQ(editorUi.GetLastFrame().ModelBuildStats.DomainWindowModelBuilds,
-              0u);
     EXPECT_EQ(
-        editorUi.GetLastFrame().ModelBuildStats.DomainWindowModelCacheHits,
+        harness.Shell.GetLastFrame().ModelBuildStats.DomainWindowModelBuilds,
         0u);
-
-    editorUi.Detach();
-    panels.Unregister();
-    engine.Shutdown();
+    EXPECT_EQ(
+        harness.Shell.GetLastFrame().ModelBuildStats.DomainWindowModelCacheHits,
+        0u);
 }
 
 TEST(SandboxDomainPanels, OpenSameDomainWindowsShareOneModelBuildPerFrame)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(), std::make_unique<OneFrameApplication>());
-    engine.Initialize();
-
-    SandboxEditor::EditorShell editorUi;
+    EditorUiShellHarness harness;
     SandboxEditor::DomainPanels panels;
-    panels.Register(editorUi);
+    panels.Register(harness.Shell);
     for (const std::string_view id :
          {"pointcloud.appearance",
           "pointcloud.properties",
           "pointcloud.selection",
           "pointcloud.processing.remove_outliers"})
     {
-        ASSERT_TRUE(editorUi.SetEditorWindowOpen(id, true)) << id;
+        ASSERT_TRUE(harness.Shell.SetEditorWindowOpen(id, true)) << id;
     }
 
-    editorUi.Attach(engine);
-    engine.Run();
+    harness.Kernel.Run();
 
-    EXPECT_EQ(editorUi.GetLastFrame().ModelBuildStats.DomainWindowModelBuilds,
-              1u);
     EXPECT_EQ(
-        editorUi.GetLastFrame().ModelBuildStats.DomainWindowModelCacheHits,
+        harness.Shell.GetLastFrame().ModelBuildStats.DomainWindowModelBuilds,
+        1u);
+    EXPECT_EQ(
+        harness.Shell.GetLastFrame().ModelBuildStats.DomainWindowModelCacheHits,
         3u);
-
-    editorUi.Detach();
-    panels.Unregister();
-    engine.Shutdown();
 }

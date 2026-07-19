@@ -13,6 +13,7 @@ import Extrinsic.Core.FrameGraph;
 import Extrinsic.Core.Hash;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.CommandBus;
+import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
@@ -46,6 +47,8 @@ namespace Extrinsic::Runtime
         JobService& Jobs;
         WorldRegistry& Worlds;
         ServiceRegistry& Services;
+        EditorInputCaptureSnapshot& EditorCapture;
+        RuntimeFramePacingDiagnostics& Pacing;
         std::uint64_t FrameIndex{0};
         double FrameDeltaSeconds{0.0};
         double FixedStepAlpha{0.0};

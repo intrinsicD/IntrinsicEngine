@@ -21,11 +21,15 @@ is `intrinsicengine-import-visibility-contract` (`PROC-018`).
 ### 1. ImGui capture must gate camera / gizmo / pick input
 
 When ImGui wants the mouse or keyboard, that input must **not** also drive engine
-controls. The frame loop derives `imguiCapturesInput` from
-the single `m_ImGuiEditorBridge.CaptureSnapshot()` read and its
-`CapturesViewportInput()` result, then gates viewport click-pick, camera
-control, and gizmo drive on it; a viewport click submits a pick request only
-when neither ImGui nor a gizmo owns the click.
+controls. The frame loop owns one `EditorInputCaptureSnapshot`, clears it once
+at frame start, and lends that exact value to every ephemeral hook context.
+The optional `EditorUiModule` runs adapter begin/build/end through
+`UiBegin` → application variable tick → `UiBuild` → `UiEndCapture`, then writes
+capture only after `EndFrame()`. Later viewport behavior and input actions
+derive `imguiCapturesInput` from that completed value and its
+`CapturesViewportInput()` result; a viewport click submits a pick request only
+when neither ImGui nor a gizmo owns the click. Omitting the module leaves the
+snapshot unclaimed.
 
 Evidence: `BUG-017` (clicks over UI fell through to selection / black outline),
 `BUG-036` (UI-captured input leaked into engine controls).

@@ -22,6 +22,7 @@ namespace Extrinsic::Runtime
         std::uint64_t FrameIndex{0};
         Graphics::RenderFrameInput RenderInput{};
         RuntimeRenderExtractionStats ExtractionStats{};
+        EditorInputCaptureSnapshot EditorCapture{};
         std::uint32_t PooledFrontSlot{RenderWorldPool::kInvalidSlot};
     };
 

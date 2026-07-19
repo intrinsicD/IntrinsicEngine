@@ -21,6 +21,7 @@
 import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.ImGuiAdapter;
+import Extrinsic.Runtime.Module;
 
 namespace Plat = Extrinsic::Platform;
 namespace Runtime = Extrinsic::Runtime;
@@ -104,6 +105,7 @@ TEST(ImGuiAdapter, InitializeProducesZeroListFrameForEmptyWindow)
     EXPECT_TRUE(overlay.IsInitialized());
 
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
 
     const auto& diag = adapter.GetDiagnostics();
@@ -165,6 +167,7 @@ TEST(ImGuiAdapter, InitializeLoadsBundledRobotoAndBuildsLegacyFontAtlas)
     EXPECT_EQ(fontBytesPerPixel, 1);
 
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
 
     const auto* frame = overlay.GetCurrentFrame();
@@ -203,6 +206,7 @@ TEST(ImGuiAdapter, FontAtlasPayloadIsCopiedOnlyWhenDirty)
     ASSERT_TRUE(adapter.Initialize());
 
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
     {
         const auto& diag = adapter.GetDiagnostics();
@@ -219,6 +223,7 @@ TEST(ImGuiAdapter, FontAtlasPayloadIsCopiedOnlyWhenDirty)
     const std::vector<std::byte> firstPixels = firstFrame->FontAtlas.Pixels;
 
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
 
     const auto& diag = adapter.GetDiagnostics();
@@ -260,8 +265,10 @@ TEST(ImGuiAdapter, EditorPanelDrawProducesNonEmptyDrawList)
     // Drive a warm-up frame followed by the asserted frame so window geometry is
     // produced regardless of ImGui's first-appearance handling.
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
 
     const auto& diag = adapter.GetDiagnostics();
@@ -309,8 +316,10 @@ TEST(ImGuiAdapter, ImageDrawPreservesUserTextureBindlessCommand)
         });
 
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
 
     const auto& diag = adapter.GetDiagnostics();
@@ -361,6 +370,7 @@ TEST(ImGuiAdapter, LargeDrawListPreservesNonZeroVertexOffset)
         });
 
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
 
     const ImDrawData* drawData = ImGui::GetDrawData();
@@ -447,8 +457,10 @@ TEST(ImGuiAdapter, NestedChildDrawPreservesFramebufferScissor)
         });
 
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
 
     ASSERT_TRUE(capturedChildClip);
@@ -554,6 +566,7 @@ TEST(ImGuiAdapter, ScalesClampsAndRejectsInvalidFramebufferClipRects)
         });
 
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
 
     const auto* frame = overlay.GetCurrentFrame();
@@ -677,8 +690,10 @@ TEST(ImGuiAdapter, EditorCallbackInvokedOncePerFramePair)
     adapter.SetEditorCallback([&calls] { ++calls; });
 
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
 
     EXPECT_EQ(calls, 2u);
@@ -708,6 +723,7 @@ TEST(ImGuiAdapter, PumpsInputAndResizeReportsFramebufferPixelsWithoutDoubleScali
     window.QueueEvent(Plat::CharEvent{static_cast<unsigned int>('A')});
 
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
     {
         const auto& diag = adapter.GetDiagnostics();
@@ -723,6 +739,7 @@ TEST(ImGuiAdapter, PumpsInputAndResizeReportsFramebufferPixelsWithoutDoubleScali
     window.QueueEvent(Plat::WindowResizeEvent{1600, 1200});
 
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
     {
         const auto& diag = adapter.GetDiagnostics();
@@ -749,6 +766,7 @@ TEST(ImGuiAdapter, SnapshotsCaptureStateOncePerCompletedEditorFrame)
     ImGui::SetNextFrameWantCaptureKeyboard(true);
 
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
 
     const Runtime::EditorInputCaptureSnapshot snapshot =
@@ -771,6 +789,7 @@ TEST(ImGuiAdapter, HiddenEditorClearsStaleCaptureState)
     ImGui::SetNextFrameWantCaptureMouse(true);
     ImGui::SetNextFrameWantCaptureKeyboard(true);
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
     ASSERT_TRUE(adapter.CaptureSnapshot().CapturesViewportInput());
     ASSERT_EQ(editorCallbacks, 1u);
@@ -780,6 +799,7 @@ TEST(ImGuiAdapter, HiddenEditorClearsStaleCaptureState)
     EXPECT_FALSE(adapter.CaptureSnapshot().CapturesViewportInput());
 
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
     EXPECT_FALSE(adapter.CaptureSnapshot().CapturedMouse);
     EXPECT_FALSE(adapter.CaptureSnapshot().CapturedKeyboard);
@@ -805,6 +825,7 @@ TEST(ImGuiAdapter, RebuildForDisplayChangeCyclesOverlayExactlyOnce)
 
     // The adapter still produces frames after a rebuild.
     adapter.BeginFrame(kFrameDelta);
+    adapter.BuildEditorFrame();
     adapter.EndFrame();
     EXPECT_EQ(adapter.GetDiagnostics().FramesProduced, 1u);
 }

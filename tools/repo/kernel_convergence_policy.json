@@ -71,8 +71,8 @@
   "current_snapshot": {
     "date": "2026-07-19",
     "metric": "exact_allowlist_complement_v2",
-    "plain_import_count": 40,
-    "domain_import_count": 18,
+    "plain_import_count": 39,
+    "domain_import_count": 17,
     "domain_imports": [
       "Extrinsic.Asset.Service",
       "Extrinsic.ECS.Component.StableId",
@@ -82,7 +82,6 @@
       "Extrinsic.Runtime.CameraControllers",
       "Extrinsic.Runtime.EditorCommandHistory",
       "Extrinsic.Runtime.GizmoFrameService",
-      "Extrinsic.Runtime.ImGuiAdapter",
       "Extrinsic.Runtime.MeshPrimitiveViewPacker",
       "Extrinsic.Runtime.ObjectSpaceNormalBakeService",
       "Extrinsic.Runtime.PrimitiveSelectionRefinement",
@@ -98,7 +97,7 @@
       "Extrinsic.Runtime.FramePacingDiagnostics",
       "Extrinsic.Runtime.InputActions"
     ],
-    "public_getter_count": 29,
+    "public_getter_count": 28,
     "public_getter_names": [
       "GetAssetImportPipeline",
       "GetAssetService",
@@ -110,7 +109,6 @@
       "GetGizmoInteraction",
       "GetGizmoUndoStack",
       "GetGpuAssetCache",
-      "GetImGuiAdapter",
       "GetLastFramePacingDiagnostics",
       "GetLastRefinedPrimitiveSelection",
       "GetLastRefinedPrimitiveSelectionGeneration",
