@@ -254,6 +254,7 @@ if(TARGET ExtrinsicRuntime)
         Test.AssetGeometryIO.cpp
         Test.AssetIngestStateMachine.cpp
         Test.AssetImportFormatCoverage.cpp
+        Test.AssetWorkflowModule.cpp
         Test.AssetMeshNormals.cpp
         Test.AssetModelSceneHandoff.cpp
         Test.AssetModelTextureHandoff.cpp

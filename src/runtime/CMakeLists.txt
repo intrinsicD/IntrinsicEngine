@@ -10,6 +10,7 @@ target_sources(${target_name}
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Runtime.AsyncWorkModule.cppm
         Runtime.AsyncBufferReadback.cppm
+        Runtime.AssetWorkflowModule.cppm
         Runtime.AssetImportPipeline.cppm
         Runtime.AssetGeometryIO.cppm
         Runtime.AssetIngestStateMachine.cppm
@@ -96,6 +97,7 @@ target_sources(${target_name}
         PRIVATE
         Runtime.AsyncWorkModule.cpp
         Runtime.AsyncBufferReadback.cpp
+        Runtime.AssetWorkflowModule.cpp
         Runtime.AssetImportPipeline.cpp
         Runtime.AssetGeometryIO.cpp
         Runtime.AssetIngestStateMachine.cpp
