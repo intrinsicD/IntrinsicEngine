@@ -171,9 +171,10 @@ triggers. The implementation graph is:
   one active-world binding owns file operations, history, and the narrow
   synchronous scene-replacement participant contract.
 - [`RUNTIME-188`](RUNTIME-188-extract-scene-interaction-module.md) — compose
-  selection/lookup/readback/gizmo/mesh-view ownership after the document,
-  camera, and editor-capture seams exist; copied world-tagged snapshots replace
-  Engine-owned interaction pointers.
+  selection/lookup/readback/gizmo ownership after the document, camera, and
+  editor-capture seams exist; copied world-tagged snapshots replace
+  Engine-owned interaction pointers, while obsolete mesh-view compatibility
+  facades/cache are deleted and ECS render-hint components remain authoritative.
 - [`RUNTIME-183`](RUNTIME-183-extract-asset-workflow-module.md) — compose the
   global asset/residency/import/bake owner after its async, document,
   interaction, camera, and config capabilities exist; borrowed world handoffs

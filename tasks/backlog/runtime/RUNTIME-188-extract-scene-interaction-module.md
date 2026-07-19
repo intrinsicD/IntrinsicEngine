@@ -12,24 +12,33 @@ maturity_target: Operational
 ## Status
 
 - 2026-07-19 audit: split from `RUNTIME-172` after the ownership inventory
-  showed that selection, stable lookup/readback, gizmo, and mesh primitive-view
-  state share viewport/extraction/maintenance hooks and omission behavior that
+  showed that selection, stable lookup/readback, and gizmo state share
+  viewport/extraction/maintenance hooks and omission behavior that
   document/history state does not. All implementation checkboxes remain open.
-- Current-state indexes, architecture docs, and `tasks/SESSION-BRIEF.md` are
-  intentionally deferred to the atomic integration after `RUNTIME-180`
-  retires.
+- 2026-07-19 readiness correction: `RUNTIME-106` made ECS `RenderEdges` /
+  `RenderPoints` the authoritative primitive-view controls, and `RUNTIME-172`
+  preserves those components through scene serialization. The remaining Engine
+  facade and render-extraction settings cache have no production consumer; this
+  task deletes that compatibility residue instead of moving or clearing it as
+  interaction state.
+- `RUNTIME-180` and `RUNTIME-182` are retired. Implementation remains blocked
+  only on the `RUNTIME-172` scene-document/participant contract.
 
 ## Goal
 
 - Move selection, stable-entity lookup and binding, pick readback/refinement,
-  gizmo interaction, and mesh primitive-view control ownership out of
-  `Runtime.Engine` into one app-composed `SceneInteractionModule` with an
-  exact active-world binding and pointer-free render snapshot.
+  and gizmo interaction out of `Runtime.Engine` into one app-composed
+  `SceneInteractionModule` with an exact active-world binding and pointer-free
+  render snapshot; delete the obsolete Engine mesh primitive-view facade and
+  unused settings cache.
 
 ## Non-goals
 
-- No selection, picking, refinement, gizmo transform, gizmo undo, or mesh
-  primitive-view behavior change.
+- No selection, picking, refinement, gizmo transform, gizmo undo, component-
+  driven primitive-view extraction, or scene-serialization behavior change.
+- No `SceneInteractionModule` ownership of ECS `RenderEdges` / `RenderPoints`;
+  those remain scene-authoring components edited through the existing Sandbox
+  command/history path.
 - No ownership of scene document/file operations, editor command history,
   camera, UI, renderer, render-extraction cache, asset workflow, or graphics
   selection/readback production.
@@ -39,8 +48,7 @@ maturity_target: Operational
 - No unification of `GizmoUndoStack` with `EditorCommandHistory`; they have
   distinct commit/rollback semantics and remain separate owners.
 - No per-world interaction map and no resurrection of selection, lookup,
-  pending picks, gizmo state, or visualization controls when returning to an
-  old world.
+  pending picks, or gizmo state when returning to an old world.
 
 ## Context
 
@@ -50,9 +58,15 @@ maturity_target: Operational
 - The owned cohort is `SelectionController`, `StableEntityLookup`,
   `StableEntityLookupSceneBinding`, `SelectionReadbackState`,
   `GizmoFrameService` (including interaction, undo, scratch selection, and
-  packet construction), and mesh primitive-view editor controls. These states
-  share one input-to-render lifecycle and must clear together at a world or
-  document replacement boundary.
+  packet construction). These states share one input-to-render lifecycle and
+  must clear together at a world or document replacement boundary.
+- The legacy `Engine::{Set,Clear,Get}MeshPrimitiveViewSettings` methods only
+  translate to authoritative ECS `RenderEdges` / `RenderPoints`. The parallel
+  `RenderExtractionCache` settings map is not read by production extraction,
+  and the Sandbox editor already authors the ECS components directly under
+  `EditorCommandHistory`. Moving either compatibility surface would create
+  module API with no production consumer and would incorrectly make persistent
+  scene authoring state ephemeral interaction state.
 - `RUNTIME-180` provides the typed viewport-input hook and exact
   `CameraControllerRegistry`; `RUNTIME-182` provides the completed
   frame-owned editor-capture snapshot. This task consumes those capabilities
@@ -76,6 +90,14 @@ maturity_target: Operational
   alive after scene providers. `RuntimeShutdownAnnounced` is therefore the
   early quiescence boundary: detach callbacks and invalidate borrowed state
   while all services are still live, before ordinary reverse shutdown.
+- Until `RUNTIME-183` moves `AssetImportPipeline`, its production import-
+  completed policy still borrows the active `SelectionController` to select a
+  newly imported entity. This is one named, implementation-only transition:
+  `Runtime.Engine.cpp` resolves the exact published service locally in
+  `BindActiveSceneAssetHandoffs` and when registering
+  `RUNTIME-183.EngineAssetHandoffTransition`; it is not Engine ownership and
+  must not appear in `Runtime.Engine.cppm`, Engine state, frame work, or a
+  facade.
 - The exact post-`RUNTIME-172` Engine convergence baseline is
   `33` plain imports / `11` domain imports / `2` re-exports /
   `22` public getter names.
@@ -87,8 +109,7 @@ maturity_target: Operational
       `.cpp` as one concrete `SceneInteractionModule final : IRuntimeModule`
       with a PImpl. Own `SelectionController`, `StableEntityLookup`,
       `StableEntityLookupSceneBinding`, `SelectionReadbackState`,
-      `GizmoFrameService` and its interaction/undo/scratch/packet state, and
-      mesh primitive-view controls.
+      and `GizmoFrameService` with its interaction/undo/scratch/packet state.
 - [ ] Publish the exact `SceneInteractionModule` and exact owned
       `SelectionController` through `ServiceRegistry`. Do not publish raw
       `SelectionReadbackState`, `GizmoFrameService`, or
@@ -96,6 +117,17 @@ maturity_target: Operational
       read-only lookup diagnostics through the module; publish the raw
       `StableEntityLookup` only if the implementation inventory identifies a
       present production consumer rather than test-only access.
+- [ ] Replace Engine's temporary
+      `RUNTIME-188.EngineInteractionTransition` with the module-owned strong
+      `RUNTIME-172` participant handle. Keep
+      `RUNTIME-183.EngineAssetHandoffTransition` until `RUNTIME-183`, but source
+      its `SelectionController*` and the initial
+      `AssetImportPipelineDependencies::Selection` from local
+      `ServiceRegistry::Find<SelectionController>()` results at those existing
+      wiring call sites. This is the only allowed Engine-side interaction
+      borrow: it is non-owning, implementation-only, never cached in an Engine
+      member, null when the module is omitted, and owned for removal by
+      `RUNTIME-183`.
 - [ ] Own one interaction binding
       `{WorldHandle, ECS::Scene::Registry*, interaction epoch}`. App-global
       configuration may retain selection-controller and gizmo configuration,
@@ -135,12 +167,15 @@ maturity_target: Operational
       `Maintenance` phases; add neither a seventh `FramePhase` nor viewport
       fields to `RuntimeFrameHookContext`.
 - [ ] Add a pointer-free
-      `RuntimeSceneInteractionRenderSnapshot` containing its `WorldHandle`,
-      copied selected stable/render identities, copied hover/refinement data
-      needed by extraction, and copied gizmo draw packets. Have
-      `RenderExtractionCache` copy and validate the snapshot's world and
-      default to empty interaction data when the module is omitted or the
-      world mismatches.
+      `RuntimeSceneInteractionRenderSnapshot` on
+      `Extrinsic.Runtime.RenderExtraction` containing only its `WorldHandle`,
+      copied selected render IDs, copied hover presence/render ID, and copied
+      gizmo draw packets. Have `RenderExtractionCache` copy the submitted value,
+      validate its world, and default to empty interaction data when the module
+      is omitted or the world mismatches. Primitive-refinement output remains
+      editor-facing state on the exact interaction module; no refinement result,
+      pick context, or other zero-consumer payload belongs in the render
+      snapshot.
 - [ ] Remove `SelectionController*`, gizmo spans, and every other borrowed
       interaction pointer from `ExtractAndSubmit` and the Engine frame hook.
       Render extraction must not retain a module-owned pointer beyond the
@@ -159,21 +194,32 @@ maturity_target: Operational
       wrong-epoch results before calling `SelectionController` or refinement.
       Remove the unmatched-readback fallback that currently mutates selection,
       and clear every context record at reset.
-- [ ] Move mesh primitive-view `Set`, `Clear`, and `Get` behavior to the exact
-      interaction capability. Route invalidation through the existing
-      render-extraction service and clear world-bound controls at replacement;
-      do not introduce a visualization service wrapper.
+- [ ] Delete the obsolete Engine mesh primitive-view `Set`, `Clear`, and `Get`
+      facade; the zero-consumer `Runtime.MeshPrimitiveViewControls` translation
+      module and CMake entries; and the unused `RenderExtractionCache`
+      `Set`/`Clear`/`Get` settings API, backing map, and private-service
+      forwarding. Do not remove `MeshPrimitiveViewPacker`, component-driven
+      extraction/sidecars, ECS `RenderEdges` / `RenderPoints`, Sandbox
+      component authoring/history, or `RUNTIME-172` serialization coverage.
 - [ ] On `RuntimeShutdownAnnounced`, cancel drag/input, invalidate the binding
       epoch, clear readback/context/snapshot state, unregister the document
       participant, and detach every borrowed service while providers are still
-      live. Ordinary shutdown then unsubscribes hooks/events, withdraws exact
-      services, and destroys state. Partial registration and reinitialize with
-      recycled handle bits must start empty and leak no callback.
+      live. Engine must already have cancelled active imports, then detach the
+      transitional `AssetImportPipeline` selection dependency in
+      `AnnounceAndShutdownRuntimeModules()` after the announcement pump returns
+      and before reverse `OnShutdown` can destroy the controller. Document
+      quiescence prevents the retained
+      `RUNTIME-183.EngineAssetHandoffTransition` callback from running after
+      announcement; its provider-owned capture is discarded without
+      dereferencing the controller. Ordinary shutdown then unsubscribes
+      hooks/events, withdraws exact services, and destroys state. Partial
+      registration and reinitialize with recycled handle bits must start empty
+      and leak no callback.
 - [ ] Compose the module in Sandbox as an optional interaction capability.
       Omission produces an empty render snapshot and no selection, pick,
-      stable lookup, gizmo, or mesh primitive-view behavior while scene
-      document, camera, rendering, input actions, and Engine remain
-      operational.
+      stable lookup, or gizmo behavior while scene document, camera, rendering,
+      generic input actions, component-driven `RenderEdges` / `RenderPoints`,
+      and Engine remain operational.
 - [ ] Remove Engine interaction state, initialization, hooks, imports, and
       facades: `GetSelectionController`,
       `GetStableEntityLookupDiagnostics`, `ResolveEntityByStableId`,
@@ -181,7 +227,9 @@ maturity_target: Operational
       `GetLastRefinedPrimitiveSelection`,
       `GetLastRefinedPrimitiveSelectionGeneration`,
       `SetMeshPrimitiveViewSettings`, `ClearMeshPrimitiveViewSettings`, and
-      `GetMeshPrimitiveViewSettings`.
+      `GetMeshPrimitiveViewSettings`. Remove all owned interaction members and
+      helpers; the named `RUNTIME-183` implementation-only selection borrow
+      above is the sole temporary exception.
 - [ ] Ratchet the exact final Engine snapshot to
       `26` plain imports / `4` domain imports / `2` re-exports /
       `15` public getter names. The seven removed imports are
@@ -216,23 +264,35 @@ maturity_target: Operational
 - [ ] Cover scene new/load/close through the real document participant: drag
       cancellation occurs while the old registry is live; selection/hover
       tags, pending/in-flight picks, contexts, refined cache, gizmo undo/
-      scratch/packets, and primitive-view state clear; lookup disconnects
-      before replacement and rebuilds/reattaches afterward.
+      scratch/packets clear; lookup disconnects before replacement and
+      rebuilds/reattaches afterward. Prove serialized ECS `RenderEdges` /
+      `RenderPoints` survive the document round trip independently of
+      interaction reset.
 - [ ] Cover stale-readback rejection for zero, unknown, wrong-world, and
       wrong-epoch sequences; prove an old GPU result cannot select or refine in
       a replacement world and prove the issue sequence remains monotonic
       across replacement.
 - [ ] Cover missing camera, missing UI/capture adapter, missing document
       participant during boot, and full module omission. Prove empty/mismatched
-      render snapshots fail closed and generic input/rendering continue.
+      render snapshots fail closed and generic input/rendering plus component-
+      driven primitive views continue.
+- [ ] Cover the `RUNTIME-183` transition explicitly: the Engine implementation
+      resolves the published controller for initial and replacement asset
+      dependencies, omission supplies null, active imports cancel before the
+      borrow detaches on shutdown announcement, and no callback dereferences it
+      during reverse teardown.
 - [ ] Migrate existing selection, stable-lookup, selection-readback,
-      primitive-refinement, gizmo, mesh primitive-view, render-extraction,
-      input-action, Sandbox acceptance, and GPU-smoke fixtures. Build the
-      existing Vulkan/GPU smoke callers against the new composition and run
-      the opt-in cohort on a capable host without adding a new GPU feature.
+      primitive-refinement, gizmo, render-extraction, input-action, Sandbox
+      acceptance, and GPU-smoke fixtures. Replace Engine compatibility tests
+      with structural deletion checks while preserving existing component-
+      driven mesh primitive-view extraction and serialization fixtures. Build
+      the existing Vulkan/GPU smoke callers against the new composition and
+      run the opt-in cohort on a capable host without adding a new GPU feature.
 - [ ] Add structural checks for the exact Engine import/getter ratchet, no
       interaction pointer in extraction/input aggregates, no seventh generic
-      frame phase/context widening, and no obsolete Engine facade.
+      frame phase/context widening, no obsolete Engine facade/settings cache,
+      and no Engine interaction borrow beyond the exact `RUNTIME-183`
+      implementation-only transition.
 
 ## Docs
 
@@ -240,7 +300,8 @@ maturity_target: Operational
       notes, kernel target-state, and Sandbox README with
       `SceneInteractionModule`, its one-world state scope, hook order,
       replacement participant, omission behavior, and pointer-free render
-      snapshot.
+      snapshot. Record ECS `RenderEdges` / `RenderPoints` as persistent
+      scene-authoring state, not interaction-module state.
 - [ ] Update task graph/indexes and the `RUNTIME-172`, `RUNTIME-168`,
       `RUNTIME-183`, `RUNTIME-184`, and `REVIEW-003` composition descriptions;
       regenerate `tasks/SESSION-BRIEF.md`.
@@ -249,16 +310,24 @@ maturity_target: Operational
 
 ## Acceptance criteria
 
-- [ ] Engine owns no selection/lookup/readback/gizmo/mesh-view state, import,
-      initialization, teardown, frame work, borrowed extraction pointer, or
-      public facade.
+- [ ] `Runtime.Engine.cppm` owns no selection/lookup/readback/gizmo/mesh-view
+      state, import, initialization, teardown, frame work, borrowed extraction
+      pointer, or public facade. `Runtime.Engine.cpp` contains only the named
+      non-owning `RUNTIME-183` asset-import transition, detached on shutdown
+      announcement and removed by `RUNTIME-183`.
 - [ ] Every interaction record belongs to exactly one validated active-world
       binding and clears on world/document replacement, retirement, shutdown,
       and recycled-handle reinitialize without state resurrection.
 - [ ] Old, unknown, or mismatched GPU readbacks cannot mutate selection or
       refined output in the current world; pick sequencing remains monotonic.
 - [ ] Render extraction consumes only a copied, world-tagged, pointer-free
-      snapshot and behaves as empty when the module is absent or mismatched.
+      snapshot of selected render IDs, hover, and gizmo packets; it behaves as
+      empty when the module is absent or mismatched and receives no refinement
+      payload.
+- [ ] No Engine/interaction mesh primitive-view compatibility facade, settings
+      cache, or translation module remains. ECS `RenderEdges` / `RenderPoints`,
+      their component-driven extraction, Sandbox authoring/history, and
+      `RUNTIME-172` serialization remain authoritative and operational.
 - [ ] Sandbox interaction remains Operational through the canonical Engine
       path, while omission leaves document, camera, generic input, and
       rendering operational.
@@ -282,8 +351,10 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 
 ## Forbidden changes
 
-- Retaining an Engine compatibility getter, borrowed interaction pointer, or
-  Engine back-reference while migrating ownership.
+- Retaining an Engine compatibility getter, Engine back-reference, or borrowed
+  interaction pointer other than the exact implementation-only
+  `RUNTIME-183.EngineAssetHandoffTransition` / `AssetImportPipeline` selection
+  dependency named above.
 - Recombining document/history and interaction into `SceneEditingModule`, or
   adding one module/service wrapper per owned class.
 - Adding a seventh generic frame phase, widening
@@ -293,13 +364,15 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
   accepting unmatched/wrong-world/wrong-epoch readbacks.
 - Publishing raw mutable readback, gizmo, or lookup-binding internals without
   a demonstrated production consumer.
-- Unifying gizmo undo with editor command history or changing selection,
-  refinement, gizmo, mesh-view, input, or rendering semantics.
+- Unifying gizmo undo with editor command history, moving persistent
+  `RenderEdges` / `RenderPoints` into interaction state, or changing selection,
+  refinement, gizmo, mesh-view, input, serialization, or rendering semantics.
 - Moving live ECS interaction ownership into graphics, app, or
   `SceneDocumentModule`.
 
 ## Maturity
 
-- Target: `Operational`; selection, picking, stable lookup, gizmo, mesh-view,
-  and render-snapshot composition must run through the canonical Engine/
-  Sandbox path, not only direct class or module contract tests.
+- Target: `Operational`; selection, picking, stable lookup, gizmo, and render-
+  snapshot composition must run through the canonical Engine/Sandbox path, not
+  only direct class or module contract tests. Existing component-driven
+  primitive views remain independently Operational.
