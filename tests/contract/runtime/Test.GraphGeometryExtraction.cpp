@@ -145,7 +145,7 @@ TEST(GraphGeometryExtraction, LineGraphUploadsOnceAndBindsInstanceGeometry)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeLineGraphRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -191,7 +191,7 @@ TEST(GraphGeometryExtraction, PointGraphUploadsOnceAndBindsInstanceGeometry)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakePointGraphRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -221,7 +221,7 @@ TEST(GraphGeometryExtraction, LineAndPointGraphUploadsSingleHandleForBothLanes)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeLineAndPointGraphRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -277,7 +277,7 @@ TEST(GraphGeometryExtraction, LaneOverridesColorLineAndPointLanesIndependently)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeLineAndPointGraphRenderable(scene);
     auto& raw = scene.Raw();
 
@@ -327,7 +327,7 @@ TEST(GraphGeometryExtraction, RepeatedExtractionReusesGraphHandleWithoutReupload
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeLineGraphRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -367,7 +367,7 @@ TEST(GraphGeometryExtraction, TwoGraphEntitiesAllocateIndependentUploads)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     (void)MakeLineGraphRenderable(scene);
     (void)MakePointGraphRenderable(scene);
 
@@ -394,7 +394,7 @@ TEST(GraphGeometryExtraction, EntityDestructionRetiresGraphGeometryAfterDeferred
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeLineGraphRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -445,7 +445,7 @@ TEST(GraphGeometryExtraction, ShutdownReleasesPendingGraphResidency)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     (void)MakeLineGraphRenderable(scene);
     (void)MakePointGraphRenderable(scene);
 
@@ -474,7 +474,7 @@ TEST(GraphGeometryExtraction, ProceduralRefPreemptsGraphPathOnSameEntity)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
@@ -511,7 +511,7 @@ TEST(GraphGeometryExtraction, MissingNodePositionsIncrementsMissingNodesCounter)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
@@ -545,7 +545,7 @@ TEST(GraphGeometryExtraction, OutOfRangeEdgeIncrementsInvalidEdgesCounter)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
@@ -579,7 +579,7 @@ TEST(GraphGeometryExtraction, SurfaceOnlyGraphEntityFailsClosedAsFailedPack)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
@@ -614,7 +614,7 @@ TEST(GraphGeometryExtraction, AddingProceduralRefAfterGraphUploadReleasesGraphRe
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeLineGraphRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -674,7 +674,7 @@ TEST(GraphGeometryExtraction, LosingGraphHintReleasesGraphResidency)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeLineGraphRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -737,7 +737,7 @@ TEST(GraphGeometryExtraction, GainingLineHintRepacksGraphWithoutDirtyTag)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
@@ -801,7 +801,7 @@ TEST(GraphGeometryExtraction, LosingLineHintRepacksGraphWithoutDirtyTag)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeLineAndPointGraphRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -877,7 +877,7 @@ TEST_P(GraphGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = MakeLineGraphRenderable(scene);
 
@@ -995,7 +995,7 @@ TEST(GraphGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesD
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = MakeLineGraphRenderable(scene);
 

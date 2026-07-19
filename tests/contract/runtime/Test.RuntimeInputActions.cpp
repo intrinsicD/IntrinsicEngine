@@ -90,14 +90,14 @@ namespace
     public:
         void OnInitialize(Runtime::Engine& engine) override
         {
-            Entity = engine.GetScene().Create();
+            Entity = engine.Worlds().Get(engine.ActiveWorld())->Create();
             World::Bounds bounds{};
             bounds.WorldBoundingSphere.Center = glm::vec3{4.0f, 2.0f, -1.0f};
             bounds.WorldBoundingSphere.Radius = 2.5f;
-            engine.GetScene().Raw().emplace<World::Bounds>(Entity, bounds);
+            engine.Worlds().Get(engine.ActiveWorld())->Raw().emplace<World::Bounds>(Entity, bounds);
             SelectionApplied =
                 engine.GetSelectionController().SetSelectedEntity(
-                    engine.GetScene(),
+                    *engine.Worlds().Get(engine.ActiveWorld()),
                     Entity);
 
             auto controller = std::make_unique<RecordingCameraController>();

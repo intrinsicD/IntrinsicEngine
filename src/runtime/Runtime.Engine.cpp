@@ -72,7 +72,7 @@ import Extrinsic.Core.FrameLoop;
 import Extrinsic.Runtime.EcsSystemBundle;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ProgressiveRenderData;
-import Extrinsic.Runtime.SceneDocument;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SelectionReadback;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StableEntityLookup;
@@ -295,13 +295,6 @@ namespace Extrinsic::Runtime
             AssetImportPipelineDependencies{
                 .Initialized = &m_Initialized,
                 .Config = &m_Config,
-                .CommandHistory = &m_EditorCommandHistory,
-            });
-        m_SceneDocument = std::make_unique<SceneDocument>(
-            SceneDocumentDependencies{
-                .Initialized = &m_Initialized,
-                .Scene = &m_Scene,
-                .CommandHistory = &m_EditorCommandHistory,
             });
     }
 
@@ -661,7 +654,22 @@ namespace Extrinsic::Runtime
             return;
         }
 
-        m_SceneDocument->ClearSceneRuntimeState();
+        // Active-world switching is a kernel maintenance path, not a
+        // document replacement. Keep its narrow cleanup explicit so the
+        // SceneDocumentModule participant seam cannot become a second,
+        // delayed world-switch mechanism.
+        if (m_Renderer != nullptr)
+        {
+            m_RenderExtractionService.Cache().ClearSceneState(
+                *m_Renderer);
+        }
+        m_ObjectSpaceNormalBakeService.Queue().Clear();
+        if (m_Scene != nullptr)
+            m_SelectionController.ClearSceneState(*m_Scene);
+        m_SelectionReadback.ClearRefinedPrimitiveCache();
+        m_StableEntityLookupBinding.Disconnect();
+        m_AssetResidencyService->DestroySceneBorrowers();
+
         RefreshActiveWorldScenePointer();
         RebuildStableEntityLookupAfterSceneReplacement();
         // Scene handoffs borrow the registry by reference. Active-world changes
@@ -713,11 +721,175 @@ namespace Extrinsic::Runtime
                 .RenderExtraction = &m_RenderExtractionService.Cache(),
                 .Scene = m_Scene,
                 .Selection = &m_SelectionController,
-                .CommandHistory = &m_EditorCommandHistory,
+                .CommandHistory =
+                    m_ServiceRegistry.Find<EditorCommandHistory>(),
                 .ObjectSpaceNormalBakeQueue =
                     &m_ObjectSpaceNormalBakeService.Queue(),
                 .Device = m_Device.get(),
             });
+    }
+
+    void Engine::RegisterSceneReplacementParticipants()
+    {
+        SceneDocumentModule* const documents =
+            m_ServiceRegistry.Find<SceneDocumentModule>();
+        EditorCommandHistory* const history =
+            m_ServiceRegistry.Find<EditorCommandHistory>();
+        if (documents == nullptr || history == nullptr)
+            return;
+
+        // RUNTIME-188 removes this transition adapter when editor interaction
+        // becomes module-owned. Captures name only the exact long-lived
+        // interaction objects; no Engine, setup aggregate, or scene pointer
+        // can survive a replacement boundary.
+        SelectionController* const selection =
+            &m_SelectionController;
+        SelectionReadbackState* const selectionReadback =
+            &m_SelectionReadback;
+        StableEntityLookup* const stableLookup =
+            &m_StableEntityLookup;
+        StableEntityLookupSceneBinding* const stableBinding =
+            &m_StableEntityLookupBinding;
+        auto interaction =
+            documents->RegisterReplacementParticipant(
+                SceneReplacementParticipantDesc{
+                    .Name =
+                        "RUNTIME-188.EngineInteractionTransition",
+                    .BeforeReplace =
+                        [selection,
+                         selectionReadback,
+                         stableBinding](
+                            const SceneReplacementContext& context)
+                        {
+                            selection->ClearSceneState(
+                                context.Registry);
+                            selectionReadback
+                                ->ClearRefinedPrimitiveCache();
+                            stableBinding->Disconnect();
+                        },
+                    .AfterReplace =
+                        [selection,
+                         stableLookup,
+                         stableBinding](
+                            const SceneReplacementContext& context)
+                        {
+                            stableBinding->Rebuild(
+                                *stableLookup,
+                                &context.Registry);
+                            selection->SetStableEntityLookup(
+                                stableLookup);
+                        },
+                });
+        if (!interaction.has_value())
+        {
+            Core::Log::Error(
+                "[Runtime] Failed to register RUNTIME-188 scene replacement transition: {}",
+                Core::Error::ToString(interaction.error()));
+            std::terminate();
+        }
+
+        // RUNTIME-183 removes this adapter when asset residency, extraction,
+        // and bake handoffs become module-owned. Every capture is an exact
+        // owner/capability with Engine lifetime; the callback receives its
+        // only registry reference and world token from the replacement
+        // context.
+        AssetResidencyService* const residency =
+            m_AssetResidencyService.get();
+        Assets::AssetService* const assets =
+            m_AssetService.get();
+        Graphics::IRenderer* const renderer =
+            m_Renderer.get();
+        RHI::IDevice* const device = m_Device.get();
+        RenderExtractionCache* const extraction =
+            &m_RenderExtractionService.Cache();
+        RuntimeObjectSpaceNormalBakeQueue* const bakeQueue =
+            &m_ObjectSpaceNormalBakeService.Queue();
+        AssetImportPipeline* const importPipeline =
+            m_AssetImportPipeline.get();
+        WorldRegistry* const worlds = &m_WorldRegistry;
+        SelectionController* const importSelection =
+            &m_SelectionController;
+        StreamingExecutor* const streaming =
+            m_ServiceRegistry.Find<StreamingExecutor>();
+        Core::Config::EngineConfig* const config = &m_Config;
+        bool* const initialized = &m_Initialized;
+        auto assetHandoffs =
+            documents->RegisterReplacementParticipant(
+                SceneReplacementParticipantDesc{
+                    .Name =
+                        "RUNTIME-183.EngineAssetHandoffTransition",
+                    .BeforeReplace =
+                        [residency,
+                         renderer,
+                         extraction,
+                         bakeQueue](
+                            const SceneReplacementContext&)
+                        {
+                            extraction->ClearSceneState(*renderer);
+                            bakeQueue->Clear();
+                            residency->DestroySceneBorrowers();
+                        },
+                    .AfterReplace =
+                        [residency,
+                         assets,
+                         renderer,
+                         device,
+                         extraction,
+                         bakeQueue,
+                         importPipeline,
+                         worlds,
+                         importSelection,
+                         streaming,
+                         config,
+                         initialized,
+                         history](
+                            const SceneReplacementContext& context)
+                        {
+                            residency->InitializeSceneHandoffs(
+                                *assets,
+                                context.Registry,
+                                *renderer,
+                                AssetResidencySceneHandoffOptions{
+                                    .World = context.World,
+                                    .ObjectSpaceNormalBakeQueue =
+                                        bakeQueue,
+                                    .ObjectSpaceNormalBakeGraphicsBackendOperational =
+                                        device != nullptr &&
+                                        device->IsOperational(),
+                                });
+                            importPipeline->SetDependencies(
+                                AssetImportPipelineDependencies{
+                                    .Initialized = initialized,
+                                    .Config = config,
+                                    .Streaming = streaming,
+                                    .Worlds = worlds,
+                                    .World = context.World,
+                                    .AssetService = assets,
+                                    .GpuAssetCache =
+                                        residency->CachePtr(),
+                                    .ModelTextureHandoff =
+                                        residency
+                                            ->ModelTextureHandoff(),
+                                    .ModelSceneHandoff =
+                                        residency
+                                            ->ModelSceneHandoff(),
+                                    .RenderExtraction = extraction,
+                                    .Scene = &context.Registry,
+                                    .Selection = importSelection,
+                                    .CommandHistory = history,
+                                    .ObjectSpaceNormalBakeQueue =
+                                        bakeQueue,
+                                    .Device = device,
+                                });
+                        },
+                });
+        if (!assetHandoffs.has_value())
+        {
+            Core::Log::Error(
+                "[Runtime] Failed to register RUNTIME-183 scene replacement transition: {}",
+                Core::Error::ToString(assetHandoffs.error()));
+            std::terminate();
+        }
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
@@ -824,10 +996,12 @@ namespace Extrinsic::Runtime
 
         // ── 5. Runtime-module registration (ARCH-011/RUNTIME-179) ─────────
         // Registration precedes dependent subsystem wiring so app-composed
-        // owners can publish narrow construction capabilities. Engine looks
-        // up those capabilities by type and never imports a concrete module.
-        // Resolution/finalization remains at the pre-application boundary
-        // below, after every provider has registered.
+        // owners can publish narrow construction capabilities. The public
+        // Engine surface remains module-agnostic; the two explicitly tracked
+        // RUNTIME-183/RUNTIME-188 transition adapters below resolve the exact
+        // document capabilities in this implementation unit. Resolution/
+        // finalization remains at the pre-application boundary below, after
+        // every provider has registered.
         RegisterRuntimeModulesForBoot(recipeActivation);
 
         // ── 6. Asset service ──────────────────────────────────────────────
@@ -849,23 +1023,7 @@ namespace Extrinsic::Runtime
             m_JobService);
 
         BindActiveSceneAssetHandoffs();
-        m_SceneDocument->SetDependencies(
-            SceneDocumentDependencies{
-                .Initialized = &m_Initialized,
-                .Scene = &m_Scene,
-                .Streaming =
-                    m_ServiceRegistry.Find<StreamingExecutor>(),
-                .Worlds = &m_WorldRegistry,
-                .CommandHistory = &m_EditorCommandHistory,
-                .Renderer = m_Renderer.get(),
-                .RenderExtraction = &m_RenderExtractionService.Cache(),
-                .ObjectSpaceNormalBakeQueue =
-                    &m_ObjectSpaceNormalBakeService.Queue(),
-                .Selection = &m_SelectionController,
-                .SelectionReadback = &m_SelectionReadback,
-                .StableLookup = &m_StableEntityLookup,
-                .StableLookupBinding = &m_StableEntityLookupBinding,
-            });
+        RegisterSceneReplacementParticipants();
 
         // RUNTIME-092 Slice B — attach the runtime-owned stable-entity lookup
         // to the selection authority so render-id resolution flows through the
@@ -1039,16 +1197,6 @@ namespace Extrinsic::Runtime
                 AssetImportPipelineDependencies{
                     .Initialized = &m_Initialized,
                     .Config = &m_Config,
-                    .CommandHistory = &m_EditorCommandHistory,
-                });
-        }
-        if (m_SceneDocument)
-        {
-            m_SceneDocument->SetDependencies(
-                SceneDocumentDependencies{
-                    .Initialized = &m_Initialized,
-                    .Scene = &m_Scene,
-                    .CommandHistory = &m_EditorCommandHistory,
                 });
         }
     }
@@ -1521,16 +1669,6 @@ namespace Extrinsic::Runtime
         return *m_AssetImportPipeline;
     }
 
-    SceneDocument& Engine::GetSceneDocument() noexcept
-    {
-        return *m_SceneDocument;
-    }
-
-    const SceneDocument& Engine::GetSceneDocument() const noexcept
-    {
-        return *m_SceneDocument;
-    }
-
     const RuntimeObjectSpaceNormalBakeQueueDiagnostics&
     Engine::GetObjectSpaceNormalBakeQueueDiagnosticsForTest() const noexcept
     {
@@ -1542,7 +1680,6 @@ namespace Extrinsic::Runtime
         return m_ObjectSpaceNormalBakeService.PendingCount();
     }
 
-    ECS::Scene::Registry& Engine::GetScene()         noexcept { return *m_Scene;         }
     GizmoInteraction& Engine::GetGizmoInteraction() noexcept
     {
         return m_GizmoFrameService.Interaction();
@@ -1627,14 +1764,6 @@ namespace Extrinsic::Runtime
     Engine::GetStableEntityLookupDiagnostics() const noexcept
     {
         return m_StableEntityLookup.GetDiagnostics();
-    }
-    EditorCommandHistory& Engine::GetEditorCommandHistory() noexcept
-    {
-        return m_EditorCommandHistory;
-    }
-    const EditorCommandHistory& Engine::GetEditorCommandHistory() const noexcept
-    {
-        return m_EditorCommandHistory;
     }
     const std::optional<PrimitiveSelectionResult>&
     Engine::GetLastRefinedPrimitiveSelection() const noexcept

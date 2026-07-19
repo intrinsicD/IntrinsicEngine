@@ -310,6 +310,7 @@ if(TARGET ExtrinsicRuntime)
         Test.RuntimeEcsSystemBundle.cpp
         Test.RuntimeReferenceScene.cpp
         Test.RuntimeSceneLifecycle.cpp
+        Test.SceneDocumentModule.cpp
         Test.RuntimeSceneSerialization.cpp
         Test.RuntimeVulkanBreadcrumb.cpp
         Test.SandboxEditorModels.cpp

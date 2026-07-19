@@ -47,10 +47,12 @@ import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraModule;
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.Properties;
@@ -240,7 +242,7 @@ TEST(RuntimeSandboxAcceptance, MeshGraphPointCloudAllResideThroughOneExtraction)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
 
     const EntityHandle mesh = MakeMesh(scene);
     const EntityHandle graph = MakeGraph(scene);
@@ -355,7 +357,7 @@ TEST(RuntimeSandboxAcceptance, SelectionControllerSelectsEntityOfEachFamily)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
 
     const EntityHandle mesh = MakeMesh(scene);
     const EntityHandle graph = MakeGraph(scene);
@@ -382,7 +384,7 @@ TEST(RuntimeSandboxAcceptance, EditorPanelFrameEnumeratesAcceptanceScene)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
 
     const EntityHandle mesh = MakeMesh(scene);
     (void)MakeGraph(scene);
@@ -438,7 +440,7 @@ TEST(RuntimeSandboxAcceptance, PrimitiveRefinementResolvesOneDomainPerFamily)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
 
     const EntityHandle mesh = MakeMesh(scene);
     const EntityHandle graph = MakeGraph(scene);
@@ -472,7 +474,7 @@ TEST(RuntimeSandboxAcceptance, SelectionOutlineSnapshotPopulatedForSelectedEntit
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
 
     const EntityHandle mesh = MakeMesh(scene);
     (void)MakeGraph(scene);
@@ -545,6 +547,7 @@ TEST(RuntimeSandboxAcceptance, FixedStepTaskGraphBuildsOnceThenReusesPlan)
     auto app = std::make_unique<TaskGraphReplayAndExitApplication>();
     auto* appPtr = app.get();
     Runtime::Engine engine(HeadlessConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
@@ -578,7 +581,7 @@ namespace
     public:
         void OnInitialize(Runtime::Engine& engine) override
         {
-            auto& scene = engine.GetScene();
+            auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
             Entity = Extrinsic::ECS::Scene::CreateDefault(scene, "Bug024EditTarget");
             scene.Raw().emplace<G::RenderSurface>(Entity);
         }
@@ -586,9 +589,9 @@ namespace
         void OnVariableTick(Runtime::Engine& engine, double, double) override
         {
             const Runtime::SandboxEditorContext context{
-                .Scene = &engine.GetScene(),
+                .Scene = &*engine.Worlds().Get(engine.ActiveWorld()),
                 .Selection = &engine.GetSelectionController(),
-                .CommandHistory = &engine.GetEditorCommandHistory(),
+                .CommandHistory = &*engine.Services().Find<Runtime::EditorCommandHistory>(),
             };
             LastStatus = Runtime::ApplySandboxEditorTransformEdit(
                 context,
@@ -629,7 +632,7 @@ TEST(RuntimeSandboxAcceptance, InspectorTransformEditFlushedToRenderStateSameFra
 
     ASSERT_EQ(appPtr->LastStatus, Runtime::SandboxEditorCommandStatus::Applied);
     const EntityHandle entity = appPtr->Entity;
-    auto& raw = engine.GetScene().Raw();
+    auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
 
     const glm::mat4& world = raw.get<ECSC::Transform::WorldMatrix>(entity).Matrix;
     EXPECT_FLOAT_EQ(world[3].x, kBug024EditedPosition.x);

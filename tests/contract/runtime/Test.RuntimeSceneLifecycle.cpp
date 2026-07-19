@@ -32,7 +32,7 @@ import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.SceneDocument;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StreamingExecutor;
@@ -358,9 +358,10 @@ TEST(RuntimeSceneLifecycle, EngineRunsWithoutOptionalAsyncWorkModule)
 TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSidecars)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const ECS::EntityHandle entity = scene.Create();
     scene.Raw().emplace<Sel::SelectableTag>(entity);
     const std::uint32_t stableId = Runtime::SelectionController::ToStableEntityId(entity);
@@ -399,7 +400,7 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
     EXPECT_FLOAT_EQ(std::get<float>(translatedPoints.SizeSource), 4.0f);
     ASSERT_TRUE(engine.GetVisualizationAdapterBinding(stableId).has_value());
 
-    const auto reset = engine.GetSceneDocument().NewSceneDocument();
+    const auto reset = engine.Services().Find<Runtime::SceneDocumentModule>()->NewSceneDocument();
     ASSERT_TRUE(reset.has_value()) << static_cast<int>(reset.error());
 
     EXPECT_FALSE(scene.Raw().valid(entity));
@@ -422,32 +423,33 @@ TEST(RuntimeSceneLifecycle, QueuedSceneSaveWritesSnapshotAndMarksHistoryOnComple
         [](Runtime::Engine& runningEngine)
         {
             const std::optional<Runtime::RuntimeSceneFileEvent>& event =
-                runningEngine.GetSceneDocument().GetLastSceneFileEvent();
+                runningEngine.Services().Find<Runtime::SceneDocumentModule>()->GetLastSceneFileEvent();
             return event.has_value() &&
                    event->Operation == Runtime::RuntimeSceneFileOperation::Save;
         });
     WaitForConditionApplication* app = application.get();
     Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const ECS::EntityHandle saved = scene.Create();
     scene.Raw().emplace<ECSC::MetaData>(
         saved,
         ECSC::MetaData{.EntityName = "Saved Scene Entity"});
     scene.Raw().emplace<Sel::SelectableTag>(saved);
     const Runtime::EditorCommandHistoryResult dirty =
-        engine.GetEditorCommandHistory().MarkDirty("Edit Scene");
+        engine.Services().Find<Runtime::EditorCommandHistory>()->MarkDirty("Edit Scene");
     EXPECT_TRUE(dirty.Succeeded());
-    EXPECT_TRUE(engine.GetEditorCommandHistory().Snapshot().Dirty);
+    EXPECT_TRUE(engine.Services().Find<Runtime::EditorCommandHistory>()->Snapshot().Dirty);
 
     auto queued =
-        engine.GetSceneDocument().QueueSceneSaveToPath(savedScene.Path.string());
+        engine.Services().Find<Runtime::SceneDocumentModule>()->QueueSceneSaveToPath(savedScene.Path.string());
     ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
     EXPECT_TRUE(queued->Task.IsValid());
     EXPECT_EQ(queued->Operation, Runtime::RuntimeSceneFileOperation::Save);
-    EXPECT_FALSE(engine.GetSceneDocument().GetLastSceneFileEvent().has_value());
+    EXPECT_FALSE(engine.Services().Find<Runtime::SceneDocumentModule>()->GetLastSceneFileEvent().has_value());
 
     scene.Raw().get<ECSC::MetaData>(saved).EntityName = "Mutated After Queue";
     const ECS::EntityHandle late = scene.Create();
@@ -464,7 +466,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneSaveWritesSnapshotAndMarksHistoryOnComple
         << " ms and " << app->Frames() << " frames";
     EXPECT_FALSE(app->TimedOut());
     const std::optional<Runtime::RuntimeSceneFileEvent>& event =
-        engine.GetSceneDocument().GetLastSceneFileEvent();
+        engine.Services().Find<Runtime::SceneDocumentModule>()->GetLastSceneFileEvent();
     ASSERT_TRUE(event.has_value());
     EXPECT_EQ(event->Operation, Runtime::RuntimeSceneFileOperation::Save);
     EXPECT_EQ(event->Task, queued->Task);
@@ -475,7 +477,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneSaveWritesSnapshotAndMarksHistoryOnComple
     EXPECT_EQ(event->SaveResult->Stats.SelectableEntities, 1u);
 
     const Runtime::EditorCommandHistorySnapshot history =
-        engine.GetEditorCommandHistory().Snapshot();
+        engine.Services().Find<Runtime::EditorCommandHistory>()->Snapshot();
     EXPECT_TRUE(history.HasActivePath);
     EXPECT_EQ(history.ActivePath, savedScene.Path.string());
     EXPECT_FALSE(history.Dirty);
@@ -500,27 +502,29 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadInvalidDocumentFailsClosed)
     auto application = std::make_unique<WaitForConditionApplication>(
         [](Runtime::Engine& runningEngine)
         {
-            return runningEngine.GetSceneDocument()
-                .GetLastSceneFileEvent()
+            return runningEngine.Services()
+                .Find<Runtime::SceneDocumentModule>()
+                ->GetLastSceneFileEvent()
                 .has_value();
         });
     WaitForConditionApplication* app = application.get();
     Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const ECS::EntityHandle original = scene.Create();
     scene.Raw().emplace<Sel::SelectableTag>(original);
     engine.GetSelectionController().SetSelectedEntity(scene, original);
 
     auto queued =
-        engine.GetSceneDocument().QueueSceneLoadFromPath(
+        engine.Services().Find<Runtime::SceneDocumentModule>()->QueueSceneLoadFromPath(
             invalidScene.Path.string());
     ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
     EXPECT_TRUE(queued->Task.IsValid());
     EXPECT_EQ(queued->Operation, Runtime::RuntimeSceneFileOperation::Load);
-    EXPECT_FALSE(engine.GetSceneDocument().GetLastSceneFileEvent().has_value());
+    EXPECT_FALSE(engine.Services().Find<Runtime::SceneDocumentModule>()->GetLastSceneFileEvent().has_value());
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
         << "explicit Null window backend must keep Engine::Run() drivable";
@@ -531,7 +535,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadInvalidDocumentFailsClosed)
         << " ms and " << app->Frames() << " frames";
     EXPECT_FALSE(app->TimedOut());
     const std::optional<Runtime::RuntimeSceneFileEvent>& event =
-        engine.GetSceneDocument().GetLastSceneFileEvent();
+        engine.Services().Find<Runtime::SceneDocumentModule>()->GetLastSceneFileEvent();
     ASSERT_TRUE(event.has_value());
     EXPECT_EQ(event->Operation, Runtime::RuntimeSceneFileOperation::Load);
     EXPECT_EQ(event->Task, queued->Task);
@@ -555,16 +559,17 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadAppliesParsedSceneOnMainThread)
         [](Runtime::Engine& runningEngine)
         {
             const std::optional<Runtime::RuntimeSceneFileEvent>& event =
-                runningEngine.GetSceneDocument().GetLastSceneFileEvent();
+                runningEngine.Services().Find<Runtime::SceneDocumentModule>()->GetLastSceneFileEvent();
             return event.has_value() &&
                    event->Operation == Runtime::RuntimeSceneFileOperation::Load;
         });
     WaitForConditionApplication* app = application.get();
     Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const ECS::EntityHandle original = scene.Create();
     scene.Raw().emplace<ECSC::MetaData>(
         original,
@@ -573,11 +578,11 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadAppliesParsedSceneOnMainThread)
     engine.GetSelectionController().SetSelectedEntity(scene, original);
 
     auto queued =
-        engine.GetSceneDocument().QueueSceneLoadFromPath(
+        engine.Services().Find<Runtime::SceneDocumentModule>()->QueueSceneLoadFromPath(
             validScene.Path.string());
     ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
     EXPECT_TRUE(queued->Task.IsValid());
-    EXPECT_FALSE(engine.GetSceneDocument().GetLastSceneFileEvent().has_value());
+    EXPECT_FALSE(engine.Services().Find<Runtime::SceneDocumentModule>()->GetLastSceneFileEvent().has_value());
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
         << "explicit Null window backend must keep Engine::Run() drivable";
@@ -588,7 +593,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadAppliesParsedSceneOnMainThread)
         << " ms and " << app->Frames() << " frames";
     EXPECT_FALSE(app->TimedOut());
     const std::optional<Runtime::RuntimeSceneFileEvent>& event =
-        engine.GetSceneDocument().GetLastSceneFileEvent();
+        engine.Services().Find<Runtime::SceneDocumentModule>()->GetLastSceneFileEvent();
     ASSERT_TRUE(event.has_value());
     EXPECT_TRUE(event->Succeeded());
     ASSERT_TRUE(event->LoadResult.has_value());
@@ -606,17 +611,16 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadRejectsActiveWorldSwitchBeforeApply)
     TempSceneFile validScene(
         "runtime179_world_scoped_scene_load.json",
         R"({"version":1,"entities":[{"id":0,"name":"Wrong World Load"}]})");
-    auto application = std::make_unique<WaitForConditionApplication>(
-        [](Runtime::Engine& runningEngine)
-        {
-            return runningEngine.GetSceneDocument()
-                .GetLastSceneFileEvent()
-                .has_value();
-        });
-    WaitForConditionApplication* app = application.get();
-    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    Runtime::Engine engine(
+        NullWindowHeadlessConfig(),
+        std::make_unique<StubApplication>());
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
+    Runtime::SceneDocumentModule& document =
+        *engine.Services().Find<Runtime::SceneDocumentModule>();
+    Runtime::StreamingExecutor& streaming =
+        *engine.Services().Find<Runtime::StreamingExecutor>();
 
     const Runtime::WorldHandle submissionWorld = engine.ActiveWorld();
     ECS::Scene::Registry* const submissionScene =
@@ -637,28 +641,34 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadRejectsActiveWorldSwitchBeforeApply)
         replacementMarker,
         ECSC::MetaData{.EntityName = "Replacement World Marker"});
 
-    auto queued = engine.GetSceneDocument().QueueSceneLoadFromPath(
+    auto queued = document.QueueSceneLoadFromPath(
         validScene.Path.string());
     ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
+    streaming.PumpBackground(1u);
+    if (Core::Tasks::Scheduler::IsInitialized())
+        Core::Tasks::Scheduler::WaitForAll();
+    streaming.DrainCompletions();
+    ASSERT_EQ(
+        streaming.GetState(queued->Task),
+        Runtime::StreamingTaskState::WaitingForMainThreadApply);
+
     ASSERT_TRUE(
         engine.Worlds().RequestSetActiveWorld(replacementWorld).has_value());
-
-    engine.Run();
-
-    ASSERT_TRUE(app->ConditionSatisfied())
-        << "world-switched scene load timed out after "
-        << app->Elapsed().count() << " ms and " << app->Frames() << " frames";
-    EXPECT_FALSE(app->TimedOut());
+    EXPECT_EQ(
+        engine.Worlds()
+            .ApplyMaintenance(engine.Events(), engine.Jobs())
+            .AppliedActiveWorldChanges,
+        1u);
     EXPECT_EQ(engine.ActiveWorld(), replacementWorld);
     ASSERT_EQ(engine.Worlds().Get(submissionWorld), submissionScene);
     ASSERT_EQ(engine.Worlds().Get(replacementWorld), replacementScene);
 
-    const std::optional<Runtime::RuntimeSceneFileEvent>& event =
-        engine.GetSceneDocument().GetLastSceneFileEvent();
-    ASSERT_TRUE(event.has_value());
-    EXPECT_EQ(event->Task, queued->Task);
-    EXPECT_EQ(event->Error, Core::ErrorCode::InvalidState);
-    EXPECT_FALSE(event->LoadResult.has_value());
+    // Direct validation resets the binding before the queued completion can
+    // commit, even though ActiveWorldChanged is still waiting in the event
+    // queue. The stale callback must not repopulate last-event state.
+    EXPECT_FALSE(document.GetLastSceneFileEvent().has_value());
+    streaming.ApplyMainThreadResults();
+    EXPECT_FALSE(document.GetLastSceneFileEvent().has_value());
 
     EXPECT_TRUE(SceneContainsNamedEntity(
         *submissionScene,
@@ -678,27 +688,23 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadRejectsAwayAndBackBindingEpoch)
         "runtime179_world_binding_epoch_scene_load.json",
         R"({"version":1,"entities":[{"id":0,"name":"Stale Epoch Load"}]})");
 
-    bool initialized = true;
-    Runtime::SceneDocument document{};
-    Runtime::WorldRegistry worlds{};
-    Runtime::KernelEventBus events{};
-    Runtime::JobService jobs{};
+    Runtime::Engine engine(
+        NullWindowHeadlessConfig(),
+        std::make_unique<StubApplication>());
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    Runtime::SceneDocumentModule& document =
+        *engine.Services().Find<Runtime::SceneDocumentModule>();
+    Runtime::WorldRegistry& worlds = engine.Worlds();
     const Runtime::WorldHandle submissionWorld =
-        worlds.CreateWorld("Submission");
+        engine.ActiveWorld();
     const Runtime::WorldHandle awayWorld = worlds.CreateWorld("Away");
-    ECS::Scene::Registry* activeScene = worlds.Get(submissionWorld);
+    ECS::Scene::Registry* const activeScene =
+        worlds.Get(submissionWorld);
     ASSERT_NE(activeScene, nullptr);
-    // Declare the executor after every callback dependency so an early test
-    // return still drains/destroys queued callbacks before those borrows die.
-    Runtime::StreamingExecutor streaming{};
-
-    document.SetDependencies(
-        Runtime::SceneDocumentDependencies{
-            .Initialized = &initialized,
-            .Scene = &activeScene,
-            .Streaming = &streaming,
-            .Worlds = &worlds,
-        });
+    Runtime::StreamingExecutor& streaming =
+        *engine.Services().Find<Runtime::StreamingExecutor>();
     auto queued = document.QueueSceneLoadFromPath(validScene.Path.string());
     ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
 
@@ -712,26 +718,24 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadRejectsAwayAndBackBindingEpoch)
 
     ASSERT_TRUE(worlds.RequestSetActiveWorld(awayWorld).has_value());
     EXPECT_EQ(
-        worlds.ApplyMaintenance(events, jobs).AppliedActiveWorldChanges,
+        worlds.ApplyMaintenance(engine.Events(), engine.Jobs())
+            .AppliedActiveWorldChanges,
         1u);
-    document.ClearSceneRuntimeState();
-    activeScene = worlds.Get(awayWorld);
+    EXPECT_FALSE(document.GetLastSceneFileEvent().has_value());
 
     ASSERT_TRUE(worlds.RequestSetActiveWorld(submissionWorld).has_value());
     EXPECT_EQ(
-        worlds.ApplyMaintenance(events, jobs).AppliedActiveWorldChanges,
+        worlds.ApplyMaintenance(engine.Events(), engine.Jobs())
+            .AppliedActiveWorldChanges,
         1u);
-    document.ClearSceneRuntimeState();
-    activeScene = worlds.Get(submissionWorld);
+    EXPECT_FALSE(document.GetLastSceneFileEvent().has_value());
 
     streaming.ApplyMainThreadResults();
     const std::optional<Runtime::RuntimeSceneFileEvent>& event =
         document.GetLastSceneFileEvent();
-    ASSERT_TRUE(event.has_value());
-    EXPECT_EQ(event->Task, queued->Task);
-    EXPECT_EQ(event->Error, Core::ErrorCode::InvalidState);
-    EXPECT_FALSE(event->LoadResult.has_value());
+    EXPECT_FALSE(event.has_value());
     EXPECT_FALSE(SceneContainsNamedEntity(*activeScene, "Stale Epoch Load"));
+    engine.Shutdown();
 }
 
 TEST(RuntimeSceneLifecycle, RetiredQueuedSceneSavePublishesTerminalEvent)
@@ -740,24 +744,17 @@ TEST(RuntimeSceneLifecycle, RetiredQueuedSceneSavePublishesTerminalEvent)
         "runtime179_retired_scene_save.json",
         "");
 
-    bool initialized = true;
-    Runtime::SceneDocument document{};
-    Runtime::WorldRegistry worlds{};
-    const Runtime::WorldHandle world =
-        worlds.CreateWorld("Retired scene operation");
-    ECS::Scene::Registry* activeScene = worlds.Get(world);
-    ASSERT_NE(activeScene, nullptr);
-    // The executor owns callbacks that borrow the document, so it must be
-    // destroyed first on an early test return.
-    Runtime::StreamingExecutor streaming{};
-
-    document.SetDependencies(
-        Runtime::SceneDocumentDependencies{
-            .Initialized = &initialized,
-            .Scene = &activeScene,
-            .Streaming = &streaming,
-            .Worlds = &worlds,
-        });
+    Runtime::Engine engine(
+        NullWindowHeadlessConfig(),
+        std::make_unique<StubApplication>());
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    Runtime::SceneDocumentModule& document =
+        *engine.Services().Find<Runtime::SceneDocumentModule>();
+    Runtime::StreamingExecutor& streaming =
+        *engine.Services().Find<Runtime::StreamingExecutor>();
+    const Runtime::WorldHandle world = engine.ActiveWorld();
     auto queued =
         document.QueueSceneSaveToPath(savedScene.Path.string());
     ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
@@ -783,4 +780,5 @@ TEST(RuntimeSceneLifecycle, RetiredQueuedSceneSavePublishesTerminalEvent)
     streaming.ApplyMainThreadResults();
     ASSERT_TRUE(document.GetLastSceneFileEvent().has_value());
     EXPECT_EQ(document.GetLastSceneFileEvent()->Sequence, 1u);
+    engine.Shutdown();
 }

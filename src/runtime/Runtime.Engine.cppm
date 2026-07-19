@@ -27,7 +27,6 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.AssetImportPipeline;
-import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GizmoFrameService;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.JobServiceGpuQueueBridge;
@@ -39,7 +38,6 @@ import Extrinsic.Runtime.ObjectSpaceNormalBakeService;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.SceneDocument;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.RenderWorldPool;
@@ -176,7 +174,6 @@ namespace Extrinsic::Runtime
             GetObjectSpaceNormalBakeQueueDiagnosticsForTest() const noexcept;
         [[nodiscard]] std::size_t
             GetPendingObjectSpaceNormalBakeCountForTest() const noexcept;
-        [[nodiscard]] ECS::Scene::Registry&   GetScene()         noexcept;
         // ARCH-007 — kernel command bus (ADR-0024 D5). Enqueue from any
         // thread/phase; the Engine drains once per frame between platform
         // input and the fixed-step simulation.
@@ -215,11 +212,6 @@ namespace Extrinsic::Runtime
         // instead of widening the Engine facade with import-specific methods.
         [[nodiscard]] AssetImportPipeline& GetAssetImportPipeline() noexcept;
         [[nodiscard]] const AssetImportPipeline& GetAssetImportPipeline() const noexcept;
-        // RUNTIME-148 — runtime-owned scene-document subsystem. Engine keeps
-        // composition ownership; callers use the subsystem surface directly
-        // instead of widening the Engine facade with scene-file methods.
-        [[nodiscard]] SceneDocument& GetSceneDocument() noexcept;
-        [[nodiscard]] const SceneDocument& GetSceneDocument() const noexcept;
         [[nodiscard]] RuntimeInputActionHandle RegisterInputAction(
             RuntimeInputActionDesc desc);
         void UnregisterInputAction(RuntimeInputActionHandle handle);
@@ -240,9 +232,6 @@ namespace Extrinsic::Runtime
             ResolveEntityByStableId(ECS::Components::StableId id);
         [[nodiscard]] const StableEntityLookupDiagnostics&
             GetStableEntityLookupDiagnostics() const noexcept;
-        [[nodiscard]] EditorCommandHistory&   GetEditorCommandHistory() noexcept;
-        [[nodiscard]] const EditorCommandHistory&
-            GetEditorCommandHistory() const noexcept;
         // RUNTIME-084 Slice B — runtime/editor-owned transform-gizmo authority.
         // Engine reads platform input and the active camera snapshot each frame,
         // drives hit-test / drag tick / commit against selected ECS authoring
@@ -327,11 +316,6 @@ namespace Extrinsic::Runtime
         // RUNTIME-089 Slice B — selection authority; persists across frames so
         // in-flight picks correlate with their later readbacks.
         SelectionController                   m_SelectionController{};
-        // RUNTIME-102 — runtime/editor-owned undo/redo and document dirty-state
-        // source. UI reads snapshots from this service and command facades mark
-        // save/load/import state here instead of keeping authoritative document
-        // state in panel objects.
-        EditorCommandHistory                  m_EditorCommandHistory{};
         // RUNTIME-162 — runtime/editor transform-gizmo frame service. Engine
         // keeps frame order and public facades; the service owns interaction
         // state, undo stack, selected-entity scratch, and packet production.
@@ -357,7 +341,6 @@ namespace Extrinsic::Runtime
         std::unique_ptr<AssetResidencyService>   m_AssetResidencyService;
         ObjectSpaceNormalBakeService             m_ObjectSpaceNormalBakeService{};
         std::unique_ptr<AssetImportPipeline>      m_AssetImportPipeline;
-        std::unique_ptr<SceneDocument>            m_SceneDocument;
         RuntimeInputActionRegistry            m_InputActions{};
         // ARCH-007 — kernel command bus; drained in RunFrame() pre-sim.
         CommandBus                             m_CommandBus{};
@@ -418,5 +401,6 @@ namespace Extrinsic::Runtime
         void ApplyWorldRegistryMaintenance();
         void RebuildStableEntityLookupAfterSceneReplacement();
         void BindActiveSceneAssetHandoffs();
+        void RegisterSceneReplacementParticipants();
     };
 }

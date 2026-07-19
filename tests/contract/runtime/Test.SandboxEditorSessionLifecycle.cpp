@@ -81,6 +81,7 @@ import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxConfigSections;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
@@ -283,6 +284,7 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
         HeadlessConfig(),
         std::make_unique<PassiveApplication>());
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
 
     Runtime::SandboxEditorSession session;

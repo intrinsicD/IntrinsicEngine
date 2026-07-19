@@ -90,7 +90,7 @@ TEST(PointCloudGeometryExtraction, CloudUploadsOnceAndBindsInstanceGeometry)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakePointCloudRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -156,7 +156,7 @@ TEST(PointCloudGeometryExtraction, PopulateFromCloudResolvesPointCloudDomainAndU
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
@@ -199,7 +199,7 @@ TEST(PointCloudGeometryExtraction, RepeatedExtractionReusesPointCloudHandleWitho
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakePointCloudRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -239,7 +239,7 @@ TEST(PointCloudGeometryExtraction, TwoCloudEntitiesAllocateIndependentUploads)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     (void)MakePointCloudRenderable(scene);
     (void)MakePointCloudRenderable(scene);
 
@@ -266,7 +266,7 @@ TEST(PointCloudGeometryExtraction, EntityDestructionRetiresPointCloudGeometryAft
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakePointCloudRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -317,7 +317,7 @@ TEST(PointCloudGeometryExtraction, CacheDestructionToleratesPendingDeferredRetir
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakePointCloudRenderable(scene);
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
 
@@ -348,7 +348,7 @@ TEST(PointCloudGeometryExtraction, ShutdownReleasesPendingPointCloudResidency)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     (void)MakePointCloudRenderable(scene);
     (void)MakePointCloudRenderable(scene);
 
@@ -377,7 +377,7 @@ TEST(PointCloudGeometryExtraction, ProceduralRefPreemptsPointCloudPathOnSameEnti
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
@@ -414,7 +414,7 @@ TEST(PointCloudGeometryExtraction, MissingPositionsIncrementsMissingPositionsCou
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
@@ -448,7 +448,7 @@ TEST(PointCloudGeometryExtraction, NonFinitePositionIncrementsInvalidPointsCount
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
@@ -481,7 +481,7 @@ TEST(PointCloudGeometryExtraction, PerPointSizeSourceFailsClosedAsFailedPack)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
@@ -521,7 +521,7 @@ TEST(PointCloudGeometryExtraction, AddingProceduralRefAfterUploadReleasesPointCl
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakePointCloudRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -581,7 +581,7 @@ TEST(PointCloudGeometryExtraction, LosingPointHintReleasesPointCloudResidency)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakePointCloudRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -643,7 +643,7 @@ TEST(PointCloudGeometryExtraction, UnsupportedSurfaceAndEdgeHintsFailClosed)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
@@ -678,7 +678,7 @@ TEST(PointCloudGeometryExtraction, UnsupportedSurfaceAndEdgeHintsReleasePriorRes
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakePointCloudRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -742,7 +742,7 @@ TEST_P(PointCloudGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = MakePointCloudRenderable(scene);
 
@@ -851,7 +851,7 @@ TEST(PointCloudGeometryExtraction, VertexCountChangeFallsBackToFullUpload)
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = MakePointCloudRenderable(scene);
 
@@ -909,7 +909,7 @@ TEST(PointCloudGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPrese
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = MakePointCloudRenderable(scene);
 
@@ -971,7 +971,7 @@ TEST(PointCloudGeometryExtraction, SwitchingToUnsupportedSizeSourceReleasesResid
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = MakePointCloudRenderable(scene);  // default uniform float size.
 

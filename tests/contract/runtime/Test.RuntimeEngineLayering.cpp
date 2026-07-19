@@ -722,7 +722,9 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     const auto assetImport =
         ReadFile(RepoRoot() / "src/runtime/Runtime.AssetImportPipeline.cpp");
     const auto sceneDocument =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.SceneDocument.cpp");
+        ReadFile(
+            RepoRoot() /
+            "src/runtime/Scene/Runtime.SceneDocumentModule.cpp");
     const auto sandboxPolicies =
         ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxDefaultPolicies.cpp");
     const auto visualization =
@@ -1122,9 +1124,13 @@ TEST(RuntimeEngineLayering, SelectionReadbackKeepsPickCorrelationCacheOutOfEngin
     const auto frameLoop =
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
     const auto sceneDocumentInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.SceneDocument.cppm");
+        ReadFile(
+            RepoRoot() /
+            "src/runtime/Scene/Runtime.SceneDocumentModule.cppm");
     const auto sceneDocumentImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.SceneDocument.cpp");
+        ReadFile(
+            RepoRoot() /
+            "src/runtime/Scene/Runtime.SceneDocumentModule.cpp");
     const auto readbackInterface =
         ReadFile(RepoRoot() / "src/runtime/Runtime.SelectionReadback.cppm");
     const auto readbackImpl =
@@ -1140,9 +1146,15 @@ TEST(RuntimeEngineLayering, SelectionReadbackKeepsPickCorrelationCacheOutOfEngin
               std::string::npos);
     EXPECT_NE(engineImpl.find("m_SelectionReadback.LastRefinedPrimitive()"),
               std::string::npos);
-    EXPECT_NE(sceneDocumentInterface.find("SelectionReadbackState* SelectionReadback"),
+    EXPECT_EQ(sceneDocumentInterface.find("SelectionReadback"),
               std::string::npos);
-    EXPECT_NE(sceneDocumentImpl.find("SelectionReadback->ClearRefinedPrimitiveCache()"),
+    EXPECT_EQ(sceneDocumentImpl.find("SelectionReadback"),
+              std::string::npos);
+    const auto interactionTransition =
+        engineImpl.find("RUNTIME-188.EngineInteractionTransition");
+    ASSERT_NE(interactionTransition, std::string::npos);
+    EXPECT_NE(engineImpl.find("->ClearRefinedPrimitiveCache();",
+                              interactionTransition),
               std::string::npos);
 
     EXPECT_EQ(engineInterface.find("struct InFlightPickContext"),

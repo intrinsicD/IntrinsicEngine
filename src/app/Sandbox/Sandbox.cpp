@@ -14,6 +14,7 @@ import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.WorldHandle;
 
 namespace Extrinsic::Sandbox {
@@ -87,6 +88,7 @@ void RegisterSandboxRuntimeModules(Runtime::Engine &engine) {
   engine.EmplaceModule<Runtime::CameraModule>();
   engine.EmplaceModule<Runtime::ClusteringModule>();
   engine.EmplaceModule<Runtime::EditorUiModule>();
+  engine.EmplaceModule<Runtime::SceneDocumentModule>();
 }
 
 std::unique_ptr<Runtime::IApplication> CreateSandboxApp() {

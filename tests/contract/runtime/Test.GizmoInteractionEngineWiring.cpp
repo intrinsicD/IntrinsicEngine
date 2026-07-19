@@ -38,8 +38,8 @@ namespace
 
     EntityHandle MakeTransformEntity(Engine& engine, const glm::vec3 position)
     {
-        EntityHandle entity = engine.GetScene().Create();
-        engine.GetScene().Raw().emplace<Tf::Component>(entity, Tf::Component{
+        EntityHandle entity = engine.Worlds().Get(engine.ActiveWorld())->Create();
+        engine.Worlds().Get(engine.ActiveWorld())->Raw().emplace<Tf::Component>(entity, Tf::Component{
             .Position = position,
             .Scale = glm::vec3{1.f},
         });
@@ -60,7 +60,7 @@ namespace
         {
             ++VariableTicks;
             SelectionApplied =
-                engine.GetSelectionController().SetSelectedEntity(engine.GetScene(), Entity);
+                engine.GetSelectionController().SetSelectedEntity(*engine.Worlds().Get(engine.ActiveWorld()), Entity);
             engine.GetGizmoInteraction().SetMode(Extrinsic::Runtime::GizmoMode::Translate);
             engine.RequestExit();
         }
@@ -79,11 +79,11 @@ TEST(GizmoInteractionEngineWiring, ExtractionSubmitsTransformGizmoPackets)
     engine.Initialize();
 
     const EntityHandle entity = MakeTransformEntity(engine, glm::vec3{2.f, 3.f, 4.f});
-    ASSERT_TRUE(engine.GetSelectionController().SetSelectedEntity(engine.GetScene(), entity));
+    ASSERT_TRUE(engine.GetSelectionController().SetSelectedEntity(*engine.Worlds().Get(engine.ActiveWorld()), entity));
 
     std::vector<EntityHandle> selected{entity};
     Extrinsic::Runtime::TransformGizmoRenderPacketBuilder builder{};
-    const auto packets = builder.Build(engine.GetScene(),
+    const auto packets = builder.Build(*engine.Worlds().Get(engine.ActiveWorld()),
                                        selected,
                                        Extrinsic::Runtime::GizmoMode::Translate,
                                        Extrinsic::Runtime::GizmoOrientation::Global,
@@ -91,7 +91,7 @@ TEST(GizmoInteractionEngineWiring, ExtractionSubmitsTransformGizmoPackets)
     ASSERT_EQ(packets.size(), 1u);
 
     Extrinsic::Runtime::RenderExtractionCache extraction{};
-    (void)extraction.ExtractAndSubmit(engine.GetScene(),
+    (void)extraction.ExtractAndSubmit(*engine.Worlds().Get(engine.ActiveWorld()),
                                       engine.GetRenderer(),
                                       &engine.GetGpuAssetCache(),
                                       &engine.GetSelectionController(),

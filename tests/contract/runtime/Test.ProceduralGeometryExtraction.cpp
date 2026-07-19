@@ -59,7 +59,7 @@ TEST(ProceduralGeometryExtraction, SingleRenderableProducesOneInstanceAndOneGeom
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeProceduralRenderable(scene);
     (void)entity;
 
@@ -92,7 +92,7 @@ TEST(ProceduralGeometryExtraction, TwoRenderablesSharingKeyShareGeometryAndDedup
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     (void)MakeProceduralRenderable(scene);
     (void)MakeProceduralRenderable(scene);
 
@@ -120,7 +120,7 @@ TEST(ProceduralGeometryExtraction, GpuWorldReportsBoundGeometryForProceduralInst
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeProceduralRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -159,7 +159,7 @@ TEST(ProceduralGeometryExtraction, AssetAndProceduralSourcesOnSameEntityIncremen
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
@@ -191,7 +191,7 @@ TEST(ProceduralGeometryExtraction, ProceduralSourceClearsSlotSourceAssetSentinel
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     (void)MakeProceduralRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -213,7 +213,7 @@ TEST(ProceduralGeometryExtraction, EntityDestructionRetiresGeometryAfterDeferred
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeProceduralRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
@@ -273,7 +273,7 @@ TEST(ProceduralGeometryExtraction, RecreateProceduralEntityCancelsRetireAndKeeps
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
 
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle first = MakeProceduralRenderable(scene);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;

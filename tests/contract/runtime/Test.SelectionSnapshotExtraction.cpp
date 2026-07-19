@@ -80,7 +80,7 @@ TEST(SelectionSnapshotExtraction, SelectedEntityMirrorsIntoRenderWorldSelection)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeSelectable(scene);
 
     SelectionController controller;
@@ -109,7 +109,7 @@ TEST(SelectionSnapshotExtraction, HoveredEntityMirrorsIntoRenderWorldSelection)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeSelectable(scene);
 
     SelectionController controller;
@@ -135,7 +135,7 @@ TEST(SelectionSnapshotExtraction, AdditiveSelectionMirrorsAllSelectedIds)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle first  = MakeSelectable(scene);
     const EntityHandle second = MakeSelectable(scene);
 
@@ -165,7 +165,7 @@ TEST(SelectionSnapshotExtraction, NullControllerLeavesSelectionEmpty)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const Extrinsic::Graphics::RenderWorld world = ExtractWorld(engine, extraction, scene, nullptr);
@@ -183,7 +183,7 @@ TEST(SelectionSnapshotExtraction, ClearedSelectionMirrorsEmptyOnNextExtraction)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
-    auto& scene = engine.GetScene();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeSelectable(scene);
 
     SelectionController controller;

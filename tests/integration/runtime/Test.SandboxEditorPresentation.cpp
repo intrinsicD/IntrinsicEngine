@@ -32,6 +32,7 @@ import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Sandbox.Editor.Controller;
 import Extrinsic.Sandbox.Editor.DomainPanels;
 import Extrinsic.Sandbox.Editor.MeshProcessingPanels;
@@ -776,6 +777,7 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
         HeadlessConfig(),
         std::make_unique<WaitForAssetImportEventApplication>(128u));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
     ComposeEditorUiAndInitialize(engine);
     (void)Runtime::RegisterSandboxDefaultRuntimePolicies(
         engine, nullptr);

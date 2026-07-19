@@ -204,12 +204,12 @@ namespace
         const ECS::EntityHandle entity,
         const std::string_view propertyName)
     {
-        if (!engine.GetScene().IsValid(entity))
+        if (!engine.Worlds().Get(engine.ActiveWorld())->IsValid(entity))
         {
             return false;
         }
 
-        auto& raw = engine.GetScene().Raw();
+        auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
         const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
         return view.Valid() &&
             view.ActiveDomain == GS::Domain::Mesh &&
@@ -264,10 +264,10 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsGeneratedG
             << static_cast<int>(imported.error());
         const std::optional<ECS::EntityHandle> meshEntity =
             FindFirstEntityWithDomain(
-                closingEngine.GetScene(), GS::Domain::Mesh);
+                *closingEngine.Worlds().Get(closingEngine.ActiveWorld()), GS::Domain::Mesh);
         ASSERT_TRUE(meshEntity.has_value());
         ExpectMeshLacksVertexProperty(
-            closingEngine.GetScene(), *meshEntity, "v:texcoord");
+            *closingEngine.Worlds().Get(closingEngine.ActiveWorld()), *meshEntity, "v:texcoord");
 
         ASSERT_FALSE(closingEngine.GetWindow().ShouldClose());
         closingEngine.Run();
@@ -297,7 +297,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsGeneratedG
             });
     ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
     completedEntity = FindFirstEntityWithDomain(
-        completedEngine.GetScene(), GS::Domain::Mesh);
+        *completedEngine.Worlds().Get(completedEngine.ActiveWorld()), GS::Domain::Mesh);
     ASSERT_TRUE(completedEntity.has_value());
 
     completedEngine.Run();
@@ -305,12 +305,12 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsGeneratedG
     ASSERT_TRUE(DirectMeshPostProcessReady(
         completedEngine, *completedEntity));
     const GS::ConstSourceView completed = GS::BuildConstView(
-        completedEngine.GetScene().Raw(), *completedEntity);
+        completedEngine.Worlds().Get(completedEngine.ActiveWorld())->Raw(), *completedEntity);
     ASSERT_TRUE(completed.Valid());
     EXPECT_EQ(completed.ActiveDomain, GS::Domain::Mesh);
     EXPECT_EQ(completed.VerticesAlive(), expectedVertexCount);
     EXPECT_EQ(completed.FacesAlive(), expectedFaceCount);
     ExpectMeshVertexTexcoordsFinite(
-        completedEngine.GetScene(), *completedEntity);
+        *completedEngine.Worlds().Get(completedEngine.ActiveWorld()), *completedEntity);
     completedEngine.Shutdown();
 }

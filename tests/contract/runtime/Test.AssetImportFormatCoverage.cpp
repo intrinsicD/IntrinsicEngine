@@ -53,9 +53,11 @@ import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraModule;
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxDefaultPolicies;
+import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StableEntityLookup;
@@ -754,12 +756,12 @@ namespace
         const ECS::EntityHandle entity,
         const std::string_view propertyName)
     {
-        if (!engine.GetScene().IsValid(entity))
+        if (!engine.Worlds().Get(engine.ActiveWorld())->IsValid(entity))
         {
             return false;
         }
 
-        auto& raw = engine.GetScene().Raw();
+        auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
         const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
         return view.Valid() &&
             view.ActiveDomain == GS::Domain::Mesh &&
@@ -793,7 +795,7 @@ namespace
         Runtime::Engine& engine,
         const ECS::EntityHandle entity)
     {
-        auto& raw = engine.GetScene().Raw();
+        auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
         ASSERT_TRUE(raw.all_of<G::VisualizationConfig>(entity));
         const G::VisualizationConfig& visualization =
             raw.get<G::VisualizationConfig>(entity);
@@ -802,7 +804,7 @@ namespace
         Runtime::RenderExtractionCache extraction;
         const Runtime::RuntimeRenderExtractionStats stats =
             extraction.ExtractAndSubmit(
-                engine.GetScene(),
+                *engine.Worlds().Get(engine.ActiveWorld()),
                 engine.GetRenderer(),
                 &engine.GetGpuAssetCache());
         EXPECT_EQ(stats.MeshGeometryUploads, 1u);
@@ -833,6 +835,7 @@ namespace
     {
         engine.EmplaceModule<Runtime::AsyncWorkModule>();
         engine.EmplaceModule<Runtime::CameraModule>();
+        engine.EmplaceModule<Runtime::SceneDocumentModule>();
         engine.Initialize();
     }
 
@@ -1029,10 +1032,10 @@ namespace
         ASSERT_EQ(probe.CompletedEntities.size(), 2u);
         EXPECT_EQ(probe.AuthoredEntities, probe.CompletedEntities);
         EXPECT_TRUE(probe.CompletionObservedReadyEntities);
-        EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh),
+        EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh),
                   2u);
 
-        auto& raw = engine.GetScene().Raw();
+        auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
         constexpr glm::vec3 expectedWorldCenters[]{
             {11.0f, 5.0f, 0.0f},
             {17.0f, 1.0f, 0.0f},
@@ -1042,7 +1045,7 @@ namespace
              ++index)
         {
             const ECS::EntityHandle entity = probe.CompletedEntities[index];
-            ASSERT_TRUE(engine.GetScene().IsValid(entity));
+            ASSERT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(entity));
 
             const GS::ConstSourceView source = GS::BuildConstView(raw, entity);
             ASSERT_TRUE(source.Valid());
@@ -1134,7 +1137,7 @@ namespace
                 << static_cast<int>(repeated.error());
             EXPECT_FALSE(repeated->MaterializedModelScene);
             EXPECT_EQ(repeated->PrimitiveEntitiesCreated, 0u);
-            EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh),
+            EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh),
                       2u);
             EXPECT_EQ(probe.CompletionCalls, 2u);
             EXPECT_EQ(probe.AuthoredEntities.size(), 4u);
@@ -1184,26 +1187,26 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
     EXPECT_EQ(imported->TextureUploadRequests, 0u);
     EXPECT_EQ(imported->GeneratedTextureUploadRequests, 0u);
 
-    meshEntity = FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    meshEntity = FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
     ExpectMeshVertexNormals(
-        engine.GetScene(),
+        *engine.Worlds().Get(engine.ActiveWorld()),
         *meshEntity,
         {
             {1.0f, 0.0f, 0.0f},
             {0.0f, 1.0f, 0.0f},
             {0.0f, 0.0f, -1.0f},
         });
-    ExpectMeshLacksVertexProperty(engine.GetScene(), *meshEntity, "v:texcoord");
+    ExpectMeshLacksVertexProperty(*engine.Worlds().Get(engine.ActiveWorld()), *meshEntity, "v:texcoord");
     EXPECT_FALSE(HasGeneratedNormalTextureBinding(engine, *meshEntity));
 
     engine.Run();
 
-    EXPECT_TRUE(engine.GetScene().IsValid(*meshEntity));
+    EXPECT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(*meshEntity));
     ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity));
-    ExpectMeshVertexTexcoordsFinite(engine.GetScene(), *meshEntity);
+    ExpectMeshVertexTexcoordsFinite(*engine.Worlds().Get(engine.ActiveWorld()), *meshEntity);
     ExpectMeshVertexNormals(
-        engine.GetScene(),
+        *engine.Worlds().Get(engine.ActiveWorld()),
         *meshEntity,
         {
             {1.0f, 0.0f, 0.0f},
@@ -1244,10 +1247,10 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsSmallGener
             << static_cast<int>(imported.error());
         const std::optional<ECS::EntityHandle> meshEntity =
             FindFirstEntityWithDomain(
-                closingEngine.GetScene(), GS::Domain::Mesh);
+                *closingEngine.Worlds().Get(closingEngine.ActiveWorld()), GS::Domain::Mesh);
         ASSERT_TRUE(meshEntity.has_value());
         ExpectMeshLacksVertexProperty(
-            closingEngine.GetScene(), *meshEntity, "v:texcoord");
+            *closingEngine.Worlds().Get(closingEngine.ActiveWorld()), *meshEntity, "v:texcoord");
 
         ASSERT_FALSE(closingEngine.GetWindow().ShouldClose());
         closingEngine.Run();
@@ -1276,7 +1279,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsSmallGener
             });
     ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
     completedEntity = FindFirstEntityWithDomain(
-        completedEngine.GetScene(), GS::Domain::Mesh);
+        *completedEngine.Worlds().Get(completedEngine.ActiveWorld()), GS::Domain::Mesh);
     ASSERT_TRUE(completedEntity.has_value());
 
     completedEngine.Run();
@@ -1284,13 +1287,13 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsSmallGener
     ASSERT_TRUE(DirectMeshPostProcessReady(
         completedEngine, *completedEntity));
     const GS::ConstSourceView completed = GS::BuildConstView(
-        completedEngine.GetScene().Raw(), *completedEntity);
+        completedEngine.Worlds().Get(completedEngine.ActiveWorld())->Raw(), *completedEntity);
     ASSERT_TRUE(completed.Valid());
     EXPECT_EQ(completed.ActiveDomain, GS::Domain::Mesh);
     EXPECT_EQ(completed.VerticesAlive(), expectedVertexCount);
     EXPECT_EQ(completed.FacesAlive(), expectedFaceCount);
     ExpectMeshVertexTexcoordsFinite(
-        completedEngine.GetScene(), *completedEntity);
+        *completedEngine.Worlds().Get(completedEngine.ActiveWorld()), *completedEntity);
     completedEngine.Shutdown();
 }
 
@@ -1319,7 +1322,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportDefaultsToMaterialDrivenSh
     ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
 
     const std::optional<ECS::EntityHandle> meshEntity =
-        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+        FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
     ExpectMaterialDrivenImportedSurface(engine, *meshEntity);
 
@@ -1363,9 +1366,9 @@ TEST(RuntimeAssetImportFormatCoverage, DefaultImportPoliciesApplyAuthoringUxAndP
     ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
     ASSERT_EQ(imported->PrimitiveEntitiesCreated, 1u);
 
-    meshEntity = FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    meshEntity = FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
-    auto& raw = engine.GetScene().Raw();
+    auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
     EXPECT_TRUE(raw.all_of<Sel::SelectableTag>(*meshEntity));
     EXPECT_TRUE(raw.all_of<G::RenderSurface>(*meshEntity));
     ASSERT_TRUE(raw.all_of<G::VisualizationConfig>(*meshEntity));
@@ -1428,9 +1431,9 @@ TEST(RuntimeAssetImportFormatCoverage, UnregisteredImportPoliciesMaterializeMini
     EXPECT_EQ(imported->PayloadKind, Assets::AssetPayloadKind::Mesh);
     EXPECT_EQ(imported->PrimitiveEntitiesCreated, 1u);
 
-    meshEntity = FindFirstEntityWithDomainAny(engine.GetScene(), GS::Domain::Mesh);
+    meshEntity = FindFirstEntityWithDomainAny(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
-    auto& raw = engine.GetScene().Raw();
+    auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
     EXPECT_FALSE(raw.all_of<Sel::SelectableTag>(*meshEntity));
     EXPECT_FALSE(raw.all_of<G::RenderSurface>(*meshEntity));
     EXPECT_FALSE(raw.all_of<G::RenderEdges>(*meshEntity));
@@ -1448,7 +1451,7 @@ TEST(RuntimeAssetImportFormatCoverage, UnregisteredImportPoliciesMaterializeMini
 
     engine.Run();
 
-    EXPECT_TRUE(engine.GetScene().IsValid(*meshEntity));
+    EXPECT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(*meshEntity));
     EXPECT_FALSE(HasGeneratedNormalTextureBinding(engine, *meshEntity));
 
     engine.Shutdown();
@@ -1467,6 +1470,7 @@ TEST(RuntimeAssetImportFormatCoverage,
     Runtime::Engine engine(
         HeadlessConfig(),
         std::make_unique<OneFrameApplication>());
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
     ASSERT_EQ(
         engine.Services()
@@ -1489,7 +1493,7 @@ TEST(RuntimeAssetImportFormatCoverage,
         << static_cast<int>(imported.error());
     const std::optional<ECS::EntityHandle> meshEntity =
         FindFirstEntityWithDomain(
-            engine.GetScene(), GS::Domain::Mesh);
+            *engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
     EXPECT_TRUE(engine.GetSelectionController().IsSelected(
         *meshEntity));
@@ -1651,7 +1655,7 @@ TEST(RuntimeAssetImportFormatCoverage, ExplicitCancelPublishesOneTerminalEvent)
         queue.Entries[0].TerminalStatus,
         Runtime::RuntimeAssetImportQueueTerminalStatus::Cancelled);
     EXPECT_EQ(
-        CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh),
+        CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh),
         0u);
 
     engine.Shutdown();
@@ -1676,14 +1680,14 @@ TEST(RuntimeAssetImportFormatCoverage, AssetImportPipelinePreservesImportDirtySt
     InitializeAssetImportEngine(engine);
     Runtime::AssetImportPipeline& pipeline = engine.GetAssetImportPipeline();
 
-    EXPECT_FALSE(engine.GetEditorCommandHistory().IsDirty());
+    EXPECT_FALSE(engine.Services().Find<Runtime::EditorCommandHistory>()->IsDirty());
 
     auto failed = pipeline.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
         .Path = missingPath.string(),
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
     EXPECT_FALSE(failed.has_value());
-    EXPECT_FALSE(engine.GetEditorCommandHistory().IsDirty());
+    EXPECT_FALSE(engine.Services().Find<Runtime::EditorCommandHistory>()->IsDirty());
 
     const std::optional<Runtime::RuntimeAssetImportEvent>& failedEvent =
         pipeline.GetLastAssetImportEvent();
@@ -1695,8 +1699,8 @@ TEST(RuntimeAssetImportFormatCoverage, AssetImportPipelinePreservesImportDirtySt
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
     ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
-    EXPECT_TRUE(engine.GetEditorCommandHistory().IsDirty());
-    EXPECT_TRUE(engine.GetEditorCommandHistory().Snapshot().Dirty);
+    EXPECT_TRUE(engine.Services().Find<Runtime::EditorCommandHistory>()->IsDirty());
+    EXPECT_TRUE(engine.Services().Find<Runtime::EditorCommandHistory>()->Snapshot().Dirty);
 
     const std::optional<Runtime::RuntimeAssetImportEvent>& importedEvent =
         pipeline.GetLastAssetImportEvent();
@@ -1844,7 +1848,7 @@ TEST(RuntimeAssetImportFormatCoverage, ReimportExistingMeshReloadsAssetWithoutDu
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
     ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
-    ASSERT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+    ASSERT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh), 1u);
     const auto firstTicket =
         engine.GetAssetService().GetPayloadTicket(imported->Asset);
     ASSERT_TRUE(firstTicket.has_value());
@@ -1866,7 +1870,7 @@ TEST(RuntimeAssetImportFormatCoverage, ReimportExistingMeshReloadsAssetWithoutDu
     EXPECT_EQ(reimported->Asset, imported->Asset);
     EXPECT_EQ(reimported->PayloadKind, Assets::AssetPayloadKind::Mesh);
     EXPECT_EQ(reimported->PrimitiveEntitiesCreated, 0u);
-    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+    EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh), 1u);
 
     const auto secondTicket =
         engine.GetAssetService().GetPayloadTicket(imported->Asset);
@@ -1944,7 +1948,7 @@ TEST(RuntimeAssetImportFormatCoverage, ImportAssetFromPathDoesNotWaitForUnrelate
     const bool blockerFinishedBeforeImportReturned =
         blockerFinished.load(std::memory_order_acquire);
     const std::size_t meshEntityCount =
-        CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh);
+        CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
 
     WaitUntilTrue(blockerFinished);
     engine.Shutdown();
@@ -2024,10 +2028,10 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportQueuesGeneratedNormalBakeF
     EXPECT_EQ(imported->TextureUploadRequests, 0u);
     EXPECT_EQ(imported->GeneratedTextureUploadRequests, 0u);
 
-    meshEntity = FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    meshEntity = FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
     ExpectMeshVertexNormals(
-        engine.GetScene(),
+        *engine.Worlds().Get(engine.ActiveWorld()),
         *meshEntity,
         {
             {1.0f, 0.0f, 0.0f},
@@ -2038,7 +2042,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportQueuesGeneratedNormalBakeF
 
     engine.Run();
 
-    EXPECT_TRUE(engine.GetScene().IsValid(*meshEntity));
+    EXPECT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(*meshEntity));
     ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity));
     ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(engine, *meshEntity);
 
@@ -2076,26 +2080,26 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenM
     EXPECT_EQ(imported->TextureUploadRequests, 0u);
     EXPECT_EQ(imported->GeneratedTextureUploadRequests, 0u);
 
-    meshEntity = FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    meshEntity = FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
     ExpectMeshVertexNormals(
-        engine.GetScene(),
+        *engine.Worlds().Get(engine.ActiveWorld()),
         *meshEntity,
         {
             {0.0f, 0.0f, 1.0f},
             {0.0f, 0.0f, 1.0f},
             {0.0f, 0.0f, 1.0f},
         });
-    ExpectMeshLacksVertexProperty(engine.GetScene(), *meshEntity, "v:texcoord");
+    ExpectMeshLacksVertexProperty(*engine.Worlds().Get(engine.ActiveWorld()), *meshEntity, "v:texcoord");
     EXPECT_FALSE(HasGeneratedNormalTextureBinding(engine, *meshEntity));
 
     engine.Run();
 
-    EXPECT_TRUE(engine.GetScene().IsValid(*meshEntity));
+    EXPECT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(*meshEntity));
     ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity));
-    ExpectMeshVertexTexcoordsFinite(engine.GetScene(), *meshEntity);
+    ExpectMeshVertexTexcoordsFinite(*engine.Worlds().Get(engine.ActiveWorld()), *meshEntity);
     ExpectMeshVertexNormals(
-        engine.GetScene(),
+        *engine.Worlds().Get(engine.ActiveWorld()),
         *meshEntity,
         {
             {0.0f, 0.0f, 1.0f},
@@ -2140,10 +2144,10 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesNormalsAndQueuesGe
     EXPECT_EQ(imported->TextureUploadRequests, 0u);
     EXPECT_EQ(imported->GeneratedTextureUploadRequests, 0u);
 
-    meshEntity = FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    meshEntity = FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
     ExpectMeshVertexNormals(
-        engine.GetScene(),
+        *engine.Worlds().Get(engine.ActiveWorld()),
         *meshEntity,
         {
             {0.0f, 0.0f, 1.0f},
@@ -2154,10 +2158,10 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesNormalsAndQueuesGe
 
     engine.Run();
 
-    EXPECT_TRUE(engine.GetScene().IsValid(*meshEntity));
+    EXPECT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(*meshEntity));
     ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity));
     ExpectMeshVertexNormals(
-        engine.GetScene(),
+        *engine.Worlds().Get(engine.ActiveWorld()),
         *meshEntity,
         {
             {0.0f, 0.0f, 1.0f},
@@ -2258,25 +2262,25 @@ TEST(RuntimeAssetImportFormatCoverage, RepresentativePromotedFormatsMaterializeD
         engine.GetGpuAssetCache().GetState(texture->Asset),
         Extrinsic::Graphics::GpuAssetState::NotRequested);
 
-    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 2u);
-    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Graph), 1u);
-    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::PointCloud), 1u);
+    EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh), 2u);
+    EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Graph), 1u);
+    EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::PointCloud), 1u);
 
-    auto& raw = engine.GetScene().Raw();
+    auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
     const std::optional<ECS::EntityHandle> meshEntity =
-        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+        FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
     EXPECT_TRUE(raw.all_of<G::RenderSurface>(*meshEntity));
     EXPECT_TRUE(raw.all_of<G::VisualizationConfig>(*meshEntity));
 
     const std::optional<ECS::EntityHandle> graphEntity =
-        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Graph);
+        FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Graph);
     ASSERT_TRUE(graphEntity.has_value());
     EXPECT_TRUE(raw.all_of<G::RenderEdges>(*graphEntity));
     EXPECT_TRUE(raw.all_of<G::RenderPoints>(*graphEntity));
 
     const std::optional<ECS::EntityHandle> cloudEntity =
-        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::PointCloud);
+        FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::PointCloud);
     ASSERT_TRUE(cloudEntity.has_value());
     EXPECT_TRUE(raw.all_of<G::RenderPoints>(*cloudEntity));
 
@@ -2624,7 +2628,7 @@ TEST(RuntimeAssetImportFormatCoverage, DroppedModelSceneAndTextureImportThroughS
     engine.GetAssetImportPipeline().ImportDroppedFilePaths(droppedPaths);
 
     EXPECT_FALSE(engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value());
-    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 0u);
+    EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh), 0u);
 
     Runtime::RuntimeAssetImportQueueSnapshot queue =
         engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
@@ -2699,7 +2703,7 @@ TEST(RuntimeAssetImportFormatCoverage, DroppedModelSceneAndTextureImportThroughS
               Assets::AssetPayloadKind::Texture2D);
     EXPECT_TRUE(textureRecord->Result->Asset.IsValid());
 
-    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+    EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh), 1u);
     EXPECT_TRUE(engine.GetAssetService().PathIndexContains(textureFile.Path.string()));
     const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
         engine.GetAssetImportPipeline().GetLastAssetImportEvent();
@@ -2759,7 +2763,7 @@ TEST(RuntimeAssetImportFormatCoverage, ManualModelSceneAndTextureImportQueueComp
     EXPECT_EQ(textureQueued->PayloadKind, Assets::AssetPayloadKind::Texture2D);
 
     EXPECT_FALSE(engine.GetAssetImportPipeline().GetLastAssetImportEvent().has_value());
-    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 0u);
+    EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh), 0u);
 
     Runtime::RuntimeAssetImportQueueSnapshot queue =
         engine.GetAssetImportPipeline().GetAssetImportQueueSnapshot();
@@ -2838,7 +2842,7 @@ TEST(RuntimeAssetImportFormatCoverage, ManualModelSceneAndTextureImportQueueComp
               Assets::AssetPayloadKind::Texture2D);
     EXPECT_TRUE(textureRecord->Result->Asset.IsValid());
 
-    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+    EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh), 1u);
     const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
         engine.GetAssetImportPipeline().GetLastAssetImportEvent();
     ASSERT_TRUE(lastEvent.has_value());
