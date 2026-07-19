@@ -801,7 +801,8 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpace
     options.ProgressiveRawGeometryFirst = true;
     options.ProgressiveJobs = &jobs;
     options.ObjectSpaceNormalBakeQueue = &normalBakeQueue;
-    options.ObjectSpaceNormalBakeGraphicsBackendOperational = true;
+    options.BindingEpoch = 1u;
+    options.ObjectSpaceNormalBakeDevice = &fx.Device;
     auto state = Runtime::MaterializeModelSceneAsset(
         fx.Service,
         fx.Cache,
@@ -891,7 +892,8 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpace
     options.ProgressiveRawGeometryFirst = true;
     options.ProgressiveJobs = &jobs;
     options.ObjectSpaceNormalBakeQueue = &normalBakeQueue;
-    options.ObjectSpaceNormalBakeGraphicsBackendOperational = true;
+    options.BindingEpoch = 1u;
+    options.ObjectSpaceNormalBakeDevice = &fx.Device;
     auto state = Runtime::MaterializeModelSceneAsset(
         fx.Service,
         fx.Cache,
@@ -940,7 +942,7 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpace
     ASSERT_NE(vertices, nullptr);
     EXPECT_TRUE(vertices->Properties.Exists("v:texcoord"));
     EXPECT_EQ(normalBakeQueue.Diagnostics().QueuedRequests, 1u);
-    EXPECT_EQ(normalBakeQueue.CachedContentKeyCount(), 1u);
+    EXPECT_GT(normalBakeQueue.PendingIdentityByteCount(), 0u);
     EXPECT_EQ(normalBakeQueue.PendingCount(), 1u);
 
     auto& bindings =
@@ -981,7 +983,8 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstDoesNotCpuFallbac
     options.ProgressiveRawGeometryFirst = true;
     options.ProgressiveJobs = &jobs;
     options.ObjectSpaceNormalBakeQueue = &normalBakeQueue;
-    options.ObjectSpaceNormalBakeGraphicsBackendOperational = false;
+    options.BindingEpoch = 1u;
+    options.ObjectSpaceNormalBakeDevice = nullptr;
     auto state = Runtime::MaterializeModelSceneAsset(
         fx.Service,
         fx.Cache,
@@ -1287,6 +1290,75 @@ TEST(RuntimeAssetModelSceneHandoff, GeneratesMissingAlbedoTextureFromVertexColor
     EXPECT_EQ(diagnostics.GeneratedTextureAssetsCreated, 1u);
     EXPECT_EQ(diagnostics.GeneratedTextureUploadRequests, 1u);
     EXPECT_EQ(diagnostics.GeneratedTextureBakeFailures, 0u);
+}
+
+TEST(RuntimeAssetModelSceneHandoff,
+     NonProgressiveComposedNormalBakeQueuesGpuWorkAndPreservesCpuAlbedo)
+{
+    SceneHandoffFixture fx;
+    Runtime::RuntimeObjectSpaceNormalBakeQueue normalBakeQueue{};
+    TmpFile modelFile(
+        "asset_model_scene_handoff_nonprogressive_composed_normal_bake.gltf");
+    Assets::AssetModelScenePayload payload = MakeModelScenePayload(
+        /*includeTexcoords*/ true,
+        /*includeVertexColor*/ true,
+        /*includeNormals*/ true);
+    payload.EmbeddedImages.clear();
+    payload.Materials[0].BaseColorTexture = {};
+    payload.Materials[0].NormalTexture = {};
+
+    auto model = LoadModel(
+        fx.Service,
+        modelFile.Path.string(),
+        std::move(payload));
+    ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
+
+    Runtime::AssetModelSceneHandoffDiagnostics diagnostics{};
+    Runtime::AssetModelSceneHandoffOptions options{};
+    options.BindingEpoch = 17u;
+    options.ObjectSpaceNormalBakeQueue = &normalBakeQueue;
+    options.ObjectSpaceNormalBakeDevice = &fx.Device;
+
+    auto state = Runtime::MaterializeModelSceneAsset(
+        fx.Service,
+        fx.Cache,
+        fx.Scene,
+        fx.Materials,
+        *model,
+        options,
+        &diagnostics);
+    ASSERT_TRUE(state.has_value()) << static_cast<int>(state.error());
+
+    ASSERT_EQ(state->Record.GeneratedTextureAssets.size(), 1u);
+    const Assets::AssetId generatedAlbedo =
+        state->Record.GeneratedTextureAssets.front();
+    ASSERT_TRUE(generatedAlbedo.IsValid());
+    ASSERT_EQ(state->Record.Materials.size(), 1u);
+    EXPECT_EQ(
+        state->Record.Materials[0].TextureBindings.Albedo,
+        generatedAlbedo);
+    EXPECT_FALSE(
+        state->Record.Materials[0].TextureBindings.Normal.IsValid());
+    EXPECT_EQ(
+        state->Record.Materials[0].TextureBindings.NormalSpace,
+        Graphics::MaterialNormalTextureSpace::TangentSpaceNormal);
+    EXPECT_EQ(diagnostics.GeneratedTextureAssetsCreated, 1u);
+    EXPECT_EQ(diagnostics.GeneratedNormalTextureBakeFailures, 0u);
+
+    auto pending = normalBakeQueue.TakePendingSubmissions();
+    ASSERT_EQ(pending.size(), 1u);
+    ASSERT_TRUE(pending.front().Identity.has_value());
+    ASSERT_EQ(state->Record.Primitives.size(), 1u);
+    EXPECT_EQ(
+        pending.front().Target.Entity,
+        state->Record.Primitives.front().Entity);
+    EXPECT_EQ(pending.front().Target.BindingEpoch, 17u);
+    EXPECT_TRUE(pending.front().Target.PresentationKey.empty());
+    EXPECT_EQ(
+        pending.front().Target.ExpectedProgressiveBindingGeneration,
+        0u);
+    EXPECT_EQ(pending.front().Identity->Width, options.GeneratedTextureWidth);
+    EXPECT_EQ(pending.front().Identity->Height, options.GeneratedTextureHeight);
 }
 
 TEST(RuntimeAssetModelSceneHandoff, MissingTexcoordsReceiveGeneratedAtlasBeforeGeneratedMaterialTextures)

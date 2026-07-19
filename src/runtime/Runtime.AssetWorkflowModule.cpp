@@ -104,6 +104,8 @@ namespace Extrinsic::Runtime
             {
                 DetachPipeline();
 
+                const WorldHandle outgoingWorld = BoundWorld;
+                const std::uint64_t outgoingEpoch = BindingEpoch;
                 if (clearRenderAndBakeState)
                 {
                     if (Extraction != nullptr &&
@@ -111,8 +113,14 @@ namespace Extrinsic::Runtime
                     {
                         Extraction->ClearSceneState(*Renderer);
                     }
-                    if (Bake != nullptr)
-                        Bake->Queue().Clear();
+                    if (Bake != nullptr &&
+                        outgoingWorld.IsValid() &&
+                        outgoingEpoch != 0u)
+                    {
+                        Bake->DetachTargets(
+                            outgoingWorld,
+                            outgoingEpoch);
+                    }
                 }
 
                 // The handoff destructor destroys its records through the
@@ -121,6 +129,8 @@ namespace Extrinsic::Runtime
                 BoundWorld = {};
                 BoundRegistry = nullptr;
                 AdvanceBindingEpoch();
+                if (Bake != nullptr)
+                    Bake->SetTargetScene({}, 0u, nullptr);
             }
 
             void BindTo(
@@ -143,11 +153,17 @@ namespace Extrinsic::Runtime
                     Bake == nullptr)
                 {
                     DetachPipeline();
+                    if (Bake != nullptr)
+                        Bake->SetTargetScene({}, 0u, nullptr);
                     return;
                 }
 
                 const std::uint64_t expectedEpoch =
                     BindingEpoch;
+                Bake->SetTargetScene(
+                    BoundWorld,
+                    expectedEpoch,
+                    BoundRegistry);
                 const std::weak_ptr<State> weakState = Self;
                 SceneHandoff =
                     std::make_unique<AssetModelSceneHandoff>(
@@ -157,6 +173,7 @@ namespace Extrinsic::Runtime
                         *Renderer,
                         AssetModelSceneHandoffOptions{
                             .World = BoundWorld,
+                            .BindingEpoch = expectedEpoch,
                             .BindingValid =
                                 [weakState, expectedEpoch]()
                                 {
@@ -171,8 +188,7 @@ namespace Extrinsic::Runtime
                                 },
                             .ObjectSpaceNormalBakeQueue =
                                 &Bake->Queue(),
-                            .ObjectSpaceNormalBakeGraphicsBackendOperational =
-                                Device->IsOperational(),
+                            .ObjectSpaceNormalBakeDevice = Device,
                         });
 
                 Pipeline->SetDependencies(
@@ -194,6 +210,8 @@ namespace Extrinsic::Runtime
                         .CommandHistory = History,
                         .ObjectSpaceNormalBakeQueue =
                             &Bake->Queue(),
+                        .ObjectSpaceNormalBakeBindingEpoch =
+                            expectedEpoch,
                         .Device = Device,
                     });
             }
@@ -275,6 +293,15 @@ namespace Extrinsic::Runtime
                 // Do not clear cache or bake state here. The global GPU queue
                 // bridge must observe and quiesce every pending bake first.
                 SceneHandoff.reset();
+                if (Bake != nullptr &&
+                    BoundWorld.IsValid() &&
+                    BindingEpoch != 0u)
+                {
+                    Bake->DetachTargets(
+                        BoundWorld,
+                        BindingEpoch);
+                    Bake->SetTargetScene({}, 0u, nullptr);
+                }
                 BoundWorld = {};
                 BoundRegistry = nullptr;
                 AdvanceBindingEpoch();
@@ -553,7 +580,9 @@ namespace Extrinsic::Runtime
                 *state.Assets, *state.Cache);
         m_Impl->Bake.SetDependencies(
             ObjectSpaceNormalBakeServiceDependencies{
+                .Assets = state.Assets.get(),
                 .GpuAssets = state.Cache.get(),
+                .Renderer = state.Renderer,
                 .RenderExtraction = state.Extraction,
                 .Device = state.Device,
             });
@@ -853,5 +882,7 @@ namespace Extrinsic::Runtime
                 state.SceneHandoff->
                     ResolvePendingMaterialTextureBindings());
         }
+        if (state.Bake != nullptr)
+            state.Bake->PrepareScheduledRequests();
     }
 }

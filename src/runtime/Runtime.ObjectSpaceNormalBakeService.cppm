@@ -6,11 +6,15 @@ module;
 
 export module Extrinsic.Runtime.ObjectSpaceNormalBakeService;
 
+import Extrinsic.Asset.Service;
+import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Graphics.Renderer;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.JobService;
 export import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.WorldHandle;
 
 export namespace Extrinsic::Runtime
 {
@@ -20,7 +24,9 @@ export namespace Extrinsic::Runtime
 
     struct ObjectSpaceNormalBakeServiceDependencies
     {
+        Assets::AssetService* Assets{};
         Graphics::GpuAssetCache* GpuAssets{};
+        Graphics::IRenderer* Renderer{};
         RenderExtractionCache* RenderExtraction{};
         RHI::IDevice* Device{};
     };
@@ -32,6 +38,7 @@ export namespace Extrinsic::Runtime
         bool EnableDeterministicPlan{false};
         bool InvalidateFirstRecord{false};
         bool RejectFirstReadyPublication{false};
+        std::uint64_t IdentityDigestOverride{0u};
     };
 
     struct ObjectSpaceNormalBakeServiceTestDiagnostics
@@ -47,6 +54,10 @@ export namespace Extrinsic::Runtime
         std::uint64_t LastRecordSubmitted{0u};
         std::uint64_t LastDrainProcessed{0u};
         std::uint64_t LastDrainBound{0u};
+        std::uint64_t AllocatedAssets{0u};
+        std::uint64_t PendingIdentityReuses{0u};
+        std::uint64_t ProvenReadyReuses{0u};
+        std::uint64_t CapacityRejected{0u};
     };
 
     void SetObjectSpaceNormalBakeServiceTestHooks(
@@ -72,6 +83,12 @@ export namespace Extrinsic::Runtime
 
         void SetDependencies(ObjectSpaceNormalBakeServiceDependencies deps);
         void ClearDependencies();
+        void SetTargetScene(
+            WorldHandle world,
+            std::uint64_t bindingEpoch,
+            ECS::Scene::Registry* scene) noexcept;
+        void DetachTargets(WorldHandle world, std::uint64_t bindingEpoch);
+        void PrepareScheduledRequests();
 
         [[nodiscard]] GpuQueueParticipantHandle
             RegisterGpuQueueParticipant(JobService& jobs);

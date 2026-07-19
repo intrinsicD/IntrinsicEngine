@@ -68,11 +68,16 @@ import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.Material;
+import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Backend.Glfw;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.TextureManager;
 import Extrinsic.RHI.TextureUpload;
 import Extrinsic.RHI.Types;
 import Extrinsic.Sandbox;
@@ -88,6 +93,8 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.MeshGeometryPacker;
 import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -4533,4 +4540,1011 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, HierarchySelectionKeepsDefaultSandboxVisi
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);
     engine.Shutdown();
+}
+
+// --- RUNTIME-129: real-app object-space normal bake ---------------------
+
+namespace
+{
+constexpr std::uint32_t kRuntime129BakeExtent = 64u;
+constexpr std::uint32_t kRuntime129PixelBytes = 4u;
+constexpr std::uint32_t kRuntime129MaxFrames = 72u;
+
+class Runtime129ObjectSpaceNormalBakeApp final : public IApplication
+{
+public:
+    void OnInitialize(Engine& engine) override
+    {
+        m_Device = &engine.GetDevice();
+        m_Renderer = &engine.GetRenderer();
+        m_Cache =
+            engine.Services().Find<Extrinsic::Graphics::GpuAssetCache>();
+        m_Extraction =
+            engine.Services().Find<RT::RenderExtractionCache>();
+        m_Scene = engine.Worlds().Get(engine.ActiveWorld());
+
+        if (m_Device == nullptr ||
+            m_Renderer == nullptr ||
+            m_Cache == nullptr ||
+            m_Extraction == nullptr ||
+            m_Scene == nullptr)
+        {
+            Fail(
+                "Sandbox composition did not publish the services required by the RUNTIME-129 smoke.");
+            return;
+        }
+
+        m_Participant = engine.Jobs().RegisterGpuQueueParticipant(
+            RT::GpuQueueParticipantDesc{
+                .DebugName =
+                    "RuntimeSandboxAcceptanceGpuSmoke.ObjectSpaceNormalBakeReadback",
+                .Scope = engine.ActiveWorld(),
+                .RecordFrameCommands =
+                    [this](Extrinsic::RHI::ICommandContext& commandContext)
+                    {
+                        RecordReadback(commandContext);
+                    },
+                .DrainCompletedTransfers =
+                    [this]
+                    {
+                        if (ReadbackRecorded)
+                            MaintenanceDrainObserved = true;
+                    },
+                .HasInFlightWork =
+                    [this]
+                    {
+                        return m_Configured &&
+                               m_ReadbackBuffer.IsValid();
+                    },
+                .ShutdownAfterDeviceIdle =
+                    [this]
+                    {
+                        DeviceIdleObserved = true;
+                    },
+            });
+        if (!m_Participant.IsValid())
+        {
+            Fail(
+                "JobService rejected the RUNTIME-129 readback participant.");
+        }
+    }
+
+    void OnSimTick(Engine&, double) override {}
+
+    void OnVariableTick(Engine& engine, double, double) override
+    {
+        ++Frames;
+        if (ReadbackRecorded || !FailureReason.empty())
+        {
+            engine.RequestExit();
+            return;
+        }
+
+        if (Frames > kRuntime129MaxFrames)
+        {
+            TimedOut = true;
+            engine.RequestExit();
+        }
+    }
+
+    void OnShutdown(Engine&) override
+    {
+        m_Participant = {};
+    }
+
+    void ConfigureTarget(
+        const EntityHandle entity,
+        const std::uint32_t stableEntityId,
+        const Extrinsic::Graphics::MaterialTextureAssetBindings&
+            expectedBindings,
+        const Extrinsic::RHI::BufferHandle readbackBuffer) noexcept
+    {
+        m_Target = entity;
+        m_StableEntityId = stableEntityId;
+        m_ExpectedBindings = expectedBindings;
+        m_ReadbackBuffer = readbackBuffer;
+        m_Configured =
+            m_Target != Extrinsic::ECS::InvalidEntityHandle &&
+            m_StableEntityId != 0u &&
+            m_ReadbackBuffer.IsValid();
+    }
+
+    void Detach(Engine& engine)
+    {
+        if (!m_Participant.IsValid())
+            return;
+
+        Extrinsic::RHI::IDevice* const device = m_Device;
+        engine.Jobs().UnregisterGpuQueueParticipant(
+            m_Participant,
+            [device]
+            {
+                if (device != nullptr)
+                    device->WaitIdle();
+            });
+        m_Participant = {};
+    }
+
+    [[nodiscard]] Assets::AssetId GeneratedNormalTexture() const noexcept
+    {
+        return m_GeneratedNormalTexture;
+    }
+
+    [[nodiscard]] std::uint64_t ReadyGeneration() const noexcept
+    {
+        return m_ReadyGeneration;
+    }
+
+    [[nodiscard]] std::uint32_t SurfaceFirstIndex() const noexcept
+    {
+        return m_SurfaceFirstIndex;
+    }
+
+    bool ReadbackRecorded{false};
+    bool MaintenanceDrainObserved{false};
+    bool DeviceIdleObserved{false};
+    bool TimedOut{false};
+    bool PreservedMaterialObserved{false};
+    bool ObjectSpaceBindingObserved{false};
+    std::uint32_t Frames{0u};
+    std::string FailureReason{};
+
+private:
+    void Fail(std::string reason)
+    {
+        if (FailureReason.empty())
+            FailureReason = std::move(reason);
+    }
+
+    void RecordReadback(
+        Extrinsic::RHI::ICommandContext& commandContext)
+    {
+        if (!m_Configured ||
+            ReadbackRecorded ||
+            !FailureReason.empty())
+        {
+            return;
+        }
+
+        if (m_Device == nullptr || !m_Device->IsOperational())
+        {
+            Fail(
+                "Promoted Vulkan became non-operational before the RUNTIME-129 readback.");
+            return;
+        }
+        if (m_Scene == nullptr || !m_Scene->IsValid(m_Target))
+        {
+            Fail(
+                "Imported target entity became stale before the RUNTIME-129 readback.");
+            return;
+        }
+
+        const std::optional<
+            Extrinsic::Graphics::MaterialTextureAssetBindings>
+            bindings =
+                m_Extraction->GetMaterialTextureAssetBindings(
+                    m_StableEntityId);
+        if (!bindings.has_value() || !bindings->Normal.IsValid())
+        {
+            return;
+        }
+
+        ObjectSpaceBindingObserved =
+            bindings->NormalSpace ==
+            Extrinsic::Graphics::MaterialNormalTextureSpace::
+                ObjectSpaceNormal;
+        if (!ObjectSpaceBindingObserved)
+        {
+            Fail(
+                "Generated normal texture bound without object-space normal metadata.");
+            return;
+        }
+
+        PreservedMaterialObserved =
+            bindings->Albedo == m_ExpectedBindings.Albedo &&
+            bindings->MetallicRoughness ==
+                m_ExpectedBindings.MetallicRoughness &&
+            bindings->Emissive == m_ExpectedBindings.Emissive;
+        if (!PreservedMaterialObserved)
+        {
+            Fail(
+                "Exact-ready normal binding replaced an unrelated material texture slot.");
+            return;
+        }
+
+        m_GeneratedNormalTexture = bindings->Normal;
+        if (m_Cache->GetState(m_GeneratedNormalTexture) !=
+            Extrinsic::Graphics::GpuAssetState::Ready)
+        {
+            Fail(
+                "Material referenced a generated normal whose cache state was not Ready.");
+            return;
+        }
+
+        const auto readyView =
+            m_Cache->GetView(m_GeneratedNormalTexture);
+        if (!readyView.has_value() ||
+            readyView->Kind !=
+                Extrinsic::Graphics::GpuAssetKind::Texture ||
+            !readyView->Texture.IsValid() ||
+            readyView->Generation == 0u)
+        {
+            Fail(
+                "Ready generated normal did not expose an exact nonzero texture generation.");
+            return;
+        }
+
+        const Extrinsic::RHI::TextureDesc* const textureDesc =
+            m_Renderer->GetTextureManager().GetDesc(
+                readyView->Texture);
+        const bool hasTransferSourceUsage =
+            textureDesc != nullptr &&
+            (static_cast<std::uint32_t>(textureDesc->Usage) &
+             static_cast<std::uint32_t>(
+                 Extrinsic::RHI::TextureUsage::TransferSrc)) != 0u;
+        if (textureDesc == nullptr ||
+            textureDesc->Width != kRuntime129BakeExtent ||
+            textureDesc->Height != kRuntime129BakeExtent ||
+            textureDesc->Fmt !=
+                Extrinsic::RHI::Format::RGBA8_UNORM ||
+            !hasTransferSourceUsage)
+        {
+            Fail(
+                "Generated normal texture did not expose the production 64x64 RGBA8 TransferSrc contract.");
+            return;
+        }
+
+        const auto renderable =
+            m_Extraction->FindGpuRenderableAvailability(
+                m_StableEntityId);
+        if (!renderable.has_value() ||
+            !renderable->HasRenderable ||
+            !renderable->Surface.HasGeometry)
+        {
+            Fail(
+                "Imported target had no live GPU surface when its normal bake became ready.");
+            return;
+        }
+
+        Extrinsic::Graphics::GpuGeometryResidencyView residency{};
+        if (!m_Renderer->GetGpuWorld().TryGetGeometryResidencyView(
+                renderable->Surface.Geometry,
+                residency))
+        {
+            Fail(
+                "Imported target surface lost its live GpuGeometryResidencyView before readback.");
+            return;
+        }
+        m_SurfaceFirstIndex = residency.Record.SurfaceFirstIndex;
+        if (m_SurfaceFirstIndex == 0u)
+        {
+            Fail(
+                "Target normal bake did not retain a nonzero shared-index-buffer slice.");
+            return;
+        }
+
+        m_ReadyGeneration = readyView->Generation;
+        commandContext.TextureBarrier(
+            readyView->Texture,
+            Extrinsic::RHI::TextureLayout::ShaderReadOnly,
+            Extrinsic::RHI::TextureLayout::TransferSrc);
+        commandContext.CopyTextureToBuffer(
+            readyView->Texture,
+            Extrinsic::RHI::TextureLayout::TransferSrc,
+            0u,
+            0u,
+            m_ReadbackBuffer,
+            0u,
+            0u,
+            0u,
+            textureDesc->Width,
+            textureDesc->Height);
+        commandContext.TextureBarrier(
+            readyView->Texture,
+            Extrinsic::RHI::TextureLayout::TransferSrc,
+            Extrinsic::RHI::TextureLayout::ShaderReadOnly);
+        ReadbackRecorded = true;
+    }
+
+    Extrinsic::RHI::IDevice* m_Device{nullptr};
+    Extrinsic::Graphics::IRenderer* m_Renderer{nullptr};
+    Extrinsic::Graphics::GpuAssetCache* m_Cache{nullptr};
+    RT::RenderExtractionCache* m_Extraction{nullptr};
+    Registry* m_Scene{nullptr};
+    RT::GpuQueueParticipantHandle m_Participant{};
+    EntityHandle m_Target{Extrinsic::ECS::InvalidEntityHandle};
+    std::uint32_t m_StableEntityId{0u};
+    Extrinsic::Graphics::MaterialTextureAssetBindings
+        m_ExpectedBindings{};
+    Extrinsic::RHI::BufferHandle m_ReadbackBuffer{};
+    Assets::AssetId m_GeneratedNormalTexture{};
+    std::uint64_t m_ReadyGeneration{0u};
+    std::uint32_t m_SurfaceFirstIndex{0u};
+    bool m_Configured{false};
+};
+
+[[nodiscard]] std::optional<
+    Extrinsic::Graphics::GpuGeometryResidencyView>
+FindRuntime129Residency(
+    RT::RenderExtractionCache& extraction,
+    Extrinsic::Graphics::IRenderer& renderer,
+    const std::uint32_t stableEntityId)
+{
+    const auto renderable =
+        extraction.FindGpuRenderableAvailability(stableEntityId);
+    if (!renderable.has_value() ||
+        !renderable->HasRenderable ||
+        !renderable->Surface.HasGeometry)
+    {
+        return std::nullopt;
+    }
+
+    Extrinsic::Graphics::GpuGeometryResidencyView residency{};
+    if (!renderer.GetGpuWorld().TryGetGeometryResidencyView(
+            renderable->Surface.Geometry,
+            residency))
+    {
+        return std::nullopt;
+    }
+    return residency;
+}
+
+struct Runtime129LiveBakeMesh
+{
+    std::vector<
+        Extrinsic::Graphics::ObjectSpaceNormalTextureBakeVertex>
+        Vertices{};
+    std::vector<
+        Extrinsic::Graphics::ObjectSpaceNormalTextureBakeTriangle>
+        Triangles{};
+    std::string Diagnostic{};
+
+    [[nodiscard]] bool Succeeded() const noexcept
+    {
+        return !Vertices.empty() && !Triangles.empty() &&
+               Diagnostic.empty();
+    }
+};
+
+[[nodiscard]] Runtime129LiveBakeMesh
+SnapshotRuntime129LiveBakeMesh(
+    const Registry& scene,
+    const EntityHandle entity)
+{
+    Runtime129LiveBakeMesh snapshot{};
+    const gs::ConstSourceView view =
+        gs::BuildConstView(scene.Raw(), entity);
+    if (!view.Valid() || view.VertexSource == nullptr)
+    {
+        snapshot.Diagnostic =
+            "target GeometrySources view was invalid";
+        return snapshot;
+    }
+
+    const auto texcoords =
+        view.VertexSource->Properties.Get<glm::vec2>(
+            "v:texcoord");
+    const auto normals =
+        view.VertexSource->Properties.Get<glm::vec3>(
+            pn::kNormal);
+    if (!texcoords || !normals ||
+        texcoords.Vector().empty() ||
+        texcoords.Vector().size() != normals.Vector().size())
+    {
+        snapshot.Diagnostic =
+            "target resolved texcoord/normal streams were absent or mismatched";
+        return snapshot;
+    }
+
+    std::vector<std::uint32_t> surfaceIndices{};
+    std::vector<std::uint32_t> triangleToFace{};
+    const RT::MeshPackStatus topologyStatus =
+        RT::BuildSurfaceTriangleTopology(
+            view,
+            surfaceIndices,
+            triangleToFace);
+    if (topologyStatus != RT::MeshPackStatus::Success ||
+        surfaceIndices.empty() ||
+        surfaceIndices.size() % 3u != 0u)
+    {
+        snapshot.Diagnostic =
+            std::string{
+                "target canonical topology could not be reconstructed: "} +
+            RT::DebugNameForMeshPackStatus(topologyStatus);
+        return snapshot;
+    }
+
+    snapshot.Vertices.reserve(texcoords.Vector().size());
+    for (std::size_t index = 0u;
+         index < texcoords.Vector().size();
+         ++index)
+    {
+        snapshot.Vertices.push_back(
+            Extrinsic::Graphics::
+                ObjectSpaceNormalTextureBakeVertex{
+                    .Uv = texcoords.Vector()[index],
+                    .Normal = normals.Vector()[index],
+                });
+    }
+
+    snapshot.Triangles.reserve(surfaceIndices.size() / 3u);
+    for (std::size_t index = 0u;
+         index < surfaceIndices.size();
+         index += 3u)
+    {
+        const std::uint32_t a = surfaceIndices[index + 0u];
+        const std::uint32_t b = surfaceIndices[index + 1u];
+        const std::uint32_t c = surfaceIndices[index + 2u];
+        if (a >= snapshot.Vertices.size() ||
+            b >= snapshot.Vertices.size() ||
+            c >= snapshot.Vertices.size())
+        {
+            snapshot.Vertices.clear();
+            snapshot.Triangles.clear();
+            snapshot.Diagnostic =
+                "target canonical topology referenced an invalid vertex";
+            return snapshot;
+        }
+        snapshot.Triangles.push_back(
+            Extrinsic::Graphics::
+                ObjectSpaceNormalTextureBakeTriangle{
+                    .A = a,
+                    .B = b,
+                    .C = c,
+                });
+    }
+    return snapshot;
+}
+
+void ExpectRuntime129TargetNormalPixel(
+    const RgbaPixel pixel,
+    const std::string_view label)
+{
+    constexpr int kTolerance = 4;
+    EXPECT_NEAR(static_cast<int>(pixel.R), 255, kTolerance)
+        << label << " pixel=" << PixelText(pixel);
+    EXPECT_NEAR(static_cast<int>(pixel.G), 128, kTolerance)
+        << label << " pixel=" << PixelText(pixel);
+    EXPECT_NEAR(static_cast<int>(pixel.B), 128, kTolerance)
+        << label << " pixel=" << PixelText(pixel);
+    EXPECT_NEAR(static_cast<int>(pixel.A), 255, kTolerance)
+        << label << " pixel=" << PixelText(pixel);
+    EXPECT_GT(pixel.R, 240u)
+        << label
+        << " encoded the decoy -X normal instead of the target +X normal: "
+        << PixelText(pixel);
+}
+} // namespace
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke,
+     ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice)
+{
+    auto app =
+        std::make_unique<Runtime129ObjectSpaceNormalBakeApp>();
+    auto* const appPtr = app.get();
+    auto bootstrap =
+        BootstrapDefaultSandboxAppEngineWithApp(std::move(app));
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+    Registry& scene =
+        *engine.Worlds().Get(engine.ActiveWorld());
+
+    // The Sandbox seed surface is intentionally made ineligible before the
+    // first extraction. The decoy import therefore occupies the earlier live
+    // shared-index slice and the target import must retain a later nonzero
+    // SurfaceFirstIndex.
+    const EntityHandle reference =
+        FindEntityByName(scene, "ReferenceTriangle");
+    ASSERT_NE(reference, Extrinsic::ECS::InvalidEntityHandle);
+    scene.Raw().remove<G::RenderSurface>(reference);
+
+    TempObjFile decoyObj{
+        "intrinsic_runtime129_normal_bake_decoy",
+        "v -0.75 -0.75 0\n"
+        "v 0.75 -0.75 0\n"
+        "v -0.75 0.75 0\n"
+        "vt 0.25 0.25\n"
+        "vt 0.75 0.25\n"
+        "vt 0.25 0.75\n"
+        "vn -1 0 0\n"
+        "f 1/1/1 2/2/1 3/3/1\n",
+    };
+    TempObjFile targetObj{
+        "intrinsic_runtime129_normal_bake_target",
+        "v -0.75 -0.75 0\n"
+        "v 0.75 -0.75 0\n"
+        "v -0.75 0.75 0\n"
+        "vt 0.25 0.25\n"
+        "vt 0.75 0.25\n"
+        "vt 0.25 0.75\n"
+        "vn 1 0 0\n"
+        "f 1/1/1 2/2/1 3/3/1\n",
+    };
+
+    RT::AssetImportPipeline& importPipeline =
+        RequiredEngineService<RT::AssetImportPipeline>(engine);
+    auto decoyImport = importPipeline.ImportAssetFromPath(
+        RT::RuntimeAssetImportRequest{
+            .Path = decoyObj.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    ASSERT_TRUE(decoyImport.has_value())
+        << static_cast<int>(decoyImport.error());
+    ASSERT_EQ(decoyImport->PrimitiveEntitiesCreated, 1u);
+
+    const EntityHandle decoyEntity =
+        FindEntityByName(
+            scene,
+            decoyObj.Path.filename().string());
+    ASSERT_NE(decoyEntity, Extrinsic::ECS::InvalidEntityHandle);
+    const std::uint32_t decoyStableId =
+        RT::SelectionController::ToStableEntityId(decoyEntity);
+    ASSERT_NE(decoyStableId, 0u);
+
+    RT::RenderExtractionCache& extraction =
+        RequiredEngineService<RT::RenderExtractionCache>(engine);
+    Extrinsic::Graphics::GpuAssetCache& cache =
+        RequiredEngineService<
+            Extrinsic::Graphics::GpuAssetCache>(engine);
+    const RT::RuntimeRenderExtractionStats decoyExtraction =
+        extraction.ExtractAndSubmit(
+            scene,
+            engine.GetRenderer(),
+            &cache,
+            0u,
+            engine.ActiveWorld());
+    ASSERT_EQ(decoyExtraction.MeshGeometryFailedPack, 0u);
+    ASSERT_GE(decoyExtraction.MeshGeometryUploads, 1u);
+    const auto decoyResidencyBeforeTarget =
+        FindRuntime129Residency(
+            extraction,
+            engine.GetRenderer(),
+            decoyStableId);
+    ASSERT_TRUE(decoyResidencyBeforeTarget.has_value())
+        << "The decoy must own a live shared-index slice before the target entity exists.";
+
+    auto targetImport = importPipeline.ImportAssetFromPath(
+        RT::RuntimeAssetImportRequest{
+            .Path = targetObj.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    ASSERT_TRUE(targetImport.has_value())
+        << static_cast<int>(targetImport.error());
+    ASSERT_EQ(targetImport->PrimitiveEntitiesCreated, 1u);
+
+    const EntityHandle targetEntity =
+        FindEntityByName(
+            scene,
+            targetObj.Path.filename().string());
+    ASSERT_NE(targetEntity, Extrinsic::ECS::InvalidEntityHandle);
+
+    const std::uint32_t targetStableId =
+        RT::SelectionController::ToStableEntityId(targetEntity);
+    ASSERT_NE(targetStableId, 0u);
+    ASSERT_NE(decoyStableId, targetStableId);
+
+    Assets::AssetService& assetService =
+        RequiredEngineService<Assets::AssetService>(engine);
+    const Assets::AssetTexture2DPayload preservedPayload =
+        MakeGeneratedUvSmokeAlbedoPayload();
+    const auto loadPreservedTexture =
+        [&assetService, &preservedPayload](
+            const std::string& path)
+        {
+            return assetService.Load<
+                Assets::AssetTexture2DPayload>(
+                path,
+                [preservedPayload](
+                    std::string_view,
+                    Assets::AssetId)
+                    -> Extrinsic::Core::Expected<
+                        Assets::AssetTexture2DPayload>
+                {
+                    return preservedPayload;
+                });
+        };
+
+    auto albedo = loadPreservedTexture(
+        targetObj.Path.string() + ".preserved-albedo");
+    auto metallicRoughness = loadPreservedTexture(
+        targetObj.Path.string() +
+        ".preserved-metallic-roughness");
+    auto emissive = loadPreservedTexture(
+        targetObj.Path.string() + ".preserved-emissive");
+    ASSERT_TRUE(albedo.has_value())
+        << static_cast<int>(albedo.error());
+    ASSERT_TRUE(metallicRoughness.has_value())
+        << static_cast<int>(metallicRoughness.error());
+    ASSERT_TRUE(emissive.has_value())
+        << static_cast<int>(emissive.error());
+
+    const Extrinsic::Graphics::MaterialTextureAssetBindings
+        preservedBindings{
+            .Albedo = *albedo,
+            .Normal = {},
+            .MetallicRoughness = *metallicRoughness,
+            .Emissive = *emissive,
+            .NormalSpace =
+                Extrinsic::Graphics::MaterialNormalTextureSpace::
+                    TangentSpaceNormal,
+        };
+    extraction.SetMaterialTextureAssetBindings(
+        targetStableId,
+        preservedBindings);
+
+    Extrinsic::RHI::IDevice& device = engine.GetDevice();
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(kRuntime129BakeExtent) *
+        static_cast<std::uint64_t>(kRuntime129BakeExtent) *
+        kRuntime129PixelBytes;
+    Extrinsic::RHI::BufferHandle readbackBuffer =
+        device.CreateBuffer(
+            Extrinsic::RHI::BufferDesc{
+                .SizeBytes = readbackSize,
+                .Usage =
+                    Extrinsic::RHI::BufferUsage::TransferDst,
+                .HostVisible = true,
+                .DebugName =
+                    "Sandbox.Runtime129ObjectSpaceNormalBake.Readback",
+            });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        ADD_FAILURE()
+            << "Operational Vulkan device failed to allocate the RUNTIME-129 readback buffer.";
+        return;
+    }
+
+    appPtr->ConfigureTarget(
+        targetEntity,
+        targetStableId,
+        preservedBindings,
+        readbackBuffer);
+    const AcceptanceRunCapture run =
+        DriveAcceptanceAndCapture(engine);
+    appPtr->Detach(engine);
+
+    if (!run.DeviceOperational)
+    {
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE()
+            << "RUNTIME-129 Sandbox bake smoke lost operational Vulkan: status="
+            << ToString(run.Status.Code)
+            << " reason=" << ToString(run.Status.Reason)
+            << ". pass statuses=["
+            << BuildPassStatusSummary(run.Stats) << "]";
+        return;
+    }
+
+    const bool readbackRecorded = appPtr->ReadbackRecorded;
+    const bool maintenanceDrainObserved =
+        appPtr->MaintenanceDrainObserved;
+    const bool deviceIdleObserved =
+        appPtr->DeviceIdleObserved;
+    const bool timedOut = appPtr->TimedOut;
+    const bool preservedMaterialObserved =
+        appPtr->PreservedMaterialObserved;
+    const bool objectSpaceBindingObserved =
+        appPtr->ObjectSpaceBindingObserved;
+    const std::uint32_t frames = appPtr->Frames;
+    const std::string failureReason =
+        appPtr->FailureReason;
+    const Assets::AssetId generatedNormal =
+        appPtr->GeneratedNormalTexture();
+    const std::uint64_t readyGeneration =
+        appPtr->ReadyGeneration();
+    const std::uint32_t targetFirstIndex =
+        appPtr->SurfaceFirstIndex();
+
+    const Extrinsic::Graphics::GpuAssetState finalCacheState =
+        generatedNormal.IsValid()
+            ? cache.GetState(generatedNormal)
+            : Extrinsic::Graphics::GpuAssetState::NotRequested;
+    std::optional<Extrinsic::Graphics::GpuAssetView>
+        finalCacheView{};
+    if (generatedNormal.IsValid())
+    {
+        const auto view = cache.GetView(generatedNormal);
+        if (view.has_value())
+            finalCacheView = *view;
+    }
+    const auto finalBindings =
+        extraction.GetMaterialTextureAssetBindings(
+            targetStableId);
+    const auto decoyResidency =
+        FindRuntime129Residency(
+            extraction,
+            engine.GetRenderer(),
+            decoyStableId);
+    const auto targetResidency =
+        FindRuntime129Residency(
+            extraction,
+            engine.GetRenderer(),
+            targetStableId);
+    const Runtime129LiveBakeMesh targetBakeMesh =
+        SnapshotRuntime129LiveBakeMesh(
+            scene,
+            targetEntity);
+
+    std::vector<std::uint8_t> pixels(
+        static_cast<std::size_t>(readbackSize),
+        0u);
+    device.ReadBuffer(
+        readbackBuffer,
+        pixels.data(),
+        readbackSize,
+        0u);
+    device.DestroyBuffer(readbackBuffer);
+    readbackBuffer = {};
+    engine.Shutdown();
+
+    EXPECT_TRUE(run.Stats.Compile.Succeeded)
+        << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded)
+        << run.Stats.Diagnostic;
+    EXPECT_EQ(
+        FindPassStatus(run.Stats, "Present"),
+        RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_FALSE(timedOut)
+        << "RUNTIME-129 bake did not become exact-ready in "
+        << frames << " bounded frames.";
+    EXPECT_TRUE(failureReason.empty())
+        << failureReason;
+    EXPECT_TRUE(readbackRecorded);
+    EXPECT_TRUE(maintenanceDrainObserved);
+    EXPECT_TRUE(deviceIdleObserved);
+    EXPECT_TRUE(preservedMaterialObserved);
+    EXPECT_TRUE(objectSpaceBindingObserved);
+    EXPECT_TRUE(generatedNormal.IsValid());
+    EXPECT_GT(readyGeneration, 0u);
+    EXPECT_EQ(
+        finalCacheState,
+        Extrinsic::Graphics::GpuAssetState::Ready);
+    ASSERT_TRUE(finalCacheView.has_value());
+    EXPECT_EQ(
+        finalCacheView->Kind,
+        Extrinsic::Graphics::GpuAssetKind::Texture);
+    EXPECT_EQ(
+        finalCacheView->Generation,
+        readyGeneration);
+
+    ASSERT_TRUE(finalBindings.has_value());
+    EXPECT_EQ(finalBindings->Albedo, *albedo);
+    EXPECT_EQ(
+        finalBindings->MetallicRoughness,
+        *metallicRoughness);
+    EXPECT_EQ(finalBindings->Emissive, *emissive);
+    EXPECT_EQ(finalBindings->Normal, generatedNormal);
+    EXPECT_EQ(
+        finalBindings->NormalSpace,
+        Extrinsic::Graphics::MaterialNormalTextureSpace::
+            ObjectSpaceNormal);
+
+    ASSERT_TRUE(decoyResidency.has_value());
+    ASSERT_TRUE(targetResidency.has_value());
+    EXPECT_GT(targetFirstIndex, 0u);
+    EXPECT_EQ(
+        targetResidency->Record.SurfaceFirstIndex,
+        targetFirstIndex);
+    EXPECT_LT(
+        decoyResidencyBeforeTarget->Record.SurfaceFirstIndex,
+        targetResidency->Record.SurfaceFirstIndex)
+        << "The decoy's pre-target allocation must occupy an earlier shared-index slice than the target.";
+
+    ASSERT_TRUE(targetBakeMesh.Succeeded())
+        << targetBakeMesh.Diagnostic;
+    using BakeVertex =
+        Extrinsic::Graphics::ObjectSpaceNormalTextureBakeVertex;
+    using BakeTriangle =
+        Extrinsic::Graphics::ObjectSpaceNormalTextureBakeTriangle;
+    for (const BakeVertex& vertex : targetBakeMesh.Vertices)
+    {
+        EXPECT_NEAR(vertex.Normal.x, 1.0f, 1.0e-5f);
+        EXPECT_NEAR(vertex.Normal.y, 0.0f, 1.0e-5f);
+        EXPECT_NEAR(vertex.Normal.z, 0.0f, 1.0e-5f);
+    }
+
+    const Extrinsic::Graphics::
+        ObjectSpaceNormalTextureBakeOptions bakeOptions{
+            .Width = kRuntime129BakeExtent,
+            .Height = kRuntime129BakeExtent,
+            .PaddingTexels = 4u,
+        };
+    const auto resolvedOptions =
+        Extrinsic::Graphics::
+            ResolveObjectSpaceNormalTextureBakeOptions(
+                bakeOptions);
+    const auto sampleAt =
+        [&](const std::uint32_t x,
+            const std::uint32_t y)
+        {
+            return Extrinsic::Graphics::
+                SampleObjectSpaceNormalTextureBakeAtUv(
+                    std::span<const BakeVertex>{
+                        targetBakeMesh.Vertices},
+                    std::span<const BakeTriangle>{
+                        targetBakeMesh.Triangles},
+                    Extrinsic::Graphics::
+                        UvForObjectSpaceNormalBakeTexelCenter(
+                            x,
+                            y,
+                            resolvedOptions),
+                    bakeOptions);
+        };
+
+    const Extrinsic::Core::Extent2D bakeExtent{
+        kRuntime129BakeExtent,
+        kRuntime129BakeExtent};
+    const auto readAt =
+        [&](const std::uint32_t x,
+            const std::uint32_t y)
+        {
+            return ReadPixel(
+                pixels,
+                Extrinsic::RHI::Format::RGBA8_UNORM,
+                kRuntime129PixelBytes,
+                bakeExtent,
+                x,
+                y);
+        };
+
+    struct Runtime129Texel
+    {
+        std::uint32_t X{0u};
+        std::uint32_t Y{0u};
+        std::uint32_t Distance{0u};
+    };
+    std::vector<Runtime129Texel> cpuCovered{};
+    std::vector<std::uint8_t> cpuCoverage(
+        static_cast<std::size_t>(kRuntime129BakeExtent) *
+            kRuntime129BakeExtent,
+        0u);
+    std::optional<Runtime129Texel> coveredTexel{};
+    float bestInteriorScore =
+        std::numeric_limits<float>::lowest();
+    std::uint32_t unexpectedCpuSamples = 0u;
+    for (std::uint32_t y = 0u;
+         y < kRuntime129BakeExtent;
+         ++y)
+    {
+        for (std::uint32_t x = 0u;
+             x < kRuntime129BakeExtent;
+             ++x)
+        {
+            const auto sample = sampleAt(x, y);
+            if (sample.Succeeded())
+            {
+                cpuCoverage[
+                    static_cast<std::size_t>(y) *
+                        kRuntime129BakeExtent +
+                    x] = 1u;
+                cpuCovered.push_back(
+                    Runtime129Texel{.X = x, .Y = y});
+                const float interiorScore =
+                    std::min(
+                        sample.Barycentric.x,
+                        std::min(
+                            sample.Barycentric.y,
+                            sample.Barycentric.z));
+                if (!coveredTexel.has_value() ||
+                    interiorScore > bestInteriorScore)
+                {
+                    coveredTexel =
+                        Runtime129Texel{.X = x, .Y = y};
+                    bestInteriorScore = interiorScore;
+                }
+            }
+            else if (
+                sample.Status !=
+                Extrinsic::Graphics::
+                    ObjectSpaceNormalTextureBakeStatus::
+                        NoContainingTriangle)
+            {
+                ++unexpectedCpuSamples;
+            }
+        }
+    }
+    ASSERT_EQ(unexpectedCpuSamples, 0u);
+    ASSERT_TRUE(coveredTexel.has_value());
+    ASSERT_FALSE(cpuCovered.empty());
+
+    const auto distanceToCpuCoverage =
+        [&](const std::uint32_t x,
+            const std::uint32_t y)
+        {
+            std::uint32_t distance =
+                std::numeric_limits<std::uint32_t>::max();
+            for (const Runtime129Texel covered :
+                 cpuCovered)
+            {
+                const std::uint32_t dx =
+                    x > covered.X
+                        ? x - covered.X
+                        : covered.X - x;
+                const std::uint32_t dy =
+                    y > covered.Y
+                        ? y - covered.Y
+                        : covered.Y - y;
+                distance =
+                    std::min(distance, std::max(dx, dy));
+            }
+            return distance;
+        };
+
+    std::optional<Runtime129Texel> gutterTexel{};
+    std::optional<Runtime129Texel> farTexel{};
+    for (std::uint32_t y = 0u;
+         y < kRuntime129BakeExtent;
+         ++y)
+    {
+        for (std::uint32_t x = 0u;
+             x < kRuntime129BakeExtent;
+             ++x)
+        {
+            if (cpuCoverage[
+                    static_cast<std::size_t>(y) *
+                        kRuntime129BakeExtent +
+                    x] != 0u)
+            {
+                continue;
+            }
+
+            const std::uint32_t distance =
+                distanceToCpuCoverage(x, y);
+            const RgbaPixel pixel = readAt(x, y);
+            if (distance >= 1u &&
+                distance <= bakeOptions.PaddingTexels &&
+                pixel.A >= 251u &&
+                (!gutterTexel.has_value() ||
+                 distance > gutterTexel->Distance))
+            {
+                gutterTexel = Runtime129Texel{
+                    .X = x,
+                    .Y = y,
+                    .Distance = distance,
+                };
+            }
+            if (distance > bakeOptions.PaddingTexels &&
+                (!farTexel.has_value() ||
+                 distance > farTexel->Distance))
+            {
+                farTexel = Runtime129Texel{
+                    .X = x,
+                    .Y = y,
+                    .Distance = distance,
+                };
+            }
+        }
+    }
+    ASSERT_TRUE(gutterTexel.has_value())
+        << "No GPU-covered texel existed outside the live CPU raster footprint.";
+    ASSERT_TRUE(farTexel.has_value());
+    EXPECT_EQ(
+        gutterTexel->Distance,
+        bakeOptions.PaddingTexels)
+        << "The selected dilation witness did not reach the requested four-texel gutter.";
+
+    const RgbaPixel covered =
+        readAt(coveredTexel->X, coveredTexel->Y);
+    const RgbaPixel gutter =
+        readAt(gutterTexel->X, gutterTexel->Y);
+    const RgbaPixel farUncovered =
+        readAt(farTexel->X, farTexel->Y);
+    ExpectRuntime129TargetNormalPixel(
+        covered,
+        "covered target");
+    ExpectRuntime129TargetNormalPixel(
+        gutter,
+        "dilated gutter");
+    EXPECT_LE(farUncovered.A, 4u)
+        << "Far uncovered texel gained coverage outside the four-texel padding gutter: "
+        << "coordinate=(" << farTexel->X << ","
+        << farTexel->Y << ") distance="
+        << farTexel->Distance << " pixel="
+        << PixelText(farUncovered);
 }

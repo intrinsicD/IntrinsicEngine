@@ -1,9 +1,11 @@
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -44,10 +46,12 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
+import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
@@ -656,36 +660,61 @@ namespace
     }
 
     [[nodiscard]] Runtime::RuntimeObjectSpaceNormalBakeRequest
-    MakeBakeRequest(const std::uint64_t key)
+    MakeBakeRequest(
+        const std::uint64_t key,
+        const Runtime::WorldHandle world,
+        const std::uint64_t bindingEpoch,
+        const ECS::EntityHandle entity)
     {
-        return Runtime::RuntimeObjectSpaceNormalBakeRequest{
-            .EntityScopedGeneratedTextureAsset =
-                Assets::AssetId{
-                    static_cast<std::uint32_t>(100u + key),
-                    1u},
-            .SourceKey =
-                Graphics::ObjectSpaceNormalTextureBakeSourceKey{
-                    .EntityKey = key,
-                    .GeometryGeneration = 11u,
-                    .TexcoordGeneration = 12u,
-                    .NormalGeneration = 13u,
-                },
-            .EntityGeneration = 1u,
-            .Options =
-                Graphics::ObjectSpaceNormalTextureBakeOptions{
-                    .Width = 64u,
-                    .Height = 64u,
-                    .PaddingTexels = 2u,
-                },
-            .ContentKey =
-                Runtime::RuntimeObjectSpaceNormalBakeContentKey{
-                    .GeometryKey = 0x1000u + key,
-                    .TexcoordKey = 0x2000u + key,
-                    .NormalKey = 0x3000u + key,
+        const std::array<float, 9u> positions{
+            0.0f, 0.0f, 0.0f,
+            1.0f, 0.0f, 0.0f,
+            0.0f, static_cast<float>(key), 0.0f,
+        };
+        const std::array<std::uint32_t, 3u> indices{0u, 1u, 2u};
+        const std::array<float, 6u> texcoords{
+            0.0f, 0.0f,
+            1.0f, 0.0f,
+            0.0f, 1.0f,
+        };
+        const std::array<float, 9u> normals{
+            0.0f, 0.0f, 1.0f,
+            0.0f, 0.0f, 1.0f,
+            0.0f, 0.0f, 1.0f,
+        };
+        const auto identity =
+            Runtime::BuildRuntimeObjectSpaceNormalBakeIdentity(
+                Runtime::RuntimeObjectSpaceNormalBakeIdentityInput{
+                    .PackedPositionBytes =
+                        std::as_bytes(std::span{positions}),
+                    .SurfaceIndexBytes =
+                        std::as_bytes(std::span{indices}),
+                    .ResolvedTexcoordBytes =
+                        std::as_bytes(std::span{texcoords}),
+                    .ResolvedNormalBytes =
+                        std::as_bytes(std::span{normals}),
                     .VertexCount = 3u,
-                    .IndexCount = 3u,
+                    .SurfaceIndexCount = 3u,
+                    .Options =
+                        Graphics::ObjectSpaceNormalTextureBakeOptions{
+                            .Width = 64u,
+                            .Height = 64u,
+                            .PaddingTexels = 2u,
+                        },
+                });
+        EXPECT_TRUE(identity.Succeeded());
+        return Runtime::RuntimeObjectSpaceNormalBakeRequest{
+            .Identity = identity.Identity,
+            .Target =
+                Runtime::RuntimeObjectSpaceNormalBakeTarget{
+                    .World = world,
+                    .BindingEpoch = bindingEpoch,
+                    .Entity = entity,
+                    .StableEntityId =
+                        Runtime::StableEntityLookup::ToRenderId(entity),
+                    .Semantic =
+                        Runtime::ProgressiveSlotSemantic::Normal,
                 },
-            .HasStableContentKey = true,
         };
     }
 }
@@ -1072,6 +1101,9 @@ TEST(AssetWorkflowModule,
 
     Runtime::RuntimeObjectSpaceNormalBakeQueue* bakeQueue =
         nullptr;
+    Runtime::WorldHandle bakeWorld{};
+    std::uint64_t bakeBindingEpoch = 0u;
+    const RHI::IDevice* bakeDevice = nullptr;
     const auto queueProbe =
         pipeline->RegisterPostImportProcessor(
             Runtime::RuntimePostImportProcessorDesc{
@@ -1080,7 +1112,10 @@ TEST(AssetWorkflowModule,
                 .PayloadKind =
                     Assets::AssetPayloadKind::Mesh,
                 .Process =
-                    [&bakeQueue](
+                    [&bakeQueue,
+                     &bakeWorld,
+                     &bakeBindingEpoch,
+                     &bakeDevice](
                         const Runtime::
                             RuntimePostImportProcessorContext&,
                         Runtime::
@@ -1090,6 +1125,11 @@ TEST(AssetWorkflowModule,
                     {
                         bakeQueue =
                             services.ObjectSpaceNormalBakeQueue;
+                        bakeWorld = services.World;
+                        bakeBindingEpoch =
+                            services.ObjectSpaceNormalBakeBindingEpoch;
+                        bakeDevice =
+                            services.ObjectSpaceNormalBakeDevice;
                         return bakeQueue != nullptr
                             ? Core::Ok()
                             : Core::Err(
@@ -1179,8 +1219,13 @@ TEST(AssetWorkflowModule,
             ASSERT_NE(bakeQueue, nullptr);
             const auto scheduled =
                 bakeQueue->Schedule(
-                    MakeBakeRequest(++bakeKey),
-                    /*graphicsBackendOperational=*/true);
+                    MakeBakeRequest(
+                        ++bakeKey,
+                        bakeWorld,
+                        bakeBindingEpoch,
+                        expectedOutgoing),
+                    bakeDevice != nullptr &&
+                        bakeDevice->IsOperational());
             ASSERT_TRUE(scheduled.Succeeded());
             ASSERT_EQ(bakeQueue->PendingCount(), 1u);
             ASSERT_TRUE(
@@ -1252,8 +1297,13 @@ TEST(AssetWorkflowModule,
         0u);
     const auto pendingBeforeInvalid =
         bakeQueue->Schedule(
-            MakeBakeRequest(++bakeKey),
-            /*graphicsBackendOperational=*/true);
+            MakeBakeRequest(
+                ++bakeKey,
+                bakeWorld,
+                bakeBindingEpoch,
+                expectedOutgoing),
+            bakeDevice != nullptr &&
+                bakeDevice->IsOperational());
     ASSERT_TRUE(pendingBeforeInvalid.Succeeded());
     ASSERT_EQ(bakeQueue->PendingCount(), 1u);
     ASSERT_TRUE(initialScene->IsValid(expectedOutgoing));
@@ -1636,9 +1686,10 @@ TEST(AssetWorkflowModule,
                         "RUNTIME-183 composed bake probe",
                     .PayloadKind =
                         Assets::AssetPayloadKind::Mesh,
-                    .Process =
+                        .Process =
                         [&](const Runtime::
-                                RuntimePostImportProcessorContext&,
+                                RuntimePostImportProcessorContext&
+                                    context,
                             Runtime::
                                 RuntimePostImportProcessorServices&
                                     services)
@@ -1649,8 +1700,10 @@ TEST(AssetWorkflowModule,
                                 services
                                     .ObjectSpaceNormalBakeQueue;
                             operational =
-                                services
-                                    .ObjectSpaceNormalBakeGraphicsBackendOperational;
+                                services.ObjectSpaceNormalBakeDevice !=
+                                    nullptr &&
+                                services.ObjectSpaceNormalBakeDevice->
+                                    IsOperational();
                             if (queue == nullptr)
                             {
                                 return Core::Err(
@@ -1659,7 +1712,12 @@ TEST(AssetWorkflowModule,
                             }
                             const auto scheduled =
                                 queue->Schedule(
-                                    MakeBakeRequest(bakeKey),
+                                    MakeBakeRequest(
+                                        bakeKey,
+                                        services.World,
+                                        services
+                                            .ObjectSpaceNormalBakeBindingEpoch,
+                                        context.Entity),
                                     operational);
                             return scheduled.Succeeded()
                                 ? Core::Ok()

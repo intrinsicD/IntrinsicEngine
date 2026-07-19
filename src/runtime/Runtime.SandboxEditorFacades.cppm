@@ -53,6 +53,7 @@ import Extrinsic.Runtime.KMeansGpuBackend;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
+import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -2552,6 +2553,9 @@ export namespace Extrinsic::Runtime
         CameraControllerRegistry* CameraControllers{nullptr};
         Core::Extent2D CameraViewport{};
         RHI::IDevice* Device{nullptr};
+        RuntimeObjectSpaceNormalBakeQueue* ObjectSpaceNormalBakeQueue{nullptr};
+        std::uint64_t ObjectSpaceNormalBakeBindingEpoch{0u};
+        const RHI::IDevice* ObjectSpaceNormalBakeDevice{nullptr};
         SandboxEditorAssetImportCommandSurface AssetImportCommands{};
         SandboxEditorAssetImportQueueCommandSurface AssetImportQueueCommands{};
         SandboxEditorSceneFileCommandSurface SceneFileCommands{};

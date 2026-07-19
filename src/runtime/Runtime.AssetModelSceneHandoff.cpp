@@ -1,12 +1,10 @@
 module;
 
-#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <limits>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -44,6 +42,7 @@ import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetMeshNormals;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.DerivedJobGraph;
@@ -51,6 +50,7 @@ import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.StableEntityLookup;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.HalfedgeMesh.IO;
 import Geometry.Properties;
 
@@ -859,7 +859,9 @@ namespace Extrinsic::Runtime
             {
                 const Assets::AssetModelMaterialPayload& material = model.Materials[materialIndex];
                 const bool needsNormal =
-                    options.GenerateMissingNormalTextures && !material.NormalTexture.IsValid();
+                    options.GenerateMissingNormalTextures &&
+                    !material.NormalTexture.IsValid() &&
+                    options.ObjectSpaceNormalBakeQueue == nullptr;
                 const bool needsAlbedo =
                     options.GenerateMissingAlbedoTextures &&
                     !material.BaseColorTexture.IsValid() &&
@@ -1428,63 +1430,6 @@ namespace Extrinsic::Runtime
             return mesh.VertexProperties().Exists("v:texcoord");
         }
 
-        [[nodiscard]] std::uint32_t NarrowBakeCount(const std::size_t value) noexcept
-        {
-            return value > std::numeric_limits<std::uint32_t>::max()
-                ? std::numeric_limits<std::uint32_t>::max()
-                : static_cast<std::uint32_t>(value);
-        }
-
-        [[nodiscard]] std::uint64_t MixObjectSpaceNormalBakeKey(
-            std::uint64_t seed,
-            const std::uint64_t value) noexcept
-        {
-            seed ^= value + 0x9e3779b97f4a7c15ull + (seed << 6u) + (seed >> 2u);
-            return seed == 0u ? 1u : seed;
-        }
-
-        [[nodiscard]] std::uint64_t FloatKeyBits(const float value) noexcept
-        {
-            return static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(value));
-        }
-
-        [[nodiscard]] std::uint64_t HashVec2Property(
-            const Geometry::ConstProperty<glm::vec2>& property) noexcept
-        {
-            std::uint64_t hash = 0xcbf29ce484222325ull;
-            if (!property.IsValid())
-            {
-                return 0u;
-            }
-
-            hash = MixObjectSpaceNormalBakeKey(hash, property.Vector().size());
-            for (const glm::vec2& value : property.Vector())
-            {
-                hash = MixObjectSpaceNormalBakeKey(hash, FloatKeyBits(value.x));
-                hash = MixObjectSpaceNormalBakeKey(hash, FloatKeyBits(value.y));
-            }
-            return hash == 0u ? 1u : hash;
-        }
-
-        [[nodiscard]] std::uint64_t HashVec3Property(
-            const Geometry::ConstProperty<glm::vec3>& property) noexcept
-        {
-            std::uint64_t hash = 0xcbf29ce484222325ull;
-            if (!property.IsValid())
-            {
-                return 0u;
-            }
-
-            hash = MixObjectSpaceNormalBakeKey(hash, property.Vector().size());
-            for (const glm::vec3& value : property.Vector())
-            {
-                hash = MixObjectSpaceNormalBakeKey(hash, FloatKeyBits(value.x));
-                hash = MixObjectSpaceNormalBakeKey(hash, FloatKeyBits(value.y));
-                hash = MixObjectSpaceNormalBakeKey(hash, FloatKeyBits(value.z));
-            }
-            return hash == 0u ? 1u : hash;
-        }
-
         [[nodiscard]] std::string_view NormalBakePropertyName(
             const AssetModelSceneHandoffOptions& options) noexcept
         {
@@ -1493,107 +1438,68 @@ namespace Extrinsic::Runtime
                 : std::string_view{options.GeneratedNormalPropertyName};
         }
 
-        [[nodiscard]] std::uint32_t ResolveBakeVertexCount(
-            const PreparedPrimitive& primitive) noexcept
+        [[nodiscard]] std::uint64_t
+        NextProgressiveBindingGeneration(
+            const ECS::Scene::Registry& scene,
+            const ECS::EntityHandle entity) noexcept
         {
-            return primitive.VertexCount != 0u
-                ? primitive.VertexCount
-                : NarrowBakeCount(primitive.Mesh.VertexCount());
-        }
-
-        [[nodiscard]] std::uint32_t ResolveBakeIndexCount(
-            const PreparedPrimitive& primitive) noexcept
-        {
-            return primitive.IndexCount != 0u
-                ? primitive.IndexCount
-                : NarrowBakeCount(primitive.Mesh.FaceCount() * 3u);
-        }
-
-        [[nodiscard]] Geometry::ConstProperty<glm::vec3>
-        ResolveBakePositionProperty(const Geometry::ConstPropertySet& vertexProperties)
-        {
-            auto positions = vertexProperties.Get<glm::vec3>("v:point");
-            if (!positions.IsValid())
+            const auto* bindings =
+                scene.Raw().try_get<ProgressivePresentationBindings>(entity);
+            if (bindings == nullptr)
             {
-                positions = vertexProperties.Get<glm::vec3>(
-                    ECS::Components::GeometrySources::PropertyNames::kPosition);
+                return 0u;
             }
-            return positions;
+            const std::uint64_t next = bindings->BindingGeneration + 1u;
+            return next == 0u ? 1u : next;
         }
 
-        [[nodiscard]] RuntimeObjectSpaceNormalBakeContentKey
-        BuildObjectSpaceNormalBakeContentKey(
-            const std::uint32_t geometryPayloadIndex,
-            const std::uint32_t vertexCount,
-            const std::uint32_t indexCount,
-            const Geometry::ConstPropertySet& vertexProperties,
-            const AssetModelSceneHandoffOptions& options)
-        {
-            const auto positions = ResolveBakePositionProperty(vertexProperties);
-            const auto texcoords = vertexProperties.Get<glm::vec2>("v:texcoord");
-            const auto normals =
-                vertexProperties.Get<glm::vec3>(NormalBakePropertyName(options));
-
-            std::uint64_t geometryKey = 0x84222325cbf29ce4ull;
-            geometryKey = MixObjectSpaceNormalBakeKey(
-                geometryKey,
-                geometryPayloadIndex);
-            geometryKey = MixObjectSpaceNormalBakeKey(geometryKey, vertexCount);
-            geometryKey = MixObjectSpaceNormalBakeKey(geometryKey, indexCount);
-            const std::uint64_t positionKey = HashVec3Property(positions);
-            geometryKey = MixObjectSpaceNormalBakeKey(
-                geometryKey,
-                positionKey != 0u ? positionKey : vertexCount);
-
-            return RuntimeObjectSpaceNormalBakeContentKey{
-                .GeometryKey = geometryKey,
-                .TexcoordKey = HashVec2Property(texcoords),
-                .NormalKey = HashVec3Property(normals),
-                .VertexCount = vertexCount,
-                .IndexCount = indexCount,
-            };
-        }
-
-        [[nodiscard]] RuntimeObjectSpaceNormalBakeRequest
+        [[nodiscard]] RuntimeObjectSpaceNormalBakeRequestBuildResult
         BuildObjectSpaceNormalBakeRequest(
+            const ECS::Scene::Registry& scene,
             const ECS::EntityHandle entity,
-            const std::uint32_t geometryPayloadIndex,
-            const std::uint32_t fallbackVertexCount,
-            const std::uint32_t indexCount,
-            const Geometry::ConstPropertySet& vertexProperties,
             const AssetModelSceneHandoffOptions& options)
         {
+            namespace GS = ECS::Components::GeometrySources;
+
             Graphics::ObjectSpaceNormalTextureBakeOptions bakeOptions{};
             bakeOptions.Width = options.GeneratedTextureWidth;
             bakeOptions.Height = options.GeneratedTextureHeight;
             bakeOptions.Space = Graphics::NormalTextureSpace::ObjectSpaceNormal;
 
             const std::uint32_t stableId = StableEntityLookup::ToRenderId(entity);
-            const std::uint32_t vertexCount = vertexProperties.IsValid()
-                ? NarrowBakeCount(vertexProperties.Size())
-                : fallbackVertexCount;
-            const RuntimeObjectSpaceNormalBakeContentKey contentKey =
-                BuildObjectSpaceNormalBakeContentKey(
-                    geometryPayloadIndex,
-                    vertexCount,
-                    indexCount,
-                    vertexProperties,
-                    options);
-            return RuntimeObjectSpaceNormalBakeRequest{
-                .EntityScopedGeneratedTextureAsset = stableId != kBackgroundRenderId
-                    ? Assets::AssetId{stableId, 1u}
-                    : Assets::AssetId{},
-                .SourceKey = Graphics::ObjectSpaceNormalTextureBakeSourceKey{
-                    .EntityKey = stableId,
-                    .GeometryGeneration = 1u,
-                    .TexcoordGeneration = 1u,
-                    .NormalGeneration = 1u,
-                },
-                .EntityGeneration = stableId,
-                .Options = bakeOptions,
-                .ContentKey = contentKey,
-                .HasStableContentKey = contentKey.IsValid(),
+            const std::uint64_t expectedBindingGeneration =
+                NextProgressiveBindingGeneration(scene, entity);
+            RuntimeObjectSpaceNormalBakeTarget target{
+                .World = options.World,
+                .BindingEpoch = options.BindingEpoch,
+                .Entity = entity,
+                .StableEntityId = stableId,
+                .PresentationKey =
+                    expectedBindingGeneration != 0u
+                        ? std::string{"mesh.surface"}
+                        : std::string{},
+                .Semantic = ProgressiveSlotSemantic::Normal,
+                .ExpectedProgressiveBindingGeneration =
+                    expectedBindingGeneration,
             };
+
+            VertexChannelBindingSet channelBindings{};
+            const std::string_view normalProperty =
+                NormalBakePropertyName(options);
+            const VertexChannelBindingSet* channelBindingsPtr = nullptr;
+            if (normalProperty != GS::PropertyNames::kNormal)
+            {
+                channelBindings.Normal.Enabled = true;
+                channelBindings.Normal.SourceProperty =
+                    std::string{normalProperty};
+                channelBindingsPtr = &channelBindings;
+            }
+
+            return BuildRuntimeObjectSpaceNormalBakeRequest(
+                GS::BuildConstView(scene.Raw(), entity),
+                std::move(target),
+                bakeOptions,
+                channelBindingsPtr);
         }
 
         void RecordProgressiveNormalBakeDiagnostic(
@@ -1807,14 +1713,10 @@ namespace Extrinsic::Runtime
             const bool useRuntimeObjectSpaceNormalBakeQueue =
                 material != nullptr &&
                 !materialHasAuthoredNormal &&
+                options.GenerateMissingNormalTextures &&
                 options.ObjectSpaceNormalBakeQueue != nullptr;
             if (useRuntimeObjectSpaceNormalBakeQueue)
             {
-                const std::uint32_t geometryPayloadIndex =
-                    primitive.GeometryPayloadIndex;
-                const std::uint32_t fallbackVertexCount =
-                    ResolveBakeVertexCount(primitive);
-                const std::uint32_t indexCount = ResolveBakeIndexCount(primitive);
                 if (hasProgressiveJobs)
                 {
                     DerivedJobDesc schedule{};
@@ -1855,12 +1757,7 @@ namespace Extrinsic::Runtime
                         [&scene,
                          entity,
                          queue = options.ObjectSpaceNormalBakeQueue,
-                         geometryPayloadIndex,
-                         fallbackVertexCount,
-                         indexCount,
-                         requestOptions = options,
-                         backendOperational =
-                             options.ObjectSpaceNormalBakeGraphicsBackendOperational](
+                         requestOptions = options](
                             DerivedJobApplyContext&) mutable -> Core::Result
                     {
                         if (!scene.IsValid(entity))
@@ -1868,23 +1765,27 @@ namespace Extrinsic::Runtime
                             return Core::Err(Core::ErrorCode::InvalidState);
                         }
 
-                        const auto* vertices = scene.Raw().try_get<
-                            ECS::Components::GeometrySources::Vertices>(entity);
-                        if (vertices == nullptr)
+                        RuntimeObjectSpaceNormalBakeRequestBuildResult build =
+                            BuildObjectSpaceNormalBakeRequest(
+                                scene,
+                                entity,
+                                requestOptions);
+                        if (!build.Succeeded())
                         {
-                            return Core::Err(Core::ErrorCode::InvalidState);
+                            RecordProgressiveNormalBakeDiagnostic(
+                                scene,
+                                entity,
+                                std::move(build.Diagnostic));
+                            return Core::Ok();
                         }
 
-                        RuntimeObjectSpaceNormalBakeRequest request =
-                            BuildObjectSpaceNormalBakeRequest(
-                                entity,
-                                geometryPayloadIndex,
-                                fallbackVertexCount,
-                                indexCount,
-                                Geometry::ConstPropertySet(vertices->Properties),
-                                requestOptions);
                         RuntimeObjectSpaceNormalBakeResult result =
-                            queue->Schedule(request, backendOperational);
+                            queue->Schedule(
+                                *build.Request,
+                                requestOptions.ObjectSpaceNormalBakeDevice !=
+                                        nullptr &&
+                                    requestOptions.ObjectSpaceNormalBakeDevice->
+                                        IsOperational());
                         RecordProgressiveNormalBakeDiagnostic(
                             scene,
                             entity,
@@ -1900,24 +1801,25 @@ namespace Extrinsic::Runtime
                 else if (MeshHasVertexTexcoords(primitive.Mesh) &&
                          MeshHasVertexProperty(primitive.Mesh, NormalBakePropertyName(options)))
                 {
-                    const auto* vertices = scene.Raw().try_get<
-                        ECS::Components::GeometrySources::Vertices>(entity);
-                    const Geometry::ConstPropertySet vertexProperties =
-                        vertices != nullptr
-                            ? Geometry::ConstPropertySet(vertices->Properties)
-                            : primitive.Mesh.VertexProperties();
-                    RuntimeObjectSpaceNormalBakeRequest request =
+                    RuntimeObjectSpaceNormalBakeRequestBuildResult build =
                         BuildObjectSpaceNormalBakeRequest(
+                            scene,
                             entity,
-                            geometryPayloadIndex,
-                            fallbackVertexCount,
-                            indexCount,
-                            vertexProperties,
                             options);
+                    if (!build.Succeeded())
+                    {
+                        RecordProgressiveNormalBakeDiagnostic(
+                            scene,
+                            entity,
+                            std::move(build.Diagnostic));
+                        return;
+                    }
                     RuntimeObjectSpaceNormalBakeResult result =
                         options.ObjectSpaceNormalBakeQueue->Schedule(
-                            request,
-                            options.ObjectSpaceNormalBakeGraphicsBackendOperational);
+                            *build.Request,
+                            options.ObjectSpaceNormalBakeDevice != nullptr &&
+                                options.ObjectSpaceNormalBakeDevice->
+                                    IsOperational());
                     RecordProgressiveNormalBakeDiagnostic(
                         scene,
                         entity,
@@ -2287,12 +2189,12 @@ namespace Extrinsic::Runtime
                 raw,
                 entity,
                 primitive.Mesh);
+            const Assets::AssetModelMaterialPayload* material =
+                primitive.MaterialIndex < model.Materials.size()
+                    ? &model.Materials[primitive.MaterialIndex]
+                    : nullptr;
             if (options.ProgressiveRawGeometryFirst)
             {
-                const Assets::AssetModelMaterialPayload* material =
-                    primitive.MaterialIndex < model.Materials.size()
-                        ? &model.Materials[primitive.MaterialIndex]
-                        : nullptr;
                 AttachProgressivePresentationBindings(scene,
                                                        entity,
                                                        material,
@@ -2300,6 +2202,15 @@ namespace Extrinsic::Runtime
                                                        options,
                                                        primitive,
                                                        diagnostics);
+                QueueProgressiveEnrichmentJobs(scene,
+                                                entity,
+                                                material,
+                                                primitive,
+                                                options,
+                                                diagnostics);
+            }
+            else if (options.ObjectSpaceNormalBakeQueue != nullptr)
+            {
                 QueueProgressiveEnrichmentJobs(scene,
                                                 entity,
                                                 material,

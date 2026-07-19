@@ -1024,7 +1024,8 @@ namespace Extrinsic::Runtime
                 importEntityPolicies,
             const std::span<const RuntimePostImportProcessorRecord> postImportProcessors,
             RuntimeObjectSpaceNormalBakeQueue* objectSpaceNormalBakeQueue,
-            const bool objectSpaceNormalBakeGraphicsBackendOperational,
+            const std::uint64_t objectSpaceNormalBakeBindingEpoch,
+            const RHI::IDevice* objectSpaceNormalBakeDevice,
             const DecodedGeometryImport& decoded)
         {
             RuntimeImportEntityAuthoringPolicyServices authoringServices{
@@ -1038,8 +1039,9 @@ namespace Extrinsic::Runtime
                 .RenderExtraction = &extraction,
                 .Scene = &scene,
                 .ObjectSpaceNormalBakeQueue = objectSpaceNormalBakeQueue,
-                .ObjectSpaceNormalBakeGraphicsBackendOperational =
-                    objectSpaceNormalBakeGraphicsBackendOperational,
+                .ObjectSpaceNormalBakeBindingEpoch =
+                    objectSpaceNormalBakeBindingEpoch,
+                .ObjectSpaceNormalBakeDevice = objectSpaceNormalBakeDevice,
             };
 
             return std::visit(
@@ -1477,6 +1479,8 @@ namespace Extrinsic::Runtime
         m_ObjectSpaceNormalBakeQueue =
             BorrowedSubsystem<RuntimeObjectSpaceNormalBakeQueue>{
                 dependencies.ObjectSpaceNormalBakeQueue};
+        m_ObjectSpaceNormalBakeBindingEpoch =
+            dependencies.ObjectSpaceNormalBakeBindingEpoch;
         m_Device = BorrowedSubsystem<const RHI::IDevice>{dependencies.Device};
     }
 
@@ -2242,7 +2246,8 @@ namespace Extrinsic::Runtime
                         m_ImportEntityAuthoringPolicies,
                         m_PostImportProcessors,
                         m_ObjectSpaceNormalBakeQueue.get(),
-                        m_Device != nullptr && m_Device->IsOperational(),
+                        m_ObjectSpaceNormalBakeBindingEpoch,
+                        m_Device.get(),
                         *state->Decoded);
                     if (materialized.has_value())
                     {
@@ -3127,7 +3132,8 @@ namespace Extrinsic::Runtime
                 m_ImportEntityAuthoringPolicies,
                 m_PostImportProcessors,
                 m_ObjectSpaceNormalBakeQueue.get(),
-                m_Device != nullptr && m_Device->IsOperational(),
+                m_ObjectSpaceNormalBakeBindingEpoch,
+                m_Device.get(),
                 *decoded);
             if (!materialized.has_value())
             {

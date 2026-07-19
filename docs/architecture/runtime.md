@@ -367,6 +367,70 @@ world-space bounds. With the sandbox defaults installed, this makes every leaf
 renderable and mouse-pick eligible, selects the first leaf, and focuses the
 camera once after the complete hierarchy is ready.
 
+### GPU object-space normal bake lifecycle
+
+`AssetWorkflowModule` owns the object-space normal bake as private runtime
+composition, not as an Engine or graphics-domain service. Eligible
+non-progressive model, progressive model, direct-mesh, and selected-mesh
+producers resolve UVs and normals first, then build one versioned canonical
+content identity from the exact packed position bytes, fan-triangulated surface
+index order, resolved UV and normal bytes, element counts, and resolved
+extent/padding/normal-space/epsilon options. Float `-0` is canonicalized to
+`+0`. World and binding epoch, the raw generation-qualified entity handle,
+stable render id, presentation/semantic, and expected progressive binding
+generation form a separate target record so reusable content never hides a
+destroyed/recycled entity or scene replacement.
+
+Queue scheduling does not fabricate or expose an output `AssetId`. During the
+asset tick, the private service allocates a runtime metadata asset through the
+live `AssetService`: reusable identities use a deterministic digest path with
+bounded collision probes, while identity-less requests receive distinct
+non-reusable paths. Service provenance distinguishes queued, exact pending
+`{AssetId, GpuAssetCache generation}`, and exact proven-ready states.
+Same-identity pending requests attach as waiters without opening another cache
+generation; only a proven generation that is still the cache's current
+`Ready` texture may fast-bind.
+
+The production plan provider resolves the target's current extraction surface
+and `Graphics::GpuGeometryResidencyView`. It requires the identity's exact
+fingerprints, byte/count metadata, nonzero content revision, managed index
+buffer, tightly packed bake-readable position/UV/normal/index layouts, and
+channel device addresses. It revalidates that residency immediately before
+recording, submits pending managed-buffer upload barriers, preserves the live
+`SurfaceFirstIndex` for a shared index-buffer slice, and keeps indexed-draw
+base vertex zero. Raster and optional dilation commands are recorded by the
+existing `JobService` `GpuQueue` participant in the renderer's already-open
+frame command context. This path never acquires, submits, or presents a second
+frame. Readiness remains conservatively frame-based at
+`issueFrame + framesInFlight`; exact-generation publication prevents an older
+ticket from stamping or failing a replacement.
+
+Pipeline and extent-keyed dilation resources are retained rather than created
+per frame. Fixed entry/byte caps bound queued identities, in-flight/proven
+outputs, and dilation scratch; at most one bake records per frame so shared
+dilation state is serialized. The output finishes in
+`ShaderReadOnly` and includes transfer-source usage for acceptance readback;
+dilation scratch records its actual post-use layout for safe reuse.
+
+Completion is a transactional runtime merge. Before mutation it rechecks the
+current world/epoch, raw entity lifetime and render id, latest request, exact
+cache generation, live geometry content revision/identity, presentation key,
+and expected progressive binding generation. It changes only the material
+normal `AssetId` and `ObjectSpaceNormal` metadata, preserving albedo,
+metallic-roughness, and emissive, then marks the matching progressive normal
+slot generated/ready and increments its binding generation. Any mismatch
+rejects the whole completion, leaving vertex-normal shading active; there is no
+CPU fallback for a non-operational device, record failure, stale completion, or
+capacity rejection. The CPU normal-texture path is compatibility behavior only
+for callers that compose no workflow queue.
+
+Scene replacement detaches outgoing queued work and target waiters but retains
+already-recorded tickets until their safe completion/retirement frame. The
+participant reports retained pipeline, dilation, cache, and provenance state
+through `HasInFlightWork()`, so the generic GPU-queue shutdown bridge performs
+the existing device-idle boundary before exact pending generations and
+generated assets are retired and resource leases are released.
+
 Runtime uses two tiers for CPU work. The fixed-step `FrameGraph` is the
 per-substep ECS/system DAG: it runs inside the simulation phase and may
 read/write the live active world under the normal frame contract. `JobService` is the

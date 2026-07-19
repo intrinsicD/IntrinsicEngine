@@ -10,9 +10,8 @@
 #include <utility>
 
 import Extrinsic.Asset.Registry;
-import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Graphics.GpuWorld;
-import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.BufferManager;
@@ -27,15 +26,16 @@ import Extrinsic.RHI.TextureManager;
 import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
-import Extrinsic.Runtime.ObjectSpaceNormalBakeBinding;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
-import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.WorldHandle;
 
 #include "MockRHI.hpp"
 
 namespace
 {
     namespace Assets = Extrinsic::Assets;
+    namespace ECS = Extrinsic::ECS;
     namespace Graphics = Extrinsic::Graphics;
     namespace RHI = Extrinsic::RHI;
     namespace Runtime = Extrinsic::Runtime;
@@ -146,91 +146,47 @@ namespace
         return std::move(*result.Identity);
     }
 
-    struct BindingFixture
+    [[nodiscard]] Runtime::RuntimeObjectSpaceNormalBakeTarget MakeTarget(
+        const std::uint32_t stableEntityId = 17u,
+        const std::uint64_t bindingEpoch = 3u,
+        const std::uint64_t expectedBindingGeneration = 1u,
+        const Runtime::WorldHandle world = Runtime::DefaultWorldHandle)
     {
-        Extrinsic::Tests::MockDevice Device{};
-        RHI::BufferManager BufferManager{Device};
-        RHI::TextureManager TextureManager{Device, Device.Bindless};
-        RHI::SamplerManager SamplerManager{Device};
-        Graphics::GpuAssetCache GpuAssets{
-            BufferManager,
-            TextureManager,
-            SamplerManager,
-            Device.TransferQueue};
-        Runtime::RenderExtractionCache Extraction{};
-        Runtime::RuntimeObjectSpaceNormalBakeQueue Queue{};
-    };
-
-    [[nodiscard]] RHI::TextureDesc ProducedTextureDesc()
-    {
-        return RHI::TextureDesc{
-            .Width = 64u,
-            .Height = 64u,
-            .MipLevels = 1u,
-            .Fmt = RHI::Format::RGBA8_UNORM,
-            .Usage = RHI::TextureUsage::Sampled | RHI::TextureUsage::ColorTarget,
-            .DebugName = "runtime-object-space-normal-bake-test",
-        };
-    }
-
-    [[nodiscard]] RHI::SamplerDesc ProducedTextureSamplerDesc()
-    {
-        return RHI::SamplerDesc{
-            .DebugName = "runtime-object-space-normal-bake-test-sampler",
-        };
-    }
-
-    void BeginReadyProducedTexture(BindingFixture& fx,
-                                   const Assets::AssetId asset,
-                                   const std::uint64_t readyFrame)
-    {
-        auto pending = fx.GpuAssets.BeginGpuProducedTexture(
-            Graphics::GpuProducedTextureRequest{
-                .Id = asset,
-                .Desc = ProducedTextureDesc(),
-                .SamplerDesc = ProducedTextureSamplerDesc(),
-                .ReadyFrame = readyFrame,
-                .HasReadyFrame = true,
-            });
-        ASSERT_TRUE(pending.has_value()) << static_cast<int>(pending.error());
-        fx.GpuAssets.Tick(readyFrame, fx.Device.GetFramesInFlight());
-        ASSERT_EQ(fx.GpuAssets.GetState(asset), Graphics::GpuAssetState::Ready);
-    }
-
-    [[nodiscard]] Runtime::RuntimeObjectSpaceNormalBakeContentKey MakeContentKey(
-        const std::uint64_t offset = 0u) noexcept
-    {
-        return Runtime::RuntimeObjectSpaceNormalBakeContentKey{
-            .GeometryKey = 0x1000u + offset,
-            .TexcoordKey = 0x2000u + offset,
-            .NormalKey = 0x3000u + offset,
-            .VertexCount = 3u,
-            .IndexCount = 3u,
+        return Runtime::RuntimeObjectSpaceNormalBakeTarget{
+            .World = world,
+            .BindingEpoch = bindingEpoch,
+            .Entity = static_cast<ECS::EntityHandle>(stableEntityId + 100u),
+            .StableEntityId = stableEntityId,
+            .PresentationKey =
+                "normal-presentation-" + std::to_string(stableEntityId),
+            .Semantic = Runtime::ProgressiveSlotSemantic::Normal,
+            .ExpectedProgressiveBindingGeneration =
+                expectedBindingGeneration,
         };
     }
 
     [[nodiscard]] Runtime::RuntimeObjectSpaceNormalBakeRequest MakeRequest(
-        const std::uint64_t entityKey = 17u,
-        const std::uint64_t entityGeneration = 3u,
-        const Assets::AssetId generated = Assets::AssetId{40u, 1u})
+        const IdentityInputFixture& fixture,
+        const std::uint32_t stableEntityId = 17u,
+        const std::uint64_t bindingEpoch = 3u,
+        const std::uint64_t expectedBindingGeneration = 1u)
     {
         return Runtime::RuntimeObjectSpaceNormalBakeRequest{
-            .EntityScopedGeneratedTextureAsset = generated,
-            .SourceKey = Graphics::ObjectSpaceNormalTextureBakeSourceKey{
-                .EntityKey = entityKey,
-                .GeometryGeneration = 11u,
-                .TexcoordGeneration = 12u,
-                .NormalGeneration = 13u,
-            },
-            .EntityGeneration = entityGeneration,
-            .Options = Graphics::ObjectSpaceNormalTextureBakeOptions{
-                .Width = 128u,
-                .Height = 256u,
-                .PaddingTexels = 4u,
-            },
-            .ContentKey = MakeContentKey(),
-            .HasStableContentKey = true,
+            .Identity = BuildIdentity(fixture),
+            .Target = MakeTarget(
+                stableEntityId,
+                bindingEpoch,
+                expectedBindingGeneration),
         };
+    }
+
+    [[nodiscard]] std::size_t IdentityByteCount(
+        const Runtime::RuntimeObjectSpaceNormalBakeIdentity& identity) noexcept
+    {
+        return identity.PackedPositionBytes.size() +
+               identity.SurfaceIndexBytes.size() +
+               identity.ResolvedTexcoordBytes.size() +
+               identity.ResolvedNormalBytes.size();
     }
 }
 
@@ -286,8 +242,6 @@ TEST(RuntimeObjectSpaceNormalBakeQueue,
     EXPECT_EQ(first.SurfaceIndexBytes, ownedSurfaceIndexBytes);
     EXPECT_EQ(first.ResolvedTexcoordBytes, ownedTexcoordBytes);
     EXPECT_EQ(first.ResolvedNormalBytes, ownedNormalBytes);
-    EXPECT_NE(first.PositionFingerprint,
-              FingerprintFloats(fixture.Positions));
 
     auto changedSchema = first;
     ++changedSchema.SchemaVersion;
@@ -377,8 +331,7 @@ TEST(RuntimeObjectSpaceNormalBakeQueue,
     ASSERT_TRUE(geometry.IsValid());
 
     Graphics::GpuGeometryResidencyView residency{};
-    ASSERT_TRUE(
-        world.TryGetGeometryResidencyView(geometry, residency));
+    ASSERT_TRUE(world.TryGetGeometryResidencyView(geometry, residency));
     EXPECT_EQ(residency.PositionFingerprint,
               identity.PositionFingerprint);
     EXPECT_EQ(residency.SurfaceIndexFingerprint,
@@ -432,23 +385,18 @@ TEST(RuntimeObjectSpaceNormalBakeQueue,
     auto options = baseOptions;
     options.Width = 256u;
     expectChanged(options);
-
     options = baseOptions;
     options.Height = 512u;
     expectChanged(options);
-
     options = baseOptions;
     options.PaddingTexels = 8u;
     expectChanged(options);
-
     options = baseOptions;
     options.AtlasUvEpsilon = 2.0e-4f;
     expectChanged(options);
-
     options = baseOptions;
     options.DegenerateUvAreaEpsilon = 2.0e-10f;
     expectChanged(options);
-
     options = baseOptions;
     options.DegenerateNormalLengthEpsilon = 2.0e-6f;
     expectChanged(options);
@@ -466,8 +414,6 @@ TEST(RuntimeObjectSpaceNormalBakeQueue,
     EXPECT_EQ(BuildIdentity(fixture, unresolvedDefaults),
               resolvedDefaults);
 
-    // Tangent space is intentionally rejected by the builder. Mutating a
-    // copy verifies that the value hash still covers the stored space field.
     auto differentSpace = base;
     differentSpace.Space =
         Graphics::NormalTextureSpace::TangentSpaceNormal;
@@ -584,300 +530,318 @@ TEST(RuntimeObjectSpaceNormalBakeQueue, ExactIdentityRejectsMalformedInput)
             UnsupportedNormalTextureSpace);
 }
 
-TEST(RuntimeObjectSpaceNormalBakeQueue, ReusesGeneratedAssetForStableContentKey)
+TEST(RuntimeObjectSpaceNormalBakeQueue,
+     ScheduleCarriesExactRequestWithoutAllocatingAsset)
 {
     Runtime::RuntimeObjectSpaceNormalBakeQueue queue;
-
-    const auto first = queue.Schedule(
-        MakeRequest(17u, 1u, Assets::AssetId{40u, 1u}),
-        /*graphicsBackendOperational=*/true);
-    ASSERT_TRUE(first.Succeeded())
-        << Runtime::DebugNameForRuntimeObjectSpaceNormalBakeStatus(first.Status);
-    EXPECT_EQ(first.Status, Runtime::RuntimeObjectSpaceNormalBakeStatus::Queued);
-    EXPECT_EQ(first.Submission.GeneratedTextureAsset, (Assets::AssetId{40u, 1u}));
-    EXPECT_EQ(first.Submission.AssetSelection,
-              Runtime::RuntimeObjectSpaceNormalBakeAssetSelection::ContentKeyInserted);
-    EXPECT_EQ(first.Submission.StaleKey.EntityGeneration, 1u);
-    EXPECT_EQ(first.Submission.StaleKey.Bake.GeneratedTextureAsset,
-              (Assets::AssetId{40u, 1u}));
-    EXPECT_EQ(first.Submission.StaleKey.Bake.Source.EntityKey, 17u);
-    EXPECT_EQ(first.Submission.StaleKey.Bake.Width, 128u);
-    EXPECT_EQ(first.Submission.StaleKey.Bake.Height, 256u);
-    EXPECT_EQ(first.Submission.StaleKey.Bake.PaddingTexels, 4u);
-    EXPECT_EQ(first.Submission.StaleKey.Bake.Space,
-              Graphics::NormalTextureSpace::ObjectSpaceNormal);
-
-    const auto second = queue.Schedule(
-        MakeRequest(23u, 1u, Assets::AssetId{99u, 1u}),
-        /*graphicsBackendOperational=*/true);
-    ASSERT_TRUE(second.Succeeded())
-        << Runtime::DebugNameForRuntimeObjectSpaceNormalBakeStatus(second.Status);
-    EXPECT_EQ(second.Submission.GeneratedTextureAsset, (Assets::AssetId{40u, 1u}));
-    EXPECT_EQ(second.Submission.AssetSelection,
-              Runtime::RuntimeObjectSpaceNormalBakeAssetSelection::ContentKeyReuse);
-    EXPECT_EQ(second.Submission.StaleKey.Bake.Source.EntityKey, 23u);
-    EXPECT_EQ(queue.CachedContentKeyCount(), 1u);
-    EXPECT_EQ(queue.PendingCount(), 2u);
-    EXPECT_EQ(queue.Diagnostics().QueuedRequests, 2u);
-    EXPECT_EQ(queue.Diagnostics().ContentKeyReuses, 1u);
-}
-
-TEST(RuntimeObjectSpaceNormalBakeQueue, NonOperationalBackendNoOpsWithoutCpuFallback)
-{
-    Runtime::RuntimeObjectSpaceNormalBakeQueue queue;
-
+    const IdentityInputFixture fixture{};
+    const auto request = MakeRequest(fixture);
     const auto result = queue.Schedule(
-        MakeRequest(),
-        /*graphicsBackendOperational=*/false);
-    EXPECT_FALSE(result.Succeeded());
-    EXPECT_EQ(result.Status,
-              Runtime::RuntimeObjectSpaceNormalBakeStatus::NonOperationalBackend);
-    EXPECT_NE(result.Diagnostic.find("no CPU fallback"), std::string::npos);
-    EXPECT_EQ(queue.PendingCount(), 0u);
-    EXPECT_EQ(queue.CachedContentKeyCount(), 0u);
-    EXPECT_EQ(queue.Diagnostics().NonOperationalNoOps, 1u);
-}
-
-TEST(RuntimeObjectSpaceNormalBakeQueue, DiscardsStaleCompletionBeforeBinding)
-{
-    Runtime::RuntimeObjectSpaceNormalBakeQueue queue;
-
-    const auto oldRequest = MakeRequest(17u, 1u, Assets::AssetId{40u, 1u});
-    const auto oldJob = queue.Schedule(oldRequest, /*graphicsBackendOperational=*/true);
-    ASSERT_TRUE(oldJob.Succeeded());
-
-    auto replacementRequest = MakeRequest(17u, 2u, Assets::AssetId{41u, 1u});
-    replacementRequest.SourceKey.GeometryGeneration = 21u;
-    replacementRequest.ContentKey = MakeContentKey(1u);
-    const auto replacementJob = queue.Schedule(
-        replacementRequest,
+        request,
         /*graphicsBackendOperational=*/true);
-    ASSERT_TRUE(replacementJob.Succeeded());
 
-    const auto stale = queue.Complete(oldJob.Submission.StaleKey);
-    EXPECT_FALSE(stale.Succeeded());
-    EXPECT_EQ(stale.Status,
-              Runtime::RuntimeObjectSpaceNormalBakeStatus::StaleCompletion);
+    ASSERT_TRUE(result.Succeeded())
+        << Runtime::DebugNameForRuntimeObjectSpaceNormalBakeStatus(result.Status);
+    EXPECT_EQ(result.Status, Runtime::RuntimeObjectSpaceNormalBakeStatus::Queued);
+    ASSERT_TRUE(result.Submission.Identity.has_value());
+    EXPECT_EQ(*result.Submission.Identity, *request.Identity);
+    EXPECT_EQ(result.Submission.Target, request.Target);
+    EXPECT_EQ(result.Submission.StaleKey.Target, request.Target);
+    EXPECT_GT(result.Submission.StaleKey.RequestGeneration, 0u);
+    EXPECT_FALSE(result.Submission.GeneratedTextureAsset.IsValid());
+    EXPECT_EQ(result.Submission.AssetSelection,
+              Runtime::RuntimeObjectSpaceNormalBakeAssetSelection::None);
+    EXPECT_TRUE(queue.IsLatest(result.Submission.StaleKey));
     EXPECT_EQ(queue.PendingCount(), 1u);
-    EXPECT_EQ(queue.Diagnostics().StaleCompletions, 1u);
-
-    const auto ready = queue.Complete(replacementJob.Submission.StaleKey);
-    ASSERT_TRUE(ready.Succeeded())
-        << Runtime::DebugNameForRuntimeObjectSpaceNormalBakeStatus(ready.Status);
-    EXPECT_EQ(ready.Status,
-              Runtime::RuntimeObjectSpaceNormalBakeStatus::ReadyForBinding);
-    EXPECT_EQ(ready.Submission.GeneratedTextureAsset, (Assets::AssetId{41u, 1u}));
-    EXPECT_EQ(queue.PendingCount(), 0u);
-    EXPECT_EQ(queue.Diagnostics().ReadyCompletions, 1u);
-}
-
-TEST(RuntimeObjectSpaceNormalBakeQueue, RejectsInvalidAndUnsupportedRequests)
-{
-    Runtime::RuntimeObjectSpaceNormalBakeQueue queue;
-
-    auto request = MakeRequest();
-    request.SourceKey.EntityKey = 0u;
-    auto result = queue.Schedule(request, /*graphicsBackendOperational=*/true);
-    EXPECT_FALSE(result.Succeeded());
-    EXPECT_EQ(result.Status, Runtime::RuntimeObjectSpaceNormalBakeStatus::InvalidRequest);
-
-    request = MakeRequest();
-    request.Options.Space = Graphics::NormalTextureSpace::TangentSpaceNormal;
-    result = queue.Schedule(request, /*graphicsBackendOperational=*/true);
-    EXPECT_FALSE(result.Succeeded());
-    EXPECT_EQ(result.Status,
-              Runtime::RuntimeObjectSpaceNormalBakeStatus::
-                  UnsupportedNormalTextureSpace);
-
-    request = MakeRequest();
-    request.EntityScopedGeneratedTextureAsset = {};
-    request.HasStableContentKey = false;
-    result = queue.Schedule(request, /*graphicsBackendOperational=*/true);
-    EXPECT_FALSE(result.Succeeded());
-    EXPECT_EQ(result.Status,
-              Runtime::RuntimeObjectSpaceNormalBakeStatus::
-                  MissingGeneratedTextureAsset);
-
-    EXPECT_EQ(queue.PendingCount(), 0u);
-    EXPECT_EQ(queue.Diagnostics().InvalidRequests, 3u);
-}
-
-TEST(RuntimeObjectSpaceNormalBakeQueue, BindingWaitsForGpuCacheReadiness)
-{
-    BindingFixture fx;
-    const Assets::AssetId generated{70u, 1u};
-    const auto scheduled = fx.Queue.Schedule(
-        MakeRequest(17u, 1u, generated),
-        /*graphicsBackendOperational=*/true);
-    ASSERT_TRUE(scheduled.Succeeded())
-        << Runtime::DebugNameForRuntimeObjectSpaceNormalBakeStatus(scheduled.Status);
-
-    auto pending = fx.GpuAssets.BeginGpuProducedTexture(
-        Graphics::GpuProducedTextureRequest{
-            .Id = generated,
-            .Desc = ProducedTextureDesc(),
-            .SamplerDesc = ProducedTextureSamplerDesc(),
-            .ReadyFrame = 9u,
-            .HasReadyFrame = true,
-        });
-    ASSERT_TRUE(pending.has_value()) << static_cast<int>(pending.error());
-
-    const auto waiting = Runtime::TryBindReadyObjectSpaceNormalBake(
-        fx.Queue,
-        fx.Extraction,
-        fx.GpuAssets,
-        /*stableEntityId=*/17u,
-        scheduled.Submission.StaleKey);
-
-    EXPECT_FALSE(waiting.Succeeded());
-    EXPECT_EQ(waiting.Status,
-              Runtime::RuntimeObjectSpaceNormalBakeBindingStatus::
-                  WaitingForGpuTexture);
-    EXPECT_EQ(fx.Queue.PendingCount(), 1u);
-    EXPECT_FALSE(fx.Extraction.GetMaterialTextureAssetBindings(17u).has_value());
-}
-
-TEST(RuntimeObjectSpaceNormalBakeQueue, BindingInstallsReadyObjectSpaceNormalTexture)
-{
-    BindingFixture fx;
-    const Assets::AssetId generated{71u, 1u};
-    const auto scheduled = fx.Queue.Schedule(
-        MakeRequest(17u, 1u, generated),
-        /*graphicsBackendOperational=*/true);
-    ASSERT_TRUE(scheduled.Succeeded())
-        << Runtime::DebugNameForRuntimeObjectSpaceNormalBakeStatus(scheduled.Status);
-    BeginReadyProducedTexture(fx, generated, 1u);
-
-    const auto bound = Runtime::TryBindReadyObjectSpaceNormalBake(
-        fx.Queue,
-        fx.Extraction,
-        fx.GpuAssets,
-        /*stableEntityId=*/17u,
-        scheduled.Submission.StaleKey);
-
-    ASSERT_TRUE(bound.Succeeded())
-        << Runtime::DebugNameForRuntimeObjectSpaceNormalBakeBindingStatus(bound.Status);
-    EXPECT_EQ(bound.BoundNormalTexture, generated);
-    EXPECT_EQ(bound.Completion.Status,
-              Runtime::RuntimeObjectSpaceNormalBakeStatus::ReadyForBinding);
-    EXPECT_EQ(fx.Queue.PendingCount(), 0u);
-    const std::optional<Graphics::MaterialTextureAssetBindings> bindings =
-        fx.Extraction.GetMaterialTextureAssetBindings(17u);
-    ASSERT_TRUE(bindings.has_value());
-    EXPECT_EQ(bindings->Normal, generated);
-    EXPECT_EQ(bindings->NormalSpace,
-              Graphics::MaterialNormalTextureSpace::ObjectSpaceNormal);
+    EXPECT_EQ(queue.PendingSubmissionCount(), 1u);
+    EXPECT_EQ(queue.PendingIdentityByteCount(),
+              IdentityByteCount(*request.Identity));
+    EXPECT_EQ(queue.Diagnostics().QueuedRequests, 1u);
+    EXPECT_EQ(queue.Diagnostics().IdentityRequests, 1u);
 }
 
 TEST(RuntimeObjectSpaceNormalBakeQueue,
-     BindingRejectsMismatchedStableEntityWithoutMaterialMutation)
+     IdentitylessRequestIsQueuedAsNonReusableWithoutAsset)
 {
-    BindingFixture fx;
-    const Assets::AssetId generated{75u, 1u};
-    const auto scheduled = fx.Queue.Schedule(
-        MakeRequest(17u, 1u, generated),
+    Runtime::RuntimeObjectSpaceNormalBakeQueue queue;
+    const auto request = Runtime::RuntimeObjectSpaceNormalBakeRequest{
+        .Identity = std::nullopt,
+        .Target = MakeTarget(),
+    };
+
+    const auto result = queue.Schedule(
+        request,
         /*graphicsBackendOperational=*/true);
-    ASSERT_TRUE(scheduled.Succeeded())
-        << Runtime::DebugNameForRuntimeObjectSpaceNormalBakeStatus(scheduled.Status);
-    BeginReadyProducedTexture(fx, generated, 1u);
 
-    const auto mismatch = Runtime::TryBindReadyObjectSpaceNormalBake(
-        fx.Queue,
-        fx.Extraction,
-        fx.GpuAssets,
-        /*stableEntityId=*/23u,
-        scheduled.Submission.StaleKey);
-
-    EXPECT_FALSE(mismatch.Succeeded());
-    EXPECT_EQ(mismatch.Status,
-              Runtime::RuntimeObjectSpaceNormalBakeBindingStatus::InvalidStableEntity);
-    EXPECT_EQ(fx.Queue.PendingCount(), 1u);
-    EXPECT_FALSE(fx.Extraction.GetMaterialTextureAssetBindings(17u).has_value());
-    EXPECT_FALSE(fx.Extraction.GetMaterialTextureAssetBindings(23u).has_value());
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_FALSE(result.Submission.Identity.has_value());
+    EXPECT_FALSE(result.Submission.GeneratedTextureAsset.IsValid());
+    EXPECT_EQ(result.Submission.AssetSelection,
+              Runtime::RuntimeObjectSpaceNormalBakeAssetSelection::None);
+    EXPECT_EQ(queue.PendingIdentityByteCount(), 0u);
+    EXPECT_EQ(queue.Diagnostics().IdentitylessRequests, 1u);
 }
 
-TEST(RuntimeObjectSpaceNormalBakeQueue, BindingReusesReadyContentKeyTexture)
+TEST(RuntimeObjectSpaceNormalBakeQueue,
+     IdenticalContentForDifferentTargetsDoesNotAllocateOrReuseAsset)
 {
-    BindingFixture fx;
-    const Assets::AssetId generated{72u, 1u};
-    const auto first = fx.Queue.Schedule(
-        MakeRequest(17u, 1u, generated),
+    Runtime::RuntimeObjectSpaceNormalBakeQueue queue;
+    const IdentityInputFixture fixture{};
+    const auto first = queue.Schedule(
+        MakeRequest(fixture, 17u),
+        /*graphicsBackendOperational=*/true);
+    const auto second = queue.Schedule(
+        MakeRequest(fixture, 23u),
+        /*graphicsBackendOperational=*/true);
+
+    ASSERT_TRUE(first.Succeeded());
+    ASSERT_TRUE(second.Succeeded());
+    ASSERT_TRUE(first.Submission.Identity.has_value());
+    ASSERT_TRUE(second.Submission.Identity.has_value());
+    EXPECT_EQ(*first.Submission.Identity, *second.Submission.Identity);
+    EXPECT_FALSE(first.Submission.GeneratedTextureAsset.IsValid());
+    EXPECT_FALSE(second.Submission.GeneratedTextureAsset.IsValid());
+    EXPECT_EQ(first.Submission.AssetSelection,
+              Runtime::RuntimeObjectSpaceNormalBakeAssetSelection::None);
+    EXPECT_EQ(second.Submission.AssetSelection,
+              Runtime::RuntimeObjectSpaceNormalBakeAssetSelection::None);
+    EXPECT_EQ(queue.PendingCount(), 2u);
+    EXPECT_EQ(queue.PendingSubmissionCount(), 2u);
+}
+
+TEST(RuntimeObjectSpaceNormalBakeQueue,
+     SupersedingTargetInvalidatesOldGenerationAndCompletesWithAllocatedAsset)
+{
+    Runtime::RuntimeObjectSpaceNormalBakeQueue queue;
+    IdentityInputFixture fixture{};
+    const auto first = queue.Schedule(
+        MakeRequest(fixture, 17u, 3u, 1u),
         /*graphicsBackendOperational=*/true);
     ASSERT_TRUE(first.Succeeded());
-    BeginReadyProducedTexture(fx, generated, 1u);
-    ASSERT_TRUE(Runtime::TryBindReadyObjectSpaceNormalBake(
-        fx.Queue,
-        fx.Extraction,
-        fx.GpuAssets,
-        /*stableEntityId=*/17u,
-        first.Submission.StaleKey).Succeeded());
 
-    const auto reuse = fx.Queue.Schedule(
-        MakeRequest(23u, 1u, Assets::AssetId{99u, 1u}),
+    fixture.Normals[2] = 0.5f;
+    const auto replacement = queue.Schedule(
+        MakeRequest(fixture, 17u, 3u, 2u),
         /*graphicsBackendOperational=*/true);
-    ASSERT_TRUE(reuse.Succeeded());
-    EXPECT_EQ(reuse.Submission.AssetSelection,
-              Runtime::RuntimeObjectSpaceNormalBakeAssetSelection::ContentKeyReuse);
-    EXPECT_EQ(reuse.Submission.GeneratedTextureAsset, generated);
+    ASSERT_TRUE(replacement.Succeeded());
 
-    const auto bound = Runtime::TryBindReadyObjectSpaceNormalBake(
-        fx.Queue,
-        fx.Extraction,
-        fx.GpuAssets,
-        /*stableEntityId=*/23u,
-        reuse.Submission.StaleKey);
+    EXPECT_FALSE(queue.IsLatest(first.Submission.StaleKey));
+    EXPECT_TRUE(queue.IsLatest(replacement.Submission.StaleKey));
+    EXPECT_EQ(queue.PendingCount(), 1u);
+    EXPECT_EQ(queue.PendingSubmissionCount(), 1u);
+    EXPECT_EQ(queue.Diagnostics().SupersededQueuedRequests, 1u);
+    EXPECT_EQ(
+        queue.Complete(
+            first.Submission.StaleKey,
+            Assets::AssetId{40u, 1u}).Status,
+        Runtime::RuntimeObjectSpaceNormalBakeStatus::StaleCompletion);
 
-    ASSERT_TRUE(bound.Succeeded())
-        << Runtime::DebugNameForRuntimeObjectSpaceNormalBakeBindingStatus(bound.Status);
-    const std::optional<Graphics::MaterialTextureAssetBindings> bindings =
-        fx.Extraction.GetMaterialTextureAssetBindings(23u);
-    ASSERT_TRUE(bindings.has_value());
-    EXPECT_EQ(bindings->Normal, generated);
-    EXPECT_EQ(fx.Queue.Diagnostics().ContentKeyReuses, 1u);
+    const Assets::AssetId generated{41u, 1u};
+    const auto completed = queue.Complete(
+        replacement.Submission.StaleKey,
+        generated,
+        Runtime::RuntimeObjectSpaceNormalBakeAssetSelection::IdentityInserted);
+    ASSERT_TRUE(completed.Succeeded());
+    EXPECT_EQ(completed.Status,
+              Runtime::RuntimeObjectSpaceNormalBakeStatus::ReadyForBinding);
+    EXPECT_EQ(completed.Submission.Target, replacement.Submission.Target);
+    EXPECT_EQ(completed.Submission.GeneratedTextureAsset, generated);
+    EXPECT_EQ(completed.Submission.AssetSelection,
+              Runtime::RuntimeObjectSpaceNormalBakeAssetSelection::
+                  IdentityInserted);
+    EXPECT_EQ(queue.PendingCount(), 0u);
+    EXPECT_EQ(queue.PendingSubmissionCount(), 0u);
+    EXPECT_EQ(queue.PendingIdentityByteCount(), 0u);
+    EXPECT_EQ(queue.Diagnostics().ReadyCompletions, 1u);
+    EXPECT_EQ(queue.Diagnostics().StaleCompletions, 1u);
 }
 
-TEST(RuntimeObjectSpaceNormalBakeQueue, BindingRejectsStaleCompletionWithoutMaterialMutation)
+TEST(RuntimeObjectSpaceNormalBakeQueue,
+     PendingDrainAndRequeuePreserveLatestRequest)
 {
-    BindingFixture fx;
-
-    const auto oldJob = fx.Queue.Schedule(
-        MakeRequest(17u, 1u, Assets::AssetId{73u, 1u}),
+    Runtime::RuntimeObjectSpaceNormalBakeQueue queue;
+    const IdentityInputFixture fixture{};
+    const auto first = queue.Schedule(
+        MakeRequest(fixture, 17u),
         /*graphicsBackendOperational=*/true);
-    ASSERT_TRUE(oldJob.Succeeded());
-    BeginReadyProducedTexture(fx, oldJob.Submission.GeneratedTextureAsset, 1u);
-
-    auto replacementRequest = MakeRequest(17u, 2u, Assets::AssetId{74u, 1u});
-    replacementRequest.SourceKey.GeometryGeneration = 22u;
-    replacementRequest.ContentKey = MakeContentKey(2u);
-    const auto replacementJob = fx.Queue.Schedule(
-        replacementRequest,
+    const auto second = queue.Schedule(
+        MakeRequest(fixture, 23u),
         /*graphicsBackendOperational=*/true);
-    ASSERT_TRUE(replacementJob.Succeeded());
-    BeginReadyProducedTexture(fx, replacementJob.Submission.GeneratedTextureAsset, 2u);
+    ASSERT_TRUE(first.Succeeded());
+    ASSERT_TRUE(second.Succeeded());
+    const std::size_t identityBytes =
+        IdentityByteCount(*first.Submission.Identity);
 
-    const auto stale = Runtime::TryBindReadyObjectSpaceNormalBake(
-        fx.Queue,
-        fx.Extraction,
-        fx.GpuAssets,
-        /*stableEntityId=*/17u,
-        oldJob.Submission.StaleKey);
+    auto taken = queue.TakePendingSubmissions(1u);
+    ASSERT_EQ(taken.size(), 1u);
+    EXPECT_TRUE(Runtime::RuntimeObjectSpaceNormalBakeStaleKeyMatches(
+        taken.front().StaleKey,
+        first.Submission.StaleKey));
+    EXPECT_FALSE(taken.front().GeneratedTextureAsset.IsValid());
+    EXPECT_EQ(queue.PendingSubmissionCount(), 1u);
+    EXPECT_EQ(queue.PendingCount(), 2u);
+    EXPECT_EQ(queue.PendingIdentityByteCount(), identityBytes);
 
+    queue.RequeuePendingSubmission(std::move(taken.front()));
+    EXPECT_EQ(queue.PendingSubmissionCount(), 2u);
+    EXPECT_EQ(queue.PendingIdentityByteCount(), identityBytes * 2u);
+    EXPECT_TRUE(queue.Discard(first.Submission.StaleKey));
+    EXPECT_FALSE(queue.IsLatest(first.Submission.StaleKey));
+    EXPECT_TRUE(queue.IsLatest(second.Submission.StaleKey));
+    EXPECT_EQ(queue.PendingCount(), 1u);
+    EXPECT_EQ(queue.PendingSubmissionCount(), 1u);
+}
+
+TEST(RuntimeObjectSpaceNormalBakeQueue,
+     DetachTargetsRemovesOnlyMatchingWorldEpoch)
+{
+    Runtime::RuntimeObjectSpaceNormalBakeQueue queue;
+    const IdentityInputFixture fixture{};
+    const auto first = queue.Schedule(
+        MakeRequest(fixture, 17u, 7u),
+        /*graphicsBackendOperational=*/true);
+    const auto second = queue.Schedule(
+        MakeRequest(fixture, 23u, 7u),
+        /*graphicsBackendOperational=*/true);
+    const auto otherEpoch = queue.Schedule(
+        MakeRequest(fixture, 31u, 8u),
+        /*graphicsBackendOperational=*/true);
+    auto otherWorldRequest = MakeRequest(fixture, 47u, 7u);
+    otherWorldRequest.Target.World = Runtime::WorldHandle{9u, 1u};
+    const auto otherWorld = queue.Schedule(
+        otherWorldRequest,
+        /*graphicsBackendOperational=*/true);
+    ASSERT_TRUE(first.Succeeded());
+    ASSERT_TRUE(second.Succeeded());
+    ASSERT_TRUE(otherEpoch.Succeeded());
+    ASSERT_TRUE(otherWorld.Succeeded());
+
+    EXPECT_EQ(queue.DetachTargets(Runtime::DefaultWorldHandle, 7u), 2u);
+    EXPECT_FALSE(queue.IsLatest(first.Submission.StaleKey));
+    EXPECT_FALSE(queue.IsLatest(second.Submission.StaleKey));
+    EXPECT_TRUE(queue.IsLatest(otherEpoch.Submission.StaleKey));
+    EXPECT_TRUE(queue.IsLatest(otherWorld.Submission.StaleKey));
+    EXPECT_EQ(queue.PendingCount(), 2u);
+    EXPECT_EQ(queue.PendingSubmissionCount(), 2u);
+}
+
+TEST(RuntimeObjectSpaceNormalBakeQueue,
+     TargetCapacityFailsDeterministicallyWithoutEvictingQueuedWork)
+{
+    Runtime::RuntimeObjectSpaceNormalBakeQueue queue;
+    for (std::size_t index = 0u;
+         index < Runtime::kRuntimeObjectSpaceNormalBakeMaxQueuedTargets;
+         ++index)
+    {
+        const auto result = queue.Schedule(
+            Runtime::RuntimeObjectSpaceNormalBakeRequest{
+                .Identity = std::nullopt,
+                .Target = MakeTarget(
+                    static_cast<std::uint32_t>(index + 1u),
+                    1u),
+            },
+            /*graphicsBackendOperational=*/true);
+        ASSERT_TRUE(result.Succeeded()) << index;
+    }
+
+    const auto rejected = queue.Schedule(
+        Runtime::RuntimeObjectSpaceNormalBakeRequest{
+            .Identity = std::nullopt,
+            .Target = MakeTarget(
+                static_cast<std::uint32_t>(
+                    Runtime::kRuntimeObjectSpaceNormalBakeMaxQueuedTargets + 1u),
+                1u),
+        },
+        /*graphicsBackendOperational=*/true);
+    EXPECT_FALSE(rejected.Succeeded());
+    EXPECT_EQ(rejected.Status,
+              Runtime::RuntimeObjectSpaceNormalBakeStatus::CapacityExceeded);
+    EXPECT_EQ(queue.PendingCount(),
+              Runtime::kRuntimeObjectSpaceNormalBakeMaxQueuedTargets);
+    EXPECT_EQ(queue.PendingSubmissionCount(),
+              Runtime::kRuntimeObjectSpaceNormalBakeMaxQueuedTargets);
+    EXPECT_EQ(queue.Diagnostics().CapacityRejected, 1u);
+}
+
+TEST(RuntimeObjectSpaceNormalBakeQueue,
+     NonOperationalAndInvalidRequestsLeaveQueueUnchanged)
+{
+    Runtime::RuntimeObjectSpaceNormalBakeQueue queue;
+    const IdentityInputFixture fixture{};
+
+    const auto nonOperational = queue.Schedule(
+        MakeRequest(fixture),
+        /*graphicsBackendOperational=*/false);
+    EXPECT_FALSE(nonOperational.Succeeded());
+    EXPECT_EQ(nonOperational.Status,
+              Runtime::RuntimeObjectSpaceNormalBakeStatus::
+                  NonOperationalBackend);
+    EXPECT_NE(nonOperational.Diagnostic.find("no CPU fallback"),
+              std::string::npos);
+
+    auto invalidTarget = MakeRequest(fixture);
+    invalidTarget.Target.Entity = ECS::InvalidEntityHandle;
+    const auto invalid = queue.Schedule(
+        invalidTarget,
+        /*graphicsBackendOperational=*/true);
+    EXPECT_FALSE(invalid.Succeeded());
+    EXPECT_EQ(invalid.Status,
+              Runtime::RuntimeObjectSpaceNormalBakeStatus::InvalidRequest);
+
+    auto unsupported = MakeRequest(fixture);
+    unsupported.Identity->Space =
+        Graphics::NormalTextureSpace::TangentSpaceNormal;
+    const auto tangent = queue.Schedule(
+        unsupported,
+        /*graphicsBackendOperational=*/true);
+    EXPECT_FALSE(tangent.Succeeded());
+    EXPECT_EQ(tangent.Status,
+              Runtime::RuntimeObjectSpaceNormalBakeStatus::
+                  UnsupportedNormalTextureSpace);
+
+    auto malformed = MakeRequest(fixture);
+    malformed.Identity->PackedPositionBytes.pop_back();
+    const auto malformedResult = queue.Schedule(
+        malformed,
+        /*graphicsBackendOperational=*/true);
+    EXPECT_FALSE(malformedResult.Succeeded());
+    EXPECT_EQ(malformedResult.Status,
+              Runtime::RuntimeObjectSpaceNormalBakeStatus::InvalidRequest);
+
+    EXPECT_EQ(queue.PendingCount(), 0u);
+    EXPECT_EQ(queue.PendingSubmissionCount(), 0u);
+    EXPECT_EQ(queue.Diagnostics().NonOperationalNoOps, 1u);
+    EXPECT_EQ(queue.Diagnostics().InvalidRequests, 3u);
+}
+
+TEST(RuntimeObjectSpaceNormalBakeQueue,
+     CompletionRequiresServiceAllocatedAssetAndExactStaleKey)
+{
+    Runtime::RuntimeObjectSpaceNormalBakeQueue queue;
+    const IdentityInputFixture fixture{};
+    const auto scheduled = queue.Schedule(
+        MakeRequest(fixture),
+        /*graphicsBackendOperational=*/true);
+    ASSERT_TRUE(scheduled.Succeeded());
+
+    const auto missingAsset = queue.Complete(
+        scheduled.Submission.StaleKey,
+        {});
+    EXPECT_FALSE(missingAsset.Succeeded());
+    EXPECT_EQ(missingAsset.Status,
+              Runtime::RuntimeObjectSpaceNormalBakeStatus::InvalidRequest);
+    EXPECT_TRUE(queue.IsLatest(scheduled.Submission.StaleKey));
+
+    auto mismatched = scheduled.Submission.StaleKey;
+    ++mismatched.Target.ExpectedProgressiveBindingGeneration;
+    EXPECT_FALSE(Runtime::RuntimeObjectSpaceNormalBakeStaleKeyMatches(
+        scheduled.Submission.StaleKey,
+        mismatched));
+    const auto stale = queue.Complete(
+        mismatched,
+        Assets::AssetId{50u, 1u});
     EXPECT_FALSE(stale.Succeeded());
     EXPECT_EQ(stale.Status,
-              Runtime::RuntimeObjectSpaceNormalBakeBindingStatus::StaleCompletion);
-    EXPECT_FALSE(fx.Extraction.GetMaterialTextureAssetBindings(17u).has_value());
-    EXPECT_EQ(fx.Queue.PendingCount(), 1u);
-
-    const auto bound = Runtime::TryBindReadyObjectSpaceNormalBake(
-        fx.Queue,
-        fx.Extraction,
-        fx.GpuAssets,
-        /*stableEntityId=*/17u,
-        replacementJob.Submission.StaleKey);
-    ASSERT_TRUE(bound.Succeeded())
-        << Runtime::DebugNameForRuntimeObjectSpaceNormalBakeBindingStatus(bound.Status);
-    const std::optional<Graphics::MaterialTextureAssetBindings> bindings =
-        fx.Extraction.GetMaterialTextureAssetBindings(17u);
-    ASSERT_TRUE(bindings.has_value());
-    EXPECT_EQ(bindings->Normal, replacementJob.Submission.GeneratedTextureAsset);
+              Runtime::RuntimeObjectSpaceNormalBakeStatus::StaleCompletion);
+    EXPECT_TRUE(queue.IsLatest(scheduled.Submission.StaleKey));
 }

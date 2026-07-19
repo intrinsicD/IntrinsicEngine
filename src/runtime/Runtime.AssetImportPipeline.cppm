@@ -80,7 +80,8 @@ namespace Extrinsic::Runtime
         RenderExtractionCache* RenderExtraction{};
         ECS::Scene::Registry* Scene{};
         RuntimeObjectSpaceNormalBakeQueue* ObjectSpaceNormalBakeQueue{};
-        bool ObjectSpaceNormalBakeGraphicsBackendOperational{false};
+        std::uint64_t ObjectSpaceNormalBakeBindingEpoch{0u};
+        const RHI::IDevice* ObjectSpaceNormalBakeDevice{};
     };
 
     export struct RuntimePostImportProcessorDesc
@@ -225,6 +226,14 @@ namespace Extrinsic::Runtime
         SelectionController* Selection{};
         EditorCommandHistory* CommandHistory{};
         RuntimeObjectSpaceNormalBakeQueue* ObjectSpaceNormalBakeQueue{};
+        std::uint64_t ObjectSpaceNormalBakeBindingEpoch{0u};
+        const RHI::IDevice* Device{};
+    };
+
+    export struct RuntimeObjectSpaceNormalBakeProducerContext
+    {
+        RuntimeObjectSpaceNormalBakeQueue* Queue{};
+        std::uint64_t BindingEpoch{0u};
         const RHI::IDevice* Device{};
     };
 
@@ -303,6 +312,15 @@ namespace Extrinsic::Runtime
             std::function<void(const RuntimeAssetImportRequest&)> hook);
         [[nodiscard]] RuntimeAssetImportQueueSnapshot
             GetAssetImportQueueSnapshot() const;
+        [[nodiscard]] RuntimeObjectSpaceNormalBakeProducerContext
+            GetObjectSpaceNormalBakeProducerContext() const noexcept
+        {
+            return RuntimeObjectSpaceNormalBakeProducerContext{
+                .Queue = m_ObjectSpaceNormalBakeQueue.get(),
+                .BindingEpoch = m_ObjectSpaceNormalBakeBindingEpoch,
+                .Device = m_Device.get(),
+            };
+        }
         [[nodiscard]] std::size_t ClearCompletedAssetImports();
         [[nodiscard]] Core::Result CancelAssetImport(
             RuntimeAssetIngestHandle operation);
@@ -360,6 +378,7 @@ namespace Extrinsic::Runtime
         BorrowedSubsystem<SelectionController> m_SelectionController{};
         BorrowedSubsystem<EditorCommandHistory> m_EditorCommandHistory{};
         BorrowedSubsystem<RuntimeObjectSpaceNormalBakeQueue> m_ObjectSpaceNormalBakeQueue{};
+        std::uint64_t m_ObjectSpaceNormalBakeBindingEpoch{0u};
         BorrowedSubsystem<const RHI::IDevice> m_Device{};
         RuntimeIOBackendFactory m_ModelTextureImportIOBackendFactoryForTest{};
         std::function<void(const RuntimeAssetImportRequest&)>
