@@ -11,6 +11,11 @@ maturity_target: Operational
 
 ## Status
 
+- In progress as of 2026-07-19; owner: Codex team; implementation branch:
+  `codex/runtime-180-camera-module`.
+- Next gate: land the typed viewport-input schedule and exact world-bound
+  camera registry, then migrate Sandbox/reference-scene callers without an
+  Engine compatibility facade.
 - 2026-07-19 amendment: rebased the implementation contract on the merged
   `RUNTIME-182` editor-capture seam. The camera insertion point is now a
   dedicated typed viewport-input hook rather than a seventh generic frame

@@ -158,7 +158,8 @@ triggers. The implementation graph is:
 
 - Retired `RUNTIME-179` composes the global streaming/derived-job owner and
   removes its Engine facades.
-- [`RUNTIME-180`](RUNTIME-180-extract-camera-module.md) — compose global
+- Active
+  [`RUNTIME-180`](../../active/RUNTIME-180-extract-camera-module.md) — compose global
   viewport/controller state with world-qualified targets and move initial
   reference content to app bootstrap.
 - Retired `RUNTIME-181` composes the one global validated config

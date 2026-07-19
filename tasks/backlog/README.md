@@ -300,7 +300,7 @@ and state scopes live in the [runtime backlog index](runtime/README.md).
 Retired `RUNTIME-182` extracted the optional global ImGui/host owner while
 preserving the existing paired frame bracket and one completed capture
 snapshot. The next eligible behavior-owner slice is
-[`RUNTIME-180`](runtime/RUNTIME-180-extract-camera-module.md).
+[`RUNTIME-180`](../active/RUNTIME-180-extract-camera-module.md), now active.
 Sequencing note: tasks whose deliverable ADR-0024 supersedes are
 front-matter gated on their seam dependencies — `RUNTIME-150` on
 `ARCH-007`/`ARCH-008`, `RUNTIME-151` additionally on `ARCH-011`, `ARCH-006`
@@ -321,7 +321,7 @@ The non-blocking TaskGraph substrate (`CORE-005`) and scheduler hardening
 
 Open members (kernel-seam priority set first):
 - [`../active/ARCH-014-kernel-convergence-tracking.md`](../active/ARCH-014-kernel-convergence-tracking.md) (active umbrella north-star; not a slice).
-- [`runtime/RUNTIME-180-extract-camera-module.md`](runtime/RUNTIME-180-extract-camera-module.md) through [`runtime/RUNTIME-187-finalize-domain-free-engine-surface.md`](runtime/RUNTIME-187-finalize-domain-free-engine-surface.md) (remaining ADR-0027 behavior-owner, app-lifecycle, mechanism-pruning, semantic auxiliary-surface, and final-ratchet graph; see the runtime index for exact dependencies).
+- [`../active/RUNTIME-180-extract-camera-module.md`](../active/RUNTIME-180-extract-camera-module.md) (active behavior-owner slice), then [`runtime/RUNTIME-172-privatize-scene-document-surface.md`](runtime/RUNTIME-172-privatize-scene-document-surface.md) through [`runtime/RUNTIME-187-finalize-domain-free-engine-surface.md`](runtime/RUNTIME-187-finalize-domain-free-engine-surface.md) (remaining ADR-0027 behavior-owner, app-lifecycle, mechanism-pruning, semantic auxiliary-surface, and final-ratchet graph; see the runtime index for exact dependencies).
 - [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) (one-shot post-convergence admission gate; blocked until known architecture/right-sizing/tool-rent work retires).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).
