@@ -159,7 +159,7 @@ triggers. The implementation graph is:
 - [`RUNTIME-180`](RUNTIME-180-extract-camera-module.md) — compose global
   viewport/controller state with world-qualified targets and move initial
   reference content to app bootstrap.
-- [`RUNTIME-181`](RUNTIME-181-extract-config-control-module.md) — compose the
+- [`RUNTIME-181`](../../active/RUNTIME-181-extract-config-control-module.md) — compose the
   one global validated config preview/apply and app-section owner.
 - Re-scoped [`RUNTIME-172`](RUNTIME-172-privatize-scene-document-surface.md) —
   compose the cohesive SceneEditing owner after `RUNTIME-179` and

@@ -9,6 +9,7 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/active/ARCH-014-kernel-convergence-tracking.md)
+- `RUNTIME-181` — Extract the config-control composition module (tasks/active/RUNTIME-181-extract-config-control-module.md)
 
 ## Theme B — Rendering modernization
 
@@ -37,7 +38,6 @@ the authoritative open/unblocked view.
 - blocked by `RUNTIME-172`: `RUNTIME-168` — Privatize Sandbox default-policy composition (tasks/backlog/runtime/RUNTIME-168-privatize-sandbox-default-policies-surface.md)
 - unblocked: `RUNTIME-172` — Extract the scene-editing composition module (tasks/backlog/runtime/RUNTIME-172-privatize-scene-document-surface.md)
 - unblocked: `RUNTIME-180` — Extract the camera composition module (tasks/backlog/runtime/RUNTIME-180-extract-camera-module.md)
-- unblocked: `RUNTIME-181` — Extract the config-control composition module (tasks/backlog/runtime/RUNTIME-181-extract-config-control-module.md)
 - unblocked: `RUNTIME-182` — Extract the editor-UI composition module (tasks/backlog/runtime/RUNTIME-182-extract-editor-ui-module.md)
 - blocked by `RUNTIME-172`: `RUNTIME-183` — Extract the asset-workflow composition module (tasks/backlog/runtime/RUNTIME-183-extract-asset-workflow-module.md)
 - blocked by `RUNTIME-168`: `RUNTIME-184` — Replace IApplication with explicit app composition (tasks/backlog/runtime/RUNTIME-184-replace-application-lifecycle.md)

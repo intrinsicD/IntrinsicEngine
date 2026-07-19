@@ -16,6 +16,11 @@ Each active task should include:
   `codex/arch-014-kernel-convergence-program`; blocked on final leaf
   `RUNTIME-187`. Next gate: execute the unblocked ADR-0027 behavior-owner
   leaves and update the convergence scorecard after each retirement.
+- [`RUNTIME-181`](RUNTIME-181-extract-config-control-module.md) — promote the
+  existing config control to the app-composed service while preserving
+  omission-safe synchronous startup/hot apply; owner: Codex team; branch:
+  `codex/runtime-181-config-control-module`. Next gate: implement the shared
+  narrow recipe-activation capability and lifecycle migration.
 
 ## History
 
