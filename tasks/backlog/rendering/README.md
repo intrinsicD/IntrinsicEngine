@@ -26,14 +26,16 @@ without requiring them to read every file.
 
 - The 2026-07-03 review R13 follow-up `GRAPHICS-119` retired parallel
   render-pass command recording via the task scheduler on 2026-07-07.
-- [`GRAPHICS-127`](GRAPHICS-127-native-gpu-timestamp-profiler.md) — make the
+- Active
+  [`GRAPHICS-127`](../../active/GRAPHICS-127-native-gpu-timestamp-profiler.md) —
+  make the
   already-exported RHI profiler truthful and operational: nonblocking native
   Vulkan timestamps around actual compiled passes, honest Null provenance,
   and reuse of current telemetry/Frame Graph presentation. Its Vulkan,
   multi-queue, and parallel-recording prerequisites are satisfied; ADR-0027
   additionally gated it on now-retired `RUNTIME-181`/`RUNTIME-182`, so config
   and UI land through app-composed owners rather than transitional Engine
-  facades. The task is selectable.
+  facades. The task is in progress.
 - The following Theme B incubation leaves are deliberately blocked by the
   architecture-stability gate `REVIEW-003`; they are not eligible for
   implementation during the current convergence/right-sizing phase:
@@ -95,7 +97,7 @@ The following list is the minimum dependency order for the rendering backlog.
 Each entry lists the upstream tasks that must be complete (or explicitly
 out-of-scope) before the entry is eligible for "in-progress" selection.
 
-- [GRAPHICS-127 — Native GPU timestamp profiler and frame-recipe timing integration](GRAPHICS-127-native-gpu-timestamp-profiler.md):
+- [GRAPHICS-127 — Native GPU timestamp profiler and frame-recipe timing integration](../../active/GRAPHICS-127-native-gpu-timestamp-profiler.md):
   depends on retired `GRAPHICS-033` (operational Vulkan), `GRAPHICS-037D`
   (multi-queue recording), and `GRAPHICS-119` (parallel pass recording), plus
   retired `RUNTIME-181` (ConfigControl owner) and `RUNTIME-182` (EditorUi

@@ -100,7 +100,9 @@ those broad umbrellas. Historical FetchContent instructions in the archived
 plans are superseded by the current vcpkg-manifest-only contract.
 
 The 2026-07-16 old-engine consolidation opened one immediately actionable
-Theme B remediation: `GRAPHICS-127` completes the already-exported RHI GPU
+Theme B remediation: active
+[`GRAPHICS-127`](../active/GRAPHICS-127-native-gpu-timestamp-profiler.md)
+completes the already-exported RHI GPU
 timestamp profiler across native Vulkan pass recording, truthful Null
 provenance, telemetry, and the existing Frame Graph panel. It is also a
 dependency of `REVIEW-003` because the dead/misleading public seam must close

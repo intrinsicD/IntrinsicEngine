@@ -9,6 +9,7 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/active/ARCH-014-kernel-convergence-tracking.md)
+- `GRAPHICS-127` — Native GPU timestamp profiler and frame-recipe timing integration (tasks/active/GRAPHICS-127-native-gpu-timestamp-profiler.md)
 - `RUNTIME-180` — Extract the camera composition module (tasks/active/RUNTIME-180-extract-camera-module.md)
 
 ## Theme B — Rendering modernization
@@ -21,7 +22,6 @@ the authoritative open/unblocked view.
 - blocked by `REVIEW-003`: `GRAPHICS-124` — Slughorn world-space vector annotation proof (tasks/backlog/rendering/GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md)
 - blocked by `REVIEW-003`: `GRAPHICS-125` — Memory-priced cluster hierarchy evidence (tasks/backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md)
 - blocked by `REVIEW-003`: `GRAPHICS-126` — Bandwidth-priced frame-recipe trace model (tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
-- unblocked: `GRAPHICS-127` — Native GPU timestamp profiler and frame-recipe timing integration (tasks/backlog/rendering/GRAPHICS-127-native-gpu-timestamp-profiler.md)
 - blocked by `RUNTIME-183`: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
 - unblocked: `RUNTIME-139` — Static AoS storage and shader operational path (tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md)
 

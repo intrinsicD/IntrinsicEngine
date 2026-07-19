@@ -13,10 +13,13 @@ maturity_target: Operational
 
 ## Status
 
-- Implementation-ready backlog contract as of 2026-07-19. `RUNTIME-181` and
-  `RUNTIME-182` are retired, so ConfigControl and EditorUi are settled owners,
-  not future blockers. All implementation, test, documentation, and native-GPU
-  evidence checkboxes remain open.
+- In progress as of 2026-07-19; owner: Codex team; implementation branch:
+  `codex/graphics-127-gpu-profiler`.
+- Next gate: repair the RHI lifecycle/provenance contract and land its focused
+  CPU coverage before native Vulkan query-pool and compiled-pass integration.
+- `RUNTIME-181` and `RUNTIME-182` are retired, so ConfigControl and EditorUi
+  are settled owners, not future blockers. All implementation, test,
+  documentation, and native-GPU evidence checkboxes remain open.
 - The 2026-07-19 audit confirmed that the exported profiler seam is unused in
   production: the Vulkan adapter is never constructed, `EndFrame()` never
   writes its closing timestamp, and the Null adapter reports host-clock values

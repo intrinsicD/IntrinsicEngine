@@ -21,6 +21,11 @@ Each active task should include:
   `codex/runtime-180-camera-module`; in progress. Next gate: add the dedicated
   typed viewport-input schedule, publish the exact world-bound registry, and
   migrate app-owned reference bootstrap plus omission-safe callers.
+- [`GRAPHICS-127`](GRAPHICS-127-native-gpu-timestamp-profiler.md) — native GPU
+  timestamp profiler; owner: Codex team; branch:
+  `codex/graphics-127-gpu-profiler`; in progress. Next gate: repair the RHI
+  lifecycle/provenance contract and focused CPU coverage before integrating
+  native Vulkan query pools and compiled-pass scopes.
 
 ## History
 
