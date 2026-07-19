@@ -198,12 +198,12 @@ triggers. The implementation graph is:
 
 `GRAPHICS-127` follows `RUNTIME-181`/`RUNTIME-182` so its profiling config and
 Frame Graph UI use the settled owners.
-[`RUNTIME-177`](RUNTIME-177-immediate-mode-debug-draw-seam.md) follows
-`RUNTIME-166` and `RUNTIME-181` so debug draw attaches to the final extraction
-storage and shared config lane. `RUNTIME-129` and `RUNTIME-184` may proceed
-independently after their respective owner prerequisites; both gate
-`RUNTIME-185`. `ARCH-014` reaches this graph through `RUNTIME-187`;
-`REVIEW-003` reaches it transitively through `ARCH-014`.
+Retired `RUNTIME-177` added no generic debug-draw producer seam because its
+consumer inventory was empty; existing spatial-debug and transform-gizmo
+paths remain typed. `RUNTIME-129` and `RUNTIME-184` may proceed independently
+after their respective owner prerequisites; both gate `RUNTIME-185`.
+`ARCH-014` reaches this graph through `RUNTIME-187`; `REVIEW-003` reaches it
+transitively through `ARCH-014`.
 
 #### Retired decomposition entries
 
@@ -405,15 +405,17 @@ observable to UI, agents, tests, and reproducibility tooling.
 states, UI-facing status vocabulary, and explicit provenance-carrying
 publish/apply commands for candidate renderer outputs.
 
-### Developer-experience seams (seeded 2026-07-14, Theme B)
+### Retired developer-experience decisions
 
-Opened from the 2026-07 right-sizing audit: the snapshot batch's
+The 2026-07 right-sizing audit observed that the snapshot batch's
 `DebugLines/DebugPoints/DebugTriangles` fields have no runtime writer, so a
 trivially scoped debug primitive costs 8–11 files across 4 layers.
 
-- [RUNTIME-177 — Immediate-mode debug-draw seam for runtime and method code](RUNTIME-177-immediate-mode-debug-draw-seam.md):
-  plain per-frame accumulator + free-function helpers feeding the existing
-  transient-debug pass; no new interfaces, passes, or adapter machinery.
+- [RUNTIME-177 — Immediate-mode debug-draw seam for runtime and method code](../../done/RUNTIME-177-immediate-mode-debug-draw-seam.md)
+  (done, 2026-07-19, no capability maturity): the follow-up inventory found no
+  production direct writer, so the proposed accumulator/service/config/UI
+  stack was rejected. A future producer-owned task must name and land its first
+  real caller.
 
 ### Runtime adapter umbrellas (clarified by Q tasks; producer modules)
 

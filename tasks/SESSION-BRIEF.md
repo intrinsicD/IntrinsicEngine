@@ -24,7 +24,6 @@ the authoritative open/unblocked view.
 - blocked by `RUNTIME-182`: `GRAPHICS-127` — Native GPU timestamp profiler and frame-recipe timing integration (tasks/backlog/rendering/GRAPHICS-127-native-gpu-timestamp-profiler.md)
 - blocked by `RUNTIME-183`: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/runtime/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
 - unblocked: `RUNTIME-139` — Static AoS storage and shader operational path (tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md)
-- unblocked: `RUNTIME-177` — Immediate-mode debug-draw seam for runtime integrations (tasks/backlog/runtime/RUNTIME-177-immediate-mode-debug-draw-seam.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 

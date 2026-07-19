@@ -5483,3 +5483,15 @@ imports, two re-exports, and 29 getter names. Strict layering, task, docs,
 test-layout, root-hygiene, clean-workshop, inventory, and diff checks passed.
 Implementation checkpoint: `bc90ed71`; main merge: `763505dc`; research trace:
 `9f6370dc`.
+
+[`RUNTIME-177`](RUNTIME-177-immediate-mode-debug-draw-seam.md) — proposed
+immediate-mode runtime debug-draw seam retired on 2026-07-19 as a
+no-implementation right-sizing decision with no capability maturity. The
+production inventory found zero direct debug-packet/helper writers under
+runtime, app, methods, or benchmarks. Existing spatial-debug and
+transform-gizmo producers already use semantically richer typed paths, while
+the snapshot `DebugLines`/`DebugPoints`/`DebugTriangles` spans remain a
+consumed backend-neutral renderer/test contract. No accumulator, service,
+module, config/UI field, CMake entry, source test, or inventory change landed.
+A future producer-owned slice may reopen the idea only when it names and lands
+the first real main-thread pre-extraction caller.

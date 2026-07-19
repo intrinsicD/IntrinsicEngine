@@ -23,8 +23,9 @@ maturity_target: CPUContracted
 - No production annotation packet, `RuntimeRenderSnapshotBatch` lane,
   `Graphics.VisualizationPackets` extension, frame-recipe pass/resource,
   renderer branch, runtime producer, shader asset, or config/UI surface.
-- No change to the existing transient-debug, visualization-overlay, or
-  `RUNTIME-177` seams.
+- No change to the existing transient-debug or visualization-overlay paths;
+  retired `RUNTIME-177` deliberately introduced no generic runtime producer
+  seam without a named production caller.
 - No new renderer interface, pass registry, service, bridge, queue, event
   chain, or public module.
 - No claim that the external project is production-ready beyond the tested
