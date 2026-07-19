@@ -1,4 +1,6 @@
 #include <chrono>
+#include <cstdlib>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -91,6 +93,92 @@ namespace
         bool RanFrame{false};
         bool DocumentOperationSucceeded{false};
         bool ExactHistoryPublished{false};
+    };
+
+    constexpr int kInteractionRollbackObserved = 72;
+    constexpr int kInteractionRollbackMissing = 73;
+    Runtime::SceneDocumentModule*
+        g_InteractionRollbackDocuments = nullptr;
+
+    [[noreturn]] void ObserveInteractionRollback() noexcept
+    {
+        if (g_InteractionRollbackDocuments == nullptr)
+            std::_Exit(kInteractionRollbackMissing);
+
+        auto probe =
+            g_InteractionRollbackDocuments
+                ->RegisterReplacementParticipant(
+                    Runtime::SceneReplacementParticipantDesc{
+                        .Name =
+                            "RUNTIME-188.EngineInteractionTransition",
+                        .BeforeReplace = {},
+                        .AfterReplace = {},
+                    });
+        if (!probe.has_value())
+            std::_Exit(kInteractionRollbackMissing);
+
+        (void)g_InteractionRollbackDocuments
+            ->UnregisterReplacementParticipant(*probe);
+        std::_Exit(kInteractionRollbackObserved);
+    }
+
+    class AssetTransitionConflictModule final
+        : public Runtime::IRuntimeModule
+    {
+    public:
+        [[nodiscard]] std::string_view Name() const noexcept override
+        {
+            return "zz.RUNTIME-172.AssetTransitionConflict";
+        }
+
+        [[nodiscard]] Core::Result OnRegister(
+            Runtime::EngineSetup& setup) override
+        {
+            m_Documents =
+                setup.Services()
+                    .Find<Runtime::SceneDocumentModule>();
+            if (m_Documents == nullptr)
+                return Core::Err(Core::ErrorCode::ResourceNotFound);
+
+            auto conflict =
+                m_Documents->RegisterReplacementParticipant(
+                    Runtime::SceneReplacementParticipantDesc{
+                        .Name =
+                            "RUNTIME-183.EngineAssetHandoffTransition",
+                        .BeforeReplace = {},
+                        .AfterReplace = {},
+                    });
+            if (!conflict.has_value())
+                return Core::Err(conflict.error());
+
+            m_Conflict = *conflict;
+            g_InteractionRollbackDocuments = m_Documents;
+            return Core::Ok();
+        }
+
+        [[nodiscard]] Core::Result OnResolve(
+            Runtime::EngineSetup&) override
+        {
+            return Core::Ok();
+        }
+
+        void OnShutdown(
+            Runtime::RuntimeModuleShutdownContext&) override
+        {
+            if (m_Documents != nullptr && m_Conflict.IsValid())
+            {
+                (void)m_Documents
+                    ->UnregisterReplacementParticipant(m_Conflict);
+            }
+            if (g_InteractionRollbackDocuments == m_Documents)
+                g_InteractionRollbackDocuments = nullptr;
+            m_Documents = nullptr;
+            m_Conflict = {};
+        }
+
+    private:
+        Runtime::SceneDocumentModule* m_Documents{};
+        Runtime::SceneReplacementParticipantHandle m_Conflict{};
     };
 
     [[nodiscard]] Core::Config::EngineConfig HeadlessConfig()
@@ -710,4 +798,47 @@ TEST(SceneDocumentModule,
     EXPECT_TRUE(app->DocumentOperationSucceeded);
     EXPECT_TRUE(app->ExactHistoryPublished);
     engine.Shutdown();
+}
+
+TEST(SceneDocumentModule,
+     EngineReplacementParticipantsResetAcrossReinitialize)
+{
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<StubApplication>());
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+
+    for (std::uint32_t boot = 0u; boot < 2u; ++boot)
+    {
+        engine.Initialize();
+        Runtime::SceneDocumentModule* const documents =
+            engine.Services()
+                .Find<Runtime::SceneDocumentModule>();
+        ASSERT_NE(documents, nullptr);
+        EXPECT_TRUE(
+            documents->NewSceneDocument().has_value());
+        engine.Shutdown();
+        EXPECT_EQ(
+            engine.Services()
+                .Find<Runtime::SceneDocumentModule>(),
+            nullptr);
+    }
+}
+
+TEST(SceneDocumentModule,
+     EngineRollsBackInteractionWhenAssetTransitionRegistrationFails)
+{
+    EXPECT_EXIT(
+        {
+            std::set_terminate(ObserveInteractionRollback);
+            Runtime::Engine engine(
+                HeadlessConfig(),
+                std::make_unique<StubApplication>());
+            engine.EmplaceModule<Runtime::SceneDocumentModule>();
+            engine.EmplaceModule<AssetTransitionConflictModule>();
+            engine.Initialize();
+            std::_Exit(kInteractionRollbackMissing);
+        },
+        ::testing::ExitedWithCode(kInteractionRollbackObserved),
+        "");
 }

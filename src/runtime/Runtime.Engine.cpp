@@ -125,6 +125,42 @@ namespace Extrinsic::Runtime
     {
     }
 
+    // RUNTIME-172: Engine temporarily composes two scene-replacement
+    // transitions until RUNTIME-183/RUNTIME-188 move their owners into
+    // modules. Retain only the provider and the two exact typed handles.
+    class EngineSceneReplacementTransitions final
+    {
+    public:
+        SceneDocumentModule* Documents{};
+        SceneReplacementParticipantHandle Interaction{};
+        SceneReplacementParticipantHandle AssetHandoffs{};
+
+        void Release() noexcept
+        {
+            SceneDocumentModule* const documents = Documents;
+            Documents = nullptr;
+            if (documents == nullptr)
+            {
+                Interaction = {};
+                AssetHandoffs = {};
+                return;
+            }
+
+            if (AssetHandoffs.IsValid())
+            {
+                (void)documents->UnregisterReplacementParticipant(
+                    AssetHandoffs);
+                AssetHandoffs = {};
+            }
+            if (Interaction.IsValid())
+            {
+                (void)documents->UnregisterReplacementParticipant(
+                    Interaction);
+                Interaction = {};
+            }
+        }
+    };
+
     // ── Construction / destruction ────────────────────────────────────────
 
     // RUNTIME-178: these low-fanout helpers are defined and implemented in
@@ -617,6 +653,12 @@ namespace Extrinsic::Runtime
         m_KernelEvents.Publish(RuntimeShutdownAnnounced{});
         (void)m_KernelEvents.Pump();
 
+        if (m_SceneReplacementTransitions)
+        {
+            m_SceneReplacementTransitions->Release();
+            m_SceneReplacementTransitions.reset();
+        }
+
         RuntimeModuleShutdownContext context{
             .Commands = m_CommandBus,
             .Events = m_KernelEvents,
@@ -731,12 +773,23 @@ namespace Extrinsic::Runtime
 
     void Engine::RegisterSceneReplacementParticipants()
     {
+        if (m_SceneReplacementTransitions)
+        {
+            Core::Log::Error(
+                "[Runtime] Scene replacement transitions survived a prior boot.");
+            std::terminate();
+        }
+
         SceneDocumentModule* const documents =
             m_ServiceRegistry.Find<SceneDocumentModule>();
         EditorCommandHistory* const history =
             m_ServiceRegistry.Find<EditorCommandHistory>();
         if (documents == nullptr || history == nullptr)
             return;
+
+        auto transitions =
+            std::make_unique<EngineSceneReplacementTransitions>();
+        transitions->Documents = documents;
 
         // RUNTIME-188 removes this transition adapter when editor interaction
         // becomes module-owned. Captures name only the exact long-lived
@@ -787,6 +840,7 @@ namespace Extrinsic::Runtime
                 Core::Error::ToString(interaction.error()));
             std::terminate();
         }
+        transitions->Interaction = *interaction;
 
         // RUNTIME-183 removes this adapter when asset residency, extraction,
         // and bake handoffs become module-owned. Every capture is an exact
@@ -885,11 +939,14 @@ namespace Extrinsic::Runtime
                 });
         if (!assetHandoffs.has_value())
         {
+            transitions->Release();
             Core::Log::Error(
                 "[Runtime] Failed to register RUNTIME-183 scene replacement transition: {}",
                 Core::Error::ToString(assetHandoffs.error()));
             std::terminate();
         }
+        transitions->AssetHandoffs = *assetHandoffs;
+        m_SceneReplacementTransitions = std::move(transitions);
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
