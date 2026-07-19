@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -36,6 +37,7 @@ export namespace Extrinsic::Runtime
         bool ProgressiveRawGeometryFirst{false};
         DerivedJobRegistry* ProgressiveJobs{nullptr};
         WorldHandle World{DefaultWorldHandle};
+        std::function<bool()> BindingValid{};
         RuntimeObjectSpaceNormalBakeQueue* ObjectSpaceNormalBakeQueue{nullptr};
         bool ObjectSpaceNormalBakeGraphicsBackendOperational{false};
         std::string GeneratedNormalPropertyName{"v:normal"};

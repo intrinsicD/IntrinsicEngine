@@ -3076,7 +3076,11 @@ namespace Extrinsic::Runtime
             !m_GpuAssetCache ||
             !m_AssetModelTextureHandoff ||
             !m_AssetModelSceneHandoff ||
-            !m_Scene)
+            !m_Scene ||
+            !IsCurrentSubmissionTarget(
+                m_World,
+                m_Scene.get(),
+                m_TargetBindingEpoch))
         {
             return Core::Err<RuntimeAssetImportResult>(Core::ErrorCode::InvalidState);
         }
