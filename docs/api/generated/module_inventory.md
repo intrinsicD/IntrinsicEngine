@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 83 |
+| `runtime` | 82 |
 
 ## Modules
 
@@ -398,7 +398,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderRecipeActivation` | `src/runtime/Runtime.RenderRecipeActivation.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderWorldPool` | `src/runtime/Runtime.RenderWorldPool.cppm` | `runtime` |
 | `Extrinsic.Runtime.SandboxConfigSections` | `src/runtime/Runtime.SandboxConfigSections.cppm` | `runtime` |
-| `Extrinsic.Runtime.SandboxDefaultPolicies` | `src/runtime/Runtime.SandboxDefaultPolicies.cppm` | `runtime` |
 | `Extrinsic.Runtime.SandboxEditorFacades` | `src/runtime/Runtime.SandboxEditorFacades.cppm` | `runtime` |
 | `Extrinsic.Runtime.SceneSerialization` | `src/runtime/Runtime.SceneSerialization.cppm` | `runtime` |
 | `Extrinsic.Runtime.SelectedMeshTextureBake` | `src/runtime/Runtime.SelectedMeshTextureBake.cppm` | `runtime` |
@@ -418,4 +417,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **391**
+Total modules: **390**

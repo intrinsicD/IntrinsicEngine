@@ -75,10 +75,10 @@ import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.TextureUpload;
 import Extrinsic.RHI.Types;
+import Extrinsic.Sandbox;
 import Extrinsic.Sandbox.Editor.Controller;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
-import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.EditorUiHost;
@@ -91,18 +91,13 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
-import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxConfigSections;
 import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Sandbox.ConfigSections;
-import Extrinsic.Sandbox.Editor.MethodPanels;
-import Extrinsic.Sandbox.Editor.Shell;
 import Geometry.Properties;
 
 namespace
@@ -180,14 +175,18 @@ public:
 class ExitAfterFramesApp final : public IApplication
 {
 public:
-    explicit ExitAfterFramesApp(const std::uint32_t targetFrames) noexcept
+    explicit ExitAfterFramesApp(
+        const std::uint32_t targetFrames,
+        const bool attachEditor = true) noexcept
         : m_TargetFrames(targetFrames)
+        , m_AttachEditor(attachEditor)
     {
     }
 
     void OnInitialize(Engine& engine) override
     {
-        m_EditorUi.Attach(engine);
+        if (m_AttachEditor)
+            m_EditorUi.Attach(engine);
     }
 
     void OnSimTick(Engine&, double) override {}
@@ -203,122 +202,64 @@ public:
 
     void OnShutdown(Engine&) override
     {
-        m_EditorUi.Detach();
+        if (m_AttachEditor)
+            m_EditorUi.Detach();
     }
 
 private:
     Extrinsic::Sandbox::Editor::SandboxEditorController m_EditorUi{};
     std::uint32_t m_TargetFrames{1u};
     std::uint32_t m_Frames{0u};
+    bool m_AttachEditor{true};
 };
 
-// Test-only wrapper that mirrors the application-owned initialization order in
-// `Extrinsic.Sandbox.App`: reference bootstrap/seed, default policies, then
-// the caller-specific inner application. Keeping that order is load-bearing
-// for inner applications that select or edit ReferenceTriangle in
-// `OnInitialize`.
+// Compose the real Sandbox application before the caller-specific probe.
+// Keeping that order is load-bearing for inner applications that select or
+// edit ReferenceTriangle in `OnInitialize`.
 class SandboxCompositionApp final : public IApplication
 {
 public:
     explicit SandboxCompositionApp(std::unique_ptr<IApplication> inner) noexcept
-        : m_Inner(std::move(inner))
+        : m_Sandbox(Extrinsic::Sandbox::CreateSandboxApp())
+        , m_Inner(std::move(inner))
     {
     }
 
     void OnInitialize(Engine& engine) override
     {
-        m_CameraControllers =
-            engine.Services().Find<
-                Extrinsic::Runtime::CameraControllerRegistry>();
-        const auto& referenceConfig =
-            engine.GetEngineConfig().ReferenceScene;
-        if (referenceConfig.Enabled &&
-            !m_ReferenceBootstrap.has_value())
-        {
-            const Extrinsic::Runtime::WorldHandle world =
-                engine.ActiveWorld();
-            if (Registry* scene = engine.Worlds().Get(world);
-                scene != nullptr)
-            {
-                Extrinsic::Runtime::ReferenceScenePopulation population =
-                    Extrinsic::Runtime::BootstrapReferenceScene(
-                        referenceConfig.Selector,
-                        *scene);
-                if (m_CameraControllers != nullptr)
-                {
-                    (void)m_CameraControllers->SetWorldSeed(
-                        world,
-                        population.Camera);
-                }
-                m_ReferenceBootstrap = ReferenceBootstrap{
-                    .World = world,
-                    .Population = std::move(population),
-                };
-            }
-        }
-
-        m_DefaultPolicies =
-            Extrinsic::Runtime::RegisterSandboxDefaultRuntimePolicies(
-                engine,
-                m_CameraControllers);
+        if (m_Sandbox)
+            m_Sandbox->OnInitialize(engine);
         if (m_Inner)
-        {
             m_Inner->OnInitialize(engine);
-        }
     }
 
     void OnSimTick(Engine& engine, double fixedDt) override
     {
+        if (m_Sandbox)
+            m_Sandbox->OnSimTick(engine, fixedDt);
         if (m_Inner)
-        {
             m_Inner->OnSimTick(engine, fixedDt);
-        }
     }
 
     void OnVariableTick(Engine& engine, double alpha, double dt) override
     {
+        if (m_Sandbox)
+            m_Sandbox->OnVariableTick(engine, alpha, dt);
         if (m_Inner)
-        {
             m_Inner->OnVariableTick(engine, alpha, dt);
-        }
     }
 
     void OnShutdown(Engine& engine) override
     {
         if (m_Inner)
-        {
             m_Inner->OnShutdown(engine);
-        }
-        Extrinsic::Runtime::UnregisterSandboxDefaultRuntimePolicies(
-            engine,
-            m_DefaultPolicies);
-        if (m_ReferenceBootstrap.has_value())
-        {
-            if (Registry* scene =
-                    engine.Worlds().Get(
-                        m_ReferenceBootstrap->World);
-                scene != nullptr)
-            {
-                Extrinsic::Runtime::TeardownReferenceScene(
-                    *scene,
-                    m_ReferenceBootstrap->Population);
-            }
-            m_ReferenceBootstrap.reset();
-        }
-        m_CameraControllers = nullptr;
+        if (m_Sandbox)
+            m_Sandbox->OnShutdown(engine);
     }
 
 private:
-    struct ReferenceBootstrap
-    {
-        Extrinsic::Runtime::WorldHandle World{};
-        Extrinsic::Runtime::ReferenceScenePopulation Population{};
-    };
-
+    std::unique_ptr<IApplication> m_Sandbox{};
     std::unique_ptr<IApplication> m_Inner{};
-    Extrinsic::Runtime::RuntimeSandboxDefaultPolicyRegistration m_DefaultPolicies{};
-    Extrinsic::Runtime::CameraControllerRegistry* m_CameraControllers{nullptr};
-    std::optional<ReferenceBootstrap> m_ReferenceBootstrap{};
 };
 
 Counters::Snapshot ToCounterSnapshot(
@@ -442,10 +383,7 @@ public:
         m_GeneratedTexture = generatedTexture;
     }
 
-    void OnInitialize(Engine& engine) override
-    {
-        m_EditorUi.Attach(engine);
-    }
+    void OnInitialize(Engine&) override {}
 
     void OnSimTick(Engine&, double) override {}
 
@@ -492,10 +430,7 @@ public:
         }
     }
 
-    void OnShutdown(Engine&) override
-    {
-        m_EditorUi.Detach();
-    }
+    void OnShutdown(Engine&) override {}
 
     bool UploadRequested{false};
     bool TextureReadyObserved{false};
@@ -507,7 +442,6 @@ public:
 private:
     static constexpr std::uint32_t kMaxFrames = 48u;
 
-    Extrinsic::Sandbox::Editor::SandboxEditorController m_EditorUi{};
     Assets::AssetId m_GeneratedTexture{};
 };
 
@@ -878,15 +812,7 @@ struct AcceptanceBootstrap
         config,
         std::make_unique<SandboxCompositionApp>(std::move(app)));
     enginePtr->AddModule(std::move(configControl));
-    enginePtr->EmplaceModule<Extrinsic::Runtime::AsyncWorkModule>();
-    enginePtr->EmplaceModule<Extrinsic::Runtime::CameraModule>();
-    enginePtr->EmplaceModule<Extrinsic::Runtime::EditorUiModule>();
-    enginePtr->EmplaceModule<
-        Extrinsic::Runtime::SceneDocumentModule>();
-    enginePtr->EmplaceModule<
-        Extrinsic::Runtime::SceneInteractionModule>();
-    enginePtr->EmplaceModule<
-        Extrinsic::Runtime::AssetWorkflowModule>();
+    Extrinsic::Sandbox::RegisterSandboxRuntimeModules(*enginePtr);
     enginePtr->Initialize();
 
     const auto initInputs = GetVulkanDeviceOperationalInputs(&enginePtr->GetDevice());
@@ -906,7 +832,9 @@ struct AcceptanceBootstrap
 [[nodiscard]] AcceptanceBootstrap BootstrapDefaultSandboxAppEngine()
 {
     return BootstrapDefaultSandboxAppEngineWithApp(
-        std::make_unique<ExitAfterFramesApp>(kTargetFrames));
+        std::make_unique<ExitAfterFramesApp>(
+            kTargetFrames,
+            false));
 }
 
 struct AcceptanceRunCapture
@@ -1520,10 +1448,13 @@ public:
             Selection(engine).SetSelectedEntity(
                 *engine.Worlds().Get(engine.ActiveWorld()), triangle);
 
-        m_EditorShell.Attach(engine);
-        m_MethodPanels.Register(m_EditorShell);
-        m_State->WindowOpened = m_EditorShell.SetEditorWindowOpen(
-            "mesh.processing.parameterize_uv", true);
+        RT::EditorUiHost* const editorUi =
+            engine.Services().Find<RT::EditorUiHost>();
+        m_State->WindowOpened =
+            editorUi != nullptr &&
+            editorUi->Windows().SetOpen(
+                "mesh.processing.parameterize_uv",
+                true);
     }
 
     void OnSimTick(Engine&, double) override {}
@@ -1562,16 +1493,10 @@ public:
         }
     }
 
-    void OnShutdown(Engine&) override
-    {
-        m_MethodPanels.Unregister();
-        m_EditorShell.Detach();
-    }
+    void OnShutdown(Engine&) override {}
 
 private:
     std::shared_ptr<ParameterizationUvViewRuntimePathState> m_State{};
-    Extrinsic::Sandbox::Editor::EditorShell m_EditorShell{};
-    Extrinsic::Sandbox::Editor::MethodPanels m_MethodPanels{};
 };
 } // namespace
 
@@ -2247,10 +2172,7 @@ public:
     {
     }
 
-    void OnInitialize(Engine& engine) override
-    {
-        m_EditorUi.Attach(engine);
-    }
+    void OnInitialize(Engine&) override {}
 
     void OnSimTick(Engine&, double) override {}
 
@@ -2285,15 +2207,11 @@ public:
         }
     }
 
-    void OnShutdown(Engine&) override
-    {
-        m_EditorUi.Detach();
-    }
+    void OnShutdown(Engine&) override {}
 
     [[nodiscard]] bool Mutated() const noexcept { return m_Mutated; }
 
 private:
-    Extrinsic::Sandbox::Editor::SandboxEditorController m_EditorUi{};
     std::uint32_t m_MutateFrame{1u};
     std::uint32_t m_TargetFrames{1u};
     std::uint32_t m_Frames{0u};
@@ -3378,10 +3296,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldSurfaceAndIso
 class EditTriangleViaInspectorApp final : public IApplication
 {
 public:
-    void OnInitialize(Engine& engine) override
-    {
-        m_EditorUi.Attach(engine);
-    }
+    void OnInitialize(Engine&) override {}
 
     void OnSimTick(Engine&, double) override {}
 
@@ -3417,16 +3332,12 @@ public:
         }
     }
 
-    void OnShutdown(Engine&) override
-    {
-        m_EditorUi.Detach();
-    }
+    void OnShutdown(Engine&) override {}
 
     Extrinsic::Runtime::SandboxEditorCommandStatus EditStatus{
         Extrinsic::Runtime::SandboxEditorCommandStatus::NoChange};
 
 private:
-    Extrinsic::Sandbox::Editor::SandboxEditorController m_EditorUi{};
     std::uint32_t m_Frames{0u};
 };
 } // namespace
@@ -3993,7 +3904,6 @@ public:
 
     void OnInitialize(Engine& engine) override
     {
-        m_EditorUi.Attach(engine);
         if (m_Triangle == Extrinsic::ECS::InvalidEntityHandle)
         {
             m_Triangle = FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle");
@@ -4100,10 +4010,7 @@ public:
         }
     }
 
-    void OnShutdown(Engine&) override
-    {
-        m_EditorUi.Detach();
-    }
+    void OnShutdown(Engine&) override {}
 
     bool TriangleClickSubmitted{false};
     bool TriangleHitObserved{false};
@@ -4189,7 +4096,6 @@ private:
                !Interaction(engine).LastRefinedPrimitive().has_value();
     }
 
-    Extrinsic::Sandbox::Editor::SandboxEditorController m_EditorUi{};
     EntityHandle m_Triangle{Extrinsic::ECS::InvalidEntityHandle};
     glm::vec3 m_TargetWorldPoint{0.0f};
     std::string m_TargetName{"ReferenceTriangle"};

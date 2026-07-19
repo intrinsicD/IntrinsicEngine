@@ -47,6 +47,7 @@ import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KMeansGpuBackend;
 import Extrinsic.Runtime.KernelEvents;
@@ -78,6 +79,23 @@ export import Geometry.Parameterization;
 
 export namespace Extrinsic::Runtime
 {
+    [[nodiscard]] std::array<
+        RuntimeImportEntityAuthoringPolicyDesc,
+        3>
+        MakeSandboxDefaultImportAuthoringPolicies();
+
+    [[nodiscard]] RuntimeImportCompletedHandlerDesc
+        MakeSandboxDefaultImportCompletedHandler(
+            CameraControllerRegistry* cameraControllers);
+
+    [[nodiscard]] RuntimePostImportProcessorDesc
+        MakeSandboxDefaultDirectMeshPostProcessor();
+
+    [[nodiscard]] RuntimeInputActionDesc
+        MakeSandboxDefaultFocusInputAction(
+            CameraControllerRegistry& cameraControllers,
+            SelectionController& selection);
+
     enum class RuntimeKMeansGpuJobStatus : std::uint8_t
     {
         Idle,

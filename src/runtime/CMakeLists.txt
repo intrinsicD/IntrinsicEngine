@@ -34,7 +34,6 @@ target_sources(${target_name}
         Runtime.ProgressivePresentationExtraction.cppm
         Runtime.ProgressiveRenderData.cppm
         Runtime.RenderArtifactPublication.cppm
-        Runtime.SandboxDefaultPolicies.cppm
         Runtime.SandboxConfigSections.cppm
         Runtime.SelectedMeshTextureBake.cppm
         Runtime.EcsSystemBundle.cppm

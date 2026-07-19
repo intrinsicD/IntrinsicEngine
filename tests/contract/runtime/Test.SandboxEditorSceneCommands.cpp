@@ -79,13 +79,13 @@ import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
@@ -139,9 +139,47 @@ namespace
 
 void InstallSandboxDefaultRuntimePolicies(Runtime::Engine& engine)
     {
-        (void)Runtime::RegisterSandboxDefaultRuntimePolicies(
-            engine,
-            engine.Services().Find<Runtime::CameraControllerRegistry>());
+        auto* const pipeline =
+            engine.Services().Find<Runtime::AssetImportPipeline>();
+        auto* const inputActions =
+            engine.Services().Find<Runtime::RuntimeInputActionRegistry>();
+        ASSERT_NE(pipeline, nullptr);
+        ASSERT_NE(inputActions, nullptr);
+
+        auto authoring =
+            Runtime::MakeSandboxDefaultImportAuthoringPolicies();
+        for (auto& desc : authoring)
+        {
+            ASSERT_TRUE(
+                pipeline->RegisterImportEntityAuthoringPolicy(
+                    std::move(desc))
+                    .IsValid());
+        }
+        ASSERT_TRUE(
+            pipeline->RegisterImportCompletedHandler(
+                Runtime::MakeSandboxDefaultImportCompletedHandler(
+                    engine.Services()
+                        .Find<Runtime::CameraControllerRegistry>()))
+                .IsValid());
+        ASSERT_TRUE(
+            pipeline->RegisterPostImportProcessor(
+                Runtime::MakeSandboxDefaultDirectMeshPostProcessor())
+                .IsValid());
+
+        auto* const cameraControllers =
+            engine.Services().Find<Runtime::CameraControllerRegistry>();
+        auto* const selection =
+            engine.Services().Find<Runtime::SelectionController>();
+        if (cameraControllers != nullptr && selection != nullptr)
+        {
+            ASSERT_TRUE(
+                inputActions
+                    ->Register(
+                        Runtime::MakeSandboxDefaultFocusInputAction(
+                            *cameraControllers,
+                            *selection))
+                    .IsValid());
+        }
     }
 
 [[nodiscard]] Runtime::SelectionController& Selection(
@@ -880,12 +918,8 @@ class ShutdownWhileGeometryImportBlockedApplication final
             ++m_State->InitializeCalls;
             m_ObservedFrames = 0u;
             m_ExitRequested = false;
-            m_DefaultPolicies =
-                Runtime::RegisterSandboxDefaultRuntimePolicies(
-                    engine,
-                    engine.Services()
-                        .Find<Runtime::CameraControllerRegistry>());
-            m_State->PoliciesRegistered = !m_DefaultPolicies.IsEmpty();
+            m_State->PoliciesRegistered =
+                InstallDefaultPolicies(engine);
             m_Editor.Attach(engine);
         }
 
@@ -912,15 +946,14 @@ class ShutdownWhileGeometryImportBlockedApplication final
 
         void OnShutdown(Runtime::Engine& engine) override
         {
+            (void)engine;
             m_Editor.Detach();
-            Runtime::UnregisterSandboxDefaultRuntimePolicies(
-                engine,
-                m_DefaultPolicies);
+            UninstallDefaultPolicies();
 
             if (m_State->ShutdownCalls == 0u)
             {
                 m_State->PoliciesUnregisteredBeforeWorkerRelease =
-                    m_DefaultPolicies.IsEmpty() &&
+                    DefaultPoliciesAreEmpty() &&
                     !m_State->Release.load(std::memory_order_acquire);
                 m_State->WorkerReleasedFromOnShutdown = true;
             }
@@ -934,9 +967,168 @@ class ShutdownWhileGeometryImportBlockedApplication final
         }
 
     private:
+        [[nodiscard]] bool DefaultPoliciesAreEmpty() const noexcept
+        {
+            if (m_Pipeline != nullptr ||
+                m_InputActions != nullptr ||
+                m_ImportCompleted.IsValid() ||
+                m_DirectMeshPostProcessor.IsValid() ||
+                m_FocusAction.has_value())
+            {
+                return false;
+            }
+            return std::ranges::none_of(
+                m_ImportAuthoring,
+                [](const auto handle)
+                {
+                    return handle.IsValid();
+                });
+        }
+
+        void UninstallDefaultPolicies() noexcept
+        {
+            if (m_InputActions != nullptr &&
+                m_FocusAction.has_value())
+            {
+                m_InputActions->Unregister(*m_FocusAction);
+            }
+            m_FocusAction.reset();
+
+            if (m_Pipeline != nullptr)
+            {
+                if (m_DirectMeshPostProcessor.IsValid())
+                {
+                    m_Pipeline->UnregisterPostImportProcessor(
+                        m_DirectMeshPostProcessor);
+                }
+                m_DirectMeshPostProcessor = {};
+
+                if (m_ImportCompleted.IsValid())
+                {
+                    m_Pipeline->UnregisterImportCompletedHandler(
+                        m_ImportCompleted);
+                }
+                m_ImportCompleted = {};
+
+                for (std::size_t index = m_ImportAuthoring.size();
+                     index > 0u;
+                     --index)
+                {
+                    const auto handle =
+                        m_ImportAuthoring[index - 1u];
+                    if (handle.IsValid())
+                    {
+                        m_Pipeline
+                            ->UnregisterImportEntityAuthoringPolicy(
+                                handle);
+                    }
+                    m_ImportAuthoring[index - 1u] = {};
+                }
+            }
+            else
+            {
+                m_DirectMeshPostProcessor = {};
+                m_ImportCompleted = {};
+                m_ImportAuthoring = {};
+            }
+
+            m_InputActions = nullptr;
+            m_Pipeline = nullptr;
+        }
+
+        [[nodiscard]] bool InstallDefaultPolicies(
+            Runtime::Engine& engine)
+        {
+            if (!DefaultPoliciesAreEmpty())
+                return false;
+
+            m_Pipeline =
+                engine.Services()
+                    .Find<Runtime::AssetImportPipeline>();
+            m_InputActions =
+                engine.Services()
+                    .Find<Runtime::RuntimeInputActionRegistry>();
+            if (m_Pipeline == nullptr || m_InputActions == nullptr)
+            {
+                UninstallDefaultPolicies();
+                return false;
+            }
+
+            auto authoring =
+                Runtime::MakeSandboxDefaultImportAuthoringPolicies();
+            for (std::size_t index = 0u;
+                 index < authoring.size();
+                 ++index)
+            {
+                m_ImportAuthoring[index] =
+                    m_Pipeline
+                        ->RegisterImportEntityAuthoringPolicy(
+                            std::move(authoring[index]));
+                if (!m_ImportAuthoring[index].IsValid())
+                {
+                    UninstallDefaultPolicies();
+                    return false;
+                }
+            }
+
+            auto* const cameraControllers =
+                engine.Services()
+                    .Find<Runtime::CameraControllerRegistry>();
+            m_ImportCompleted =
+                m_Pipeline->RegisterImportCompletedHandler(
+                    Runtime::MakeSandboxDefaultImportCompletedHandler(
+                        cameraControllers));
+            if (!m_ImportCompleted.IsValid())
+            {
+                UninstallDefaultPolicies();
+                return false;
+            }
+
+            m_DirectMeshPostProcessor =
+                m_Pipeline->RegisterPostImportProcessor(
+                    Runtime::
+                        MakeSandboxDefaultDirectMeshPostProcessor());
+            if (!m_DirectMeshPostProcessor.IsValid())
+            {
+                UninstallDefaultPolicies();
+                return false;
+            }
+
+            auto* const selection =
+                engine.Services()
+                    .Find<Runtime::SelectionController>();
+            if (cameraControllers != nullptr &&
+                selection != nullptr)
+            {
+                const auto focusAction =
+                    m_InputActions->Register(
+                        Runtime::
+                            MakeSandboxDefaultFocusInputAction(
+                                *cameraControllers,
+                                *selection));
+                if (!focusAction.IsValid())
+                {
+                    UninstallDefaultPolicies();
+                    return false;
+                }
+                m_FocusAction = focusAction;
+            }
+            return true;
+        }
+
         std::shared_ptr<ShutdownBlockedGeometryImportState> m_State{};
         Runtime::SandboxEditorSession m_Editor{};
-        Runtime::RuntimeSandboxDefaultPolicyRegistration m_DefaultPolicies{};
+        Runtime::AssetImportPipeline* m_Pipeline{nullptr};
+        Runtime::RuntimeInputActionRegistry* m_InputActions{nullptr};
+        std::array<
+            Runtime::RuntimeImportEntityAuthoringPolicyHandle,
+            3> m_ImportAuthoring{};
+        Runtime::RuntimeImportCompletedHandlerHandle
+            m_ImportCompleted{};
+        Runtime::RuntimePostImportProcessorHandle
+            m_DirectMeshPostProcessor{};
+        std::optional<Runtime::RuntimeInputActionHandle>
+            m_FocusAction{};
         std::uint32_t m_MaxFrames{1u};
         std::uint32_t m_ObservedFrames{0u};
         bool m_ExitRequested{false};

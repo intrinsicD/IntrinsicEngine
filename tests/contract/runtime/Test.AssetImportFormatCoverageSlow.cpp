@@ -32,7 +32,7 @@ import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.SceneDocumentModule;
-import Extrinsic.Runtime.SandboxDefaultPolicies;
+import Extrinsic.Runtime.SandboxEditorFacades;
 import Geometry.HalfedgeMesh.IO;
 
 namespace Assets = Extrinsic::Assets;
@@ -242,8 +242,27 @@ namespace
 
     void InstallSandboxDefaultRuntimePolicies(Runtime::Engine& engine)
     {
-        (void)Runtime::RegisterSandboxDefaultRuntimePolicies(
-            engine, nullptr);
+        auto* const pipeline =
+            engine.Services().Find<Runtime::AssetImportPipeline>();
+        ASSERT_NE(pipeline, nullptr);
+
+        auto authoring =
+            Runtime::MakeSandboxDefaultImportAuthoringPolicies();
+        for (auto& desc : authoring)
+        {
+            ASSERT_TRUE(
+                pipeline->RegisterImportEntityAuthoringPolicy(
+                    std::move(desc))
+                    .IsValid());
+        }
+        ASSERT_TRUE(
+            pipeline->RegisterImportCompletedHandler(
+                Runtime::MakeSandboxDefaultImportCompletedHandler(nullptr))
+                .IsValid());
+        ASSERT_TRUE(
+            pipeline->RegisterPostImportProcessor(
+                Runtime::MakeSandboxDefaultDirectMeshPostProcessor())
+                .IsValid());
     }
 }
 

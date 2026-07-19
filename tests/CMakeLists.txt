@@ -365,6 +365,7 @@ if(TARGET ExtrinsicSandboxEditor)
         FILES
             Test.SandboxDomainPanels.cpp
             Test.SandboxConfigSections.cpp
+            Test.SandboxAppComposition.cpp
             Test.SandboxEditorPresentation.cpp
             Test.SandboxParameterizationPanel.cpp
     )

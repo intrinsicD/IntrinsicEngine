@@ -96,11 +96,20 @@ result presentation. K-Means and Progressive Poisson command/config/result
 implementations compile in a private runtime facade unit; all other panel
 models, processing commands, history/jobs, validation, and result sinks likewise
 remain runtime-owned, so app panels expose no geometry, ECS, graphics, or RHI
-dependencies. The app also resolves the optional exact
-`Runtime::CameraControllerRegistry` once and installs the sandbox default
-runtime policy bundle through
-`Runtime::RegisterSandboxDefaultRuntimePolicies(engine, cameraRegistry)`.
-It unregisters the returned handles during shutdown before the engine tears down.
+dependencies. The app installs Sandbox defaults transactionally without an
+exported lifecycle owner. It first resolves the exact required published
+`Runtime::AssetImportPipeline` and built-in
+`Runtime::RuntimeInputActionRegistry`; if either is absent, it registers
+nothing. It obtains the fixed authoring array, import-completed handler,
+direct-mesh postprocessor, and `F` action descriptors from
+`Runtime::SandboxEditorFacades`, while the callback implementations stay
+runtime-private. One file-local handle record retains only the two required
+provider borrows and typed registration handles. Optional
+`Runtime::CameraControllerRegistry` and `Runtime::SelectionController` lookups
+are independent: the completed handler receives only the optional camera and
+uses pipeline-provided selection for auto-selection, while `F` is registered
+only when both optional services exist. Partial install rolls back in exact
+reverse order.
 The app remains a runtime-only consumer: `EditorShell` registers its
 parameterless frame contribution and windows through the resolved host, reads
 scene and selection state through runtime APIs, emits selection and
@@ -227,13 +236,24 @@ The default module list explicitly composes `AsyncWorkModule`, `CameraModule`,
 `SceneInteractionModule`, followed by `AssetWorkflowModule`. Camera remains
 optional at the runtime contract:
 when omitted, Sandbox policy registration omits `F` and autofocus, editor
-camera controls report unavailable, and import auto-selection plus non-camera
-behavior continue. Scene document and scene interaction remain independently
-optional as described above; without interaction, generic input/rendering and
-component-driven primitive views continue while selection/gizmo surfaces report
-unavailable. Asset workflow is independently optional to generic Engine and
-render-extraction maintenance, but requires the document/history services when
-it is composed.
+camera controls report unavailable, and pipeline-provided import auto-selection
+plus non-camera behavior continue. When interaction/selection alone is omitted,
+`F` is absent but a present camera may still consume an import focus target;
+materialization does not require selection. Scene document and scene
+interaction remain independently optional as described above; without
+interaction, generic input/rendering and component-driven primitive views
+continue while selection/gizmo surfaces report unavailable. Asset workflow is
+independently optional to generic Engine and render-extraction maintenance, but
+requires the document/history services when it is composed.
+
+During shutdown, the announcement first cancels imports and detaches their
+provider borrows, then the generic GPU-participant bridge drains and performs
+any required device-idle wait. Sandbox application shutdown next detaches the
+editor and unregisters `F`, the direct-mesh postprocessor, the completed
+handler, and PointCloud/Graph/Mesh authoring handles while both required
+registries remain live. Reverse AsyncWork/AssetWorkflow module and provider
+teardown follows. Repeated app shutdown sees an empty handle record and is a
+no-op.
 
 ## Build presets
 

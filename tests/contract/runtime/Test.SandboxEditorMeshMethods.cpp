@@ -73,13 +73,13 @@ import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
@@ -137,9 +137,47 @@ constexpr std::uint32_t kInvalidIndex =
 
 void InstallSandboxDefaultRuntimePolicies(Runtime::Engine& engine)
     {
-        (void)Runtime::RegisterSandboxDefaultRuntimePolicies(
-            engine,
-            engine.Services().Find<Runtime::CameraControllerRegistry>());
+        auto* const pipeline =
+            engine.Services().Find<Runtime::AssetImportPipeline>();
+        auto* const inputActions =
+            engine.Services().Find<Runtime::RuntimeInputActionRegistry>();
+        ASSERT_NE(pipeline, nullptr);
+        ASSERT_NE(inputActions, nullptr);
+
+        auto authoring =
+            Runtime::MakeSandboxDefaultImportAuthoringPolicies();
+        for (auto& desc : authoring)
+        {
+            ASSERT_TRUE(
+                pipeline->RegisterImportEntityAuthoringPolicy(
+                    std::move(desc))
+                    .IsValid());
+        }
+        ASSERT_TRUE(
+            pipeline->RegisterImportCompletedHandler(
+                Runtime::MakeSandboxDefaultImportCompletedHandler(
+                    engine.Services()
+                        .Find<Runtime::CameraControllerRegistry>()))
+                .IsValid());
+        ASSERT_TRUE(
+            pipeline->RegisterPostImportProcessor(
+                Runtime::MakeSandboxDefaultDirectMeshPostProcessor())
+                .IsValid());
+
+        auto* const cameraControllers =
+            engine.Services().Find<Runtime::CameraControllerRegistry>();
+        auto* const selection =
+            engine.Services().Find<Runtime::SelectionController>();
+        if (cameraControllers != nullptr && selection != nullptr)
+        {
+            ASSERT_TRUE(
+                inputActions
+                    ->Register(
+                        Runtime::MakeSandboxDefaultFocusInputAction(
+                            *cameraControllers,
+                            *selection))
+                    .IsValid());
+        }
     }
 
 [[nodiscard]] bool HasDiagnostic(

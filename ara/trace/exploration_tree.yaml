@@ -6404,3 +6404,21 @@ tree:
       22/0/2/10 convergence contract. A05 no longer describes current
       ownership and is marked superseded by A15.
     status: resolved
+  - id: N270
+    type: experiment
+    title: "Verify RUNTIME-168 real-Sandbox policy lifecycle coverage"
+    provenance: ai-executed
+    timestamp: "2026-07-19T19:59+02:00"
+    also_depends_on: [N268, N269]
+    evidence:
+      - "tests/integration/runtime/Test.SandboxAppComposition.cpp"
+      - "cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests -j 1"
+      - "ctest --test-dir build/ci --output-on-failure -R '^SandboxAppComposition\\.' --timeout 120"
+    result: >
+      Added real CreateSandboxApp coverage for transactional default-policy
+      registration, omission behavior, reinitialization, autofocus and F-key
+      focus dispatch, and blocked geometry-import cancellation before Sandbox
+      unregisters exact pipeline and input-registry identities. The focused
+      Sandbox editor integration target built successfully and all six
+      SandboxAppComposition tests passed.
+    status: resolved

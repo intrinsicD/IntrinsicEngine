@@ -133,8 +133,9 @@ maturity_target: Operational
   Record failure, ready-publication failure, stale discard, and shutdown must
   invalidate the matching pending reuse provenance as well as fail the pending
   cache generation.
-- **Real source generations.** `AssetModelSceneHandoff` and
-  `SandboxDefaultPolicies` currently hardcode geometry/texcoord/normal
+- **Real source generations.** `AssetModelSceneHandoff` and the Sandbox-default
+  direct-mesh postprocessor implementation private to
+  `SandboxEditorFacades` currently hardcode geometry/texcoord/normal
   generations to `1`; selected-mesh paths derive property generations but
   still use stable identity as entity generation. Producers must derive source
   and entity-lifetime generations from content/dirty/lifetime facts so a new

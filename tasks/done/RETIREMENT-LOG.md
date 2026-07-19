@@ -8,6 +8,24 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md) —
+Sandbox default-policy composition retired on 2026-07-19 at `Operational`.
+The one-consumer exported policy module and public BMI are gone; four plain
+descriptor factories now live on the existing Sandbox editor-facade surface,
+while Sandbox owns only exact provider borrows and transactional typed handles
+with strict reverse rollback/uninstall. Real-app CPU coverage proves required
+and optional omission, reinitialize, repeated shutdown, blocked-import
+cancellation, provider identity, and callback lifetime; the capable-host
+ASan+UBSan Vulkan acceptance selector passed 16/16 with zero skips on an RTX
+3050 / NVIDIA 590.48.01 / Vulkan 1.4.325. The focused CPU selector passed
+64/64, the post-review real-app composition selector passed 6/6, the
+direct-mesh slow case passed 1/1, and the full supported CPU selector completed
+4,247 selected cases with zero failures and one expected GLFW/LSan skip. Engine
+remains exactly `22/0/2/10`, the generated inventory is 390 modules, and strict
+task/state, docs, layering, clean-workshop, test-layout, root-hygiene, ARA YAML,
+and whitespace gates pass. Implementation checkpoints: `842de246` and
+`bd405e5c`.
+
 [`RUNTIME-183`](RUNTIME-183-extract-asset-workflow-module.md) —
 asset-workflow composition retired on 2026-07-19 at `Operational`. One
 app-composed PImpl now owns persistent import/bake objects plus per-boot

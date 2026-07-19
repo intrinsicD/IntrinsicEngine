@@ -22,7 +22,8 @@ import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.Engine;
-import Extrinsic.Runtime.SandboxDefaultPolicies;
+import Extrinsic.Runtime.InputActions;
+import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
 
@@ -168,9 +169,21 @@ TEST(RuntimeInputActions, DefaultFocusKeyDispatchesRegisteredAction)
     engine.EmplaceModule<Runtime::CameraModule>();
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
-    (void)Runtime::RegisterSandboxDefaultRuntimePolicies(
-        engine,
-        engine.Services().Find<Runtime::CameraControllerRegistry>());
+    auto* const inputActions =
+        engine.Services().Find<Runtime::RuntimeInputActionRegistry>();
+    auto* const cameraControllers =
+        engine.Services().Find<Runtime::CameraControllerRegistry>();
+    auto* const selection =
+        engine.Services().Find<Runtime::SelectionController>();
+    ASSERT_NE(inputActions, nullptr);
+    ASSERT_NE(cameraControllers, nullptr);
+    ASSERT_NE(selection, nullptr);
+    const Runtime::RuntimeInputActionHandle focusAction =
+        inputActions->Register(
+            Runtime::MakeSandboxDefaultFocusInputAction(
+                *cameraControllers,
+                *selection));
+    ASSERT_TRUE(focusAction.IsValid());
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
         << "Null window backend should keep Engine::Run() drivable";
@@ -188,6 +201,7 @@ TEST(RuntimeInputActions, DefaultFocusKeyDispatchesRegisteredAction)
     EXPECT_NEAR(appPtr->Controller->LastFocus->Center.z, -1.0f, 1.0e-5f);
     EXPECT_NEAR(appPtr->Controller->LastFocus->Radius, 2.5f, 1.0e-5f);
 
+    inputActions->Unregister(focusAction);
     engine.Shutdown();
 }
 
@@ -228,11 +242,6 @@ TEST(RuntimeInputActions,
             .Find<Runtime::CameraControllerRegistry>(),
         nullptr);
 
-    Runtime::RuntimeSandboxDefaultPolicyRegistration policies =
-        Runtime::RegisterSandboxDefaultRuntimePolicies(
-            engine, nullptr);
-    EXPECT_TRUE(policies.InputActions.empty());
-
     std::uint32_t genericExecutions = 0u;
     const Runtime::RuntimeInputActionHandle generic =
         engine.RegisterInputAction(
@@ -261,8 +270,6 @@ TEST(RuntimeInputActions,
 
     EXPECT_EQ(appPtr->VariableTicks, 1u);
     EXPECT_EQ(genericExecutions, 1u);
-    Runtime::UnregisterSandboxDefaultRuntimePolicies(
-        engine, policies);
     engine.UnregisterInputAction(generic);
     engine.Shutdown();
 }

@@ -151,9 +151,9 @@ snapshot carries no temporary debt.
 - [x] No `Engine&` is passed through the `IRuntimeModule`/`EngineSetup`
       composition seam (`ARCH-011`)
 - [ ] No `Engine&` is passed through any handler, module, app behavior, or
-      setup surface (D13). Remaining EditorUiHost/Sandbox-default/facade and
-      `IApplication` compatibility surfaces are removed by
-      `RUNTIME-168`/`RUNTIME-184`
+      setup surface (D13). `RUNTIME-168` removed the Engine-bound Sandbox
+      default-policy lifecycle helper; the remaining `IApplication` and app
+      facade compatibility surfaces are owned by `RUNTIME-184`
 - [ ] `IApplication::OnSimTick` / `OnVariableTick` removed (**baseline: present**)
 
 ### Domain responsibilities are app-composed (D9/ADR-0027)
@@ -202,8 +202,12 @@ snapshot carries no temporary debt.
 - [x] EditorUi — `RUNTIME-182`; global optional adapter/host/contribution owner
       producing the single capture snapshot; Sandbox panel content stays
       app-owned
-- [ ] Sandbox composition glue — re-scoped `RUNTIME-168`; app parts and default
-      policies resolve the owners above without `Engine&`
+- [x] Sandbox composition glue — `RUNTIME-168`; the former exported default-
+      policy module is gone, four plain descriptor factories live on the
+      existing Sandbox editor-facade surface, and Sandbox privately owns
+      transactional handles over the exact import pipeline/input registry plus
+      optional camera/selection services without passing `Engine&` into policy
+      callbacks or lifecycle helpers
 - [ ] Explicit app lifecycle — `RUNTIME-184`; remove `IApplication`,
       `OnSimTick`/`OnVariableTick`, and every `Engine&` app behavior surface
       without adding a replacement framework

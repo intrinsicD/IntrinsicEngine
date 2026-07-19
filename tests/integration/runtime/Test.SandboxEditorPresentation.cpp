@@ -32,7 +32,6 @@ import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
-import Extrinsic.Runtime.SandboxDefaultPolicies;
 import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Sandbox.Editor.Controller;
@@ -835,21 +834,38 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     ComposeEditorUiAndInitialize(engine);
-    (void)Runtime::RegisterSandboxDefaultRuntimePolicies(
-        engine, nullptr);
+    auto& pipeline =
+        RequiredEngineService<Runtime::AssetImportPipeline>(engine);
+    auto authoring =
+        Runtime::MakeSandboxDefaultImportAuthoringPolicies();
+    for (auto& desc : authoring)
+    {
+        EXPECT_TRUE(
+            pipeline.RegisterImportEntityAuthoringPolicy(
+                std::move(desc))
+                .IsValid());
+    }
+    EXPECT_TRUE(
+        pipeline.RegisterImportCompletedHandler(
+            Runtime::MakeSandboxDefaultImportCompletedHandler(nullptr))
+            .IsValid());
+    EXPECT_TRUE(
+        pipeline.RegisterPostImportProcessor(
+            Runtime::MakeSandboxDefaultDirectMeshPostProcessor())
+            .IsValid());
 
     SandboxEditor::EditorShell shell;
     shell.Attach(engine);
 
     const std::vector<std::string> droppedPaths{cloudFile.Path.string()};
-    RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportDroppedFilePaths(droppedPaths);
-    EXPECT_FALSE(RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).GetLastAssetImportEvent().has_value());
+    pipeline.ImportDroppedFilePaths(droppedPaths);
+    EXPECT_FALSE(pipeline.GetLastAssetImportEvent().has_value());
     ASSERT_FALSE(engine.GetWindow().ShouldClose());
 
     engine.Run();
 
     const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
-        RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).GetLastAssetImportEvent();
+        pipeline.GetLastAssetImportEvent();
     ASSERT_TRUE(lastEvent.has_value()) << waitDiagnostics->Describe();
     EXPECT_TRUE(lastEvent->Succeeded());
     ASSERT_TRUE(lastEvent->Result.has_value());
