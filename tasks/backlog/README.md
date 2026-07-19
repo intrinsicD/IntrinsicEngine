@@ -427,7 +427,9 @@ LSQR/LSCM, `GEOM-071` shared sharp-feature classification, and `GEOM-072`
 Catmull-Clark creases (blocked by `GEOM-071`). The post-stability Issue 445 research incubations are
 `GEOM-065`, `METHOD-027..031`, and `HARDEN-084`; each is blocked first by
 `REVIEW-003`, and their task files require killing tests or concrete
-two-consumer evidence before opening broader engine integration.
+two-consumer evidence before opening broader engine integration. The
+2026-07-19 in-house octree-parity normal-orientation method (original
+formulation, no upstream paper) opens unblocked as `METHOD-032`.
 
 ## Cross-domain dependency anchors
 
