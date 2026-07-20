@@ -444,8 +444,8 @@ EAR/anisotropic (blocked by `METHOD-016`/`GEOM-062`), `METHOD-019` optimized CPU
 family on the retired `GEOM-063` shared surface — `METHOD-021` ARAP (blocked by
 `GEOM-064`), `METHOD-022` SLIM (blocked by `GEOM-064`/`METHOD-021`),
 `METHOD-023` BFF (retired),
-`METHOD-024` SCP (blocked by `GEOM-024`), `METHOD-025` optimized CPU
-(blocked by `METHOD-021`/`022`), `METHOD-026` GPU (blocked by
+`METHOD-024` SCP (blocked by `GEOM-024`), `METHOD-025` Progressive SLIM
+optimized CPU (blocked by `METHOD-022`), `METHOD-026` iterative-strategy GPU (blocked by
 `METHOD-025`; the retired `RUNTIME-176` dependency is satisfied; iterative
 strategies only), and its delivered engine-integration/view leaves
 `RUNTIME-176`, `UI-036`, and `GRAPHICS-122` (all retired 2026-07-15;

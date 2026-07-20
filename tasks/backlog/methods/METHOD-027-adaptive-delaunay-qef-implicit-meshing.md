@@ -42,10 +42,14 @@ depends_on: [REVIEW-003, GEOM-013, METHOD-007]
   ([arXiv:2605.03235](https://arxiv.org/abs/2605.03235)), Manifold Dual
   Contouring, and restricted-Delaunay surface sampling. This task evaluates a
   recombination; it does not presume novelty.
-- Retired `GEOM-007` supplies robust orientation/insphere predicates,
-  `GEOM-008` supplies small dense/SVD utilities, `GEOM-009` supplies the
-  manifest-driven geometry benchmark pattern, `GEOM-039` supplies exact
-  nearest-face queries, and `GEOM-046` supplies topology analysis.
+- Retired `GEOM-007` supplies filtered orientation/uncertainty diagnostics,
+  not `inSphere` or exact/indirect construction predicates. The
+  `METHOD-007` dependency owns the selected CDT's exact/indirect signs and
+  builder contract; this task consumes that contract rather than claiming the
+  older predicate foundation is stronger than it is. `GEOM-008` supplies
+  small dense/SVD utilities, `GEOM-009` supplies the manifest-driven geometry
+  benchmark pattern, `GEOM-039` supplies exact nearest-face queries, and
+  `GEOM-046` supplies topology analysis.
 
 ## Slice plan
 

@@ -16,25 +16,32 @@ map.
 ## Tasks
 
 - [METHOD-003 — Closest Point Method PDE solver reference backend](METHOD-003-closest-point-method-pde-reference-backend.md)
-  (variant A default; unblocked by retired `geometry/GEOM-023` and expected
-  to use `Geometry.Sparse::SparseBiCGSTAB` for its non-symmetric solve).
-- [METHOD-004 — Walk on Spheres / Walk on Stars PDE solver reference backend](METHOD-004-walk-on-spheres-reference-backend.md)
-  (variant A default; no solver gate — promotable now).
+  (interior-boundary CPM selected; unblocked by retired `geometry/GEOM-023`
+  and expected to use `Geometry.Sparse::SparseBiCGSTAB` for its non-symmetric
+  solve).
+- [METHOD-004 — Walk on Stars PDE solver reference backend](METHOD-004-walk-on-spheres-reference-backend.md)
+  (mixed-boundary Walk on Stars selected; no solver gate — promotable now).
 - [METHOD-005 — Robust mesh boolean reference backend](METHOD-005-robust-mesh-boolean-reference-backend.md)
-  (variant A default; `GEOM-007` gate satisfied 2026-05-27 — promotable now).
-- [METHOD-006 — Cross-field / frame-field design reference backend](METHOD-006-cross-field-design-reference-backend.md)
-  (variant B default; gated on `geometry/GEOM-024` eigensolver seam).
+  (Cherchi et al. formulation selected; `GEOM-007` gate satisfied 2026-05-27
+  for filtered-sign/diagnostic vocabulary; this method owns its
+  formula-specific exact/indirect escalation).
+- [METHOD-006 — Surface cross-field design CPU reference backend](METHOD-006-cross-field-design-reference-backend.md)
+  (globally optimal N-RoSy formulation selected; gated on the
+  `geometry/GEOM-024` eigensolver seam).
 - [METHOD-007 — Constrained Delaunay tetrahedralization reference backend](METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
-  (variant A default; `GEOM-007` gate satisfied 2026-05-27 — promotable now).
+  (Diazzi et al. formulation selected; `GEOM-007` gate satisfied 2026-05-27
+  for filtered orientation/diagnostics; this method owns LNC indirect
+  `orient3d`/`inSphere`).
 - [METHOD-014 — Progressive Poisson GPU operational parity](METHOD-014-progressive-poisson-gpu-operational-parity.md)
   (Vulkan compute operational/parity follow-up to retired `METHOD-013`; no
   speedup claim without benchmark baseline comparison).
 - [METHOD-015 — Coherent Point Drift registration family reference backend](METHOD-015-coherent-point-drift-family-reference-backend.md)
-  (variant A rigid default with affine/nonrigid in-package; gated on
+  (rigid default with affine/nonrigid in-package; gated on
   `geometry/GEOM-058` Gaussian-mixture/EM seam).
 - [METHOD-016 — Locally Optimal Projection (LOP/WLOP) consolidation reference backend](METHOD-016-locally-optimal-projection-reference-backend.md)
-  (variant A WLOP default; establishes the shared `Geometry.PointCloud.Consolidation`
-  strategy×backend surface; gated on `geometry/GEOM-062` kernel seam).
+  (WLOP default; establishes the shared typed
+  `Geometry.PointCloud.Consolidation` strategy surface; the first backend
+  selector belongs to `METHOD-019`; gated on `geometry/GEOM-062` kernels).
 - [METHOD-017 — Continuous LOP (CLOP) reference backend](METHOD-017-continuous-lop-clop-reference-backend.md)
   (adds the `Clop` strategy; gated on `METHOD-016`, `geometry/GEOM-058`
   Gaussian-mixture seam, and `geometry/GEOM-062` kernels).
@@ -42,8 +49,10 @@ map.
   (adds the `Ear`/anisotropic strategies; gated on `METHOD-016` and
   `geometry/GEOM-062`; consumes `Geometry.PointCloud.Normals`).
 - [METHOD-019 — LOP-family optimized CPU backend and comparison benchmark](METHOD-019-lop-family-optimized-cpu-backend.md)
-  (adds `cpu_optimized` with parity; gated on `METHOD-016`/`017`/`018`; reuses
-  the `geometry/GEOM-060` permutohedral and `geometry/GEOM-061` grid seams).
+  (adds the first concrete backend selector plus `cpu_optimized` with paired
+  parity/baseline evidence; gated on `METHOD-016`/`017`/`018` and the delivered
+  `RUNTIME-175`/`UI-035` CPU control surfaces; deliberately excludes
+  opportunistic `GEOM-060`/`061` adoption).
 - [METHOD-020 — LOP-family GPU (Vulkan compute) backend and parity](METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
   (adds `gpu_vulkan_compute` with `gpu;vulkan` parity; gated on `METHOD-019`).
 - [METHOD-021 — ARAP (local/global) parameterization reference backend](METHOD-021-arap-parameterization-reference-backend.md)
@@ -56,12 +65,13 @@ map.
 - [METHOD-024 — Spectral Conformal Parameterization (SCP) reference backend](METHOD-024-spectral-conformal-parameterization-reference-backend.md)
   (adds its concrete pin-free conformal SCP params alternative; gated on the
   `geometry/GEOM-024` generalized eigensolver seam; new SOTA pack).
-- [METHOD-025 — Parameterization family optimized CPU backend and comparison benchmark](METHOD-025-parameterization-family-optimized-cpu-backend.md)
-  (adds `cpu_optimized` progressive acceleration with parity; gated on
-  `METHOD-021`/`022`).
+- [METHOD-025 — Progressive SLIM optimized CPU backend and comparison benchmark](METHOD-025-parameterization-family-optimized-cpu-backend.md)
+  (evaluates a SLIM-only `cpu_optimized` Progressive Parameterizations path
+  against `METHOD-022`; ARAP deliberately remains reference-only).
 - [METHOD-026 — Parameterization family GPU (Vulkan compute) backend and parity](METHOD-026-parameterization-family-gpu-vulkan-compute-backend.md)
   (adds `gpu_vulkan_compute` for the iterative ARAP/SLIM strategies with
-  `gpu;vulkan` parity; gated on `METHOD-025` and builds on retired
+  `gpu;vulkan` parity; gated on the SLIM-only `METHOD-025` evidence pass and
+  builds on retired
   `RUNTIME-176`'s delivered facade/config/result model, extending it with the
   GPU job-queue seam and extending the panel delivered by retired `UI-036`;
   the linear one-shot strategies
@@ -85,6 +95,9 @@ map.
   (conditional post-stability study over the exact retained `METHOD-029`
   analytic-C++/Slang-SPIR-V corpus; held-out predictive evidence only, with no
   compiler, material, or renderer framework).
+- [METHOD-032 — Octree parity normal orientation reference backend](METHOD-032-octree-parity-normal-orientation.md)
+  (in-house formulation; prior-art/formulation intake and a frozen held-out
+  killing test precede any public CPU-reference surface).
 - [HARDEN-084 — Localized CPU/GPU parity signatures](HARDEN-084-localized-cpu-gpu-parity-signatures.md)
   (post-stability two-consumer evidence task, gated by the Progressive Poisson
   and parameterization GPU paths; no generic parity framework unless both
@@ -112,9 +125,10 @@ map.
   [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md)
   and target gaps from
   [`docs/reviews/2026-05-12-src-geometry-gap-analysis.md`](../../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md).
-  Each task lists explicit algorithm variants with a marked public-facing
-  default backend; changing a default re-opens the corresponding solver-seam
-  gating (see the per-task notes above).
+  Each open task now names one selected public method contract and treats
+  alternatives explicitly as internal comparisons, prior art, or separately
+  scoped follow-ups. Changing that selection re-opens its intake, dependency,
+  and evidence gates.
 - METHOD-015 and METHOD-016 are seeded by the 2026-07-07 framework24
   (`bcg_framework`) port-gap comparison (see the geometry backlog README's
   port-gap section). METHOD-015's E-step numerics are owned by
@@ -122,12 +136,13 @@ map.
   fast path is deferred to the `geometry/GEOM-060` permutohedral seam.
 - **LOP consolidation family (METHOD-016..020).** WLOP/LOP (`METHOD-016`),
   CLOP (`METHOD-017`), and EAR/anisotropic (`METHOD-018`) share one
-  `Geometry.PointCloud.Consolidation` module and its `Strategy` × `Backend`
-  dispatch axis (`docs/architecture/algorithm-variant-dispatch.md`), so every
-  state-of-the-art variant is choosable through one surface. The shared weight
+  `Geometry.PointCloud.Consolidation` module and typed `Strategy` surface, so
+  every implemented variant is choosable through one surface. The first
+  backend selector lands only with the real `cpu_optimized` implementation in
+  `METHOD-019`; the GPU adapter follows in `METHOD-020`. The shared weight
   math is factored into the `geometry/GEOM-062` `Geometry.PointCloud.Kernels`
-  seam; the optimized CPU (`METHOD-019`) and GPU (`METHOD-020`) backends follow
-  reference parity; and the engine integration — config lane, runtime facade,
+  seam; optimized CPU/GPU work follows reference parity; and the engine
+  integration — config lane, runtime facade,
   and Sandbox editor panel — is owned by `runtime/RUNTIME-175` and `ui/UI-035`,
   mirroring the retired `RUNTIME-134` progressive-Poisson playground. Promote
   CPU-reference-first in the dependency order encoded in each task's
@@ -142,9 +157,10 @@ map.
   that owns a real second implementation. The
   iterative variants share the `geometry/GEOM-064` optimization-kernel seam
   (local rotation fit, symmetric-Dirichlet energy/proxy, injective line search)
-  and the `GEOM-018` diagnostics; the optimized CPU (`METHOD-025`) and GPU
-  (`METHOD-026`) backends follow reference parity for the iterative strategies
-  (the linear one-shot strategies record no optimized/GPU follow-up); and the
+  and the `GEOM-018` diagnostics. The optimized CPU task (`METHOD-025`) is
+  SLIM-only; ARAP records no optimized follow-up. The GPU task (`METHOD-026`)
+  follows reference parity for both iterative strategies (the linear one-shot
+  strategies record no optimized/GPU follow-up); and the
   engine integration — config lane, runtime facade, the UV view model, and the
   Sandbox editor panel with a resizable UV split view — was delivered by
   retired `RUNTIME-176` and `UI-036`. Later strategies/backends extend those
@@ -219,7 +235,8 @@ split; narratives live in the retirement log.
   (LDLT/LLT) path that METHOD-002 used is available from retired
   [`geometry/GEOM-020`](../../archive/GEOM-020-sparse-direct-factorization-seam.md);
   METHOD-002 is retired at `CPUContracted`.
-  METHOD-003's variant-A non-symmetric operator is available from retired
+  METHOD-003's selected non-symmetric closest-point-extension solver is
+  available from retired
   [`geometry/GEOM-023`](../../archive/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md);
   METHOD-003 is no longer blocked on the solver seam.
   METHOD-004 needs no solver gate and may proceed against retired

@@ -354,18 +354,20 @@ consumer lives here because `runtime` owns composition over `geometry`.
 `Extrinsic.Runtime.SpatialDebugClosestFace`. Editor method windows for the
 ported algorithms are retired `UI-024`/`UI-025`/`UI-026` under the UI backlog.
 
-- [`RUNTIME-175 — Point-cloud consolidation runtime facade, config lane, and backend adapter`](RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
+- [`RUNTIME-175 — Point-cloud consolidation runtime facade and config lane`](RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
   is the engine-integration leaf for the LOP consolidation method family
-  (`methods/METHOD-016..020`): an app-owned
+  (`methods/METHOD-016..018`): an app-owned
   `sandbox.point_cloud_consolidation` section on the generic CORE-009 config
   lane, an `EngineConfigControl` hot-apply path, the
   `ApplySandboxEditorPointCloudConsolidationCommand` editor facade with
-  `GeometrySources` writeback, and the `Runtime.ConsolidationBackend` RHI
-  fallback adapter. Gated on `methods/METHOD-016`; the GPU job-queue leg is
-  gated on `methods/METHOD-020`. Gated on `CORE-009` for the section substrate
-  and on `methods/METHOD-016` for the algorithm. Mirrors retired `RUNTIME-134`
-  progressive-Poisson playground; the Sandbox panel is `ui/UI-035`; coordinate
-  with the app-owned editor structure retired by `ARCH-006`.
+  `GeometrySources` writeback, and CPU-reference result diagnostics. It is
+  gated on `CORE-009` for the section substrate and on
+  `methods/METHOD-016..018` for the four reference strategies. No placeholder
+  backend selector or RHI adapter lands here; METHOD-019/020 extend the
+  delivered surface only for backends that pass their evidence gates. Mirrors
+  retired `RUNTIME-134` progressive-Poisson playground; the Sandbox panel is
+  `ui/UI-035`; coordinate with the app-owned editor structure retired by
+  `ARCH-006`.
 
 ### Parameterization family integration (Theme I, seeded 2026-07-13)
 
@@ -381,7 +383,8 @@ ported algorithms are retired `UI-024`/`UI-025`/`UI-026` under the UI backlog.
   `v:texcoord` via `GeometrySources`, plus a pointer-free
   `SandboxEditorParameterizationViewModel` the UV split view draws. No
   placeholder backend selector landed in its CPU-only slice.
-  `METHOD-025`/`METHOD-026` own later optimized/GPU extensions. Mirrors
+  SLIM-only `METHOD-025` and iterative-strategy `METHOD-026` own later
+  optimized/GPU extensions. Mirrors
   `RUNTIME-175`/`RUNTIME-134`; retired `UI-036` delivered the Sandbox panel and
   resizable CPU UV split view on 2026-07-15. Future strategies/backends extend
   that delivered panel and this delivered runtime model rather than assigning

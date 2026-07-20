@@ -40,6 +40,23 @@ maturity_target: ParityProven
   GPU execution succeeds and parity diagnostics pass; otherwise return the
   METHOD-012 CPU reference with explicit fallback reason.
 
+## Slice plan
+- **Slice A — public completion/fallback.** Connect the already-recordable
+  METHOD-013 path to parsed results and prove honest CPU fallback in the default
+  gate.
+- **Slice B — Vulkan parity.** Run the real compute/readback path on the fixed
+  METHOD-012 fixtures and reject GPU publication outside frozen tolerances.
+- **Slice C — GPU evidence.** Add a dedicated actual-GPU smoke result and
+  baseline comparison; do not infer a speedup from parity alone.
+
+## Right-sizing
+- Finish the single runtime path, parser, and diagnostics delivered by
+  METHOD-013. Do not add a second adapter, backend registry, device service, or
+  synchronous readback path.
+- Add one dedicated GPU smoke runner because actual-device evidence cannot be
+  emitted by the CPU smoke. Reuse the benchmark result schema and the fixed
+  METHOD-012 fixtures rather than creating GPU-benchmark infrastructure.
+
 ## Required changes
 - [ ] Complete the GPU-capable runtime overload so completed Vulkan pass output
       flows through the readback parser/parity diagnostics.
@@ -48,8 +65,17 @@ maturity_target: ParityProven
 - [ ] Implement CPU fallback for non-operational devices, GPU pass failure,
       readback failure, and parity mismatch.
 - [ ] Finalize `method.yaml` backend identity and parity tolerance fields.
-- [ ] Extend the benchmark manifest/result payload with GPU timing and
-      CPU-vs-GPU diagnostics without claiming speedup until a baseline is cited.
+- [ ] Add dedicated manifest
+      `benchmarks/geometry/manifests/progressive_poisson_gpu_vulkan_smoke.yaml`
+      with stable ID `geometry.progressive_poisson.gpu_vulkan.smoke`, built-in
+      METHOD-012 fixture/params, `intent: gpu`, explicit warmup/measured counts,
+      `baseline_comparison: cpu_reference_same_fixture`, and allowed metrics
+      `runtime_ms`, `gpu_time_ms`, and `quality_error_l2`.
+- [ ] Add an `IntrinsicProgressivePoissonGpuBenchmarkSmoke` runner that emits
+      schema-valid result JSON from actual Vulkan execution. Put per-level
+      parity, readback/fallback, device, and timing-source details in
+      diagnostics; a skipped/fallback run cannot support a GPU performance
+      claim.
 
 ## Tests
 - [ ] Default CPU/null fallback test asserting a Vulkan request returns the CPU
@@ -57,7 +83,8 @@ maturity_target: ParityProven
 - [ ] Opt-in `gpu;vulkan` parity tests asserting per-level counts, accepted order
       where deterministic, splat radii, and the Poisson guarantee against shared
       fixtures.
-- [ ] Benchmark manifest and result validation for the GPU metric extension.
+- [ ] Benchmark manifest and actual-GPU result validation for the dedicated
+      stable ID.
 
 ## Docs
 - [ ] Update `methods/geometry/progressive_poisson/README.md` and
@@ -76,19 +103,27 @@ maturity_target: ParityProven
       tests pass under the default gate.
 - [ ] Benchmark manifests/results validate; no performance claim is made without
       baseline comparison.
+- [ ] The GPU result records exact CPU-reference fixture/params, device/backend,
+      warmup/sample policy, and parity delta; fallback/skipped evidence is never
+      labeled as GPU execution.
 
 ## Verification
 ```bash
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -R 'ProgressivePoisson' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 cmake --preset ci-vulkan
-cmake --build --preset ci-vulkan --target IntrinsicTests
-ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'ProgressivePoisson' --timeout 120
-python3 tools/agents/validate_method_manifests.py --root methods --strict
+cmake --build --preset ci-vulkan --target IntrinsicTests IntrinsicProgressivePoissonGpuBenchmarkSmoke
+ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'ProgressivePoisson|IntrinsicProgressivePoissonGpuBenchmarkSmoke' --timeout 180
+python3 tools/agents/validate_method_manifests.py
 python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
+python3 tools/benchmark/validate_benchmark_results.py --root build/ci-vulkan/benchmark-ctest/IntrinsicProgressivePoissonGpuBenchmarkSmoke --strict
 python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
 python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/validate_tasks.py --root tasks --strict
 ```
 
 ## Forbidden changes

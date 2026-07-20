@@ -159,7 +159,7 @@ depends_on: [REVIEW-003, METHOD-004]
 ```bash
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests IntrinsicBenchmarkSmoke
-ctest --test-dir build/ci --output-on-failure -R 'WalkOnStars|WalkOnSpheres|ConfidenceGuiding|BenchmarkSmoke' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180
+ctest --test-dir build/ci --output-on-failure -R 'WalkOnStars|ConfidenceGuiding|BenchmarkSmoke' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/agents/validate_method_manifests.py
 python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
