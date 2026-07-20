@@ -28,6 +28,7 @@ maturity_target: CPUContracted
 - [ ] Deterministic: fixed iteration counts and traversal order; identical `(input, params)` produce bitwise-identical output.
 - [ ] Fail-closed with explicit statuses: empty/too-small input, missing/count-mismatched/zero-length normals, non-finite data, resolution bounds exceeded.
 - [ ] Register the module in `src/geometry/CMakeLists.txt` (alphabetical, no new link dependency).
+- [ ] Smoke benchmark manifest on the synthetic fixtures; extend the benchmark metric schema in the same change (`ALLOWED_METRICS` in `tools/benchmark/validate_benchmark_manifests.py` plus `docs/benchmarking/metrics.md` / `benchmark-manifest-schema.md`) with any of this task's declared metrics not yet allowed (`reconstruction_mean_distance`, `watertight_fraction`, `genus_match`, `solver_residual`) — the current allowlist is generic-only and would reject them.
 
 ## Tests
 - [ ] `tests/unit/geometry/Test.SurfaceReconstructionPoisson.cpp` with `unit;geometry` labels.

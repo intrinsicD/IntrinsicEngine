@@ -26,6 +26,7 @@ maturity_target: CPUContracted
 - [ ] Package-local reference implementation: params (regularization width factor, CG iteration count/tolerance, hard input-size cap), result (oriented normals, per-point confidence from surfel magnitude, status), diagnostics (residual history summary, capped-input rejection).
 - [ ] Deterministic: identical `(input, params)` produce bitwise-identical outputs across runs and thread counts.
 - [ ] Fail-closed with explicit statuses: empty/too-small input, non-finite data, input size above the documented `O(N^2)` guard, CG non-convergence beyond tolerance (distinct non-success status).
+- [ ] Smoke benchmark manifest; extend the benchmark metric schema in the same change (`ALLOWED_METRICS` in `tools/benchmark/validate_benchmark_manifests.py` plus `docs/benchmarking/metrics.md` / `benchmark-manifest-schema.md`) with any of this task's declared metrics not yet allowed (`oriented_correct_fraction`, `confidence_mean`, `cg_residual`).
 
 ## Tests
 - [ ] `tests/unit/geometry/Test.ParametricGaussOrientation.cpp` with `unit;geometry` labels.

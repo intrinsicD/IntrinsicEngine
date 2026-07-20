@@ -20,7 +20,7 @@ depends_on: [METHOD-032, METHOD-034, METHOD-035]
 - Report lands under `methods/geometry/octree_parity_orientation/reports/` following `docs/methods/report-template.md`; audited per the results-audit checklist before any claim propagates.
 
 ## Required changes
-- [ ] Shared benchmark manifest family under `benchmarks/geometry/manifests/` with stable per-method `benchmark_id`s over the identical fixture/seed matrix (smoke lane).
+- [ ] Shared benchmark manifest family under `benchmarks/geometry/manifests/` with stable per-method `benchmark_id`s over the identical fixture/seed matrix (smoke lane). The shared metric names must already be schema-valid — the owning method tasks (`METHOD-032`/`033`/`034`/`035`) extend `ALLOWED_METRICS` when their manifests land; verify with `tools/benchmark/validate_benchmark_manifests.py` before measuring and extend the schema here only for any comparison-specific metric this task introduces itself.
 - [ ] Heavy/nightly manifests with declared datasets per `docs/methods/dataset-policy.md`.
 - [ ] Comparability guard: a validation step (test or benchmark preflight) asserting all compared runs consumed bitwise-identical fixture inputs and unoriented normals.
 - [ ] Comparison report in `methods/geometry/octree_parity_orientation/reports/` with per-method, per-fixture tables and failure-status accounting.

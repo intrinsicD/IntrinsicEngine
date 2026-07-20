@@ -27,6 +27,7 @@ maturity_target: CPUContracted
 - [ ] Package-local reference implementation: params (seed, max iterations, flip-fraction convergence threshold, inner Poisson params passthrough), result (oriented normals, per-iteration flip-fraction history, converged flag, status), diagnostics assembly.
 - [ ] Deterministic given `(input, params, seed)`: fixed iteration order and transfer tie-breaking; bitwise-identical outputs across runs.
 - [ ] Fail-closed with explicit statuses: empty/too-small input, non-finite data, inner reconstruction failure (propagated, not swallowed), iteration cap reached without convergence (distinct non-success status).
+- [ ] Smoke benchmark manifest; extend the benchmark metric schema in the same change (`ALLOWED_METRICS` in `tools/benchmark/validate_benchmark_manifests.py` plus `docs/benchmarking/metrics.md` / `benchmark-manifest-schema.md`) with any of this task's declared metrics not yet allowed (`oriented_correct_fraction`, `iterations`, `final_flip_fraction`).
 
 ## Tests
 - [ ] `tests/unit/geometry/Test.IPSROrientationBaseline.cpp` with `unit;geometry` labels.
