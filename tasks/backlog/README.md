@@ -460,7 +460,13 @@ Catmull-Clark creases (blocked by `GEOM-071`). The post-stability Issue 445 rese
 `REVIEW-003`, and their task files require killing tests or concrete
 two-consumer evidence before opening broader engine integration. The
 2026-07-19 in-house octree-parity normal-orientation method (original
-formulation, no upstream paper) opens unblocked as `METHOD-032`.
+formulation, no upstream paper) opens unblocked as `METHOD-032`; its
+publication track seeds screened-Poisson reconstruction `METHOD-033`, the
+iPSR baseline `METHOD-034` (blocked by `METHOD-033`), the PGR
+winding-number baseline `METHOD-035`, the shared-protocol comparison
+evidence `METHOD-036` (blocked by `METHOD-032`/`034`/`035`), and the
+sandbox parity-diagnostics debug-draw view `RUNTIME-189` (blocked by
+`METHOD-032`; its `RUNTIME-177` prerequisite is retired).
 
 ## Cross-domain dependency anchors
 

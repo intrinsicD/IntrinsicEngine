@@ -98,6 +98,18 @@ map.
 - [METHOD-032 — Octree parity normal orientation reference backend](METHOD-032-octree-parity-normal-orientation.md)
   (in-house formulation; prior-art/formulation intake and a frozen held-out
   killing test precede any public CPU-reference surface).
+- [METHOD-033 — Screened Poisson surface reconstruction reference backend](METHOD-033-screened-poisson-reconstruction-reference.md)
+  (uniform-grid CPU reference and watertight reconstruction oracle; supplies
+  the inner reconstruction solver required by `METHOD-034`).
+- [METHOD-034 — iPSR normal orientation baseline](METHOD-034-ipsr-orientation-baseline.md)
+  (package-local deterministic CPU comparison baseline; gated on the
+  screened-Poisson reference in `METHOD-033`).
+- [METHOD-035 — Parametric Gauss normal orientation baseline](METHOD-035-pgr-winding-number-orientation-baseline.md)
+  (package-local dense matrix-free CPU comparison baseline with an explicit
+  smoke-scale resource guard).
+- [METHOD-036 — Normal-orientation comparison evidence](METHOD-036-orientation-comparison-evidence.md)
+  (shared-fixture publication protocol comparing octree parity, MST, iPSR,
+  and PGR; implementation changes remain in their owning method tasks).
 - [HARDEN-084 — Localized CPU/GPU parity signatures](HARDEN-084-localized-cpu-gpu-parity-signatures.md)
   (post-stability two-consumer evidence task, gated by the Progressive Poisson
   and parameterization GPU paths; no generic parity framework unless both
@@ -174,6 +186,13 @@ map.
   [parameterization/mapping roadmap](../../../docs/architecture/parameterization-mapping-roadmap.md)
   plus the new SCP/BFF SOTA packs. Promote CPU-reference-first in each task's
   `depends_on` order.
+- **Normal-orientation publication track (METHOD-032..036).** `METHOD-032`
+  owns the in-house octree-parity killing gate and conditional CPU reference;
+  `METHOD-033` supplies screened-Poisson reconstruction for the `METHOD-034`
+  iPSR baseline; `METHOD-035` supplies the PGR winding-number baseline; and
+  `METHOD-036` owns only the shared-input comparison evidence and publication
+  report. The optional Sandbox diagnostic view is `runtime/RUNTIME-189` and
+  cannot change method outputs or confer method maturity.
 - Forbidden: importing runtime, graphics, platform, app, or live ECS ownership
   into a method package; claiming performance wins without a baseline.
 

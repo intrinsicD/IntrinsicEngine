@@ -369,6 +369,15 @@ ported algorithms are retired `UI-024`/`UI-025`/`UI-026` under the UI backlog.
   `ui/UI-035`; coordinate with the app-owned editor structure retired by
   `ARCH-006`.
 
+### Normal-orientation diagnostics (Theme I, seeded 2026-07-20)
+
+- [`RUNTIME-189 — Sandbox debug-draw view for orientation parity diagnostics`](RUNTIME-189-orientation-parity-debug-draw-view.md)
+  consumes the method-owned `METHOD-032` result/diagnostics through retired
+  `RUNTIME-177`'s immediate-mode debug-draw seam. It owns deterministic
+  primitive budgeting, config/UI parity, and the opt-in `gpu;vulkan`
+  operational smoke; it does not alter orientation results or gate the method
+  reference.
+
 ### Parameterization family integration (Theme I, seeded 2026-07-13)
 
 - `RUNTIME-176 — Parameterization runtime facade, config lane, and UV view

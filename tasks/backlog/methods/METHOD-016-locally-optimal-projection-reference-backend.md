@@ -127,7 +127,12 @@ reserved.
 - [ ] Benchmark smoke manifest validates and runs.
 - [ ] Smoke result validates and reports quality/error plus convergence
       diagnostics for both LOP and WLOP.
-- [ ] Public API exposes only `std`/`glm`/scalar types.
+- [ ] Public API type discipline: the exported surface uses only
+      `std`/`glm`/scalar types plus the engine's own point-cloud types. The
+      `Cloud`-taking `Consolidate(cloud, params)` entry is explicitly
+      in-contract (vertex `PropertySet` access, matching the
+      `Geometry.PointCloud.Normals` house pattern); no third-party types or
+      method-internal solver state are exported.
 
 ## Verification
 ```bash
