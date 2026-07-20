@@ -98,7 +98,12 @@ the authoritative open/unblocked view.
 - blocked by `REVIEW-003`: `METHOD-030` — Neural render proxy path-replay reference (tasks/backlog/methods/METHOD-030-neural-render-proxy-path-replay-reference.md)
 - blocked by `REVIEW-003`: `METHOD-031` — Cross-artifact Jacobian portability prediction (tasks/backlog/methods/METHOD-031-jacobian-portability-predictive-study.md)
 - unblocked: `METHOD-032` — Octree parity normal orientation reference backend (tasks/backlog/methods/METHOD-032-octree-parity-normal-orientation.md)
+- unblocked: `METHOD-033` — Screened Poisson surface reconstruction reference backend (tasks/backlog/methods/METHOD-033-screened-poisson-reconstruction-reference.md)
+- blocked by `METHOD-033`: `METHOD-034` — iPSR normal orientation baseline (reference backend) (tasks/backlog/methods/METHOD-034-ipsr-orientation-baseline.md)
+- unblocked: `METHOD-035` — Parametric Gauss (winding-number) orientation baseline (reference backend) (tasks/backlog/methods/METHOD-035-pgr-winding-number-orientation-baseline.md)
+- blocked by `METHOD-032`: `METHOD-036` — Normal-orientation method comparison evidence (publication protocol) (tasks/backlog/methods/METHOD-036-orientation-comparison-evidence.md)
 - blocked by `METHOD-016`: `RUNTIME-175` — Point-cloud consolidation runtime facade, config lane, and backend adapter (tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
+- blocked by `RUNTIME-177`: `RUNTIME-179` — Sandbox debug-draw view for orientation parity diagnostics (tasks/backlog/runtime/RUNTIME-179-orientation-parity-debug-draw-view.md)
 - blocked by `RUNTIME-175`: `UI-035` — Sandbox point-cloud consolidation editor panel (tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
 
 ## Unthemed
