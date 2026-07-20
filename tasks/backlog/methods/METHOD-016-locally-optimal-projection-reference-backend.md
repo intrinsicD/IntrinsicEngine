@@ -68,7 +68,7 @@ These are the two `Strategy` tokens this task ships. The full state-of-the-art L
 - [ ] Variant A marked default; variant B available from the same implementation.
 - [ ] All correctness tests pass in the default CPU gate.
 - [ ] Benchmark smoke manifest validates and runs.
-- [ ] Public API exposes only `std`/`glm`/scalar types.
+- [ ] Public API type discipline: the exported surface uses only `std`/`glm`/scalar types plus the engine's own point-cloud types — the `Cloud`-taking `Consolidate(cloud, params)` entry is explicitly in-contract (vertex `PropertySet` access, matching the `Geometry.PointCloud.Normals` house pattern); no third-party types and no method-internal solver state are exported.
 
 ## Verification
 ```bash
