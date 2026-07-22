@@ -82,6 +82,7 @@ namespace Extrinsic::Runtime
         RuntimeObjectSpaceNormalBakeQueue* ObjectSpaceNormalBakeQueue{};
         std::uint64_t ObjectSpaceNormalBakeBindingEpoch{0u};
         const RHI::IDevice* ObjectSpaceNormalBakeDevice{};
+        std::weak_ptr<void> ObjectSpaceNormalBakeLifetime{};
     };
 
     export struct RuntimePostImportProcessorDesc
@@ -227,6 +228,7 @@ namespace Extrinsic::Runtime
         EditorCommandHistory* CommandHistory{};
         RuntimeObjectSpaceNormalBakeQueue* ObjectSpaceNormalBakeQueue{};
         std::uint64_t ObjectSpaceNormalBakeBindingEpoch{0u};
+        std::weak_ptr<void> ObjectSpaceNormalBakeLifetime{};
         const RHI::IDevice* Device{};
     };
 
@@ -235,6 +237,7 @@ namespace Extrinsic::Runtime
         RuntimeObjectSpaceNormalBakeQueue* Queue{};
         std::uint64_t BindingEpoch{0u};
         const RHI::IDevice* Device{};
+        std::weak_ptr<void> Lifetime{};
     };
 
     struct BorrowedBool
@@ -319,6 +322,7 @@ namespace Extrinsic::Runtime
                 .Queue = m_ObjectSpaceNormalBakeQueue.get(),
                 .BindingEpoch = m_ObjectSpaceNormalBakeBindingEpoch,
                 .Device = m_Device.get(),
+                .Lifetime = m_ObjectSpaceNormalBakeLifetime,
             };
         }
         [[nodiscard]] std::size_t ClearCompletedAssetImports();
@@ -379,6 +383,7 @@ namespace Extrinsic::Runtime
         BorrowedSubsystem<EditorCommandHistory> m_EditorCommandHistory{};
         BorrowedSubsystem<RuntimeObjectSpaceNormalBakeQueue> m_ObjectSpaceNormalBakeQueue{};
         std::uint64_t m_ObjectSpaceNormalBakeBindingEpoch{0u};
+        std::weak_ptr<void> m_ObjectSpaceNormalBakeLifetime{};
         BorrowedSubsystem<const RHI::IDevice> m_Device{};
         RuntimeIOBackendFactory m_ModelTextureImportIOBackendFactoryForTest{};
         std::function<void(const RuntimeAssetImportRequest&)>

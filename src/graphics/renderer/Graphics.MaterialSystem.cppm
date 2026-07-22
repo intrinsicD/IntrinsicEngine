@@ -14,6 +14,7 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Types;
 import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.Material;
 
 // ============================================================
@@ -174,7 +175,8 @@ export namespace Extrinsic::Graphics
         /// deterministic failures. No asset service or runtime state is read.
         Core::Result ResolveTextureAssetBindings(MaterialHandle handle,
                                                  const MaterialTextureAssetBindings& bindings,
-                                                 GpuAssetCache& assets);
+                                                 GpuAssetCache& assets,
+                                                 const ColormapSystem* colormaps = nullptr);
 
         // -----------------------------------------------------------------
         // LeasableManager concept requirements
@@ -238,4 +240,3 @@ export namespace Extrinsic::Graphics
         std::unique_ptr<Impl> m_Impl;
     };
 }
-

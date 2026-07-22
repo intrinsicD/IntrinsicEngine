@@ -56,7 +56,8 @@ vec3 ResolveSurfaceNormal(
     // legacy ObjectSpaceNormalMap flag is honored as a transitional alias.
     const bool normalFromTexture =
         GpuMaterialChannelSource(mat, GpuMaterialChannel_Normal) == GpuAttributeSource_Texture ||
-        (mat.Flags & GpuMaterialFlag_ObjectSpaceNormalMap) != 0u;
+        (mat.Flags & (GpuMaterialFlag_ObjectSpaceNormalMap |
+                      GpuMaterialFlag_WorldSpaceNormalMap)) != 0u;
     if (!normalFromTexture || !IsValidTextureID(mat.NormalID)) {
         return n;
     }
@@ -72,6 +73,10 @@ vec3 ResolveSurfaceNormal(
         return n;
     }
     objectNormal /= objectNormalLength;
+
+    if ((mat.Flags & GpuMaterialFlag_WorldSpaceNormalMap) != 0u) {
+        return objectNormal;
+    }
 
     const mat3 normalMatrix = transpose(inverse(mat3(dyn.Model)));
     const vec3 worldNormal = normalMatrix * objectNormal;
@@ -91,7 +96,15 @@ vec2 ResolveSurfaceMetallicRoughness(GpuMaterialSlot mat, vec2 uv)
     }
 
     const vec4 mrSample = texture(globalTextures[nonuniformEXT(mat.MetallicRoughnessID)], uv);
-    return vec2(mrSample.g, mrSample.b);
+    const float roughness =
+        (mat.Flags & GpuMaterialFlag_ScalarRoughnessTexture) != 0u
+            ? mrSample.r
+            : mrSample.g;
+    const float metallic =
+        (mat.Flags & GpuMaterialFlag_ScalarMetallicTexture) != 0u
+            ? mrSample.r
+            : mrSample.b;
+    return vec2(roughness, metallic);
 }
 
 void main() {
@@ -109,7 +122,16 @@ void main() {
 
     vec4 baseColor = mat.BaseColorFactor;
     if (IsValidTextureID(mat.AlbedoID)) {
-        baseColor *= texture(globalTextures[nonuniformEXT(mat.AlbedoID)], vUv);
+        vec4 albedoSample =
+            texture(globalTextures[nonuniformEXT(mat.AlbedoID)], vUv);
+        if ((mat.Flags & GpuMaterialFlag_ScalarAlbedoTexture) != 0u) {
+            const float t = GpuNormalizeScalarAlbedo(mat, albedoSample.r);
+            const uint colormapID = GpuScalarAlbedoColormapID(mat);
+            albedoSample = IsValidTextureID(colormapID)
+                ? texture(globalTextures[nonuniformEXT(colormapID)], vec2(t, 0.5))
+                : vec4(t, t, t, 1.0);
+        }
+        baseColor *= albedoSample;
     }
     float visualizationScalar = vVisualizationScalar;
     vec4 visualizationColor = vVisualizationColor;

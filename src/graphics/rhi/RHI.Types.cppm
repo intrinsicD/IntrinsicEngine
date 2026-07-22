@@ -462,7 +462,7 @@ export namespace Extrinsic::RHI
     // Layout:
     //   Bytes   0–47  — standard PBR fields (superset of GpuMaterialData)
     //   Bytes  48–51  — MaterialTypeID   (shader branches on this)
-    //   Bytes  52–63  — padding to next vec4 boundary
+    //   Bytes  52–63  — shading/source metadata plus scalar-albedo range
     //   Bytes  64–127 — CustomData[4]   (4 × vec4, user-defined per-type)
     //
     // Shaders index this SSBO by MaterialSlot from GpuInstanceData.
@@ -490,9 +490,12 @@ export namespace Extrinsic::RHI
         // (0 = VertexAttribute, 1 = Texture). Occupies the former _pad1 word.
         std::uint32_t ChannelSourceBits   = 0;
 
-        // Padding to align CustomData to byte 64
-        std::uint32_t _pad2 = 0;
-        std::uint32_t _pad3 = 0;
+        // Raw scalar-albedo normalization range. The matching colormap
+        // bindless index occupies the otherwise-unused high 16 bits of
+        // ChannelSourceBits; the low eight bits remain the four 2-bit
+        // MaterialChannel source selectors.
+        float AlbedoScalarRangeMin = 0.0f;
+        float AlbedoScalarRangeMax = 1.0f;
 
         // Custom params  (bytes 64–127)
         alignas(16) glm::vec4 CustomData[4]{};

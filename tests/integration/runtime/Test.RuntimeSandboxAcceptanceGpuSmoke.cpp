@@ -25,6 +25,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <limits>
@@ -94,6 +95,7 @@ import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshGeometryPacker;
 import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
@@ -104,6 +106,9 @@ import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.SelectedMeshTextureBake;
+import Extrinsic.Runtime.TextureBakeModule;
+import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Sandbox.ConfigSections;
 import Geometry.Properties;
 
@@ -5547,4 +5552,1200 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         << farTexel->Y << ") distance="
         << farTexel->Distance << " pixel="
         << PixelText(farUncovered);
+}
+
+// --- RUNTIME-190: generalized GPU property-texture baking --------------
+
+namespace
+{
+constexpr std::uint32_t kRuntime190BakeExtent = 32u;
+constexpr std::uint32_t kRuntime190BakePixelBytes = 4u;
+constexpr std::uint32_t kRuntime190MaxFrames = 120u;
+constexpr std::string_view kRuntime190Presentation =
+    "runtime190.surface";
+constexpr std::string_view kRuntime190VertexOutput =
+    "runtime190.vertex.scalar";
+constexpr std::string_view kRuntime190FaceOutput =
+    "runtime190.face.color";
+constexpr std::string_view kRuntime190EdgeOutput =
+    "runtime190.edge.color";
+constexpr std::string_view kRuntime190SavedEdgeOutput =
+    "runtime190.edge.color.saved";
+
+[[nodiscard]] RT::ProgressivePresentationBindings
+MakeRuntime190PresentationBindings()
+{
+    RT::ProgressiveSlotBinding albedo{};
+    albedo.Semantic = RT::ProgressiveSlotSemantic::Albedo;
+    albedo.SourceKind = RT::ProgressiveSlotSourceKind::PropertyBuffer;
+    albedo.Property = RT::ProgressivePropertyBindingDescriptor{
+        .Domain = RT::ProgressiveGeometryDomain::MeshVertex,
+        .PropertyName = "v:runtime190_scalar",
+        .ExpectedValueKind =
+            RT::ProgressivePropertyValueKind::ScalarFloat,
+        .ExpectedElementCount = 3u,
+    };
+    albedo.Readiness = RT::ProgressiveReadinessState::Ready;
+    albedo.Provenance =
+        RT::ProgressiveGeneratedOutputProvenance::PropertyBuffer;
+
+    RT::ProgressiveSlotBinding scalar = albedo;
+    scalar.Semantic = RT::ProgressiveSlotSemantic::ScalarField;
+
+    return RT::ProgressivePresentationBindings{
+        .Shape = RT::ProgressiveEntityShape::MeshLeaf,
+        .Lanes = {
+            RT::ProgressiveRenderLaneBinding{
+                .Lane = RT::ProgressiveRenderLane::Surface,
+                .PresentationKey = std::string{kRuntime190Presentation},
+            },
+        },
+        .Presentations = {
+            RT::ProgressivePresentationBinding{
+                .Key = std::string{kRuntime190Presentation},
+                .Kind =
+                    RT::ProgressivePresentationKind::SurfaceMaterial,
+                .Slots = {albedo, scalar},
+            },
+        },
+        .BindingGeneration = 1u,
+    };
+}
+
+[[nodiscard]] const RT::BakedPropertyTextureRecord*
+FindRuntime190Record(
+    const RT::TextureBakeSnapshot& snapshot,
+    const std::string_view outputName)
+{
+    const auto found = std::ranges::find(
+        snapshot.Textures,
+        outputName,
+        &RT::BakedPropertyTextureRecord::OutputName);
+    return found != snapshot.Textures.end() ? &*found : nullptr;
+}
+
+class Runtime190PropertyTextureBakeApp final : public IApplication
+{
+public:
+    void OnInitialize(Engine& engine) override
+    {
+        m_Device = &engine.GetDevice();
+        m_Renderer = &engine.GetRenderer();
+        m_Cache = engine.Services().Find<
+            Extrinsic::Graphics::GpuAssetCache>();
+        m_Extraction = engine.Services().Find<
+            RT::RenderExtractionCache>();
+        m_TextureBake = engine.Services().Find<
+            RT::TextureBakeService>();
+        m_Assets = engine.Services().Find<Assets::AssetService>();
+        m_History = engine.Services().Find<RT::EditorCommandHistory>();
+        m_Scene = engine.Worlds().Get(engine.ActiveWorld());
+        m_World = engine.ActiveWorld();
+        if (m_Device == nullptr ||
+            m_Renderer == nullptr ||
+            m_Cache == nullptr ||
+            m_Extraction == nullptr ||
+            m_TextureBake == nullptr ||
+            m_Assets == nullptr ||
+            m_History == nullptr ||
+            m_Scene == nullptr)
+        {
+            Fail(
+                "Sandbox composition did not publish the services required by the RUNTIME-190 smoke.");
+            return;
+        }
+
+        m_Participant = engine.Jobs().RegisterGpuQueueParticipant(
+            RT::GpuQueueParticipantDesc{
+                .DebugName =
+                    "RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureBakeReadback",
+                .Scope = m_World,
+                .RecordFrameCommands =
+                    [this](Extrinsic::RHI::ICommandContext& commands)
+                    {
+                        RecordReadbacks(commands);
+                    },
+                .DrainCompletedTransfers =
+                    [this]
+                    {
+                        if (InitialReadbacksRecorded)
+                            InitialReadbackDrainObserved = true;
+                        if (RebakeReadbackRecorded)
+                            RebakeReadbackDrainObserved = true;
+                    },
+                .HasInFlightWork =
+                    [this]
+                    {
+                        return Configured &&
+                               m_Stage != Stage::Finished;
+                    },
+                .ShutdownAfterDeviceIdle =
+                    [this]
+                    {
+                        DeviceIdleObserved = true;
+                    },
+            });
+        if (!m_Participant.IsValid())
+            Fail("JobService rejected the RUNTIME-190 readback participant.");
+    }
+
+    void OnSimTick(Engine&, double) override {}
+
+    void OnVariableTick(Engine& engine, double, double) override
+    {
+        ++Frames;
+        if (!FailureReason.empty())
+        {
+            engine.RequestExit();
+            return;
+        }
+        if (!Configured)
+        {
+            if (Frames >= kRuntime190MaxFrames)
+            {
+                TimedOut = true;
+                engine.RequestExit();
+            }
+            return;
+        }
+        if (Frames >= kRuntime190MaxFrames)
+        {
+            TimedOut = true;
+            engine.RequestExit();
+            return;
+        }
+
+        switch (m_Stage)
+        {
+        case Stage::WaitingToSchedule:
+            if (m_Device->IsOperational() &&
+                m_TextureBake->Available())
+            {
+                if (!ScheduleInitialBakes())
+                {
+                    engine.RequestExit();
+                    return;
+                }
+                m_Stage = Stage::WaitingForInitialReadback;
+            }
+            break;
+        case Stage::WaitingForInitialReadback:
+            if (InitialReadbacksRecorded &&
+                InitialReadbackDrainObserved)
+            {
+                ObserveInitialBinding();
+                m_SettleFrames = 3u;
+                m_Stage = Stage::ViridisSettle;
+            }
+            break;
+        case Stage::ViridisSettle:
+            if (m_SettleFrames > 0u)
+            {
+                --m_SettleFrames;
+                break;
+            }
+            if (!RenameEdgeAndSelectInferno())
+            {
+                engine.RequestExit();
+                return;
+            }
+            m_Renderer->SetDefaultRecipeBackbufferReadbackBuffer(
+                m_InfernoBackbuffer);
+            m_SettleFrames = 4u;
+            m_Stage = Stage::InfernoSettle;
+            break;
+        case Stage::InfernoSettle:
+            if (m_SettleFrames > 0u)
+            {
+                --m_SettleFrames;
+                break;
+            }
+            if (!ObserveInfernoAndScheduleRebake())
+                break;
+            m_Renderer->SetDefaultRecipeBackbufferReadbackBuffer({});
+            m_Stage = Stage::WaitingForRebakeReadback;
+            break;
+        case Stage::WaitingForRebakeReadback:
+            if (RebakeReadbackRecorded &&
+                RebakeReadbackDrainObserved)
+            {
+                m_SettleFrames = 2u;
+                m_Stage = Stage::RetireReadback;
+            }
+            break;
+        case Stage::RetireReadback:
+            if (m_SettleFrames > 0u)
+            {
+                --m_SettleFrames;
+                break;
+            }
+            if (!RemoveAllOutputs())
+            {
+                engine.RequestExit();
+                return;
+            }
+            m_Stage = Stage::Finished;
+            engine.RequestExit();
+            break;
+        case Stage::Finished:
+            engine.RequestExit();
+            break;
+        }
+    }
+
+    void OnShutdown(Engine&) override
+    {
+        m_Participant = {};
+    }
+
+    void Configure(
+        const EntityHandle target,
+        const std::uint32_t stableEntityId,
+        const Extrinsic::RHI::BufferHandle initialVertexReadback,
+        const Extrinsic::RHI::BufferHandle rebakedVertexReadback,
+        const Extrinsic::RHI::BufferHandle faceReadback,
+        const Extrinsic::RHI::BufferHandle edgeReadback,
+        const Extrinsic::RHI::BufferHandle infernoBackbuffer) noexcept
+    {
+        m_Target = target;
+        m_StableEntityId = stableEntityId;
+        m_InitialVertexReadback = initialVertexReadback;
+        m_RebakedVertexReadback = rebakedVertexReadback;
+        m_FaceReadback = faceReadback;
+        m_EdgeReadback = edgeReadback;
+        m_InfernoBackbuffer = infernoBackbuffer;
+        Configured =
+            m_Target != Extrinsic::ECS::InvalidEntityHandle &&
+            m_StableEntityId != 0u &&
+            m_InitialVertexReadback.IsValid() &&
+            m_RebakedVertexReadback.IsValid() &&
+            m_FaceReadback.IsValid() &&
+            m_EdgeReadback.IsValid() &&
+            m_InfernoBackbuffer.IsValid();
+    }
+
+    void Detach(Engine& engine)
+    {
+        if (!m_Participant.IsValid())
+            return;
+        Extrinsic::RHI::IDevice* const device = m_Device;
+        engine.Jobs().UnregisterGpuQueueParticipant(
+            m_Participant,
+            [device]
+            {
+                if (device != nullptr)
+                    device->WaitIdle();
+            });
+        m_Participant = {};
+    }
+
+    bool Configured{false};
+    bool InitialReadbacksRecorded{false};
+    bool InitialReadbackDrainObserved{false};
+    bool RebakeReadbackRecorded{false};
+    bool RebakeReadbackDrainObserved{false};
+    bool DeviceIdleObserved{false};
+    bool InitialViridisBindingObserved{false};
+    bool InfernoBindingObserved{false};
+    bool ColormapChangedWithoutRebake{false};
+    bool RenamePreservedOldAsset{false};
+    bool RebakeReusedAsset{false};
+    bool AssetsDestroyedObserved{false};
+    bool PropertyBufferFallbackObserved{false};
+    bool TimedOut{false};
+    std::uint32_t Frames{0u};
+    std::string FailureReason{};
+    Assets::AssetId VertexAsset{};
+    Assets::AssetId FaceAsset{};
+    Assets::AssetId SavedEdgeAsset{};
+    Assets::AssetId NewEdgeAsset{};
+    std::uint64_t InitialVertexCacheGeneration{0u};
+    std::uint64_t RebakedVertexCacheGeneration{0u};
+
+private:
+    enum class Stage : std::uint8_t
+    {
+        WaitingToSchedule,
+        WaitingForInitialReadback,
+        ViridisSettle,
+        InfernoSettle,
+        WaitingForRebakeReadback,
+        RetireReadback,
+        Finished,
+    };
+
+    void Fail(std::string reason)
+    {
+        if (FailureReason.empty())
+            FailureReason = std::move(reason);
+    }
+
+    [[nodiscard]] RT::SandboxEditorContext CommandContext() const
+    {
+        return RT::SandboxEditorContext{
+            .Scene = m_Scene,
+            .World = m_World,
+            .CommandHistory = m_History,
+            .AssetService = m_Assets,
+            .Device = m_Device,
+            .TextureBake = m_TextureBake,
+        };
+    }
+
+    [[nodiscard]] std::vector<RT::BakedPropertyTextureConsumer>
+    Consumers(const Extrinsic::Graphics::Colormap::Type colormap) const
+    {
+        return {
+            RT::BakedPropertyTextureConsumer{
+                .PresentationKey =
+                    std::string{kRuntime190Presentation},
+                .Semantic = RT::ProgressiveSlotSemantic::Albedo,
+                .Colormap = colormap,
+            },
+            RT::BakedPropertyTextureConsumer{
+                .PresentationKey =
+                    std::string{kRuntime190Presentation},
+                .Semantic =
+                    RT::ProgressiveSlotSemantic::ScalarField,
+                .Colormap = colormap,
+            },
+        };
+    }
+
+    [[nodiscard]] RT::SandboxEditorTextureBakeCommand
+    VertexCommand(const Extrinsic::Graphics::Colormap::Type colormap) const
+    {
+        RT::SandboxEditorTextureBakeCommand command{};
+        command.StableEntityId = m_StableEntityId;
+        command.PresentationKey =
+            std::string{kRuntime190Presentation};
+        command.TargetSemantic =
+            RT::ProgressiveSlotSemantic::Albedo;
+        command.SourceDomain =
+            RT::ProgressiveGeometryDomain::MeshVertex;
+        command.ExpectedValueKind =
+            RT::ProgressivePropertyValueKind::ScalarFloat;
+        command.PropertyName = "v:runtime190_scalar";
+        command.RangePolicy =
+            RT::MeshAttributeTextureBakeRangePolicy::Manual;
+        command.RangeMin = 0.0f;
+        command.RangeMax = 1.0f;
+        command.Width = kRuntime190BakeExtent;
+        command.Height = kRuntime190BakeExtent;
+        command.OutputName = std::string{kRuntime190VertexOutput};
+        command.Storage =
+            RT::SelectedMeshTextureBakeStorage::RawFloat;
+        command.Consumers = Consumers(colormap);
+        command.BindGeneratedTexture = true;
+        return command;
+    }
+
+    [[nodiscard]] RT::SandboxEditorTextureBakeCommand
+    EncodedCommand(
+        const RT::ProgressiveGeometryDomain domain,
+        std::string property,
+        std::string output) const
+    {
+        RT::SandboxEditorTextureBakeCommand command{};
+        command.StableEntityId = m_StableEntityId;
+        command.SourceDomain = domain;
+        command.ExpectedValueKind =
+            RT::ProgressivePropertyValueKind::Vec4;
+        command.PropertyName = std::move(property);
+        command.Encoder =
+            RT::MeshAttributeTextureBakeEncoder::RgbaColor;
+        command.Width = kRuntime190BakeExtent;
+        command.Height = kRuntime190BakeExtent;
+        command.OutputName = std::move(output);
+        command.Storage =
+            RT::SelectedMeshTextureBakeStorage::EncodedRgba;
+        command.BindGeneratedTexture = false;
+        return command;
+    }
+
+    [[nodiscard]] bool ScheduleInitialBakes()
+    {
+        const RT::SandboxEditorContext context = CommandContext();
+        m_VertexCommand = VertexCommand(
+            Extrinsic::Graphics::Colormap::Type::Viridis);
+        const RT::SandboxEditorTextureBakeCommand face = EncodedCommand(
+            RT::ProgressiveGeometryDomain::MeshFace,
+            "f:runtime190_color",
+            std::string{kRuntime190FaceOutput});
+        const RT::SandboxEditorTextureBakeCommand edge = EncodedCommand(
+            RT::ProgressiveGeometryDomain::MeshEdge,
+            "e:runtime190_color",
+            std::string{kRuntime190EdgeOutput});
+
+        const RT::SandboxEditorTextureBakeCommandResult vertexResult =
+            RT::ApplySandboxEditorTextureBakeCommand(
+                context,
+                m_VertexCommand);
+        const RT::SandboxEditorTextureBakeCommandResult faceResult =
+            RT::ApplySandboxEditorTextureBakeCommand(context, face);
+        const RT::SandboxEditorTextureBakeCommandResult edgeResult =
+            RT::ApplySandboxEditorTextureBakeCommand(context, edge);
+        if (!vertexResult.Succeeded() || !vertexResult.Scheduled ||
+            !faceResult.Succeeded() || !faceResult.Scheduled ||
+            !edgeResult.Succeeded() || !edgeResult.Scheduled)
+        {
+            Fail(
+                "The shared Sandbox texture-bake command did not schedule all vertex/face/edge requests: vertex=" +
+                vertexResult.Diagnostic + " face=" +
+                faceResult.Diagnostic + " edge=" +
+                edgeResult.Diagnostic);
+            return false;
+        }
+        VertexAsset = vertexResult.GeneratedTexture;
+        FaceAsset = faceResult.GeneratedTexture;
+        SavedEdgeAsset = edgeResult.GeneratedTexture;
+        return VertexAsset.IsValid() &&
+               FaceAsset.IsValid() &&
+               SavedEdgeAsset.IsValid();
+    }
+
+    void ObserveInitialBinding()
+    {
+        const auto bindings =
+            m_Extraction->GetMaterialTextureAssetBindings(
+                m_StableEntityId);
+        InitialViridisBindingObserved =
+            bindings.has_value() &&
+            bindings->Albedo == VertexAsset &&
+            bindings->AlbedoInterpretation ==
+                Extrinsic::Graphics::
+                    MaterialAlbedoTextureInterpretation::Scalar &&
+            bindings->AlbedoScalarColormap ==
+                Extrinsic::Graphics::Colormap::Type::Viridis &&
+            std::abs(bindings->AlbedoScalarRangeMin - 0.0f) <
+                1.0e-6f &&
+            std::abs(bindings->AlbedoScalarRangeMax - 1.0f) <
+                1.0e-6f;
+        if (!InitialViridisBindingObserved)
+            Fail("Ready raw scalar texture did not bind as Viridis albedo.");
+    }
+
+    [[nodiscard]] bool RenameEdgeAndSelectInferno()
+    {
+        const RT::TextureBakeMutationResult renamed =
+            m_TextureBake->Rename(
+                m_StableEntityId,
+                kRuntime190EdgeOutput,
+                kRuntime190SavedEdgeOutput);
+        if (!renamed.Succeeded())
+        {
+            Fail("Ready edge texture could not be renamed: " +
+                 renamed.Diagnostic);
+            return false;
+        }
+
+        const RT::SandboxEditorTextureBakeCommand edge = EncodedCommand(
+            RT::ProgressiveGeometryDomain::MeshEdge,
+            "e:runtime190_color",
+            std::string{kRuntime190EdgeOutput});
+        const RT::SandboxEditorTextureBakeCommandResult edgeResult =
+            RT::ApplySandboxEditorTextureBakeCommand(
+                CommandContext(),
+                edge);
+        if (!edgeResult.Succeeded() || !edgeResult.Scheduled ||
+            !edgeResult.GeneratedTexture.IsValid())
+        {
+            Fail("Rebaking the old edge output name after rename failed: " +
+                 edgeResult.Diagnostic);
+            return false;
+        }
+        NewEdgeAsset = edgeResult.GeneratedTexture;
+        RenamePreservedOldAsset =
+            NewEdgeAsset != SavedEdgeAsset &&
+            m_Assets->IsAlive(SavedEdgeAsset);
+        if (!RenamePreservedOldAsset)
+        {
+            Fail("Renaming did not preserve a distinct live edge texture asset.");
+            return false;
+        }
+
+        const std::vector<RT::BakedPropertyTextureConsumer> inferno =
+            Consumers(Extrinsic::Graphics::Colormap::Type::Inferno);
+        const RT::TextureBakeMutationResult changed =
+            m_TextureBake->SetConsumers(
+                RT::TextureBakeConsumerUpdateRequest{
+                    .StableEntityId = m_StableEntityId,
+                    .OutputName = std::string{kRuntime190VertexOutput},
+                    .Consumers = inferno,
+                });
+        if (!changed.Succeeded())
+        {
+            Fail("Raw scalar colormap update failed: " +
+                 changed.Diagnostic);
+            return false;
+        }
+        m_VertexCommand.Consumers = inferno;
+        return true;
+    }
+
+    [[nodiscard]] bool ObserveInfernoAndScheduleRebake()
+    {
+        const auto bindings =
+            m_Extraction->GetMaterialTextureAssetBindings(
+                m_StableEntityId);
+        const auto vertexView = m_Cache->GetView(VertexAsset);
+        InfernoBindingObserved =
+            bindings.has_value() &&
+            bindings->Albedo == VertexAsset &&
+            bindings->AlbedoInterpretation ==
+                Extrinsic::Graphics::
+                    MaterialAlbedoTextureInterpretation::Scalar &&
+            bindings->AlbedoScalarColormap ==
+                Extrinsic::Graphics::Colormap::Type::Inferno;
+        ColormapChangedWithoutRebake =
+            vertexView.has_value() &&
+            vertexView->Generation == InitialVertexCacheGeneration;
+        if (!InfernoBindingObserved ||
+            !ColormapChangedWithoutRebake)
+        {
+            Fail(
+                "Changing the raw scalar colormap changed texture identity/generation or failed to update the material binding.");
+            return false;
+        }
+
+        const RT::TextureBakeSnapshot snapshot =
+            m_TextureBake->Snapshot(m_StableEntityId);
+        const RT::BakedPropertyTextureRecord* savedEdge =
+            FindRuntime190Record(snapshot, kRuntime190SavedEdgeOutput);
+        const RT::BakedPropertyTextureRecord* newEdge =
+            FindRuntime190Record(snapshot, kRuntime190EdgeOutput);
+        if (savedEdge == nullptr || newEdge == nullptr ||
+            savedEdge->State != RT::BakedPropertyTextureState::Ready ||
+            newEdge->State != RT::BakedPropertyTextureState::Ready)
+        {
+            return false;
+        }
+
+        auto& values = m_Scene->Raw()
+            .get<gs::Vertices>(m_Target)
+            .Properties.Get<float>("v:runtime190_scalar")
+            .Vector();
+        values = {0.75f, 0.75f, 0.75f};
+        const RT::SandboxEditorTextureBakeCommandResult rebake =
+            RT::ApplySandboxEditorTextureBakeCommand(
+                CommandContext(),
+                m_VertexCommand);
+        if (!rebake.Succeeded() || !rebake.Scheduled)
+        {
+            Fail("Mutated scalar rebake was not scheduled: " +
+                 rebake.Diagnostic);
+            return false;
+        }
+        RebakeReusedAsset = rebake.GeneratedTexture == VertexAsset;
+        if (!RebakeReusedAsset)
+        {
+            Fail("Rebaking the same named output allocated a different asset.");
+            return false;
+        }
+        return true;
+    }
+
+    [[nodiscard]] bool RemoveAllOutputs()
+    {
+        const std::array<std::string_view, 4u> names{
+            kRuntime190VertexOutput,
+            kRuntime190FaceOutput,
+            kRuntime190SavedEdgeOutput,
+            kRuntime190EdgeOutput,
+        };
+        const std::array<Assets::AssetId, 4u> assets{
+            VertexAsset,
+            FaceAsset,
+            SavedEdgeAsset,
+            NewEdgeAsset,
+        };
+        for (const std::string_view name : names)
+        {
+            const RT::TextureBakeMutationResult removed =
+                m_TextureBake->Remove(m_StableEntityId, name);
+            if (!removed.Succeeded())
+            {
+                Fail("Generated texture removal failed: " +
+                     removed.Diagnostic);
+                return false;
+            }
+        }
+
+        AssetsDestroyedObserved = std::ranges::none_of(
+            assets,
+            [this](const Assets::AssetId asset)
+            {
+                return m_Assets->IsAlive(asset);
+            });
+        const RT::TextureBakeSnapshot snapshot =
+            m_TextureBake->Snapshot(m_StableEntityId);
+        const auto* progressive = m_Scene->Raw()
+            .try_get<RT::ProgressivePresentationBindings>(m_Target);
+        const RT::ProgressivePresentationBinding* presentation =
+            progressive != nullptr
+                ? RT::FindPresentationBinding(
+                      *progressive,
+                      kRuntime190Presentation)
+                : nullptr;
+        const RT::ProgressiveSlotBinding* albedo =
+            presentation != nullptr
+                ? RT::FindSlotBinding(
+                      *presentation,
+                      RT::ProgressiveSlotSemantic::Albedo)
+                : nullptr;
+        const RT::ProgressiveSlotBinding* scalar =
+            presentation != nullptr
+                ? RT::FindSlotBinding(
+                      *presentation,
+                      RT::ProgressiveSlotSemantic::ScalarField)
+                : nullptr;
+        const auto material =
+            m_Extraction->GetMaterialTextureAssetBindings(
+                m_StableEntityId);
+        PropertyBufferFallbackObserved =
+            snapshot.Textures.empty() &&
+            albedo != nullptr &&
+            scalar != nullptr &&
+            albedo->SourceKind ==
+                RT::ProgressiveSlotSourceKind::PropertyBuffer &&
+            scalar->SourceKind ==
+                RT::ProgressiveSlotSourceKind::PropertyBuffer &&
+            (!material.has_value() || !material->Albedo.IsValid());
+        if (!AssetsDestroyedObserved ||
+            !PropertyBufferFallbackObserved)
+        {
+            Fail(
+                "Removing generated textures did not destroy assets and restore property-buffer consumers.");
+            return false;
+        }
+        return true;
+    }
+
+    [[nodiscard]] bool CopyReadyTexture(
+        Extrinsic::RHI::ICommandContext& commands,
+        const RT::BakedPropertyTextureRecord& record,
+        const Extrinsic::RHI::Format expectedFormat,
+        const Extrinsic::RHI::BufferHandle readback,
+        std::uint64_t& generation)
+    {
+        const auto view = m_Cache->GetView(record.Texture);
+        if (!view.has_value() ||
+            view->Kind != Extrinsic::Graphics::GpuAssetKind::Texture ||
+            !view->Texture.IsValid())
+        {
+            Fail("Ready property texture has no exact GPU cache view.");
+            return false;
+        }
+        const Extrinsic::RHI::TextureDesc* const desc =
+            m_Renderer->GetTextureManager().GetDesc(view->Texture);
+        if (desc == nullptr ||
+            desc->Width != kRuntime190BakeExtent ||
+            desc->Height != kRuntime190BakeExtent ||
+            desc->Fmt != expectedFormat)
+        {
+            Fail("Ready property texture has the wrong extent or format.");
+            return false;
+        }
+        generation = view->Generation;
+        commands.TextureBarrier(
+            view->Texture,
+            Extrinsic::RHI::TextureLayout::ShaderReadOnly,
+            Extrinsic::RHI::TextureLayout::TransferSrc);
+        commands.CopyTextureToBuffer(
+            view->Texture,
+            Extrinsic::RHI::TextureLayout::TransferSrc,
+            0u,
+            0u,
+            readback,
+            0u,
+            0u,
+            0u,
+            desc->Width,
+            desc->Height);
+        commands.TextureBarrier(
+            view->Texture,
+            Extrinsic::RHI::TextureLayout::TransferSrc,
+            Extrinsic::RHI::TextureLayout::ShaderReadOnly);
+        return true;
+    }
+
+    void RecordReadbacks(
+        Extrinsic::RHI::ICommandContext& commands)
+    {
+        if (!Configured ||
+            !FailureReason.empty() ||
+            !m_Device->IsOperational())
+        {
+            return;
+        }
+        const RT::TextureBakeSnapshot snapshot =
+            m_TextureBake->Snapshot(m_StableEntityId);
+        if (!InitialReadbacksRecorded)
+        {
+            const RT::BakedPropertyTextureRecord* vertex =
+                FindRuntime190Record(snapshot, kRuntime190VertexOutput);
+            const RT::BakedPropertyTextureRecord* face =
+                FindRuntime190Record(snapshot, kRuntime190FaceOutput);
+            const RT::BakedPropertyTextureRecord* edge =
+                FindRuntime190Record(snapshot, kRuntime190EdgeOutput);
+            if (vertex == nullptr || face == nullptr || edge == nullptr ||
+                vertex->State != RT::BakedPropertyTextureState::Ready ||
+                face->State != RT::BakedPropertyTextureState::Ready ||
+                edge->State != RT::BakedPropertyTextureState::Ready)
+            {
+                return;
+            }
+            std::uint64_t ignoredFaceGeneration = 0u;
+            std::uint64_t ignoredEdgeGeneration = 0u;
+            if (!CopyReadyTexture(
+                    commands,
+                    *vertex,
+                    Extrinsic::RHI::Format::R32_FLOAT,
+                    m_InitialVertexReadback,
+                    InitialVertexCacheGeneration) ||
+                !CopyReadyTexture(
+                    commands,
+                    *face,
+                    Extrinsic::RHI::Format::RGBA8_UNORM,
+                    m_FaceReadback,
+                    ignoredFaceGeneration) ||
+                !CopyReadyTexture(
+                    commands,
+                    *edge,
+                    Extrinsic::RHI::Format::RGBA8_UNORM,
+                    m_EdgeReadback,
+                    ignoredEdgeGeneration))
+            {
+                return;
+            }
+            InitialReadbacksRecorded = true;
+            return;
+        }
+
+        if (m_Stage != Stage::WaitingForRebakeReadback ||
+            RebakeReadbackRecorded)
+        {
+            return;
+        }
+        const RT::BakedPropertyTextureRecord* vertex =
+            FindRuntime190Record(snapshot, kRuntime190VertexOutput);
+        if (vertex == nullptr ||
+            vertex->State != RT::BakedPropertyTextureState::Ready)
+        {
+            return;
+        }
+        const auto view = m_Cache->GetView(vertex->Texture);
+        if (!view.has_value() ||
+            view->Generation <= InitialVertexCacheGeneration)
+        {
+            return;
+        }
+        if (CopyReadyTexture(
+                commands,
+                *vertex,
+                Extrinsic::RHI::Format::R32_FLOAT,
+                m_RebakedVertexReadback,
+                RebakedVertexCacheGeneration))
+        {
+            RebakeReadbackRecorded = true;
+        }
+    }
+
+    Extrinsic::RHI::IDevice* m_Device{nullptr};
+    Extrinsic::Graphics::IRenderer* m_Renderer{nullptr};
+    Extrinsic::Graphics::GpuAssetCache* m_Cache{nullptr};
+    RT::RenderExtractionCache* m_Extraction{nullptr};
+    RT::TextureBakeService* m_TextureBake{nullptr};
+    Assets::AssetService* m_Assets{nullptr};
+    RT::EditorCommandHistory* m_History{nullptr};
+    Registry* m_Scene{nullptr};
+    RT::WorldHandle m_World{};
+    RT::GpuQueueParticipantHandle m_Participant{};
+    EntityHandle m_Target{Extrinsic::ECS::InvalidEntityHandle};
+    std::uint32_t m_StableEntityId{0u};
+    Extrinsic::RHI::BufferHandle m_InitialVertexReadback{};
+    Extrinsic::RHI::BufferHandle m_RebakedVertexReadback{};
+    Extrinsic::RHI::BufferHandle m_FaceReadback{};
+    Extrinsic::RHI::BufferHandle m_EdgeReadback{};
+    Extrinsic::RHI::BufferHandle m_InfernoBackbuffer{};
+    RT::SandboxEditorTextureBakeCommand m_VertexCommand{};
+    Stage m_Stage{Stage::WaitingToSchedule};
+    std::uint32_t m_SettleFrames{0u};
+};
+
+[[nodiscard]] float ReadRuntime190FloatTexel(
+    const std::vector<std::uint8_t>& bytes,
+    const std::uint32_t x,
+    const std::uint32_t y)
+{
+    const std::size_t offset =
+        (static_cast<std::size_t>(y) * kRuntime190BakeExtent + x) *
+        sizeof(float);
+    if (offset + sizeof(float) > bytes.size())
+        return std::numeric_limits<float>::quiet_NaN();
+    float value = 0.0f;
+    std::memcpy(&value, bytes.data() + offset, sizeof(value));
+    return value;
+}
+} // namespace
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke,
+     PropertyTextureModuleBakesRebindsRebakesAndRemovesOnVulkan)
+{
+    auto app = std::make_unique<Runtime190PropertyTextureBakeApp>();
+    auto* const appPtr = app.get();
+    auto bootstrap =
+        BootstrapDefaultSandboxAppEngineWithApp(std::move(app));
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+    Registry& scene =
+        *engine.Worlds().Get(engine.ActiveWorld());
+    const EntityHandle triangle =
+        FindEntityByName(scene, "ReferenceTriangle");
+    ASSERT_TRUE(IsReferenceTriangleEntityValid(scene, triangle))
+        << BuildReferenceTriangleEntityDiagnostic(scene, triangle);
+
+    auto& raw = scene.Raw();
+    auto& vertices = raw.get<gs::Vertices>(triangle);
+    ASSERT_EQ(vertices.Properties.Size(), 3u);
+    vertices.Properties
+        .GetOrAdd<float>("v:runtime190_scalar", 0.25f)
+        .Vector() = {0.25f, 0.25f, 0.25f};
+    vertices.Properties
+        .GetOrAdd<glm::vec3>(
+            std::string{pn::kNormal},
+            glm::vec3{0.0f, 0.0f, 1.0f})
+        .Vector() = {
+            glm::vec3{0.0f, 0.0f, 1.0f},
+            glm::vec3{0.0f, 0.0f, 1.0f},
+            glm::vec3{0.0f, 0.0f, 1.0f},
+        };
+
+    auto& faces = raw.get<gs::Faces>(triangle);
+    ASSERT_EQ(faces.Properties.Size(), 1u);
+    faces.Properties
+        .GetOrAdd<glm::vec4>(
+            "f:runtime190_color",
+            glm::vec4{0.0f, 1.0f, 0.0f, 1.0f})
+        .Vector() = {
+            glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+        };
+
+    auto& edges = raw.get<gs::Edges>(triangle);
+    edges.Properties.Resize(3u);
+    edges.Properties
+        .GetOrAdd<std::uint32_t>(
+            std::string{pn::kEdgeV0},
+            kInvalidIndex)
+        .Vector() = {0u, 1u, 2u};
+    edges.Properties
+        .GetOrAdd<std::uint32_t>(
+            std::string{pn::kEdgeV1},
+            kInvalidIndex)
+        .Vector() = {1u, 2u, 0u};
+    edges.Properties
+        .GetOrAdd<glm::vec4>(
+            "e:runtime190_color",
+            glm::vec4{1.0f})
+        .Vector() = {
+            glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+            glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+            glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
+        };
+    raw.emplace_or_replace<RT::ProgressivePresentationBindings>(
+        triangle,
+        MakeRuntime190PresentationBindings());
+    auto& visualization =
+        raw.get_or_emplace<G::VisualizationConfig>(triangle);
+    visualization.Source =
+        G::VisualizationConfig::ColorSource::Material;
+
+    const std::uint32_t stableEntityId =
+        RT::SelectionController::ToStableEntityId(triangle);
+    ASSERT_NE(stableEntityId, 0u);
+
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    const Extrinsic::RHI::Format backbufferFormat =
+        device.GetBackbufferFormat();
+    const std::uint32_t backbufferPixelBytes =
+        Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    const Extrinsic::Core::Extent2D backbufferExtent =
+        device.GetBackbufferExtent();
+    if (backbufferPixelBytes < 4u ||
+        backbufferExtent.Width == 0u ||
+        backbufferExtent.Height == 0u)
+    {
+        engine.Shutdown();
+        GTEST_SKIP()
+            << "Backbuffer format or extent cannot support the RUNTIME-190 color-map readback.";
+    }
+
+    const std::uint64_t bakeReadbackSize =
+        static_cast<std::uint64_t>(kRuntime190BakeExtent) *
+        kRuntime190BakeExtent *
+        kRuntime190BakePixelBytes;
+    const std::uint64_t backbufferReadbackSize =
+        static_cast<std::uint64_t>(backbufferPixelBytes) *
+        backbufferExtent.Width *
+        backbufferExtent.Height;
+    const auto createReadback =
+        [&device](
+            const std::uint64_t size,
+            const char* const name)
+        {
+            return device.CreateBuffer(
+                Extrinsic::RHI::BufferDesc{
+                    .SizeBytes = size,
+                    .Usage =
+                        Extrinsic::RHI::BufferUsage::TransferDst,
+                    .HostVisible = true,
+                    .DebugName = name,
+                });
+        };
+
+    std::array<Extrinsic::RHI::BufferHandle, 6u> readbacks{
+        createReadback(
+            bakeReadbackSize,
+            "Sandbox.Runtime190.VertexInitial"),
+        createReadback(
+            bakeReadbackSize,
+            "Sandbox.Runtime190.VertexRebaked"),
+        createReadback(
+            bakeReadbackSize,
+            "Sandbox.Runtime190.Face"),
+        createReadback(
+            bakeReadbackSize,
+            "Sandbox.Runtime190.Edge"),
+        createReadback(
+            backbufferReadbackSize,
+            "Sandbox.Runtime190.ViridisBackbuffer"),
+        createReadback(
+            backbufferReadbackSize,
+            "Sandbox.Runtime190.InfernoBackbuffer"),
+    };
+    if (std::ranges::any_of(
+            readbacks,
+            [](const Extrinsic::RHI::BufferHandle handle)
+            {
+                return !handle.IsValid();
+            }))
+    {
+        for (Extrinsic::RHI::BufferHandle handle : readbacks)
+        {
+            if (handle.IsValid())
+                device.DestroyBuffer(handle);
+        }
+        engine.Shutdown();
+        GTEST_SKIP()
+            << "Pre-run RUNTIME-190 readback allocation was unavailable.";
+    }
+
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbacks[4]);
+    appPtr->Configure(
+        triangle,
+        stableEntityId,
+        readbacks[0],
+        readbacks[1],
+        readbacks[2],
+        readbacks[3],
+        readbacks[5]);
+
+    const AcceptanceRunCapture run =
+        DriveAcceptanceAndCapture(engine);
+    appPtr->Detach(engine);
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer({});
+
+    if (!run.DeviceOperational)
+    {
+        for (const Extrinsic::RHI::BufferHandle handle : readbacks)
+            device.DestroyBuffer(handle);
+        engine.Shutdown();
+        ADD_FAILURE()
+            << "RUNTIME-190 property-bake smoke lost operational Vulkan: status="
+            << ToString(run.Status.Code)
+            << " reason=" << ToString(run.Status.Reason)
+            << ". pass statuses=["
+            << BuildPassStatusSummary(run.Stats) << "]";
+        return;
+    }
+
+    std::array<std::vector<std::uint8_t>, 4u> bakeBytes{};
+    for (std::size_t index = 0u; index < bakeBytes.size(); ++index)
+    {
+        bakeBytes[index].resize(
+            static_cast<std::size_t>(bakeReadbackSize));
+        device.ReadBuffer(
+            readbacks[index],
+            bakeBytes[index].data(),
+            bakeReadbackSize,
+            0u);
+    }
+    std::vector<std::uint8_t> viridisBytes(
+        static_cast<std::size_t>(backbufferReadbackSize));
+    std::vector<std::uint8_t> infernoBytes(
+        static_cast<std::size_t>(backbufferReadbackSize));
+    device.ReadBuffer(
+        readbacks[4],
+        viridisBytes.data(),
+        backbufferReadbackSize,
+        0u);
+    device.ReadBuffer(
+        readbacks[5],
+        infernoBytes.data(),
+        backbufferReadbackSize,
+        0u);
+    for (const Extrinsic::RHI::BufferHandle handle : readbacks)
+        device.DestroyBuffer(handle);
+
+    EXPECT_TRUE(run.Stats.Compile.Succeeded)
+        << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded)
+        << run.Stats.Diagnostic;
+    EXPECT_EQ(
+        FindPassStatus(run.Stats, "SurfacePass"),
+        RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(
+        FindPassStatus(run.Stats, "Present"),
+        RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_FALSE(appPtr->TimedOut)
+        << "RUNTIME-190 timed out after " << appPtr->Frames
+        << " bounded frames.";
+    EXPECT_TRUE(appPtr->FailureReason.empty())
+        << appPtr->FailureReason;
+    EXPECT_TRUE(appPtr->Configured);
+    EXPECT_TRUE(appPtr->InitialReadbacksRecorded);
+    EXPECT_TRUE(appPtr->RebakeReadbackRecorded);
+    EXPECT_TRUE(appPtr->DeviceIdleObserved);
+    EXPECT_TRUE(appPtr->InitialViridisBindingObserved);
+    EXPECT_TRUE(appPtr->InfernoBindingObserved);
+    EXPECT_TRUE(appPtr->ColormapChangedWithoutRebake);
+    EXPECT_TRUE(appPtr->RenamePreservedOldAsset);
+    EXPECT_TRUE(appPtr->RebakeReusedAsset);
+    EXPECT_TRUE(appPtr->AssetsDestroyedObserved);
+    EXPECT_TRUE(appPtr->PropertyBufferFallbackObserved);
+    EXPECT_GT(appPtr->InitialVertexCacheGeneration, 0u);
+    EXPECT_GT(
+        appPtr->RebakedVertexCacheGeneration,
+        appPtr->InitialVertexCacheGeneration);
+
+    EXPECT_NEAR(
+        ReadRuntime190FloatTexel(bakeBytes[0], 8u, 8u),
+        0.25f,
+        1.0e-5f);
+    EXPECT_NEAR(
+        ReadRuntime190FloatTexel(bakeBytes[1], 8u, 8u),
+        0.75f,
+        1.0e-5f);
+
+    const Extrinsic::Core::Extent2D bakeExtent{
+        kRuntime190BakeExtent,
+        kRuntime190BakeExtent};
+    const RgbaPixel facePixel = ReadPixel(
+        bakeBytes[2],
+        Extrinsic::RHI::Format::RGBA8_UNORM,
+        kRuntime190BakePixelBytes,
+        bakeExtent,
+        8u,
+        8u);
+    EXPECT_LE(facePixel.R, 4u) << PixelText(facePixel);
+    EXPECT_GE(facePixel.G, 251u) << PixelText(facePixel);
+    EXPECT_LE(facePixel.B, 4u) << PixelText(facePixel);
+    EXPECT_GE(facePixel.A, 251u) << PixelText(facePixel);
+
+    std::array<std::uint32_t, 3u> edgeColorCounts{};
+    for (std::uint32_t y = 0u; y < kRuntime190BakeExtent; ++y)
+    {
+        for (std::uint32_t x = 0u; x < kRuntime190BakeExtent; ++x)
+        {
+            const RgbaPixel pixel = ReadPixel(
+                bakeBytes[3],
+                Extrinsic::RHI::Format::RGBA8_UNORM,
+                kRuntime190BakePixelBytes,
+                bakeExtent,
+                x,
+                y);
+            if (pixel.R >= 251u && pixel.G <= 4u && pixel.B <= 4u)
+                ++edgeColorCounts[0];
+            if (pixel.G >= 251u && pixel.R <= 4u && pixel.B <= 4u)
+                ++edgeColorCounts[1];
+            if (pixel.B >= 251u && pixel.R <= 4u && pixel.G <= 4u)
+                ++edgeColorCounts[2];
+        }
+    }
+    EXPECT_GT(edgeColorCounts[0], 0u);
+    EXPECT_GT(edgeColorCounts[1], 0u);
+    EXPECT_GT(edgeColorCounts[2], 0u);
+
+    const auto viridisLut = renderer.GetColormapSystem().SampleCpu(
+        Extrinsic::Graphics::Colormap::Type::Viridis,
+        0.25f);
+    const auto infernoLut = renderer.GetColormapSystem().SampleCpu(
+        Extrinsic::Graphics::Colormap::Type::Inferno,
+        0.25f);
+    const RgbaPixel expectedViridis{
+        .R = viridisLut.R,
+        .G = viridisLut.G,
+        .B = viridisLut.B,
+        .A = 255u,
+    };
+    const RgbaPixel expectedInferno{
+        .R = infernoLut.R,
+        .G = infernoLut.G,
+        .B = infernoLut.B,
+        .A = 255u,
+    };
+    const std::uint32_t centerX = backbufferExtent.Width / 2u;
+    const std::uint32_t centerY = backbufferExtent.Height / 2u;
+    const RgbaPixel viridisPixel = ToLinearPixel(
+        backbufferFormat,
+        ReadPixel(
+            viridisBytes,
+            backbufferFormat,
+            backbufferPixelBytes,
+            backbufferExtent,
+            centerX,
+            centerY));
+    const RgbaPixel infernoPixel = ToLinearPixel(
+        backbufferFormat,
+        ReadPixel(
+            infernoBytes,
+            backbufferFormat,
+            backbufferPixelBytes,
+            backbufferExtent,
+            centerX,
+            centerY));
+    EXPECT_LT(viridisPixel.R, viridisPixel.G)
+        << "Tone-mapped Viridis frame center=" << PixelText(viridisPixel)
+        << " source LUT=" << PixelText(expectedViridis);
+    EXPECT_LT(viridisPixel.G, viridisPixel.B)
+        << "Tone-mapped Viridis frame center=" << PixelText(viridisPixel)
+        << " source LUT=" << PixelText(expectedViridis);
+    EXPECT_LT(infernoPixel.G, infernoPixel.R)
+        << "Tone-mapped Inferno frame center=" << PixelText(infernoPixel)
+        << " source LUT=" << PixelText(expectedInferno);
+    EXPECT_LT(infernoPixel.R, infernoPixel.B)
+        << "Tone-mapped Inferno frame center=" << PixelText(infernoPixel)
+        << " source LUT=" << PixelText(expectedInferno);
+    EXPECT_GT(RgbDistance(viridisPixel, infernoPixel), 24)
+        << "Render-time colormap edit did not visibly change the raw scalar texture: Viridis="
+        << PixelText(viridisPixel)
+        << " Inferno=" << PixelText(infernoPixel);
+
+    EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
+        << "Vulkan fallback counters changed across RUNTIME-190: fallbackToNull "
+        << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
+        << ", initFailure " << run.Before.InitFailure << " -> "
+        << run.After.InitFailure << ", validationError "
+        << run.Before.ValidationError << " -> "
+        << run.After.ValidationError << ", gateFailure "
+        << run.Before.OperationalGateFailure << " -> "
+        << run.After.OperationalGateFailure;
+
+    engine.Shutdown();
 }

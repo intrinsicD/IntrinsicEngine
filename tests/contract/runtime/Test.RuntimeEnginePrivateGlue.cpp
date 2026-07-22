@@ -565,7 +565,8 @@ TEST(RuntimeEnginePrivateGlue, RenderExtractionServiceIsEnginePrivateImplementat
               std::string::npos);
 }
 
-TEST(RuntimeEnginePrivateGlue, AssetWorkflowCompositionIsModuleOwned)
+TEST(RuntimeEnginePrivateGlue,
+     AssetWorkflowAndTextureBakeCompositionAreModuleOwned)
 {
     const auto root = RepoRoot();
     const auto engineInterface =
@@ -578,6 +579,10 @@ TEST(RuntimeEnginePrivateGlue, AssetWorkflowCompositionIsModuleOwned)
         root / "src/runtime/Runtime.AssetWorkflowModule.cppm");
     const auto workflowImpl = ReadFile(
         root / "src/runtime/Runtime.AssetWorkflowModule.cpp");
+    const auto textureBakeInterface = ReadFile(
+        root / "src/runtime/Runtime.TextureBakeModule.cppm");
+    const auto textureBakeImpl = ReadFile(
+        root / "src/runtime/Runtime.TextureBakeModule.cpp");
     const auto runtimeCMake =
         ReadFile(root / "src/runtime/CMakeLists.txt");
 
@@ -659,7 +664,6 @@ TEST(RuntimeEnginePrivateGlue, AssetWorkflowCompositionIsModuleOwned)
         "std::unique_ptr<Assets::AssetService> Assets{}",
         "std::unique_ptr<Graphics::GpuAssetCache> Cache{}",
         "AssetImportPipeline Pipeline{}",
-        "ObjectSpaceNormalBakeService Bake{}",
         "Provide<Assets::AssetService>",
         "Provide<AssetImportPipeline>",
         "Provide<Graphics::GpuAssetCache>",
@@ -703,6 +707,25 @@ TEST(RuntimeEnginePrivateGlue, AssetWorkflowCompositionIsModuleOwned)
         workflowImpl.find(
             "InitializeRuntimeGpuAssetFallbackTexture("),
         std::string::npos);
+    EXPECT_NE(workflowImpl.find(
+                  "import Extrinsic.Runtime.TextureBakeModule;"),
+              std::string::npos);
+    EXPECT_NE(workflowImpl.find("TextureBake->ProducerContext()"),
+              std::string::npos);
+    EXPECT_NE(textureBakeInterface.find(
+                  "export module Extrinsic.Runtime.TextureBakeModule;"),
+              std::string::npos);
+    EXPECT_NE(textureBakeImpl.find(
+                  "ObjectSpaceNormalBakeService Bake{}"),
+              std::string::npos);
+    EXPECT_NE(textureBakeImpl.find("Provide<TextureBakeService>"),
+              std::string::npos);
+    EXPECT_EQ(workflowImpl.find(
+                  "ObjectSpaceNormalBakeService Bake{}"),
+              std::string::npos);
+    EXPECT_EQ(engineImpl.find(
+                  "ObjectSpaceNormalBakeService Bake{}"),
+              std::string::npos);
 
     EXPECT_NE(workflowImpl.find(
                   "setup.Services().Find<StreamingExecutor>()"),
@@ -727,6 +750,10 @@ TEST(RuntimeEnginePrivateGlue, AssetWorkflowCompositionIsModuleOwned)
     EXPECT_NE(runtimeCMake.find("Runtime.AssetWorkflowModule.cppm"),
               std::string::npos);
     EXPECT_NE(runtimeCMake.find("Runtime.AssetWorkflowModule.cpp"),
+              std::string::npos);
+    EXPECT_NE(runtimeCMake.find("Runtime.TextureBakeModule.cppm"),
+              std::string::npos);
+    EXPECT_NE(runtimeCMake.find("Runtime.TextureBakeModule.cpp"),
               std::string::npos);
     EXPECT_EQ(runtimeCMake.find("Runtime.AssetResidencyService"),
               std::string::npos);

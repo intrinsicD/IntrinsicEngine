@@ -8,6 +8,8 @@
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Error;
 import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Graphics.Colormap;
+import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.RHI.BufferManager;
@@ -361,9 +363,33 @@ TEST(GraphicsMaterialSystem, ObjectSpaceNormalBindingsSetExplicitMaterialFlag)
     EXPECT_TRUE(Graphics::HasFlag(
         params.Flags,
         Graphics::MaterialFlags::ObjectSpaceNormalMap));
+    EXPECT_FALSE(Graphics::HasFlag(
+        params.Flags,
+        Graphics::MaterialFlags::WorldSpaceNormalMap));
     // The per-channel source authority mirrors the legacy flag: Normal = Texture.
     EXPECT_EQ(Graphics::GetChannelSource(
                   params.ChannelSourceBits, Graphics::MaterialChannel::Normal),
+              Graphics::AttributeSource::Texture);
+
+    ASSERT_TRUE(materials.ResolveTextureAssetBindings(
+        material.GetHandle(),
+        Graphics::MaterialTextureAssetBindings{
+            .Normal = normalAsset,
+            .NormalSpace =
+                Graphics::MaterialNormalTextureSpace::WorldSpaceNormal,
+        },
+        assets).has_value());
+
+    params = materials.GetParams(material.GetHandle());
+    EXPECT_FALSE(Graphics::HasFlag(
+        params.Flags,
+        Graphics::MaterialFlags::ObjectSpaceNormalMap));
+    EXPECT_TRUE(Graphics::HasFlag(
+        params.Flags,
+        Graphics::MaterialFlags::WorldSpaceNormalMap));
+    EXPECT_EQ(Graphics::GetChannelSource(
+                  params.ChannelSourceBits,
+                  Graphics::MaterialChannel::Normal),
               Graphics::AttributeSource::Texture);
 
     ASSERT_TRUE(materials.ResolveTextureAssetBindings(
@@ -380,14 +406,121 @@ TEST(GraphicsMaterialSystem, ObjectSpaceNormalBindingsSetExplicitMaterialFlag)
     EXPECT_FALSE(Graphics::HasFlag(
         params.Flags,
         Graphics::MaterialFlags::ObjectSpaceNormalMap));
+    EXPECT_FALSE(Graphics::HasFlag(
+        params.Flags,
+        Graphics::MaterialFlags::WorldSpaceNormalMap));
     // Tangent-space normal map is not the object-space texture lane: Normal
     // reverts to the vertex attribute source.
     EXPECT_EQ(Graphics::GetChannelSource(
                   params.ChannelSourceBits, Graphics::MaterialChannel::Normal),
               Graphics::AttributeSource::VertexAttribute);
 
+    ASSERT_TRUE(materials.ResolveTextureAssetBindings(
+        material.GetHandle(),
+        Graphics::MaterialTextureAssetBindings{},
+        assets).has_value());
+    params = materials.GetParams(material.GetHandle());
+    EXPECT_EQ(params.NormalID, RHI::kInvalidBindlessIndex);
+    EXPECT_FALSE(Graphics::HasFlag(
+        params.Flags,
+        Graphics::MaterialFlags::ObjectSpaceNormalMap));
+    EXPECT_FALSE(Graphics::HasFlag(
+        params.Flags,
+        Graphics::MaterialFlags::WorldSpaceNormalMap));
+
     material.Reset();
     materials.Shutdown();
+}
+
+TEST(GraphicsMaterialSystem, RawScalarAlbedoChangesColormapWithoutRebakingTexture)
+{
+    MockDevice device;
+    RHI::BufferManager buffers{device};
+    RHI::TextureManager textures{device, device.Bindless};
+    RHI::SamplerManager samplers{device};
+    Graphics::GpuAssetCache assets{
+        buffers,
+        textures,
+        samplers,
+        device.TransferQueue};
+    Graphics::ColormapSystem colormaps{};
+    colormaps.Initialize(device, textures, samplers);
+    ASSERT_TRUE(colormaps.IsReady());
+
+    const Assets::AssetId scalarAsset = MakeAssetId(204u);
+    ASSERT_TRUE(assets.RequestUpload(Graphics::GpuTextureRequest{
+        .Id = scalarAsset,
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = AnyTextureDesc(),
+        .SamplerDesc = AnySamplerDesc(),
+    }).has_value());
+    assets.Tick(0u, 2u);
+    const auto scalarView = assets.GetView(scalarAsset);
+    ASSERT_TRUE(scalarView.has_value());
+
+    Graphics::MaterialSystem materials{};
+    materials.Initialize(device, buffers);
+    auto material = materials.CreateInstance(
+        materials.FindType(Graphics::kMaterialTypeName_StandardPBR),
+        {});
+    ASSERT_TRUE(material.IsValid());
+    Graphics::MaterialParams authored = materials.GetParams(
+        material.GetHandle());
+    authored.CustomData[0] = {11.0f, 12.0f, 13.0f, 14.0f};
+    materials.SetParams(material.GetHandle(), authored);
+
+    Graphics::MaterialTextureAssetBindings bindings{
+        .Albedo = scalarAsset,
+        .AlbedoInterpretation =
+            Graphics::MaterialAlbedoTextureInterpretation::Scalar,
+        .AlbedoScalarColormap = Graphics::Colormap::Type::Viridis,
+        .AlbedoScalarRangeMin = -4.0f,
+        .AlbedoScalarRangeMax = 8.0f,
+    };
+    ASSERT_TRUE(materials.ResolveTextureAssetBindings(
+        material.GetHandle(),
+        bindings,
+        assets,
+        &colormaps).has_value());
+
+    Graphics::MaterialParams params = materials.GetParams(material.GetHandle());
+    EXPECT_EQ(params.AlbedoID, scalarView->BindlessIdx);
+    EXPECT_TRUE(Graphics::HasFlag(
+        params.Flags,
+        Graphics::MaterialFlags::ScalarAlbedoTexture));
+    EXPECT_EQ(
+        Graphics::GetScalarAlbedoColormapIndex(params.ChannelSourceBits),
+        colormaps.GetBindlessIndex(Graphics::Colormap::Type::Viridis));
+    EXPECT_FLOAT_EQ(params.AlbedoScalarRangeMin, -4.0f);
+    EXPECT_FLOAT_EQ(params.AlbedoScalarRangeMax, 8.0f);
+    for (std::size_t component = 0u; component < 4u; ++component)
+    {
+        EXPECT_FLOAT_EQ(
+            params.CustomData[0][component],
+            authored.CustomData[0][component]);
+    }
+
+    bindings.AlbedoScalarColormap = Graphics::Colormap::Type::Inferno;
+    ASSERT_TRUE(materials.ResolveTextureAssetBindings(
+        material.GetHandle(),
+        bindings,
+        assets,
+        &colormaps).has_value());
+    params = materials.GetParams(material.GetHandle());
+    EXPECT_EQ(params.AlbedoID, scalarView->BindlessIdx);
+    EXPECT_EQ(
+        Graphics::GetScalarAlbedoColormapIndex(params.ChannelSourceBits),
+        colormaps.GetBindlessIndex(Graphics::Colormap::Type::Inferno));
+    for (std::size_t component = 0u; component < 4u; ++component)
+    {
+        EXPECT_FLOAT_EQ(
+            params.CustomData[0][component],
+            authored.CustomData[0][component]);
+    }
+
+    material.Reset();
+    materials.Shutdown();
+    colormaps.Shutdown();
 }
 
 TEST(GraphicsMaterialSystem, ChannelSourceBitsDefaultToVertexAttributeAndRoundTrip)

@@ -1,8 +1,11 @@
 module;
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
+#include <vector>
 
 export module Extrinsic.Runtime.SelectedMeshTextureBake;
 
@@ -11,6 +14,7 @@ import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.Colormap;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -59,7 +63,98 @@ export namespace Extrinsic::Runtime
         Synchronous,
         DerivedJob,
         ObjectSpaceNormalBakeQueue,
+        PropertyRasterGpu,
     };
+
+    enum class SelectedMeshTextureBakeStorage : std::uint8_t
+    {
+        Auto,
+        RawFloat,
+        EncodedRgba,
+    };
+
+    enum class BakedPropertyTextureState : std::uint8_t
+    {
+        Pending,
+        Ready,
+        Failed,
+    };
+
+    enum class BakedPropertyNormalSpace : std::uint8_t
+    {
+        Object,
+        World,
+    };
+
+    struct BakedPropertyTextureConsumer
+    {
+        std::string PresentationKey{};
+        ProgressiveSlotSemantic Semantic{ProgressiveSlotSemantic::Albedo};
+        Graphics::Colormap::Type Colormap{
+            Graphics::Colormap::Type::Viridis};
+    };
+
+    struct BakedPropertyTextureRecord
+    {
+        std::string OutputName{};
+        ProgressiveGeometryDomain SourceDomain{
+            ProgressiveGeometryDomain::MeshVertex};
+        std::string SourcePropertyName{};
+        ProgressivePropertyValueKind ValueKind{
+            ProgressivePropertyValueKind::Unknown};
+        std::string TexcoordPropertyName{"v:texcoord"};
+        SelectedMeshTextureBakeStorage Storage{
+            SelectedMeshTextureBakeStorage::Auto};
+        MeshAttributeTextureBakeEncoder Encoder{
+            MeshAttributeTextureBakeEncoder::Auto};
+        Graphics::Colormap::Type EncodingColormap{
+            Graphics::Colormap::Type::Viridis};
+        BakedPropertyNormalSpace NormalSpace{
+            BakedPropertyNormalSpace::Object};
+        Assets::AssetId Texture{};
+        std::vector<BakedPropertyTextureConsumer> Consumers{};
+        std::size_t ExpectedElementCount{0u};
+        std::uint64_t SourceGeneration{0u};
+        float RangeMin{0.0f};
+        float RangeMax{1.0f};
+        std::uint32_t Width{0u};
+        std::uint32_t Height{0u};
+        std::uint64_t Generation{0u};
+        BakedPropertyTextureState State{BakedPropertyTextureState::Pending};
+        std::string Diagnostic{};
+    };
+
+    struct BakedPropertyTextures
+    {
+        std::vector<BakedPropertyTextureRecord> Records{};
+        std::uint64_t Generation{1u};
+    };
+
+    struct BakedPropertyTextureRepresentation
+    {
+        SelectedMeshTextureBakeStorage Storage{
+            SelectedMeshTextureBakeStorage::RawFloat};
+        MeshAttributeTextureBakeEncoder Encoder{
+            MeshAttributeTextureBakeEncoder::Auto};
+    };
+
+    [[nodiscard]] BakedPropertyTextureRepresentation
+        ResolveBakedPropertyTextureRepresentation(
+            ProgressivePropertyValueKind valueKind,
+            SelectedMeshTextureBakeStorage requestedStorage,
+            MeshAttributeTextureBakeEncoder requestedEncoder,
+            std::span<const BakedPropertyTextureConsumer> consumers) noexcept;
+
+    [[nodiscard]] bool IsBakedPropertyTextureRepresentationCompatible(
+        ProgressivePropertyValueKind valueKind,
+        SelectedMeshTextureBakeStorage storage,
+        MeshAttributeTextureBakeEncoder encoder) noexcept;
+
+    [[nodiscard]] bool IsBakedPropertyTextureConsumerCompatible(
+        const BakedPropertyTextureConsumer& consumer,
+        ProgressivePropertyValueKind valueKind,
+        SelectedMeshTextureBakeStorage storage,
+        MeshAttributeTextureBakeEncoder encoder) noexcept;
 
     struct SelectedMeshTextureBakeRequest
     {
@@ -83,6 +178,14 @@ export namespace Extrinsic::Runtime
         ProgressiveGeneratedOutputPolicy GeneratedPolicy{
             ProgressiveGeneratedOutputPolicy::DeterministicChildAsset};
         std::string GeneratedKey{};
+        std::string OutputName{};
+        SelectedMeshTextureBakeStorage Storage{
+            SelectedMeshTextureBakeStorage::Auto};
+        Graphics::Colormap::Type EncodingColormap{
+            Graphics::Colormap::Type::Viridis};
+        BakedPropertyNormalSpace NormalSpace{
+            BakedPropertyNormalSpace::Object};
+        std::vector<BakedPropertyTextureConsumer> Consumers{};
         Assets::AssetId ExistingGeneratedTexture{};
         bool BindGeneratedTexture{true};
         bool PreferDerivedJob{false};
@@ -97,6 +200,7 @@ export namespace Extrinsic::Runtime
         ProgressivePropertyResolution PropertyResolution{};
         std::size_t ExpectedElementCount{0u};
         std::string GeneratedAssetPath{};
+        std::string OutputName{};
         std::string Diagnostic{};
 
         [[nodiscard]] bool Succeeded() const noexcept
@@ -130,6 +234,7 @@ export namespace Extrinsic::Runtime
         bool PreviousOutputRetained{false};
         std::uint64_t BindingGeneration{0u};
         std::string GeneratedAssetPath{};
+        std::string OutputName{};
         std::string Diagnostic{};
 
         [[nodiscard]] bool Succeeded() const noexcept

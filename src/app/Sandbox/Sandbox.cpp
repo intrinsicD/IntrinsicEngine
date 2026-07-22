@@ -22,6 +22,7 @@ import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
 
 namespace Extrinsic::Sandbox {
@@ -224,6 +225,7 @@ void RegisterSandboxRuntimeModules(Runtime::Engine &engine) {
   engine.EmplaceModule<Runtime::SceneDocumentModule>();
   engine.EmplaceModule<Runtime::SceneInteractionModule>();
   engine.EmplaceModule<Runtime::AssetWorkflowModule>();
+  engine.EmplaceModule<Runtime::TextureBakeModule>();
 }
 
 std::unique_ptr<Runtime::IApplication> CreateSandboxApp() {

@@ -2608,7 +2608,11 @@ TEST(RendererFrameLifecycle, ForwardSurfacePipelineSurvivesOperationalRebuild)
     EXPECT_NE(surfaceFragment.find("mat.NormalID"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("GpuMaterialFlag_ObjectSpaceNormalMap"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("ResolveSurfaceNormal"), std::string::npos);
-    EXPECT_EQ(defaultGBufferFragment.find("mat.NormalID"), std::string::npos);
+    EXPECT_NE(defaultGBufferFragment.find("mat.NormalID"), std::string::npos);
+    EXPECT_NE(defaultGBufferFragment.find("GpuMaterialFlag_ObjectSpaceNormalMap"),
+              std::string::npos);
+    EXPECT_NE(defaultGBufferFragment.find("ResolveSurfaceNormal"),
+              std::string::npos);
     EXPECT_NE(promotedGBufferFragment.find("mat.NormalID"), std::string::npos);
     EXPECT_NE(promotedGBufferFragment.find("GpuMaterialFlag_ObjectSpaceNormalMap"), std::string::npos);
     EXPECT_NE(promotedGBufferFragment.find("ResolveSurfaceNormal"), std::string::npos);

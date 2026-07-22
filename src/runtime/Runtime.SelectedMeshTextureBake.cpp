@@ -6,6 +6,7 @@ module;
 #include <expected>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -159,8 +160,10 @@ namespace Extrinsic::Runtime
             case ProgressiveGeometryDomain::MeshFace:
                 status = SelectedMeshTextureBakeStatus::Success;
                 return MeshAttributeTextureBakeSourceDomain::Face;
-            case ProgressiveGeometryDomain::Unknown:
             case ProgressiveGeometryDomain::MeshEdge:
+                status = SelectedMeshTextureBakeStatus::Success;
+                return MeshAttributeTextureBakeSourceDomain::Edge;
+            case ProgressiveGeometryDomain::Unknown:
             case ProgressiveGeometryDomain::MeshHalfedge:
             case ProgressiveGeometryDomain::MeshSurface:
             case ProgressiveGeometryDomain::GraphVertex:
@@ -248,13 +251,13 @@ namespace Extrinsic::Runtime
             case ProgressiveSlotSemantic::ScalarField:
                 return kind == ProgressivePropertyValueKind::UInt32
                     ? MeshAttributeTextureBakeEncoder::LabelPalette
-                    : MeshAttributeTextureBakeEncoder::ScalarColormap;
+                    : MeshAttributeTextureBakeEncoder::LinearScalar;
             case ProgressiveSlotSemantic::Albedo:
                 switch (kind)
                 {
                 case ProgressivePropertyValueKind::ScalarFloat:
                 case ProgressivePropertyValueKind::ScalarDouble:
-                    return MeshAttributeTextureBakeEncoder::ScalarColormap;
+                    return MeshAttributeTextureBakeEncoder::LinearScalar;
                 case ProgressivePropertyValueKind::UInt32:
                     return MeshAttributeTextureBakeEncoder::LabelPalette;
                 case ProgressivePropertyValueKind::Vec3:
@@ -1239,6 +1242,218 @@ namespace Extrinsic::Runtime
 
             return DerivedJobApplyValidation::Current;
         }
+    }
+
+    BakedPropertyTextureRepresentation
+    ResolveBakedPropertyTextureRepresentation(
+        const ProgressivePropertyValueKind valueKind,
+        const SelectedMeshTextureBakeStorage requestedStorage,
+        const MeshAttributeTextureBakeEncoder requestedEncoder,
+        const std::span<const BakedPropertyTextureConsumer> consumers) noexcept
+    {
+        BakedPropertyTextureRepresentation representation{
+            .Storage = requestedStorage,
+            .Encoder = requestedEncoder,
+        };
+
+        const bool hasNormalConsumer = std::ranges::any_of(
+            consumers,
+            [](const BakedPropertyTextureConsumer& consumer)
+            {
+                return consumer.Semantic == ProgressiveSlotSemantic::Normal;
+            });
+        const bool hasLinearPbrConsumer = std::ranges::any_of(
+            consumers,
+            [](const BakedPropertyTextureConsumer& consumer)
+            {
+                return consumer.Semantic ==
+                           ProgressiveSlotSemantic::Roughness ||
+                       consumer.Semantic ==
+                           ProgressiveSlotSemantic::Metallic;
+            });
+
+        if (representation.Storage == SelectedMeshTextureBakeStorage::Auto)
+        {
+            representation.Storage =
+                hasNormalConsumer ||
+                    valueKind == ProgressivePropertyValueKind::UInt32
+                ? SelectedMeshTextureBakeStorage::EncodedRgba
+                : SelectedMeshTextureBakeStorage::RawFloat;
+        }
+
+        if (representation.Encoder != MeshAttributeTextureBakeEncoder::Auto)
+            return representation;
+
+        if (hasNormalConsumer)
+        {
+            representation.Encoder = MeshAttributeTextureBakeEncoder::Normal;
+        }
+        else if (valueKind == ProgressivePropertyValueKind::UInt32)
+        {
+            representation.Encoder =
+                MeshAttributeTextureBakeEncoder::LabelPalette;
+        }
+        else if (IsScalarKind(valueKind))
+        {
+            representation.Encoder = hasLinearPbrConsumer
+                ? MeshAttributeTextureBakeEncoder::LinearScalar
+                : representation.Storage ==
+                      SelectedMeshTextureBakeStorage::EncodedRgba
+                    ? MeshAttributeTextureBakeEncoder::ScalarColormap
+                    : MeshAttributeTextureBakeEncoder::LinearScalar;
+        }
+        else if (valueKind == ProgressivePropertyValueKind::Vec2)
+        {
+            representation.Encoder = MeshAttributeTextureBakeEncoder::Vector2;
+        }
+        else if (valueKind == ProgressivePropertyValueKind::Vec3)
+        {
+            representation.Encoder = MeshAttributeTextureBakeEncoder::Vector3;
+        }
+        else if (valueKind == ProgressivePropertyValueKind::Vec4)
+        {
+            representation.Encoder = MeshAttributeTextureBakeEncoder::RgbaColor;
+        }
+        return representation;
+    }
+
+    bool IsBakedPropertyTextureConsumerCompatible(
+        const BakedPropertyTextureConsumer& consumer,
+        const ProgressivePropertyValueKind valueKind,
+        const SelectedMeshTextureBakeStorage storage,
+        const MeshAttributeTextureBakeEncoder encoder) noexcept
+    {
+        if (!IsBakedPropertyTextureRepresentationCompatible(
+                valueKind,
+                storage,
+                encoder))
+        {
+            return false;
+        }
+        const bool raw =
+            storage == SelectedMeshTextureBakeStorage::RawFloat;
+        const bool scalar = IsScalarKind(valueKind);
+        switch (consumer.Semantic)
+        {
+        case ProgressiveSlotSemantic::Normal:
+            return valueKind == ProgressivePropertyValueKind::Vec3 &&
+                   storage == SelectedMeshTextureBakeStorage::EncodedRgba &&
+                   encoder == MeshAttributeTextureBakeEncoder::Normal;
+        case ProgressiveSlotSemantic::Roughness:
+        case ProgressiveSlotSemantic::Metallic:
+            return scalar &&
+                   (raw ||
+                    encoder == MeshAttributeTextureBakeEncoder::LinearScalar);
+        case ProgressiveSlotSemantic::ScalarField:
+            return (scalar &&
+                    (raw ||
+                     encoder == MeshAttributeTextureBakeEncoder::LinearScalar ||
+                     encoder == MeshAttributeTextureBakeEncoder::ScalarColormap)) ||
+                   (valueKind == ProgressivePropertyValueKind::UInt32 &&
+                    !raw &&
+                    encoder == MeshAttributeTextureBakeEncoder::LabelPalette);
+        case ProgressiveSlotSemantic::Albedo:
+            if (scalar)
+            {
+                return raw ||
+                       encoder == MeshAttributeTextureBakeEncoder::LinearScalar ||
+                       encoder == MeshAttributeTextureBakeEncoder::ScalarColormap;
+            }
+            if (valueKind == ProgressivePropertyValueKind::UInt32)
+            {
+                return !raw &&
+                       encoder == MeshAttributeTextureBakeEncoder::LabelPalette;
+            }
+            if (valueKind == ProgressivePropertyValueKind::Vec2)
+            {
+                return raw ||
+                       encoder == MeshAttributeTextureBakeEncoder::Vector2 ||
+                       encoder == MeshAttributeTextureBakeEncoder::RgbaColor;
+            }
+            if (valueKind == ProgressivePropertyValueKind::Vec3)
+            {
+                return raw ||
+                       encoder == MeshAttributeTextureBakeEncoder::Vector3 ||
+                       encoder == MeshAttributeTextureBakeEncoder::RgbaColor ||
+                       encoder == MeshAttributeTextureBakeEncoder::Normal;
+            }
+            return valueKind == ProgressivePropertyValueKind::Vec4 &&
+                   (raw ||
+                    encoder == MeshAttributeTextureBakeEncoder::RgbaColor);
+        case ProgressiveSlotSemantic::Displacement:
+        case ProgressiveSlotSemantic::PointColor:
+        case ProgressiveSlotSemantic::PointScalarField:
+        case ProgressiveSlotSemantic::PointSize:
+        case ProgressiveSlotSemantic::PointNormalOrientation:
+        case ProgressiveSlotSemantic::LineColor:
+        case ProgressiveSlotSemantic::LineScalarField:
+        case ProgressiveSlotSemantic::LineWidth:
+            return false;
+        }
+        return false;
+    }
+
+    bool IsBakedPropertyTextureRepresentationCompatible(
+        const ProgressivePropertyValueKind valueKind,
+        const SelectedMeshTextureBakeStorage storage,
+        const MeshAttributeTextureBakeEncoder encoder) noexcept
+    {
+        if (storage == SelectedMeshTextureBakeStorage::Auto ||
+            encoder == MeshAttributeTextureBakeEncoder::Auto)
+        {
+            return false;
+        }
+
+        if (storage == SelectedMeshTextureBakeStorage::RawFloat)
+        {
+            switch (valueKind)
+            {
+            case ProgressivePropertyValueKind::ScalarFloat:
+            case ProgressivePropertyValueKind::ScalarDouble:
+                return encoder ==
+                    MeshAttributeTextureBakeEncoder::LinearScalar;
+            case ProgressivePropertyValueKind::Vec2:
+                return encoder == MeshAttributeTextureBakeEncoder::Vector2;
+            case ProgressivePropertyValueKind::Vec3:
+                return encoder == MeshAttributeTextureBakeEncoder::Vector3;
+            case ProgressivePropertyValueKind::Vec4:
+                return encoder == MeshAttributeTextureBakeEncoder::RgbaColor;
+            case ProgressivePropertyValueKind::UInt32:
+            case ProgressivePropertyValueKind::Any:
+            case ProgressivePropertyValueKind::Unknown:
+                return false;
+            }
+            return false;
+        }
+
+        if (storage != SelectedMeshTextureBakeStorage::EncodedRgba)
+            return false;
+
+        switch (valueKind)
+        {
+        case ProgressivePropertyValueKind::ScalarFloat:
+        case ProgressivePropertyValueKind::ScalarDouble:
+            return encoder ==
+                       MeshAttributeTextureBakeEncoder::LinearScalar ||
+                   encoder ==
+                       MeshAttributeTextureBakeEncoder::ScalarColormap;
+        case ProgressivePropertyValueKind::UInt32:
+            return encoder ==
+                MeshAttributeTextureBakeEncoder::LabelPalette;
+        case ProgressivePropertyValueKind::Vec2:
+            return encoder == MeshAttributeTextureBakeEncoder::Vector2 ||
+                   encoder == MeshAttributeTextureBakeEncoder::RgbaColor;
+        case ProgressivePropertyValueKind::Vec3:
+            return encoder == MeshAttributeTextureBakeEncoder::Vector3 ||
+                   encoder == MeshAttributeTextureBakeEncoder::RgbaColor ||
+                   encoder == MeshAttributeTextureBakeEncoder::Normal;
+        case ProgressivePropertyValueKind::Vec4:
+            return encoder == MeshAttributeTextureBakeEncoder::RgbaColor;
+        case ProgressivePropertyValueKind::Any:
+        case ProgressivePropertyValueKind::Unknown:
+            return false;
+        }
+        return false;
     }
 
     const char* DebugNameForSelectedMeshTextureBakeStatus(

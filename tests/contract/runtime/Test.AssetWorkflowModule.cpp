@@ -1,6 +1,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -17,6 +18,7 @@
 #include <glm/glm.hpp>
 
 import Extrinsic.Asset.ImportRouter;
+import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
 import Extrinsic.Core.Config.Engine;
@@ -50,9 +52,11 @@ import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 
@@ -503,6 +507,14 @@ namespace
                         result.has_value();
                     return result;
                 };
+            const auto registerTextureBake =
+                [this, &setup]() -> Core::Result
+                {
+                    const Core::Result result =
+                        TextureBake.OnRegister(setup);
+                    TextureBakeRegistered = result.has_value();
+                    return result;
+                };
 
             if (assetFirst)
             {
@@ -511,14 +523,24 @@ namespace
                 {
                     return result;
                 }
-                return registerDocument();
+                if (Core::Result result = registerDocument();
+                    !result.has_value())
+                {
+                    return result;
+                }
+                return registerTextureBake();
             }
             if (Core::Result result = registerDocument();
                 !result.has_value())
             {
                 return result;
             }
-            return registerAsset();
+            if (Core::Result result = registerAsset();
+                !result.has_value())
+            {
+                return result;
+            }
+            return registerTextureBake();
         }
 
         [[nodiscard]] Core::Result ResolveModules()
@@ -534,9 +556,15 @@ namespace
             const Core::Result result =
                 Asset.OnResolve(setup);
             AssetResolved = result.has_value();
-            if (result.has_value())
-                Services.Lock();
-            return result;
+            if (!result.has_value())
+                return result;
+            const Core::Result textureResult =
+                TextureBake.OnResolve(setup);
+            TextureBakeResolved = textureResult.has_value();
+            if (!textureResult.has_value())
+                return textureResult;
+            Services.Lock();
+            return Core::Ok();
         }
 
         [[nodiscard]] Core::Result Start(
@@ -558,7 +586,8 @@ namespace
 
         void Announce()
         {
-            if (Announced || !AssetRegistered)
+            if (Announced ||
+                (!AssetRegistered && !TextureBakeRegistered))
                 return;
             Initialized = false;
             Events.Publish(
@@ -580,6 +609,7 @@ namespace
         void Stop()
         {
             if (!AssetRegistered &&
+                !TextureBakeRegistered &&
                 !DocumentRegistered)
             {
                 return;
@@ -596,6 +626,8 @@ namespace
                 .Worlds = Worlds,
                 .Services = Services,
             };
+            if (TextureBakeRegistered)
+                TextureBake.OnShutdown(context);
             if (AssetRegistered)
                 Asset.OnShutdown(context);
             if (DocumentRegistered)
@@ -605,6 +637,8 @@ namespace
             Selection.reset();
             AssetRegistered = false;
             AssetResolved = false;
+            TextureBakeRegistered = false;
+            TextureBakeResolved = false;
             DocumentRegistered = false;
             Announced = false;
             Initialized = false;
@@ -621,6 +655,7 @@ namespace
         Core::Config::EngineConfig Config{};
         bool Initialized{false};
         Runtime::AssetWorkflowModule Asset{};
+        Runtime::TextureBakeModule TextureBake{};
         Runtime::SceneDocumentModule Document{};
         std::unique_ptr<Runtime::StreamingExecutor> Streaming{};
         std::unique_ptr<Runtime::SelectionController> Selection{};
@@ -628,6 +663,8 @@ namespace
         std::uint64_t GpuIdleWaits{0u};
         bool AssetRegistered{false};
         bool AssetResolved{false};
+        bool TextureBakeRegistered{false};
+        bool TextureBakeResolved{false};
         bool DocumentRegistered{false};
         bool Announced{false};
     };
@@ -1077,9 +1114,15 @@ TEST(AssetWorkflowModule,
         harness.Services.Find<Core::IAssetFrameHooks>();
     Graphics::GpuAssetCache* const cache =
         harness.Services.Find<Graphics::GpuAssetCache>();
+    Assets::AssetService* const assets =
+        harness.Services.Find<Assets::AssetService>();
+    Runtime::TextureBakeService* const textureBake =
+        harness.Services.Find<Runtime::TextureBakeService>();
     ASSERT_NE(pipeline, nullptr);
     ASSERT_NE(hooks, nullptr);
     ASSERT_NE(cache, nullptr);
+    ASSERT_NE(assets, nullptr);
+    ASSERT_NE(textureBake, nullptr);
     TempObjFile initialMesh{
         "runtime183-binding-initial.obj"};
     TempObjFile afterNewMesh{
@@ -1155,9 +1198,9 @@ TEST(AssetWorkflowModule,
     auto observer =
         harness.Document.RegisterReplacementParticipant(
             Runtime::SceneReplacementParticipantDesc{
-                // Sort immediately after Runtime.AssetWorkflowModule so
-                // these observations see its synchronous Before/After work.
-                .Name = "Runtime.AssetWorkflowObserver",
+                // Sort after both asset and texture-bake owners so these
+                // observations see their synchronous Before/After work.
+                .Name = "Runtime.TextureBakeObserver",
                 .BeforeReplace =
                     [&](const Runtime::
                             SceneReplacementContext& context)
@@ -1363,6 +1406,44 @@ TEST(AssetWorkflowModule,
         afterSawOutgoingDestroyed,
         (std::vector<bool>{true, true, true}));
 
+    Assets::AssetTexture2DPayload retainedPayload{};
+    retainedPayload.Metadata.Width = 1u;
+    retainedPayload.Metadata.Height = 1u;
+    retainedPayload.Metadata.Components = 1u;
+    retainedPayload.Metadata.PixelFormat =
+        Assets::AssetTexturePixelFormat::R8Unorm;
+    retainedPayload.Metadata.ColorSpace =
+        Assets::AssetTextureColorSpace::Linear;
+    retainedPayload.Metadata.SourceKind =
+        Assets::AssetTextureSourceKind::Generated;
+    retainedPayload.PixelBytes = {std::byte{0x7f}};
+    auto retainedTexture = assets->Load<Assets::AssetTexture2DPayload>(
+        "generated://runtime190/inactive-world-retained",
+        [retainedPayload](
+            std::string_view,
+            Assets::AssetId) -> Core::Expected<Assets::AssetTexture2DPayload>
+        {
+            return retainedPayload;
+        });
+    ASSERT_TRUE(retainedTexture.has_value());
+    const ECS::EntityHandle retainedEntity = initialScene->Create();
+    initialScene->Raw().emplace<Runtime::BakedPropertyTextures>(
+        retainedEntity,
+        Runtime::BakedPropertyTextures{
+            .Records = {
+                Runtime::BakedPropertyTextureRecord{
+                    .OutputName = "inactive-world-retained",
+                    .Texture = *retainedTexture,
+                    .State = Runtime::BakedPropertyTextureState::Ready,
+                    .Diagnostic = "ready",
+                },
+            },
+        });
+    const Runtime::TextureBakeProducerContext initialProducer =
+        textureBake->ProducerContext();
+    ASSERT_EQ(initialProducer.World, harness.InitialWorld);
+    ASSERT_FALSE(initialProducer.Lifetime.expired());
+
     const Runtime::WorldHandle away =
         harness.Worlds.CreateWorld("Away");
     ASSERT_TRUE(
@@ -1397,6 +1478,45 @@ TEST(AssetWorkflowModule,
     ASSERT_NE(awayScene, nullptr);
     EXPECT_GT(EntityCount(*awayScene), 0u);
 
+    (void)harness.Events.Pump();
+    const Runtime::TextureBakeProducerContext awayProducer =
+        textureBake->ProducerContext();
+    EXPECT_EQ(awayProducer.World, away);
+    EXPECT_NE(awayProducer.BindingEpoch, initialProducer.BindingEpoch);
+    EXPECT_TRUE(initialProducer.Lifetime.expired());
+    EXPECT_FALSE(awayProducer.Lifetime.expired());
+    EXPECT_TRUE(assets->IsAlive(*retainedTexture));
+
+    ASSERT_TRUE(
+        harness.Worlds.RequestSetActiveWorld(harness.InitialWorld).has_value());
+    EXPECT_EQ(
+        harness.Worlds.ApplyMaintenance(
+            harness.Events, harness.Jobs)
+            .AppliedActiveWorldChanges,
+        1u);
+    (void)harness.Events.Pump();
+    const Runtime::TextureBakeProducerContext restoredProducer =
+        textureBake->ProducerContext();
+    EXPECT_EQ(restoredProducer.World, harness.InitialWorld);
+    EXPECT_NE(restoredProducer.BindingEpoch, awayProducer.BindingEpoch);
+    EXPECT_TRUE(awayProducer.Lifetime.expired());
+    EXPECT_FALSE(restoredProducer.Lifetime.expired());
+    const Runtime::TextureBakeSnapshot restored = textureBake->Snapshot(
+        Runtime::StableEntityLookup::ToRenderId(retainedEntity));
+    ASSERT_EQ(restored.Textures.size(), 1u);
+    EXPECT_EQ(
+        restored.Textures.front().State,
+        Runtime::BakedPropertyTextureState::Ready);
+    EXPECT_TRUE(assets->IsAlive(*retainedTexture));
+
+    ASSERT_TRUE(harness.Worlds.RequestSetActiveWorld(away).has_value());
+    EXPECT_EQ(
+        harness.Worlds.ApplyMaintenance(
+            harness.Events, harness.Jobs)
+            .AppliedActiveWorldChanges,
+        1u);
+    (void)harness.Events.Pump();
+
     ASSERT_TRUE(
         harness.Worlds.RequestDestroyWorld(
             harness.InitialWorld)
@@ -1408,6 +1528,7 @@ TEST(AssetWorkflowModule,
         harness.Events, harness.Jobs);
     EXPECT_FALSE(
         harness.Worlds.Contains(harness.InitialWorld));
+    EXPECT_FALSE(assets->IsAlive(*retainedTexture));
 
     pipeline->UnregisterPostImportProcessor(queueProbe);
     EXPECT_TRUE(
@@ -1440,6 +1561,9 @@ TEST(AssetWorkflowModule,
     Runtime::EngineSetup setup = harness.MakeSetup();
     ASSERT_TRUE(harness.Asset.OnRegister(setup).has_value());
     harness.AssetRegistered = true;
+    ASSERT_TRUE(
+        harness.TextureBake.OnRegister(setup).has_value());
+    harness.TextureBakeRegistered = true;
 
     bool releaseProbeCalled = false;
     bool releasedNameWasReusable = false;
@@ -1475,8 +1599,9 @@ TEST(AssetWorkflowModule,
             });
     ASSERT_TRUE(releaseProbe.IsValid());
 
-    // Subscribe the document owner after the probe. The announcement order is
-    // AssetWorkflow release, exact-name probe, then document quiescence.
+    // Subscribe the document owner after the probe. AssetWorkflow and the
+    // texture-bake module release their state before the exact-name probe,
+    // followed by document quiescence.
     ASSERT_TRUE(
         harness.Document.OnRegister(setup).has_value());
     harness.DocumentRegistered = true;
@@ -1485,6 +1610,9 @@ TEST(AssetWorkflowModule,
         harness.Document.OnResolve(setup).has_value());
     ASSERT_TRUE(harness.Asset.OnResolve(setup).has_value());
     harness.AssetResolved = true;
+    ASSERT_TRUE(
+        harness.TextureBake.OnResolve(setup).has_value());
+    harness.TextureBakeResolved = true;
     harness.Services.Lock();
     harness.Initialized = true;
 
@@ -1516,7 +1644,7 @@ TEST(AssetWorkflowModule,
     EXPECT_TRUE(recycledHandleReleased);
     harness.Events.Unsubscribe(releaseProbe);
 
-    EXPECT_EQ(harness.QuiesceGpuParticipants(), 1u);
+    EXPECT_EQ(harness.QuiesceGpuParticipants(), 2u);
     EXPECT_EQ(harness.QuiesceGpuParticipants(), 0u);
 
     Runtime::RuntimeModuleShutdownContext context{
@@ -1526,6 +1654,9 @@ TEST(AssetWorkflowModule,
         .Worlds = harness.Worlds,
         .Services = harness.Services,
     };
+    harness.TextureBake.OnShutdown(context);
+    harness.TextureBakeRegistered = false;
+    harness.TextureBakeResolved = false;
     harness.Asset.OnShutdown(context);
     harness.AssetRegistered = false;
     EXPECT_EQ(
@@ -1554,39 +1685,64 @@ TEST(AssetWorkflowModule,
         harness.Asset.OnRegister(nextSetup).has_value());
     harness.AssetRegistered = true;
     ASSERT_TRUE(
+        harness.TextureBake.OnRegister(nextSetup).has_value());
+    harness.TextureBakeRegistered = true;
+    ASSERT_TRUE(
         harness.Document.OnRegister(nextSetup).has_value());
     harness.DocumentRegistered = true;
     harness.Services.BeginResolution();
     ASSERT_TRUE(
         harness.Document.OnResolve(nextSetup).has_value());
 
-    auto generationSeed =
+    auto generationSeedA =
         harness.Document.RegisterReplacementParticipant(
             Runtime::SceneReplacementParticipantDesc{
-                .Name = "Runtime.AssetWorkflowGenerationSeed",
+                .Name = "Runtime.AssetWorkflowGenerationSeedA",
                 .BeforeReplace = {},
                 .AfterReplace = {},
             });
-    ASSERT_TRUE(generationSeed.has_value());
-    ASSERT_EQ(generationSeed->Index, recycledHandle.Index);
+    auto generationSeedB =
+        harness.Document.RegisterReplacementParticipant(
+            Runtime::SceneReplacementParticipantDesc{
+                .Name = "Runtime.AssetWorkflowGenerationSeedB",
+                .BeforeReplace = {},
+                .AfterReplace = {},
+            });
+    ASSERT_TRUE(generationSeedA.has_value());
+    ASSERT_TRUE(generationSeedB.has_value());
+    const Runtime::SceneReplacementParticipantHandle* const reusedSeed =
+        generationSeedA->Index == recycledHandle.Index
+        ? &*generationSeedA
+        : (generationSeedB->Index == recycledHandle.Index
+               ? &*generationSeedB
+               : nullptr);
+    ASSERT_NE(reusedSeed, nullptr);
     EXPECT_NE(
-        generationSeed->Generation,
+        reusedSeed->Generation,
         recycledHandle.Generation);
     ASSERT_TRUE(
         harness.Document
             .UnregisterReplacementParticipant(
-                *generationSeed)
+                *generationSeedA)
+            .has_value());
+    ASSERT_TRUE(
+        harness.Document
+            .UnregisterReplacementParticipant(
+                *generationSeedB)
             .has_value());
 
     ASSERT_TRUE(
         harness.Asset.OnResolve(nextSetup).has_value());
     harness.AssetResolved = true;
+    ASSERT_TRUE(
+        harness.TextureBake.OnResolve(nextSetup).has_value());
+    harness.TextureBakeResolved = true;
     harness.Services.Lock();
     harness.Initialized = true;
 
-    // AssetWorkflow consumes the same free index with another module-lifetime
-    // generation. A stale first-boot teardown must not detach this boot's
-    // participant, and its callback must still run.
+    // The two owners consume the recycled slots with new module-lifetime
+    // generations. A stale first-boot teardown must not detach this boot's
+    // AssetWorkflow participant, and its callback must still run.
     const auto duplicateCurrentName =
         harness.Document.RegisterReplacementParticipant(
             Runtime::SceneReplacementParticipantDesc{
@@ -1666,12 +1822,12 @@ TEST(AssetWorkflowModule,
             persistentPipeline = pipeline;
         EXPECT_EQ(pipeline, persistentPipeline);
 
-        // One drain callback means exactly one private bake participant is
-        // registered for this boot without exposing the service itself.
+        // The texture-bake module registers one legacy normal-bake
+        // participant plus one generalized property-raster participant.
         EXPECT_EQ(
             harness.Jobs
                 .DrainGpuQueueCompletedTransfers(),
-            1u);
+            2u);
 
         Runtime::RuntimeObjectSpaceNormalBakeQueue* queue =
             nullptr;
@@ -1749,7 +1905,7 @@ TEST(AssetWorkflowModule,
 
         const std::uint64_t idleBefore =
             harness.GpuIdleWaits;
-        EXPECT_EQ(harness.QuiesceGpuParticipants(), 1u);
+        EXPECT_EQ(harness.QuiesceGpuParticipants(), 2u);
         EXPECT_EQ(
             harness.GpuIdleWaits, idleBefore + 1u);
         EXPECT_EQ(queue->PendingCount(), 0u);
@@ -1760,9 +1916,8 @@ TEST(AssetWorkflowModule,
 
         pipeline->UnregisterPostImportProcessor(processor);
         harness.Stop();
-        // Bake owns the queue across boots, but ordinary module cleanup
-        // clears all service-private state before cache/renderer teardown.
-        EXPECT_EQ(queue->PendingCount(), 0u);
+        // The queue is module-state owned and no longer addressable after
+        // shutdown; quiescence above proves it was cleared before teardown.
         EXPECT_EQ(
             harness.Services.Find<
                 Runtime::AssetImportPipeline>(),
@@ -1811,6 +1966,9 @@ TEST(AssetWorkflowModule,
         ASSERT_TRUE(
             harness.Document.OnRegister(setup).has_value());
         harness.DocumentRegistered = true;
+        ASSERT_TRUE(
+            harness.TextureBake.OnRegister(setup).has_value());
+        harness.TextureBakeRegistered = true;
 
         harness.Services.BeginResolution();
         ASSERT_TRUE(
@@ -1819,6 +1977,9 @@ TEST(AssetWorkflowModule,
         ASSERT_TRUE(async.OnResolve(setup).has_value());
         ASSERT_TRUE(
             harness.Document.OnResolve(setup).has_value());
+        ASSERT_TRUE(
+            harness.TextureBake.OnResolve(setup).has_value());
+        harness.TextureBakeResolved = true;
         harness.Services.Lock();
         harness.Initialized = true;
 
@@ -1880,7 +2041,7 @@ TEST(AssetWorkflowModule,
                 RuntimeAssetImportQueueTerminalStatus::
                     Cancelled);
         EXPECT_EQ(
-            harness.QuiesceGpuParticipants(), 1u);
+            harness.QuiesceGpuParticipants(), 2u);
 
         Runtime::RuntimeModuleShutdownContext context{
             .Commands = harness.Commands,
@@ -1894,17 +2055,21 @@ TEST(AssetWorkflowModule,
             releaseWorker.store(
                 true, std::memory_order_release);
             async.OnShutdown(context);
+            harness.TextureBake.OnShutdown(context);
             harness.Asset.OnShutdown(context);
         }
         else
         {
             // The worker still owns a callback capturing the persistent
             // pipeline while per-boot asset/cache state is withdrawn.
+            harness.TextureBake.OnShutdown(context);
             harness.Asset.OnShutdown(context);
             releaseWorker.store(
                 true, std::memory_order_release);
             async.OnShutdown(context);
         }
+        harness.TextureBakeRegistered = false;
+        harness.TextureBakeResolved = false;
         harness.AssetRegistered = false;
         harness.AssetResolved = false;
 

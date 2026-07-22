@@ -94,6 +94,7 @@ import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Graph;
@@ -3932,6 +3933,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorPropertyCatalogDomain domain) noexcept
         {
             return domain == SandboxEditorPropertyCatalogDomain::MeshVertices ||
+                   domain == SandboxEditorPropertyCatalogDomain::MeshEdges ||
                    domain == SandboxEditorPropertyCatalogDomain::MeshFaces;
         }
 
@@ -3960,7 +3962,8 @@ namespace Extrinsic::Runtime
             if (!IsTextureBakeSourceDomain(row.Domain))
             {
                 out.Category = SandboxEditorTextureBakeSourceCategory::WrongDomain;
-                out.DisabledReason = "texture baking supports mesh vertex and face properties";
+                out.DisabledReason =
+                    "texture baking supports mesh vertex, edge, and face properties";
                 return out;
             }
             if (row.Connectivity || IsNonBakeableMeshAttribute(row.Name))
@@ -4093,7 +4096,9 @@ namespace Extrinsic::Runtime
                 availability.Has(GS::SourceCapability::VertexPoints) &&
                 availability.Has(GS::SourceCapability::Halfedges) &&
                 availability.Has(GS::SourceCapability::Faces);
-            model.HasRuntimeBakeCommand = context.AssetService != nullptr;
+            model.HasRuntimeBakeCommand =
+                context.TextureBake != nullptr &&
+                context.TextureBake->Available();
             const bool hasOperationalGpu =
                 context.Device != nullptr && context.Device->IsOperational();
             model.Uv = BuildUvDiagnosticsModel(context, view);
@@ -4101,6 +4106,12 @@ namespace Extrinsic::Runtime
                 context.DerivedJobs,
                 stableEntityId,
                 kUvRegenerationJobOutputName);
+            if (context.TextureBake != nullptr)
+            {
+                TextureBakeSnapshot snapshot =
+                    context.TextureBake->Snapshot(stableEntityId);
+                model.BakedTextures = std::move(snapshot.Textures);
+            }
 
             model.Sources.reserve(catalog.Rows.size());
             SandboxEditorModelBuildStats* stats = context.ModelBuildStats;
@@ -11031,12 +11042,8 @@ namespace Extrinsic::Runtime
                 engine.Services().Find<Assets::AssetService>();
             AssetImportPipeline* const assetImportPipeline =
                 engine.Services().Find<AssetImportPipeline>();
-            const RuntimeObjectSpaceNormalBakeProducerContext
-                objectSpaceNormalBake =
-                    assetImportPipeline != nullptr
-                        ? assetImportPipeline->
-                            GetObjectSpaceNormalBakeProducerContext()
-                        : RuntimeObjectSpaceNormalBakeProducerContext{};
+            TextureBakeService* const textureBake =
+                engine.Services().Find<TextureBakeService>();
             SandboxEditorDerivedJobCommandSurface derivedJobCommands{};
             if (derivedJobs != nullptr)
             {
@@ -11072,12 +11079,7 @@ namespace Extrinsic::Runtime
                     engine.GetWindow().GetFramebufferExtent().Width,
                     engine.GetWindow().GetFramebufferExtent().Height},
                 .Device = &engine.GetDevice(),
-                .ObjectSpaceNormalBakeQueue =
-                    objectSpaceNormalBake.Queue,
-                .ObjectSpaceNormalBakeBindingEpoch =
-                    objectSpaceNormalBake.BindingEpoch,
-                .ObjectSpaceNormalBakeDevice =
-                    objectSpaceNormalBake.Device,
+                .TextureBake = textureBake,
                 .AssetImportCommands = SandboxEditorAssetImportCommandSurface{
                     .Import =
                         [assetImportPipeline](
@@ -13948,27 +13950,23 @@ namespace Extrinsic::Runtime
                 .Diagnostic = "Scene registry is unavailable.",
             };
         }
-        const bool useObjectSpaceNormalBakeQueue =
-            context.ObjectSpaceNormalBakeQueue != nullptr &&
-            command.BindGeneratedTexture &&
-            command.TargetSemantic == ProgressiveSlotSemantic::Normal &&
-            command.SourceDomain == ProgressiveGeometryDomain::MeshVertex;
-        if (!useObjectSpaceNormalBakeQueue &&
-            context.AssetService == nullptr)
+        if (context.TextureBake == nullptr)
         {
             return SandboxEditorTextureBakeCommandResult{
                 .Status = SandboxEditorCommandStatus::AssetImportFailed,
-                .BakeStatus = SelectedMeshTextureBakeStatus::MissingAssetService,
-                .Diagnostic = "Asset service is unavailable for generated texture payloads.",
+                .BakeStatus =
+                    SelectedMeshTextureBakeStatus::NonOperationalBackend,
+                .Diagnostic = "Texture-bake runtime module is unavailable.",
             };
         }
-        if (!useObjectSpaceNormalBakeQueue &&
-            (context.Device == nullptr || !context.Device->IsOperational()))
+        if (!context.TextureBake->Available())
         {
             return SandboxEditorTextureBakeCommandResult{
                 .Status = SandboxEditorCommandStatus::InvalidVisualizationProperty,
-                .BakeStatus = SelectedMeshTextureBakeStatus::CommandFailed,
-                .Diagnostic = "Texture baking requires an operational GPU backend.",
+                .BakeStatus =
+                    SelectedMeshTextureBakeStatus::NonOperationalBackend,
+                .Diagnostic =
+                    "Texture baking requires an operational GPU runtime module.",
             };
         }
         if (command.PropertyName.empty() ||
@@ -14000,23 +13998,17 @@ namespace Extrinsic::Runtime
         request.GeneratedKey = command.GeneratedKey.empty()
             ? command.PropertyName
             : command.GeneratedKey;
+        request.OutputName = command.OutputName.empty()
+            ? command.PropertyName
+            : command.OutputName;
+        request.Storage = command.Storage;
+        request.EncodingColormap = command.EncodingColormap;
+        request.NormalSpace = command.NormalSpace;
+        request.Consumers = command.Consumers;
         request.BindGeneratedTexture = command.BindGeneratedTexture;
 
         const SelectedMeshTextureBakeResult bake =
-            ApplySelectedMeshTextureBakeCommand(
-                SelectedMeshTextureBakeContext{
-                    .Scene = context.Scene,
-                    .World = context.World,
-                    .BindingEpoch =
-                        context.ObjectSpaceNormalBakeBindingEpoch,
-                    .AssetService = context.AssetService,
-                    .CommandHistory = context.CommandHistory,
-                    .ObjectSpaceNormalBakeQueue =
-                        context.ObjectSpaceNormalBakeQueue,
-                    .ObjectSpaceNormalBakeDevice =
-                        context.ObjectSpaceNormalBakeDevice,
-                },
-                request);
+            context.TextureBake->Bake(request);
 
         SandboxEditorCommandStatus status =
             SandboxEditorCommandStatus::Applied;
@@ -14076,9 +14068,70 @@ namespace Extrinsic::Runtime
             .Scheduled = bake.Status == SelectedMeshTextureBakeStatus::Scheduled,
             .BoundGeneratedTexture = bake.BoundGeneratedTexture,
             .GeneratedAssetPath = bake.GeneratedAssetPath,
+            .OutputName = bake.OutputName,
             .Diagnostic = bake.Diagnostic,
         };
         if (result.Status == SandboxEditorCommandStatus::Applied)
+            InvalidateSelectedModelCache(context);
+        return result;
+    }
+
+    TextureBakeMutationResult RenameSandboxEditorBakedTexture(
+        const SandboxEditorContext& context,
+        const std::uint32_t stableEntityId,
+        const std::string_view currentName,
+        const std::string_view newName)
+    {
+        if (context.TextureBake == nullptr)
+        {
+            return TextureBakeMutationResult{
+                .Status = TextureBakeMutationStatus::MissingScene,
+                .Diagnostic = "Texture-bake runtime module is unavailable.",
+            };
+        }
+        const TextureBakeMutationResult result = context.TextureBake->Rename(
+            stableEntityId,
+            currentName,
+            newName);
+        if (result.Succeeded())
+            InvalidateSelectedModelCache(context);
+        return result;
+    }
+
+    TextureBakeMutationResult RemoveSandboxEditorBakedTexture(
+        const SandboxEditorContext& context,
+        const std::uint32_t stableEntityId,
+        const std::string_view outputName)
+    {
+        if (context.TextureBake == nullptr)
+        {
+            return TextureBakeMutationResult{
+                .Status = TextureBakeMutationStatus::MissingScene,
+                .Diagnostic = "Texture-bake runtime module is unavailable.",
+            };
+        }
+        const TextureBakeMutationResult result = context.TextureBake->Remove(
+            stableEntityId,
+            outputName);
+        if (result.Succeeded())
+            InvalidateSelectedModelCache(context);
+        return result;
+    }
+
+    TextureBakeMutationResult SetSandboxEditorBakedTextureConsumers(
+        const SandboxEditorContext& context,
+        const TextureBakeConsumerUpdateRequest& request)
+    {
+        if (context.TextureBake == nullptr)
+        {
+            return TextureBakeMutationResult{
+                .Status = TextureBakeMutationStatus::MissingScene,
+                .Diagnostic = "Texture-bake runtime module is unavailable.",
+            };
+        }
+        const TextureBakeMutationResult result =
+            context.TextureBake->SetConsumers(request);
+        if (result.Succeeded())
             InvalidateSelectedModelCache(context);
         return result;
     }

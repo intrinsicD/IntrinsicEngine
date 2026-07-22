@@ -24,6 +24,7 @@ target_sources(${target_name}
         Graphics.Material.cppm
         Graphics.MaterialSystem.cppm
         Graphics.ObjectSpaceNormalTextureBake.cppm
+        Graphics.PropertyTextureBake.cppm
         Graphics.ColormapSystem.cppm
         Graphics.VisualizationPackets.cppm
         Graphics.VisualizationPropertyBufferResidency.cppm
@@ -65,6 +66,7 @@ target_sources(${target_name}
         Graphics.GpuWorld.cpp
         Graphics.MaterialSystem.cpp
         Graphics.ObjectSpaceNormalTextureBake.cpp
+        Graphics.PropertyTextureBake.cpp
         Graphics.ColormapSystem.cpp
         Graphics.VisualizationPackets.cpp
         Graphics.VisualizationPropertyBufferResidency.cpp

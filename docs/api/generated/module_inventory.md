@@ -15,12 +15,12 @@ Root scanned: `src`
 | `geometry` | 103 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 70 |
+| `graphics/renderer` | 71 |
 | `graphics/rhi` | 20 |
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 82 |
+| `runtime` | 83 |
 
 ## Modules
 
@@ -252,6 +252,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.MaterialSystem` | `src/graphics/renderer/Graphics.MaterialSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.ObjectSpaceNormalTextureBake` | `src/graphics/renderer/Graphics.ObjectSpaceNormalTextureBake.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PostProcessSystem` | `src/graphics/renderer/Graphics.PostProcessSystem.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.PropertyTextureBake` | `src/graphics/renderer/Graphics.PropertyTextureBake.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Reconstruction` | `src/graphics/renderer/Graphics.Reconstruction.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.RenderCommandRouter` | `src/graphics/renderer/Graphics.RenderCommandRouter.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.RenderFrameInput` | `src/graphics/renderer/Graphics.RenderFrameInput.cppm` | `graphics/renderer` |
@@ -406,6 +407,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.ServiceRegistry` | `src/runtime/Runtime.ServiceRegistry.cppm` | `runtime` |
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
+| `Extrinsic.Runtime.TextureBakeModule` | `src/runtime/Runtime.TextureBakeModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexAttributeBinding` | `src/runtime/Runtime.VertexAttributeBinding.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexChannelBindings` | `src/runtime/Runtime.VertexChannelBindings.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexChannelStreams` | `src/runtime/Runtime.VertexChannelStreams.cppm` | `runtime` |
@@ -417,4 +419,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **390**
+Total modules: **392**
