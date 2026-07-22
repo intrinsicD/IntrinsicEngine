@@ -73,7 +73,8 @@ vec3 ResolveSurfaceNormal(
     // legacy ObjectSpaceNormalMap flag is honored as a transitional alias.
     const bool normalFromTexture =
         GpuMaterialChannelSource(mat, GpuMaterialChannel_Normal) == GpuAttributeSource_Texture ||
-        (mat.Flags & GpuMaterialFlag_ObjectSpaceNormalMap) != 0u;
+        (mat.Flags & (GpuMaterialFlag_ObjectSpaceNormalMap |
+                      GpuMaterialFlag_WorldSpaceNormalMap)) != 0u;
     if (!normalFromTexture || !IsValidTextureID(mat.NormalID)) {
         return n;
     }
@@ -89,6 +90,10 @@ vec3 ResolveSurfaceNormal(
         return n;
     }
     objectNormal /= objectNormalLen;
+
+    if ((mat.Flags & GpuMaterialFlag_WorldSpaceNormalMap) != 0u) {
+        return objectNormal;
+    }
 
     const GpuInstanceDynamic dyn =
         GpuInstanceDynamicRef(scene.InstanceDynamicBDA).Data[instanceSlot];
@@ -110,7 +115,16 @@ void main() {
 
     vec4 baseColor = mat.BaseColorFactor;
     if (IsValidTextureID(mat.AlbedoID)) {
-        baseColor *= texture(globalTextures[nonuniformEXT(mat.AlbedoID)], fragUv);
+        vec4 albedoSample =
+            texture(globalTextures[nonuniformEXT(mat.AlbedoID)], fragUv);
+        if ((mat.Flags & GpuMaterialFlag_ScalarAlbedoTexture) != 0u) {
+            const float t = GpuNormalizeScalarAlbedo(mat, albedoSample.r);
+            const uint colormapID = GpuScalarAlbedoColormapID(mat);
+            albedoSample = IsValidTextureID(colormapID)
+                ? texture(globalTextures[nonuniformEXT(colormapID)], vec2(t, 0.5))
+                : vec4(t, t, t, 1.0);
+        }
+        baseColor *= albedoSample;
     }
     if (fragHasVertexColor != 0u) {
         baseColor = fragVertexColor;

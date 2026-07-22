@@ -35,6 +35,7 @@ import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.ECS.Component.Light;
 import Extrinsic.Asset.Registry;
+import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.GpuWorld;
@@ -1274,7 +1275,8 @@ namespace Extrinsic::Runtime
         auto resolved = renderer.GetMaterialSystem().ResolveTextureAssetBindings(
             sidecar.Material.Lease.GetHandle(),
             it->second,
-            *gpuAssets);
+            *gpuAssets,
+            &renderer.GetColormapSystem());
         if (resolved.has_value())
         {
             sidecar.Material.EffectiveSlot =
@@ -1303,18 +1305,39 @@ namespace Extrinsic::Runtime
             {
             case ProgressiveSlotSemantic::Albedo:
             case ProgressiveSlotSemantic::ScalarField:
+                if (bindings.Albedo != slot.TextureAsset)
+                {
+                    bindings.AlbedoInterpretation = Graphics::
+                        MaterialAlbedoTextureInterpretation::Color;
+                    bindings.AlbedoScalarColormap =
+                        Graphics::Colormap::Type::Viridis;
+                    bindings.AlbedoScalarRangeMin = 0.0f;
+                    bindings.AlbedoScalarRangeMax = 1.0f;
+                }
                 bindings.Albedo = slot.TextureAsset;
                 return true;
             case ProgressiveSlotSemantic::Normal:
+            {
+                const bool preserveInterpretation =
+                    bindings.Normal == slot.TextureAsset;
                 bindings.Normal = slot.TextureAsset;
-                bindings.NormalSpace =
-                    (slot.SourceKind == ProgressiveSlotSourceKind::GeneratedTextureAsset ||
-                     slot.SourceKind == ProgressiveSlotSourceKind::PropertyBake)
-                        ? Graphics::MaterialNormalTextureSpace::ObjectSpaceNormal
-                        : Graphics::MaterialNormalTextureSpace::TangentSpaceNormal;
+                if (!preserveInterpretation)
+                {
+                    bindings.NormalSpace =
+                        (slot.SourceKind == ProgressiveSlotSourceKind::GeneratedTextureAsset ||
+                         slot.SourceKind == ProgressiveSlotSourceKind::PropertyBake)
+                            ? Graphics::MaterialNormalTextureSpace::ObjectSpaceNormal
+                            : Graphics::MaterialNormalTextureSpace::TangentSpaceNormal;
+                }
                 return true;
+            }
             case ProgressiveSlotSemantic::Roughness:
             case ProgressiveSlotSemantic::Metallic:
+                if (bindings.MetallicRoughness != slot.TextureAsset)
+                {
+                    bindings.RoughnessFromRed = false;
+                    bindings.MetallicFromRed = false;
+                }
                 bindings.MetallicRoughness = slot.TextureAsset;
                 return true;
             case ProgressiveSlotSemantic::Displacement:
@@ -1334,6 +1357,7 @@ namespace Extrinsic::Runtime
     void RenderExtractionCache::State::ApplyProgressivePresentationBindings(
         entt::registry& registry,
         const entt::entity entity,
+        const std::uint32_t stableId,
         const ECS::Components::GeometrySources::ConstSourceView& view,
         RenderableSidecar& sidecar,
         Graphics::IRenderer& renderer,
@@ -1360,7 +1384,19 @@ namespace Extrinsic::Runtime
         stats.ProgressiveDiagnosticCount += snapshot.Stats.DiagnosticCount;
 
         Graphics::MaterialTextureAssetBindings textureBindings{};
-        bool hasTextureBinding = false;
+        if (const auto direct = m_MaterialTextureBindings.find(stableId);
+            direct != m_MaterialTextureBindings.end())
+        {
+            // Preserve runtime interpretation metadata (raw-scalar range,
+            // colormap, and single-channel PBR routing) when a progressive
+            // generated-texture slot refers to the same full binding record.
+            textureBindings = direct->second;
+        }
+        bool hasTextureBinding =
+            textureBindings.Albedo.IsValid() ||
+            textureBindings.Normal.IsValid() ||
+            textureBindings.MetallicRoughness.IsValid() ||
+            textureBindings.Emissive.IsValid();
         for (const ProgressiveSlotExtraction& slot : snapshot.Slots)
         {
             hasTextureBinding =
@@ -1381,7 +1417,8 @@ namespace Extrinsic::Runtime
         auto resolved = renderer.GetMaterialSystem().ResolveTextureAssetBindings(
             sidecar.Material.Lease.GetHandle(),
             textureBindings,
-            *gpuAssets);
+            *gpuAssets,
+            &renderer.GetColormapSystem());
         if (resolved.has_value())
         {
             sidecar.Material.EffectiveSlot =
@@ -1609,6 +1646,7 @@ namespace Extrinsic::Runtime
             sourceViewThisFrame = view;
             ApplyProgressivePresentationBindings(registry,
                                                  entity,
+                                                 stableId,
                                                  view,
                                                  *sidecar,
                                                  renderer,

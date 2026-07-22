@@ -88,6 +88,7 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Graph.Vertex.Normals;
@@ -3780,7 +3781,7 @@ TEST(SandboxEditorUi, UvRegenerationPanelModelTracksDerivedJobStateThroughCache)
     const Runtime::SandboxEditorSelectedModelCacheStats stats = cache.Stats();
     EXPECT_GE(stats.SelectedAnalysisCacheMisses, 4u);
 }
-TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRouteCommand)
+TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRequireRuntimeModule)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
@@ -3807,6 +3808,8 @@ TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRouteCommand)
         MakeContext(registry, selection, true, nullptr, &device);
     context.CommandHistory = &history;
     context.AssetService = &assets;
+    Runtime::TextureBakeService textureBake{};
+    context.TextureBake = &textureBake;
 
     const Runtime::SandboxEditorPanelFrame frame =
         Runtime::BuildSandboxEditorPanelFrame(context);
@@ -3817,8 +3820,8 @@ TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRouteCommand)
     EXPECT_TRUE(bake.Uv.HasTexcoords);
     EXPECT_TRUE(bake.Uv.TexcoordCountMatchesVertices);
     EXPECT_TRUE(bake.Uv.TexcoordsFinite);
-    EXPECT_TRUE(bake.HasRuntimeBakeCommand);
-    EXPECT_TRUE(bake.CanBake);
+    EXPECT_FALSE(bake.HasRuntimeBakeCommand);
+    EXPECT_FALSE(bake.CanBake);
     EXPECT_TRUE(bake.Uv.UvRegenerationAvailable);
     EXPECT_TRUE(bake.Uv.UvRegenerationDisabledReason.empty());
 
@@ -3856,33 +3859,16 @@ TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRouteCommand)
                 .BindGeneratedTexture = true,
             });
 
-    ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_EQ(
+        result.Status,
+        Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
     EXPECT_EQ(result.BakeStatus,
-              Runtime::SelectedMeshTextureBakeStatus::Success);
-    ASSERT_TRUE(result.GeneratedTexture.IsValid());
-    EXPECT_TRUE(result.BoundGeneratedTexture);
-    EXPECT_TRUE(history.IsDirty());
-
-    const auto texture =
-        assets.Read<Assets::AssetTexture2DPayload>(result.GeneratedTexture);
-    ASSERT_TRUE(texture.has_value());
-    ASSERT_EQ(texture->size(), 1u);
-    EXPECT_EQ((*texture)[0].Metadata.Width, 4u);
-
-    const auto& bindings =
-        registry.Raw().get<Runtime::ProgressivePresentationBindings>(mesh);
-    const auto* presentation =
-        Runtime::FindPresentationBinding(bindings, "mesh.surface");
-    ASSERT_NE(presentation, nullptr);
-    const auto* albedo =
-        Runtime::FindSlotBinding(*presentation,
-                                 Runtime::ProgressiveSlotSemantic::Albedo);
-    ASSERT_NE(albedo, nullptr);
-    EXPECT_EQ(albedo->SourceKind,
-              Runtime::ProgressiveSlotSourceKind::GeneratedTextureAsset);
-    EXPECT_EQ(albedo->GeneratedTexture, result.GeneratedTexture);
+              Runtime::SelectedMeshTextureBakeStatus::NonOperationalBackend);
+    EXPECT_FALSE(result.GeneratedTexture.IsValid());
+    EXPECT_FALSE(result.BoundGeneratedTexture);
+    EXPECT_FALSE(history.IsDirty());
 }
-TEST(SandboxEditorUi, AttachedEngineContextWiresObjectSpaceNormalBakeProducer)
+TEST(SandboxEditorUi, AttachedEngineContextWiresTextureBakeModule)
 {
     Runtime::Engine engine(
         HeadlessConfig(),
@@ -3895,16 +3881,24 @@ TEST(SandboxEditorUi, AttachedEngineContextWiresObjectSpaceNormalBakeProducer)
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
+    engine.EmplaceModule<Runtime::TextureBakeModule>();
     engine.Initialize();
 
     Runtime::AssetImportPipeline& pipeline =
         RequiredEngineService<Runtime::AssetImportPipeline>(engine);
     const Runtime::RuntimeObjectSpaceNormalBakeProducerContext producer =
         pipeline.GetObjectSpaceNormalBakeProducerContext();
+    Runtime::TextureBakeService& textureBake =
+        RequiredEngineService<Runtime::TextureBakeService>(engine);
+    const Runtime::TextureBakeProducerContext moduleProducer =
+        textureBake.ProducerContext();
     ASSERT_NE(producer.Queue, nullptr);
     ASSERT_NE(producer.Device, nullptr);
     EXPECT_EQ(producer.Device, &engine.GetDevice());
     EXPECT_NE(producer.BindingEpoch, 0u);
+    EXPECT_EQ(producer.Queue, moduleProducer.Queue);
+    EXPECT_EQ(producer.BindingEpoch, moduleProducer.BindingEpoch);
+    EXPECT_EQ(producer.Device, moduleProducer.Device);
 
     Runtime::SandboxEditorSession session{};
     session.Attach(engine);
@@ -3915,27 +3909,18 @@ TEST(SandboxEditorUi, AttachedEngineContextWiresObjectSpaceNormalBakeProducer)
             [&](const Runtime::SandboxEditorPreparedFrameView prepared)
             {
                 visited = true;
-                EXPECT_EQ(
-                    prepared.Context.ObjectSpaceNormalBakeQueue,
-                    producer.Queue);
-                EXPECT_EQ(
-                    prepared.Context.ObjectSpaceNormalBakeBindingEpoch,
-                    producer.BindingEpoch);
-                EXPECT_EQ(
-                    prepared.Context.ObjectSpaceNormalBakeDevice,
-                    producer.Device);
+                EXPECT_EQ(prepared.Context.TextureBake, &textureBake);
             }));
     EXPECT_TRUE(visited);
 
     session.Detach();
     engine.Shutdown();
 }
-TEST(SandboxEditorUi, QueueBackedNormalBakeSchedulesWithoutAssetServiceOrGenericDevice)
+TEST(SandboxEditorUi, TextureBakeFacadeDoesNotBypassUnavailableRuntimeModule)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    Tests::MockDevice bakeDevice;
-    Runtime::RuntimeObjectSpaceNormalBakeQueue queue;
+    Runtime::TextureBakeService textureBake{};
 
     const ECS::EntityHandle mesh =
         MakeSelectable(registry, "QueuedNormalBakeMesh");
@@ -3948,9 +3933,7 @@ TEST(SandboxEditorUi, QueueBackedNormalBakeSchedulesWithoutAssetServiceOrGeneric
 
     Runtime::SandboxEditorContext context =
         MakeContext(registry, selection);
-    context.ObjectSpaceNormalBakeQueue = &queue;
-    context.ObjectSpaceNormalBakeBindingEpoch = 41u;
-    context.ObjectSpaceNormalBakeDevice = &bakeDevice;
+    context.TextureBake = &textureBake;
 
     const std::uint32_t stableId =
         Runtime::SelectionController::ToStableEntityId(mesh);
@@ -3973,48 +3956,26 @@ TEST(SandboxEditorUi, QueueBackedNormalBakeSchedulesWithoutAssetServiceOrGeneric
                 .BindGeneratedTexture = true,
             });
 
-    ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_EQ(
+        result.Status,
+        Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
     EXPECT_EQ(
         result.BakeStatus,
-        Runtime::SelectedMeshTextureBakeStatus::Scheduled);
-    EXPECT_TRUE(result.Scheduled);
+        Runtime::SelectedMeshTextureBakeStatus::NonOperationalBackend);
+    EXPECT_FALSE(result.Scheduled);
     EXPECT_FALSE(result.GeneratedTexture.IsValid());
     EXPECT_FALSE(result.BoundGeneratedTexture);
-    EXPECT_EQ(queue.PendingCount(), 1u);
 
     const auto& bindings =
         registry.Raw().get<Runtime::ProgressivePresentationBindings>(mesh);
-    EXPECT_EQ(bindings.BindingGeneration, 8u);
-    const Runtime::ProgressivePresentationBinding* presentation =
-        Runtime::FindPresentationBinding(bindings, "mesh.surface");
-    ASSERT_NE(presentation, nullptr);
-    const Runtime::ProgressiveSlotBinding* normal =
-        Runtime::FindSlotBinding(
-            *presentation,
-            Runtime::ProgressiveSlotSemantic::Normal);
-    ASSERT_NE(normal, nullptr);
-    EXPECT_EQ(
-        normal->SourceKind,
-        Runtime::ProgressiveSlotSourceKind::PropertyBake);
-    EXPECT_EQ(
-        normal->Readiness,
-        Runtime::ProgressiveReadinessState::Pending);
-    EXPECT_FALSE(normal->GeneratedTexture.IsValid());
-
-    const auto pending = queue.TakePendingSubmissions();
-    ASSERT_EQ(pending.size(), 1u);
-    EXPECT_EQ(pending.front().Target.BindingEpoch, 41u);
-    EXPECT_EQ(pending.front().Target.Entity, mesh);
-    EXPECT_EQ(pending.front().Target.StableEntityId, stableId);
+    EXPECT_EQ(bindings.BindingGeneration, 7u);
 }
-TEST(SandboxEditorUi, QueueBackedNormalBakeHasNoCpuFallbackWhenDeviceIsNotOperational)
+TEST(SandboxEditorUi, UnavailableTextureBakeModuleHasNoCpuFallback)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
     Tests::MockDevice genericDevice;
-    Tests::MockDevice bakeDevice;
-    bakeDevice.Operational = false;
-    Runtime::RuntimeObjectSpaceNormalBakeQueue queue;
+    Runtime::TextureBakeService textureBake{};
 
     const ECS::EntityHandle mesh =
         MakeSelectable(registry, "UnavailableNormalBakeMesh");
@@ -4027,9 +3988,7 @@ TEST(SandboxEditorUi, QueueBackedNormalBakeHasNoCpuFallbackWhenDeviceIsNotOperat
 
     Runtime::SandboxEditorContext context =
         MakeContext(registry, selection, true, nullptr, &genericDevice);
-    context.ObjectSpaceNormalBakeQueue = &queue;
-    context.ObjectSpaceNormalBakeBindingEpoch = 43u;
-    context.ObjectSpaceNormalBakeDevice = &bakeDevice;
+    context.TextureBake = &textureBake;
 
     const Runtime::SandboxEditorTextureBakeCommandResult result =
         Runtime::ApplySandboxEditorTextureBakeCommand(
@@ -4059,9 +4018,7 @@ TEST(SandboxEditorUi, QueueBackedNormalBakeHasNoCpuFallbackWhenDeviceIsNotOperat
         Runtime::SelectedMeshTextureBakeStatus::NonOperationalBackend);
     EXPECT_FALSE(result.Scheduled);
     EXPECT_FALSE(result.BoundGeneratedTexture);
-    EXPECT_NE(result.Diagnostic.find("no CPU fallback"), std::string::npos);
-    EXPECT_EQ(queue.PendingCount(), 0u);
-    EXPECT_EQ(queue.Diagnostics().NonOperationalNoOps, 1u);
+    EXPECT_NE(result.Diagnostic.find("operational GPU"), std::string::npos);
 
     const auto& bindings =
         registry.Raw().get<Runtime::ProgressivePresentationBindings>(mesh);
@@ -4129,12 +4086,12 @@ TEST(SandboxEditorUi, QueueBackedNormalBakeRejectsNoncanonicalOrMissingChannels)
         Runtime::SelectedMeshTextureBakeStatus::MissingProperty);
     EXPECT_EQ(queue.PendingCount(), 0u);
 }
-TEST(SandboxEditorUi, NonNormalBakeStillRequiresAssetServiceWithQueuePresent)
+TEST(SandboxEditorUi, TextureBakeModuleAvailabilityPrecedesAssetCreation)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
     Tests::MockDevice device;
-    Runtime::RuntimeObjectSpaceNormalBakeQueue queue;
+    Runtime::TextureBakeService textureBake{};
 
     const ECS::EntityHandle mesh =
         MakeSelectable(registry, "MissingAssetServiceBakeMesh");
@@ -4150,9 +4107,7 @@ TEST(SandboxEditorUi, NonNormalBakeStillRequiresAssetServiceWithQueuePresent)
 
     Runtime::SandboxEditorContext context =
         MakeContext(registry, selection, true, nullptr, &device);
-    context.ObjectSpaceNormalBakeQueue = &queue;
-    context.ObjectSpaceNormalBakeBindingEpoch = 53u;
-    context.ObjectSpaceNormalBakeDevice = &device;
+    context.TextureBake = &textureBake;
 
     const Runtime::SandboxEditorTextureBakeCommandResult result =
         Runtime::ApplySandboxEditorTextureBakeCommand(
@@ -4177,11 +4132,10 @@ TEST(SandboxEditorUi, NonNormalBakeStillRequiresAssetServiceWithQueuePresent)
 
     EXPECT_EQ(
         result.Status,
-        Runtime::SandboxEditorCommandStatus::AssetImportFailed);
+        Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
     EXPECT_EQ(
         result.BakeStatus,
-        Runtime::SelectedMeshTextureBakeStatus::MissingAssetService);
-    EXPECT_EQ(queue.PendingCount(), 0u);
+        Runtime::SelectedMeshTextureBakeStatus::NonOperationalBackend);
 }
 TEST(SandboxEditorUi, TextureBakeRequiresOperationalGpuBackend)
 {
@@ -4208,6 +4162,8 @@ TEST(SandboxEditorUi, TextureBakeRequiresOperationalGpuBackend)
     Runtime::SandboxEditorContext context =
         MakeContext(registry, selection, true, nullptr, &device);
     context.AssetService = &assets;
+    Runtime::TextureBakeService textureBake{};
+    context.TextureBake = &textureBake;
 
     const Runtime::SandboxEditorPanelFrame frame =
         Runtime::BuildSandboxEditorPanelFrame(context);
@@ -4215,7 +4171,7 @@ TEST(SandboxEditorUi, TextureBakeRequiresOperationalGpuBackend)
         frame.Inspector.TextureBake;
     ASSERT_TRUE(bake.HasSelectedEntity);
     EXPECT_TRUE(bake.IsMesh);
-    EXPECT_TRUE(bake.HasRuntimeBakeCommand);
+    EXPECT_FALSE(bake.HasRuntimeBakeCommand);
     EXPECT_TRUE(bake.Uv.HasTexcoords);
     EXPECT_TRUE(bake.Uv.TexcoordsFinite);
     EXPECT_FALSE(bake.CanBake);
@@ -4244,7 +4200,7 @@ TEST(SandboxEditorUi, TextureBakeRequiresOperationalGpuBackend)
     EXPECT_EQ(result.Status,
               Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
     EXPECT_EQ(result.BakeStatus,
-              Runtime::SelectedMeshTextureBakeStatus::CommandFailed);
+              Runtime::SelectedMeshTextureBakeStatus::NonOperationalBackend);
     EXPECT_NE(result.Diagnostic.find("operational GPU"), std::string::npos);
 }
 

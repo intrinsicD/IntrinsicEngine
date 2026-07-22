@@ -345,6 +345,7 @@ into graphics public contracts.
 - `Extrinsic.Graphics.Material`
 - `Extrinsic.Graphics.MaterialSystem`
 - `Extrinsic.Graphics.ObjectSpaceNormalTextureBake`
+- `Extrinsic.Graphics.PropertyTextureBake`
 - `Extrinsic.Graphics.ColormapSystem`
 - `Extrinsic.Graphics.VisualizationPackets`
 - `Extrinsic.Graphics.VisualizationSyncSystem`
@@ -550,17 +551,23 @@ Concretely:
   reported `Recorded`). The forward shader pair forwards the packed surface
   UV channel plus the packed vertex normal; it samples
   `MaterialParams::AlbedoID` through the bindless texture set when that ID is
-  valid, otherwise it falls back to `BaseColorFactor`. The shading normal
-  comes from the transformed packed vertex normal unless
-  `MaterialFlags::ObjectSpaceNormalMap` is set and `NormalID` resolves to a
-  real texture. In that case the shader decodes RGB as an object-space normal,
-  transforms it by the model normal matrix, normalizes it, and falls back to the
-  vertex normal for uncovered alpha-zero texels. Tangent-space normal maps are
-  still reserved for a future path and are not inferred from `NormalID` alone.
+  valid, otherwise it falls back to `BaseColorFactor`. When
+  `MaterialFlags::ScalarAlbedoTexture` is set, the red channel remains a raw
+  scalar, is normalized with `AlbedoScalarRangeMin/Max`, and samples the
+  colormap whose bindless index occupies bits 8..23 of `ChannelSourceBits`.
+  This keeps custom material data intact and lets runtime change a scalar
+  texture's colormap without rebaking it. The shading normal comes from the
+  transformed packed vertex normal unless an explicit normal-space flag and a
+  real `NormalID` select a generated map. Object-space data is decoded from RGB
+  and transformed by the model normal matrix; world-space data is decoded and
+  used directly. Both paths fall back to the vertex normal for uncovered
+  alpha-zero texels. Tangent-space normal maps are still reserved for a future
+  path and are not inferred from `NormalID` alone.
   The forward fragment stage is still a debug Lambert-style
   surface shader, not full PBR lighting; metallic/roughness/emissive texture
   lighting remains future forward-surface work. The promoted GBuffer path emits
-  texture-backed metallic/roughness material channels when available. The legacy
+  texture-backed metallic/roughness material channels when available, including
+  the explicit raw-scalar red-channel roughness and metallic flags. The legacy
   `assets/shaders/surface.vert/frag` pair predates
   the GpuScene seam (it declares `mat4 Model` + `PtrPositions` push constants
   plus `set = 0/2/3` descriptor sets) and is deliberately *not* referenced by
@@ -1846,21 +1853,27 @@ Concretely:
   0xFF, nearest filter, clamp-to-edge) exists for missing/pending texture
   assets and is observable through `TextureAssetFallbackResolveCount`.
   Surface shaders sample `MaterialParams::AlbedoID` for base color when the
-  bindless ID is valid; invalid IDs fall back to `BaseColorFactor`. Retained
-  forward and promoted GBuffer shaders consume `MaterialParams::NormalID` only
-  when `MaterialFlags::ObjectSpaceNormalMap` is set by
-  `MaterialSystem::ResolveTextureAssetBindings()`. That flagged path decodes
-  object-space normal RGB, transforms through the model normal matrix, and
-  otherwise preserves vertex-normal shading. Tangent-space authored normal maps
-  remain reserved for a future material path. `MaterialParams::MetallicRoughnessID`
-  is consumed by the promoted GBuffer shaders when `MaterialSystem` marks the
-  metallic-roughness channel as texture-backed; the texture follows the glTF
-  convention (`G = roughness`, `B = metallic`). Full PBR texture/factor lighting
-  is still not implemented in the current default forward shader.
-  Runtime-generated vertex-property textures are still consumed through the same
-  albedo/normal material slots as authored texture assets; graphics never
-  imports `AssetService` or knows whether a bindless index came from an
-  authored file, embedded image, CPU bake, or GPU-produced generated texture.
+  bindless ID is valid; invalid IDs fall back to `BaseColorFactor`. A binding
+  marked `MaterialAlbedoTextureInterpretation::Scalar` instead reads the raw
+  red-channel value, applies its dedicated finite range, and samples the chosen
+  built-in colormap at shading time. The colormap bindless index uses the
+  previously unused high bits of `ChannelSourceBits`; the range uses the two
+  reserved material-slot words, so `CustomData[0..3]` retains its material-type
+  meaning. Retained forward and promoted GBuffer shaders consume
+  `MaterialParams::NormalID` only with an explicit object- or world-space flag
+  set by `MaterialSystem::ResolveTextureAssetBindings()`. Object-space RGB is
+  transformed through the model normal matrix; world-space RGB is used
+  directly; uncovered texels preserve vertex-normal shading. Tangent-space
+  authored normal maps remain reserved for a future material path.
+  `MaterialParams::MetallicRoughnessID` is consumed by the promoted GBuffer
+  shaders when `MaterialSystem` marks the channel texture-backed. Authored glTF
+  data reads `G = roughness` and `B = metallic`; explicit scalar-property
+  bindings use red for roughness and/or metallic. Full PBR texture/factor
+  lighting is still not implemented in the current default forward shader.
+  Runtime-generated property textures use the same physical material slots as
+  authored texture assets; graphics never imports `AssetService` or knows
+  whether a bindless index came from a file, embedded image, compatibility CPU
+  bake, or GPU-produced generated texture.
   Visualization
   and Htex/UV bake atlas references do not use the magenta fallback: per
   `GRAPHICS-014Q`, deferred-residency atlas descriptors are dropped from
@@ -1943,6 +1956,25 @@ Concretely:
   eight-byte-aligned BDA and `RGB32_FLOAT` normals at a four-byte-aligned BDA.
   The graphics plan/recorder and runtime residency validation reject
   misaligned addresses before command recording.
+- `Extrinsic.Graphics.PropertyTextureBake` is the generalized graphics-owned
+  UV-raster surface used by `Runtime.TextureBakeModule`. Its backend-neutral
+  descriptor carries an already-open command context, caller-owned pipeline,
+  output and managed index handles, texcoord/property/index BDAs, surface index
+  slice, extent, property domain/value kind, encoding, scalar range, and
+  colormap index. It maps UVs to clip space and rasterizes the resident triangle
+  topology directly: vertex values interpolate, face values remain primitive
+  constant, discrete vertex labels choose the nearest corner, and edge values
+  choose the nearest triangle segment by exact UV-space point-to-segment
+  distance. Encodings are
+  raw values, encoded normals, RGBA colors, scalar colormaps, label palettes,
+  and linear scalar red-channel output. Runtime selects `R32_FLOAT`,
+  `RG32_FLOAT`, or `RGBA32_FLOAT` for raw scalar/vector data and `RGBA8_UNORM`
+  for explicit encoded output. Uncovered texels clear to alpha zero; normal
+  output clears to encoded `+Z`, while other output clears to zero. The recorder
+  validates handles, BDAs, triangulation, extent, range, and required colormap,
+  then records barriers/render pass/draw/final layout only—it does not acquire,
+  submit, present, inspect ECS, or access live assets, and no `Vk*` type crosses
+  the graphics/RHI/runtime surfaces.
 - `Extrinsic.Graphics.ComputeParallelPrimitives` owns the generic
   scan/compaction primitive contract introduced by `GRAPHICS-108`. It exports
   deterministic CPU reference helpers for `uint32` exclusive/inclusive

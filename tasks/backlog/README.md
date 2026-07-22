@@ -264,8 +264,10 @@ as the async-work service extraction. All five additive ADR-0024 seams
 (`ARCH-007`..`ARCH-011`) and the collision sweep (`ARCH-013`) are retired;
 `ARCH-014` remains the open kernel-convergence umbrella.
 Retired `GRAPHICS-128` supplies the nonzero shared-index-slice contract;
-retired `RUNTIME-129` now supplies the production Vulkan provider inside the
-AssetWorkflow owner retired by `RUNTIME-183`.
+retired `RUNTIME-129` supplies the production Vulkan normal-bake provider.
+Retired `RUNTIME-190` relocated that provider from the AssetWorkflow owner
+retired by `RUNTIME-183` into a dedicated `TextureBakeModule` and adds the
+generalized interactive property-raster path.
 Provider resolution, population state, camera-seed caching, reference-scene
 teardown policy, input-action descriptor/state/dispatch policy, and
 runtime-module contribution ordering/dispatch, selection readback correlation
@@ -293,14 +295,16 @@ production consumer. The bounded implementation graph is
 `RUNTIME-179` AsyncWork, retired `RUNTIME-172` SceneDocument, retired
 `RUNTIME-188` SceneInteraction, `RUNTIME-180` Camera, `RUNTIME-181`
 ConfigControl, `RUNTIME-183` AssetWorkflow, retired `RUNTIME-182` EditorUi,
+retired `RUNTIME-190` TextureBake,
 retired post-`RUNTIME-188`/`RUNTIME-183` `RUNTIME-168` private Sandbox
 provider/handle composition on the existing editor-facade surface, retired
 `RUNTIME-129` operational normal bake after the retired independent
 `GRAPHICS-128` shared-index prerequisite,
 `RUNTIME-184` application-lifecycle removal, `RUNTIME-185` mechanism pruning,
 and `RUNTIME-186` residual auxiliary-surface cleanup followed by the
-`RUNTIME-187` exact Engine-surface ratchet. The bake leaf is retired; the
-lifecycle leaf remains before mechanism pruning. The detailed graph
+`RUNTIME-187` exact Engine-surface ratchet. The original normal-bake leaf is
+retired; its right-sized generalized module consolidation is active as
+`RUNTIME-190`; the lifecycle leaf remains before mechanism pruning. The detailed graph
 and state scopes live in the [runtime backlog index](runtime/README.md).
 Retired `RUNTIME-182` extracted the optional global ImGui/host owner while
 preserving the existing paired frame bracket and one completed capture

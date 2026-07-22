@@ -68,6 +68,7 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Platform.Input;
@@ -944,6 +945,7 @@ namespace
         engine.EmplaceModule<Runtime::SceneDocumentModule>();
         engine.EmplaceModule<Runtime::SceneInteractionModule>();
         engine.EmplaceModule<Runtime::AssetWorkflowModule>();
+        engine.EmplaceModule<Runtime::TextureBakeModule>();
         engine.Initialize();
     }
 
@@ -1695,6 +1697,7 @@ TEST(RuntimeAssetImportFormatCoverage,
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
+    engine.EmplaceModule<Runtime::TextureBakeModule>();
     engine.Initialize();
     ASSERT_EQ(
         engine.Services()

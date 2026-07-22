@@ -7,6 +7,18 @@ another backlog directory.
 
 ## Runtime backlog tasks
 
+### GPU property texture baking (retired 2026-07-21)
+
+- [`RUNTIME-190` — GPU property texture bake runtime module](../../done/RUNTIME-190-gpu-property-texture-bake-module.md)
+  consolidates interactive texture baking into an app-composed
+  `TextureBakeModule`. It owns the generalized UV-raster GPU participant and
+  the retained import-time object-space-normal producer, while
+  `AssetWorkflowModule` remains the asset/cache/import owner and borrows that
+  producer. The retired operational slice covers raw-first scalar/vector
+  storage, explicit encoded RGBA, vertex/face/nearest-edge domains, named
+  replace/rename/remove asset lifecycle, multi-consumer material/presentation
+  bindings, and render-time scalar colormaps with no interactive CPU fallback.
+
 ### Main-loop non-blocking and composition-root cleanup (seeded 2026-07-03)
 
 Opened from the main-loop/task-graph/render-graph review
@@ -179,12 +191,13 @@ triggers. The implementation graph is:
   world-tagged snapshots replace Engine-owned interaction pointers, while
   obsolete mesh-view compatibility facades/cache are deleted and ECS
   render-hint components remain authoritative.
-- Retired `RUNTIME-183` composes the global asset/residency/import/bake owner
-  after the hard document/interaction split; it requires exact document/history
-  and built-in device/renderer/extraction services, optionally consumes
-  streaming/selection, and borrows kernel config/initialized state without
-  camera or config-control-module ownership. Borrowed world handoffs never
-  become hidden ECS ownership.
+- Retired `RUNTIME-183` composes the global asset/residency/import owner after
+  the hard document/interaction split; retired `RUNTIME-190` subsequently
+  moved the bake producer and GPU participants into `TextureBakeModule`. Asset workflow still
+  requires exact document/history and built-in device/renderer/extraction
+  services, optionally consumes streaming/selection, and borrows kernel
+  config/initialized state without camera or config-control-module ownership.
+  Borrowed world handoffs never become hidden ECS ownership.
 - Retired `RUNTIME-182` composes the optional global ImGui/host owner, with
   one frame-local kernel capture value, a preserved paired Begin/End bracket,
   and app-owned Sandbox panels.
@@ -195,9 +208,10 @@ triggers. The implementation graph is:
   Sandbox transactional typed handles over only the exact import pipeline/input
   registry plus optional exact camera/selection for focus. CPU and capable-host
   Vulkan acceptance verification are complete.
-- Retired `RUNTIME-129` completes the operational Vulkan bake inside
-  `AssetWorkflowModule` after retired `GRAPHICS-128` made the shared
-  managed-index subrange selectable.
+- Retired `RUNTIME-129` completes the operational Vulkan normal-bake provider
+  after retired `GRAPHICS-128` made the shared managed-index subrange
+  selectable. Retired `RUNTIME-190` relocated that provider unchanged into
+  `TextureBakeModule` alongside the generalized property raster path.
 - [`RUNTIME-184`](RUNTIME-184-replace-application-lifecycle.md) — remove
   `IApplication` and unrestricted app ticks through explicit Sandbox/module
   composition, isolated from residual API migration and the final
@@ -229,11 +243,12 @@ transitively through `ARCH-014`.
 
 - [`RUNTIME-183` — Extract the asset-workflow composition module](../../done/RUNTIME-183-extract-asset-workflow-module.md)
   (done, 2026-07-19, `Operational`): one app-composed `AssetWorkflowModule`
-  owns persistent import/bake objects plus per-boot asset/cache/listener/
-  handoff state, publishes four exact existing services, and validates every
-  borrowed scene target. Announcement-first cancellation/detachment plus
-  generic GPU/async drain makes shutdown order-safe; Engine has no asset-domain
-  owner, import, facade, transition, or diagnostic and measures `22/0/2/10`.
+  originally absorbed persistent import/bake objects plus per-boot
+  asset/cache/listener/handoff state. Retired `RUNTIME-190` subsequently
+  extracted bake ownership into `TextureBakeModule`; AssetWorkflow retains the persistent
+  import pipeline, publishes four exact asset services, and validates every
+  borrowed scene target. Engine still has no asset-domain owner, import, bake
+  facade, transition, or diagnostic and measures `22/0/2/10`.
 - [`RUNTIME-182` — Extract the editor-UI composition module](../../done/RUNTIME-182-extract-editor-ui-module.md)
   (done, 2026-07-19, `Operational`): one app-composed `EditorUiModule` owns
   the ImGui overlay/adapter, exact Engine-free editor host, global visibility

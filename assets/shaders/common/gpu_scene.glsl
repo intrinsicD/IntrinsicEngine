@@ -28,6 +28,10 @@ const uint GpuMaterialType_DefaultDebugSurface = 2u;
 const uint GpuMaterialType_DefaultDebugUVs = 3u;
 const uint GpuMaterialFlag_Unlit = 1u << 3;
 const uint GpuMaterialFlag_ObjectSpaceNormalMap = 1u << 5;
+const uint GpuMaterialFlag_ScalarAlbedoTexture = 1u << 6;
+const uint GpuMaterialFlag_ScalarRoughnessTexture = 1u << 7;
+const uint GpuMaterialFlag_ScalarMetallicTexture = 1u << 8;
+const uint GpuMaterialFlag_WorldSpaceNormalMap = 1u << 9;
 // Single lit/unlit authority (GpuMaterialSlot.ShadingModel). The legacy
 // GpuMaterialFlag_Unlit bit is honored as a transitional alias until its
 // remaining writers migrate to ShadingModel.
@@ -196,8 +200,8 @@ struct GpuMaterialSlot {
     uint Flags;
     uint ShadingModel;
     uint ChannelSourceBits;
-    uint _pad2;
-    uint _pad3;
+    float AlbedoScalarRangeMin;
+    float AlbedoScalarRangeMax;
     vec4 CustomData[4];
 };
 
@@ -205,6 +209,19 @@ struct GpuMaterialSlot {
 // 0 = vertex attribute, 1 = texture.
 uint GpuMaterialChannelSource(GpuMaterialSlot mat, uint channel) {
     return (mat.ChannelSourceBits >> (channel * 2u)) & 0x3u;
+}
+
+uint GpuScalarAlbedoColormapID(GpuMaterialSlot mat) {
+    return (mat.ChannelSourceBits >> 8u) & 0xffffu;
+}
+
+float GpuNormalizeScalarAlbedo(GpuMaterialSlot mat, float scalar) {
+    const float rangeMin = mat.AlbedoScalarRangeMin;
+    const float rangeMax = mat.AlbedoScalarRangeMax;
+    const float span = rangeMax - rangeMin;
+    return span > 1.0e-20
+        ? clamp((scalar - rangeMin) / span, 0.0, 1.0)
+        : 0.0;
 }
 
 struct GpuLight {

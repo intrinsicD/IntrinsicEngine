@@ -14,10 +14,7 @@ module;
 
 module Extrinsic.Runtime.SandboxEditorFacades;
 
-import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.ImportRouter;
-import Extrinsic.Asset.ModelTexturePayload;
-import Extrinsic.Asset.Service;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
@@ -30,8 +27,6 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
-import Extrinsic.Graphics.GpuAssetCache;
-import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.RHI.Device;
@@ -43,10 +38,8 @@ import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.InputActions;
-import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ProgressiveRenderData;
-import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.StreamingExecutor;
@@ -59,13 +52,6 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
-        struct DirectMeshGeneratedTextureResult
-        {
-            Assets::AssetId NormalTexture{};
-            std::uint64_t GeneratedTextureAssetsCreated{0u};
-            std::uint64_t GeneratedTextureUploadRequests{0u};
-        };
-
         struct DirectMeshPostProcessState
         {
             std::string Path{};
@@ -73,15 +59,7 @@ namespace Extrinsic::Runtime
             ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
             Core::ErrorCode Error{Core::ErrorCode::Success};
             std::optional<RuntimeMeshMaterializationResult> Materialized{};
-            std::optional<Assets::AssetTexture2DPayload> GeneratedNormalTexture{};
         };
-
-        [[nodiscard]] bool IsTextureUploadDeferral(
-            const Core::ErrorCode error) noexcept
-        {
-            return error == Core::ErrorCode::DeviceNotOperational ||
-                   error == Core::ErrorCode::ResourceBusy;
-        }
 
         [[nodiscard]] std::string FileNameFromPath(const std::string_view path)
         {
@@ -144,88 +122,6 @@ namespace Extrinsic::Runtime
 
             controller->Focus(*target);
             cameraControllers.MarkCameraTransition(CameraControllerSlot::Main);
-        }
-
-        [[nodiscard]] std::optional<Assets::AssetTexture2DPayload>
-        BakeDirectMeshGeneratedNormalTexturePayload(
-            const std::string_view meshPath,
-            const Geometry::HalfedgeMesh::Mesh& mesh,
-            const bool hasResolvedTexcoords)
-        {
-            if (!hasResolvedTexcoords)
-            {
-                return std::nullopt;
-            }
-
-            MeshAttributeTextureBakeOptions options{};
-            options.SourcePropertyName = "v:normal";
-            options.Width = 64u;
-            options.Height = 64u;
-            options.DebugName = "generated-direct-mesh-normal-v:normal";
-
-            MeshAttributeTextureBakeResult bake =
-                BakeMeshVertexNormalTexture(mesh, options);
-            if (bake.Status != MeshAttributeTextureBakeStatus::Success)
-            {
-                return std::nullopt;
-            }
-
-            bake.Payload.Metadata.SourcePath = std::string{meshPath};
-            return std::move(bake.Payload);
-        }
-
-        [[nodiscard]] Core::Expected<DirectMeshGeneratedTextureResult>
-        RegisterDirectMeshGeneratedNormalTexture(
-            Assets::AssetService& assetService,
-            Graphics::GpuAssetCache& gpuAssetCache,
-            RenderExtractionCache& extraction,
-            const std::string_view meshPath,
-            const ECS::EntityHandle entity,
-            const Assets::AssetTexture2DPayload& payload)
-        {
-            DirectMeshGeneratedTextureResult result{};
-            const std::string generatedPath = BuildGeneratedTextureAssetPath(
-                meshPath,
-                0u,
-                "normal",
-                "v:normal");
-            auto texture = LoadGeneratedTextureAsset(
-                assetService,
-                generatedPath,
-                payload);
-            if (!texture.has_value())
-            {
-                return Core::Err<DirectMeshGeneratedTextureResult>(
-                    texture.error());
-            }
-
-            result.NormalTexture = *texture;
-            result.GeneratedTextureAssetsCreated = 1u;
-
-            auto upload =
-                RequestTextureAssetUpload(assetService, gpuAssetCache, *texture);
-            if (upload.has_value())
-            {
-                result.GeneratedTextureUploadRequests = 1u;
-            }
-            else if (!IsTextureUploadDeferral(upload.error()))
-            {
-                return Core::Err<DirectMeshGeneratedTextureResult>(
-                    upload.error());
-            }
-
-            extraction.SetMaterialTextureAssetBindings(
-                StableEntityLookup::ToRenderId(entity),
-                Graphics::MaterialTextureAssetBindings{
-                    .Albedo = {},
-                    .Normal = *texture,
-                    .MetallicRoughness = {},
-                    .Emissive = {},
-                    .NormalSpace =
-                        Graphics::MaterialNormalTextureSpace::ObjectSpaceNormal,
-                });
-
-            return result;
         }
 
         [[nodiscard]] RuntimeObjectSpaceNormalBakeRequestBuildResult
@@ -324,13 +220,11 @@ namespace Extrinsic::Runtime
         void QueueDirectMeshPostProcess(
             StreamingExecutor* streamingExecutor,
             const WorldHandle world,
-            Assets::AssetService& assetService,
-            Graphics::GpuAssetCache& gpuAssetCache,
-            RenderExtractionCache& extraction,
             ECS::Scene::Registry& scene,
             RuntimeObjectSpaceNormalBakeQueue* objectSpaceNormalBakeQueue,
             const std::uint64_t objectSpaceNormalBakeBindingEpoch,
             const RHI::IDevice* objectSpaceNormalBakeDevice,
+            std::weak_ptr<void> objectSpaceNormalBakeLifetime,
             std::string meshPath,
             const Geometry::MeshIO::MeshIOResult& meshPayload,
             const ECS::EntityHandle entity)
@@ -345,6 +239,8 @@ namespace Extrinsic::Runtime
             state->Path = std::move(meshPath);
             state->Payload = meshPayload;
             state->Entity = entity;
+            const bool guardObjectSpaceNormalBakeLifetime =
+                objectSpaceNormalBakeLifetime.use_count() != 0u;
 
             const StreamingTaskHandle handle = streamingExecutor->Submit(
                 StreamingTaskDesc{
@@ -355,10 +251,7 @@ namespace Extrinsic::Runtime
                     .EstimatedCost = 8u,
                     .Scope = world,
                     .Execute =
-                        [
-                            state,
-                            useObjectSpaceNormalBakeQueue =
-                                objectSpaceNormalBakeQueue != nullptr]() mutable
+                        [state]() mutable
                             -> StreamingResult
                         {
                             auto materialized =
@@ -375,15 +268,6 @@ namespace Extrinsic::Runtime
                                     StreamingCpuPayloadReady{.PayloadToken = 0u}};
                             }
 
-                            if (!useObjectSpaceNormalBakeQueue)
-                            {
-                                state->GeneratedNormalTexture =
-                                    BakeDirectMeshGeneratedNormalTexturePayload(
-                                        state->Path,
-                                        materialized->Mesh,
-                                        materialized->Diagnostics
-                                            .ResolvedTexcoordsValid);
-                            }
                             state->Materialized = std::move(*materialized);
                             state->Error = Core::ErrorCode::Success;
                             return StreamingResult{
@@ -392,14 +276,13 @@ namespace Extrinsic::Runtime
                     .ApplyOnMainThread =
                         [
                             state,
-                            &assetService,
-                            &gpuAssetCache,
-                            &extraction,
                             &scene,
                             objectSpaceNormalBakeQueue,
                             world,
                             objectSpaceNormalBakeBindingEpoch,
-                            objectSpaceNormalBakeDevice](
+                            objectSpaceNormalBakeDevice,
+                            objectSpaceNormalBakeLifetime,
+                            guardObjectSpaceNormalBakeLifetime](
                                 StreamingResult&& result) mutable
                         {
                             if (!result.has_value() ||
@@ -440,6 +323,15 @@ namespace Extrinsic::Runtime
 
                             if (objectSpaceNormalBakeQueue != nullptr)
                             {
+                                const std::shared_ptr<void> producerLifetime =
+                                    guardObjectSpaceNormalBakeLifetime
+                                        ? objectSpaceNormalBakeLifetime.lock()
+                                        : std::shared_ptr<void>{};
+                                if (guardObjectSpaceNormalBakeLifetime &&
+                                    producerLifetime == nullptr)
+                                {
+                                    return;
+                                }
                                 RuntimeObjectSpaceNormalBakeRequestBuildResult
                                     request =
                                     BuildDirectMeshObjectSpaceNormalBakeRequest(
@@ -476,25 +368,6 @@ namespace Extrinsic::Runtime
                                         queued.Diagnostic);
                                 }
                                 return;
-                            }
-
-                            if (state->GeneratedNormalTexture.has_value())
-                            {
-                                auto generated =
-                                    RegisterDirectMeshGeneratedNormalTexture(
-                                        assetService,
-                                        gpuAssetCache,
-                                        extraction,
-                                        state->Path,
-                                        state->Entity,
-                                        *state->GeneratedNormalTexture);
-                                if (!generated.has_value())
-                                {
-                                    Core::Log::Warn(
-                                        "[Runtime] Deferred generated normal texture registration failed: path='{}' error={}",
-                                        state->Path,
-                                        Core::Error::ToString(generated.error()));
-                                }
                             }
                         },
                 });
@@ -680,9 +553,6 @@ namespace Extrinsic::Runtime
                     if (context.MeshPayload == nullptr)
                         return Core::Ok();
                     if (services.Streaming == nullptr ||
-                        services.AssetService == nullptr ||
-                        services.GpuAssetCache == nullptr ||
-                        services.RenderExtraction == nullptr ||
                         services.Scene == nullptr)
                     {
                         return Core::Err(
@@ -692,13 +562,11 @@ namespace Extrinsic::Runtime
                     QueueDirectMeshPostProcess(
                         services.Streaming,
                         services.World,
-                        *services.AssetService,
-                        *services.GpuAssetCache,
-                        *services.RenderExtraction,
                         *services.Scene,
                         services.ObjectSpaceNormalBakeQueue,
                         services.ObjectSpaceNormalBakeBindingEpoch,
                         services.ObjectSpaceNormalBakeDevice,
+                        services.ObjectSpaceNormalBakeLifetime,
                         std::string{context.Path},
                         *context.MeshPayload,
                         context.Entity);

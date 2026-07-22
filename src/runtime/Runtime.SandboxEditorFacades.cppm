@@ -53,7 +53,6 @@ import Extrinsic.Runtime.KMeansGpuBackend;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
-import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -63,6 +62,7 @@ export import Extrinsic.Runtime.SandboxConfigSections;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
@@ -1501,6 +1501,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t DefaultHeight{64u};
         SandboxEditorUvDiagnosticsModel Uv{};
         std::vector<SandboxEditorTextureBakeSourceRow> Sources{};
+        std::vector<BakedPropertyTextureRecord> BakedTextures{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
@@ -2553,9 +2554,7 @@ export namespace Extrinsic::Runtime
         CameraControllerRegistry* CameraControllers{nullptr};
         Core::Extent2D CameraViewport{};
         RHI::IDevice* Device{nullptr};
-        RuntimeObjectSpaceNormalBakeQueue* ObjectSpaceNormalBakeQueue{nullptr};
-        std::uint64_t ObjectSpaceNormalBakeBindingEpoch{0u};
-        const RHI::IDevice* ObjectSpaceNormalBakeDevice{nullptr};
+        TextureBakeService* TextureBake{nullptr};
         SandboxEditorAssetImportCommandSurface AssetImportCommands{};
         SandboxEditorAssetImportQueueCommandSurface AssetImportQueueCommands{};
         SandboxEditorSceneFileCommandSurface SceneFileCommands{};
@@ -2827,6 +2826,14 @@ export namespace Extrinsic::Runtime
         std::uint32_t Width{64u};
         std::uint32_t Height{64u};
         std::string GeneratedKey{};
+        std::string OutputName{};
+        SelectedMeshTextureBakeStorage Storage{
+            SelectedMeshTextureBakeStorage::Auto};
+        Graphics::Colormap::Type EncodingColormap{
+            Graphics::Colormap::Type::Viridis};
+        BakedPropertyNormalSpace NormalSpace{
+            BakedPropertyNormalSpace::Object};
+        std::vector<BakedPropertyTextureConsumer> Consumers{};
         bool BindGeneratedTexture{true};
     };
 
@@ -2840,6 +2847,7 @@ export namespace Extrinsic::Runtime
         bool Scheduled{false};
         bool BoundGeneratedTexture{false};
         std::string GeneratedAssetPath{};
+        std::string OutputName{};
         std::string Diagnostic{};
 
         [[nodiscard]] bool Succeeded() const noexcept
@@ -3071,6 +3079,21 @@ export namespace Extrinsic::Runtime
     SandboxEditorTextureBakeCommandResult ApplySandboxEditorTextureBakeCommand(
         const SandboxEditorContext& context,
         const SandboxEditorTextureBakeCommand& command);
+
+    TextureBakeMutationResult RenameSandboxEditorBakedTexture(
+        const SandboxEditorContext& context,
+        std::uint32_t stableEntityId,
+        std::string_view currentName,
+        std::string_view newName);
+
+    TextureBakeMutationResult RemoveSandboxEditorBakedTexture(
+        const SandboxEditorContext& context,
+        std::uint32_t stableEntityId,
+        std::string_view outputName);
+
+    TextureBakeMutationResult SetSandboxEditorBakedTextureConsumers(
+        const SandboxEditorContext& context,
+        const TextureBakeConsumerUpdateRequest& request);
 
     SandboxEditorUvRegenerationCommandResult ApplySandboxEditorUvRegenerationCommand(
         const SandboxEditorContext& context,

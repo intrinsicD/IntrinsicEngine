@@ -22,6 +22,7 @@ import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.TextureBakeModule;
 
 #include "MockRHI.hpp"
 
@@ -92,6 +93,9 @@ namespace
         edges.Properties
             .GetOrAdd<std::uint32_t>(std::string{GS::PropertyNames::kEdgeV1}, kInvalidIndex)
             .Vector() = {1u, 2u, 0u};
+        edges.Properties
+            .GetOrAdd<float>("e:weight", 0.0f)
+            .Vector() = {0.25f, 0.5f, 0.75f};
 
         auto& halfedges = raw.emplace<GS::Halfedges>(entity);
         halfedges.Properties.Resize(6u);
@@ -333,6 +337,140 @@ namespace
     }
 }
 
+TEST(RuntimeSelectedMeshTextureBake, RepresentationDefaultsPreserveRawScalarData)
+{
+    const std::vector<Runtime::BakedPropertyTextureConsumer> consumers{
+        Runtime::BakedPropertyTextureConsumer{
+            .PresentationKey = "mesh.surface",
+            .Semantic = Runtime::ProgressiveSlotSemantic::Albedo,
+        },
+        Runtime::BakedPropertyTextureConsumer{
+            .PresentationKey = "mesh.surface",
+            .Semantic = Runtime::ProgressiveSlotSemantic::ScalarField,
+        },
+    };
+    const Runtime::BakedPropertyTextureRepresentation representation =
+        Runtime::ResolveBakedPropertyTextureRepresentation(
+            Runtime::ProgressivePropertyValueKind::ScalarFloat,
+            Runtime::SelectedMeshTextureBakeStorage::Auto,
+            Runtime::MeshAttributeTextureBakeEncoder::Auto,
+            consumers);
+
+    EXPECT_EQ(
+        representation.Storage,
+        Runtime::SelectedMeshTextureBakeStorage::RawFloat);
+    EXPECT_EQ(
+        representation.Encoder,
+        Runtime::MeshAttributeTextureBakeEncoder::LinearScalar);
+    EXPECT_TRUE(Runtime::IsBakedPropertyTextureConsumerCompatible(
+        consumers[0],
+        Runtime::ProgressivePropertyValueKind::ScalarFloat,
+        representation.Storage,
+        representation.Encoder));
+    EXPECT_TRUE(Runtime::IsBakedPropertyTextureConsumerCompatible(
+        consumers[1],
+        Runtime::ProgressivePropertyValueKind::ScalarFloat,
+        representation.Storage,
+        representation.Encoder));
+}
+
+TEST(RuntimeSelectedMeshTextureBake, NormalAndLabelDefaultsChooseEncodedStorage)
+{
+    const std::vector<Runtime::BakedPropertyTextureConsumer> normalConsumer{
+        Runtime::BakedPropertyTextureConsumer{
+            .PresentationKey = "mesh.surface",
+            .Semantic = Runtime::ProgressiveSlotSemantic::Normal,
+        },
+    };
+    const auto normal = Runtime::ResolveBakedPropertyTextureRepresentation(
+        Runtime::ProgressivePropertyValueKind::Vec3,
+        Runtime::SelectedMeshTextureBakeStorage::Auto,
+        Runtime::MeshAttributeTextureBakeEncoder::Auto,
+        normalConsumer);
+    EXPECT_EQ(
+        normal.Storage,
+        Runtime::SelectedMeshTextureBakeStorage::EncodedRgba);
+    EXPECT_EQ(
+        normal.Encoder,
+        Runtime::MeshAttributeTextureBakeEncoder::Normal);
+    EXPECT_TRUE(Runtime::IsBakedPropertyTextureConsumerCompatible(
+        normalConsumer.front(),
+        Runtime::ProgressivePropertyValueKind::Vec3,
+        normal.Storage,
+        normal.Encoder));
+
+    const std::vector<Runtime::BakedPropertyTextureConsumer> albedoConsumer{
+        Runtime::BakedPropertyTextureConsumer{
+            .PresentationKey = "mesh.surface",
+            .Semantic = Runtime::ProgressiveSlotSemantic::Albedo,
+        },
+    };
+    const auto label = Runtime::ResolveBakedPropertyTextureRepresentation(
+        Runtime::ProgressivePropertyValueKind::UInt32,
+        Runtime::SelectedMeshTextureBakeStorage::Auto,
+        Runtime::MeshAttributeTextureBakeEncoder::Auto,
+        albedoConsumer);
+    EXPECT_EQ(
+        label.Storage,
+        Runtime::SelectedMeshTextureBakeStorage::EncodedRgba);
+    EXPECT_EQ(
+        label.Encoder,
+        Runtime::MeshAttributeTextureBakeEncoder::LabelPalette);
+}
+
+TEST(RuntimeSelectedMeshTextureBake,
+     RepresentationMatrixRejectsEncodersThatDoNotMatchStorageAndValueType)
+{
+    using Runtime::IsBakedPropertyTextureRepresentationCompatible;
+    using Runtime::MeshAttributeTextureBakeEncoder;
+    using Runtime::ProgressivePropertyValueKind;
+    using Runtime::SelectedMeshTextureBakeStorage;
+
+    EXPECT_TRUE(IsBakedPropertyTextureRepresentationCompatible(
+        ProgressivePropertyValueKind::ScalarFloat,
+        SelectedMeshTextureBakeStorage::RawFloat,
+        MeshAttributeTextureBakeEncoder::LinearScalar));
+    EXPECT_FALSE(IsBakedPropertyTextureRepresentationCompatible(
+        ProgressivePropertyValueKind::ScalarFloat,
+        SelectedMeshTextureBakeStorage::RawFloat,
+        MeshAttributeTextureBakeEncoder::Normal));
+    EXPECT_TRUE(IsBakedPropertyTextureRepresentationCompatible(
+        ProgressivePropertyValueKind::ScalarFloat,
+        SelectedMeshTextureBakeStorage::EncodedRgba,
+        MeshAttributeTextureBakeEncoder::ScalarColormap));
+    EXPECT_FALSE(IsBakedPropertyTextureRepresentationCompatible(
+        ProgressivePropertyValueKind::UInt32,
+        SelectedMeshTextureBakeStorage::RawFloat,
+        MeshAttributeTextureBakeEncoder::LabelPalette));
+    EXPECT_TRUE(IsBakedPropertyTextureRepresentationCompatible(
+        ProgressivePropertyValueKind::UInt32,
+        SelectedMeshTextureBakeStorage::EncodedRgba,
+        MeshAttributeTextureBakeEncoder::LabelPalette));
+    EXPECT_TRUE(IsBakedPropertyTextureRepresentationCompatible(
+        ProgressivePropertyValueKind::Vec3,
+        SelectedMeshTextureBakeStorage::EncodedRgba,
+        MeshAttributeTextureBakeEncoder::Normal));
+    EXPECT_FALSE(IsBakedPropertyTextureRepresentationCompatible(
+        ProgressivePropertyValueKind::Vec4,
+        SelectedMeshTextureBakeStorage::EncodedRgba,
+        MeshAttributeTextureBakeEncoder::Normal));
+    EXPECT_FALSE(IsBakedPropertyTextureRepresentationCompatible(
+        ProgressivePropertyValueKind::Vec3,
+        SelectedMeshTextureBakeStorage::Auto,
+        MeshAttributeTextureBakeEncoder::Vector3));
+}
+
+TEST(RuntimeSelectedMeshTextureBake, ModuleServiceFailsClosedWithoutGpuComposition)
+{
+    Runtime::TextureBakeService service{};
+    EXPECT_FALSE(service.Available());
+    const Runtime::SelectedMeshTextureBakeResult result =
+        service.Bake(Runtime::SelectedMeshTextureBakeRequest{});
+    EXPECT_EQ(
+        result.Status,
+        Runtime::SelectedMeshTextureBakeStatus::NonOperationalBackend);
+}
+
 TEST(RuntimeSelectedMeshTextureBake, BuildsVertexNormalBakeRequest)
 {
     ECS::Scene::Registry scene{};
@@ -392,6 +530,24 @@ TEST(RuntimeSelectedMeshTextureBake, AutoEncodersMatchTargetMaterialSlots)
     ASSERT_EQ(metallicBuild.Status, Runtime::SelectedMeshTextureBakeStatus::Success);
     EXPECT_EQ(metallicBuild.BakeRequest.Encoder,
               Runtime::MeshAttributeTextureBakeEncoder::LinearScalar);
+}
+
+TEST(RuntimeSelectedMeshTextureBake, BuildsNearestEdgeScalarBakeRequest)
+{
+    ECS::Scene::Registry scene{};
+    const ECS::EntityHandle entity = MakeMeshEntity(scene);
+    Runtime::SelectedMeshTextureBakeRequest request = MakeHeatRequest(entity);
+    request.SourceDomain = Runtime::ProgressiveGeometryDomain::MeshEdge;
+    request.SourcePropertyName = "e:weight";
+    request.OutputName = "edge-weight";
+
+    const Runtime::SelectedMeshTextureBakeBuildResult build =
+        Runtime::BuildSelectedMeshTextureBakeRequest(scene, request);
+    ASSERT_EQ(build.Status, Runtime::SelectedMeshTextureBakeStatus::Success);
+    EXPECT_EQ(
+        build.BakeRequest.SourceDomain,
+        Runtime::MeshAttributeTextureBakeSourceDomain::Edge);
+    EXPECT_EQ(build.ExpectedElementCount, 3u);
 }
 
 TEST(RuntimeSelectedMeshTextureBake, IncompatibleMaterialSlotEncodersFailClosed)

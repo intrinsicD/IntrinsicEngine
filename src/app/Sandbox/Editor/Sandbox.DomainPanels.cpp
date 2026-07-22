@@ -26,6 +26,8 @@ import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.SelectedMeshTextureBake;
+import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 
@@ -55,14 +57,13 @@ inline constexpr VisualizationColorSource kUniformColorSource =
 inline constexpr VisualizationColorSource kScalarFieldSource =
     static_cast<VisualizationColorSource>(2);
 
-inline constexpr std::array<ProgressiveSlotSemantic, 6>
+inline constexpr std::array<ProgressiveSlotSemantic, 5>
     kTextureBakeTargetSemantics{{
         ProgressiveSlotSemantic::Albedo,
         ProgressiveSlotSemantic::Normal,
         ProgressiveSlotSemantic::Roughness,
         ProgressiveSlotSemantic::Metallic,
         ProgressiveSlotSemantic::ScalarField,
-        ProgressiveSlotSemantic::Displacement,
     }};
 
 inline constexpr std::array<MeshAttributeTextureBakeEncoder, 8>
@@ -76,6 +77,25 @@ inline constexpr std::array<MeshAttributeTextureBakeEncoder, 8>
         MeshAttributeTextureBakeEncoder::Vector2,
         MeshAttributeTextureBakeEncoder::Vector3,
     }};
+
+inline constexpr std::array<SelectedMeshTextureBakeStorage, 3>
+    kTextureBakeStorageModes{{
+        SelectedMeshTextureBakeStorage::Auto,
+        SelectedMeshTextureBakeStorage::RawFloat,
+        SelectedMeshTextureBakeStorage::EncodedRgba,
+    }};
+
+inline constexpr std::array<const char *, 3> kTextureBakeStorageNames{{
+    "auto (raw except normals/labels)",
+    "raw float texture",
+    "encoded RGBA texture",
+}};
+
+inline constexpr std::array<const char *, 6> kColormapNames{{
+    "Viridis", "Inferno", "Plasma", "Jet", "Coolwarm", "Heat"}};
+
+inline constexpr std::array<const char *, 2> kNormalSpaceNames{{
+    "object space", "world space"}};
 
 [[nodiscard]] const char *DebugNameForTextureBakeEncoder(
     const MeshAttributeTextureBakeEncoder encoder) noexcept {
@@ -116,6 +136,10 @@ struct TextureBakeUiState {
   std::int32_t *SourceIndex{nullptr};
   std::int32_t *TargetSemanticIndex{nullptr};
   std::int32_t *EncoderIndex{nullptr};
+  std::int32_t *StorageIndex{nullptr};
+  std::int32_t *ColormapIndex{nullptr};
+  std::int32_t *NormalSpaceIndex{nullptr};
+  std::uint32_t *AdditionalConsumerMask{nullptr};
   std::int32_t *Width{nullptr};
   std::int32_t *Height{nullptr};
   std::int32_t *UvResolution{nullptr};
@@ -487,6 +511,10 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
   std::int32_t fallbackSourceIndex{0};
   std::int32_t fallbackSemanticIndex{0};
   std::int32_t fallbackEncoderIndex{0};
+  std::int32_t fallbackStorageIndex{0};
+  std::int32_t fallbackColormapIndex{0};
+  std::int32_t fallbackNormalSpaceIndex{0};
+  std::uint32_t fallbackAdditionalConsumerMask{0u};
   std::int32_t fallbackWidth{static_cast<std::int32_t>(model.DefaultWidth)};
   std::int32_t fallbackHeight{static_cast<std::int32_t>(model.DefaultHeight)};
   std::int32_t fallbackUvResolution{1024};
@@ -509,6 +537,21 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
   std::int32_t &encoderIndex =
       state != nullptr && state->EncoderIndex != nullptr ? *state->EncoderIndex
                                                          : fallbackEncoderIndex;
+  std::int32_t &storageIndex =
+      state != nullptr && state->StorageIndex != nullptr ? *state->StorageIndex
+                                                         : fallbackStorageIndex;
+  std::int32_t &colormapIndex =
+      state != nullptr && state->ColormapIndex != nullptr
+          ? *state->ColormapIndex
+          : fallbackColormapIndex;
+  std::int32_t &normalSpaceIndex =
+      state != nullptr && state->NormalSpaceIndex != nullptr
+          ? *state->NormalSpaceIndex
+          : fallbackNormalSpaceIndex;
+  std::uint32_t &additionalConsumerMask =
+      state != nullptr && state->AdditionalConsumerMask != nullptr
+          ? *state->AdditionalConsumerMask
+          : fallbackAdditionalConsumerMask;
   std::int32_t &bakeWidth = state != nullptr && state->Width != nullptr
                                 ? *state->Width
                                 : fallbackWidth;
@@ -539,6 +582,15 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
   encoderIndex = std::clamp<std::int32_t>(
       encoderIndex, 0,
       static_cast<std::int32_t>(kTextureBakeEncoders.size() - 1u));
+  storageIndex = std::clamp<std::int32_t>(
+      storageIndex, 0,
+      static_cast<std::int32_t>(kTextureBakeStorageModes.size() - 1u));
+  colormapIndex = std::clamp<std::int32_t>(
+      colormapIndex, 0,
+      static_cast<std::int32_t>(kColormapNames.size() - 1u));
+  normalSpaceIndex = std::clamp<std::int32_t>(
+      normalSpaceIndex, 0,
+      static_cast<std::int32_t>(kNormalSpaceNames.size() - 1u));
   bakeWidth = std::clamp<std::int32_t>(bakeWidth, 1, 8192);
   bakeHeight = std::clamp<std::int32_t>(bakeHeight, 1, 8192);
   uvResolution = std::clamp<std::int32_t>(uvResolution, 1, 16384);
@@ -619,6 +671,29 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
     ImGui::EndCombo();
   }
 
+  const auto targetCompatible =
+      [selectedSource, storageIndex, encoderIndex, colormapIndex](
+          const ProgressiveSlotSemantic semantic) {
+        if (selectedSource == nullptr)
+          return false;
+        const std::array<BakedPropertyTextureConsumer, 1> consumer{{
+            BakedPropertyTextureConsumer{
+                .PresentationKey = "mesh.surface",
+                .Semantic = semantic,
+                .Colormap = static_cast<ColormapType>(colormapIndex),
+            },
+        }};
+        const BakedPropertyTextureRepresentation representation =
+            ResolveBakedPropertyTextureRepresentation(
+                selectedSource->ExpectedValueKind,
+                kTextureBakeStorageModes[static_cast<std::size_t>(storageIndex)],
+                kTextureBakeEncoders[static_cast<std::size_t>(encoderIndex)],
+                consumer);
+        return IsBakedPropertyTextureConsumerCompatible(
+            consumer.front(), selectedSource->ExpectedValueKind,
+            representation.Storage, representation.Encoder);
+      };
+
   if (ImGui::BeginCombo(
           "Target",
           std::string(
@@ -628,8 +703,13 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
     for (std::size_t i = 0u; i < kTextureBakeTargetSemantics.size(); ++i) {
       const std::string label{ToString(kTextureBakeTargetSemantics[i])};
       const bool selected = semanticIndex == static_cast<std::int32_t>(i);
+      const bool compatible = targetCompatible(kTextureBakeTargetSemantics[i]);
+      if (!compatible)
+        ImGui::BeginDisabled();
       if (ImGui::Selectable(label.c_str(), selected))
         semanticIndex = static_cast<std::int32_t>(i);
+      if (!compatible)
+        ImGui::EndDisabled();
       if (selected)
         ImGui::SetItemDefaultFocus();
     }
@@ -652,13 +732,107 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
     }
     ImGui::EndCombo();
   }
+  (void)ImGui::Combo("Storage", &storageIndex,
+                     kTextureBakeStorageNames.data(),
+                     static_cast<int>(kTextureBakeStorageNames.size()));
+  (void)ImGui::Combo("Texture colormap", &colormapIndex,
+                     kColormapNames.data(),
+                     static_cast<int>(kColormapNames.size()));
+
+  const auto makeConsumer =
+      [colormapIndex](const ProgressiveSlotSemantic semantic) {
+        return BakedPropertyTextureConsumer{
+            .PresentationKey = "mesh.surface",
+            .Semantic = semantic,
+            .Colormap = static_cast<ColormapType>(colormapIndex),
+        };
+      };
+  const auto consumersCompatible =
+      [selectedSource, storageIndex, encoderIndex](
+          const std::vector<BakedPropertyTextureConsumer> &values) {
+        if (selectedSource == nullptr)
+          return false;
+        const BakedPropertyTextureRepresentation representation =
+            ResolveBakedPropertyTextureRepresentation(
+                selectedSource->ExpectedValueKind,
+                kTextureBakeStorageModes[static_cast<std::size_t>(storageIndex)],
+                kTextureBakeEncoders[static_cast<std::size_t>(encoderIndex)],
+                values);
+        return std::ranges::all_of(
+            values, [&](const BakedPropertyTextureConsumer &consumer) {
+              return IsBakedPropertyTextureConsumerCompatible(
+                  consumer, selectedSource->ExpectedValueKind,
+                  representation.Storage, representation.Encoder);
+            });
+      };
+
+  std::vector<BakedPropertyTextureConsumer> consumers{
+      makeConsumer(kTextureBakeTargetSemantics[
+          static_cast<std::size_t>(semanticIndex)])};
+  for (std::size_t i = 0u; i < kTextureBakeTargetSemantics.size(); ++i) {
+    if (i == static_cast<std::size_t>(semanticIndex))
+      continue;
+    const std::uint32_t bit = 1u << static_cast<std::uint32_t>(i);
+    if ((additionalConsumerMask & bit) != 0u)
+      consumers.push_back(makeConsumer(kTextureBakeTargetSemantics[i]));
+  }
+
+  ImGui::TextUnformatted("Additional consumers");
+  for (std::size_t i = 0u; i < kTextureBakeTargetSemantics.size(); ++i) {
+    if (i == static_cast<std::size_t>(semanticIndex))
+      continue;
+    const ProgressiveSlotSemantic semantic = kTextureBakeTargetSemantics[i];
+    const std::uint32_t bit = 1u << static_cast<std::uint32_t>(i);
+    bool selected = (additionalConsumerMask & bit) != 0u;
+    std::vector<BakedPropertyTextureConsumer> candidate = consumers;
+    if (!selected)
+      candidate.push_back(makeConsumer(semantic));
+    const bool compatible = consumersCompatible(candidate);
+    if (selected && !compatible) {
+      additionalConsumerMask &= ~bit;
+      std::erase_if(consumers,
+                    [semantic](const BakedPropertyTextureConsumer &consumer) {
+                      return consumer.Semantic == semantic;
+                    });
+      selected = false;
+    }
+    const std::string label{"Also bind to " + std::string(ToString(semantic))};
+    if (!compatible)
+      ImGui::BeginDisabled();
+    if (ImGui::Checkbox(label.c_str(), &selected)) {
+      if (selected) {
+        additionalConsumerMask |= bit;
+        consumers.push_back(makeConsumer(semantic));
+      } else {
+        additionalConsumerMask &= ~bit;
+        std::erase_if(
+            consumers,
+            [semantic](const BakedPropertyTextureConsumer &consumer) {
+              return consumer.Semantic == semantic;
+            });
+      }
+    }
+    if (!compatible)
+      ImGui::EndDisabled();
+  }
+
+  const bool hasNormalConsumer = std::ranges::any_of(
+      consumers, [](const BakedPropertyTextureConsumer &consumer) {
+        return consumer.Semantic == ProgressiveSlotSemantic::Normal;
+      });
+  if (hasNormalConsumer) {
+    (void)ImGui::Combo("Normal texture space", &normalSpaceIndex,
+                       kNormalSpaceNames.data(),
+                       static_cast<int>(kNormalSpaceNames.size()));
+  }
   ImGui::InputInt("Bake width", &bakeWidth);
   ImGui::InputInt("Bake height", &bakeHeight);
   bakeWidth = std::clamp<std::int32_t>(bakeWidth, 1, 8192);
   bakeHeight = std::clamp<std::int32_t>(bakeHeight, 1, 8192);
 
   const bool canBake =
-      model.CanBake && context != nullptr && selectedSource != nullptr;
+      model.CanBake && context != nullptr && selectedSource != nullptr &&
+      consumersCompatible(consumers);
   if (!canBake)
     ImGui::BeginDisabled();
   if (ImGui::Button("Bake") && canBake) {
@@ -677,6 +851,13 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
             .Width = static_cast<std::uint32_t>(bakeWidth),
             .Height = static_cast<std::uint32_t>(bakeHeight),
             .GeneratedKey = selectedSource->Name,
+            .Storage = kTextureBakeStorageModes[
+                static_cast<std::size_t>(storageIndex)],
+            .EncodingColormap = static_cast<ColormapType>(colormapIndex),
+            .NormalSpace = normalSpaceIndex == 1
+                               ? BakedPropertyNormalSpace::World
+                               : BakedPropertyNormalSpace::Object,
+            .Consumers = consumers,
             .BindGeneratedTexture = true,
         });
   }
@@ -685,6 +866,165 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
     if (!model.DisabledReason.empty())
       ImGui::TextDisabled("%s", model.DisabledReason.c_str());
   }
+
+  ImGui::SeparatorText("Baked textures");
+  if (model.BakedTextures.empty())
+    ImGui::TextDisabled("No baked property textures on this entity.");
+  static std::string renameTarget{};
+  static std::array<char, 128> renameBuffer{};
+  static std::string mutationDiagnostic{};
+  for (const BakedPropertyTextureRecord &record : model.BakedTextures) {
+    ImGui::PushID(record.OutputName.c_str());
+    if (ImGui::CollapsingHeader(record.OutputName.c_str(),
+                                ImGuiTreeNodeFlags_DefaultOpen)) {
+      const char *stateName = "pending";
+      if (record.State == BakedPropertyTextureState::Ready)
+        stateName = "ready";
+      else if (record.State == BakedPropertyTextureState::Failed)
+        stateName = "failed";
+      const char *storageName =
+          record.Storage == SelectedMeshTextureBakeStorage::RawFloat
+              ? "raw float"
+              : record.Storage == SelectedMeshTextureBakeStorage::EncodedRgba
+                    ? "encoded RGBA"
+                    : "auto";
+      ImGui::Text("%s | %s | %ux%u", stateName, storageName, record.Width,
+                  record.Height);
+      ImGui::Text("Source: %s  range=[%.6g, %.6g]",
+                  record.SourcePropertyName.c_str(), record.RangeMin,
+                  record.RangeMax);
+      if (record.Encoder == MeshAttributeTextureBakeEncoder::ScalarColormap) {
+        const std::size_t mapIndex = std::min<std::size_t>(
+            static_cast<std::size_t>(record.EncodingColormap),
+            kColormapNames.size() - 1u);
+        ImGui::Text("Baked colormap: %s", kColormapNames[mapIndex]);
+      }
+      if (record.Encoder == MeshAttributeTextureBakeEncoder::Normal) {
+        ImGui::Text("Normal space: %s",
+                    record.NormalSpace == BakedPropertyNormalSpace::World
+                        ? "world"
+                        : "object");
+      }
+      if (!record.Diagnostic.empty())
+        ImGui::TextDisabled("%s", record.Diagnostic.c_str());
+
+      if (ImGui::SmallButton("Rename")) {
+        renameTarget = record.OutputName;
+        renameBuffer.fill('\0');
+        const std::size_t count = std::min(
+            renameTarget.size(), renameBuffer.size() - 1u);
+        std::copy_n(renameTarget.data(), count, renameBuffer.data());
+        ImGui::OpenPopup("Rename baked texture");
+      }
+      if (context != nullptr && renameTarget == record.OutputName &&
+          ImGui::BeginPopup("Rename baked texture")) {
+        ImGui::InputText("Name", renameBuffer.data(), renameBuffer.size());
+        if (ImGui::Button("Apply")) {
+          const TextureBakeMutationResult result =
+              RenameSandboxEditorBakedTexture(
+                  *context, model.SelectedStableId, record.OutputName,
+                  std::string_view{renameBuffer.data()});
+          mutationDiagnostic = result.Diagnostic;
+          if (result.Succeeded())
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+      }
+      ImGui::SameLine();
+      if (context != nullptr && ImGui::SmallButton("Remove")) {
+        const TextureBakeMutationResult result =
+            RemoveSandboxEditorBakedTexture(
+                *context, model.SelectedStableId, record.OutputName);
+        mutationDiagnostic = result.Diagnostic;
+      }
+
+      std::vector<BakedPropertyTextureConsumer> nextConsumers =
+          record.Consumers;
+      bool consumersChanged = false;
+      for (std::size_t i = 0u; i < kTextureBakeTargetSemantics.size(); ++i) {
+        const ProgressiveSlotSemantic semantic =
+            kTextureBakeTargetSemantics[i];
+        const auto found = std::find_if(
+            nextConsumers.begin(), nextConsumers.end(),
+            [semantic](const BakedPropertyTextureConsumer &consumer) {
+              return consumer.Semantic == semantic;
+            });
+        bool enabled = found != nextConsumers.end();
+        const bool compatible = IsBakedPropertyTextureConsumerCompatible(
+            BakedPropertyTextureConsumer{
+                .PresentationKey = "mesh.surface",
+                .Semantic = semantic,
+            },
+            record.ValueKind, record.Storage, record.Encoder);
+        const std::string label{
+            "Consume as " + std::string(ToString(semantic))};
+        const bool disableConsumer = !compatible && !enabled;
+        if (disableConsumer)
+          ImGui::BeginDisabled();
+        if (ImGui::Checkbox(label.c_str(), &enabled)) {
+          consumersChanged = true;
+          if (enabled) {
+            nextConsumers.push_back(BakedPropertyTextureConsumer{
+                .PresentationKey = "mesh.surface",
+                .Semantic = semantic,
+                .Colormap = static_cast<ColormapType>(colormapIndex),
+            });
+          } else {
+            std::erase_if(
+                nextConsumers,
+                [semantic](const BakedPropertyTextureConsumer &consumer) {
+                  return consumer.Semantic == semantic;
+                });
+          }
+        }
+        if (disableConsumer)
+          ImGui::EndDisabled();
+      }
+
+      const bool rawScalar =
+          record.Storage == SelectedMeshTextureBakeStorage::RawFloat &&
+          (record.ValueKind == ProgressivePropertyValueKind::ScalarFloat ||
+           record.ValueKind == ProgressivePropertyValueKind::ScalarDouble);
+      if (rawScalar) {
+        int recordColormap = 0;
+        for (const BakedPropertyTextureConsumer &consumer : nextConsumers) {
+          if (consumer.Semantic == ProgressiveSlotSemantic::Albedo ||
+              consumer.Semantic == ProgressiveSlotSemantic::ScalarField) {
+            recordColormap = static_cast<int>(consumer.Colormap);
+            break;
+          }
+        }
+        recordColormap = std::clamp(
+            recordColormap, 0,
+            static_cast<int>(kColormapNames.size() - 1u));
+        if (ImGui::Combo("Render colormap", &recordColormap,
+                         kColormapNames.data(),
+                         static_cast<int>(kColormapNames.size()))) {
+          consumersChanged = true;
+          for (BakedPropertyTextureConsumer &consumer : nextConsumers) {
+            if (consumer.Semantic == ProgressiveSlotSemantic::Albedo ||
+                consumer.Semantic == ProgressiveSlotSemantic::ScalarField) {
+              consumer.Colormap =
+                  static_cast<ColormapType>(recordColormap);
+            }
+          }
+        }
+      }
+      if (context != nullptr && consumersChanged) {
+        const TextureBakeMutationResult result =
+            SetSandboxEditorBakedTextureConsumers(
+                *context, TextureBakeConsumerUpdateRequest{
+                              .StableEntityId = model.SelectedStableId,
+                              .OutputName = record.OutputName,
+                              .Consumers = std::move(nextConsumers),
+                          });
+        mutationDiagnostic = result.Diagnostic;
+      }
+    }
+    ImGui::PopID();
+  }
+  if (!mutationDiagnostic.empty())
+    ImGui::TextDisabled("%s", mutationDiagnostic.c_str());
 
   if (ImGui::BeginTable("TextureBakeSources", 5,
                         ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
@@ -1489,6 +1829,10 @@ struct DomainPanels::Impl {
   std::int32_t TextureBakeSourceIndex{0};
   std::int32_t TextureBakeTargetSemanticIndex{0};
   std::int32_t TextureBakeEncoderIndex{0};
+  std::int32_t TextureBakeStorageIndex{0};
+  std::int32_t TextureBakeColormapIndex{0};
+  std::int32_t TextureBakeNormalSpaceIndex{0};
+  std::uint32_t TextureBakeAdditionalConsumerMask{0u};
   std::int32_t TextureBakeWidth{64};
   std::int32_t TextureBakeHeight{64};
   std::int32_t UvAtlasResolution{1024};
@@ -1640,6 +1984,10 @@ void DomainPanels::Impl::DrawWindow(
       .SourceIndex = &TextureBakeSourceIndex,
       .TargetSemanticIndex = &TextureBakeTargetSemanticIndex,
       .EncoderIndex = &TextureBakeEncoderIndex,
+      .StorageIndex = &TextureBakeStorageIndex,
+      .ColormapIndex = &TextureBakeColormapIndex,
+      .NormalSpaceIndex = &TextureBakeNormalSpaceIndex,
+      .AdditionalConsumerMask = &TextureBakeAdditionalConsumerMask,
       .Width = &TextureBakeWidth,
       .Height = &TextureBakeHeight,
       .UvResolution = &UvAtlasResolution,

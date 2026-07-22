@@ -10,6 +10,7 @@ export module Extrinsic.Graphics.Material;
 
 import Extrinsic.Core.StrongHandle;
 import Extrinsic.Asset.Registry;
+import Extrinsic.Graphics.Colormap;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.Types;
 
@@ -18,8 +19,8 @@ import Extrinsic.RHI.Types;
 //
 // These are the CPU-side representations.  The GPU layout is
 // GpuMaterialSlot (RHI.Types), a 128-byte std430 struct with
-// 48 bytes of standard PBR fields, 16 bytes of material type/flags and
-// padding, and 64 bytes of custom data.
+// 48 bytes of standard PBR fields, 16 bytes of material/source metadata,
+// and 64 bytes of custom data.
 //
 // Separation of concerns:
 //   Graphics.Material      — descriptors, params, handles (this file)
@@ -174,6 +175,10 @@ export namespace Extrinsic::Graphics
         Unlit         = 1 << 3,  // skip lighting entirely
         EmissiveOnly  = 1 << 4,  // treat EmissiveID as the colour source
         ObjectSpaceNormalMap = 1 << 5, // NormalID decodes as object-space normal data
+        ScalarAlbedoTexture = 1 << 6, // AlbedoID stores raw scalar data sampled through a colormap
+        ScalarRoughnessTexture = 1 << 7, // MetallicRoughnessID.r drives roughness
+        ScalarMetallicTexture = 1 << 8, // MetallicRoughnessID.r drives metallic
+        WorldSpaceNormalMap = 1 << 9, // NormalID decodes directly in world space
     };
 
     [[nodiscard]] constexpr MaterialFlags operator|(MaterialFlags a, MaterialFlags b) noexcept
@@ -233,6 +238,27 @@ export namespace Extrinsic::Graphics
     {
         const std::uint32_t shift = static_cast<std::uint32_t>(channel) * 2u;
         return static_cast<AttributeSource>((bits >> shift) & 0x3u);
+    }
+
+    inline constexpr std::uint32_t kScalarAlbedoColormapShift = 8u;
+    inline constexpr std::uint32_t kScalarAlbedoColormapMask =
+        0xffffu << kScalarAlbedoColormapShift;
+
+    [[nodiscard]] constexpr std::uint32_t SetScalarAlbedoColormapIndex(
+        const std::uint32_t bits,
+        const RHI::BindlessIndex index) noexcept
+    {
+        const std::uint32_t encoded = index <= 0xffffu ? index : 0u;
+        return (bits & ~kScalarAlbedoColormapMask) |
+               (encoded << kScalarAlbedoColormapShift);
+    }
+
+    [[nodiscard]] constexpr RHI::BindlessIndex GetScalarAlbedoColormapIndex(
+        const std::uint32_t bits) noexcept
+    {
+        return static_cast<RHI::BindlessIndex>(
+            (bits & kScalarAlbedoColormapMask) >>
+            kScalarAlbedoColormapShift);
     }
 
     // -----------------------------------------------------------------
@@ -301,8 +327,12 @@ export namespace Extrinsic::Graphics
 
         // Per-channel attribute source (2 bits per MaterialChannel). Defaults
         // to all VertexAttribute (0), so behavior is unchanged unless a channel
-        // is explicitly switched to Texture. Use Set/GetChannelSource.
+        // is explicitly switched to Texture. Bits 8..23 retain the raw scalar
+        // albedo colormap bindless index. Use the typed helpers above.
         std::uint32_t ChannelSourceBits = 0;
+
+        float AlbedoScalarRangeMin = 0.0f;
+        float AlbedoScalarRangeMax = 1.0f;
 
         // Custom data — maps directly to GpuMaterialSlot::CustomData[0..3]
         glm::vec4 CustomData[4]{};
@@ -312,6 +342,13 @@ export namespace Extrinsic::Graphics
     {
         TangentSpaceNormal = 0,
         ObjectSpaceNormal = 1,
+        WorldSpaceNormal = 2,
+    };
+
+    enum class MaterialAlbedoTextureInterpretation : std::uint32_t
+    {
+        Color = 0,
+        Scalar = 1,
     };
 
     struct MaterialTextureAssetBindings
@@ -322,5 +359,12 @@ export namespace Extrinsic::Graphics
         Assets::AssetId Emissive{};
         MaterialNormalTextureSpace NormalSpace{
             MaterialNormalTextureSpace::TangentSpaceNormal};
+        MaterialAlbedoTextureInterpretation AlbedoInterpretation{
+            MaterialAlbedoTextureInterpretation::Color};
+        Colormap::Type AlbedoScalarColormap{Colormap::Type::Viridis};
+        float AlbedoScalarRangeMin{0.0f};
+        float AlbedoScalarRangeMax{1.0f};
+        bool RoughnessFromRed{false};
+        bool MetallicFromRed{false};
     };
 }

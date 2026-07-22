@@ -212,7 +212,7 @@ TEST(RuntimeEngineLayering, EngineDelegatesGpuQueueLifecycleToJobService)
 }
 
 TEST(RuntimeEngineLayering,
-     AssetWorkflowModuleOwnsObjectSpaceNormalBakeComposition)
+     TextureBakeModuleOwnsGpuBakeCompositionOutsideAssetWorkflow)
 {
     const auto engineInterface =
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
@@ -226,6 +226,14 @@ TEST(RuntimeEngineLayering,
         ReadFile(
             RepoRoot() /
             "src/runtime/Runtime.AssetWorkflowModule.cpp");
+    const auto textureBakeInterface =
+        ReadFile(
+            RepoRoot() /
+            "src/runtime/Runtime.TextureBakeModule.cppm");
+    const auto textureBakeImpl =
+        ReadFile(
+            RepoRoot() /
+            "src/runtime/Runtime.TextureBakeModule.cpp");
     const auto serviceInterface =
         ReadFile(RepoRoot() / "src/runtime/Runtime.ObjectSpaceNormalBakeService.cppm");
     const auto serviceImpl =
@@ -238,30 +246,40 @@ TEST(RuntimeEngineLayering,
               std::string::npos);
     EXPECT_EQ(engineImpl.find("ObjectSpaceNormalBakeService"),
               std::string::npos);
-    EXPECT_NE(workflowImpl.find(
+    EXPECT_EQ(workflowImpl.find(
                   "import Extrinsic.Runtime.ObjectSpaceNormalBakeService;"),
               std::string::npos);
-    EXPECT_NE(workflowImpl.find("ObjectSpaceNormalBakeService Bake{}"),
-              std::string::npos);
-    EXPECT_NE(workflowImpl.find("m_Impl->Bake.SetDependencies("),
-              std::string::npos);
     EXPECT_NE(workflowImpl.find(
-                  "m_Impl->Bake.RegisterGpuQueueParticipant("),
+                  "import Extrinsic.Runtime.TextureBakeModule;"),
+              std::string::npos);
+    EXPECT_NE(workflowImpl.find("TextureBake->ProducerContext()"),
+              std::string::npos);
+    EXPECT_NE(textureBakeImpl.find(
+                  "import Extrinsic.Runtime.ObjectSpaceNormalBakeService;"),
+              std::string::npos);
+    EXPECT_NE(textureBakeImpl.find("ObjectSpaceNormalBakeService Bake{}"),
+              std::string::npos);
+    EXPECT_NE(textureBakeImpl.find("state.Bake.SetDependencies("),
+              std::string::npos);
+    EXPECT_NE(textureBakeImpl.find(
+                  "state.Bake.RegisterGpuQueueParticipant("),
               std::string::npos);
     EXPECT_EQ(CountOccurrences(
                   workflowImpl,
                   ".ObjectSpaceNormalBakeQueue ="),
               2u);
-    EXPECT_EQ(CountOccurrences(workflowImpl, "&Bake->Queue()"),
-              2u);
-    EXPECT_NE(workflowImpl.find("Bake.ClearDependencies()"),
+    EXPECT_EQ(workflowImpl.find("&Bake->Queue()"),
               std::string::npos);
-    EXPECT_NE(workflowImpl.find("Bake.Queue().Clear()"),
+    EXPECT_NE(textureBakeImpl.find("Bake.ClearDependencies()"),
               std::string::npos);
-    EXPECT_EQ(workflowImpl.find(
+    EXPECT_NE(textureBakeImpl.find("Bake.Queue().Clear()"),
+              std::string::npos);
+    EXPECT_EQ(textureBakeImpl.find(
                   "Provide<ObjectSpaceNormalBakeService>"),
               std::string::npos);
-    EXPECT_EQ(workflowImpl.find("QueueDiagnostics()"),
+    EXPECT_NE(textureBakeImpl.find("Provide<TextureBakeService>"),
+              std::string::npos);
+    EXPECT_EQ(textureBakeImpl.find("QueueDiagnostics()"),
               std::string::npos);
 
     EXPECT_EQ(engineInterface.find("import Extrinsic.Runtime.ObjectSpaceNormalBakeGpuQueue"),
@@ -289,6 +307,13 @@ TEST(RuntimeEngineLayering,
                   "export module Extrinsic.Runtime.AssetWorkflowModule"),
               std::string::npos);
     EXPECT_EQ(workflowInterface.find("ObjectSpaceNormalBakeService"),
+              std::string::npos);
+    EXPECT_NE(textureBakeInterface.find(
+                  "export module Extrinsic.Runtime.TextureBakeModule"),
+              std::string::npos);
+    EXPECT_NE(textureBakeInterface.find("class TextureBakeService"),
+              std::string::npos);
+    EXPECT_NE(textureBakeInterface.find("class TextureBakeModule final"),
               std::string::npos);
     EXPECT_NE(serviceInterface.find("export module Extrinsic.Runtime.ObjectSpaceNormalBakeService"),
               std::string::npos);
@@ -321,7 +346,13 @@ TEST(RuntimeEngineLayering,
         RepoRoot() / "src/runtime/Runtime.ObjectSpaceNormalBakeGpuQueue.cpp"));
     EXPECT_EQ(runtimeCMake.find("Runtime.ObjectSpaceNormalBakeGpuQueue"),
               std::string::npos);
+    EXPECT_NE(runtimeCMake.find("Runtime.TextureBakeModule.cppm"),
+              std::string::npos);
+    EXPECT_NE(runtimeCMake.find("Runtime.TextureBakeModule.cpp"),
+              std::string::npos);
     EXPECT_EQ(moduleInventory.find("Extrinsic.Runtime.ObjectSpaceNormalBakeGpuQueue"),
+              std::string::npos);
+    EXPECT_NE(moduleInventory.find("Extrinsic.Runtime.TextureBakeModule`"),
               std::string::npos);
 }
 

@@ -8,6 +8,26 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-190`](RUNTIME-190-gpu-property-texture-bake-module.md) — GPU property
+texture baking retired on 2026-07-21 at `Operational`. One app-composed
+`TextureBakeModule` now owns the generalized GPU UV-raster participant,
+generated-asset identity/lifetime, renderer-consumer bindings, and the retained
+import-time object-normal producer borrowed by `AssetWorkflowModule`. Existing
+named vertex, face, and nearest-edge properties bake to raw scalar/vector,
+normal, label, or explicit encoded-RGBA textures; missing UVs/properties fail
+closed and no interactive CPU fallback exists. Rebake replaces one named asset,
+rename preserves a distinct asset, remove destroys it and atomically restores
+property-buffer rendering, and one texture may feed multiple compatible
+consumers. Raw scalar textures carry range/colormap metadata so colormap edits
+do not rebake. The capable-host Vulkan smoke passed 1/1 with zero skips in
+25.15 seconds through real readback; the eight affected ASan cases passed 8/8,
+and the selected-mesh representation cohort passed 19/19.
+The full CPU-supported selector passed 4,281/4,282 in 395.01 seconds; its sole
+failure is the unrelated 408-byte GLFW/X11 LeakSanitizer recurrence tracked by
+`BUG-118`, with no gate suppression or exclusion. Strict layering, task/state,
+docs, test-layout, root-hygiene, generated-inventory, clean-workshop, and
+whitespace checks passed.
+
 [`RUNTIME-168`](RUNTIME-168-privatize-sandbox-default-policies-surface.md) —
 Sandbox default-policy composition retired on 2026-07-19 at `Operational`.
 The one-consumer exported policy module and public BMI are gone; four plain

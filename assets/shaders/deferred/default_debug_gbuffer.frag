@@ -56,6 +56,44 @@ bool IsValidTextureID(uint id) {
     return id != 0u && id != 0xFFFFFFFFu;
 }
 
+vec3 ResolveSurfaceNormal(
+    GpuMaterialSlot mat,
+    GpuInstanceDynamic dyn,
+    vec3 vertexWorldNormal,
+    vec2 uv)
+{
+    const float vertexNormalLen = length(vertexWorldNormal);
+    vec3 n = vertexNormalLen > 1.0e-6
+        ? vertexWorldNormal / vertexNormalLen
+        : vec3(0.0, 0.0, 1.0);
+    const bool normalFromTexture =
+        GpuMaterialChannelSource(mat, GpuMaterialChannel_Normal) ==
+            GpuAttributeSource_Texture ||
+        (mat.Flags & (GpuMaterialFlag_ObjectSpaceNormalMap |
+                      GpuMaterialFlag_WorldSpaceNormalMap)) != 0u;
+    if (!normalFromTexture || !IsValidTextureID(mat.NormalID)) {
+        return n;
+    }
+
+    const vec4 normalSample =
+        texture(globalTextures[nonuniformEXT(mat.NormalID)], uv);
+    vec3 objectNormal = normalSample.rgb * 2.0 - vec3(1.0);
+    const float objectNormalLen = length(objectNormal);
+    if (normalSample.a <= 1.0e-6 || objectNormalLen <= 1.0e-6) {
+        return n;
+    }
+    objectNormal /= objectNormalLen;
+    if ((mat.Flags & GpuMaterialFlag_WorldSpaceNormalMap) != 0u) {
+        return objectNormal;
+    }
+    const vec3 worldNormal =
+        transpose(inverse(mat3(dyn.Model))) * objectNormal;
+    const float worldNormalLen = length(worldNormal);
+    return worldNormalLen > 1.0e-6
+        ? worldNormal / worldNormalLen
+        : n;
+}
+
 vec2 ResolveMetallicRoughness(GpuMaterialSlot mat, vec2 uv)
 {
     vec2 roughnessMetallic = vec2(mat.RoughnessFactor, mat.MetallicFactor);
@@ -66,13 +104,23 @@ vec2 ResolveMetallicRoughness(GpuMaterialSlot mat, vec2 uv)
     }
 
     const vec4 mrSample = texture(globalTextures[nonuniformEXT(mat.MetallicRoughnessID)], uv);
-    return vec2(mrSample.g, mrSample.b);
+    const float roughness =
+        (mat.Flags & GpuMaterialFlag_ScalarRoughnessTexture) != 0u
+            ? mrSample.r
+            : mrSample.g;
+    const float metallic =
+        (mat.Flags & GpuMaterialFlag_ScalarMetallicTexture) != 0u
+            ? mrSample.r
+            : mrSample.b;
+    return vec2(roughness, metallic);
 }
 
 void main() {
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
     const GpuInstanceStatic inst =
         GpuInstanceStaticRef(scene.InstanceStaticBDA).Data[fragInstanceSlot];
+    const GpuInstanceDynamic dyn =
+        GpuInstanceDynamicRef(scene.InstanceDynamicBDA).Data[fragInstanceSlot];
     const uint materialSlot = fragMaterialSlot != 0xFFFFFFFFu
         ? fragMaterialSlot
         : inst.MaterialSlot;
@@ -82,15 +130,24 @@ void main() {
     const GpuMaterialSlot mat = GpuMaterialSlotRef(scene.MaterialBDA).Data[materialSlot];
     const GpuEntityConfig cfg = GpuEntityConfigRef(scene.EntityConfigBDA).Data[configSlot];
 
-    vec3 n = vec3(0.0, 0.0, 1.0);
-    const float vertexNormalLen = length(fragWorldNormal);
-    if (vertexNormalLen > 1.0e-6) {
-        n = fragWorldNormal / vertexNormalLen;
-    }
+    const vec3 n = ResolveSurfaceNormal(
+        mat,
+        dyn,
+        fragWorldNormal,
+        fragUv);
 
     vec4 baseColor = mat.BaseColorFactor;
     if (IsValidTextureID(mat.AlbedoID)) {
-        baseColor *= texture(globalTextures[nonuniformEXT(mat.AlbedoID)], fragUv);
+        vec4 albedoSample =
+            texture(globalTextures[nonuniformEXT(mat.AlbedoID)], fragUv);
+        if ((mat.Flags & GpuMaterialFlag_ScalarAlbedoTexture) != 0u) {
+            const float t = GpuNormalizeScalarAlbedo(mat, albedoSample.r);
+            const uint colormapID = GpuScalarAlbedoColormapID(mat);
+            albedoSample = IsValidTextureID(colormapID)
+                ? texture(globalTextures[nonuniformEXT(colormapID)], vec2(t, 0.5))
+                : vec4(t, t, t, 1.0);
+        }
+        baseColor *= albedoSample;
     }
     if (fragHasVertexColor != 0u) {
         baseColor = fragVertexColor;

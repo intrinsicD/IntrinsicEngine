@@ -239,6 +239,7 @@ namespace Extrinsic::Runtime
         void ApplyProgressivePresentationBindings(
             entt::registry& registry,
             entt::entity entity,
+            std::uint32_t stableId,
             const ECS::Components::GeometrySources::ConstSourceView& view,
             RenderableSidecar& sidecar,
             Graphics::IRenderer& renderer,

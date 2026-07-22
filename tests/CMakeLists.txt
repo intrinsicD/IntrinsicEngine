@@ -859,6 +859,7 @@ set(_graphics_contract_test_files
     Test.GpuTransferFacade.cpp
     Test.MinimalTriangleAcceptance.cpp
     Test.ObjectSpaceNormalTextureBake.cpp
+    Test.PropertyTextureBake.cpp
     Test.RHI.CommandContextBarriers.cpp
     Test.RendererRhiBoundary.cpp
     Test.TextureReadback.cpp

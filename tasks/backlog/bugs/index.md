@@ -5,6 +5,11 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-118` — GLFW X11 input-method LeakSanitizer recurrence](BUG-118-glfw-x11-input-method-lsan-recurrence.md):
+  the standalone lifetime contract again retains the unsuppressed 408-byte
+  libX11 input-method allocation despite proving process-static
+  `glfwTerminate()` ran once; compare the live XIM environment and teardown
+  path with the retired `BUG-082` evidence without weakening leak detection.
 - [`BUG-110` — Implicit smoothing applies boundary pins after rather than during solve](BUG-110-implicit-smoothing-boundary-dirichlet-solve.md):
   `PreserveBoundary` currently solves an all-free shifted system and only then
   overwrites boundary entries, so interior vertices do not satisfy the claimed

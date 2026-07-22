@@ -1,7 +1,6 @@
 module;
 
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <string_view>
 #include <utility>
@@ -27,12 +26,12 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
-import Extrinsic.Runtime.ObjectSpaceNormalBakeService;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 
@@ -43,7 +42,7 @@ namespace Extrinsic::Runtime
         struct State
         {
             AssetImportPipeline* Pipeline{nullptr};
-            ObjectSpaceNormalBakeService* Bake{nullptr};
+            TextureBakeService* TextureBake{nullptr};
 
             JobService* Jobs{nullptr};
             WorldRegistry* Worlds{nullptr};
@@ -69,7 +68,6 @@ namespace Extrinsic::Runtime
             ECS::Scene::Registry* BoundRegistry{nullptr};
             std::uint64_t BindingEpoch{1u};
             SceneReplacementParticipantHandle DocumentParticipant{};
-            GpuQueueParticipantHandle BakeParticipant{};
             bool AcceptingCallbacks{false};
             bool ShutdownAnnounced{false};
             std::weak_ptr<State> Self{};
@@ -104,22 +102,12 @@ namespace Extrinsic::Runtime
             {
                 DetachPipeline();
 
-                const WorldHandle outgoingWorld = BoundWorld;
-                const std::uint64_t outgoingEpoch = BindingEpoch;
                 if (clearRenderAndBakeState)
                 {
                     if (Extraction != nullptr &&
                         Renderer != nullptr)
                     {
                         Extraction->ClearSceneState(*Renderer);
-                    }
-                    if (Bake != nullptr &&
-                        outgoingWorld.IsValid() &&
-                        outgoingEpoch != 0u)
-                    {
-                        Bake->DetachTargets(
-                            outgoingWorld,
-                            outgoingEpoch);
                     }
                 }
 
@@ -129,8 +117,6 @@ namespace Extrinsic::Runtime
                 BoundWorld = {};
                 BoundRegistry = nullptr;
                 AdvanceBindingEpoch();
-                if (Bake != nullptr)
-                    Bake->SetTargetScene({}, 0u, nullptr);
             }
 
             void BindTo(
@@ -149,21 +135,20 @@ namespace Extrinsic::Runtime
                     TextureHandoff == nullptr ||
                     Renderer == nullptr ||
                     Device == nullptr ||
-                    Pipeline == nullptr ||
-                    Bake == nullptr)
+                    Pipeline == nullptr)
                 {
                     DetachPipeline();
-                    if (Bake != nullptr)
-                        Bake->SetTargetScene({}, 0u, nullptr);
                     return;
                 }
 
                 const std::uint64_t expectedEpoch =
                     BindingEpoch;
-                Bake->SetTargetScene(
-                    BoundWorld,
-                    expectedEpoch,
-                    BoundRegistry);
+                const TextureBakeProducerContext bake =
+                    TextureBake != nullptr
+                        ? TextureBake->ProducerContext()
+                        : TextureBakeProducerContext{};
+                const bool bakeMatchesScene =
+                    bake.IsValid() && bake.World == BoundWorld;
                 const std::weak_ptr<State> weakState = Self;
                 SceneHandoff =
                     std::make_unique<AssetModelSceneHandoff>(
@@ -185,10 +170,11 @@ namespace Extrinsic::Runtime
                                                 expectedEpoch);
                                     }
                                     return false;
-                                },
+                            },
                             .ObjectSpaceNormalBakeQueue =
-                                &Bake->Queue(),
-                            .ObjectSpaceNormalBakeDevice = Device,
+                                bakeMatchesScene ? bake.Queue : nullptr,
+                            .ObjectSpaceNormalBakeDevice =
+                                bakeMatchesScene ? bake.Device : nullptr,
                         });
 
                 Pipeline->SetDependencies(
@@ -209,11 +195,42 @@ namespace Extrinsic::Runtime
                         .Selection = Selection,
                         .CommandHistory = History,
                         .ObjectSpaceNormalBakeQueue =
-                            &Bake->Queue(),
+                            bakeMatchesScene ? bake.Queue : nullptr,
                         .ObjectSpaceNormalBakeBindingEpoch =
-                            expectedEpoch,
+                            bakeMatchesScene ? bake.BindingEpoch : 0u,
+                        .ObjectSpaceNormalBakeLifetime =
+                            bakeMatchesScene
+                                ? bake.Lifetime
+                                : std::weak_ptr<void>{},
                         .Device = Device,
                     });
+            }
+
+            void RefreshTextureBakeBinding()
+            {
+                if (!AcceptingCallbacks ||
+                    !BoundWorld.IsValid() ||
+                    BoundRegistry == nullptr)
+                {
+                    return;
+                }
+                const TextureBakeProducerContext bake =
+                    TextureBake != nullptr
+                        ? TextureBake->ProducerContext()
+                        : TextureBakeProducerContext{};
+                const RuntimeObjectSpaceNormalBakeProducerContext current =
+                    Pipeline->GetObjectSpaceNormalBakeProducerContext();
+                const bool bakeMatchesScene =
+                    bake.IsValid() && bake.World == BoundWorld;
+                if (current.Queue ==
+                        (bakeMatchesScene ? bake.Queue : nullptr) &&
+                    current.BindingEpoch ==
+                        (bakeMatchesScene ? bake.BindingEpoch : 0u) &&
+                    current.Device == Device)
+                {
+                    return;
+                }
+                BindTo(BoundWorld, BoundRegistry);
             }
 
             void ResetAndBindTo(
@@ -290,18 +307,9 @@ namespace Extrinsic::Runtime
                 DetachPipeline();
 
                 AcceptingCallbacks = false;
-                // Do not clear cache or bake state here. The global GPU queue
-                // bridge must observe and quiesce every pending bake first.
+                // TextureBakeModule owns and quiesces its GPU queue before
+                // this module destroys the shared asset/cache state.
                 SceneHandoff.reset();
-                if (Bake != nullptr &&
-                    BoundWorld.IsValid() &&
-                    BindingEpoch != 0u)
-                {
-                    Bake->DetachTargets(
-                        BoundWorld,
-                        BindingEpoch);
-                    Bake->SetTargetScene({}, 0u, nullptr);
-                }
                 BoundWorld = {};
                 BoundRegistry = nullptr;
                 AdvanceBindingEpoch();
@@ -318,14 +326,15 @@ namespace Extrinsic::Runtime
                 Renderer = nullptr;
                 Device = nullptr;
                 Jobs = nullptr;
+                TextureBake = nullptr;
             }
         };
 
         AssetImportPipeline Pipeline{};
-        ObjectSpaceNormalBakeService Bake{};
         std::shared_ptr<State> Shared{};
         KernelEventSubscription ActiveWorldChangedSubscription{};
         KernelEventSubscription WorldDestroyedSubscription{};
+        KernelEventSubscription TextureBakeBindingChangedSubscription{};
         KernelEventSubscription ShutdownSubscription{};
         bool AssetServicePublished{false};
         bool PipelinePublished{false};
@@ -347,11 +356,17 @@ namespace Extrinsic::Runtime
                     events->Unsubscribe(
                         WorldDestroyedSubscription);
                 }
+                if (TextureBakeBindingChangedSubscription.IsValid())
+                {
+                    events->Unsubscribe(
+                        TextureBakeBindingChangedSubscription);
+                }
                 if (ShutdownSubscription.IsValid())
                     events->Unsubscribe(ShutdownSubscription);
             }
             ActiveWorldChangedSubscription = {};
             WorldDestroyedSubscription = {};
+            TextureBakeBindingChangedSubscription = {};
             ShutdownSubscription = {};
         }
 
@@ -420,9 +435,9 @@ namespace Extrinsic::Runtime
         void RollBack(
             AssetWorkflowModule& module,
             KernelEventBus* const events,
-            JobService* const jobs,
+            JobService* const,
             ServiceRegistry* const services,
-            const bool waitForGpuIdle) noexcept
+            const bool) noexcept
         {
             if (Shared != nullptr)
             {
@@ -430,33 +445,10 @@ namespace Extrinsic::Runtime
                 state.AcceptingCallbacks = false;
                 state.DetachPipeline();
                 state.ReleaseDocumentParticipant();
-
-                JobService* const participantJobs =
-                    jobs != nullptr ? jobs : state.Jobs;
-                if (participantJobs != nullptr &&
-                    state.BakeParticipant.IsValid())
-                {
-                    RHI::IDevice* const device =
-                        state.Device;
-                    participantJobs->
-                        UnregisterGpuQueueParticipant(
-                            state.BakeParticipant,
-                            waitForGpuIdle &&
-                                    device != nullptr
-                                ? std::function<void()>{
-                                      [device]
-                                      {
-                                          device->WaitIdle();
-                                      }}
-                                : std::function<void()>{});
-                }
-                state.BakeParticipant = {};
             }
 
             Unsubscribe(events);
             WithdrawServices(module, services);
-            Bake.ClearDependencies();
-            Bake.Queue().Clear();
             DestroyPerBootAssets();
             Shared.reset();
         }
@@ -485,6 +477,7 @@ namespace Extrinsic::Runtime
             m_Impl->AssetHooksPublished ||
             m_Impl->ActiveWorldChangedSubscription.IsValid() ||
             m_Impl->WorldDestroyedSubscription.IsValid() ||
+            m_Impl->TextureBakeBindingChangedSubscription.IsValid() ||
             m_Impl->ShutdownSubscription.IsValid() ||
             setup.Services().Phase() !=
                 ServiceRegistryPhase::Registration ||
@@ -527,7 +520,6 @@ namespace Extrinsic::Runtime
         auto& state = *m_Impl->Shared;
         state.Self = m_Impl->Shared;
         state.Pipeline = &m_Impl->Pipeline;
-        state.Bake = &m_Impl->Bake;
         state.Jobs = &setup.Jobs();
         state.Worlds = &setup.Worlds();
         state.Initialized = setup.InitializedState();
@@ -578,14 +570,6 @@ namespace Extrinsic::Runtime
         state.TextureHandoff =
             std::make_unique<AssetModelTextureHandoff>(
                 *state.Assets, *state.Cache);
-        m_Impl->Bake.SetDependencies(
-            ObjectSpaceNormalBakeServiceDependencies{
-                .Assets = state.Assets.get(),
-                .GpuAssets = state.Cache.get(),
-                .Renderer = state.Renderer,
-                .RenderExtraction = state.Extraction,
-                .Device = state.Device,
-            });
 
         if (Core::Result provided =
                 setup.Services().Provide<Assets::AssetService>(
@@ -668,6 +652,13 @@ namespace Extrinsic::Runtime
                         state->DestroySceneBinding(true);
                     }
                 });
+        m_Impl->TextureBakeBindingChangedSubscription =
+            setup.Subscribe<TextureBakeBindingChanged>(
+                [weakState](const TextureBakeBindingChanged&)
+                {
+                    if (const auto state = weakState.lock())
+                        state->RefreshTextureBakeBinding();
+                });
         m_Impl->ShutdownSubscription =
             setup.Subscribe<RuntimeShutdownAnnounced>(
                 [weakState](const RuntimeShutdownAnnounced&)
@@ -678,6 +669,7 @@ namespace Extrinsic::Runtime
 
         if (!m_Impl->ActiveWorldChangedSubscription.IsValid() ||
             !m_Impl->WorldDestroyedSubscription.IsValid() ||
+            !m_Impl->TextureBakeBindingChangedSubscription.IsValid() ||
             !m_Impl->ShutdownSubscription.IsValid())
         {
             m_Impl->RollBack(
@@ -760,6 +752,8 @@ namespace Extrinsic::Runtime
             setup.Services().Find<StreamingExecutor>();
         state.Selection =
             setup.Services().Find<SelectionController>();
+        state.TextureBake =
+            setup.Services().Find<TextureBakeService>();
         state.AcceptingCallbacks = true;
 
         const std::weak_ptr<Impl::State> weakState =
@@ -822,20 +816,6 @@ namespace Extrinsic::Runtime
             return Core::Err(Core::ErrorCode::InvalidState);
         }
 
-        state.BakeParticipant =
-            m_Impl->Bake.RegisterGpuQueueParticipant(
-                setup.Jobs());
-        if (!state.BakeParticipant.IsValid())
-        {
-            m_Impl->RollBack(
-                *this,
-                &setup.Events(),
-                &setup.Jobs(),
-                &setup.Services(),
-                true);
-            return Core::Err(Core::ErrorCode::InvalidState);
-        }
-
         return Core::Ok();
     }
 
@@ -882,7 +862,5 @@ namespace Extrinsic::Runtime
                 state.SceneHandoff->
                     ResolvePendingMaterialTextureBindings());
         }
-        if (state.Bake != nullptr)
-            state.Bake->PrepareScheduledRequests();
     }
 }

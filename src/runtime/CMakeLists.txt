@@ -84,6 +84,7 @@ target_sources(${target_name}
         Runtime.SelectionController.cppm
         Runtime.StableEntityLookup.cppm
         Runtime.StreamingExecutor.cppm
+        Runtime.TextureBakeModule.cppm
         Runtime.VertexAttributeBinding.cppm
         Runtime.VertexChannelBindings.cppm
         Runtime.VertexChannelStreams.cppm
@@ -176,6 +177,7 @@ target_sources(${target_name}
         Runtime.SelectionController.cpp
         Runtime.StableEntityLookup.cpp
         Runtime.StreamingExecutor.cpp
+        Runtime.TextureBakeModule.cpp
         Runtime.VertexAttributeBinding.cpp
         Runtime.VertexChannelStreams.cpp
         SpatialDebug/Runtime.SpatialDebugAdapters.cpp

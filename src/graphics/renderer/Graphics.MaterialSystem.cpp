@@ -27,6 +27,7 @@ import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Types;
 import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.Material;
 
 // ============================================================
@@ -169,6 +170,8 @@ namespace Extrinsic::Graphics
             slot.Flags                 = static_cast<std::uint32_t>(p.Flags);
             slot.ShadingModel          = static_cast<std::uint32_t>(p.Shading);
             slot.ChannelSourceBits     = p.ChannelSourceBits;
+            slot.AlbedoScalarRangeMin  = p.AlbedoScalarRangeMin;
+            slot.AlbedoScalarRangeMax  = p.AlbedoScalarRangeMax;
             for (int i = 0; i < 4; ++i)
                 slot.CustomData[i] = p.CustomData[i];
         }
@@ -493,7 +496,8 @@ namespace Extrinsic::Graphics
     Core::Result MaterialSystem::ResolveTextureAssetBindings(
         MaterialHandle handle,
         const MaterialTextureAssetBindings& bindings,
-        GpuAssetCache& assets)
+        GpuAssetCache& assets,
+        const ColormapSystem* colormaps)
     {
         InstanceMeta* meta = m_Impl->Resolve(handle);
         if (!meta)
@@ -517,16 +521,12 @@ namespace Extrinsic::Graphics
 
         MaterialParams params = meta->Params;
         bool anyFailure = false;
-        bool normalTextureRequested = false;
+        bool albedoResolvedWithoutFallback = false;
         bool normalResolvedWithoutFallback = false;
-        bool metallicRoughnessTextureRequested = false;
         bool metallicRoughnessResolvedWithoutFallback = false;
 
         for (const Binding& binding : requested)
         {
-            if (!binding.Id.IsValid())
-                continue;
-
             RHI::BindlessIndex* target = SelectTextureSlot(params, binding.Semantic);
             if (target == nullptr)
             {
@@ -534,15 +534,12 @@ namespace Extrinsic::Graphics
                 ++m_Impl->Diagnostics.TextureAssetResolveFailureCount;
                 continue;
             }
+            // The binding record is a complete material-texture snapshot.
+            // Invalid AssetIds therefore clear old resolved bindless slots.
+            *target = RHI::kInvalidBindlessIndex;
 
-            if (binding.Semantic == MaterialTextureSemantic::Normal)
-            {
-                normalTextureRequested = true;
-            }
-            if (binding.Semantic == MaterialTextureSemantic::MetallicRoughness)
-            {
-                metallicRoughnessTextureRequested = true;
-            }
+            if (!binding.Id.IsValid())
+                continue;
 
             ++m_Impl->Diagnostics.TextureAssetResolveCount;
             auto resolved = assets.GetViewOrFallback(binding.Id);
@@ -560,44 +557,84 @@ namespace Extrinsic::Graphics
                 ++m_Impl->Diagnostics.TextureAssetFallbackResolveCount;
 
             *target = resolved->View.BindlessIdx;
-            if (binding.Semantic == MaterialTextureSemantic::Normal &&
-                !resolved->UsedFallback)
+            if (resolved->UsedFallback)
+                continue;
+
+            if (binding.Semantic == MaterialTextureSemantic::Albedo)
+            {
+                albedoResolvedWithoutFallback = true;
+            }
+            else if (binding.Semantic == MaterialTextureSemantic::Normal)
             {
                 normalResolvedWithoutFallback = true;
             }
-            if (binding.Semantic == MaterialTextureSemantic::MetallicRoughness &&
-                !resolved->UsedFallback)
+            else if (binding.Semantic ==
+                     MaterialTextureSemantic::MetallicRoughness)
             {
                 metallicRoughnessResolvedWithoutFallback = true;
             }
         }
 
-        if (normalTextureRequested)
-        {
-            const bool useObjectSpaceNormalTexture =
-                normalResolvedWithoutFallback &&
-                bindings.NormalSpace == MaterialNormalTextureSpace::ObjectSpaceNormal;
-            params.Flags = SetFlagEnabled(
-                params.Flags,
-                MaterialFlags::ObjectSpaceNormalMap,
-                useObjectSpaceNormalTexture);
-            // Mirror the legacy flag onto the per-channel source authority so
-            // the Normal channel's source is data-driven (GRAPHICS-105).
-            params.ChannelSourceBits = SetChannelSource(
-                params.ChannelSourceBits,
-                MaterialChannel::Normal,
-                useObjectSpaceNormalTexture ? AttributeSource::Texture
-                                            : AttributeSource::VertexAttribute);
-        }
-        if (metallicRoughnessTextureRequested)
-        {
-            params.ChannelSourceBits = SetChannelSource(
-                params.ChannelSourceBits,
-                MaterialChannel::MetallicRoughness,
-                metallicRoughnessResolvedWithoutFallback
-                    ? AttributeSource::Texture
-                    : AttributeSource::VertexAttribute);
-        }
+        const bool useScalarAlbedo =
+            albedoResolvedWithoutFallback &&
+            bindings.AlbedoInterpretation ==
+                MaterialAlbedoTextureInterpretation::Scalar;
+        params.Flags = SetFlagEnabled(
+            params.Flags,
+            MaterialFlags::ScalarAlbedoTexture,
+            useScalarAlbedo);
+        const RHI::BindlessIndex colormap =
+            useScalarAlbedo && colormaps != nullptr
+                ? colormaps->GetBindlessIndex(
+                      bindings.AlbedoScalarColormap)
+                : RHI::kInvalidBindlessIndex;
+        params.ChannelSourceBits = SetScalarAlbedoColormapIndex(
+            params.ChannelSourceBits,
+            colormap);
+        params.AlbedoScalarRangeMin = bindings.AlbedoScalarRangeMin;
+        params.AlbedoScalarRangeMax = bindings.AlbedoScalarRangeMax;
+
+        const bool useObjectSpaceNormalTexture =
+            normalResolvedWithoutFallback &&
+            bindings.NormalSpace ==
+                MaterialNormalTextureSpace::ObjectSpaceNormal;
+        const bool useWorldSpaceNormalTexture =
+            normalResolvedWithoutFallback &&
+            bindings.NormalSpace ==
+                MaterialNormalTextureSpace::WorldSpaceNormal;
+        params.Flags = SetFlagEnabled(
+            params.Flags,
+            MaterialFlags::ObjectSpaceNormalMap,
+            useObjectSpaceNormalTexture);
+        params.Flags = SetFlagEnabled(
+            params.Flags,
+            MaterialFlags::WorldSpaceNormalMap,
+            useWorldSpaceNormalTexture);
+        // Mirror the legacy flag onto the per-channel source authority so
+        // the Normal channel's source is data-driven (GRAPHICS-105).
+        params.ChannelSourceBits = SetChannelSource(
+            params.ChannelSourceBits,
+            MaterialChannel::Normal,
+            useObjectSpaceNormalTexture || useWorldSpaceNormalTexture
+                ? AttributeSource::Texture
+                : AttributeSource::VertexAttribute);
+
+        params.Flags = SetFlagEnabled(
+            params.Flags,
+            MaterialFlags::ScalarRoughnessTexture,
+            metallicRoughnessResolvedWithoutFallback &&
+                bindings.RoughnessFromRed);
+        params.Flags = SetFlagEnabled(
+            params.Flags,
+            MaterialFlags::ScalarMetallicTexture,
+            metallicRoughnessResolvedWithoutFallback &&
+                bindings.MetallicFromRed);
+        params.ChannelSourceBits = SetChannelSource(
+            params.ChannelSourceBits,
+            MaterialChannel::MetallicRoughness,
+            metallicRoughnessResolvedWithoutFallback
+                ? AttributeSource::Texture
+                : AttributeSource::VertexAttribute);
 
         SetParams(handle, params);
         return anyFailure

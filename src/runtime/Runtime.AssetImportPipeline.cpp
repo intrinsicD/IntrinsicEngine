@@ -1026,6 +1026,7 @@ namespace Extrinsic::Runtime
             RuntimeObjectSpaceNormalBakeQueue* objectSpaceNormalBakeQueue,
             const std::uint64_t objectSpaceNormalBakeBindingEpoch,
             const RHI::IDevice* objectSpaceNormalBakeDevice,
+            const std::weak_ptr<void>& objectSpaceNormalBakeLifetime,
             const DecodedGeometryImport& decoded)
         {
             RuntimeImportEntityAuthoringPolicyServices authoringServices{
@@ -1042,6 +1043,8 @@ namespace Extrinsic::Runtime
                 .ObjectSpaceNormalBakeBindingEpoch =
                     objectSpaceNormalBakeBindingEpoch,
                 .ObjectSpaceNormalBakeDevice = objectSpaceNormalBakeDevice,
+                .ObjectSpaceNormalBakeLifetime =
+                    objectSpaceNormalBakeLifetime,
             };
 
             return std::visit(
@@ -1481,6 +1484,8 @@ namespace Extrinsic::Runtime
                 dependencies.ObjectSpaceNormalBakeQueue};
         m_ObjectSpaceNormalBakeBindingEpoch =
             dependencies.ObjectSpaceNormalBakeBindingEpoch;
+        m_ObjectSpaceNormalBakeLifetime =
+            std::move(dependencies.ObjectSpaceNormalBakeLifetime);
         m_Device = BorrowedSubsystem<const RHI::IDevice>{dependencies.Device};
     }
 
@@ -2248,6 +2253,7 @@ namespace Extrinsic::Runtime
                         m_ObjectSpaceNormalBakeQueue.get(),
                         m_ObjectSpaceNormalBakeBindingEpoch,
                         m_Device.get(),
+                        m_ObjectSpaceNormalBakeLifetime,
                         *state->Decoded);
                     if (materialized.has_value())
                     {
@@ -3134,6 +3140,7 @@ namespace Extrinsic::Runtime
                 m_ObjectSpaceNormalBakeQueue.get(),
                 m_ObjectSpaceNormalBakeBindingEpoch,
                 m_Device.get(),
+                m_ObjectSpaceNormalBakeLifetime,
                 *decoded);
             if (!materialized.has_value())
             {
