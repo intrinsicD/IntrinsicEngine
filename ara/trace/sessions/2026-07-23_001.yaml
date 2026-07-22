@@ -1,0 +1,52 @@
+session:
+  id: "2026-07-23_001"
+  date: "2026-07-23"
+  started: "2026-07-23T01:31+02:00"
+  last_turn: "2026-07-23T01:31+02:00"
+  turn_count: 1
+  summary: "Audited the crowded runtime source layout and recommended cohesive post-convergence directories instead of one folder per file."
+
+events_logged:
+  - turn: 1
+    type: question
+    id: "N273"
+    routing: direct
+    provenance: user
+    summary: "Opened whether src/runtime should be reorganized into directories around Runtime.Engine.cppm."
+  - turn: 1
+    type: experiment
+    id: "N274"
+    routing: direct
+    provenance: ai-executed
+    summary: "Measured 178 runtime files, 146 at root, 92,416 C++ lines, and a clean strict-layering baseline while mapping RUNTIME-184 through RUNTIME-187 churn."
+  - turn: 1
+    type: architecture
+    id: "O57"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged cohesive owner directories rather than one directory per source pair."
+  - turn: 1
+    type: constraint
+    id: "O58"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged a separate mechanical reorganization after Engine semantic convergence."
+
+ai_actions:
+  - turn: 1
+    action: "Inspected repository contracts, runtime architecture, accepted ADRs, open Engine convergence tasks, source/CMake layout, importers, line/file counts, and the strict layering baseline."
+    provenance: ai-executed
+    files_changed: []
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "The runtime root is objectively crowded, but directories should map cohesive ownership and the move should not race the already-planned Engine semantic cleanup."
+
+open_threads:
+  - "User decision on whether to adopt the cohesive-directory recommendation and request a task or implementation."
+  - "Exact file-to-directory inventory remains intentionally uncommitted until the RUNTIME-184 through RUNTIME-187 surface settles."
+
+ai_suggestions_pending:
+  - "Create a dedicated mechanical runtime-layout task after Engine convergence, preserving module names and separating moves from semantic refactors."

@@ -6474,3 +6474,41 @@ tree:
       structural and clean-workshop checks passed, and RUNTIME-129 retired at
       Operational.
     status: resolved
+  - id: N273
+    type: question
+    title: "Decide whether to reorganize the runtime source directory"
+    provenance: user
+    timestamp: "2026-07-23T01:31+02:00"
+    description: >
+      Should the crowded src/runtime root be cleaned up by distributing its
+      files into directories, with Runtime.Engine.cppm as the immediate
+      architectural reference point?
+    status: open
+  - id: N274
+    type: experiment
+    title: "Audit runtime layout and Engine convergence constraints"
+    provenance: ai-executed
+    timestamp: "2026-07-23T01:31+02:00"
+    also_depends_on: [N273]
+    evidence:
+      - "find src/runtime -type f -print"
+      - "rg --files -g '*.cpp' -g '*.cppm' src/runtime -0 | xargs -0 wc -l"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/CMakeLists.txt"
+      - "docs/adr/0026-runtime-module-scope-by-consumer-contract.md"
+      - "docs/adr/0027-right-sized-runtime-composition.md"
+      - "tasks/backlog/runtime/RUNTIME-184-replace-application-lifecycle.md"
+      - "tasks/backlog/runtime/RUNTIME-185-prune-runtime-composition-mechanisms.md"
+      - "tasks/backlog/runtime/RUNTIME-186-retire-engine-auxiliary-surface.md"
+      - "tasks/backlog/runtime/RUNTIME-187-finalize-domain-free-engine-surface.md"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+    result: >
+      The runtime tree contains 178 files, with 146 directly in src/runtime,
+      and 92,416 C++ source/interface lines. Runtime.Engine.cppm still exposes
+      the IApplication lifecycle, auxiliary re-exports/getters, and concrete
+      implementation state already assigned to RUNTIME-184 through
+      RUNTIME-187. The strict layering scan covered 753 files, 6,794 source
+      references, and 85 CMake links with zero violations. Physical cleanup is
+      therefore justified for locality, but current Engine semantics should
+      converge before a separate mechanical move.
+    status: resolved

@@ -740,3 +740,39 @@ observations:
     promoted_to: "logic/solution/constraints.md:K22"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O57
+    timestamp: "2026-07-23T01:31+02:00"
+    provenance: ai-suggested
+    content: >
+      Runtime source directories should correspond to cohesive ownership and
+      lifecycle cohorts rather than to individual .cppm/.cpp pairs. Broad
+      Engine, composition, async, asset, rendering, scene, config, and editor
+      directories improve locality; a one-folder-per-file layout adds path
+      ceremony without creating an architectural seam.
+    context: >
+      Read-only audit of the 178-file runtime tree against ADR-0026 cohesion,
+      ADR-0027 right-sizing, and the existing mixed flat/subdirectory layout.
+    potential_type: architecture
+    bound_to: [N273, N274]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O58
+    timestamp: "2026-07-23T01:31+02:00"
+    provenance: ai-suggested
+    content: >
+      A runtime path reorganization should be a dedicated mechanical slice
+      after the RUNTIME-184 through RUNTIME-187 semantic convergence chain,
+      preserving module names and behavior and avoiding simultaneous module
+      decomposition or API refactoring.
+    context: >
+      Runtime.Engine.cppm contains several surfaces already scheduled for
+      deletion, caller migration, pruning, or PImpl relocation, so moving the
+      current shape first would duplicate churn and obscure semantic review.
+    potential_type: constraint
+    bound_to: [N273, N274]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

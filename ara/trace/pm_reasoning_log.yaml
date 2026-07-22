@@ -1066,3 +1066,10 @@ entries:
       - "Recorded the dynamic CPU UV witness, SPIR-V Aligned 8 texcoord load, invalid base+36 address, corrected per-channel alignment, 4,273/4,273 CPU result, and 47/47 ASan+UBSan gpu+vulkan result without generalizing a performance claim."
       - "Kept O08, O09, O13, and O38 unpromoted and non-stale because this task supplies no closure or contradiction for module posture, model-training interpretation, or Progressive Poisson parity."
       - "Closed the RUNTIME-129 research thread with no follow-up: the task retired at Operational and the user explicitly required stopping after repository integration."
+  - turn: "2026-07-23_001#1"
+    notes:
+      - "Routed the user's runtime-folder question as open question N273 and the quantitative source/layout plus strict-layering audit as resolved experiment N274."
+      - "Staged O57 as architecture and O58 as a sequencing constraint because cohesive directory grouping and post-RUNTIME-187 timing are AI recommendations, not user-affirmed decisions."
+      - "Did not crystallize O57 or O58: the user has not adopted a layout or committed a downstream task/artifact."
+      - "Did not mark O08, O09, O13, or O38 stale or abandoned because only one new session-day has elapsed since their explicit 2026-07-20 review and their underlying topics remain unresolved."
+      - "Recorded no runtime code mutation; the only writes are this mandatory ARA epilogue."

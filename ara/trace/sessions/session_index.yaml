@@ -146,3 +146,10 @@ sessions:
     events_count: 2
     claims_touched: []
     open_threads: 0
+  - id: "2026-07-23_001"
+    date: "2026-07-23"
+    summary: "Audited the crowded runtime source layout and recommended cohesive post-convergence directories instead of one folder per file."
+    turn_count: 1
+    events_count: 4
+    claims_touched: []
+    open_threads: 2
