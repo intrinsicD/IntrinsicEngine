@@ -6586,3 +6586,25 @@ tree:
       retired, and REVIEW-003 became unblocked. The three implementation
       commits were pushed to the branch requested by the user.
     status: resolved
+  - id: N278
+    type: decision
+    title: "Integrate the completed ARCH-014 branch into main"
+    provenance: user
+    timestamp: "2026-07-23T08:40+02:00"
+    also_depends_on: [N275, N277]
+    choice: >
+      Fast-forward the completed codex/arch-014-kernel-convergence-program
+      branch into an up-to-date local main and push the resulting main tip to
+      origin.
+    alternatives:
+      - "Leave the completed commits only on the feature branch."
+      - "Open a pull request or create a merge commit despite a linear ancestor relationship."
+    evidence:
+      - "N277"
+      - "git fetch origin"
+      - "git rev-list --left-right --count origin/main...codex/arch-014-kernel-convergence-program returned 0 4"
+      - "git merge-base returned origin/main commit 95897f6c"
+      - "git merge --ff-only codex/arch-014-kernel-convergence-program"
+      - "git push origin main advanced 95897f6c to 9d7638ab"
+      - "post-push main...origin/main returned 0 0"
+    status: resolved

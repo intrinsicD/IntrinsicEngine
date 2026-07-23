@@ -148,8 +148,8 @@ sessions:
     open_threads: 0
   - id: "2026-07-23_001"
     date: "2026-07-23"
-    summary: "Audited the runtime layout, then completed and pushed ARCH-014's exact 12/0/0/5 Engine convergence chain with full CPU, sanitizer, Vulkan, and structural evidence."
-    turn_count: 2
-    events_count: 10
+    summary: "Audited the runtime layout, completed ARCH-014's exact 12/0/0/5 Engine convergence chain, and fast-forwarded the verified result into remote main."
+    turn_count: 3
+    events_count: 11
     claims_touched: []
     open_threads: 2

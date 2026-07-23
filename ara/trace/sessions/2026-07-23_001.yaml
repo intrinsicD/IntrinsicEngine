@@ -2,9 +2,9 @@ session:
   id: "2026-07-23_001"
   date: "2026-07-23"
   started: "2026-07-23T01:31+02:00"
-  last_turn: "2026-07-23T08:31+02:00"
-  turn_count: 2
-  summary: "Audited the runtime layout, then completed and pushed ARCH-014's exact 12/0/0/5 Engine convergence chain with full CPU, sanitizer, Vulkan, and structural evidence."
+  last_turn: "2026-07-23T08:40+02:00"
+  turn_count: 3
+  summary: "Audited the runtime layout, completed ARCH-014's exact 12/0/0/5 Engine convergence chain, and fast-forwarded the verified result into remote main."
 
 events_logged:
   - turn: 1
@@ -67,6 +67,12 @@ events_logged:
     routing: crystallized
     provenance: ai-executed
     summary: "Crystallized explicit public owning-module imports as K23 after the transitive-import dependency was exposed and fixed."
+  - turn: 3
+    type: decision
+    id: "N278"
+    routing: direct
+    provenance: user
+    summary: "Selected and completed a clean fast-forward of the verified ARCH-014 branch into remote main."
 
 ai_actions:
   - turn: 1
@@ -87,6 +93,10 @@ ai_actions:
       - "tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp"
       - "tasks/done/ARCH-014-kernel-convergence-tracking.md"
       - "docs/reviews/2026-07-23-arch-014-clean-workshop-review.md"
+  - turn: 3
+    action: "Fetched origin, proved remote main was unchanged and the feature branch was four commits ahead with main as its merge base, fast-forwarded local main, pushed main from 95897f6c to 9d7638ab, and confirmed zero local/remote divergence."
+    provenance: ai-executed
+    files_changed: []
 
 claims_touched: []
 
@@ -95,6 +105,8 @@ key_context:
     excerpt: "The runtime root is objectively crowded, but directories should map cohesive ownership and the move should not race the already-planned Engine semantic cleanup."
   - turn: 2
     excerpt: "The user directed completion of the active ARCH-014 dependency chain with commit and push; the resulting Engine interface is exactly 12 plain imports, zero domain imports, zero re-exports, and five typed getters."
+  - turn: 3
+    excerpt: "The user directed the completed branch into main; origin/main was its direct ancestor, so integration preserved the four audited commits as a conflict-free fast-forward."
 
 open_threads:
   - "N273 and O57 remain open: decide whether to create a dedicated mechanical runtime-layout task now that semantic convergence is complete."
