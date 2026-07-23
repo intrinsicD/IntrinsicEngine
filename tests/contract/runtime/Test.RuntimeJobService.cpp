@@ -177,7 +177,6 @@ namespace
                     }));
         }
 
-        void Simulate(double) override {}
 
         void Frame(double, double) override
         {

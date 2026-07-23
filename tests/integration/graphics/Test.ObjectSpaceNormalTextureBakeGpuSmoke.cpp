@@ -46,7 +46,6 @@ namespace
         }
 
         void Resolve() override {}
-        void Simulate(double) override {}
 
         void Frame(double, double) override
         {

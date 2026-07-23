@@ -434,7 +434,6 @@ void ExpectEnabledFileImportPayloadOptions(
     {
     public:
         void Resolve() override {}
-        void Simulate(double) override {}
         void Frame(double, double) override
         {
             auto& engine = Kernel();
@@ -641,7 +640,6 @@ void CaptureAssetImportEventWaitPhase(
         }
 
         void Resolve() override {}
-        void Simulate(double) override {}
         void Frame(double, double) override
         {
             auto& engine   = Kernel();
@@ -725,7 +723,6 @@ void CaptureAssetImportEventWaitPhase(
         }
 
         void Resolve() override {}
-        void Simulate(double) override {}
         void Frame(double, double) override
         {
             auto& engine = Kernel();
@@ -754,7 +751,6 @@ void CaptureAssetImportEventWaitPhase(
         }
 
         void Resolve() override {}
-        void Simulate(double) override {}
         void Frame(double, double) override
         {
             auto& engine = Kernel();
@@ -810,7 +806,6 @@ public:
     }
 
     void Resolve() override {}
-    void Simulate(double) override {}
     void Frame(double, double) override
     {
         auto& engine = Kernel();
@@ -912,7 +907,6 @@ struct ShutdownBlockedGeometryImportState
             m_Editor.Attach(engine.Worlds(), engine.Services());
         }
 
-        void Simulate(double) override {}
 
         void Frame(double, double) override
         {

@@ -63,28 +63,36 @@ Runtime modules compose through `Engine::AddModule(...)` before
 `IRuntimeModule::OnRegister(EngineSetup&)`, then invokes every
 `IRuntimeModule::OnResolve(EngineSetup&)` after the two-phase
 `ServiceRegistry` has all provided services. `EngineSetup` exposes only the
-kernel command, event, job, world, service, sim-system, generic frame-hook, and
-typed viewport-input-hook seams; it does not expose `Engine&`. The typed
-viewport context is separate from the six `FramePhase` values and from
+kernel command, event, job, world, and service capabilities; the startup
+render-recipe capability and initialized-state observation; and registration-
+phase generic frame-hook and typed viewport-input-hook registrars. It does not
+expose `Engine&`. Resolve receives the same capability context with both hook
+registrars closed, so dependency resolution cannot mutate the finalized hook
+shape. The typed viewport context is separate from the five `FramePhase`
+values and from
 `RuntimeFrameHookContext`: it exists only at the stable post-`UiEndCapture`,
-post-render-input-initialization, pre-gizmo insertion point. Module sim systems
-join the fixed-step `FrameGraph`
-with declared wait/signal labels so registration order does not decide pass
-order. Because every `SimSystemContext` exposes the live active world, runtime
-also declares `StructuralRead()` for every module sim system. Baseline or
-module pass setup that adds/removes components declares `StructuralWrite()`;
-component-specific hazards alone do not serialize EnTT's registry-wide
-storage-map mutation. Before any per-tick passes can be appended, schedule
-finalization rejects
-duplicate `(module, system)` identities with `InvalidArgument` and rejects
-cyclic or unprovided signal dependencies with `InvalidState`. The schedule seam
-remains open through all `OnResolve` callbacks: sim systems and frame hooks may
-be registered there when their contribution depends on a resolved service, and
-the engine finalizes only after the complete register-plus-resolve contribution
-set has been collected. The seam returns validation errors for direct contract
-testing; `Engine::Initialize()` logs the error and terminates boot under the
-engine's fail-closed initialization policy, so an invalid schedule cannot
-execute even once (BUG-070, BUG-071). Module shutdown runs after
+post-render-input-initialization, pre-gizmo insertion point.
+
+The `RUNTIME-185` production audit found ten implementors: nine runtime-owned
+responsibilities plus the Sandbox-local optional frame-pacing capture module.
+They register exactly seven generic frame hooks (Editor UI: three, texture
+bake: one, scene interaction: two, frame-pacing capture: one) and two typed
+viewport-input hooks (camera and scene interaction). `RuntimeModuleSchedule`
+therefore owns only deterministic frame-hook and viewport-hook records, sorted
+by phase/module/registration sequence or module/registration sequence. There
+is no module sim-system registrar, descriptor/context, causal signal DAG, or
+fixed-step schedule branch. The promoted ECS bundle is the complete current
+fixed-step contribution.
+
+Two-phase `Provide`/`Require`/`OnResolve` remains behavior-backed: texture bake,
+asset workflow, scene document, editor UI, camera, interaction, and config
+control resolve real cross-owner capabilities independent of module insertion
+order, and missing required providers fail boot. Engine publishes only the six
+built-in capabilities with production lookup consumers: `JobService`,
+`RenderExtractionCache`, `RHI::IDevice`, `Platform::IWindow`,
+`Graphics::IRenderer`, and `RuntimeInputActionRegistry`. Registry statistics
+and a copied boot-error list were removed; fail-closed validation retains
+`HasBootErrors`, `LastBootError`, and `ValidateBoot`. Module shutdown runs after
 `RuntimeShutdownAnnounced` has been published and pumped. A module that owns a
 published service withdraws that exact borrowed instance before destroying it.
 `ServiceRegistry::Withdraw(...)` is owner-only and phase-independent so it can
@@ -98,12 +106,10 @@ current mechanism from the accepted ownership target. `IRuntimeModule` remains
 the current lean type-erased app-to-runtime lifecycle boundary; the bounded
 extractions test which real owners need it, and a domain responsibility does
 not need a wrapper merely to satisfy the architecture.
-`EngineSetup` remains the no-`Engine&` capability context. The service
-registry's two-phase `Require`/`OnResolve` path and the general module schedule
-are conditional, however: each must gain a production consumer during the
-convergence work or be removed/narrowed by `RUNTIME-185`. The current schedule
-behavior above remains factual until those children land; it is not a
-requirement to preserve an unused DAG or registrar.
+`EngineSetup` remains the no-`Engine&` capability context. `RUNTIME-185`
+completed the deletion test: behavior-backed two-phase service resolution and
+the exact two hook kinds remain, while unused simulation/DAG, phase, registrar,
+provision, and diagnostic branches are gone.
 
 Module granularity follows
 [ADR-0026](../adr/0026-runtime-module-scope-by-consumer-contract.md) only after
@@ -180,26 +186,16 @@ The frame order is:
    pre-simulation mutation window per
    [ADR-0024](../adr/0024-kernel-module-architecture.md) D5; commands enqueue
    thread-safely from any phase and execute here in enqueue order, fail-closed
-   when no handler is registered (ARCH-007), then run runtime-module
-   `AfterCommandDrain` hooks;
+   when no handler is registered (ARCH-007);
 3. pump the queued kernel event bus (`Engine::Events()`) post-command-drain;
    command-published events become visible before simulation, and events
    published by listeners defer to the next pump per
    [ADR-0024](../adr/0024-kernel-module-architecture.md) D7 (ARCH-008);
-4. fixed-step simulation and CPU `FrameGraph` execution: the promoted baseline
-   ECS system bundle is appended first, then module-registered sim systems. This
-   ensures a module
-   system that reads a baseline output (e.g.
-   `Transform::WorldMatrix`) or waits on the baseline `TransformUpdate` signal is
-   ordered after its producer — the core `FrameGraph` preserves insertion order
-   for passes that share a resource, so bundle-last would place such a module
-   before its producer (BUG-069). `Runtime.ModuleSchedule` then canonicalizes sim
-   systems by stable module/pass identity under explicit named-signal
-   dependencies so the applied order among modules is independent of module
-   registration order (ARCH-011, BUG-066). Each substep finishes with
+4. fixed-step simulation and CPU `FrameGraph` execution: the complete promoted
+   ECS system bundle appends `TransformHierarchy`, `BoundsPropagation`, and
+   `RenderSync`. Each substep finishes with
    `Compile` → `Execute` → `ResetForReplay`: exact repeated descriptors reuse
-   topology with freshly bound callbacks, while module-system shape changes
-   rebuild transparently (CORE-008);
+   topology with freshly bound callbacks (CORE-008);
 5. drain `Engine::Jobs()` completions before pump B; `JobService` checks token
    and world-scope cancellation on the main thread, drops suppressed results
    whole, and publishes completion events only for survivors per

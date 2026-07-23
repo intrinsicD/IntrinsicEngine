@@ -1,12 +1,10 @@
 module;
 
-#include <array>
 #include <cstdint>
 
 export module Extrinsic.Runtime.EcsSystemBundle;
 
 import Extrinsic.Core.FrameGraph;
-import Extrinsic.Core.Hash;
 import Extrinsic.ECS.Scene.Registry;
 
 // ============================================================
@@ -16,17 +14,14 @@ import Extrinsic.ECS.Scene.Registry;
 // (currently `Extrinsic.ECS.System.TransformHierarchy` and
 // `Extrinsic.ECS.System.BoundsPropagation`) into the fixed-step
 // `Core::FrameGraph` each substep. Runtime composition calls this
-// helper after registered simulation systems have had a chance to
-// register app passes and before `Core::FrameGraph::Compile`, so
-// dependency edges declared by the systems (`Read`/`Write` on
-// component TypeTokens, and the named `TransformUpdate` /
-// `WorldBoundsUpdate` signals) resolve naturally against any app
-// passes that mutate transforms or wait on the propagation seam.
+// helper before `Core::FrameGraph::Compile`, so dependency edges
+// declared by the systems (`Read`/`Write` on component TypeTokens,
+// and the named `TransformUpdate` / `WorldBoundsUpdate` signals)
+// resolve within the promoted baseline bundle.
 //
 // The helper is intentionally split out of `Runtime.Engine` so it
 // can be exercised in contract tests without driving a full
-// `Engine::Run()` loop, and so future runtime bundle composition
-// extensions stay in a single, focused module.
+// `Engine::Run()` loop.
 //
 // Layering: runtime depends on `ecs` and `core`; ECS never imports
 // runtime, so the activation glue lives here and not in
@@ -73,16 +68,6 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] PromotedEcsSystemBundleStats RegisterPromotedEcsSystemBundle(
         Core::FrameGraph& graph,
         ECS::Scene::Registry& scene);
-
-    // The named signals the promoted bundle emits into the fixed-step
-    // FrameGraph (`TransformUpdate`, `WorldBoundsUpdate`, `RenderSync`). Runtime
-    // composition seeds these into `RuntimeModuleSchedule::FinalizeForBoot` as
-    // externally-provided signalers, so a module sim-system may declare
-    // `WaitForSignals` on a baseline signal without boot failing — the bundle is
-    // registered before module systems each substep (BUG-069), so the per-tick
-    // FrameGraph WaitFor edge resolves against it (BUG-072).
-    [[nodiscard]] std::array<Core::Hash::StringID, 3>
-        PromotedEcsSystemBundleSignalLabels();
 
     // BUG-024 — Observables for the runtime-owned pre-render transform
     // flush. `WorldUpdatedObserved` counts entities whose world matrix was

@@ -71,7 +71,6 @@ namespace
             Entity       = MakeTransformEntity(engine, glm::vec3{2.f, 3.f, 4.f});
         }
 
-        void Simulate(double /*fixedDt*/) override {}
 
         void Frame(double /*alpha*/, double /*dt*/) override
         {

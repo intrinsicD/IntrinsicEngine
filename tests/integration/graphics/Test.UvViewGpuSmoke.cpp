@@ -161,7 +161,6 @@ public:
             m_Error = "Renderer rejected the UV-view runtime readback hook.";
     }
 
-    void Simulate(double) override {}
 
     void Frame(double, double) override
     {

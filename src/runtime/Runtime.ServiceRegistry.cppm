@@ -3,7 +3,6 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -35,13 +34,6 @@ namespace Extrinsic::Runtime
         Registration,
         Resolution,
         Locked,
-    };
-
-    export struct ServiceRegistryStats
-    {
-        std::uint32_t ProvidedServices{0};
-        std::uint32_t MissingRequirements{0};
-        std::uint32_t BootErrors{0};
     };
 
     export class ServiceRegistry
@@ -104,8 +96,6 @@ namespace Extrinsic::Runtime
         [[nodiscard]] Core::Result ValidateBoot() const noexcept;
         [[nodiscard]] bool HasBootErrors() const noexcept;
         [[nodiscard]] std::string_view LastBootError() const noexcept;
-        [[nodiscard]] std::span<const std::string> BootErrors() const noexcept;
-        [[nodiscard]] ServiceRegistryStats Stats() const noexcept;
         [[nodiscard]] ServiceRegistryPhase Phase() const noexcept;
 
     private:
@@ -132,6 +122,5 @@ namespace Extrinsic::Runtime
         std::unordered_map<ServiceTypeKey, ServiceRecord> m_Services{};
         std::vector<std::string> m_BootErrors{};
         ServiceRegistryPhase m_Phase{ServiceRegistryPhase::Registration};
-        ServiceRegistryStats m_Stats{};
     };
 }

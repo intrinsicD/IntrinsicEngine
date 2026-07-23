@@ -217,10 +217,12 @@ triggers. The implementation graph is:
   Sandbox/module composition. Engine construction is config-only, Sandbox owns
   concrete session state, and app teardown is interposed through the narrow
   two-stage kernel shutdown contract.
-- [`RUNTIME-185`](RUNTIME-185-prune-runtime-composition-mechanisms.md) —
-  separately remove/narrow every lifecycle/setup/service/schedule feature
-  still lacking a production consumer after both explicit app lifecycle and
-  the operational normal-bake consumer graph have landed.
+- Retired [`RUNTIME-185`](../../done/RUNTIME-185-prune-runtime-composition-mechanisms.md)
+  removes every lifecycle/setup/service/schedule feature still lacking a
+  production consumer: sim registration and its causal DAG, the unused
+  command-drain phase, resolve-phase registrars, redundant built-in provisions,
+  and test-only registry statistics. The exact production frame/viewport hooks
+  and behavior-backed two-phase service resolution remain.
 - [`RUNTIME-186`](RUNTIME-186-retire-engine-auxiliary-surface.md) — settle
   residual frame-pacing/render-extraction observation and input-action setup
   APIs, remove Engine re-exports, and migrate callers without absorbing a
@@ -235,13 +237,20 @@ Retired `RUNTIME-177` added no generic debug-draw producer seam because its
 consumer inventory was empty; existing spatial-debug and transform-gizmo
 paths remain typed. Retired `RUNTIME-129` satisfies the normal-bake gate;
 retired `RUNTIME-184` satisfies the remaining lifecycle gate after retired
-`RUNTIME-168` lifecycle-policy privatization, so `RUNTIME-185` is the next
-unblocked convergence leaf.
+`RUNTIME-168` lifecycle-policy privatization, and retired `RUNTIME-185` prunes
+the unproven composition machinery, so `RUNTIME-186` is the next unblocked
+convergence leaf.
 `ARCH-014` reaches this graph through `RUNTIME-187`; `REVIEW-003` reaches it
 transitively through `ARCH-014`.
 
 #### Retired decomposition entries
 
+- [`RUNTIME-185` — Prune unproven runtime-composition mechanisms](../../done/RUNTIME-185-prune-runtime-composition-mechanisms.md)
+  (done, 2026-07-23, `Operational`): the runtime module contract retains only
+  production-backed lifecycle, service dependency resolution, generic frame
+  hooks, and typed viewport-input hooks. Sim registration, its causal DAG, the
+  unused command-drain phase, resolve-phase registrars, redundant built-in
+  provisions, and test-only service-registry statistics are deleted.
 - [`RUNTIME-184` — Replace IApplication with explicit app composition](../../done/RUNTIME-184-replace-application-lifecycle.md)
   (done, 2026-07-23, `Operational`): Engine owns no application callback and
   is constructed from config alone. Sandbox `main()` visibly composes each

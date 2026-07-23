@@ -199,7 +199,7 @@ TEST(RuntimeEnginePrivateGlue,
         ++registrarWiringCount;
         cursor += registrarCall.size();
     }
-    EXPECT_EQ(registrarWiringCount, 2u);
+    EXPECT_EQ(registrarWiringCount, 1u);
 
     const auto frameContextBegin = moduleInterface.find(
         "export struct RuntimeFrameHookContext");

@@ -173,12 +173,6 @@ namespace
                                            });
         }
 
-        [[nodiscard]] Extrinsic::Runtime::RuntimeModuleResult
-        OnResolve(Extrinsic::Runtime::EngineSetup&) override
-        {
-            return Extrinsic::Runtime::RuntimeModuleOk();
-        }
-
         void OnShutdown(Extrinsic::Runtime::RuntimeModuleShutdownContext&) override {}
 
         void CaptureLatest()

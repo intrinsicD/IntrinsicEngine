@@ -13,7 +13,7 @@ import Extrinsic.Runtime.Module;
 namespace Intrinsic::Tests
 {
     // Test-only bridge used while production applications compose ordinary
-    // runtime modules directly. It maps a fixture's resolve/simulation/frame/
+    // runtime modules directly. It maps a fixture's resolve/frame/
     // shutdown behavior onto IRuntimeModule without restoring a production
     // application callback interface.
     class RuntimeTestModule : public Extrinsic::Runtime::IRuntimeModule
@@ -22,7 +22,6 @@ namespace Intrinsic::Tests
         void BindKernel(Extrinsic::Runtime::Engine& kernel) noexcept { m_Kernel = &kernel; }
 
         void ResolveForComposition() { Resolve(); }
-        void SimulateForComposition(double fixedDt) { Simulate(fixedDt); }
         void FrameForComposition(double alpha, double dt) { Frame(alpha, dt); }
         void ShutdownForComposition()
         {
@@ -44,17 +43,6 @@ namespace Intrinsic::Tests
         OnRegister(Extrinsic::Runtime::EngineSetup& setup) override
         {
             m_ShutdownInvoked = false;
-            if (Extrinsic::Core::Result result =
-                    setup.RegisterSimSystem(Extrinsic::Runtime::SimSystemDesc{
-                        .Name    = "Simulate",
-                        .Execute = [this](Extrinsic::Runtime::SimSystemContext& context)
-                        { Simulate(context.FixedDeltaSeconds); },
-                    });
-                !result.has_value())
-            {
-                return result;
-            }
-
             return setup.RegisterFrameHook(
                 Extrinsic::Runtime::FramePhase::UiBuild,
                 [this](Extrinsic::Runtime::RuntimeFrameHookContext& context)
@@ -75,7 +63,6 @@ namespace Intrinsic::Tests
         [[nodiscard]] Extrinsic::Runtime::Engine& Kernel() noexcept { return *m_Kernel; }
 
         virtual void Resolve() {}
-        virtual void Simulate(double) {}
         virtual void Frame(double, double) {}
         virtual void Shutdown() {}
 

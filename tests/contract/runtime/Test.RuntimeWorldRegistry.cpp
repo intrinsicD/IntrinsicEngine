@@ -178,7 +178,6 @@ namespace
             RequestResult = engine.Worlds().RequestSetActiveWorld(CreatedWorld);
         }
 
-        void Simulate(double) override {}
 
         void Frame(double, double) override
         {
@@ -231,7 +230,6 @@ namespace
                 engine.Worlds().RequestSetActiveWorld(SecondWorld).has_value();
         }
 
-        void Simulate(double) override {}
 
         void Frame(double, double) override
         {

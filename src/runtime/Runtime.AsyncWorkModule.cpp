@@ -93,12 +93,6 @@ namespace Extrinsic::Runtime
         return Core::Ok();
     }
 
-    Core::Result AsyncWorkModule::OnResolve(EngineSetup& setup)
-    {
-        (void)setup;
-        return Core::Ok();
-    }
-
     void AsyncWorkModule::OnShutdown(RuntimeModuleShutdownContext& context)
     {
         if (m_WorldRetirementSubscription.IsValid())

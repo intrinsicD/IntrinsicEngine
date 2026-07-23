@@ -88,7 +88,6 @@ namespace
         }
 
         void Resolve() override {}
-        void Simulate(double /*fixedDt*/) override {}
         void Frame(double /*alpha*/, double /*dt*/) override
         {
             auto& engine = Kernel();
@@ -156,7 +155,6 @@ namespace
             Handle = Jobs->Submit(std::move(desc));
         }
 
-        void Simulate(double) override {}
 
         void Frame(double, double) override
         {
@@ -282,7 +280,6 @@ namespace
                                         std::move(controller));
         }
 
-        void Simulate(double /*fixedDt*/) override {}
 
         void Frame(double /*alpha*/, double /*dt*/) override
         {
@@ -322,7 +319,6 @@ namespace
                                         std::move(controller));
         }
 
-        void Simulate(double /*fixedDt*/) override {}
 
         void Frame(double /*alpha*/, double /*dt*/) override
         {

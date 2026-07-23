@@ -136,7 +136,6 @@ namespace Extrinsic::Runtime
     public:
         [[nodiscard]] std::string_view Name() const noexcept override;
         [[nodiscard]] Core::Result OnRegister(EngineSetup& setup) override;
-        [[nodiscard]] Core::Result OnResolve(EngineSetup& setup) override;
         void OnShutdown(RuntimeModuleShutdownContext& context) override;
 
         [[nodiscard]] const ClusteringModuleStats& Stats() const noexcept

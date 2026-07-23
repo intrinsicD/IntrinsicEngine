@@ -158,7 +158,6 @@ namespace
             LastSeed = Population->Camera;
         }
 
-        void Simulate(double) override {}
         void Frame(double, double) override {}
 
         void Shutdown() override

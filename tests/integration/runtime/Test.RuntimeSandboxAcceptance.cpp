@@ -90,7 +90,6 @@ namespace
     {
     public:
         void Resolve() override {}
-        void Simulate(double) override {}
         void Frame(double, double) override
         {
             auto& engine                               = Kernel();
@@ -108,7 +107,6 @@ namespace
     {
     public:
         void Resolve() override {}
-        void Simulate(double) override {}
         void Frame(double, double) override
         {
             auto& engine = Kernel();
@@ -121,7 +119,6 @@ namespace
     {
     public:
         void Resolve() override {}
-        void Simulate(double) override {}
         void Frame(double, double) override
         {
             auto& engine = Kernel();
@@ -621,7 +618,6 @@ namespace
             Entity = Extrinsic::ECS::Scene::CreateDefault(scene, "Bug024EditTarget");
             scene.Raw().emplace<G::RenderSurface>(Entity);
         }
-        void Simulate(double) override {}
         void Frame(double, double) override
         {
             auto& engine = Kernel();

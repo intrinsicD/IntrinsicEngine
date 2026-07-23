@@ -45,7 +45,6 @@ namespace
                   Jobs,
                   Worlds,
                   Services,
-                  [](Runtime::SimSystemDesc) {},
                   [](Runtime::FramePhase, Runtime::RuntimeFrameHook) {})
         {
         }

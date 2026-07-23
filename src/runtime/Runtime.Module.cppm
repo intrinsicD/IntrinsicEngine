@@ -3,10 +3,8 @@ module;
 #include <cstdint>
 #include <functional>
 #include <memory>
-#include <string>
 #include <string_view>
 #include <utility>
-#include <vector>
 
 export module Extrinsic.Runtime.Module;
 
@@ -14,9 +12,7 @@ export import Extrinsic.Runtime.RenderRecipeActivation;
 
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Config.Engine;
-import Extrinsic.Core.FrameGraph;
 import Extrinsic.Core.Geometry2D;
-import Extrinsic.Core.Hash;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Platform.Input;
@@ -36,7 +32,6 @@ namespace Extrinsic::Runtime
 
     export enum class FramePhase : std::uint8_t
     {
-        AfterCommandDrain,
         UiBegin,
         UiBuild,
         UiEndCapture,
@@ -62,7 +57,6 @@ namespace Extrinsic::Runtime
 
     export struct RuntimeFrameHookContext
     {
-        FramePhase Phase{FramePhase::AfterCommandDrain};
         ECS::Scene::Registry& ActiveWorld;
         WorldHandle ActiveWorldHandle{};
         CommandBus& Commands;
@@ -94,33 +88,6 @@ namespace Extrinsic::Runtime
     export using RuntimeViewportInputHook =
         std::function<void(RuntimeViewportInputHookContext&)>;
 
-    export struct SimSystemContext
-    {
-        ECS::Scene::Registry& ActiveWorld;
-        WorldHandle ActiveWorldHandle{};
-        CommandBus& Commands;
-        KernelEventBus& Events;
-        JobService& Jobs;
-        WorldRegistry& Worlds;
-        ServiceRegistry& Services;
-        std::uint64_t FrameIndex{0};
-        double FixedDeltaSeconds{0.0};
-    };
-
-    export struct SimSystemDesc
-    {
-        std::string Name{};
-        Core::FrameGraphPassOptions Options{
-            .MainThreadOnly = true,
-            .AllowParallel = false,
-            .DebugCategory = "RuntimeModule",
-        };
-        std::vector<Core::Hash::StringID> WaitForSignals{};
-        std::vector<Core::Hash::StringID> SignalLabels{};
-        std::function<void(Core::FrameGraphBuilder&)> Setup{};
-        std::function<void(SimSystemContext&)> Execute{};
-    };
-
     export struct RuntimeModuleShutdownContext
     {
         CommandBus& Commands;
@@ -133,7 +100,6 @@ namespace Extrinsic::Runtime
     export class EngineSetup
     {
     public:
-        using SimSystemRegistrar = std::function<void(SimSystemDesc)>;
         using FrameHookRegistrar =
             std::function<void(FramePhase, RuntimeFrameHook)>;
         using ViewportInputHookRegistrar =
@@ -144,7 +110,6 @@ namespace Extrinsic::Runtime
                     JobService& jobs,
                     WorldRegistry& worlds,
                     ServiceRegistry& services,
-                    SimSystemRegistrar simSystemRegistrar,
                     FrameHookRegistrar frameHookRegistrar,
                     RuntimeRenderRecipeActivationKernel
                         renderRecipeActivation = {},
@@ -156,7 +121,6 @@ namespace Extrinsic::Runtime
             , m_Jobs(jobs)
             , m_Worlds(worlds)
             , m_Services(services)
-            , m_SimSystemRegistrar(std::move(simSystemRegistrar))
             , m_FrameHookRegistrar(std::move(frameHookRegistrar))
             , m_RenderRecipeActivation(
                   std::move(renderRecipeActivation))
@@ -195,16 +159,6 @@ namespace Extrinsic::Runtime
             return m_Events.Subscribe<TEvent>(std::move(listener));
         }
 
-        [[nodiscard]] Core::Result RegisterSimSystem(SimSystemDesc desc)
-        {
-            if (desc.Name.empty() || !desc.Execute)
-                return Core::Err(Core::ErrorCode::InvalidArgument);
-            if (!m_SimSystemRegistrar)
-                return Core::Err(Core::ErrorCode::InvalidState);
-            m_SimSystemRegistrar(std::move(desc));
-            return Core::Ok();
-        }
-
         [[nodiscard]] Core::Result RegisterFrameHook(
             FramePhase phase,
             RuntimeFrameHook hook)
@@ -234,7 +188,6 @@ namespace Extrinsic::Runtime
         JobService& m_Jobs;
         WorldRegistry& m_Worlds;
         ServiceRegistry& m_Services;
-        SimSystemRegistrar m_SimSystemRegistrar{};
         FrameHookRegistrar m_FrameHookRegistrar{};
         RuntimeRenderRecipeActivationKernel m_RenderRecipeActivation{};
         ViewportInputHookRegistrar m_ViewportInputHookRegistrar{};
@@ -248,7 +201,10 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] virtual std::string_view Name() const noexcept = 0;
         [[nodiscard]] virtual RuntimeModuleResult OnRegister(EngineSetup& setup) = 0;
-        [[nodiscard]] virtual RuntimeModuleResult OnResolve(EngineSetup& setup) = 0;
+        [[nodiscard]] virtual RuntimeModuleResult OnResolve(EngineSetup&)
+        {
+            return RuntimeModuleOk();
+        }
         virtual void OnShutdown(RuntimeModuleShutdownContext& context) = 0;
     };
 }

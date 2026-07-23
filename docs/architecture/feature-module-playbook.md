@@ -46,12 +46,12 @@ When a feature grows past the floor, it is a small contract-driven slice:
    lifecycle, state scope, commit ownership, and consumers. Use the current
    `IRuntimeModule`/`EngineSetup` boundary when the responsibility genuinely
    needs Engine-owned optional lifecycle or frame-loop registration; never
-   pass `Engine&`. Register only the command, event, service, hook, or system
+   pass `Engine&`. Register only the command, event, service, or hook
    surface the production behavior consumes. `Provide`/`Find` is the current
-   typed discovery seam; `Require`/`OnResolve` and the general schedule remain
-   conditional under
-   [ADR-0027](../adr/0027-right-sized-runtime-composition.md), not boilerplate
-   to copy into every feature. See
+   typed discovery seam; `Require`/`OnResolve` is reserved for a real
+   order-independent provider dependency and is not boilerplate to copy into
+   every feature. The current schedule accepts only generic frame hooks and the
+   narrow typed viewport-input hook. See
    [`kernel-target-state.md`](kernel-target-state.md).
 2. **Domain/service layer** (pure logic, testable without GPU/UI).
 3. **Data contract** (typed IDs/handles, immutable inputs, explicit outputs).
@@ -116,23 +116,19 @@ optional lifecycle may implement `IRuntimeModule` and register through
 `EngineSetup` before `Engine::Initialize()`. Per ADR-0024 D13 and ADR-0027,
 setup/context surfaces remain narrow capabilities and never receive `Engine&`.
 Provide a typed service only when another production owner consumes it.
-Register a frame hook or fixed-step system only when the frame loop must
-iterate real behavior. `Require`/`OnResolve`, general wait/signal scheduling,
-and additional registrars must pass ADR-0027's live-consumer deletion test;
-do not copy them as a default module skeleton.
+Register a frame hook only when the frame loop must iterate real behavior.
+`Require`/`OnResolve`, new scheduling kinds, wait/signal machinery, and
+additional registrars must pass ADR-0027's live-consumer deletion test; do not
+copy them as a default module skeleton. `OnResolve` cannot register hooks: the
+registrars are intentionally available only during `OnRegister`, before the
+schedule is finalized.
 
-When a production fixed-step contribution exists, the composition appends the
-promoted baseline ECS bundle before registered sim systems. That bundle
-provides `TransformUpdate`, so a contribution that
-consumes the current substep's `Transform::WorldMatrix` declares
-`WaitForSignals = {"TransformUpdate"}` and the matching `Read<WorldMatrix>`
-hazard; it must not rely on module registration order or synthesize a duplicate
-baseline signal. Runtime also gives every module sim system an implicit
-`StructuralRead()` because `SimSystemContext` always exposes the live active
-world. A pass that adds or removes ECS components must declare
-`StructuralWrite()` in its setup callback; component-specific `Read<T>` /
-`Write<T>` declarations do not protect EnTT's registry-wide storage map from
-first-use pool creation.
+The current fixed-step composition is closed over the promoted
+`TransformHierarchy` / `BoundsPropagation` / `RenderSync` ECS bundle. There is
+no module sim-system descriptor, context, registrar, or causal DAG. A first
+production fixed-step contribution must justify the smallest coherent seam
+from its actual data and ordering needs; it does not pre-authorize restoration
+of the removed general scheduler.
 
 This composition surface is not required for a one-caller, synchronous probe
 that still fits the floor. A second caller, backend split, scheduled work,

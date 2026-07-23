@@ -36,7 +36,6 @@ namespace
     {
     public:
         void Resolve() override {}
-        void Simulate(double /*fixedDt*/) override {}
         void Frame(double /*alpha*/, double /*dt*/) override
         {
             auto& engine = Kernel();
@@ -49,7 +48,6 @@ namespace
     {
     public:
         void Resolve() override {}
-        void Simulate(double) override {}
         void Frame(double, double) override
         {
             auto& engine = Kernel();

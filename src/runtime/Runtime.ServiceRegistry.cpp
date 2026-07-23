@@ -1,7 +1,5 @@
 module;
 
-#include <cstdint>
-#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -30,7 +28,6 @@ namespace Extrinsic::Runtime
     {
         m_Services.clear();
         m_BootErrors.clear();
-        m_Stats = ServiceRegistryStats{};
         m_Phase = ServiceRegistryPhase::Registration;
     }
 
@@ -77,8 +74,6 @@ namespace Extrinsic::Runtime
                 .TypeName = std::string(typeName),
                 .Provider = std::string(provider.empty() ? "<unnamed>" : provider),
             });
-        m_Stats.ProvidedServices =
-            static_cast<std::uint32_t>(m_Services.size());
         return Core::Ok();
     }
 
@@ -96,8 +91,6 @@ namespace Extrinsic::Runtime
             return Core::Err(Core::ErrorCode::InvalidArgument);
 
         m_Services.erase(existing);
-        m_Stats.ProvidedServices =
-            static_cast<std::uint32_t>(m_Services.size());
         return Core::Ok();
     }
 
@@ -114,7 +107,6 @@ namespace Extrinsic::Runtime
         const std::string_view requester,
         const std::string_view typeName)
     {
-        m_Stats.MissingRequirements += 1u;
         RecordBootError("ServiceRegistry missing Require<" +
                         std::string(typeName) +
                         "> requested by " +
@@ -124,7 +116,6 @@ namespace Extrinsic::Runtime
     void ServiceRegistry::RecordBootError(std::string message)
     {
         m_BootErrors.push_back(std::move(message));
-        m_Stats.BootErrors = static_cast<std::uint32_t>(m_BootErrors.size());
     }
 
     Core::Result ServiceRegistry::ValidateBoot() const noexcept
@@ -144,20 +135,6 @@ namespace Extrinsic::Runtime
         if (m_BootErrors.empty())
             return {};
         return m_BootErrors.back();
-    }
-
-    std::span<const std::string> ServiceRegistry::BootErrors() const noexcept
-    {
-        return m_BootErrors;
-    }
-
-    ServiceRegistryStats ServiceRegistry::Stats() const noexcept
-    {
-        ServiceRegistryStats stats = m_Stats;
-        stats.ProvidedServices =
-            static_cast<std::uint32_t>(m_Services.size());
-        stats.BootErrors = static_cast<std::uint32_t>(m_BootErrors.size());
-        return stats;
     }
 
     ServiceRegistryPhase ServiceRegistry::Phase() const noexcept

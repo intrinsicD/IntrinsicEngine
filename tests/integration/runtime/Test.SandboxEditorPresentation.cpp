@@ -62,7 +62,6 @@ namespace
     {
     public:
         void Resolve() override {}
-        void Simulate(double) override {}
         void Frame(double, double) override
         {
             auto& engine = Kernel();
@@ -77,7 +76,6 @@ namespace
         static constexpr std::uint32_t MaxFrames = 64u;
 
         void Resolve() override {}
-        void Simulate(double) override {}
         void Frame(double, double) override
         {
             auto& engine = Kernel();
@@ -102,7 +100,6 @@ namespace
         }
 
         void Resolve() override {}
-        void Simulate(double) override {}
         void Frame(double, double) override
         {
             auto& engine   = Kernel();
@@ -179,7 +176,6 @@ namespace
     {
     public:
         void Resolve() override {}
-        void Simulate(double) override {}
         void Frame(double, double) override
         {
             auto& engine = Kernel();

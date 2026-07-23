@@ -37,7 +37,6 @@ namespace {
     {
     public:
         void Resolve() override {}
-        void Simulate(double) override {}
         void Frame(double, double) override
         {
             auto& engine = Kernel();
@@ -65,7 +64,6 @@ public:
   explicit UiBracketApplication(UiBracketProbeState &state) : State(state) {}
 
   void Resolve() override {}
-  void Simulate(double) override {}
   void Frame(double, double) override
   {
       auto& engine = Kernel();
@@ -229,7 +227,6 @@ class ReinitializeApplication final : public Intrinsic::Tests::RuntimeTestModule
 {
 public:
     void Resolve() override { ++BootCount; }
-    void Simulate(double) override {}
     void Frame(double, double) override
     {
         auto& engine = Kernel();
@@ -508,7 +505,6 @@ TEST(EditorUiModule, FailedRegistrationAndResolutionWithdrawPartialHost) {
       jobs,
       worlds,
       services,
-      [](Runtime::SimSystemDesc) {},
       {});
   const Core::Result registration = module.OnRegister(missingHookSetup);
   EXPECT_FALSE(registration.has_value());
@@ -523,7 +519,6 @@ TEST(EditorUiModule, FailedRegistrationAndResolutionWithdrawPartialHost) {
       jobs,
       worlds,
       services,
-      [](Runtime::SimSystemDesc) {},
       [&hooks](const Runtime::FramePhase phase,
                Runtime::RuntimeFrameHook hook) {
         hooks.emplace_back(phase, std::move(hook));

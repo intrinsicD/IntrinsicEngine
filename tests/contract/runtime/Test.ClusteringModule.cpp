@@ -141,7 +141,6 @@ namespace
             });
         }
 
-        void Simulate(double) override {}
 
         void Frame(double, double) override
         {
@@ -243,7 +242,6 @@ namespace
             NextWorld = engine.Worlds().CreateWorld("Switched");
         }
 
-        void Simulate(double) override {}
 
         void Frame(double, double) override
         {
@@ -322,7 +320,6 @@ namespace
             });
         }
 
-        void Simulate(double) override {}
 
         void Frame(double, double) override
         {

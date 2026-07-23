@@ -53,7 +53,7 @@ namespace Extrinsic::Runtime
     // Scheduling surfaces:
     //   CPU     — Core::FrameGraph wrapping a Dag::TaskGraph(Cpu).
     //             Drives ECS system scheduling each sim tick.
-    //             App-composed module systems add passes; Engine calls
+    //             The promoted ECS bundle adds passes; Engine calls
     //             Compile → Execute → ResetForReplay per tick.
     //
     //   GPU     — Owned internally by IRenderer.
@@ -70,7 +70,7 @@ namespace Extrinsic::Runtime
     //   BeginFrame(clock)
     //     [if resized:   WaitIdle → Resize]
     //   FixedStepLoop {
-    //     Module systems × N
+    //     Promoted ECS systems × N
     //       FrameGraph: Compile → Execute → ResetForReplay  (CPU task graph)
     //   }
     //   Module frame hooks
@@ -249,10 +249,6 @@ namespace Extrinsic::Runtime
             const RuntimeRenderRecipeActivationKernel& recipeActivation);
         void ResolveRuntimeModulesForBoot(
             const RuntimeRenderRecipeActivationKernel& recipeActivation);
-        void RegisterRuntimeModuleSimSystemsForTick(
-            Core::FrameGraph& graph,
-            ECS::Scene::Registry& scene,
-            double fixedDt);
         void RunRuntimeModuleFrameHooks(
             FramePhase phase,
             double frameDt,

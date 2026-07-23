@@ -70,7 +70,6 @@ namespace
             engine.Commands().Enqueue(StartEventPumpProbe{});
         }
 
-        void Simulate(double) override {}
 
         void Frame(double, double) override
         {

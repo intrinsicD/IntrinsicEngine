@@ -8,6 +8,30 @@ maturity_target: Operational
 ---
 # RUNTIME-185 — Prune unproven runtime-composition mechanisms
 
+## Status
+
+- Retired on 2026-07-23 at `Operational` on
+  `codex/arch-014-kernel-convergence-program` after `RUNTIME-184` retirement.
+- Production inventory: nine runtime-owned modules plus the Sandbox-local
+  frame-pacing capture module; seven frame-hook registrations across
+  `EditorUiModule`, `TextureBakeModule`, `SceneInteractionModule`, and the
+  Sandbox capture; two viewport-input hooks across `CameraModule` and
+  `SceneInteractionModule`; zero sim-system registrations.
+  `OnResolve`/`Require` remain behavior-backed by cross-owner dependencies.
+- Deletion decision: remove the sim-system registrar/context/descriptor,
+  causal signal DAG and fixed-step schedule branch; remove the unused
+  `AfterCommandDrain` phase, hook-context phase echo, resolve-phase registrars,
+  redundant built-in service provisions, and test-only registry statistics.
+  Retain two-phase service resolution plus the exact frame/viewport hooks.
+- Focused module/setup/service/schedule and Sandbox coverage passed 35/35 and
+  the broader named cohort passed 22/22. The default CPU selector exercised
+  4,270 cases; its sole stale source-shape expectation was repaired and rerun
+  cleanly. The fresh ASan and UBSan selectors each passed 2,924/2,924, and the
+  promoted Vulkan Sandbox/object-space-normal cohort passed 21/21 including
+  shutdown LeakSanitizer. Strict layering and the generated module inventory
+  are clean.
+- Commit: pending this slice's implementation checkpoint.
+
 ## Goal
 - Re-audit the landed production composition graph and remove or narrow every
   `IRuntimeModule`, `EngineSetup`, `ServiceRegistry`, and
@@ -37,53 +61,53 @@ maturity_target: Operational
   redundant built-in provisions or a mandatory resolve phase.
 
 ## Required changes
-- [ ] Record every production implementor/caller/provider/finder/requirement,
+- [x] Record every production implementor/caller/provider/finder/requirement,
       frame hook, sim system, and wait/signal edge for the four flagged
       surfaces; classify tests separately.
-- [ ] Retain the lean type-erased lifecycle operations actually used by
+- [x] Retain the lean type-erased lifecycle operations actually used by
       app-composed owners and remove optional lifecycle phases without a
       production caller.
-- [ ] Narrow `EngineSetup` to the capabilities and registrars used by the
+- [x] Narrow `EngineSetup` to the capabilities and registrars used by the
       landed owners; do not keep sim-system or phase vocabulary for roadmap
       work.
-- [ ] Remove redundant service provisions with no production lookup consumer.
+- [x] Remove redundant service provisions with no production lookup consumer.
       Retain `Require`/`OnResolve` only if a real cross-owner dependency proves
       order-independent two-phase resolution and its missing-provider failure.
-- [ ] Retain the smallest frame-hook scheduling used by production. Remove
+- [x] Retain the smallest frame-hook scheduling used by production. Remove
       sim-system registration, topological signal machinery, validation, and
       records independently when no real production system/edge uses them.
-- [ ] Update module/setup/service/schedule contract tests to cover the
+- [x] Update module/setup/service/schedule contract tests to cover the
       retained behavior and deletion boundary without manufacturing a
       production-like test consumer.
-- [ ] Preserve registration failure, stable identity, shutdown announcement,
+- [x] Preserve registration failure, stable identity, shutdown announcement,
       reverse shutdown, and any behavior-backed hook/service ordering.
 
 ## Tests
-- [ ] Focused module/setup/service/schedule tests prove every retained branch
+- [x] Focused module/setup/service/schedule tests prove every retained branch
       and the fail-closed invalid registration/dependency cases that remain.
-- [ ] Canonical Sandbox integration proves all composed owners boot, execute
+- [x] Canonical Sandbox integration proves all composed owners boot, execute
       their real hooks/services, and shut down after the pruning.
-- [ ] Run strict layering, the complete default CPU-supported gate, and ASan/
+- [x] Run strict layering, the complete default CPU-supported gate, and ASan/
       UBSan variants because exported lifecycle records and teardown paths may
       shrink.
-- [ ] Configure/build `ci-vulkan` and rerun the Sandbox/object-space-normal
+- [x] Configure/build `ci-vulkan` and rerun the Sandbox/object-space-normal
       smoke cohort so pruning exported setup/module records cannot silently
       invalidate the already-landed Vulkan fixtures.
 
 ## Docs
-- [ ] Update runtime architecture, ADR-0027 validation evidence, feature-module
+- [x] Update runtime architecture, ADR-0027 validation evidence, feature-module
       guidance, and runtime source README with exact retained consumer counts.
-- [ ] Regenerate the module inventory for every changed `.cppm` surface.
+- [x] Regenerate the module inventory for every changed `.cppm` surface.
 
 ## Acceptance criteria
-- [ ] Every retained composition method/type/branch names at least one
+- [x] Every retained composition method/type/branch names at least one
       production consumer and passes its deletion test.
-- [ ] No `Require`/`OnResolve`, sim-system registrar, causal-DAG branch,
+- [x] No `Require`/`OnResolve`, sim-system registrar, causal-DAG branch,
       redundant provision, or schedule record remains for tests or hypothetical
       work alone.
-- [ ] App composition, module behavior, failure diagnostics, and teardown
+- [x] App composition, module behavior, failure diagnostics, and teardown
       remain Operational through the Sandbox path.
-- [ ] No replacement abstraction or Engine domain facade is introduced.
+- [x] No replacement abstraction or Engine domain facade is introduced.
 
 ## Verification
 ```bash

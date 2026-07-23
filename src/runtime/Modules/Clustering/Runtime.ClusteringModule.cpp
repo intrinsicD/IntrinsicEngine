@@ -812,12 +812,6 @@ namespace Extrinsic::Runtime
         return Core::Ok();
     }
 
-    Core::Result ClusteringModule::OnResolve(EngineSetup& setup)
-    {
-        (void)setup;
-        return Core::Ok();
-    }
-
     void ClusteringModule::OnShutdown(RuntimeModuleShutdownContext& context)
     {
         if (m_JobCompletedSubscription.IsValid())

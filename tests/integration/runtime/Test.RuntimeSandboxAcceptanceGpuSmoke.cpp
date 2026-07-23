@@ -206,7 +206,6 @@ public:
             m_EditorUi.Attach(engine.Worlds(), engine.Services());
     }
 
-    void Simulate(double) override {}
 
     void Frame(double, double) override
     {
@@ -252,12 +251,6 @@ public:
             m_Inner->BindKernel(engine);
             m_Inner->ResolveForComposition();
         }
-    }
-
-    void Simulate(double fixedDt) override
-    {
-        if (m_Inner)
-            m_Inner->SimulateForComposition(fixedDt);
     }
 
     void Frame(double alpha, double dt) override
@@ -402,7 +395,6 @@ public:
 
     void Resolve() override {}
 
-    void Simulate(double) override {}
 
     void Frame(double, double) override
     {
@@ -1486,7 +1478,6 @@ public:
                 true);
     }
 
-    void Simulate(double) override {}
 
     void Frame(double, double) override
     {
@@ -2231,7 +2222,6 @@ namespace
 
         void Resolve() override {}
 
-        void Simulate(double) override {}
 
         void Frame(double, double) override
         {
@@ -3372,7 +3362,6 @@ class EditTriangleViaInspectorApp final : public Intrinsic::Tests::RuntimeTestMo
 public:
     void Resolve() override {}
 
-    void Simulate(double) override {}
 
     void Frame(double, double) override
     {
@@ -3998,7 +3987,6 @@ public:
         }
     }
 
-    void Simulate(double) override {}
 
     void Frame(double, double) override
     {
@@ -4689,7 +4677,6 @@ public:
         }
     }
 
-    void Simulate(double) override {}
 
     void Frame(double, double) override
     {
@@ -5762,7 +5749,6 @@ public:
             Fail("JobService rejected the RUNTIME-190 readback participant.");
     }
 
-    void Simulate(double) override {}
 
     void Frame(double, double) override
     {

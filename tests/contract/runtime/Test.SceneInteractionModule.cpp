@@ -53,7 +53,6 @@ namespace
     {
     public:
         void Resolve() override { ++InitializeCalls; }
-        void Simulate(double) override {}
         void Frame(double, double) override
         {
             auto& engine = Kernel();
@@ -128,7 +127,6 @@ namespace
                 Jobs,
                 Worlds,
                 Services,
-                [](Runtime::SimSystemDesc) {},
                 std::move(frames),
                 {},
                 std::move(viewport),
@@ -255,7 +253,7 @@ namespace
         struct FrameHookRecord
         {
             Runtime::FramePhase Phase{
-                Runtime::FramePhase::AfterCommandDrain};
+                Runtime::FramePhase::Maintenance};
             Runtime::RuntimeFrameHook Hook{};
         };
 
@@ -300,7 +298,6 @@ namespace
                 Worlds.Get(Worlds.ActiveWorld());
             ASSERT_NE(scene, nullptr);
             Runtime::RuntimeFrameHookContext context{
-                .Phase = FrameHooks.at(index).Phase,
                 .ActiveWorld = *scene,
                 .ActiveWorldHandle =
                     Worlds.ActiveWorld(),
@@ -498,7 +495,6 @@ TEST(SceneInteractionModule,
         for (const auto& record : harness.FrameHooks)
         {
             Runtime::RuntimeFrameHookContext context{
-                .Phase = record.Phase,
                 .ActiveWorld = *scene,
                 .ActiveWorldHandle =
                     harness.InitialWorld,

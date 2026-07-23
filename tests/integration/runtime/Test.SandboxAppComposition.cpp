@@ -78,7 +78,6 @@ namespace
             m_Sandbox.Initialize(engine.GetEngineConfig(), engine.Worlds(), engine.Services());
         }
 
-        void Simulate(double) override {}
 
         void Frame(const double alpha, const double dt) override
         {
@@ -152,7 +151,6 @@ namespace
             m_Sandbox.Initialize(engine.GetEngineConfig(), engine.Worlds(), engine.Services());
         }
 
-        void Simulate(double) override {}
 
         void Frame(const double alpha, const double dt) override
         {

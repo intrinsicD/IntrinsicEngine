@@ -128,7 +128,6 @@ namespace
                 Jobs,
                 Worlds,
                 Services,
-                [](Runtime::SimSystemDesc) {},
                 [](Runtime::FramePhase,
                    Runtime::RuntimeFrameHook) {},
                 {},
@@ -146,7 +145,6 @@ namespace
                 Jobs,
                 Worlds,
                 Services,
-                [](Runtime::SimSystemDesc) {},
                 [](Runtime::FramePhase,
                    Runtime::RuntimeFrameHook) {},
                 {},
@@ -244,7 +242,6 @@ namespace
                 SeedAt(glm::vec3{1.0f, 2.0f, 6.0f}));
         }
 
-        void Simulate(double) override {}
 
         void Frame(double, double) override
         {
@@ -264,7 +261,6 @@ namespace
     {
     public:
         void Resolve() override {}
-        void Simulate(double) override {}
         void Frame(double, double) override
         {
             auto& engine = Kernel();

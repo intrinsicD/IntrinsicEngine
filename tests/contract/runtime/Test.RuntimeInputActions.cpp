@@ -116,7 +116,6 @@ namespace
                 std::move(controller));
         }
 
-        void Simulate(double /*fixedDt*/) override {}
 
         void Frame(double /*alpha*/, double /*dt*/) override
         {
@@ -141,7 +140,6 @@ namespace
     {
     public:
         void Resolve() override {}
-        void Simulate(double) override {}
         void Frame(double, double) override
         {
             auto& engine = Kernel();

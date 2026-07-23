@@ -300,12 +300,13 @@ retired post-`RUNTIME-188`/`RUNTIME-183` `RUNTIME-168` private Sandbox
 provider/handle composition on the existing editor-facade surface, retired
 `RUNTIME-129` operational normal bake after the retired independent
 `GRAPHICS-128` shared-index prerequisite,
-retired `RUNTIME-184` application-lifecycle removal, `RUNTIME-185` mechanism pruning,
+retired `RUNTIME-184` application-lifecycle removal, retired `RUNTIME-185`
+mechanism pruning,
 and `RUNTIME-186` residual auxiliary-surface cleanup followed by the
 `RUNTIME-187` exact Engine-surface ratchet. The original normal-bake leaf is
 retired; its right-sized generalized module consolidation is retired as
-`RUNTIME-190`; the lifecycle leaf is also retired, so mechanism pruning is the
-next convergence step. The detailed graph
+`RUNTIME-190`; the lifecycle and mechanism-pruning leaves are also retired, so
+residual auxiliary-surface cleanup is the next convergence step. The detailed graph
 and state scopes live in the [runtime backlog index](runtime/README.md).
 Retired `RUNTIME-182` extracted the optional global ImGui/host owner while
 preserving the existing paired frame bracket and one completed capture
@@ -316,8 +317,8 @@ document owner is retired with exact service publication. `RUNTIME-188` now
 is retired with the separate interaction owner, exact optional selection
 service, and `26/4/2/15` Engine ratchet. `RUNTIME-183` is retired with the
 app-composed AssetWorkflow owner and `22/0/2/10` Engine ratchet.
-`RUNTIME-168`, `RUNTIME-129`, and `RUNTIME-184` are retired; `RUNTIME-185` is
-unblocked.
+`RUNTIME-168`, `RUNTIME-129`, `RUNTIME-184`, and `RUNTIME-185` are retired;
+`RUNTIME-186` is unblocked.
 Sequencing note: tasks whose deliverable ADR-0024 supersedes are
 front-matter gated on their seam dependencies — `RUNTIME-150` on
 `ARCH-007`/`ARCH-008`, `RUNTIME-151` additionally on `ARCH-011`, `ARCH-006`

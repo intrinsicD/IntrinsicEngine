@@ -293,25 +293,15 @@ namespace Extrinsic::Runtime
                                      ECS::Scene::Registry& scene,
                                      double& accumulator,
                                      const double fixedDt,
-                                     const int maxSubSteps,
-                                     auto&& registerModuleSystems)
+                                     const int maxSubSteps)
     {
         int substeps = 0;
         while (accumulator >= fixedDt && substeps < maxSubSteps)
         {
-            // BUG-069 (restores BUG-066): register the promoted baseline ECS
-            // systems FIRST. The core FrameGraph orients every resource hazard
-            // edge from earlier- to later-inserted passes and preserves
-            // insertion order for passes that touch the same resource, so a
-            // module sim-system that reads a baseline output (e.g.
-            // Transform::WorldMatrix) or waits on the baseline "TransformUpdate"
-            // signal must be appended AFTER the bundle. Registering the bundle
-            // last (RUNTIME-091) inserts such a module before its producer,
-            // which reads the previous substep's data or fails to compile with
-            // "no prior signaler" and drops the substep's passes.
+            // The promoted ECS bundle is the complete production fixed-step
+            // schedule. App-composed owners contribute frame/viewport hooks;
+            // no test-only module-system lane is retained in production.
             (void)RegisterPromotedEcsSystemBundle(frameGraph, scene);
-
-            registerModuleSystems(frameGraph, scene, fixedDt);
 
             if (frameGraph.PassCount() > 0)
             {

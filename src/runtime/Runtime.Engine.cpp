@@ -1,7 +1,6 @@
 module;
 
 #include <algorithm>
-#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -32,7 +31,6 @@ import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
-import Extrinsic.Core.Hash;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.Core.Logging;
 import Extrinsic.Core.Tasks;
@@ -185,18 +183,9 @@ namespace Extrinsic::Runtime
                 std::terminate();
             }
         };
-        requireProvide(m_ServiceRegistry.Provide<CommandBus>(
-                           m_CommandBus, "Engine"),
-                       "CommandBus");
-        requireProvide(m_ServiceRegistry.Provide<KernelEventBus>(
-                           m_KernelEvents, "Engine"),
-                       "KernelEventBus");
         requireProvide(m_ServiceRegistry.Provide<JobService>(
                            m_JobService, "Engine"),
                        "JobService");
-        requireProvide(m_ServiceRegistry.Provide<WorldRegistry>(
-                           m_WorldRegistry, "Engine"),
-                       "WorldRegistry");
         requireProvide(m_ServiceRegistry.Provide<RenderExtractionCache>(
                            m_RenderExtractionService.Cache(), "Engine"),
                        "RenderExtractionCache");
@@ -222,11 +211,6 @@ namespace Extrinsic::Runtime
                 m_JobService,
                 m_WorldRegistry,
                 m_ServiceRegistry,
-                [this, moduleName](SimSystemDesc desc)
-                {
-                    m_RuntimeModuleSchedule.RegisterSimSystem(
-                        moduleName, std::move(desc));
-                },
                 [this, moduleName](FramePhase phase, RuntimeFrameHook hook)
                 {
                     m_RuntimeModuleSchedule.RegisterFrameHook(
@@ -274,22 +258,9 @@ namespace Extrinsic::Runtime
                 m_JobService,
                 m_WorldRegistry,
                 m_ServiceRegistry,
-                [this, moduleName](SimSystemDesc desc)
-                {
-                    m_RuntimeModuleSchedule.RegisterSimSystem(
-                        moduleName, std::move(desc));
-                },
-                [this, moduleName](FramePhase phase, RuntimeFrameHook hook)
-                {
-                    m_RuntimeModuleSchedule.RegisterFrameHook(
-                        moduleName, phase, std::move(hook));
-                },
+                {},
                 recipeActivation,
-                [this, moduleName](RuntimeViewportInputHook hook)
-                {
-                    m_RuntimeModuleSchedule.RegisterViewportInputHook(
-                        moduleName, std::move(hook));
-                },
+                {},
                 &m_Initialized);
 
             Core::Result result = module->OnResolve(setup);
@@ -321,48 +292,7 @@ namespace Extrinsic::Runtime
         }
         m_ServiceRegistry.Lock();
 
-        // BUG-071: finalize the schedule after BOTH the register and resolve
-        // phases. OnResolve can register sim-systems (the resolve EngineSetup
-        // wires the sim-system registrar), so finalizing at the end of the
-        // register phase left resolve-registered systems appended after the
-        // sort — unordered and skipping the duplicate/cycle/unprovided-signal
-        // validation in FinalizeForBoot.
-        //
-        // Seed the promoted baseline ECS bundle's signals as externally
-        // provided so a module may wait on e.g. "TransformUpdate" without boot
-        // failing — the bundle is appended to the fixed-step FrameGraph ahead of
-        // module systems (BUG-069), so the per-tick WaitFor edge resolves.
-        const std::array<Core::Hash::StringID, 3> baselineSignals =
-            PromotedEcsSystemBundleSignalLabels();
-        if (Core::Result finalizeResult =
-                m_RuntimeModuleSchedule.FinalizeForBoot(baselineSignals);
-            !finalizeResult.has_value())
-        {
-            Core::Log::Error(
-                "[RuntimeModule] Sim system schedule finalize failed: {}",
-                Core::Error::ToString(finalizeResult.error()));
-            std::terminate();
-        }
-    }
-
-    void Engine::RegisterRuntimeModuleSimSystemsForTick(
-        Core::FrameGraph& graph,
-        ECS::Scene::Registry& scene,
-        const double fixedDt)
-    {
-        m_RuntimeModuleSchedule.RegisterSimSystemsForTick(
-            RuntimeModuleSimSystemScheduleContext{
-                .Graph = graph,
-                .ActiveWorld = scene,
-                .ActiveWorldHandle = ActiveWorld(),
-                .Commands = m_CommandBus,
-                .Events = m_KernelEvents,
-                .Jobs = m_JobService,
-                .Worlds = m_WorldRegistry,
-                .Services = m_ServiceRegistry,
-                .FrameIndex = m_RenderExtractionService.CurrentFrameIndex(),
-                .FixedDeltaSeconds = fixedDt,
-            });
+        m_RuntimeModuleSchedule.FinalizeForBoot();
     }
 
     void Engine::RunRuntimeModuleFrameHooks(
@@ -783,13 +713,6 @@ namespace Extrinsic::Runtime
                                .Worlds = &m_WorldRegistry,
                            });
 
-        RunRuntimeModuleFrameHooks(
-            FramePhase::AfterCommandDrain,
-            0.0,
-            0.0,
-            frameContext.EditorCapture,
-            pacing);
-
         // ── Event pump A (post-drain; ARCH-008 / ADR-0024 D7) ─────────────
         // Command-published events become visible before simulation. Events
         // published by listeners during this pump land in pump B or the next
@@ -797,8 +720,8 @@ namespace Extrinsic::Runtime
         (void)m_KernelEvents.Pump();
 
         // ── Phase 2: Fixed-step simulation + CPU task graph ───────────────
-        // Each tick: module systems add FrameGraph passes → Engine compiles and
-        // executes the ECS system DAG → resets registration for exact-plan replay.
+        // Each tick: the promoted ECS bundle adds FrameGraph passes → Engine
+        // compiles and executes the DAG → resets for exact-plan replay.
 
         const double frameDt = m_FrameClock.FrameDeltaClamped(m_MaxFrameDelta);
         frameContext.FrameDeltaSeconds = frameDt;
@@ -809,14 +732,7 @@ namespace Extrinsic::Runtime
                                     *m_Scene,
                                     m_Accumulator,
                                     m_FixedDt,
-                                    m_MaxSubSteps,
-                                    [this](Core::FrameGraph& graph,
-                                           ECS::Scene::Registry& scene,
-                                           const double fixedDt)
-                                    {
-                                        RegisterRuntimeModuleSimSystemsForTick(
-                                            graph, scene, fixedDt);
-                                    });
+                                    m_MaxSubSteps);
         pacing.FixedStepMicros = ElapsedMicros(fixedStepBegin);
 
         // ── Job completion gate (pre-pump B; ARCH-009 / ADR-0024 D8) ─────

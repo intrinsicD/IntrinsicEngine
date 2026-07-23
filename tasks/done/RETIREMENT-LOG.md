@@ -5726,3 +5726,19 @@ behavior or sanitizer failure after the four source-shape assertions were
 rebuilt and rerun cleanly; and the Vulkan Sandbox/object-space-normal cohort
 passed 21/21 including the shutdown LeakSanitizer contract. Engine convergence
 remains `22/0/2/10` for the dedicated mechanism/API/PImpl leaves.
+
+[`RUNTIME-185`](RUNTIME-185-prune-runtime-composition-mechanisms.md) — runtime
+composition mechanism pruning retired on 2026-07-23 at `Operational`. The
+production contract now retains nine runtime-owned modules plus the
+Sandbox-local frame-pacing capture, seven generic frame hooks, two typed
+viewport-input hooks, and behavior-backed two-phase service resolution. The
+unused sim-system registrar and causal DAG, command-drain phase, hook-context
+phase echo, resolve-phase registrars, redundant built-in provisions, and
+test-only service-registry statistics are deleted without a replacement
+framework. Focused coverage passed 35/35 and the named broader cohort passed
+22/22. The default CPU selector exercised 4,270 cases; its sole stale
+source-shape expectation was repaired and rerun cleanly. Fresh ASan and UBSan
+selectors each passed 2,924/2,924, while the promoted Vulkan
+Sandbox/object-space-normal cohort passed 21/21 including shutdown
+LeakSanitizer. Strict layering and generated inventory checks passed; Engine
+convergence remains `22/0/2/10` for the semantic API and PImpl leaves.

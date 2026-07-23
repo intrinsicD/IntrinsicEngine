@@ -635,7 +635,7 @@ TEST(RuntimeEngineLayering, PromotedFrameLoopContractPreservesRendererAndMainten
     EXPECT_LT(submit, pump);
 }
 
-TEST(RuntimeEngineLayering, RunFrameRegistersPromotedEcsSystemBundleBeforeModuleSystemsAndCompile)
+TEST(RuntimeEngineLayering, RunFrameRegistersPromotedEcsSystemBundleBeforeCompile)
 {
     const auto content =
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.FrameLoop.Internal.hpp");
@@ -644,8 +644,6 @@ TEST(RuntimeEngineLayering, RunFrameRegistersPromotedEcsSystemBundleBeforeModule
 
     const auto bundleRegistration = content.find(
         "RegisterPromotedEcsSystemBundle(frameGraph, scene)");
-    const auto moduleRegistration =
-        content.find("registerModuleSystems(frameGraph, scene, fixedDt)");
     const auto compile = content.find("frameGraph.Compile()");
     const auto execute = content.find("frameGraph.Execute()");
     const auto resetForReplay =
@@ -654,19 +652,16 @@ TEST(RuntimeEngineLayering, RunFrameRegistersPromotedEcsSystemBundleBeforeModule
         engineImpl.find("import Extrinsic.Runtime.EcsSystemBundle");
 
     ASSERT_NE(bundleRegistration, std::string::npos);
-    ASSERT_NE(moduleRegistration, std::string::npos);
     ASSERT_NE(compile, std::string::npos);
     ASSERT_NE(execute, std::string::npos);
     ASSERT_NE(resetForReplay, std::string::npos);
     ASSERT_NE(bundleImport, std::string::npos);
 
-    // Baseline ECS producers are inserted before app-composed module systems;
-    // module wait/signal and resource edges therefore resolve against the
-    // current substep rather than the previous one. BUG-069.
-    EXPECT_LT(bundleRegistration, moduleRegistration);
-    EXPECT_LT(moduleRegistration, compile);
+    // The promoted baseline is the complete fixed-step system bundle. BUG-069.
+    EXPECT_LT(bundleRegistration, compile);
     EXPECT_LT(compile, execute);
     EXPECT_LT(execute, resetForReplay);
+    EXPECT_EQ(content.find("registerModuleSystems"), std::string::npos);
     EXPECT_EQ(content.find("frameGraph.Reset();"), std::string::npos);
 }
 
@@ -1259,7 +1254,7 @@ TEST(RuntimeEngineLayering, InputActionsKeepRegistryAndDispatchOutOfEngine)
     EXPECT_NE(inputImpl.find("Core::Log::Warn"), std::string::npos);
 }
 
-TEST(RuntimeEngineLayering, RuntimeModuleScheduleKeepsContributionPolicyOutOfEngine)
+TEST(RuntimeEngineLayering, RuntimeModuleScheduleKeepsRetainedHookPolicyOutOfEngine)
 {
     const auto engineInterface =
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
@@ -1278,7 +1273,7 @@ TEST(RuntimeEngineLayering, RuntimeModuleScheduleKeepsContributionPolicyOutOfEng
               std::string::npos);
     EXPECT_NE(engineImpl.find("m_RuntimeModuleSchedule.FinalizeForBoot("),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_RuntimeModuleSchedule.RegisterSimSystemsForTick("),
+    EXPECT_EQ(engineImpl.find("RegisterSimSystemsForTick"),
               std::string::npos);
     EXPECT_NE(engineImpl.find("m_RuntimeModuleSchedule.RunFrameHooks("),
               std::string::npos);
@@ -1313,20 +1308,20 @@ TEST(RuntimeEngineLayering, RuntimeModuleScheduleKeepsContributionPolicyOutOfEng
 
     EXPECT_NE(scheduleInterface.find("export module Extrinsic.Runtime.ModuleSchedule"),
               std::string::npos);
-    EXPECT_NE(scheduleInterface.find("RuntimeModuleSimSystemRecord"),
+    EXPECT_EQ(scheduleInterface.find("RuntimeModuleSimSystemRecord"),
               std::string::npos);
     EXPECT_NE(scheduleInterface.find("RuntimeModuleFrameHookRecord"),
               std::string::npos);
     EXPECT_NE(scheduleInterface.find(
                   "RuntimeModuleViewportInputHookRecord"),
               std::string::npos);
-    EXPECT_NE(scheduleImpl.find("std::vector<std::vector<std::size_t>> edges"),
+    EXPECT_EQ(scheduleImpl.find("std::vector<std::vector<std::size_t>> edges"),
               std::string::npos);
-    EXPECT_NE(scheduleImpl.find("waits for unprovided signal"),
+    EXPECT_EQ(scheduleImpl.find("waits for unprovided signal"),
               std::string::npos);
-    EXPECT_NE(scheduleImpl.find("Sim system dependency cycle detected"),
+    EXPECT_EQ(scheduleImpl.find("Sim system dependency cycle detected"),
               std::string::npos);
-    EXPECT_NE(scheduleImpl.find("context.Graph.AddPass("),
+    EXPECT_EQ(scheduleImpl.find("context.Graph.AddPass("),
               std::string::npos);
     EXPECT_NE(scheduleImpl.find("RuntimeFrameHookContext hookContext"),
               std::string::npos);
