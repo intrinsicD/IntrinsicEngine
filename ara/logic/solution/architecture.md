@@ -187,3 +187,21 @@
   tests/contract/runtime/Test.RuntimeEngineLayering.cpp]
 - **From staging**: O55
 - **Supersedes**: A05
+
+## A16: Keep Stable Module Seams Thin and Implementation-Private
+- **Decision**: Stable architectural seams remain C++23 modules, but their
+  interfaces contain only exported types, declarations, small accessors, and
+  the exact imports required by that public surface. Runtime.Engine applies
+  this posture with twelve owning imports, five typed getters, and no domain
+  imports or re-exports; all concrete state, control flow, and implementation-
+  only dependencies live behind `Engine::Impl` and private implementation
+  headers.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [src/runtime/Runtime.Engine.cppm,
+  src/runtime/Runtime.Engine.cpp,
+  src/runtime/Runtime.RenderExtractionService.Internal.hpp,
+  tools/repo/kernel_convergence_policy.json,
+  tasks/done/RUNTIME-187-finalize-domain-free-engine-surface.md,
+  commit 982c72ae, N277]
+- **From staging**: O08

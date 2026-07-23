@@ -2,9 +2,9 @@ session:
   id: "2026-07-23_001"
   date: "2026-07-23"
   started: "2026-07-23T01:31+02:00"
-  last_turn: "2026-07-23T01:31+02:00"
-  turn_count: 1
-  summary: "Audited the crowded runtime source layout and recommended cohesive post-convergence directories instead of one folder per file."
+  last_turn: "2026-07-23T08:31+02:00"
+  turn_count: 2
+  summary: "Audited the runtime layout, then completed and pushed ARCH-014's exact 12/0/0/5 Engine convergence chain with full CPU, sanitizer, Vulkan, and structural evidence."
 
 events_logged:
   - turn: 1
@@ -31,22 +31,74 @@ events_logged:
     routing: staged
     provenance: ai-suggested
     summary: "Staged a separate mechanical reorganization after Engine semantic convergence."
+  - turn: 2
+    type: decision
+    id: "N275"
+    routing: direct
+    provenance: user
+    summary: "Selected completion, retirement, commit, and push of ARCH-014 plus RUNTIME-184 through RUNTIME-187 before physical runtime layout work."
+  - turn: 2
+    type: dead_end
+    id: "N276"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected an external RenderGraph:Pass import and corrected the exposed consumer dependency to the public RenderGraph primary module."
+  - turn: 2
+    type: experiment
+    id: "N277"
+    routing: direct
+    provenance: ai-executed
+    summary: "Closed the exact 12/0/0/5 Engine surface; 4,269 CPU, 2,923 ASan, 2,923 UBSan, and 48 Vulkan tests passed with strict structural gates."
+  - turn: 2
+    type: architecture
+    id: "O08"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the thin stable-module/private-implementation posture as A16 through the committed Engine PImpl boundary."
+  - turn: 2
+    type: heuristic
+    id: "O59"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized exact import/getter identity ratchets as H11 through the version-two checker and its 22 regressions."
+  - turn: 2
+    type: constraint
+    id: "O60"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized explicit public owning-module imports as K23 after the transitive-import dependency was exposed and fixed."
 
 ai_actions:
   - turn: 1
     action: "Inspected repository contracts, runtime architecture, accepted ADRs, open Engine convergence tasks, source/CMake layout, importers, line/file counts, and the strict layering baseline."
     provenance: ai-executed
     files_changed: []
+  - turn: 2
+    action: "Implemented and retired RUNTIME-184 through RUNTIME-187 plus ARCH-014, migrated callers and tests, strengthened the exact convergence policy, synchronized architecture/task docs and generated inventories, ran the complete CPU/sanitizer/Vulkan/structural evidence matrix, committed three scoped checkpoints, and pushed the requested branch."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/runtime/Runtime.RenderExtractionService.Internal.hpp"
+      - "src/app/Sandbox/main.cpp"
+      - "tools/repo/check_kernel_convergence.py"
+      - "tools/repo/kernel_convergence_policy.json"
+      - "tests/regression/tooling/Test.CheckKernelConvergence.py"
+      - "tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp"
+      - "tasks/done/ARCH-014-kernel-convergence-tracking.md"
+      - "docs/reviews/2026-07-23-arch-014-clean-workshop-review.md"
 
 claims_touched: []
 
 key_context:
   - turn: 1
     excerpt: "The runtime root is objectively crowded, but directories should map cohesive ownership and the move should not race the already-planned Engine semantic cleanup."
+  - turn: 2
+    excerpt: "The user directed completion of the active ARCH-014 dependency chain with commit and push; the resulting Engine interface is exactly 12 plain imports, zero domain imports, zero re-exports, and five typed getters."
 
 open_threads:
-  - "User decision on whether to adopt the cohesive-directory recommendation and request a task or implementation."
-  - "Exact file-to-directory inventory remains intentionally uncommitted until the RUNTIME-184 through RUNTIME-187 surface settles."
+  - "N273 and O57 remain open: decide whether to create a dedicated mechanical runtime-layout task now that semantic convergence is complete."
+  - "REVIEW-003 is now unblocked and is the next architecture-stability audit when the backlog program resumes."
 
 ai_suggestions_pending:
-  - "Create a dedicated mechanical runtime-layout task after Engine convergence, preserving module names and separating moves from semantic refactors."
+  - "If runtime layout cleanup is selected, create one dedicated mechanical task with an exact file-to-cohesive-directory inventory, preserved module names, and no semantic refactor."

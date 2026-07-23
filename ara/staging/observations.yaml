@@ -83,9 +83,9 @@ observations:
     context: "AI inspected IntrinsicEngine core policy, CI-007, module counts, most-imported modules, and existing compile-hotspot backlog entries before answering the user's module-strategy question."
     potential_type: architecture
     bound_to: [N183]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A16"
+    crystallized_via: artifact-commitment
     stale: false
   - id: O09
     timestamp: "2026-07-10T10:59"
@@ -775,4 +775,42 @@ observations:
     promoted: false
     promoted_to: null
     crystallized_via: null
+    stale: false
+  - id: O59
+    timestamp: "2026-07-23T08:31+02:00"
+    provenance: ai-executed
+    content: >
+      A convergence ratchet must validate semantic surface identity rather
+      than cardinality alone. Runtime.Engine plain imports are compared by
+      exact module name, and each public getter is compared by name, return
+      type, owning type, and owning import, so a same-count substitution cannot
+      conceal architectural backsliding.
+    context: >
+      ARCH-014 finalization upgraded the kernel-convergence policy/checker and
+      added synthetic regressions that deliberately preserve counts while
+      replacing imports or getter contracts.
+    potential_type: heuristic
+    bound_to: [N277]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H11"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O60
+    timestamp: "2026-07-23T08:31+02:00"
+    provenance: ai-executed
+    content: >
+      A C++ module consumer must import the public primary module that owns a
+      declaration it uses. It cannot depend on another interface's transitive
+      implementation imports or import a private partition from outside the
+      owning named module.
+    context: >
+      Removing render-graph implementation visibility from Runtime.Engine
+      exposed a Vulkan smoke's hidden dependency. Clang rejected a direct
+      RenderGraph:Pass partition import, and the committed fix imports the
+      public Extrinsic.Graphics.RenderGraph primary module.
+    potential_type: constraint
+    bound_to: [N276, N277]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K23"
+    crystallized_via: artifact-commitment
     stale: false

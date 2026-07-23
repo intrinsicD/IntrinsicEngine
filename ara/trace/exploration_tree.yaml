@@ -6512,3 +6512,77 @@ tree:
       therefore justified for locality, but current Engine semantics should
       converge before a separate mechanical move.
     status: resolved
+  - id: N275
+    type: decision
+    title: "Complete kernel convergence before runtime layout work"
+    provenance: user
+    timestamp: "2026-07-23T08:31+02:00"
+    also_depends_on: [N273, N274]
+    choice: >
+      Execute ARCH-014 and its RUNTIME-184 through RUNTIME-187 dependency
+      chain to retirement, then commit and push the result before considering
+      a physical runtime-directory reorganization.
+    alternatives:
+      - "Move the crowded runtime sources before finishing the semantic convergence chain."
+      - "Leave ARCH-014 and its remaining dependencies active after the read-only audit."
+    evidence:
+      - "tasks/active/ARCH-014-kernel-convergence-tracking.md"
+      - "tasks/backlog/runtime/RUNTIME-184-replace-application-lifecycle.md"
+      - "tasks/backlog/runtime/RUNTIME-185-prune-runtime-composition-mechanisms.md"
+      - "tasks/backlog/runtime/RUNTIME-186-retire-engine-auxiliary-surface.md"
+      - "tasks/backlog/runtime/RUNTIME-187-finalize-domain-free-engine-surface.md"
+      - "N274"
+    status: resolved
+  - id: N276
+    type: dead_end
+    title: "Reject direct external import of a render-graph partition"
+    provenance: ai-executed
+    timestamp: "2026-07-23T08:31+02:00"
+    also_depends_on: [N275]
+    hypothesis: >
+      The Vulkan default-recipe smoke can replace its lost transitive Engine
+      visibility by importing Extrinsic.Graphics.RenderGraph:Pass directly.
+    failure_mode: >
+      Clang rejected the external module-partition import because a consumer
+      outside the named module must import the published primary module. The
+      smoke had exposed a hidden dependency only after Runtime.Engine stopped
+      importing render-graph implementation details.
+    lesson: >
+      A consumer names the public primary owning module explicitly; it neither
+      relies on another module's transitive imports nor reaches into a private
+      partition. The smoke now imports Extrinsic.Graphics.RenderGraph.
+    status: resolved
+  - id: N277
+    type: experiment
+    title: "Close and verify the ARCH-014 exact kernel surface"
+    provenance: ai-executed
+    timestamp: "2026-07-23T08:31+02:00"
+    also_depends_on: [N274, N275, N276]
+    evidence:
+      - "commits af850058, a708d09a, and 982c72ae"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "tools/repo/check_kernel_convergence.py"
+      - "tools/repo/kernel_convergence_policy.json"
+      - "tests/regression/tooling/Test.CheckKernelConvergence.py"
+      - "tasks/done/ARCH-014-kernel-convergence-tracking.md"
+      - "docs/reviews/2026-07-23-arch-014-clean-workshop-review.md"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "fresh ci-asan and ci-ubsan grouped CPU selectors"
+      - "ci-vulkan gpu+vulkan selector with combined ASan+UBSan"
+      - "strict convergence, layering, task, docs, test-layout, and clean-workshop checks"
+    result: >
+      Replaced application callbacks with explicit composition, removed
+      unproven composition mechanisms and Engine auxiliary facades, moved all
+      private state behind Engine::Impl, and reduced Runtime.Engine.cppm to an
+      exact 12 plain imports, zero domain imports, zero re-exports, and five
+      typed getters. The version-two checker rejects same-count import or
+      getter substitutions and all 22 synthetic regressions passed. The
+      canonical CPU selector passed 4,269/4,269, fresh ASan and UBSan selectors
+      each passed 2,923/2,923, and the promoted Vulkan selector passed 48/48,
+      including its shutdown LeakSanitizer contract. Strict structural and
+      clean-workshop gates passed; RUNTIME-184 through RUNTIME-187 and ARCH-014
+      retired, and REVIEW-003 became unblocked. The three implementation
+      commits were pushed to the branch requested by the user.
+    status: resolved

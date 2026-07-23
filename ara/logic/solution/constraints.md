@@ -289,3 +289,14 @@
   tasks/done/RUNTIME-129-schedule-gpu-normal-bake-after-import.md,
   d2f838f2, N272]
 - **From staging**: O56
+
+## K23: External Consumers Import the Public Owning Module
+- **Constraint**: A C++ module consumer explicitly imports the public primary
+  module that owns every declaration it uses. It must not rely on another
+  interface's transitive implementation imports or directly import a private
+  partition from outside the owning named module.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp,
+  src/runtime/Runtime.Engine.cppm, commit 982c72ae, N276, N277]
+- **From staging**: O60

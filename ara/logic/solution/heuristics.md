@@ -146,3 +146,20 @@
 - **Code ref**: [tasks/done/PROC-025-port-research-ideation-skill-to-other-repos.md,
   N259]
 - **From staging**: O54
+
+## H11: Ratchet Semantic Surface Identity, Not Only Cardinality
+- **Rationale**: Import and getter counts can remain unchanged while a
+  dependency or ownership contract is silently substituted. A convergence
+  checker therefore compares exact plain-module identities and each getter's
+  name, return type, owning type, and owning import, with focused regressions
+  for same-count replacement. Cardinality remains a useful summary, not the
+  contract itself.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Sensitivity**: high
+- **Code ref**: [tools/repo/check_kernel_convergence.py,
+  tools/repo/kernel_convergence_policy.json,
+  tests/regression/tooling/Test.CheckKernelConvergence.py,
+  tasks/done/ARCH-014-kernel-convergence-tracking.md,
+  commit 982c72ae, N277]
+- **From staging**: O59
