@@ -166,6 +166,15 @@ still open. `UI-031` is retired and consumes the visibility-gated model-build
 slice for the domain-window information-architecture cleanup; the broader async
 cache/job pipeline remains owned by `RUNTIME-138`.
 
+[`RUNTIME-191`](runtime/RUNTIME-191-unified-property-texture-bake-pipeline.md)
+is the explicit property-to-texture consolidation follow-up to the narrower
+retired `RUNTIME-190` scope. It replaces the remaining selected-mesh,
+mesh-attribute CPU, and object-space-normal production paths with one
+`TextureBakeModule` service and GPU participant. Normal/color/other special
+meaning is caller-owned property preparation or result processing, never a
+parallel bake service; the task stays open through `ParityProven` until the
+legacy modules are deleted at `Retired` maturity.
+
 The 2026-07-16 Sandbox model-workflow audit opened four Theme F leaves:
 `ASSETIO-010` owns asynchronous primary/companion-file preview on top of the
 route-level prerequisite contract delivered by `BUG-093`; `ASSETIO-011` owns

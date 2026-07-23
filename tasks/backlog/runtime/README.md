@@ -7,6 +7,18 @@ another backlog directory.
 
 ## Runtime backlog tasks
 
+### Unified property-to-texture pipeline
+
+- [`RUNTIME-191` — Unify property-to-texture baking and retire specialized paths](RUNTIME-191-unified-property-texture-bake-pipeline.md)
+  completes the narrower `RUNTIME-190` migration. It makes
+  `TextureBakeModule`/`TextureBakeService` the one production surface for
+  editor, agent, import, and default-policy bakes; callers prepare named source
+  properties first and process consumers after completion. The task preserves
+  the specialized path's lifetime, residency, cache-generation,
+  padding/dilation, and stale-result guarantees while deleting the
+  selected-mesh, CPU mesh-attribute, and object-space-normal parallel
+  pipelines at `Retired` maturity.
+
 ### GPU property texture baking (retired 2026-07-21)
 
 - [`RUNTIME-190` — GPU property texture bake runtime module](../../done/RUNTIME-190-gpu-property-texture-bake-module.md)
