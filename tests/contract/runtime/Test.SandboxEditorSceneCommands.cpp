@@ -3438,7 +3438,7 @@ TEST(SandboxEditorUi, PlatformDropNoUvObjUploadsRawSurfaceBeforeDeferredPostProc
     EXPECT_EQ(lastEvent->Result->PrimitiveEntitiesCreated, 1u);
 
     const Runtime::RuntimeRenderExtractionStats& stats =
-        engine.GetLastRenderExtractionStats();
+        RequiredEngineService<Runtime::RenderExtractionCache>(engine).GetLastStats();
     EXPECT_EQ(stats.CandidateRenderableCount, 1u);
     EXPECT_EQ(stats.MeshGeometryUploads, 1u);
     EXPECT_EQ(stats.MeshGeometryMissingTexcoords, 1u);
@@ -3547,7 +3547,8 @@ TEST(SandboxEditorUi, ConfiguredBackendBornClosedLogsZeroFrameRunDiagnostic)
     const std::string engineSource =
         ReadRepositoryTextFile("src/runtime/Runtime.Engine.cpp");
     ASSERT_FALSE(engineSource.empty());
-    EXPECT_NE(engineSource.find("m_Window && m_Window->ShouldClose()"),
+    EXPECT_NE(engineSource.find(
+                  "m_Impl->m_Window && m_Impl->m_Window->ShouldClose()"),
               std::string::npos);
     EXPECT_NE(engineSource.find("Platform window initialized closed"),
               std::string::npos);

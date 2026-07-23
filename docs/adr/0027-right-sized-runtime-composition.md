@@ -282,10 +282,13 @@ The amended target retains all of these outcomes:
 | D12 `InlineModule` builder | No symbol, production experiment app, or first consumer. | **Defer.** A one-file experiment may first use a concrete app-owned responsibility and the existing narrow composition seam. | A named one-file experiment that needs runtime lifecycle, scheduling, removal, and headless testing may justify the smallest builder. Extract an experiment-app template only after bootstrap is repeated by a second production experiment app. |
 | `WorldSwitchModule` | `WorldRegistry` and deferred world operations are live; no production preview/readiness/switch policy exists. | **Defer the policy owner.** `WorldRegistry` and `WorldHandle` remain kernel substrate; no empty module is created. | A production app creates a secondary or preview world and needs readiness tracking plus a staged activation decision distinct from the registry's deferred mechanism. |
 
-The keep verdict for `IRuntimeModule` is not permission to freeze its current
-surface. `RUNTIME-185` measured the landed production tree and removed every
-remaining method or branch retained only by a test double. Future additions
-must repeat the same present-use test.
+The keep verdict for `IRuntimeModule` is not permission to freeze or expand its
+surface casually. `RUNTIME-185` measured the landed production tree and
+removed every remaining method or branch retained only by a test double.
+`RUNTIME-186` then removed Engine re-exports and auxiliary forwarding APIs,
+and `RUNTIME-187` hid implementation state without changing the settled public
+declarations. Future additions must repeat the same present-use test and amend
+the exact convergence policy deliberately.
 
 ### 4. Current responsibility hypotheses and state scope
 
@@ -316,28 +319,35 @@ content is app bootstrap, not another runtime owner.
 
 ### 5. Measurable convergence target
 
-`ARCH-014` remains the umbrella, but its scorecard measures outcomes rather
-than wrapper counts:
+`ARCH-014` served as the convergence umbrella and retired with an all-green
+scorecard measured by outcomes rather than wrapper counts:
 
 - `Runtime.Engine.cppm` contains only the exact imports required by its final
-  public surface and no unused plain imports. The present candidate is
-  `Core.Config.Engine`, `Core.FrameGraph`, `RHI.Device`, `Platform.Window`,
-  `Graphics.Renderer`, `Runtime.CommandBus`, `Runtime.KernelEvents`,
-  `Runtime.JobService`, `Runtime.Module`, `Runtime.ServiceRegistry`,
+  public surface and no unused plain imports. `RUNTIME-187` verified the final
+  set as `Core.Config.Engine`, `RHI.Device`, `Platform.Window`,
+  `Graphics.Renderer`, `Runtime.CommandBus`,
+  `Runtime.FramePacingDiagnostics`, `Runtime.JobService`,
+  `Runtime.KernelEvents`, `Runtime.Module`, `Runtime.ServiceRegistry`,
   `Runtime.WorldHandle`, and `Runtime.WorldRegistry`. This named set of 12 is
-  evidence to verify and shrink as the API lands, not an “at most 12” budget
-  that permits unrelated imports.
+  exact policy, not an “at most 12” budget that permits unrelated imports.
 - Domain imports are zero by the exact substrate-allowlist complement.
   `Extrinsic.Runtime.WorldHandle` is added to the substrate set.
-- Domain re-exports are zero. The two current re-exports remain separately
-  exact-ratcheted and may stay only if their types are classified as kernel
-  substrate.
+- Domain re-exports are zero. `RUNTIME-186` removed the frame-pacing and
+  input-action compatibility re-exports; users import those owning modules
+  explicitly.
 - Domain-facade getters are zero. A domain-facade getter is any public
   `Engine::GetX()` whose returned reference, pointer, view, or value belongs to
   a responsibility outside the accepted kernel substrate. The final checker
   maintains an exact allowlist of permitted kernel getter names and owning
   types; the measured domain set is the complement. Test-only suffixes,
   aliases, prefixes, and forwarding return types do not exempt a getter.
+- The final public getter set is exactly `GetDevice -> RHI::IDevice&`,
+  `GetEngineConfig -> const Core::Config::EngineConfig&`,
+  `GetLastFramePacingDiagnostics -> const RuntimeFramePacingDiagnostics&`,
+  `GetRenderer -> Graphics::IRenderer&`, and
+  `GetWindow -> Platform::IWindow&`. The checker binds each return/owning type
+  to its exact owning import and rejects same-count import substitutions,
+  stale policy entries, and getter type drift.
 - No `Engine&` occurs in a handler, setup, or composed-responsibility surface.
 - `IApplication` and its simulation/variable-frame callbacks were removed by
   `RUNTIME-184`; application

@@ -8,7 +8,8 @@
   post-seam collision re-review), `RUNTIME-146`..`RUNTIME-151` (Engine
   decomposition), `ARCH-006` (Sandbox editor content), `UI-034` (editor window
   contribution), `RUNTIME-137` (async GPU readback / `JobService` `GpuQueue`),
-  `CORE-005`..`CORE-008` (task-system hardening)
+  `CORE-005`..`CORE-008` (task-system hardening), `ARCH-014` and
+  `RUNTIME-179`..`RUNTIME-187` (right-sized convergence closure)
 - **Related docs:** [ADR-0003](0003-ideal-runtime-architecture.md) (staged
   frame products; this ADR refines it),
   [`docs/architecture/ground-up-redesign-vision.md`](../architecture/ground-up-redesign-vision.md),
@@ -264,6 +265,11 @@ through narrow world/service capabilities, and then call `Engine::Shutdown()`.
   every feature becomes removable; command streams give deterministic
   replay/repro; experiments compose a minimal parts list instead of paying the
   god object's build and coupling costs.
+- Final evidence (`RUNTIME-186`/`RUNTIME-187`, 2026-07-23): Engine has twelve
+  exact declaration-required imports, zero domain imports, zero re-exports,
+  and five exact kernel getter names/owning types. All implementation state is
+  behind `Engine::Impl`; input-action and render-extraction callers use their
+  published owning capabilities rather than Engine forwarding APIs.
 - Trade-offs: one frame of latency on discrete UI commands (accepted);
   snapshot copies for background jobs (accepted — versioned results are a
   feature); queued-only events mean "I fired it" never implies "it already
@@ -335,6 +341,6 @@ placement.
 - Ongoing convergence toward this contract is tracked by the living
   [`docs/architecture/kernel-target-state.md`](../architecture/kernel-target-state.md)
   scorecard (greppable kernel-slimness invariants + per-domain module rows),
-  owned by the umbrella task
-  [`ARCH-014`](../../tasks/active/ARCH-014-kernel-convergence-tracking.md).
+  closed by the umbrella task
+  [`ARCH-014`](../../tasks/done/ARCH-014-kernel-convergence-tracking.md).
   `ARCH-007` retired 2026-07-08 (first seam; CommandBus).

@@ -7,6 +7,26 @@ maturity_target: Operational
 ---
 # RUNTIME-187 — Finalize the exact domain-free Engine surface
 
+## Status
+
+- Retired on 2026-07-23 at `Operational` on
+  `codex/arch-014-kernel-convergence-program` after `RUNTIME-186` retired.
+- Every Engine field now lives behind `Engine::Impl`; no domain owner moved
+  into that storage, and the public declarations accepted by `RUNTIME-186`
+  are unchanged. The one affected Vulkan smoke now imports its owning
+  `Extrinsic.Graphics.RenderGraph` module explicitly instead of relying on
+  accidental transitive reachability through Engine.
+- The final exact policy is `12/0/0/5`: twelve declaration-required plain
+  imports, zero domain imports, zero re-exports, and five kernel getters whose
+  names, return types, owning types, and owning imports are all ratcheted.
+  Same-count import substitutions and getter-type drift fail synthetic tests.
+- Focused runtime/app coverage passed 54/54 and checker regressions passed
+  22/22. The complete CPU selector passed 4,269/4,269; fresh ASan and UBSan
+  selectors each passed 2,923/2,923; and the promoted Vulkan intersection
+  passed 48/48, including the 96.96-second shutdown LeakSanitizer contract.
+  Strict layering reported 753 files, 6,767 references, and zero violations.
+- Commit: pending this retirement checkpoint.
+
 ## Goal
 - Close runtime convergence with a representation-only Engine PImpl change and
   an exact structural ratchet derived from the already-settled public kernel
@@ -36,56 +56,56 @@ maturity_target: Operational
   public API means.
 
 ## Required changes
-- [ ] Confirm the precondition: the landed Engine API has no domain facade,
+- [x] Confirm the precondition: the landed Engine API has no domain facade,
       domain re-export, `Engine&` composition leak, old application callback,
       or outstanding production/test caller migration.
-- [ ] Put all Engine implementation state behind opaque implementation storage
+- [x] Put all Engine implementation state behind opaque implementation storage
       so implementation-only imports do not enter `Runtime.Engine.cppm`.
-- [ ] Inventory every settled public Engine declaration and derive the exact
+- [x] Inventory every settled public Engine declaration and derive the exact
       required import and allowed-kernel-getter/type sets from those
       declarations; remove every unused candidate import.
-- [ ] Preserve every public declaration and behavior accepted by
+- [x] Preserve every public declaration and behavior accepted by
       `RUNTIME-186`; if a declaration must change, stop and re-scope that
       semantic change outside this task.
-- [ ] Extend the convergence checker with exact allowed-kernel-getter and
+- [x] Extend the convergence checker with exact allowed-kernel-getter and
       owning-type classification, then lower its policy in the same commit to
       the measured plain-import/re-export/getter sets and zero domain
       imports/facades.
-- [ ] Update structural tests to fail on an unused/new Engine import, domain
+- [x] Update structural tests to fail on an unused/new Engine import, domain
       re-export/facade, `Engine&` composition leak, stale policy entry, or
       policy regrowth.
 
 ## Tests
-- [ ] Add focused structural regressions for exact imports, allowed kernel
+- [x] Add focused structural regressions for exact imports, allowed kernel
       getters/types, re-exports, no domain surface, and no `Engine&`.
-- [ ] Preserve module boot/wiring/hook/shutdown ordering, Sandbox composition,
+- [x] Preserve module boot/wiring/hook/shutdown ordering, Sandbox composition,
       Null/headless omission, and application lifecycle behavior.
-- [ ] Run all focused module/runtime/app coverage, strict layering and
+- [x] Run all focused module/runtime/app coverage, strict layering and
       convergence checks, and the complete default CPU-supported gate.
-- [ ] Run ASan and UBSan CPU variants because PImpl changes composition-root
+- [x] Run ASan and UBSan CPU variants because PImpl changes composition-root
       storage and teardown representation.
-- [ ] Configure/build `ci-vulkan` and rerun the Sandbox/object-space-normal
+- [x] Configure/build `ci-vulkan` and rerun the Sandbox/object-space-normal
       Vulkan smoke cohort so storage relocation cannot invalidate
       `RUNTIME-129` evidence.
 
 ## Docs
-- [ ] Update ADR-0024/0027-linked runtime architecture, feature-module
+- [x] Update ADR-0024/0027-linked runtime architecture, feature-module
       playbook, kernel target state, app documentation, and module inventory.
-- [ ] Record exact before/after Engine metrics and the final public import,
+- [x] Record exact before/after Engine metrics and the final public import,
       getter/type, and re-export sets.
 
 ## Acceptance criteria
-- [ ] `Runtime.Engine.cppm` contains exactly the imports required by its
+- [x] `Runtime.Engine.cppm` contains exactly the imports required by its
       settled public kernel API, no unused imports, zero domain imports, zero
       domain re-exports, and zero domain-facade getters.
-- [ ] Engine implementation state is opaque and no domain owner is hidden
+- [x] Engine implementation state is opaque and no domain owner is hidden
       behind that storage.
-- [ ] No public declaration or caller changes in this task; the PImpl and
+- [x] No public declaration or behavioral caller changes in this task; the PImpl and
       checker patch preserves the `RUNTIME-186` semantic API and already-pruned
       composition behavior.
-- [ ] Every allowed getter/type and import has a declaration-backed reason;
+- [x] Every allowed getter/type and import has a declaration-backed reason;
       the policy contains no capacity for unrelated future surface.
-- [ ] Canonical Sandbox, CPU, ASan, UBSan, and Vulkan smoke gates pass with the
+- [x] Canonical Sandbox, CPU, ASan, UBSan, and Vulkan smoke gates pass with the
       exact ratchet green.
 
 ## Verification

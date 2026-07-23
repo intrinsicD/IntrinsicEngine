@@ -27,10 +27,14 @@ depends_on:
 
 ## Status
 
+- Ready on 2026-07-23: `ARCH-014` retired with the all-green kernel scorecard
+  and exact `12/0/0/5` Engine policy, satisfying this task's final static
+  dependency. The next owner must run the one-shot audit on a fresh `main`
+  commit; no partial evidence from the convergence branch substitutes for it.
 - 2026-07-19 dependency amendment: the scene-owner audit split
   `SceneDocumentModule` (`RUNTIME-172`) from `SceneInteractionModule`
   (`RUNTIME-188`). Both are retired at `Operational`, satisfying this specific
-  gate; the audit remains blocked on its other open dependencies.
+  gate; other dependencies present at that time subsequently retired.
 - 2026-07-19 dependency update: `GRAPHICS-127` retired at `Operational` on
   native Vulkan and `CPUContracted` on Null/unsupported hosts. Its dead and
   misleading profiler-seam gate is satisfied; the task remains in

@@ -2,10 +2,14 @@ module;
 
 #include <cstdint>
 #include <memory>
-#include <optional>
-#include <utility>
 
 module Extrinsic.Runtime.Engine;
+
+import Extrinsic.Graphics.Renderer;
+import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.RenderWorldPool;
+
+#include "Runtime.RenderExtractionService.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -36,18 +40,6 @@ namespace Extrinsic::Runtime
         return *m_Pool;
     }
 
-    const RuntimeRenderExtractionStats&
-    RenderExtractionService::LastStats() const noexcept
-    {
-        return m_LastStats;
-    }
-
-    void RenderExtractionService::PublishLastStats(
-        const RuntimeRenderExtractionStats& stats) noexcept
-    {
-        m_LastStats = stats;
-    }
-
     std::uint64_t RenderExtractionService::CurrentFrameIndex() const noexcept
     {
         return m_FrameIndex;
@@ -72,29 +64,4 @@ namespace Extrinsic::Runtime
         m_Cache.Shutdown(renderer);
     }
 
-    void RenderExtractionService::SetVisualizationAdapterBinding(
-        const std::uint32_t stableEntityId,
-        RenderExtractionCache::VisualizationAdapterBinding binding)
-    {
-        m_Cache.SetVisualizationAdapterBinding(stableEntityId, std::move(binding));
-    }
-
-    void RenderExtractionService::ClearVisualizationAdapterBinding(
-        const std::uint32_t stableEntityId) noexcept
-    {
-        m_Cache.ClearVisualizationAdapterBinding(stableEntityId);
-    }
-
-    std::optional<RenderExtractionCache::VisualizationAdapterBinding>
-    RenderExtractionService::GetVisualizationAdapterBinding(
-        const std::uint32_t stableEntityId) const noexcept
-    {
-        return m_Cache.GetVisualizationAdapterBinding(stableEntityId);
-    }
-
-    std::uint64_t
-    RenderExtractionService::GetVisualizationAdapterBindingRevision() const noexcept
-    {
-        return m_Cache.GetVisualizationAdapterBindingRevision();
-    }
 }

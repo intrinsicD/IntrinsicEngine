@@ -23,6 +23,7 @@
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Telemetry;
+import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;

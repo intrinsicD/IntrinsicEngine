@@ -18,6 +18,7 @@
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraModule;

@@ -1,7 +1,7 @@
 #pragma once
 
-// Include-only Engine module glue. Include after the required graphics and
-// runtime module imports in Runtime.Engine.cppm.
+// Include-only Engine implementation glue. Include after the required
+// graphics and runtime module imports in Engine implementation units.
 
 namespace Extrinsic::Runtime
 {
@@ -13,7 +13,7 @@ namespace Extrinsic::Runtime
     //     extraction in `ExtractAndSubmit`.
     //   - `RenderWorldPool` — snapshot slot lifecycle (synchronous
     //     single-slot or pipelined render-N-1 buffering; `ConfigurePool`).
-    //   - Last-frame extraction stats and the extraction frame index.
+    //   - The extraction frame index used to stamp pool snapshots.
     //
     // Contract:
     //   - Extraction performs semantic filtering (render hints,
@@ -49,28 +49,15 @@ namespace Extrinsic::Runtime
         [[nodiscard]] RenderWorldPool& Pool() noexcept;
         [[nodiscard]] const RenderWorldPool& Pool() const noexcept;
 
-        [[nodiscard]] const RuntimeRenderExtractionStats& LastStats() const noexcept;
-        void PublishLastStats(const RuntimeRenderExtractionStats& stats) noexcept;
-
         [[nodiscard]] std::uint64_t CurrentFrameIndex() const noexcept;
         [[nodiscard]] std::uint64_t ConsumeFrameIndex() noexcept;
 
         void ReleaseFrontSlot(std::uint32_t slot) noexcept;
         void Shutdown(Graphics::IRenderer& renderer);
 
-        void SetVisualizationAdapterBinding(
-            std::uint32_t stableEntityId,
-            RenderExtractionCache::VisualizationAdapterBinding binding);
-        void ClearVisualizationAdapterBinding(std::uint32_t stableEntityId) noexcept;
-        [[nodiscard]] std::optional<RenderExtractionCache::VisualizationAdapterBinding>
-            GetVisualizationAdapterBinding(std::uint32_t stableEntityId) const noexcept;
-        [[nodiscard]] std::uint64_t
-            GetVisualizationAdapterBindingRevision() const noexcept;
-
     private:
         RenderExtractionCache m_Cache{};
         std::unique_ptr<RenderWorldPool> m_Pool{};
-        RuntimeRenderExtractionStats m_LastStats{};
         std::uint64_t m_FrameIndex{0u};
     };
 }

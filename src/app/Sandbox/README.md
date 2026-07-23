@@ -19,7 +19,14 @@ waits for device idle while worlds and module services are still live.
 `SandboxSession::Shutdown()` then removes app-owned policies/editor/reference
 content, after which `Engine::Shutdown()` reverses modules and tears down the
 kernel. Frame-pacing capture writes into main-owned report state, so the report
-remains valid after its module has been destroyed.
+remains valid after its module has been destroyed. The executable imports
+`Extrinsic.Runtime.FramePacingDiagnostics` directly; Engine no longer
+re-exports that record. Its read-only
+`GetLastFramePacingDiagnostics()` remains one of the five exact kernel
+observations because this report is its production reader. Sandbox default
+input policy similarly imports `Extrinsic.Runtime.InputActions` and registers
+against the published `RuntimeInputActionRegistry`, with no Engine forwarding
+method.
 `Sandbox.ConfigSections` is the pre-boot composition surface for the current
 `sandbox.progressive_poisson` and `sandbox.parameterization` records. The
 runtime module owns their typed DTOs/codecs. `main.cpp` constructs the

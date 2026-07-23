@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "engine_interface": "src/runtime/Runtime.Engine.cppm",
   "substrate_imports": {
     "prefixes": [
@@ -8,23 +8,15 @@
       "Extrinsic.Platform."
     ],
     "exact": [
-      "Extrinsic.ECS.Scene.Handle",
-      "Extrinsic.ECS.Scene.Registry",
       "Extrinsic.Graphics.Renderer",
-      "Extrinsic.Graphics.RenderFrameInput",
-      "Extrinsic.Graphics.FrameRecipe",
-      "Extrinsic.Graphics.RenderWorld",
       "Extrinsic.Runtime.CommandBus",
-      "Extrinsic.Runtime.KernelEvents",
+      "Extrinsic.Runtime.FramePacingDiagnostics",
       "Extrinsic.Runtime.JobService",
-      "Extrinsic.Runtime.JobServiceGpuQueueBridge",
-      "Extrinsic.Runtime.WorldRegistry",
+      "Extrinsic.Runtime.KernelEvents",
       "Extrinsic.Runtime.Module",
-      "Extrinsic.Runtime.ModuleSchedule",
       "Extrinsic.Runtime.ServiceRegistry",
-      "Extrinsic.Runtime.RenderExtraction",
-      "Extrinsic.Runtime.RenderWorldPool",
-      "Extrinsic.Runtime.WorldHandle"
+      "Extrinsic.Runtime.WorldHandle",
+      "Extrinsic.Runtime.WorldRegistry"
     ]
   },
   "reference_snapshot": {
@@ -69,28 +61,59 @@
     ]
   },
   "current_snapshot": {
-    "date": "2026-07-19",
-    "metric": "exact_allowlist_complement_v2",
-    "plain_import_count": 22,
+    "date": "2026-07-23",
+    "metric": "exact_declared_engine_surface_v3",
+    "plain_import_count": 12,
+    "plain_imports": [
+      "Extrinsic.Core.Config.Engine",
+      "Extrinsic.RHI.Device",
+      "Extrinsic.Platform.Window",
+      "Extrinsic.Graphics.Renderer",
+      "Extrinsic.Runtime.CommandBus",
+      "Extrinsic.Runtime.FramePacingDiagnostics",
+      "Extrinsic.Runtime.JobService",
+      "Extrinsic.Runtime.KernelEvents",
+      "Extrinsic.Runtime.Module",
+      "Extrinsic.Runtime.ServiceRegistry",
+      "Extrinsic.Runtime.WorldHandle",
+      "Extrinsic.Runtime.WorldRegistry"
+    ],
     "domain_import_count": 0,
     "domain_imports": [],
-    "export_import_count": 2,
-    "export_imports": [
-      "Extrinsic.Runtime.FramePacingDiagnostics",
-      "Extrinsic.Runtime.InputActions"
-    ],
-    "public_getter_count": 10,
-    "public_getter_names": [
-      "GetDevice",
-      "GetEngineConfig",
-      "GetFrameGraph",
-      "GetLastFramePacingDiagnostics",
-      "GetLastRenderExtractionStats",
-      "GetRenderWorldPool",
-      "GetRenderer",
-      "GetVisualizationAdapterBinding",
-      "GetVisualizationAdapterBindingRevision",
-      "GetWindow"
+    "export_import_count": 0,
+    "export_imports": [],
+    "public_getter_count": 5,
+    "public_getters": [
+      {
+        "name": "GetDevice",
+        "return_type": "RHI::IDevice&",
+        "owning_type": "RHI::IDevice",
+        "owning_import": "Extrinsic.RHI.Device"
+      },
+      {
+        "name": "GetEngineConfig",
+        "return_type": "const Core::Config::EngineConfig&",
+        "owning_type": "Core::Config::EngineConfig",
+        "owning_import": "Extrinsic.Core.Config.Engine"
+      },
+      {
+        "name": "GetLastFramePacingDiagnostics",
+        "return_type": "const RuntimeFramePacingDiagnostics&",
+        "owning_type": "RuntimeFramePacingDiagnostics",
+        "owning_import": "Extrinsic.Runtime.FramePacingDiagnostics"
+      },
+      {
+        "name": "GetRenderer",
+        "return_type": "Graphics::IRenderer&",
+        "owning_type": "Graphics::IRenderer",
+        "owning_import": "Extrinsic.Graphics.Renderer"
+      },
+      {
+        "name": "GetWindow",
+        "return_type": "Platform::IWindow&",
+        "owning_type": "Platform::IWindow",
+        "owning_import": "Extrinsic.Platform.Window"
+      }
     ]
   },
   "temporary_debt": null

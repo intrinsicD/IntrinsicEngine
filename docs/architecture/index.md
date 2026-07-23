@@ -17,8 +17,9 @@ Status labels:
 - [Overview](overview.md) (`canonical`)
 - [Layering rules](layering.md) (`canonical`)
 - [Kernel target state](kernel-target-state.md) (`canonical`) — north-star +
-  convergence scorecard for ADR-0024 as right-sized by ADR-0027; tracked by
-  [`ARCH-014`](../../tasks/active/ARCH-014-kernel-convergence-tracking.md).
+  closed convergence scorecard for ADR-0024 as right-sized by ADR-0027;
+  closure recorded by
+  [`ARCH-014`](../../tasks/done/ARCH-014-kernel-convergence-tracking.md).
 - [Runtime](runtime.md) (`canonical`)
 - [Runtime config control](runtime-config-control.md) (`canonical`)
 - [Engine config file](engine-config.md) (`canonical`)

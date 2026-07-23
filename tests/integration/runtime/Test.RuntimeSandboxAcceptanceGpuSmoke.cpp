@@ -1587,7 +1587,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, AcceptanceSceneReachesOperationalDefaultR
     // resident, non-dirty family increments its own lane's reuse hit on each
     // steady-state extraction (Runtime.RenderExtraction.cpp), so the last frame's
     // stats carry one reuse (or, on the first frame, one upload) per family.
-    const auto& ex = engine.GetLastRenderExtractionStats();
+    const auto& ex = RequiredEngineService<RT::RenderExtractionCache>(engine).GetLastStats();
     EXPECT_GE(ex.MeshGeometryUploads + ex.MeshGeometryReuseHits, 1u)
         << "Acceptance mesh family did not reside on the operational mesh lane.";
     EXPECT_GE(ex.GraphGeometryUploads + ex.GraphGeometryReuseHits, 1u)
@@ -1676,7 +1676,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ProgressiveRenderDataReachesOperationalFr
               RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(run.Stats);
 
-    const auto& ex = engine.GetLastRenderExtractionStats();
+    const auto& ex = RequiredEngineService<RT::RenderExtractionCache>(engine).GetLastStats();
     EXPECT_GE(ex.ProgressivePresentationEntityCount, 2u);
     EXPECT_GE(ex.ProgressivePresentationSlotCount,
               readyMesh.Stats.SlotCount + graphSnapshot.Stats.SlotCount);
@@ -1990,7 +1990,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigPresentsRefe
         return;
     }
 
-    const auto& ex = engine.GetLastRenderExtractionStats();
+    const auto& ex = RequiredEngineService<RT::RenderExtractionCache>(engine).GetLastStats();
     EXPECT_GE(ex.CandidateRenderableCount, 1u);
     EXPECT_GE(ex.SubmittedTransformCount, 1u);
     EXPECT_GE(ex.SubmittedVisualizationCount, 1u);
@@ -2139,7 +2139,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleVertexColorStreamShadesD
         return;
     }
 
-    const auto& ex = engine.GetLastRenderExtractionStats();
+    const auto& ex = RequiredEngineService<RT::RenderExtractionCache>(engine).GetLastStats();
     EXPECT_GE(ex.MeshGeometryUploads + ex.MeshGeometryReuseHits, 1u)
         << "ReferenceTriangle did not remain resident on the mesh extraction "
            "lane.";
@@ -2339,7 +2339,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, VertexColorDirtyChannelPartiallyUploadsAn
     ASSERT_TRUE(appView->Mutated())
         << "Partial vertex-color smoke did not run its final-frame mutation.";
 
-    const auto& ex = engine.GetLastRenderExtractionStats();
+    const auto& ex = RequiredEngineService<RT::RenderExtractionCache>(engine).GetLastStats();
     EXPECT_EQ(ex.MeshGeometryReuploads, 1u);
     EXPECT_EQ(ex.MeshGeometryPartialUploads, 1u);
     EXPECT_EQ(ex.MeshGeometryReleases, 0u);
@@ -2565,7 +2565,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
         << "Sandbox edge/point readback copy did not record on an operational "
            "frame.";
 
-    const auto& ex = engine.GetLastRenderExtractionStats();
+    const auto& ex = RequiredEngineService<RT::RenderExtractionCache>(engine).GetLastStats();
     EXPECT_GE(ex.MeshEdgeViewUploads + ex.MeshEdgeViewReuseHits, 1u)
         << "ReferenceTriangle did not submit the mesh edge sidecar.";
     EXPECT_GE(ex.MeshVertexViewUploads + ex.MeshVertexViewReuseHits, 1u)
@@ -3660,7 +3660,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedOffOriginObjTriangleAutoFramesAtC
         return;
     }
 
-    const auto& ex = engine.GetLastRenderExtractionStats();
+    const auto& ex = RequiredEngineService<RT::RenderExtractionCache>(engine).GetLastStats();
     EXPECT_GE(ex.CandidateRenderableCount, 1u);
     EXPECT_GE(ex.MeshGeometryUploads + ex.MeshGeometryReuseHits, 1u)
         << "Imported OBJ did not remain resident on the mesh extraction lane.";
@@ -3888,7 +3888,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
               Extrinsic::Graphics::GpuAssetState::Ready)
         << "Generated albedo texture never reached ready GPU residency.";
 
-    const auto& ex = engine.GetLastRenderExtractionStats();
+    const auto& ex = RequiredEngineService<RT::RenderExtractionCache>(engine).GetLastStats();
     EXPECT_GE(ex.MeshGeometryUploads + ex.MeshGeometryReuseHits, 1u)
         << "Imported OBJ did not remain resident on the mesh extraction lane.";
     EXPECT_EQ(ex.MeshGeometryMissingTexcoords, 0u)
@@ -4471,7 +4471,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedModelSceneIsVisibleAndClickPickab
     EXPECT_EQ(Selection(engine).SelectedCount(), 0u);
     EXPECT_FALSE(raw.all_of<ECSC::Selection::SelectedTag>(targetInstance));
 
-    const auto& extraction = engine.GetLastRenderExtractionStats();
+    const auto& extraction = RequiredEngineService<RT::RenderExtractionCache>(engine).GetLastStats();
     EXPECT_GE(extraction.CandidateRenderableCount, 2u);
     EXPECT_GE(extraction.MeshGeometryUploads + extraction.MeshGeometryReuseHits,
               2u);

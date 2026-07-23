@@ -240,8 +240,11 @@ TEST(RuntimeInputActions,
         nullptr);
 
     std::uint32_t genericExecutions = 0u;
+    auto* const inputActions =
+        engine.Services().Find<Runtime::RuntimeInputActionRegistry>();
+    ASSERT_NE(inputActions, nullptr);
     const Runtime::RuntimeInputActionHandle generic =
-        engine.RegisterInputAction(
+        inputActions->Register(
             Runtime::RuntimeInputActionDesc{
                 .DebugName = "RuntimeInputActions.GenericWithoutCamera",
                 .Binding =
@@ -267,6 +270,6 @@ TEST(RuntimeInputActions,
 
     EXPECT_EQ(appPtr->VariableTicks, 1u);
     EXPECT_EQ(genericExecutions, 1u);
-    engine.UnregisterInputAction(generic);
+    inputActions->Unregister(generic);
     engine.Shutdown();
 }

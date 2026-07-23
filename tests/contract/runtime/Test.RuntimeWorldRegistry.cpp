@@ -32,6 +32,7 @@ import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
+import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 import Geometry.HalfedgeMesh.IO;
@@ -198,7 +199,7 @@ namespace
             }
 
             ThirdVariableActive = engine.ActiveWorld();
-            LastExtractionWorld = engine.GetLastRenderExtractionStats().World;
+            LastExtractionWorld = RequiredEngineService<Runtime::RenderExtractionCache>(engine).GetLastStats().World;
             engine.RequestExit();
         }
 

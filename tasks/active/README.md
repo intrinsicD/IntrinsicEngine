@@ -11,11 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-- [`ARCH-014`](ARCH-014-kernel-convergence-tracking.md) — kernel convergence
-  umbrella; owner: Codex; coordination branch:
-  `codex/arch-014-kernel-convergence-program`; blocked on final leaf
-  `RUNTIME-187`. Next gate: execute unblocked `RUNTIME-186`, then the final
-  representation-only `RUNTIME-187` ratchet.
+- None. `RUNTIME-187` and its `ARCH-014` umbrella retired on 2026-07-23 after
+  the exact `12/0/0/5` Engine boundary and full CPU/sanitizer/Vulkan matrix
+  passed.
+
 ## History
 
 Retirement narratives live in the append-only

@@ -22,6 +22,7 @@ ENGINE_CLASS_RE = re.compile(r"\bexport\s+class\s+Engine\s*\{")
 GETTER_RE = re.compile(r"\b(Get[A-Z][A-Za-z0-9_]*)\s*\(")
 ACCESS_RE = re.compile(r"(public|private|protected)\s*:")
 IMPORT_KEYWORD_RE = re.compile(r"\bimport\b")
+ATTRIBUTE_RE = re.compile(r"\[\[[^\]]*\]\]")
 
 
 class PolicyError(RuntimeError):
@@ -29,11 +30,21 @@ class PolicyError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class GetterSurface:
+    name: str
+    return_type: str
+
+
+@dataclass(frozen=True)
 class Snapshot:
     plain_imports: tuple[str, ...]
     domain_imports: tuple[str, ...]
     export_imports: tuple[str, ...]
-    public_getter_names: tuple[str, ...]
+    public_getters: tuple[GetterSurface, ...]
+
+    @property
+    def public_getter_names(self) -> tuple[str, ...]:
+        return tuple(getter.name for getter in self.public_getters)
 
 
 def _mapping(value: Any, name: str) -> dict[str, Any]:
@@ -62,6 +73,67 @@ def _string_list(value: Any, name: str) -> list[str]:
         result.append(_string(item, f"{name}[{index}]"))
     if len(result) != len(set(result)):
         raise PolicyError(f"{name} contains duplicate entries")
+    return result
+
+
+def _normalize_cpp_type(value: str) -> str:
+    normalized = " ".join(value.split())
+    normalized = re.sub(r"\s*::\s*", "::", normalized)
+    normalized = re.sub(r"\s*([&*<>,])\s*", r"\1", normalized)
+    return normalized
+
+
+def _owning_type(return_type: str) -> str:
+    owning = return_type.strip()
+    while owning.startswith("const ") or owning.startswith("volatile "):
+        owning = owning.split(" ", 1)[1].strip()
+    owning = re.sub(r"(?:&&|[&*])+$", "", owning).strip()
+    while owning.endswith(" const") or owning.endswith(" volatile"):
+        owning = owning.rsplit(" ", 1)[0].strip()
+    return owning
+
+
+def _getter_policy_list(value: Any, name: str) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        raise PolicyError(f"{name} must be an array")
+
+    result: list[dict[str, str]] = []
+    names: set[str] = set()
+    for index, item in enumerate(value):
+        entry_name = f"{name}[{index}]"
+        entry = _mapping(item, entry_name)
+        expected_keys = {"name", "return_type", "owning_type", "owning_import"}
+        if set(entry) != expected_keys:
+            raise PolicyError(
+                f"{entry_name} must contain exactly {sorted(expected_keys)}"
+            )
+        getter_name = _string(entry.get("name"), f"{entry_name}.name")
+        if not re.fullmatch(r"Get[A-Z][A-Za-z0-9_]*", getter_name):
+            raise PolicyError(f"{entry_name}.name is not an Engine GetX name")
+        if getter_name in names:
+            raise PolicyError(f"{name} contains duplicate getter {getter_name}")
+        names.add(getter_name)
+
+        return_type = _normalize_cpp_type(
+            _string(entry.get("return_type"), f"{entry_name}.return_type")
+        )
+        owning_type = _normalize_cpp_type(
+            _string(entry.get("owning_type"), f"{entry_name}.owning_type")
+        )
+        if _owning_type(return_type) != owning_type:
+            raise PolicyError(
+                f"{entry_name}.owning_type does not match its return_type"
+            )
+        result.append(
+            {
+                "name": getter_name,
+                "return_type": return_type,
+                "owning_type": owning_type,
+                "owning_import": _string(
+                    entry.get("owning_import"), f"{entry_name}.owning_import"
+                ),
+            }
+        )
     return result
 
 
@@ -146,10 +218,11 @@ def _engine_class_body(clean_source: str) -> str:
     raise PolicyError("export class Engine definition has unbalanced braces")
 
 
-def _public_top_level_text(class_body: str) -> str:
-    """Return only top-level characters from public Engine class sections."""
+def _public_top_level_declarations(class_body: str) -> list[str]:
+    """Return public Engine declarations without inline-function bodies."""
 
-    out = ["\n" if char == "\n" else " " for char in class_body]
+    declarations: list[str] = []
+    current: list[str] = []
     access = "private"
     depth = 0
     index = 0
@@ -157,24 +230,68 @@ def _public_top_level_text(class_body: str) -> str:
         if depth == 0:
             match = ACCESS_RE.match(class_body, index)
             if match is not None:
+                current.clear()
                 access = match.group(1)
                 index = match.end()
                 continue
 
         char = class_body[index]
-        if depth == 0 and access == "public":
-            out[index] = char
-        if char == "{":
+        if depth == 0 and char == "{":
+            declaration = "".join(current).strip()
+            if access == "public" and declaration:
+                declarations.append(declaration)
+            current.clear()
             depth += 1
+        elif depth == 0 and char == ";":
+            if access == "public":
+                current.append(char)
+                declaration = "".join(current).strip()
+                if declaration:
+                    declarations.append(declaration)
+            current.clear()
+        elif depth == 0:
+            if access == "public":
+                current.append(char)
         elif char == "}":
-            if depth == 0:
-                raise PolicyError("unexpected closing brace in Engine class body")
             depth -= 1
+            if depth < 0:
+                raise PolicyError("unexpected closing brace in Engine class body")
         index += 1
 
     if depth != 0:
         raise PolicyError("unbalanced nested braces in Engine class body")
-    return "".join(out)
+    return declarations
+
+
+def _public_getters(class_body: str) -> tuple[GetterSurface, ...]:
+    getters: list[GetterSurface] = []
+    seen: set[str] = set()
+    for declaration in _public_top_level_declarations(class_body):
+        matches = list(GETTER_RE.finditer(declaration))
+        if not matches:
+            continue
+        if len(matches) != 1:
+            raise PolicyError(
+                "ambiguous public Engine getter declaration: "
+                + " ".join(declaration.split())
+            )
+        match = matches[0]
+        name = match.group(1)
+        if name in seen:
+            raise PolicyError(f"overloaded public Engine getter is unsupported: {name}")
+        seen.add(name)
+
+        prefix = ATTRIBUTE_RE.sub(" ", declaration[: match.start()])
+        prefix = re.sub(
+            r"^(?:(?:virtual|static|inline|constexpr|consteval|friend)\s+)+",
+            "",
+            prefix.strip(),
+        )
+        return_type = _normalize_cpp_type(prefix)
+        if not return_type:
+            raise PolicyError(f"cannot determine return type for public Engine getter {name}")
+        getters.append(GetterSurface(name=name, return_type=return_type))
+    return tuple(sorted(getters, key=lambda getter: getter.name))
 
 
 def _is_substrate(module: str, prefixes: list[str], exact: set[str]) -> bool:
@@ -213,13 +330,12 @@ def inspect_engine(source: str, prefixes: list[str], exact: set[str]) -> Snapsho
             if not _is_substrate(module, prefixes, exact)
         )
     )
-    public_text = _public_top_level_text(_engine_class_body(clean))
-    getters = tuple(sorted(set(GETTER_RE.findall(public_text))))
+    getters = _public_getters(_engine_class_body(clean))
     return Snapshot(
         plain_imports=plain_imports,
         domain_imports=domain_imports,
         export_imports=tuple(sorted(export_imports)),
-        public_getter_names=getters,
+        public_getters=getters,
     )
 
 
@@ -259,8 +375,8 @@ def _validate_open_debt_owner(root: Path, owner: str) -> None:
 
 
 def _validate_policy(policy: dict[str, Any], root: Path) -> dict[str, Any]:
-    if policy.get("schema_version") != 1:
-        raise PolicyError("schema_version must be 1")
+    if policy.get("schema_version") != 2:
+        raise PolicyError("schema_version must be 2")
     _string(policy.get("engine_interface"), "engine_interface")
 
     substrate = _mapping(policy.get("substrate_imports"), "substrate_imports")
@@ -296,6 +412,11 @@ def _validate_policy(policy: dict[str, Any], root: Path) -> dict[str, Any]:
     current_plain = _nonnegative_int(
         current.get("plain_import_count"), "current_snapshot.plain_import_count"
     )
+    current_plain_imports = _string_list(
+        current.get("plain_imports"), "current_snapshot.plain_imports"
+    )
+    if current_plain != len(current_plain_imports):
+        raise PolicyError("current_snapshot.plain_import_count does not match its list")
     current_domain = _nonnegative_int(
         current.get("domain_import_count"), "current_snapshot.domain_import_count"
     )
@@ -312,18 +433,27 @@ def _validate_policy(policy: dict[str, Any], root: Path) -> dict[str, Any]:
     )
     if current_export_count != len(current_exports):
         raise PolicyError("current_snapshot.export_import_count does not match its list")
-    current_getters = _string_list(
-        current.get("public_getter_names"), "current_snapshot.public_getter_names"
+    current_getters = _getter_policy_list(
+        current.get("public_getters"), "current_snapshot.public_getters"
     )
     current_getter_count = _nonnegative_int(
         current.get("public_getter_count"), "current_snapshot.public_getter_count"
     )
     if current_getter_count != len(current_getters):
         raise PolicyError("current_snapshot.public_getter_count does not match its list")
+    for getter in current_getters:
+        if getter["owning_import"] not in current_plain_imports:
+            raise PolicyError(
+                "current_snapshot.public_getters owning_import is not an exact "
+                f"plain import: {getter['name']} -> {getter['owning_import']}"
+            )
 
     expected_debt_plain = max(0, current_plain - reference_plain)
     expected_debt_domain = max(0, current_domain - reference_domain)
-    expected_debt_getters = sorted(set(current_getters) - set(reference_getters))
+    current_getter_names = [getter["name"] for getter in current_getters]
+    expected_debt_getters = sorted(
+        set(current_getter_names) - set(reference_getters)
+    )
     has_expected_debt = bool(
         expected_debt_plain or expected_debt_domain or expected_debt_getters
     )
@@ -360,6 +490,8 @@ def _validate_policy(policy: dict[str, Any], root: Path) -> dict[str, Any]:
         "exact": set(exact),
         "reference": reference,
         "current": current,
+        "current_plain_imports": current_plain_imports,
+        "current_getters": current_getters,
         "debt": debt,
     }
 
@@ -409,6 +541,13 @@ def check(root: Path) -> int:
         )
     findings.extend(
         _describe_delta(
+            "plain imports",
+            list(snapshot.plain_imports),
+            validated["current_plain_imports"],
+        )
+    )
+    findings.extend(
+        _describe_delta(
             "domain imports",
             list(snapshot.domain_imports),
             _string_list(current.get("domain_imports"), "current_snapshot.domain_imports"),
@@ -421,16 +560,27 @@ def check(root: Path) -> int:
             _string_list(current.get("export_imports"), "current_snapshot.export_imports"),
         )
     )
+    expected_getters = {
+        getter["name"]: getter for getter in validated["current_getters"]
+    }
+    observed_getters = {getter.name: getter for getter in snapshot.public_getters}
     findings.extend(
         _describe_delta(
             "public Engine GetX names",
-            list(snapshot.public_getter_names),
-            _string_list(
-                current.get("public_getter_names"),
-                "current_snapshot.public_getter_names",
-            ),
+            list(observed_getters),
+            list(expected_getters),
         )
     )
+    for getter_name in sorted(set(observed_getters) & set(expected_getters)):
+        observed_return = observed_getters[getter_name].return_type
+        expected_return = expected_getters[getter_name]["return_type"]
+        if observed_return != expected_return:
+            findings.append(
+                f"public Engine getter {getter_name} return type changed: "
+                f"observed {observed_return}, policy {expected_return} "
+                f"(owning type {expected_getters[getter_name]['owning_type']}, "
+                f"import {expected_getters[getter_name]['owning_import']})"
+            )
 
     print(f"[check_kernel_convergence] Engine interface: {interface_relative}")
     print(

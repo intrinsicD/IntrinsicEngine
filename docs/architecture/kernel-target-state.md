@@ -10,8 +10,9 @@
   [ADR-0026](../adr/0026-runtime-module-scope-by-consumer-contract.md) decides
   when demonstrated runtime responsibilities share one composed module or
   split; it defines no family taxonomy or wrapper-count outcome.
-- **Tracked by:** [`ARCH-014`](../../tasks/active/ARCH-014-kernel-convergence-tracking.md)
-  (umbrella; stays open until the scorecard is all-green).
+- **Closure record:** [`ARCH-014`](../../tasks/done/ARCH-014-kernel-convergence-tracking.md)
+  retired on 2026-07-23 after the scorecard became all-green. The exact
+  convergence checker now protects the closed surface.
 - **Read this before** adding anything to `Runtime.Engine` or introducing a
   new `Runtime.*Module`. See the [Feature Module Playbook](feature-module-playbook.md)
   for the per-feature procedure.
@@ -47,7 +48,7 @@ this table. If it does not fit a row, that is a signal to revisit ADR-0024,
 | Background multi-frame compute (remesh, k-means, bake, readback) | a **job** | `Jobs().Submit(JobDesc{...})`; snapshot in, result committed at a pump (D8) |
 | A new render technique (overlay, fullscreen analysis, compute fill) | a built-in recipe pass while the vocabulary remains sufficient | Add validated recipe data and the graphics-owned implementation; propose extension registration only with the first real pass the built-in vocabulary cannot express (D10/ADR-0027) |
 | Deciding whether a click belongs to UI or the viewport | one frame-loop-owned capture value borrowed by each ephemeral hook context | Reset it once at frame start; EditorUi brackets the application tick with `UiBegin`/`UiBuild`/`UiEndCapture` and writes the value after `EndFrame`; later viewport behavior, any later hooks, and kernel input-action dispatch read the same value. Add precedence only after a second independent simultaneous claimant proves a conflict (D11/ADR-0027) |
-| A keybinding/chord that triggers an action | an **input action** | `RegisterInputAction(...)` (usually enqueues a command) |
+| A keybinding/chord that triggers an action | an **input action** | Resolve the published `RuntimeInputActionRegistry` and call `Register(...)` (usually enqueues a command); Engine has no registration facade |
 | Always-present infrastructure another composed responsibility needs (asset service, GPU cache) | a typed service or explicit narrow non-owning construction capability with a declared lifetime | Use the current `Provide<T>()` / `Find<T>()` registry for optional discovery and the retained `Require`/`OnResolve` path for proven order-independent dependencies. Never create hidden ownership or a mutable peer backreference (D3/ADR-0027) |
 | A *domain-specific* extension point (post-import processors, camera controllers, visualization adapters, editor panels) | a **module-provided service**, **not** a kernel knob | the owning module `Provide`s its own registry; others `Find` it |
 | Durable state other composed responsibilities query (selection, undo history, camera set) | state owned by one app-composed responsibility, exposed narrowly if another real consumer exists | Record global versus world-qualified scope; do not add an Engine getter or one-service wrapper |
@@ -60,8 +61,8 @@ design, not a gap.
 
 ## Convergence scorecard
 
-Each row is a greppable invariant. `ARCH-014` owns keeping this current;
-flip a box when the invariant holds on `main`. Baseline column is the
+Each row is a greppable invariant. Retired `ARCH-014` owns the closure record;
+future runtime changes must keep every box green. Baseline column is the
 2026-07-08 measurement (post-ARCH-007) and remains fixed for comparison;
 dated current snapshots are refreshed separately. The fixed 2026-07-13
 legacy-interim reference snapshot is 43 plain imports and 23 domain imports.
@@ -82,6 +83,12 @@ imports / 11 domain imports / 2 re-exports / 22 public getter names.
 `RUNTIME-188` then removes interaction ownership/facades and the obsolete
 mesh-view compatibility surface, reducing the current exact snapshot to
 26 plain imports / 4 domain imports / 2 re-exports / 15 public getter names.
+`RUNTIME-183` reduces that surface to `22/0/2/10`. `RUNTIME-186` removes the
+two re-exports and five auxiliary getters, producing the intentionally
+transitional `24/2/0/5` interface before representation moves. `RUNTIME-187`
+puts implementation state behind `Engine::Impl` and establishes the final
+exact snapshot `12/0/0/5`. The five getters are exact-ratcheted by return type,
+owning type, and owning import as well as name.
 The fixed reference remains historical comparison evidence; the current
 snapshot carries no temporary debt.
 
@@ -114,24 +121,28 @@ snapshot carries no temporary debt.
 > python3 tools/repo/check_kernel_convergence.py --root . --strict
 > ```
 >
-> The checker treats plain imports and re-exports separately, uses exact
-> runtime substrate names so `JobServiceGpuQueueBridge`/`ModuleSchedule` are
-> intentional rather than regex accidents, strips comments before finding the
-> public Engine getter set, and fails on both new and stale snapshot entries.
-> A reduction therefore must lower the policy in the same change, preventing
-> the old cap from becoming room for later regrowth.
+> The checker treats exact plain-import and re-export sets separately, uses the
+> substrate allowlist complement for the domain metric, parses public Engine
+> declarations after stripping comments/literals/inline bodies, and validates
+> each allowed getter's return type, owning type, and owning import. It fails on
+> same-count substitutions, new or stale entries, and getter type drift. A
+> reduction therefore must lower the policy in the same change, while the
+> final policy has no numerical capacity for later regrowth.
 
 
-- [ ] `Runtime.Engine.cppm` contains only the exact imports required by its
+- [x] `Runtime.Engine.cppm` contains only the exact imports required by its
       accepted kernel public surface and no unused plain imports
       (**baseline 45; 2026-07-13 reference 43; post-`RUNTIME-183` checked
-      snapshot 22**).
-      ADR-0027 records the present final-surface candidate of 12 exact imports;
-      that is an auditable allowlist derived from the remaining API, not a
-      numerical budget or room for unrelated imports.
+      snapshot 22; final `RUNTIME-187` snapshot 12**).
+      The final set is `Core.Config.Engine`, `RHI.Device`, `Platform.Window`,
+      `Graphics.Renderer`, `Runtime.CommandBus`,
+      `Runtime.FramePacingDiagnostics`, `Runtime.JobService`,
+      `Runtime.KernelEvents`, `Runtime.Module`, `Runtime.ServiceRegistry`,
+      `Runtime.WorldHandle`, and `Runtime.WorldRegistry`. This is an exact
+      declaration-derived set, not a numerical budget.
 - [x] Domain (non-substrate) imports in `Runtime.Engine.cppm` = 0
       (**baseline 27; 2026-07-13 reference 23; post-`RUNTIME-183` snapshot
-      0**).
+      0; final snapshot 0**).
       Measure by
       **allowlist**, not
       a blocklist of names:
@@ -144,9 +155,12 @@ snapshot carries no temporary debt.
       kernel-substrate allowlist; the final checker measures the complement of
       exact allowed kernel getter names rather than treating all `GetX()` names
       alike (**baseline estimate 13 domain facades; the post-`RUNTIME-183`
-      exact guard contains 10 kernel getter names and no domain facade**)
-- [ ] Domain re-exports from `Runtime.Engine.cppm` = 0; a retained re-export
-      must be explicitly classified as kernel public surface
+      exact guard contained 10 kernel getter names; the final exact guard
+      permits five kernel getters with their return/owning types and no domain
+      facade**)
+- [x] Domain re-exports from `Runtime.Engine.cppm` = 0; `RUNTIME-186` removed
+      both compatibility re-exports and made record users import their owning
+      modules explicitly
 - [x] No `entt::dispatcher::trigger` or direct dispatcher use in module code
 - [x] No `Engine&` is passed through the `IRuntimeModule`/`EngineSetup`
       composition seam (`ARCH-011`)
@@ -216,15 +230,15 @@ snapshot carries no temporary debt.
       two-stage shutdown boundary to release editor/default/reference state
       while exact runtime services remain live. No replacement application
       framework or `Engine&` app behavior surface exists
-- [ ] Composition mechanism deletion test — `RUNTIME-185`; retain only
+- [x] Composition mechanism deletion test — `RUNTIME-185`; retain only
       behavior-backed lifecycle/setup/service/hook surface and remove
       test-only resolve/sim/DAG/provision branches after `RUNTIME-129` and
       explicit app lifecycle have both landed
-- [ ] Residual Engine auxiliary surface — `RUNTIME-186`; remove the two
+- [x] Residual Engine auxiliary surface — `RUNTIME-186`; removed the two
       re-exports and migrate remaining frame-pacing/render-extraction
       observation and input-action setup callers without absorbing a missed
       domain-owner correction or creating a generic facade
-- [ ] Final exact Engine surface ratchet — `RUNTIME-187`; put implementation
+- [x] Final exact Engine surface ratchet — `RUNTIME-187`; implementation
       state behind PImpl and derive the exact allowed import/getter/type sets
       from the already-settled public API without semantic caller migration or
       a numerical budget
@@ -268,6 +282,7 @@ snapshot carries no temporary debt.
 - **Picking work?** The additive seams `ARCH-007`..`ARCH-011`, the
   `ARCH-012` ClusteringModule proof, retired `UI-034`, the `ARCH-006`
   Sandbox-content relocation, and the `RUNTIME-178` budget restoration are
-  complete. Explicit app lifecycle is complete under `RUNTIME-184`; remaining
-  convergence work proceeds through `RUNTIME-185`, `RUNTIME-186`, and
-  `RUNTIME-187` in the exact dependency graph recorded by `ARCH-014`.
+  complete. Explicit app lifecycle, the composition deletion audit, auxiliary
+  API migration, and the exact representation/checker ratchet are complete
+  under `RUNTIME-184`..`RUNTIME-187`; new work must preserve the closed
+  `12/0/0/5` boundary.

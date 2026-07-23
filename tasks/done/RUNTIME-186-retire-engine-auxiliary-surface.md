@@ -7,6 +7,27 @@ maturity_target: Operational
 ---
 # RUNTIME-186 — Retire residual Engine auxiliary surface
 
+## Status
+
+- Retired on 2026-07-23 at `Operational` on
+  `codex/arch-014-kernel-convergence-program` after `RUNTIME-185` retirement.
+- The settled public API retains kernel lifecycle/control, the explicit
+  platform-event test seam, and five declaration-backed kernel observations:
+  window, device, renderer, engine config, and frame-pacing diagnostics. The
+  Sandbox frame-pacing report is the named production diagnostics reader.
+- Engine no longer re-exports frame-pacing/input-action records or forwards
+  input registration, frame graph, render-world-pool, render-extraction stats,
+  or visualization-adapter state. Callers import owning records directly and
+  use `RuntimeInputActionRegistry`, `RenderExtractionCache`, or the renderer's
+  already-published state.
+- The semantic snapshot moved from `22/0/2/10` to the intentional transitional
+  `24/2/0/5`: the former re-exports are plain imports until `RUNTIME-187` moves
+  implementation state behind opaque storage. Focused coverage passed 106/106;
+  the complete default CPU selector passed 4,268/4,268, fresh ASan and UBSan
+  selectors each passed 2,922/2,922, and the promoted Vulkan cohort passed
+  21/21 including shutdown LeakSanitizer.
+- Commit: included with the dependent `RUNTIME-187` exact-surface checkpoint.
+
 ## Goal
 - Make the final semantic public-API decisions for residual Engine
   observation/setup conveniences and migrate their callers before the
@@ -44,72 +65,72 @@ maturity_target: Operational
   production behavior proves.
 
 ## Required changes
-- [ ] Inventory every remaining public Engine declaration and production/test
+- [x] Inventory every remaining public Engine declaration and production/test
       caller after `RUNTIME-185`; classify each as kernel control, kernel
       observation/setup, test-only seam, or residual domain facade.
-- [ ] If the inventory finds a residual domain facade or owner import, stop
+- [x] If the inventory finds a residual domain facade or owner import, stop
       and correct the responsible behavior-owner task. Record that correction
       rather than broadening this auxiliary-surface slice.
-- [ ] Remove the two Engine re-exports. Make users that name
+- [x] Remove the two Engine re-exports. Make users that name
       `RuntimeFramePacingDiagnostics` or runtime input-action records import
       their owning modules explicitly.
-- [ ] Remove Engine forwarding getters for frame-pacing/render-extraction
+- [x] Remove Engine forwarding getters for frame-pacing/render-extraction
       observations where callers can use an already-landed owning snapshot or
       narrow read-only composition capability. If a production caller still
       needs an observation, expose the smallest direct value/snapshot surface
       at the kernel owner; do not introduce a catch-all telemetry facade.
-- [ ] Route production input-action registration through the narrow
+- [x] Route production input-action registration through the narrow
       behavior-backed setup capability used by app-composed owners. Keep the
       action registry and dispatch in the frame loop. If no production owner
       registers an action after the app migration, delete the public
       registration capability instead of preserving it for tests.
-- [ ] Move test-only diagnostic and event-replay callers to explicit test
+- [x] Move test-only diagnostic and event-replay callers to explicit test
       seams or owning component snapshots; do not keep a public Engine
       convenience solely for a fixture.
-- [ ] Preserve the frame-loop-owned input-capture value: reset once per frame,
+- [x] Preserve the frame-loop-owned input-capture value: reset once per frame,
       borrowed by each ephemeral hook context, completed by EditorUi before
       later behavior hooks and input-action dispatch read it.
-- [ ] Preserve the composition contract accepted by `RUNTIME-185`, queued
+- [x] Preserve the composition contract accepted by `RUNTIME-185`, queued
       command/event pump order, world/job teardown, renderer sequencing, and
       direct-dispatch prohibition.
 
 ## Tests
-- [ ] Add focused contract coverage for every retained kernel observation or
+- [x] Add focused contract coverage for every retained kernel observation or
       setup capability and structural coverage that Engine re-exports remain
       absent.
-- [ ] Preserve frame-pacing/render-extraction diagnostics, input-action
+- [x] Preserve frame-pacing/render-extraction diagnostics, input-action
       registration/dispatch/capture gating, event replay, Sandbox composition,
       Null/headless omission, and app lifecycle behavior.
-- [ ] Run all focused runtime/app coverage, strict layering and convergence
+- [x] Run all focused runtime/app coverage, strict layering and convergence
       checks, and the complete default CPU-supported gate.
-- [ ] Run ASan and UBSan CPU variants because public caller and capability
+- [x] Run ASan and UBSan CPU variants because public caller and capability
       ownership changes can expose lifetime errors.
-- [ ] Configure/build `ci-vulkan` and rerun the Sandbox/object-space-normal
+- [x] Configure/build `ci-vulkan` and rerun the Sandbox/object-space-normal
       Vulkan smoke cohort so caller migration cannot invalidate
       `RUNTIME-129` evidence.
 
 ## Docs
-- [ ] Update ADR-0024/0027-linked runtime architecture, feature-module
+- [x] Update ADR-0024/0027-linked runtime architecture, feature-module
       playbook, kernel target state, app documentation, and affected source
       READMEs.
-- [ ] Record the before/after public declarations and where each removed
+- [x] Record the before/after public declarations and where each removed
       observation/setup caller now obtains its capability.
-- [ ] Regenerate the module inventory for changed module surfaces.
+- [x] Regenerate the module inventory for changed module surfaces.
 
 ## Acceptance criteria
-- [ ] Engine re-exports neither frame-pacing nor input-action records, and
+- [x] Engine re-exports neither frame-pacing nor input-action records, and
       callers import owning modules explicitly.
-- [ ] Engine exposes no residual domain facade and no auxiliary forwarding
+- [x] Engine exposes no residual domain facade and no auxiliary forwarding
       getter or registration convenience retained only for tests.
-- [ ] Every retained kernel observation/setup surface has a named production
+- [x] Every retained kernel observation/setup surface has a named production
       caller, is read-only or narrowly mutating as appropriate, and is smaller
       than a generic Engine/telemetry facade.
-- [ ] Input actions and the coherent capture value remain frame-loop-owned
+- [x] Input actions and the coherent capture value remain frame-loop-owned
       without exposing Engine or ImGui types through module/app behavior.
-- [ ] The public Engine declarations and all callers are semantically settled
+- [x] The public Engine declarations and all callers are semantically settled
       so `RUNTIME-187` can change only representation and exact structural
       policy.
-- [ ] Canonical Sandbox, CPU, ASan, UBSan, and Vulkan smoke gates pass.
+- [x] Canonical Sandbox, CPU, ASan, UBSan, and Vulkan smoke gates pass.
 
 ## Verification
 ```bash

@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `ARCH-014` — Kernel convergence tracking (umbrella north-star) (tasks/active/ARCH-014-kernel-convergence-tracking.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -28,11 +28,9 @@ the authoritative open/unblocked view.
 - blocked by `ASSETIO-010`: `ASSETIO-011` — Semantic Sandbox File / Import workflow matrix (tasks/backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md)
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
-- blocked by `ARCH-014`: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
+- unblocked: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
-- unblocked: `RUNTIME-186` — Retire residual Engine auxiliary surface (tasks/backlog/runtime/RUNTIME-186-retire-engine-auxiliary-surface.md)
-- blocked by `RUNTIME-186`: `RUNTIME-187` — Finalize the exact domain-free Engine surface (tasks/backlog/runtime/RUNTIME-187-finalize-domain-free-engine-surface.md)
 - blocked by `BUG-096`: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
 - unblocked: `UI-038` — Progressive Poisson destructive-conversion safety (tasks/backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md)
 

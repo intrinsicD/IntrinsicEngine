@@ -10,7 +10,7 @@ Use it when introducing anything like `Runtime.SomethingModule.cppm`, geometry t
 > converging to a slim seam-only core
 > ([ADR-0024](../adr/0024-kernel-module-architecture.md), as amended by
 > [ADR-0027](../adr/0027-right-sized-runtime-composition.md),
-> tracked by [`ARCH-014`](../../tasks/active/ARCH-014-kernel-convergence-tracking.md)):
+> completed by `ARCH-014` and protected by the exact convergence checker):
 > if your feature wants a new `Engine` method, that is the signal it is a
 > command, event, service, or app-composed responsibility — not kernel
 > surface. A new `IRuntimeModule` wrapper is not automatically required.
@@ -59,6 +59,15 @@ When a feature grows past the floor, it is a small contract-driven slice:
 
 If a grown feature is missing one of these seams, it will drift into "works
 now" code instead of reusable architecture.
+
+The converged Engine interface is an exact, closed surface: twelve
+declaration-required imports, no domain import or re-export, and five allowed
+read-only `GetX` observations with exact owning types. Do not treat those
+numbers as capacity. The convergence policy rejects any new or substituted
+import/getter/type unless an architectural change explicitly amends the
+accepted boundary. Runtime input actions are registered on the published
+`RuntimeInputActionRegistry`; render-extraction observations come from the
+published `RenderExtractionCache`; neither is an Engine convenience API.
 
 ---
 

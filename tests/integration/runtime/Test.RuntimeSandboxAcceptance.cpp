@@ -51,6 +51,7 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
@@ -113,39 +114,6 @@ namespace
             engine.RequestExit();
         }
         void Shutdown() override {}
-    };
-
-    class TaskGraphReplayAndExitApplication final : public Intrinsic::Tests::RuntimeTestModule
-    {
-    public:
-        void Resolve() override {}
-        void Frame(double, double) override
-        {
-            auto& engine = Kernel();
-            Stats        = engine.GetFrameGraph().GetPlanReuseStats();
-            if (Stats.PlanReuseCount >= 1u)
-            {
-                engine.RequestExit();
-                return;
-            }
-
-            if (++VariableTicks >= 20u)
-            {
-                TimedOut = true;
-                engine.RequestExit();
-                return;
-            }
-
-            // Force the following frame to own at least one fixed step on
-            // fast headless hosts. Two such frames prove the canonical
-            // Engine::Run() path builds once and then replays.
-            std::this_thread::sleep_for(std::chrono::milliseconds(20));
-        }
-        void Shutdown() override {}
-
-        Extrinsic::Core::Dag::TaskGraphPlanReuseStats Stats{};
-        std::uint32_t VariableTicks = 0u;
-        bool TimedOut = false;
     };
 
     [[nodiscard]] Core::Config::EngineConfig HeadlessConfig()
@@ -568,32 +536,6 @@ TEST(RuntimeSandboxAcceptance, IdleFrameSkipsPreRenderTransformFlush)
     EXPECT_EQ(pacing.PreRenderTransformWorldUpdatedObserved, 0u);
     EXPECT_EQ(pacing.PreRenderTransformDirtyTransformStamped, 0u);
     EXPECT_EQ(pacing.PreRenderTransformWorldUpdatedCleared, 0u);
-
-    engine.Shutdown();
-}
-
-TEST(RuntimeSandboxAcceptance, FixedStepTaskGraphBuildsOnceThenReusesPlan)
-{
-    auto app = std::make_unique<TaskGraphReplayAndExitApplication>();
-    auto* appPtr = app.get();
-    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(app));
-    engine.EmplaceModule<Runtime::SceneDocumentModule>();
-    engine.Initialize();
-
-    ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on "
-           "headless hosts";
-
-    engine.Run();
-
-    EXPECT_FALSE(appPtr->TimedOut);
-    EXPECT_GE(appPtr->Stats.CompileCallCount, 2u);
-    EXPECT_EQ(appPtr->Stats.PlanBuildCount, 1u);
-    EXPECT_GE(appPtr->Stats.PlanReuseCount, 1u);
-    EXPECT_EQ(appPtr->Stats.CompileCallCount,
-              appPtr->Stats.PlanBuildCount +
-                  appPtr->Stats.PlanReuseCount);
-    EXPECT_TRUE(appPtr->Stats.LastCompileReusedPlan);
 
     engine.Shutdown();
 }

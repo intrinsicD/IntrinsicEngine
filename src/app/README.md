@@ -65,6 +65,15 @@ the matching reference population and tears it down only through that world.
 Generic Engine neither composes `CameraModule` nor interprets
 `ReferenceSceneConfig`.
 
+The converged Engine surface is not an app service locator. Sandbox imports
+`Extrinsic.Runtime.InputActions` explicitly and registers its default focus
+action on the published `RuntimeInputActionRegistry`; Engine has no
+input-registration or record re-export facade. Render-extraction and
+visualization observations likewise come from their published owning cache,
+while renderer statistics stay on `IRenderer`. The only retained diagnostic
+getter used by the executable is the read-only
+`GetLastFramePacingDiagnostics()` sample for the bounded report mode.
+
 `Sandbox.Editor.MethodPanels` also owns the registered
 `Mesh > Processing > Parameterize (UV)` window. The window offers only LSCM,
 harmonic cotangent, uniform Tutte, and Boundary First Flattening; maintains an

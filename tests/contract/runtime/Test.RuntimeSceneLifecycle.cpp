@@ -359,6 +359,8 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
     engine.Initialize();
     Runtime::SelectionController& selection =
         *engine.Services().Find<Runtime::SelectionController>();
+    Runtime::RenderExtractionCache& extraction =
+        *engine.Services().Find<Runtime::RenderExtractionCache>();
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const ECS::EntityHandle entity = scene.Create();
@@ -380,14 +382,14 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
             .Type = G::RenderPoints::RenderType::Surfel,
             .SizeSource = 4.0f,
         });
-    engine.SetVisualizationAdapterBinding(
+    extraction.SetVisualizationAdapterBinding(
         stableId,
         Runtime::RenderExtractionCache::VisualizationAdapterBinding{
             .AdapterKey = 0x5CE11u,
             .BufferBDA = 0xCAFE1000u,
         });
     const std::uint64_t bindingRevisionBeforeReset =
-        engine.GetVisualizationAdapterBindingRevision();
+        extraction.GetVisualizationAdapterBindingRevision();
     EXPECT_EQ(bindingRevisionBeforeReset, 1u);
     ASSERT_TRUE(scene.Raw().all_of<G::RenderEdges>(entity));
     ASSERT_TRUE(scene.Raw().all_of<G::RenderPoints>(entity));
@@ -396,7 +398,7 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
     EXPECT_EQ(translatedPoints.Type, G::RenderPoints::RenderType::Surfel);
     ASSERT_TRUE(std::holds_alternative<float>(translatedPoints.SizeSource));
     EXPECT_FLOAT_EQ(std::get<float>(translatedPoints.SizeSource), 4.0f);
-    ASSERT_TRUE(engine.GetVisualizationAdapterBinding(stableId).has_value());
+    ASSERT_TRUE(extraction.GetVisualizationAdapterBinding(stableId).has_value());
 
     const auto reset = engine.Services().Find<Runtime::SceneDocumentModule>()->NewSceneDocument();
     ASSERT_TRUE(reset.has_value()) << static_cast<int>(reset.error());
@@ -406,8 +408,8 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
     EXPECT_FALSE(selection.HasHovered());
     EXPECT_FALSE(selection.HasPendingPick());
     EXPECT_EQ(selection.InFlightPickCount(), 0u);
-    EXPECT_FALSE(engine.GetVisualizationAdapterBinding(stableId).has_value());
-    EXPECT_GT(engine.GetVisualizationAdapterBindingRevision(),
+    EXPECT_FALSE(extraction.GetVisualizationAdapterBinding(stableId).has_value());
+    EXPECT_GT(extraction.GetVisualizationAdapterBindingRevision(),
               bindingRevisionBeforeReset);
 
     engine.Shutdown();

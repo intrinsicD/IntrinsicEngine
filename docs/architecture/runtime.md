@@ -111,6 +111,52 @@ completed the deletion test: behavior-backed two-phase service resolution and
 the exact two hook kinds remain, while unused simulation/DAG, phase, registrar,
 provision, and diagnostic branches are gone.
 
+## Final Engine boundary
+
+`RUNTIME-186` settled the caller-facing API before representation changed.
+Engine no longer re-exports `Runtime.FramePacingDiagnostics` or
+`Runtime.InputActions`; callers that name those records import their owning
+modules. Input registration goes through the `RuntimeInputActionRegistry`
+published during composition. Render-extraction statistics come from the
+published `RenderExtractionCache`, visualization binding/revision state comes
+from that same owner, and renderer diagnostics remain on `IRenderer`. The
+frame graph and render-world pool have no public Engine forwarding surface.
+The retained `GetLastFramePacingDiagnostics()` is a read-only kernel
+observation with the Sandbox frame-pacing report as its production reader.
+
+`RUNTIME-187` then moved all private state into `Engine::Impl` without changing
+those declarations or frame behavior. The public interface now has the exact
+convergence snapshot `12/0/0/5`: twelve plain imports, zero domain imports,
+zero re-exports, and five allowed `GetX` names. The twelve imports are:
+
+- `Extrinsic.Core.Config.Engine`
+- `Extrinsic.RHI.Device`
+- `Extrinsic.Platform.Window`
+- `Extrinsic.Graphics.Renderer`
+- `Extrinsic.Runtime.CommandBus`
+- `Extrinsic.Runtime.FramePacingDiagnostics`
+- `Extrinsic.Runtime.JobService`
+- `Extrinsic.Runtime.KernelEvents`
+- `Extrinsic.Runtime.Module`
+- `Extrinsic.Runtime.ServiceRegistry`
+- `Extrinsic.Runtime.WorldHandle`
+- `Extrinsic.Runtime.WorldRegistry`
+
+The exact allowed getter/type/owner set is:
+
+| Getter | Return type | Owning import |
+| --- | --- | --- |
+| `GetDevice` | `RHI::IDevice&` | `Extrinsic.RHI.Device` |
+| `GetEngineConfig` | `const Core::Config::EngineConfig&` | `Extrinsic.Core.Config.Engine` |
+| `GetLastFramePacingDiagnostics` | `const RuntimeFramePacingDiagnostics&` | `Extrinsic.Runtime.FramePacingDiagnostics` |
+| `GetRenderer` | `Graphics::IRenderer&` | `Extrinsic.Graphics.Renderer` |
+| `GetWindow` | `Platform::IWindow&` | `Extrinsic.Platform.Window` |
+
+`tools/repo/check_kernel_convergence.py` compares the exact import and
+re-export sets, getter names, return/owning types, and owning imports. A
+same-count substitution, an unused/new import, a stale policy entry, or a
+getter type change therefore fails instead of fitting under a numerical cap.
+
 Module granularity follows
 [ADR-0026](../adr/0026-runtime-module-scope-by-consumer-contract.md) only after
 ADR-0024 has established that a responsibility belongs in runtime composition.

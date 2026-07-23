@@ -1,43 +1,23 @@
 module;
 
-#include <cstdint>
 #include <memory>
-#include <optional>
-#include <span>
-#include <string>
 #include <string_view>
-#include <vector>
 #include <utility>
 
 export module Extrinsic.Runtime.Engine;
 
-export import Extrinsic.Runtime.FramePacingDiagnostics;
-export import Extrinsic.Runtime.InputActions;
-
 import Extrinsic.Core.Config.Engine;
-import Extrinsic.Core.Error;
-import Extrinsic.Core.FrameClock;
-import Extrinsic.Core.FrameGraph;
-import Extrinsic.Core.Geometry2D;
-import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
-import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CommandBus;
+import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.JobService;
-import Extrinsic.Runtime.JobServiceGpuQueueBridge;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
-import Extrinsic.Runtime.ModuleSchedule;
-import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.ServiceRegistry;
-import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
-import Extrinsic.ECS.Scene.Registry;
-
-#include "Runtime.RenderExtractionService.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -149,42 +129,13 @@ namespace Extrinsic::Runtime
         }
         [[nodiscard]] ServiceRegistry& Services() noexcept;
         [[nodiscard]] const ServiceRegistry& Services() const noexcept;
-        [[nodiscard]] RuntimeInputActionHandle RegisterInputAction(
-            RuntimeInputActionDesc desc);
-        void UnregisterInputAction(RuntimeInputActionHandle handle);
         // Contract-test seam: replay a platform event through the same runtime
         // handler installed as the window listener during Initialize().
         void DispatchPlatformEventForTest(const Platform::Event& event);
-        [[nodiscard]] Core::FrameGraph&       GetFrameGraph()    noexcept;
-
-        // ── GRAPHICS-036C — pipelined-frames render-world pool ────────────
-        // Runtime-owned slot-lifecycle pool (`GRAPHICS-036A`) driven by RunFrame:
-        // extraction acquires/publishes a back slot, the renderer consumes/releases
-        // the current front in synchronous mode or previous front in pipelined
-        // mode, and the pool's three diagnostics counters mirror onto the last
-        // extraction stats each frame. Sized from
-        // `RenderConfig::SynchronousExtraction` in Initialize() (1 buffer when
-        // synchronous, triple-buffered otherwise). Valid after Initialize();
-        // pipelined mode consumes the previous front after publishing the new
-        // front so render-N observes the retained N-1 snapshot.
-        [[nodiscard]] const RenderWorldPool&  GetRenderWorldPool() const noexcept;
-        // The `RuntimeRenderExtractionStats` produced by the most recent frame's
-        // `ExtractAndSubmit`, including the mirrored `RenderWorldPool*` counters.
-        // Zero-initialized until the first frame extracts.
-        [[nodiscard]] const RuntimeRenderExtractionStats&
-            GetLastRenderExtractionStats() const noexcept;
-        void SetVisualizationAdapterBinding(
-            std::uint32_t stableEntityId,
-            RenderExtractionCache::VisualizationAdapterBinding binding);
-        void ClearVisualizationAdapterBinding(std::uint32_t stableEntityId) noexcept;
-        [[nodiscard]] std::optional<RenderExtractionCache::VisualizationAdapterBinding>
-            GetVisualizationAdapterBinding(std::uint32_t stableEntityId) const noexcept;
-        [[nodiscard]] std::uint64_t
-            GetVisualizationAdapterBindingRevision() const noexcept;
 
         // UI-030 — last frame-loop pacing sample. Runtime owns the cross-layer
-        // phase boundaries; renderer/backend-specific diagnostics remain on
-        // their owning surfaces and are mirrored here only as copied counters.
+        // phase boundaries and the Sandbox report is the production reader;
+        // renderer/backend-specific diagnostics remain on their owning surfaces.
         [[nodiscard]] const RuntimeFramePacingDiagnostics&
             GetLastFramePacingDiagnostics() const noexcept;
 
@@ -197,54 +148,8 @@ namespace Extrinsic::Runtime
             MakeRenderRecipeActivationKernel(
                 RuntimeRenderRecipeState& state) noexcept;
 
-        Core::Config::EngineConfig           m_Config;
-        std::vector<std::unique_ptr<IRuntimeModule>> m_RuntimeModules{};
-        std::unique_ptr<Platform::IWindow>   m_Window;
-        std::unique_ptr<RHI::IDevice>        m_Device;
-        std::unique_ptr<Graphics::IRenderer> m_Renderer;
-        // RUNTIME-163 — render extraction owner state and compatibility facades.
-        // Engine keeps frame ordering and dependent-subsystem wiring; the service
-        // owns the cache, pool, last stats, and frame-index counter.
-        RenderExtractionService               m_RenderExtractionService{};
-        // CPU task graph — ECS system scheduling
-        std::unique_ptr<Core::FrameGraph>      m_FrameGraph;
-        RuntimeInputActionRegistry            m_InputActions{};
-        // ARCH-007 — kernel command bus; drained in RunFrame() pre-sim.
-        CommandBus                             m_CommandBus{};
-        // ARCH-008 — queued-only kernel events; pumped post-drain and post-sim.
-        KernelEventBus                         m_KernelEvents{};
-        // ARCH-009 — kernel background jobs; completions gate before pump B.
-        JobService                             m_JobService{};
-        // ARCH-011 — two-phase module service registry. Engine provides the
-        // always-present kernel services during module registration; feature
-        // modules provide their own synchronous infrastructure there and
-        // require/find dependencies only during resolution.
-        ServiceRegistry                        m_ServiceRegistry{};
-        // ARCH-010 — kernel world registry owns scene registries; m_Scene is
-        // the cached active-world pointer used by legacy single-world call
-        // sites until later module extractions carry WorldHandle explicitly.
-        WorldRegistry                          m_WorldRegistry{};
-        ECS::Scene::Registry*                  m_Scene{};
-        RuntimeModuleSchedule                  m_RuntimeModuleSchedule{};
-
-        Core::FrameClock m_FrameClock{};
-
-        // Fixed-step simulation state
-        double m_Accumulator{0.0};
-        double m_FixedDt{1.0 / 60.0};          // 60 Hz
-        double m_MaxFrameDelta{0.25};           // 250 ms spiral-of-death clamp
-        int    m_MaxSubSteps{8};
-
-        bool m_Initialized{false};
-        bool m_Running{false};
-        bool m_ShutdownBegun{false};
-        bool m_RendererOperational{false};
-        bool m_WindowCloseLogged{false};
-        RuntimeFramePacingDiagnostics m_LastFramePacingDiagnostics{};
-
-        // RUNTIME-160 — runtime-owned bridge from JobService GPU queue
-        // participants to the renderer frame-command hook.
-        JobServiceGpuQueueBridge m_JobServiceGpuQueueBridge{};
+        struct Impl;
+        std::unique_ptr<Impl> m_Impl;
         void RegisterRuntimeModulesForBoot(
             const RuntimeRenderRecipeActivationKernel& recipeActivation);
         void ResolveRuntimeModulesForBoot(

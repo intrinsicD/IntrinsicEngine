@@ -262,7 +262,8 @@ extraction, `RUNTIME-163` as the render-extraction service extraction,
 `RUNTIME-164` as the asset-residency service extraction, and `RUNTIME-165`
 as the async-work service extraction. All five additive ADR-0024 seams
 (`ARCH-007`..`ARCH-011`) and the collision sweep (`ARCH-013`) are retired;
-`ARCH-014` remains the open kernel-convergence umbrella.
+`ARCH-014` retired on 2026-07-23 after the kernel-convergence scorecard became
+all-green.
 Retired `GRAPHICS-128` supplies the nonzero shared-index-slice contract;
 retired `RUNTIME-129` supplies the production Vulkan normal-bake provider.
 Retired `RUNTIME-190` relocated that provider from the AssetWorkflow owner
@@ -301,12 +302,11 @@ provider/handle composition on the existing editor-facade surface, retired
 `RUNTIME-129` operational normal bake after the retired independent
 `GRAPHICS-128` shared-index prerequisite,
 retired `RUNTIME-184` application-lifecycle removal, retired `RUNTIME-185`
-mechanism pruning,
-and `RUNTIME-186` residual auxiliary-surface cleanup followed by the
-`RUNTIME-187` exact Engine-surface ratchet. The original normal-bake leaf is
+mechanism pruning, retired `RUNTIME-186` residual auxiliary-surface cleanup,
+and retired `RUNTIME-187` exact Engine-surface ratchet. The original normal-bake leaf is
 retired; its right-sized generalized module consolidation is retired as
 `RUNTIME-190`; the lifecycle and mechanism-pruning leaves are also retired, so
-residual auxiliary-surface cleanup is the next convergence step. The detailed graph
+the convergence graph is closed at `12/0/0/5`. The detailed graph
 and state scopes live in the [runtime backlog index](runtime/README.md).
 Retired `RUNTIME-182` extracted the optional global ImGui/host owner while
 preserving the existing paired frame bracket and one completed capture
@@ -317,8 +317,8 @@ document owner is retired with exact service publication. `RUNTIME-188` now
 is retired with the separate interaction owner, exact optional selection
 service, and `26/4/2/15` Engine ratchet. `RUNTIME-183` is retired with the
 app-composed AssetWorkflow owner and `22/0/2/10` Engine ratchet.
-`RUNTIME-168`, `RUNTIME-129`, `RUNTIME-184`, and `RUNTIME-185` are retired;
-`RUNTIME-186` is unblocked.
+`RUNTIME-168`, `RUNTIME-129`, `RUNTIME-184`, `RUNTIME-185`, `RUNTIME-186`,
+and `RUNTIME-187` are retired; `ARCH-014` records the closed endpoint.
 Sequencing note: tasks whose deliverable ADR-0024 supersedes are
 front-matter gated on their seam dependencies — `RUNTIME-150` on
 `ARCH-007`/`ARCH-008`, `RUNTIME-151` additionally on `ARCH-011`, `ARCH-006`
@@ -339,8 +339,7 @@ The non-blocking TaskGraph substrate (`CORE-005`) and scheduler hardening
 (`CORE-007`) are retired, as is compiled-plan efficiency (`CORE-008`).
 
 Open members (kernel-seam priority set first):
-- [`../active/ARCH-014-kernel-convergence-tracking.md`](../active/ARCH-014-kernel-convergence-tracking.md) (active umbrella north-star; not a slice).
-- [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) (one-shot post-convergence admission gate; blocked until known architecture/right-sizing/tool-rent work retires).
+- [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) (one-shot post-convergence admission gate; ready after `ARCH-014` retirement satisfied its final static dependency).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).
 - [`assets/ASSETIO-010-async-model-companion-preflight.md`](assets/ASSETIO-010-async-model-companion-preflight.md).

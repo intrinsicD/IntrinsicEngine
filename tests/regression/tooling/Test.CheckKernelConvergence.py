@@ -27,7 +27,7 @@ export class Engine;
 export class Engine
 {
 public:
-    int GetDomain() const;
+    Domain& GetDomain() const;
     // int GetCommentOnly();
     void Invoke() { GetInlineCall(); }
     const char* Label{"GetStringOnly()"};
@@ -38,8 +38,14 @@ private:
 
 
 def fixture_policy(*, plain_imports: int = 2) -> dict[str, object]:
+    exact_plain_imports = [
+        "Extrinsic.Core.Error",
+        "Extrinsic.Runtime.Domain",
+    ]
+    if plain_imports == 3:
+        exact_plain_imports.append("Extrinsic.Core.FrameClock")
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "engine_interface": "src/runtime/Runtime.Engine.cppm",
         "substrate_imports": {
             "prefixes": ["Extrinsic.Core."],
@@ -57,12 +63,20 @@ def fixture_policy(*, plain_imports: int = 2) -> dict[str, object]:
             "date": "2026-01-01",
             "metric": "fixture",
             "plain_import_count": plain_imports,
+            "plain_imports": exact_plain_imports,
             "domain_import_count": 1,
             "domain_imports": ["Extrinsic.Runtime.Domain"],
             "export_import_count": 1,
             "export_imports": ["Extrinsic.Runtime.InputActions"],
             "public_getter_count": 1,
-            "public_getter_names": ["GetDomain"],
+            "public_getters": [
+                {
+                    "name": "GetDomain",
+                    "return_type": "Domain&",
+                    "owning_type": "Domain",
+                    "owning_import": "Extrinsic.Runtime.Domain",
+                }
+            ],
         },
         "temporary_debt": None,
     }
@@ -115,8 +129,8 @@ class KernelConvergenceTests(unittest.TestCase):
         result = run_checker(REPO_ROOT)
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn(
-            "plain_imports=35 domain_imports=13 export_imports=2 "
-            "public_getter_names=25",
+            "plain_imports=12 domain_imports=0 export_imports=0 "
+            "public_getter_names=5",
             result.stdout,
         )
         self.assertIn("Temporary debt: none", result.stdout)
@@ -221,10 +235,23 @@ class KernelConvergenceTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("plain_imports=3 domain_imports=1", result.stdout)
 
+    def test_same_count_substrate_import_replacement_fails_exact_set(self) -> None:
+        source = BASE_SOURCE.replace(
+            "import Extrinsic.Core.Error;",
+            "import Extrinsic.Core.FrameClock;",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_fixture(root, source=source)
+            result = run_checker(root)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("unexpected plain imports: Extrinsic.Core.FrameClock", result.stdout)
+        self.assertIn("stale plain imports policy entries", result.stdout)
+
     def test_new_public_getter_fails(self) -> None:
         source = BASE_SOURCE.replace(
-            "int GetDomain() const;",
-            "int GetDomain() const;\n    int GetNewDomainThing() const;",
+            "Domain& GetDomain() const;",
+            "Domain& GetDomain() const;\n    Domain& GetNewDomainThing() const;",
         )
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -232,6 +259,35 @@ class KernelConvergenceTests(unittest.TestCase):
             result = run_checker(root)
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("GetNewDomainThing", result.stdout)
+
+    def test_public_getter_return_type_change_fails_owning_type_ratchet(self) -> None:
+        source = BASE_SOURCE.replace(
+            "Domain& GetDomain() const;",
+            "const Domain& GetDomain() const;",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_fixture(root, source=source)
+            result = run_checker(root)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("GetDomain return type changed", result.stdout)
+        self.assertIn("owning type Domain", result.stdout)
+
+    def test_getter_owning_import_must_be_an_exact_plain_import(self) -> None:
+        policy = fixture_policy()
+        current = policy["current_snapshot"]
+        assert isinstance(current, dict)
+        getters = current["public_getters"]
+        assert isinstance(getters, list)
+        getter = getters[0]
+        assert isinstance(getter, dict)
+        getter["owning_import"] = "Extrinsic.Runtime.MissingOwner"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_fixture(root, policy=policy)
+            result = run_checker(root)
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("owning_import is not an exact plain import", result.stdout)
 
     def test_removed_domain_import_forces_same_change_policy_ratchet(self) -> None:
         source = BASE_SOURCE.replace("import Extrinsic.Runtime.Domain;\n", "")

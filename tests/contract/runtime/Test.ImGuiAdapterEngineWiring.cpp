@@ -48,6 +48,7 @@ import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.SceneInteractionModule;

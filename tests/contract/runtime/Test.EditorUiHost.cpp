@@ -22,6 +22,7 @@ import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;

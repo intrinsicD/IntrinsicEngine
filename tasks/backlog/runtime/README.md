@@ -212,24 +212,24 @@ triggers. The implementation graph is:
   after retired `GRAPHICS-128` made the shared managed-index subrange
   selectable. Retired `RUNTIME-190` relocated that provider unchanged into
   `TextureBakeModule` alongside the generalized property raster path.
-- Retired [`RUNTIME-184`](../../done/RUNTIME-184-replace-application-lifecycle.md)
+- Retired `RUNTIME-184`
   removes `IApplication` and unrestricted app ticks through explicit
   Sandbox/module composition. Engine construction is config-only, Sandbox owns
   concrete session state, and app teardown is interposed through the narrow
   two-stage kernel shutdown contract.
-- Retired [`RUNTIME-185`](../../done/RUNTIME-185-prune-runtime-composition-mechanisms.md)
+- Retired `RUNTIME-185`
   removes every lifecycle/setup/service/schedule feature still lacking a
   production consumer: sim registration and its causal DAG, the unused
   command-drain phase, resolve-phase registrars, redundant built-in provisions,
   and test-only registry statistics. The exact production frame/viewport hooks
   and behavior-backed two-phase service resolution remain.
-- [`RUNTIME-186`](RUNTIME-186-retire-engine-auxiliary-surface.md) — settle
+- Retired `RUNTIME-186` — settle
   residual frame-pacing/render-extraction observation and input-action setup
   APIs, remove Engine re-exports, and migrate callers without absorbing a
   missed domain-owner correction.
-- [`RUNTIME-187`](RUNTIME-187-finalize-domain-free-engine-surface.md) — final
+- Retired `RUNTIME-187` — final
   representation-only PImpl plus exact Engine import/getter/type/re-export
-  checker ratchet.
+  checker ratchet, closed at `12/0/0/5` with no temporary debt.
 
 Retired `GRAPHICS-127` followed `RUNTIME-181`/`RUNTIME-182`, so its profiling
 config and Frame Graph UI use the settled owners.
@@ -237,14 +237,27 @@ Retired `RUNTIME-177` added no generic debug-draw producer seam because its
 consumer inventory was empty; existing spatial-debug and transform-gizmo
 paths remain typed. Retired `RUNTIME-129` satisfies the normal-bake gate;
 retired `RUNTIME-184` satisfies the remaining lifecycle gate after retired
-`RUNTIME-168` lifecycle-policy privatization, and retired `RUNTIME-185` prunes
-the unproven composition machinery, so `RUNTIME-186` is the next unblocked
-convergence leaf.
-`ARCH-014` reaches this graph through `RUNTIME-187`; `REVIEW-003` reaches it
-transitively through `ARCH-014`.
+`RUNTIME-168` lifecycle-policy privatization, retired `RUNTIME-185` prunes
+the unproven composition machinery, and retired `RUNTIME-186` settles the
+semantic API. Retired `RUNTIME-187` closes the representation/checker leaf and
+retired `ARCH-014` records the all-green program endpoint. `REVIEW-003`'s
+transitive kernel-convergence prerequisite is therefore satisfied.
 
 #### Retired decomposition entries
 
+- [`RUNTIME-187` — Finalize the exact domain-free Engine surface](../../done/RUNTIME-187-finalize-domain-free-engine-surface.md)
+  (done, 2026-07-23, `Operational`): all Engine fields live behind
+  `Engine::Impl`, leaving exactly twelve declaration-backed kernel imports,
+  zero domain imports, zero re-exports, and five kernel getters. The checker
+  ratchets exact import identities plus getter return/owning types and imports;
+  CPU passed 4,269/4,269, fresh ASan and UBSan each passed 2,923/2,923, and
+  promoted Vulkan passed 48/48 including shutdown LeakSanitizer.
+- [`RUNTIME-186` — Retire residual Engine auxiliary surface](../../done/RUNTIME-186-retire-engine-auxiliary-surface.md)
+  (done, 2026-07-23, `Operational`): Engine re-exports and residual forwarding
+  conveniences are gone; callers import owning records and use the published
+  input-action, render-extraction, and renderer capabilities directly. The
+  five retained kernel observations are declaration-backed, and the
+  transitional semantic snapshot is `24/2/0/5` pending the opaque-state leaf.
 - [`RUNTIME-185` — Prune unproven runtime-composition mechanisms](../../done/RUNTIME-185-prune-runtime-composition-mechanisms.md)
   (done, 2026-07-23, `Operational`): the runtime module contract retains only
   production-backed lifecycle, service dependency resolution, generic frame
@@ -620,7 +633,9 @@ split; narratives live in the retirement log.
   checks, ImGui keyboard-capture suppression, callback failure logging, and
   per-frame dispatch now live in `Extrinsic.Runtime.InputActions`. `Engine`
   re-exports the API for compatibility and keeps `RegisterInputAction(...)` /
-  `UnregisterInputAction(...)` as delegating facades.
+  `UnregisterInputAction(...)` as delegating facades at this historical
+  checkpoint; retired `RUNTIME-186` later removes both the re-export and
+  forwarders, and app composition uses the published registry directly.
 - [RUNTIME-156 — Extract runtime-module schedule out of Engine](../../archive/RUNTIME-156-extract-runtime-module-schedule.md)
   (done, 2026-07-09, `Operational`): runtime-module sim-system/frame-hook
   records, deterministic dependency ordering, frame-hook ordering, fixed-step

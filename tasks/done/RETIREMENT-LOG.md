@@ -5742,3 +5742,41 @@ selectors each passed 2,924/2,924, while the promoted Vulkan
 Sandbox/object-space-normal cohort passed 21/21 including shutdown
 LeakSanitizer. Strict layering and generated inventory checks passed; Engine
 convergence remains `22/0/2/10` for the semantic API and PImpl leaves.
+
+[`RUNTIME-186`](RUNTIME-186-retire-engine-auxiliary-surface.md) — residual
+Engine auxiliary-surface cleanup retired on 2026-07-23 at `Operational`.
+Engine no longer re-exports frame-pacing/input-action records or forwards
+input registration, frame graph, render-world-pool, render-extraction stats,
+or visualization-adapter state. Callers import the owning records and use the
+published input-action registry, render-extraction cache, or renderer state
+directly. Five declaration-backed kernel observations remain: window, device,
+renderer, engine config, and frame-pacing diagnostics. The semantic endpoint
+was the intentional `24/2/0/5` transitional surface before opaque storage.
+Focused coverage passed 106/106, the default CPU selector passed 4,268/4,268,
+fresh ASan and UBSan selectors each passed 2,922/2,922, and promoted Vulkan
+passed 21/21 including shutdown LeakSanitizer.
+
+[`RUNTIME-187`](RUNTIME-187-finalize-domain-free-engine-surface.md) — exact
+domain-free Engine boundary retired on 2026-07-23 at `Operational`. Every
+private field now lives behind `Engine::Impl` without hiding a domain owner or
+changing the public declarations settled by `RUNTIME-186`. The interface has
+exactly twelve declaration-required kernel imports, zero domain imports, zero
+re-exports, and five kernel getters. Checker schema v2 ratchets exact import
+identities and each getter's return type, owning type, and owning import; its
+synthetic tests reject same-count substitutions and type drift. One Vulkan
+smoke added its missing direct `Extrinsic.Graphics.RenderGraph` import after
+the former transitive reachability disappeared. Focused runtime/app coverage
+passed 54/54, checker regressions passed 22/22, CPU passed 4,269/4,269, fresh
+ASan and UBSan each passed 2,923/2,923, and promoted Vulkan passed 48/48,
+including the 96.96-second shutdown LeakSanitizer contract.
+
+[`ARCH-014`](ARCH-014-kernel-convergence-tracking.md) — the kernel-convergence
+umbrella retired on 2026-07-23 at the architecture-governance `Retired`
+endpoint. Every ADR-0027 child and every kernel/domain scorecard row is
+complete; the historical baseline remains intact while the current Engine
+surface is closed at exact `12/0/0/5` with `temporary_debt: null`. The final
+layering scan covered 753 files and 6,767 references with zero violations,
+and the clean-workshop review found no architectural drift or follow-up.
+`REVIEW-003` is now ready as the separate commit-anchored whole-tree admission
+audit. Review:
+[`2026-07-23-arch-014-clean-workshop-review.md`](../../docs/reviews/2026-07-23-arch-014-clean-workshop-review.md).

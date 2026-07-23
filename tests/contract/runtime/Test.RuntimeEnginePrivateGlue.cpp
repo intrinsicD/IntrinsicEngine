@@ -125,11 +125,11 @@ TEST(RuntimeEnginePrivateGlue,
     const auto renderInputInitialization = engineImpl.find(
         "frameContext.RenderInput = Graphics::RenderFrameInput{");
     const auto viewportDispatch = engineImpl.find(
-        "m_RuntimeModuleSchedule.RunViewportInputHooks(");
+        "m_Impl->m_RuntimeModuleSchedule.RunViewportInputHooks(");
     const auto transformFlush = engineImpl.find(
-        "FlushPreRenderTransformState(*m_Scene)");
+        "FlushPreRenderTransformState(*m_Impl->m_Scene)");
     const auto inputActions = engineImpl.find(
-        "m_InputActions.DispatchForFrame(");
+        "m_Impl->m_InputActions.DispatchForFrame(");
     const auto beforeExtraction = engineImpl.find(
         "FramePhase::BeforeExtraction");
     ASSERT_NE(uiEndCapture, std::string::npos);
@@ -192,7 +192,7 @@ TEST(RuntimeEnginePrivateGlue,
     std::size_t registrarWiringCount = 0u;
     std::size_t cursor = 0u;
     constexpr std::string_view registrarCall =
-        "m_RuntimeModuleSchedule.RegisterViewportInputHook(";
+        "m_Impl->m_RuntimeModuleSchedule.RegisterViewportInputHook(";
     while ((cursor = engineImpl.find(registrarCall, cursor)) !=
            std::string::npos)
     {
@@ -350,13 +350,13 @@ TEST(RuntimeEnginePrivateGlue, EditorUiModuleOwnsOptionalEditorUiComposition)
     EXPECT_EQ(hostImpl.find("Engine&"), std::string::npos);
 
     EXPECT_NE(engineImpl.find(
-                  "m_ServiceRegistry.Provide<Platform::IWindow>("),
+                  "m_Impl->m_ServiceRegistry.Provide<Platform::IWindow>("),
               std::string::npos);
     EXPECT_NE(engineImpl.find(
-                  "m_ServiceRegistry.Provide<Graphics::IRenderer>("),
+                  "m_Impl->m_ServiceRegistry.Provide<Graphics::IRenderer>("),
               std::string::npos);
     EXPECT_NE(engineImpl.find(
-                  "m_ServiceRegistry.Provide<RuntimeInputActionRegistry>("),
+                  "m_Impl->m_ServiceRegistry.Provide<RuntimeInputActionRegistry>("),
               std::string::npos);
 
     EXPECT_NE(moduleImpl.find("FramePhase::UiBegin"),
@@ -450,9 +450,10 @@ TEST(RuntimeEnginePrivateGlue, RenderExtractionServiceIsEnginePrivateImplementat
 
     EXPECT_FALSE(std::filesystem::exists(
         root / "src/runtime/Runtime.RenderExtractionService.cppm"));
-    ASSERT_EQ(includeOwners.size(), 1u);
-    EXPECT_EQ(includeOwners.front().filename(), "Runtime.Engine.cppm");
-    EXPECT_NE(engineInterface.find(includeDirective), std::string::npos);
+    ASSERT_EQ(includeOwners.size(), 2u);
+    EXPECT_NE(engineImpl.find(includeDirective), std::string::npos);
+    EXPECT_NE(serviceImpl.find(includeDirective), std::string::npos);
+    EXPECT_EQ(engineInterface.find(includeDirective), std::string::npos);
     EXPECT_EQ(engineInterface.find(
                   "import Extrinsic.Runtime.RenderExtractionService"),
               std::string::npos);
@@ -463,12 +464,15 @@ TEST(RuntimeEnginePrivateGlue, RenderExtractionServiceIsEnginePrivateImplementat
               std::string::npos);
     EXPECT_NE(privateHeader.find("std::unique_ptr<RenderWorldPool> m_Pool"),
               std::string::npos);
-    EXPECT_NE(privateHeader.find("RuntimeRenderExtractionStats m_LastStats"),
+    EXPECT_EQ(privateHeader.find("RuntimeRenderExtractionStats m_LastStats"),
               std::string::npos);
     EXPECT_NE(privateHeader.find("std::uint64_t m_FrameIndex"),
               std::string::npos);
-    EXPECT_NE(WithoutWhitespace(engineInterface).find(
+    EXPECT_NE(WithoutWhitespace(engineImpl).find(
                   "RenderExtractionServicem_RenderExtractionService"),
+              std::string::npos);
+    EXPECT_NE(WithoutWhitespace(engineInterface).find(
+                  "structImpl;std::unique_ptr<Impl>m_Impl;"),
               std::string::npos);
     EXPECT_EQ(engineInterface.find(
                   "RenderExtractionCache                 m_RenderExtraction"),
@@ -483,10 +487,10 @@ TEST(RuntimeEnginePrivateGlue, RenderExtractionServiceIsEnginePrivateImplementat
                   "std::uint64_t                         m_FrameIndex"),
               std::string::npos);
 
-    EXPECT_NE(engineInterface.find(
+    EXPECT_EQ(engineInterface.find(
                   "import Extrinsic.Runtime.RenderExtraction;"),
               std::string::npos);
-    EXPECT_NE(engineInterface.find(
+    EXPECT_EQ(engineInterface.find(
                   "import Extrinsic.Runtime.RenderWorldPool;"),
               std::string::npos);
     EXPECT_EQ(engineInterface.find("FindSurfaceGpuGeometry"),
@@ -519,17 +523,17 @@ TEST(RuntimeEnginePrivateGlue, RenderExtractionServiceIsEnginePrivateImplementat
     EXPECT_EQ(serviceImpl.find(
                   "module Extrinsic.Runtime.RenderExtractionService;"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_RenderExtractionService.ConfigurePool("),
+    EXPECT_NE(engineImpl.find("m_Impl->m_RenderExtractionService.ConfigurePool("),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_RenderExtractionService.Cache()"),
+    EXPECT_NE(engineImpl.find("m_Impl->m_RenderExtractionService.Cache()"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_RenderExtractionService.Pool()"),
+    EXPECT_NE(engineImpl.find("m_Impl->m_RenderExtractionService.Pool()"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_RenderExtractionService.ConsumeFrameIndex()"),
+    EXPECT_NE(engineImpl.find("m_Impl->m_RenderExtractionService.ConsumeFrameIndex()"),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_RenderExtractionService.PublishLastStats("),
+    EXPECT_EQ(engineImpl.find("m_Impl->m_RenderExtractionService.PublishLastStats("),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("m_RenderExtractionService.ReleaseFrontSlot("),
+    EXPECT_NE(engineImpl.find("m_Impl->m_RenderExtractionService.ReleaseFrontSlot("),
               std::string::npos);
     EXPECT_EQ(engineImpl.find("m_RenderExtraction.Shutdown("),
               std::string::npos);
@@ -552,7 +556,13 @@ TEST(RuntimeEnginePrivateGlue, RenderExtractionServiceIsEnginePrivateImplementat
     EXPECT_EQ(engineImpl.find("m_FrameIndex++"), std::string::npos);
     EXPECT_NE(serviceImpl.find("m_Cache.Shutdown(renderer)"),
               std::string::npos);
-    EXPECT_NE(serviceImpl.find("m_Cache.SetVisualizationAdapterBinding("),
+    EXPECT_EQ(serviceImpl.find("m_Cache.SetVisualizationAdapterBinding("),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("GetLastRenderExtractionStats"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("GetRenderWorldPool"),
+              std::string::npos);
+    EXPECT_EQ(engineInterface.find("GetVisualizationAdapterBinding"),
               std::string::npos);
     EXPECT_NE(serviceImpl.find("RenderWorldPool::kDefaultBuffers"),
               std::string::npos);
@@ -572,6 +582,53 @@ TEST(RuntimeEnginePrivateGlue, RenderExtractionServiceIsEnginePrivateImplementat
               std::string::npos);
     EXPECT_NE(moduleInventory.find("Extrinsic.Runtime.RenderWorldPool`"),
               std::string::npos);
+}
+
+TEST(RuntimeEnginePrivateGlue, EngineInterfaceCarriesOnlyOpaqueImplementationState)
+{
+    const auto root = RepoRoot();
+    const std::string engineInterface =
+        ReadFile(root / "src/runtime/Runtime.Engine.cppm");
+    const std::string engineImpl =
+        ReadFile(root / "src/runtime/Runtime.Engine.cpp");
+    const std::string moduleInterface =
+        ReadFile(root / "src/runtime/Runtime.Module.cppm");
+    const std::string compactInterface = WithoutWhitespace(engineInterface);
+
+    EXPECT_NE(compactInterface.find(
+                  "structImpl;std::unique_ptr<Impl>m_Impl;"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("struct Engine::Impl"), std::string::npos);
+    EXPECT_NE(engineImpl.find("Core::FrameClock m_FrameClock"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("RuntimeModuleSchedule m_RuntimeModuleSchedule"),
+              std::string::npos);
+    EXPECT_NE(engineImpl.find("RenderExtractionService m_RenderExtractionService"),
+              std::string::npos);
+
+    constexpr std::string_view implementationOnlyInterfaceTokens[] = {
+        "import Extrinsic.Core.Error;",
+        "import Extrinsic.Core.FrameClock;",
+        "import Extrinsic.Core.FrameGraph;",
+        "import Extrinsic.Core.Geometry2D;",
+        "import Extrinsic.ECS.Scene.Registry;",
+        "import Extrinsic.Runtime.InputActions;",
+        "import Extrinsic.Runtime.JobServiceGpuQueueBridge;",
+        "import Extrinsic.Runtime.ModuleSchedule;",
+        "import Extrinsic.Runtime.RenderExtraction;",
+        "import Extrinsic.Runtime.RenderWorldPool;",
+        "m_Config",
+        "m_RuntimeModules",
+        "m_RenderExtractionService",
+        "m_RuntimeModuleSchedule",
+        "m_FrameClock",
+        "m_ServiceRegistry",
+    };
+    for (const std::string_view token : implementationOnlyInterfaceTokens)
+        EXPECT_EQ(engineInterface.find(token), std::string::npos) << token;
+
+    EXPECT_EQ(moduleInterface.find("Engine&"), std::string::npos);
+    EXPECT_EQ(moduleInterface.find("Engine *"), std::string::npos);
 }
 
 TEST(RuntimeEnginePrivateGlue,
@@ -743,13 +800,13 @@ TEST(RuntimeEnginePrivateGlue,
                   "setup.Services().Find<SelectionController>()"),
               std::string::npos);
     EXPECT_NE(engineImpl.find(
-                  "m_ServiceRegistry.Find<Graphics::GpuAssetCache>()"),
+                  "m_Impl->m_ServiceRegistry.Find<Graphics::GpuAssetCache>()"),
               std::string::npos);
     EXPECT_NE(engineImpl.find(
                   "Core::IAssetFrameHooks>()"),
               std::string::npos);
     EXPECT_NE(engineImpl.find(
-                  "m_ServiceRegistry.Find<AssetImportPipeline>()"),
+                  "m_Impl->m_ServiceRegistry.Find<AssetImportPipeline>()"),
               std::string::npos);
     EXPECT_NE(frameLoop.find("if (AssetWorkflow != nullptr)"),
               std::string::npos);

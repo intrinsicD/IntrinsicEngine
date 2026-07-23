@@ -28,6 +28,7 @@ module Extrinsic.Runtime.Engine;
 #if defined(EXTRINSIC_RUNTIME_HAS_PROMOTED_VULKAN)
 import Extrinsic.Backends.Vulkan;
 #endif
+import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
@@ -41,12 +42,17 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Runtime.AssetImportPipeline;
+import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.DeviceBootstrap;
 import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.InputActions;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.JobServiceGpuQueueBridge;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ModuleSchedule;
+import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Core.FrameLoop;
 import Extrinsic.Runtime.EcsSystemBundle;
 import Extrinsic.Runtime.ServiceRegistry;
@@ -58,23 +64,56 @@ import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Scene.Registry;
 
 #include "Runtime.Engine.FrameLoop.Internal.hpp"
+#include "Runtime.RenderExtractionService.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {
-    namespace
+    struct Engine::Impl
     {
-    }
+        explicit Impl(Core::Config::EngineConfig config)
+            : m_Config(std::move(config))
+        {
+        }
+
+        Core::Config::EngineConfig m_Config;
+        std::vector<std::unique_ptr<IRuntimeModule>> m_RuntimeModules{};
+        std::unique_ptr<Platform::IWindow> m_Window;
+        std::unique_ptr<RHI::IDevice> m_Device;
+        std::unique_ptr<Graphics::IRenderer> m_Renderer;
+        RenderExtractionService m_RenderExtractionService{};
+        std::unique_ptr<Core::FrameGraph> m_FrameGraph;
+        RuntimeInputActionRegistry m_InputActions{};
+        CommandBus m_CommandBus{};
+        KernelEventBus m_KernelEvents{};
+        JobService m_JobService{};
+        ServiceRegistry m_ServiceRegistry{};
+        WorldRegistry m_WorldRegistry{};
+        ECS::Scene::Registry* m_Scene{};
+        RuntimeModuleSchedule m_RuntimeModuleSchedule{};
+        Core::FrameClock m_FrameClock{};
+        double m_Accumulator{0.0};
+        double m_FixedDt{1.0 / 60.0};
+        double m_MaxFrameDelta{0.25};
+        int m_MaxSubSteps{8};
+        bool m_Initialized{false};
+        bool m_Running{false};
+        bool m_ShutdownBegun{false};
+        bool m_RendererOperational{false};
+        bool m_WindowCloseLogged{false};
+        RuntimeFramePacingDiagnostics m_LastFramePacingDiagnostics{};
+        JobServiceGpuQueueBridge m_JobServiceGpuQueueBridge{};
+    };
 
     // ── Construction / destruction ────────────────────────────────────────
 
     Engine::Engine(Core::Config::EngineConfig config)
-        : m_Config(std::move(config))
+        : m_Impl(std::make_unique<Impl>(std::move(config)))
     {
     }
 
     Engine::~Engine()
     {
-        if (m_Initialized || m_ShutdownBegun)
+        if (m_Impl && (m_Impl->m_Initialized || m_Impl->m_ShutdownBegun))
             Shutdown();
     }
 
@@ -83,23 +122,23 @@ namespace Extrinsic::Runtime
         RuntimeRenderRecipeState& state) noexcept
     {
         return RuntimeRenderRecipeActivationKernel{
-            .ActiveConfig = &m_Config,
+            .ActiveConfig = &m_Impl->m_Config,
             .State = &state,
             .ReadFramebufferExtent =
                 [this]()
                 {
-                    if (m_Window != nullptr)
+                    if (m_Impl->m_Window != nullptr)
                     {
                         const Platform::Extent2D extent =
-                            m_Window->GetFramebufferExtent();
+                            m_Impl->m_Window->GetFramebufferExtent();
                         return Core::Extent2D{
                             .Width = extent.Width,
                             .Height = extent.Height,
                         };
                     }
                     return Core::Extent2D{
-                        .Width = std::max(m_Config.Window.Width, 1),
-                        .Height = std::max(m_Config.Window.Height, 1),
+                        .Width = std::max(m_Impl->m_Config.Window.Width, 1),
+                        .Height = std::max(m_Impl->m_Config.Window.Height, 1),
                     };
                 },
             .SetFrameRecipeOverride =
@@ -107,16 +146,16 @@ namespace Extrinsic::Runtime
                     std::optional<Graphics::FrameRecipeOverride>
                         recipeOverride)
                 {
-                    if (m_Renderer == nullptr)
+                    if (m_Impl->m_Renderer == nullptr)
                         return;
                     if (recipeOverride.has_value())
                     {
-                        m_Renderer->SetActiveFrameRecipeOverride(
+                        m_Impl->m_Renderer->SetActiveFrameRecipeOverride(
                             std::move(recipeOverride));
                     }
                     else
                     {
-                        m_Renderer->ClearActiveFrameRecipeOverride();
+                        m_Impl->m_Renderer->ClearActiveFrameRecipeOverride();
                     }
                 },
         };
@@ -129,7 +168,7 @@ namespace Extrinsic::Runtime
             Core::Log::Error("[RuntimeModule] Engine::AddModule received null.");
             std::terminate();
         }
-        if (m_Initialized)
+        if (m_Impl->m_Initialized)
         {
             Core::Log::Error(
                 "[RuntimeModule] Engine::AddModule called after Initialize().");
@@ -142,7 +181,7 @@ namespace Extrinsic::Runtime
             std::terminate();
         }
 
-        for (const std::unique_ptr<IRuntimeModule>& existing : m_RuntimeModules)
+        for (const std::unique_ptr<IRuntimeModule>& existing : m_Impl->m_RuntimeModules)
         {
             if (existing && existing->Name() == module->Name())
             {
@@ -153,24 +192,24 @@ namespace Extrinsic::Runtime
             }
         }
 
-        m_RuntimeModules.push_back(std::move(module));
+        m_Impl->m_RuntimeModules.push_back(std::move(module));
     }
 
     void Engine::RegisterRuntimeModulesForBoot(
         const RuntimeRenderRecipeActivationKernel& recipeActivation)
     {
         std::sort(
-            m_RuntimeModules.begin(),
-            m_RuntimeModules.end(),
+            m_Impl->m_RuntimeModules.begin(),
+            m_Impl->m_RuntimeModules.end(),
             [](const std::unique_ptr<IRuntimeModule>& lhs,
                const std::unique_ptr<IRuntimeModule>& rhs)
             {
                 return lhs->Name() < rhs->Name();
             });
 
-        m_RuntimeModuleSchedule.Clear();
+        m_Impl->m_RuntimeModuleSchedule.Clear();
 
-        m_ServiceRegistry.BeginRegistration();
+        m_Impl->m_ServiceRegistry.BeginRegistration();
         const auto requireProvide = [](Core::Result result,
                                        std::string_view serviceName)
         {
@@ -183,46 +222,46 @@ namespace Extrinsic::Runtime
                 std::terminate();
             }
         };
-        requireProvide(m_ServiceRegistry.Provide<JobService>(
-                           m_JobService, "Engine"),
+        requireProvide(m_Impl->m_ServiceRegistry.Provide<JobService>(
+                           m_Impl->m_JobService, "Engine"),
                        "JobService");
-        requireProvide(m_ServiceRegistry.Provide<RenderExtractionCache>(
-                           m_RenderExtractionService.Cache(), "Engine"),
+        requireProvide(m_Impl->m_ServiceRegistry.Provide<RenderExtractionCache>(
+                           m_Impl->m_RenderExtractionService.Cache(), "Engine"),
                        "RenderExtractionCache");
-        requireProvide(m_ServiceRegistry.Provide<RHI::IDevice>(
-                           *m_Device, "Engine"),
+        requireProvide(m_Impl->m_ServiceRegistry.Provide<RHI::IDevice>(
+                           *m_Impl->m_Device, "Engine"),
                        "RHI::IDevice");
-        requireProvide(m_ServiceRegistry.Provide<Platform::IWindow>(
-                           *m_Window, "Engine"),
+        requireProvide(m_Impl->m_ServiceRegistry.Provide<Platform::IWindow>(
+                           *m_Impl->m_Window, "Engine"),
                        "Platform::IWindow");
-        requireProvide(m_ServiceRegistry.Provide<Graphics::IRenderer>(
-                           *m_Renderer, "Engine"),
+        requireProvide(m_Impl->m_ServiceRegistry.Provide<Graphics::IRenderer>(
+                           *m_Impl->m_Renderer, "Engine"),
                        "Graphics::IRenderer");
-        requireProvide(m_ServiceRegistry.Provide<RuntimeInputActionRegistry>(
-                           m_InputActions, "Engine"),
+        requireProvide(m_Impl->m_ServiceRegistry.Provide<RuntimeInputActionRegistry>(
+                           m_Impl->m_InputActions, "Engine"),
                        "RuntimeInputActionRegistry");
 
-        for (const std::unique_ptr<IRuntimeModule>& module : m_RuntimeModules)
+        for (const std::unique_ptr<IRuntimeModule>& module : m_Impl->m_RuntimeModules)
         {
             const std::string moduleName{module->Name()};
             EngineSetup setup(
-                m_CommandBus,
-                m_KernelEvents,
-                m_JobService,
-                m_WorldRegistry,
-                m_ServiceRegistry,
+                m_Impl->m_CommandBus,
+                m_Impl->m_KernelEvents,
+                m_Impl->m_JobService,
+                m_Impl->m_WorldRegistry,
+                m_Impl->m_ServiceRegistry,
                 [this, moduleName](FramePhase phase, RuntimeFrameHook hook)
                 {
-                    m_RuntimeModuleSchedule.RegisterFrameHook(
+                    m_Impl->m_RuntimeModuleSchedule.RegisterFrameHook(
                         moduleName, phase, std::move(hook));
                 },
                 recipeActivation,
                 [this, moduleName](RuntimeViewportInputHook hook)
                 {
-                    m_RuntimeModuleSchedule.RegisterViewportInputHook(
+                    m_Impl->m_RuntimeModuleSchedule.RegisterViewportInputHook(
                         moduleName, std::move(hook));
                 },
-                &m_Initialized);
+                &m_Impl->m_Initialized);
 
             Core::Result result = module->OnRegister(setup);
             if (!result.has_value())
@@ -233,12 +272,12 @@ namespace Extrinsic::Runtime
                     Core::Error::ToString(result.error()));
                 std::terminate();
             }
-            if (m_ServiceRegistry.HasBootErrors())
+            if (m_Impl->m_ServiceRegistry.HasBootErrors())
             {
                 Core::Log::Error(
                     "[RuntimeModule] Registration failed for module '{}': {}",
                     moduleName,
-                    m_ServiceRegistry.LastBootError());
+                    m_Impl->m_ServiceRegistry.LastBootError());
                 std::terminate();
             }
         }
@@ -248,20 +287,20 @@ namespace Extrinsic::Runtime
     void Engine::ResolveRuntimeModulesForBoot(
         const RuntimeRenderRecipeActivationKernel& recipeActivation)
     {
-        m_ServiceRegistry.BeginResolution();
-        for (const std::unique_ptr<IRuntimeModule>& module : m_RuntimeModules)
+        m_Impl->m_ServiceRegistry.BeginResolution();
+        for (const std::unique_ptr<IRuntimeModule>& module : m_Impl->m_RuntimeModules)
         {
             const std::string moduleName{module->Name()};
             EngineSetup setup(
-                m_CommandBus,
-                m_KernelEvents,
-                m_JobService,
-                m_WorldRegistry,
-                m_ServiceRegistry,
+                m_Impl->m_CommandBus,
+                m_Impl->m_KernelEvents,
+                m_Impl->m_JobService,
+                m_Impl->m_WorldRegistry,
+                m_Impl->m_ServiceRegistry,
                 {},
                 recipeActivation,
                 {},
-                &m_Initialized);
+                &m_Impl->m_Initialized);
 
             Core::Result result = module->OnResolve(setup);
             if (!result.has_value())
@@ -272,27 +311,27 @@ namespace Extrinsic::Runtime
                     Core::Error::ToString(result.error()));
                 std::terminate();
             }
-            if (m_ServiceRegistry.HasBootErrors())
+            if (m_Impl->m_ServiceRegistry.HasBootErrors())
             {
                 Core::Log::Error(
                     "[RuntimeModule] Resolution failed for module '{}': {}",
                     moduleName,
-                    m_ServiceRegistry.LastBootError());
+                    m_Impl->m_ServiceRegistry.LastBootError());
                 std::terminate();
             }
         }
 
-        if (Core::Result result = m_ServiceRegistry.ValidateBoot();
+        if (Core::Result result = m_Impl->m_ServiceRegistry.ValidateBoot();
             !result.has_value())
         {
             Core::Log::Error(
                 "[RuntimeModule] ServiceRegistry boot validation failed: {}",
-                m_ServiceRegistry.LastBootError());
+                m_Impl->m_ServiceRegistry.LastBootError());
             std::terminate();
         }
-        m_ServiceRegistry.Lock();
+        m_Impl->m_ServiceRegistry.Lock();
 
-        m_RuntimeModuleSchedule.FinalizeForBoot();
+        m_Impl->m_RuntimeModuleSchedule.FinalizeForBoot();
     }
 
     void Engine::RunRuntimeModuleFrameHooks(
@@ -302,22 +341,22 @@ namespace Extrinsic::Runtime
         EditorInputCaptureSnapshot& editorCapture,
         RuntimeFramePacingDiagnostics& pacing)
     {
-        if (!m_Scene)
+        if (!m_Impl->m_Scene)
             return;
 
-        m_RuntimeModuleSchedule.RunFrameHooks(
+        m_Impl->m_RuntimeModuleSchedule.RunFrameHooks(
             RuntimeModuleFrameHookDispatchContext{
                 .Phase = phase,
-                .ActiveWorld = *m_Scene,
+                .ActiveWorld = *m_Impl->m_Scene,
                 .ActiveWorldHandle = ActiveWorld(),
-                .Commands = m_CommandBus,
-                .Events = m_KernelEvents,
-                .Jobs = m_JobService,
-                .Worlds = m_WorldRegistry,
-                .Services = m_ServiceRegistry,
+                .Commands = m_Impl->m_CommandBus,
+                .Events = m_Impl->m_KernelEvents,
+                .Jobs = m_Impl->m_JobService,
+                .Worlds = m_Impl->m_WorldRegistry,
+                .Services = m_Impl->m_ServiceRegistry,
                 .EditorCapture = editorCapture,
                 .Pacing = pacing,
-                .FrameIndex = m_RenderExtractionService.CurrentFrameIndex(),
+                .FrameIndex = m_Impl->m_RenderExtractionService.CurrentFrameIndex(),
                 .FrameDeltaSeconds = frameDt,
                 .FixedStepAlpha = alpha,
             });
@@ -325,48 +364,48 @@ namespace Extrinsic::Runtime
 
     void Engine::AnnounceRuntimeShutdown()
     {
-        m_Initialized = false;
-        m_KernelEvents.Publish(RuntimeShutdownAnnounced{});
-        (void)m_KernelEvents.Pump();
+        m_Impl->m_Initialized = false;
+        m_Impl->m_KernelEvents.Publish(RuntimeShutdownAnnounced{});
+        (void)m_Impl->m_KernelEvents.Pump();
     }
 
     void Engine::ShutdownRuntimeModules()
     {
         RuntimeModuleShutdownContext context{
-            .Commands = m_CommandBus,
-            .Events = m_KernelEvents,
-            .Jobs = m_JobService,
-            .Worlds = m_WorldRegistry,
-            .Services = m_ServiceRegistry,
+            .Commands = m_Impl->m_CommandBus,
+            .Events = m_Impl->m_KernelEvents,
+            .Jobs = m_Impl->m_JobService,
+            .Worlds = m_Impl->m_WorldRegistry,
+            .Services = m_Impl->m_ServiceRegistry,
         };
-        for (auto it = m_RuntimeModules.rbegin();
-             it != m_RuntimeModules.rend();
+        for (auto it = m_Impl->m_RuntimeModules.rbegin();
+             it != m_Impl->m_RuntimeModules.rend();
              ++it)
         {
             if (*it)
                 (*it)->OnShutdown(context);
         }
-        if (m_Device)
-            (void)m_ServiceRegistry.Withdraw<RHI::IDevice>(*m_Device);
+        if (m_Impl->m_Device)
+            (void)m_Impl->m_ServiceRegistry.Withdraw<RHI::IDevice>(*m_Impl->m_Device);
         // Module-owned services may be destroyed during OnShutdown. Clear all
         // borrowed records before control returns to the remaining kernel
         // teardown so no post-shutdown lookup can observe a dangling service.
-        m_ServiceRegistry.Reset();
+        m_Impl->m_ServiceRegistry.Reset();
     }
 
     void Engine::RefreshActiveWorldScenePointer() noexcept
     {
-        m_Scene = m_WorldRegistry.Get(m_WorldRegistry.ActiveWorld());
+        m_Impl->m_Scene = m_Impl->m_WorldRegistry.Get(m_Impl->m_WorldRegistry.ActiveWorld());
     }
 
     void Engine::ApplyWorldRegistryMaintenance()
     {
-        const WorldHandle previousActive = m_WorldRegistry.ActiveWorld();
+        const WorldHandle previousActive = m_Impl->m_WorldRegistry.ActiveWorld();
         const WorldRegistryMaintenanceStats stats =
-            m_WorldRegistry.ApplyMaintenance(m_KernelEvents, m_JobService);
+            m_Impl->m_WorldRegistry.ApplyMaintenance(m_Impl->m_KernelEvents, m_Impl->m_JobService);
 
         if (stats.AppliedActiveWorldChanges == 0u ||
-            m_WorldRegistry.ActiveWorld() == previousActive)
+            m_Impl->m_WorldRegistry.ActiveWorld() == previousActive)
         {
             return;
         }
@@ -374,10 +413,10 @@ namespace Extrinsic::Runtime
         // Active-world switching is a kernel maintenance path. Clear generic
         // render-extraction state immediately; optional modules validate and
         // rebind their own world-scoped borrowers independently.
-        if (m_Renderer != nullptr)
+        if (m_Impl->m_Renderer != nullptr)
         {
-            m_RenderExtractionService.Cache().ClearSceneState(
-                *m_Renderer);
+            m_Impl->m_RenderExtractionService.Cache().ClearSceneState(
+                *m_Impl->m_Renderer);
         }
 
         RefreshActiveWorldScenePointer();
@@ -387,16 +426,16 @@ namespace Extrinsic::Runtime
 
     void Engine::Initialize()
     {
-        m_ShutdownBegun = false;
+        m_Impl->m_ShutdownBegun = false;
         // ── 1. CPU fiber scheduler ────────────────────────────────────────
         // Must be first — all three graphs dispatch through it.
-        Core::Tasks::Scheduler::Initialize(m_Config.Simulation.WorkerThreadCount);
+        Core::Tasks::Scheduler::Initialize(m_Impl->m_Config.Simulation.WorkerThreadCount);
 
         // ARCH-007 — built-in kernel command (ADR-0024 D13): the sanctioned
         // shutdown path for module/UI code. Future module code enqueues
         // `QuitRequested` instead of reaching for an Engine& to call
         // shutdown entry points directly.
-        m_CommandBus.RegisterHandler<QuitRequested>(
+        m_Impl->m_CommandBus.RegisterHandler<QuitRequested>(
             [this](CommandContext&, const QuitRequested&) -> CommandOutcome
             {
                 RequestExit();
@@ -408,18 +447,18 @@ namespace Extrinsic::Runtime
         // between platform window and graphics backend. RHI is platform-
         // neutral, so we fill a backend-agnostic `RHI::DeviceCreateDesc`
         // from the live `IWindow` here.
-        m_Window   = Platform::CreateWindow(m_Config.Window);
-        if (m_Window && m_Window->ShouldClose())
+        m_Impl->m_Window   = Platform::CreateWindow(m_Impl->m_Config.Window);
+        if (m_Impl->m_Window && m_Impl->m_Window->ShouldClose())
         {
             Core::Log::Warn(
                 "[Runtime] Platform window initialized closed; Engine::Run() will execute zero frames unless the test or caller requests a headless-capable window backend.");
         }
-        m_Device   = CreateRuntimeDevice(m_Config.Render);
-        const Platform::Extent2D initialExtent = m_Window->GetFramebufferExtent();
-        m_Device->Initialize(RHI::MakeDeviceCreateDesc(
-            m_Config.Render,
+        m_Impl->m_Device   = CreateRuntimeDevice(m_Impl->m_Config.Render);
+        const Platform::Extent2D initialExtent = m_Impl->m_Window->GetFramebufferExtent();
+        m_Impl->m_Device->Initialize(RHI::MakeDeviceCreateDesc(
+            m_Impl->m_Config.Render,
             initialExtent,
-            m_Window->GetNativeHandle()));
+            m_Impl->m_Window->GetNativeHandle()));
 
         // GRAPHICS-033B: emit the Vulkan-requested-but-not-operational
         // breadcrumb and bump the operational diagnostics counters exactly
@@ -428,11 +467,11 @@ namespace Extrinsic::Runtime
         // aborts on this fallback — see the truth table in
         // `src/graphics/vulkan/README.md`.
         if (ShouldEmitVulkanRequestedButNotOperationalBreadcrumb(
-                m_Config.Render, m_Device->IsOperational()))
+                m_Impl->m_Config.Render, m_Impl->m_Device->IsOperational()))
         {
 #if defined(EXTRINSIC_RUNTIME_HAS_PROMOTED_VULKAN)
             const Backends::Vulkan::VulkanOperationalStatus status =
-                Backends::Vulkan::EvaluateVulkanDeviceOperationalStatus(m_Device.get());
+                Backends::Vulkan::EvaluateVulkanDeviceOperationalStatus(m_Impl->m_Device.get());
             Core::Log::Warn(
                 "[Runtime] VulkanRequestedButNotOperational status={} reason={}",
                 Backends::Vulkan::ToString(status.Code),
@@ -448,19 +487,19 @@ namespace Extrinsic::Runtime
 #endif
         }
 
-        m_Renderer = Graphics::CreateRenderer();
-        m_Renderer->Initialize(*m_Device);
-        m_RendererOperational = m_Device->IsOperational();
+        m_Impl->m_Renderer = Graphics::CreateRenderer();
+        m_Impl->m_Renderer->Initialize(*m_Impl->m_Device);
+        m_Impl->m_RendererOperational = m_Impl->m_Device->IsOperational();
         RuntimeRenderRecipeState startupRecipeState{};
         const RuntimeRenderRecipeActivationKernel recipeActivation =
             MakeRenderRecipeActivationKernel(startupRecipeState);
         ResetRuntimeRenderRecipeActivation(recipeActivation);
-        m_JobServiceGpuQueueBridge.Install(*m_Renderer, m_JobService);
-        if (!m_Config.Render.DefaultRecipeConfigPath.empty())
+        m_Impl->m_JobServiceGpuQueueBridge.Install(*m_Impl->m_Renderer, m_Impl->m_JobService);
+        if (!m_Impl->m_Config.Render.DefaultRecipeConfigPath.empty())
         {
             (void)LoadAndApplyRuntimeRenderRecipeConfigFile(
                 recipeActivation,
-                m_Config.Render.DefaultRecipeConfigPath,
+                m_Impl->m_Config.Render.DefaultRecipeConfigPath,
                 RuntimeRenderRecipeActivationSource::StartupConfigFile);
         }
 
@@ -471,18 +510,18 @@ namespace Extrinsic::Runtime
         // extraction is requested. The production default remains synchronous;
         // GRAPHICS-036D proves the opt-in render-N-1 path by consuming the
         // previous front while extraction writes the newly acquired back slot.
-        m_RenderExtractionService.ConfigurePool(
-            m_Config.Render.SynchronousExtraction);
+        m_Impl->m_RenderExtractionService.ConfigurePool(
+            m_Impl->m_Config.Render.SynchronousExtraction);
 
         // ── 3. CPU task graph (ECS system scheduling) ─────────────────────
-        m_FrameGraph = std::make_unique<Core::FrameGraph>();
+        m_Impl->m_FrameGraph = std::make_unique<Core::FrameGraph>();
 
         // ── 4. World registry / boot ECS scene ────────────────────────────
         // Create the boot world before module registration so every
         // EngineSetup observes the same live kernel substrate as before.
-        m_WorldRegistry.Clear();
-        const WorldHandle bootWorld = m_WorldRegistry.CreateWorld("Main");
-        m_Scene = m_WorldRegistry.Get(bootWorld);
+        m_Impl->m_WorldRegistry.Clear();
+        const WorldHandle bootWorld = m_Impl->m_WorldRegistry.CreateWorld("Main");
+        m_Impl->m_Scene = m_Impl->m_WorldRegistry.Get(bootWorld);
         // ── 5. Runtime-module registration (ARCH-011) ──────────────────────
         // App-composed owners publish narrow construction capabilities after
         // every required Engine built-in is live. Resolution/finalization
@@ -493,11 +532,11 @@ namespace Extrinsic::Runtime
         // ── 6. Runtime-module resolution/finalization (ARCH-011) ──────────
         ResolveRuntimeModulesForBoot(recipeActivation);
 
-        m_Initialized = true;
-        m_Running     = true;
-        m_WindowCloseLogged = false;
+        m_Impl->m_Initialized = true;
+        m_Impl->m_Running     = true;
+        m_Impl->m_WindowCloseLogged = false;
 
-        m_Window->Listen(
+        m_Impl->m_Window->Listen(
             [this](const Platform::Event& event)
             {
                 HandlePlatformEvent(event);
@@ -506,38 +545,38 @@ namespace Extrinsic::Runtime
 
     void Engine::BeginShutdown()
     {
-        if (m_ShutdownBegun || (!m_Initialized && !m_Window && !m_Device))
+        if (m_Impl->m_ShutdownBegun || (!m_Impl->m_Initialized && !m_Impl->m_Window && !m_Impl->m_Device))
             return;
 
         // ARCH-007 — drop commands enqueued after the final frame's drain
         // (e.g. from a frame hook just before RequestExit()). The engine
         // is documented as reusable via Shutdown() + Initialize(); stale
         // commands must not replay into the next session's fresh scene.
-        m_CommandBus.DiscardPending();
+        m_Impl->m_CommandBus.DiscardPending();
         AnnounceRuntimeShutdown();
 
-        if (m_Window)
-            m_Window->Listen({});
+        if (m_Impl->m_Window)
+            m_Impl->m_Window->Listen({});
 
-        (void)m_JobServiceGpuQueueBridge.ShutdownParticipants(
-            m_Renderer.get(),
-            m_JobService,
+        (void)m_Impl->m_JobServiceGpuQueueBridge.ShutdownParticipants(
+            m_Impl->m_Renderer.get(),
+            m_Impl->m_JobService,
             [this]
             {
-                if (m_Device)
-                    m_Device->WaitIdle();
+                if (m_Impl->m_Device)
+                    m_Impl->m_Device->WaitIdle();
             });
 
-        m_Running = false;
-        if (m_Device)
-            m_Device->WaitIdle();
-        m_ShutdownBegun = true;
+        m_Impl->m_Running = false;
+        if (m_Impl->m_Device)
+            m_Impl->m_Device->WaitIdle();
+        m_Impl->m_ShutdownBegun = true;
     }
 
     void Engine::Shutdown()
     {
         BeginShutdown();
-        if (!m_ShutdownBegun)
+        if (!m_Impl->m_ShutdownBegun)
             return;
 
         struct ShutdownHooks final : Core::IShutdownHooks
@@ -588,7 +627,7 @@ namespace Extrinsic::Runtime
             {
                 if (Renderer)
                 {
-                    Owner.m_RenderExtractionService.Shutdown(*Renderer);
+                    Owner.m_Impl->m_RenderExtractionService.Shutdown(*Renderer);
                     Renderer->Shutdown();
                     Renderer.reset();
                 }
@@ -612,25 +651,25 @@ namespace Extrinsic::Runtime
         };
 
         ShutdownHooks hooks(*this,
-                            m_Initialized,
-                            m_Window,
-                            m_Device,
-                            m_Renderer,
-                            m_FrameGraph,
-                            m_WorldRegistry,
-                            m_Scene);
+                            m_Impl->m_Initialized,
+                            m_Impl->m_Window,
+                            m_Impl->m_Device,
+                            m_Impl->m_Renderer,
+                            m_Impl->m_FrameGraph,
+                            m_Impl->m_WorldRegistry,
+                            m_Impl->m_Scene);
         Core::ExecuteShutdownContract(hooks);
-        m_ShutdownBegun = false;
+        m_Impl->m_ShutdownBegun = false;
     }
 
     // ── Main loop ─────────────────────────────────────────────────────────
 
     void Engine::Run()
     {
-        while (m_Running && m_Window != nullptr && !m_Window->ShouldClose())
+        while (m_Impl->m_Running && m_Impl->m_Window != nullptr && !m_Impl->m_Window->ShouldClose())
             RunFrame();
 
-        if (m_Running && m_Window != nullptr && m_Window->ShouldClose())
+        if (m_Impl->m_Running && m_Impl->m_Window != nullptr && m_Impl->m_Window->ShouldClose())
             RequestExitFromWindowClose("native-poll");
     }
 
@@ -639,19 +678,19 @@ namespace Extrinsic::Runtime
         RuntimeFrameContext frameContext{};
         RuntimeFramePacingDiagnostics pacing{};
         pacing.Valid = true;
-        pacing.FrameIndex = m_RenderExtractionService.CurrentFrameIndex();
+        pacing.FrameIndex = m_Impl->m_RenderExtractionService.CurrentFrameIndex();
         const auto framePacingBegin = std::chrono::steady_clock::now();
         const auto publishPacingSample = [&]()
         {
-            if (m_Renderer)
+            if (m_Impl->m_Renderer)
                 MirrorRenderGraphFramePacingDiagnostics(
-                    pacing, m_Renderer->GetLastRenderGraphStats());
+                    pacing, m_Impl->m_Renderer->GetLastRenderGraphStats());
             pacing.TotalMicros = ElapsedMicros(framePacingBegin);
-            m_LastFramePacingDiagnostics = pacing;
+            m_Impl->m_LastFramePacingDiagnostics = pacing;
         };
 
         // ── Phase 1: Platform ─────────────────────────────────────────────
-        PlatformFrameHooks platformHooks{*m_Window};
+        PlatformFrameHooks platformHooks{*m_Impl->m_Window};
         const auto platformBegin = std::chrono::steady_clock::now();
         const Core::PlatformFrameResult platformResult =
             Core::ExecutePlatformBeginFrameContract(platformHooks,
@@ -664,39 +703,39 @@ namespace Extrinsic::Runtime
             publishPacingSample();
             return;
         }
-        if (!m_Running)
+        if (!m_Impl->m_Running)
         {
             publishPacingSample();
             return;
         }
 
-        m_FrameClock.BeginFrame();
+        m_Impl->m_FrameClock.BeginFrame();
 
         if (!platformResult.ContinueFrame)
         {
-            m_FrameClock.Resample();
+            m_Impl->m_FrameClock.Resample();
             publishPacingSample();
             return;
         }
 
         // Swapchain resize: drain GPU, resize resources, then proceed normally.
         const auto resizeBegin = std::chrono::steady_clock::now();
-        if (m_Window->WasResized())
+        if (m_Impl->m_Window->WasResized())
         {
-            const auto extent = m_Window->GetFramebufferExtent();
+            const auto extent = m_Impl->m_Window->GetFramebufferExtent();
             if (extent.Width > 0 && extent.Height > 0)
             {
-                m_Device->WaitIdle();
-                m_Device->Resize(static_cast<unsigned>(extent.Width),
+                m_Impl->m_Device->WaitIdle();
+                m_Impl->m_Device->Resize(static_cast<unsigned>(extent.Width),
                                  static_cast<unsigned>(extent.Height));
-                m_Renderer->Resize(static_cast<unsigned>(extent.Width),
+                m_Impl->m_Renderer->Resize(static_cast<unsigned>(extent.Width),
                                    static_cast<unsigned>(extent.Height));
             }
-            m_Window->AcknowledgeResize();
+            m_Impl->m_Window->AcknowledgeResize();
         }
         pacing.ResizeMicros = ElapsedMicros(resizeBegin);
 
-        OperationalTransitionHooks operationalHooks(*m_Device, *m_Renderer, m_RendererOperational);
+        OperationalTransitionHooks operationalHooks(*m_Impl->m_Device, *m_Impl->m_Renderer, m_Impl->m_RendererOperational);
         const auto operationalBegin = std::chrono::steady_clock::now();
         (void)Core::ExecuteOperationalTransitionContract(operationalHooks);
         pacing.OperationalTransitionMicros = ElapsedMicros(operationalBegin);
@@ -706,49 +745,49 @@ namespace Extrinsic::Runtime
         // fixed-step ticks and the render snapshot observe this frame is
         // post-command, pre-tick. Commands enqueued during the drain (by
         // handlers) or later in the frame execute at the next frame's drain.
-        m_CommandBus.Drain(*m_Scene,
+        m_Impl->m_CommandBus.Drain(*m_Impl->m_Scene,
                            CommandDrainServices{
-                               .Events = &m_KernelEvents,
-                               .Jobs = &m_JobService,
-                               .Worlds = &m_WorldRegistry,
+                               .Events = &m_Impl->m_KernelEvents,
+                               .Jobs = &m_Impl->m_JobService,
+                               .Worlds = &m_Impl->m_WorldRegistry,
                            });
 
         // ── Event pump A (post-drain; ARCH-008 / ADR-0024 D7) ─────────────
         // Command-published events become visible before simulation. Events
         // published by listeners during this pump land in pump B or the next
         // frame, never recursively within this pump.
-        (void)m_KernelEvents.Pump();
+        (void)m_Impl->m_KernelEvents.Pump();
 
         // ── Phase 2: Fixed-step simulation + CPU task graph ───────────────
         // Each tick: the promoted ECS bundle adds FrameGraph passes → Engine
         // compiles and executes the DAG → resets for exact-plan replay.
 
-        const double frameDt = m_FrameClock.FrameDeltaClamped(m_MaxFrameDelta);
+        const double frameDt = m_Impl->m_FrameClock.FrameDeltaClamped(m_Impl->m_MaxFrameDelta);
         frameContext.FrameDeltaSeconds = frameDt;
-        m_Accumulator += frameDt;
+        m_Impl->m_Accumulator += frameDt;
 
         const auto fixedStepBegin = std::chrono::steady_clock::now();
-        RunFixedStepSimulationTicks(*m_FrameGraph,
-                                    *m_Scene,
-                                    m_Accumulator,
-                                    m_FixedDt,
-                                    m_MaxSubSteps);
+        RunFixedStepSimulationTicks(*m_Impl->m_FrameGraph,
+                                    *m_Impl->m_Scene,
+                                    m_Impl->m_Accumulator,
+                                    m_Impl->m_FixedDt,
+                                    m_Impl->m_MaxSubSteps);
         pacing.FixedStepMicros = ElapsedMicros(fixedStepBegin);
 
         // ── Job completion gate (pre-pump B; ARCH-009 / ADR-0024 D8) ─────
         // Workers deposit opaque results into JobService. The main thread
         // checks token/world cancellation here and publishes completion events
         // only for survivors, so pump B owns all completion commits.
-        (void)m_JobService.DrainCompletions(m_KernelEvents);
+        (void)m_Impl->m_JobService.DrainCompletions(m_Impl->m_KernelEvents);
 
         // ── Event pump B (post-sim; ARCH-008 / ADR-0024 D7) ───────────────
         // Simulation/job events reach runtime modules before UI/extraction.
-        (void)m_KernelEvents.Pump();
+        (void)m_Impl->m_KernelEvents.Pump();
 
-        const double alpha = m_Accumulator / m_FixedDt;
+        const double alpha = m_Impl->m_Accumulator / m_Impl->m_FixedDt;
         frameContext.FixedStepAlpha = alpha;
         bool preRenderTransformFlushNeeded =
-            HasPendingPreRenderTransformFlush(*m_Scene);
+            HasPendingPreRenderTransformFlush(*m_Impl->m_Scene);
 
         // Optional editor UI modules open their frame immediately before the
         // variable tick. Minimized frames return before this point, so a
@@ -771,7 +810,7 @@ namespace Extrinsic::Runtime
         pacing.VariableTickMicros = ElapsedMicros(variableTickBegin);
         preRenderTransformFlushNeeded =
             preRenderTransformFlushNeeded ||
-            HasPendingPreRenderTransformFlush(*m_Scene);
+            HasPendingPreRenderTransformFlush(*m_Impl->m_Scene);
 
         // Optional editor UI modules close, publish overlay data, and write the
         // single frame-owned capture snapshot at the existing pre-render
@@ -784,7 +823,7 @@ namespace Extrinsic::Runtime
             pacing);
         preRenderTransformFlushNeeded =
             preRenderTransformFlushNeeded ||
-            HasPendingPreRenderTransformFlush(*m_Scene);
+            HasPendingPreRenderTransformFlush(*m_Impl->m_Scene);
 
         const EditorInputCaptureSnapshot& editorCapture =
             frameContext.EditorCapture;
@@ -793,19 +832,19 @@ namespace Extrinsic::Runtime
 
         // ── Phase 4: Build render snapshot ────────────────────────────────
         const auto preRenderSetupBegin = std::chrono::steady_clock::now();
-        const Platform::Extent2D viewport = m_Window->GetFramebufferExtent();
+        const Platform::Extent2D viewport = m_Impl->m_Window->GetFramebufferExtent();
         frameContext.RenderInput = Graphics::RenderFrameInput{
             .Alpha    = alpha,
             .Viewport = viewport,
             .EnableGpuProfiling =
-                m_Config.Render.EnableGpuProfiling,
+                m_Impl->m_Config.Render.EnableGpuProfiling,
         };
         Graphics::RenderFrameInput& renderInput = frameContext.RenderInput;
 
-        const Platform::IWindow& inputWindow = *m_Window;
-        m_RuntimeModuleSchedule.RunViewportInputHooks(
+        const Platform::IWindow& inputWindow = *m_Impl->m_Window;
+        m_Impl->m_RuntimeModuleSchedule.RunViewportInputHooks(
             RuntimeViewportInputHookContext{
-                .Config = m_Config,
+                .Config = m_Impl->m_Config,
                 .ActiveWorldHandle = ActiveWorld(),
                 .Input = inputWindow.GetInput(),
                 .Viewport = viewport,
@@ -815,7 +854,7 @@ namespace Extrinsic::Runtime
             });
         preRenderTransformFlushNeeded =
             preRenderTransformFlushNeeded ||
-            HasPendingPreRenderTransformFlush(*m_Scene);
+            HasPendingPreRenderTransformFlush(*m_Impl->m_Scene);
         pacing.PreRenderSetupMicros += ElapsedMicros(preRenderSetupBegin);
 
         // ── BUG-024/RUNTIME-145: pre-render transform flush ───────────────
@@ -834,7 +873,7 @@ namespace Extrinsic::Runtime
         if (preRenderTransformFlushNeeded)
         {
             const PreRenderTransformFlushStats preRenderFlush =
-                FlushPreRenderTransformState(*m_Scene);
+                FlushPreRenderTransformState(*m_Impl->m_Scene);
             pacing.PreRenderTransformFlushRan = true;
             pacing.PreRenderTransformWorldUpdatedObserved =
                 preRenderFlush.WorldUpdatedObserved;
@@ -854,8 +893,8 @@ namespace Extrinsic::Runtime
         // render camera so the snapped view reaches transform-gizmo packet
         // building and render extraction this same frame.
         const auto postFlushSetupBegin = std::chrono::steady_clock::now();
-        m_InputActions.DispatchForFrame(m_Config,
-                                        *m_Scene,
+        m_Impl->m_InputActions.DispatchForFrame(m_Impl->m_Config,
+                                        *m_Impl->m_Scene,
                                         inputWindow.GetInput(),
                                         viewport,
                                         imguiCapturesKeyboard,
@@ -881,16 +920,16 @@ namespace Extrinsic::Runtime
         // consumer: AcquireFront) and the front reference is released after the
         // frame retires below. `frameIndex` stamps the acquired slot so the
         // consumer's frame-age diagnostic reads 0 in the synchronous baseline.
-        frameContext.FrameIndex = m_RenderExtractionService.ConsumeFrameIndex();
+        frameContext.FrameIndex = m_Impl->m_RenderExtractionService.ConsumeFrameIndex();
 
         Graphics::GpuAssetCache* const gpuAssetCache =
-            m_ServiceRegistry.Find<Graphics::GpuAssetCache>();
-        RuntimeRenderFrameHooks renderHooks(*m_Renderer,
-                                            *m_Scene,
-                                            m_RenderExtractionService.Cache(),
+            m_Impl->m_ServiceRegistry.Find<Graphics::GpuAssetCache>();
+        RuntimeRenderFrameHooks renderHooks(*m_Impl->m_Renderer,
+                                            *m_Impl->m_Scene,
+                                            m_Impl->m_RenderExtractionService.Cache(),
                                             gpuAssetCache,
-                                            m_RenderExtractionService.Pool(),
-                                            m_Config.Render.SynchronousExtraction,
+                                            m_Impl->m_RenderExtractionService.Pool(),
+                                            m_Impl->m_Config.Render.SynchronousExtraction,
                                             frameContext.ExtractionStats,
                                             frameContext.FrameIndex,
                                             frameContext.PooledFrontSlot,
@@ -905,32 +944,31 @@ namespace Extrinsic::Runtime
         pacing.RenderContractMicros = ElapsedMicros(renderContractBegin);
         pacing.RendererBeganFrame = renderResult.BeganFrame;
         pacing.RendererCompletedFrame = renderResult.CompletedFrame;
-        m_RenderExtractionService.PublishLastStats(frameContext.ExtractionStats);
         if (!renderResult.BeganFrame)
         {
             // BeginFrame failed before extraction ran, so no slot was acquired
             // (PooledFrontSlot stays kInvalidSlot) — nothing to release.
-            m_FrameClock.EndFrame();
+            m_Impl->m_FrameClock.EndFrame();
             publishPacingSample();
             return;
         }
 
         const std::uint64_t completedGpuValue = renderResult.CompletedGpuValue;
         const auto presentBegin = std::chrono::steady_clock::now();
-        m_Device->Present(frame);
+        m_Impl->m_Device->Present(frame);
         pacing.PresentMicros = ElapsedMicros(presentBegin);
 
         // ── Phase 10: Maintenance ─────────────────────────────────────────
-        TransferHooks transferHooks(*m_Device);
+        TransferHooks transferHooks(*m_Impl->m_Device);
         AssetHooks assetHooks(
-                              m_ServiceRegistry.Find<
+                              m_Impl->m_ServiceRegistry.Find<
                                   Core::IAssetFrameHooks>(),
-                              *m_Device,
-                              m_RenderExtractionService.Cache(),
-                              *m_Renderer);
+                              *m_Impl->m_Device,
+                              m_Impl->m_RenderExtractionService.Cache(),
+                              *m_Impl->m_Renderer);
         const auto maintenanceBegin = std::chrono::steady_clock::now();
         if (Core::IStreamingFrameHooks* streamingHooks =
-                m_ServiceRegistry.Find<Core::IStreamingFrameHooks>();
+                m_Impl->m_ServiceRegistry.Find<Core::IStreamingFrameHooks>();
             streamingHooks != nullptr)
         {
             Core::ExecuteMaintenanceContract(
@@ -945,8 +983,8 @@ namespace Extrinsic::Runtime
         }
         // ARCH-009 — drop terminal job records after the frame has observed
         // their completion/cancellation state. Does not wait on workers.
-        (void)m_JobService.ReapCompleted();
-        (void)m_JobService.DrainGpuQueueCompletedTransfers();
+        (void)m_Impl->m_JobService.ReapCompleted();
+        (void)m_Impl->m_JobService.DrainGpuQueueCompletedTransfers();
         RunRuntimeModuleFrameHooks(
             FramePhase::Maintenance,
             frameDt,
@@ -967,7 +1005,7 @@ namespace Extrinsic::Runtime
         // front; pipelined mode releases the previous front consumed by render-N
         // after extraction-N has already published the new front.
         const auto releaseFrontBegin = std::chrono::steady_clock::now();
-        m_RenderExtractionService.ReleaseFrontSlot(frameContext.PooledFrontSlot);
+        m_Impl->m_RenderExtractionService.ReleaseFrontSlot(frameContext.PooledFrontSlot);
         pacing.ReleaseRenderWorldMicros = ElapsedMicros(releaseFrontBegin);
 
         // ARCH-010 — world mutations are deferred to the Maintenance boundary.
@@ -978,73 +1016,53 @@ namespace Extrinsic::Runtime
         pacing.MaintenanceMicros += ElapsedMicros(worldMaintenanceBegin);
 
         // ── Phase 11: Clock EndFrame ──────────────────────────────────────
-        m_FrameClock.EndFrame();
+        m_Impl->m_FrameClock.EndFrame();
         publishPacingSample();
     }
 
     // ── Query / control ───────────────────────────────────────────────────
 
-    CommandBus& Engine::Commands() noexcept { return m_CommandBus; }
-    KernelEventBus& Engine::Events() noexcept { return m_KernelEvents; }
-    JobService& Engine::Jobs() noexcept { return m_JobService; }
-    WorldRegistry& Engine::Worlds() noexcept { return m_WorldRegistry; }
-    const WorldRegistry& Engine::Worlds() const noexcept { return m_WorldRegistry; }
+    CommandBus& Engine::Commands() noexcept { return m_Impl->m_CommandBus; }
+    KernelEventBus& Engine::Events() noexcept { return m_Impl->m_KernelEvents; }
+    JobService& Engine::Jobs() noexcept { return m_Impl->m_JobService; }
+    WorldRegistry& Engine::Worlds() noexcept { return m_Impl->m_WorldRegistry; }
+    const WorldRegistry& Engine::Worlds() const noexcept { return m_Impl->m_WorldRegistry; }
     WorldHandle Engine::ActiveWorld() const noexcept
     {
-        return m_WorldRegistry.ActiveWorld();
+        return m_Impl->m_WorldRegistry.ActiveWorld();
     }
-    ServiceRegistry& Engine::Services() noexcept { return m_ServiceRegistry; }
+    ServiceRegistry& Engine::Services() noexcept { return m_Impl->m_ServiceRegistry; }
     const ServiceRegistry& Engine::Services() const noexcept
     {
-        return m_ServiceRegistry;
+        return m_Impl->m_ServiceRegistry;
     }
-    bool Engine::IsRunning() const noexcept { return m_Running; }
-    void Engine::RequestExit()      noexcept { m_Running = false; }
+    bool Engine::IsRunning() const noexcept { return m_Impl->m_Running; }
+    void Engine::RequestExit()      noexcept { m_Impl->m_Running = false; }
 
     void Engine::RequestExitFromWindowClose(const std::string_view source)
     {
-        if (!m_WindowCloseLogged)
+        if (!m_Impl->m_WindowCloseLogged)
         {
             Core::Log::Info(
                 "[Runtime] Window close requested; stopping Engine::Run loop. source={}",
                 source);
-            m_WindowCloseLogged = true;
+            m_Impl->m_WindowCloseLogged = true;
         }
         RequestExit();
     }
 
-    Platform::IWindow&    Engine::GetWindow()        noexcept { return *m_Window;        }
-    RHI::IDevice&         Engine::GetDevice()        noexcept { return *m_Device;        }
-    Graphics::IRenderer&  Engine::GetRenderer()      noexcept { return *m_Renderer;      }
+    Platform::IWindow&    Engine::GetWindow()        noexcept { return *m_Impl->m_Window;        }
+    RHI::IDevice&         Engine::GetDevice()        noexcept { return *m_Impl->m_Device;        }
+    Graphics::IRenderer&  Engine::GetRenderer()      noexcept { return *m_Impl->m_Renderer;      }
     const Core::Config::EngineConfig& Engine::GetEngineConfig() const noexcept
     {
-        return m_Config;
-    }
-
-    const RenderWorldPool& Engine::GetRenderWorldPool() const noexcept
-    {
-        return m_RenderExtractionService.Pool();
-    }
-    const RuntimeRenderExtractionStats& Engine::GetLastRenderExtractionStats() const noexcept
-    {
-        return m_RenderExtractionService.LastStats();
+        return m_Impl->m_Config;
     }
 
     const RuntimeFramePacingDiagnostics&
     Engine::GetLastFramePacingDiagnostics() const noexcept
     {
-        return m_LastFramePacingDiagnostics;
-    }
-
-    RuntimeInputActionHandle Engine::RegisterInputAction(
-        RuntimeInputActionDesc desc)
-    {
-        return m_InputActions.Register(std::move(desc));
-    }
-
-    void Engine::UnregisterInputAction(const RuntimeInputActionHandle handle)
-    {
-        m_InputActions.Unregister(handle);
+        return m_Impl->m_LastFramePacingDiagnostics;
     }
 
     void Engine::HandlePlatformEvent(const Platform::Event& event)
@@ -1071,42 +1089,11 @@ namespace Extrinsic::Runtime
         Core::Log::Info("[Runtime] File drop received: path_count={}",
                         event.Paths.size());
         if (AssetImportPipeline* const pipeline =
-                m_ServiceRegistry.Find<AssetImportPipeline>();
+                m_Impl->m_ServiceRegistry.Find<AssetImportPipeline>();
             pipeline != nullptr)
         {
             pipeline->ImportDroppedFilePaths(event.Paths);
         }
-    }
-
-    Core::FrameGraph&     Engine::GetFrameGraph()    noexcept { return *m_FrameGraph;    }
-
-    void Engine::SetVisualizationAdapterBinding(
-        const std::uint32_t stableEntityId,
-        RenderExtractionCache::VisualizationAdapterBinding binding)
-    {
-        m_RenderExtractionService.SetVisualizationAdapterBinding(
-            stableEntityId,
-            std::move(binding));
-    }
-
-    void Engine::ClearVisualizationAdapterBinding(
-        const std::uint32_t stableEntityId) noexcept
-    {
-        m_RenderExtractionService.ClearVisualizationAdapterBinding(stableEntityId);
-    }
-
-    std::optional<RenderExtractionCache::VisualizationAdapterBinding>
-    Engine::GetVisualizationAdapterBinding(
-        const std::uint32_t stableEntityId) const noexcept
-    {
-        return m_RenderExtractionService.GetVisualizationAdapterBinding(
-            stableEntityId);
-    }
-
-    std::uint64_t
-    Engine::GetVisualizationAdapterBindingRevision() const noexcept
-    {
-        return m_RenderExtractionService.GetVisualizationAdapterBindingRevision();
     }
 
 }

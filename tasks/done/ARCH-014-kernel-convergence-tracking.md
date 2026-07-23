@@ -72,10 +72,10 @@ depends_on:
   not regrow while the migration is in flight.
 
 ## Status
-- Blocked on the final `RUNTIME-187` convergence leaf; owner: Codex;
-  coordination branch:
-  `codex/arch-014-kernel-convergence-program`; activated 2026-07-18 after
-  `ARCH-015` retirement.
+- Retired on 2026-07-23 at the architecture-governance `Retired` endpoint on
+  `codex/arch-014-kernel-convergence-program`. Every ADR-0027 child is retired,
+  the living target-state scorecard is all-green, and the exact Engine guard
+  is closed at `12/0/0/5` with no temporary debt.
 - The 2026-07-18 reconciliation audit measured the exact clean ratchet at
   42 plain imports, 21 then-classified domain imports, 2 re-exports, and 31
   public getter names. Subsequent behavior-backed extractions now measure
@@ -93,11 +93,18 @@ depends_on:
   Retired `GRAPHICS-128` closed the bake's shared-index-slice prerequisite,
   retired `RUNTIME-183` supplied the accepted private AssetWorkflow composition
   owner, and retired `RUNTIME-129` now supplies the operational bake evidence.
-  The remaining lifecycle leaf gates the later mechanism deletion audit,
-  semantic auxiliary-surface cleanup, and final representation/checker leaf.
+  `RUNTIME-184` removed the application callback, `RUNTIME-185` deleted
+  unproven composition machinery, `RUNTIME-186` settled the remaining
+  semantic Engine API, and `RUNTIME-187` completed opaque state plus the exact
+  declaration-backed checker. The complete CPU selector passed 4,269/4,269,
+  fresh ASan and UBSan selectors each passed 2,923/2,923, and the promoted
+  Vulkan intersection passed 48/48 including shutdown LeakSanitizer. The
+  [clean-workshop review](../../docs/reviews/2026-07-23-arch-014-clean-workshop-review.md)
+  records no findings.
+- Commit: pending this retirement checkpoint.
 
 ## Required changes
-- [ ] After each child seam/extraction merges, update the target-state
+- [x] After each child seam/extraction merges, update the target-state
       scorecard (flip the invariant boxes that now hold on `main`) and
       add or refresh a dated current metric snapshot without rewriting the
       historical 2026-07-08 baseline.
@@ -110,14 +117,14 @@ depends_on:
       domain accessor appears — a monotone "no backsliding" gate wired into
       `pr-fast`. This checker is the authoritative metric and requires exact
       policy updates on improvements so a stale cap cannot permit regrowth.
-- [ ] Keep the child-task inventory in the target-state doc in sync with the
+- [x] Keep the child-task inventory in the target-state doc in sync with the
       backlog: add extractions discovered during seam work, retain completed
       rows as checked evidence, and remove retired tasks from open-work
       sequencing text.
 - [x] Record the GPU-job-participant lifecycle decision from retired
       `RUNTIME-137`: `JobService` owns the `GpuQueue` participant registry,
       frame-command recording, completion draining, and post-idle shutdown.
-- [ ] Require each module extraction to decide whether its durable state is
+- [x] Require each module extraction to decide whether its durable state is
       world-scoped or global. `ARCH-010` supplied `WorldRegistry`; it did not
       make that policy decision for later domain modules. Track those decisions
       here rather than assigning the open work back to retired `ARCH-010`.
@@ -142,25 +149,25 @@ depends_on:
       and fails a synthetic new-domain-import regression.
 
 ## Docs
-- [ ] The target-state doc is the deliverable surface; keep its scorecard and
+- [x] The target-state doc is the deliverable surface; keep its scorecard and
       dated current metric snapshot synchronized while preserving the baseline
       numbers (this task's ongoing work).
-- [ ] Regenerate `tasks/SESSION-BRIEF.md` when child gating changes.
+- [x] Regenerate `tasks/SESSION-BRIEF.md` when child gating changes.
 
 ## Acceptance criteria
 
 This umbrella closes only when ALL of the following hold on `main`:
 
-- [ ] Every "Kernel seams exist" scorecard row is checked.
-- [ ] `Runtime.Engine.cppm` contains only the exact accepted kernel imports,
+- [x] Every "Kernel seams exist" scorecard row is checked.
+- [x] `Runtime.Engine.cppm` contains only the exact accepted kernel imports,
       with no unused imports, domain imports, domain re-exports, or
       `Engine::GetX()` domain facades.
-- [ ] No `entt::dispatcher::trigger` / direct dispatcher in module code; no
+- [x] No `entt::dispatcher::trigger` / direct dispatcher in module code; no
       `Engine&` through any module surface; `OnSimTick`/`OnVariableTick`
       removed.
-- [ ] Every "Domain responsibilities are app-composed" row is checked with its
+- [x] Every "Domain responsibilities are app-composed" row is checked with its
       global or world-qualified state scope preserved.
-- [ ] The final deletion test removes or narrows any `EngineSetup`,
+- [x] The final deletion test removes or narrows any `EngineSetup`,
       `ServiceRegistry`, or `ModuleSchedule` surface without a production
       consumer; deferred D10/D11/D12/world-switch mechanisms remain absent
       until their recorded triggers occur.
