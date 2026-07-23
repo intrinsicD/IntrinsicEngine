@@ -27,17 +27,6 @@ namespace
         return *service;
     }
 
-    class StubApplication final : public Extrinsic::Runtime::IApplication
-    {
-    public:
-        void OnInitialize(Extrinsic::Runtime::Engine& /*engine*/) override {}
-        void OnSimTick(Extrinsic::Runtime::Engine& /*engine*/, double /*fixedDt*/) override {}
-        void OnVariableTick(Extrinsic::Runtime::Engine& /*engine*/,
-                            double /*alpha*/,
-                            double /*dt*/) override {}
-        void OnShutdown(Extrinsic::Runtime::Engine& /*engine*/) override {}
-    };
-
     [[nodiscard]] Extrinsic::Core::Config::EngineConfig SingleWorkerEngineConfig()
     {
         Extrinsic::Core::Config::EngineConfig config{};
@@ -49,7 +38,7 @@ namespace
 TEST(GpuAssetCacheFallbackBootstrap, NullDeviceLeavesFallbackUnreadyDeterministically)
 {
     Extrinsic::Core::Config::EngineConfig config = SingleWorkerEngineConfig();
-    Extrinsic::Runtime::Engine engine(config, std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(config);
 
     engine.EmplaceModule<
         Extrinsic::Runtime::SceneDocumentModule>();
@@ -62,7 +51,8 @@ TEST(GpuAssetCacheFallbackBootstrap, NullDeviceLeavesFallbackUnreadyDeterministi
         << "Null device must not back the fallback texture; bootstrap is "
            "gated on IDevice::IsOperational() per RUNTIME-070.";
     EXPECT_EQ(diagnostics.TextureCreateFailures, 0u)
-        << "Gated bootstrap must not increment failure counters on the Null path.";
+        << "Gated bootstrap must not increment failure counters on the Null "
+           "path.";
 
     engine.Shutdown();
 }
@@ -70,7 +60,7 @@ TEST(GpuAssetCacheFallbackBootstrap, NullDeviceLeavesFallbackUnreadyDeterministi
 TEST(GpuAssetCacheFallbackBootstrap, ReInitializeRebootstrapsExactlyOnce)
 {
     Extrinsic::Core::Config::EngineConfig config = SingleWorkerEngineConfig();
-    Extrinsic::Runtime::Engine engine(config, std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(config);
 
     engine.EmplaceModule<
         Extrinsic::Runtime::SceneDocumentModule>();
@@ -84,8 +74,10 @@ TEST(GpuAssetCacheFallbackBootstrap, ReInitializeRebootstrapsExactlyOnce)
     engine.Initialize();
     const auto secondDiagnostics = RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine).GetDiagnostics();
     EXPECT_FALSE(secondDiagnostics.FallbackTextureReady)
-        << "Re-Initialize must rebuild the cache cleanly with the same Null-gated "
-           "fallback state — no leftover lease, no double-bootstrap counter drift.";
+        << "Re-Initialize must rebuild the cache cleanly with the same "
+           "Null-gated "
+           "fallback state — no leftover lease, no double-bootstrap counter "
+           "drift.";
     EXPECT_EQ(secondDiagnostics.TextureCreateFailures, 0u);
     engine.Shutdown();
 }

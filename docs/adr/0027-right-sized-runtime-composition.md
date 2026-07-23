@@ -276,7 +276,7 @@ only by a test double fails the present-use test.
 
 ### 4. Current responsibility hypotheses and state scope
 
-The live Engine responsibilities group into the following seven implementation
+The live Engine responsibilities group into the following eight implementation
 hypotheses. They are bounded child-task starting points, not an architectural
 taxonomy. Each child must rerun ADR-0026 and split or merge when lifecycle,
 state, commit, or consumer evidence disagrees.
@@ -290,6 +290,7 @@ state, commit, or consumer evidence disagrees.
 | Camera | App-composed `CameraModule` owns camera-controller/viewport state and active camera selection, publishes the exact registry, and contributes the typed viewport-input hook. | Global viewport owner with registry state bound to exactly one `WorldHandle`; reset clears slots/poses/transitions/seed even for equal handle bits, active change rebinds empty, destruction/shutdown invalidates, and away/back never resurrects. Reference-scene entity creation, owning-world retention, and optional initial seed handoff belong to app initial-world bootstrap. |
 | Editor UI | ImGui adapter/overlay/host, window contribution state, and production of the single capture snapshot | Global and optional. `EditorUiModule` owns UI lifetime, publishes the Engine-free host, and writes the frame-loop-owned capture value through the borrowed `UiEndCapture` hook context after the paired begin/build/end bracket; it does not own camera, selection, scene, config, asset, or method state. |
 | Config control | `EngineConfigControl` and the app-section registry used by boot and live apply | Global owner. The app supplies section codecs before boot; preview remains side-effect-free and apply uses the existing validated commit path. |
+| App session/lifecycle | The app root explicitly composes modules; Sandbox owns `SandboxSession` for editor/default-policy/reference-content state rather than an Engine-owned application callback object. | Global app-owned session bound to the current Engine boot. Initialization borrows exact config/world/service capabilities after kernel boot; two-stage shutdown quiesces the runtime first, tears app state down while those borrows remain live, then reverses modules/subsystems. No state is cached across a new Engine boot. |
 
 Clustering remains the existing app-optional composition proof. Its owner is
 global, while job cancellation, commit targets, and label results are scoped
@@ -325,7 +326,8 @@ than wrapper counts:
   types; the measured domain set is the complement. Test-only suffixes,
   aliases, prefixes, and forwarding return types do not exempt a getter.
 - No `Engine&` occurs in a handler, setup, or composed-responsibility surface.
-- `IApplication::OnSimTick` and `OnVariableTick` are removed; application
+- `IApplication` and its simulation/variable-frame callbacks were removed by
+  `RUNTIME-184`; application
   behavior reaches the frame through behavior-carrying composition, not an
   unrestricted Engine callback.
 - No direct EnTT dispatcher use occurs in composed responsibility code.

@@ -8,6 +8,8 @@
 #include <thread>
 #include <vector>
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Tasks;
@@ -138,12 +140,13 @@ namespace
         return config;
     }
 
-    class JobPumpProbeApplication final : public Runtime::IApplication
+    class JobPumpProbeApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine& engine) override
+        void Resolve() override
         {
-            MainThread = std::this_thread::get_id();
+            auto& engine = Kernel();
+            MainThread   = std::this_thread::get_id();
             Subscription = engine.Events().Subscribe<JobProbeCompleted>(
                 [this](const JobProbeCompleted& event)
                 {
@@ -174,10 +177,11 @@ namespace
                     }));
         }
 
-        void OnSimTick(Runtime::Engine&, double) override {}
+        void Simulate(double) override {}
 
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             VariableTicks += 1;
             if (CompletionHits > 0)
             {
@@ -195,7 +199,7 @@ namespace
             }
         }
 
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
         Runtime::KernelEventSubscription Subscription{};
         Runtime::JobToken Token{};
@@ -711,11 +715,12 @@ TEST(RuntimeJobService, EngineCompletionGatePublishesBeforePumpBOnMainThread)
     auto app = std::make_unique<JobPumpProbeApplication>();
     JobPumpProbeApplication* appPtr = app.get();
 
-    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(app));
     engine.Initialize();
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
 
     engine.Run();
 

@@ -8,6 +8,8 @@
 
 #include "OperationalCounterStability.hpp"
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.Graphics.CullingSystem;
@@ -30,7 +32,6 @@ using Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs;
 using Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot;
 using Extrinsic::Backends::Vulkan::ToString;
 using Extrinsic::Runtime::Engine;
-using Extrinsic::Runtime::IApplication;
 
 constexpr std::uint32_t kOptionExemptSelectionBuckets = 1u << 1u;
 
@@ -78,7 +79,7 @@ struct BucketCounters
     std::uint32_t Phase2RescuedCount = 0u;
 };
 
-class ExitAfterFramesApp final : public IApplication
+class ExitAfterFramesApp final : public Intrinsic::Tests::RuntimeTestModule
 {
 public:
     explicit ExitAfterFramesApp(const std::uint32_t targetFrames) noexcept
@@ -86,11 +87,12 @@ public:
     {
     }
 
-    void OnInitialize(Engine&) override {}
-    void OnSimTick(Engine&, double) override {}
+    void Resolve() override {}
+    void Simulate(double) override {}
 
-    void OnVariableTick(Engine& engine, double, double) override
+    void Frame(double, double) override
     {
+        auto& engine = Kernel();
         ++m_Frames;
         if (m_Frames >= m_TargetFrames)
         {
@@ -98,7 +100,7 @@ public:
         }
     }
 
-    void OnShutdown(Engine&) override {}
+    void Shutdown() override {}
 
 private:
     std::uint32_t m_TargetFrames = 1u;
@@ -128,9 +130,10 @@ struct SmokeBootstrap
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
     {
         return SmokeBootstrap{
-            .EnginePtr = nullptr,
-            .Skipped = true,
-            .SkipReason = "GLFW could not initialize in this environment; gpu;vulkan HZB conservatism smoke is opt-in.",
+            .EnginePtr  = nullptr,
+            .Skipped    = true,
+            .SkipReason = "GLFW could not initialize in this environment; "
+                          "gpu;vulkan HZB conservatism smoke is opt-in.",
         };
     }
 
@@ -142,7 +145,8 @@ struct SmokeBootstrap
     config.Render.EnableValidation = false;
     config.Render.EnableVSync = false;
 
-    auto engine = std::make_unique<Engine>(config, std::make_unique<ExitAfterFramesApp>(4u));
+    auto engine = std::make_unique<Engine>(config);
+    Intrinsic::Tests::AddRuntimeTestModule(*engine, std::make_unique<ExitAfterFramesApp>(4u));
     engine->Initialize();
 
     const auto initInputs = GetVulkanDeviceOperationalInputs(&engine->GetDevice());
@@ -150,9 +154,10 @@ struct SmokeBootstrap
     {
         engine->Shutdown();
         return SmokeBootstrap{
-            .EnginePtr = nullptr,
-            .Skipped = true,
-            .SkipReason = "Promoted Vulkan did not reach logical-device/swapchain/command-sync readiness on this host.",
+            .EnginePtr  = nullptr,
+            .Skipped    = true,
+            .SkipReason = "Promoted Vulkan did not reach "
+                          "logical-device/swapchain/command-sync readiness on this host.",
         };
     }
 
@@ -236,9 +241,11 @@ TEST(HzbOcclusionConservatismGpuSmoke, TwoPhasePredicateMatchesCpuContractOnOper
     if (!device.IsOperational())
     {
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during HZB conservatism warmup: status="
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during HZB "
+                         "conservatism warmup: status="
                       << ToString(status.Code) << " reason=" << ToString(status.Reason)
-                      << ". Host capability checks passed, so this is a GRAPHICS-038E regression, not a skip condition.";
+                      << ". Host capability checks passed, so this is a "
+                         "GRAPHICS-038E regression, not a skip condition.";
         return;
     }
 
@@ -248,7 +255,8 @@ TEST(HzbOcclusionConservatismGpuSmoke, TwoPhasePredicateMatchesCpuContractOnOper
     {
         engine.Shutdown();
         ASSERT_TRUE(Counters::IsStable(beforeWarmup, afterWarmup))
-            << "Vulkan fallback counters incremented during HZB conservatism warmup.";
+            << "Vulkan fallback counters incremented during HZB conservatism "
+               "warmup.";
     }
 
     constexpr std::array<HZBSmokeCandidate, 6u> kCandidates{{
@@ -343,7 +351,8 @@ TEST(HzbOcclusionConservatismGpuSmoke, TwoPhasePredicateMatchesCpuContractOnOper
     {
         engine.Shutdown();
         ASSERT_TRUE(pipeline.IsValid())
-            << "Operational Vulkan device failed to create the HZB conservatism smoke compute pipeline.";
+            << "Operational Vulkan device failed to create the HZB conservatism "
+               "smoke compute pipeline.";
     }
 
     Extrinsic::RHI::BufferHandle candidateBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
@@ -365,7 +374,8 @@ TEST(HzbOcclusionConservatismGpuSmoke, TwoPhasePredicateMatchesCpuContractOnOper
         DestroyPipelineIfValid(device, pipeline);
         engine.Shutdown();
         ASSERT_TRUE(candidateBuffer.IsValid() && resultBuffer.IsValid())
-            << "Operational Vulkan device failed to create HZB conservatism smoke buffers.";
+            << "Operational Vulkan device failed to create HZB conservatism smoke "
+               "buffers.";
     }
 
     constexpr std::array<HZBSmokeResult, kCandidates.size()> kZeroResults{};
@@ -395,7 +405,8 @@ TEST(HzbOcclusionConservatismGpuSmoke, TwoPhasePredicateMatchesCpuContractOnOper
         DestroyBufferIfValid(device, candidateBuffer);
         DestroyPipelineIfValid(device, pipeline);
         engine.Shutdown();
-        ADD_FAILURE() << "Operational Vulkan device failed to begin the HZB conservatism smoke frame.";
+        ADD_FAILURE() << "Operational Vulkan device failed to begin the HZB "
+                         "conservatism smoke frame.";
         return;
     }
 
@@ -460,17 +471,20 @@ TEST(HzbOcclusionConservatismGpuSmoke, TwoPhasePredicateMatchesCpuContractOnOper
     EXPECT_EQ(actualFrustumRejected, expected.FrustumRejectedCount);
     EXPECT_EQ(actualSelectionExempt, expected.SelectionOcclusionExemptCount);
 
-    EXPECT_EQ(actual[0].Decision,
-              static_cast<std::uint32_t>(Extrinsic::Graphics::CullingTwoPhaseDecision::Phase1Visible))
-        << "known-visible probe was over-rejected by the Vulkan HZB predicate smoke";
-    EXPECT_EQ(actual[1].Decision,
-              static_cast<std::uint32_t>(Extrinsic::Graphics::CullingTwoPhaseDecision::Phase2Rescued))
-        << "known-disoccluded probe was not rescued by the Vulkan HZB predicate smoke";
+    EXPECT_EQ(actual[0].Decision, static_cast<std::uint32_t>(
+                                      Extrinsic::Graphics::CullingTwoPhaseDecision::Phase1Visible))
+        << "known-visible probe was over-rejected by the Vulkan HZB predicate "
+           "smoke";
+    EXPECT_EQ(actual[1].Decision, static_cast<std::uint32_t>(
+                                      Extrinsic::Graphics::CullingTwoPhaseDecision::Phase2Rescued))
+        << "known-disoccluded probe was not rescued by the Vulkan HZB predicate "
+           "smoke";
 
     const Counters::Snapshot afterSmoke =
         ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
     EXPECT_TRUE(Counters::IsStable(afterWarmup, afterSmoke))
-        << "Vulkan fallback counters incremented across the HZB conservatism smoke frame.";
+        << "Vulkan fallback counters incremented across the HZB conservatism "
+           "smoke frame.";
 
     DestroyBufferIfValid(device, resultBuffer);
     DestroyBufferIfValid(device, candidateBuffer);

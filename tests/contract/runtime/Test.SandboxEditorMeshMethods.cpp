@@ -5,8 +5,8 @@
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
-#include <functional>
 #include <fstream>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -18,10 +18,11 @@
 #include <variant>
 #include <vector>
 
-#include <entt/entity/entity.hpp>
-#include <gtest/gtest.h>
-#include <glm/gtc/quaternion.hpp>
 #include "ProgressivePoissonReference.hpp"
+#include <entt/entity/entity.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <gtest/gtest.h>
+#include "RuntimeTestModule.hpp"
 
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
@@ -570,7 +571,7 @@ void AttachDerivedJobCommands(
             };
     }
 
-class WaitForConditionApplication final : public Runtime::IApplication
+    class WaitForConditionApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         explicit WaitForConditionApplication(
@@ -581,10 +582,11 @@ class WaitForConditionApplication final : public Runtime::IApplication
         {
         }
 
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++m_ObservedFrames;
             if ((m_Ready && m_Ready(engine)) || m_ObservedFrames >= m_MaxFrames)
             {
@@ -593,7 +595,7 @@ class WaitForConditionApplication final : public Runtime::IApplication
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
     private:
         std::function<bool(Runtime::Engine&)> m_Ready{};
@@ -2968,15 +2970,14 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProce
 
     std::optional<ECS::EntityHandle> meshEntity{};
     std::optional<std::uint32_t> stableId{};
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<WaitForConditionApplication>(
-            [&meshEntity](Runtime::Engine& runningEngine)
-            {
-                return meshEntity.has_value() &&
-                    DirectMeshPostProcessReady(runningEngine, *meshEntity);
-            },
-            128u));
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(), std::make_unique<WaitForConditionApplication>(
+                              [&meshEntity](Runtime::Engine& runningEngine)
+                              {
+                                  return meshEntity.has_value() &&
+                                         DirectMeshPostProcessReady(runningEngine, *meshEntity);
+                              },
+                              128u));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
@@ -3870,13 +3871,9 @@ TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRequireRuntimeModule)
 }
 TEST(SandboxEditorUi, AttachedEngineContextWiresTextureBakeModule)
 {
-    Runtime::Engine engine(
+    Intrinsic::Tests::RuntimeTestKernel engine(
         HeadlessConfig(),
-        std::make_unique<WaitForConditionApplication>(
-            [](Runtime::Engine&)
-            {
-                return true;
-            }));
+        std::make_unique<WaitForConditionApplication>([](Runtime::Engine&) { return true; }));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
@@ -3901,7 +3898,7 @@ TEST(SandboxEditorUi, AttachedEngineContextWiresTextureBakeModule)
     EXPECT_EQ(producer.Device, moduleProducer.Device);
 
     Runtime::SandboxEditorSession session{};
-    session.Attach(engine);
+    session.Attach(engine.Worlds(), engine.Services());
     ASSERT_TRUE(session.PrepareFrame());
     bool visited = false;
     ASSERT_TRUE(

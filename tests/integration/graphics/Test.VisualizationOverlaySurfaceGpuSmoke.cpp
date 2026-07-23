@@ -17,6 +17,8 @@
 #include "MinimalTriangleReadback.hpp"
 #include "OperationalCounterStability.hpp"
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Graphics.Renderer;
@@ -42,7 +44,6 @@ using Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot;
 using Extrinsic::Backends::Vulkan::ToString;
 using Extrinsic::Graphics::RenderCommandPassStatus;
 using Extrinsic::Runtime::Engine;
-using Extrinsic::Runtime::IApplication;
 
 inline constexpr std::uint32_t kReadbackWidth = 256u;
 inline constexpr std::uint32_t kReadbackHeight = 256u;
@@ -75,11 +76,12 @@ struct VisualizationOverlaySamplePoint
 };
 
 inline constexpr std::array<VisualizationOverlaySamplePoint, 3> kVisualizationReadbackSamples{{
-	VisualizationOverlaySamplePoint{"vector_field_red", 72u, 64u, ExpectedColor(1.0f, 0.0f, 0.0f)},
-	VisualizationOverlaySamplePoint{"isoline_green", 184u, 176u, ExpectedColor(0.0f, 1.0f, 0.0f)},
-	// BUG-015/BUG-016: the default-recipe SceneColorHDR background clears to a
-	// visible blue (0.10, 0.20, 0.45), not black.
-	VisualizationOverlaySamplePoint{"scene_clear_blue", 16u, 16u, ExpectedColor(0.10f, 0.20f, 0.45f)},
+    VisualizationOverlaySamplePoint{"vector_field_red", 72u, 64u, ExpectedColor(1.0f, 0.0f, 0.0f)},
+    VisualizationOverlaySamplePoint{"isoline_green", 184u, 176u, ExpectedColor(0.0f, 1.0f, 0.0f)},
+    // BUG-015/BUG-016: the default-recipe SceneColorHDR background clears
+    // to a visible blue (0.10, 0.20, 0.45), not black.
+    VisualizationOverlaySamplePoint{"scene_clear_blue", 16u, 16u,
+                                    ExpectedColor(0.10f, 0.20f, 0.45f)},
 }};
 
 [[nodiscard]] Readback::ExpectedPixel ReorderToRgba(
@@ -133,7 +135,7 @@ inline constexpr std::array<VisualizationOverlaySamplePoint, 3> kVisualizationRe
 	};
 }
 
-class ExitAfterFramesApp final : public IApplication
+class ExitAfterFramesApp final : public Intrinsic::Tests::RuntimeTestModule
 {
 public:
 	explicit ExitAfterFramesApp(const std::uint32_t targetFrames) noexcept
@@ -141,21 +143,22 @@ public:
 	{
 	}
 
-	void OnInitialize(Engine&) override {}
-	void OnSimTick(Engine&, double) override {}
+        void Resolve() override {}
+        void Simulate(double) override {}
 
-	void OnVariableTick(Engine& engine, double, double) override
-	{
-		++m_Frames;
-		if (m_Frames >= m_TargetFrames)
-		{
-			engine.RequestExit();
-		}
+        void Frame(double, double) override
+        {
+            auto& engine = Kernel();
+            ++m_Frames;
+            if (m_Frames >= m_TargetFrames)
+            {
+                engine.RequestExit();
+            }
 	}
 
-	void OnShutdown(Engine&) override {}
+        void Shutdown() override {}
 
-private:
+    private:
 	std::uint32_t m_TargetFrames{1u};
 	std::uint32_t m_Frames{0u};
 };
@@ -184,12 +187,13 @@ struct VisualizationOverlayBootstrap
 {
 	if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
 	{
-		return VisualizationOverlayBootstrap{
-			.EnginePtr = nullptr,
-			.Skipped = true,
-			.SkipReason = "GLFW could not initialize in this environment; gpu;vulkan visualization-overlay smoke is opt-in.",
-		};
-	}
+            return VisualizationOverlayBootstrap{
+                .EnginePtr  = nullptr,
+                .Skipped    = true,
+                .SkipReason = "GLFW could not initialize in this environment; "
+                              "gpu;vulkan visualization-overlay smoke is opt-in.",
+            };
+        }
 
 	auto config = Extrinsic::Runtime::CreateReferenceEngineConfig();
 	config.Window.Title = windowTitle;
@@ -199,36 +203,39 @@ struct VisualizationOverlayBootstrap
 	config.Render.EnableValidation = false;
 	config.Render.EnableVSync = false;
 
-	auto enginePtr = std::make_unique<Engine>(
-		config, std::make_unique<ExitAfterFramesApp>(targetFrames));
-	enginePtr->Initialize();
+        auto enginePtr = std::make_unique<Engine>(config);
+        Intrinsic::Tests::AddRuntimeTestModule(*enginePtr,
+                                               std::make_unique<ExitAfterFramesApp>(targetFrames));
+        enginePtr->Initialize();
 
 	const auto initInputs = GetVulkanDeviceOperationalInputs(&enginePtr->GetDevice());
 	if (!initInputs.LogicalDeviceReady || !initInputs.SwapchainReady || !initInputs.CommandSyncReady)
 	{
 		enginePtr->Shutdown();
-		return VisualizationOverlayBootstrap{
-			.EnginePtr = nullptr,
-			.Skipped = true,
-			.SkipReason = "Promoted Vulkan did not reach logical-device/swapchain/command-sync readiness on this host.",
-		};
-	}
+                return VisualizationOverlayBootstrap{
+                    .EnginePtr  = nullptr,
+                    .Skipped    = true,
+                    .SkipReason = "Promoted Vulkan did not reach "
+                                  "logical-device/swapchain/command-sync readiness on this host.",
+                };
+        }
 
 	enginePtr->Run();
 
 	const auto warmupStatus = EvaluateVulkanDeviceOperationalStatus(&enginePtr->GetDevice());
 	if (!enginePtr->GetDevice().IsOperational())
 	{
-		std::string skipReason{"Promoted Vulkan operational gate did not flip during default-recipe warmup: status="};
-		skipReason += ToString(warmupStatus.Code);
-		skipReason += " reason=";
-		skipReason += ToString(warmupStatus.Reason);
-		enginePtr->Shutdown();
-		return VisualizationOverlayBootstrap{
-			.EnginePtr = nullptr,
-			.Skipped = true,
-			.SkipReason = std::move(skipReason),
-		};
+            std::string skipReason{"Promoted Vulkan operational gate did not flip "
+                                   "during default-recipe warmup: status="};
+            skipReason += ToString(warmupStatus.Code);
+            skipReason += " reason=";
+            skipReason += ToString(warmupStatus.Reason);
+            enginePtr->Shutdown();
+            return VisualizationOverlayBootstrap{
+                .EnginePtr  = nullptr,
+                .Skipped    = true,
+                .SkipReason = std::move(skipReason),
+            };
 	}
 
 	return VisualizationOverlayBootstrap{.EnginePtr = std::move(enginePtr), .Skipped = false, .SkipReason = {}};
@@ -367,9 +374,11 @@ TEST(VisualizationOverlaySurfaceGpuSmoke, PropertyBuffersPublishBdasBeforeOperat
 	if (!run.DeviceOperational)
 	{
 		engine.Shutdown();
-		ADD_FAILURE() << "Promoted Vulkan operational gate dropped during visualization-overlay frame: status="
-					  << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason);
-		return;
+                ADD_FAILURE() << "Promoted Vulkan operational gate dropped during "
+                                 "visualization-overlay frame: status="
+                              << ToString(run.Status.Code)
+                              << " reason=" << ToString(run.Status.Reason);
+                return;
 	}
 
 	EXPECT_EQ(run.Status.Code, Extrinsic::Backends::Vulkan::VulkanOperationalStatusCode::Operational);
@@ -387,26 +396,29 @@ TEST(VisualizationOverlaySurfaceGpuSmoke, PropertyBuffersPublishBdasBeforeOperat
 	EXPECT_FALSE(stats.VisualizationPropertyBuffers.HasErrors);
 
 	const auto* pass = FindCommandPass(stats, "VisualizationOverlayPass");
-	ASSERT_NE(pass, nullptr)
-		<< "Default recipe omitted VisualizationOverlayPass despite overlay snapshots.";
-	EXPECT_EQ(pass->Status, RenderCommandPassStatus::Recorded)
-		<< "VisualizationOverlayPass did not record on the operational Vulkan command stream.";
+        ASSERT_NE(pass, nullptr) << "Default recipe omitted VisualizationOverlayPass "
+                                    "despite overlay snapshots.";
+        EXPECT_EQ(pass->Status, RenderCommandPassStatus::Recorded)
+            << "VisualizationOverlayPass did not record on the operational Vulkan "
+               "command stream.";
 
-	EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsSubmitted, 1u);
+        EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsSubmitted, 1u);
 	EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 1u);
 	EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsSubmitted, 1u);
 	EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsRecorded, 1u);
 	EXPECT_EQ(stats.VisualizationOverlayUpload.UploadOverflowCount, 0u);
 	EXPECT_EQ(stats.VisualizationOverlayUpload.MissingPipelineSkipCount, 0u);
 
-	EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
-		<< "Vulkan fallback counters incremented across the visualization-overlay frame: "
-		<< "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
-		<< ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
-		<< ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
-		<< ", gateFailure " << run.Before.OperationalGateFailure << " -> " << run.After.OperationalGateFailure;
+        EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
+            << "Vulkan fallback counters incremented across the "
+               "visualization-overlay frame: "
+            << "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
+            << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
+            << ", validationError " << run.Before.ValidationError << " -> "
+            << run.After.ValidationError << ", gateFailure " << run.Before.OperationalGateFailure
+            << " -> " << run.After.OperationalGateFailure;
 
-	engine.Shutdown();
+        engine.Shutdown();
 }
 
 TEST(VisualizationOverlaySurfaceGpuSmoke, MixedLanesReadBackExpectedSampleColors)
@@ -425,8 +437,9 @@ TEST(VisualizationOverlaySurfaceGpuSmoke, MixedLanesReadBackExpectedSampleColors
 	if (bytesPerPixel < 4u)
 	{
 		engine.Shutdown();
-		GTEST_SKIP() << "Backbuffer format has no 4-channel host-readable layout on this host; readback skipped.";
-	}
+                GTEST_SKIP() << "Backbuffer format has no 4-channel host-readable layout "
+                                "on this host; readback skipped.";
+        }
 
 	const std::uint64_t readbackSize =
 		static_cast<std::uint64_t>(bytesPerPixel) *
@@ -452,9 +465,11 @@ TEST(VisualizationOverlaySurfaceGpuSmoke, MixedLanesReadBackExpectedSampleColors
 		renderer.SetVisualizationOverlayBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
 		device.DestroyBuffer(readbackBuffer);
 		engine.Shutdown();
-		ADD_FAILURE() << "Promoted Vulkan operational gate dropped during visualization-overlay readback frame: status="
-					  << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason);
-		return;
+                ADD_FAILURE() << "Promoted Vulkan operational gate dropped during "
+                                 "visualization-overlay readback frame: status="
+                              << ToString(run.Status.Code)
+                              << " reason=" << ToString(run.Status.Reason);
+                return;
 	}
 
 	EXPECT_EQ(run.Status.Code, Extrinsic::Backends::Vulkan::VulkanOperationalStatusCode::Operational);
@@ -470,28 +485,34 @@ TEST(VisualizationOverlaySurfaceGpuSmoke, MixedLanesReadBackExpectedSampleColors
 	EXPECT_FALSE(stats.VisualizationPropertyBuffers.HasErrors);
 
 	const auto* pass = FindCommandPass(stats, "VisualizationOverlayPass");
-	ASSERT_NE(pass, nullptr)
-		<< "Default recipe omitted VisualizationOverlayPass despite overlay snapshots.";
-	EXPECT_EQ(pass->Status, RenderCommandPassStatus::Recorded)
-		<< "VisualizationOverlayPass did not record on the operational Vulkan command stream.";
+        ASSERT_NE(pass, nullptr) << "Default recipe omitted VisualizationOverlayPass "
+                                    "despite overlay snapshots.";
+        EXPECT_EQ(pass->Status, RenderCommandPassStatus::Recorded)
+            << "VisualizationOverlayPass did not record on the operational Vulkan "
+               "command stream.";
 
-	EXPECT_EQ(stats.VisualizationOverlayBackbufferReadbackCopyCount, 1u)
-		<< "Visualization-overlay readback copy must record once for the armed mixed-lane frame.";
-	EXPECT_EQ(stats.DefaultRecipeBackbufferReadbackCopyCount, 0u)
-		<< "Visualization-overlay pixel parity must use its own counter, not the canonical surface readback counter.";
-	EXPECT_EQ(stats.TransientDebugBackbufferReadbackCopyCount, 0u)
-		<< "Visualization-overlay pixel parity must not reuse the transient-debug counter.";
-	EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 1u);
+        EXPECT_EQ(stats.VisualizationOverlayBackbufferReadbackCopyCount, 1u)
+            << "Visualization-overlay readback copy must record once for the armed "
+               "mixed-lane frame.";
+        EXPECT_EQ(stats.DefaultRecipeBackbufferReadbackCopyCount, 0u)
+            << "Visualization-overlay pixel parity must use its own counter, not the "
+               "canonical surface readback counter.";
+        EXPECT_EQ(stats.TransientDebugBackbufferReadbackCopyCount, 0u)
+            << "Visualization-overlay pixel parity must not reuse the "
+               "transient-debug counter.";
+        EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 1u);
 	EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsRecorded, 1u);
 
-	EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
-		<< "Vulkan fallback counters incremented across the visualization-overlay readback frame: "
-		<< "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
-		<< ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
-		<< ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
-		<< ", gateFailure " << run.Before.OperationalGateFailure << " -> " << run.After.OperationalGateFailure;
+        EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
+            << "Vulkan fallback counters incremented across the "
+               "visualization-overlay readback frame: "
+            << "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
+            << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
+            << ", validationError " << run.Before.ValidationError << " -> "
+            << run.After.ValidationError << ", gateFailure " << run.Before.OperationalGateFailure
+            << " -> " << run.After.OperationalGateFailure;
 
-	std::vector<std::uint8_t> readbackBytes(static_cast<std::size_t>(readbackSize), 0u);
+        std::vector<std::uint8_t> readbackBytes(static_cast<std::size_t>(readbackSize), 0u);
 	device.ReadBuffer(readbackBuffer, readbackBytes.data(), readbackSize, 0u);
 
 	const std::uint64_t rowStride =

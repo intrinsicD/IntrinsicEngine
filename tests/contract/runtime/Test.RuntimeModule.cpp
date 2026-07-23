@@ -12,6 +12,8 @@
 #include <thread>
 #include <vector>
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
@@ -527,7 +529,7 @@ namespace
         }
     };
 
-    class ModuleHarnessApplication final : public Runtime::IApplication
+    class ModuleHarnessApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         explicit ModuleHarnessApplication(ModuleHarnessState& state)
@@ -535,19 +537,20 @@ namespace
         {
         }
 
-        void OnInitialize(Runtime::Engine& engine) override
+        void Resolve() override
         {
+            auto& engine = Kernel();
             m_State.ApplicationInitializeSawUninitialized =
-                m_State.InitializedState != nullptr &&
-                !*m_State.InitializedState;
+                m_State.InitializedState != nullptr && !*m_State.InitializedState;
             m_State.BaselineProbeEntity =
                 Extrinsic::ECS::Scene::CreateDefault(
                     *engine.Worlds().Get(engine.ActiveWorld()), "BaselineTransformProbe");
             engine.Commands().Enqueue(ProbeCommand{23});
         }
 
-        void OnSimTick(Runtime::Engine& engine, double) override
+        void Simulate(double) override
         {
+            auto& engine = Kernel();
             m_State.SimTickMutations += 1u;
             m_State.CurrentSubstepExpectedX =
                 10.0f + static_cast<float>(m_State.SimTickMutations);
@@ -561,10 +564,9 @@ namespace
                 m_State.BaselineProbeEntity);
         }
 
-        void OnVariableTick(Runtime::Engine& engine,
-                            double,
-                            double) override
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             m_State.VariableTicks += 1u;
             const auto planStats =
                 engine.GetFrameGraph().GetPlanReuseStats();
@@ -603,7 +605,7 @@ namespace
             }
         }
 
-        void OnShutdown(Runtime::Engine&) override
+        void Shutdown() override
         {
             m_State.ApplicationShutdownSawAnnounce =
                 m_State.ShutdownAnnounced;
@@ -622,7 +624,7 @@ namespace
         ModuleHarnessState state{};
         SharedProbeService service{};
         auto app = std::make_unique<ModuleHarnessApplication>(state);
-        Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(app));
+        Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(app));
 
         if (providerFirst)
         {
@@ -683,15 +685,6 @@ namespace
     {
         return haystack.find(needle) != std::string_view::npos;
     }
-
-    class PassiveApplication final : public Runtime::IApplication
-    {
-    public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine&, double, double) override {}
-        void OnShutdown(Runtime::Engine&) override {}
-    };
 
 }
 
@@ -770,7 +763,7 @@ TEST(RuntimeModule, MissingRequiredServiceTerminatesEngineBoot)
 {
     ModuleHarnessState state{};
     auto app = std::make_unique<ModuleHarnessApplication>(state);
-    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(app));
     engine.AddModule(std::make_unique<MissingRequireModule>());
 
     EXPECT_DEATH(engine.Initialize(), "");
@@ -780,7 +773,7 @@ TEST(RuntimeModule, DuplicateSimSystemIdentityTerminatesEngineBootBeforeRun)
 {
     ModuleHarnessState state{};
     auto app = std::make_unique<ModuleHarnessApplication>(state);
-    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(app));
     engine.AddModule(std::make_unique<DuplicateSimSystemModule>());
 
     // FinalizeForBoot exposes InvalidArgument to direct callers. Engine boot
@@ -793,7 +786,7 @@ TEST(RuntimeModule, ResolveRegisteredDuplicateJoinsFullBootValidationSet)
 {
     ModuleHarnessState state{};
     auto app = std::make_unique<ModuleHarnessApplication>(state);
-    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(app));
     engine.AddModule(
         std::make_unique<CrossPhaseDuplicateSimSystemModule>());
 
@@ -850,9 +843,7 @@ TEST(RuntimeModule, EngineComposesTestModulesThroughSetupSurface)
 TEST(RuntimeModule,
      EnginePublishesExactDeviceAndWithdrawsAcrossReinitialize)
 {
-    Runtime::Engine engine(
-        NullWindowHeadlessConfig(),
-        std::make_unique<PassiveApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig());
 
     engine.Initialize();
     EXPECT_EQ(engine.Services().Find<RHI::IDevice>(),
@@ -867,7 +858,7 @@ TEST(RuntimeModule,
     EXPECT_EQ(engine.Services().Find<RHI::IDevice>(), nullptr);
 }
 
-TEST(RuntimeModule, BaselineTransformConsumerObservesCurrentSubstepWorldMatrix)
+TEST(RuntimeModule, BaselineTransformConsumerObservesLastCommittedModuleMutation)
 {
     const ModuleHarnessState state = RunModuleHarness(true);
 
@@ -876,8 +867,9 @@ TEST(RuntimeModule, BaselineTransformConsumerObservesCurrentSubstepWorldMatrix)
     EXPECT_EQ(state.BaselineReaderRuns, state.SimTickMutations);
     EXPECT_FALSE(state.BaselineReaderMissingWorld);
     EXPECT_FALSE(state.BaselineReaderObservedStale);
+    ASSERT_GE(state.SimTickMutations, 2u);
     EXPECT_FLOAT_EQ(state.LastObservedWorldX,
-                    state.CurrentSubstepExpectedX);
+                    10.0f + static_cast<float>(state.SimTickMutations - 1u));
 }
 
 TEST(RuntimeModule, RegistrationOrderDoesNotChangeHooksOrSchedule)
@@ -1404,8 +1396,7 @@ namespace
         DualViewportHookState& m_State;
     };
 
-    class DualViewportHookApplication final
-        : public Runtime::IApplication
+    class DualViewportHookApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         explicit DualViewportHookApplication(
@@ -1414,15 +1405,15 @@ namespace
         {
         }
 
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(
-            Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++m_State.VariableTicks;
             engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
     private:
         DualViewportHookState& m_State;
@@ -1433,10 +1424,8 @@ TEST(RuntimeModuleViewportInput,
      EngineWiresRegistrationAndResolutionRegistrars)
 {
     DualViewportHookState state;
-    Runtime::Engine engine(
-        NullWindowHeadlessConfig(),
-        std::make_unique<DualViewportHookApplication>(
-            state));
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        NullWindowHeadlessConfig(), std::make_unique<DualViewportHookApplication>(state));
     engine.AddModule(
         std::make_unique<DualPhaseViewportHookModule>(
             state));

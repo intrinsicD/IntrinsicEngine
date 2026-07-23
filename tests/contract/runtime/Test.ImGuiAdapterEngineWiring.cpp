@@ -26,9 +26,11 @@
 #include <thread>
 #include <utility>
 
-#include <gtest/gtest.h>
 #include <glm/glm.hpp>
+#include <gtest/gtest.h>
 #include <imgui.h>
+
+#include "RuntimeTestModule.hpp"
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
@@ -77,7 +79,7 @@ namespace
     // `Engine::Run()` executes exactly `TargetFrames` full frames. The editor
     // draw is registered by the test (not the app) so the adapter's editor-hook
     // cadence is what is under test.
-    class BoundedRunApplication final : public Extrinsic::Runtime::IApplication
+    class BoundedRunApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         explicit BoundedRunApplication(const std::uint32_t targetFrames)
@@ -85,15 +87,16 @@ namespace
         {
         }
 
-        void OnInitialize(Engine& /*engine*/) override {}
-        void OnSimTick(Engine& /*engine*/, double /*fixedDt*/) override {}
-        void OnVariableTick(Engine& engine, double /*alpha*/, double /*dt*/) override
+        void Resolve() override {}
+        void Simulate(double /*fixedDt*/) override {}
+        void Frame(double /*alpha*/, double /*dt*/) override
         {
+            auto& engine = Kernel();
             ++m_VariableTicks;
             if (m_VariableTicks >= m_TargetFrames)
                 engine.RequestExit();
         }
-        void OnShutdown(Engine& /*engine*/) override {}
+        void Shutdown() override {}
 
     private:
         std::uint32_t m_TargetFrames{0u};
@@ -106,16 +109,17 @@ namespace
         return status == Runtime::DerivedJobStatus::Running;
     }
 
-    class SlowDerivedJobApplication final : public Runtime::IApplication
+    class SlowDerivedJobApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         static constexpr std::uint32_t kMaxFrames = 512u;
         static constexpr auto kWorkerSleep = std::chrono::milliseconds(250);
         static constexpr auto kVariableTickDelay = std::chrono::milliseconds(1);
 
-        void OnInitialize(Engine& engine) override
+        void Resolve() override
         {
-            Jobs = engine.Services().Find<Runtime::DerivedJobRegistry>();
+            auto& engine = Kernel();
+            Jobs         = engine.Services().Find<Runtime::DerivedJobRegistry>();
             ASSERT_NE(Jobs, nullptr);
 
             Runtime::DerivedJobDesc desc{
@@ -152,10 +156,11 @@ namespace
             Handle = Jobs->Submit(std::move(desc));
         }
 
-        void OnSimTick(Engine&, double) override {}
+        void Simulate(double) override {}
 
-        void OnVariableTick(Engine& engine, double, double) override
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++VariableTicks;
 
             if (PreviousTickEnteredRenderWithRunningJob)
@@ -188,7 +193,7 @@ namespace
             std::this_thread::sleep_for(kVariableTickDelay);
         }
 
-        void OnShutdown(Engine&) override {}
+        void Shutdown() override {}
 
         Runtime::DerivedJobHandle Handle{};
         Runtime::DerivedJobRegistry* Jobs{};
@@ -262,11 +267,12 @@ namespace
         Graphics::CameraViewInput m_View{Runtime::DefaultCameraControllerSeed()};
     };
 
-    class UiCapturedInputApplication final : public Runtime::IApplication
+    class UiCapturedInputApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Engine& engine) override
+        void Resolve() override
         {
+            auto& engine    = Kernel();
             auto controller = std::make_unique<RecordingCameraController>();
             Controller = controller.get();
             auto* cameraControllers =
@@ -276,10 +282,11 @@ namespace
                                         std::move(controller));
         }
 
-        void OnSimTick(Engine& /*engine*/, double /*fixedDt*/) override {}
+        void Simulate(double /*fixedDt*/) override {}
 
-        void OnVariableTick(Engine& engine, double /*alpha*/, double /*dt*/) override
+        void Frame(double /*alpha*/, double /*dt*/) override
         {
+            auto& engine = Kernel();
             ++VariableTicks;
             if (VariableTicks == 2u)
             {
@@ -294,17 +301,18 @@ namespace
             }
         }
 
-        void OnShutdown(Engine& /*engine*/) override {}
+        void Shutdown() override {}
 
         RecordingCameraController* Controller{nullptr};
         std::uint32_t              VariableTicks{0u};
     };
 
-    class CloseAfterInteractiveInputApplication final : public Runtime::IApplication
+    class CloseAfterInteractiveInputApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Engine& engine) override
+        void Resolve() override
         {
+            auto& engine    = Kernel();
             auto controller = std::make_unique<RecordingCameraController>();
             Controller = controller.get();
             auto* cameraControllers =
@@ -314,10 +322,11 @@ namespace
                                         std::move(controller));
         }
 
-        void OnSimTick(Engine& /*engine*/, double /*fixedDt*/) override {}
+        void Simulate(double /*fixedDt*/) override {}
 
-        void OnVariableTick(Engine& engine, double /*alpha*/, double /*dt*/) override
+        void Frame(double /*alpha*/, double /*dt*/) override
         {
+            auto& engine = Kernel();
             ++VariableTicks;
 
             const auto& window = engine.GetWindow();
@@ -332,7 +341,7 @@ namespace
                 engine.RequestExit();
         }
 
-        void OnShutdown(Engine& /*engine*/) override {}
+        void Shutdown() override {}
 
         RecordingCameraController* Controller{nullptr};
         std::uint32_t              VariableTicks{0u};
@@ -394,7 +403,8 @@ namespace
 // before the loop runs.
 TEST(ImGuiAdapterEngineWiring, AdapterInitializedAfterEngineInitialize)
 {
-    Engine engine(HeadlessConfig(), std::make_unique<BoundedRunApplication>(1u));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<BoundedRunApplication>(1u));
     engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.Initialize();
 
@@ -415,7 +425,8 @@ TEST(ImGuiAdapterEngineWiring, AdapterInitializedAfterEngineInitialize)
 TEST(ImGuiAdapterEngineWiring, RunProducesOneOverlayFramePerEngineFrame)
 {
     constexpr std::uint32_t kFrames = 3u;
-    Engine engine(HeadlessConfig(), std::make_unique<BoundedRunApplication>(kFrames));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<BoundedRunApplication>(kFrames));
     engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.Initialize();
     const Runtime::EditorUiHost* editorUi =
@@ -429,7 +440,8 @@ TEST(ImGuiAdapterEngineWiring, RunProducesOneOverlayFramePerEngineFrame)
         // asserted; the per-frame loop assertion needs a real window.
         EXPECT_TRUE(editorUi->IsOperational());
         engine.Shutdown();
-        GTEST_SKIP() << "window backend unavailable; per-frame loop coverage requires a display";
+        GTEST_SKIP() << "window backend unavailable; per-frame loop coverage "
+                        "requires a display";
     }
 
     engine.Run();
@@ -445,7 +457,8 @@ TEST(ImGuiAdapterEngineWiring, RunProducesOneOverlayFramePerEngineFrame)
 TEST(ImGuiAdapterEngineWiring, EditorHookInvokedOncePerFrameAndProducesDrawLists)
 {
     constexpr std::uint32_t kFrames = 3u;
-    Engine engine(HeadlessConfig(), std::make_unique<BoundedRunApplication>(kFrames));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<BoundedRunApplication>(kFrames));
     engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.Initialize();
 
@@ -471,7 +484,8 @@ TEST(ImGuiAdapterEngineWiring, EditorHookInvokedOncePerFrameAndProducesDrawLists
     if (engine.GetWindow().ShouldClose())
     {
         engine.Shutdown();
-        GTEST_SKIP() << "window backend unavailable; per-frame editor-hook coverage requires a display";
+        GTEST_SKIP() << "window backend unavailable; per-frame editor-hook "
+                        "coverage requires a display";
     }
 
     engine.Run();
@@ -502,8 +516,8 @@ TEST(ImGuiAdapterEngineWiring, EditorHookInvokedOncePerFrameAndProducesDrawLists
 TEST(ImGuiAdapterEngineWiring, FramePacingDiagnosticsPopulateOnNullBackend)
 {
     constexpr std::uint32_t kFrames = 2u;
-    Engine engine(NullWindowHeadlessConfig(),
-                  std::make_unique<BoundedRunApplication>(kFrames));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(),
+                                               std::make_unique<BoundedRunApplication>(kFrames));
     engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.Initialize();
 
@@ -525,7 +539,8 @@ TEST(ImGuiAdapterEngineWiring, FramePacingDiagnosticsPopulateOnNullBackend)
     ASSERT_TRUE(contribution.IsValid());
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
 
     engine.Run();
 
@@ -599,7 +614,7 @@ TEST(ImGuiAdapterEngineWiring,
 {
     auto app = std::make_unique<SlowDerivedJobApplication>();
     SlowDerivedJobApplication* appPtr = app.get();
-    Engine engine(NullWindowHeadlessConfig(), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(app));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.Initialize();
@@ -637,7 +652,8 @@ TEST(ImGuiAdapterEngineWiring,
 
     ASSERT_TRUE(appPtr->Handle.IsValid());
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
 
     engine.Run();
 
@@ -660,7 +676,7 @@ TEST(ImGuiAdapterEngineWiring, UiCaptureSuppressesRuntimeInputConsumers)
 {
     auto app = std::make_unique<UiCapturedInputApplication>();
     auto* appPtr = app.get();
-    Engine engine(NullInputRoutingConfig(), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullInputRoutingConfig(), std::move(app));
     engine.EmplaceModule<Runtime::CameraModule>();
     engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
@@ -686,7 +702,8 @@ TEST(ImGuiAdapterEngineWiring, UiCaptureSuppressesRuntimeInputConsumers)
     if (engine.GetWindow().ShouldClose())
     {
         engine.Shutdown();
-        GTEST_SKIP() << "window backend unavailable; input-routing coverage requires a live window";
+        GTEST_SKIP() << "window backend unavailable; input-routing coverage "
+                        "requires a live window";
     }
 
     engine.Run();
@@ -725,14 +742,15 @@ TEST(ImGuiAdapterEngineWiring, RunNormalizesNativeCloseBeforeFirstFrame)
 {
     auto app = std::make_unique<UiCapturedInputApplication>();
     auto* appPtr = app.get();
-    Engine engine(InputRoutingConfig(), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(InputRoutingConfig(), std::move(app));
     engine.EmplaceModule<Runtime::CameraModule>();
     engine.Initialize();
 
     if (!RequestNativeWindowClose(engine.GetWindow()))
     {
         engine.Shutdown();
-        GTEST_SKIP() << "window backend unavailable; native close-state coverage requires a live GLFW window";
+        GTEST_SKIP() << "window backend unavailable; native close-state coverage "
+                        "requires a live GLFW window";
     }
 
     engine.Run();
@@ -748,7 +766,7 @@ TEST(ImGuiAdapterEngineWiring, RunNormalizesNativeCloseAfterInteractiveInput)
 {
     auto app = std::make_unique<CloseAfterInteractiveInputApplication>();
     auto* appPtr = app.get();
-    Engine engine(InputRoutingConfig(), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(InputRoutingConfig(), std::move(app));
     engine.EmplaceModule<Runtime::CameraModule>();
     engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.Initialize();
@@ -775,7 +793,8 @@ TEST(ImGuiAdapterEngineWiring, RunNormalizesNativeCloseAfterInteractiveInput)
         glfwSetWindowShouldClose == nullptr)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "window backend unavailable; native close-state coverage requires a live GLFW window";
+        GTEST_SKIP() << "window backend unavailable; native close-state coverage "
+                        "requires a live GLFW window";
     }
 
     engine.Run();

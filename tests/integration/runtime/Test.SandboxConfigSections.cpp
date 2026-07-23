@@ -10,6 +10,8 @@
 
 #include <gtest/gtest.h>
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
@@ -25,16 +27,17 @@ namespace Sandbox = Extrinsic::Sandbox;
 
 namespace
 {
-    class OneFrameApplication final : public Runtime::IApplication
+    class OneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
     };
 
     class ScopedConfigFile final
@@ -137,9 +140,8 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
 
     Runtime::EngineConfigControl* const expectedConfigControl =
         configControl.get();
-    Runtime::Engine engine{
-        std::move(boot.Config),
-        std::make_unique<OneFrameApplication>()};
+    Intrinsic::Tests::RuntimeTestKernel engine{std::move(boot.Config),
+                                               std::make_unique<OneFrameApplication>()};
     engine.AddModule(std::move(configControl));
     engine.Initialize();
     Runtime::EngineConfigControl* const control =

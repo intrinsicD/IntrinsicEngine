@@ -1,10 +1,10 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <bit>
 #include <chrono>
-#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -61,7 +61,6 @@ import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
@@ -802,12 +801,11 @@ namespace Extrinsic::Runtime
             GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
             if (!view.Valid() || !SourceViewSupportsKMeansDomain(view, domain))
             {
-                return MakeKMeansResult(
-                    SandboxEditorCommandStatus::UnsupportedGeometryDomain,
-                    domain,
-                    SandboxEditorKMeansBackend::VulkanCompute,
-                    Core::ErrorCode::InvalidArgument,
-                    "Completed K-Means GPU job no longer matches a writable GeometrySources domain.");
+                return MakeKMeansResult(SandboxEditorCommandStatus::UnsupportedGeometryDomain,
+                                        domain, SandboxEditorKMeansBackend::VulkanCompute,
+                                        Core::ErrorCode::InvalidArgument,
+                                        "Completed K-Means GPU job no longer matches a writable "
+                                        "GeometrySources domain.");
             }
 
             Geometry::PropertySet* properties =
@@ -825,11 +823,10 @@ namespace Extrinsic::Runtime
             if (!PublishKMeansProperties(*properties, domain, job.Result))
             {
                 return MakeKMeansResult(
-                    SandboxEditorCommandStatus::GeometryProcessingFailed,
-                    domain,
-                    SandboxEditorKMeansBackend::VulkanCompute,
-                    Core::ErrorCode::TypeMismatch,
-                    "K-Means GPU result publication failed because output properties have incompatible types or sizes.");
+                    SandboxEditorCommandStatus::GeometryProcessingFailed, domain,
+                    SandboxEditorKMeansBackend::VulkanCompute, Core::ErrorCode::TypeMismatch,
+                    "K-Means GPU result publication failed because output properties have "
+                    "incompatible types or sizes.");
             }
 
             Dirty::MarkVertexAttributesDirty(raw, *entity);
@@ -1069,13 +1066,16 @@ namespace Extrinsic::Runtime
                 return {};
             if (device == nullptr)
             {
-                return "Vulkan compute requested but no RHI device is attached; ran CPU reference.";
+                return "Vulkan compute requested but no RHI device is attached; ran CPU "
+                       "reference.";
             }
             if (!device->IsOperational())
             {
-                return "Vulkan compute requested but the RHI device is not operational; ran CPU reference.";
+                return "Vulkan compute requested but the RHI device is not operational; "
+                       "ran CPU reference.";
             }
-            return "Vulkan compute requested but the runtime K-Means GPU queue is unavailable; ran CPU reference.";
+            return "Vulkan compute requested but the runtime K-Means GPU queue is "
+                   "unavailable; ran CPU reference.";
         }
 
         [[nodiscard]] std::string BuildKMeansSuccessMessage(
@@ -1380,8 +1380,8 @@ namespace Extrinsic::Runtime
             }
             else
             {
-                resolved.FallbackReason =
-                    "Vulkan compute requested but GPU execution is unavailable; ran CPU reference.";
+                resolved.FallbackReason = "Vulkan compute requested but GPU execution is "
+                                          "unavailable; ran CPU reference.";
             }
             return resolved;
         }
@@ -2100,10 +2100,10 @@ namespace Extrinsic::Runtime
             if (!handle.IsValid())
             {
                 return MakeProgressivePoissonResult(
-                    SandboxEditorCommandStatus::GeometryProcessingFailed,
-                    command.Config.Channel,
+                    SandboxEditorCommandStatus::GeometryProcessingFailed, command.Config.Channel,
                     Core::ErrorCode::InvalidState,
-                    "Progressive Poisson CPU job submission was rejected by the runtime job lane.");
+                    "Progressive Poisson CPU job submission was rejected by the runtime "
+                    "job lane.");
             }
 
             return MakePendingProgressivePoissonCpuJobResult(
@@ -2133,9 +2133,8 @@ namespace Extrinsic::Runtime
     }
 
     std::vector<SandboxEditorGeometryProcessingDomain>
-    GetAvailableSandboxEditorKMeansDomains(
-        const ECS::Scene::Registry& registry,
-        const ECS::EntityHandle entity)
+    GetAvailableSandboxEditorKMeansDomains(const ECS::Scene::Registry& registry,
+                                           const ECS::EntityHandle entity)
     {
         using Domain = SandboxEditorGeometryProcessingDomain;
         const Domain domains =
@@ -2343,11 +2342,10 @@ namespace Extrinsic::Runtime
             command.MaxIterations == 0u)
         {
             return MakeKMeansResult(
-                SandboxEditorCommandStatus::InvalidProcessingParameters,
-                command.Domain,
-                command.Backend,
-                Core::ErrorCode::InvalidArgument,
-                "K-Means requires mesh vertices, graph nodes, or point-cloud points with positive cluster and iteration counts.");
+                SandboxEditorCommandStatus::InvalidProcessingParameters, command.Domain,
+                command.Backend, Core::ErrorCode::InvalidArgument,
+                "K-Means requires mesh vertices, graph nodes, or point-cloud points "
+                "with positive cluster and iteration counts.");
         }
 
         entt::registry& raw = context.Scene->Raw();
@@ -2367,11 +2365,10 @@ namespace Extrinsic::Runtime
         if (!view.Valid() || !SourceViewSupportsKMeansDomain(view, command.Domain))
         {
             return MakeKMeansResult(
-                SandboxEditorCommandStatus::UnsupportedGeometryDomain,
-                command.Domain,
-                command.Backend,
-                Core::ErrorCode::InvalidArgument,
-                "Selected entity does not expose the requested K-Means GeometrySources domain.");
+                SandboxEditorCommandStatus::UnsupportedGeometryDomain, command.Domain,
+                command.Backend, Core::ErrorCode::InvalidArgument,
+                "Selected entity does not expose the requested K-Means GeometrySources "
+                "domain.");
         }
 
         Geometry::PropertySet* properties =
@@ -2379,11 +2376,10 @@ namespace Extrinsic::Runtime
         if (properties == nullptr)
         {
             return MakeKMeansResult(
-                SandboxEditorCommandStatus::UnsupportedGeometryDomain,
-                command.Domain,
-                command.Backend,
-                Core::ErrorCode::InvalidArgument,
-                "Requested K-Means GeometrySources domain has no writable property set.");
+                SandboxEditorCommandStatus::UnsupportedGeometryDomain, command.Domain,
+                command.Backend, Core::ErrorCode::InvalidArgument,
+                "Requested K-Means GeometrySources domain has no writable property "
+                "set.");
         }
 
         std::optional<std::vector<glm::vec3>> points =
@@ -2391,11 +2387,10 @@ namespace Extrinsic::Runtime
         if (!points.has_value())
         {
             return MakeKMeansResult(
-                SandboxEditorCommandStatus::InvalidProcessingParameters,
-                command.Domain,
-                command.Backend,
-                Core::ErrorCode::InvalidArgument,
-                "K-Means requires a non-empty finite v:position property on the requested domain.");
+                SandboxEditorCommandStatus::InvalidProcessingParameters, command.Domain,
+                command.Backend, Core::ErrorCode::InvalidArgument,
+                "K-Means requires a non-empty finite v:position property on the "
+                "requested domain.");
         }
 
         GK::KMeansParams params{};
@@ -2449,9 +2444,11 @@ namespace Extrinsic::Runtime
                         ? "K-Means Vulkan compute job submission failed."
                         : submission.Diagnostic);
             }
-            gpuQueueFallbackReason = submission.Diagnostic.empty()
-                ? "K-Means Vulkan compute execution is unavailable; ran CPU reference."
-                : submission.Diagnostic + " Ran CPU reference.";
+            gpuQueueFallbackReason =
+                submission.Diagnostic.empty()
+                    ? "K-Means Vulkan compute execution is unavailable; ran CPU "
+                      "reference."
+                    : submission.Diagnostic + " Ran CPU reference.";
         }
 
         if (context.KMeansCommands.Available())
@@ -2514,11 +2511,10 @@ namespace Extrinsic::Runtime
         if (!PublishKMeansProperties(*properties, command.Domain, *clustered))
         {
             return MakeKMeansResult(
-                SandboxEditorCommandStatus::GeometryProcessingFailed,
-                command.Domain,
-                command.Backend,
-                Core::ErrorCode::TypeMismatch,
-                "K-Means result publication failed because output properties have incompatible types or sizes.");
+                SandboxEditorCommandStatus::GeometryProcessingFailed, command.Domain,
+                command.Backend, Core::ErrorCode::TypeMismatch,
+                "K-Means result publication failed because output properties have "
+                "incompatible types or sizes.");
         }
 
         Dirty::MarkVertexAttributesDirty(raw, *entity);
@@ -2551,10 +2547,10 @@ namespace Extrinsic::Runtime
         if (!IsValidProgressivePoissonConfig(command.Config))
         {
             return MakeProgressivePoissonResult(
-                SandboxEditorCommandStatus::InvalidProcessingParameters,
-                command.Config.Channel,
+                SandboxEditorCommandStatus::InvalidProcessingParameters, command.Config.Channel,
                 Core::ErrorCode::InvalidArgument,
-                "Progressive Poisson sampling requires dimension 2 or 3, positive grid/max-level/hash settings, and finite radius alpha.");
+                "Progressive Poisson sampling requires dimension 2 or 3, positive "
+                "grid/max-level/hash settings, and finite radius alpha.");
         }
 
         entt::registry& raw = context.Scene->Raw();
@@ -2576,10 +2572,10 @@ namespace Extrinsic::Runtime
             availability.ProvenanceDomain != GS::Domain::Mesh)
         {
             return MakeProgressivePoissonResult(
-                SandboxEditorCommandStatus::UnsupportedGeometryDomain,
-                command.Config.Channel,
+                SandboxEditorCommandStatus::UnsupportedGeometryDomain, command.Config.Channel,
                 Core::ErrorCode::InvalidArgument,
-                "Progressive Poisson sampling requires selected point-cloud or mesh GeometrySources.");
+                "Progressive Poisson sampling requires selected point-cloud or mesh "
+                "GeometrySources.");
         }
 
         if (availability.ProvenanceDomain == GS::Domain::PointCloud)
@@ -2587,10 +2583,10 @@ namespace Extrinsic::Runtime
             if (view.VertexSource == nullptr)
             {
                 return MakeProgressivePoissonResult(
-                    SandboxEditorCommandStatus::UnsupportedGeometryDomain,
-                    command.Config.Channel,
+                    SandboxEditorCommandStatus::UnsupportedGeometryDomain, command.Config.Channel,
                     Core::ErrorCode::InvalidArgument,
-                    "Progressive Poisson sampling requires selected point-cloud vertices.");
+                    "Progressive Poisson sampling requires selected point-cloud "
+                    "vertices.");
             }
 
             std::optional<std::vector<glm::vec3>> positions =
@@ -2598,10 +2594,10 @@ namespace Extrinsic::Runtime
             if (!positions.has_value())
             {
                 return MakeProgressivePoissonResult(
-                    SandboxEditorCommandStatus::InvalidProcessingParameters,
-                    command.Config.Channel,
+                    SandboxEditorCommandStatus::InvalidProcessingParameters, command.Config.Channel,
                     Core::ErrorCode::InvalidArgument,
-                    "Progressive Poisson sampling requires a non-empty finite v:position property.");
+                    "Progressive Poisson sampling requires a non-empty finite v:position "
+                    "property.");
             }
 
             if (context.DerivedJobCommands.Available())
@@ -2653,10 +2649,10 @@ namespace Extrinsic::Runtime
         if (!IsValidProgressivePoissonMeshSurfaceConfig(command.Config))
         {
             return MakeProgressivePoissonResult(
-                SandboxEditorCommandStatus::InvalidProcessingParameters,
-                command.Config.Channel,
+                SandboxEditorCommandStatus::InvalidProcessingParameters, command.Config.Channel,
                 Core::ErrorCode::InvalidArgument,
-                "Progressive Poisson mesh sampling requires a positive surface sample count and finite positive minimum triangle area.");
+                "Progressive Poisson mesh sampling requires a positive surface sample "
+                "count and finite positive minimum triangle area.");
         }
 
         const GS::ConstSourceView constView =
@@ -2665,13 +2661,11 @@ namespace Extrinsic::Runtime
             Detail::BuildSandboxEditorMeshSourceSnapshot(constView);
         if (source.Status != SandboxEditorCommandStatus::Applied)
         {
-            return MakeProgressivePoissonResult(
-                source.Status,
-                command.Config.Channel,
-                source.Error,
-                source.Diagnostic.empty()
-                    ? "Progressive Poisson mesh sampling could not build selected mesh GeometrySources."
-                    : source.Diagnostic);
+            return MakeProgressivePoissonResult(source.Status, command.Config.Channel, source.Error,
+                                                source.Diagnostic.empty()
+                                                    ? "Progressive Poisson mesh sampling could "
+                                                      "not build selected mesh GeometrySources."
+                                                    : source.Diagnostic);
         }
 
         if (context.DerivedJobCommands.Available())
@@ -2855,64 +2849,54 @@ namespace Extrinsic::Runtime
         return MakeSandboxEditorProgressivePoissonConfig(*config);
     }
 
-
-    void SandboxEditorSession::AttachKMeansGpuQueue(Engine& engine)
+    void SandboxEditorSession::AttachKMeansGpuQueue(ServiceRegistry& services)
     {
         DetachKMeansGpuQueue();
+        m_Device                            = services.Find<RHI::IDevice>();
+        Graphics::IRenderer* const renderer = services.Find<Graphics::IRenderer>();
+        m_Jobs                              = services.Find<JobService>();
+        if (m_Device == nullptr || renderer == nullptr || m_Jobs == nullptr)
+            return;
         m_KMeansGpuJobs = std::make_unique<RuntimeKMeansGpuJobQueue>(
-            engine.GetDevice(),
-            engine.GetRenderer().GetBufferManager(),
-            engine.GetDevice().GetTransferQueue());
-        m_KMeansGpuParticipant = engine.Jobs().RegisterGpuQueueParticipant(
-            GpuQueueParticipantDesc{
-                .DebugName = "SandboxEditor.KMeansGpu",
-                .RecordFrameCommands =
-                    [epoch = m_AttachmentEpoch,
-                     this](RHI::ICommandContext& commandContext)
-                    {
-                        if (epoch != nullptr &&
-                            epoch->load(std::memory_order_acquire) &&
-                            m_KMeansGpuJobs)
-                            m_KMeansGpuJobs->AdvanceGpuWork(commandContext);
-                    },
-                .DrainCompletedTransfers =
-                    [epoch = m_AttachmentEpoch, this]()
-                    {
-                        if (epoch != nullptr &&
-                            epoch->load(std::memory_order_acquire) &&
-                            m_KMeansGpuJobs)
-                            m_KMeansGpuJobs->DrainCompletedTransfers();
-                    },
-                .HasInFlightWork =
-                    [this]() -> bool
-                    {
-                        return m_KMeansGpuJobs &&
-                               m_KMeansGpuJobs->HasInFlightJob();
-                    },
-                .ShutdownAfterDeviceIdle =
-                    [this]()
-                    {
-                        m_KMeansGpuJobs.reset();
-                        m_KMeansGpuParticipant = {};
-                    },
-            });
+            *m_Device, renderer->GetBufferManager(), m_Device->GetTransferQueue());
+        m_KMeansGpuParticipant = m_Jobs->RegisterGpuQueueParticipant(GpuQueueParticipantDesc{
+            .DebugName = "SandboxEditor.KMeansGpu",
+            .RecordFrameCommands =
+                [epoch = m_AttachmentEpoch, this](RHI::ICommandContext& commandContext)
+            {
+                if (epoch != nullptr && epoch->load(std::memory_order_acquire) && m_KMeansGpuJobs)
+                    m_KMeansGpuJobs->AdvanceGpuWork(commandContext);
+            },
+            .DrainCompletedTransfers =
+                [epoch = m_AttachmentEpoch, this]()
+            {
+                if (epoch != nullptr && epoch->load(std::memory_order_acquire) && m_KMeansGpuJobs)
+                    m_KMeansGpuJobs->DrainCompletedTransfers();
+            },
+            .HasInFlightWork = [this]() -> bool
+            { return m_KMeansGpuJobs && m_KMeansGpuJobs->HasInFlightJob(); },
+            .ShutdownAfterDeviceIdle =
+                [this]()
+            {
+                m_KMeansGpuJobs.reset();
+                m_KMeansGpuParticipant = {};
+            },
+        });
         if (!m_KMeansGpuParticipant.IsValid())
             m_KMeansGpuJobs.reset();
     }
 
     void SandboxEditorSession::DetachKMeansGpuQueue()
     {
-        if (m_Engine != nullptr && m_KMeansGpuParticipant.IsValid())
+        if (m_Jobs != nullptr && m_Device != nullptr && m_KMeansGpuParticipant.IsValid())
         {
-            m_Engine->Jobs().UnregisterGpuQueueParticipant(
-                m_KMeansGpuParticipant,
-                [engine = m_Engine]
-                {
-                    engine->GetDevice().WaitIdle();
-                });
+            m_Jobs->UnregisterGpuQueueParticipant(m_KMeansGpuParticipant,
+                                                  [device = m_Device] { device->WaitIdle(); });
         }
         m_KMeansGpuParticipant = {};
         m_KMeansGpuJobs.reset();
+        m_Jobs   = nullptr;
+        m_Device = nullptr;
     }
 
 }

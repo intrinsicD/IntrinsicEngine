@@ -6,8 +6,8 @@
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
-#include <functional>
 #include <fstream>
+#include <functional>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -20,10 +20,11 @@
 #include <variant>
 #include <vector>
 
-#include <entt/entity/entity.hpp>
-#include <gtest/gtest.h>
-#include <glm/gtc/quaternion.hpp>
 #include "ProgressivePoissonReference.hpp"
+#include <entt/entity/entity.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <gtest/gtest.h>
+#include "RuntimeTestModule.hpp"
 
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
@@ -429,25 +430,17 @@ void ExpectEnabledFileImportPayloadOptions(
         };
     }
 
-class OneFrameApplication final : public Runtime::IApplication
+    class OneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine&) override {}
-    };
-
-class PassiveApplication final : public Runtime::IApplication
-    {
-    public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine&, double, double) override {}
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
     };
 
 enum class AssetImportEventWaitExitReason : std::uint8_t
@@ -631,7 +624,7 @@ void CaptureAssetImportEventWaitPhase(
         }
     }
 
-class WaitForAssetImportEventApplication final : public Runtime::IApplication
+    class WaitForAssetImportEventApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         explicit WaitForAssetImportEventApplication(
@@ -647,10 +640,11 @@ class WaitForAssetImportEventApplication final : public Runtime::IApplication
         {
         }
 
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine   = Kernel();
             const auto now = std::chrono::steady_clock::now();
             if (!m_Diagnostics->Armed)
                 m_Diagnostics->Arm();
@@ -705,8 +699,9 @@ class WaitForAssetImportEventApplication final : public Runtime::IApplication
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-        void OnShutdown(Runtime::Engine& engine) override
+        void Shutdown() override
         {
+            auto& engine = Kernel();
             CaptureAssetImportEventWaitPhase(engine, *m_Diagnostics);
             m_Diagnostics->ReleaseWorker.store(true, std::memory_order_release);
         }
@@ -721,7 +716,7 @@ class WaitForAssetImportEventApplication final : public Runtime::IApplication
         std::chrono::steady_clock::time_point m_WorkerStartDeadline{};
     };
 
-class FixedFrameApplication final : public Runtime::IApplication
+    class FixedFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         explicit FixedFrameApplication(std::uint32_t maxFrames)
@@ -729,24 +724,25 @@ class FixedFrameApplication final : public Runtime::IApplication
         {
         }
 
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++m_ObservedFrames;
             if (m_ObservedFrames >= m_MaxFrames)
             {
                 engine.RequestExit();
             }
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
     private:
         std::uint32_t m_MaxFrames{1u};
         std::uint32_t m_ObservedFrames{0u};
     };
 
-class WaitForConditionApplication final : public Runtime::IApplication
+    class WaitForConditionApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         explicit WaitForConditionApplication(
@@ -757,10 +753,11 @@ class WaitForConditionApplication final : public Runtime::IApplication
         {
         }
 
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++m_ObservedFrames;
             if ((m_Ready && m_Ready(engine)) || m_ObservedFrames >= m_MaxFrames)
             {
@@ -769,7 +766,7 @@ class WaitForConditionApplication final : public Runtime::IApplication
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
     private:
         std::function<bool(Runtime::Engine&)> m_Ready{};
@@ -799,91 +796,82 @@ enum class BlockedGeometryImportAction : std::uint8_t
         Cancel,
     };
 
-class DriveBlockedGeometryImportApplication final : public Runtime::IApplication
+class DriveBlockedGeometryImportApplication final : public Intrinsic::Tests::RuntimeTestModule
+{
+public:
+    explicit DriveBlockedGeometryImportApplication(
+        std::shared_ptr<BlockingGeometryDecodeState> state,
+        const BlockedGeometryImportAction action = BlockedGeometryImportAction::Release,
+        const std::uint32_t maxFrames            = 512u)
+        : m_State(std::move(state))
+        , m_Action(action)
+        , m_MaxFrames(maxFrames)
     {
-    public:
-        explicit DriveBlockedGeometryImportApplication(
-            std::shared_ptr<BlockingGeometryDecodeState> state,
-            const BlockedGeometryImportAction action =
-                BlockedGeometryImportAction::Release,
-            const std::uint32_t maxFrames = 512u)
-            : m_State(std::move(state))
-            , m_Action(action)
-            , m_MaxFrames(maxFrames)
-        {
-        }
+    }
 
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+    void Resolve() override {}
+    void Simulate(double) override {}
+    void Frame(double, double) override
+    {
+        auto& engine = Kernel();
+        ++m_ObservedFrames;
+        if (m_State->Started.load(std::memory_order_acquire) &&
+            !m_State->Release.load(std::memory_order_acquire))
         {
-            ++m_ObservedFrames;
-            if (m_State->Started.load(std::memory_order_acquire) &&
-                !m_State->Release.load(std::memory_order_acquire))
+            const std::uint32_t framesProduced =
+                engine.Services().Find<Runtime::EditorUiHost>()->GetDiagnostics().FramesProduced;
+            if (!m_State->ImGuiFrameBaselineCaptured)
             {
-                const std::uint32_t framesProduced =
-                    engine.Services()
-                        .Find<Runtime::EditorUiHost>()
-                        ->GetDiagnostics()
-                        .FramesProduced;
-                if (!m_State->ImGuiFrameBaselineCaptured)
-                {
-                    m_State->ImGuiFramesProducedAtBlockStart = framesProduced;
-                    m_State->ImGuiFrameBaselineCaptured = true;
-                }
-                m_State->ImGuiFramesProducedWhileBlocked = framesProduced;
-
-                if (engine.Services().Find<Runtime::EditorCommandHistory>()->IsDirty() ||
-                    !Selection(engine).SelectedStableIds().empty() ||
-                    RequiredEngineService<Extrinsic::Assets::AssetService>(engine).LiveAssetCount() !=
-                        m_State->BaselineLiveAssetCount)
-                {
-                    m_State->MutationObservedWhileBlocked.store(
-                        true,
-                        std::memory_order_release);
-                }
-                const std::uint32_t blockedFrames =
-                    m_State->FramesWhileBlocked.fetch_add(
-                        1u,
-                        std::memory_order_acq_rel) + 1u;
-                if (blockedFrames >= 3u)
-                {
-                    if (m_Action == BlockedGeometryImportAction::Cancel)
-                    {
-                        m_State->CancelAttempted = true;
-                        m_State->CancelSucceeded =
-                            RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine)
-                                .CancelAssetImport(m_State->Operation)
-                                .has_value();
-                    }
-                    m_State->Release.store(true, std::memory_order_release);
-                }
+                m_State->ImGuiFramesProducedAtBlockStart = framesProduced;
+                m_State->ImGuiFrameBaselineCaptured      = true;
             }
+            m_State->ImGuiFramesProducedWhileBlocked = framesProduced;
 
-            if ((m_Action == BlockedGeometryImportAction::Release &&
-                 RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).GetLastAssetImportEvent().has_value()) ||
-                (m_Action == BlockedGeometryImportAction::Cancel &&
-                 m_State->CancelAttempted && ++m_FramesAfterAction >= 16u) ||
-                m_ObservedFrames >= m_MaxFrames)
+            if (engine.Services().Find<Runtime::EditorCommandHistory>()->IsDirty() ||
+                !Selection(engine).SelectedStableIds().empty() ||
+                RequiredEngineService<Extrinsic::Assets::AssetService>(engine).LiveAssetCount() !=
+                    m_State->BaselineLiveAssetCount)
             {
+                m_State->MutationObservedWhileBlocked.store(true, std::memory_order_release);
+            }
+            const std::uint32_t blockedFrames =
+                m_State->FramesWhileBlocked.fetch_add(1u, std::memory_order_acq_rel) + 1u;
+            if (blockedFrames >= 3u)
+            {
+                if (m_Action == BlockedGeometryImportAction::Cancel)
+                {
+                    m_State->CancelAttempted = true;
+                    m_State->CancelSucceeded =
+                        RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine)
+                            .CancelAssetImport(m_State->Operation)
+                            .has_value();
+                }
                 m_State->Release.store(true, std::memory_order_release);
-                engine.RequestExit();
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-        void OnShutdown(Runtime::Engine&) override
+
+        if ((m_Action == BlockedGeometryImportAction::Release &&
+             RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine)
+                 .GetLastAssetImportEvent()
+                 .has_value()) ||
+            (m_Action == BlockedGeometryImportAction::Cancel && m_State->CancelAttempted &&
+             ++m_FramesAfterAction >= 16u) ||
+            m_ObservedFrames >= m_MaxFrames)
         {
             m_State->Release.store(true, std::memory_order_release);
+            engine.RequestExit();
         }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    void Shutdown() override { m_State->Release.store(true, std::memory_order_release); }
 
-    private:
-        std::shared_ptr<BlockingGeometryDecodeState> m_State{};
-        BlockedGeometryImportAction m_Action{
-            BlockedGeometryImportAction::Release};
-        std::uint32_t m_MaxFrames{1u};
-        std::uint32_t m_ObservedFrames{0u};
-        std::uint32_t m_FramesAfterAction{0u};
-    };
+private:
+    std::shared_ptr<BlockingGeometryDecodeState> m_State{};
+    BlockedGeometryImportAction m_Action{BlockedGeometryImportAction::Release};
+    std::uint32_t m_MaxFrames{1u};
+    std::uint32_t m_ObservedFrames{0u};
+    std::uint32_t m_FramesAfterAction{0u};
+};
 
 struct ShutdownBlockedGeometryImportState
     {
@@ -901,8 +889,8 @@ struct ShutdownBlockedGeometryImportState
         bool WorkerReleasedFromOnShutdown{false};
     };
 
-class ShutdownWhileGeometryImportBlockedApplication final
-    : public Runtime::IApplication
+    class ShutdownWhileGeometryImportBlockedApplication final
+        : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         explicit ShutdownWhileGeometryImportBlockedApplication(
@@ -913,20 +901,22 @@ class ShutdownWhileGeometryImportBlockedApplication final
         {
         }
 
-        void OnInitialize(Runtime::Engine& engine) override
+        void Resolve() override
         {
+            auto& engine = Kernel();
             ++m_State->InitializeCalls;
             m_ObservedFrames = 0u;
             m_ExitRequested = false;
             m_State->PoliciesRegistered =
                 InstallDefaultPolicies(engine);
-            m_Editor.Attach(engine);
+            m_Editor.Attach(engine.Worlds(), engine.Services());
         }
 
-        void OnSimTick(Runtime::Engine&, double) override {}
+        void Simulate(double) override {}
 
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++m_ObservedFrames;
             if (!m_ExitRequested &&
                 m_State->Started.load(std::memory_order_acquire))
@@ -944,8 +934,9 @@ class ShutdownWhileGeometryImportBlockedApplication final
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
 
-        void OnShutdown(Runtime::Engine& engine) override
+        void Shutdown() override
         {
+            auto& engine = Kernel();
             (void)engine;
             m_Editor.Detach();
             UninstallDefaultPolicies();
@@ -1375,18 +1366,18 @@ TEST(SandboxEditorUi, FileImportPrerequisitesAreDeterministic)
                        Assets::AssetPayloadKind::Unknown);
     EXPECT_FALSE(model.CanChoosePayloadHint);
     EXPECT_FALSE(model.CanImport);
-    EXPECT_EQ(
-        model.ImportDisabledReason,
-        "Asset extension '.bin' is unsupported; choose a path with a supported asset file extension.");
+    EXPECT_EQ(model.ImportDisabledReason,
+              "Asset extension '.bin' is unsupported; choose a path with a "
+              "supported asset file extension.");
 
     model = buildModel("assets/textures/albedo.ktx",
                        Assets::AssetPayloadKind::Unknown);
     EXPECT_FALSE(model.CanChoosePayloadHint);
     EXPECT_FALSE(model.CanImport);
     EXPECT_EQ(model.ResolvedPayloadKind, Assets::AssetPayloadKind::Texture2D);
-    EXPECT_EQ(
-        model.ImportDisabledReason,
-        "KTX import is unavailable because no promoted Texture2D importer supports this format; choose a supported asset format.");
+    EXPECT_EQ(model.ImportDisabledReason,
+              "KTX import is unavailable because no promoted Texture2D importer "
+              "supports this format; choose a supported asset format.");
     ExpectEnabledFileImportPayloadOptions(
         model,
         std::array<Assets::AssetPayloadKind, 0>{});
@@ -1396,9 +1387,9 @@ TEST(SandboxEditorUi, FileImportPrerequisitesAreDeterministic)
     EXPECT_FALSE(model.CanChoosePayloadHint);
     EXPECT_FALSE(model.CanImport);
     EXPECT_EQ(model.ResolvedPayloadKind, Assets::AssetPayloadKind::Unknown);
-    EXPECT_EQ(
-        model.ImportDisabledReason,
-        "KTX import is unavailable because no promoted Texture2D importer supports this format; choose a supported asset format.");
+    EXPECT_EQ(model.ImportDisabledReason,
+              "KTX import is unavailable because no promoted Texture2D importer "
+              "supports this format; choose a supported asset format.");
     ExpectEnabledFileImportPayloadOptions(
         model,
         std::array<Assets::AssetPayloadKind, 0>{});
@@ -1510,48 +1501,45 @@ TEST(SandboxEditorUi, FileImportDispatchRejectsInvalidPrerequisitesBeforeCallbac
     };
     constexpr std::array invalidCases{
         InvalidCase{
-            .Path = {},
-            .Error = Core::ErrorCode::InvalidPath,
-            .Reason =
-                "Enter an asset path before choosing a payload or importing.",
+            .Path   = {},
+            .Error  = Core::ErrorCode::InvalidPath,
+            .Reason = "Enter an asset path before choosing a payload or importing.",
         },
         InvalidCase{
-            .Path = "assets/models/model",
-            .Error = Core::ErrorCode::InvalidPath,
-            .Reason =
-                "Add a supported file extension to the asset path before importing.",
+            .Path   = "assets/models/model",
+            .Error  = Core::ErrorCode::InvalidPath,
+            .Reason = "Add a supported file extension to the asset path before "
+                      "importing.",
         },
         InvalidCase{
-            .Path = "assets/models/Duck0.bin",
-            .Error = Core::ErrorCode::AssetUnsupportedFormat,
-            .Reason =
-                "Asset extension '.bin' is unsupported; choose a path with a supported asset file extension.",
+            .Path   = "assets/models/Duck0.bin",
+            .Error  = Core::ErrorCode::AssetUnsupportedFormat,
+            .Reason = "Asset extension '.bin' is unsupported; choose a path with "
+                      "a supported asset file extension.",
         },
         InvalidCase{
-            .Path = "assets/textures/albedo.ktx",
-            .Error = Core::ErrorCode::AssetUnsupportedFormat,
-            .Reason =
-                "KTX import is unavailable because no promoted Texture2D importer supports this format; choose a supported asset format.",
+            .Path   = "assets/textures/albedo.ktx",
+            .Error  = Core::ErrorCode::AssetUnsupportedFormat,
+            .Reason = "KTX import is unavailable because no promoted Texture2D "
+                      "importer supports this format; choose a supported asset format.",
         },
         InvalidCase{
-            .Path = "assets/textures/albedo.ktx2",
+            .Path        = "assets/textures/albedo.ktx2",
             .PayloadKind = Assets::AssetPayloadKind::Graph,
-            .Error = Core::ErrorCode::AssetUnsupportedFormat,
-            .Reason =
-                "KTX import is unavailable because no promoted Texture2D importer supports this format; choose a supported asset format.",
+            .Error       = Core::ErrorCode::AssetUnsupportedFormat,
+            .Reason      = "KTX import is unavailable because no promoted Texture2D "
+                           "importer supports this format; choose a supported asset format.",
         },
         InvalidCase{
-            .Path = "assets/models/model.ply",
-            .Error = Core::ErrorCode::InvalidArgument,
-            .Reason =
-                "PLY import requires an explicit Mesh or PointCloud payload.",
+            .Path   = "assets/models/model.ply",
+            .Error  = Core::ErrorCode::InvalidArgument,
+            .Reason = "PLY import requires an explicit Mesh or PointCloud payload.",
         },
         InvalidCase{
-            .Path = "assets/models/model.obj",
+            .Path        = "assets/models/model.obj",
             .PayloadKind = Assets::AssetPayloadKind::Graph,
-            .Error = Core::ErrorCode::InvalidArgument,
-            .Reason =
-                "OBJ import requires the Mesh payload; Graph is incompatible.",
+            .Error       = Core::ErrorCode::InvalidArgument,
+            .Reason      = "OBJ import requires the Mesh payload; Graph is incompatible.",
         },
     };
 
@@ -2035,7 +2023,8 @@ TEST(SandboxEditorUi, SceneSaveCommandTreatsAsyncPendingAsNonFailure)
 }
 TEST(SandboxEditorUi, EngineImportFacadeReportsMissingFile)
 {
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     engine.Initialize();
@@ -2071,7 +2060,8 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesStandaloneGeometryDomains)
         "0 0 0\n"
         "1 2 3\n");
 
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     engine.Initialize();
@@ -2183,14 +2173,13 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesNonManifoldObjAsRenderableMe
         "f 1/1 2/2 5/5\n");
 
     std::optional<ECS::EntityHandle> meshEntity{};
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<WaitForConditionApplication>(
-            [&meshEntity](Runtime::Engine& runningEngine)
-            {
-                return meshEntity.has_value() &&
-                    DirectMeshPostProcessReady(runningEngine, *meshEntity);
-            }));
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(), std::make_unique<WaitForConditionApplication>(
+                              [&meshEntity](Runtime::Engine& runningEngine)
+                              {
+                                  return meshEntity.has_value() &&
+                                         DirectMeshPostProcessReady(runningEngine, *meshEntity);
+                              }));
     ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
@@ -2249,14 +2238,13 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesObjWithoutAuthoredTexcoordsA
         "f 1 2 3\n");
 
     std::optional<ECS::EntityHandle> meshEntity{};
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<WaitForConditionApplication>(
-            [&meshEntity](Runtime::Engine& runningEngine)
-            {
-                return meshEntity.has_value() &&
-                    DirectMeshPostProcessReady(runningEngine, *meshEntity);
-            }));
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(), std::make_unique<WaitForConditionApplication>(
+                              [&meshEntity](Runtime::Engine& runningEngine)
+                              {
+                                  return meshEntity.has_value() &&
+                                         DirectMeshPostProcessReady(runningEngine, *meshEntity);
+                              }));
     ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
@@ -2353,7 +2341,7 @@ TEST(SandboxEditorUi, QueuedManualGeometryImportsRemainResponsiveAndApplyOnce)
 
         Core::Config::EngineConfig config = HeadlessConfig();
         config.Camera.Enabled = true;
-        Runtime::Engine engine(config, std::move(application));
+        Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(application));
         ComposeAsyncWorkAndInitialize(engine);
         InstallSandboxDefaultRuntimePolicies(engine);
         decodeState->BaselineLiveAssetCount =
@@ -2401,7 +2389,7 @@ TEST(SandboxEditorUi, QueuedManualGeometryImportsRemainResponsiveAndApplyOnce)
                 });
 
         Runtime::SandboxEditorSession session;
-        session.Attach(engine);
+        session.Attach(engine.Worlds(), engine.Services());
         ASSERT_TRUE(session.PrepareFrame(
             {},
             importCase.Path.string(),
@@ -2514,7 +2502,7 @@ TEST(SandboxEditorUi, QueuedManualGeometryCancellationPreventsApply)
 
     Core::Config::EngineConfig config = HeadlessConfig();
     config.Camera.Enabled = true;
-    Runtime::Engine engine(config, std::move(application));
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(application));
     ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
     decodeState->BaselineLiveAssetCount =
@@ -2560,7 +2548,7 @@ TEST(SandboxEditorUi, QueuedManualGeometryCancellationPreventsApply)
             });
 
     Runtime::SandboxEditorSession session;
-    session.Attach(engine);
+    session.Attach(engine.Worlds(), engine.Services());
     ASSERT_TRUE(session.PrepareFrame(
         {},
         meshFile.Path.string(),
@@ -2656,7 +2644,7 @@ TEST(SandboxEditorUi, ShutdownCancelsBlockedManualGeometryBeforePolicyUnregister
 
     Core::Config::EngineConfig config = HeadlessConfig();
     config.Camera.Enabled = true;
-    Runtime::Engine engine(config, std::move(application));
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(application));
     ComposeAsyncWorkAndInitialize(engine);
     ASSERT_EQ(shutdownState->InitializeCalls, 1u);
     ASSERT_TRUE(shutdownState->PoliciesRegistered);
@@ -2812,9 +2800,8 @@ TEST(SandboxEditorUi, QueuedManualGeometryDecodeFailureIsFailClosed)
 
     Core::Config::EngineConfig config = HeadlessConfig();
     config.Camera.Enabled = true;
-    Runtime::Engine engine(
-        config,
-        std::make_unique<WaitForAssetImportEventApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        config, std::make_unique<WaitForAssetImportEventApplication>());
     ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
     const std::size_t baselineLiveAssetCount =
@@ -2846,7 +2833,7 @@ TEST(SandboxEditorUi, QueuedManualGeometryDecodeFailureIsFailClosed)
     ASSERT_TRUE(completionHandle.IsValid());
 
     Runtime::SandboxEditorSession session;
-    session.Attach(engine);
+    session.Attach(engine.Worlds(), engine.Services());
     ASSERT_TRUE(session.PrepareFrame(
         {},
         malformedMeshFile.Path.string(),
@@ -2926,9 +2913,8 @@ TEST(SandboxEditorUi, DuplicateDroppedGeometryImportUsesSingleIngestRecord)
         "v 0 1 0\n"
         "f 1 2 3\n");
 
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<FixedFrameApplication>(128u));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<FixedFrameApplication>(128u));
     ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
@@ -2955,7 +2941,8 @@ TEST(SandboxEditorUi, DuplicateDroppedGeometryImportUsesSingleIngestRecord)
               Runtime::RuntimeAssetIngestDiagnostic::DuplicateActiveRequest);
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
 
     engine.Run();
 
@@ -2988,9 +2975,8 @@ TEST(SandboxEditorUi, DroppedFileQueuePreservesOrderDiagnosticsAndClearCompleted
         std::filesystem::temp_directory_path() / "runtime_queue_missing.obj";
     std::filesystem::remove(missingFile);
 
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<FixedFrameApplication>(128u));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<FixedFrameApplication>(128u));
     ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
@@ -3011,7 +2997,8 @@ TEST(SandboxEditorUi, DroppedFileQueuePreservesOrderDiagnosticsAndClearCompleted
     EXPECT_TRUE(queue.Entries[0].CanCancel);
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
     engine.Run();
 
     queue = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).GetAssetImportQueueSnapshot();
@@ -3043,9 +3030,8 @@ TEST(SandboxEditorUi, DroppedGeometryQueueCancellationPreventsMainThreadApply)
         "v 0 1 0\n"
         "f 1 2 3\n");
 
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<FixedFrameApplication>(16u));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<FixedFrameApplication>(16u));
     ComposeAsyncWorkAndInitialize(engine);
 
     const std::vector<std::string> droppedPaths{meshFile.Path.string()};
@@ -3066,7 +3052,8 @@ TEST(SandboxEditorUi, DroppedGeometryQueueCancellationPreventsMainThreadApply)
               std::string::npos);
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
     engine.Run();
 
     EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh), 0u);
@@ -3084,12 +3071,9 @@ TEST(SandboxEditorUi, DroppedGeometryAssetReimportWaitReportsDeadlineAndCancella
 
     auto waitDiagnostics =
         std::make_shared<AssetImportEventWaitDiagnostics>();
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<WaitForAssetImportEventApplication>(
-            std::chrono::milliseconds(250),
-            waitDiagnostics,
-            true));
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(), std::make_unique<WaitForAssetImportEventApplication>(
+                              std::chrono::milliseconds(250), waitDiagnostics, true));
     ComposeAsyncWorkAndInitialize(engine);
 
     waitDiagnostics->Arm();
@@ -3123,7 +3107,8 @@ TEST(SandboxEditorUi, DroppedGeometryAssetReimportWaitReportsDeadlineAndCancella
     waitDiagnostics->Operation = queuedImport.Entries.front().Operation;
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
     engine.Run();
 
     EXPECT_EQ(
@@ -3169,11 +3154,9 @@ TEST(SandboxEditorUi, DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplica
 
     auto waitDiagnostics =
         std::make_shared<AssetImportEventWaitDiagnostics>();
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<WaitForAssetImportEventApplication>(
-            std::chrono::seconds(10),
-            waitDiagnostics));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<WaitForAssetImportEventApplication>(
+                                                   std::chrono::seconds(10), waitDiagnostics));
     ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
@@ -3237,7 +3220,8 @@ TEST(SandboxEditorUi, DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplica
     waitDiagnostics->Operation = queuedImport.Entries.front().Operation;
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
 
     engine.Run();
     waitDiagnostics->ReleaseWorker.store(true, std::memory_order_release);
@@ -3346,9 +3330,8 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderCo
         "vt 0 1\n"
         "f 1/1 2/2 3/3\n");
 
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<WaitForAssetImportEventApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(), std::make_unique<WaitForAssetImportEventApplication>());
     ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
@@ -3357,7 +3340,8 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderCo
     });
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
 
     engine.Run();
 
@@ -3435,9 +3419,8 @@ TEST(SandboxEditorUi, PlatformDropNoUvObjUploadsRawSurfaceBeforeDeferredPostProc
         "v 0 1 0\n"
         "f 1 2 3\n");
 
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<WaitForAssetImportEventApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(), std::make_unique<WaitForAssetImportEventApplication>());
     ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
@@ -3446,7 +3429,8 @@ TEST(SandboxEditorUi, PlatformDropNoUvObjUploadsRawSurfaceBeforeDeferredPostProc
     });
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
 
     engine.Run();
 
@@ -3479,9 +3463,8 @@ TEST(SandboxEditorUi, DroppedFileImportFailureLogsDiagnostics)
     std::error_code ec;
     std::filesystem::remove(missingMeshPath, ec);
 
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<WaitForAssetImportEventApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(), std::make_unique<WaitForAssetImportEventApplication>());
     ComposeAsyncWorkAndInitialize(engine);
 
     Core::Log::ClearEntries();
@@ -3492,13 +3475,16 @@ TEST(SandboxEditorUi, DroppedFileImportFailureLogsDiagnostics)
 
     const Core::Log::LogSnapshot queuedLogs = Core::Log::TakeSnapshot();
     EXPECT_TRUE(LogSnapshotContains(queuedLogs, "File drop received"))
-        << "The platform drop boundary must log receipt before deferred import work completes.";
+        << "The platform drop boundary must log receipt before deferred import "
+           "work completes.";
     EXPECT_TRUE(LogSnapshotContains(queuedLogs, "Queued dropped geometry import"))
-        << "Dropped geometry imports must log that they were queued off the platform polling path.";
+        << "Dropped geometry imports must log that they were queued off the "
+           "platform polling path.";
     EXPECT_FALSE(RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).GetLastAssetImportEvent().has_value());
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
 
     engine.Run();
 
@@ -3529,9 +3515,8 @@ TEST(SandboxEditorUi, PlatformDropEventImportsOffMesh)
         "0 1 0\n"
         "3 0 1 2\n");
 
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<WaitForAssetImportEventApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(), std::make_unique<WaitForAssetImportEventApplication>());
     ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
@@ -3540,7 +3525,8 @@ TEST(SandboxEditorUi, PlatformDropEventImportsOffMesh)
     });
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
 
     engine.Run();
 
@@ -3576,12 +3562,13 @@ TEST(SandboxEditorUi, ConfiguredBackendBornClosedLogsZeroFrameRunDiagnostic)
 }
 TEST(SandboxEditorUi, PlatformCloseEventStopsEngineRunState)
 {
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<PassiveApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig());
     engine.Initialize();
 
     ASSERT_TRUE(engine.IsRunning());
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
 
     Core::Log::ClearEntries();
     engine.DispatchPlatformEventForTest(Plat::WindowCloseEvent{});

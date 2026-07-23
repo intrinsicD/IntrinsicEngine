@@ -186,9 +186,9 @@ The frame order is:
    command-published events become visible before simulation, and events
    published by listeners defer to the next pump per
    [ADR-0024](../adr/0024-kernel-module-architecture.md) D7 (ARCH-008);
-4. fixed-step simulation and CPU `FrameGraph` execution: application
-   `OnSimTick` contributions are appended first, then the promoted baseline ECS
-   system bundle, then module-registered sim systems. This ensures a module
+4. fixed-step simulation and CPU `FrameGraph` execution: the promoted baseline
+   ECS system bundle is appended first, then module-registered sim systems. This
+   ensures a module
    system that reads a baseline output (e.g.
    `Transform::WorldMatrix`) or waits on the baseline `TransformUpdate` signal is
    ordered after its producer — the core `FrameGraph` preserves insertion order
@@ -198,15 +198,14 @@ The frame order is:
    dependencies so the applied order among modules is independent of module
    registration order (ARCH-011, BUG-066). Each substep finishes with
    `Compile` → `Execute` → `ResetForReplay`: exact repeated descriptors reuse
-   topology with freshly bound callbacks, while application/module shape
-   changes rebuild transparently (CORE-008);
+   topology with freshly bound callbacks, while module-system shape changes
+   rebuild transparently (CORE-008);
 5. drain `Engine::Jobs()` completions before pump B; `JobService` checks token
    and world-scope cancellation on the main thread, drops suppressed results
    whole, and publishes completion events only for survivors per
    [ADR-0024](../adr/0024-kernel-module-architecture.md) D8 (ARCH-009);
 6. pump the queued kernel event bus post-simulation, before UI/extraction;
-7. runtime-module `UiBegin` hooks, the variable application tick,
-   runtime-module `UiBuild` hooks, then `UiEndCapture` hooks. The optional
+7. runtime-module `UiBegin`, `UiBuild`, then `UiEndCapture` hooks. The optional
    `EditorUiModule` opens the ImGui frame in `UiBegin`, draws registered
    contributions in `UiBuild`, and closes the frame plus writes capture in
    `UiEndCapture`;

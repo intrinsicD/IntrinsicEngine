@@ -150,11 +150,13 @@ snapshot carries no temporary debt.
 - [x] No `entt::dispatcher::trigger` or direct dispatcher use in module code
 - [x] No `Engine&` is passed through the `IRuntimeModule`/`EngineSetup`
       composition seam (`ARCH-011`)
-- [ ] No `Engine&` is passed through any handler, module, app behavior, or
+- [x] No `Engine&` is passed through any handler, module, app behavior, or
       setup surface (D13). `RUNTIME-168` removed the Engine-bound Sandbox
-      default-policy lifecycle helper; the remaining `IApplication` and app
-      facade compatibility surfaces are owned by `RUNTIME-184`
-- [ ] `IApplication::OnSimTick` / `OnVariableTick` removed (**baseline: present**)
+      default-policy helper and `RUNTIME-184` removed the application callback
+      object; Sandbox session state now receives exact config/world/service
+      capabilities
+- [x] `IApplication`, `OnSimTick`, and `OnVariableTick` removed by
+      `RUNTIME-184` (**baseline: present**)
 
 ### Domain responsibilities are app-composed (D9/ADR-0027)
 
@@ -208,9 +210,12 @@ snapshot carries no temporary debt.
       transactional handles over the exact import pipeline/input registry plus
       optional camera/selection services without passing `Engine&` into policy
       callbacks or lifecycle helpers
-- [ ] Explicit app lifecycle — `RUNTIME-184`; remove `IApplication`,
-      `OnSimTick`/`OnVariableTick`, and every `Engine&` app behavior surface
-      without adding a replacement framework
+- [x] Explicit app lifecycle — `RUNTIME-184`; Sandbox `main()` visibly composes
+      the exact module set (including separate document and interaction
+      modules), initializes a global app-owned `SandboxSession`, and uses the
+      two-stage shutdown boundary to release editor/default/reference state
+      while exact runtime services remain live. No replacement application
+      framework or `Engine&` app behavior surface exists
 - [ ] Composition mechanism deletion test — `RUNTIME-185`; retain only
       behavior-backed lifecycle/setup/service/hook surface and remove
       test-only resolve/sim/DAG/provision branches after `RUNTIME-129` and
@@ -263,5 +268,6 @@ snapshot carries no temporary debt.
 - **Picking work?** The additive seams `ARCH-007`..`ARCH-011`, the
   `ARCH-012` ClusteringModule proof, retired `UI-034`, the `ARCH-006`
   Sandbox-content relocation, and the `RUNTIME-178` budget restoration are
-  complete. Remaining domain rows proceed through the exact dependency graph
-  recorded by `ARCH-014`.
+  complete. Explicit app lifecycle is complete under `RUNTIME-184`; remaining
+  convergence work proceeds through `RUNTIME-185`, `RUNTIME-186`, and
+  `RUNTIME-187` in the exact dependency graph recorded by `ARCH-014`.

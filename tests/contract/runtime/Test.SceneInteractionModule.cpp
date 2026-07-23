@@ -8,6 +8,8 @@
 
 #include <gtest/gtest.h>
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
@@ -47,25 +49,18 @@ namespace
     namespace Runtime = Extrinsic::Runtime;
     namespace Sel = Extrinsic::ECS::Components::Selection;
 
-    class ExitAfterOneFrameApplication final
-        : public Runtime::IApplication
+    class ExitAfterOneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine&) override
+        void Resolve() override { ++InitializeCalls; }
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
-            ++InitializeCalls;
-        }
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(
-            Runtime::Engine& engine, double, double) override
-        {
+            auto& engine = Kernel();
             ++VariableTicks;
             engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine&) override
-        {
-            ++ShutdownCalls;
-        }
+        void Shutdown() override { ++ShutdownCalls; }
 
         std::uint32_t InitializeCalls{0u};
         std::uint32_t VariableTicks{0u};
@@ -1039,8 +1034,7 @@ TEST(SceneInteractionModule,
                 ExitAfterOneFrameApplication>();
         ExitAfterOneFrameApplication* const app =
             application.get();
-        Runtime::Engine engine(
-            HeadlessConfig(), std::move(application));
+        Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
         engine.Initialize();
 
         EXPECT_EQ(
@@ -1063,8 +1057,7 @@ TEST(SceneInteractionModule,
                 ExitAfterOneFrameApplication>();
         ExitAfterOneFrameApplication* const app =
             application.get();
-        Runtime::Engine engine(
-            HeadlessConfig(), std::move(application));
+        Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
         engine.EmplaceModule<
             Runtime::SceneInteractionModule>();
         engine.Initialize();
@@ -1085,8 +1078,7 @@ TEST(SceneInteractionModule,
 {
     auto application =
         std::make_unique<ExitAfterOneFrameApplication>();
-    Runtime::Engine engine(
-        HeadlessConfig(), std::move(application));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
     engine.EmplaceModule<
         Runtime::SceneInteractionModule>();
     engine.Initialize();

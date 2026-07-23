@@ -78,9 +78,6 @@ namespace Extrinsic::Core
 
     void ExecuteShutdownContract(IShutdownHooks& hooks)
     {
-        hooks.StopRunning();
-        hooks.WaitDeviceIdle();
-        hooks.ShutdownApplication();
         hooks.ShutdownStreaming();
         hooks.DestroyScene();
         hooks.DestroyAssets();

@@ -9,8 +9,9 @@
 #include <string_view>
 #include <vector>
 
-#include <gtest/gtest.h>
 #include <glm/glm.hpp>
+#include <gtest/gtest.h>
+#include "RuntimeTestModule.hpp"
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -38,16 +39,17 @@ namespace Runtime = Extrinsic::Runtime;
 
 namespace
 {
-    class OneFrameApplication final : public Runtime::IApplication
+    class OneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
     };
 
     class ConfigControlHarness final
@@ -64,9 +66,8 @@ namespace
             config.Window.Backend = Config::WindowBackend::Null;
             config.Render.EnablePromotedVulkanDevice = false;
             config.Render.DefaultRecipeConfigPath.clear();
-            m_Engine = std::make_unique<Runtime::Engine>(
-                std::move(config),
-                std::make_unique<OneFrameApplication>());
+            m_Engine = std::make_unique<Intrinsic::Tests::RuntimeTestKernel>(
+                std::move(config), std::make_unique<OneFrameApplication>());
             m_Engine->EmplaceModule<Runtime::EngineConfigControl>(
                 std::move(sectionRegistry));
             m_Engine->Initialize();
@@ -94,7 +95,7 @@ namespace
         }
 
     private:
-        std::unique_ptr<Runtime::Engine> m_Engine{};
+        std::unique_ptr<Intrinsic::Tests::RuntimeTestKernel> m_Engine{};
         Runtime::EngineConfigControl* m_Control{};
     };
 

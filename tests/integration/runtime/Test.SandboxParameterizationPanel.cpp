@@ -10,10 +10,12 @@
 #include <string_view>
 #include <vector>
 
-#include <gtest/gtest.h>
 #include <glm/glm.hpp>
+
+#include <gtest/gtest.h>
 #include <imgui.h>
 #include <imgui_internal.h>
+#include "RuntimeTestModule.hpp"
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -48,16 +50,17 @@ namespace SandboxEditor = Extrinsic::Sandbox::Editor;
 
 namespace
 {
-    class OneFrameApplication final : public Runtime::IApplication
+    class OneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
     };
 
     [[nodiscard]] Config::EngineConfig HeadlessConfig()
@@ -72,16 +75,15 @@ namespace
 
     struct EditorUiShellHarness
     {
-        Runtime::Engine Kernel{
-            HeadlessConfig(),
-            std::make_unique<OneFrameApplication>()};
+        Intrinsic::Tests::RuntimeTestKernel Kernel{HeadlessConfig(),
+                                                   std::make_unique<OneFrameApplication>()};
         SandboxEditor::EditorShell Shell{};
 
         EditorUiShellHarness()
         {
             Kernel.EmplaceModule<Runtime::EditorUiModule>();
             Kernel.Initialize();
-            Shell.Attach(Kernel);
+            Shell.Attach(Kernel.Worlds(), Kernel.Services());
         }
 
         ~EditorUiShellHarness()
@@ -130,7 +132,7 @@ namespace
         Runtime::SelectionController Selection{};
         Runtime::EditorCommandHistory History{};
         Runtime::SandboxEditorSelectedModelCache ModelCache{};
-        std::unique_ptr<Runtime::Engine> ConfigEngine{};
+        std::unique_ptr<Intrinsic::Tests::RuntimeTestKernel> ConfigEngine{};
         Runtime::EngineConfigControl* ConfigControl{};
         ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
         std::uint32_t StableEntityId{0u};
@@ -150,9 +152,8 @@ namespace
             config.Window.Backend = Config::WindowBackend::Null;
             config.Render.EnablePromotedVulkanDevice = false;
             config.Render.DefaultRecipeConfigPath.clear();
-            ConfigEngine = std::make_unique<Runtime::Engine>(
-                std::move(config),
-                std::make_unique<OneFrameApplication>());
+            ConfigEngine = std::make_unique<Intrinsic::Tests::RuntimeTestKernel>(
+                std::move(config), std::make_unique<OneFrameApplication>());
             ConfigEngine->AddModule(std::move(configControl));
             ConfigEngine->Initialize();
             ConfigControl =
@@ -542,13 +543,12 @@ TEST(SandboxParameterizationPanel, RealWindowAndTypedActionAreOperational)
     EXPECT_TRUE(harness.HasFiniteUvs());
     EXPECT_TRUE(harness.History.CanUndo());
 
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.Initialize();
     SandboxEditor::EditorShell shell;
-    shell.Attach(engine);
+    shell.Attach(engine.Worlds(), engine.Services());
     SandboxEditor::MethodPanels panels;
     panels.Register(shell);
     ASSERT_TRUE(shell.SetEditorWindowOpen(
@@ -567,7 +567,8 @@ TEST(SandboxParameterizationPanel, RealWindowAndTypedActionAreOperational)
             ->GetDiagnostics();
     EXPECT_GE(imguiDiagnostics.FramesProduced, 1u);
     EXPECT_FALSE(imguiDiagnostics.LastFrameUsedUserTexture)
-        << "Configured CpuLayout must use the panel ImDrawList path without a user texture.";
+        << "Configured CpuLayout must use the panel ImDrawList path without a "
+           "user texture.";
     EXPECT_GT(imguiDiagnostics.LastVertexCount, 0u);
     EXPECT_GT(imguiDiagnostics.LastIndexCount, 0u);
     panels.Unregister();

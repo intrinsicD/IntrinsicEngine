@@ -230,15 +230,6 @@ namespace
         ShutdownLookupProbeState& m_State;
     };
 
-    class NoopApplication final : public Runtime::IApplication
-    {
-    public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine&, double, double) override {}
-        void OnShutdown(Runtime::Engine&) override {}
-    };
-
     [[nodiscard]] Core::Config::EngineConfig HeadlessConfig()
     {
         Core::Config::EngineConfig config{};
@@ -323,8 +314,7 @@ TEST(RuntimeAsyncWorkModule, RegistrationConflictDoesNotPublishPartialServices)
 TEST(RuntimeAsyncWorkModule, ShutdownWithdrawsServicesBeforeLaterModulesRun)
 {
     ShutdownLookupProbeState state{};
-    Runtime::Engine engine(
-        HeadlessConfig(), std::make_unique<NoopApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     engine.EmplaceModule<ShutdownLookupProbeModule>(state);
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
 

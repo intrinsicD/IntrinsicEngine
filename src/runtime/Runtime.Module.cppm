@@ -30,6 +30,10 @@ import Extrinsic.Runtime.WorldRegistry;
 
 namespace Extrinsic::Runtime
 {
+    export using RuntimeModuleResult = Core::Result;
+
+    export [[nodiscard]] inline RuntimeModuleResult RuntimeModuleOk() { return Core::Ok(); }
+
     export enum class FramePhase : std::uint8_t
     {
         AfterCommandDrain,
@@ -243,8 +247,8 @@ namespace Extrinsic::Runtime
         virtual ~IRuntimeModule() = default;
 
         [[nodiscard]] virtual std::string_view Name() const noexcept = 0;
-        [[nodiscard]] virtual Core::Result OnRegister(EngineSetup& setup) = 0;
-        [[nodiscard]] virtual Core::Result OnResolve(EngineSetup& setup) = 0;
+        [[nodiscard]] virtual RuntimeModuleResult OnRegister(EngineSetup& setup) = 0;
+        [[nodiscard]] virtual RuntimeModuleResult OnResolve(EngineSetup& setup) = 0;
         virtual void OnShutdown(RuntimeModuleShutdownContext& context) = 0;
     };
 }

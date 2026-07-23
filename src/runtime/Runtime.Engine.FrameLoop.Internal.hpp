@@ -289,9 +289,7 @@ namespace Extrinsic::Runtime
         return worldUpdated.begin() != worldUpdated.end();
     }
 
-    void RunFixedStepSimulationTicks(Engine& engine,
-                                     IApplication& application,
-                                     Core::FrameGraph& frameGraph,
+    void RunFixedStepSimulationTicks(Core::FrameGraph& frameGraph,
                                      ECS::Scene::Registry& scene,
                                      double& accumulator,
                                      const double fixedDt,
@@ -301,8 +299,6 @@ namespace Extrinsic::Runtime
         int substeps = 0;
         while (accumulator >= fixedDt && substeps < maxSubSteps)
         {
-            application.OnSimTick(engine, fixedDt);
-
             // BUG-069 (restores BUG-066): register the promoted baseline ECS
             // systems FIRST. The core FrameGraph orients every resource hazard
             // edge from earlier- to later-inserted passes and preserves

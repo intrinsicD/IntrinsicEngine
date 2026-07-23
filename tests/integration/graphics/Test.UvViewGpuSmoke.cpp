@@ -17,6 +17,8 @@
 
 #include "OperationalCounterStability.hpp"
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Renderer;
@@ -40,7 +42,6 @@ using Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot;
 using Extrinsic::Backends::Vulkan::ToString;
 using Extrinsic::Graphics::RenderCommandPassStatus;
 using Extrinsic::Runtime::Engine;
-using Extrinsic::Runtime::IApplication;
 
 inline constexpr std::uint32_t kTargetWidth = 128u;
 inline constexpr std::uint32_t kTargetHeight = 128u;
@@ -139,7 +140,7 @@ FindCommandPass(const Extrinsic::Graphics::RenderGraphFrameStats& stats,
     return found == stats.CommandRecords.Passes.end() ? nullptr : &*found;
 }
 
-class UvViewSmokeApp final : public IApplication
+class UvViewSmokeApp final : public Intrinsic::Tests::RuntimeTestModule
 {
 public:
     UvViewSmokeApp()
@@ -147,9 +148,10 @@ public:
         BuildAsymmetricHeatmapMesh();
     }
 
-    void OnInitialize(Engine& engine) override
+    void Resolve() override
     {
-        m_Engine = &engine;
+        auto& engine   = Kernel();
+        m_Engine       = &engine;
         m_ReadbackHook = engine.GetRenderer().RegisterRuntimeFrameCommandHook(
             [this](Extrinsic::RHI::ICommandContext& commandContext)
             {
@@ -159,10 +161,11 @@ public:
             m_Error = "Renderer rejected the UV-view runtime readback hook.";
     }
 
-    void OnSimTick(Engine&, double) override {}
+    void Simulate(double) override {}
 
-    void OnVariableTick(Engine& engine, double, double) override
+    void Frame(double, double) override
     {
+        auto& engine = Kernel();
         ++m_Frames;
         if (!m_Error.empty())
         {
@@ -235,8 +238,9 @@ public:
         }
     }
 
-    void OnShutdown(Engine& engine) override
+    void Shutdown() override
     {
+        auto& engine = Kernel();
         if (m_ReadbackHook.IsValid())
         {
             engine.GetRenderer().UnregisterRuntimeFrameCommandHook(
@@ -349,7 +353,8 @@ private:
             });
             if (!m_ReadbackBuffers[index].IsValid())
             {
-                m_Error = "Operational Vulkan device failed to allocate the UV-view readback buffers.";
+                m_Error = "Operational Vulkan device failed to allocate the UV-view "
+                          "readback buffers.";
                 return;
             }
         }
@@ -373,7 +378,8 @@ private:
         });
         if (!m_Geometry.IsValid())
         {
-            m_Error = "Operational GpuWorld rejected the asymmetric UV heatmap mesh upload.";
+            m_Error = "Operational GpuWorld rejected the asymmetric UV heatmap mesh "
+                      "upload.";
             return;
         }
 
@@ -391,7 +397,8 @@ private:
         });
         if (!m_TextureBackground.IsValid())
         {
-            m_Error = "Operational Vulkan device failed to create the real UV-view texture background.";
+            m_Error = "Operational Vulkan device failed to create the real UV-view "
+                      "texture background.";
             return;
         }
 
@@ -438,7 +445,8 @@ private:
         });
         if (!m_TextureBackgroundSampler.IsValid())
         {
-            m_Error = "Operational Vulkan device failed to create the UV-view texture sampler.";
+            m_Error = "Operational Vulkan device failed to create the UV-view "
+                      "texture sampler.";
             return;
         }
 
@@ -449,7 +457,8 @@ private:
         if (m_TextureBackgroundBindlessIndex ==
             Extrinsic::RHI::kInvalidBindlessIndex)
         {
-            m_Error = "Operational Vulkan bindless heap rejected the real UV-view texture background.";
+            m_Error = "Operational Vulkan bindless heap rejected the real UV-view "
+                      "texture background.";
             return;
         }
         engine.GetDevice().GetBindlessHeap().FlushPending();
@@ -570,11 +579,11 @@ struct UvViewSmokeBootstrap
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
     {
         return UvViewSmokeBootstrap{
-            .EnginePtr = nullptr,
-            .App = nullptr,
-            .Skipped = true,
-            .SkipReason =
-                "GLFW could not initialize in this environment; gpu;vulkan UV-view smoke is opt-in.",
+            .EnginePtr  = nullptr,
+            .App        = nullptr,
+            .Skipped    = true,
+            .SkipReason = "GLFW could not initialize in this environment; "
+                          "gpu;vulkan UV-view smoke is opt-in.",
         };
     }
 
@@ -591,7 +600,8 @@ struct UvViewSmokeBootstrap
 
     auto app = std::make_unique<UvViewSmokeApp>();
     UvViewSmokeApp* appPtr = app.get();
-    auto engine = std::make_unique<Engine>(config, std::move(app));
+    auto engine            = std::make_unique<Engine>(config);
+    Intrinsic::Tests::AddRuntimeTestModule(*engine, std::move(app));
     engine->Initialize();
 
     const auto inputs = GetVulkanDeviceOperationalInputs(&engine->GetDevice());
@@ -600,11 +610,11 @@ struct UvViewSmokeBootstrap
     {
         engine->Shutdown();
         return UvViewSmokeBootstrap{
-            .EnginePtr = nullptr,
-            .App = nullptr,
-            .Skipped = true,
-            .SkipReason =
-                "Promoted Vulkan did not reach logical-device/swapchain/command-sync readiness on this host.",
+            .EnginePtr  = nullptr,
+            .App        = nullptr,
+            .Skipped    = true,
+            .SkipReason = "Promoted Vulkan did not reach "
+                          "logical-device/swapchain/command-sync readiness on this host.",
         };
     }
 
@@ -730,10 +740,10 @@ TEST(UvViewGpuSmoke, RetainedBackgroundModesReadBackOnOperationalVulkan)
         EvaluateVulkanDeviceOperationalStatus(&engine.GetDevice());
     if (!engine.GetDevice().IsOperational())
     {
-        ADD_FAILURE()
-            << "Promoted Vulkan operational gate did not flip during UV-view frames: status="
-            << ToString(operationalStatus.Code)
-            << " reason=" << ToString(operationalStatus.Reason);
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during "
+                         "UV-view frames: status="
+                      << ToString(operationalStatus.Code)
+                      << " reason=" << ToString(operationalStatus.Reason);
         return;
     }
     EXPECT_EQ(
@@ -911,7 +921,8 @@ TEST(UvViewGpuSmoke, RetainedBackgroundModesReadBackOnOperationalVulkan)
     EXPECT_GT(checkerPixelCount, kPixelCount / 5u)
         << "Retained target did not preserve a substantial checker background.";
     EXPECT_GT(geometryPixelCount, kPixelCount / 16u)
-        << "Retained target did not contain the asymmetric shaded-triangle footprint.";
+        << "Retained target did not contain the asymmetric shaded-triangle "
+           "footprint.";
 
     // Texel-density mode is a high-frequency blue/orange reference pattern.
     // Count both color families only in the target border, outside every
@@ -951,9 +962,11 @@ TEST(UvViewGpuSmoke, RetainedBackgroundModesReadBackOnOperationalVulkan)
         }
     }
     EXPECT_GT(texelDensityBluePixels, kPixelCount / 32u)
-        << "Texel-density background did not render its blue cell family outside the mesh.";
+        << "Texel-density background did not render its blue cell family outside "
+           "the mesh.";
     EXPECT_GT(texelDensityOrangePixels, kPixelCount / 32u)
-        << "Texel-density background did not render its orange cell family outside the mesh.";
+        << "Texel-density background did not render its orange cell family "
+           "outside the mesh.";
 
     // Texture mode samples a real uploaded RGBA8 texture through a real
     // bindless slot. Probe known UVs in all four colored quadrants; their pane
@@ -1012,7 +1025,8 @@ TEST(UvViewGpuSmoke, RetainedBackgroundModesReadBackOnOperationalVulkan)
         }
     }
     EXPECT_GT(realTexturePixelCount, kPixelCount / 3u)
-        << "Real four-quadrant bindless texture did not cover a substantial retained-target region.";
+        << "Real four-quadrant bindless texture did not cover a substantial "
+           "retained-target region.";
 
     EXPECT_TRUE(Counters::IsStable(before, after))
         << "Vulkan operational counters changed across UV-view rendering: "

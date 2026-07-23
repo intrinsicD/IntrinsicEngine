@@ -1536,7 +1536,8 @@ namespace Extrinsic::Sandbox::Editor
                 }
                 if (property.VectorFieldCandidate && !wroteButton)
                 {
-                    ImGui::TextDisabled("Vector-field candidate; adapter residency is not owned by this UI slice.");
+                    ImGui::TextDisabled("Vector-field candidate; adapter residency is not "
+                                        "owned by this UI slice.");
                 }
                 ImGui::PopID();
             }
@@ -2268,7 +2269,8 @@ namespace Extrinsic::Sandbox::Editor
                                     progressive.BindingGeneration));
                     if (progressive.Composition.HasChildren)
                     {
-                        ImGui::Text("Composition: children=%u bindings=%u slots=%u pending=%u failed=%u jobs=%u active=%u job failures=%u",
+                        ImGui::Text("Composition: children=%u bindings=%u slots=%u pending=%u "
+                                    "failed=%u jobs=%u active=%u job failures=%u",
                                     progressive.Composition.ChildCount,
                                     progressive.Composition.ChildBindingsCount,
                                     progressive.Composition.ChildSlotCount,
@@ -2803,13 +2805,15 @@ namespace Extrinsic::Sandbox::Editor
                                 frame.RenderGraph.BarrierCount,
                                 static_cast<unsigned long long>(
                                     frame.RenderGraph.TransientMemoryEstimateBytes));
-                    ImGui::Text("Queue handoffs: %u, timeline edges=%u signals=%u waits=%u ownership=%u",
+                    ImGui::Text("Queue handoffs: %u, timeline edges=%u signals=%u waits=%u "
+                                "ownership=%u",
                                 frame.RenderGraph.QueueHandoffEdgeCount,
                                 frame.RenderGraph.CrossQueueTimelineEdgeCount,
                                 frame.RenderGraph.CrossQueueTimelineSignalCount,
                                 frame.RenderGraph.CrossQueueTimelineWaitCount,
                                 frame.RenderGraph.CrossQueueOwnershipTransferCount);
-                    ImGui::Text("Command passes: recorded=%u skipped=%u nonOperational=%u unavailable=%u",
+                    ImGui::Text("Command passes: recorded=%u skipped=%u nonOperational=%u "
+                                "unavailable=%u",
                                 frame.RenderGraph.CommandPassesRecorded,
                                 frame.RenderGraph.CommandPassesSkipped,
                                 frame.RenderGraph.CommandPassesSkippedNonOperational,
@@ -2998,7 +3002,8 @@ namespace Extrinsic::Sandbox::Editor
                 if (context != nullptr &&
                     frame.CameraRender.CameraControlsAvailable)
                 {
-                    ImGui::TextDisabled("Viewport controls: RMB/MMB drag rotates; WASD pans/moves; Shift accelerates; scroll zooms.");
+                    ImGui::TextDisabled("Viewport controls: RMB/MMB drag rotates; WASD "
+                                        "pans/moves; Shift accelerates; scroll zooms.");
                     if (ImGui::Button("Orbit"))
                     {
                         (void)ApplySandboxEditorCameraControllerCommand(
@@ -3332,10 +3337,10 @@ namespace Extrinsic::Sandbox::Editor
             return handle;
         }
 
-        void Attach(Runtime::Engine& engine)
+        void Attach(Runtime::WorldRegistry& worlds, Runtime::ServiceRegistry& services)
         {
             Detach();
-            Host = engine.Services().Find<Runtime::EditorUiHost>();
+            Host = services.Find<Runtime::EditorUiHost>();
             if (Host == nullptr || !Host->IsOperational())
             {
                 Host = nullptr;
@@ -3343,7 +3348,7 @@ namespace Extrinsic::Sandbox::Editor
             }
 
             RegisterBuiltinWindows();
-            Session.Attach(engine);
+            Session.Attach(worlds, services);
             if (!Session.IsAttached())
             {
                 Detach();
@@ -3380,9 +3385,9 @@ namespace Extrinsic::Sandbox::Editor
         Detach();
     }
 
-    void EditorShell::Attach(Runtime::Engine& engine)
+    void EditorShell::Attach(Runtime::WorldRegistry& worlds, Runtime::ServiceRegistry& services)
     {
-        m_Impl->Attach(engine);
+        m_Impl->Attach(worlds, services);
     }
 
     void EditorShell::Detach()

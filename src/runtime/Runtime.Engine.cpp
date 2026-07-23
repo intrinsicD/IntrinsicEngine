@@ -69,18 +69,14 @@ namespace Extrinsic::Runtime
 
     // ── Construction / destruction ────────────────────────────────────────
 
-    Engine::Engine(Core::Config::EngineConfig config,
-                   std::unique_ptr<IApplication> application)
+    Engine::Engine(Core::Config::EngineConfig config)
         : m_Config(std::move(config))
-        , m_Application(std::move(application))
     {
-        if (!m_Application)
-            std::terminate();
     }
 
     Engine::~Engine()
     {
-        if (m_Initialized)
+        if (m_Initialized || m_ShutdownBegun)
             Shutdown();
     }
 
@@ -461,6 +457,7 @@ namespace Extrinsic::Runtime
 
     void Engine::Initialize()
     {
+        m_ShutdownBegun = false;
         // ── 1. CPU fiber scheduler ────────────────────────────────────────
         // Must be first — all three graphs dispatch through it.
         Core::Tasks::Scheduler::Initialize(m_Config.Simulation.WorkerThreadCount);
@@ -566,9 +563,6 @@ namespace Extrinsic::Runtime
         // ── 6. Runtime-module resolution/finalization (ARCH-011) ──────────
         ResolveRuntimeModulesForBoot(recipeActivation);
 
-        // ── 7. Application ────────────────────────────────────────────────
-        m_Application->OnInitialize(*this);
-
         m_Initialized = true;
         m_Running     = true;
         m_WindowCloseLogged = false;
@@ -580,10 +574,13 @@ namespace Extrinsic::Runtime
             });
     }
 
-    void Engine::Shutdown()
+    void Engine::BeginShutdown()
     {
+        if (m_ShutdownBegun || (!m_Initialized && !m_Window && !m_Device))
+            return;
+
         // ARCH-007 — drop commands enqueued after the final frame's drain
-        // (e.g. from OnVariableTick just before RequestExit()). The engine
+        // (e.g. from a frame hook just before RequestExit()). The engine
         // is documented as reusable via Shutdown() + Initialize(); stale
         // commands must not replay into the next session's fresh scene.
         m_CommandBus.DiscardPending();
@@ -601,12 +598,22 @@ namespace Extrinsic::Runtime
                     m_Device->WaitIdle();
             });
 
+        m_Running = false;
+        if (m_Device)
+            m_Device->WaitIdle();
+        m_ShutdownBegun = true;
+    }
+
+    void Engine::Shutdown()
+    {
+        BeginShutdown();
+        if (!m_ShutdownBegun)
+            return;
+
         struct ShutdownHooks final : Core::IShutdownHooks
         {
             Engine& Owner;
-            bool& Running;
             bool& Initialized;
-            std::unique_ptr<IApplication>& Application;
             std::unique_ptr<Platform::IWindow>& Window;
             std::unique_ptr<RHI::IDevice>& Device;
             std::unique_ptr<Graphics::IRenderer>& Renderer;
@@ -615,9 +622,7 @@ namespace Extrinsic::Runtime
             ECS::Scene::Registry*& Scene;
 
             ShutdownHooks(Engine& owner,
-                          bool& running,
                           bool& initialized,
-                          std::unique_ptr<IApplication>& application,
                           std::unique_ptr<Platform::IWindow>& window,
                           std::unique_ptr<RHI::IDevice>& device,
                           std::unique_ptr<Graphics::IRenderer>& renderer,
@@ -625,9 +630,7 @@ namespace Extrinsic::Runtime
                           WorldRegistry& worlds,
                           ECS::Scene::Registry*& scene)
                 : Owner(owner)
-                , Running(running)
                 , Initialized(initialized)
-                , Application(application)
                 , Window(window)
                 , Device(device)
                 , Renderer(renderer)
@@ -635,18 +638,6 @@ namespace Extrinsic::Runtime
                 , Worlds(worlds)
                 , Scene(scene)
             {
-            }
-
-            void StopRunning() override { Running = false; }
-            void WaitDeviceIdle() override
-            {
-                if (Device)
-                    Device->WaitIdle();
-            }
-            void ShutdownApplication() override
-            {
-                if (Application)
-                    Application->OnShutdown(Owner);
             }
             void ShutdownStreaming() override
             {
@@ -691,9 +682,7 @@ namespace Extrinsic::Runtime
         };
 
         ShutdownHooks hooks(*this,
-                            m_Running,
                             m_Initialized,
-                            m_Application,
                             m_Window,
                             m_Device,
                             m_Renderer,
@@ -701,6 +690,7 @@ namespace Extrinsic::Runtime
                             m_WorldRegistry,
                             m_Scene);
         Core::ExecuteShutdownContract(hooks);
+        m_ShutdownBegun = false;
     }
 
     // ── Main loop ─────────────────────────────────────────────────────────
@@ -807,17 +797,15 @@ namespace Extrinsic::Runtime
         (void)m_KernelEvents.Pump();
 
         // ── Phase 2: Fixed-step simulation + CPU task graph ───────────────
-        // Each tick: app adds FrameGraph passes → Engine compiles and executes
-        // the ECS system DAG → resets registration for exact-plan replay.
+        // Each tick: module systems add FrameGraph passes → Engine compiles and
+        // executes the ECS system DAG → resets registration for exact-plan replay.
 
         const double frameDt = m_FrameClock.FrameDeltaClamped(m_MaxFrameDelta);
         frameContext.FrameDeltaSeconds = frameDt;
         m_Accumulator += frameDt;
 
         const auto fixedStepBegin = std::chrono::steady_clock::now();
-        RunFixedStepSimulationTicks(*this,
-                                    *m_Application,
-                                    *m_FrameGraph,
+        RunFixedStepSimulationTicks(*m_FrameGraph,
                                     *m_Scene,
                                     m_Accumulator,
                                     m_FixedDt,
@@ -856,9 +844,8 @@ namespace Extrinsic::Runtime
             frameContext.EditorCapture,
             pacing);
 
-        // ── Phase 3: Variable tick ────────────────────────────────────────
+        // ── Phase 3: Variable-frame hooks ────────────────────────────────
         const auto variableTickBegin = std::chrono::steady_clock::now();
-        m_Application->OnVariableTick(*this, alpha, frameDt);
         RunRuntimeModuleFrameHooks(
             FramePhase::UiBuild,
             frameDt,
@@ -918,7 +905,7 @@ namespace Extrinsic::Runtime
         // ── BUG-024/RUNTIME-145: pre-render transform flush ───────────────
         // Local-transform mutations made after the fixed-step ECS bundle —
         // Sandbox Editor UI inspector edits (applied inside the ImGui editor
-        // hook during EndFrame above), OnVariableTick app mutations, and the
+        // hook during EndFrame above), variable-frame hook mutations, and the
         // GizmoInteraction drag just driven — would otherwise reach render
         // extraction with a stale Transform::WorldMatrix and only become
         // visible one frame late (or never, when no further fixed-step tick
@@ -945,7 +932,7 @@ namespace Extrinsic::Runtime
 
         // Registered input actions run after the pre-render flush above so
         // camera commands gather refreshed `World::Bounds` that already reflect
-        // this frame's OnVariableTick / editor-hook / gizmo transform edits.
+        // this frame's module-frame-hook / editor-hook / gizmo transform edits.
         // The default `F` focus action is edge-triggered and suppressed while
         // Dear ImGui owns the keyboard; successful camera actions rebuild the
         // render camera so the snapped view reaches transform-gizmo packet

@@ -19,6 +19,8 @@
 #include <entt/entity/entity.hpp>
 #include <glm/glm.hpp>
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Core.Config.Engine;
@@ -53,19 +55,20 @@ namespace
         return *service;
     }
 
-    class OneFrameApplication final : public Runtime::IApplication
+    class OneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
     };
 
-    class WaitForConditionApplication final : public Runtime::IApplication
+    class WaitForConditionApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         explicit WaitForConditionApplication(
@@ -76,10 +79,11 @@ namespace
         {
         }
 
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++m_ObservedFrames;
             if ((m_Ready && m_Ready(engine)) || m_ObservedFrames >= m_MaxFrames)
             {
@@ -88,7 +92,7 @@ namespace
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
     private:
         std::function<bool(Runtime::Engine&)> m_Ready{};
@@ -279,9 +283,8 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsGeneratedG
         GridObjText(side));
 
     {
-        Runtime::Engine closingEngine(
-            HeadlessConfig(),
-            std::make_unique<OneFrameApplication>());
+        Intrinsic::Tests::RuntimeTestKernel closingEngine(HeadlessConfig(),
+                                                          std::make_unique<OneFrameApplication>());
         closingEngine.EmplaceModule<Runtime::AsyncWorkModule>();
         closingEngine.EmplaceModule<Runtime::SceneDocumentModule>();
         closingEngine.EmplaceModule<Runtime::AssetWorkflowModule>();
@@ -309,7 +312,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsGeneratedG
     }
 
     std::optional<ECS::EntityHandle> completedEntity{};
-    Runtime::Engine completedEngine(
+    Intrinsic::Tests::RuntimeTestKernel completedEngine(
         HeadlessConfig(),
         std::make_unique<WaitForConditionApplication>(
             [&completedEntity](Runtime::Engine& runningEngine)

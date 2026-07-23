@@ -1,10 +1,10 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <bit>
 #include <chrono>
-#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -62,6 +62,7 @@ import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.QueueAffinity;
+import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
@@ -70,7 +71,6 @@ import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorUiHost;
-import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
@@ -97,6 +97,7 @@ import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
+import Extrinsic.Runtime.WorldRegistry;
 import Geometry.Graph;
 import Geometry.Graph.Vertex.Normals;
 import Geometry.Curvature;
@@ -396,10 +397,11 @@ namespace Extrinsic::Runtime
             const A::AssetFileFormatInfo* format = A::FindAssetFileFormat(path);
             if (format == nullptr || format->ImportPayloads.empty())
             {
-                const std::string reason = automaticDiagnostic.Message.empty()
-                    ? std::string{
-                          "The selected asset format has no supported import payload."}
-                    : automaticDiagnostic.Message;
+                const std::string reason =
+                    automaticDiagnostic.Message.empty()
+                        ? std::string{"The selected asset format has no supported import "
+                                      "payload."}
+                        : automaticDiagnostic.Message;
                 disableAll(reason, automaticDiagnostic.Error);
                 return evaluation;
             }
@@ -3971,9 +3973,11 @@ namespace Extrinsic::Runtime
                 out.Category = row.Connectivity
                     ? SandboxEditorTextureBakeSourceCategory::Connectivity
                     : SandboxEditorTextureBakeSourceCategory::Internal;
-                out.DisabledReason = row.Connectivity
-                    ? "connectivity properties are visible but not texture-bake sources"
-                    : "internal mesh coordinate properties are visible but not bake sources";
+                out.DisabledReason =
+                    row.Connectivity
+                        ? "connectivity properties are visible but not texture-bake sources"
+                        : "internal mesh coordinate properties are visible but not bake "
+                          "sources";
                 return out;
             }
             if (!row.Supported ||
@@ -5063,8 +5067,8 @@ namespace Extrinsic::Runtime
                     result.Status =
                         SandboxEditorCommandStatus::InvalidProcessingParameters;
                     result.Error = Core::ErrorCode::InvalidArgument;
-                    result.Diagnostic =
-                        "selected mesh face ring could not be reconstructed for normal recompute";
+                    result.Diagnostic = "selected mesh face ring could not be reconstructed "
+                                        "for normal recompute";
                     return result;
                 }
             }
@@ -5284,8 +5288,8 @@ namespace Extrinsic::Runtime
                 result.Status =
                     SandboxEditorCommandStatus::InvalidProcessingParameters;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Diagnostic =
-                    "selected graph requires count-matched edge endpoint properties for normal recompute";
+                result.Diagnostic = "selected graph requires count-matched edge endpoint "
+                                    "properties for normal recompute";
                 return result;
             }
 
@@ -5300,8 +5304,8 @@ namespace Extrinsic::Runtime
                 result.Status =
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::Unknown;
-                result.Diagnostic =
-                    "graph normal recompute could not build halfedge connectivity scratch storage";
+                result.Diagnostic = "graph normal recompute could not build halfedge "
+                                    "connectivity scratch storage";
                 return result;
             }
 
@@ -5535,8 +5539,9 @@ namespace Extrinsic::Runtime
                 result.Status = soup.Status;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Diagnostic = soup.Diagnostic.empty()
-                    ? "Mesh denoise could not build a triangle soup from GeometrySources."
-                    : soup.Diagnostic;
+                                        ? "Mesh denoise could not build a triangle soup "
+                                          "from GeometrySources."
+                                        : soup.Diagnostic;
                 return result;
             }
 
@@ -5547,8 +5552,8 @@ namespace Extrinsic::Runtime
                 result.Status =
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Diagnostic =
-                    "Mesh denoise could not convert selected GeometrySources to halfedge topology.";
+                result.Diagnostic = "Mesh denoise could not convert selected "
+                                    "GeometrySources to halfedge topology.";
                 return result;
             }
             if (converted.Mesh.VerticesSize() != result.BeforePositions.size())
@@ -5748,14 +5753,15 @@ namespace Extrinsic::Runtime
             else if (source.Status ==
                      SandboxEditorCommandStatus::InvalidProcessingParameters)
             {
-                result.Diagnostic =
-                    "Mesh curvature requires finite count-matched vertex positions and valid mesh topology.";
+                result.Diagnostic = "Mesh curvature requires finite count-matched vertex "
+                                    "positions and valid mesh topology.";
             }
             else
             {
                 result.Diagnostic = source.Diagnostic.empty()
-                    ? "Mesh curvature could not build a halfedge mesh from GeometrySources."
-                    : source.Diagnostic;
+                                        ? "Mesh curvature could not build a halfedge mesh "
+                                          "from GeometrySources."
+                                        : source.Diagnostic;
             }
             return result;
         }
@@ -6868,8 +6874,8 @@ namespace Extrinsic::Runtime
             {
                 result.Status = commitStatus;
                 result.Error = Core::ErrorCode::Unknown;
-                result.Message =
-                    "Point-cloud outlier-removal publication failed during editor history commit.";
+                result.Message = "Point-cloud outlier-removal publication failed during "
+                                 "editor history commit.";
                 PublishPointCloudOutlierRemovalResultSink(context, result);
                 return Core::Err(Core::ErrorCode::Unknown);
             }
@@ -6976,8 +6982,8 @@ namespace Extrinsic::Runtime
                 result.GeometryStatus =
                     Geometry::PointCloud::OutlierRemovalStatus::BuildFailed;
                 result.Error = Core::ErrorCode::InvalidState;
-                result.Message =
-                    "Point-cloud outlier-removal CPU job submission was rejected by the runtime job lane.";
+                result.Message = "Point-cloud outlier-removal CPU job submission was "
+                                 "rejected by the runtime job lane.";
                 return result;
             }
 
@@ -7288,8 +7294,8 @@ namespace Extrinsic::Runtime
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
                 result.NormalStatus = GN::RecomputeStatus::InvalidOutputProperty;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message =
-                    "Geometry.HalfedgeMesh.Vertices.Normals produced missing or count-mismatched normals.";
+                result.Message      = "Geometry.HalfedgeMesh.Vertices.Normals produced missing "
+                                      "or count-mismatched normals.";
                 return DerivedJobOutput{
                     .PayloadToken = 0u,
                     .NormalizedProgress = 1.0f,
@@ -7372,8 +7378,8 @@ namespace Extrinsic::Runtime
                 result.NormalStatus =
                     GraphNormals::RecomputeStatus::InvalidOutputProperty;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message =
-                    "Geometry.Graph.Vertex.Normals produced missing or count-mismatched normals.";
+                result.Message = "Geometry.Graph.Vertex.Normals produced missing or "
+                                 "count-mismatched normals.";
                 return DerivedJobOutput{
                     .PayloadToken = 0u,
                     .NormalizedProgress = 1.0f,
@@ -7454,8 +7460,8 @@ namespace Extrinsic::Runtime
                 result.NormalStatus =
                     PointNormals::RecomputeStatus::InvalidOutputProperty;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message =
-                    "Geometry.PointCloud.Normals produced missing or count-mismatched normals.";
+                result.Message = "Geometry.PointCloud.Normals produced missing or "
+                                 "count-mismatched normals.";
                 return DerivedJobOutput{
                     .PayloadToken = 0u,
                     .NormalizedProgress = 1.0f,
@@ -7533,8 +7539,8 @@ namespace Extrinsic::Runtime
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
                 result.NormalStatus = GN::RecomputeStatus::PropertyTypeConflict;
                 result.Error = Core::ErrorCode::TypeMismatch;
-                result.Message =
-                    "Mesh vertex-normal publication failed because v:normal has an incompatible type or size.";
+                result.Message      = "Mesh vertex-normal publication failed because v:normal "
+                                      "has an incompatible type or size.";
                 PublishMeshVertexNormalsResultSink(context, result);
                 return Core::Err(result.Error);
             }
@@ -7597,8 +7603,8 @@ namespace Extrinsic::Runtime
                 result.NormalStatus =
                     GraphNormals::RecomputeStatus::PropertyTypeConflict;
                 result.Error = Core::ErrorCode::TypeMismatch;
-                result.Message =
-                    "Graph vertex-normal publication failed because v:normal has an incompatible type or size.";
+                result.Message = "Graph vertex-normal publication failed because v:normal "
+                                 "has an incompatible type or size.";
                 PublishGraphVertexNormalsResultSink(context, result);
                 return Core::Err(result.Error);
             }
@@ -7630,8 +7636,8 @@ namespace Extrinsic::Runtime
             {
                 result.Status = SandboxEditorCommandStatus::MissingScene;
                 result.Error = Core::ErrorCode::InvalidState;
-                result.Message =
-                    "Scene registry is unavailable for point-cloud vertex-normal publication.";
+                result.Message = "Scene registry is unavailable for point-cloud "
+                                 "vertex-normal publication.";
                 PublishPointCloudVertexNormalsResultSink(context, result);
                 return Core::Err(result.Error);
             }
@@ -7662,8 +7668,8 @@ namespace Extrinsic::Runtime
                 result.NormalStatus =
                     PointNormals::RecomputeStatus::PropertyTypeConflict;
                 result.Error = Core::ErrorCode::TypeMismatch;
-                result.Message =
-                    "Point-cloud vertex-normal publication failed because v:normal has an incompatible type or size.";
+                result.Message = "Point-cloud vertex-normal publication failed because "
+                                 "v:normal has an incompatible type or size.";
                 PublishPointCloudVertexNormalsResultSink(context, result);
                 return Core::Err(result.Error);
             }
@@ -7788,10 +7794,10 @@ namespace Extrinsic::Runtime
             {
                 return MakeMeshNormalsResult(
                     SandboxEditorCommandStatus::GeometryProcessingFailed,
-                    GN::RecomputeStatus::InvalidOutputProperty,
-                    command.Weighting,
+                    GN::RecomputeStatus::InvalidOutputProperty, command.Weighting,
                     Core::ErrorCode::InvalidState,
-                    "Mesh vertex-normal CPU job submission was rejected by the runtime job lane.");
+                    "Mesh vertex-normal CPU job submission was rejected by the runtime job "
+                    "lane.");
             }
 
             return MakePendingMeshVertexNormalsResult(
@@ -7817,9 +7823,9 @@ namespace Extrinsic::Runtime
                 return MakeGraphNormalsResult(
                     SandboxEditorCommandStatus::InvalidProcessingParameters,
                     GraphNormals::RecomputeStatus::InvalidPositionProperty,
-                    command.OrientTowardFallback,
-                    Core::ErrorCode::InvalidArgument,
-                    "selected graph requires count-matched finite v:position for normal recompute");
+                    command.OrientTowardFallback, Core::ErrorCode::InvalidArgument,
+                    "selected graph requires count-matched finite v:position for normal "
+                    "recompute");
             }
 
             auto state =
@@ -7866,9 +7872,9 @@ namespace Extrinsic::Runtime
                 return MakeGraphNormalsResult(
                     SandboxEditorCommandStatus::GeometryProcessingFailed,
                     GraphNormals::RecomputeStatus::InvalidOutputProperty,
-                    command.OrientTowardFallback,
-                    Core::ErrorCode::InvalidState,
-                    "Graph vertex-normal CPU job submission was rejected by the runtime job lane.");
+                    command.OrientTowardFallback, Core::ErrorCode::InvalidState,
+                    "Graph vertex-normal CPU job submission was rejected by the runtime "
+                    "job lane.");
             }
 
             return MakePendingGraphVertexNormalsResult(
@@ -7891,10 +7897,10 @@ namespace Extrinsic::Runtime
             {
                 return MakePointCloudNormalsResult(
                     SandboxEditorCommandStatus::InvalidProcessingParameters,
-                    PointNormals::RecomputeStatus::InvalidPositionProperty,
-                    command,
+                    PointNormals::RecomputeStatus::InvalidPositionProperty, command,
                     Core::ErrorCode::InvalidArgument,
-                    "selected point-cloud requires count-matched finite v:position for normal recompute");
+                    "selected point-cloud requires count-matched finite v:position for "
+                    "normal recompute");
             }
 
             auto state =
@@ -7935,10 +7941,10 @@ namespace Extrinsic::Runtime
             {
                 return MakePointCloudNormalsResult(
                     SandboxEditorCommandStatus::GeometryProcessingFailed,
-                    PointNormals::RecomputeStatus::InvalidOutputProperty,
-                    command,
+                    PointNormals::RecomputeStatus::InvalidOutputProperty, command,
                     Core::ErrorCode::InvalidState,
-                    "Point-cloud vertex-normal CPU job submission was rejected by the runtime job lane.");
+                    "Point-cloud vertex-normal CPU job submission was rejected by the "
+                    "runtime job lane.");
             }
 
             return MakePendingPointCloudVertexNormalsResult(
@@ -8183,8 +8189,8 @@ namespace Extrinsic::Runtime
                 result.Status =
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message =
-                    "Geometry.Curvature produced missing or count-mismatched scalar properties.";
+                result.Message = "Geometry.Curvature produced missing or count-mismatched "
+                                 "scalar properties.";
                 return DerivedJobOutput{
                     .PayloadToken = 0u,
                     .NormalizedProgress = 1.0f,
@@ -8238,8 +8244,8 @@ namespace Extrinsic::Runtime
                     result.Status =
                         SandboxEditorCommandStatus::GeometryProcessingFailed;
                     result.Error = Core::ErrorCode::InvalidArgument;
-                    result.Message =
-                        "Geometry.Curvature produced missing or count-mismatched principal-direction properties.";
+                    result.Message = "Geometry.Curvature produced missing or "
+                                     "count-mismatched principal-direction properties.";
                     return DerivedJobOutput{
                         .PayloadToken = 0u,
                         .NormalizedProgress = 1.0f,
@@ -8346,8 +8352,8 @@ namespace Extrinsic::Runtime
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
                 result.DenoiseStatus = Smooth::DenoiseStatus::NonFiniteInput;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message =
-                    "Geometry.Smoothing denoise produced invalid or count-mismatched positions.";
+                result.Message       = "Geometry.Smoothing denoise produced invalid or "
+                                       "count-mismatched positions.";
                 return DerivedJobOutput{
                     .PayloadToken = 0u,
                     .NormalizedProgress = 1.0f,
@@ -8491,8 +8497,8 @@ namespace Extrinsic::Runtime
                     result.Status =
                         SandboxEditorCommandStatus::GeometryProcessingFailed;
                     result.Error = Core::ErrorCode::InvalidArgument;
-                    result.Message =
-                        "Geometry.Subdivision Loop subdivision failed for the selected mesh and parameters.";
+                    result.Message = "Geometry.Subdivision Loop subdivision failed for the "
+                                     "selected mesh and parameters.";
                     return DerivedJobOutput{
                         .PayloadToken = 0u,
                         .NormalizedProgress = 1.0f,
@@ -8519,8 +8525,8 @@ namespace Extrinsic::Runtime
                     result.Status =
                         SandboxEditorCommandStatus::GeometryProcessingFailed;
                     result.Error = Core::ErrorCode::InvalidArgument;
-                    result.Message =
-                        "Geometry.CatmullClark subdivision failed for the selected mesh and parameters.";
+                    result.Message = "Geometry.CatmullClark subdivision failed for the "
+                                     "selected mesh and parameters.";
                     return DerivedJobOutput{
                         .PayloadToken = 0u,
                         .NormalizedProgress = 1.0f,
@@ -8548,8 +8554,8 @@ namespace Extrinsic::Runtime
                     result.Status =
                         SandboxEditorCommandStatus::GeometryProcessingFailed;
                     result.Error = Core::ErrorCode::InvalidArgument;
-                    result.Message =
-                        "Geometry.HalfedgeMesh.SubdivisionSqrt3 failed for the selected mesh and parameters.";
+                    result.Message = "Geometry.HalfedgeMesh.SubdivisionSqrt3 failed for the "
+                                     "selected mesh and parameters.";
                     return DerivedJobOutput{
                         .PayloadToken = 0u,
                         .NormalizedProgress = 1.0f,
@@ -8688,8 +8694,8 @@ namespace Extrinsic::Runtime
             {
                 result.Status = commitStatus;
                 result.Error = Core::ErrorCode::Unknown;
-                result.Message =
-                    "Mesh denoise position publication failed during editor history commit.";
+                result.Message = "Mesh denoise position publication failed during editor "
+                                 "history commit.";
                 PublishMeshDenoiseResultSink(context, result);
                 return Core::Err(Core::ErrorCode::Unknown);
             }
@@ -8723,8 +8729,8 @@ namespace Extrinsic::Runtime
             {
                 result.Status = commitStatus;
                 result.Error = Core::ErrorCode::Unknown;
-                result.Message =
-                    "Mesh curvature property publication failed during editor history commit.";
+                result.Message = "Mesh curvature property publication failed during editor "
+                                 "history commit.";
                 PublishMeshCurvatureResultSink(context, result);
                 return Core::Err(Core::ErrorCode::Unknown);
             }
@@ -8963,8 +8969,8 @@ namespace Extrinsic::Runtime
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
                 result.VertexSlotCount = source.VertexSlotCount;
                 result.Error = Core::ErrorCode::InvalidState;
-                result.Message =
-                    "Mesh curvature CPU job submission was rejected by the runtime job lane.";
+                result.Message         = "Mesh curvature CPU job submission was rejected by the "
+                                         "runtime job lane.";
                 return result;
             }
 
@@ -9136,8 +9142,8 @@ namespace Extrinsic::Runtime
                 result.Status =
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidState;
-                result.Message =
-                    "Mesh subdivide CPU job submission was rejected by the runtime job lane.";
+                result.Message = "Mesh subdivide CPU job submission was rejected by the "
+                                 "runtime job lane.";
                 return result;
             }
 
@@ -9189,8 +9195,8 @@ namespace Extrinsic::Runtime
                 result.Status =
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidState;
-                result.Message =
-                    "Mesh simplify CPU job submission was rejected by the runtime job lane.";
+                result.Message = "Mesh simplify CPU job submission was rejected by the "
+                                 "runtime job lane.";
                 return result;
             }
 
@@ -9463,8 +9469,8 @@ namespace Extrinsic::Runtime
                 result.Status =
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message =
-                    "ICP rejected the selected point clouds (fewer than 3 points or invalid parameters).";
+                result.Message = "ICP rejected the selected point clouds (fewer than 3 "
+                                 "points or invalid parameters).";
                 return DerivedJobOutput{
                     .PayloadToken = 0u,
                     .NormalizedProgress = 1.0f,
@@ -9690,8 +9696,8 @@ namespace Extrinsic::Runtime
                 result.SourcePointCount = state->SourceLocalPoints.size();
                 result.TargetPointCount = state->TargetLocalPoints.size();
                 result.Error = Core::ErrorCode::InvalidState;
-                result.Message =
-                    "ICP registration CPU job submission was rejected by the runtime job lane.";
+                result.Message          = "ICP registration CPU job submission was rejected by the "
+                                          "runtime job lane.";
                 return result;
             }
 
@@ -10837,10 +10843,10 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] SandboxEditorParameterizationUvViewState
-        SubmitEngineParameterizationUvView(
-            Engine& engine,
-            const RenderExtractionCache* renderExtraction,
-            SandboxEditorParameterizationUvViewRequest request)
+        SubmitRuntimeParameterizationUvView(Graphics::IRenderer& renderer, RHI::IDevice& device,
+                                            ServiceRegistry& services,
+                                            const RenderExtractionCache* renderExtraction,
+                                            SandboxEditorParameterizationUvViewRequest request)
         {
             using ConfigBackground = ParameterizationUvBackgroundMode;
             using ConfigMode = ParameterizationUvRenderMode;
@@ -10871,8 +10877,7 @@ namespace Extrinsic::Runtime
             {
                 Graphics::UvViewRequest disabledRequest{};
                 disabledRequest.RequestToken = request.RequestToken;
-                engine.GetRenderer().SubmitUvViewRequest(
-                    std::move(disabledRequest));
+                renderer.SubmitUvViewRequest(std::move(disabledRequest));
                 return state;
             }
 
@@ -10902,7 +10907,7 @@ namespace Extrinsic::Runtime
                 RHI::kInvalidBindlessIndex;
             std::uint64_t backgroundTextureGeneration = 0u;
             const Graphics::GpuAssetCache* const gpuAssetCache =
-                engine.Services().Find<Graphics::GpuAssetCache>();
+                services.Find<Graphics::GpuAssetCache>();
             if (renderExtraction != nullptr &&
                 gpuAssetCache != nullptr &&
                 request.View.BackgroundMode == ConfigBackground::Texture)
@@ -10949,26 +10954,24 @@ namespace Extrinsic::Runtime
                 .TriangleConformalDistortion =
                     std::move(request.TriangleConformalDistortion),
             };
-            engine.GetRenderer().SubmitUvViewRequest(
-                std::move(graphicsRequest));
+            renderer.SubmitUvViewRequest(std::move(graphicsRequest));
 
-            if (!engine.GetDevice().IsOperational())
+            if (!device.IsOperational())
             {
                 state.Status = SandboxStatus::CpuFallbackNonOperational;
-                state.Message =
-                    "GPU UV view is unavailable because the render device is not operational; CPU layout is active.";
+                state.Message = "GPU UV view is unavailable because the render device is "
+                                "not operational; CPU layout is active.";
                 return state;
             }
             if (!geometry.has_value())
             {
                 state.Status = SandboxStatus::WaitingForGeometry;
-                state.Message =
-                    "Selected mesh GPU surface residency is not ready; CPU layout is active.";
+                state.Message = "Selected mesh GPU surface residency is not ready; CPU "
+                                "layout is active.";
                 return state;
             }
 
-            const Graphics::UvViewOutput output =
-                engine.GetRenderer().GetUvViewOutput();
+            const Graphics::UvViewOutput output = renderer.GetUvViewOutput();
             if (output.RequestToken != state.RequestToken)
                 return state;
 
@@ -11005,8 +11008,8 @@ namespace Extrinsic::Runtime
                 {
                     state.ActiveBackground = ConfigBackground::Checker;
                 }
-                state.Message =
-                    "GPU UV view target is not yet ready for this pane extent; CPU layout is active.";
+                state.Message = "GPU UV view target is not yet ready for this pane extent; "
+                                "CPU layout is active.";
                 return state;
             }
             if (output.Status == Graphics::UvViewStatus::Ready)
@@ -11019,31 +11022,24 @@ namespace Extrinsic::Runtime
             return state;
         }
 
-        [[nodiscard]] SandboxEditorContext BuildContextFromEngine(Engine& engine)
+        [[nodiscard]] SandboxEditorContext BuildContextFromRuntime(WorldRegistry& worlds,
+                                                                   ServiceRegistry& services)
         {
-            const RenderExtractionCache* renderExtraction =
-                engine.Services().Find<RenderExtractionCache>();
-            DerivedJobRegistry* derivedJobs =
-                engine.Services().Find<DerivedJobRegistry>();
-            EngineConfigControl* configControl =
-                engine.Services().Find<EngineConfigControl>();
-            const auto activeWorld = engine.ActiveWorld();
-            ECS::Scene::Registry* const activeScene =
-                engine.Worlds().Get(activeWorld);
-            EditorCommandHistory* const commandHistory =
-                engine.Services().Find<EditorCommandHistory>();
-            SceneDocumentModule* const sceneDocuments =
-                engine.Services().Find<SceneDocumentModule>();
-            SceneInteractionModule* const interaction =
-                engine.Services().Find<SceneInteractionModule>();
-            SelectionController* const selection =
-                engine.Services().Find<SelectionController>();
-            Assets::AssetService* const assetService =
-                engine.Services().Find<Assets::AssetService>();
-            AssetImportPipeline* const assetImportPipeline =
-                engine.Services().Find<AssetImportPipeline>();
-            TextureBakeService* const textureBake =
-                engine.Services().Find<TextureBakeService>();
+            RenderExtractionCache* renderExtraction    = services.Find<RenderExtractionCache>();
+            DerivedJobRegistry* derivedJobs            = services.Find<DerivedJobRegistry>();
+            EngineConfigControl* configControl         = services.Find<EngineConfigControl>();
+            Platform::IWindow* const window            = services.Find<Platform::IWindow>();
+            RHI::IDevice* const device                 = services.Find<RHI::IDevice>();
+            Graphics::IRenderer* const renderer        = services.Find<Graphics::IRenderer>();
+            const auto activeWorld                     = worlds.ActiveWorld();
+            ECS::Scene::Registry* const activeScene    = worlds.Get(activeWorld);
+            EditorCommandHistory* const commandHistory = services.Find<EditorCommandHistory>();
+            SceneDocumentModule* const sceneDocuments  = services.Find<SceneDocumentModule>();
+            SceneInteractionModule* const interaction  = services.Find<SceneInteractionModule>();
+            SelectionController* const selection       = services.Find<SelectionController>();
+            Assets::AssetService* const assetService   = services.Find<Assets::AssetService>();
+            AssetImportPipeline* const assetImportPipeline = services.Find<AssetImportPipeline>();
+            TextureBakeService* const textureBake          = services.Find<TextureBakeService>();
             SandboxEditorDerivedJobCommandSurface derivedJobCommands{};
             if (derivedJobs != nullptr)
             {
@@ -11060,30 +11056,26 @@ namespace Extrinsic::Runtime
                     };
             }
             SandboxEditorContext context{
-                .Scene = activeScene,
-                .World = activeWorld,
-                .Selection = selection,
+                .Scene          = activeScene,
+                .World          = activeWorld,
+                .Selection      = selection,
                 .CommandHistory = commandHistory,
-                .AssetService = assetService,
-                .LastRefinedPrimitive = interaction != nullptr
-                    ? &interaction->LastRefinedPrimitive()
-                    : nullptr,
+                .AssetService   = assetService,
+                .LastRefinedPrimitive =
+                    interaction != nullptr ? &interaction->LastRefinedPrimitive() : nullptr,
                 .LastRefinedPrimitiveGeneration =
-                    interaction != nullptr
-                        ? interaction->
-                            LastRefinedPrimitiveGeneration()
-                        : 0u,
-                .CameraControllers =
-                    engine.Services().Find<CameraControllerRegistry>(),
-                .CameraViewport = Core::Extent2D{
-                    engine.GetWindow().GetFramebufferExtent().Width,
-                    engine.GetWindow().GetFramebufferExtent().Height},
-                .Device = &engine.GetDevice(),
-                .TextureBake = textureBake,
-                .AssetImportCommands = SandboxEditorAssetImportCommandSurface{
-                    .Import =
-                        [assetImportPipeline](
-                            const SandboxEditorFileImportCommand& command)
+                    interaction != nullptr ? interaction->LastRefinedPrimitiveGeneration() : 0u,
+                .CameraControllers = services.Find<CameraControllerRegistry>(),
+                .CameraViewport    = window != nullptr
+                                         ? Core::Extent2D{window->GetFramebufferExtent().Width,
+                                                       window->GetFramebufferExtent().Height}
+                                         : Core::Extent2D{},
+                .Device            = device,
+                .TextureBake       = textureBake,
+                .AssetImportCommands =
+                    SandboxEditorAssetImportCommandSurface{
+                        .Import =
+                            [assetImportPipeline](const SandboxEditorFileImportCommand& command)
                         {
                             if (assetImportPipeline == nullptr)
                             {
@@ -11178,19 +11170,19 @@ namespace Extrinsic::Runtime
                                 BuildImportSuccessMessage(command, result);
                             return result;
                         },
-                },
-                .AssetImportQueueCommands = SandboxEditorAssetImportQueueCommandSurface{
-                    .ClearCompleted =
-                        [assetImportPipeline]()
+                    },
+                .AssetImportQueueCommands =
+                    SandboxEditorAssetImportQueueCommandSurface{
+                        .ClearCompleted =
+                            [assetImportPipeline]()
                         {
                             return assetImportPipeline != nullptr
                                 ? assetImportPipeline->
                                       ClearCompletedAssetImports()
                                 : std::size_t{0u};
                         },
-                    .Cancel =
-                        [assetImportPipeline](
-                            const RuntimeAssetIngestHandle operation)
+                        .Cancel =
+                            [assetImportPipeline](const RuntimeAssetIngestHandle operation)
                         {
                             return assetImportPipeline != nullptr
                                 ? assetImportPipeline->
@@ -11198,10 +11190,11 @@ namespace Extrinsic::Runtime
                                 : Core::Err(
                                       Core::ErrorCode::InvalidState);
                         },
-                },
-                .SceneFileCommands = SandboxEditorSceneFileCommandSurface{
-                    .New =
-                        [sceneDocuments]()
+                    },
+                .SceneFileCommands =
+                    SandboxEditorSceneFileCommandSurface{
+                        .New =
+                            [sceneDocuments]()
                         {
                             if (sceneDocuments == nullptr)
                             {
@@ -11234,9 +11227,8 @@ namespace Extrinsic::Runtime
                             result.Message = BuildSceneFileSuccessMessage({}, result);
                             return result;
                         },
-                    .Save =
-                        [sceneDocuments](
-                            const SandboxEditorSceneFileCommand& command)
+                        .Save =
+                            [sceneDocuments](const SandboxEditorSceneFileCommand& command)
                         {
                             if (sceneDocuments == nullptr)
                             {
@@ -11274,9 +11266,8 @@ namespace Extrinsic::Runtime
                                 result.Operation);
                             return result;
                         },
-                    .Load =
-                        [sceneDocuments](
-                            const SandboxEditorSceneFileCommand& command)
+                        .Load =
+                            [sceneDocuments](const SandboxEditorSceneFileCommand& command)
                         {
                             if (sceneDocuments == nullptr)
                             {
@@ -11314,8 +11305,8 @@ namespace Extrinsic::Runtime
                                 result.Operation);
                             return result;
                         },
-                    .Close =
-                        [sceneDocuments]()
+                        .Close =
+                            [sceneDocuments]()
                         {
                             if (sceneDocuments == nullptr)
                             {
@@ -11348,59 +11339,67 @@ namespace Extrinsic::Runtime
                             result.Message = BuildSceneFileSuccessMessage({}, result);
                             return result;
                         },
-                },
+                    },
                 .ParameterizationUvViewCommands =
                     SandboxEditorParameterizationUvViewCommandSurface{
                         .Submit =
-                            [&engine, renderExtraction](
-                                SandboxEditorParameterizationUvViewRequest request)
+                            [renderer, device, &services,
+                             renderExtraction](SandboxEditorParameterizationUvViewRequest request)
+                        {
+                            if (renderer == nullptr || device == nullptr)
                             {
-                                return SubmitEngineParameterizationUvView(
-                                    engine,
-                                    renderExtraction,
-                                    std::move(request));
-                            },
+                                return SandboxEditorParameterizationUvViewState{};
+                            }
+                            return SubmitRuntimeParameterizationUvView(
+                                *renderer, *device, services, renderExtraction, std::move(request));
+                        },
                     },
-                .VisualizationAdapterBindings = SandboxEditorVisualizationAdapterBindingCommandSurface{
-                    .GetBinding =
-                        [&engine](const std::uint32_t stableEntityId)
+                .VisualizationAdapterBindings =
+                    SandboxEditorVisualizationAdapterBindingCommandSurface{
+                        .GetBinding =
+                            [renderExtraction](const std::uint32_t stableEntityId)
                         {
-                            return engine.GetVisualizationAdapterBinding(stableEntityId);
+                            return renderExtraction != nullptr
+                                       ? renderExtraction->GetVisualizationAdapterBinding(
+                                             stableEntityId)
+                                       : std::optional<
+                                             RenderExtractionCache::VisualizationAdapterBinding>{};
                         },
-                    .SetBinding =
-                        [&engine](
-                            const std::uint32_t stableEntityId,
-                            RenderExtractionCache::VisualizationAdapterBinding binding)
+                        .SetBinding =
+                            [renderExtraction](
+                                const std::uint32_t stableEntityId,
+                                RenderExtractionCache::VisualizationAdapterBinding binding)
                         {
-                            engine.SetVisualizationAdapterBinding(
-                                stableEntityId,
-                                std::move(binding));
+                            if (renderExtraction != nullptr)
+                                renderExtraction->SetVisualizationAdapterBinding(
+                                    stableEntityId, std::move(binding));
                         },
-                    .ClearBinding =
-                        [&engine](const std::uint32_t stableEntityId)
+                        .ClearBinding =
+                            [renderExtraction](const std::uint32_t stableEntityId)
                         {
-                            engine.ClearVisualizationAdapterBinding(stableEntityId);
+                            if (renderExtraction != nullptr)
+                                renderExtraction->ClearVisualizationAdapterBinding(stableEntityId);
                         },
-                },
+                    },
                 .VisualizationAdapterBindingRevision =
-                    engine.GetVisualizationAdapterBindingRevision(),
+                    renderExtraction != nullptr
+                        ? renderExtraction->GetVisualizationAdapterBindingRevision()
+                        : 0u,
                 .DerivedJobCommands = std::move(derivedJobCommands),
-                .AssetImportQueue =
-                    assetImportPipeline != nullptr
-                        ? assetImportPipeline->GetAssetImportQueueSnapshot()
-                        : RuntimeAssetImportQueueSnapshot{},
-                .RenderGraphStats = &engine.GetRenderer().GetLastRenderGraphStats(),
+                .AssetImportQueue   = assetImportPipeline != nullptr
+                                          ? assetImportPipeline->GetAssetImportQueueSnapshot()
+                                          : RuntimeAssetImportQueueSnapshot{},
+                .RenderGraphStats =
+                    renderer != nullptr ? &renderer->GetLastRenderGraphStats() : nullptr,
                 .ImGuiAdapterAvailable =
-                    [&engine]
-                    {
-                        const EditorUiHost* host =
-                            engine.Services().Find<EditorUiHost>();
-                        return host != nullptr && host->IsOperational();
-                    }(),
-                .AssetImportCommandsAvailable =
-                    assetImportPipeline != nullptr,
-                .SceneFileCommandsAvailable = true,
-                .CameraRenderCommandsAvailable = true,
+                    [&services]
+                {
+                    const EditorUiHost* host = services.Find<EditorUiHost>();
+                    return host != nullptr && host->IsOperational();
+                }(),
+                .AssetImportCommandsAvailable   = assetImportPipeline != nullptr,
+                .SceneFileCommandsAvailable     = true,
+                .CameraRenderCommandsAvailable  = true,
                 .VisualizationCommandsAvailable = true,
             };
             if (configControl != nullptr)
@@ -11543,35 +11542,29 @@ namespace Extrinsic::Runtime
                             "Scene close failed: editor session attachment expired.",
                     };
                 });
-            context.ParameterizationUvViewCommands.Submit =
-                GuardAttachmentCommand(
-                    std::move(
-                        context.ParameterizationUvViewCommands.Submit),
-                    epoch,
-                    [](SandboxEditorParameterizationUvViewRequest request)
-                    {
-                        return SandboxEditorParameterizationUvViewState{
-                            .Status =
-                                SandboxEditorParameterizationUvViewStatus::CpuFallbackNonOperational,
-                            .RequestedMode = request.View.RenderMode,
-                            .ActiveMode =
-                                ParameterizationUvRenderMode::CpuLayout,
-                            .RequestedBackground =
-                                request.View.BackgroundMode,
-                            .ActiveBackground =
-                                request.View.BackgroundMode ==
-                                            ParameterizationUvBackgroundMode::Grid ||
-                                        request.View.BackgroundMode ==
-                                            ParameterizationUvBackgroundMode::Checker
-                                    ? request.View.BackgroundMode
-                                    : ParameterizationUvBackgroundMode::Checker,
-                            .RequestToken = request.RequestToken,
-                            .Width = request.Width,
-                            .Height = request.Height,
-                            .Message =
-                                "GPU UV view command failed because the editor session attachment expired.",
-                        };
-                    });
+            context.ParameterizationUvViewCommands.Submit = GuardAttachmentCommand(
+                std::move(context.ParameterizationUvViewCommands.Submit), epoch,
+                [](SandboxEditorParameterizationUvViewRequest request)
+                {
+                    return SandboxEditorParameterizationUvViewState{
+                        .Status =
+                            SandboxEditorParameterizationUvViewStatus::CpuFallbackNonOperational,
+                        .RequestedMode       = request.View.RenderMode,
+                        .ActiveMode          = ParameterizationUvRenderMode::CpuLayout,
+                        .RequestedBackground = request.View.BackgroundMode,
+                        .ActiveBackground =
+                            request.View.BackgroundMode == ParameterizationUvBackgroundMode::Grid ||
+                                    request.View.BackgroundMode ==
+                                        ParameterizationUvBackgroundMode::Checker
+                                ? request.View.BackgroundMode
+                                : ParameterizationUvBackgroundMode::Checker,
+                        .RequestToken = request.RequestToken,
+                        .Width        = request.Width,
+                        .Height       = request.Height,
+                        .Message      = "GPU UV view command failed because the editor session "
+                                        "attachment expired.",
+                    };
+                });
             context.VisualizationAdapterBindings.GetBinding =
                 GuardAttachmentCommand(
                     std::move(
@@ -11724,8 +11717,8 @@ namespace Extrinsic::Runtime
         }
     }
 
-    const char* DebugNameForSandboxEditorDiagnosticCode(
-        const SandboxEditorDiagnosticCode code) noexcept
+    const char*
+    DebugNameForSandboxEditorDiagnosticCode(const SandboxEditorDiagnosticCode code) noexcept
     {
         switch (code)
         {
@@ -14500,7 +14493,8 @@ namespace Extrinsic::Runtime
             return MakeUvRegenerationResult(
                 SandboxEditorCommandStatus::GeometryProcessingFailed,
                 Geometry::UvAtlas::UvAtlasStatus::BackendFailed,
-                "UV regeneration CPU job submission was rejected by the runtime job lane.");
+                "UV regeneration CPU job submission was rejected by the runtime job "
+                "lane.");
         }
 
         return MakePendingUvRegenerationResult(handle);
@@ -14522,7 +14516,8 @@ namespace Extrinsic::Runtime
             return MakeUvRegenerationResult(
                 SandboxEditorCommandStatus::InvalidProcessingParameters,
                 Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
-                "UV regeneration requires a positive resolution and padding smaller than the atlas.");
+                "UV regeneration requires a positive resolution and padding smaller "
+                "than the atlas.");
         }
         if (!command.BackendName.empty() && command.BackendName != "xatlas")
         {
@@ -14570,7 +14565,8 @@ namespace Extrinsic::Runtime
             return MakeUvRegenerationResult(
                 SandboxEditorCommandStatus::InvalidProcessingParameters,
                 Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
-                "UV regeneration requires count-matched mesh position and halfedge topology properties.");
+                "UV regeneration requires count-matched mesh position and halfedge "
+                "topology properties.");
         }
 
         std::vector<glm::vec2> authoredTexcoords;
@@ -14639,8 +14635,8 @@ namespace Extrinsic::Runtime
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
             result.DenoiseStatus = Smooth::DenoiseStatus::InvalidParams;
             result.Error = Core::ErrorCode::InvalidState;
-            result.Message =
-                "Geometry.Smoothing mesh denoiser is unavailable in this runtime configuration.";
+            result.Message       = "Geometry.Smoothing mesh denoiser is unavailable in this "
+                                   "runtime configuration.";
             return result;
         }
 
@@ -14661,8 +14657,9 @@ namespace Extrinsic::Runtime
                 SandboxEditorCommandStatus::InvalidProcessingParameters;
             result.DenoiseStatus = Smooth::DenoiseStatus::InvalidParams;
             result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message =
-                "Mesh denoise requires a valid stage, positive iteration counts, non-negative finite sigma values, and a positive finite degeneracy epsilon.";
+            result.Message       = "Mesh denoise requires a valid stage, positive iteration "
+                                   "counts, non-negative finite sigma values, and a positive "
+                                   "finite degeneracy epsilon.";
             return result;
         }
 
@@ -14749,8 +14746,8 @@ namespace Extrinsic::Runtime
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
             result.DenoiseStatus = Smooth::DenoiseStatus::NonFiniteInput;
             result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message =
-                "Geometry.Smoothing denoise produced invalid or count-mismatched positions.";
+            result.Message       = "Geometry.Smoothing denoise produced invalid or "
+                                   "count-mismatched positions.";
             return result;
         }
 
@@ -14777,8 +14774,8 @@ namespace Extrinsic::Runtime
         {
             result.Status = commitStatus;
             result.Error = Core::ErrorCode::Unknown;
-            result.Message =
-                "Mesh denoise position publication failed during editor history commit.";
+            result.Message = "Mesh denoise position publication failed during editor "
+                             "history commit.";
             return result;
         }
 
@@ -14809,8 +14806,8 @@ namespace Extrinsic::Runtime
         {
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidState;
-            result.Message =
-                "Geometry.Curvature mesh curvature is unavailable in this runtime configuration.";
+            result.Message = "Geometry.Curvature mesh curvature is unavailable in this "
+                             "runtime configuration.";
             return result;
         }
 
@@ -14895,8 +14892,8 @@ namespace Extrinsic::Runtime
         {
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message =
-                "Geometry.Curvature produced missing or count-mismatched scalar properties.";
+            result.Message = "Geometry.Curvature produced missing or count-mismatched "
+                             "scalar properties.";
             return result;
         }
 
@@ -14939,8 +14936,8 @@ namespace Extrinsic::Runtime
                 result.Status =
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message =
-                    "Geometry.Curvature produced missing or count-mismatched principal-direction properties.";
+                result.Message = "Geometry.Curvature produced missing or "
+                                 "count-mismatched principal-direction properties.";
                 return result;
             }
 
@@ -14981,8 +14978,8 @@ namespace Extrinsic::Runtime
         {
             result.Status = commitStatus;
             result.Error = Core::ErrorCode::Unknown;
-            result.Message =
-                "Mesh curvature property publication failed during editor history commit.";
+            result.Message = "Mesh curvature property publication failed during editor "
+                             "history commit.";
             return result;
         }
 
@@ -15028,8 +15025,9 @@ namespace Extrinsic::Runtime
             result.Status =
                 SandboxEditorCommandStatus::InvalidProcessingParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message =
-                "Mesh remesh requires a valid mode, sizing law, positive iteration count, finite non-negative target length, positive lambda, and valid projection/sizing parameters.";
+            result.Message = "Mesh remesh requires a valid mode, sizing law, positive "
+                             "iteration count, finite non-negative target length, "
+                             "positive lambda, and valid projection/sizing parameters.";
             return result;
         }
         if (command.Mode == SandboxEditorMeshRemeshMode::Uniform &&
@@ -15037,8 +15035,8 @@ namespace Extrinsic::Runtime
         {
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidState;
-            result.Message =
-                "Geometry.Remeshing uniform remesher is unavailable in this runtime configuration.";
+            result.Message = "Geometry.Remeshing uniform remesher is unavailable in "
+                             "this runtime configuration.";
             return result;
         }
         if (command.Mode == SandboxEditorMeshRemeshMode::Adaptive &&
@@ -15046,8 +15044,8 @@ namespace Extrinsic::Runtime
         {
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidState;
-            result.Message =
-                "Geometry.HalfedgeMesh.AdaptiveRemeshing is unavailable in this runtime configuration.";
+            result.Message = "Geometry.HalfedgeMesh.AdaptiveRemeshing is unavailable "
+                             "in this runtime configuration.";
             return result;
         }
         if (command.ProjectToSurface &&
@@ -15055,8 +15053,8 @@ namespace Extrinsic::Runtime
         {
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidState;
-            result.Message =
-                "Mesh remesh project-to-surface is unavailable in this runtime configuration.";
+            result.Message = "Mesh remesh project-to-surface is unavailable in this "
+                             "runtime configuration.";
             return result;
         }
         if (command.SizingLaw ==
@@ -15065,8 +15063,8 @@ namespace Extrinsic::Runtime
         {
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidState;
-            result.Message =
-                "Mesh remesh error-bounded Taubin sizing is unavailable in this runtime configuration.";
+            result.Message = "Mesh remesh error-bounded Taubin sizing is unavailable "
+                             "in this runtime configuration.";
             return result;
         }
 
@@ -15201,8 +15199,9 @@ namespace Extrinsic::Runtime
             result.Status =
                 SandboxEditorCommandStatus::InvalidProcessingParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message =
-                "Mesh subdivide requires a valid operator, positive iteration count, and a feature-edge property name when feature preservation is enabled.";
+            result.Message = "Mesh subdivide requires a valid operator, positive "
+                             "iteration count, and a feature-edge property name when "
+                             "feature preservation is enabled.";
             return result;
         }
         if (command.Operator == SandboxEditorMeshSubdivideOperator::Loop &&
@@ -15210,8 +15209,8 @@ namespace Extrinsic::Runtime
         {
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidState;
-            result.Message =
-                "Geometry.Subdivision Loop subdivision is unavailable in this runtime configuration.";
+            result.Message = "Geometry.Subdivision Loop subdivision is unavailable in "
+                             "this runtime configuration.";
             return result;
         }
         if (command.Operator ==
@@ -15220,8 +15219,8 @@ namespace Extrinsic::Runtime
         {
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidState;
-            result.Message =
-                "Geometry.CatmullClark subdivision is unavailable in this runtime configuration.";
+            result.Message = "Geometry.CatmullClark subdivision is unavailable in this "
+                             "runtime configuration.";
             return result;
         }
         if (command.Operator == SandboxEditorMeshSubdivideOperator::Sqrt3 &&
@@ -15229,8 +15228,8 @@ namespace Extrinsic::Runtime
         {
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidState;
-            result.Message =
-                "Geometry.HalfedgeMesh.SubdivisionSqrt3 is unavailable in this runtime configuration.";
+            result.Message = "Geometry.HalfedgeMesh.SubdivisionSqrt3 is unavailable in "
+                             "this runtime configuration.";
             return result;
         }
         if (command.PreserveLoopFeatureEdges &&
@@ -15239,8 +15238,8 @@ namespace Extrinsic::Runtime
             result.Status =
                 SandboxEditorCommandStatus::InvalidProcessingParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message =
-                "Loop feature-edge preservation can only be used with the Loop subdivision operator.";
+            result.Message = "Loop feature-edge preservation can only be used with the "
+                             "Loop subdivision operator.";
             return result;
         }
         if (command.PreserveLoopFeatureEdges &&
@@ -15248,8 +15247,8 @@ namespace Extrinsic::Runtime
         {
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidState;
-            result.Message =
-                "Loop subdivision feature-edge preservation is unavailable in this runtime configuration.";
+            result.Message = "Loop subdivision feature-edge preservation is "
+                             "unavailable in this runtime configuration.";
             return result;
         }
 
@@ -15304,8 +15303,8 @@ namespace Extrinsic::Runtime
                 result.Status =
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message =
-                    "Geometry.Subdivision Loop subdivision failed for the selected mesh and parameters.";
+                result.Message = "Geometry.Subdivision Loop subdivision failed for the "
+                                 "selected mesh and parameters.";
                 return result;
             }
             result.IterationsPerformed =
@@ -15326,8 +15325,8 @@ namespace Extrinsic::Runtime
                 result.Status =
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message =
-                    "Geometry.CatmullClark subdivision failed for the selected mesh and parameters.";
+                result.Message = "Geometry.CatmullClark subdivision failed for the "
+                                 "selected mesh and parameters.";
                 return result;
             }
             result.IterationsPerformed =
@@ -15348,8 +15347,8 @@ namespace Extrinsic::Runtime
                 result.Status =
                     SandboxEditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message =
-                    "Geometry.HalfedgeMesh.SubdivisionSqrt3 failed for the selected mesh and parameters.";
+                result.Message = "Geometry.HalfedgeMesh.SubdivisionSqrt3 failed for the "
+                                 "selected mesh and parameters.";
                 return result;
             }
             result.IterationsPerformed =
@@ -15414,8 +15413,9 @@ namespace Extrinsic::Runtime
             result.Status =
                 SandboxEditorCommandStatus::InvalidProcessingParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message =
-                "Mesh simplify requires a valid metric, a positive target face count or maximum error, non-negative weights, and a feature angle within [0, 180].";
+            result.Message = "Mesh simplify requires a valid metric, a positive target "
+                             "face count or maximum error, non-negative weights, and a "
+                             "feature angle within [0, 180].";
             return result;
         }
         if (!context.MeshSimplifyKernelAvailable)
@@ -15554,10 +15554,10 @@ namespace Extrinsic::Runtime
         {
             return MakeMeshNormalsResult(
                 SandboxEditorCommandStatus::InvalidProcessingParameters,
-                GN::RecomputeStatus::InvalidOutputProperty,
-                command.Weighting,
+                GN::RecomputeStatus::InvalidOutputProperty, command.Weighting,
                 Core::ErrorCode::InvalidArgument,
-                "Mesh vertex-normal recompute requires a positive finite degeneracy epsilon.");
+                "Mesh vertex-normal recompute requires a positive finite degeneracy "
+                "epsilon.");
         }
 
         entt::registry& raw = context.Scene->Raw();
@@ -15629,8 +15629,8 @@ namespace Extrinsic::Runtime
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
             result.NormalStatus = GN::RecomputeStatus::PropertyTypeConflict;
             result.Error = Core::ErrorCode::TypeMismatch;
-            result.Message =
-                "Mesh vertex-normal publication failed because v:normal has an incompatible type or size.";
+            result.Message      = "Mesh vertex-normal publication failed because v:normal "
+                                  "has an incompatible type or size.";
             return result;
         }
 
@@ -15661,10 +15661,10 @@ namespace Extrinsic::Runtime
         {
             return MakeGraphNormalsResult(
                 SandboxEditorCommandStatus::InvalidProcessingParameters,
-                GraphNormals::RecomputeStatus::InvalidOutputProperty,
-                command.OrientTowardFallback,
+                GraphNormals::RecomputeStatus::InvalidOutputProperty, command.OrientTowardFallback,
                 Core::ErrorCode::InvalidArgument,
-                "Graph vertex-normal recompute requires positive finite degeneracy and collinearity epsilons.");
+                "Graph vertex-normal recompute requires positive finite degeneracy and "
+                "collinearity epsilons.");
         }
 
         entt::registry& raw = context.Scene->Raw();
@@ -15760,8 +15760,8 @@ namespace Extrinsic::Runtime
             result.NormalStatus =
                 GraphNormals::RecomputeStatus::PropertyTypeConflict;
             result.Error = Core::ErrorCode::TypeMismatch;
-            result.Message =
-                "Graph vertex-normal publication failed because v:normal has an incompatible type or size.";
+            result.Message = "Graph vertex-normal publication failed because v:normal "
+                             "has an incompatible type or size.";
             return result;
         }
 
@@ -15782,11 +15782,10 @@ namespace Extrinsic::Runtime
         if (context.Scene == nullptr)
         {
             return MakePointCloudNormalsResult(
-                SandboxEditorCommandStatus::MissingScene,
-                PointNormals::RecomputeStatus::EmptyInput,
-                command,
-                Core::ErrorCode::InvalidState,
-                "Scene registry is unavailable for point-cloud vertex-normal recompute.");
+                SandboxEditorCommandStatus::MissingScene, PointNormals::RecomputeStatus::EmptyInput,
+                command, Core::ErrorCode::InvalidState,
+                "Scene registry is unavailable for point-cloud vertex-normal "
+                "recompute.");
         }
         if (command.KNeighbors == 0u ||
             command.MinimumNeighbors == 0u ||
@@ -15797,10 +15796,10 @@ namespace Extrinsic::Runtime
         {
             return MakePointCloudNormalsResult(
                 SandboxEditorCommandStatus::InvalidProcessingParameters,
-                PointNormals::RecomputeStatus::InvalidOutputProperty,
-                command,
+                PointNormals::RecomputeStatus::InvalidOutputProperty, command,
                 Core::ErrorCode::InvalidArgument,
-                "Point-cloud vertex-normal recompute requires positive finite neighborhood settings.");
+                "Point-cloud vertex-normal recompute requires positive finite "
+                "neighborhood settings.");
         }
 
         entt::registry& raw = context.Scene->Raw();
@@ -15824,10 +15823,10 @@ namespace Extrinsic::Runtime
         {
             return MakePointCloudNormalsResult(
                 SandboxEditorCommandStatus::UnsupportedGeometryDomain,
-                PointNormals::RecomputeStatus::EmptyInput,
-                command,
+                PointNormals::RecomputeStatus::EmptyInput, command,
                 Core::ErrorCode::InvalidArgument,
-                "Point-cloud vertex normals require selected point-cloud GeometrySources.");
+                "Point-cloud vertex normals require selected point-cloud "
+                "GeometrySources.");
         }
 
         if (context.DerivedJobCommands.Available())
@@ -15892,8 +15891,8 @@ namespace Extrinsic::Runtime
             result.NormalStatus =
                 PointNormals::RecomputeStatus::PropertyTypeConflict;
             result.Error = Core::ErrorCode::TypeMismatch;
-            result.Message =
-                "Point-cloud vertex-normal publication failed because v:normal has an incompatible type or size.";
+            result.Message = "Point-cloud vertex-normal publication failed because "
+                             "v:normal has an incompatible type or size.";
             return result;
         }
 
@@ -15936,8 +15935,8 @@ namespace Extrinsic::Runtime
                 result.GeometryStatus =
                     Geometry::PointCloud::OutlierRemovalStatus::InvalidParameters;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message =
-                    "Statistical outlier removal requires KNeighbors > 0 and a finite std-dev multiplier.";
+                result.Message = "Statistical outlier removal requires KNeighbors > 0 "
+                                 "and a finite std-dev multiplier.";
                 return result;
             }
         }
@@ -15975,8 +15974,8 @@ namespace Extrinsic::Runtime
             result.Status =
                 SandboxEditorCommandStatus::UnsupportedGeometryDomain;
             result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message =
-                "Point-cloud outlier removal requires selected point-cloud GeometrySources.";
+            result.Message = "Point-cloud outlier removal requires selected "
+                             "point-cloud GeometrySources.";
             return result;
         }
 
@@ -15991,8 +15990,8 @@ namespace Extrinsic::Runtime
             result.GeometryStatus =
                 Geometry::PointCloud::OutlierRemovalStatus::InvalidParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message =
-                "Point-cloud outlier removal requires a count-matched v:position property.";
+            result.Message = "Point-cloud outlier removal requires a count-matched "
+                             "v:position property.";
             return result;
         }
         Geometry::PointCloud::Cloud beforeCloud{
@@ -16013,8 +16012,8 @@ namespace Extrinsic::Runtime
             result.GeometryStatus =
                 Geometry::PointCloud::OutlierRemovalStatus::InvalidParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message =
-                "Point-cloud outlier removal requires a count-matched v:position property.";
+            result.Message = "Point-cloud outlier removal requires a count-matched "
+                             "v:position property.";
             return result;
         }
         Geometry::PointCloud::Cloud workCloud{workPoints, workNumDeleted};
@@ -16030,8 +16029,8 @@ namespace Extrinsic::Runtime
             result.GeometryStatus =
                 Geometry::PointCloud::OutlierRemovalStatus::InvalidParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message =
-                "Point-cloud outlier removal requires a count-matched v:position property.";
+            result.Message = "Point-cloud outlier removal requires a count-matched "
+                             "v:position property.";
             return result;
         }
 
@@ -16109,8 +16108,8 @@ namespace Extrinsic::Runtime
         if (status != SandboxEditorCommandStatus::Applied)
         {
             result.Error = Core::ErrorCode::ResourceNotFound;
-            result.Message =
-                "Point-cloud outlier-removal publication failed; the target entity may no longer be live.";
+            result.Message = "Point-cloud outlier-removal publication failed; the "
+                             "target entity may no longer be live.";
             return result;
         }
 
@@ -16150,8 +16149,9 @@ namespace Extrinsic::Runtime
             result.Status =
                 SandboxEditorCommandStatus::InvalidProcessingParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message =
-                "ICP registration requires a valid variant, a positive iteration count, an inlier ratio in (0, 1], and a finite correspondence distance.";
+            result.Message = "ICP registration requires a valid variant, a positive "
+                             "iteration count, an inlier ratio in (0, 1], and a finite "
+                             "correspondence distance.";
             return result;
         }
 
@@ -16215,8 +16215,8 @@ namespace Extrinsic::Runtime
             result.Status =
                 SandboxEditorCommandStatus::InvalidProcessingParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message =
-                "ICP registration requires both point clouds to expose a count-matched, finite v:position property.";
+            result.Message = "ICP registration requires both point clouds to expose a "
+                             "count-matched, finite v:position property.";
             return result;
         }
         result.SourcePointCount = sourcePoints->size();
@@ -16292,8 +16292,8 @@ namespace Extrinsic::Runtime
         {
             result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message =
-                "ICP rejected the selected point clouds (fewer than 3 points or invalid parameters).";
+            result.Message = "ICP rejected the selected point clouds (fewer than 3 "
+                             "points or invalid parameters).";
             return result;
         }
 
@@ -16360,13 +16360,14 @@ namespace Extrinsic::Runtime
         Detach();
     }
 
-    void SandboxEditorSession::Attach(Engine& engine)
+    void SandboxEditorSession::Attach(WorldRegistry& worlds, ServiceRegistry& services)
     {
         Detach();
-        m_Engine = &engine;
+        m_Worlds          = &worlds;
+        m_Services        = &services;
         m_AttachmentEpoch = std::make_shared<std::atomic_bool>(true);
-        AttachKMeansGpuQueue(engine);
-        m_ClusteringService = engine.Services().Find<ClusteringService>();
+        AttachKMeansGpuQueue(services);
+        m_ClusteringService = services.Find<ClusteringService>();
         if (m_ClusteringService != nullptr &&
             m_ClusteringService->Available())
         {
@@ -16398,13 +16399,13 @@ namespace Extrinsic::Runtime
         m_FramePrepared = false;
         m_Context = {};
         m_LastFrame = {};
-        if (m_Engine == nullptr ||
+        if (m_Worlds == nullptr || m_Services == nullptr ||
             !AttachmentEpochIsActive(m_AttachmentEpoch))
         {
             return false;
         }
         const AssetImportPipeline* const assetImportPipeline =
-            m_Engine->Services().Find<AssetImportPipeline>();
+            m_Services->Find<AssetImportPipeline>();
         const std::optional<RuntimeAssetImportEvent>* const runtimeImport =
             assetImportPipeline != nullptr
                 ? &assetImportPipeline->GetLastAssetImportEvent()
@@ -16419,8 +16420,7 @@ namespace Extrinsic::Runtime
             m_LastObservedRuntimeImportSequence =
                 (*runtimeImport)->Sequence;
         }
-        SceneDocumentModule* const sceneDocuments =
-            m_Engine->Services().Find<SceneDocumentModule>();
+        SceneDocumentModule* const sceneDocuments = m_Services->Find<SceneDocumentModule>();
         const std::optional<RuntimeSceneFileEvent>* runtimeSceneFile =
             sceneDocuments != nullptr
                 ? &sceneDocuments->GetLastSceneFileEvent()
@@ -16436,7 +16436,7 @@ namespace Extrinsic::Runtime
             m_LastObservedRuntimeSceneFileSequence =
                 (*runtimeSceneFile)->Sequence;
         }
-        m_Context = BuildContextFromEngine(*m_Engine);
+        m_Context                     = BuildContextFromRuntime(*m_Worlds, *m_Services);
         SandboxEditorContext& context = m_Context;
         GuardAttachmentCommandSurfaces(context, m_AttachmentEpoch);
         context.SelectedModelCache = &m_SelectedModelCache;
@@ -16461,10 +16461,10 @@ namespace Extrinsic::Runtime
                         !m_KMeansGpuJobs)
                     {
                         return RuntimeKMeansGpuJobSubmission{
-                            .Status = RuntimeKMeansGpuJobStatus::GpuUnavailable,
-                            .GpuStatus = KMeansGpuStatus::DeviceUnavailable,
-                            .Diagnostic =
-                                "Sandbox editor K-Means GPU job queue is unavailable or its attachment expired.",
+                            .Status     = RuntimeKMeansGpuJobStatus::GpuUnavailable,
+                            .GpuStatus  = KMeansGpuStatus::DeviceUnavailable,
+                            .Diagnostic = "Sandbox editor K-Means GPU job queue is "
+                                          "unavailable or its attachment expired.",
                         };
                     }
                     return m_KMeansGpuJobs->Submit(std::move(request));
@@ -16490,8 +16490,7 @@ namespace Extrinsic::Runtime
                         *completed);
             }
         }
-        if (const DerivedJobRegistry* derivedJobs =
-                m_Engine->Services().Find<DerivedJobRegistry>();
+        if (const DerivedJobRegistry* derivedJobs = m_Services->Find<DerivedJobRegistry>();
             derivedJobs != nullptr)
         {
             m_DerivedJobSnapshot = derivedJobs->SnapshotAll();
@@ -16674,8 +16673,7 @@ namespace Extrinsic::Runtime
         context.RenderRecipeContext = &m_RenderRecipeContext;
         context.RenderRecipeEditorState = &m_RenderRecipeState;
         context.RenderArtifacts = &m_RenderArtifactRegistry;
-        EngineConfigControl* configControl =
-            m_Engine->Services().Find<EngineConfigControl>();
+        EngineConfigControl* configControl = m_Services->Find<EngineConfigControl>();
         context.RenderRecipeCommandsAvailable =
             configControl != nullptr &&
             context.PreviewRenderRecipeDocument &&
@@ -16746,7 +16744,7 @@ namespace Extrinsic::Runtime
         {
             m_AttachmentEpoch->store(false, std::memory_order_release);
         }
-        if (m_Engine != nullptr)
+        if (m_Worlds != nullptr && m_Services != nullptr)
         {
             if (m_ClusteringService != nullptr &&
                 m_KMeansCompletionSubscription.IsValid())
@@ -16757,7 +16755,8 @@ namespace Extrinsic::Runtime
             m_KMeansCompletionSubscription = {};
             m_ClusteringService = nullptr;
             DetachKMeansGpuQueue();
-            m_Engine = nullptr;
+            m_Worlds   = nullptr;
+            m_Services = nullptr;
         }
         else
         {
@@ -16765,6 +16764,8 @@ namespace Extrinsic::Runtime
             m_ClusteringService = nullptr;
             m_KMeansGpuParticipant = {};
             m_KMeansGpuJobs.reset();
+            m_Jobs   = nullptr;
+            m_Device = nullptr;
         }
         m_AttachmentEpoch.reset();
         ResetAttachmentState();

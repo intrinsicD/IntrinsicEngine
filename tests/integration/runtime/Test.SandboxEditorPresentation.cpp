@@ -19,6 +19,8 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
@@ -56,39 +58,41 @@ namespace
         return *service;
     }
 
-    class OneFrameApplication final : public Runtime::IApplication
+    class OneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
     };
 
-    class TooltipDelayApplication final : public Runtime::IApplication
+    class TooltipDelayApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         static constexpr std::uint32_t MaxFrames = 64u;
 
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             std::this_thread::sleep_for(std::chrono::milliseconds{10});
             ++m_Frames;
             if (m_Frames >= MaxFrames)
                 engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
     private:
         std::uint32_t m_Frames{0u};
     };
 
-    class WaitForAssetImportEventApplication final : public Runtime::IApplication
+    class WaitForAssetImportEventApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         explicit WaitForAssetImportEventApplication(
@@ -97,10 +101,11 @@ namespace
         {
         }
 
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine   = Kernel();
             const auto now = std::chrono::steady_clock::now();
             if (!m_Started)
             {
@@ -125,7 +130,7 @@ namespace
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
         [[nodiscard]] std::string Describe() const
         {
@@ -170,13 +175,14 @@ namespace
         }
     };
 
-    class ToggleEditorVisibilityApplication final : public Runtime::IApplication
+    class ToggleEditorVisibilityApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++m_Frames;
             if (m_Frames == 1u)
             {
@@ -188,7 +194,7 @@ namespace
             input.SetKeyState(Plat::Input::Key::G, true);
             engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
     private:
         std::uint32_t m_Frames{0u};
@@ -304,12 +310,12 @@ namespace
 
 TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     ComposeEditorUiAndInitialize(engine);
 
     SandboxEditor::EditorShell shell;
-    shell.Attach(engine);
+    shell.Attach(engine.Worlds(), engine.Services());
     SandboxEditor::MethodPanels methodPanels;
     SandboxEditor::MeshProcessingPanels meshProcessingPanels;
     SandboxEditor::DomainPanels domainPanels;
@@ -365,11 +371,11 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         {"view.registration", {"View"}},
     }};
 
-    Runtime::Engine engine(
-        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     ComposeEditorUiAndInitialize(engine);
     SandboxEditor::EditorShell shell;
-    shell.Attach(engine);
+    shell.Attach(engine.Worlds(), engine.Services());
     SandboxEditor::MethodPanels methodPanels;
     SandboxEditor::MeshProcessingPanels meshProcessingPanels;
     SandboxEditor::DomainPanels domainPanels;
@@ -535,8 +541,7 @@ TEST(SandboxEditorPresentation, RuntimeFacadesCompileSeparatelyFromEditorShell)
     ASSERT_FALSE(methodFacade.empty());
     ASSERT_FALSE(renderRecipeFacade.empty());
 
-    constexpr std::string_view kMeansDefinition =
-        "SandboxEditorKMeansResult ApplySandboxEditorKMeansCommand(";
+    constexpr std::string_view kMeansDefinition = "ApplySandboxEditorKMeansCommand(";
     constexpr std::string_view poissonDefinition =
         "ApplySandboxEditorProgressivePoissonCommand(";
     constexpr std::string_view renderRecipeDefinition =
@@ -609,11 +614,11 @@ TEST(SandboxEditorPresentation, GeometryProcessingMenusExposeDomainElementSubmen
 
 TEST(SandboxEditorPresentation, AdapterCallbackDrawsDeterministicMenuOnlyFrame)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     ComposeEditorUiAndInitialize(engine);
     SandboxEditor::EditorShell shell;
-    shell.Attach(engine);
+    shell.Attach(engine.Worlds(), engine.Services());
 
     engine.Run();
 
@@ -634,12 +639,12 @@ TEST(SandboxEditorPresentation, AdapterCallbackDrawsDeterministicMenuOnlyFrame)
 TEST(SandboxEditorPresentation,
      FileImportDisabledReasonRendersThroughRealHoveredControl)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(), std::make_unique<TooltipDelayApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<TooltipDelayApplication>());
     ComposeEditorUiAndInitialize(engine);
 
     SandboxEditor::EditorShell shell;
-    shell.Attach(engine);
+    shell.Attach(engine.Worlds(), engine.Services());
     ASSERT_TRUE(shell.SetEditorWindowOpen("file.import", true));
 
     std::uint32_t observerFrames = 0u;
@@ -777,13 +782,13 @@ TEST(SandboxEditorPresentation,
 
 TEST(SandboxEditorPresentation, RuntimeImportEventIsReflectedByAppFilePanel)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     ComposeEditorUiAndInitialize(engine);
     SandboxEditor::EditorShell shell;
-    shell.Attach(engine);
+    shell.Attach(engine.Worlds(), engine.Services());
 
     const auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(
         Runtime::RuntimeAssetImportRequest{
@@ -827,9 +832,7 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
         std::make_unique<WaitForAssetImportEventApplication>();
     WaitForAssetImportEventApplication* waitDiagnostics =
         waitForImport.get();
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::move(waitForImport));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(waitForImport));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
@@ -855,7 +858,7 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
             .IsValid());
 
     SandboxEditor::EditorShell shell;
-    shell.Attach(engine);
+    shell.Attach(engine.Worlds(), engine.Services());
 
     const std::vector<std::string> droppedPaths{cloudFile.Path.string()};
     pipeline.ImportDroppedFilePaths(droppedPaths);
@@ -887,11 +890,11 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
 
 TEST(SandboxEditorPresentation, EngineAttachmentRegistersEditorCallback)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     ComposeEditorUiAndInitialize(engine);
     SandboxEditor::EditorShell shell;
-    shell.Attach(engine);
+    shell.Attach(engine.Worlds(), engine.Services());
     EXPECT_TRUE(shell.IsAttached());
 
     engine.Run();
@@ -913,20 +916,20 @@ TEST(SandboxEditorPresentation, ControllerReattachPinsPanelAttachmentResetPolicy
 {
     SandboxEditor::SandboxEditorController controller;
 
-    Runtime::Engine firstEngine(
-        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel firstEngine(HeadlessConfig(),
+                                                    std::make_unique<OneFrameApplication>());
     ComposeEditorUiAndInitialize(firstEngine);
-    controller.Attach(firstEngine);
+    controller.Attach(firstEngine.Worlds(), firstEngine.Services());
     ASSERT_TRUE(controller.IsAttached());
     firstEngine.Run();
     controller.Detach();
     EXPECT_FALSE(controller.IsAttached());
     firstEngine.Shutdown();
 
-    Runtime::Engine secondEngine(
-        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel secondEngine(HeadlessConfig(),
+                                                     std::make_unique<OneFrameApplication>());
     ComposeEditorUiAndInitialize(secondEngine);
-    controller.Attach(secondEngine);
+    controller.Attach(secondEngine.Worlds(), secondEngine.Services());
     ASSERT_TRUE(controller.IsAttached());
     secondEngine.Run();
     controller.Detach();
@@ -981,11 +984,11 @@ TEST(SandboxEditorPresentation, ControllerReattachPinsPanelAttachmentResetPolicy
 
 TEST(SandboxEditorPresentation, EditorShellStartsWithOnlyBuiltinWindows)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     ComposeEditorUiAndInitialize(engine);
     SandboxEditor::EditorShell shell;
-    shell.Attach(engine);
+    shell.Attach(engine.Worlds(), engine.Services());
     const auto menu = shell.BuildEditorWindowMenuModel();
     ASSERT_EQ(menu.size(), 10u);
     for (const std::string_view id :
@@ -1033,10 +1036,9 @@ TEST(SandboxEditorPresentation,
         std::string_view::npos);
     EXPECT_NE(frameGraphPanel.find("\"GPU Profile\""),
               std::string_view::npos);
-    EXPECT_NE(
-        compactPanel.find(
-            "ApplySandboxEditorGpuProfilingConfigCommand(*context,gpuProfilingEnabled)"),
-        std::string::npos);
+    EXPECT_NE(compactPanel.find("ApplySandboxEditorGpuProfilingConfigCommand(*"
+                                "context,gpuProfilingEnabled)"),
+              std::string::npos);
     EXPECT_NE(frameGraphPanel.find("Queue envelopes:"),
               std::string_view::npos);
     EXPECT_NE(frameGraphPanel.find("Pass samples:"),
@@ -1045,11 +1047,11 @@ TEST(SandboxEditorPresentation,
 
 TEST(SandboxEditorPresentation, ExternalWindowContributionNeedsNoLegacySwitchEntry)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     ComposeEditorUiAndInitialize(engine);
     SandboxEditor::EditorShell shell;
-    shell.Attach(engine);
+    shell.Attach(engine.Worlds(), engine.Services());
     int drawCalls = 0;
     const Runtime::EditorWindowHandle handle = shell.RegisterEditorWindow(
         SandboxEditor::EditorWindowDescriptor{
@@ -1082,12 +1084,12 @@ TEST(SandboxEditorPresentation, ExternalWindowContributionNeedsNoLegacySwitchEnt
 
 TEST(SandboxEditorPresentation, ContextWindowContributionReceivesRuntimeFacade)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     ComposeEditorUiAndInitialize(engine);
 
     SandboxEditor::EditorShell shell;
-    shell.Attach(engine);
+    shell.Attach(engine.Worlds(), engine.Services());
     int drawCalls = 0;
     bool receivedScene = false;
     const Runtime::EditorWindowHandle handle = shell.RegisterEditorWindow(
@@ -1118,13 +1120,12 @@ TEST(SandboxEditorPresentation, ContextWindowContributionReceivesRuntimeFacade)
 
 TEST(SandboxEditorPresentation, GlobalVisibilityHotkeyUsesTheVisibilityCommandPath)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<ToggleEditorVisibilityApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(), std::make_unique<ToggleEditorVisibilityApplication>());
     ComposeEditorUiAndInitialize(engine);
 
     SandboxEditor::EditorShell shell;
-    shell.Attach(engine);
+    shell.Attach(engine.Worlds(), engine.Services());
     ASSERT_TRUE(shell.IsEditorVisible());
 
     engine.Run();

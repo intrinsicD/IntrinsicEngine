@@ -43,6 +43,18 @@ namespace
         }
         return false;
     }
+
+    std::string WithoutWhitespace(const std::string_view content)
+    {
+        std::string compact;
+        compact.reserve(content.size());
+        for (const char value : content)
+        {
+            if (value != ' ' && value != '\t' && value != '\r' && value != '\n')
+                compact.push_back(value);
+        }
+        return compact;
+    }
 }
 
 TEST(RuntimeEnginePrivateGlue, FrameLoopHelpersArePrivateTextualGlue)
@@ -358,21 +370,18 @@ TEST(RuntimeEnginePrivateGlue, EditorUiModuleOwnsOptionalEditorUiComposition)
               std::string::npos);
     EXPECT_NE(moduleImpl.find("m_Impl->Adapter->BuildEditorFrame()"),
               std::string::npos);
-    const auto uiBegin = engineImpl.find("FramePhase::UiBegin");
-    const auto variableTick = engineImpl.find(
-        "m_Application->OnVariableTick(*this, alpha, frameDt);");
-    const auto uiBuild = engineImpl.find("FramePhase::UiBuild");
+    const std::string compactEngineImpl = WithoutWhitespace(engineImpl);
+    const auto uiBegin = compactEngineImpl.find("FramePhase::UiBegin");
+    const auto uiBuild = compactEngineImpl.find("FramePhase::UiBuild");
     const auto uiEndCapture =
-        engineImpl.find("FramePhase::UiEndCapture");
-    const auto completedCapture = engineImpl.find(
-        "const EditorInputCaptureSnapshot& editorCapture =");
+        compactEngineImpl.find("FramePhase::UiEndCapture");
+    const auto completedCapture = compactEngineImpl.find(
+        "EditorInputCaptureSnapshot&editorCapture=");
     ASSERT_NE(uiBegin, std::string::npos);
-    ASSERT_NE(variableTick, std::string::npos);
     ASSERT_NE(uiBuild, std::string::npos);
     ASSERT_NE(uiEndCapture, std::string::npos);
     ASSERT_NE(completedCapture, std::string::npos);
-    EXPECT_LT(uiBegin, variableTick);
-    EXPECT_LT(variableTick, uiBuild);
+    EXPECT_LT(uiBegin, uiBuild);
     EXPECT_LT(uiBuild, uiEndCapture);
     EXPECT_LT(uiEndCapture, completedCapture);
     const auto adapterEndFrame =
@@ -458,8 +467,8 @@ TEST(RuntimeEnginePrivateGlue, RenderExtractionServiceIsEnginePrivateImplementat
               std::string::npos);
     EXPECT_NE(privateHeader.find("std::uint64_t m_FrameIndex"),
               std::string::npos);
-    EXPECT_NE(engineInterface.find(
-                  "RenderExtractionService               m_RenderExtractionService"),
+    EXPECT_NE(WithoutWhitespace(engineInterface).find(
+                  "RenderExtractionServicem_RenderExtractionService"),
               std::string::npos);
     EXPECT_EQ(engineInterface.find(
                   "RenderExtractionCache                 m_RenderExtraction"),
@@ -899,10 +908,8 @@ TEST(RuntimeEnginePrivateGlue, KMeansGpuJobQueueIsSandboxFacadePrivateImplementa
 
     const auto detach = methodImpl.find(
         "void SandboxEditorSession::DetachKMeansGpuQueue(");
-    const auto unregister = methodImpl.find(
-        "UnregisterGpuQueueParticipant(", detach);
-    const auto waitIdle = methodImpl.find(
-        "engine->GetDevice().WaitIdle();", unregister);
+    const auto unregister       = methodImpl.find("m_Jobs->UnregisterGpuQueueParticipant(", detach);
+    const auto waitIdle         = methodImpl.find("device->WaitIdle();", unregister);
     const auto clearParticipant = methodImpl.find(
         "m_KMeansGpuParticipant = {};", waitIdle);
     const auto destroyQueue = methodImpl.find(

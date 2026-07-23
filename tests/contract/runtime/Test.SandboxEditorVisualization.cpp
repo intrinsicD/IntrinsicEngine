@@ -5,8 +5,8 @@
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
-#include <functional>
 #include <fstream>
+#include <functional>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -19,10 +19,10 @@
 #include <variant>
 #include <vector>
 
-#include <entt/entity/entity.hpp>
-#include <gtest/gtest.h>
-#include <glm/gtc/quaternion.hpp>
 #include "ProgressivePoissonReference.hpp"
+#include <entt/entity/entity.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <gtest/gtest.h>
 
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
@@ -383,15 +383,6 @@ void AddGraphSource(ECS::Scene::Registry& registry,
             .VisualizationCommandsAvailable = false,
         };
     }
-
-class PassiveApplication final : public Runtime::IApplication
-    {
-    public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine&, double, double) override {}
-        void OnShutdown(Runtime::Engine&) override {}
-    };
 
 [[nodiscard]] Extrinsic::Core::Config::EngineConfig HeadlessConfig()
     {
@@ -958,7 +949,7 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
 }
 TEST(SandboxEditorUi, RenderHintCommandRepackagesGraphLaneResidency)
 {
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<PassiveApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();

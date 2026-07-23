@@ -7,8 +7,9 @@
 #include <memory>
 #include <vector>
 
-#include <gtest/gtest.h>
 #include <glm/glm.hpp>
+#include <gtest/gtest.h>
+#include "RuntimeTestModule.hpp"
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Component.Transform;
@@ -61,18 +62,20 @@ namespace
         return entity;
     }
 
-    class SelectGizmoEntityApplication final : public Extrinsic::Runtime::IApplication
+    class SelectGizmoEntityApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Engine& engine) override
+        void Resolve() override
         {
-            Entity = MakeTransformEntity(engine, glm::vec3{2.f, 3.f, 4.f});
+            auto& engine = Kernel();
+            Entity       = MakeTransformEntity(engine, glm::vec3{2.f, 3.f, 4.f});
         }
 
-        void OnSimTick(Engine& /*engine*/, double /*fixedDt*/) override {}
+        void Simulate(double /*fixedDt*/) override {}
 
-        void OnVariableTick(Engine& engine, double /*alpha*/, double /*dt*/) override
+        void Frame(double /*alpha*/, double /*dt*/) override
         {
+            auto& engine = Kernel();
             ++VariableTicks;
             auto& selection =
                 *engine.Services().Find<
@@ -89,7 +92,7 @@ namespace
             engine.RequestExit();
         }
 
-        void OnShutdown(Engine& /*engine*/) override {}
+        void Shutdown() override {}
 
         EntityHandle Entity{Extrinsic::ECS::InvalidEntityHandle};
         bool         SelectionApplied{false};
@@ -99,7 +102,8 @@ namespace
 
 TEST(GizmoInteractionEngineWiring, ExtractionSubmitsTransformGizmoPackets)
 {
-    Engine engine(HeadlessConfig(), std::make_unique<SelectGizmoEntityApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<SelectGizmoEntityApplication>());
     engine.EmplaceModule<
         Extrinsic::Runtime::SceneInteractionModule>();
     engine.EmplaceModule<
@@ -167,7 +171,7 @@ TEST(GizmoInteractionEngineWiring, RunFramePublishesSelectedEntityGizmoPacket)
 {
     auto app = std::make_unique<SelectGizmoEntityApplication>();
     SelectGizmoEntityApplication* appRaw = app.get();
-    Engine engine(HeadlessConfig(), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(app));
     engine.EmplaceModule<
         Extrinsic::Runtime::SceneInteractionModule>();
     engine.Initialize();
@@ -175,7 +179,8 @@ TEST(GizmoInteractionEngineWiring, RunFramePublishesSelectedEntityGizmoPacket)
     if (engine.GetWindow().ShouldClose())
     {
         engine.Shutdown();
-        GTEST_SKIP() << "window backend unavailable; per-frame gizmo wiring requires a display";
+        GTEST_SKIP() << "window backend unavailable; per-frame gizmo wiring "
+                        "requires a display";
     }
 
     engine.Run();

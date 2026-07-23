@@ -20,6 +20,8 @@
 
 #include <gtest/gtest.h>
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.RenderWorldPool;
@@ -31,7 +33,7 @@ namespace
     // Drives a bounded run: requests exit once `TargetFrames` variable ticks
     // have run so `Engine::Run()` executes exactly `TargetFrames` full frames on
     // a live-window lane.
-    class BoundedRunApplication final : public Extrinsic::Runtime::IApplication
+    class BoundedRunApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         explicit BoundedRunApplication(const std::uint32_t targetFrames)
@@ -39,15 +41,16 @@ namespace
         {
         }
 
-        void OnInitialize(Engine& /*engine*/) override {}
-        void OnSimTick(Engine& /*engine*/, double /*fixedDt*/) override {}
-        void OnVariableTick(Engine& engine, double /*alpha*/, double /*dt*/) override
+        void Resolve() override {}
+        void Simulate(double /*fixedDt*/) override {}
+        void Frame(double /*alpha*/, double /*dt*/) override
         {
+            auto& engine = Kernel();
             ++m_VariableTicks;
             if (m_VariableTicks >= m_TargetFrames)
                 engine.RequestExit();
         }
-        void OnShutdown(Engine& /*engine*/) override {}
+        void Shutdown() override {}
 
     private:
         std::uint32_t m_TargetFrames{0u};
@@ -73,7 +76,8 @@ namespace
 // diagnostics baseline yet.
 TEST(RenderWorldPoolEngineWiring, EngineSizesSingleBufferPoolFromSynchronousConfig)
 {
-    Engine engine(PoolConfig(/*synchronous=*/true), std::make_unique<BoundedRunApplication>(1u));
+    Intrinsic::Tests::RuntimeTestKernel engine(PoolConfig(/*synchronous=*/true),
+                                               std::make_unique<BoundedRunApplication>(1u));
     engine.Initialize();
 
     const auto& pool = engine.GetRenderWorldPool();
@@ -100,7 +104,8 @@ TEST(RenderWorldPoolEngineWiring, EngineSizesSingleBufferPoolFromSynchronousConf
 // default itself is GRAPHICS-036D; here the flag is set explicitly.
 TEST(RenderWorldPoolEngineWiring, EngineSizesTripleBufferedPoolWhenAsynchronous)
 {
-    Engine engine(PoolConfig(/*synchronous=*/false), std::make_unique<BoundedRunApplication>(1u));
+    Intrinsic::Tests::RuntimeTestKernel engine(PoolConfig(/*synchronous=*/false),
+                                               std::make_unique<BoundedRunApplication>(1u));
     engine.Initialize();
 
     const auto& pool = engine.GetRenderWorldPool();
@@ -110,15 +115,17 @@ TEST(RenderWorldPoolEngineWiring, EngineSizesTripleBufferedPoolWhenAsynchronous)
     engine.Shutdown();
 }
 
-// Per-frame: a bounded `Engine::Run()` in synchronous mode drives the pool every
-// frame and preserves the existing single-snapshot behavior — the consumer never
-// stalls or skips and always reads a freshly published front (frame age 0). The
-// pool's index/refcount sequencing is unit-tested in every environment by
-// Test.RenderWorldPool.cpp; this asserts the engine drives that contract.
+// Per-frame: a bounded `Engine::Run()` in synchronous mode drives the pool
+// every frame and preserves the existing single-snapshot behavior — the
+// consumer never stalls or skips and always reads a freshly published front
+// (frame age 0). The pool's index/refcount sequencing is unit-tested in every
+// environment by Test.RenderWorldPool.cpp; this asserts the engine drives that
+// contract.
 TEST(RenderWorldPoolEngineWiring, BoundedRunDrivesPoolSynchronousBaseline)
 {
     constexpr std::uint32_t kFrames = 3u;
-    Engine engine(PoolConfig(/*synchronous=*/true), std::make_unique<BoundedRunApplication>(kFrames));
+    Intrinsic::Tests::RuntimeTestKernel engine(PoolConfig(/*synchronous=*/true),
+                                               std::make_unique<BoundedRunApplication>(kFrames));
     engine.Initialize();
 
     if (engine.GetWindow().ShouldClose())
@@ -128,7 +135,8 @@ TEST(RenderWorldPoolEngineWiring, BoundedRunDrivesPoolSynchronousBaseline)
         // per-frame baseline needs a real window.
         EXPECT_EQ(engine.GetRenderWorldPool().BufferCount(), 1u);
         engine.Shutdown();
-        GTEST_SKIP() << "window backend unavailable; per-frame pool coverage requires a display";
+        GTEST_SKIP() << "window backend unavailable; per-frame pool coverage "
+                        "requires a display";
     }
 
     engine.Run();

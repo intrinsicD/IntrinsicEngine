@@ -5,8 +5,8 @@
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
-#include <functional>
 #include <fstream>
+#include <functional>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -19,10 +19,10 @@
 #include <variant>
 #include <vector>
 
-#include <entt/entity/entity.hpp>
-#include <gtest/gtest.h>
-#include <glm/gtc/quaternion.hpp>
 #include "ProgressivePoissonReference.hpp"
+#include <entt/entity/entity.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <gtest/gtest.h>
 
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
@@ -172,15 +172,6 @@ namespace
         return request;
     }
 
-class PassiveApplication final : public Runtime::IApplication
-    {
-    public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine&, double, double) override {}
-        void OnShutdown(Runtime::Engine&) override {}
-    };
-
 [[nodiscard]] Extrinsic::Core::Config::EngineConfig HeadlessConfig()
     {
         Extrinsic::Core::Config::EngineConfig config{};
@@ -208,13 +199,11 @@ TEST(SandboxEditorSession, UnattachedPrepareFrameFailsClosed)
 }
 TEST(SandboxEditorSession, AttachPrepareDetachBoundsPreparedFrameLifetime)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<PassiveApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     engine.Initialize();
 
     Runtime::SandboxEditorSession session;
-    session.Attach(engine);
+    session.Attach(engine.Worlds(), engine.Services());
     EXPECT_TRUE(session.IsAttached());
     EXPECT_FALSE(session.VisitPreparedFrame(
         [](Runtime::SandboxEditorPreparedFrameView)
@@ -272,7 +261,7 @@ TEST(SandboxEditorSession, AttachPrepareDetachBoundsPreparedFrameLifetime)
         }));
     EXPECT_FALSE(session.PrepareFrame());
 
-    session.Attach(engine);
+    session.Attach(engine.Worlds(), engine.Services());
     ASSERT_TRUE(session.PrepareFrame());
     ASSERT_TRUE(session.VisitPreparedFrame(
         [](Runtime::SandboxEditorPreparedFrameView frame)
@@ -289,16 +278,14 @@ TEST(SandboxEditorSession, AttachPrepareDetachBoundsPreparedFrameLifetime)
 }
 TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<PassiveApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     engine.Initialize();
 
     Runtime::SandboxEditorSession session;
-    session.Attach(engine);
+    session.Attach(engine.Worlds(), engine.Services());
     ASSERT_TRUE(session.PrepareFrame(MakeNoSandboxEditorModelBuildRequest()));
 
     std::function<void(Runtime::SandboxEditorKMeansResult)> staleResultSink{};
@@ -352,7 +339,7 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
     EXPECT_EQ(activeImport.Error, Core::ErrorCode::Success);
 
     session.Detach();
-    session.Attach(engine);
+    session.Attach(engine.Worlds(), engine.Services());
     ASSERT_TRUE(session.PrepareFrame(MakeNoSandboxEditorModelBuildRequest()));
 
     std::function<void(Runtime::SandboxEditorKMeansResult)> currentResultSink{};
@@ -440,9 +427,7 @@ TEST(SandboxEditorSession, ReattachObservesEqualSequenceFromDifferentEngine)
     std::uint64_t firstSequence = 0u;
 
     {
-        Runtime::Engine firstEngine(
-            HeadlessConfig(),
-            std::make_unique<PassiveApplication>());
+        Extrinsic::Runtime::Engine firstEngine(HeadlessConfig());
         firstEngine.EmplaceModule<Runtime::SceneDocumentModule>();
         firstEngine.EmplaceModule<Runtime::AssetWorkflowModule>();
         firstEngine.Initialize();
@@ -460,7 +445,7 @@ TEST(SandboxEditorSession, ReattachObservesEqualSequenceFromDifferentEngine)
         ASSERT_TRUE(event.has_value());
         firstSequence = event->Sequence;
 
-        session.Attach(firstEngine);
+        session.Attach(firstEngine.Worlds(), firstEngine.Services());
         ASSERT_TRUE(session.PrepareFrame(
             MakeNoSandboxEditorModelBuildRequest()));
         ASSERT_TRUE(session.VisitPreparedFrame(
@@ -475,9 +460,7 @@ TEST(SandboxEditorSession, ReattachObservesEqualSequenceFromDifferentEngine)
     }
 
     {
-        Runtime::Engine secondEngine(
-            HeadlessConfig(),
-            std::make_unique<PassiveApplication>());
+        Extrinsic::Runtime::Engine secondEngine(HeadlessConfig());
         secondEngine.EmplaceModule<Runtime::SceneDocumentModule>();
         secondEngine.EmplaceModule<Runtime::AssetWorkflowModule>();
         secondEngine.Initialize();
@@ -495,7 +478,7 @@ TEST(SandboxEditorSession, ReattachObservesEqualSequenceFromDifferentEngine)
         ASSERT_TRUE(event.has_value());
         ASSERT_EQ(event->Sequence, firstSequence);
 
-        session.Attach(secondEngine);
+        session.Attach(secondEngine.Worlds(), secondEngine.Services());
         ASSERT_TRUE(session.PrepareFrame(
             MakeNoSandboxEditorModelBuildRequest()));
         ASSERT_TRUE(session.VisitPreparedFrame(

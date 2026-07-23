@@ -31,9 +31,10 @@ pass named `"TransformUpdate"` declaring `StructuralWrite()`,
 `Write<Transform::IsDirtyTag>`, `Write<Transform::WorldUpdatedTag>`, and
 `Signal("TransformUpdate")`. The runtime activates this pass every fixed-step
 substep through `Extrinsic.Runtime.EcsSystemBundle::RegisterPromotedEcsSystemBundle`
-(`RUNTIME-091`), invoked after `IApplication::OnSimTick` and before
-`Core::FrameGraph::Compile` so app passes that mutate transforms run before
-the traversal and passes that `WaitFor("TransformUpdate")` run after it.
+(`RUNTIME-091`). The baseline bundle registers before app-composed module
+systems, then `Core::FrameGraph::Compile` resolves the declared dependencies;
+passes that mutate transforms must therefore declare the ordering they need,
+and passes that `WaitFor("TransformUpdate")` run after the traversal.
 
 ## World bounds propagation
 

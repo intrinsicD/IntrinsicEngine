@@ -5,12 +5,14 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <glm/glm.hpp>
 #include <glm/geometric.hpp>
+#include <glm/glm.hpp>
 #include <memory>
 #include <span>
 #include <string>
 #include <vector>
+
+#include "RuntimeTestModule.hpp"
 
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Filesystem.PathResolver;
@@ -30,13 +32,12 @@ namespace
     using Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs;
     using Extrinsic::Backends::Vulkan::ToString;
     using Extrinsic::Runtime::Engine;
-    using Extrinsic::Runtime::IApplication;
 
     inline constexpr std::uint32_t kBakeWidth = 16u;
     inline constexpr std::uint32_t kBakeHeight = 16u;
     inline constexpr std::uint32_t kPixelBytes = 4u;
 
-    class ExitAfterFramesApp final : public IApplication
+    class ExitAfterFramesApp final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         explicit ExitAfterFramesApp(const std::uint32_t targetFrames) noexcept
@@ -44,11 +45,12 @@ namespace
         {
         }
 
-        void OnInitialize(Engine&) override {}
-        void OnSimTick(Engine&, double) override {}
+        void Resolve() override {}
+        void Simulate(double) override {}
 
-        void OnVariableTick(Engine& engine, double, double) override
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++m_Frames;
             if (m_Frames >= m_TargetFrames)
             {
@@ -56,7 +58,7 @@ namespace
             }
         }
 
-        void OnShutdown(Engine&) override {}
+        void Shutdown() override {}
 
     private:
         std::uint32_t m_TargetFrames = 1u;
@@ -75,8 +77,9 @@ namespace
         if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
         {
             return SmokeBootstrap{
-                .Skipped = true,
-                .SkipReason = "GLFW could not initialize in this environment; gpu;vulkan object-space normal bake smoke is opt-in.",
+                .Skipped    = true,
+                .SkipReason = "GLFW could not initialize in this environment; "
+                              "gpu;vulkan object-space normal bake smoke is opt-in.",
             };
         }
 
@@ -88,9 +91,8 @@ namespace
         config.Render.EnableValidation = false;
         config.Render.EnableVSync = false;
 
-        auto engine = std::make_unique<Engine>(
-            config,
-            std::make_unique<ExitAfterFramesApp>(4u));
+        auto engine = std::make_unique<Engine>(config);
+        Intrinsic::Tests::AddRuntimeTestModule(*engine, std::make_unique<ExitAfterFramesApp>(4u));
         engine->Initialize();
 
         const auto initInputs = GetVulkanDeviceOperationalInputs(&engine->GetDevice());
@@ -100,8 +102,9 @@ namespace
         {
             engine->Shutdown();
             return SmokeBootstrap{
-                .Skipped = true,
-                .SkipReason = "Promoted Vulkan did not reach logical-device/swapchain/command-sync readiness on this host.",
+                .Skipped    = true,
+                .SkipReason = "Promoted Vulkan did not reach "
+                              "logical-device/swapchain/command-sync readiness on this host.",
             };
         }
 
@@ -202,7 +205,8 @@ TEST(ObjectSpaceNormalTextureBakeGpuSmoke, VulkanBakeMatchesCpuContractAtSelecte
     if (!device.IsOperational())
     {
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during object-space normal bake warmup: status="
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during "
+                         "object-space normal bake warmup: status="
                       << ToString(status.Code) << " reason=" << ToString(status.Reason);
         return;
     }
@@ -282,7 +286,8 @@ TEST(ObjectSpaceNormalTextureBakeGpuSmoke, VulkanBakeMatchesCpuContractAtSelecte
         DestroyBufferIfValid(device, normalBuffer);
         DestroyBufferIfValid(device, texcoordBuffer);
         engine.Shutdown();
-        ASSERT_TRUE(false) << "Operational Vulkan device failed to allocate object-space normal bake resources.";
+        ASSERT_TRUE(false) << "Operational Vulkan device failed to allocate "
+                              "object-space normal bake resources.";
     }
 
     device.WriteBuffer(texcoordBuffer, texcoords.data(), sizeof(texcoords), 0u);
@@ -323,7 +328,8 @@ TEST(ObjectSpaceNormalTextureBakeGpuSmoke, VulkanBakeMatchesCpuContractAtSelecte
         DestroyBufferIfValid(device, texcoordBuffer);
         engine.Shutdown();
         ASSERT_TRUE(pipeline.IsValid())
-            << "Operational Vulkan device failed to create the object-space normal bake pipeline.";
+            << "Operational Vulkan device failed to create the object-space normal "
+               "bake pipeline.";
     }
 
     Extrinsic::RHI::FrameHandle frame{};
@@ -336,7 +342,8 @@ TEST(ObjectSpaceNormalTextureBakeGpuSmoke, VulkanBakeMatchesCpuContractAtSelecte
         DestroyBufferIfValid(device, normalBuffer);
         DestroyBufferIfValid(device, texcoordBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "Operational Vulkan device failed to begin the object-space normal bake frame.";
+        ADD_FAILURE() << "Operational Vulkan device failed to begin the "
+                         "object-space normal bake frame.";
         return;
     }
 
@@ -495,7 +502,8 @@ TEST(ObjectSpaceNormalTextureBakeGpuSmoke, VulkanBakeMatchesCpuContractAtSelecte
         DestroyBufferIfValid(device, normalBuffer);
         DestroyBufferIfValid(device, texcoordBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "Operational Vulkan device failed to begin the padded object-space normal bake frame.";
+        ADD_FAILURE() << "Operational Vulkan device failed to begin the padded "
+                         "object-space normal bake frame.";
         return;
     }
 

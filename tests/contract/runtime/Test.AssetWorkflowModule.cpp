@@ -14,8 +14,9 @@
 
 #include <entt/entity/entity.hpp>
 #include <entt/entity/registry.hpp>
-#include <gtest/gtest.h>
 #include <glm/glm.hpp>
+#include <gtest/gtest.h>
+#include "RuntimeTestModule.hpp"
 
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
@@ -175,7 +176,7 @@ namespace
         void TickAssets() override {}
     };
 
-    class RunOnceApplication final : public Runtime::IApplication
+    class RunOnceApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         explicit RunOnceApplication(
@@ -186,8 +187,9 @@ namespace
         {
         }
 
-        void OnInitialize(Runtime::Engine& engine) override
+        void Resolve() override
         {
+            auto& engine = Kernel();
             ++InitializeCalls;
             ObserveServices(engine);
             if (ExpectAssets && !ImportPath.empty())
@@ -210,13 +212,11 @@ namespace
             }
         }
 
-        void OnSimTick(Runtime::Engine&, double) override {}
+        void Simulate(double) override {}
 
-        void OnVariableTick(
-            Runtime::Engine& engine,
-            double,
-            double) override
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++VariableTicks;
             ObserveServices(engine);
             if (ExpectAssets && !ImportPath.empty())
@@ -238,10 +238,7 @@ namespace
             engine.RequestExit();
         }
 
-        void OnShutdown(Runtime::Engine&) override
-        {
-            ++ShutdownCalls;
-        }
+        void Shutdown() override { ++ShutdownCalls; }
 
         void ObserveServices(Runtime::Engine& engine)
         {
@@ -271,8 +268,7 @@ namespace
         std::vector<bool> RuntimeImportSucceeded{};
     };
 
-    class FixedFrameApplication final :
-        public Runtime::IApplication
+    class FixedFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         explicit FixedFrameApplication(
@@ -281,18 +277,16 @@ namespace
         {
         }
 
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(
-            Runtime::Engine& engine,
-            double,
-            double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++ObservedFrames;
             if (ObservedFrames >= FrameCount)
                 engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
         std::uint32_t FrameCount{1u};
         std::uint32_t ObservedFrames{0u};
@@ -2133,8 +2127,7 @@ TEST(AssetWorkflowModule,
             std::make_unique<FixedFrameApplication>(8u);
         FixedFrameApplication* const observed =
             application.get();
-        Runtime::Engine engine(
-            HeadlessConfig(), std::move(application));
+        Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
         if (omitted == OmittedOwner::AssetWorkflow)
         {
             engine.EmplaceModule<Runtime::AsyncWorkModule>();
@@ -2200,8 +2193,7 @@ TEST(AssetWorkflowModule,
     auto application =
         std::make_unique<RunOnceApplication>(
             /*expectAssets=*/true);
-    Runtime::Engine engine(
-        HeadlessConfig(), std::move(application));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
     ShutdownOrderObservation observation{};
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
@@ -2225,8 +2217,7 @@ TEST(AssetWorkflowModule,
     TempObjFile mesh{"runtime183-omitted-drop.obj"};
     auto application =
         std::make_unique<FixedFrameApplication>(2u);
-    Runtime::Engine engine(
-        HeadlessConfig(), std::move(application));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.Initialize();
 
@@ -2288,8 +2279,7 @@ TEST(AssetWorkflowModule,
                 /*expectAssets=*/false);
         RunOnceApplication* const observed =
             application.get();
-        Runtime::Engine engine(
-            HeadlessConfig(), std::move(application));
+        Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
 
         engine.Initialize();
         engine.Run();
@@ -2311,8 +2301,7 @@ TEST(AssetWorkflowModule,
             initializedGateMesh.Path.string());
     RunOnceApplication* const observed =
         application.get();
-    Runtime::Engine engine(
-        HeadlessConfig(), std::move(application));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
 

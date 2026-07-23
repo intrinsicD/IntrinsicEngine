@@ -2,14 +2,24 @@
 
 This directory contains the `Sandbox` module/files.
 
-`Sandbox` is the generic reference integration target. The executable obtains
-its concrete runtime application through `Sandbox::CreateSandboxApp()` so the
-module-private app implementation remains policy-light. `Sandbox.cppm` exports
-only the app factory and runtime-module registration declarations; the concrete
-`App` lifecycle class and its runtime imports live in `Sandbox.cpp`. It may observe
-lifecycle hooks, but engine feature wiring, frame phases, and subsystem behavior
-belong in `Runtime` or lower engine layers. The executable obtains its default
-configuration through `Runtime` and should not import lower layers directly.
+`Sandbox` is the generic reference integration target. `main.cpp` is the visible
+composition root: it constructs `Runtime::Engine`, adds each concrete runtime
+module (including separate `SceneDocumentModule` and
+`SceneInteractionModule` values), initializes the kernel, installs initial app
+state, runs, and tears down explicitly. `Sandbox.cppm` exports only the concrete
+app-owned `SandboxSession`; it owns reference-content/default-policy/editor
+state and receives narrow config/world/service capabilities rather than an
+`Engine&`. Engine feature wiring, frame phases, and subsystem behavior remain
+in `Runtime` or lower engine layers. The executable obtains its default
+configuration through `Runtime` and does not import lower layers directly.
+
+Shutdown is deliberately two-stage. `Engine::BeginShutdown()` discards final
+commands, publishes the shutdown announcement, drains GPU participants, and
+waits for device idle while worlds and module services are still live.
+`SandboxSession::Shutdown()` then removes app-owned policies/editor/reference
+content, after which `Engine::Shutdown()` reverses modules and tears down the
+kernel. Frame-pacing capture writes into main-owned report state, so the report
+remains valid after its module has been destroyed.
 `Sandbox.ConfigSections` is the pre-boot composition surface for the current
 `sandbox.progressive_poisson` and `sandbox.parameterization` records. The
 runtime module owns their typed DTOs/codecs. `main.cpp` constructs the

@@ -11,6 +11,8 @@
 
 #include <glm/glm.hpp>
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Tasks;
@@ -90,12 +92,13 @@ namespace
         return labels ? labels.Vector().size() : 0u;
     }
 
-    class KMeansSuccessApp final : public Runtime::IApplication
+    class KMeansSuccessApp final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine& engine) override
+        void Resolve() override
         {
-            MainThread = std::this_thread::get_id();
+            auto& engine = Kernel();
+            MainThread   = std::this_thread::get_id();
             Runtime::ClusteringService* service =
                 engine.Services().Find<Runtime::ClusteringService>();
             if (service == nullptr || !service->Available())
@@ -138,10 +141,11 @@ namespace
             });
         }
 
-        void OnSimTick(Runtime::Engine&, double) override {}
+        void Simulate(double) override {}
 
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             Ticks += 1u;
             const bool committed =
                 Entity != ECS::InvalidEntityHandle &&
@@ -169,7 +173,7 @@ namespace
             }
         }
 
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
         Runtime::KernelEventSubscription CompletionSub{};
         Runtime::KernelEventSubscription ChangedSub{};
@@ -187,11 +191,12 @@ namespace
         bool TimedOut{false};
     };
 
-    class KMeansWorldSwitchApp final : public Runtime::IApplication
+    class KMeansWorldSwitchApp final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine& engine) override
+        void Resolve() override
         {
+            auto& engine = Kernel();
             Runtime::ClusteringService* service =
                 engine.Services().Find<Runtime::ClusteringService>();
             if (service == nullptr || !service->Available())
@@ -238,10 +243,11 @@ namespace
             NextWorld = engine.Worlds().CreateWorld("Switched");
         }
 
-        void OnSimTick(Runtime::Engine&, double) override {}
+        void Simulate(double) override {}
 
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             Ticks += 1u;
             if (!SwitchRequested &&
                 BlockerStarted.load(std::memory_order_acquire))
@@ -273,10 +279,7 @@ namespace
             }
         }
 
-        void OnShutdown(Runtime::Engine&) override
-        {
-            ReleaseBlocker.store(true, std::memory_order_release);
-        }
+        void Shutdown() override { ReleaseBlocker.store(true, std::memory_order_release); }
 
         Runtime::KernelEventSubscription CompletionSub{};
         Runtime::CommandCorrelationId Correlation{};
@@ -295,19 +298,19 @@ namespace
         bool TimedOut{false};
     };
 
-    class MissingModuleApp final : public Runtime::IApplication
+    class MissingModuleApp final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine& engine) override
+        void Resolve() override
         {
-            Entity = AddPointCloud(
-                *engine.Worlds().Get(engine.ActiveWorld()),
-                {
-                    {0.0f, 0.0f, 0.0f},
-                    {0.1f, 0.0f, 0.0f},
-                    {2.0f, 0.0f, 0.0f},
-                    {2.1f, 0.0f, 0.0f},
-                });
+            auto& engine = Kernel();
+            Entity =
+                AddPointCloud(*engine.Worlds().Get(engine.ActiveWorld()), {
+                                                                              {0.0f, 0.0f, 0.0f},
+                                                                              {0.1f, 0.0f, 0.0f},
+                                                                              {2.0f, 0.0f, 0.0f},
+                                                                              {2.1f, 0.0f, 0.0f},
+                                                                          });
             StableEntityId =
                 Runtime::SelectionController::ToStableEntityId(Entity);
             Correlation = engine.Commands().Enqueue(Runtime::RunKMeans{
@@ -319,10 +322,11 @@ namespace
             });
         }
 
-        void OnSimTick(Runtime::Engine&, double) override {}
+        void Simulate(double) override {}
 
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             Ticks += 1u;
             if (Ticks >= 2u)
             {
@@ -332,7 +336,7 @@ namespace
             }
         }
 
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
         Runtime::CommandCorrelationId Correlation{};
         Runtime::CommandBusStats CommandStats{};
@@ -348,7 +352,7 @@ TEST(ClusteringModule, EngineRunCommitsLabelsAndPublishesChangeEvent)
     auto app = std::make_unique<KMeansSuccessApp>();
     KMeansSuccessApp* appPtr = app.get();
 
-    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(app));
     engine.EmplaceModule<Runtime::ClusteringModule>();
     engine.Initialize();
     engine.Run();
@@ -384,7 +388,7 @@ TEST(ClusteringModule, WorldSwitchBeforeCompletionDropsCommit)
     auto app = std::make_unique<KMeansWorldSwitchApp>();
     KMeansWorldSwitchApp* appPtr = app.get();
 
-    Runtime::Engine engine(NullWindowHeadlessConfig(1u), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(1u), std::move(app));
     engine.EmplaceModule<Runtime::ClusteringModule>();
     engine.Initialize();
     engine.Run();
@@ -407,7 +411,7 @@ TEST(ClusteringModule, RunKMeansWithoutModuleFailsClosedAtCommandDrain)
     auto app = std::make_unique<MissingModuleApp>();
     MissingModuleApp* appPtr = app.get();
 
-    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(app));
     engine.Initialize();
     engine.Run();
 

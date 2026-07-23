@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-#include <gtest/gtest.h>
 #include <glm/glm.hpp>
+#include <gtest/gtest.h>
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Components.GeometrySources;
@@ -54,17 +54,6 @@ namespace
         engine.Initialize();
     }
 
-    class StubApplication final : public Extrinsic::Runtime::IApplication
-    {
-    public:
-        void OnInitialize(Extrinsic::Runtime::Engine& /*engine*/) override {}
-        void OnSimTick(Extrinsic::Runtime::Engine& /*engine*/, double /*fixedDt*/) override {}
-        void OnVariableTick(Extrinsic::Runtime::Engine& /*engine*/,
-                            double /*alpha*/,
-                            double /*dt*/) override {}
-        void OnShutdown(Extrinsic::Runtime::Engine& /*engine*/) override {}
-    };
-
     [[nodiscard]] Extrinsic::Core::Config::EngineConfig HeadlessConfig()
     {
         Extrinsic::Core::Config::EngineConfig config{};
@@ -109,7 +98,7 @@ namespace
 
 TEST(PointCloudGeometryExtraction, CloudUploadsOnceAndBindsInstanceGeometry)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -175,7 +164,7 @@ TEST(PointCloudGeometryExtraction, PopulateFromCloudResolvesPointCloudDomainAndU
     namespace E = Extrinsic::ECS::Components;
     namespace G = Extrinsic::Graphics::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -218,7 +207,7 @@ TEST(PointCloudGeometryExtraction, PopulateFromCloudResolvesPointCloudDomainAndU
 
 TEST(PointCloudGeometryExtraction, RepeatedExtractionReusesPointCloudHandleWithoutReupload)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -258,7 +247,7 @@ TEST(PointCloudGeometryExtraction, RepeatedExtractionReusesPointCloudHandleWitho
 
 TEST(PointCloudGeometryExtraction, TwoCloudEntitiesAllocateIndependentUploads)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -285,7 +274,7 @@ TEST(PointCloudGeometryExtraction, TwoCloudEntitiesAllocateIndependentUploads)
 
 TEST(PointCloudGeometryExtraction, EntityDestructionRetiresPointCloudGeometryAfterDeferredWindow)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -336,7 +325,7 @@ TEST(PointCloudGeometryExtraction, EntityDestructionRetiresPointCloudGeometryAft
 
 TEST(PointCloudGeometryExtraction, CacheDestructionToleratesPendingDeferredRetireState)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -367,7 +356,7 @@ TEST(PointCloudGeometryExtraction, CacheDestructionToleratesPendingDeferredRetir
 
 TEST(PointCloudGeometryExtraction, ShutdownReleasesPendingPointCloudResidency)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -396,7 +385,7 @@ TEST(PointCloudGeometryExtraction, ProceduralRefPreemptsPointCloudPathOnSameEnti
     namespace E = Extrinsic::ECS::Components;
     namespace G = Extrinsic::Graphics::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -433,7 +422,7 @@ TEST(PointCloudGeometryExtraction, MissingPositionsIncrementsMissingPositionsCou
     namespace E = Extrinsic::ECS::Components;
     namespace G = Extrinsic::Graphics::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -467,7 +456,7 @@ TEST(PointCloudGeometryExtraction, NonFinitePositionIncrementsInvalidPointsCount
     namespace E = Extrinsic::ECS::Components;
     namespace G = Extrinsic::Graphics::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -500,7 +489,7 @@ TEST(PointCloudGeometryExtraction, PerPointSizeSourceFailsClosedAsFailedPack)
     namespace E = Extrinsic::ECS::Components;
     namespace G = Extrinsic::Graphics::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -540,7 +529,7 @@ TEST(PointCloudGeometryExtraction, AddingProceduralRefAfterUploadReleasesPointCl
 {
     namespace E = Extrinsic::ECS::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -600,7 +589,7 @@ TEST(PointCloudGeometryExtraction, LosingPointHintReleasesPointCloudResidency)
 {
     namespace G = Extrinsic::Graphics::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -662,7 +651,7 @@ TEST(PointCloudGeometryExtraction, UnsupportedSurfaceAndEdgeHintsFailClosed)
     namespace E = Extrinsic::ECS::Components;
     namespace G = Extrinsic::Graphics::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -697,7 +686,7 @@ TEST(PointCloudGeometryExtraction, UnsupportedSurfaceAndEdgeHintsReleasePriorRes
 {
     namespace G = Extrinsic::Graphics::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -761,7 +750,7 @@ TEST_P(PointCloudGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
 {
     namespace D = Extrinsic::ECS::Components::DirtyTags;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -870,7 +859,7 @@ TEST(PointCloudGeometryExtraction, VertexCountChangeFallsBackToFullUpload)
 {
     namespace D = Extrinsic::ECS::Components::DirtyTags;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -928,7 +917,7 @@ TEST(PointCloudGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPrese
 {
     namespace D = Extrinsic::ECS::Components::DirtyTags;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -982,15 +971,15 @@ TEST(PointCloudGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPrese
     engine.Shutdown();
 }
 
-// RUNTIME-087 follow-up — switching a resident cloud to an unsupported per-point
-// size-source buffer (the `std::string` alternative) must also release the
-// stale residency, since the size-source check fails closed before the reuse
-// path.
+// RUNTIME-087 follow-up — switching a resident cloud to an unsupported
+// per-point size-source buffer (the `std::string` alternative) must also
+// release the stale residency, since the size-source check fails closed before
+// the reuse path.
 TEST(PointCloudGeometryExtraction, SwitchingToUnsupportedSizeSourceReleasesResidency)
 {
     namespace G = Extrinsic::Graphics::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());

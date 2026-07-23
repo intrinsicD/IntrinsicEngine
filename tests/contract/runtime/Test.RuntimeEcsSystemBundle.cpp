@@ -274,7 +274,7 @@ TEST(RuntimeEcsSystemBundle, AppPassMutatingTransformRunsBeforeTransformHierarch
 
     FrameGraph graph;
 
-    // App-style pass that runs in OnSimTick: write Transform::Component +
+    // Module-system pass: write Transform::Component +
     // emplace IsDirtyTag so TransformHierarchy picks it up. Declaring Write
     // on Transform::Component creates a WAR edge against TransformHierarchy's
     // Read on the same component, forcing it to run first.

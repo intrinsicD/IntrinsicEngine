@@ -1,9 +1,9 @@
 module;
 
-#include <cstddef>
-#include <cstdint>
 #include <array>
 #include <atomic>
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -45,7 +45,6 @@ import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobService;
@@ -68,6 +67,7 @@ import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldHandle;
+import Extrinsic.Runtime.WorldRegistry;
 import Geometry.KMeans;
 import Geometry.Graph.Vertex.Normals;
 import Geometry.HalfedgeMesh.Vertices.Normals;
@@ -3231,7 +3231,7 @@ export namespace Extrinsic::Runtime
         SandboxEditorSession(SandboxEditorSession&&) = delete;
         SandboxEditorSession& operator=(SandboxEditorSession&&) = delete;
 
-        void Attach(Engine& engine);
+        void Attach(WorldRegistry& worlds, ServiceRegistry& services);
         void Detach();
 
         [[nodiscard]] bool PrepareFrame(
@@ -3253,15 +3253,18 @@ export namespace Extrinsic::Runtime
 
         [[nodiscard]] bool IsAttached() const noexcept
         {
-            return m_Engine != nullptr;
+            return m_Worlds != nullptr && m_Services != nullptr;
         }
 
     private:
-        void AttachKMeansGpuQueue(Engine& engine);
+        void AttachKMeansGpuQueue(ServiceRegistry& services);
         void DetachKMeansGpuQueue();
         void ResetAttachmentState();
 
-        Engine* m_Engine{nullptr};
+        WorldRegistry* m_Worlds{nullptr};
+        ServiceRegistry* m_Services{nullptr};
+        JobService* m_Jobs{nullptr};
+        RHI::IDevice* m_Device{nullptr};
         bool m_FramePrepared{false};
         SandboxEditorContext m_Context{};
         SandboxEditorPanelFrame m_LastFrame{};

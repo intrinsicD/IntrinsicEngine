@@ -4,8 +4,9 @@
 #include <optional>
 #include <utility>
 
-#include <gtest/gtest.h>
 #include <glm/glm.hpp>
+#include <gtest/gtest.h>
+#include "RuntimeTestModule.hpp"
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
@@ -230,50 +231,47 @@ namespace
         return true;
     }
 
-    class OneFrameCameraApplication final
-        : public Runtime::IApplication
+    class OneFrameCameraApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine& engine) override
+        void Resolve() override
         {
-            Registry =
-                engine.Services()
-                    .Find<Runtime::CameraControllerRegistry>();
+            auto& engine = Kernel();
+            Registry     = engine.Services().Find<Runtime::CameraControllerRegistry>();
             ASSERT_NE(Registry, nullptr);
             SeedResult = Registry->SetWorldSeed(
                 engine.ActiveWorld(),
                 SeedAt(glm::vec3{1.0f, 2.0f, 6.0f}));
         }
 
-        void OnSimTick(Runtime::Engine&, double) override {}
+        void Simulate(double) override {}
 
-        void OnVariableTick(
-            Runtime::Engine& engine, double, double) override
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++VariableTicks;
             engine.RequestExit();
         }
 
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
         Runtime::CameraControllerRegistry* Registry{nullptr};
         Core::Result SeedResult{Core::Ok()};
         std::uint32_t VariableTicks{0u};
     };
 
-    class OneFramePassiveApplication final
-        : public Runtime::IApplication
+    class OneFramePassiveApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(
-            Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++VariableTicks;
             engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
         std::uint32_t VariableTicks{0u};
     };
@@ -716,8 +714,7 @@ TEST(CameraModuleComposition,
     auto app =
         std::make_unique<OneFramePassiveApplication>();
     OneFramePassiveApplication* appPtr = app.get();
-    Runtime::Engine engine(
-        CameraConfig(true), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(CameraConfig(true), std::move(app));
     engine.Initialize();
     EXPECT_EQ(engine.Services()
                   .Find<Runtime::CameraControllerRegistry>(),
@@ -736,8 +733,7 @@ TEST(CameraModuleComposition,
     auto app =
         std::make_unique<OneFrameCameraApplication>();
     OneFrameCameraApplication* appPtr = app.get();
-    Runtime::Engine engine(
-        CameraConfig(true), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(CameraConfig(true), std::move(app));
     engine.EmplaceModule<Runtime::CameraModule>();
     engine.Initialize();
     ASSERT_NE(appPtr->Registry, nullptr);

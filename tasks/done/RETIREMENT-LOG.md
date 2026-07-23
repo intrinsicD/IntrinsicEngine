@@ -5708,3 +5708,21 @@ inventory, and whitespace checks passed. Review:
 [`2026-07-19-runtime-129-clean-workshop-review.md`](../../docs/reviews/2026-07-19-runtime-129-clean-workshop-review.md).
 Implementation checkpoints: `35e0fc80`, `d86dbd0d`, `d5ade642`, `d2f838f2`,
 and `f3aacda9`.
+
+[`RUNTIME-184`](RUNTIME-184-replace-application-lifecycle.md) — application
+lifecycle convergence retired on 2026-07-23 at `Operational`. Engine is now
+constructed from config alone and owns no application callback object.
+Sandbox `main()` visibly composes every production runtime module, then owns
+one concrete `SandboxSession` whose initial content/default policies/editor
+state are initialized after kernel boot and released between the new
+`BeginShutdown()` quiescence boundary and final reverse module shutdown. The
+former no-op production fixed/variable ticks are deleted; frame-pacing capture
+is an ordinary app-composed frame hook, and callback-heavy fixtures use a
+test-only runtime-module bridge without adding a production framework. Focused
+lifecycle/module/Sandbox coverage completed after repairing five
+whitespace-sensitive structural assertions. The complete UBSan CPU selector
+passed 2,937/2,937; the ASan selector exercised all 2,937 cases with no
+behavior or sanitizer failure after the four source-shape assertions were
+rebuilt and rerun cleanly; and the Vulkan Sandbox/object-space-normal cohort
+passed 21/21 including the shutdown LeakSanitizer contract. Engine convergence
+remains `22/0/2/10` for the dedicated mechanism/API/PImpl leaves.

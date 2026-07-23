@@ -2,13 +2,13 @@
 //
 // Composes the promoted runtime/graphics path end to end on the Null backend:
 // one mesh, one graph, and one point cloud authored through promoted ECS
-// `GeometrySources`, extracted once through `RenderExtractionCache`, proving all
-// three residency lanes upload and bind distinct `GpuWorld` instance/geometry
-// handles; a runtime camera controller producing a finite/invertible frame
-// camera; runtime whole-entity selection over the acceptance scene; and the
-// sandbox editor panel frame enumerating the scene. This is the headless
-// acceptance for Theme A; the opt-in `gpu;vulkan` default-recipe present smoke
-// is the deferred Operational slice.
+// `GeometrySources`, extracted once through `RenderExtractionCache`, proving
+// all three residency lanes upload and bind distinct `GpuWorld`
+// instance/geometry handles; a runtime camera controller producing a
+// finite/invertible frame camera; runtime whole-entity selection over the
+// acceptance scene; and the sandbox editor panel frame enumerating the scene.
+// This is the headless acceptance for Theme A; the opt-in `gpu;vulkan`
+// default-recipe present smoke is the deferred Operational slice.
 
 #include <algorithm>
 #include <chrono>
@@ -19,8 +19,9 @@
 #include <thread>
 #include <vector>
 
-#include <gtest/gtest.h>
 #include <glm/glm.hpp>
+#include <gtest/gtest.h>
+#include "RuntimeTestModule.hpp"
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
@@ -85,22 +86,14 @@ namespace
 
     constexpr std::uint32_t kInvalidIndex = std::numeric_limits<std::uint32_t>::max();
 
-    class StubApplication final : public Runtime::IApplication
+    class InjectClickAndExitApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine&, double, double) override {}
-        void OnShutdown(Runtime::Engine&) override {}
-    };
-
-    class InjectClickAndExitApplication final : public Runtime::IApplication
-    {
-    public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine                               = Kernel();
             const Extrinsic::Platform::IWindow& window = engine.GetWindow();
             auto& input = const_cast<Extrinsic::Platform::Input::Context&>(
                 window.GetInput());
@@ -108,30 +101,31 @@ namespace
             input.SetMouseButtonState(0, true);
             engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
     };
 
-    class IdleFrameAndExitApplication final : public Runtime::IApplication
+    class IdleFrameAndExitApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
     };
 
-    class TaskGraphReplayAndExitApplication final
-        : public Runtime::IApplication
+    class TaskGraphReplayAndExitApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
-            Stats = engine.GetFrameGraph().GetPlanReuseStats();
+            auto& engine = Kernel();
+            Stats        = engine.GetFrameGraph().GetPlanReuseStats();
             if (Stats.PlanReuseCount >= 1u)
             {
                 engine.RequestExit();
@@ -150,7 +144,7 @@ namespace
             // Engine::Run() path builds once and then replays.
             std::this_thread::sleep_for(std::chrono::milliseconds(20));
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
         Extrinsic::Core::Dag::TaskGraphPlanReuseStats Stats{};
         std::uint32_t VariableTicks = 0u;
@@ -252,7 +246,7 @@ namespace
 // bind three distinct live instance/geometry pairs through one extraction.
 TEST(RuntimeSandboxAcceptance, MeshGraphPointCloudAllResideThroughOneExtraction)
 {
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig());
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     engine.Initialize();
@@ -338,9 +332,8 @@ TEST(RuntimeSandboxAcceptance, CameraControllerProducesFiniteInvertibleFrameCame
 TEST(RuntimeSandboxAcceptance,
      ComposedCameraModuleDrivesFiniteFirstFrame)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<IdleFrameAndExitApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<IdleFrameAndExitApplication>());
     engine.EmplaceModule<Runtime::CameraModule>();
     engine.Initialize();
     Runtime::CameraControllerRegistry* registry =
@@ -369,7 +362,7 @@ TEST(RuntimeSandboxAcceptance,
 // Runtime selection works for an entity of each geometry family.
 TEST(RuntimeSandboxAcceptance, SelectionControllerSelectsEntityOfEachFamily)
 {
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig());
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -398,7 +391,7 @@ TEST(RuntimeSandboxAcceptance, SelectionControllerSelectsEntityOfEachFamily)
 // reports selection state without owning engine state.
 TEST(RuntimeSandboxAcceptance, EditorPanelFrameEnumeratesAcceptanceScene)
 {
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig());
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -456,7 +449,7 @@ namespace
 // family against the authoritative GeometrySources.
 TEST(RuntimeSandboxAcceptance, PrimitiveRefinementResolvesOneDomainPerFamily)
 {
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig());
     engine.Initialize();
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
 
@@ -490,7 +483,7 @@ TEST(RuntimeSandboxAcceptance, PrimitiveRefinementResolvesOneDomainPerFamily)
 // graphics path consumes, with the recipe's default outline styling preserved.
 TEST(RuntimeSandboxAcceptance, SelectionOutlineSnapshotPopulatedForSelectedEntity)
 {
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig());
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
@@ -533,12 +526,14 @@ TEST(RuntimeSandboxAcceptance, SelectionOutlineSnapshotPopulatedForSelectedEntit
 
 TEST(RuntimeSandboxAcceptance, ViewportLeftClickSubmitsSelectionPick)
 {
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<InjectClickAndExitApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<InjectClickAndExitApplication>());
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
 
     engine.Run();
 
@@ -559,13 +554,13 @@ TEST(RuntimeSandboxAcceptance, ViewportLeftClickSubmitsSelectionPick)
 
 TEST(RuntimeSandboxAcceptance, IdleFrameSkipsPreRenderTransformFlush)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<IdleFrameAndExitApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<IdleFrameAndExitApplication>());
     engine.Initialize();
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
 
     engine.Run();
 
@@ -584,12 +579,13 @@ TEST(RuntimeSandboxAcceptance, FixedStepTaskGraphBuildsOnceThenReusesPlan)
 {
     auto app = std::make_unique<TaskGraphReplayAndExitApplication>();
     auto* appPtr = app.get();
-    Runtime::Engine engine(HeadlessConfig(), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(app));
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
 
     engine.Run();
 
@@ -614,23 +610,24 @@ namespace
     // Applies the promoted Sandbox Editor transform-edit command (through the
     // live EditorCommandHistory path) during the variable tick — i.e. after
     // the fixed-step ECS bundle already ran for this frame — and exits.
-    class EditTransformViaInspectorAndExitApplication final : public Runtime::IApplication
+    class EditTransformViaInspectorAndExitApplication final
+        : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine& engine) override
+        void Resolve() override
         {
-            auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+            auto& engine = Kernel();
+            auto& scene  = *engine.Worlds().Get(engine.ActiveWorld());
             Entity = Extrinsic::ECS::Scene::CreateDefault(scene, "Bug024EditTarget");
             scene.Raw().emplace<G::RenderSurface>(Entity);
         }
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             const Runtime::SandboxEditorContext context{
-                .Scene = &*engine.Worlds().Get(engine.ActiveWorld()),
-                .Selection =
-                    engine.Services()
-                        .Find<Runtime::SelectionController>(),
+                .Scene          = &*engine.Worlds().Get(engine.ActiveWorld()),
+                .Selection      = engine.Services().Find<Runtime::SelectionController>(),
                 .CommandHistory = &*engine.Services().Find<Runtime::EditorCommandHistory>(),
             };
             LastStatus = Runtime::ApplySandboxEditorTransformEdit(
@@ -643,7 +640,7 @@ namespace
                 });
             engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
         EntityHandle Entity{};
         Runtime::SandboxEditorCommandStatus LastStatus{
@@ -662,12 +659,13 @@ TEST(RuntimeSandboxAcceptance, InspectorTransformEditFlushedToRenderStateSameFra
 {
     auto app = std::make_unique<EditTransformViaInspectorAndExitApplication>();
     auto* appPtr = app.get();
-    Runtime::Engine engine(HeadlessConfig(), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(app));
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
 
     engine.Run();
 

@@ -15,24 +15,14 @@ namespace
 using Extrinsic::Core::Config::EngineConfig;
 using Extrinsic::Core::Config::GraphicsBackend;
 using Extrinsic::Core::Config::RenderConfig;
-using Extrinsic::Core::Log::LogSnapshot;
 using Extrinsic::Core::Log::Level;
+using Extrinsic::Core::Log::LogSnapshot;
 using Extrinsic::Core::Log::TakeSnapshot;
 using Extrinsic::Runtime::Engine;
-using Extrinsic::Runtime::IApplication;
 using Extrinsic::Runtime::ShouldEmitVulkanRequestedButNotOperationalBreadcrumb;
 
 constexpr std::string_view kBreadcrumbPrefix =
     "[Runtime] VulkanRequestedButNotOperational";
-
-class StubApplication final : public IApplication
-{
-public:
-    void OnInitialize(Engine& /*engine*/) override {}
-    void OnSimTick(Engine& /*engine*/, double /*fixedDt*/) override {}
-    void OnVariableTick(Engine& /*engine*/, double /*alpha*/, double /*dt*/) override {}
-    void OnShutdown(Engine& /*engine*/) override {}
-};
 
 [[nodiscard]] EngineConfig SingleWorkerEngineConfig()
 {
@@ -115,7 +105,7 @@ TEST(RuntimeVulkanBreadcrumb, EngineInitializeFiresBreadcrumbOncePerStartupWhenR
     const LogSnapshot before = TakeSnapshot();
     const std::size_t beforeCount = CountBreadcrumbWarnings(before, 0);
 
-    Engine engine(config, std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(config);
     engine.Initialize();
 
     const LogSnapshot after = TakeSnapshot();
@@ -138,7 +128,7 @@ TEST(RuntimeVulkanBreadcrumb, EngineInitializeSilentWhenPromotedVulkanNotRequest
     const LogSnapshot before = TakeSnapshot();
     const std::size_t beforeCount = CountBreadcrumbWarnings(before, 0);
 
-    Engine engine(config, std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(config);
     engine.Initialize();
 
     const LogSnapshot after = TakeSnapshot();
@@ -160,7 +150,7 @@ TEST(RuntimeVulkanBreadcrumb, EngineInitializeSucceedsEvenWhenVulkanFallsBackToN
     config.Render.Backend = GraphicsBackend::Vulkan;
     config.Render.EnablePromotedVulkanDevice = true;
 
-    Engine engine(config, std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(config);
     engine.Initialize();
     EXPECT_FALSE(engine.GetDevice().IsOperational())
         << "CPU contract gate falls back to the Null device which reports "

@@ -44,50 +44,6 @@ namespace Extrinsic::Runtime
     export class Engine;
 
     // ============================================================
-    // IApplication — the user-facing hook interface.
-    //
-    // Lifecycle order guaranteed by Engine:
-    //
-    //   OnInitialize(engine)           — once, after all subsystems are live.
-    //                                    Register FrameGraph system passes here.
-    //
-    //   per frame:
-    //     OnSimTick(engine, fixedDt)   — 0..N times, fixed timestep.
-    //                                    Add FrameGraph passes each tick;
-    //                                    Engine calls
-    //                                    Compile→Execute→ResetForReplay.
-    //     OnVariableTick(engine,       — once per frame, after all sim ticks.
-    //                    alpha, dt)      alpha = accumulator / fixedDt ∈ [0,1).
-    //                                    Use for camera, UI, interpolation.
-    //
-    //   OnShutdown(engine)             — once, before subsystem teardown.
-    //
-    // Contract: implementations must be non-throwing.  The engine
-    // builds with -fno-exceptions; std::terminate fires on violation.
-    // ============================================================
-
-    export class IApplication
-    {
-    public:
-        virtual ~IApplication() = default;
-
-        virtual void OnInitialize(Engine& engine) = 0;
-
-        /// Called 0..N times per frame with the fixed simulation timestep.
-        /// N is bounded by EngineConfig::Simulation::MaxSubSteps.
-        /// Add FrameGraph passes via engine.GetFrameGraph().AddPass(...) here.
-        virtual void OnSimTick(Engine& engine, double fixedDt) = 0;
-
-        /// Called once per frame after all sim ticks complete.
-        /// @param alpha  interpolation blend in [0, 1) — use to smooth
-        ///               rendered positions between committed ticks.
-        /// @param dt     wall-clock delta of this frame (clamped).
-        virtual void OnVariableTick(Engine& engine, double alpha, double dt) = 0;
-
-        virtual void OnShutdown(Engine& engine) = 0;
-    };
-
-    // ============================================================
     // Engine — composition root and frame-loop owner.
     //
     // Owns: Window, IDevice, IRenderer, FrameClock,
@@ -97,7 +53,7 @@ namespace Extrinsic::Runtime
     // Scheduling surfaces:
     //   CPU     — Core::FrameGraph wrapping a Dag::TaskGraph(Cpu).
     //             Drives ECS system scheduling each sim tick.
-    //             IApplication::OnSimTick adds passes; Engine calls
+    //             App-composed module systems add passes; Engine calls
     //             Compile → Execute → ResetForReplay per tick.
     //
     //   GPU     — Owned internally by IRenderer.
@@ -114,10 +70,10 @@ namespace Extrinsic::Runtime
     //   BeginFrame(clock)
     //     [if resized:   WaitIdle → Resize]
     //   FixedStepLoop {
-    //     OnSimTick × N
+    //     Module systems × N
     //       FrameGraph: Compile → Execute → ResetForReplay  (CPU task graph)
     //   }
-    //   OnVariableTick(alpha, dt)
+    //   Module frame hooks
     //   BuildRenderFrameInput
     //   Renderer::BeginFrame      (GPU task graph — acquire)
     //     [if skip: EndFrame(clock) → continue]
@@ -135,8 +91,7 @@ namespace Extrinsic::Runtime
     export class Engine
     {
     public:
-        Engine(Core::Config::EngineConfig config,
-               std::unique_ptr<IApplication> application);
+        explicit Engine(Core::Config::EngineConfig config);
         ~Engine();
 
         Engine(const Engine&)            = delete;
@@ -144,6 +99,12 @@ namespace Extrinsic::Runtime
 
         void Initialize();
         void Run();
+        // Stop runtime work, announce shutdown, drain GPU participants, and
+        // wait for device idle while module services and worlds remain live.
+        // An app with concrete teardown state calls this, tears that state down,
+        // then calls Shutdown(). Shutdown() calls BeginShutdown() itself when no
+        // app-owned teardown needs to be interposed.
+        void BeginShutdown();
         void Shutdown();
 
         [[nodiscard]] bool IsRunning()    const noexcept;
@@ -237,7 +198,6 @@ namespace Extrinsic::Runtime
                 RuntimeRenderRecipeState& state) noexcept;
 
         Core::Config::EngineConfig           m_Config;
-        std::unique_ptr<IApplication>        m_Application;
         std::vector<std::unique_ptr<IRuntimeModule>> m_RuntimeModules{};
         std::unique_ptr<Platform::IWindow>   m_Window;
         std::unique_ptr<RHI::IDevice>        m_Device;
@@ -277,6 +237,7 @@ namespace Extrinsic::Runtime
 
         bool m_Initialized{false};
         bool m_Running{false};
+        bool m_ShutdownBegun{false};
         bool m_RendererOperational{false};
         bool m_WindowCloseLogged{false};
         RuntimeFramePacingDiagnostics m_LastFramePacingDiagnostics{};

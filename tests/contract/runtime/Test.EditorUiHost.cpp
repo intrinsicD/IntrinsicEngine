@@ -10,6 +10,8 @@
 #include <gtest/gtest.h>
 #include <imgui.h>
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
@@ -31,15 +33,18 @@ namespace Graphics = Extrinsic::Graphics;
 namespace Runtime = Extrinsic::Runtime;
 
 namespace {
-class OneFrameApplication final : public Runtime::IApplication {
-public:
-  void OnInitialize(Runtime::Engine &) override {}
-  void OnSimTick(Runtime::Engine &, double) override {}
-  void OnVariableTick(Runtime::Engine &engine, double, double) override {
-    engine.RequestExit();
-  }
-  void OnShutdown(Runtime::Engine &) override {}
-};
+    class OneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
+        {
+            auto& engine = Kernel();
+            engine.RequestExit();
+        }
+        void Shutdown() override {}
+    };
 
 struct UiBracketProbeState {
   std::vector<std::string> Trace{};
@@ -54,19 +59,22 @@ struct UiBracketProbeState {
   bool BeforeExtractionClaimed{false};
 };
 
-class UiBracketApplication final : public Runtime::IApplication {
+class UiBracketApplication final : public Intrinsic::Tests::RuntimeTestModule
+{
 public:
   explicit UiBracketApplication(UiBracketProbeState &state) : State(state) {}
 
-  void OnInitialize(Runtime::Engine &) override {}
-  void OnSimTick(Runtime::Engine &, double) override {}
-  void OnVariableTick(Runtime::Engine &engine, double, double) override {
-    State.Trace.emplace_back("variable_tick");
-    engine.RequestExit();
+  void Resolve() override {}
+  void Simulate(double) override {}
+  void Frame(double, double) override
+  {
+      auto& engine = Kernel();
+      State.Trace.emplace_back("variable_tick");
+      engine.RequestExit();
   }
-  void OnShutdown(Runtime::Engine &) override {}
+  void Shutdown() override {}
 
-private:
+  private:
   UiBracketProbeState &State;
 };
 
@@ -217,22 +225,25 @@ private:
   EditorShutdownProbeState &State;
 };
 
-class ReinitializeApplication final : public Runtime::IApplication {
+class ReinitializeApplication final : public Intrinsic::Tests::RuntimeTestModule
+{
 public:
-  void OnInitialize(Runtime::Engine &) override { ++BootCount; }
-  void OnSimTick(Runtime::Engine &, double) override {}
-  void OnVariableTick(Runtime::Engine &engine, double, double) override {
-    if (BootCount == 2u) {
-      const Extrinsic::Platform::IWindow &window = engine.GetWindow();
-      auto &input = const_cast<Extrinsic::Platform::Input::Context &>(
-          window.GetInput());
-      input.SetKeyState(Extrinsic::Platform::Input::Key::G, true);
+    void Resolve() override { ++BootCount; }
+    void Simulate(double) override {}
+    void Frame(double, double) override
+    {
+        auto& engine = Kernel();
+        if (BootCount == 2u)
+        {
+            const Extrinsic::Platform::IWindow& window = engine.GetWindow();
+            auto& input = const_cast<Extrinsic::Platform::Input::Context&>(window.GetInput());
+            input.SetKeyState(Extrinsic::Platform::Input::Key::G, true);
+        }
+        engine.RequestExit();
     }
-    engine.RequestExit();
-  }
-  void OnShutdown(Runtime::Engine &) override {}
+    void Shutdown() override {}
 
-  std::uint32_t BootCount{0u};
+    std::uint32_t BootCount{0u};
 };
 
 [[nodiscard]] Core::Config::EngineConfig HeadlessConfig() {
@@ -246,34 +257,32 @@ public:
 } // namespace
 
 TEST(EditorUiHost, ComposedModulePublishesHostAndRunsFrameContribution) {
-  Runtime::Engine engine(HeadlessConfig(),
-                         std::make_unique<OneFrameApplication>());
-  engine.EmplaceModule<Runtime::EditorUiModule>();
-  engine.Initialize();
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
+    engine.EmplaceModule<Runtime::EditorUiModule>();
+    engine.Initialize();
 
-  std::size_t frameCallbacks = 0u;
-  Runtime::EditorUiHost *host =
-      engine.Services().Find<Runtime::EditorUiHost>();
-  ASSERT_NE(host, nullptr);
-  ASSERT_TRUE(host->IsOperational());
-  const Runtime::EditorUiFrameContributionHandle contribution =
-      host->RegisterFrameContribution(
-          [&frameCallbacks] { ++frameCallbacks; });
-  ASSERT_TRUE(contribution.IsValid());
+    std::size_t frameCallbacks  = 0u;
+    Runtime::EditorUiHost* host = engine.Services().Find<Runtime::EditorUiHost>();
+    ASSERT_NE(host, nullptr);
+    ASSERT_TRUE(host->IsOperational());
+    const Runtime::EditorUiFrameContributionHandle contribution =
+        host->RegisterFrameContribution([&frameCallbacks] { ++frameCallbacks; });
+    ASSERT_TRUE(contribution.IsValid());
 
-  EXPECT_TRUE(host->IsVisible());
-  engine.Run();
-  EXPECT_EQ(frameCallbacks, 1u);
-  EXPECT_EQ(host->GetDiagnostics().FramesProduced, 1u);
-  EXPECT_TRUE(host->UnregisterFrameContribution(contribution));
+    EXPECT_TRUE(host->IsVisible());
+    engine.Run();
+    EXPECT_EQ(frameCallbacks, 1u);
+    EXPECT_EQ(host->GetDiagnostics().FramesProduced, 1u);
+    EXPECT_TRUE(host->UnregisterFrameContribution(contribution));
 
-  engine.Shutdown();
+    engine.Shutdown();
 }
 
 TEST(EditorUiHost, OmittedModuleLeavesEditorHostUnpublished) {
   OmittedEditorProbeState state{};
-  Runtime::Engine engine(HeadlessConfig(),
-                         std::make_unique<OneFrameApplication>());
+  Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                             std::make_unique<OneFrameApplication>());
   engine.EmplaceModule<OmittedEditorProbeModule>(state);
   engine.Initialize();
 
@@ -363,8 +372,8 @@ TEST(EditorUiHost, FrameContributionMutationIsSafeAndDeterministic) {
 
 TEST(EditorUiModule, PreservesBeginVariableBuildEndAndCaptureOrdering) {
   UiBracketProbeState state{};
-  Runtime::Engine engine(
-      HeadlessConfig(), std::make_unique<UiBracketApplication>(state));
+  Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                             std::make_unique<UiBracketApplication>(state));
   engine.EmplaceModule<Runtime::EditorUiModule>();
   engine.EmplaceModule<UiBracketProbeModule>(state);
   engine.Initialize();
@@ -407,8 +416,8 @@ TEST(EditorUiModule, PreservesBeginVariableBuildEndAndCaptureOrdering) {
 
 TEST(EditorUiModule, ReverseShutdownWithdrawsHostAndDetachesLiveRenderer) {
   EditorShutdownProbeState state{};
-  Runtime::Engine engine(HeadlessConfig(),
-                         std::make_unique<OneFrameApplication>());
+  Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                             std::make_unique<OneFrameApplication>());
   engine.EmplaceModule<EditorShutdownProbeModule>(state);
   engine.EmplaceModule<Runtime::EditorUiModule>();
   engine.Initialize();
@@ -428,7 +437,7 @@ TEST(EditorUiModule, ReverseShutdownWithdrawsHostAndDetachesLiveRenderer) {
 TEST(EditorUiModule, ShutdownReinitializeStartsFromFreshEditorState) {
   auto application = std::make_unique<ReinitializeApplication>();
   ReinitializeApplication *applicationPtr = application.get();
-  Runtime::Engine engine(HeadlessConfig(), std::move(application));
+  Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
   engine.EmplaceModule<Runtime::EditorUiModule>();
   engine.Initialize();
 

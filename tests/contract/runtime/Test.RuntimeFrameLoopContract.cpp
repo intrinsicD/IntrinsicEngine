@@ -169,9 +169,6 @@ namespace
         {
         }
 
-        void StopRunning() override { m_Trace.emplace_back("shutdown:stop_running"); }
-        void WaitDeviceIdle() override { m_Trace.emplace_back("shutdown:wait_device_idle"); }
-        void ShutdownApplication() override { m_Trace.emplace_back("shutdown:application"); }
         void ShutdownStreaming() override { m_Trace.emplace_back("shutdown:streaming_shutdown_and_drain"); }
         void DestroyScene() override { m_Trace.emplace_back("shutdown:destroy_scene"); }
         void DestroyAssets() override { m_Trace.emplace_back("shutdown:destroy_assets"); }
@@ -333,7 +330,7 @@ TEST(RuntimeFrameLoopContract, OperationalTransitionDoesNotMarkRendererWhenRebui
                      }));
 }
 
-TEST(RuntimeFrameLoopContract, ShutdownOrdersApplicationStreamingAndSubsystemTeardown)
+TEST(RuntimeFrameLoopContract, ShutdownOrdersStreamingAndSubsystemTeardown)
 {
     Trace trace;
     FakeShutdownHooks shutdown(trace);
@@ -341,9 +338,6 @@ TEST(RuntimeFrameLoopContract, ShutdownOrdersApplicationStreamingAndSubsystemTea
     Extrinsic::Core::ExecuteShutdownContract(shutdown);
 
     EXPECT_EQ(trace, (Trace{
-                         "shutdown:stop_running",
-                         "shutdown:wait_device_idle",
-                         "shutdown:application",
                          "shutdown:streaming_shutdown_and_drain",
                          "shutdown:destroy_scene",
                          "shutdown:destroy_assets",

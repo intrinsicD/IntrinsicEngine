@@ -12,8 +12,8 @@
 #include <type_traits>
 #include <vector>
 
-#include <gtest/gtest.h>
 #include <glm/glm.hpp>
+#include <gtest/gtest.h>
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Components.GeometrySources;
@@ -63,17 +63,6 @@ namespace
     }
 
     constexpr std::uint32_t kInvalidIndex = std::numeric_limits<std::uint32_t>::max();
-
-    class StubApplication final : public Extrinsic::Runtime::IApplication
-    {
-    public:
-        void OnInitialize(Extrinsic::Runtime::Engine& /*engine*/) override {}
-        void OnSimTick(Extrinsic::Runtime::Engine& /*engine*/, double /*fixedDt*/) override {}
-        void OnVariableTick(Extrinsic::Runtime::Engine& /*engine*/,
-                            double /*alpha*/,
-                            double /*dt*/) override {}
-        void OnShutdown(Extrinsic::Runtime::Engine& /*engine*/) override {}
-    };
 
     [[nodiscard]] Extrinsic::Core::Config::EngineConfig HeadlessConfig()
     {
@@ -140,7 +129,7 @@ TEST(RenderExtractionContract, WorldMatrixWithoutRenderHintPublishesNoDrawCandid
 {
     namespace E = Extrinsic::ECS::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     engine.Initialize();
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -170,7 +159,7 @@ TEST(RenderExtractionContract, FailedMeshPackPublishesNoDrawCandidate)
     namespace E = Extrinsic::ECS::Components;
     namespace G = Extrinsic::Graphics::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     engine.EmplaceModule<
         Extrinsic::Runtime::SceneDocumentModule>();
     engine.EmplaceModule<
@@ -215,7 +204,7 @@ TEST(RenderExtractionContract, SnapshotSurvivesLiveEcsMutationAndDestruction)
     namespace E = Extrinsic::ECS::Components;
     namespace G = Extrinsic::Graphics::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     engine.EmplaceModule<
         Extrinsic::Runtime::SceneDocumentModule>();
     engine.EmplaceModule<

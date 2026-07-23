@@ -7,6 +7,8 @@
 
 #include <gtest/gtest.h>
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
@@ -26,16 +28,17 @@ namespace Runtime = Extrinsic::Runtime;
 
 namespace
 {
-    class OneFrameApplication final : public Runtime::IApplication
+    class OneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine& /*engine*/) override {}
-        void OnSimTick(Runtime::Engine& /*engine*/, double /*fixedDt*/) override {}
-        void OnVariableTick(Runtime::Engine& engine, double /*alpha*/, double /*dt*/) override
+        void Resolve() override {}
+        void Simulate(double /*fixedDt*/) override {}
+        void Frame(double /*alpha*/, double /*dt*/) override
         {
+            auto& engine = Kernel();
             engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine& /*engine*/) override {}
+        void Shutdown() override {}
     };
 
     [[nodiscard]] CoreConfig::EngineConfig HeadlessConfig()
@@ -223,7 +226,7 @@ TEST(RuntimeRenderRecipeActivation, StartupRecipeConfigDisablesPostprocessOnFirs
 
     CoreConfig::EngineConfig config = HeadlessConfig();
     config.Render.DefaultRecipeConfigPath = path.string();
-    Runtime::Engine engine(config, std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::make_unique<OneFrameApplication>());
     ComposeConfigControl(engine);
     engine.Initialize();
     std::filesystem::remove(path);
@@ -262,7 +265,7 @@ TEST(RuntimeRenderRecipeActivation, MissingStartupRecipeConfigFallsBackToDefault
 
     CoreConfig::EngineConfig config = HeadlessConfig();
     config.Render.DefaultRecipeConfigPath = path.string();
-    Runtime::Engine engine(config, std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::make_unique<OneFrameApplication>());
     ComposeConfigControl(engine);
     engine.Initialize();
 
@@ -296,7 +299,7 @@ TEST(RuntimeRenderRecipeActivation, InvalidStartupRecipeConfigFallsBackToDefault
 
     CoreConfig::EngineConfig config = HeadlessConfig();
     config.Render.DefaultRecipeConfigPath = path.string();
-    Runtime::Engine engine(config, std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::make_unique<OneFrameApplication>());
     ComposeConfigControl(engine);
     engine.Initialize();
     std::filesystem::remove(path);
@@ -326,9 +329,8 @@ TEST(RuntimeRenderRecipeActivation, InvalidStartupRecipeConfigFallsBackToDefault
 TEST(RuntimeRenderRecipeActivation,
      EmptyStartupRecipePathWithComposedControlUsesDefault)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     ComposeConfigControl(engine);
     engine.Initialize();
 
@@ -362,9 +364,8 @@ TEST(RuntimeRenderRecipeActivation,
 
     CoreConfig::EngineConfig config = HeadlessConfig();
     config.Render.DefaultRecipeConfigPath = path.string();
-    Runtime::Engine engine(
-        std::move(config),
-        std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(std::move(config),
+                                               std::make_unique<OneFrameApplication>());
     engine.Initialize();
     std::filesystem::remove(path);
 
@@ -391,9 +392,8 @@ TEST(RuntimeRenderRecipeActivation,
         {
             CoreConfig::EngineConfig config = HeadlessConfig();
             config.Render.DefaultRecipeConfigPath = path.string();
-            Runtime::Engine engine(
-                std::move(config),
-                std::make_unique<OneFrameApplication>());
+            Intrinsic::Tests::RuntimeTestKernel engine(std::move(config),
+                                                       std::make_unique<OneFrameApplication>());
             engine.Initialize();
             EXPECT_EQ(
                 engine.Services().Find<Runtime::EngineConfigControl>(),
@@ -423,9 +423,8 @@ TEST(RuntimeRenderRecipeActivation,
 TEST(RuntimeRenderRecipeActivation,
      EmptyStartupRecipePathUsesDefaultWhenControlModuleIsOmitted)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     engine.Initialize();
 
     EXPECT_EQ(
@@ -452,9 +451,8 @@ TEST(RuntimeRenderRecipeActivation,
 
     CoreConfig::EngineConfig config = HeadlessConfig();
     config.Render.DefaultRecipeConfigPath = path.string();
-    Runtime::Engine engine(
-        std::move(config),
-        std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(std::move(config),
+                                               std::make_unique<OneFrameApplication>());
     auto deletingModule =
         std::make_unique<DeleteStartupRecipeModule>(path);
     DeleteStartupRecipeModule* const deletingModuleAddress =
@@ -485,9 +483,8 @@ TEST(RuntimeRenderRecipeActivation,
      ConfigControlServiceIsFullyUsableByEarlierResolveConsumer)
 {
     EarlyResolveConsumerState consumerState{};
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     engine.AddModule(
         std::make_unique<EarlyResolveConfigConsumerModule>(
             consumerState));
@@ -519,7 +516,7 @@ TEST(RuntimeRenderRecipeActivation,
 TEST(RuntimeRenderRecipeActivation, EditorActivationCommandRoutesThroughRuntimeApplyPath)
 {
     CoreConfig::EngineConfig config = HeadlessConfig();
-    Runtime::Engine engine(config, std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::make_unique<OneFrameApplication>());
     ComposeConfigControl(engine);
     engine.Initialize();
     Runtime::EngineConfigControl* configControl =

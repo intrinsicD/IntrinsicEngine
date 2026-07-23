@@ -51,17 +51,6 @@ namespace
         engine.Initialize();
     }
 
-    class StubApplication final : public Extrinsic::Runtime::IApplication
-    {
-    public:
-        void OnInitialize(Extrinsic::Runtime::Engine& /*engine*/) override {}
-        void OnSimTick(Extrinsic::Runtime::Engine& /*engine*/, double /*fixedDt*/) override {}
-        void OnVariableTick(Extrinsic::Runtime::Engine& /*engine*/,
-                            double /*alpha*/,
-                            double /*dt*/) override {}
-        void OnShutdown(Extrinsic::Runtime::Engine& /*engine*/) override {}
-    };
-
     [[nodiscard]] Extrinsic::Core::Config::EngineConfig HeadlessConfig()
     {
         Extrinsic::Core::Config::EngineConfig config{};
@@ -124,7 +113,7 @@ namespace
 // with no hover, and the styling defaults are preserved.
 TEST(SelectionSnapshotExtraction, SelectedEntityMirrorsIntoRenderWorldSelection)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeSelectable(scene);
@@ -156,7 +145,7 @@ TEST(SelectionSnapshotExtraction, SelectedEntityMirrorsIntoRenderWorldSelection)
 // selected set.
 TEST(SelectionSnapshotExtraction, HoveredEntityMirrorsIntoRenderWorldSelection)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeSelectable(scene);
@@ -185,7 +174,7 @@ TEST(SelectionSnapshotExtraction, HoveredEntityMirrorsIntoRenderWorldSelection)
 // Multiple additive selections mirror in insertion order.
 TEST(SelectionSnapshotExtraction, AdditiveSelectionMirrorsAllSelectedIds)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle first  = MakeSelectable(scene);
@@ -218,7 +207,7 @@ TEST(SelectionSnapshotExtraction, AdditiveSelectionMirrorsAllSelectedIds)
 // extraction callers are unaffected.
 TEST(SelectionSnapshotExtraction, OmittedInteractionSnapshotLeavesSelectionEmpty)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
 
@@ -237,7 +226,7 @@ TEST(SelectionSnapshotExtraction, OmittedInteractionSnapshotLeavesSelectionEmpty
 // ids — the snapshot tracks live controller state, not a sticky set.
 TEST(SelectionSnapshotExtraction, ClearedSelectionMirrorsEmptyOnNextExtraction)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeSelectable(scene);
@@ -266,8 +255,7 @@ TEST(SelectionSnapshotExtraction, ClearedSelectionMirrorsEmptyOnNextExtraction)
 TEST(SelectionSnapshotExtraction,
      SubmissionCopiesCallerOwnedVectorsBeforeExtraction)
 {
-    Extrinsic::Runtime::Engine engine(
-        HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeSelectable(scene);
@@ -302,8 +290,7 @@ TEST(SelectionSnapshotExtraction,
 TEST(SelectionSnapshotExtraction,
      MismatchedWorldSnapshotFailsClosed)
 {
-    Extrinsic::Runtime::Engine engine(
-        HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeSelectable(scene);
@@ -330,8 +317,7 @@ TEST(SelectionSnapshotExtraction,
 TEST(SelectionSnapshotExtraction,
      EmptyWorldSnapshotClearsPriorSelectionHoverAndGizmoPackets)
 {
-    Extrinsic::Runtime::Engine engine(
-        HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
     auto& scene =
         *engine.Worlds().Get(engine.ActiveWorld());

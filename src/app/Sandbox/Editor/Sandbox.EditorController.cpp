@@ -18,10 +18,10 @@ namespace Extrinsic::Sandbox::Editor
         MeshProcessingPanels MeshProcessing{};
         DomainPanels Domain{};
 
-        void Attach(Runtime::Engine& engine)
+        void Attach(Runtime::WorldRegistry& worlds, Runtime::ServiceRegistry& services)
         {
             Detach();
-            Shell.Attach(engine);
+            Shell.Attach(worlds, services);
             if (!Shell.IsAttached())
                 return;
             Method.Register(Shell);
@@ -48,9 +48,10 @@ namespace Extrinsic::Sandbox::Editor
         Detach();
     }
 
-    void SandboxEditorController::Attach(Runtime::Engine& engine)
+    void SandboxEditorController::Attach(Runtime::WorldRegistry& worlds,
+                                         Runtime::ServiceRegistry& services)
     {
-        m_Impl->Attach(engine);
+        m_Impl->Attach(worlds, services);
     }
 
     void SandboxEditorController::Detach()

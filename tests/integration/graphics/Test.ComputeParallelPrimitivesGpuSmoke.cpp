@@ -9,6 +9,8 @@
 #include <string_view>
 #include <vector>
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.Graphics.ComputeParallelPrimitives;
@@ -27,7 +29,7 @@ namespace
     namespace Graphics = Extrinsic::Graphics;
     namespace RHI = Extrinsic::RHI;
 
-    class ExitAfterFramesApp final : public Extrinsic::Runtime::IApplication
+    class ExitAfterFramesApp final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         explicit ExitAfterFramesApp(const std::uint32_t targetFrames) noexcept
@@ -35,11 +37,12 @@ namespace
         {
         }
 
-        void OnInitialize(Extrinsic::Runtime::Engine&) override {}
-        void OnSimTick(Extrinsic::Runtime::Engine&, double) override {}
+        void Resolve() override {}
+        void Simulate(double) override {}
 
-        void OnVariableTick(Extrinsic::Runtime::Engine& engine, double, double) override
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++m_Frames;
             if (m_Frames >= m_TargetFrames)
             {
@@ -47,7 +50,7 @@ namespace
             }
         }
 
-        void OnShutdown(Extrinsic::Runtime::Engine&) override {}
+        void Shutdown() override {}
 
     private:
         std::uint32_t m_TargetFrames = 1u;
@@ -56,7 +59,7 @@ namespace
 
     struct SmokeBootstrap
     {
-        std::unique_ptr<Extrinsic::Runtime::Engine> EnginePtr{};
+        std::unique_ptr<Intrinsic::Tests::RuntimeTestKernel> EnginePtr{};
         bool Skipped = false;
         std::string SkipReason{};
     };
@@ -89,8 +92,9 @@ namespace
         if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
         {
             return SmokeBootstrap{
-                .Skipped = true,
-                .SkipReason = "GLFW could not initialize in this environment; gpu;vulkan compute primitive smoke is opt-in.",
+                .Skipped    = true,
+                .SkipReason = "GLFW could not initialize in this environment; "
+                              "gpu;vulkan compute primitive smoke is opt-in.",
             };
         }
 
@@ -102,9 +106,8 @@ namespace
         config.Render.EnableValidation = false;
         config.Render.EnableVSync = false;
 
-        auto engine = std::make_unique<Extrinsic::Runtime::Engine>(
-            config,
-            std::make_unique<ExitAfterFramesApp>(4u));
+        auto engine = std::make_unique<Intrinsic::Tests::RuntimeTestKernel>(
+            config, std::make_unique<ExitAfterFramesApp>(4u));
         engine->Initialize();
 
         const auto initInputs =
@@ -116,8 +119,9 @@ namespace
         {
             engine->Shutdown();
             return SmokeBootstrap{
-                .Skipped = true,
-                .SkipReason = "Promoted Vulkan did not reach logical-device/swapchain/command-sync readiness on this host.",
+                .Skipped    = true,
+                .SkipReason = "Promoted Vulkan did not reach "
+                              "logical-device/swapchain/command-sync readiness on this host.",
             };
         }
 
@@ -892,7 +896,8 @@ TEST(ComputeParallelPrimitivesGpuSmoke, VulkanScanAndCompactionMatchCpuReference
     {
         const auto status =
             Extrinsic::Backends::Vulkan::EvaluateVulkanDeviceOperationalStatus(&device);
-        FAIL() << "Promoted Vulkan operational gate did not flip during compute primitive warmup: status="
+        FAIL() << "Promoted Vulkan operational gate did not flip during compute "
+                  "primitive warmup: status="
                << Extrinsic::Backends::Vulkan::ToString(status.Code)
                << " reason=" << Extrinsic::Backends::Vulkan::ToString(status.Reason);
     }
@@ -941,7 +946,8 @@ TEST(ComputeParallelPrimitivesGpuSmoke, VulkanScanAndCompactionMatchCpuReference
         DestroyPipelineIfValid(device, compactPipeline);
         DestroyPipelineIfValid(device, addPipeline);
         DestroyPipelineIfValid(device, prefixPipeline);
-        FAIL() << "Operational Vulkan device failed to create compute primitive pipelines.";
+        FAIL() << "Operational Vulkan device failed to create compute primitive "
+                  "pipelines.";
     }
 
     const Graphics::ParallelPrimitivePipelineSet pipelines{

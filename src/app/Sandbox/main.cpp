@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -17,6 +18,15 @@
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.AssetWorkflowModule;
+import Extrinsic.Runtime.AsyncWorkModule;
+import Extrinsic.Runtime.CameraModule;
+import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.EditorUiModule;
+import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.SceneDocumentModule;
+import Extrinsic.Runtime.SceneInteractionModule;
+import Extrinsic.Runtime.TextureBakeModule;
 
 import Extrinsic.Sandbox;
 import Extrinsic.Sandbox.ConfigSections;
@@ -119,95 +129,85 @@ namespace
         return parsed;
     }
 
-    class FramePacingCaptureApp final : public Extrinsic::Runtime::IApplication
+    struct FramePacingCaptureSnapshot
+    {
+        bool DeviceOperational{false};
+        Extrinsic::Runtime::RuntimeFramePacingDiagnostics Diagnostics{};
+    };
+
+    struct FramePacingCaptureState
+    {
+        bool FinalDeviceOperational{false};
+        std::optional<std::uint64_t> LastCapturedFrame{};
+        std::vector<Extrinsic::Runtime::RuntimeFramePacingDiagnostics> Samples{};
+    };
+
+    class FramePacingCaptureModule final : public Extrinsic::Runtime::IRuntimeModule
     {
     public:
-        FramePacingCaptureApp(std::unique_ptr<Extrinsic::Runtime::IApplication> inner,
-                              const std::uint32_t targetFrames) noexcept
-            : m_Inner(std::move(inner))
+        FramePacingCaptureModule(FramePacingCaptureState& state, const std::uint32_t targetFrames,
+                                 std::function<FramePacingCaptureSnapshot()> readLatest,
+                                 std::function<void()> requestExit) noexcept
+            : m_State(state)
             , m_TargetFrames(targetFrames)
+            , m_ReadLatest(std::move(readLatest))
+            , m_RequestExit(std::move(requestExit))
         {
         }
 
-        void OnInitialize(Extrinsic::Runtime::Engine& engine) override
+        [[nodiscard]] std::string_view Name() const noexcept override
         {
-            if (m_Inner)
-            {
-                m_Inner->OnInitialize(engine);
-            }
+            return "Sandbox.FramePacingCapture";
         }
 
-        void OnSimTick(Extrinsic::Runtime::Engine& engine, double fixedDt) override
+        [[nodiscard]] Extrinsic::Runtime::RuntimeModuleResult
+        OnRegister(Extrinsic::Runtime::EngineSetup& setup) override
         {
-            if (m_Inner)
-            {
-                m_Inner->OnSimTick(engine, fixedDt);
-            }
+            return setup.RegisterFrameHook(Extrinsic::Runtime::FramePhase::UiBuild,
+                                           [this](Extrinsic::Runtime::RuntimeFrameHookContext&)
+                                           {
+                                               CaptureLatest();
+                                               ++m_Frames;
+                                               if (m_Frames >= m_TargetFrames && m_RequestExit)
+                                                   m_RequestExit();
+                                           });
         }
 
-        void OnVariableTick(Extrinsic::Runtime::Engine& engine,
-                            double alpha,
-                            double dt) override
+        [[nodiscard]] Extrinsic::Runtime::RuntimeModuleResult
+        OnResolve(Extrinsic::Runtime::EngineSetup&) override
         {
-            CaptureLatest(engine);
-            if (m_Inner)
-            {
-                m_Inner->OnVariableTick(engine, alpha, dt);
-            }
-
-            ++m_Frames;
-            if (m_Frames >= m_TargetFrames)
-            {
-                engine.RequestExit();
-            }
+            return Extrinsic::Runtime::RuntimeModuleOk();
         }
 
-        void OnShutdown(Extrinsic::Runtime::Engine& engine) override
-        {
-            CaptureLatest(engine);
-            if (m_Inner)
-            {
-                m_Inner->OnShutdown(engine);
-            }
-        }
+        void OnShutdown(Extrinsic::Runtime::RuntimeModuleShutdownContext&) override {}
 
-        void CaptureLatest(Extrinsic::Runtime::Engine& engine)
+        void CaptureLatest()
         {
-            m_FinalDeviceOperational = engine.GetDevice().IsOperational();
-            const Extrinsic::Runtime::RuntimeFramePacingDiagnostics& sample =
-                engine.GetLastFramePacingDiagnostics();
+            if (!m_ReadLatest)
+                return;
+            const FramePacingCaptureSnapshot latest = m_ReadLatest();
+            m_State.FinalDeviceOperational          = latest.DeviceOperational;
+            const Extrinsic::Runtime::RuntimeFramePacingDiagnostics& sample = latest.Diagnostics;
             if (!sample.Valid)
             {
                 return;
             }
-            if (m_LastCapturedFrame.has_value() &&
-                *m_LastCapturedFrame == sample.FrameIndex)
+            if (m_State.LastCapturedFrame.has_value() &&
+                *m_State.LastCapturedFrame == sample.FrameIndex)
             {
                 return;
             }
 
-            m_Samples.push_back(sample);
-            m_LastCapturedFrame = sample.FrameIndex;
-        }
-
-        [[nodiscard]] const std::vector<
-            Extrinsic::Runtime::RuntimeFramePacingDiagnostics>& Samples() const noexcept
-        {
-            return m_Samples;
-        }
-
-        [[nodiscard]] bool FinalDeviceOperational() const noexcept
-        {
-            return m_FinalDeviceOperational;
+            m_State.Samples.push_back(sample);
+            m_State.LastCapturedFrame = sample.FrameIndex;
         }
 
     private:
-        std::unique_ptr<Extrinsic::Runtime::IApplication> m_Inner{};
+        FramePacingCaptureState& m_State;
         std::uint32_t m_TargetFrames{1u};
         std::uint32_t m_Frames{0u};
-        bool m_FinalDeviceOperational{false};
-        std::optional<std::uint64_t> m_LastCapturedFrame{};
-        std::vector<Extrinsic::Runtime::RuntimeFramePacingDiagnostics> m_Samples{};
+        std::function<FramePacingCaptureSnapshot()> m_ReadLatest{};
+        std::function<void()> m_RequestExit{};
     };
 
     using FramePacingDiagnostics =
@@ -413,42 +413,56 @@ int main(int argc, char** argv)
         configControl->SectionRegistry());
     auto config = std::move(boot.Config);
 
-    auto app = Extrinsic::Sandbox::CreateSandboxApp();
-    FramePacingCaptureApp* capture = nullptr;
+    Extrinsic::Runtime::Engine engine{config};
+    FramePacingCaptureState captureState{};
+    FramePacingCaptureModule* capture = nullptr;
     if (cli.Capture.Enabled)
     {
-        auto captureApp = std::make_unique<FramePacingCaptureApp>(
-            std::move(app),
-            cli.Capture.TargetFrames);
-        capture = captureApp.get();
-        app = std::move(captureApp);
+        auto captureModule = std::make_unique<FramePacingCaptureModule>(
+            captureState, cli.Capture.TargetFrames,
+            [&engine]
+            {
+                return FramePacingCaptureSnapshot{
+                    .DeviceOperational = engine.GetDevice().IsOperational(),
+                    .Diagnostics       = engine.GetLastFramePacingDiagnostics(),
+                };
+            },
+            [&engine] { engine.RequestExit(); });
+        capture = captureModule.get();
+        engine.AddModule(std::move(captureModule));
     }
 
-    Extrinsic::Runtime::Engine engine{
-        config,
-        std::move(app)};
     engine.AddModule(std::move(configControl));
-    Extrinsic::Sandbox::RegisterSandboxRuntimeModules(engine);
+    engine.EmplaceModule<Extrinsic::Runtime::AsyncWorkModule>();
+    engine.EmplaceModule<Extrinsic::Runtime::CameraModule>();
+    engine.EmplaceModule<Extrinsic::Runtime::ClusteringModule>();
+    engine.EmplaceModule<Extrinsic::Runtime::EditorUiModule>();
+    engine.EmplaceModule<Extrinsic::Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Extrinsic::Runtime::SceneInteractionModule>();
+    engine.EmplaceModule<Extrinsic::Runtime::AssetWorkflowModule>();
+    engine.EmplaceModule<Extrinsic::Runtime::TextureBakeModule>();
     engine.Initialize();
+    Extrinsic::Sandbox::SandboxSession sandbox{};
+    sandbox.Initialize(config, engine.Worlds(), engine.Services());
     engine.Run();
+    engine.BeginShutdown();
     if (capture != nullptr)
     {
-        capture->CaptureLatest(engine);
+        capture->CaptureLatest();
     }
+    sandbox.Shutdown();
     engine.Shutdown();
 
-    if (capture != nullptr)
+    if (cli.Capture.Enabled)
     {
-        const auto& samples = capture->Samples();
+        const auto& samples = captureState.Samples;
         if (samples.empty())
         {
             std::cerr << "frame-pacing capture produced no samples\n";
             return 4;
         }
-        if (!WriteFramePacingReport(cli.Capture.ReportPath,
-                                    cli.Capture.TargetFrames,
-                                    capture->FinalDeviceOperational(),
-                                    samples))
+        if (!WriteFramePacingReport(cli.Capture.ReportPath, cli.Capture.TargetFrames,
+                                    captureState.FinalDeviceOperational, samples))
         {
             return 3;
         }

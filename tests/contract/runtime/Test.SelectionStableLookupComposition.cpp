@@ -2,9 +2,9 @@
 // the runtime-owned StableEntityLookup sidecar.
 //
 // Slice B wires `StableEntityLookup` into the runtime frame path: `Engine`
-// attaches the lookup to the `SelectionController` so render-id resolution flows
-// through the single runtime authority (which decodes the `entt::entity` handle
-// *and* validates it against the live registry) rather than a bare
+// attaches the lookup to the `SelectionController` so render-id resolution
+// flows through the single runtime authority (which decodes the `entt::entity`
+// handle *and* validates it against the live registry) rather than a bare
 // `static_cast`. RUNTIME-145 Slice A keeps the durable StableId map coherent
 // from ECS component events, so RunFrame no longer rebuilds the whole lookup on
 // every pick-readback drain. The key property the wiring buys is recycling
@@ -21,8 +21,9 @@
 #include <optional>
 #include <system_error>
 
-#include <gtest/gtest.h>
 #include <entt/entity/registry.hpp>
+#include <gtest/gtest.h>
+#include "RuntimeTestModule.hpp"
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
@@ -40,8 +41,8 @@ import Extrinsic.Runtime.StableEntityLookup;
 namespace CoreConfig = Extrinsic::Core::Config;
 namespace Runtime = Extrinsic::Runtime;
 using Extrinsic::ECS::EntityHandle;
-using Extrinsic::ECS::Scene::Registry;
 using Extrinsic::ECS::Components::StableId;
+using Extrinsic::ECS::Scene::Registry;
 using Extrinsic::Runtime::Engine;
 using Extrinsic::Runtime::SelectionController;
 using Extrinsic::Runtime::StableEntityLookup;
@@ -51,25 +52,17 @@ namespace G   = Extrinsic::Graphics;
 
 namespace
 {
-    class StubApplication final : public Extrinsic::Runtime::IApplication
+    class ExitAfterOneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Engine& /*engine*/) override {}
-        void OnSimTick(Engine& /*engine*/, double /*fixedDt*/) override {}
-        void OnVariableTick(Engine& /*engine*/, double /*alpha*/, double /*dt*/) override {}
-        void OnShutdown(Engine& /*engine*/) override {}
-    };
-
-    class ExitAfterOneFrameApplication final : public Extrinsic::Runtime::IApplication
-    {
-    public:
-        void OnInitialize(Engine& /*engine*/) override {}
-        void OnSimTick(Engine& /*engine*/, double /*fixedDt*/) override {}
-        void OnVariableTick(Engine& engine, double /*alpha*/, double /*dt*/) override
+        void Resolve() override {}
+        void Simulate(double /*fixedDt*/) override {}
+        void Frame(double /*alpha*/, double /*dt*/) override
         {
+            auto& engine = Kernel();
             engine.RequestExit();
         }
-        void OnShutdown(Engine& /*engine*/) override {}
+        void Shutdown() override {}
     };
 
     struct TempSceneFile
@@ -281,8 +274,8 @@ TEST(SelectionStableLookupComposition, NoAttachedLookupFallsBackToBareDecode)
 // Incremental maintenance keeps the durable StableId map coherent across entity
 // recycling without a frame rebuild: after a durable id is re-emplaced on a
 // fresh entity and the lookup receives the matching Track/Forget events,
-// ResolveByStableId names the current occupant — the editor/serialization-facing
-// path the sidecar exists for.
+// ResolveByStableId names the current occupant — the
+// editor/serialization-facing path the sidecar exists for.
 TEST(SelectionStableLookupComposition, IncrementalDurableMapTracksRecycledStableIdOwner)
 {
     Registry           registry;
@@ -314,7 +307,8 @@ TEST(SelectionStableLookupComposition, IncrementalDurableMapTracksRecycledStable
 
 TEST(SelectionStableLookupComposition, EngineTracksStableIdEventsWithoutRunFrameRebuild)
 {
-    Engine engine(HeadlessConfig(), std::make_unique<ExitAfterOneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<ExitAfterOneFrameApplication>());
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
     Runtime::SceneInteractionModule& interaction =
@@ -367,7 +361,7 @@ TEST(SelectionStableLookupComposition, EngineTracksStableIdEventsWithoutRunFrame
 TEST(SelectionStableLookupComposition, SceneLoadRebuildsStableLookupAtReplacementBoundary)
 {
     TempSceneFile sceneFile("intrinsic-runtime145-stable-lookup-scene.json");
-    Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig());
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();

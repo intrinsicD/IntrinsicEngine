@@ -1,8 +1,8 @@
 #include <cstdint>
 #include <memory>
 
-#include <gtest/gtest.h>
 #include <glm/glm.hpp>
+#include <gtest/gtest.h>
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Components.AssetInstance;
@@ -44,17 +44,6 @@ namespace
         engine.Initialize();
     }
 
-    class StubApplication final : public Extrinsic::Runtime::IApplication
-    {
-    public:
-        void OnInitialize(Extrinsic::Runtime::Engine& /*engine*/) override {}
-        void OnSimTick(Extrinsic::Runtime::Engine& /*engine*/, double /*fixedDt*/) override {}
-        void OnVariableTick(Extrinsic::Runtime::Engine& /*engine*/,
-                            double /*alpha*/,
-                            double /*dt*/) override {}
-        void OnShutdown(Extrinsic::Runtime::Engine& /*engine*/) override {}
-    };
-
     [[nodiscard]] Extrinsic::Core::Config::EngineConfig HeadlessConfig()
     {
         Extrinsic::Core::Config::EngineConfig config{};
@@ -78,7 +67,7 @@ namespace
 
 TEST(ProceduralGeometryExtraction, SingleRenderableProducesOneInstanceAndOneGeometry)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -111,7 +100,7 @@ TEST(ProceduralGeometryExtraction, SingleRenderableProducesOneInstanceAndOneGeom
 
 TEST(ProceduralGeometryExtraction, TwoRenderablesSharingKeyShareGeometryAndDedup)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -139,7 +128,7 @@ TEST(ProceduralGeometryExtraction, TwoRenderablesSharingKeyShareGeometryAndDedup
 
 TEST(ProceduralGeometryExtraction, GpuWorldReportsBoundGeometryForProceduralInstance)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -178,7 +167,7 @@ TEST(ProceduralGeometryExtraction, AssetAndProceduralSourcesOnSameEntityIncremen
     namespace E = Extrinsic::ECS::Components;
     namespace G = Extrinsic::Graphics::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -210,7 +199,7 @@ TEST(ProceduralGeometryExtraction, AssetAndProceduralSourcesOnSameEntityIncremen
 
 TEST(ProceduralGeometryExtraction, ProceduralSourceClearsSlotSourceAssetSentinel)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -232,7 +221,7 @@ TEST(ProceduralGeometryExtraction, ProceduralSourceClearsSlotSourceAssetSentinel
 
 TEST(ProceduralGeometryExtraction, EntityDestructionRetiresGeometryAfterDeferredWindow)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -292,7 +281,7 @@ TEST(ProceduralGeometryExtraction, EntityDestructionRetiresGeometryAfterDeferred
 
 TEST(ProceduralGeometryExtraction, RecreateProceduralEntityCancelsRetireAndKeepsHandle)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());

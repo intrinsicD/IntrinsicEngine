@@ -11,6 +11,8 @@
 
 #include <gtest/gtest.h>
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Config.Engine;
@@ -49,21 +51,13 @@ namespace Sel = Extrinsic::ECS::Components::Selection;
 
 namespace
 {
-    class StubApplication final : public Runtime::IApplication
+    class DerivedJobFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine&, double, double) override {}
-        void OnShutdown(Runtime::Engine&) override {}
-    };
-
-    class DerivedJobFrameApplication final : public Runtime::IApplication
-    {
-    public:
-        void OnInitialize(Runtime::Engine& engine) override
+        void Resolve() override
         {
-            Jobs = engine.Services().Find<Runtime::DerivedJobRegistry>();
+            auto& engine = Kernel();
+            Jobs         = engine.Services().Find<Runtime::DerivedJobRegistry>();
             ASSERT_NE(Jobs, nullptr);
 
             Runtime::DerivedJobDesc desc{
@@ -100,16 +94,17 @@ namespace
             Handle = Jobs->Submit(std::move(desc));
         }
 
-        void OnSimTick(Runtime::Engine&, double) override {}
+        void Simulate(double) override {}
 
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++Frames;
             if (ApplyRuns.load(std::memory_order_relaxed) > 0u || Frames >= 8u)
                 engine.RequestExit();
         }
 
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
         Runtime::DerivedJobHandle Handle{};
         Runtime::DerivedJobRegistry* Jobs{};
@@ -118,7 +113,7 @@ namespace
         std::uint32_t Frames{0u};
     };
 
-    class WaitForConditionApplication final : public Runtime::IApplication
+    class WaitForConditionApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         using Clock = std::chrono::steady_clock;
@@ -135,10 +130,11 @@ namespace
         {
         }
 
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine                = Kernel();
             const Clock::time_point now = Clock::now();
             if (!m_Started)
             {
@@ -168,7 +164,7 @@ namespace
 
             std::this_thread::sleep_for(m_PollDelay);
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
         std::uint32_t Frames() const noexcept { return m_Frames; }
         bool ConditionSatisfied() const noexcept { return m_Satisfied; }
@@ -242,7 +238,7 @@ TEST(RuntimeDerivedJobEngineWiring, RunFrameAppliesSubmittedDerivedJob)
 {
     auto application = std::make_unique<DerivedJobFrameApplication>();
     DerivedJobFrameApplication* app = application.get();
-    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(application));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.Initialize();
 
@@ -306,7 +302,7 @@ TEST(RuntimeSceneLifecycle, AsyncWaitAllowsCompletionBeyondLegacyFrameBudget)
         },
         std::chrono::seconds(10));
     WaitForConditionApplication* app = application.get();
-    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(application));
     engine.Initialize();
     engine.Run();
 
@@ -325,7 +321,7 @@ TEST(RuntimeSceneLifecycle, AsyncWaitReportsElapsedTimeout)
         [](Runtime::Engine&) { return false; },
         std::chrono::milliseconds(5));
     WaitForConditionApplication* app = application.get();
-    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(application));
     engine.Initialize();
     engine.Run();
 
@@ -342,7 +338,7 @@ TEST(RuntimeSceneLifecycle, EngineRunsWithoutOptionalAsyncWorkModule)
     auto application = std::make_unique<WaitForConditionApplication>(
         [](Runtime::Engine&) { return true; });
     WaitForConditionApplication* app = application.get();
-    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(application));
     engine.Initialize();
 
     EXPECT_EQ(engine.Services().Find<Runtime::StreamingExecutor>(), nullptr);
@@ -358,7 +354,7 @@ TEST(RuntimeSceneLifecycle, EngineRunsWithoutOptionalAsyncWorkModule)
 
 TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSidecars)
 {
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig());
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
@@ -431,7 +427,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneSaveWritesSnapshotAndMarksHistoryOnComple
                    event->Operation == Runtime::RuntimeSceneFileOperation::Save;
         });
     WaitForConditionApplication* app = application.get();
-    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(application));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
@@ -511,7 +507,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadInvalidDocumentFailsClosed)
                 .has_value();
         });
     WaitForConditionApplication* app = application.get();
-    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(application));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
@@ -570,7 +566,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadAppliesParsedSceneOnMainThread)
                    event->Operation == Runtime::RuntimeSceneFileOperation::Load;
         });
     WaitForConditionApplication* app = application.get();
-    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(application));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(application));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
@@ -620,9 +616,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadRejectsActiveWorldSwitchBeforeApply)
     TempSceneFile validScene(
         "runtime179_world_scoped_scene_load.json",
         R"({"version":1,"entities":[{"id":0,"name":"Wrong World Load"}]})");
-    Runtime::Engine engine(
-        NullWindowHeadlessConfig(),
-        std::make_unique<StubApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig());
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
@@ -697,9 +691,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadRejectsAwayAndBackBindingEpoch)
         "runtime179_world_binding_epoch_scene_load.json",
         R"({"version":1,"entities":[{"id":0,"name":"Stale Epoch Load"}]})");
 
-    Runtime::Engine engine(
-        NullWindowHeadlessConfig(),
-        std::make_unique<StubApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig());
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
@@ -753,9 +745,7 @@ TEST(RuntimeSceneLifecycle, RetiredQueuedSceneSavePublishesTerminalEvent)
         "runtime179_retired_scene_save.json",
         "");
 
-    Runtime::Engine engine(
-        NullWindowHeadlessConfig(),
-        std::make_unique<StubApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig());
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();

@@ -10,6 +10,8 @@
 
 #include <gtest/gtest.h>
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Dag.Scheduler;
@@ -61,17 +63,15 @@ namespace
         std::filesystem::path Path;
     };
 
-    class StubApplication final : public Runtime::IApplication
+    class StubApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(
-            Runtime::Engine& engine,
-            double,
-            double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
-            RanFrame = true;
+            auto& engine = Kernel();
+            RanFrame     = true;
             if (Runtime::SceneDocumentModule* documents =
                     engine.Services()
                         .Find<Runtime::SceneDocumentModule>();
@@ -86,7 +86,7 @@ namespace
                 nullptr;
             engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
         bool RanFrame{false};
         bool DocumentOperationSucceeded{false};
@@ -603,9 +603,8 @@ TEST(SceneDocumentModule,
         "runtime172-event-sequence-first.scene.json", "");
     TempSceneFile second(
         "runtime172-event-sequence-second.scene.json", "");
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<StubApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<StubApplication>());
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
@@ -672,9 +671,8 @@ TEST(SceneDocumentModule,
     {
         auto omittedApplication =
             std::make_unique<StubApplication>();
-        Runtime::Engine omitted(
-            HeadlessConfig(),
-            std::move(omittedApplication));
+        Intrinsic::Tests::RuntimeTestKernel omitted(HeadlessConfig(),
+                                                    std::move(omittedApplication));
         omitted.Initialize();
         EXPECT_EQ(
             omitted.Services()
@@ -691,8 +689,7 @@ TEST(SceneDocumentModule,
 
     auto application = std::make_unique<StubApplication>();
     StubApplication* const app = application.get();
-    Runtime::Engine engine(
-        HeadlessConfig(), std::move(application));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
 
@@ -715,9 +712,8 @@ TEST(SceneDocumentModule,
 TEST(SceneDocumentModule,
      EngineReplacementParticipantsResetAcrossReinitialize)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<StubApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<StubApplication>());
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
 
     for (std::uint32_t boot = 0u; boot < 2u; ++boot)

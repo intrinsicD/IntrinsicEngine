@@ -15,8 +15,9 @@
 #include <thread>
 #include <utility>
 
-#include <gtest/gtest.h>
 #include <glm/glm.hpp>
+#include <gtest/gtest.h>
+#include "RuntimeTestModule.hpp"
 
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Core.Config.Engine;
@@ -62,51 +63,40 @@ namespace
         std::size_t SandboxShutdownCalls{0u};
     };
 
-    class SandboxHarnessApplication final : public Runtime::IApplication
+    class SandboxHarnessApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        SandboxHarnessApplication(
-            SandboxLifecycleProbe& probe,
-            const bool repeatSandboxShutdown)
+        SandboxHarnessApplication(SandboxLifecycleProbe& probe, const bool repeatSandboxShutdown)
             : m_Probe(probe)
             , m_RepeatSandboxShutdown(repeatSandboxShutdown)
-            , m_Sandbox(Extrinsic::Sandbox::CreateSandboxApp())
         {
         }
 
-        void OnInitialize(Runtime::Engine& engine) override
+        void Resolve() override
         {
-            if (m_Sandbox)
-                m_Sandbox->OnInitialize(engine);
+            auto& engine = Kernel();
+            m_Sandbox.Initialize(engine.GetEngineConfig(), engine.Worlds(), engine.Services());
         }
 
-        void OnSimTick(Runtime::Engine& engine, const double fixedDt) override
-        {
-            if (m_Sandbox)
-                m_Sandbox->OnSimTick(engine, fixedDt);
-        }
+        void Simulate(double) override {}
 
-        void OnVariableTick(
-            Runtime::Engine& engine,
-            const double alpha,
-            const double dt) override
+        void Frame(const double alpha, const double dt) override
         {
-            if (m_Sandbox)
-                m_Sandbox->OnVariableTick(engine, alpha, dt);
+            auto& engine = Kernel();
+            (void)alpha;
+            (void)dt;
             engine.RequestExit();
         }
 
-        void OnShutdown(Runtime::Engine& engine) override
+        void Shutdown() override
         {
-            if (!m_Sandbox)
-                return;
-
-            m_Sandbox->OnShutdown(engine);
+            auto& engine = Kernel();
+            m_Sandbox.Shutdown();
             ++m_Probe.SandboxShutdownCalls;
 
             if (m_RepeatSandboxShutdown)
             {
-                m_Sandbox->OnShutdown(engine);
+                m_Sandbox.Shutdown();
                 ++m_Probe.SandboxShutdownCalls;
             }
 
@@ -122,7 +112,7 @@ namespace
     private:
         SandboxLifecycleProbe& m_Probe;
         bool m_RepeatSandboxShutdown{false};
-        std::unique_ptr<Runtime::IApplication> m_Sandbox{};
+        Extrinsic::Sandbox::SandboxSession m_Sandbox{};
     };
 
     struct BlockedImportShutdownProbe
@@ -148,38 +138,27 @@ namespace
         bool ReleaseIssuedAfterSandboxShutdown{false};
     };
 
-    class BlockedImportShutdownApplication final
-        : public Runtime::IApplication
+    class BlockedImportShutdownModule final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        explicit BlockedImportShutdownApplication(
-            std::shared_ptr<BlockedImportShutdownProbe> probe)
+        explicit BlockedImportShutdownModule(std::shared_ptr<BlockedImportShutdownProbe> probe)
             : m_Probe(std::move(probe))
-            , m_Sandbox(Extrinsic::Sandbox::CreateSandboxApp())
         {
         }
 
-        void OnInitialize(Runtime::Engine& engine) override
+        void Resolve() override
         {
-            if (m_Sandbox)
-                m_Sandbox->OnInitialize(engine);
+            auto& engine = Kernel();
+            m_Sandbox.Initialize(engine.GetEngineConfig(), engine.Worlds(), engine.Services());
         }
 
-        void OnSimTick(
-            Runtime::Engine& engine,
-            const double fixedDt) override
-        {
-            if (m_Sandbox)
-                m_Sandbox->OnSimTick(engine, fixedDt);
-        }
+        void Simulate(double) override {}
 
-        void OnVariableTick(
-            Runtime::Engine& engine,
-            const double alpha,
-            const double dt) override
+        void Frame(const double alpha, const double dt) override
         {
-            if (m_Sandbox)
-                m_Sandbox->OnVariableTick(engine, alpha, dt);
+            auto& engine = Kernel();
+            (void)alpha;
+            (void)dt;
 
             ++m_Probe->ObservedFrames;
             if (m_Probe->WorkerStarted.load(std::memory_order_acquire))
@@ -204,8 +183,9 @@ namespace
             std::this_thread::yield();
         }
 
-        void OnShutdown(Runtime::Engine& engine) override
+        void Shutdown() override
         {
+            auto& engine = Kernel();
             m_Probe->WorkerBlockedBeforeSandboxShutdown =
                 m_Probe->WorkerStarted.load(std::memory_order_acquire) &&
                 !m_Probe->ReleaseWorker.load(std::memory_order_acquire);
@@ -241,8 +221,7 @@ namespace
                 }
             }
 
-            if (m_Sandbox)
-                m_Sandbox->OnShutdown(engine);
+            m_Sandbox.Shutdown();
 
             m_Probe->PipelineIdentityLiveAfterSandboxShutdown =
                 engine.Services().Find<Runtime::AssetImportPipeline>() ==
@@ -261,7 +240,7 @@ namespace
 
     private:
         std::shared_ptr<BlockedImportShutdownProbe> m_Probe{};
-        std::unique_ptr<Runtime::IApplication> m_Sandbox{};
+        Extrinsic::Sandbox::SandboxSession m_Sandbox{};
     };
 
     class RecordingCameraController final
@@ -438,11 +417,8 @@ namespace
 TEST(SandboxAppComposition, MissingAssetWorkflowLeavesRequiredPolicySetAbsent)
 {
     SandboxLifecycleProbe probe{};
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<SandboxHarnessApplication>(
-            probe,
-            false));
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(), std::make_unique<SandboxHarnessApplication>(probe, false));
     ComposeSandboxProviders(engine, false, true, true);
 
     engine.Initialize();
@@ -488,11 +464,8 @@ TEST(SandboxAppComposition, PipelineSelectionDoesNotRequireCamera)
         "v 0 1 0\n"
         "f 1 2 3\n");
     SandboxLifecycleProbe probe{};
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<SandboxHarnessApplication>(
-            probe,
-            false));
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(), std::make_unique<SandboxHarnessApplication>(probe, false));
     ComposeSandboxProviders(engine, true, false, true);
     engine.Initialize();
 
@@ -528,11 +501,8 @@ TEST(SandboxAppComposition, MaterializationAndAutofocusDoNotRequireSelection)
         "v 0 1 0\n"
         "f 1 2 3\n");
     SandboxLifecycleProbe probe{};
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<SandboxHarnessApplication>(
-            probe,
-            false));
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(), std::make_unique<SandboxHarnessApplication>(probe, false));
     ComposeSandboxProviders(engine, true, true, false);
     engine.Initialize();
 
@@ -592,11 +562,8 @@ TEST(SandboxAppComposition, ReinitializeAndRepeatedShutdownDoNotDuplicateState)
         "v 0 2 0\n"
         "f 1 2 3\n");
     SandboxLifecycleProbe probe{};
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<SandboxHarnessApplication>(
-            probe,
-            true));
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(), std::make_unique<SandboxHarnessApplication>(probe, true));
     ComposeSandboxProviders(engine, true, true, true);
 
     engine.Initialize();
@@ -670,9 +637,8 @@ TEST(SandboxAppComposition,
         "v 0 1 0\n"
         "f 1 2 3\n");
     auto probe = std::make_shared<BlockedImportShutdownProbe>();
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<BlockedImportShutdownApplication>(probe));
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(), std::make_unique<BlockedImportShutdownModule>(probe));
     ComposeSandboxProviders(engine, true, true, true);
     engine.Initialize();
 
@@ -855,11 +821,8 @@ TEST(SandboxAppComposition, DefaultPolicyLifecycleIsPrivateAndTransactional)
         app.find("structSandboxDefaultPolicyHandles"),
         std::string::npos);
 
-    const auto appShutdownBegin =
-        app.find(
-            "voidOnShutdown(Runtime::Engine&engine)override{");
-    const auto appShutdownEnd =
-        app.find("private:", appShutdownBegin);
+    const auto appShutdownBegin = app.find("voidShutdown()noexcept{");
+    const auto appShutdownEnd   = app.find("structReferenceBootstrap", appShutdownBegin);
     ASSERT_NE(appShutdownBegin, std::string::npos);
     ASSERT_NE(appShutdownEnd, std::string::npos);
     const std::string_view appShutdown =

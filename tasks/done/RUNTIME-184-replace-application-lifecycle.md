@@ -9,10 +9,28 @@ maturity_target: Operational
 
 ## Status
 
+- Implemented on 2026-07-23 on
+  `codex/arch-014-kernel-convergence-program` as the first dependency in the
+  `ARCH-014` convergence chain. Engine now has config-only construction and
+  two-stage shutdown; Sandbox owns a concrete session and composes every
+  production module explicitly in `main()`. Tests use only a test-support
+  module bridge.
+- Retired at `Operational` after focused runtime/app coverage, the complete
+  UBSan CPU selector (2,937/2,937), the complete ASan selector plus a clean
+  rebuild/rerun of its four whitespace-sensitive source-shape assertions, and
+  the 21/21 Sandbox/object-space-normal Vulkan cohort including shutdown LSan.
+- Commit reference: this retirement commit records the implementation, final
+  evidence, and generated task/module inventories.
+- The implementation inventory confirms one production behavior owner
+  (Sandbox), one production frame-pacing wrapper in the app root, and the
+  remaining callback implementations are test fixtures. Sandbox fixed and
+  variable ticks were no-ops and were deleted; the frame-pacing wrapper is now
+  an ordinary app-composed frame-hook module, while real fixture behavior moved
+  to a test-only runtime module bridge.
 - 2026-07-19 contract amendment: explicit app composition names
   `SceneDocumentModule` and `SceneInteractionModule` as separate capabilities;
   it must not recreate the rejected combined scene-editing owner.
-  Implementation remains open.
+  The explicit Sandbox composition preserves the separate owners.
 - 2026-07-19 composition evidence: Sandbox now owns separate persistent
   `SceneDocumentModule` and `SceneInteractionModule` values and registers both
   through the ordinary module list. Interaction omission is supported without
@@ -72,62 +90,62 @@ maturity_target: Operational
    required to explain the cutover.
 
 ## Required changes
-- [ ] Inventory every production and test `IApplication` implementation and
+- [x] Inventory every production and test `IApplication` implementation and
       classify initialize, fixed-step, variable-frame, and shutdown behavior.
-- [ ] Remove `std::unique_ptr<IApplication>` from Engine construction and
+- [x] Remove `std::unique_ptr<IApplication>` from Engine construction and
       delete the `IApplication` interface.
-- [ ] Make Sandbox construct Engine, compose concrete modules before
+- [x] Make Sandbox construct Engine, compose concrete modules before
       initialization—including separate `SceneDocumentModule` and
       `SceneInteractionModule` instances—retain the narrow module references
       needed for their own app composition, install initial-world state, and
       preserve `RUNTIME-168`'s separate private default-policy provider/handle
       aggregate over exact published services; then explicitly run and tear
       down in the documented order.
-- [ ] Move any real per-frame production behavior to the owning module's
+- [x] Move any real per-frame production behavior to the owning module's
       smallest existing frame hook/system; delete the no-op Sandbox tick
       callbacks rather than replacing them.
-- [ ] Replace test callback fixtures with small test-only runtime modules or
+- [x] Replace test callback fixtures with small test-only runtime modules or
       direct narrow lifecycle helpers. Do not add a production inline builder
       solely to shorten tests.
-- [ ] Preserve module registration/finalization, initial-content timing,
+- [x] Preserve module registration/finalization, initial-content timing,
       shutdown announcement, reverse module shutdown, and device-idle teardown
       order.
-- [ ] Remove `Engine&` from every app lifecycle callback or stored app
+- [x] Remove `Engine&` from every app lifecycle callback or stored app
       behavior object; `main()` may own a concrete Engine value and narrow
       module references as the composition root.
 
 ## Tests
-- [ ] Preserve fixed-step count/alpha, frame-hook order, exit, minimized,
+- [x] Preserve fixed-step count/alpha, frame-hook order, exit, minimized,
       close-before-render, initialization failure, and reverse-shutdown
       coverage through test modules/narrow fixtures.
-- [ ] Preserve the full Sandbox acceptance path with explicit module/default
+- [x] Preserve the full Sandbox acceptance path with explicit module/default
       composition and no application callbacks.
-- [ ] Add structural coverage proving `IApplication`, `OnSimTick`, and
+- [x] Add structural coverage proving `IApplication`, `OnSimTick`, and
       `OnVariableTick` are absent from production source and no app lifecycle
       surface accepts `Engine&`.
-- [ ] Run focused runtime/app/module coverage and the complete default
+- [x] Run focused runtime/app/module coverage and the complete default
       CPU-supported gate.
-- [ ] Run ASan and UBSan CPU variants because Engine no longer owns the app
+- [x] Run ASan and UBSan CPU variants because Engine no longer owns the app
       callback object and teardown ownership changes.
-- [ ] Configure/build `ci-vulkan` and rerun the Sandbox/object-space-normal
+- [x] Configure/build `ci-vulkan` and rerun the Sandbox/object-space-normal
       smoke cohort because Vulkan smoke fixtures also migrate off
       `IApplication`. If `RUNTIME-129` is already retired, preserve its
       operational proof; otherwise leave the fixtures on the settled explicit
       lifecycle for that task to extend.
 
 ## Docs
-- [ ] Update runtime lifecycle, Sandbox startup, app examples, ADR-0024/0027
+- [x] Update runtime lifecycle, Sandbox startup, app examples, ADR-0024/0027
       current-state notes, and source READMEs.
-- [ ] Regenerate the module inventory if module surfaces change.
+- [x] Regenerate the module inventory if module surfaces change.
 
 ## Acceptance criteria
-- [ ] Engine owns no application callback object and production source
+- [x] Engine owns no application callback object and production source
       contains no `IApplication`, `OnSimTick`, or `OnVariableTick`.
-- [ ] Sandbox composition is explicit at the app root and behaviorally
+- [x] Sandbox composition is explicit at the app root and behaviorally
       equivalent through a real Engine run.
-- [ ] No module, handler, setup, or app lifecycle surface receives `Engine&`.
-- [ ] Test convenience does not create a production builder/framework.
-- [ ] CPU, ASan, and UBSan lifecycle/teardown gates pass.
+- [x] No module, handler, setup, or app lifecycle surface receives `Engine&`.
+- [x] Test convenience does not create a production builder/framework.
+- [x] CPU, ASan, and UBSan lifecycle/teardown gates pass.
 
 ## Verification
 ```bash

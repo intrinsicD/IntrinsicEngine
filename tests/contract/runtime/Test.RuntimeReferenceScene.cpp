@@ -4,8 +4,9 @@
 #include <optional>
 #include <utility>
 
-#include <gtest/gtest.h>
 #include <glm/glm.hpp>
+#include <gtest/gtest.h>
+#include "RuntimeTestModule.hpp"
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
@@ -133,22 +134,12 @@ namespace
         return config;
     }
 
-    class StubApplication final : public Runtime::IApplication
+    class AppOwnedReferenceApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(
-            Runtime::Engine&, double, double) override {}
-        void OnShutdown(Runtime::Engine&) override {}
-    };
-
-    class AppOwnedReferenceApplication final
-        : public Runtime::IApplication
-    {
-    public:
-        void OnInitialize(Runtime::Engine& engine) override
+        void Resolve() override
         {
+            auto& engine = Kernel();
             ++InitializeCalls;
             if (!engine.GetEngineConfig().ReferenceScene.Enabled ||
                 Population.has_value())
@@ -167,12 +158,12 @@ namespace
             LastSeed = Population->Camera;
         }
 
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(
-            Runtime::Engine&, double, double) override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override {}
 
-        void OnShutdown(Runtime::Engine& engine) override
+        void Shutdown() override
         {
+            auto& engine = Kernel();
             ++ShutdownCalls;
             if (!Population.has_value())
                 return;
@@ -281,9 +272,7 @@ TEST(ReferenceSceneBootstrap, TeardownIsNoexceptAndIdempotent)
 TEST(ReferenceSceneOwnership,
      GenericEngineDoesNotInterpretEnabledReferenceConfig)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(true),
-        std::make_unique<StubApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(true));
     engine.Initialize();
 
     EXPECT_EQ(EntityCount(*engine.Worlds().Get(engine.ActiveWorld())), 0u);
@@ -300,8 +289,7 @@ TEST(ReferenceSceneOwnership,
 {
     auto app = std::make_unique<AppOwnedReferenceApplication>();
     AppOwnedReferenceApplication* appPtr = app.get();
-    Runtime::Engine engine(
-        HeadlessConfig(true), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(true), std::move(app));
 
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
@@ -345,8 +333,7 @@ TEST(ReferenceSceneOwnership, DisabledAppBootstrapCreatesNothing)
 {
     auto app = std::make_unique<AppOwnedReferenceApplication>();
     AppOwnedReferenceApplication* appPtr = app.get();
-    Runtime::Engine engine(
-        HeadlessConfig(false), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(false), std::move(app));
     engine.Initialize();
 
     EXPECT_EQ(appPtr->InitializeCalls, 1u);
@@ -440,8 +427,7 @@ TEST(ReferenceSceneOwnership,
      AppOwnedTriangleRemainsVisibleToSandboxEditorModels)
 {
     auto app = std::make_unique<AppOwnedReferenceApplication>();
-    Runtime::Engine engine(
-        HeadlessConfig(true), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(true), std::move(app));
     engine.EmplaceModule<
         Runtime::SceneInteractionModule>();
     engine.Initialize();

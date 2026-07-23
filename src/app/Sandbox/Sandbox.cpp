@@ -10,19 +10,11 @@ module Extrinsic.Sandbox;
 
 import Extrinsic.Sandbox.Editor.Controller;
 import Extrinsic.Runtime.AssetImportPipeline;
-import Extrinsic.Runtime.AssetWorkflowModule;
-import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
-import Extrinsic.Runtime.CameraModule;
-import Extrinsic.Runtime.ClusteringModule;
-import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.SandboxEditorFacades;
-import Extrinsic.Runtime.SceneDocumentModule;
-import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
 
 namespace Extrinsic::Sandbox {
@@ -142,16 +134,18 @@ void UninstallSandboxDefaultPolicies(
 }
 } // namespace
 
-class App final : public Runtime::IApplication {
-public:
-  void OnInitialize(Runtime::Engine &engine) override {
-    m_CameraControllers =
-        engine.Services().Find<Runtime::CameraControllerRegistry>();
+struct SandboxSession::Impl {
+  void Initialize(const Runtime::RuntimeEngineConfig &config,
+                  Runtime::WorldRegistry &worlds,
+                  Runtime::ServiceRegistry &services) {
+    Shutdown();
+    m_Worlds = &worlds;
+    m_CameraControllers = services.Find<Runtime::CameraControllerRegistry>();
 
-    const auto &referenceConfig = engine.GetEngineConfig().ReferenceScene;
+    const auto &referenceConfig = config.ReferenceScene;
     if (referenceConfig.Enabled && !m_ReferenceBootstrap.has_value()) {
-      const auto world = engine.ActiveWorld();
-      if (auto *scene = engine.Worlds().Get(world); scene != nullptr) {
+      const auto world = worlds.ActiveWorld();
+      if (auto *scene = worlds.Get(world); scene != nullptr) {
         Runtime::ReferenceScenePopulation population =
             Runtime::BootstrapReferenceScene(referenceConfig.Selector, *scene);
         if (m_CameraControllers != nullptr) {
@@ -164,48 +158,32 @@ public:
       }
     }
 
-    auto* const pipeline =
-        engine.Services().Find<Runtime::AssetImportPipeline>();
-    auto* const inputActions =
-        engine.Services().Find<Runtime::RuntimeInputActionRegistry>();
-    auto* const selection =
-        engine.Services().Find<Runtime::SelectionController>();
-    (void)InstallSandboxDefaultPolicies(
-        pipeline,
-        inputActions,
-        m_CameraControllers,
-        selection,
-        m_DefaultPolicies);
-    m_EditorController.Attach(engine);
+    auto *const pipeline = services.Find<Runtime::AssetImportPipeline>();
+    auto *const inputActions =
+        services.Find<Runtime::RuntimeInputActionRegistry>();
+    auto *const selection = services.Find<Runtime::SelectionController>();
+    (void)InstallSandboxDefaultPolicies(pipeline, inputActions,
+                                        m_CameraControllers, selection,
+                                        m_DefaultPolicies);
+    m_EditorController.Attach(worlds, services);
   }
 
-  void OnSimTick(Runtime::Engine &engine, double fixedDt) override {
-    (void)engine;
-    (void)fixedDt;
-  }
-
-  void OnVariableTick(Runtime::Engine &engine, double alpha,
-                      double dt) override {
-    (void)engine;
-    (void)alpha;
-    (void)dt;
-  }
-
-  void OnShutdown(Runtime::Engine &engine) override {
+  void Shutdown() noexcept {
     m_EditorController.Detach();
     UninstallSandboxDefaultPolicies(m_DefaultPolicies);
     if (m_ReferenceBootstrap.has_value()) {
-      if (auto *scene = engine.Worlds().Get(m_ReferenceBootstrap->World);
+      if (auto *scene = m_Worlds != nullptr
+                            ? m_Worlds->Get(m_ReferenceBootstrap->World)
+                            : nullptr;
           scene != nullptr) {
-        Runtime::TeardownReferenceScene(
-            *scene, m_ReferenceBootstrap->Population);
+        Runtime::TeardownReferenceScene(*scene,
+                                        m_ReferenceBootstrap->Population);
       }
       m_ReferenceBootstrap.reset();
     }
     m_CameraControllers = nullptr;
+    m_Worlds = nullptr;
   }
-
-private:
   struct ReferenceBootstrap {
     Runtime::WorldHandle World{};
     Runtime::ReferenceScenePopulation Population{};
@@ -214,21 +192,22 @@ private:
   Editor::SandboxEditorController m_EditorController{};
   SandboxDefaultPolicyHandles m_DefaultPolicies{};
   Runtime::CameraControllerRegistry *m_CameraControllers{nullptr};
+  Runtime::WorldRegistry *m_Worlds{nullptr};
   std::optional<ReferenceBootstrap> m_ReferenceBootstrap{};
 };
 
-void RegisterSandboxRuntimeModules(Runtime::Engine &engine) {
-  engine.EmplaceModule<Runtime::AsyncWorkModule>();
-  engine.EmplaceModule<Runtime::CameraModule>();
-  engine.EmplaceModule<Runtime::ClusteringModule>();
-  engine.EmplaceModule<Runtime::EditorUiModule>();
-  engine.EmplaceModule<Runtime::SceneDocumentModule>();
-  engine.EmplaceModule<Runtime::SceneInteractionModule>();
-  engine.EmplaceModule<Runtime::AssetWorkflowModule>();
-  engine.EmplaceModule<Runtime::TextureBakeModule>();
+SandboxSession::SandboxSession() : m_Impl(std::make_unique<Impl>()) {}
+
+SandboxSession::~SandboxSession() { Shutdown(); }
+
+void SandboxSession::Initialize(const Runtime::RuntimeEngineConfig &config,
+                                Runtime::WorldRegistry &worlds,
+                                Runtime::ServiceRegistry &services) {
+  m_Impl->Initialize(config, worlds, services);
 }
 
-std::unique_ptr<Runtime::IApplication> CreateSandboxApp() {
-  return std::make_unique<App>();
+void SandboxSession::Shutdown() noexcept {
+  if (m_Impl)
+    m_Impl->Shutdown();
 }
 } // namespace Extrinsic::Sandbox

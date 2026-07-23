@@ -7,8 +7,8 @@
 #include <string>
 #include <vector>
 
-#include <gtest/gtest.h>
 #include <glm/glm.hpp>
+#include <gtest/gtest.h>
 
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Config.Engine;
@@ -69,17 +69,6 @@ namespace
 
     constexpr std::uint32_t kInvalidIndex = std::numeric_limits<std::uint32_t>::max();
     std::array<std::byte, 64u> ZeroTextureBytes{};
-
-    class StubApplication final : public Extrinsic::Runtime::IApplication
-    {
-    public:
-        void OnInitialize(Extrinsic::Runtime::Engine& /*engine*/) override {}
-        void OnSimTick(Extrinsic::Runtime::Engine& /*engine*/, double /*fixedDt*/) override {}
-        void OnVariableTick(Extrinsic::Runtime::Engine& /*engine*/,
-                            double /*alpha*/,
-                            double /*dt*/) override {}
-        void OnShutdown(Extrinsic::Runtime::Engine& /*engine*/) override {}
-    };
 
     [[nodiscard]] Extrinsic::Core::Config::EngineConfig HeadlessConfig()
     {
@@ -205,7 +194,7 @@ namespace
 
 TEST(MeshGeometryExtraction, SingleMeshEntityUploadsOnceAndBindsInstanceGeometry)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -491,7 +480,7 @@ TEST(MeshGeometryExtraction, ProgressiveGeneratedPropertyTexturesBindUniqueMater
 
 TEST(MeshGeometryExtraction, RepeatedExtractionReusesMeshHandleWithoutReupload)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -533,7 +522,7 @@ TEST(MeshGeometryExtraction, RepeatedExtractionReusesMeshHandleWithoutReupload)
 
 TEST(MeshGeometryExtraction, TwoMeshEntitiesAllocateIndependentMeshUploads)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -562,7 +551,7 @@ TEST(MeshGeometryExtraction, TwoMeshEntitiesAllocateIndependentMeshUploads)
 
 TEST(MeshGeometryExtraction, EntityDestructionRetiresMeshGeometryAfterDeferredWindow)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -615,7 +604,7 @@ TEST(MeshGeometryExtraction, EntityDestructionRetiresMeshGeometryAfterDeferredWi
 
 TEST(MeshGeometryExtraction, ShutdownReleasesPendingMeshResidency)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -644,7 +633,7 @@ TEST(MeshGeometryExtraction, ProceduralRefPreemptsMeshPathOnSameEntity)
     namespace E = Extrinsic::ECS::Components;
     namespace G = Extrinsic::Graphics::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -682,7 +671,7 @@ TEST(MeshGeometryExtraction, AssetSourcePresentPreemptsMeshPathOnSameEntity)
     namespace E = Extrinsic::ECS::Components;
     namespace G = Extrinsic::Graphics::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -716,7 +705,7 @@ TEST(MeshGeometryExtraction, MissingPositionsIncrementsMissingPositionsCounter)
     namespace E = Extrinsic::ECS::Components;
     namespace G = Extrinsic::Graphics::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -756,7 +745,7 @@ TEST(MeshGeometryExtraction, MissingPositionsIncrementsMissingPositionsCounter)
 
 TEST(MeshGeometryExtraction, MissingTexcoordsUploadsWithDefaultUvFallback)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -788,7 +777,7 @@ TEST(MeshGeometryExtraction, MissingTexcoordsUploadsWithDefaultUvFallback)
 
 TEST(MeshGeometryExtraction, NonFiniteTexcoordsUploadWithDefaultUvFallback)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -822,7 +811,7 @@ TEST(MeshGeometryExtraction, InvalidTopologyIncrementsInvalidTopologyCounter)
     namespace E = Extrinsic::ECS::Components;
     namespace G = Extrinsic::Graphics::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -873,7 +862,7 @@ TEST(MeshGeometryExtraction, DegenerateAllFacesIncrementsFailedPackCounter)
     namespace E = Extrinsic::ECS::Components;
     namespace G = Extrinsic::Graphics::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -925,7 +914,7 @@ TEST(MeshGeometryExtraction, AddingProceduralRefAfterMeshUploadReleasesMeshResid
 {
     namespace E = Extrinsic::ECS::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -987,7 +976,7 @@ TEST(MeshGeometryExtraction, AddingAssetSourceAfterMeshUploadReleasesMeshResiden
 {
     namespace E = Extrinsic::ECS::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -1045,7 +1034,7 @@ TEST(MeshGeometryExtraction, AddingAssetSourceAfterMeshUploadReleasesMeshResiden
 
 TEST(MeshGeometryExtraction, LosingMeshDomainTopologyReleasesMeshResidency)
 {
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -1104,7 +1093,7 @@ TEST(MeshGeometryExtraction, NonMeshDomainEntityIsIgnoredByMeshPath)
     namespace E = Extrinsic::ECS::Components;
     namespace G = Extrinsic::Graphics::Components;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -1165,7 +1154,7 @@ TEST_P(MeshGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
 {
     namespace D = Extrinsic::ECS::Components::DirtyTags;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -1289,7 +1278,7 @@ TEST(MeshGeometryExtraction, MultipleDirtyTagsCoalesceIntoSingleReupload)
 {
     namespace D = Extrinsic::ECS::Components::DirtyTags;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -1338,7 +1327,7 @@ TEST(MeshGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesDi
 {
     namespace D = Extrinsic::ECS::Components::DirtyTags;
 
-    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
     InitializeAssetWorkflowEngine(engine);
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());

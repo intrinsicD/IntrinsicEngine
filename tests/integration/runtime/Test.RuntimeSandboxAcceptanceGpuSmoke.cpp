@@ -38,11 +38,14 @@
 #include <utility>
 #include <vector>
 
-#include <gtest/gtest.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <gtest/gtest.h>
+
 #include "OperationalCounterStability.hpp"
+
+#include "RuntimeTestModule.hpp"
 
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
@@ -85,8 +88,10 @@ import Extrinsic.Sandbox;
 import Extrinsic.Sandbox.Editor.Controller;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
+import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraModule;
+import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -141,7 +146,6 @@ using Extrinsic::ECS::EntityHandle;
 using Extrinsic::ECS::Scene::Registry;
 using Extrinsic::Graphics::RenderCommandPassStatus;
 using Extrinsic::Runtime::Engine;
-using Extrinsic::Runtime::IApplication;
 
 constexpr std::uint32_t kInvalidIndex = std::numeric_limits<std::uint32_t>::max();
 constexpr std::uint32_t kTargetFrames = 4u;
@@ -184,7 +188,7 @@ public:
 // Bounded `engine.Run()` driver so the smoke cannot hang on a misconfigured
 // swapchain loop even when the operational Vulkan gate flips green. Mirrors the
 // GRAPHICS-076 Slice D default-recipe smoke driver.
-class ExitAfterFramesApp final : public IApplication
+class ExitAfterFramesApp final : public Intrinsic::Tests::RuntimeTestModule
 {
 public:
     explicit ExitAfterFramesApp(
@@ -195,16 +199,18 @@ public:
     {
     }
 
-    void OnInitialize(Engine& engine) override
+    void Resolve() override
     {
+        auto& engine = Kernel();
         if (m_AttachEditor)
-            m_EditorUi.Attach(engine);
+            m_EditorUi.Attach(engine.Worlds(), engine.Services());
     }
 
-    void OnSimTick(Engine&, double) override {}
+    void Simulate(double) override {}
 
-    void OnVariableTick(Engine& engine, double, double) override
+    void Frame(double, double) override
     {
+        auto& engine = Kernel();
         ++m_Frames;
         if (m_Frames >= m_TargetFrames)
         {
@@ -212,7 +218,7 @@ public:
         }
     }
 
-    void OnShutdown(Engine&) override
+    void Shutdown() override
     {
         if (m_AttachEditor)
             m_EditorUi.Detach();
@@ -227,51 +233,49 @@ private:
 
 // Compose the real Sandbox application before the caller-specific probe.
 // Keeping that order is load-bearing for inner applications that select or
-// edit ReferenceTriangle in `OnInitialize`.
-class SandboxCompositionApp final : public IApplication
+// edit ReferenceTriangle in `Resolve`.
+class SandboxCompositionApp final : public Intrinsic::Tests::RuntimeTestModule
 {
 public:
-    explicit SandboxCompositionApp(std::unique_ptr<IApplication> inner) noexcept
-        : m_Sandbox(Extrinsic::Sandbox::CreateSandboxApp())
-        , m_Inner(std::move(inner))
+    explicit SandboxCompositionApp(
+        std::unique_ptr<Intrinsic::Tests::RuntimeTestModule> inner) noexcept
+        : m_Inner(std::move(inner))
     {
     }
 
-    void OnInitialize(Engine& engine) override
+    void Resolve() override
     {
-        if (m_Sandbox)
-            m_Sandbox->OnInitialize(engine);
+        auto& engine = Kernel();
+        m_Sandbox.Initialize(engine.GetEngineConfig(), engine.Worlds(), engine.Services());
         if (m_Inner)
-            m_Inner->OnInitialize(engine);
+        {
+            m_Inner->BindKernel(engine);
+            m_Inner->ResolveForComposition();
+        }
     }
 
-    void OnSimTick(Engine& engine, double fixedDt) override
+    void Simulate(double fixedDt) override
     {
-        if (m_Sandbox)
-            m_Sandbox->OnSimTick(engine, fixedDt);
         if (m_Inner)
-            m_Inner->OnSimTick(engine, fixedDt);
+            m_Inner->SimulateForComposition(fixedDt);
     }
 
-    void OnVariableTick(Engine& engine, double alpha, double dt) override
+    void Frame(double alpha, double dt) override
     {
-        if (m_Sandbox)
-            m_Sandbox->OnVariableTick(engine, alpha, dt);
         if (m_Inner)
-            m_Inner->OnVariableTick(engine, alpha, dt);
+            m_Inner->FrameForComposition(alpha, dt);
     }
 
-    void OnShutdown(Engine& engine) override
+    void Shutdown() override
     {
         if (m_Inner)
-            m_Inner->OnShutdown(engine);
-        if (m_Sandbox)
-            m_Sandbox->OnShutdown(engine);
+            m_Inner->ShutdownForComposition();
+        m_Sandbox.Shutdown();
     }
 
 private:
-    std::unique_ptr<IApplication> m_Sandbox{};
-    std::unique_ptr<IApplication> m_Inner{};
+    Extrinsic::Sandbox::SandboxSession m_Sandbox{};
+    std::unique_ptr<Intrinsic::Tests::RuntimeTestModule> m_Inner{};
 };
 
 Counters::Snapshot ToCounterSnapshot(
@@ -285,7 +289,8 @@ Counters::Snapshot ToCounterSnapshot(
     };
 }
 
-// --- Acceptance scene authoring (mirrors Slice 1 `Test.RuntimeSandboxAcceptance.cpp`) ---
+// --- Acceptance scene authoring (mirrors Slice 1
+// `Test.RuntimeSandboxAcceptance.cpp`) ---
 
 void StampCommon(Registry& scene, EntityHandle entity, std::string name, std::uint32_t stableId)
 {
@@ -387,7 +392,7 @@ void SetTexcoords(Geometry::PropertySet& props, const std::vector<glm::vec2>& te
     };
 }
 
-class GeneratedUvTextureSmokeApp final : public IApplication
+class GeneratedUvTextureSmokeApp final : public Intrinsic::Tests::RuntimeTestModule
 {
 public:
     void SetGeneratedTexture(const Assets::AssetId generatedTexture) noexcept
@@ -395,12 +400,13 @@ public:
         m_GeneratedTexture = generatedTexture;
     }
 
-    void OnInitialize(Engine&) override {}
+    void Resolve() override {}
 
-    void OnSimTick(Engine&, double) override {}
+    void Simulate(double) override {}
 
-    void OnVariableTick(Engine& engine, double, double) override
+    void Frame(double, double) override
     {
+        auto& engine = Kernel();
         ++Frames;
 
         if (!UploadRequested &&
@@ -442,7 +448,7 @@ public:
         }
     }
 
-    void OnShutdown(Engine&) override {}
+    void Shutdown() override {}
 
     bool UploadRequested{false};
     bool TextureReadyObserved{false};
@@ -749,7 +755,7 @@ void MarkProgressiveMeshNormalReady(Registry& scene, const EntityHandle mesh)
 
 struct AcceptanceBootstrap
 {
-    std::unique_ptr<Engine> EnginePtr;
+    std::unique_ptr<Intrinsic::Tests::RuntimeTestKernel> EnginePtr;
     bool Skipped{false};
     std::string SkipReason;
 };
@@ -762,9 +768,10 @@ struct AcceptanceBootstrap
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
     {
         return AcceptanceBootstrap{
-            .EnginePtr = nullptr,
-            .Skipped = true,
-            .SkipReason = "GLFW could not initialize in this environment; gpu;vulkan sandbox acceptance smoke is opt-in.",
+            .EnginePtr  = nullptr,
+            .Skipped    = true,
+            .SkipReason = "GLFW could not initialize in this environment; "
+                          "gpu;vulkan sandbox acceptance smoke is opt-in.",
         };
     }
 
@@ -773,7 +780,7 @@ struct AcceptanceBootstrap
     config.Window.Resizable = false;
     config.Render.EnableValidation = false;
     config.Render.EnableVSync = false;
-    auto enginePtr = std::make_unique<Engine>(
+    auto enginePtr                 = std::make_unique<Intrinsic::Tests::RuntimeTestKernel>(
         config, std::make_unique<ExitAfterFramesApp>(kTargetFrames));
     enginePtr->EmplaceModule<Extrinsic::Runtime::CameraModule>();
     enginePtr->EmplaceModule<Extrinsic::Runtime::EditorUiModule>();
@@ -790,9 +797,10 @@ struct AcceptanceBootstrap
     {
         enginePtr->Shutdown();
         return AcceptanceBootstrap{
-            .EnginePtr = nullptr,
-            .Skipped = true,
-            .SkipReason = "Promoted Vulkan did not reach logical-device/swapchain/command-sync readiness on this host.",
+            .EnginePtr  = nullptr,
+            .Skipped    = true,
+            .SkipReason = "Promoted Vulkan did not reach "
+                          "logical-device/swapchain/command-sync readiness on this host.",
         };
     }
 
@@ -802,15 +810,16 @@ struct AcceptanceBootstrap
 
 // Reproduce the actual `src/app/Sandbox/main.cpp` config path: keep
 // `CreateReferenceEngineConfig()` defaults, including validation and VSync.
-[[nodiscard]] AcceptanceBootstrap BootstrapDefaultSandboxAppEngineWithApp(
-    std::unique_ptr<IApplication> app)
+[[nodiscard]] AcceptanceBootstrap
+BootstrapDefaultSandboxAppEngineWithApp(std::unique_ptr<Intrinsic::Tests::RuntimeTestModule> app)
 {
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
     {
         return AcceptanceBootstrap{
-            .EnginePtr = nullptr,
-            .Skipped = true,
-            .SkipReason = "GLFW could not initialize in this environment; gpu;vulkan sandbox app smoke is opt-in.",
+            .EnginePtr  = nullptr,
+            .Skipped    = true,
+            .SkipReason = "GLFW could not initialize in this environment; "
+                          "gpu;vulkan sandbox app smoke is opt-in.",
         };
     }
 
@@ -820,11 +829,17 @@ struct AcceptanceBootstrap
     auto config =
         Extrinsic::Runtime::CreateReferenceEngineConfig(
             configControl->SectionRegistry());
-    auto enginePtr = std::make_unique<Engine>(
-        config,
-        std::make_unique<SandboxCompositionApp>(std::move(app)));
+    auto enginePtr = std::make_unique<Intrinsic::Tests::RuntimeTestKernel>(
+        config, std::make_unique<SandboxCompositionApp>(std::move(app)));
     enginePtr->AddModule(std::move(configControl));
-    Extrinsic::Sandbox::RegisterSandboxRuntimeModules(*enginePtr);
+    enginePtr->EmplaceModule<Extrinsic::Runtime::AsyncWorkModule>();
+    enginePtr->EmplaceModule<Extrinsic::Runtime::CameraModule>();
+    enginePtr->EmplaceModule<Extrinsic::Runtime::ClusteringModule>();
+    enginePtr->EmplaceModule<Extrinsic::Runtime::EditorUiModule>();
+    enginePtr->EmplaceModule<Extrinsic::Runtime::SceneDocumentModule>();
+    enginePtr->EmplaceModule<Extrinsic::Runtime::SceneInteractionModule>();
+    enginePtr->EmplaceModule<Extrinsic::Runtime::AssetWorkflowModule>();
+    enginePtr->EmplaceModule<Extrinsic::Runtime::TextureBakeModule>();
     enginePtr->Initialize();
 
     const auto initInputs = GetVulkanDeviceOperationalInputs(&enginePtr->GetDevice());
@@ -832,9 +847,10 @@ struct AcceptanceBootstrap
     {
         enginePtr->Shutdown();
         return AcceptanceBootstrap{
-            .EnginePtr = nullptr,
-            .Skipped = true,
-            .SkipReason = "Promoted Vulkan did not reach logical-device/swapchain/command-sync readiness on this host.",
+            .EnginePtr  = nullptr,
+            .Skipped    = true,
+            .SkipReason = "Promoted Vulkan did not reach "
+                          "logical-device/swapchain/command-sync readiness on this host.",
         };
     }
 
@@ -1394,7 +1410,7 @@ struct ParameterizationUvViewRuntimePathState
 // reference-scene mesh, opens the contributed parameterization window, and
 // waits until that window consumes the renderer-owned UV target as an ImGui
 // user texture. Pixel content remains covered by Test.UvViewGpuSmoke.cpp.
-class ParameterizationUvViewRuntimePathApp final : public IApplication
+class ParameterizationUvViewRuntimePathApp final : public Intrinsic::Tests::RuntimeTestModule
 {
 public:
     explicit ParameterizationUvViewRuntimePathApp(
@@ -1403,8 +1419,9 @@ public:
     {
     }
 
-    void OnInitialize(Engine& engine) override
+    void Resolve() override
     {
+        auto& engine                   = Kernel();
         Config::EngineConfig candidate = engine.GetEngineConfig();
         auto parameterization =
             RT::GetParameterizationConfig(candidate);
@@ -1469,10 +1486,11 @@ public:
                 true);
     }
 
-    void OnSimTick(Engine&, double) override {}
+    void Simulate(double) override {}
 
-    void OnVariableTick(Engine& engine, double, double) override
+    void Frame(double, double) override
     {
+        auto& engine = Kernel();
         ++m_State->Frames;
 
         const Extrinsic::Graphics::UvViewOutput output =
@@ -1505,7 +1523,7 @@ public:
         }
     }
 
-    void OnShutdown(Engine&) override {}
+    void Shutdown() override {}
 
 private:
     std::shared_ptr<ParameterizationUvViewRuntimePathState> m_State{};
@@ -1513,9 +1531,10 @@ private:
 } // namespace
 
 // The working-sandbox acceptance scene (one mesh, one graph, one point cloud)
-// reaches the canonical default-recipe present on an operational promoted-Vulkan
-// device, with no canonical pass falling through the `SkippedUnavailable`
-// branch and the Vulkan fallback counters stable across the bounded run.
+// reaches the canonical default-recipe present on an operational
+// promoted-Vulkan device, with no canonical pass falling through the
+// `SkippedUnavailable` branch and the Vulkan fallback counters stable across
+// the bounded run.
 TEST(RuntimeSandboxAcceptanceGpuSmoke, AcceptanceSceneReachesOperationalDefaultRecipePresent)
 {
     auto bootstrap = BootstrapAcceptanceEngine();
@@ -1530,9 +1549,11 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, AcceptanceSceneReachesOperationalDefaultR
     if (!run.DeviceOperational)
     {
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip after driving the sandbox acceptance scene: status="
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip after "
+                         "driving the sandbox acceptance scene: status="
                       << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
-                      << ". Host capability checks passed, so this is a RUNTIME-095 Slice 3 regression, not a skip condition.";
+                      << ". Host capability checks passed, so this is a "
+                         "RUNTIME-095 Slice 3 regression, not a skip condition.";
         return;
     }
 
@@ -1547,10 +1568,12 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, AcceptanceSceneReachesOperationalDefaultR
     // Vulkan command stream. Assert presence before status so a missing pass
     // shows as a clear recipe-shape regression rather than a status mismatch.
     ASSERT_TRUE(ContainsPass(run.Stats, "Present"))
-        << "Sandbox acceptance scene did not emit a \"Present\" command record; the recipe shape regressed. "
+        << "Sandbox acceptance scene did not emit a \"Present\" command record; "
+           "the recipe shape regressed. "
         << "pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
     EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
-        << "Canonical \"Present\" pass did not record on the operational Vulkan command stream. "
+        << "Canonical \"Present\" pass did not record on the operational Vulkan "
+           "command stream. "
         << "pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
 
     // No canonical pass fell through the unavailable branch: every pass the
@@ -1577,19 +1600,23 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, AcceptanceSceneReachesOperationalDefaultR
     EXPECT_GE(ex.MeshGeometryUploads + ex.MeshGeometryReuseHits, 1u)
         << "Acceptance mesh family did not reside on the operational mesh lane.";
     EXPECT_GE(ex.GraphGeometryUploads + ex.GraphGeometryReuseHits, 1u)
-        << "Acceptance graph family did not reside on the operational graph lane.";
+        << "Acceptance graph family did not reside on the operational graph "
+           "lane.";
     EXPECT_GE(ex.PointCloudGeometryUploads + ex.PointCloudGeometryReuseHits, 1u)
-        << "Acceptance point-cloud family did not reside on the operational point-cloud lane.";
+        << "Acceptance point-cloud family did not reside on the operational "
+           "point-cloud lane.";
     EXPECT_EQ(ex.MeshGeometryFailedPack, 0u) << "Acceptance mesh lane reported a failed pack.";
     EXPECT_EQ(ex.GraphGeometryFailedPack, 0u) << "Acceptance graph lane reported a failed pack.";
     EXPECT_EQ(ex.PointCloudGeometryFailedPack, 0u) << "Acceptance point-cloud lane reported a failed pack.";
 
     EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
-        << "Vulkan fallback counters incremented across operational sandbox acceptance frames: "
+        << "Vulkan fallback counters incremented across operational sandbox "
+           "acceptance frames: "
         << "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
         << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
         << ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
-        << ", gateFailure " << run.Before.OperationalGateFailure << " -> " << run.After.OperationalGateFailure;
+        << ", gateFailure " << run.Before.OperationalGateFailure << " -> "
+        << run.After.OperationalGateFailure;
 
     engine.Shutdown();
 }
@@ -1645,7 +1672,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ProgressiveRenderDataReachesOperationalFr
     if (!run.DeviceOperational)
     {
         engine.Shutdown();
-        ADD_FAILURE() << "Progressive render-data smoke did not reach operational Vulkan: status="
+        ADD_FAILURE() << "Progressive render-data smoke did not reach operational "
+                         "Vulkan: status="
                       << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
                       << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
         return;
@@ -1674,14 +1702,17 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ProgressiveRenderDataReachesOperationalFr
     EXPECT_GE(ex.ProgressiveDiagnosticCount,
               readyMesh.Stats.DiagnosticCount);
     EXPECT_GE(ex.ProgressiveMaterialTextureBindingResolveFailureCount, 1u)
-        << "Generated progressive texture slots should attempt material binding resolution and fail closed when the smoke uses synthetic AssetIds.";
+        << "Generated progressive texture slots should attempt material binding "
+           "resolution and fail closed when the smoke uses synthetic AssetIds.";
 
     EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
-        << "Vulkan fallback counters incremented across operational progressive frames: "
+        << "Vulkan fallback counters incremented across operational progressive "
+           "frames: "
         << "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
         << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
         << ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
-        << ", gateFailure " << run.Before.OperationalGateFailure << " -> " << run.After.OperationalGateFailure;
+        << ", gateFailure " << run.Before.OperationalGateFailure << " -> "
+        << run.After.OperationalGateFailure;
 
     engine.Shutdown();
 }
@@ -1703,7 +1734,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigProducesVisi
     if (bytesPerPixel < 4u || extent.Width == 0u || extent.Height == 0u)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style "
+                        "smoke readback.";
     }
 
     const std::uint64_t readbackSize =
@@ -1736,7 +1768,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigProducesVisi
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan after bounded frames: status="
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach "
+                         "operational Vulkan after bounded frames: status="
                       << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
                       << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
         return;
@@ -1751,7 +1784,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigProducesVisi
     EXPECT_EQ(FindPassStatus(run.Stats, "ImGuiPass"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(run.Stats);
     EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
-        << "Sandbox default-config readback triplet did not record on any operational frame.";
+        << "Sandbox default-config readback triplet did not record on any "
+           "operational frame.";
     EXPECT_GT(editorUiDiagnostics.FramesProduced, 0u);
     EXPECT_GT(editorUiDiagnostics.LastVertexCount, 0u);
     EXPECT_GT(editorUiDiagnostics.LastIndexCount, 0u);
@@ -1762,14 +1796,16 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigProducesVisi
     const std::uint64_t totalPixels =
         static_cast<std::uint64_t>(extent.Width) * static_cast<std::uint64_t>(extent.Height);
     EXPECT_GT(nonBlackPixels, 0u)
-        << "Sandbox default-config frame read back as entirely black despite recorded Present/ImGui passes. "
+        << "Sandbox default-config frame read back as entirely black despite "
+           "recorded Present/ImGui passes. "
         << "editor UI frames=" << editorUiDiagnostics.FramesProduced
         << " drawLists=" << editorUiDiagnostics.LastDrawListCount
         << " vertices=" << editorUiDiagnostics.LastVertexCount
         << " indices=" << editorUiDiagnostics.LastIndexCount
         << " commands=" << editorUiDiagnostics.LastCommandCount
-        << " display=" << editorUiDiagnostics.DisplayWidth << "x" << editorUiDiagnostics.DisplayHeight
-        << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        << " display=" << editorUiDiagnostics.DisplayWidth << "x"
+        << editorUiDiagnostics.DisplayHeight << " pass statuses=["
+        << BuildPassStatusSummary(run.Stats) << "]";
 
     // BUG-016: the operational default recipe must present the lit scene-color
     // background (the recipe's blue clear tonemapped and presented), not just a
@@ -1779,7 +1815,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigProducesVisi
     // to be non-black so a regression that only leaves ImGui (or nothing)
     // visible is caught, not just a single stray non-black texel.
     EXPECT_GT(nonBlackPixels, totalPixels / 2u)
-        << "Sandbox default-config frame did not present a full-screen lit background; only "
+        << "Sandbox default-config frame did not present a full-screen lit "
+           "background; only "
         << nonBlackPixels << "/" << totalPixels << " pixels were non-black. This indicates the "
         << "postprocess present source regressed to black again (BUG-016).";
 
@@ -1813,11 +1850,10 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
     if (!run.DeviceOperational)
     {
         engine.Shutdown();
-        ADD_FAILURE()
-            << "Promoted Vulkan became non-operational while driving the real parameterization UV-view window: status="
-            << ToString(run.Status.Code)
-            << " reason=" << ToString(run.Status.Reason)
-            << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        ADD_FAILURE() << "Promoted Vulkan became non-operational while driving the "
+                         "real parameterization UV-view window: status="
+                      << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
+                      << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
         return;
     }
 
@@ -1828,11 +1864,14 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
     EXPECT_TRUE(state->ConfigAppliedFromAgentCli)
         << "UV-view config apply lost its AgentCli provenance.";
     EXPECT_TRUE(state->ParameterizationConfigChanged)
-        << "EngineConfigControl did not report the parameterization hot subset as changed.";
+        << "EngineConfigControl did not report the parameterization hot subset "
+           "as changed.";
     EXPECT_TRUE(state->ActiveConfigMatchesRequest)
-        << "The active config lane does not match the requested GPU/checker/no-heatmap view.";
+        << "The active config lane does not match the requested "
+           "GPU/checker/no-heatmap view.";
     EXPECT_TRUE(state->ReferenceTriangleSelected)
-        << "The real ReferenceTriangle was not selected through SelectionController.";
+        << "The real ReferenceTriangle was not selected through "
+           "SelectionController.";
     EXPECT_TRUE(state->WindowOpened)
         << "The contributed mesh.processing.parameterize_uv window did not open.";
     const RT::EngineConfigControl* const configControl =
@@ -1852,13 +1891,15 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
               RT::RuntimeConfigControlSource::AgentCli);
 
     EXPECT_TRUE(state->SawGpuReadyUvView)
-        << "The real runtime/editor path never observed a completed renderer-owned UV target after "
-        << state->Frames << " bounded frames. last diagnostic="
-        << state->LastUvViewDiagnostic;
+        << "The real runtime/editor path never observed a completed "
+           "renderer-owned UV target after "
+        << state->Frames << " bounded frames. last diagnostic=" << state->LastUvViewDiagnostic;
     EXPECT_TRUE(state->SawImGuiUserTexture)
-        << "The parameterization panel never emitted its ready UV target as an ImGui user texture.";
+        << "The parameterization panel never emitted its ready UV target as an "
+           "ImGui user texture.";
     EXPECT_TRUE(state->ExitedAfterOperationalPath)
-        << "The bounded app timed out before both UV readiness and ImGui consumption were observed.";
+        << "The bounded app timed out before both UV readiness and ImGui "
+           "consumption were observed.";
     EXPECT_GT(state->ReadyRequestToken, 0u);
     EXPECT_GT(state->ReadyRecordedPassCount, 0u);
 
@@ -1890,13 +1931,12 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
     EXPECT_GT(editorUiDiagnostics.LastVertexCount, 0u);
     EXPECT_GT(editorUiDiagnostics.LastIndexCount, 0u);
     EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
-        << "Vulkan fallback counters incremented across the operational UV-view runtime path: "
-        << "fallbackToNull " << run.Before.FallbackToNull << " -> "
-        << run.After.FallbackToNull << ", initFailure "
-        << run.Before.InitFailure << " -> " << run.After.InitFailure
-        << ", validationError " << run.Before.ValidationError << " -> "
-        << run.After.ValidationError << ", gateFailure "
-        << run.Before.OperationalGateFailure << " -> "
+        << "Vulkan fallback counters incremented across the operational UV-view "
+           "runtime path: "
+        << "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
+        << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
+        << ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
+        << ", gateFailure " << run.Before.OperationalGateFailure << " -> "
         << run.After.OperationalGateFailure;
 
     engine.Shutdown();
@@ -1924,7 +1964,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigPresentsRefe
     if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style "
+                        "smoke readback.";
     }
 
     const std::uint64_t readbackSize =
@@ -1951,7 +1992,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigPresentsRefe
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan for triangle readback: status="
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach "
+                         "operational Vulkan for triangle readback: status="
                       << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
                       << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
         return;
@@ -1962,7 +2004,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigPresentsRefe
     EXPECT_GE(ex.SubmittedTransformCount, 1u);
     EXPECT_GE(ex.SubmittedVisualizationCount, 1u);
     EXPECT_GE(ex.MeshGeometryUploads + ex.MeshGeometryReuseHits, 1u)
-        << "ReferenceTriangle did not remain resident on the mesh extraction lane.";
+        << "ReferenceTriangle did not remain resident on the mesh extraction "
+           "lane.";
 
     EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
     EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
@@ -1973,7 +2016,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigPresentsRefe
     EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(run.Stats);
     EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
-        << "Sandbox triangle readback triplet did not record on an operational frame.";
+        << "Sandbox triangle readback triplet did not record on an operational "
+           "frame.";
 
     std::vector<std::uint8_t> bytes(static_cast<std::size_t>(readbackSize), 0u);
     device.ReadBuffer(readbackBuffer, bytes.data(), readbackSize, 0u);
@@ -2005,13 +2049,11 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigPresentsRefe
     }
 
     EXPECT_GT(nearestBackgroundDistance, 48)
-        << "The actual ECS ReferenceTriangle did not contribute a distinguishable center pixel. "
-        << "center=(" << static_cast<int>(center.R) << ","
-        << static_cast<int>(center.G) << ","
-        << static_cast<int>(center.B) << ","
-        << static_cast<int>(center.A) << ") "
-        << "background samples=("
-        << static_cast<int>(backgroundSamples[0].R) << ","
+        << "The actual ECS ReferenceTriangle did not contribute a "
+           "distinguishable center pixel. "
+        << "center=(" << static_cast<int>(center.R) << "," << static_cast<int>(center.G) << ","
+        << static_cast<int>(center.B) << "," << static_cast<int>(center.A) << ") "
+        << "background samples=(" << static_cast<int>(backgroundSamples[0].R) << ","
         << static_cast<int>(backgroundSamples[0].G) << ","
         << static_cast<int>(backgroundSamples[0].B) << "),("
         << static_cast<int>(backgroundSamples[1].R) << ","
@@ -2028,10 +2070,9 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigPresentsRefe
         << " extraction candidates=" << ex.CandidateRenderableCount
         << " transforms=" << ex.SubmittedTransformCount
         << " visualizations=" << ex.SubmittedVisualizationCount
-        << " mesh uploads=" << ex.MeshGeometryUploads
-        << " mesh reuse=" << ex.MeshGeometryReuseHits
-        << " nearest background distance=" << nearestBackgroundDistance
-        << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        << " mesh uploads=" << ex.MeshGeometryUploads << " mesh reuse=" << ex.MeshGeometryReuseHits
+        << " nearest background distance=" << nearestBackgroundDistance << " pass statuses=["
+        << BuildPassStatusSummary(run.Stats) << "]";
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);
@@ -2072,7 +2113,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleVertexColorStreamShadesD
     if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style "
+                        "smoke readback.";
     }
 
     const std::uint64_t readbackSize =
@@ -2099,7 +2141,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleVertexColorStreamShadesD
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan for vertex-color readback: status="
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach "
+                         "operational Vulkan for vertex-color readback: status="
                       << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
                       << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
         return;
@@ -2107,7 +2150,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleVertexColorStreamShadesD
 
     const auto& ex = engine.GetLastRenderExtractionStats();
     EXPECT_GE(ex.MeshGeometryUploads + ex.MeshGeometryReuseHits, 1u)
-        << "ReferenceTriangle did not remain resident on the mesh extraction lane.";
+        << "ReferenceTriangle did not remain resident on the mesh extraction "
+           "lane.";
 
     EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
     EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
@@ -2118,15 +2162,18 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleVertexColorStreamShadesD
     EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(run.Stats);
     EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
-        << "Vertex-color readback triplet did not record on an operational frame.";
+        << "Vertex-color readback triplet did not record on an operational "
+           "frame.";
 
     const GpuSceneInputSummary gpuScene = SummarizeGpuSceneInputs(device, renderer);
     EXPECT_GE(gpuScene.SurfaceInstances, 1u);
     EXPECT_EQ(gpuScene.SurfaceInstancesWithInvalidGeometry, 0u);
     EXPECT_GE(gpuScene.SurfaceInstancesWithSoaChannels, 1u)
-        << "No visible surface instance published position, texcoord, and normal channel BDAs.";
+        << "No visible surface instance published position, texcoord, and normal "
+           "channel BDAs.";
     EXPECT_GE(gpuScene.SurfaceInstancesWithColorBuffer, 1u)
-        << "No visible surface instance published a GpuGeometryRecord::ColorBufferBDA.";
+        << "No visible surface instance published a "
+           "GpuGeometryRecord::ColorBufferBDA.";
 
     std::vector<std::uint8_t> bytes(static_cast<std::size_t>(readbackSize), 0u);
     device.ReadBuffer(readbackBuffer, bytes.data(), readbackSize, 0u);
@@ -2146,13 +2193,11 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleVertexColorStreamShadesD
         static_cast<int>(center.R) -
         static_cast<int>(std::max(center.G, center.B));
     EXPECT_GT(RgbDistance(center, background), 48)
-        << "The vertex-colored ReferenceTriangle did not contribute a distinguishable center pixel. "
-        << "center=(" << static_cast<int>(center.R) << ","
-        << static_cast<int>(center.G) << ","
-        << static_cast<int>(center.B) << ") background=("
-        << static_cast<int>(background.R) << ","
-        << static_cast<int>(background.G) << ","
-        << static_cast<int>(background.B) << ")"
+        << "The vertex-colored ReferenceTriangle did not contribute a "
+           "distinguishable center pixel. "
+        << "center=(" << static_cast<int>(center.R) << "," << static_cast<int>(center.G) << ","
+        << static_cast<int>(center.B) << ") background=(" << static_cast<int>(background.R) << ","
+        << static_cast<int>(background.G) << "," << static_cast<int>(background.B) << ")"
         << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
     EXPECT_GT(redDominance, 48)
         << "The center pixel was not red-dominant after binding v:color. center=("
@@ -2162,9 +2207,9 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleVertexColorStreamShadesD
         << " surface instances with color BDA="
         << gpuScene.SurfaceInstancesWithColorBuffer;
     EXPECT_LT(RgbDistance(center, authoredRed), RgbDistance(center, materialWhite))
-        << "The center pixel is closer to the white/material fallback than to the authored red vertex color. center=("
-        << static_cast<int>(center.R) << ","
-        << static_cast<int>(center.G) << ","
+        << "The center pixel is closer to the white/material fallback than to "
+           "the authored red vertex color. center=("
+        << static_cast<int>(center.R) << "," << static_cast<int>(center.G) << ","
         << static_cast<int>(center.B) << ")";
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
@@ -2174,61 +2219,58 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleVertexColorStreamShadesD
 
 namespace
 {
-class PartialVertexColorMutationApp final : public IApplication
-{
-public:
-    PartialVertexColorMutationApp(const std::uint32_t mutateFrame,
-                                  const std::uint32_t targetFrames) noexcept
-        : m_MutateFrame(mutateFrame)
-        , m_TargetFrames(targetFrames)
+    class PartialVertexColorMutationApp final : public Intrinsic::Tests::RuntimeTestModule
     {
-    }
-
-    void OnInitialize(Engine&) override {}
-
-    void OnSimTick(Engine&, double) override {}
-
-    void OnVariableTick(Engine& engine, double, double) override
-    {
-        ++m_Frames;
-        if (m_Frames == m_MutateFrame)
+    public:
+        PartialVertexColorMutationApp(const std::uint32_t mutateFrame,
+                                      const std::uint32_t targetFrames) noexcept
+            : m_MutateFrame(mutateFrame)
+            , m_TargetFrames(targetFrames)
         {
-            Registry& scene = *engine.Worlds().Get(engine.ActiveWorld());
-            const EntityHandle triangle = FindEntityByName(scene, "ReferenceTriangle");
-            if (IsReferenceTriangleEntityValid(scene, triangle))
+        }
+
+        void Resolve() override {}
+
+        void Simulate(double) override {}
+
+        void Frame(double, double) override
+        {
+            auto& engine = Kernel();
+            ++m_Frames;
+            if (m_Frames == m_MutateFrame)
             {
-                auto& raw = scene.Raw();
-                auto& vertices = raw.get<gs::Vertices>(triangle);
-                vertices.Properties
-                    .GetOrAdd<glm::vec4>("v:color", glm::vec4{1.0f})
-                    .Vector() = {
+                Registry& scene             = *engine.Worlds().Get(engine.ActiveWorld());
+                const EntityHandle triangle = FindEntityByName(scene, "ReferenceTriangle");
+                if (IsReferenceTriangleEntityValid(scene, triangle))
+                {
+                    auto& raw      = scene.Raw();
+                    auto& vertices = raw.get<gs::Vertices>(triangle);
+                    vertices.Properties.GetOrAdd<glm::vec4>("v:color", glm::vec4{1.0f}).Vector() = {
                         glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
                         glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
                         glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
                     };
-                Extrinsic::ECS::Components::DirtyTags::MarkVertexColorsDirty(
-                    raw,
-                    triangle);
-                m_Mutated = true;
+                    Extrinsic::ECS::Components::DirtyTags::MarkVertexColorsDirty(raw, triangle);
+                    m_Mutated = true;
+                }
+            }
+
+            if (m_Frames >= m_TargetFrames)
+            {
+                engine.RequestExit();
             }
         }
 
-        if (m_Frames >= m_TargetFrames)
-        {
-            engine.RequestExit();
-        }
-    }
+        void Shutdown() override {}
 
-    void OnShutdown(Engine&) override {}
+        [[nodiscard]] bool Mutated() const noexcept { return m_Mutated; }
 
-    [[nodiscard]] bool Mutated() const noexcept { return m_Mutated; }
-
-private:
-    std::uint32_t m_MutateFrame{1u};
-    std::uint32_t m_TargetFrames{1u};
-    std::uint32_t m_Frames{0u};
-    bool m_Mutated{false};
-};
+    private:
+        std::uint32_t m_MutateFrame{1u};
+        std::uint32_t m_TargetFrames{1u};
+        std::uint32_t m_Frames{0u};
+        bool m_Mutated{false};
+    };
 } // namespace
 
 TEST(RuntimeSandboxAcceptanceGpuSmoke, VertexColorDirtyChannelPartiallyUploadsAndShadesDeferredSurface)
@@ -2269,7 +2311,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, VertexColorDirtyChannelPartiallyUploadsAn
     if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style "
+                        "smoke readback.";
     }
 
     const std::uint64_t readbackSize =
@@ -2296,7 +2339,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, VertexColorDirtyChannelPartiallyUploadsAn
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan for partial vertex-color readback: status="
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan "
+                         "for partial vertex-color readback: status="
                       << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
                       << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
         return;
@@ -2317,7 +2361,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, VertexColorDirtyChannelPartiallyUploadsAn
     EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(run.Stats);
     EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
-        << "Partial vertex-color readback did not record on an operational frame.";
+        << "Partial vertex-color readback did not record on an operational "
+           "frame.";
 
     std::vector<std::uint8_t> bytes(static_cast<std::size_t>(readbackSize), 0u);
     device.ReadBuffer(readbackBuffer, bytes.data(), readbackSize, 0u);
@@ -2333,14 +2378,14 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, VertexColorDirtyChannelPartiallyUploadsAn
         static_cast<int>(center.G) -
         static_cast<int>(std::max(center.R, center.B));
     EXPECT_GT(greenDominance, 48)
-        << "The center pixel was not green-dominant after a DirtyVertexColors partial upload. center=("
-        << static_cast<int>(center.R) << ","
-        << static_cast<int>(center.G) << ","
+        << "The center pixel was not green-dominant after a DirtyVertexColors "
+           "partial upload. center=("
+        << static_cast<int>(center.R) << "," << static_cast<int>(center.G) << ","
         << static_cast<int>(center.B) << ") greenDominance=" << greenDominance;
     EXPECT_LT(RgbDistance(center, authoredGreen), RgbDistance(center, authoredRed))
-        << "The final center pixel is closer to the pre-mutation red stream than to the green partial update. center=("
-        << static_cast<int>(center.R) << ","
-        << static_cast<int>(center.G) << ","
+        << "The final center pixel is closer to the pre-mutation red stream than "
+           "to the green partial update. center=("
+        << static_cast<int>(center.R) << "," << static_cast<int>(center.G) << ","
         << static_cast<int>(center.B) << ")";
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
@@ -2485,7 +2530,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
     if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style "
+                        "smoke readback.";
     }
 
     const std::uint64_t readbackSize =
@@ -2512,7 +2558,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan for edge/point readback: status="
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach "
+                         "operational Vulkan for edge/point readback: status="
                       << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
                       << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
         return;
@@ -2525,7 +2572,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
     EXPECT_EQ(FindPassStatus(run.Stats, "PointPass"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(run.Stats);
     EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
-        << "Sandbox edge/point readback copy did not record on an operational frame.";
+        << "Sandbox edge/point readback copy did not record on an operational "
+           "frame.";
 
     const auto& ex = engine.GetLastRenderExtractionStats();
     EXPECT_GE(ex.MeshEdgeViewUploads + ex.MeshEdgeViewReuseHits, 1u)
@@ -2614,18 +2662,21 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
                                   kReferenceTriangleLineWidthSampleRadius);
 
     EXPECT_GE(lineCullCount, 1u)
-        << "ReferenceTriangle mesh edge lane did not emit an indexed line draw command."
+        << "ReferenceTriangle mesh edge lane did not emit an indexed line draw "
+           "command."
         << " lineCmd={indexCount=" << firstLineCmd.IndexCount
         << ", instanceCount=" << firstLineCmd.InstanceCount
         << ", firstIndex=" << firstLineCmd.FirstIndex
         << ", vertexOffset=" << firstLineCmd.VertexOffset
         << ", firstInstance=" << firstLineCmd.FirstInstance << "}";
     ASSERT_TRUE(firstLineConfigRead)
-        << "ReferenceTriangle mesh edge lane did not expose a readable first line config.";
+        << "ReferenceTriangle mesh edge lane did not expose a readable first "
+           "line config.";
     EXPECT_FLOAT_EQ(firstLineConfig.Line.LineWidth, kReferenceTriangleLineWidthSmokePx);
     EXPECT_EQ(firstLineConfig.Line.LineWidthBDA, 0u);
     EXPECT_GE(lineQuadCullCount, 1u)
-        << "ReferenceTriangle mesh edge lane did not emit the non-indexed line-quad draw consumed by LinePass."
+        << "ReferenceTriangle mesh edge lane did not emit the non-indexed "
+           "line-quad draw consumed by LinePass."
         << " lineQuadCmd={vertexCount=" << firstLineQuadCmd.VertexCount
         << ", instanceCount=" << firstLineQuadCmd.InstanceCount
         << ", firstVertex=" << firstLineQuadCmd.FirstVertex
@@ -2637,27 +2688,26 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
         << ", firstVertex=" << firstPointCmd.FirstVertex
         << ", firstInstance=" << firstPointCmd.FirstInstance << "}";
     EXPECT_GE(sceneInputs.LineInstancesWithPositionBuffer, 1u)
-        << "ReferenceTriangle mesh edge lane did not publish a position channel BDA.";
+        << "ReferenceTriangle mesh edge lane did not publish a position channel "
+           "BDA.";
     EXPECT_GE(sceneInputs.PointInstancesWithPositionBuffer, 1u)
-        << "ReferenceTriangle mesh vertex lane did not publish a position channel BDA.";
+        << "ReferenceTriangle mesh vertex lane did not publish a position "
+           "channel BDA.";
 
     EXPECT_GE(darkEdgePixels, kReferenceTriangleLineWidthMinDarkPixels)
-        << "ReferenceTriangle mesh edge lane did not leave a configured-width dark overlay near the projected bottom-edge midpoint. "
+        << "ReferenceTriangle mesh edge lane did not leave a configured-width "
+           "dark overlay near the projected bottom-edge midpoint. "
         << "sample=(" << edgeX << "," << edgeY << ")"
         << " darkPixels=" << darkEdgePixels
         << " minExpectedDarkPixels=" << kReferenceTriangleLineWidthMinDarkPixels
-        << " configuredWidthPx=" << firstLineConfig.Line.LineWidth
-        << " center=(" << static_cast<int>(edgeStats.Center.R) << ","
-        << static_cast<int>(edgeStats.Center.G) << ","
-        << static_cast<int>(edgeStats.Center.B) << ")"
-        << " min=(" << static_cast<int>(edgeStats.Min.R) << ","
-        << static_cast<int>(edgeStats.Min.G) << ","
-        << static_cast<int>(edgeStats.Min.B) << ")"
-        << " max=(" << static_cast<int>(edgeStats.Max.R) << ","
-        << static_cast<int>(edgeStats.Max.G) << ","
-        << static_cast<int>(edgeStats.Max.B) << ")"
-        << " lineCullCount=" << lineCullCount
-        << " lineCmd={indexCount=" << firstLineCmd.IndexCount
+        << " configuredWidthPx=" << firstLineConfig.Line.LineWidth << " center=("
+        << static_cast<int>(edgeStats.Center.R) << "," << static_cast<int>(edgeStats.Center.G)
+        << "," << static_cast<int>(edgeStats.Center.B) << ")"
+        << " min=(" << static_cast<int>(edgeStats.Min.R) << "," << static_cast<int>(edgeStats.Min.G)
+        << "," << static_cast<int>(edgeStats.Min.B) << ")"
+        << " max=(" << static_cast<int>(edgeStats.Max.R) << "," << static_cast<int>(edgeStats.Max.G)
+        << "," << static_cast<int>(edgeStats.Max.B) << ")"
+        << " lineCullCount=" << lineCullCount << " lineCmd={indexCount=" << firstLineCmd.IndexCount
         << ", instanceCount=" << firstLineCmd.InstanceCount
         << ", firstIndex=" << firstLineCmd.FirstIndex
         << ", vertexOffset=" << firstLineCmd.VertexOffset
@@ -2674,8 +2724,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
         << ", firstInstance=" << firstPointCmd.FirstInstance << "}"
         << " sceneInputs={live=" << sceneInputs.LiveInstanceCount
         << ", capacity=" << sceneInputs.InstanceCapacity
-        << ", visible=" << sceneInputs.VisibleInstances
-        << ", lines=" << sceneInputs.LineInstances
+        << ", visible=" << sceneInputs.VisibleInstances << ", lines=" << sceneInputs.LineInstances
         << ", points=" << sceneInputs.PointInstances
         << ", linePositionBuffers=" << sceneInputs.LineInstancesWithPositionBuffer
         << ", pointPositionBuffers=" << sceneInputs.PointInstancesWithPositionBuffer
@@ -2709,43 +2758,42 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
 
 namespace
 {
-// GRAPHICS-091 Slice C scalar-field colormap smoke parameters. The reference
-// triangle's source vertices carry a uniform vertex-domain scalar at the range
-// maximum so the shared `common/gpu_scene.glsl` colormap resolver paints one
-// predictable colour (the LUT maximum) on every forward line and point fragment,
-// independent of interpolation or the exact sampled pixel.
-inline constexpr std::string_view kScalarFieldSmokeProperty = "v:graphics091_scalar";
-inline constexpr float kScalarFieldSmokeRangeMin = 0.0f;
-inline constexpr float kScalarFieldSmokeRangeMax = 1.0f;
-inline constexpr float kScalarFieldSmokeLineWidthPx = 8.0f;
-inline constexpr float kScalarFieldSmokePointSizePx = 12.0f;
-inline constexpr std::uint32_t kScalarFieldSmokeSampleRadius = 8u;
-inline constexpr std::uint32_t kScalarFieldSurfaceSmokeSampleRadius = 3u;
-// Minimum RGB distance from the background clear for a sampled neighborhood
-// pixel to count as a drawn line/point fragment.
-inline constexpr int kScalarFieldSmokeMinForeground = 60;
-// `ColorSourceMode` value for `ScalarField` in the `GpuEntityConfig` contract
-// (mirrors `VisualizationSyncSystem` `kMode_ScalarField` and the GLSL
-// `GpuColorSource_ScalarField`); `VisDomain` 0 is the vertex domain.
-inline constexpr std::uint32_t kColorSourceScalarFieldMode = 2u;
-inline constexpr std::uint32_t kVisDomainVertex = 0u;
+    // GRAPHICS-091 Slice C scalar-field colormap smoke parameters. The reference
+    // triangle's source vertices carry a uniform vertex-domain scalar at the range
+    // maximum so the shared `common/gpu_scene.glsl` colormap resolver paints one
+    // predictable colour (the LUT maximum) on every forward line and point
+    // fragment, independent of interpolation or the exact sampled pixel.
+    inline constexpr std::string_view kScalarFieldSmokeProperty         = "v:graphics091_scalar";
+    inline constexpr float kScalarFieldSmokeRangeMin                    = 0.0f;
+    inline constexpr float kScalarFieldSmokeRangeMax                    = 1.0f;
+    inline constexpr float kScalarFieldSmokeLineWidthPx                 = 8.0f;
+    inline constexpr float kScalarFieldSmokePointSizePx                 = 12.0f;
+    inline constexpr std::uint32_t kScalarFieldSmokeSampleRadius        = 8u;
+    inline constexpr std::uint32_t kScalarFieldSurfaceSmokeSampleRadius = 3u;
+    // Minimum RGB distance from the background clear for a sampled neighborhood
+    // pixel to count as a drawn line/point fragment.
+    inline constexpr int kScalarFieldSmokeMinForeground = 60;
+    // `ColorSourceMode` value for `ScalarField` in the `GpuEntityConfig` contract
+    // (mirrors `VisualizationSyncSystem` `kMode_ScalarField` and the GLSL
+    // `GpuColorSource_ScalarField`); `VisDomain` 0 is the vertex domain.
+    inline constexpr std::uint32_t kColorSourceScalarFieldMode = 2u;
+    inline constexpr std::uint32_t kVisDomainVertex            = 0u;
 
-[[nodiscard]] std::string DescribeColormapConfig(
-    const std::string_view lane,
-    const Extrinsic::RHI::GpuEntityConfig& cfg,
-    const std::uint32_t expectedColormapId)
-{
-    std::string out{lane};
-    out += " cfg{mode=" + std::to_string(cfg.ColorSourceMode);
-    out += ", colormapId=" + std::to_string(cfg.ColormapID);
-    out += ", expectedColormapId=" + std::to_string(expectedColormapId);
-    out += ", scalarBDA=" + std::to_string(cfg.ScalarBDA);
-    out += ", rangeMin=" + std::to_string(cfg.ScalarRangeMin);
-    out += ", rangeMax=" + std::to_string(cfg.ScalarRangeMax);
-    out += ", visDomain=" + std::to_string(cfg.VisDomain);
-    out += ", elementCount=" + std::to_string(cfg.ElementCount) + "}";
-    return out;
-}
+    [[nodiscard]] std::string DescribeColormapConfig(const std::string_view lane,
+                                                     const Extrinsic::RHI::GpuEntityConfig& cfg,
+                                                     const std::uint32_t expectedColormapId)
+    {
+        std::string out{lane};
+        out += " cfg{mode=" + std::to_string(cfg.ColorSourceMode);
+        out += ", colormapId=" + std::to_string(cfg.ColormapID);
+        out += ", expectedColormapId=" + std::to_string(expectedColormapId);
+        out += ", scalarBDA=" + std::to_string(cfg.ScalarBDA);
+        out += ", rangeMin=" + std::to_string(cfg.ScalarRangeMin);
+        out += ", rangeMax=" + std::to_string(cfg.ScalarRangeMax);
+        out += ", visDomain=" + std::to_string(cfg.VisDomain);
+        out += ", elementCount=" + std::to_string(cfg.ElementCount) + "}";
+        return out;
+    }
 
 [[nodiscard]] std::string PixelText(const RgbaPixel p)
 {
@@ -2769,8 +2817,9 @@ inline constexpr std::uint32_t kVisDomainVertex = 0u;
     return static_cast<std::uint8_t>(clamped * 255.0f + 0.5f);
 }
 
-// Bring a sampled backbuffer pixel into the colormap LUT's linear space so it can
-// be compared against ColormapSystem::SampleCpu (which returns linear LUT bytes).
+// Bring a sampled backbuffer pixel into the colormap LUT's linear space so it
+// can be compared against ColormapSystem::SampleCpu (which returns linear LUT
+// bytes).
 [[nodiscard]] RgbaPixel ToLinearPixel(const Extrinsic::RHI::Format format,
                                       const RgbaPixel px) noexcept
 {
@@ -2890,15 +2939,16 @@ struct ClosestPixelSample
 // The unified scalar-field colormap resolution (Slice A's shared
 // `common/gpu_scene.glsl` helper) is live on the modern forward LINE and POINT
 // passes at parity with the surface path. Slice B proved the CPU/null
-// `VisualizationSyncSystem` config parity (`Test.MinimalTriangleAcceptance.cpp`);
-// this slice drives the promoted-Vulkan default recipe with a `ScalarField`
-// `VisualizationConfig` on a line+point renderable and asserts the per-line and
-// per-point `GpuEntityConfig` carry the scalar-field colormap config end to end
-// to the GPU entity-config buffer, the `LinePass`/`PointPass` record on the
-// operational command stream, and — with the surface lane removed so only the
-// line/point draws contribute pixels — each lane's strongest sampled fragment
-// resolves closer to the expected Viridis colormap colour than to the
-// white/material fallback a colormap-ignoring shader would emit.
+// `VisualizationSyncSystem` config parity
+// (`Test.MinimalTriangleAcceptance.cpp`); this slice drives the promoted-Vulkan
+// default recipe with a `ScalarField` `VisualizationConfig` on a line+point
+// renderable and asserts the per-line and per-point `GpuEntityConfig` carry the
+// scalar-field colormap config end to end to the GPU entity-config buffer, the
+// `LinePass`/`PointPass` record on the operational command stream, and — with
+// the surface lane removed so only the line/point draws contribute pixels —
+// each lane's strongest sampled fragment resolves closer to the expected
+// Viridis colormap colour than to the white/material fallback a
+// colormap-ignoring shader would emit.
 //
 // The fixture self-skips on non-Vulkan hosts via
 // `BootstrapDefaultSandboxAppEngine`, so it is excluded from the default CPU
@@ -2933,9 +2983,9 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldColormapResol
                      kScalarFieldSmokeRangeMax,
                      kScalarFieldSmokeRangeMax};
 
-    // Draw the edge and point lanes with sampleable width/size so the scalar-field
-    // colormap is proven on the forward LinePass and PointPass, not only the
-    // surface pass.
+    // Draw the edge and point lanes with sampleable width/size so the
+    // scalar-field colormap is proven on the forward LinePass and PointPass, not
+    // only the surface pass.
     G::RenderEdges edges{};
     edges.WidthSource = kScalarFieldSmokeLineWidthPx;
     raw.emplace_or_replace<G::RenderEdges>(triangle, edges);
@@ -2970,7 +3020,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldColormapResol
     if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style "
+                        "smoke readback.";
     }
 
     const std::uint64_t readbackSize =
@@ -2997,7 +3048,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldColormapResol
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan for scalar-field colormap readback: status="
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan "
+                         "for scalar-field colormap readback: status="
                       << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
                       << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
         return;
@@ -3010,7 +3062,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldColormapResol
     EXPECT_EQ(FindPassStatus(run.Stats, "PointPass"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(run.Stats);
     EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
-        << "Sandbox scalar-field colormap readback copy did not record on an operational frame.";
+        << "Sandbox scalar-field colormap readback copy did not record on an "
+           "operational frame.";
 
     // Read back the per-line and per-point GpuEntityConfig from the GPU
     // entity-config buffer and assert the unified scalar-field colormap config
@@ -3035,9 +3088,11 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldColormapResol
     };
 
     ASSERT_NE(sceneInputs.FirstLineSlot, kInvalidIndex)
-        << "ReferenceTriangle did not emit a forward line instance for the scalar-field colormap smoke.";
+        << "ReferenceTriangle did not emit a forward line instance for the "
+           "scalar-field colormap smoke.";
     ASSERT_NE(sceneInputs.FirstPointSlot, kInvalidIndex)
-        << "ReferenceTriangle did not emit a forward point instance for the scalar-field colormap smoke.";
+        << "ReferenceTriangle did not emit a forward point instance for the "
+           "scalar-field colormap smoke.";
 
     const Extrinsic::RHI::GpuEntityConfig lineCfg = readConfig(sceneInputs.FirstLineInstance.ConfigSlot);
     const Extrinsic::RHI::GpuEntityConfig pointCfg = readConfig(sceneInputs.FirstPointInstance.ConfigSlot);
@@ -3109,14 +3164,17 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldColormapResol
             << " strongest=" << PixelText(fg.Pixel)
             << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
         EXPECT_LT(toColormap, toFallback)
-            << lane << " lane fragment is closer to the white/material fallback than to the expected "
-            << "Viridis colormap colour — the line/point colormap path did not resolve on the GPU. "
+            << lane
+            << " lane fragment is closer to the white/material fallback than to "
+               "the expected "
+            << "Viridis colormap colour — the line/point colormap path did not "
+               "resolve on the GPU. "
             << "strongest(linearized)=" << PixelText(lit)
             << " expectedViridis=" << PixelText(expectedColormap)
-            << " fallback=" << PixelText(fallbackColor)
-            << " toColormap=" << toColormap << " toFallback=" << toFallback
-            << " backbufferFormat=" << static_cast<int>(backbufferFormat)
-            << " cfg=[" << DescribeColormapConfig(lane, cfg, expectedColormapId) << "]";
+            << " fallback=" << PixelText(fallbackColor) << " toColormap=" << toColormap
+            << " toFallback=" << toFallback
+            << " backbufferFormat=" << static_cast<int>(backbufferFormat) << " cfg=["
+            << DescribeColormapConfig(lane, cfg, expectedColormapId) << "]";
     };
 
     expectColormapLane("line", glm::vec3{0.0f, -0.5f, 0.0f});  // bottom-edge midpoint (v0-v1)
@@ -3177,7 +3235,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldSurfaceAndIso
     if (bytesPerPixel < 4u || extent.Width == 0u || extent.Height == 0u)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style "
+                        "smoke readback.";
     }
 
     const std::uint64_t readbackSize =
@@ -3204,7 +3263,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldSurfaceAndIso
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan for scalar-field surface/isolines readback: status="
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan "
+                         "for scalar-field surface/isolines readback: status="
                       << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
                       << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
         return;
@@ -3217,7 +3277,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldSurfaceAndIso
     EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(run.Stats);
     EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
-        << "Sandbox scalar-field surface/isolines readback copy did not record on an operational frame.";
+        << "Sandbox scalar-field surface/isolines readback copy did not record "
+           "on an operational frame.";
 
     const std::uint32_t triangleRenderId =
         Extrinsic::Runtime::SelectionController::ToStableEntityId(triangle);
@@ -3225,7 +3286,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldSurfaceAndIso
         ReadVisibleInstanceConfigByEntityId(
             device, renderer, triangleRenderId, Extrinsic::RHI::GpuRender_Surface);
     ASSERT_TRUE(surfaceInstance.Found)
-        << "ReferenceTriangle did not emit a visible surface instance with render id "
+        << "ReferenceTriangle did not emit a visible surface instance with "
+           "render id "
         << triangleRenderId << ".";
 
     const std::uint32_t expectedColormapId =
@@ -3279,14 +3341,14 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldSurfaceAndIso
         const int toExpected = RgbDistance(lit, expected);
         const int toRejected = RgbDistance(lit, rejected);
         EXPECT_LT(toExpected, toRejected)
-            << label << " surface probe resolved closer to the rejected colour than the expected colour. "
+            << label
+            << " surface probe resolved closer to the rejected colour than the "
+               "expected colour. "
             << "sample=(" << px << "," << py << ")"
-            << " pixel(linearized)=" << PixelText(lit)
-            << " expected=" << PixelText(expected)
-            << " rejected=" << PixelText(rejected)
-            << " toExpected=" << toExpected
-            << " toRejected=" << toRejected
-            << " cfg=[" << DescribeColormapConfig("surface", cfg, expectedColormapId) << "]";
+            << " pixel(linearized)=" << PixelText(lit) << " expected=" << PixelText(expected)
+            << " rejected=" << PixelText(rejected) << " toExpected=" << toExpected
+            << " toRejected=" << toRejected << " cfg=["
+            << DescribeColormapConfig("surface", cfg, expectedColormapId) << "]";
     };
 
     // raw t = 0.4, binned t = 0.5: must stay Viridis, not a false contour.
@@ -3305,15 +3367,16 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldSurfaceAndIso
 // live EditorCommandHistory path) to the ReferenceTriangle on a mid-run frame
 // — i.e. after that frame's fixed-step bundle already ran — and exits after a
 // bounded number of frames so the readback captures post-edit pixels.
-class EditTriangleViaInspectorApp final : public IApplication
+class EditTriangleViaInspectorApp final : public Intrinsic::Tests::RuntimeTestModule
 {
 public:
-    void OnInitialize(Engine&) override {}
+    void Resolve() override {}
 
-    void OnSimTick(Engine&, double) override {}
+    void Simulate(double) override {}
 
-    void OnVariableTick(Engine& engine, double, double) override
+    void Frame(double, double) override
     {
+        auto& engine = Kernel();
         ++m_Frames;
         if (m_Frames == kBug024EditFrame)
         {
@@ -3344,7 +3407,7 @@ public:
         }
     }
 
-    void OnShutdown(Engine&) override {}
+    void Shutdown() override {}
 
     Extrinsic::Runtime::SandboxEditorCommandStatus EditStatus{
         Extrinsic::Runtime::SandboxEditorCommandStatus::NoChange};
@@ -3383,7 +3446,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, InspectorTransformEditShiftsReferenceTria
     if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style "
+                        "smoke readback.";
     }
 
     const std::uint64_t readbackSize =
@@ -3410,14 +3474,16 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, InspectorTransformEditShiftsReferenceTria
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan for the BUG-024B edit smoke: status="
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach "
+                         "operational Vulkan for the BUG-024B edit smoke: status="
                       << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
                       << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
         return;
     }
 
     ASSERT_EQ(appPtr->EditStatus, Extrinsic::Runtime::SandboxEditorCommandStatus::Applied)
-        << "Inspector transform-edit command did not apply during the bounded run.";
+        << "Inspector transform-edit command did not apply during the bounded "
+           "run.";
 
     // The CPU-side contract from BUG-024 must hold on the live engine: the
     // edited local position reached the world matrix and the dirty tags were
@@ -3471,23 +3537,23 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, InspectorTransformEditShiftsReferenceTria
 
     // The frame center returned to the background after the edit.
     EXPECT_LT(RgbDistance(center, backgroundBottom), 48)
-        << "Frame center did not return to the background after the inspector edit. center="
+        << "Frame center did not return to the background after the inspector "
+           "edit. center="
         << pixelText(center) << " backgroundBottom=" << pixelText(backgroundBottom)
-        << " backgroundCorner=" << pixelText(backgroundCorner)
-        << " shifted=" << pixelText(shifted) << " at (" << shiftX << "," << shiftY << ")"
+        << " backgroundCorner=" << pixelText(backgroundCorner) << " shifted=" << pixelText(shifted)
+        << " at (" << shiftX << "," << shiftY << ")"
         << " extent=" << extent.Width << "x" << extent.Height;
 
     // The shifted sample location contains the triangle.
     const int shiftedToBackground = std::min(RgbDistance(shifted, backgroundBottom),
                                              RgbDistance(shifted, backgroundCorner));
     EXPECT_GT(shiftedToBackground, 48)
-        << "The rendered triangle did not appear at the shifted location after the inspector edit. "
+        << "The rendered triangle did not appear at the shifted location after "
+           "the inspector edit. "
         << "shifted=" << pixelText(shifted) << " at (" << shiftX << "," << shiftY << ")"
-        << " center=" << pixelText(center)
-        << " backgroundBottom=" << pixelText(backgroundBottom)
-        << " backgroundCorner=" << pixelText(backgroundCorner)
-        << " extent=" << extent.Width << "x" << extent.Height
-        << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        << " center=" << pixelText(center) << " backgroundBottom=" << pixelText(backgroundBottom)
+        << " backgroundCorner=" << pixelText(backgroundCorner) << " extent=" << extent.Width << "x"
+        << extent.Height << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);
@@ -3570,7 +3636,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedOffOriginObjTriangleAutoFramesAtC
     if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style "
+                        "smoke readback.";
     }
 
     const std::uint64_t readbackSize =
@@ -3597,7 +3664,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedOffOriginObjTriangleAutoFramesAtC
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan for imported OBJ readback: status="
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach "
+                         "operational Vulkan for imported OBJ readback: status="
                       << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
                       << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
         return;
@@ -3620,7 +3688,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedOffOriginObjTriangleAutoFramesAtC
     EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(run.Stats);
     EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
-        << "Sandbox imported OBJ readback triplet did not record on an operational frame.";
+        << "Sandbox imported OBJ readback triplet did not record on an "
+           "operational frame.";
 
     std::vector<std::uint8_t> bytes(static_cast<std::size_t>(readbackSize), 0u);
     device.ReadBuffer(readbackBuffer, bytes.data(), readbackSize, 0u);
@@ -3651,13 +3720,11 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedOffOriginObjTriangleAutoFramesAtC
     }
 
     EXPECT_GT(nearestBackgroundDistance, 48)
-        << "The imported OBJ triangle did not contribute a distinguishable center pixel. "
-        << "center=(" << static_cast<int>(center.R) << ","
-        << static_cast<int>(center.G) << ","
-        << static_cast<int>(center.B) << ","
-        << static_cast<int>(center.A) << ") "
-        << "background samples=("
-        << static_cast<int>(backgroundSamples[0].R) << ","
+        << "The imported OBJ triangle did not contribute a distinguishable "
+           "center pixel. "
+        << "center=(" << static_cast<int>(center.R) << "," << static_cast<int>(center.G) << ","
+        << static_cast<int>(center.B) << "," << static_cast<int>(center.A) << ") "
+        << "background samples=(" << static_cast<int>(backgroundSamples[0].R) << ","
         << static_cast<int>(backgroundSamples[0].G) << ","
         << static_cast<int>(backgroundSamples[0].B) << "),("
         << static_cast<int>(backgroundSamples[1].R) << ","
@@ -3671,10 +3738,9 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedOffOriginObjTriangleAutoFramesAtC
         << static_cast<int>(backgroundSamples[3].B) << ") "
         << "extent=" << extent.Width << "x" << extent.Height
         << " extraction candidates=" << ex.CandidateRenderableCount
-        << " mesh uploads=" << ex.MeshGeometryUploads
-        << " mesh reuse=" << ex.MeshGeometryReuseHits
-        << " nearest background distance=" << nearestBackgroundDistance
-        << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        << " mesh uploads=" << ex.MeshGeometryUploads << " mesh reuse=" << ex.MeshGeometryReuseHits
+        << " nearest background distance=" << nearestBackgroundDistance << " pass statuses=["
+        << BuildPassStatusSummary(run.Stats) << "]";
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);
@@ -3761,7 +3827,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
     if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style "
+                        "smoke readback.";
     }
 
     const std::uint64_t readbackSize =
@@ -3788,19 +3855,23 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "Generated-UV texture smoke did not reach operational Vulkan: status="
+        ADD_FAILURE() << "Generated-UV texture smoke did not reach operational "
+                         "Vulkan: status="
                       << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
                       << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
         return;
     }
 
     ASSERT_TRUE(appPtr->UploadRequested)
-        << "Generated texture upload was never requested after promoted Vulkan became operational.";
+        << "Generated texture upload was never requested after promoted Vulkan "
+           "became operational.";
     ASSERT_FALSE(appPtr->UploadError.has_value())
-        << "Generated texture upload failed after promoted Vulkan became operational: "
+        << "Generated texture upload failed after promoted Vulkan became "
+           "operational: "
         << static_cast<int>(*appPtr->UploadError);
     EXPECT_TRUE(appPtr->TextureReadyObserved)
-        << "Generated texture upload did not reach ready GPU residency within the bounded smoke run.";
+        << "Generated texture upload did not reach ready GPU residency within "
+           "the bounded smoke run.";
     EXPECT_FALSE(appPtr->TimedOut)
         << "Generated-UV texture smoke timed out after " << appPtr->Frames << " frames.";
 
@@ -3821,8 +3892,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
             std::abs(uv.x) > 1.0e-6f ||
             std::abs(uv.y) > 1.0e-6f;
     }
-    EXPECT_TRUE(sawNonZeroTexcoord)
-        << "ASSETIO-008 did not publish non-zero generated UVs for the imported OBJ.";
+    EXPECT_TRUE(sawNonZeroTexcoord) << "ASSETIO-008 did not publish non-zero "
+                                       "generated UVs for the imported OBJ.";
 
     EXPECT_EQ(RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine).GetState(*generatedTexture),
               Extrinsic::Graphics::GpuAssetState::Ready)
@@ -3832,19 +3903,22 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
     EXPECT_GE(ex.MeshGeometryUploads + ex.MeshGeometryReuseHits, 1u)
         << "Imported OBJ did not remain resident on the mesh extraction lane.";
     EXPECT_EQ(ex.MeshGeometryMissingTexcoords, 0u)
-        << "Mesh extraction fell back to default zero UVs instead of ASSETIO-008 generated UVs.";
+        << "Mesh extraction fell back to default zero UVs instead of ASSETIO-008 "
+           "generated UVs.";
     EXPECT_EQ(ex.MeshGeometryNonFiniteTexcoords, 0u);
     EXPECT_GE(ex.ProgressivePresentationEntityCount, 1u);
     EXPECT_GE(ex.ProgressiveReadyTextureSlotCount, 1u);
     EXPECT_GE(ex.ProgressiveMaterialTextureBindingResolveCount, 1u)
-        << "Generated texture slot did not resolve through the material texture binding path.";
+        << "Generated texture slot did not resolve through the material texture "
+           "binding path.";
     EXPECT_EQ(ex.ProgressiveMaterialTextureBindingResolveFailureCount, 0u);
 
     const auto materialDiagnostics =
         renderer.GetMaterialSystem().GetDiagnostics();
     EXPECT_GE(materialDiagnostics.TextureAssetResolveCount, 1u);
     EXPECT_EQ(materialDiagnostics.TextureAssetFallbackResolveCount, 0u)
-        << "Generated texture binding resolved through fallback instead of the uploaded texture.";
+        << "Generated texture binding resolved through fallback instead of the "
+           "uploaded texture.";
 
     EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
     EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
@@ -3853,7 +3927,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
     EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(run.Stats);
     EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
-        << "Generated-UV texture smoke did not record a backbuffer readback copy.";
+        << "Generated-UV texture smoke did not record a backbuffer readback "
+           "copy.";
 
     std::vector<std::uint8_t> bytes(static_cast<std::size_t>(readbackSize), 0u);
     device.ReadBuffer(readbackBuffer, bytes.data(), readbackSize, 0u);
@@ -3872,19 +3947,19 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
     const int green = static_cast<int>(foreground.Pixel.G);
 
     EXPECT_GE(foreground.BackgroundDistance, 48)
-        << "Imported OBJ did not contribute a distinguishable center-region pixel. "
-        << "background=" << PixelText(background)
-        << " foreground=" << PixelText(foreground.Pixel)
+        << "Imported OBJ did not contribute a distinguishable center-region "
+           "pixel. "
+        << "background=" << PixelText(background) << " foreground=" << PixelText(foreground.Pixel)
         << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
     EXPECT_GT(redBlue, green * 2 + 48)
-        << "Imported OBJ center-region pixel is not magenta-hued; generated albedo texture "
-        << "was not sampled through the material path. foreground="
-        << PixelText(foreground.Pixel)
+        << "Imported OBJ center-region pixel is not magenta-hued; generated "
+           "albedo texture "
+        << "was not sampled through the material path. foreground=" << PixelText(foreground.Pixel)
         << " background=" << PixelText(background);
-    EXPECT_GT(redBlue, 80)
-        << "Imported OBJ sampled the generated texture's zero-UV texel or no texture at all. "
-        << "foreground=" << PixelText(foreground.Pixel)
-        << " background=" << PixelText(background);
+    EXPECT_GT(redBlue, 80) << "Imported OBJ sampled the generated texture's "
+                              "zero-UV texel or no texture at all. "
+                           << "foreground=" << PixelText(foreground.Pixel)
+                           << " background=" << PixelText(background);
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);
@@ -3898,7 +3973,7 @@ namespace
 constexpr std::uint32_t kBug026MaxFrames = 24u;
 constexpr float kBug026PlaneTolerance = 0.05f;
 
-class ClickPickRoundTripApp final : public IApplication
+class ClickPickRoundTripApp final : public Intrinsic::Tests::RuntimeTestModule
 {
 public:
     void SetTarget(
@@ -3914,18 +3989,20 @@ public:
         m_PostBackgroundSettleFrames = postBackgroundSettleFrames;
     }
 
-    void OnInitialize(Engine& engine) override
+    void Resolve() override
     {
+        auto& engine = Kernel();
         if (m_Triangle == Extrinsic::ECS::InvalidEntityHandle)
         {
             m_Triangle = FindEntityByName(*engine.Worlds().Get(engine.ActiveWorld()), "ReferenceTriangle");
         }
     }
 
-    void OnSimTick(Engine&, double) override {}
+    void Simulate(double) override {}
 
-    void OnVariableTick(Engine& engine, double, double) override
+    void Frame(double, double) override
     {
+        auto& engine = Kernel();
         ++m_Frames;
         if (m_Triangle == Extrinsic::ECS::InvalidEntityHandle ||
             !engine.Worlds().Get(engine.ActiveWorld())->IsValid(m_Triangle))
@@ -4022,7 +4099,7 @@ public:
         }
     }
 
-    void OnShutdown(Engine&) override {}
+    void Shutdown() override {}
 
     bool TriangleClickSubmitted{false};
     bool TriangleHitObserved{false};
@@ -4148,7 +4225,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ClickPickReadbackSelectsReferenceTriangle
     if (!run.DeviceOperational)
     {
         engine.Shutdown();
-        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan for the BUG-026B click-pick smoke: status="
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan "
+                         "for the BUG-026B click-pick smoke: status="
                       << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
                       << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
         return;
@@ -4156,15 +4234,21 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ClickPickReadbackSelectsReferenceTriangle
 
     ASSERT_TRUE(appPtr->FailureReason.empty()) << appPtr->FailureReason;
     ASSERT_TRUE(appPtr->TriangleClickSubmitted)
-        << "The click-pick smoke never submitted its center-pixel triangle click.";
+        << "The click-pick smoke never submitted its center-pixel triangle "
+           "click.";
     ASSERT_TRUE(appPtr->TriangleHitObserved)
-        << "The Vulkan pick readback did not select ReferenceTriangle before timeout. "
-        << "triangle pixel=(" << appPtr->TrianglePixel.first << "," << appPtr->TrianglePixel.second << ") "
-        << "background pixel=(" << appPtr->BackgroundPixel.first << "," << appPtr->BackgroundPixel.second << ")";
+        << "The Vulkan pick readback did not select ReferenceTriangle before "
+           "timeout. "
+        << "triangle pixel=(" << appPtr->TrianglePixel.first << "," << appPtr->TrianglePixel.second
+        << ") "
+        << "background pixel=(" << appPtr->BackgroundPixel.first << ","
+        << appPtr->BackgroundPixel.second << ")";
     ASSERT_TRUE(appPtr->TriangleHitResult.has_value())
-        << "The triangle click selected the entity but did not publish a refined primitive.";
+        << "The triangle click selected the entity but did not publish a refined "
+           "primitive.";
     ASSERT_TRUE(appPtr->BackgroundClickSubmitted)
-        << "The smoke observed the triangle hit but never submitted its background click.";
+        << "The smoke observed the triangle hit but never submitted its "
+           "background click.";
     ASSERT_TRUE(appPtr->BackgroundNoHitObserved)
         << "The background pick did not publish a no-hit clear before timeout.";
 
@@ -4425,8 +4509,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedModelSceneIsVisibleAndClickPickab
             Extrinsic::Runtime::SelectionController::ToStableEntityId(
                 targetInstance),
             Extrinsic::RHI::GpuRender_Surface);
-    EXPECT_TRUE(targetGpu.Found)
-        << "The imported target instance did not reach the visible GPU surface lane.";
+    EXPECT_TRUE(targetGpu.Found) << "The imported target instance did not reach "
+                                    "the visible GPU surface lane.";
 
     std::vector<std::uint8_t> bytes(
         static_cast<std::size_t>(readbackSize),
@@ -4489,7 +4573,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, HierarchySelectionKeepsDefaultSandboxVisi
     if (bytesPerPixel < 4u || extent.Width == 0u || extent.Height == 0u)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style "
+                        "smoke readback.";
     }
 
     const std::uint64_t readbackSize =
@@ -4516,7 +4601,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, HierarchySelectionKeepsDefaultSandboxVisi
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan with hierarchy selection: status="
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach "
+                         "operational Vulkan with hierarchy selection: status="
                       << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
                       << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
         return;
@@ -4531,7 +4617,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, HierarchySelectionKeepsDefaultSandboxVisi
     EXPECT_EQ(FindPassStatus(run.Stats, "SelectionOutlinePass"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(run.Stats);
     EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
-        << "Sandbox hierarchy-selection readback triplet did not record on any operational frame.";
+        << "Sandbox hierarchy-selection readback triplet did not record on any "
+           "operational frame.";
 
     const std::uint64_t nonBlackPixels =
         CountNonBlackRgbPixels(device, readbackBuffer, readbackSize, bytesPerPixel);
@@ -4555,12 +4642,13 @@ constexpr std::uint32_t kRuntime129BakeExtent = 64u;
 constexpr std::uint32_t kRuntime129PixelBytes = 4u;
 constexpr std::uint32_t kRuntime129MaxFrames = 72u;
 
-class Runtime129ObjectSpaceNormalBakeApp final : public IApplication
+class Runtime129ObjectSpaceNormalBakeApp final : public Intrinsic::Tests::RuntimeTestModule
 {
 public:
-    void OnInitialize(Engine& engine) override
+    void Resolve() override
     {
-        m_Device = &engine.GetDevice();
+        auto& engine = Kernel();
+        m_Device     = &engine.GetDevice();
         m_Renderer = &engine.GetRenderer();
         m_Cache =
             engine.Services().Find<Extrinsic::Graphics::GpuAssetCache>();
@@ -4574,39 +4662,26 @@ public:
             m_Extraction == nullptr ||
             m_Scene == nullptr)
         {
-            Fail(
-                "Sandbox composition did not publish the services required by the RUNTIME-129 smoke.");
+            Fail("Sandbox composition did not publish the services required by the "
+                 "RUNTIME-129 smoke.");
             return;
         }
 
-        m_Participant = engine.Jobs().RegisterGpuQueueParticipant(
-            RT::GpuQueueParticipantDesc{
-                .DebugName =
-                    "RuntimeSandboxAcceptanceGpuSmoke.ObjectSpaceNormalBakeReadback",
-                .Scope = engine.ActiveWorld(),
-                .RecordFrameCommands =
-                    [this](Extrinsic::RHI::ICommandContext& commandContext)
-                    {
-                        RecordReadback(commandContext);
-                    },
-                .DrainCompletedTransfers =
-                    [this]
-                    {
-                        if (ReadbackRecorded)
-                            MaintenanceDrainObserved = true;
-                    },
-                .HasInFlightWork =
-                    [this]
-                    {
-                        return m_Configured &&
-                               m_ReadbackBuffer.IsValid();
-                    },
-                .ShutdownAfterDeviceIdle =
-                    [this]
-                    {
-                        DeviceIdleObserved = true;
-                    },
-            });
+        m_Participant = engine.Jobs().RegisterGpuQueueParticipant(RT::GpuQueueParticipantDesc{
+            .DebugName           = "RuntimeSandboxAcceptanceGpuSmoke."
+                                   "ObjectSpaceNormalBakeReadback",
+            .Scope               = engine.ActiveWorld(),
+            .RecordFrameCommands = [this](Extrinsic::RHI::ICommandContext& commandContext)
+            { RecordReadback(commandContext); },
+            .DrainCompletedTransfers =
+                [this]
+            {
+                if (ReadbackRecorded)
+                    MaintenanceDrainObserved = true;
+            },
+            .HasInFlightWork = [this] { return m_Configured && m_ReadbackBuffer.IsValid(); },
+            .ShutdownAfterDeviceIdle = [this] { DeviceIdleObserved = true; },
+        });
         if (!m_Participant.IsValid())
         {
             Fail(
@@ -4614,10 +4689,11 @@ public:
         }
     }
 
-    void OnSimTick(Engine&, double) override {}
+    void Simulate(double) override {}
 
-    void OnVariableTick(Engine& engine, double, double) override
+    void Frame(double, double) override
     {
+        auto& engine = Kernel();
         ++Frames;
         if (ReadbackRecorded || !FailureReason.empty())
         {
@@ -4632,10 +4708,7 @@ public:
         }
     }
 
-    void OnShutdown(Engine&) override
-    {
-        m_Participant = {};
-    }
+    void Shutdown() override { m_Participant = {}; }
 
     void ConfigureTarget(
         const EntityHandle entity,
@@ -4713,14 +4786,14 @@ private:
 
         if (m_Device == nullptr || !m_Device->IsOperational())
         {
-            Fail(
-                "Promoted Vulkan became non-operational before the RUNTIME-129 readback.");
+            Fail("Promoted Vulkan became non-operational before the RUNTIME-129 "
+                 "readback.");
             return;
         }
         if (m_Scene == nullptr || !m_Scene->IsValid(m_Target))
         {
-            Fail(
-                "Imported target entity became stale before the RUNTIME-129 readback.");
+            Fail("Imported target entity became stale before the RUNTIME-129 "
+                 "readback.");
             return;
         }
 
@@ -4740,8 +4813,8 @@ private:
                 ObjectSpaceNormal;
         if (!ObjectSpaceBindingObserved)
         {
-            Fail(
-                "Generated normal texture bound without object-space normal metadata.");
+            Fail("Generated normal texture bound without object-space normal "
+                 "metadata.");
             return;
         }
 
@@ -4752,8 +4825,8 @@ private:
             bindings->Emissive == m_ExpectedBindings.Emissive;
         if (!PreservedMaterialObserved)
         {
-            Fail(
-                "Exact-ready normal binding replaced an unrelated material texture slot.");
+            Fail("Exact-ready normal binding replaced an unrelated material texture "
+                 "slot.");
             return;
         }
 
@@ -4761,8 +4834,8 @@ private:
         if (m_Cache->GetState(m_GeneratedNormalTexture) !=
             Extrinsic::Graphics::GpuAssetState::Ready)
         {
-            Fail(
-                "Material referenced a generated normal whose cache state was not Ready.");
+            Fail("Material referenced a generated normal whose cache state was not "
+                 "Ready.");
             return;
         }
 
@@ -4774,8 +4847,8 @@ private:
             !readyView->Texture.IsValid() ||
             readyView->Generation == 0u)
         {
-            Fail(
-                "Ready generated normal did not expose an exact nonzero texture generation.");
+            Fail("Ready generated normal did not expose an exact nonzero texture "
+                 "generation.");
             return;
         }
 
@@ -4794,8 +4867,8 @@ private:
                 Extrinsic::RHI::Format::RGBA8_UNORM ||
             !hasTransferSourceUsage)
         {
-            Fail(
-                "Generated normal texture did not expose the production 64x64 RGBA8 TransferSrc contract.");
+            Fail("Generated normal texture did not expose the production 64x64 RGBA8 "
+                 "TransferSrc contract.");
             return;
         }
 
@@ -4806,8 +4879,8 @@ private:
             !renderable->HasRenderable ||
             !renderable->Surface.HasGeometry)
         {
-            Fail(
-                "Imported target had no live GPU surface when its normal bake became ready.");
+            Fail("Imported target had no live GPU surface when its normal bake "
+                 "became ready.");
             return;
         }
 
@@ -4816,15 +4889,15 @@ private:
                 renderable->Surface.Geometry,
                 residency))
         {
-            Fail(
-                "Imported target surface lost its live GpuGeometryResidencyView before readback.");
+            Fail("Imported target surface lost its live GpuGeometryResidencyView "
+                 "before readback.");
             return;
         }
         m_SurfaceFirstIndex = residency.Record.SurfaceFirstIndex;
         if (m_SurfaceFirstIndex == 0u)
         {
-            Fail(
-                "Target normal bake did not retain a nonzero shared-index-buffer slice.");
+            Fail("Target normal bake did not retain a nonzero shared-index-buffer "
+                 "slice.");
             return;
         }
 
@@ -5109,7 +5182,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
             engine.GetRenderer(),
             decoyStableId);
     ASSERT_TRUE(decoyResidencyBeforeTarget.has_value())
-        << "The decoy must own a live shared-index slice before the target entity exists.";
+        << "The decoy must own a live shared-index slice before the target "
+           "entity exists.";
 
     auto targetImport = importPipeline.ImportAssetFromPath(
         RT::RuntimeAssetImportRequest{
@@ -5198,8 +5272,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
     if (!readbackBuffer.IsValid())
     {
         engine.Shutdown();
-        ADD_FAILURE()
-            << "Operational Vulkan device failed to allocate the RUNTIME-129 readback buffer.";
+        ADD_FAILURE() << "Operational Vulkan device failed to allocate the "
+                         "RUNTIME-129 readback buffer.";
         return;
     }
 
@@ -5336,10 +5410,10 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
     EXPECT_EQ(
         targetResidency->Record.SurfaceFirstIndex,
         targetFirstIndex);
-    EXPECT_LT(
-        decoyResidencyBeforeTarget->Record.SurfaceFirstIndex,
-        targetResidency->Record.SurfaceFirstIndex)
-        << "The decoy's pre-target allocation must occupy an earlier shared-index slice than the target.";
+    EXPECT_LT(decoyResidencyBeforeTarget->Record.SurfaceFirstIndex,
+              targetResidency->Record.SurfaceFirstIndex)
+        << "The decoy's pre-target allocation must occupy an earlier "
+           "shared-index slice than the target.";
 
     ASSERT_TRUE(targetBakeMesh.Succeeded())
         << targetBakeMesh.Diagnostic;
@@ -5529,10 +5603,9 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
     ASSERT_TRUE(gutterTexel.has_value())
         << "No GPU-covered texel existed outside the live CPU raster footprint.";
     ASSERT_TRUE(farTexel.has_value());
-    EXPECT_EQ(
-        gutterTexel->Distance,
-        bakeOptions.PaddingTexels)
-        << "The selected dilation witness did not reach the requested four-texel gutter.";
+    EXPECT_EQ(gutterTexel->Distance, bakeOptions.PaddingTexels)
+        << "The selected dilation witness did not reach the requested four-texel "
+           "gutter.";
 
     const RgbaPixel covered =
         readAt(coveredTexel->X, coveredTexel->Y);
@@ -5547,11 +5620,10 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         gutter,
         "dilated gutter");
     EXPECT_LE(farUncovered.A, 4u)
-        << "Far uncovered texel gained coverage outside the four-texel padding gutter: "
-        << "coordinate=(" << farTexel->X << ","
-        << farTexel->Y << ") distance="
-        << farTexel->Distance << " pixel="
-        << PixelText(farUncovered);
+        << "Far uncovered texel gained coverage outside the four-texel padding "
+           "gutter: "
+        << "coordinate=(" << farTexel->X << "," << farTexel->Y
+        << ") distance=" << farTexel->Distance << " pixel=" << PixelText(farUncovered);
 }
 
 // --- RUNTIME-190: generalized GPU property-texture baking --------------
@@ -5624,12 +5696,13 @@ FindRuntime190Record(
     return found != snapshot.Textures.end() ? &*found : nullptr;
 }
 
-class Runtime190PropertyTextureBakeApp final : public IApplication
+class Runtime190PropertyTextureBakeApp final : public Intrinsic::Tests::RuntimeTestModule
 {
 public:
-    void OnInitialize(Engine& engine) override
+    void Resolve() override
     {
-        m_Device = &engine.GetDevice();
+        auto& engine = Kernel();
+        m_Device     = &engine.GetDevice();
         m_Renderer = &engine.GetRenderer();
         m_Cache = engine.Services().Find<
             Extrinsic::Graphics::GpuAssetCache>();
@@ -5650,8 +5723,8 @@ public:
             m_History == nullptr ||
             m_Scene == nullptr)
         {
-            Fail(
-                "Sandbox composition did not publish the services required by the RUNTIME-190 smoke.");
+            Fail("Sandbox composition did not publish the services required by the "
+                 "RUNTIME-190 smoke.");
             return;
         }
 
@@ -5689,10 +5762,11 @@ public:
             Fail("JobService rejected the RUNTIME-190 readback participant.");
     }
 
-    void OnSimTick(Engine&, double) override {}
+    void Simulate(double) override {}
 
-    void OnVariableTick(Engine& engine, double, double) override
+    void Frame(double, double) override
     {
+        auto& engine = Kernel();
         ++Frames;
         if (!FailureReason.empty())
         {
@@ -5793,10 +5867,7 @@ public:
         }
     }
 
-    void OnShutdown(Engine&) override
-    {
-        m_Participant = {};
-    }
+    void Shutdown() override { m_Participant = {}; }
 
     void Configure(
         const EntityHandle target,
@@ -5989,11 +6060,10 @@ private:
             !faceResult.Succeeded() || !faceResult.Scheduled ||
             !edgeResult.Succeeded() || !edgeResult.Scheduled)
         {
-            Fail(
-                "The shared Sandbox texture-bake command did not schedule all vertex/face/edge requests: vertex=" +
-                vertexResult.Diagnostic + " face=" +
-                faceResult.Diagnostic + " edge=" +
-                edgeResult.Diagnostic);
+            Fail("The shared Sandbox texture-bake command did not schedule all "
+                 "vertex/face/edge requests: vertex=" +
+                 vertexResult.Diagnostic + " face=" + faceResult.Diagnostic +
+                 " edge=" + edgeResult.Diagnostic);
             return false;
         }
         VertexAsset = vertexResult.GeneratedTexture;
@@ -6103,8 +6173,8 @@ private:
         if (!InfernoBindingObserved ||
             !ColormapChangedWithoutRebake)
         {
-            Fail(
-                "Changing the raw scalar colormap changed texture identity/generation or failed to update the material binding.");
+            Fail("Changing the raw scalar colormap changed texture "
+                 "identity/generation or failed to update the material binding.");
             return false;
         }
 
@@ -6214,8 +6284,8 @@ private:
         if (!AssetsDestroyedObserved ||
             !PropertyBufferFallbackObserved)
         {
-            Fail(
-                "Removing generated textures did not destroy assets and restore property-buffer consumers.");
+            Fail("Removing generated textures did not destroy assets and restore "
+                 "property-buffer consumers.");
             return false;
         }
         return true;
@@ -6480,8 +6550,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         backbufferExtent.Height == 0u)
     {
         engine.Shutdown();
-        GTEST_SKIP()
-            << "Backbuffer format or extent cannot support the RUNTIME-190 color-map readback.";
+        GTEST_SKIP() << "Backbuffer format or extent cannot support the "
+                        "RUNTIME-190 color-map readback.";
     }
 
     const std::uint64_t bakeReadbackSize =
@@ -6733,9 +6803,9 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         << "Tone-mapped Inferno frame center=" << PixelText(infernoPixel)
         << " source LUT=" << PixelText(expectedInferno);
     EXPECT_GT(RgbDistance(viridisPixel, infernoPixel), 24)
-        << "Render-time colormap edit did not visibly change the raw scalar texture: Viridis="
-        << PixelText(viridisPixel)
-        << " Inferno=" << PixelText(infernoPixel);
+        << "Render-time colormap edit did not visibly change the raw scalar "
+           "texture: Viridis="
+        << PixelText(viridisPixel) << " Inferno=" << PixelText(infernoPixel);
 
     EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
         << "Vulkan fallback counters changed across RUNTIME-190: fallbackToNull "

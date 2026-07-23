@@ -13,6 +13,8 @@
 #include <entt/entity/entity.hpp>
 #include <glm/glm.hpp>
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Asset.GeometryIOBridge;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
@@ -163,22 +165,24 @@ namespace
         return payload;
     }
 
-    class EngineWorldProbeApplication final : public Runtime::IApplication
+    class EngineWorldProbeApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine& engine) override
+        void Resolve() override
         {
-            InitActive = engine.ActiveWorld();
+            auto& engine      = Kernel();
+            InitActive        = engine.ActiveWorld();
             InitScene = &*engine.Worlds().Get(engine.ActiveWorld());
             InitRegistryScene = engine.Worlds().Get(InitActive);
             CreatedWorld = engine.Worlds().CreateWorld("secondary");
             RequestResult = engine.Worlds().RequestSetActiveWorld(CreatedWorld);
         }
 
-        void OnSimTick(Runtime::Engine&, double) override {}
+        void Simulate(double) override {}
 
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++VariableTicks;
             if (VariableTicks == 1u)
             {
@@ -199,7 +203,7 @@ namespace
             engine.RequestExit();
         }
 
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
         Runtime::WorldHandle InitActive{};
         Runtime::WorldHandle CreatedWorld{};
@@ -215,22 +219,23 @@ namespace
         std::uint32_t VariableTicks{0};
     };
 
-    class EngineSceneBorrowerRebindApplication final
-        : public Runtime::IApplication
+    class EngineSceneBorrowerRebindApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine& engine) override
+        void Resolve() override
         {
-            FirstWorld = engine.ActiveWorld();
+            auto& engine = Kernel();
+            FirstWorld   = engine.ActiveWorld();
             SecondWorld = engine.Worlds().CreateWorld("scene-borrower-target");
             SwitchRequested =
                 engine.Worlds().RequestSetActiveWorld(SecondWorld).has_value();
         }
 
-        void OnSimTick(Runtime::Engine&, double) override {}
+        void Simulate(double) override {}
 
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++VariableTicks;
             if (VariableTicks == 2u)
             {
@@ -292,7 +297,7 @@ namespace
             }
         }
 
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
         Runtime::WorldHandle FirstWorld{};
         Runtime::WorldHandle SecondWorld{};
@@ -488,7 +493,7 @@ TEST(RuntimeWorldRegistry, EngineBootsFrameZeroWorldAndAppliesSwitchAtMaintenanc
     auto app = std::make_unique<EngineWorldProbeApplication>();
     EngineWorldProbeApplication* appPtr = app.get();
 
-    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(app));
     engine.Initialize();
 
     ASSERT_TRUE(appPtr->InitActive.IsValid());
@@ -516,7 +521,7 @@ TEST(RuntimeWorldRegistry, EngineRebindsSceneBorrowersBeforeRetiringPreviousWorl
     auto app = std::make_unique<EngineSceneBorrowerRebindApplication>();
     EngineSceneBorrowerRebindApplication* appPtr = app.get();
 
-    Runtime::Engine engine(NullWindowHeadlessConfig(), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(app));
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     engine.Initialize();

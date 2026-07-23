@@ -11,6 +11,8 @@
 
 #include "OperationalCounterStability.hpp"
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
@@ -34,7 +36,6 @@ using Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot;
 using Extrinsic::Backends::Vulkan::ToString;
 using Extrinsic::Graphics::RenderCommandPassStatus;
 using Extrinsic::Runtime::Engine;
-using Extrinsic::Runtime::IApplication;
 
 inline constexpr std::uint32_t kReadbackWidth = 256u;
 inline constexpr std::uint32_t kReadbackHeight = 256u;
@@ -56,7 +57,7 @@ struct CpuFontAtlasProbe
 
 CpuFontAtlasProbe g_LastCpuFontAtlasProbe{};
 
-class ExitAfterFramesApp final : public IApplication
+class ExitAfterFramesApp final : public Intrinsic::Tests::RuntimeTestModule
 {
 public:
     explicit ExitAfterFramesApp(const std::uint32_t targetFrames) noexcept
@@ -64,11 +65,12 @@ public:
     {
     }
 
-    void OnInitialize(Engine&) override {}
-    void OnSimTick(Engine&, double) override {}
+    void Resolve() override {}
+    void Simulate(double) override {}
 
-    void OnVariableTick(Engine& engine, double, double) override
+    void Frame(double, double) override
     {
+        auto& engine = Kernel();
         ++m_Frames;
         if (m_Frames >= m_TargetFrames)
         {
@@ -76,7 +78,7 @@ public:
         }
     }
 
-    void OnShutdown(Engine&) override {}
+    void Shutdown() override {}
 
 private:
     std::uint32_t m_TargetFrames{1u};
@@ -108,9 +110,10 @@ struct ImGuiSmokeBootstrap
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
     {
         return ImGuiSmokeBootstrap{
-            .EnginePtr = nullptr,
-            .Skipped = true,
-            .SkipReason = "GLFW could not initialize in this environment; gpu;vulkan ImGui smoke is opt-in.",
+            .EnginePtr  = nullptr,
+            .Skipped    = true,
+            .SkipReason = "GLFW could not initialize in this environment; "
+                          "gpu;vulkan ImGui smoke is opt-in.",
         };
     }
 
@@ -122,8 +125,9 @@ struct ImGuiSmokeBootstrap
     config.Render.EnableValidation = false;
     config.Render.EnableVSync = false;
 
-    auto enginePtr = std::make_unique<Engine>(
-        config, std::make_unique<ExitAfterFramesApp>(targetFrames));
+    auto enginePtr = std::make_unique<Engine>(config);
+    Intrinsic::Tests::AddRuntimeTestModule(*enginePtr,
+                                           std::make_unique<ExitAfterFramesApp>(targetFrames));
     enginePtr->EmplaceModule<Extrinsic::Runtime::EditorUiModule>();
     enginePtr->Initialize();
     auto* const editorUi =
@@ -134,9 +138,10 @@ struct ImGuiSmokeBootstrap
     {
         enginePtr->Shutdown();
         return ImGuiSmokeBootstrap{
-            .EnginePtr = nullptr,
-            .Skipped = true,
-            .SkipReason = "Promoted Vulkan did not reach logical-device/swapchain/command-sync readiness on this host.",
+            .EnginePtr  = nullptr,
+            .Skipped    = true,
+            .SkipReason = "Promoted Vulkan did not reach "
+                          "logical-device/swapchain/command-sync readiness on this host.",
         };
     }
 
@@ -270,7 +275,8 @@ TEST(ImGuiSurfaceGpuSmoke, UserTextureImageRecordsOnOperationalVulkanCommandStre
         EXPECT_TRUE(
             bootstrap.EditorUi->UnregisterFrameContribution(contribution));
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during ImGui frame: status="
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during "
+                         "ImGui frame: status="
                       << ToString(status.Code) << " reason=" << ToString(status.Reason);
         return;
     }
@@ -292,8 +298,8 @@ TEST(ImGuiSurfaceGpuSmoke, UserTextureImageRecordsOnOperationalVulkanCommandStre
     EXPECT_TRUE(stats.Execute.DeviceOperational);
 
     const auto* pass = FindCommandPass(stats, "ImGuiPass");
-    ASSERT_NE(pass, nullptr)
-        << "Default recipe omitted ImGuiPass despite adapter-produced overlay work.";
+    ASSERT_NE(pass, nullptr) << "Default recipe omitted ImGuiPass despite "
+                                "adapter-produced overlay work.";
     EXPECT_EQ(pass->Status, RenderCommandPassStatus::Recorded)
         << "ImGuiPass did not record on the operational Vulkan command stream.";
 
@@ -337,7 +343,8 @@ TEST(ImGuiSurfaceGpuSmoke, LargeSelectedEntityPayloadRetainsAtlasOnOperationalVu
         EXPECT_TRUE(
             bootstrap.EditorUi->UnregisterFrameContribution(contribution));
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during large selected-entity ImGui frame: status="
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during "
+                         "large selected-entity ImGui frame: status="
                       << ToString(status.Code) << " reason=" << ToString(status.Reason);
         return;
     }
@@ -377,17 +384,19 @@ TEST(ImGuiSurfaceGpuSmoke, LargeSelectedEntityPayloadRetainsAtlasOnOperationalVu
     EXPECT_TRUE(stats.Execute.DeviceOperational);
 
     const auto* pass = FindCommandPass(stats, "ImGuiPass");
-    ASSERT_NE(pass, nullptr)
-        << "Default recipe omitted ImGuiPass despite large selected-entity overlay work.";
+    ASSERT_NE(pass, nullptr) << "Default recipe omitted ImGuiPass despite large "
+                                "selected-entity overlay work.";
     EXPECT_EQ(pass->Status, RenderCommandPassStatus::Recorded)
         << "ImGuiPass did not record the large selected-entity overlay payload.";
 
     EXPECT_TRUE(Counters::IsStable(before, after))
-        << "Vulkan fallback counters incremented across the large selected-entity ImGui frame: "
+        << "Vulkan fallback counters incremented across the large "
+           "selected-entity ImGui frame: "
         << "fallbackToNull " << before.FallbackToNull << " -> " << after.FallbackToNull
         << ", initFailure " << before.InitFailure << " -> " << after.InitFailure
         << ", validationError " << before.ValidationError << " -> " << after.ValidationError
-        << ", gateFailure " << before.OperationalGateFailure << " -> " << after.OperationalGateFailure;
+        << ", gateFailure " << before.OperationalGateFailure << " -> "
+        << after.OperationalGateFailure;
 
     EXPECT_TRUE(
         bootstrap.EditorUi->UnregisterFrameContribution(contribution));
@@ -428,7 +437,8 @@ TEST(ImGuiSurfaceGpuSmoke, DrawListPixelsReachBackbufferOnOperationalVulkan)
     if (!readbackBuffer.IsValid())
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan ImGui smoke is opt-in.";
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan ImGui smoke "
+                        "is opt-in.";
     }
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
 
@@ -488,7 +498,8 @@ TEST(ImGuiSurfaceGpuSmoke, DrawListPixelsReachBackbufferOnOperationalVulkan)
         EXPECT_TRUE(
             bootstrap.EditorUi->UnregisterFrameContribution(contribution));
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during ImGui visible-pixel frame: status="
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during "
+                         "ImGui visible-pixel frame: status="
                       << ToString(status.Code) << " reason=" << ToString(status.Reason);
         return;
     }
@@ -500,8 +511,8 @@ TEST(ImGuiSurfaceGpuSmoke, DrawListPixelsReachBackbufferOnOperationalVulkan)
     EXPECT_EQ(stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
         << "Visible ImGui pixel smoke requires one backbuffer readback copy.";
     const auto* pass = FindCommandPass(stats, "ImGuiPass");
-    ASSERT_NE(pass, nullptr)
-        << "Default recipe omitted ImGuiPass despite adapter-produced overlay work.";
+    ASSERT_NE(pass, nullptr) << "Default recipe omitted ImGuiPass despite "
+                                "adapter-produced overlay work.";
     EXPECT_EQ(pass->Status, RenderCommandPassStatus::Recorded)
         << "ImGuiPass did not record on the operational Vulkan command stream.";
 

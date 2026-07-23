@@ -8,6 +8,8 @@
 
 #include <gtest/gtest.h>
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Runtime.EditorUiModule;
@@ -22,16 +24,17 @@ namespace SandboxEditor = Extrinsic::Sandbox::Editor;
 
 namespace
 {
-    class OneFrameApplication final : public Runtime::IApplication
+    class OneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
     };
 
     [[nodiscard]] Core::Config::EngineConfig HeadlessConfig()
@@ -46,16 +49,15 @@ namespace
 
     struct EditorUiShellHarness
     {
-        Runtime::Engine Kernel{
-            HeadlessConfig(),
-            std::make_unique<OneFrameApplication>()};
+        Intrinsic::Tests::RuntimeTestKernel Kernel{HeadlessConfig(),
+                                                   std::make_unique<OneFrameApplication>()};
         SandboxEditor::EditorShell Shell{};
 
         EditorUiShellHarness()
         {
             Kernel.EmplaceModule<Runtime::EditorUiModule>();
             Kernel.Initialize();
-            Shell.Attach(Kernel);
+            Shell.Attach(Kernel.Worlds(), Kernel.Services());
         }
 
         ~EditorUiShellHarness()

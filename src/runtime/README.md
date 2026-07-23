@@ -24,7 +24,7 @@ startup/shutdown.
 | `Extrinsic.Runtime.SandboxConfigSections` | Presentation-free typed DTO, canonical JSON codec/validator, lookup/update helper, and registration-factory surface for the `sandbox.progressive_poisson` and `sandbox.parameterization` application sections. It owns the Sandbox field vocabulary while Core sees only generic records; `app/Sandbox` composes the registrations before boot. |
 | `Extrinsic.Runtime.InputActions` | Runtime-owned input-action registry from `RUNTIME-155`. Exports the action binding/handle/context/service/descriptor API plus `RuntimeInputActionRegistry`, which owns handle allocation, registration/unregistration state, key-edge trigger checks, ImGui keyboard-capture suppression, callback failure logging, and per-frame dispatch after the pre-render transform flush. Its generic service aggregate carries config, scene, and mutable render input; camera- and selection-aware actions capture their exact optional services when app policy registers them. `Runtime.Engine` re-exports the API for compatibility and delegates `RegisterInputAction(...)`, `UnregisterInputAction(...)`, and frame dispatch to the registry. |
 | `Extrinsic.Runtime.AsyncWorkModule` | App-composed global async-work owner from `RUNTIME-179`. Owns the persistent `StreamingExecutor` and `DerivedJobRegistry`, publishes both concrete capabilities plus the existing `Core::IStreamingFrameHooks` contract through `ServiceRegistry`, and drives completion/readback drain, count-limited main-thread apply, and background pumping in the canonical Maintenance order. It subscribes to `WorldWillBeDestroyed`, cancels generation-qualified queued/running/readback/apply work for that world, rejects later submissions to the retired handle, and relies on the executor's final pre-apply retirement check to suppress stale commits. Derived cancellation is terminal: a late success/error from a running worker and the apply path both preserve `Cancelled`. Shutdown joins executor work, applies readbacks already ready at the boundary, terminally cancels unresolved derived records, withdraws all three exact borrowed service entries, and only then destroys both owned services. Sandbox and tests that need async work compose the module explicitly; `Runtime.Engine` neither imports nor names it. |
-| `Extrinsic.Runtime.Engine` | Domain-free composition root and frame-loop owner. Its interface owns no asset/import/residency/bake, scene-document/history, scene-interaction, camera, async, config-control, editor-UI, reference-scene, selection, lookup, readback, gizmo, or mesh primitive-view capability. Optional owners publish exact services and contribute typed hooks through the module schedule. Before module registration Engine publishes the exact live `RHI::IDevice`, `Platform::IWindow`, `Graphics::IRenderer`, `RenderExtractionCache`, and `RuntimeInputActionRegistry` built-ins; reinitialization republishes fresh borrowed instances. Shutdown publishes and pumps the existing announcement after command discard and before application, GPU-participant, provider, renderer, or device teardown, then performs ordinary reverse module shutdown in the streaming phase. Render-extraction cache/pool/stats/frame-index ownership remains in the Engine-private `RenderExtractionService`; the local maintenance composite always advances its five geometry-retirement lanes and optionally invokes a published `Core::IAssetFrameHooks`. The exact post-`RUNTIME-183` surface is 22 plain imports / 0 domain imports / 2 re-exports / 10 public getter names. |
+| `Extrinsic.Runtime.Engine` | Domain-free composition root and frame-loop owner. Its interface owns no application callback object and no asset/import/residency/bake, scene-document/history, scene-interaction, camera, async, config-control, editor-UI, reference-scene, selection, lookup, readback, gizmo, or mesh primitive-view capability. Optional owners publish exact services and contribute typed hooks through the module schedule. Before module registration Engine publishes the exact live `RHI::IDevice`, `Platform::IWindow`, `Graphics::IRenderer`, `RenderExtractionCache`, and `RuntimeInputActionRegistry` built-ins; reinitialization republishes fresh borrowed instances. `BeginShutdown()` publishes and pumps the announcement after command discard, drains GPU participants, stops the loop, and waits for device idle while worlds/services remain live so concrete app state can detach. `Shutdown()` invokes that boundary when needed, then performs ordinary reverse module and subsystem teardown. Render-extraction cache/pool/stats/frame-index ownership remains in the Engine-private `RenderExtractionService`; the local maintenance composite always advances its five geometry-retirement lanes and optionally invokes a published `Core::IAssetFrameHooks`. The exact post-`RUNTIME-183` surface remains 22 plain imports / 0 domain imports / 2 re-exports / 10 public getter names. |
 | `Extrinsic.Runtime.FramePacingDiagnostics` | Runtime-owned frame-pacing diagnostics module from `RUNTIME-158`. Exports `RuntimeFramePacingDiagnostics` plus the pure helper that copies renderer `RenderGraphFrameStats` compile/execute timings into the current frame sample. `EditorUiModule` privately copies ImGui adapter timings/counters into the borrowed sample, so this generic module no longer imports the adapter. `Engine::RunFrame()` writes phase-boundary timings and publishes the last sample through `Engine::GetLastFramePacingDiagnostics()`. |
 | `Extrinsic.Runtime.SceneDocumentModule` | Optional app-composed document owner from `RUNTIME-172`. The concrete `final IRuntimeModule` publishes itself and its exact owned `EditorCommandHistory`, binds document path/event/sequence/history to one validated active `{WorldHandle, Scene::Registry*, binding epoch}`, and resets that complete durable state instead of retaining a per-world map. It preserves synchronous save/load/new/close without async; when `StreamingExecutor` is present it also queues snapshot saves and temporary-registry loads. Every completion captures weak operation state plus module generation, binding epoch, world, and registry identity and revalidates immediately before commit. New/load/close snapshot strong-handle participants in deterministic name/registration order, run every `BeforeReplace` callback while the outgoing registry is live, replace, run every `AfterReplace` callback against the rebound registry, then reset history. Parse failure invokes no participant and mutates no document state. Shutdown invalidates generation/epoch and cancels owned tasks before reverse module teardown; omission leaves Engine and the active world operational while document/history services are unavailable. |
 | `Extrinsic.Runtime.SceneInteractionModule` | Optional app-composed one-world interaction owner from `RUNTIME-188`. Its PImpl owns `SelectionController`, `StableEntityLookup` plus its scene binding, `SelectionReadbackState`, and `GizmoFrameService`; it publishes only the exact module and exact controller. Every input, `BeforeExtraction`, and `Maintenance` hook validates `{WorldHandle, Registry*, interaction epoch}` directly. The typed viewport hook runs after camera/capture, `BeforeExtraction` drains one pick and submits a copied world-tagged selection/hover/gizmo snapshot after input actions and transform flush, and `Maintenance` drains completed readbacks. A strong scene-document participant clears the complete cohort while the outgoing registry is live and rebuilds lookup on New/Load/Close; active-world mismatch, retirement, announcement, and recycled-handle reinitialize use the same reset. Pick sequences remain monotonic while zero, unknown, wrong-world, and wrong-epoch results fail closed. Announcement unregisters the document participant and detaches borrows before ordinary exact withdrawal. Omission leaves document, camera, generic input, component-driven primitive views, rendering, and Engine operational with empty interaction snapshots. |
@@ -59,7 +59,7 @@ startup/shutdown.
 | `Extrinsic.Runtime.EditorWindowRegistry` | Generic editor-window contribution contract from `UI-034`. Contributors register a stable id, display title, structured menu path, draw callback, initial open state, and optional open-state observer. Duplicate/invalid registrations fail closed; handles support unregister and visibility changes; callbacks may unregister themselves during dispatch. `DrawOpenWindows()` invokes only open windows and invokes none while global visibility is disabled. The data-only `EditorUiVisibilityCommand` (`Toggle`/`Show`/`Hide`) preserves each window's open state across global hide/show. |
 | `Extrinsic.Runtime.EditorPropertyWidgets` | Generic property-inspection model and draw wrapper from `UI-034`. `BuildEditorScalarPropertyPlotModel(...)` enumerates numeric scalar properties from a `Geometry::ConstPropertySet`, excludes vector properties, selects deterministically, copies finite values into a data-only plot model, and reports filtered non-finite samples plus the finite range. `DrawEditorScalarPropertyPlotWidget(...)` renders the selector, bin control, and histogram while keeping ImGui/ImPlot types private to the implementation unit. ImPlot 1.0 is manifest-managed and linked **PRIVATE** to runtime; its context is created, rebuilt, and destroyed with the existing ImGui adapter context. |
 | `Extrinsic.Runtime.EditorUiHost` | Engine-free editor capability published by `EditorUiModule`. It owns the existing `EditorWindowRegistry`, global visibility state, copied adapter diagnostics, and mutation-safe parameterless frame contributions; it stores no `Engine&`, adapter, overlay, or capture reference. Consumers register/unregister windows and contributions and may issue visibility commands. A move-only owner control is claimed exactly once before publication and is retained only by the module, so service consumers cannot invoke contributions out of bracket or forge operational/diagnostic state. |
-| `Extrinsic.Runtime.EditorUiModule` | Optional app-composed PImpl owner from `RUNTIME-182`. Fresh registration claims the host owner control, publishes the exact `EditorUiHost`, and registers `UiBegin`, `UiBuild`, and `UiEndCapture` hooks. Resolution requires only the exact live `Platform::IWindow`, `Graphics::IRenderer`, and `RuntimeInputActionRegistry` built-ins, then initializes one adapter/overlay and the unsuppressed global `G` visibility action. `UiBegin` opens the ImGui frame before `IApplication::OnVariableTick`, `UiBuild` invokes host contributions afterward, and `UiEndCapture` closes the adapter before copying capture plus ImGui pacing/diagnostics. Reverse shutdown unregisters the action, detaches the overlay while renderer/window remain live, withdraws the host, and destroys all boot state. Omission is fail-closed and leaves capture/pacing unclaimed. |
+| `Extrinsic.Runtime.EditorUiModule` | Optional app-composed PImpl owner from `RUNTIME-182`. Fresh registration claims the host owner control, publishes the exact `EditorUiHost`, and registers `UiBegin`, `UiBuild`, and `UiEndCapture` hooks. Resolution requires only the exact live `Platform::IWindow`, `Graphics::IRenderer`, and `RuntimeInputActionRegistry` built-ins, then initializes one adapter/overlay and the unsuppressed global `G` visibility action. `UiBegin` opens the ImGui frame, `UiBuild` invokes host contributions and any other deterministically ordered module hooks, and `UiEndCapture` closes the adapter before copying capture plus ImGui pacing/diagnostics. Reverse shutdown unregisters the action, detaches the overlay while renderer/window remain live, withdraws the host, and destroys all boot state. Omission is fail-closed and leaves capture/pacing unclaimed. |
 | `Extrinsic.Runtime.PhysicsBridge` | Runtime-owned ECS-to-physics bridge added by `PHYSICS-001`. Exports `PhysicsBridgeFixedStepConfig`, `PhysicsBridgeDiagnostics`, and `PhysicsBridge`, which owns an `Extrinsic.Physics.World`, a `StableId -> BodyHandle` sidecar, descriptor synchronization from ECS collider/rigid-body authoring, fixed-step accumulator stepping, and dynamic-body transform writeback with `Transform::IsDirtyTag` / `Transform::WorldUpdatedTag` stamping. The bridge keeps handles out of ECS, skips static/kinematic writeback with diagnostics, and deliberately does not route contact events until `PHYSICS-002` exposes contact records. |
 | `Extrinsic.Runtime.CameraControllers` | Runtime-owned camera controller behavior and exact published registry surface. Exports `CameraFocusTarget`, `ICameraController`, `OrbitCameraController`, `FlyCameraController`, `FreeLookCameraController`, `TopDownCameraController`, `CreateCameraController()`, `CameraControllerSlot`, and `CameraControllerRegistry`. `ICameraController::Focus(...)` performs one-shot centering/framing of imported or selected geometry without making UI own camera state. Controllers consume `Extrinsic.Platform.Input::Context`, use `Core::Extent2D` for viewport dimensions, and produce immutable `Graphics::CameraViewInput` for renderer extraction. `TopDownCameraController` seeds from the input view focus point, not the input position XZ, so the default reference triangle remains centered when starting in or switching to top-down mode. The registry is bound to exactly one valid `WorldHandle`: `ResetForWorld` always clears slots, poses, transitions, and seed even for equal handle bits; `SetWorldSeed` rejects invalid/unbound/wrong-world writes; an invalid reset is the shutdown state; and away/back never resurrects state. GRAPHICS-040A keeps the base `CameraViewInput` ABI stable; graphics-side temporal jitter is selected through `BuildTemporalCameraViewSnapshot(...)`, which accepts the rendered-frame index explicitly, while GRAPHICS-040C maps the renderer AA selector to TAA/external reconstruction without adding runtime camera authority. |
 | `Extrinsic.Runtime.CameraModule` | Optional app-composed camera owner from `RUNTIME-180`. On registration it binds the active world, publishes the exact `CameraControllerRegistry`, subscribes to `ActiveWorldChanged` and `WorldWillBeDestroyed`, and contributes one typed viewport-input hook. The hook rechecks the active handle before reading config or seed, lazily creates the configured main controller, suppresses motion while editor capture owns viewport input, writes the immutable camera view, and consumes the one-shot transition. Shutdown unsubscribes, withdraws the exact borrowed registry, and resets it invalid. Omitting the module publishes no service and produces no fallback camera, while generic input actions, import selection, editor non-camera behavior, and app-owned reference content remain operational. |
@@ -1018,9 +1018,10 @@ freshly-constructed subsystems):
    finalizes its already-published service. Other optional modules resolve
    their own declared services, and the complete schedule is validated and
    locked.
-7. `IApplication::OnInitialize`; Sandbox optionally bootstraps reference
-   content in the initial world exactly once, retains that owning handle for
-   teardown, and hands the population seed to the camera registry when present.
+7. The app root initializes its concrete state after `Engine::Initialize()`.
+   Sandbox initializes `SandboxSession`, optionally bootstraps reference content
+   in the initial world exactly once, retains that owning handle for teardown,
+   and hands the population seed to the camera registry when present.
 
 ## Canonical frame loop phases (`Engine::RunFrame`)
 
@@ -1042,12 +1043,12 @@ execution should request `Core::Config::WindowBackend::Null` explicitly.
 3. Kernel event pump A. `Engine::Events()` pumps once after the command drain
    so command-published events are visible before simulation; listener-published
    cascades defer to the next pump.
-4. Fixed-step simulation. Each substep calls `IApplication::OnSimTick`,
-   appends the promoted `TransformHierarchy` / `BoundsPropagation` /
-   `RenderSync` bundle, registers boot-finalized module systems, then runs
+4. Fixed-step simulation. Each substep appends the promoted
+   `TransformHierarchy` / `BoundsPropagation` / `RenderSync` bundle first,
+   registers boot-finalized module systems, then runs
    `Compile` → `Execute` → `ResetForReplay` on the CPU `FrameGraph`. Exact
    repeated descriptors reuse the compiled topology with current callbacks;
-   application/module shape changes rebuild transparently. Dirty world
+   module-system shape changes rebuild transparently. Dirty world
    matrices and bounds are recomputed before the next substep or render
    extraction (`RUNTIME-091`, `CORE-008`).
 5. Job completion gate. `Engine::Jobs()` drains finished worker results on the
@@ -1055,7 +1056,7 @@ execution should request `Core::Config::WindowBackend::Null` explicitly.
    completion events only for survivors.
 6. Kernel event pump B. Post-simulation and job-completion events are delivered
    before UI, variable tick, and extraction.
-7. Variable tick.
+7. Variable-frame module hooks: `UiBegin`, `UiBuild`, then `UiEndCapture`.
 8. Render input and interaction snapshot preparation. After `UiEndCapture`,
    typed viewport hooks run in module-name order: `Runtime.CameraModule`
    populates the camera before `Runtime.SceneInteractionModule` gates gizmo and
@@ -1066,7 +1067,7 @@ execution should request `Core::Config::WindowBackend::Null` explicitly.
    `TransformHierarchy` → `BoundsPropagation` → `RenderSync` execute directly
    (outside the fixed-step FrameGraph) so post-fixed-step local-transform
    mutations — Sandbox Editor inspector edits applied in the ImGui editor hook,
-   `OnVariableTick()` app mutations, and module-owned gizmo drags — refresh
+   other module-frame-hook mutations, and module-owned gizmo drags — refresh
    `Transform::WorldMatrix`, world bounds, and `DirtyTags::DirtyTransform`
    before transform-gizmo packets are built and before render extraction
    observes the scene. Idle frames skip the redundant sweep. The runtime then
@@ -1232,9 +1233,9 @@ graphics, or UI ownership below runtime. Sandbox manual File / Import commands
 and promoted dropped geometry/model/texture requests remain queued across the
 worker/apply boundary; explicit direct imports and reimports still use the same
 state-machine records but reach a terminal row inside their synchronous call.
-`Engine::Shutdown()` discards pending commands, marks the initialization state
-false, and publishes/pumps `RuntimeShutdownAnnounced` before application,
-GPU-participant, module-provider, renderer, or device teardown. The
+`Engine::BeginShutdown()` discards pending commands, marks the initialization
+state false, and publishes/pumps `RuntimeShutdownAnnounced` before concrete app
+state, GPU-participant, module-provider, renderer, or device teardown. The
 `AssetWorkflowModule` listener calls
 `AssetImportPipeline::CancelActiveAssetImportsForShutdown()`, advances the
 binding epoch, releases its document participant, and detaches every provider
@@ -1251,8 +1252,9 @@ Shutdown order requirement:
    scene/document/provider borrows detach in the listener
 2. generic `JobServiceGpuQueueBridge` participant shutdown and the required
    device-idle coordination while asset cache/bake state remains live
-3. application shutdown, which unregisters import policies and may release a
-   blocked decoder
+3. app-owned teardown while runtime services/worlds remain live; Sandbox
+   unregisters import policies, detaches editor state, tears down its initial
+   reference population, and may release a blocked decoder
 4. reverse name-sorted module shutdown:
    `AsyncWorkModule::OnShutdown()` runs before
    `AssetWorkflowModule::OnShutdown()` over the live `StreamingExecutor`. Async
@@ -1264,7 +1266,8 @@ Shutdown order requirement:
    assets/cache/handoffs. `TextureBakeModule` withdraws its service and releases
    its already-idle GPU-owned bake state in its own reverse-order slot
 5. world, frame graph, renderer, device, window, and finally task-scheduler
-   teardown
+   teardown. Calling `Engine::Shutdown()` without a separate app-owned teardown
+   invokes `BeginShutdown()` automatically.
 
 ## Stable entity lookup ownership and policy
 

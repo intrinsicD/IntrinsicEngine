@@ -218,8 +218,9 @@ app-owned; diagnostics stay in logs/telemetry.
 
 ### D12 — Application = parts list; seams-first migration
 
-**ADR-0027 amendment.** The app-parts-list and removal of
-`IApplication::OnSimTick`/`OnVariableTick` remain required. `InlineModule` and
+**ADR-0027 amendment; implemented by `RUNTIME-184`.** The app is now an
+explicit parts list and the `IApplication` interface plus its unrestricted
+simulation/variable-frame callbacks are removed. `InlineModule` and
 an experiment-app template are deferred: the first real one-file experiment
 with runtime lifecycle may justify a local convenience, and a shared template
 requires a second production/research app that repeats the same bootstrap.
@@ -227,13 +228,14 @@ Ordinary explicit named composition is the default until then.
 
 An app is `main()` + explicit composed responsibilities + initial world
 content + initial `FrameRecipe`. The additive `ARCH-007`..`ARCH-011` seams and
-`ARCH-012` Clustering extraction are retired. Clustering proved app-owned
+`ARCH-012` Clustering extraction and the `RUNTIME-184` lifecycle cutover are
+retired. Clustering proved app-owned
 lifecycle, stable naming, command/job/event flow, service provision/discovery,
 and reverse shutdown; it did **not** prove `Require`, non-no-op `OnResolve`,
 sim-system registration, or frame-hook registration. `RUNTIME-179`..`187`
-finish the behavior-owning extractions, application-tick removal, mechanism
-deletion test, residual API migration, and final representation/checker
-ratchet. `CommandSequence`, an inline builder, and an experiment template land
+finish the behavior-owning extractions, mechanism deletion test, residual API
+migration, and final representation/checker ratchet. `CommandSequence`, an
+inline builder, and an experiment template land
 only when their respective first consumers appear.
 
 ### D13 — No god-handles: contexts carry capabilities
@@ -250,8 +252,10 @@ retaining it for hypothetical modules.
 Registration receives an `EngineSetup` (not "KernelSetup" — "kernel" is a
 documentation role word, not code vocabulary; the class stays `Engine`).
 Shutdown is a built-in `QuitRequested` command. The target contains no
-`Engine&` in module, handler, setup, or app lifecycle surfaces; `RUNTIME-184`
-removes the remaining legacy `IApplication` uses.
+`Engine&` in module, handler, setup, or app lifecycle surfaces. `RUNTIME-184`
+removed the legacy application object; a concrete app may use
+`Engine::BeginShutdown()` to announce/quiesce first, release app-owned state
+through narrow world/service capabilities, and then call `Engine::Shutdown()`.
 
 ## Consequences
 

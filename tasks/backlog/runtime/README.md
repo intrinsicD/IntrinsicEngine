@@ -212,10 +212,11 @@ triggers. The implementation graph is:
   after retired `GRAPHICS-128` made the shared managed-index subrange
   selectable. Retired `RUNTIME-190` relocated that provider unchanged into
   `TextureBakeModule` alongside the generalized property raster path.
-- [`RUNTIME-184`](RUNTIME-184-replace-application-lifecycle.md) — remove
-  `IApplication` and unrestricted app ticks through explicit Sandbox/module
-  composition, isolated from residual API migration and the final
-  representation/checker ratchet.
+- Retired [`RUNTIME-184`](../../done/RUNTIME-184-replace-application-lifecycle.md)
+  removes `IApplication` and unrestricted app ticks through explicit
+  Sandbox/module composition. Engine construction is config-only, Sandbox owns
+  concrete session state, and app teardown is interposed through the narrow
+  two-stage kernel shutdown contract.
 - [`RUNTIME-185`](RUNTIME-185-prune-runtime-composition-mechanisms.md) —
   separately remove/narrow every lifecycle/setup/service/schedule feature
   still lacking a production consumer after both explicit app lifecycle and
@@ -233,14 +234,23 @@ config and Frame Graph UI use the settled owners.
 Retired `RUNTIME-177` added no generic debug-draw producer seam because its
 consumer inventory was empty; existing spatial-debug and transform-gizmo
 paths remain typed. Retired `RUNTIME-129` satisfies the normal-bake gate;
-`RUNTIME-184` may proceed after retired `RUNTIME-168` lifecycle-policy
-privatization, and its retirement will satisfy the remaining `RUNTIME-185`
-gate.
+retired `RUNTIME-184` satisfies the remaining lifecycle gate after retired
+`RUNTIME-168` lifecycle-policy privatization, so `RUNTIME-185` is the next
+unblocked convergence leaf.
 `ARCH-014` reaches this graph through `RUNTIME-187`; `REVIEW-003` reaches it
 transitively through `ARCH-014`.
 
 #### Retired decomposition entries
 
+- [`RUNTIME-184` — Replace IApplication with explicit app composition](../../done/RUNTIME-184-replace-application-lifecycle.md)
+  (done, 2026-07-23, `Operational`): Engine owns no application callback and
+  is constructed from config alone. Sandbox `main()` visibly composes each
+  production module, initializes one concrete app-owned session after kernel
+  boot, and releases it between `BeginShutdown()` and final reverse module
+  shutdown. The former no-op production ticks are deleted; frame-pacing capture
+  is an ordinary app module, and callback-heavy fixtures use a test-only module
+  bridge without creating a production framework. Engine convergence remains
+  `22/0/2/10` pending the dedicated auxiliary-surface and representation leaves.
 - [`RUNTIME-183` — Extract the asset-workflow composition module](../../done/RUNTIME-183-extract-asset-workflow-module.md)
   (done, 2026-07-19, `Operational`): one app-composed `AssetWorkflowModule`
   originally absorbed persistent import/bake objects plus per-boot

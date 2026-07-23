@@ -17,6 +17,8 @@
 #include "MinimalTriangleReadback.hpp"
 #include "OperationalCounterStability.hpp"
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Graphics.Renderer;
@@ -41,7 +43,6 @@ using Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot;
 using Extrinsic::Backends::Vulkan::ToString;
 using Extrinsic::Graphics::RenderCommandPassStatus;
 using Extrinsic::Runtime::Engine;
-using Extrinsic::Runtime::IApplication;
 
 inline constexpr std::uint32_t kReadbackWidth = 256u;
 inline constexpr std::uint32_t kReadbackHeight = 256u;
@@ -161,7 +162,7 @@ inline constexpr std::array<TransientDebugSamplePoint, 4> kTransientReadbackSamp
 	};
 }
 
-class ExitAfterFramesApp final : public IApplication
+class ExitAfterFramesApp final : public Intrinsic::Tests::RuntimeTestModule
 {
 public:
 	explicit ExitAfterFramesApp(const std::uint32_t targetFrames) noexcept
@@ -169,21 +170,22 @@ public:
 	{
 	}
 
-	void OnInitialize(Engine&) override {}
-	void OnSimTick(Engine&, double) override {}
+        void Resolve() override {}
+        void Simulate(double) override {}
 
-	void OnVariableTick(Engine& engine, double, double) override
-	{
-		++m_Frames;
-		if (m_Frames >= m_TargetFrames)
-		{
-			engine.RequestExit();
-		}
+        void Frame(double, double) override
+        {
+            auto& engine = Kernel();
+            ++m_Frames;
+            if (m_Frames >= m_TargetFrames)
+            {
+                engine.RequestExit();
+            }
 	}
 
-	void OnShutdown(Engine&) override {}
+        void Shutdown() override {}
 
-private:
+    private:
 	std::uint32_t m_TargetFrames{1u};
 	std::uint32_t m_Frames{0u};
 };
@@ -212,12 +214,13 @@ struct TransientDebugBootstrap
 {
 	if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
 	{
-		return TransientDebugBootstrap{
-			.EnginePtr = nullptr,
-			.Skipped = true,
-			.SkipReason = "GLFW could not initialize in this environment; gpu;vulkan transient-debug smoke is opt-in.",
-		};
-	}
+            return TransientDebugBootstrap{
+                .EnginePtr  = nullptr,
+                .Skipped    = true,
+                .SkipReason = "GLFW could not initialize in this environment; "
+                              "gpu;vulkan transient-debug smoke is opt-in.",
+            };
+        }
 
 	auto config = Extrinsic::Runtime::CreateReferenceEngineConfig();
 	config.Window.Title = windowTitle;
@@ -227,36 +230,39 @@ struct TransientDebugBootstrap
 	config.Render.EnableValidation = false;
 	config.Render.EnableVSync = false;
 
-	auto enginePtr = std::make_unique<Engine>(
-		config, std::make_unique<ExitAfterFramesApp>(targetFrames));
-	enginePtr->Initialize();
+        auto enginePtr = std::make_unique<Engine>(config);
+        Intrinsic::Tests::AddRuntimeTestModule(*enginePtr,
+                                               std::make_unique<ExitAfterFramesApp>(targetFrames));
+        enginePtr->Initialize();
 
 	const auto initInputs = GetVulkanDeviceOperationalInputs(&enginePtr->GetDevice());
 	if (!initInputs.LogicalDeviceReady || !initInputs.SwapchainReady || !initInputs.CommandSyncReady)
 	{
 		enginePtr->Shutdown();
-		return TransientDebugBootstrap{
-			.EnginePtr = nullptr,
-			.Skipped = true,
-			.SkipReason = "Promoted Vulkan did not reach logical-device/swapchain/command-sync readiness on this host.",
-		};
-	}
+                return TransientDebugBootstrap{
+                    .EnginePtr  = nullptr,
+                    .Skipped    = true,
+                    .SkipReason = "Promoted Vulkan did not reach "
+                                  "logical-device/swapchain/command-sync readiness on this host.",
+                };
+        }
 
 	enginePtr->Run();
 
 	const auto warmupStatus = EvaluateVulkanDeviceOperationalStatus(&enginePtr->GetDevice());
 	if (!enginePtr->GetDevice().IsOperational())
 	{
-		std::string skipReason{"Promoted Vulkan operational gate did not flip during default-recipe warmup: status="};
-		skipReason += ToString(warmupStatus.Code);
-		skipReason += " reason=";
-		skipReason += ToString(warmupStatus.Reason);
-		enginePtr->Shutdown();
-		return TransientDebugBootstrap{
-			.EnginePtr = nullptr,
-			.Skipped = true,
-			.SkipReason = std::move(skipReason),
-		};
+            std::string skipReason{"Promoted Vulkan operational gate did not flip "
+                                   "during default-recipe warmup: status="};
+            skipReason += ToString(warmupStatus.Code);
+            skipReason += " reason=";
+            skipReason += ToString(warmupStatus.Reason);
+            enginePtr->Shutdown();
+            return TransientDebugBootstrap{
+                .EnginePtr  = nullptr,
+                .Skipped    = true,
+                .SkipReason = std::move(skipReason),
+            };
 	}
 
 	return TransientDebugBootstrap{.EnginePtr = std::move(enginePtr), .Skipped = false, .SkipReason = {}};
@@ -369,9 +375,11 @@ TEST(TransientDebugSurfaceGpuSmoke, MixedLanesRecordOnOperationalVulkanCommandSt
 	if (!run.DeviceOperational)
 	{
 		engine.Shutdown();
-		ADD_FAILURE() << "Promoted Vulkan operational gate dropped during transient-debug frame: status="
-					  << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason);
-		return;
+                ADD_FAILURE() << "Promoted Vulkan operational gate dropped during "
+                                 "transient-debug frame: status="
+                              << ToString(run.Status.Code)
+                              << " reason=" << ToString(run.Status.Reason);
+                return;
 	}
 
 	EXPECT_EQ(run.Status.Code, Extrinsic::Backends::Vulkan::VulkanOperationalStatusCode::Operational);
@@ -383,12 +391,14 @@ TEST(TransientDebugSurfaceGpuSmoke, MixedLanesRecordOnOperationalVulkanCommandSt
 	EXPECT_TRUE(stats.Execute.DeviceOperational);
 
 	const auto* pass = FindCommandPass(stats, "TransientDebugSurfacePass");
-	ASSERT_NE(pass, nullptr)
-		<< "Default recipe omitted TransientDebugSurfacePass despite mixed debug primitive snapshots.";
-	EXPECT_EQ(pass->Status, RenderCommandPassStatus::Recorded)
-		<< "TransientDebugSurfacePass did not record on the operational Vulkan command stream.";
+        ASSERT_NE(pass, nullptr)
+            << "Default recipe omitted TransientDebugSurfacePass despite mixed debug "
+               "primitive snapshots.";
+        EXPECT_EQ(pass->Status, RenderCommandPassStatus::Recorded)
+            << "TransientDebugSurfacePass did not record on the operational Vulkan "
+               "command stream.";
 
-	EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsSubmitted, 1u);
+        EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsSubmitted, 1u);
 	EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsRecorded, 1u);
 	EXPECT_EQ(stats.TransientDebugUpload.LineRecordsSubmitted, 1u);
 	EXPECT_EQ(stats.TransientDebugUpload.LineRecordsRecorded, 1u);
@@ -397,14 +407,16 @@ TEST(TransientDebugSurfaceGpuSmoke, MixedLanesRecordOnOperationalVulkanCommandSt
 	EXPECT_EQ(stats.TransientDebugUpload.UploadOverflowCount, 0u);
 	EXPECT_EQ(stats.TransientDebugUpload.MissingPipelineSkipCount, 0u);
 
-	EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
-		<< "Vulkan fallback counters incremented across the transient-debug frame: "
-		<< "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
-		<< ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
-		<< ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
-		<< ", gateFailure " << run.Before.OperationalGateFailure << " -> " << run.After.OperationalGateFailure;
+        EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
+            << "Vulkan fallback counters incremented across the transient-debug "
+               "frame: "
+            << "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
+            << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
+            << ", validationError " << run.Before.ValidationError << " -> "
+            << run.After.ValidationError << ", gateFailure " << run.Before.OperationalGateFailure
+            << " -> " << run.After.OperationalGateFailure;
 
-	engine.Shutdown();
+        engine.Shutdown();
 }
 
 TEST(TransientDebugSurfaceGpuSmoke, MixedLanesReadBackExpectedSampleColors)
@@ -423,8 +435,9 @@ TEST(TransientDebugSurfaceGpuSmoke, MixedLanesReadBackExpectedSampleColors)
 	if (bytesPerPixel < 4u)
 	{
 		engine.Shutdown();
-		GTEST_SKIP() << "Backbuffer format has no 4-channel host-readable layout on this host; readback skipped.";
-	}
+                GTEST_SKIP() << "Backbuffer format has no 4-channel host-readable layout "
+                                "on this host; readback skipped.";
+        }
 
 	const std::uint64_t readbackSize =
 		static_cast<std::uint64_t>(bytesPerPixel) *
@@ -450,9 +463,11 @@ TEST(TransientDebugSurfaceGpuSmoke, MixedLanesReadBackExpectedSampleColors)
 		renderer.SetTransientDebugBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
 		device.DestroyBuffer(readbackBuffer);
 		engine.Shutdown();
-		ADD_FAILURE() << "Promoted Vulkan operational gate dropped during transient-debug readback frame: status="
-					  << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason);
-		return;
+                ADD_FAILURE() << "Promoted Vulkan operational gate dropped during "
+                                 "transient-debug readback frame: status="
+                              << ToString(run.Status.Code)
+                              << " reason=" << ToString(run.Status.Reason);
+                return;
 	}
 
 	EXPECT_EQ(run.Status.Code, Extrinsic::Backends::Vulkan::VulkanOperationalStatusCode::Operational);
@@ -464,27 +479,33 @@ TEST(TransientDebugSurfaceGpuSmoke, MixedLanesReadBackExpectedSampleColors)
 	EXPECT_TRUE(stats.Execute.DeviceOperational);
 
 	const auto* pass = FindCommandPass(stats, "TransientDebugSurfacePass");
-	ASSERT_NE(pass, nullptr)
-		<< "Default recipe omitted TransientDebugSurfacePass despite mixed debug primitive snapshots.";
-	EXPECT_EQ(pass->Status, RenderCommandPassStatus::Recorded)
-		<< "TransientDebugSurfacePass did not record on the operational Vulkan command stream.";
+        ASSERT_NE(pass, nullptr)
+            << "Default recipe omitted TransientDebugSurfacePass despite mixed debug "
+               "primitive snapshots.";
+        EXPECT_EQ(pass->Status, RenderCommandPassStatus::Recorded)
+            << "TransientDebugSurfacePass did not record on the operational Vulkan "
+               "command stream.";
 
-	EXPECT_EQ(stats.TransientDebugBackbufferReadbackCopyCount, 1u)
-		<< "Transient-debug readback copy must record once for the armed mixed-lane frame.";
-	EXPECT_EQ(stats.DefaultRecipeBackbufferReadbackCopyCount, 0u)
-		<< "Transient-debug pixel parity must use its own counter, not the canonical surface readback counter.";
-	EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsRecorded, 1u);
+        EXPECT_EQ(stats.TransientDebugBackbufferReadbackCopyCount, 1u)
+            << "Transient-debug readback copy must record once for the armed "
+               "mixed-lane frame.";
+        EXPECT_EQ(stats.DefaultRecipeBackbufferReadbackCopyCount, 0u)
+            << "Transient-debug pixel parity must use its own counter, not the "
+               "canonical surface readback counter.";
+        EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsRecorded, 1u);
 	EXPECT_EQ(stats.TransientDebugUpload.LineRecordsRecorded, 1u);
 	EXPECT_EQ(stats.TransientDebugUpload.PointRecordsRecorded, 1u);
 
-	EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
-		<< "Vulkan fallback counters incremented across the transient-debug readback frame: "
-		<< "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
-		<< ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
-		<< ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
-		<< ", gateFailure " << run.Before.OperationalGateFailure << " -> " << run.After.OperationalGateFailure;
+        EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
+            << "Vulkan fallback counters incremented across the transient-debug "
+               "readback frame: "
+            << "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
+            << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
+            << ", validationError " << run.Before.ValidationError << " -> "
+            << run.After.ValidationError << ", gateFailure " << run.Before.OperationalGateFailure
+            << " -> " << run.After.OperationalGateFailure;
 
-	std::vector<std::uint8_t> readbackBytes(static_cast<std::size_t>(readbackSize), 0u);
+        std::vector<std::uint8_t> readbackBytes(static_cast<std::size_t>(readbackSize), 0u);
 	device.ReadBuffer(readbackBuffer, readbackBytes.data(), readbackSize, 0u);
 
 	const std::uint64_t rowStride =

@@ -16,7 +16,7 @@ import Extrinsic.ECS.Scene.Registry;
 // (currently `Extrinsic.ECS.System.TransformHierarchy` and
 // `Extrinsic.ECS.System.BoundsPropagation`) into the fixed-step
 // `Core::FrameGraph` each substep. Runtime composition calls this
-// helper after `IApplication::OnSimTick` has had a chance to
+// helper after registered simulation systems have had a chance to
 // register app passes and before `Core::FrameGraph::Compile`, so
 // dependency edges declared by the systems (`Read`/`Write` on
 // component TypeTokens, and the named `TransformUpdate` /
@@ -100,7 +100,7 @@ export namespace Extrinsic::Runtime
     // systems (`TransformHierarchy` → `BoundsPropagation` → `RenderSync`)
     // directly, outside the fixed-step FrameGraph, so local-transform
     // mutations made after the scheduled fixed-step bundle — Sandbox Editor
-    // UI inspector edits (via the ImGui editor hook), `OnVariableTick()`
+    // UI inspector edits (via the ImGui editor hook), frame-hook
     // app mutations, and `GizmoInteraction` drags — are reflected in
     // `Transform::WorldMatrix`, world bounds, and
     // `DirtyTags::DirtyTransform` before render extraction observes the

@@ -7,8 +7,9 @@
 #include <memory>
 #include <optional>
 
-#include <gtest/gtest.h>
 #include <glm/glm.hpp>
+#include <gtest/gtest.h>
+#include "RuntimeTestModule.hpp"
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
@@ -87,12 +88,13 @@ namespace
         return config;
     }
 
-    class PressFocusKeyApplication final : public Runtime::IApplication
+    class PressFocusKeyApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine& engine) override
+        void Resolve() override
         {
-            Entity = engine.Worlds().Get(engine.ActiveWorld())->Create();
+            auto& engine = Kernel();
+            Entity       = engine.Worlds().Get(engine.ActiveWorld())->Create();
             World::Bounds bounds{};
             bounds.WorldBoundingSphere.Center = glm::vec3{4.0f, 2.0f, -1.0f};
             bounds.WorldBoundingSphere.Radius = 2.5f;
@@ -114,12 +116,11 @@ namespace
                 std::move(controller));
         }
 
-        void OnSimTick(Runtime::Engine& /*engine*/, double /*fixedDt*/) override {}
+        void Simulate(double /*fixedDt*/) override {}
 
-        void OnVariableTick(Runtime::Engine& engine,
-                            double /*alpha*/,
-                            double /*dt*/) override
+        void Frame(double /*alpha*/, double /*dt*/) override
         {
+            auto& engine = Kernel();
             ++VariableTicks;
             const Extrinsic::Platform::IWindow& window = engine.GetWindow();
             auto& input = const_cast<Extrinsic::Platform::Input::Context&>(
@@ -128,7 +129,7 @@ namespace
             engine.RequestExit();
         }
 
-        void OnShutdown(Runtime::Engine& /*engine*/) override {}
+        void Shutdown() override {}
 
         ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
         RecordingCameraController* Controller{nullptr};
@@ -136,15 +137,14 @@ namespace
         std::uint32_t VariableTicks{0u};
     };
 
-    class PressGenericKeyApplication final
-        : public Runtime::IApplication
+    class PressGenericKeyApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(
-            Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++VariableTicks;
             const Extrinsic::Platform::IWindow& window =
                 engine.GetWindow();
@@ -155,7 +155,7 @@ namespace
                 Extrinsic::Platform::Input::Key::G, true);
             engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
         std::uint32_t VariableTicks{0u};
     };
@@ -165,7 +165,7 @@ TEST(RuntimeInputActions, DefaultFocusKeyDispatchesRegisteredAction)
 {
     auto app = std::make_unique<PressFocusKeyApplication>();
     auto* appPtr = app.get();
-    Runtime::Engine engine(InputActionConfig(), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(InputActionConfig(), std::move(app));
     engine.EmplaceModule<Runtime::CameraModule>();
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
@@ -209,7 +209,7 @@ TEST(RuntimeInputActions, NoDefaultInputActionsLeaveFocusKeyNoOp)
 {
     auto app = std::make_unique<PressFocusKeyApplication>();
     auto* appPtr = app.get();
-    Runtime::Engine engine(InputActionConfig(), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(InputActionConfig(), std::move(app));
     engine.EmplaceModule<Runtime::CameraModule>();
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.Initialize();
@@ -234,8 +234,7 @@ TEST(RuntimeInputActions,
 {
     auto app = std::make_unique<PressGenericKeyApplication>();
     auto* appPtr = app.get();
-    Runtime::Engine engine(
-        InputActionConfig(), std::move(app));
+    Intrinsic::Tests::RuntimeTestKernel engine(InputActionConfig(), std::move(app));
     engine.Initialize();
     ASSERT_EQ(
         engine.Services()

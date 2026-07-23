@@ -18,6 +18,8 @@
 #include "MinimalTriangleReadback.hpp"
 #include "OperationalCounterStability.hpp"
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Telemetry;
@@ -48,7 +50,6 @@ using Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot;
 using Extrinsic::Backends::Vulkan::ToString;
 using Extrinsic::Graphics::RenderCommandPassStatus;
 using Extrinsic::Runtime::Engine;
-using Extrinsic::Runtime::IApplication;
 
 [[nodiscard]] Readback::ExpectedPixel ReorderToRgba(
     const Extrinsic::RHI::Format format,
@@ -104,7 +105,7 @@ using Extrinsic::Runtime::IApplication;
 // GRAPHICS-076 Slice D — bounded `engine.Run()` driver. The smoke drives a
 // small fixed number of frames so the test cannot hang on a misconfigured
 // swapchain loop even when the operational Vulkan gate flips green.
-class ExitAfterFramesApp final : public IApplication
+class ExitAfterFramesApp final : public Intrinsic::Tests::RuntimeTestModule
 {
 public:
     explicit ExitAfterFramesApp(const std::uint32_t targetFrames) noexcept
@@ -112,11 +113,12 @@ public:
     {
     }
 
-    void OnInitialize(Engine&) override {}
-    void OnSimTick(Engine&, double) override {}
+    void Resolve() override {}
+    void Simulate(double) override {}
 
-    void OnVariableTick(Engine& engine, double, double) override
+    void Frame(double, double) override
     {
+        auto& engine = Kernel();
         ++m_Frames;
         if (m_Frames >= m_TargetFrames)
         {
@@ -124,7 +126,7 @@ public:
         }
     }
 
-    void OnShutdown(Engine&) override {}
+    void Shutdown() override {}
 
 private:
     std::uint32_t m_TargetFrames{1u};
@@ -158,9 +160,10 @@ struct DefaultRecipeBootstrap
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
     {
         return DefaultRecipeBootstrap{
-            .EnginePtr = nullptr,
-            .Skipped = true,
-            .SkipReason = "GLFW could not initialize in this environment; gpu;vulkan default-recipe smoke is opt-in.",
+            .EnginePtr  = nullptr,
+            .Skipped    = true,
+            .SkipReason = "GLFW could not initialize in this environment; "
+                          "gpu;vulkan default-recipe smoke is opt-in.",
         };
     }
 
@@ -174,8 +177,9 @@ struct DefaultRecipeBootstrap
     config.Render.EnableValidation = enableValidation;
     config.Render.EnableVSync = false;
     config.Render.EnableGpuProfiling = enableGpuProfiling;
-    auto enginePtr = std::make_unique<Engine>(
-        config, std::make_unique<ExitAfterFramesApp>(targetFrames));
+    auto enginePtr                   = std::make_unique<Engine>(config);
+    Intrinsic::Tests::AddRuntimeTestModule(*enginePtr,
+                                           std::make_unique<ExitAfterFramesApp>(targetFrames));
     enginePtr->Initialize();
 
     const auto initInputs = GetVulkanDeviceOperationalInputs(&enginePtr->GetDevice());
@@ -183,9 +187,10 @@ struct DefaultRecipeBootstrap
     {
         enginePtr->Shutdown();
         return DefaultRecipeBootstrap{
-            .EnginePtr = nullptr,
-            .Skipped = true,
-            .SkipReason = "Promoted Vulkan did not reach logical-device/swapchain/command-sync readiness on this host.",
+            .EnginePtr  = nullptr,
+            .Skipped    = true,
+            .SkipReason = "Promoted Vulkan did not reach "
+                          "logical-device/swapchain/command-sync readiness on this host.",
         };
     }
 
@@ -370,7 +375,8 @@ void ExpectMinimalHarnessReadbackSamples(
     const Extrinsic::Graphics::RenderGraphFrameStats& stats)
 {
     static_assert(Readback::kSamplePoints.size() == 4u,
-                  "gpu;vulkan pixel readback requires exactly four deterministic sample points");
+                  "gpu;vulkan pixel readback requires exactly four deterministic "
+                  "sample points");
 
     std::vector<std::uint8_t> readbackBytes(static_cast<std::size_t>(readbackSize), 0u);
     device.ReadBuffer(readbackBuffer, readbackBytes.data(), readbackSize, 0u);
@@ -473,7 +479,8 @@ void ExpectDefaultRecipeDebugViewReadbackRecorded(
     EXPECT_EQ(FindPassStatus(stats, "Present"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(stats);
     EXPECT_GE(stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
-        << "Default-recipe readback triplet did not record on any operational frame.";
+        << "Default-recipe readback triplet did not record on any operational "
+           "frame.";
 }
 
 [[nodiscard]] Extrinsic::Graphics::FrameRecipeOverride MakeGraphicsOnlyFrameRecipeOverride()
@@ -698,9 +705,11 @@ TEST(DefaultRecipeSurfaceGpuSmoke, RecipeSelectorReachesOperationalVulkanCommand
     if (!run.DeviceOperational)
     {
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip after running the default recipe: status="
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip after "
+                         "running the default recipe: status="
                       << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
-                      << ". Host capability checks passed, so this is a GRAPHICS-076 Slice D regression, not a skip condition.";
+                      << ". Host capability checks passed, so this is a "
+                         "GRAPHICS-076 Slice D regression, not a skip condition.";
         return;
     }
 
@@ -722,15 +731,18 @@ TEST(DefaultRecipeSurfaceGpuSmoke, RecipeSelectorReachesOperationalVulkanCommand
         << "Canonical default recipe did not emit a \"Present\" command record; "
         << "the recipe shape itself regressed.";
     EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
-        << "Canonical default recipe \"Present\" pass did not record on the operational "
+        << "Canonical default recipe \"Present\" pass did not record on the "
+           "operational "
         << "Vulkan command stream.";
 
     EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
-        << "Vulkan fallback counters incremented across an operational default-recipe frame: "
+        << "Vulkan fallback counters incremented across an operational "
+           "default-recipe frame: "
         << "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
         << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
         << ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
-        << ", gateFailure " << run.Before.OperationalGateFailure << " -> " << run.After.OperationalGateFailure;
+        << ", gateFailure " << run.Before.OperationalGateFailure << " -> "
+        << run.After.OperationalGateFailure;
 
     engine.Shutdown();
 }
@@ -936,9 +948,12 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ReferenceTriangleDebugViewReadbackMatchesMini
     if (!warmup.DeviceOperational)
     {
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during default-recipe readback warmup: status="
-                      << ToString(warmup.Status.Code) << " reason=" << ToString(warmup.Status.Reason)
-                      << ". Host capability checks passed, so this is a GRAPHICS-076E regression, not a skip condition.";
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during "
+                         "default-recipe readback warmup: status="
+                      << ToString(warmup.Status.Code)
+                      << " reason=" << ToString(warmup.Status.Reason)
+                      << ". Host capability checks passed, so this is a "
+                         "GRAPHICS-076E regression, not a skip condition.";
         return;
     }
 
@@ -949,7 +964,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ReferenceTriangleDebugViewReadbackMatchesMini
     if (bytesPerPixel == 0u)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Backbuffer format has no host-uploadable layout on this host; readback skipped.";
+        GTEST_SKIP() << "Backbuffer format has no host-uploadable layout on this "
+                        "host; readback skipped.";
     }
 
     const std::uint64_t readbackSize =
@@ -976,9 +992,11 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ReferenceTriangleDebugViewReadbackMatchesMini
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip after running the default recipe readback smoke: status="
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip after "
+                         "running the default recipe readback smoke: status="
                       << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
-                      << ". Host capability checks passed, so this is a GRAPHICS-076E regression, not a skip condition.";
+                      << ". Host capability checks passed, so this is a "
+                         "GRAPHICS-076E regression, not a skip condition.";
         return;
     }
 
@@ -1000,14 +1018,17 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ReferenceTriangleDebugViewReadbackMatchesMini
     EXPECT_EQ(FindPassStatus(stats, "Present"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(stats);
     EXPECT_GE(stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
-        << "Default-recipe readback triplet did not record on any operational frame.";
+        << "Default-recipe readback triplet did not record on any operational "
+           "frame.";
 
     EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
-        << "Vulkan fallback counters incremented across an operational default-recipe readback frame: "
+        << "Vulkan fallback counters incremented across an operational "
+           "default-recipe readback frame: "
         << "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
         << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
         << ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
-        << ", gateFailure " << run.Before.OperationalGateFailure << " -> " << run.After.OperationalGateFailure;
+        << ", gateFailure " << run.Before.OperationalGateFailure << " -> "
+        << run.After.OperationalGateFailure;
 
     ExpectMinimalHarnessReadbackSamples(device,
                                         readbackBuffer,
@@ -1038,7 +1059,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialReadbackWithVal
     if (!bootstrapDiagnostics.ValidationEnabled || !bootstrapDiagnostics.DebugUtilsEnabled)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Vulkan validation layer/debug-utils is unavailable; parallel-recording validation smoke is opt-in.";
+        GTEST_SKIP() << "Vulkan validation layer/debug-utils is unavailable; "
+                        "parallel-recording validation smoke is opt-in.";
     }
 
     auto& renderer = engine.GetRenderer();
@@ -1068,9 +1090,12 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialReadbackWithVal
     {
         renderer.ClearActiveFrameRecipeOverride();
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during parallel-recording smoke warmup: status="
-                      << ToString(warmup.Status.Code) << " reason=" << ToString(warmup.Status.Reason)
-                      << ". Host capability checks passed, so this is a GRAPHICS-119 Slice D regression, not a skip condition.";
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during "
+                         "parallel-recording smoke warmup: status="
+                      << ToString(warmup.Status.Code)
+                      << " reason=" << ToString(warmup.Status.Reason)
+                      << ". Host capability checks passed, so this is a "
+                         "GRAPHICS-119 Slice D regression, not a skip condition.";
         return;
     }
 
@@ -1080,7 +1105,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialReadbackWithVal
     {
         renderer.ClearActiveFrameRecipeOverride();
         engine.Shutdown();
-        GTEST_SKIP() << "Backbuffer format has no host-uploadable layout on this host; parallel-recording smoke skipped.";
+        GTEST_SKIP() << "Backbuffer format has no host-uploadable layout on this "
+                        "host; parallel-recording smoke skipped.";
     }
 
     const std::uint64_t readbackSize =
@@ -1096,7 +1122,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialReadbackWithVal
     if (!readbackBuffer.IsValid())
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan parallel-recording smoke is opt-in.";
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan "
+                        "parallel-recording smoke is opt-in.";
     }
 
     renderer.SetRenderGraphDebugDumpEnabled(true);
@@ -1113,8 +1140,10 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialReadbackWithVal
         renderer.ClearActiveFrameRecipeOverride();
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate dropped during serial baseline frame: status="
-                      << ToString(serial.Run.Status.Code) << " reason=" << ToString(serial.Run.Status.Reason);
+        ADD_FAILURE() << "Promoted Vulkan operational gate dropped during serial "
+                         "baseline frame: status="
+                      << ToString(serial.Run.Status.Code)
+                      << " reason=" << ToString(serial.Run.Status.Reason);
         return;
     }
 
@@ -1131,7 +1160,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialReadbackWithVal
         << "The GRAPHICS-119 Vulkan smoke disables async-capable optional recipe "
            "slots so the Vulkan path exercises a graphics-only context plan.";
     EXPECT_TRUE(Counters::IsStable(serial.Run.Before, serial.Run.After))
-        << "Vulkan fallback/validation counters changed across serial baseline frame.";
+        << "Vulkan fallback/validation counters changed across serial baseline "
+           "frame.";
     ExpectMinimalHarnessReadbackSamples(device,
                                         readbackBuffer,
                                         readbackSize,
@@ -1163,8 +1193,10 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialReadbackWithVal
         renderer.ClearActiveFrameRecipeOverride();
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate dropped during parallel-recording frame: status="
-                      << ToString(parallel.Run.Status.Code) << " reason=" << ToString(parallel.Run.Status.Reason);
+        ADD_FAILURE() << "Promoted Vulkan operational gate dropped during "
+                         "parallel-recording frame: status="
+                      << ToString(parallel.Run.Status.Code)
+                      << " reason=" << ToString(parallel.Run.Status.Reason);
         return;
     }
 
@@ -1184,7 +1216,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialReadbackWithVal
               parallelStats.Execute.ParallelCommandContextCount);
     EXPECT_EQ(parallelStats.AsyncComputeUtilizedFrames, 0u);
     EXPECT_TRUE(Counters::IsStable(parallel.Run.Before, parallel.Run.After))
-        << "Vulkan fallback/validation counters changed across parallel-recording frame.";
+        << "Vulkan fallback/validation counters changed across "
+           "parallel-recording frame.";
     ExpectMinimalHarnessReadbackSamples(device,
                                         readbackBuffer,
                                         readbackSize,
@@ -1247,7 +1280,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialAsyncComputeRea
     if (!bootstrapDiagnostics.ValidationEnabled || !bootstrapDiagnostics.DebugUtilsEnabled)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Vulkan validation layer/debug-utils is unavailable; async parallel-recording validation smoke is opt-in.";
+        GTEST_SKIP() << "Vulkan validation layer/debug-utils is unavailable; async "
+                        "parallel-recording validation smoke is opt-in.";
     }
 
     auto& renderer = engine.GetRenderer();
@@ -1255,7 +1289,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialAsyncComputeRea
     if (!device.GetQueueCapabilityProfile().SupportsAsyncCompute)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Promoted Vulkan framegraph async-compute queue is unavailable; GRAPHICS-119 async smoke is opt-in.";
+        GTEST_SKIP() << "Promoted Vulkan framegraph async-compute queue is "
+                        "unavailable; GRAPHICS-119 async smoke is opt-in.";
     }
     const Extrinsic::RHI::IProfiler* profiler = device.GetProfiler();
     ASSERT_NE(profiler, nullptr);
@@ -1279,9 +1314,12 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialAsyncComputeRea
     if (!warmup.DeviceOperational)
     {
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during async parallel-recording smoke warmup: status="
-                      << ToString(warmup.Status.Code) << " reason=" << ToString(warmup.Status.Reason)
-                      << ". Host capability checks passed, so this is a GRAPHICS-119 Slice C.11 regression, not a skip condition.";
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during async "
+                         "parallel-recording smoke warmup: status="
+                      << ToString(warmup.Status.Code)
+                      << " reason=" << ToString(warmup.Status.Reason)
+                      << ". Host capability checks passed, so this is a GRAPHICS-119 Slice "
+                         "C.11 regression, not a skip condition.";
         return;
     }
 
@@ -1290,7 +1328,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialAsyncComputeRea
     if (bytesPerPixel == 0u)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Backbuffer format has no host-uploadable layout on this host; async parallel-recording smoke skipped.";
+        GTEST_SKIP() << "Backbuffer format has no host-uploadable layout on this "
+                        "host; async parallel-recording smoke skipped.";
     }
 
     const std::uint64_t readbackSize =
@@ -1306,7 +1345,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialAsyncComputeRea
     if (!readbackBuffer.IsValid())
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan async parallel-recording smoke is opt-in.";
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan async "
+                        "parallel-recording smoke is opt-in.";
     }
 
     renderer.SetRenderGraphDebugDumpEnabled(true);
@@ -1322,8 +1362,10 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialAsyncComputeRea
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate dropped during async serial baseline frame: status="
-                      << ToString(serial.Run.Status.Code) << " reason=" << ToString(serial.Run.Status.Reason);
+        ADD_FAILURE() << "Promoted Vulkan operational gate dropped during async "
+                         "serial baseline frame: status="
+                      << ToString(serial.Run.Status.Code)
+                      << " reason=" << ToString(serial.Run.Status.Reason);
         return;
     }
 
@@ -1339,7 +1381,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialAsyncComputeRea
     EXPECT_FALSE(serialStats.Execute.SerialFallbackUsed);
     EXPECT_EQ(serialStats.Execute.ParallelCommandContextCount, 0u);
     EXPECT_TRUE(Counters::IsStable(serial.Run.Before, serial.Run.After))
-        << "Vulkan fallback/validation counters changed across async serial baseline frame.";
+        << "Vulkan fallback/validation counters changed across async serial "
+           "baseline frame.";
     ExpectMinimalHarnessReadbackSamples(device,
                                         readbackBuffer,
                                         readbackSize,
@@ -1370,8 +1413,10 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialAsyncComputeRea
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate dropped during async parallel-recording frame: status="
-                      << ToString(parallel.Run.Status.Code) << " reason=" << ToString(parallel.Run.Status.Reason);
+        ADD_FAILURE() << "Promoted Vulkan operational gate dropped during async "
+                         "parallel-recording frame: status="
+                      << ToString(parallel.Run.Status.Code)
+                      << " reason=" << ToString(parallel.Run.Status.Reason);
         return;
     }
 
@@ -1392,7 +1437,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ParallelRecordingMatchesSerialAsyncComputeRea
                   parallelStats.Execute.ParallelRecordCallerRecordCount,
               parallelStats.Execute.ParallelCommandContextCount);
     EXPECT_TRUE(Counters::IsStable(parallel.Run.Before, parallel.Run.After))
-        << "Vulkan fallback/validation counters changed across async parallel-recording frame.";
+        << "Vulkan fallback/validation counters changed across async "
+           "parallel-recording frame.";
     ExpectMinimalHarnessReadbackSamples(device,
                                         readbackBuffer,
                                         readbackSize,
@@ -1500,16 +1546,20 @@ TEST(DefaultRecipeSurfaceGpuSmoke, TransientAliasingMatchesFallbackReadbackAndRe
     if (!bootstrapDiagnostics.ValidationEnabled || !bootstrapDiagnostics.DebugUtilsEnabled)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Vulkan validation layer/debug-utils is unavailable; transient-aliasing validation smoke is opt-in.";
+        GTEST_SKIP() << "Vulkan validation layer/debug-utils is unavailable; "
+                        "transient-aliasing validation smoke is opt-in.";
     }
 
     const auto warmup = DriveDefaultRecipeAndCapture(engine);
     if (!warmup.DeviceOperational)
     {
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during transient-aliasing smoke warmup: status="
-                      << ToString(warmup.Status.Code) << " reason=" << ToString(warmup.Status.Reason)
-                      << ". Host capability checks passed, so this is a GRAPHICS-118 Slice D.2 regression, not a skip condition.";
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during "
+                         "transient-aliasing smoke warmup: status="
+                      << ToString(warmup.Status.Code)
+                      << " reason=" << ToString(warmup.Status.Reason)
+                      << ". Host capability checks passed, so this is a "
+                         "GRAPHICS-118 Slice D.2 regression, not a skip condition.";
         return;
     }
 
@@ -1520,7 +1570,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, TransientAliasingMatchesFallbackReadbackAndRe
     if (bytesPerPixel == 0u)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Backbuffer format has no host-uploadable layout on this host; transient-aliasing smoke skipped.";
+        GTEST_SKIP() << "Backbuffer format has no host-uploadable layout on this "
+                        "host; transient-aliasing smoke skipped.";
     }
 
     const std::uint64_t readbackSize =
@@ -1536,7 +1587,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, TransientAliasingMatchesFallbackReadbackAndRe
     if (!readbackBuffer.IsValid())
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan transient-aliasing smoke is opt-in.";
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan "
+                        "transient-aliasing smoke is opt-in.";
     }
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
     renderer.SetRenderGraphDebugDumpEnabled(true);
@@ -1549,8 +1601,10 @@ TEST(DefaultRecipeSurfaceGpuSmoke, TransientAliasingMatchesFallbackReadbackAndRe
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate dropped during aliasing-off baseline frame: status="
-                      << ToString(fallbackRun.Status.Code) << " reason=" << ToString(fallbackRun.Status.Reason);
+        ADD_FAILURE() << "Promoted Vulkan operational gate dropped during "
+                         "aliasing-off baseline frame: status="
+                      << ToString(fallbackRun.Status.Code)
+                      << " reason=" << ToString(fallbackRun.Status.Reason);
         return;
     }
     const auto& fallbackStats = fallbackRun.Stats;
@@ -1580,8 +1634,10 @@ TEST(DefaultRecipeSurfaceGpuSmoke, TransientAliasingMatchesFallbackReadbackAndRe
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate dropped during aliasing-on frame: status="
-                      << ToString(aliasRun.Status.Code) << " reason=" << ToString(aliasRun.Status.Reason);
+        ADD_FAILURE() << "Promoted Vulkan operational gate dropped during "
+                         "aliasing-on frame: status="
+                      << ToString(aliasRun.Status.Code)
+                      << " reason=" << ToString(aliasRun.Status.Reason);
         return;
     }
     const auto& aliasStats = aliasRun.Stats;
@@ -1601,7 +1657,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, TransientAliasingMatchesFallbackReadbackAndRe
         << "aliasing-off bytes=" << fallbackStats.Compile.TransientMemoryEstimateBytes
         << " aliasing-on bytes=" << aliasStats.Compile.TransientMemoryEstimateBytes;
     EXPECT_TRUE(Counters::IsStable(aliasRun.Before, aliasRun.After))
-        << "Vulkan fallback/validation counters changed across aliasing-on frame.";
+        << "Vulkan fallback/validation counters changed across aliasing-on "
+           "frame.";
     ExpectMinimalHarnessReadbackSamples(device,
                                         readbackBuffer,
                                         readbackSize,
@@ -1636,9 +1693,12 @@ TEST(DefaultRecipeSurfaceGpuSmoke, VulkanRenderContractPublishesDeclaredArtifact
     if (!warmup.DeviceOperational)
     {
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during render-contract warmup: status="
-                      << ToString(warmup.Status.Code) << " reason=" << ToString(warmup.Status.Reason)
-                      << ". Host capability checks passed, so this is a GRAPHICS-103 regression, not a skip condition.";
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during "
+                         "render-contract warmup: status="
+                      << ToString(warmup.Status.Code)
+                      << " reason=" << ToString(warmup.Status.Reason)
+                      << ". Host capability checks passed, so this is a "
+                         "GRAPHICS-103 regression, not a skip condition.";
         return;
     }
 
@@ -1649,7 +1709,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, VulkanRenderContractPublishesDeclaredArtifact
     if (bytesPerPixel == 0u)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Backbuffer format has no host-uploadable layout on this host; render-contract smoke skipped.";
+        GTEST_SKIP() << "Backbuffer format has no host-uploadable layout on this "
+                        "host; render-contract smoke skipped.";
     }
 
     const std::uint64_t readbackSize =
@@ -1676,9 +1737,11 @@ TEST(DefaultRecipeSurfaceGpuSmoke, VulkanRenderContractPublishesDeclaredArtifact
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip after running the render-contract smoke: status="
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip after "
+                         "running the render-contract smoke: status="
                       << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
-                      << ". Host capability checks passed, so this is a GRAPHICS-103 regression, not a skip condition.";
+                      << ". Host capability checks passed, so this is a "
+                         "GRAPHICS-103 regression, not a skip condition.";
         return;
     }
 
@@ -1747,7 +1810,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, VulkanResourceSlotsRecycleAfterRetirementWind
     if (!initial.DeviceOperational)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Promoted Vulkan device did not become operational; resource slot recycling smoke is opt-in.";
+        GTEST_SKIP() << "Promoted Vulkan device did not become operational; "
+                        "resource slot recycling smoke is opt-in.";
     }
 
     auto& device = engine.GetDevice();
@@ -1835,10 +1899,10 @@ TEST(DefaultRecipeSurfaceGpuSmoke, VulkanResourceSlotsRecycleAfterRetirementWind
         device.DestroyTexture(handle);
     }
 
-    EXPECT_TRUE(sawRecycledBuffer)
-        << "The destroyed buffer slot was not returned to the ResourcePool free queue.";
-    EXPECT_TRUE(sawRecycledTexture)
-        << "The destroyed texture slot was not returned to the ResourcePool free queue.";
+    EXPECT_TRUE(sawRecycledBuffer) << "The destroyed buffer slot was not "
+                                      "returned to the ResourcePool free queue.";
+    EXPECT_TRUE(sawRecycledTexture) << "The destroyed texture slot was not "
+                                       "returned to the ResourcePool free queue.";
 
     engine.Shutdown();
 }
@@ -1858,16 +1922,20 @@ TEST(DefaultRecipeSurfaceGpuSmoke, AsyncComputeHistogramQueueReadbackMatchesMini
     if (!device.GetQueueCapabilityProfile().SupportsAsyncCompute)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Promoted Vulkan device has no async-compute queue; GRAPHICS-037D smoke is opt-in.";
+        GTEST_SKIP() << "Promoted Vulkan device has no async-compute queue; "
+                        "GRAPHICS-037D smoke is opt-in.";
     }
 
     const auto warmup = DriveDefaultRecipeAndCapture(engine);
     if (!warmup.DeviceOperational)
     {
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during async-compute smoke warmup: status="
-                      << ToString(warmup.Status.Code) << " reason=" << ToString(warmup.Status.Reason)
-                      << ". Host capability checks passed, so this is a GRAPHICS-037D regression, not a skip condition.";
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during "
+                         "async-compute smoke warmup: status="
+                      << ToString(warmup.Status.Code)
+                      << " reason=" << ToString(warmup.Status.Reason)
+                      << ". Host capability checks passed, so this is a "
+                         "GRAPHICS-037D regression, not a skip condition.";
         return;
     }
 
@@ -1876,7 +1944,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, AsyncComputeHistogramQueueReadbackMatchesMini
     if (bytesPerPixel == 0u)
     {
         engine.Shutdown();
-        GTEST_SKIP() << "Backbuffer format has no host-uploadable layout on this host; async-compute smoke skipped.";
+        GTEST_SKIP() << "Backbuffer format has no host-uploadable layout on this "
+                        "host; async-compute smoke skipped.";
     }
 
     const std::uint64_t readbackSize =
@@ -1903,9 +1972,11 @@ TEST(DefaultRecipeSurfaceGpuSmoke, AsyncComputeHistogramQueueReadbackMatchesMini
         renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
-        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip after running the async-compute smoke: status="
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip after "
+                         "running the async-compute smoke: status="
                       << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
-                      << ". Host capability checks passed, so this is a GRAPHICS-037D regression, not a skip condition.";
+                      << ". Host capability checks passed, so this is a "
+                         "GRAPHICS-037D regression, not a skip condition.";
         return;
     }
 
@@ -1919,16 +1990,20 @@ TEST(DefaultRecipeSurfaceGpuSmoke, AsyncComputeHistogramQueueReadbackMatchesMini
     EXPECT_EQ(FindPassStatus(stats, "PostProcessHistogramPass"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(stats);
     EXPECT_GE(stats.AsyncComputeUtilizedFrames, 1u)
-        << "Default recipe did not accept a multi-queue submit plan with an async-compute batch.";
+        << "Default recipe did not accept a multi-queue submit plan with an "
+           "async-compute batch.";
     EXPECT_GE(stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
-        << "Default-recipe readback triplet did not record on the async-compute smoke frame.";
+        << "Default-recipe readback triplet did not record on the async-compute "
+           "smoke frame.";
 
     EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
-        << "Vulkan fallback counters incremented across an operational async-compute frame: "
+        << "Vulkan fallback counters incremented across an operational "
+           "async-compute frame: "
         << "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
         << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
         << ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
-        << ", gateFailure " << run.Before.OperationalGateFailure << " -> " << run.After.OperationalGateFailure;
+        << ", gateFailure " << run.Before.OperationalGateFailure << " -> "
+        << run.After.OperationalGateFailure;
 
     ExpectMinimalHarnessReadbackSamples(device,
                                         readbackBuffer,

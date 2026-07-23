@@ -11,6 +11,8 @@
 
 #include <gtest/gtest.h>
 
+#include "RuntimeTestModule.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
@@ -30,32 +32,34 @@ namespace Runtime = Extrinsic::Runtime;
 
 namespace
 {
-    class OneFrameApplication final : public Runtime::IApplication
+    class OneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine& /*engine*/) override {}
-        void OnSimTick(Runtime::Engine& /*engine*/, double /*fixedDt*/) override {}
-        void OnVariableTick(Runtime::Engine& engine, double /*alpha*/, double /*dt*/) override
+        void Resolve() override {}
+        void Simulate(double /*fixedDt*/) override {}
+        void Frame(double /*alpha*/, double /*dt*/) override
         {
+            auto& engine = Kernel();
             engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine& /*engine*/) override {}
+        void Shutdown() override {}
     };
 
-    class TwoFrameApplication final : public Runtime::IApplication
+    class TwoFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++m_Frames;
             if (m_Frames >= 2u)
             {
                 engine.RequestExit();
             }
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
     private:
         std::uint32_t m_Frames{0u};
@@ -246,7 +250,8 @@ TEST(RuntimeConfigControlFacade, AgentCliControlsRecipeAndEngineConfigWithoutUi)
     WriteTextFile(recipePath, RenderRecipeConfigDisablingPostprocess(
                                   "runtime.agent.config-control"));
 
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     engine.EmplaceModule<Runtime::EngineConfigControl>();
     engine.Initialize();
     Runtime::EngineConfigControl* configControlService =
@@ -308,7 +313,8 @@ TEST(RuntimeConfigControlFacade, AgentCliControlsRecipeAndEngineConfigWithoutUi)
 
 TEST(RuntimeConfigControlFacade, BootOnlyEngineConfigDifferencesAreRejected)
 {
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     engine.EmplaceModule<Runtime::EngineConfigControl>();
     engine.Initialize();
     Runtime::EngineConfigControl* configControlService =
@@ -344,8 +350,8 @@ TEST(RuntimeConfigControlFacade, BootOnlyEngineConfigDifferencesAreRejected)
 TEST(RuntimeConfigControlFacade,
      GpuProfilingHotApplyIsSynchronousForEditorAndAgentCli)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     engine.EmplaceModule<Runtime::EngineConfigControl>();
     engine.Initialize();
     Runtime::EngineConfigControl* configControl =
@@ -415,8 +421,8 @@ TEST(RuntimeConfigControlFacade,
 {
     CoreConfig::EngineConfig config = HeadlessConfig();
     config.Render.EnableGpuProfiling = true;
-    Runtime::Engine engine(
-        std::move(config), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(std::move(config),
+                                               std::make_unique<OneFrameApplication>());
     engine.Initialize();
     EXPECT_EQ(
         engine.Services().Find<Runtime::EngineConfigControl>(),
@@ -433,8 +439,8 @@ TEST(RuntimeConfigControlFacade,
 TEST(RuntimeConfigControlFacade,
      UiEndHotToggleControlsTheSameFramesImmutableRenderSnapshot)
 {
-    Runtime::Engine engine(
-        HeadlessConfig(), std::make_unique<TwoFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<TwoFrameApplication>());
     engine.EmplaceModule<Runtime::EngineConfigControl>();
     GpuProfilingUiEndToggleModule& toggle =
         engine.EmplaceModule<GpuProfilingUiEndToggleModule>();
@@ -517,9 +523,8 @@ TEST(RuntimeConfigControlFacade,
                     .LastApply.SectionChanged(current.Name);
         })));
 
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     engine.EmplaceModule<Runtime::EngineConfigControl>(
         std::move(registry));
     engineAddress = &engine;
@@ -596,9 +601,8 @@ TEST(RuntimeConfigControlFacade,
             ++callbackCount;
         })));
 
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     engine.EmplaceModule<Runtime::EngineConfigControl>(
         std::move(registry));
     engine.Initialize();
@@ -687,7 +691,8 @@ TEST(RuntimeConfigControlFacade, InvalidHotRecipeConfigPreservesActiveOverride)
         TempPath("intrinsic_runtime_config_control_invalid_recipe");
     WriteTextFile(invalidPath, InvalidRenderRecipeConfig());
 
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     engine.EmplaceModule<Runtime::EngineConfigControl>();
     engine.Initialize();
     Runtime::EngineConfigControl* configControlService =
@@ -758,9 +763,8 @@ TEST(RuntimeConfigControlFacade,
             std::move(registry));
     Runtime::EngineConfigControl* const exactControl =
         configControl.get();
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     engine.AddModule(std::move(configControl));
     engine.Initialize();
 
@@ -906,7 +910,8 @@ TEST(RuntimeConfigControlFacade,
 
 TEST(RuntimeConfigControlFacade, EditorAndAgentPreviewUseSameFacadeResult)
 {
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     engine.EmplaceModule<Runtime::EngineConfigControl>();
     engine.Initialize();
     Runtime::EngineConfigControl* configControlService =

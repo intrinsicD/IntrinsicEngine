@@ -112,9 +112,6 @@ namespace Extrinsic::Core
     public:
         virtual ~IShutdownHooks() = default;
 
-        virtual void StopRunning() = 0;
-        virtual void WaitDeviceIdle() = 0;
-        virtual void ShutdownApplication() = 0;
         virtual void ShutdownStreaming() = 0;
         virtual void DestroyScene() = 0;
         virtual void DestroyAssets() = 0;

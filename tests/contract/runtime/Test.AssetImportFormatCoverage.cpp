@@ -2,19 +2,19 @@
 
 #include <algorithm>
 #include <atomic>
-#include <cmath>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
-#include <functional>
 #include <fstream>
+#include <functional>
 #include <initializer_list>
 #include <iterator>
 #include <memory>
 #include <optional>
-#include <sstream>
 #include <span>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -24,6 +24,8 @@
 
 #include <entt/entity/entity.hpp>
 #include <glm/glm.hpp>
+
+#include "RuntimeTestModule.hpp"
 
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
@@ -96,19 +98,20 @@ namespace
         return *service;
     }
 
-    class OneFrameApplication final : public Runtime::IApplication
+    class OneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             engine.RequestExit();
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
     };
 
-    class WaitForConditionApplication final : public Runtime::IApplication
+    class WaitForConditionApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         explicit WaitForConditionApplication(
@@ -119,10 +122,11 @@ namespace
         {
         }
 
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++m_ObservedFrames;
             if ((m_Ready && m_Ready(engine)) || m_ObservedFrames >= m_MaxFrames)
             {
@@ -131,7 +135,7 @@ namespace
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
     private:
         std::function<bool(Runtime::Engine&)> m_Ready{};
@@ -139,7 +143,7 @@ namespace
         std::uint32_t m_ObservedFrames{0u};
     };
 
-    class AwayAndBackImportApplication final : public Runtime::IApplication
+    class AwayAndBackImportApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         void Arm(Runtime::WorldHandle submissionWorld,
@@ -152,10 +156,11 @@ namespace
             m_Armed = true;
         }
 
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++m_ObservedFrames;
             if (!m_Armed)
                 return;
@@ -197,7 +202,7 @@ namespace
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-        void OnShutdown(Runtime::Engine&) override
+        void Shutdown() override
         {
             if (m_ReleaseWorker != nullptr)
                 m_ReleaseWorker->store(true, std::memory_order_release);
@@ -218,7 +223,7 @@ namespace
         bool m_TimedOut{false};
     };
 
-    class RetireImportWorldApplication final : public Runtime::IApplication
+    class RetireImportWorldApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         void Arm(Runtime::WorldHandle submissionWorld,
@@ -231,10 +236,11 @@ namespace
             m_Armed = true;
         }
 
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++m_ObservedFrames;
             if (!m_Armed)
                 return;
@@ -273,7 +279,7 @@ namespace
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
 
-        void OnShutdown(Runtime::Engine&) override
+        void Shutdown() override
         {
             if (m_ReleaseWorker != nullptr)
                 m_ReleaseWorker->store(true, std::memory_order_release);
@@ -395,7 +401,7 @@ namespace
         Core::IO::FileIOBackend m_File{};
     };
 
-    class SlowImportProbeApplication final : public Runtime::IApplication
+    class SlowImportProbeApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         explicit SlowImportProbeApplication(
@@ -404,10 +410,11 @@ namespace
         {
         }
 
-        void OnInitialize(Runtime::Engine&) override {}
-        void OnSimTick(Runtime::Engine&, double) override {}
-        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        void Resolve() override {}
+        void Simulate(double) override {}
+        void Frame(double, double) override
         {
+            auto& engine = Kernel();
             ++m_Frames;
             if (!m_ReleasedRead && RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).GetLastAssetImportEvent().has_value())
                 m_EventArrivedBeforeRelease = true;
@@ -434,7 +441,7 @@ namespace
                 engine.RequestExit();
             }
         }
-        void OnShutdown(Runtime::Engine&) override {}
+        void Shutdown() override {}
 
         [[nodiscard]] bool FrameAdvancedWhileReadBlocked() const noexcept
         {
@@ -572,7 +579,8 @@ namespace
         const std::string_view bufferUri)
     {
         constexpr std::string_view pngBase64 =
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=";
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/"
+            "p9sAAAAASUVORK5CYII=";
         return std::string(R"json({
   "asset": {"version": "2.0"},
   "buffers": [{"uri": ")json")
@@ -979,7 +987,7 @@ namespace
         // Declared before Engine so callbacks captured by the pipeline remain
         // valid through destructor-driven shutdown after a fatal assertion.
         ModelSceneRouteProbe probe{};
-        std::unique_ptr<Runtime::IApplication> application{};
+        std::unique_ptr<Intrinsic::Tests::RuntimeTestModule> application{};
         if (queued)
         {
             application = std::make_unique<WaitForConditionApplication>(
@@ -1001,7 +1009,7 @@ namespace
 
         Core::Config::EngineConfig config = HeadlessConfig();
         config.Camera.Enabled = true;
-        Runtime::Engine engine(config, std::move(application));
+        Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(application));
         InitializeAssetImportEngine(engine);
         InstallSandboxDefaultRuntimePolicies(engine);
 
@@ -1284,11 +1292,10 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
 
     std::optional<ECS::EntityHandle> meshEntity{};
     ComposedNormalBakeProbe bakeProbe{};
-    Runtime::Engine engine(
+    Intrinsic::Tests::RuntimeTestKernel engine(
         HeadlessConfig(),
         std::make_unique<WaitForConditionApplication>(
-            [&meshEntity, &bakeProbe](
-                Runtime::Engine& runningEngine)
+            [&meshEntity, &bakeProbe](Runtime::Engine& runningEngine)
             {
                 return meshEntity.has_value() &&
                     DirectMeshPostProcessReady(
@@ -1357,9 +1364,8 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsSmallGener
         GridObjText(side));
 
     {
-        Runtime::Engine closingEngine(
-            HeadlessConfig(),
-            std::make_unique<OneFrameApplication>());
+        Intrinsic::Tests::RuntimeTestKernel closingEngine(HeadlessConfig(),
+                                                          std::make_unique<OneFrameApplication>());
         InitializeAssetImportEngine(closingEngine);
         InstallSandboxDefaultRuntimePolicies(closingEngine);
 
@@ -1385,11 +1391,10 @@ TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsSmallGener
 
     std::optional<ECS::EntityHandle> completedEntity{};
     ComposedNormalBakeProbe bakeProbe{};
-    Runtime::Engine completedEngine(
+    Intrinsic::Tests::RuntimeTestKernel completedEngine(
         HeadlessConfig(),
         std::make_unique<WaitForConditionApplication>(
-            [&completedEntity, &bakeProbe](
-                Runtime::Engine& runningEngine)
+            [&completedEntity, &bakeProbe](Runtime::Engine& runningEngine)
             {
                 return completedEntity.has_value() &&
                     DirectMeshPostProcessReady(
@@ -1441,9 +1446,8 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportDefaultsToMaterialDrivenSh
         "vn 0 0 1\n"
         "f 1//1 2//2 3//3\n");
 
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     InitializeAssetImportEngine(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
@@ -1550,19 +1554,14 @@ TEST(RuntimeAssetImportFormatCoverage, DefaultImportPoliciesApplyAuthoringUxAndP
     ComposedNormalBakeProbe bakeProbe{};
     Core::Config::EngineConfig config = HeadlessConfig();
     config.Camera.Enabled = true;
-    Runtime::Engine engine(
-        config,
-        std::make_unique<WaitForConditionApplication>(
-            [&meshEntity, &bakeProbe](
-                Runtime::Engine& runningEngine)
-            {
-                return meshEntity.has_value() &&
-                    DirectMeshPostProcessReady(
-                        runningEngine,
-                        *meshEntity,
-                        bakeProbe);
-            },
-            256u));
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        config, std::make_unique<WaitForConditionApplication>(
+                    [&meshEntity, &bakeProbe](Runtime::Engine& runningEngine)
+                    {
+                        return meshEntity.has_value() &&
+                               DirectMeshPostProcessReady(runningEngine, *meshEntity, bakeProbe);
+                    },
+                    256u));
     InitializeAssetImportEngine(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
     InstallComposedNormalBakeProbe(engine, bakeProbe);
@@ -1629,15 +1628,14 @@ TEST(RuntimeAssetImportFormatCoverage, UnregisteredImportPoliciesMaterializeMini
     std::optional<ECS::EntityHandle> meshEntity{};
     Core::Config::EngineConfig config = HeadlessConfig();
     config.Camera.Enabled = true;
-    Runtime::Engine engine(
-        config,
-        std::make_unique<WaitForConditionApplication>(
-            [&meshEntity](Runtime::Engine& runningEngine)
-            {
-                return meshEntity.has_value() &&
-                    HasGeneratedNormalTextureBinding(runningEngine, *meshEntity);
-            },
-            64u));
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        config, std::make_unique<WaitForConditionApplication>(
+                    [&meshEntity](Runtime::Engine& runningEngine)
+                    {
+                        return meshEntity.has_value() &&
+                               HasGeneratedNormalTextureBinding(runningEngine, *meshEntity);
+                    },
+                    64u));
     InitializeAssetImportEngine(engine);
 
     auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
@@ -1691,9 +1689,8 @@ TEST(RuntimeAssetImportFormatCoverage,
         "v 0 1 0\n"
         "f 1 2 3\n");
 
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
@@ -1740,7 +1737,8 @@ TEST(RuntimeAssetImportFormatCoverage, DirectImportCompletesIngestStateMachineRe
         "v 0 1 0\n"
         "f 1 2 3\n");
 
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     InitializeAssetImportEngine(engine);
 
     auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
@@ -1778,7 +1776,7 @@ TEST(RuntimeAssetImportFormatCoverage, AssetImportPipelineAccessorExposesQueueAn
         "assetio147_pipeline_accessor_albedo.png",
         std::span<const std::byte>(pngBytes.data(), pngBytes.size()));
 
-    Runtime::Engine engine(
+    Intrinsic::Tests::RuntimeTestKernel engine(
         HeadlessConfig(),
         std::make_unique<WaitForConditionApplication>(
             [](Runtime::Engine& runningEngine)
@@ -1840,9 +1838,8 @@ TEST(RuntimeAssetImportFormatCoverage, ExplicitCancelPublishesOneTerminalEvent)
         "v 0 1 0\n"
         "f 1 2 3\n");
 
-    Runtime::Engine engine(
-        HeadlessConfig(),
-        std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     InitializeAssetImportEngine(engine);
 
     Runtime::AssetImportPipeline& pipeline =
@@ -1904,7 +1901,8 @@ TEST(RuntimeAssetImportFormatCoverage, AssetImportPipelinePreservesImportDirtySt
     std::error_code ignored;
     std::filesystem::remove(missingPath, ignored);
 
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     InitializeAssetImportEngine(engine);
     Runtime::AssetImportPipeline& pipeline = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine);
 
@@ -1965,7 +1963,8 @@ TEST(RuntimeAssetImportFormatCoverage, PostImportProcessorsRunInOrderAndCanUnreg
         "#\n"
         "1 2 1.0 edge\n");
 
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     InitializeAssetImportEngine(engine);
 
     std::vector<int> observedOrder{};
@@ -2068,7 +2067,8 @@ TEST(RuntimeAssetImportFormatCoverage, ReimportExistingMeshReloadsAssetWithoutDu
         "v 0 1 0\n"
         "f 1 2 3\n");
 
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     InitializeAssetImportEngine(engine);
 
     auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
@@ -2149,7 +2149,7 @@ TEST(RuntimeAssetImportFormatCoverage, ImportAssetFromPathDoesNotWaitForUnrelate
 
     Core::Config::EngineConfig config = HeadlessConfig();
     config.Simulation.WorkerThreadCount = 1u;
-    Runtime::Engine engine(config, std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::make_unique<OneFrameApplication>());
     InitializeAssetImportEngine(engine);
 
     std::atomic<bool> blockerStarted{false};
@@ -2191,7 +2191,8 @@ TEST(RuntimeAssetImportFormatCoverage, ImportAssetFromPathDoesNotWaitForUnrelate
 
 TEST(RuntimeAssetImportFormatCoverage, ReimportInvalidAssetReportsDeterministicIngestDiagnostic)
 {
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     InitializeAssetImportEngine(engine);
 
     auto reimported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ReimportAsset(Runtime::RuntimeAssetReimportRequest{
@@ -2237,11 +2238,10 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportQueuesGeneratedNormalBakeF
 
     std::optional<ECS::EntityHandle> meshEntity{};
     ComposedNormalBakeProbe bakeProbe{};
-    Runtime::Engine engine(
+    Intrinsic::Tests::RuntimeTestKernel engine(
         HeadlessConfig(),
         std::make_unique<WaitForConditionApplication>(
-            [&meshEntity, &bakeProbe](
-                Runtime::Engine& runningEngine)
+            [&meshEntity, &bakeProbe](Runtime::Engine& runningEngine)
             {
                 return meshEntity.has_value() &&
                     DirectMeshPostProcessReady(
@@ -2296,11 +2296,10 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenM
 
     std::optional<ECS::EntityHandle> meshEntity{};
     ComposedNormalBakeProbe bakeProbe{};
-    Runtime::Engine engine(
+    Intrinsic::Tests::RuntimeTestKernel engine(
         HeadlessConfig(),
         std::make_unique<WaitForConditionApplication>(
-            [&meshEntity, &bakeProbe](
-                Runtime::Engine& runningEngine)
+            [&meshEntity, &bakeProbe](Runtime::Engine& runningEngine)
             {
                 return meshEntity.has_value() &&
                     DirectMeshPostProcessReady(
@@ -2369,11 +2368,10 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesNormalsAndQueuesGe
 
     std::optional<ECS::EntityHandle> meshEntity{};
     ComposedNormalBakeProbe bakeProbe{};
-    Runtime::Engine engine(
+    Intrinsic::Tests::RuntimeTestKernel engine(
         HeadlessConfig(),
         std::make_unique<WaitForConditionApplication>(
-            [&meshEntity, &bakeProbe](
-                Runtime::Engine& runningEngine)
+            [&meshEntity, &bakeProbe](Runtime::Engine& runningEngine)
             {
                 return meshEntity.has_value() &&
                     DirectMeshPostProcessReady(
@@ -2465,7 +2463,8 @@ TEST(RuntimeAssetImportFormatCoverage, RepresentativePromotedFormatsMaterializeD
         "assetio004_albedo.png",
         std::span<const std::byte>(pngBytes.data(), pngBytes.size()));
 
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+                                               std::make_unique<OneFrameApplication>());
     InitializeAssetImportEngine(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
@@ -2570,7 +2569,7 @@ TEST(RuntimeAssetImportFormatCoverage, QueuedImportsRejectActiveWorldSwitchBefor
         "runtime179_world_scoped_import.gltf",
         TriangleGltfJson(modelBinName));
 
-    Runtime::Engine engine(
+    Intrinsic::Tests::RuntimeTestKernel engine(
         HeadlessConfig(),
         std::make_unique<WaitForConditionApplication>(
             [](Runtime::Engine& runningEngine)
@@ -2688,7 +2687,7 @@ TEST(RuntimeAssetImportFormatCoverage, QueuedImportRejectsAwayAndBackBindingEpoc
     // boundaries apply the away-and-back switch. Keep another worker available
     // for the frame graph so the test cannot self-deadlock.
     config.Simulation.WorkerThreadCount = 2u;
-    Runtime::Engine engine(config, std::move(application));
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(application));
     InitializeAssetImportEngine(engine);
 
     const Runtime::WorldHandle submissionWorld = engine.ActiveWorld();
@@ -2762,7 +2761,7 @@ TEST(RuntimeAssetImportFormatCoverage, RetiredWorldImportTerminalizesQueueState)
     std::atomic<bool> releaseWorker{false};
     Core::Config::EngineConfig config = HeadlessConfig();
     config.Simulation.WorkerThreadCount = 2u;
-    Runtime::Engine engine(config, std::move(application));
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(application));
     InitializeAssetImportEngine(engine);
 
     const Runtime::WorldHandle submissionWorld = engine.ActiveWorld();
@@ -2859,7 +2858,7 @@ TEST(RuntimeAssetImportFormatCoverage, DroppedModelSceneAndTextureImportThroughS
         "assetio142_drop_albedo.png",
         std::span<const std::byte>(pngBytes.data(), pngBytes.size()));
 
-    Runtime::Engine engine(
+    Intrinsic::Tests::RuntimeTestKernel engine(
         HeadlessConfig(),
         std::make_unique<WaitForConditionApplication>(
             [](Runtime::Engine& runningEngine)
@@ -2898,7 +2897,8 @@ TEST(RuntimeAssetImportFormatCoverage, DroppedModelSceneAndTextureImportThroughS
     EXPECT_TRUE(queue.Entries[1].CanCancel);
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
     engine.Run();
 
     queue = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).GetAssetImportQueueSnapshot();
@@ -2982,7 +2982,7 @@ TEST(RuntimeAssetImportFormatCoverage, ManualModelSceneAndTextureImportQueueComp
         "assetio142_manual_albedo.png",
         std::span<const std::byte>(pngBytes.data(), pngBytes.size()));
 
-    Runtime::Engine engine(
+    Intrinsic::Tests::RuntimeTestKernel engine(
         HeadlessConfig(),
         std::make_unique<WaitForConditionApplication>(
             [](Runtime::Engine& runningEngine)
@@ -3037,7 +3037,8 @@ TEST(RuntimeAssetImportFormatCoverage, ManualModelSceneAndTextureImportQueueComp
     EXPECT_TRUE(queue.Entries[1].CanCancel);
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
     engine.Run();
 
     queue = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).GetAssetImportQueueSnapshot();
@@ -3113,7 +3114,7 @@ TEST(RuntimeAssetImportFormatCoverage, SlowQueuedTextureReadDoesNotBlockRunFrame
     auto readState = std::make_shared<BlockingReadBackendState>();
     auto application = std::make_unique<SlowImportProbeApplication>(readState);
     SlowImportProbeApplication* app = application.get();
-    Runtime::Engine engine(HeadlessConfig(), std::move(application));
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
     InitializeAssetImportEngine(engine);
     RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).SetModelTextureImportIOBackendFactoryForTest(
         [readState]()
@@ -3135,14 +3136,16 @@ TEST(RuntimeAssetImportFormatCoverage, SlowQueuedTextureReadDoesNotBlockRunFrame
     EXPECT_FALSE(readState->ReadStarted.load(std::memory_order_acquire));
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
-        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+        << "explicit Null window backend must keep Engine::Run() drivable on "
+           "headless hosts";
     engine.Run();
 
     EXPECT_FALSE(app->TimedOut()) << "frames observed: " << app->Frames();
     EXPECT_TRUE(app->FrameAdvancedWhileReadBlocked())
         << "The frame loop must advance while queued texture IO is blocked.";
     EXPECT_FALSE(app->EventArrivedBeforeRelease())
-        << "Import apply must not complete before the blocked worker read is released.";
+        << "Import apply must not complete before the blocked worker read is "
+           "released.";
     EXPECT_TRUE(readState->ReadStarted.load(std::memory_order_acquire));
     EXPECT_TRUE(readState->ReadFinished.load(std::memory_order_acquire));
     const std::optional<Runtime::RuntimeAssetImportEvent>& event =

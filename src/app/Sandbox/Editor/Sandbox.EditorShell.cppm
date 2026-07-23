@@ -9,8 +9,9 @@ module;
 export module Extrinsic.Sandbox.Editor.Shell;
 
 import Extrinsic.Runtime.EditorUiHost;
-import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.SandboxEditorFacades;
+import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.WorldRegistry;
 
 export namespace Extrinsic::Sandbox::Editor
 {
@@ -39,7 +40,7 @@ export namespace Extrinsic::Sandbox::Editor
         EditorShell(EditorShell&&) = delete;
         EditorShell& operator=(EditorShell&&) = delete;
 
-        void Attach(Runtime::Engine& engine);
+        void Attach(Runtime::WorldRegistry& worlds, Runtime::ServiceRegistry& services);
         void Detach();
 
         [[nodiscard]] Runtime::EditorWindowHandle RegisterEditorWindow(

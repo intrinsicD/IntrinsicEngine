@@ -13,6 +13,8 @@ import Extrinsic.Core.Config.Render;
 
 namespace Extrinsic::Runtime
 {
+    export using RuntimeEngineConfig = Core::Config::EngineConfig;
+
     export [[nodiscard]] Core::Config::EngineConfig CreateReferenceEngineConfig();
     export [[nodiscard]] Core::Config::EngineConfig CreateReferenceEngineConfig(
         const Core::Config::EngineConfigSectionRegistry& sectionRegistry);
