@@ -1,7 +1,7 @@
 ---
 id: RUNTIME-191
 theme: F
-depends_on: [RUNTIME-190]
+depends_on: [RUNTIME-190, RUNTIME-192]
 maturity_target: Retired
 ---
 # RUNTIME-191 — Unify property-to-texture baking and retire specialized paths
@@ -27,18 +27,19 @@ maturity_target: Retired
   but this task proves mesh vertex, face, and nearest-edge properties.
 - No live CPU fallback, synchronous GPU readback, or silent backend switch.
   Null and non-operational devices fail closed with actionable diagnostics.
-- No change to the material/shading-model authority owned by `GRAPHICS-105`;
-  this task preserves current consumer semantics while unifying how textures
-  are produced and delivered.
+- No material, visualization, presentation, or other consumer mutation inside
+  texture baking. `GRAPHICS-105` and the relevant caller own how a completed
+  output is interpreted and bound.
 - No new normal-generation algorithm, texture format feature, or unrelated
   renderer capability.
 
 ## Context
 
-- Owning layer: `runtime` composes ECS property lookup, world lifetime, job
-  scheduling, generated `AssetService` ownership, completion, and consumer
-  binding. `graphics/renderer` owns the backend-neutral property-raster
-  planning/recording implementation and shaders.
+- Owning layer: `runtime` composes canonical property resolution, world
+  lifetime, job scheduling, generated `AssetService` ownership, completion,
+  and output-asset lifecycle. `graphics/renderer` owns the backend-neutral
+  property-raster planning/recording implementation and shaders. Callers own
+  all material/presentation/visualization result processing and binding.
 - Retired `RUNTIME-190` generalized the interactive editor/agent GPU path, but
   deliberately retained the standalone CPU compatibility baker and relocated
   the import-time object-space-normal producer unchanged. Its narrower
@@ -56,9 +57,10 @@ maturity_target: Retired
   records with an older selected-entity direct command, and its public records
   reuse `MeshAttributeTextureBake*` vocabulary. App/editor code consequently
   imports a CPU implementation module merely to name encoder and range enums.
-- Canonical vocabulary for this task is **property**: a named geometry-domain
-  value field is the bake source. “Attribute” remains renderer vocabulary
-  where appropriate, but must not create a second bake contract.
+- Canonical vocabulary for this task is **property**: a
+  `RUNTIME-192` `GeometryPropertyRef` is the bake source. “Attribute” remains
+  renderer vocabulary where appropriate, but must not create a second bake
+  contract.
 - Producers of transform-derived fields own their mathematics and
   invalidation. For example, a world-space normal producer applies the normal
   matrix, publishes a named property, and advances its source generation when
@@ -68,14 +70,16 @@ maturity_target: Retired
   canonical source identity, bounded scheduling, world/epoch and weak-lifetime
   validation, stale-completion rejection, cache generation, ready-frame and
   frame-safe retirement, UV/topology/property byte revalidation,
-  padding/dilation, progressive fallback, and exact consumer binding. The task
-  moves these invariants; it does not discard them.
+  padding/dilation, output publication, and cleanup. Caller integration tests
+  separately preserve progressive fallback and exact consumer binding; those
+  semantics do not move into the baker.
 
 ## Control surfaces
 
-- Config: no new tuning lane. Existing/default extent, encoding, range, and
-  colormap inputs continue through the canonical request and validated apply
-  path.
+- Config: no new tuning lane. Existing/default extent, storage encoding,
+  numeric range, and padding inputs continue through the canonical request and
+  validated apply path. Colormap/material meaning remains caller-owned
+  processing.
 - UI: selected-entity controls construct the same canonical request used by
   every other caller; selection is caller context, not part of bake identity
   or type names.
@@ -104,9 +108,9 @@ maturity_target: Retired
 - **Simpler alternative:** deepen the existing `TextureBakeModule` and
   `Graphics.PropertyTextureBake` seams. Export plain canonical DTOs from
   `Runtime.TextureBakeModule`; keep lifecycle, queues, completion, asset
-  ownership, and bindings private in its implementation units. Express
-  encoding, padding, and consumer semantics as request data rather than
-  services.
+  ownership, and output catalog operations private in its implementation
+  units. Express storage encoding, range, raster mapping, and padding as
+  request data; do not accept consumers or semantic normal/color space.
 - **Blast radius:** runtime module/interface and CMake wiring, asset workflow
   and model-scene handoff, Sandbox editor facades/panels, renderer property
   bake recorder/shaders, generated-asset/presentation tests, Vulkan smokes,
@@ -121,7 +125,7 @@ maturity_target: Retired
 ## Slice plan
 
 - **Slice A — canonical contract (`CPUContracted`).** Move the generic
-  property/domain/value/encoding/range/normal-space request, result, snapshot,
+  property-reference/UV-raster/storage-encoding/range request, result, snapshot,
   and diagnostic vocabulary onto `Runtime.TextureBakeModule`; migrate
   editor/agent/import call sites away from `SelectedMesh*` and
   `MeshAttributeTextureBake*` public types without changing execution
@@ -134,12 +138,12 @@ maturity_target: Retired
   import/default policy through `TextureBakeService`, remove the raw
   object-normal queue borrow, and register exactly one texture-bake GPU
   participant.
-- **Slice C — parity and consumer migration (`ParityProven`).** Prove
+- **Slice C — parity and workflow result migration (`ParityProven`).** Prove
   interactive and import-time normal/color outputs, progressive fallback,
-  generated-asset identity, multi-consumer binding, world replacement, stale
-  completion, and shutdown behavior through the canonical path. Remove every
-  live CPU bake call and decide whether the minimal CPU oracle is deleted or
-  moved to test-only support.
+  generated-asset identity, caller-owned material/presentation binding, world
+  replacement, stale completion, and shutdown behavior through the canonical
+  path. Remove every live CPU bake call and decide whether the minimal CPU
+  oracle is deleted or moved to test-only support.
 - **Slice D — legacy deletion (`Retired`).** In a separate mechanical cleanup
   commit, delete the superseded selected-mesh, mesh-attribute CPU production,
   object-space-normal runtime/graphics modules and shaders, obsolete tests and
@@ -150,9 +154,13 @@ maturity_target: Retired
 
 - [ ] Export one plain `PropertyTextureBakeRequest` /
       `PropertyTextureBakeResult` family from `Runtime.TextureBakeModule`,
-      covering source entity/world, property name/domain/value kind, UV
-      property, encoding/storage/range/normal-space metadata, extent/padding,
-      output identity, and zero or more compatible consumers.
+      covering source entity/world, one canonical `GeometryPropertyRef`, UV /
+      topology raster mapping, expected source/property generations, storage
+      encoding and numeric range,
+      extent/padding, output description, and stable output identity. The
+      result reports operation/output `AssetId`, generation, readiness, and
+      diagnostics; neither request nor result owns a consumer list, normal
+      space, material channel, visualization mode, or presentation binding.
 - [ ] Replace `SelectedMeshTextureBake*` and
       `MeshAttributeTextureBake*` vocabulary in the service, Sandbox facade,
       UI, agent surface, catalogs, diagnostics, and tests with the canonical
@@ -164,18 +172,21 @@ maturity_target: Retired
       generation/dirty identity so an old world-space result cannot survive a
       transform change.
 - [ ] Extend the general graphics property-raster plan/recorder with the
-      currently load-bearing padding/dilation and normal-encoding behavior,
+      currently load-bearing padding/dilation and signed-vector storage
+      encoding behavior,
       without normal-specific public plans, shaders, descriptor contracts, or
       Vulkan types crossing the graphics/runtime interface.
 - [ ] Consolidate scheduling, canonical content identity, GPU residency
       validation, cache generations, ready-frame publication, stale rejection,
-      frame-safe retirement, generated-asset ownership, and consumer binding
-      into the one `TextureBakeModule` implementation and one JobService GPU
-      participant.
+      frame-safe retirement, generated-asset ownership, and output catalog
+      lifecycle into the one `TextureBakeModule` implementation and one
+      JobService GPU participant.
 - [ ] Change `AssetWorkflowModule` and `AssetModelSceneHandoff` to call the
       published `TextureBakeService` after property materialization. Preserve
       visible property-buffer/authored-texture fallback while asynchronous
       output is pending and preserve exact world/epoch/entity lifetime checks.
+      Once a result is ready, the asset/material/presentation owner binds or
+      postprocesses it through its own typed operation.
 - [ ] Remove `TextureBakeProducerContext`'s specialized queue exposure; no
       production interface may publish or accept
       `RuntimeObjectSpaceNormalBakeQueue*`.
@@ -193,9 +204,11 @@ maturity_target: Retired
       remove their implementation units, specialized shaders, CMake entries,
       compatibility wrappers, and production imports.
 - [ ] Preserve one generated output's deterministic rebake/rename/remove
-      identity and atomic multi-consumer behavior without introducing a second
-      asset registry, texture manager, event bus, queue facade, or binding
-      family.
+      identity. Migrate existing multi-consumer workflows to caller-owned
+      result processing that applies the completed `AssetId` atomically while
+      preserving unrelated channels; remove `SetConsumers`,
+      `TextureBakeConsumerUpdateRequest`, and equivalent bake-owned binding
+      APIs rather than replacing them.
 - [ ] Separate semantic migration commits from the final mechanical deletion
       commit so review can distinguish behavior changes from removals.
 
@@ -203,8 +216,9 @@ maturity_target: Retired
 
 - [ ] CPU/headless contract tests cover canonical request validation for
       vertex, face, and nearest-edge domains; scalar, label, vector, color, and
-      normal encodings; missing/invalid properties, UVs, topology, counts,
-      finite values, ranges, extents, padding, and consumers.
+      storage encodings; missing/invalid properties, UVs, topology, counts,
+      finite values, ranges, extents, and padding. Assert that consumer or
+      normal-space semantics cannot be supplied to the bake request.
 - [ ] CPU/headless contracts prove Null/non-operational devices fail closed and
       neither import nor editor/agent routes execute a CPU fallback.
 - [ ] Import contracts prove required properties are materialized before
@@ -217,9 +231,10 @@ maturity_target: Retired
       content/cache generation, stale completion rejection, world/document
       replacement, weak target lifetime, generated-asset cleanup, and shutdown
       with the single participant.
-- [ ] Consumer tests cover pending fallback, exact normal/albedo/visualization
-      binding, multi-consumer updates, rebake, rename, remove, and preservation
-      of unrelated material channels.
+- [ ] Caller integration tests cover pending fallback, exact
+      normal/albedo/visualization result processing, atomic multi-consumer
+      updates outside the baker, rebake, rename, remove, and preservation of
+      unrelated material channels.
 - [ ] Opt-in `gpu;vulkan` readback smokes prove representative editor/agent and
       import/default-policy normal and color properties use
       `Graphics.PropertyTextureBake`, including padding/dilation, with no
@@ -251,8 +266,8 @@ maturity_target: Retired
       exposes no specialized normal queue, service, binding, submission, or
       producer context.
 - [ ] Normal, color, scalar, label, and vector bakes differ only through
-      prepared source properties, request data, and result consumers; none
-      selects a parallel end-to-end path.
+      prepared source properties and storage/output data; none selects a
+      parallel end-to-end path or embeds consumer semantics in the baker.
 - [ ] Import-time missing-texture policy first materializes the named source
       property and then uses the canonical asynchronous GPU path, retaining
       visible fallback until exact completion.
@@ -265,8 +280,9 @@ maturity_target: Retired
 - [ ] A retained CPU oracle, if any, exists only in test support and cannot be
       selected by production code.
 - [ ] Existing generated-asset, cache/residency, stale-result, padding/dilation,
-      progressive presentation, and shutdown guarantees have parity evidence
-      through the canonical path.
+      and shutdown guarantees have parity evidence through the canonical path;
+      progressive/material/visualization integration has separate caller-owned
+      result-processing parity.
 - [ ] The final implementation passes the right-sizing deletion test: removing
       any remaining bake module would redistribute necessary complexity across
       multiple callers or cross a real runtime/graphics seam.
@@ -308,6 +324,9 @@ tools/ci/run_clean_workshop_review.sh . --strict
 - Adding a new `Service`/`Queue`/`Binding`/`Submission` chain, forwarding
   facade, backend registry, or texture manager.
 - Computing a missing property implicitly inside `TextureBakeService`.
+- Encoding object/world/tangent space, material channels, visualization modes,
+  or consumer lists into the bake request/result instead of preparing the
+  source property and processing the output in the caller.
 - Retaining a live CPU fallback or letting importer/editor availability choose
   different semantic bake paths.
 - Keeping compatibility aliases, re-exports, specialized shaders, or raw queue

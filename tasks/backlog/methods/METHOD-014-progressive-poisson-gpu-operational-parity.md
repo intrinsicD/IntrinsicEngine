@@ -4,6 +4,9 @@ theme: I
 depends_on:
   - METHOD-013
   - CORE-009
+  - RUNTIME-194
+  - RUNTIME-195
+  - RUNTIME-202
 maturity_target: ParityProven
 ---
 # METHOD-014 — Progressive Poisson GPU operational parity
@@ -30,7 +33,9 @@ maturity_target: ParityProven
 ## Control surfaces
 - Config: registered app section
   `sandbox.progressive_poisson` field `backend`.
-- Command/API: `SandboxEditorProgressivePoissonCommand::Config.Backend`.
+- Command/API: the post-`RUNTIME-202` typed
+  `ProgressivePoissonRequest::Backend`; UI/config/agent callers use that same
+  operation.
 - UI: retired `RUNTIME-136` already exposes requested backend and fallback
   readout.
 
@@ -53,13 +58,21 @@ maturity_target: ParityProven
 - Finish the single runtime path, parser, and diagnostics delivered by
   METHOD-013. Do not add a second adapter, backend registry, device service, or
   synchronous readback path.
+- Use the canonical `JobService` and multi-range GPU readback operation; the
+  Progressive Poisson GPU recorder/parser remains a private implementation of
+  its typed feature operation, not a public queue or universal method service.
 - Add one dedicated GPU smoke runner because actual-device evidence cannot be
   emitted by the CPU smoke. Reuse the benchmark result schema and the fixed
   METHOD-012 fixtures rather than creating GPU-benchmark infrastructure.
 
 ## Required changes
-- [ ] Complete the GPU-capable runtime overload so completed Vulkan pass output
-      flows through the readback parser/parity diagnostics.
+- [ ] Complete one typed Progressive Poisson runtime operation so CPU and GPU
+      requests share snapshot, validation, cancellation, stale-result,
+      result, and writeback semantics.
+- [ ] Record GPU work through `JobService` and flow the existing multi-buffer
+      Vulkan output through the `RUNTIME-195` readback operation into the
+      parser/parity diagnostics; remove direct blocking `IDevice::ReadBuffer`
+      result reads.
 - [ ] Return public results with requested/actual backend identity and parity
       deltas.
 - [ ] Implement CPU fallback for non-operational devices, GPU pass failure,
@@ -76,10 +89,14 @@ maturity_target: ParityProven
       parity, readback/fallback, device, and timing-source details in
       diagnostics; a skipped/fallback run cannot support a GPU performance
       claim.
+- [ ] After CPU/fallback and actual Vulkan parity pass through the typed
+      operation, delete duplicate Sandbox backend/result records, direct
+      CPU/GPU command routes, and any public backend wrapper/queue that has no
+      independent consumer.
 
 ## Tests
 - [ ] Default CPU/null fallback test asserting a Vulkan request returns the CPU
-      result with `ActualBackend == CPU`.
+      result with `ActualBackend == CPU` through the same typed operation.
 - [ ] Opt-in `gpu;vulkan` parity tests asserting per-level counts, accepted order
       where deterministic, splat radii, and the Poisson guarantee against shared
       fixtures.
@@ -130,7 +147,11 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 - Changing CPU reference semantics to make the GPU path match.
 - Introducing CUDA.
 - Claiming speedups without a baseline comparison.
+- Adding a Progressive Poisson queue/service family, universal method service,
+  or second readback path alongside `JobService`/`RUNTIME-195`.
 
 ## Maturity
 - Target: `ParityProven` on Vulkan-capable hosts; CPU fallback remains the
   intended endpoint on Null/non-operational hosts.
+- Closure also requires migration of UI/config/agent workflows to the typed
+  operation and deletion of the parallel Sandbox/backend paths after parity.

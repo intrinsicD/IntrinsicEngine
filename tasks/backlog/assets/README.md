@@ -15,7 +15,8 @@ GPU-agnostic; GPU residency lives under `src/graphics/assets` and is wired by
 - [ASSETIO-010 — Async model companion preflight](ASSETIO-010-async-model-companion-preflight.md):
   generation-keyed background preview for primary model sources and external
   glTF dependencies, with required buffers gated, optional images reported as
-  warnings, and authoritative import-time revalidation. Depends on `BUG-093`'s
+  warnings, and authoritative import-time revalidation as a `RUNTIME-200`
+  recipe stage executed by `RUNTIME-194` `JobService`. Depends on `BUG-093`'s
   runtime-owned readiness/presentation model.
 - [ASSETIO-009 — Loss-aware MaterialX subset import](ASSETIO-009-loss-aware-materialx-subset-import.md):
   post-stability standalone material-library routing that reuses the canonical

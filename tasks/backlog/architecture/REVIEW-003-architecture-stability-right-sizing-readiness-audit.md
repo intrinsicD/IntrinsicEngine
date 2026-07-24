@@ -21,16 +21,40 @@ depends_on:
   - RUNTIME-174
   - RUNTIME-177
   - RUNTIME-188
+  - RUNTIME-138
+  - RUNTIME-191
+  - RUNTIME-192
+  - RUNTIME-193
+  - RUNTIME-194
+  - RUNTIME-195
+  - RUNTIME-196
+  - RUNTIME-197
+  - RUNTIME-198
+  - RUNTIME-199
+  - RUNTIME-200
+  - RUNTIME-201
+  - RUNTIME-202
+  - RUNTIME-203
+  - RUNTIME-204
+  - PHYSICS-004
   - PROC-027
 ---
 # REVIEW-003 — Architecture stability and right-sizing readiness audit
 
 ## Status
 
+- Re-gated on 2026-07-24: a source-complete runtime surface audit found
+  parallel property/presentation/work/readback/clustering/residency/
+  visualization/spatial-debug/import/history paths, a monolithic Sandbox
+  facade, exported one-consumer helpers, and additional dormant/test-only
+  production surfaces. `RUNTIME-191..204`, `RUNTIME-138`, and `PHYSICS-004`
+  now own the
+  bounded remediation/migration/deletion work. The prior Ready status is
+  superseded; this audit must not start until those dependencies retire.
 - Ready on 2026-07-23: `ARCH-014` retired with the all-green kernel scorecard
   and exact `12/0/0/5` Engine policy, satisfying this task's final static
-  dependency. The next owner must run the one-shot audit on a fresh `main`
-  commit; no partial evidence from the convergence branch substitutes for it.
+  dependency known at that time. The 2026-07-24 re-gate above supersedes this
+  readiness claim.
 - 2026-07-19 dependency amendment: the scene-owner audit split
   `SceneDocumentModule` (`RUNTIME-172`) from `SceneInteractionModule`
   (`RUNTIME-188`). Both are retired at `Operational`, satisfying this specific
@@ -71,6 +95,10 @@ depends_on:
   itself audit whole-tree complexity, premature abstraction, dead seams, or
   process-tool rent. The other static dependencies are the currently known
   ownership and right-sizing leaves that must retire before this audit runs.
+- The 2026-07-24 runtime audit deliberately sequences each new remediation as
+  contract/test → production workflow migration → parity → old-path deletion.
+  A task cannot satisfy this gate by adding a general abstraction while
+  retaining the specialized path as a permanent compatibility route.
 - `RUNTIME-172` and `RUNTIME-188` are separate gates because the audited scene
   ownership split assigns document/history replacement authority and
   frame-driven interaction/readback state to different concrete modules. The

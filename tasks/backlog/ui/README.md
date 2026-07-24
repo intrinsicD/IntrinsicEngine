@@ -11,18 +11,18 @@ map.
 ## Tasks
 
 - [UI-038 — Progressive Poisson destructive-conversion safety](UI-038-progressive-poisson-destructive-conversion-safety.md)
-  (runtime-owned preview/confirmation plus exact undo/redo for the existing
-  mesh-to-point-cloud replacement; auto-run and agent/backend paths cannot
-  bypass confirmation).
+  (feature-owned typed preview/confirmation plus the `RUNTIME-201` common
+  mutation/history transaction for exact undo/redo; post-`RUNTIME-202`
+  auto-run and agent/backend paths cannot bypass confirmation).
 - [UI-037 — Linear domain-action readiness and disabled-reason tooltips](UI-037-linear-domain-action-readiness-tooltips.md)
-  (one runtime-owned readiness/reason contract for mesh, UV, bake,
-  point-cloud, registration, and parameterization actions, consumed by both
-  app and agent/controller callers; gated on truthful point-to-plane semantics
-  from `BUG-096`, the shared tooltip convention from `BUG-093`, and
+  (one shared readiness value reused by each feature-owned typed operation for
+  mesh, UV, bake, point-cloud, registration, and parameterization actions;
+  app owns aggregation after `RUNTIME-202`; gated on truthful point-to-plane
+  semantics from `BUG-096`, the shared tooltip convention from `BUG-093`, and
   generation-keyed nonblocking selected analysis from `RUNTIME-138`).
 - [UI-035 — Sandbox point-cloud consolidation editor panel](UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
   (LOP/WLOP/CLOP/EAR CPU-reference strategy and parameter controls driving the
-  `RUNTIME-175` config-lane apply path; METHOD-019/020 may add only backends
+  post-facade `RUNTIME-175` typed operation/config path; METHOD-019/020 may add only backends
   that pass their evidence gates; gated on `runtime/RUNTIME-175`; uses the
   app-owned editor structure retired by `ARCH-006`).
 

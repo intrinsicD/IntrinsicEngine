@@ -1,13 +1,17 @@
 ---
 id: UI-037
 theme: F
-depends_on: [BUG-093, BUG-096, RUNTIME-138]
+depends_on: [BUG-093, BUG-096, RUNTIME-138, RUNTIME-202]
 maturity_target: Operational
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
 ## Goal
-- Keep every action in the Sandbox's linear mesh, UV, bake, point-cloud, registration, and parameterization workflow visible while making its current readiness explicit: runtime supplies one authoritative `ActionReadiness { Enabled, DisabledReason }` value per action, and the app disables unavailable controls and explains the missing prerequisite on hover.
+- Keep every action in the Sandbox's linear mesh, UV, bake, point-cloud,
+  registration, and parameterization workflow visible while making its current
+  readiness explicit: each typed runtime operation supplies the same
+  authoritative `ActionReadiness { Enabled, DisabledReason }` used by apply,
+  and the app disables unavailable controls and explains the prerequisite.
 
 ## Non-goals
 - No new geometry algorithm, method backend, processing parameter, or automatic prerequisite repair.
@@ -16,13 +20,22 @@ maturity_target: Operational
 - No redesign of Sandbox navigation, input capture, window registration, or panel layout beyond keeping the existing linear controls present and understandable.
 
 ## Context
-- Owner/layers: `src/runtime/` owns selection/domain/config/capability validation and constructs the readiness model; `src/app/Sandbox/Editor/` consumes that model and owns only ImGui presentation. The dependency remains `app -> runtime`.
+- Owner/layers: runtime feature owners own selection/domain/config/capability
+  validation and expose copied readiness with their operation snapshots;
+  `src/app/Sandbox/Editor/` aggregates those values into its view model and
+  owns only ImGui presentation. The dependency remains `app -> runtime`.
 - Today the domain panels mix boolean availability, early returns, inline `TextDisabled`, and buttons that remain enabled until their command fails. That makes the next step in the linear workflow difficult to discover and risks app validation drifting from the command contract.
 - The readiness inventory covers mesh processing actions (denoise, curvature, remesh, subdivide, simplify, and recompute normals), selected-mesh UV regeneration, texture bake, point/graph/mesh normal generation where offered, point-cloud outlier removal, K-Means, Progressive Poisson, ICP, and parameterization.
 - ICP readiness must distinguish two distinct selected point clouds from point-to-plane's additional finite, count-matched target-normal requirement. `BUG-096` first makes those normals authoritative so the UI cannot advertise a variant that silently executes point-to-point.
-- Parameterization readiness includes the selected editable mesh, validated strategy/config, and strategy-specific pin or boundary prerequisites. Texture-bake readiness includes an operational device, compatible source property, finite UVs, valid resolution/range, and an eligible output binding. Backend choices report their own capability readiness without changing requested-versus-actual fallback policy.
-- Control surfaces remain co-equal: the runtime facade exposes the same plain
-  readiness values to UI and agent/controller callers. Actions that already
+- Parameterization readiness includes the selected editable mesh, validated
+  strategy/config, and strategy-specific pin or boundary prerequisites.
+  Texture-bake readiness includes an operational device, canonical compatible
+  source property, finite UVs, and valid output resolution/range; consumer
+  binding is a separate caller-owned operation. Backend choices report their
+  own capability readiness without changing requested-versus-actual fallback
+  policy.
+- Control surfaces remain co-equal: each typed runtime operation exposes the
+  same plain readiness value to UI and agent/controller callers. Actions that already
   have a config lane keep config-file/UI/agent parity through their typed
   preview/apply path; this task does not invent config state for commands that
   are not currently config-backed.
@@ -31,7 +44,8 @@ maturity_target: Operational
   it may not reintroduce full-buffer scans in the per-frame ImGui model build.
 
 ## Slice plan
-- **Slice A — Runtime readiness contract.** Add the plain readiness records,
+- **Slice A — Runtime readiness contract.** Add the shared plain readiness
+  record to feature-operation snapshots,
   stable reason priority, validator reuse, generation keys, and table-driven
   model tests while consuming `RUNTIME-138` cached/async analysis results.
 - **Slice B — App presentation.** Add the private disabled-reason item helper,
@@ -43,7 +57,11 @@ maturity_target: Operational
   cite that run before claiming `Operational`.
 
 ## Required changes
-- [ ] Export one right-sized runtime value record, `SandboxEditorActionReadiness` (the Sandbox `ActionReadiness { Enabled, DisabledReason }` contract), and include a readiness value for every listed action and selectable backend/variant in the existing domain-window model.
+- [ ] Export one right-sized runtime value record,
+      `ActionReadiness { Enabled, DisabledReason }`, reuse it in each typed
+      feature-operation snapshot, and include a value for every listed action
+      and selectable backend/variant in the app-owned domain-window model. Do
+      not create a monolithic Sandbox readiness service/facade.
 - [ ] Derive readiness in runtime from the same selection snapshots, config preview results, capability state, property compatibility checks, and command validators that govern apply. Factor shared pure predicates/results where necessary; do not copy command rules into a parallel readiness implementation.
 - [ ] Make every disabled reason deterministic, non-empty, and actionable: name the failed prerequisite and the user action that can satisfy it. Preserve the first stable blocking reason when several prerequisites are absent.
 - [ ] Keep actions in their existing linear order and render them even when
@@ -93,7 +111,9 @@ maturity_target: Operational
 ## Acceptance criteria
 - [ ] Mesh/UV/bake/normal/outlier/K-Means/Progressive-Poisson/ICP/parameterization controls remain visible in their linear workflow and cannot be invoked while their runtime readiness is disabled.
 - [ ] Hovering every disabled action or unavailable option presents its runtime-supplied prerequisite reason, including in the two-frame ImGui integration test.
-- [ ] Runtime is the sole owner of domain/action readiness and app code contains no duplicate geometry, config, capability, or selection validation for the affected actions.
+- [ ] Runtime feature owners are the sole owners of action readiness and app
+      code contains no duplicate geometry, config, capability, or selection
+      validation for the affected actions.
 - [ ] Agent/controller consumers can inspect the same readiness records. For
       config-backed actions, config files, UI, and agents share the existing
       typed preview/apply path; non-config-backed commands remain on the same
@@ -125,7 +145,9 @@ python3 tools/agents/check_task_policy.py --root . --strict
   free function established by `BUG-093`.
 - No weakening, skipping, or treating readiness as a substitute for runtime apply-time and derived-job completion validation.
 - No silent backend/algorithm substitution or requested-versus-actual misreporting, especially for ICP point-to-plane.
-- No per-action service/interface/registry hierarchy; use the plain record and existing domain-window/facade model.
+- No per-action service/interface/registry hierarchy or replacement Sandbox
+  readiness facade; use the shared plain record in feature snapshots and the
+  app-owned domain-window model.
 - No synchronous full-buffer finite/property scan from the per-frame readiness
   or ImGui path; pending cached/async analysis remains an explicit disabled
   state.

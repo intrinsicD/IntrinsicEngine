@@ -1,0 +1,132 @@
+---
+id: RUNTIME-192
+theme: F
+depends_on: []
+maturity_target: Retired
+---
+# RUNTIME-192 — Canonical geometry-property reference and catalog
+
+## Goal
+
+- Establish one pointer-free semantic runtime vocabulary for referring to a
+  geometry property and enumerating resolved entries in a
+  generation-stamped source snapshot, then
+  migrate every runtime consumer to it and delete the duplicate
+  progressive/editor/bake domain and value-kind vocabularies.
+
+## Non-goals
+
+- No universal variant that stores arbitrary property values.
+- No merge of `ECS::GeometrySources::Domain`, mesh sampling/raster domains,
+  `Runtime::VertexChannel`, `Graphics::MaterialChannel`, or visualization
+  semantics; those answer different questions.
+- No registry, interface, service hierarchy, property copy, or live ECS
+  pointer in the reference.
+- No property derivation algorithm. Callers remain responsible for producing
+  world normals, curvature, labels, or any other special field.
+
+## Context
+
+- `Runtime.GeometryAvailability` already owns the general
+  `GeometryElementDomain`, while `Geometry.Properties` owns
+  `Geometry::PropertyValueKind`. `Runtime.ProgressiveRenderData`,
+  `Runtime.SandboxEditorFacades`, texture-bake records, visualization records,
+  and vertex-attribute helpers currently mirror or translate subsets of that
+  vocabulary.
+- The duplicated enums force conversion switches and let otherwise identical
+  property identity drift between editor, presentation, bake, and extraction.
+- The right-sized endpoint is a plain authoring-safe `GeometryPropertyRef`
+  (domain/name/value kind) plus a copied, resolved
+  `GeometryPropertyCatalogSnapshot` carrying source/property generations;
+  `GeometryAvailability` remains the resolver and no new long-lived owner is
+  required.
+
+## Slice plan
+
+- **Slice A — contract.** Add the canonical reference/catalog records,
+  deterministic validation, and generation identity with focused unit tests.
+- **Slice B — adoption.** Migrate bake, selected analysis, presentation,
+  visualization, readiness, and attribute-resolution callers without changing
+  their feature semantics.
+- **Slice C — cleanup.** After equivalence tests pass, delete the duplicate
+  enums, conversion switches, aliases, and obsolete public fields in a
+  separate mechanical commit.
+
+## Required changes
+
+- [ ] Export one semantic `GeometryPropertyRef` using
+      `GeometryElementDomain`, `Geometry::PropertyValueKind`, and a stable
+      property name. It contains no entity, pointer, count, generation,
+      storage, material, or visualization state and is safe to place in
+      desired authoring recipes.
+- [ ] Export one pointer-free `GeometryPropertyCatalogSnapshot` with stable
+      ordering, source identity, availability/source generation, and resolved
+      entries pairing each plain reference with element count and property
+      generation; keep live property storage and ECS handles out.
+- [ ] Centralize name/domain/value-kind/count/finite-value compatibility
+      queries as pure functions over the existing availability/property views.
+- [ ] Migrate `Runtime.TextureBakeModule`, selected-entity analysis and
+      readiness, progressive presentation, visualization extraction, and
+      vertex-attribute candidate enumeration to the canonical reference.
+- [ ] Delete `ProgressiveGeometryDomain`,
+      `ProgressivePropertyValueKind`,
+      `SandboxEditorVisualizationPropertyValueKind`, and equivalent
+      bake/editor aliases after every production caller uses the canonical
+      contract.
+- [ ] Keep provenance domain, sampling domain, structural vertex channels,
+      material channels, and visualization output meaning as distinct typed
+      fields where a consumer actually needs them.
+
+## Tests
+
+- [ ] Unit contracts cover every supported element domain and property value
+      kind, deterministic catalog order, stale snapshot/generation rejection,
+      missing property, wrong domain/kind/count, and non-finite diagnostics.
+- [ ] Cross-consumer parity tests prove one reference resolves identically for
+      bake, presentation, visualization, and selected-analysis validation.
+- [ ] Structural tests or strict source scans prove no duplicate runtime
+      property-domain/value-kind enum or conversion switch remains.
+
+## Docs
+
+- [ ] Document the property-reference contract and the intentionally separate
+      domain/channel vocabularies in `src/runtime/README.md`.
+- [ ] Update affected architecture docs and regenerate
+      `docs/api/generated/module_inventory.md`.
+- [ ] Refresh task indexes, the session brief, and retirement records.
+
+## Acceptance criteria
+
+- [ ] Every runtime feature that names a geometry property uses
+      `GeometryPropertyRef` and the shared catalog/resolver.
+- [ ] Property meaning is prepared by callers and is not encoded as a
+      specialized runtime path or duplicate enum.
+- [ ] The old progressive/editor/bake property identity vocabularies and all
+      compatibility aliases are deleted after tests pass.
+
+## Verification
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -R 'GeometryProperty|PropertyCatalog|GeometryAvailability' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+```
+
+## Forbidden changes
+
+- Creating a second property store, registry, service, or opaque type-erased
+  value container.
+- Treating provenance, raster sampling, material channels, and property
+  element domains as interchangeable.
+- Keeping aliases indefinitely after the migrated tests are green.
+
+## Maturity
+
+- Target: `Retired`; `CPUContracted` establishes the canonical value
+  vocabulary, while closure requires all production adoption and deletion of
+  the duplicated contracts.

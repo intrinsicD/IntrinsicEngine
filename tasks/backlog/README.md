@@ -117,12 +117,14 @@ reference method, ECS authoring contract, world/runtime bridge, and
 broadphase/narrowphase and constraint/island/sleep solver contracts are retired — see
 [`physics/README.md`](physics/README.md) and the retirement log.
 
-Theme C currently has **no open members**: the rigid-body foundation
+Theme C's CPU reference foundation is complete: the rigid-body foundation
 (ADR-0019, METHOD-001, PHYSICS-001..003) and all three non-rigid reference
 method packages from the phenomena roadmap (METHOD-009 particles/springs,
 METHOD-010 XPBD cloth, METHOD-011 SPH fluid) are retired at
-`CPUContracted`. Optimized/GPU physics backends and runtime integration
-open as new tasks per the roadmap's engine-integration gates.
+`CPUContracted`. Open `PHYSICS-004` now owns the first real app-composed
+runtime physics module and retirement of the otherwise test-only public
+`PhysicsBridge`; optimized/GPU backends still open separately only through the
+roadmap's evidence gates.
 
 ### Theme D — ECS hardening parity (P0, complete)
 
@@ -168,12 +170,23 @@ cache/job pipeline remains owned by `RUNTIME-138`.
 
 [`RUNTIME-191`](runtime/RUNTIME-191-unified-property-texture-bake-pipeline.md)
 is the explicit property-to-texture consolidation follow-up to the narrower
-retired `RUNTIME-190` scope. It replaces the remaining selected-mesh,
+retired `RUNTIME-190` scope and depends on `RUNTIME-192`'s canonical property
+reference. It replaces the remaining selected-mesh,
 mesh-attribute CPU, and object-space-normal production paths with one
 `TextureBakeModule` service and GPU participant. Normal/color/other special
-meaning is caller-owned property preparation or result processing, never a
+meaning, normal space, and material/visualization consumers are caller-owned
+property preparation or result processing, never bake request data or a
 parallel bake service; the task stays open through `ParityProven` until the
 legacy modules are deleted at `Retired` maturity.
+
+The 2026-07-24 source-complete runtime surface audit opened the dependency-
+ordered `RUNTIME-192..204` remediation set and `PHYSICS-004`, re-gating
+`REVIEW-003`. It consolidates canonical property/presentation/work/readback/
+clustering/residency/visualization/spatial-debug/import/history concepts,
+migrates production workflows, retires the monolithic Sandbox facade,
+internalizes one-consumer helpers, and withdraws dormant public modules. Every
+member requires tests and production adoption before its old specialized path
+is deleted; none may retire by leaving a permanent compatibility facade.
 
 The 2026-07-16 Sandbox model-workflow audit opened four Theme F leaves:
 `ASSETIO-010` owns asynchronous primary/companion-file preview on top of the
@@ -348,13 +361,23 @@ The non-blocking TaskGraph substrate (`CORE-005`) and scheduler hardening
 (`CORE-007`) are retired, as is compiled-plan efficiency (`CORE-008`).
 
 Open members (kernel-seam priority set first):
-- [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) (one-shot post-convergence admission gate; ready after `ARCH-014` retirement satisfied its final static dependency).
+- [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
+  (one-shot post-convergence admission gate; re-gated by the 2026-07-24 runtime
+  surface remediation set).
+- [`runtime/RUNTIME-191-unified-property-texture-bake-pipeline.md`](runtime/RUNTIME-191-unified-property-texture-bake-pipeline.md)
+  and the dependency-ordered
+  [`RUNTIME-192..204` runtime consolidation set](runtime/README.md).
+- [`physics/PHYSICS-004-operational-runtime-physics-module.md`](physics/PHYSICS-004-operational-runtime-physics-module.md).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
-- [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md).
+- [`runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md`](runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
+  (remaining slices use `RUNTIME-192` property snapshots and the
+  post-`RUNTIME-194` `JobService`).
 - [`assets/ASSETIO-010-async-model-companion-preflight.md`](assets/ASSETIO-010-async-model-companion-preflight.md).
 - [`assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md`](assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md) (blocked by `ASSETIO-010`; `BUG-098`, `BUG-099`, and `BUG-100` are satisfied dependencies).
-- [`ui/UI-037-linear-domain-action-readiness-tooltips.md`](ui/UI-037-linear-domain-action-readiness-tooltips.md) (blocked by `BUG-096` and `RUNTIME-138`).
-- [`ui/UI-038-progressive-poisson-destructive-conversion-safety.md`](ui/UI-038-progressive-poisson-destructive-conversion-safety.md).
+- [`ui/UI-037-linear-domain-action-readiness-tooltips.md`](ui/UI-037-linear-domain-action-readiness-tooltips.md)
+  (blocked by `BUG-096`, `RUNTIME-138`, and facade retirement).
+- [`ui/UI-038-progressive-poisson-destructive-conversion-safety.md`](ui/UI-038-progressive-poisson-destructive-conversion-safety.md)
+  (blocked by the common mutation transaction and facade retirement).
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
 
 ### Theme G — Active bugs

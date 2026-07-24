@@ -36,7 +36,7 @@ maturity_target: ParityProven
 ## Control surfaces
 - Config/UI/Agent: this task introduces the first concrete
   `cpu_reference`/`cpu_optimized` selector. Extend the validated
-  `RUNTIME-175` config/facade and `UI-035` presentation path only after the
+  `RUNTIME-175` config/typed-operation and `UI-035` presentation path only after the
   optimized implementation exists; do not expose a placeholder choice.
 
 ## Backends
@@ -79,7 +79,7 @@ maturity_target: ParityProven
       per-strategy capability matrix in package docs and result diagnostics so
       a package-level backend list never implies unsupported pairs.
 - [ ] For passing strategies only, extend the delivered `RUNTIME-175`
-      config/facade and `UI-035` panel with the `cpu_optimized` request and
+      config/typed operation and `UI-035` panel with the `cpu_optimized` request and
       requested/actual/fallback diagnostics. Reject unsupported
       strategy/backend pairs during preview; if no strategy passes, leave
       both control surfaces CPU-reference-only.

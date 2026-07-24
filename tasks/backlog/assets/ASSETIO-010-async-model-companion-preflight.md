@@ -1,7 +1,7 @@
 ---
 id: ASSETIO-010
 theme: F
-depends_on: [BUG-093]
+depends_on: [BUG-093, RUNTIME-194, RUNTIME-200]
 maturity_target: Operational
 ---
 # ASSETIO-010 — Async model companion preflight
@@ -16,15 +16,15 @@ maturity_target: Operational
 ## Non-goals
 
 - No file IO, manifest parse, or companion probe in the app/ImGui callback or
-  in per-frame facade-model construction.
+  in per-frame app view-model construction.
 - No GPU upload, renderer, material-residency, or visibility-policy change;
   this task stops at CPU asset/model dependency readiness and runtime import
   dispatch.
 - No remote URI fetch, virtual filesystem, archive/pak locator, file watcher,
   native file dialog, or generalized hot-reload system.
-- No new `*Service`, registry, queue framework, or duplicate executor; reuse
-  `AssetImportPipeline`, `SandboxEditorSession`, and the engine-owned
-  `StreamingExecutor`.
+- No new `*Service`, registry, queue framework, or duplicate executor; add the
+  preview stage to the `RUNTIME-200` import recipe and execute it through the
+  canonical `RUNTIME-194` `JobService`.
 - No decoded-payload cache or promise that preview avoids the import worker's
   authoritative reread/decode.
 - No promotion of missing external images to hard failures; the current
@@ -39,7 +39,7 @@ maturity_target: Operational
   validation path.
 - Ownership/layering: `assets` remains CPU-only and may own plain external-path
   and dependency data over core IO; runtime owns TinyGLTF integration,
-  background scheduling, request-generation/stale-result handling, facade
+  background scheduling, request-generation/stale-result handling, recipe
   composition, and dispatch. The app consumes copied runtime records only.
 - The checked-in `assets/models/Duck.gltf` is a deterministic repository
   fixture: it references required buffer `Duck0.bin` and optional image
@@ -67,14 +67,15 @@ maturity_target: Operational
   overall GLTF loading; `data:` URIs and images backed by `bufferView` require
   no separate loose file, although a buffer-view image inherits the readiness
   of its owning buffer.
-- Current `Asset.ModelTextureIOBridge` resolves external paths relative to the
-  source parent, while the runtime TinyGLTF callbacks also receive/join a base
-  directory. Preview and import must share one resolution rule and resolve a
-  repository-relative URI exactly once; existing absolute-path-only tests are
-  not sufficient evidence for that contract.
-- Runtime architecture already requires model/texture reads and decode to run
-  through the persistent `StreamingExecutor`, with only bounded main-thread
-  result apply mutating editor/runtime state. Preview is advisory UI state;
+- The current `Asset.ModelTextureIOBridge` resolves external paths relative to
+  the source parent, while runtime TinyGLTF callbacks also receive/join a base
+  directory. `RUNTIME-200` removes that callback registry, so preview and
+  import must instead share one pure assets-owned external-resource path
+  resolver and resolve a repository-relative URI exactly once; existing
+  absolute-path-only tests are not sufficient evidence.
+- Runtime architecture requires model/texture reads and decode to run through
+  the persistent `JobService`, with only bounded main-thread result apply
+  mutating editor/runtime state. Preview is an advisory recipe-stage result;
   the import worker remains authoritative when files change after preview.
 
 ## Slice plan
@@ -83,12 +84,13 @@ maturity_target: Operational
   one shared external-URI resolver, GLTF/GLB manifest classification, required
   buffer checks, optional image warnings, and deterministic fake-IO plus
   checked-in Duck fixture coverage.
-- **Slice B — async runtime composition.** Reuse `AssetImportPipeline` and its
-  `StreamingExecutor` dependency to submit preview work on path/hint changes,
+- **Slice B — async runtime composition.** Add preview to the staged
+  `AssetImportRecipe`, submit it through `JobService` on path/hint changes,
   cancel superseded work where possible, and discard every completion whose
   attachment epoch or request generation is stale.
 - **Slice C — editor operational proof.** Feed pending/ready/warning/failure
-  state through the `BUG-093` facade model, revalidate on dispatch/worker read,
+  state through the post-`RUNTIME-202` app view model, revalidate on
+  dispatch/worker read,
   and exercise the real `File / Import` window during Null-window
   `Engine::Run()`.
 
@@ -99,13 +101,13 @@ maturity_target: Operational
       (`Buffer`/`Image`), requirement (`Required`/`Optional`), availability,
       core error, and diagnostic text. Keep implementation/control-flow bodies
       out of `.cppm` surfaces.
-- [ ] Make `Asset.ModelTextureIOBridge` the single external-resource path
-      resolution owner: runtime preview/import callbacks pass the unresolved
-      URI plus source-model path, the bridge resolves it exactly once and then
-      reads the resulting path, and no caller pre-joins or re-resolves the
-      bridge result. Relative URI resolves against the model's parent, absolute
-      paths remain absolute, `data:` URIs remain embedded, and no fallback
-      search path is introduced.
+- [ ] Add one pure assets-owned
+      `ResolveExternalAssetResourcePath(sourcePath, unresolvedUri)` free
+      function used by both recipe preview and the authoritative runtime
+      decoder. Relative URI resolves against the model's parent, absolute
+      paths remain absolute, `data:` URIs remain embedded, and no caller
+      pre-joins, re-resolves, or fallback-searches the result. Do not retain
+      `Asset.ModelTextureIOBridge` merely to host this function.
 - [ ] Implement manifest-only GLTF/GLB inspection in the existing promoted
       model IO implementation: classify `buffers[].uri`, `images[].uri`, data
       URIs, buffer-view images, and embedded GLB chunks without materializing
@@ -116,10 +118,10 @@ maturity_target: Operational
 - [ ] Check external images as optional dependencies. Missing/unreadable images
       append deterministic warnings but do not clear readiness; embedded/data
       and buffer-view images do not request a separate loose-file check.
-- [ ] Extend the existing runtime import pipeline/session rather than adding a
-      new service: submit preview only when the effective `(path, payload hint)`
-      request changes, represent queued/running state as `Pending`, and deliver
-      the result through the existing main-thread apply drain.
+- [ ] Extend the staged import recipe/session rather than adding a new service:
+      submit preview only when the effective `(path, payload hint)` request
+      changes, represent queued/running state as `Pending`, and deliver the
+      result through the bounded JobService main-thread apply.
 - [ ] Give each preview request a monotonically increasing generation tied to
       the editor attachment epoch. On path/hint change or detach, cancel prior
       work when possible and unconditionally discard late results whose
@@ -143,9 +145,10 @@ maturity_target: Operational
       paths resolve exactly once, absolute paths remain unchanged, data URIs do
       not become filesystem paths, and a URI cannot fall back from the model
       directory into `assets/textures`.
-- [ ] Instrument the fake IO/bridge boundary to assert one resolver invocation
-      and one final read path per external URI; the runtime callback must pass
-      the original unresolved URI and must not pre-join the model directory.
+- [ ] Instrument the fake IO/resolver boundary to assert one resolver
+      invocation and one final read path per external URI; the runtime decoder
+      must pass the original unresolved URI and must not pre-join the model
+      directory.
 - [ ] Use `assets/models/Duck.gltf` and `assets/models/Duck0.bin` directly as a
       checked-in mixed-dependency fixture: assert the required buffer is ready,
       the absent adjacent `DuckCM.png` is an optional warning, the resolved
@@ -165,7 +168,7 @@ maturity_target: Operational
       its normal event/queue diagnostic without materializing an asset/entity.
 - [ ] Add an app-linked Null-window `Engine::Run()` integration that opens
       `File / Import`, waits boundedly for the Duck preview, and observes ready
-      import plus the optional-image warning through the real facade/editor
+      import plus the optional-image warning through the real app/runtime
       callback path.
 - [ ] Preserve app-to-runtime-only source/link coverage and prove neither
       assets nor the preview implementation imports ECS, graphics, platform,
@@ -217,7 +220,7 @@ python3 tools/repo/check_test_layout.py --root . --strict
 
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicAssetUnitTests IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests
-ctest --test-dir build/ci --output-on-failure -R 'AssetModelTextureIOBridge|RuntimeAssetModelTextureIO|SandboxEditorUi\.FileImportPreview|SandboxEditorPresentation\.FileImportPreview' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+ctest --test-dir build/ci --output-on-failure -R 'AssetImportRecipe|ModelCompanionPreview|SandboxEditorUi\\.FileImportPreview|SandboxEditorPresentation\\.FileImportPreview' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
 
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60

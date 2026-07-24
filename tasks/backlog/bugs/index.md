@@ -29,11 +29,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 - [`BUG-096` — ICP point-to-plane ignores target normals](BUG-096-icp-point-to-plane-target-normals.md):
   synchronous and queued runtime registration pass an empty target-normal span,
   so geometry silently executes point-to-point while the editor reports the
-  requested point-to-plane variant.
+  requested point-to-plane variant; the fix targets the canonical property
+  reference and `JobService` operation before the thin facade wrapper retires.
 - [`BUG-095` — Direct-mesh postprocess can overwrite newer editor geometry](BUG-095-direct-mesh-postprocess-stale-overwrite.md):
   deferred import enrichment validates only entity liveness before replacing
   live geometry, allowing newer position, topology, UV, or property edits to be
-  lost; apply must be generation-keyed and stale-safe.
+  lost; apply must be generation-keyed and stale-safe on `JobService`, and
+  `RUNTIME-200` must preserve the regression when the import recipe migrates.
 - [`BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start](BUG-091-gtest-pretest-discovery-cold-timeout.md):
   CMake's implicit five-second PRE_TEST discovery limit can abort CTest while
   an unrelated cold sanitizer binary enumerates tests, before the selected

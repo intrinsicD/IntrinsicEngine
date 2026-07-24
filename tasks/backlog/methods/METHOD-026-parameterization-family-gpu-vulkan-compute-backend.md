@@ -1,7 +1,13 @@
 ---
 id: METHOD-026
 theme: I
-depends_on: [METHOD-025, RUNTIME-176, UI-036]
+depends_on:
+  - METHOD-025
+  - RUNTIME-176
+  - UI-036
+  - RUNTIME-194
+  - RUNTIME-195
+  - RUNTIME-202
 maturity_target: ParityProven
 ---
 # METHOD-026 — Parameterization family GPU (Vulkan compute) backend and parity
@@ -20,16 +26,17 @@ maturity_target: ParityProven
 - No new GPU primitive library — reuse the shared `Extrinsic.Graphics.ComputeParallelPrimitives` (GRAPHICS-108) and the runtime GPU-queue/readback substrate rather than private CUB-equivalents.
 
 ## Context
-- Owner/layer: a declared method backend adapter in `src/runtime`, the layer
-  allowed to import RHI. This task introduces the runtime GPU request and
+- Owner/layer: a private backend implementation of the typed parameterization
+  operation in `src/runtime`, the layer allowed to import RHI. This task
+  introduces the runtime GPU request and
   requested/actual/fallback telemetry for ARAP/SLIM; the geometry strategy
   variant stays RHI-free and carries no family-wide GPU token.
 - GPU shape: the local step (per-triangle signed-SVD rotation fit) is
   embarrassingly parallel; the global step is a sparse SPD solve run as a GPU
   Jacobi/CG iteration (matching the reference within tolerance). SLIM energy,
   signed-area, and line-search reductions remain on-device throughout the
-  bounded iteration. Results drain once through
-  `Extrinsic.Runtime.AsyncBufferReadback` (RUNTIME-137), never through a
+  bounded iteration. Results drain once through the `RUNTIME-195` multi-range
+  transfer/readback operation, never through a
   per-iteration CPU round trip or device-wide `ReadBuffer` stall.
 - Gating: reference parity (`METHOD-021`/`022`) and completion of the
   SLIM-only `METHOD-025` optimized-CPU evaluation must exist first. The CPU
@@ -40,9 +47,9 @@ maturity_target: ParityProven
   falls back to `cpu_reference` with honest telemetry.
 - Config/UI: this task extends the config/result model delivered by retired
   `RUNTIME-176` and the panel delivered by retired `UI-036` with
-  `gpu_vulkan_compute` after the implementation exists, and wires the new
-  runtime GPU job queue. The satisfied dependency supplies the CPU
-  facade/config path; it does not reserve an inert GPU request.
+  `gpu_vulkan_compute` after the implementation exists. `RUNTIME-202` first
+  migrates the old CPU facade into a typed parameterization operation; this
+  task extends that operation and does not wire a feature-specific queue.
 
 ## Control surfaces
 - Config/UI/Agent: add the runtime-owned `gpu_vulkan_compute` request for the
@@ -55,8 +62,9 @@ maturity_target: ParityProven
   `cpu_optimized` path is an additional comparison, never the ARAP oracle.
 
 ## Slice plan
-- **Slice A — runtime adapter/fallback.** Define the record/submit/readback
-  contract and prove honest Null-device fallback in the default gate.
+- **Slice A — private backend/fallback.** Extend the typed operation's
+  record/submit/readback contract and prove honest Null-device fallback in the
+  default gate.
 - **Slice B — ARAP Vulkan parity.** Land and verify one iterative strategy on
   an operational device.
 - **Slice C — SLIM Vulkan parity.** Add the injectivity-preserving path
@@ -66,20 +74,19 @@ maturity_target: ParityProven
   additional comparison before a speed claim.
 
 ## Right-sizing
-- One runtime adapter and one existing JobService GPU-queue participant are
-  justified by the layer/thread seam. Do not add per-strategy queues, a backend
-  registry, or a second sparse-GPU framework.
+- One private backend implementation and one participant on the canonical
+  `JobService` are justified by the layer/thread seam. Do not export an
+  adapter, add per-strategy queues, a backend registry, or a second sparse-GPU
+  framework.
 
 ## Required changes
-- [ ] Add the runtime GPU backend adapter (mirroring
-      `Runtime.KMeansGpuBackend` plus the Sandbox-editor-private K-Means queue
-      attached to `Extrinsic.Runtime.SandboxEditorFacades`, whose queue DTOs
-      remain on that public facade) that records the local-step and global-solve
-      compute passes for ARAP/SLIM, uploads mesh topology/positions once,
-      iterates on the GPU, and drains UVs through `AsyncBufferReadback`.
-- [ ] Add and wire a runtime parameterization GPU job queue (JobService
-      `GpuQueue` participant) so work records inside the renderer frame context
-      with no extra present.
+- [ ] Implement local-step/global-solve GPU recording as private state of the
+      typed parameterization operation. Upload mesh topology/positions once,
+      iterate on the GPU, and drain UVs through `RUNTIME-195`; the old
+      K-Means public wrapper/private queue is explicitly not a precedent.
+- [ ] Register one private parameterization participant with `JobService` so
+      work records inside the renderer frame context with no extra present; do
+      not expose a parameterization job queue or queue DTO.
 - [ ] Keep every local/global iteration on-device. In particular, implement
       SLIM energy, signed-area, and accepted-step reductions through
       `ComputeParallelPrimitives`; no per-iteration CPU readback may decide
@@ -89,9 +96,16 @@ maturity_target: ParityProven
       `cpu_reference` when unavailable. Reject a strategy/GPU pair that missed
       parity during config preview rather than substituting a strategy.
 - [ ] Preserve determinism within the documented GPU parity tolerance; preserve SLIM injectivity on the GPU path.
+- [ ] After CPU/fallback and actual Vulkan parity pass, remove duplicate
+      Sandbox backend/result DTOs and any direct CPU/GPU apply route that
+      bypasses the typed parameterization operation.
 
 ## Tests
-- [ ] Opt-in `tests/integration/runtime/Test.ParameterizationGpuBackendGpuSmoke.cpp` labeled `gpu;vulkan` (mirroring `Test.KMeansGpuBackendGpuSmoke.cpp` — the adapter under test is runtime-owned): on a Vulkan-capable host the GPU ARAP/SLIM result matches the CPU reference within the documented parity tolerance, with zero flips for SLIM.
+- [ ] Opt-in
+      `tests/integration/runtime/Test.ParameterizationGpuBackendGpuSmoke.cpp`
+      labeled `gpu;vulkan`: through the typed operation, the private GPU
+      ARAP/SLIM path matches the CPU reference within the documented parity
+      tolerance, with zero flips for SLIM.
 - [ ] Fallback: on the Null/non-operational device the runtime GPU request
       reports `ActualBackend == cpu_reference` and
       `FellBackToCPU == true` (default gate).
@@ -127,9 +141,12 @@ maturity_target: ParityProven
       also preserves injectivity. A miss remains CPU-only with negative
       evidence.
 - [ ] GPU requests fall back honestly on non-operational devices with asserted telemetry (default CPU gate).
-- [ ] The GPU-vs-CPU benchmark validates and runs; layering holds (geometry RHI-free; the adapter lives in runtime).
+- [ ] The GPU-vs-CPU benchmark validates and runs; layering holds (geometry is
+      RHI-free and the private backend implementation lives in runtime).
 - [ ] The emitted actual-GPU result validates; skipped/fallback execution
       cannot satisfy the operational/parity acceptance row.
+- [ ] UI, config, and agent requests use the same typed operation and no
+      backend wrapper/queue/facade compatibility route remains.
 
 ## Verification
 ```bash
@@ -154,8 +171,11 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 
 ## Forbidden changes
 - No numeric change versus the reference beyond documented parity tolerance; no speedup claim without the baseline benchmark.
-- No live GPU work on the poll thread; readback drains through `AsyncBufferReadback`, not `IDevice::ReadBuffer`.
+- No live GPU work on the poll thread; readback drains through `RUNTIME-195`,
+  not `AsyncBufferReadback` or `IDevice::ReadBuffer`.
 - No RHI import into `src/geometry`; no private GPU primitive library.
+- No public parameterization backend adapter, feature job queue/DTO, or
+  replacement Sandbox facade.
 
 ## Maturity
 - Target: `Operational` on Vulkan-capable hosts and `ParityProven` against the

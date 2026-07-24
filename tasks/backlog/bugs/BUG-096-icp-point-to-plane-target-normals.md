@@ -1,7 +1,7 @@
 ---
 id: BUG-096
 theme: G
-depends_on: []
+depends_on: [RUNTIME-192, RUNTIME-194]
 maturity_target: CPUContracted
 ---
 # BUG-096 — ICP point-to-plane ignores target normals
@@ -42,9 +42,9 @@ maturity_target: CPUContracted
   cannot distinguish the requested and effective point-to-plane variants.
 
 ## Required changes
-- [ ] Read the target point cloud's authoritative `v:normal` property into the
-      same immutable registration snapshot as target positions for both
-      synchronous and queued execution.
+- [ ] Resolve the target point cloud's authoritative `v:normal` through the
+      canonical `GeometryPropertyRef`/catalog and copy it into the same
+      immutable registration snapshot as target positions for every execution.
 - [ ] Validate property presence, element type/count, finiteness, nonzero
       length, and target transform invertibility before dispatch. A
       point-to-plane request with invalid normals must fail closed with a
@@ -52,9 +52,10 @@ maturity_target: CPUContracted
 - [ ] Transform target normals into world space with the inverse-transpose
       normal transform and normalize them before calling
       `Geometry::AlignPointClouds`.
-- [ ] Pass the validated target-normal span through synchronous and derived-job
-      paths. Include its source-property generation in queued staleness
-      validation so a normal edit before apply discards the result.
+- [ ] Pass the validated target-normal span through the typed registration
+      operation on `JobService`. Include its source-property generation in
+      staleness validation so a normal edit before apply discards the result;
+      do not retain a second synchronous/derived-job command implementation.
 - [ ] Record both requested and effective registration variants, or otherwise
       return an equivalent truthful result contract. Runtime must never report
       point-to-plane success when geometry executed point-to-point.
@@ -79,9 +80,10 @@ maturity_target: CPUContracted
       transformation.
 - [ ] Add a queued stale case that edits target normals after submission and
       proves the completion is discarded without applying the old transform.
-- [ ] Extend `tests/unit/runtime/Test.RegistrationAlignment.cpp` to pin
-      requested/effective variant reporting and preserve point-to-point
-      behavior with an empty normal span.
+- [ ] Pin requested/effective variant reporting and point-to-point behavior in
+      the typed registration-operation tests. `RUNTIME-202` may delete the
+      thin `RegistrationAlignment` production wrapper after this behavior is
+      covered through its owner.
 
 ## Docs
 - [ ] Document the runtime point-to-plane prerequisites, world-space normal

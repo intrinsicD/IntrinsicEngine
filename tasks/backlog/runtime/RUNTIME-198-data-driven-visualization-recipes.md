@@ -1,0 +1,120 @@
+---
+id: RUNTIME-198
+theme: B
+depends_on: [RUNTIME-192, RUNTIME-193, RUNTIME-194, RUNTIME-197]
+maturity_target: Retired
+---
+# RUNTIME-198 — Data-driven visualization recipes
+
+## Goal
+
+- Replace the runtime visualization adapter interface/registry/opaque-key
+  binding path with one plain `VisualizationRecipe` variant and pure typed
+  encoders that consume canonical property references and emit existing
+  graphics visualization packets.
+
+## Non-goals
+
+- No merge of scientific visualization with PBR material channels.
+- No new renderer pass, property derivation algorithm, GPU resource owner, or
+  universal plugin registry.
+- No background work launched by a pure visualization encoder. An Htex/atlas
+  rebuild is a typed feature operation on `JobService`; its completed metadata
+  may then be referenced by a recipe.
+- No claim that every visualization kind has identical inputs; the recipe is a
+  closed typed variant with per-kind data.
+
+## Context
+
+- `Runtime.VisualizationAdapters` exports an interface, concrete adapters, and
+  a registry, while production extraction directly constructs the scalar and
+  K-Means paths and production code does not register external adapters.
+- The interface/opaque key therefore adds lifetime and missing-adapter states
+  without a real extension consumer. Existing graphics packet types and
+  property-buffer residency remain useful destinations.
+- `RUNTIME-192` supplies property identity, `RUNTIME-193` supplies desired
+  presentation state, and `RUNTIME-197` supplies common property-buffer
+  residency.
+
+## Slice plan
+
+- **Slice A — recipe/encoders.** Add a closed plain variant for scalar, color,
+  labels, vector field, isolines, and supported atlas metadata plus pure
+  validation/encoding functions.
+- **Slice B — extraction adoption.** Project presentation recipes directly
+  during render extraction and migrate editor/config/result workflows.
+- **Slice C — retirement.** After packet/residency parity, delete the adapter
+  interface, registry, opaque bindings, registration methods, and obsolete
+  tests/docs.
+
+## Required changes
+
+- [ ] Define `VisualizationRecipe` as plain data with a typed alternative for
+      each supported visualization and `GeometryPropertyRef` for source fields.
+- [ ] Implement pure encoders returning packet batches and deterministic
+      diagnostics; keep allocation/residency in the existing common owners.
+- [ ] Project recipes directly from `GeometryPresentationRecipe` during copied
+      runtime extraction without borrowed adapter/source pointers.
+- [ ] Migrate scalar/color/K-Means/vector/isoline/Htex/fragment-preview
+      production paths and preserve their ranges, colormaps, budgets, stamps,
+      and rejection diagnostics.
+- [ ] Move Htex/atlas regeneration out of adapter encoding and onto the
+      canonical typed `JobService` operation; recipes encode only current
+      copied metadata/results.
+- [ ] Delete `IVisualizationAdapter`,
+      `VisualizationAdapterRegistry`, adapter binding keys,
+      `RegisterVisualizationAdapter`/`UnregisterVisualizationAdapter`, and
+      concrete wrapper classes after parity.
+
+## Tests
+
+- [ ] Pure encoder tests cover every recipe alternative, valid packets,
+      malformed/missing/stale properties, deterministic diagnostics, and empty
+      output.
+- [ ] Render-extraction parity tests preserve packet bytes/counts, property
+      residency requests, cache invalidation, and visualization statistics.
+- [ ] Existing Vulkan visualization smokes run through recipes.
+- [ ] Source scans prove no production registry/adapter interface or opaque
+      visualization key remains.
+
+## Docs
+
+- [ ] Update visualization/runtime extraction docs with recipe alternatives,
+      pure encoding, and material/visualization separation.
+- [ ] Regenerate the module inventory and remove old adapter registration
+      instructions.
+- [ ] Refresh task indexes, session brief, and retirement records.
+
+## Acceptance criteria
+
+- [ ] All production visualization packets originate from typed recipes and
+      pure encoders using canonical property references.
+- [ ] No production lifetime depends on an adapter object or opaque registry
+      key.
+- [ ] The old adapter interface, registry, wrappers, and extraction
+      registration surface are deleted after parity.
+
+## Verification
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -R 'Visualization|RenderExtraction' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicTests
+ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R 'Visualization' --timeout 180
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
+python3 tools/agents/check_task_policy.py --root . --strict
+```
+
+## Forbidden changes
+
+- Open-ended adapter/plugin registry without a live external implementation.
+- Encoding visualization meaning into material source enums.
+- Keeping old adapter registration as a permanent compatibility route.
+
+## Maturity
+
+- Target: `Retired`; pure CPU packet parity and operational Vulkan coverage
+  must precede removal of the adapter/registry family.

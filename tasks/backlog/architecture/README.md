@@ -18,8 +18,10 @@ are retired to `tasks/done/`; `ARCH-014` now records the closed umbrella.
 
 - [`REVIEW-003`](REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
   one-shot, commit-anchored architecture stability and right-sizing audit. It
-  is now ready after `ARCH-014` satisfied its final static dependency and is
-  the machine-visible admission gate for deferred post-stability research and
+  was re-gated on 2026-07-24 after the runtime surface audit opened
+  `RUNTIME-191..204`, `RUNTIME-138`, and `PHYSICS-004` as explicit
+  abstraction/adoption/legacy-deletion dependencies. It remains the
+  machine-visible admission gate for deferred post-stability research and
   rendering ideas; audit findings become separate dependencies rather than
   fixes inside the review task.
 

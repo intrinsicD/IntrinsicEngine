@@ -5,6 +5,11 @@ depends_on:
   - GRAPHICS-104
   - RUNTIME-128
   - RUNTIME-129
+  - RUNTIME-191
+  - RUNTIME-192
+  - RUNTIME-193
+  - RUNTIME-197
+  - RUNTIME-198
 maturity_target: Operational
 ---
 # GRAPHICS-105 — Unified mesh shading-model + per-attribute source authority
@@ -18,11 +23,20 @@ maturity_target: Operational
 - Removing debug visualization overlays (scalar field / per-vertex / per-face color) — they stay as an explicit, clearly-separate debug layer, just no longer a lit/unlit authority for ordinary mesh imports.
 - New vertex channels beyond the existing `VertexChannel` set.
 - Claiming that one binary `AttributeSource` contract already covers every PBR channel or arbitrary geometry property. `Normal` is the V1 operational channel; existing authored albedo, metallic-roughness, and emissive slots remain supported without making generalized property baking part of this task.
-- Replacing the generic CPU compatibility baker or the GPU bake scheduling delivered by RUNTIME-109/GRAPHICS-104/RUNTIME-129. The separate RUNTIME-190 task now owns generalized interactive property baking and may land independently; this task consumes only the material-authority result it needs.
+- Replacing the unified property-to-texture producer. `RUNTIME-191` removes the
+  CPU/specialized compatibility paths and owns the sole bake execution route;
+  this task consumes its completed output through caller-owned material/
+  presentation processing.
 - Introducing a public global `TexturePool`, a second texture manager, or another GPU-resource owner. CPU payloads remain asset-owned, `GpuAssetCache` owns asset-to-GPU residency, and the RHI `TextureManager` owns durable GPU texture leases.
-- Adding another texture-bake module, controller hierarchy, queue/registry framework, or role-named `Service`/`Binding`/`Submission` family. RUNTIME-190 is the dedicated right-sized `IRuntimeModule` consolidation; GRAPHICS-105 neither duplicates nor expands it.
+- Adding another texture-bake module, controller hierarchy, queue/registry
+  framework, or role-named `Service`/`Binding`/`Submission` family.
+  `RUNTIME-191` is the dedicated right-sized consolidation; GRAPHICS-105
+  neither duplicates nor expands it.
 - Synchronous GPU readback or a general-purpose texture debugger. The editor may inspect CPU-backed payload values and preview ready GPU textures, but must report when numeric GPU-only inspection is unavailable.
-- Defining a second edge/halfedge-to-surface lifting rule. RUNTIME-190 explicitly defines mesh-edge baking as nearest-triangle-edge selection in UV space; that generalized bake policy is outside this normal-channel authority task.
+- Defining a second edge/halfedge-to-surface lifting rule. `RUNTIME-191`
+  explicitly defines mesh-edge baking as nearest-triangle-edge selection in UV
+  space; that generalized bake policy is outside this normal-channel
+  authority task.
 
 ## Context
 - Owner/layer: `graphics` for the material shading-model + per-channel attribute-source metadata and the unified shader resolution; `runtime` for uniform default-lit material assignment across import routes, extraction, and mesh-only gating; `app`/editor for the UI selector.
@@ -36,7 +50,13 @@ maturity_target: Operational
   - `Graphics::MaterialChannel` describes shader-facing PBR appearance channels and their effective material slots.
   - `Graphics::Components::VisualizationConfig` describes scientific/debug presentation such as scalar fields, colormaps, and per-element color.
   A single generic enum must not blur these contracts. Mesh drawing still requires positions plus topology/indices; texcoords are optional until a selected texture source needs them.
-- Existing building blocks to reuse: `MaterialFlags` (`Unlit`, `ObjectSpaceNormalMap`), the `VertexChannel`/`VertexAttributeBinding` resolver (`Runtime.VertexAttributeBinding.cppm`, RUNTIME-120), generic mesh attribute texture bake (RUNTIME-109), GPU object-space normal bake (GRAPHICS-104) + scheduling (RUNTIME-129), the independently owned generalized `TextureBakeModule` (RUNTIME-190), default-lit material for material-less model-scene imports (RUNTIME-128), and direct-import material-driven shading (`3485151`).
+- Existing building blocks to reuse: `MaterialFlags` (`Unlit`,
+  `ObjectSpaceNormalMap`), the structural `VertexChannel` resolver,
+  `RUNTIME-192` canonical property references, the independently owned unified
+  `TextureBakeModule` (`RUNTIME-191`), the general presentation recipe
+  (`RUNTIME-193`), common residency (`RUNTIME-197`), visualization recipes
+  (`RUNTIME-198`), default-lit material for material-less model-scene imports
+  (`RUNTIME-128`), and direct-import material-driven shading (`3485151`).
 - Existing texture ownership is already layered: `AssetService` owns CPU identities/payloads; `GpuAssetCache` owns generation-qualified asset residency; the RHI `TextureManager` owns durable backend leases; frame-graph allocators own transient textures. `MaterialTextureAssetBindings` carries `AssetId`s keyed by stable render id and must not become a second texture owner.
 - "Works end to end / only this path exists": this task must **remove** the divergent lit/unlit decision for ordinary mesh imports, not merely add a parallel one, and prove the unified path through the real runtime extraction path plus an opt-in Vulkan smoke.
 - ARCH-013 re-review (2026-07-08): Decision confirmed with a standing-event
@@ -49,16 +69,35 @@ maturity_target: Operational
 
 ### Locked design decisions
 - **Effective authority and edit scope.** The authored/shared material supplies defaults. Each runtime renderable owns a material instance/lease and per-renderable `MaterialTextureAssetBindings`; selecting or generating a texture for entity A must not mutate entity B merely because both originated from the same material asset. Editing the shared material asset is a separate explicit operation. Graphics receives one resolved material slot, not a base material plus a competing live override.
-- **Desired state vs. operational state.** The serialized projection of `ProgressivePresentationBindings` stores values, enums, property names, stable asset identities, and requested source choices — never component references, borrowed pointers, bindless indices, GPU handles, job handles, readiness, or diagnostics. Runtime-only fields/sidecars/snapshots own pending/ready/failed/stale state and generation tokens. Commands carry a stable entity id and resolve/validate the entity and mesh domain when applied.
-- **V1 source scope.** `Normal` is the required `VertexAttribute | Texture` channel for GRAPHICS-105. The vertex normal remains mandatory and is the fallback until the exact object-space texture is ready. RUNTIME-190 may expose separately contracted scalar/color/normal consumers; their existence does not broaden this task's completion claims.
+- **Desired state vs. operational state.** The serialized
+  `GeometryPresentationRecipe` (`RUNTIME-193`) stores values, canonical
+  property references, stable asset identities, and requested source choices
+  — never component references, borrowed pointers, bindless indices, GPU
+  handles, job handles, readiness, or diagnostics. Runtime snapshots own
+  pending/ready/failed/stale state and generation tokens. Commands carry a
+  stable entity id and resolve/validate the entity and mesh domain when
+  applied.
+- **V1 source scope.** `Normal` is the required
+  `VertexAttribute | Texture` material-channel source for GRAPHICS-105. The
+  vertex normal remains mandatory and is the fallback until the exact
+  object-space texture is ready. `RUNTIME-191` produces property textures but
+  accepts no consumer/material semantics; this task owns the normal-channel
+  result binding.
 - **Color and scalar semantics.** Authored base color belongs to the material; scientific scalar/per-element color belongs to `VisualizationConfig`. A future scalar texture source must preserve raw linear scalar values plus range/encoding metadata and apply the colormap in the shader; baking an RGBA colormap is an explicit export/material-color operation, not the default scientific representation. Normal textures carry explicit object-space encoding; true color textures carry explicit linear/sRGB metadata.
-- **Surface-domain semantics.** Vertex values interpolate over triangles and face values are flat per face. RUNTIME-190's separate generalized path uses its documented nearest-triangle-edge policy for edge fields; GRAPHICS-105 defines no alternate rule. UV seams, overlap, degenerate triangles, padding/dilation, and source/texcoord dirty stamps are explicit validation/invalidation concerns, never silent assumptions.
+- **Surface-domain semantics.** Vertex values interpolate over triangles and
+  face values are flat per face. `RUNTIME-191` uses its documented
+  nearest-triangle-edge policy for edge fields; GRAPHICS-105 defines no
+  alternate rule. UV seams, overlap, degenerate triangles, padding/dilation,
+  and source/texcoord dirty stamps are explicit validation/invalidation
+  concerns, never silent assumptions.
 - **UI and command ownership.** `app` owns ImGui/menu layout. Runtime exposes data-only commands and snapshots; it does not expose GUI callbacks or retain component references. The UI uses the same command/apply path available to tests and agents. Per-entity selections are scene state; any engine-wide default or bake policy introduced later must also round-trip through the validated config lane.
 - **Preview boundary.** Reuse the existing UV/background-texture view for ready image preview. Decode hover values from retained CPU payloads using texture metadata. A GPU-only texture reports that numeric inspection needs asynchronous readback; this task must not stall the frame with an implicit readback.
 - **Unlit provenance.** Only source assets (`KHR_materials_unlit`) or an explicit user command select `Unlit`; missing material/data never does.
 
 ## Control surfaces
-- Scene/serialization: the desired `ProgressivePresentationBindings`/material/visualization projection and stable asset identities only; no transient runtime state.
+- Scene/serialization: the desired `GeometryPresentationRecipe` material/
+  visualization projection and stable asset identities only; no transient
+  runtime state.
 - Runtime/test/agent: existing stable-id editor commands plus read-only models/snapshots for requested/effective source, output `AssetId`, encoding, readiness, and diagnostics.
 - UI: Sandbox editor renders those snapshots and submits the same commands; no private material-system mutation path.
 - Engine config: only engine-wide defaults/policies, if added by a slice, use preview/validate-then-apply and file round-trip. Per-renderable edits are not duplicated into global config.
@@ -70,8 +109,17 @@ maturity_target: Operational
 - [ ] Complete the `Normal` `AttributeSource { VertexAttribute, Texture }` path: runtime/material resolution publishes `Texture` plus a valid bindless normal only for the exact ready object-space asset generation; both promoted forward and deferred shaders sample/decode that effective texture and otherwise use the required vertex normal.
 - [ ] Route source-choice and generated-texture readiness changes through a standing runtime reaction/kernel event that invalidates the affected extraction/material state. Preserve exact identity/generation checks, stale completion rejection, and frame-ready/deferred-retire behavior.
 - [ ] Collapse `VisualizationSyncSystem` override-material synthesis into the existing `GpuEntityConfig` visualization-data path once contract tests prove all retained scalar/color/isoline modes are representable. Fill a missing data field if needed; do not preserve a second material authority merely as a delivery mechanism.
-- [ ] Enforce normal-source capability at the command, extraction, and UI seams: only mesh surfaces with valid topology, texcoords, and normal properties may select/bake this task's normal texture source; point clouds and graphs remain vertex-buffer-only. Generalized vertex/face/nearest-edge property gating belongs to RUNTIME-190.
-- [ ] Extend the existing progressive-presentation/editor command and model surfaces for the selected renderable's requested/effective normal source, source/output identities, encoding, readiness, and diagnostics. Commands resolve the stable entity id at apply time and participate in existing undo/serialization; no new facade/module or persistent controller object holds an ECS reference.
+- [ ] Enforce normal-source capability at the command, extraction, and UI
+      seams: only mesh surfaces with valid topology, texcoords, and canonical
+      normal property references may select/bake this task's normal texture
+      source; point clouds and graphs remain vertex-buffer-only. Generalized
+      vertex/face/nearest-edge property gating belongs to `RUNTIME-191`.
+- [ ] Extend `GeometryPresentationRecipe` plus its typed editor operation and
+      runtime snapshot for the selected renderable's requested/effective normal
+      source, source/output identities, encoding, readiness, and diagnostics.
+      Commands resolve the stable entity id at apply time and participate in
+      existing undo/serialization; no facade/module or persistent controller
+      object holds an ECS reference.
 - [ ] In the app-owned editor panel, expose the normal source selector and bake request for eligible meshes, the effective/fallback state, output `AssetId` and encoding, and a ready-texture preview through the existing UV view. Decode CPU-backed hover values; report GPU-only numeric inspection as unavailable without async readback.
 - [ ] Audit the reserved `Color`, `MetallicRoughness`, and `Emissive` source bits: keep existing authored texture behavior intact, but hide or reject any generalized property-source choice that this task does not contract and test.
 
@@ -103,7 +151,10 @@ maturity_target: Operational
 - [ ] Structural geometry channels, PBR material channels, and scientific visualization sources remain distinct contracts; scalar fields are not silently converted to RGBA material color.
 - [ ] Point clouds and graphs are unaffected and have no texture-source option.
 - [ ] CPU payload, asset-to-GPU residency, and durable/transient GPU texture ownership remain with the existing owners; no global public texture pool or duplicate texture manager is introduced.
-- [ ] No controller retains component references and no additional `IRuntimeModule`/queue/registry/facade family or parallel editor-command surface is introduced by this task; the independently scoped RUNTIME-190 module is reused where applicable.
+- [ ] No controller retains component references and no additional
+      `IRuntimeModule`/queue/registry/facade family or parallel editor-command
+      surface is introduced by this task; the independently scoped
+      `RUNTIME-191` module and caller-owned presentation operation are reused.
 - [ ] No layering violations; no `Vk*` across RHI/renderer/runtime APIs; graphics-owned modules carry no live ECS/runtime/AssetService knowledge.
 - [ ] `Operational` is cited by an actually-run `gpu;vulkan` smoke for the normal texture path; CPU contract gate is green for authority, per-renderable isolation, exact-ready fallback, route-uniform defaults, visualization separation, command/snapshot behavior, and domain gating.
 
@@ -130,10 +181,17 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' --time
 - Mutating a shared authored material as an accidental consequence of editing or completing a bake for one renderable.
 - Treating `Runtime::VertexChannel`, `Graphics::MaterialChannel`, and `VisualizationConfig` sources as one interchangeable enum or claiming untested source kinds as supported.
 - Enabling a texture attribute source for point cloud or graph domains.
-- Inventing an alternate implicit edge/halfedge lifting rule or ignoring missing/invalid UVs; generalized edge baking must use RUNTIME-190's explicit nearest-triangle-edge policy.
+- Inventing an alternate implicit edge/halfedge lifting rule or ignoring
+  missing/invalid UVs; generalized edge baking must use `RUNTIME-191`'s
+  explicit nearest-triangle-edge policy.
 - Using `Unlit` as a missing-material/missing-data fallback instead of an explicit shading-model choice.
 - Persisting component references, borrowed pointers, GPU/bindless/job handles, or operational readiness as scene/config authoring state.
-- Introducing a public global texture pool/manager, another `IRuntimeModule`, or a controller/queue/registry/facade framework in this authority task instead of reusing RUNTIME-190.
+- Introducing a public global texture pool/manager, another `IRuntimeModule`,
+  or a controller/queue/registry/facade framework in this authority task
+  instead of reusing `RUNTIME-191` and `RUNTIME-193`.
+- Passing material channels, consumers, or normal-space semantics into
+  `TextureBakeService`; this task processes the completed generic texture
+  result in its own presentation/material operation.
 - Importing ImGui/app concerns into runtime or lower layers, or adding an app-only mutation path that bypasses runtime commands.
 - Blocking the frame for synchronous GPU texture readback in the editor.
 - Passing `Vk*` types through RHI/renderer/runtime/cache public APIs.
@@ -144,7 +202,10 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' --time
 ## Maturity
 - Target: `Operational` on Vulkan-capable hosts; `CPUContracted` for the authority/resolution/gating contracts on CPU/null.
 - Slices A–E close `CPUContracted`; Slice F closes `Operational` for the normal texture path and cites an actually-run `gpu;vulkan` smoke. Depends on RUNTIME-129 for GPU scheduling.
-- This task does not use RUNTIME-190's generalized property-to-texture baking or nearest-edge semantics to claim GRAPHICS-105 `Operational` maturity; its own normal-source Vulkan smoke remains required. GPU-only numeric texture inspection is also out of scope.
+- This task does not use `RUNTIME-191`'s property-to-texture or nearest-edge
+  evidence to claim GRAPHICS-105 `Operational` maturity; its own normal-source
+  Vulkan smoke remains required. GPU-only numeric texture inspection is also
+  out of scope.
 
 ## Slice plan
 - **Slice A (CPUContracted).** Add material `ShadingModel` as the single lit/unlit authority; route the unified shader to honor it; assign a default **lit** material uniformly across both import routes via one helper (subsuming RUNTIME-128 + `3485151`); demote `VisualizationConfig` lit/unlit role for imports. Defers attribute-source and UI to later slices.
@@ -153,8 +214,16 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' --time
 - **Slice B (CPUContracted) — landed.** Added `Graphics::AttributeSource{VertexAttribute,Texture}` + `MaterialChannel` + `Set/GetChannelSource`, and `MaterialParams::ChannelSourceBits` → `GpuMaterialSlot.ChannelSourceBits` (former `_pad1`, layout-preserving) + GLSL mirror, constants, and the `GpuMaterialChannelSource` accessor. Both promoted `ResolveSurfaceNormal` paths (forward `default_debug_surface.frag`, deferred `gbuffer.frag`) now gate the Normal texture lane on the per-channel source (legacy `ObjectSpaceNormalMap` flag kept as transitional alias; default `VertexAttribute` preserves behavior). The producer (`ResolveTextureAssetBindings`) sets the Normal channel source = Texture wherever it sets the object-space flag. Tests: channel-source round-trip, producer mirrors flag↔source, shader-source contract in both promoted paths. **Build/CPU gate not run here (vcpkg egress block).** Keeps non-Normal source semantics out of the UI/acceptance scope and defers the normal controls to Slice E.
 - **Slice C (CPUContracted).** Finish the single-authority cleanup: shared imported-material policy, `KHR_materials_unlit`, retirement of transitional lit/unlit writers/branches, and collapse of visualization override-material synthesis after retained visualization-mode contracts pass.
 - **Slice D (CPUContracted).** Make the normal binding explicitly per-renderable; preserve unrelated slots, prove shared-authored-material isolation, exact-generation fallback, standing readiness invalidation, stale rejection, and mesh/domain/UV gating.
-- **Slice E (CPUContracted).** Extend the existing stable-id progressive/editor command and model surfaces plus app-owned controls. Show requested/effective/fallback state, output metadata, ready UV preview, CPU-backed decoded hover values, and an explicit GPU-readback-required state without adding a parallel facade or synchronous readback path.
-- **Slice F (Operational).** End-to-end Vulkan wiring + opt-in `gpu;vulkan` smoke proving the normal `Texture` source uses vertex normals before `Ready` and the exact baked object-space normal texture after. RUNTIME-190's other generalized property sources remain outside GRAPHICS-105 evidence and closure.
+- **Slice E (CPUContracted).** Extend the stable-id
+  `GeometryPresentationRecipe` operation/snapshot plus app-owned controls. Show
+  requested/effective/fallback state, output metadata, ready UV preview,
+  CPU-backed decoded hover values, and an explicit GPU-readback-required state
+  without adding a parallel facade or synchronous readback path.
+- **Slice F (Operational).** End-to-end Vulkan wiring + opt-in `gpu;vulkan`
+  smoke proving the normal `Texture` source uses vertex normals before `Ready`
+  and the exact baked object-space normal texture after. `RUNTIME-191`'s other
+  generalized property sources remain outside GRAPHICS-105 evidence and
+  closure.
 
 ## Implementation design (data-driven, one effective receiver)
 
@@ -175,7 +244,7 @@ state stay separate.
     treats other fields as existing/reserved until their semantics are tested.
     Mirrored in `gpu_scene.glsl` and written by `MaterialSystem::PackSlot` — no
     new upload path is required.
-- **Per-renderable desired bindings** (`ProgressivePresentationBindings`) — the
+- **Per-renderable desired presentation** (`GeometryPresentationRecipe`) — the
   scene-owned data record for requested source kind, property/asset identities,
   and generated-output policy. Its serialized projection omits transient
   readiness and diagnostics.
@@ -241,7 +310,7 @@ The unified surface frag (forward `default_debug_surface.frag` + deferred
   apply colormap during visualization. RGBA colormap baking is opt-in export or
   material-color authoring, not the default scalar lane.
 - Vertex and face surface domains keep their existing interpolation/flat
-  meaning. Generalized mesh-edge requests use RUNTIME-190's explicit nearest
+  meaning. Generalized mesh-edge requests use `RUNTIME-191`'s explicit nearest
   triangle-edge rule; this task neither changes nor duplicates it.
 
 ## Cleanup — removal inventory (the old wrong implementation)
@@ -281,12 +350,12 @@ Delete/collapse, with the single data path replacing each:
   range/colormap/isoline/binning and per-vertex/edge/face color behavior; if a
   mode is not representable, add the smallest missing data field rather than
   preserving a competing material authority.
-- Reuse `ProgressivePresentationBindings`, the existing editor command/model
-  surface, the per-renderable material lease, `MaterialTextureAssetBindings`,
-  `GpuAssetCache`, RHI `TextureManager`, RUNTIME-129 scheduling, and UV view.
+- Reuse `GeometryPresentationRecipe`, its typed editor operation/snapshot, the
+  per-renderable material lease, `MaterialTextureAssetBindings`,
+  `GpuAssetCache`, RHI `TextureManager`, `RUNTIME-191`, and the UV view.
   Do not add a controller class, manager/pool, module registry, or another
   Service → Queue → Binding → Submission chain.
-- RUNTIME-190 is the separate texture-bake runtime-module consolidation. Its
-  keep-list is the real import/editor consumers plus cross-frame GPU lifecycle;
-  GRAPHICS-105 reuses that published service and preserves its
-  identity/readiness invariants rather than wrapping it.
+- `RUNTIME-191` is the separate texture-bake runtime-module consolidation.
+  GRAPHICS-105 reuses its pure producer service, then owns the material/
+  presentation binding of the completed `AssetId`; it preserves bake
+  identity/readiness invariants rather than wrapping the service.

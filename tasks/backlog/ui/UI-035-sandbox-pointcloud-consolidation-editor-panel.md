@@ -14,7 +14,9 @@ maturity_target: Operational
   convergence feedback.
 
 ## Non-goals
-- No algorithm, runtime, or config code — the panel is presentation only and calls the `RUNTIME-175` facade/config surface; it never receives `Engine&` or owns geometry/runtime/asset state.
+- No algorithm, runtime, or config code — the panel is presentation only and
+  calls the post-`RUNTIME-202` `RUNTIME-175` typed operation/config surface; it
+  never receives `Engine&` or owns geometry/runtime/asset state.
 - No new control path that bypasses the config lane — the panel drives the same validated apply path an agent/config file uses.
 - No visualization/colormap changes beyond selecting the consolidated point cloud for display.
 
@@ -29,8 +31,11 @@ maturity_target: Operational
 - Window registration: `UI-034` `Runtime.EditorWindowRegistry` (decentralized registration, lazy lifecycle, one input-capture snapshot, generic scalar-property widgets) — register through it, not a central enum.
 - Retired `ARCH-006` moved point-cloud presentation into `src/app`; place the
   consolidation window with the other app-owned point-cloud panels and consume
-  the runtime facade only.
-- The consolidated result is applied back to the selected entity by the `RUNTIME-175` facade (`PopulateFromCloud` + `MarkVertexPositionsDirty`, undoable), so the viewport shows the cleaned cloud immediately — this is the `Operational`, visible-in-sandbox proof.
+  the typed runtime operation/snapshot only.
+- The consolidated result is applied back to the selected entity by the
+  `RUNTIME-175` typed operation through the common mutation/history path, so
+  the viewport shows the cleaned cloud immediately — this is the
+  `Operational`, visible-in-sandbox proof.
 
 ## Control surfaces
 - UI: `PointCloud > Processing > Consolidate (LOP/WLOP/CLOP/EAR)` window.
@@ -45,11 +50,13 @@ maturity_target: Operational
       iterations, CLOP component count, EAR edge sensitivity and normal-source
       policy, seed), edited into the editor mirror of
       `PointCloudConsolidationConfig` and applied through the `RUNTIME-175`
-      config-routed command (preview → apply), not a private call.
+      config-routed typed operation (preview → submit → apply), not a private
+      call.
 - [ ] Render the actual `cpu_reference` implementation identity, selected
       strategy, and convergence diagnostics (iterations, converged flag, moved
-      distance) from `SandboxEditorPointCloudConsolidationResult`.
-- [ ] Apply/undo affordances routed through the runtime command so edits are undoable via `EditorCommandHistory`.
+      distance) from `PointCloudConsolidationResult`.
+- [ ] Apply/undo affordances routed through the typed runtime operation so
+      edits use the common `EditorCommandHistory` transaction.
 
 ## Tests
 - [ ] Extend the app/editor panel registration coverage (or a headless panel-model test where one exists) to assert the consolidation window registers through the `UI-034` registry and produces a valid apply request from a param set without ImGui frame state.
@@ -65,7 +72,8 @@ maturity_target: Operational
 ## Acceptance criteria
 - [ ] Selecting a point cloud, choosing a strategy, and applying consolidates
       the cloud and updates the viewport, undoably.
-- [ ] The panel drives the `RUNTIME-175` validated apply path (no private subsystem poke); config-file and agent drivers stay co-equal.
+- [ ] The panel drives the `RUNTIME-175` validated typed operation (no private
+      subsystem poke); config-file and agent drivers stay co-equal.
 - [ ] Strategy/implementation identity and convergence feedback are shown;
       unavailable strategies are annotated, not offered.
 - [ ] `app -> runtime` only; the panel owns no engine state.

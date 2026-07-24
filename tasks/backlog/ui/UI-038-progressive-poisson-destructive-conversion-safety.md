@@ -1,7 +1,7 @@
 ---
 id: UI-038
 theme: F
-depends_on: []
+depends_on: [RUNTIME-201, RUNTIME-202]
 maturity_target: Operational
 ---
 # UI-038 — Progressive Poisson destructive-conversion safety
@@ -21,7 +21,11 @@ maturity_target: Operational
 - No confirmation for ordinary config preview/apply or a non-destructive Progressive Poisson run whose selected entity is already a point cloud.
 
 ## Context
-- Owner/layers: `src/runtime/Runtime.SandboxEditorFacades.*` and the existing editor-command history own preview, confirmation validation, mutation, undo, and redo. `src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp` renders the preview/confirmation surface and calls the runtime facade only.
+- Owner/layers: the feature-owned typed Progressive Poisson runtime operation
+  owns preview/token validation and uses the `RUNTIME-201` mutation/history
+  transaction for apply, undo, and redo.
+  `src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp` renders copied state and
+  calls that operation only; `RUNTIME-202` removes the old Sandbox facade.
 - The current mesh path samples a surface and replaces the selected entity's mesh `GeometrySources` with point-cloud sources. The Run button and `AutoRunOnEdit` share that direct command path, so a routine edit can irreversibly remove mesh topology without an explicit warning or a real undo record.
 - The preview is a plain runtime value containing stable entity identity and source revision, source/target domains, source vertex/face counts, requested output count, the mesh/topology/property state that will be replaced, and a concise warning. Preview has no side effects and yields a confirmation token bound to the relevant entity, source generation, and effective config.
 - Runtime/session state is authoritative for a pending conversion and its token. The app may render ImGui's modal lifecycle but owns no pending-conversion truth, validation result, geometry/config snapshot, or permission to bypass confirmation.
@@ -47,8 +51,15 @@ maturity_target: Operational
 ## Required changes
 - [ ] Add right-sized runtime records/functions for a side-effect-free mesh-conversion preview and confirmed command. The preview reports what will be replaced and returns a token tied to stable entity ID, geometry/source generation, and the effective Progressive Poisson config.
 - [ ] Require a valid unconsumed token for every mesh-to-point-cloud apply entry point. Missing, cancelled, consumed, entity-mismatched, config-mismatched, or stale-generation confirmation fails closed with an actionable result and no entity/history mutation.
-- [ ] Represent pending preview/confirmation in the existing runtime Sandbox editor session/facade model as plain data; do not add a one-consumer service/controller or make app-local modal state authoritative.
-- [ ] Route confirmed conversion through `EditorCommandHistory` as one atomic command. Capture the complete before state needed to restore mesh `GeometrySources`, compatible vertex/face properties, presentation/visualization bindings affected by the conversion, dirty/generation state, and selection visibility; capture/store the deterministic after state so redo does not resample differently.
+- [ ] Represent pending preview/confirmation in the typed Progressive Poisson
+      operation snapshot as plain data; do not add a one-consumer
+      service/controller, replacement Sandbox facade, or app-local authority.
+- [ ] Route confirmed conversion through the `RUNTIME-201` mutation transaction
+      and `EditorCommandHistory` as one atomic command. Capture the complete
+      before state needed to restore mesh `GeometrySources`, compatible
+      vertex/face properties, presentation/visualization state affected by the
+      conversion, dirty/generation state, and selection visibility;
+      capture/store the deterministic after state so redo does not resample.
 - [ ] Make Undo restore the exact pre-conversion mesh-domain state and Redo restore the exact sampled point-cloud state. Cancelled/failed/stale previews and failed jobs create no history entry and do not mark the scene dirty.
 - [ ] For derived jobs, bind the confirmation to the submitted source/config snapshot and revalidate it at completion. Selection, entity lifetime, source generation, config, or confirmation changes before completion discard the result without mutation.
 - [ ] Replace the mesh Run path with an explicit preview/confirmation flow that lists source and target domains, source/output counts, and lost/replaced topology/property information. Point-cloud runs retain the direct non-destructive path.
@@ -85,13 +96,16 @@ maturity_target: Operational
 ## Docs
 - [ ] Update `src/runtime/README.md` with the preview/token/apply contract, stale-completion behavior, and exact Undo/Redo state guarantees.
 - [ ] Update `src/app/Sandbox/README.md` with the mesh-to-point-cloud warning/confirmation flow, auto-run restriction, and UI/config/agent parity.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` for the exported runtime facade changes.
+- [ ] Regenerate `docs/api/generated/module_inventory.md` for any typed runtime
+      operation surface changes.
 
 ## Acceptance criteria
 - [ ] No Run, auto-run, agent, direct, derived-job, GPU, or fallback path can convert a mesh entity to point cloud without a fresh runtime-issued confirmation for the current entity/source/config.
 - [ ] Preview and Cancel are side-effect free; failed or stale confirmation leaves entity state and command history unchanged and reports why a new preview is required.
 - [ ] Confirmed apply is one undoable history command; Undo exactly restores the mesh-domain state and Redo exactly restores the previously sampled point-cloud state without resampling drift.
-- [ ] The Sandbox presents the conversion consequences before confirmation, while runtime owns all pending-conversion, validation, mutation, and history truth.
+- [ ] The Sandbox presents the conversion consequences before confirmation,
+      while the typed runtime operation and common history transaction own all
+      pending-conversion, validation, mutation, and history truth.
 - [ ] UI and agent/CLI apply callers, across every backend, use the same runtime
       preview and confirmed-command seam. Config supplies validated parameters
       only and cannot confirm; point-cloud-to-point-cloud Progressive Poisson

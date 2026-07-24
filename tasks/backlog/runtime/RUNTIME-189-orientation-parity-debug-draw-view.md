@@ -1,26 +1,39 @@
 ---
 id: RUNTIME-189
 theme: I
-depends_on: [RUNTIME-177, METHOD-032]
+depends_on: [RUNTIME-199, METHOD-032]
 ---
 # RUNTIME-189 — Sandbox debug-draw view for orientation parity diagnostics
 
 ## Goal
-- Visualize `METHOD-032` orientation diagnostics in the sandbox through the `RUNTIME-177` immediate-mode debug-draw seam: oriented-normal glyphs on the selected point-cloud entity (colored by flip state and confidence), parity-conflict corner markers (colored by conflict count), and an optional corner-sign-field slice plane — turning the method's leak/conflict diagnostics into something a human can see and debug.
+- Visualize `METHOD-032` orientation diagnostics in the sandbox by producing an
+  orientation-specific copied debug snapshot after `RUNTIME-199` retires the
+  unused generic registry: oriented-normal glyphs on the
+  selected point-cloud entity (colored by flip state and confidence),
+  parity-conflict corner markers (colored by conflict count), and an optional
+  corner-sign-field slice plane.
 
 ## Non-goals
-- No new render passes or renderer subsystems — strictly a consumer of the `RUNTIME-177` debug-draw seam.
+- No new render passes, renderer subsystems, immediate-debug service, adapter
+  registry, or opaque binding — use the typed snapshot and existing debug
+  packet/pass path.
 - No changes to `METHOD-032` method code; this task consumes its public `Result`/`Diagnostics` only. If the diagnostics payload lacks a field the view needs, that change goes through a `METHOD-032` follow-up, not here.
 - Not required for `METHOD-032` closure; the method's `CPUContracted` gate is independent of this view.
 
 ## Context
-- Layering: `runtime` consumes `geometry` method results and drives the debug-draw seam; no method logic in runtime.
+- Layering: `runtime` consumes copied method results and encodes the typed
+  snapshot into existing graphics debug packets; no method logic or borrowed
+  method state lives in runtime.
 - Config lane (P3): every view toggle (glyphs on/off, conflict markers, slice plane position, color-by mode) is serializable config reachable by config file, agent/CLI, and UI panel through the same validated apply path — never UI-only.
 - Primitive volume: a large cloud can produce millions of glyphs; extraction applies a deterministic budget (cap + stable selection order) and reports truncation in its diagnostics rather than silently dropping.
 - Operational proof follows the opt-in `gpu;vulkan` readback smoke policy.
 
 ## Required changes
-- [ ] Deterministic extraction from `NormalOrientation` result/diagnostics to debug-draw primitives (glyphs, conflict markers, slice quads) with a documented primitive budget and truncation reporting.
+- [ ] Deterministic extraction from `NormalOrientation` result/diagnostics to
+      an owner-specific copied orientation-debug snapshot and existing
+      primitives
+      (glyphs, conflict markers, slice quads), with a documented primitive
+      budget and truncation reporting.
 - [ ] Config section + sandbox panel toggles driving the same validated apply path (schema-id + version + diagnostics per the config-lane reference model).
 - [ ] Wire the view for the selected point-cloud entity in the sandbox editor flow.
 
@@ -48,7 +61,8 @@ python3 tools/agents/check_task_policy.py --root . --strict
 ```
 
 ## Forbidden changes
-- No renderer/pass additions outside the `RUNTIME-177` seam; no method-code edits.
+- No renderer/pass additions, general debug-draw seam/registry, or method-code
+  edits.
 - No UI-only control paths (config lane parity is mandatory).
 
 ## Maturity

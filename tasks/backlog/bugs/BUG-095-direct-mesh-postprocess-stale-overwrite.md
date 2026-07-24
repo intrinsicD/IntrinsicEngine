@@ -1,7 +1,7 @@
 ---
 id: BUG-095
 theme: G
-depends_on: []
+depends_on: [RUNTIME-194]
 maturity_target: Operational
 ---
 # BUG-095 — Direct-mesh postprocess can overwrite newer editor geometry
@@ -26,7 +26,7 @@ maturity_target: Operational
   selected-action readiness. `app` may render the runtime-owned readiness DTO
   but must not own or recompute the stale-completion decision.
 - The default direct-mesh policy captures the original import payload, runs a
-  `StreamingExecutor` postprocess, and later replaces the live mesh through
+  background postprocess, and later replaces the live mesh through
   `PopulateFromMesh()`. Its apply path checks result and entity liveness but
   does not compare the geometry, source-property, or binding generation that
   was current at submission.
@@ -92,9 +92,9 @@ maturity_target: Operational
       to assert readiness is false with a non-empty pending reason between
       submission and resolution, then true after successful apply, failure, or
       stale discard.
-- [ ] Exercise the real `Engine`, direct import policy, `StreamingExecutor`,
-      completion queue, and Null backend; the tests must coordinate with a
-      barrier/test seam rather than wall-clock sleeps.
+- [ ] Exercise the real `Engine`, direct import policy, canonical
+      `JobService`, bounded completion apply, and Null backend; the tests must
+      coordinate with a barrier/test seam rather than wall-clock sleeps.
 
 ## Docs
 - [ ] Document the direct-mesh enrichment generation key, stale-discard
@@ -153,6 +153,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - `CPUContracted` requires deterministic stale-discard and readiness contracts
   for every mutation class plus unchanged-generation success.
 - `Operational` requires those contracts through the real `Engine`,
-  `StreamingExecutor`, main-thread completion queue, and Null runtime path. No
-  Vulkan-specific proof is owed because the overwrite boundary is
-  backend-neutral.
+  post-`RUNTIME-194` `JobService`, bounded main-thread completion apply, and
+  Null runtime path. `RUNTIME-200` must preserve these tests when it migrates
+  the direct-mesh workflow into the staged import recipe. No Vulkan-specific
+  proof is owed because the overwrite boundary is backend-neutral.

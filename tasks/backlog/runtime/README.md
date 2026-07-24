@@ -10,14 +10,67 @@ another backlog directory.
 ### Unified property-to-texture pipeline
 
 - [`RUNTIME-191` — Unify property-to-texture baking and retire specialized paths](RUNTIME-191-unified-property-texture-bake-pipeline.md)
-  completes the narrower `RUNTIME-190` migration. It makes
+  follows `RUNTIME-192`'s canonical property reference and completes the
+  narrower `RUNTIME-190` migration. It makes
   `TextureBakeModule`/`TextureBakeService` the one production surface for
   editor, agent, import, and default-policy bakes; callers prepare named source
-  properties first and process consumers after completion. The task preserves
+  properties first and process/bind the returned output after completion. The
+  bake request contains no normal-space, material, visualization, or consumer
+  semantics. The task preserves
   the specialized path's lifetime, residency, cache-generation,
   padding/dilation, and stale-result guarantees while deleting the
   selected-mesh, CPU mesh-attribute, and object-space-normal parallel
   pipelines at `Retired` maturity.
+
+### Runtime abstraction consolidation (seeded 2026-07-24)
+
+The source-complete runtime surface audit re-gated `REVIEW-003`. Each task
+lands and tests the general path, migrates real production workflows, proves
+parity, and only then deletes the specialized/forwarding path in a separate
+cleanup slice:
+
+- [`RUNTIME-192` — Canonical geometry-property reference and catalog](RUNTIME-192-canonical-geometry-property-reference-and-catalog.md)
+  removes duplicate editor/progressive/bake property-domain and value-kind
+  vocabularies without conflating provenance, raster, material, or
+  visualization semantics.
+- [`RUNTIME-193` — General geometry-presentation recipe](RUNTIME-193-general-geometry-presentation-recipe.md)
+  replaces the generally used progressive-named presentation modules with one
+  desired-state recipe plus copied operational snapshot.
+- [`RUNTIME-194` — Consolidate runtime work execution](RUNTIME-194-consolidate-runtime-work-execution.md)
+  deepens `JobService`, migrates all production jobs, and retires
+  `StreamingExecutor`/`DerivedJobRegistry`.
+- [`RUNTIME-195` — Unified GPU-result readback](RUNTIME-195-unified-gpu-result-readback.md)
+  integrates one multi-range transfer wait with `JobService` and retires
+  `AsyncBufferReadback`, `GpuReadbackJob`, and blocking compute-result reads.
+- [`RUNTIME-196` — Canonical clustering-service CPU/GPU path](RUNTIME-196-canonical-clustering-service-path.md)
+  makes `ClusteringService::RunKMeans` the sole typed operation and deletes the
+  parallel backend wrapper/private queue/facade DTOs after Vulkan parity.
+- [`RUNTIME-197` — Unified geometry upload and residency coordinator](RUNTIME-197-unified-geometry-upload-residency-coordinator.md)
+  centralizes upload/reupload/generation/retirement while retaining only small
+  private typed topology plan builders.
+- [`RUNTIME-198` — Data-driven visualization recipes](RUNTIME-198-data-driven-visualization-recipes.md)
+  replaces the zero-production-registration adapter interface/registry with a
+  closed recipe variant and pure packet encoders.
+- [`RUNTIME-199` — Retire dormant spatial-debug adapter registry](RUNTIME-199-retire-dormant-spatial-debug-registry.md)
+  removes opaque bindings, the zero-production adapter registry, all
+  unconsumed adapters, and the dormant closest-face runtime surface without
+  prebuilding a replacement.
+- [`RUNTIME-200` — Staged asset-import and materialization recipe](RUNTIME-200-staged-asset-import-materialization-recipe.md)
+  unifies route/decode/materialize/author/postprocess/residency/completion and
+  deletes the role callback/IO bridge/monolithic handoff paths after workflow
+  visibility parity.
+- [`RUNTIME-201` — Unified editor mutation and history transaction](RUNTIME-201-unified-editor-mutation-history-transaction.md)
+  routes undoable edits through `EditorCommandHistory` and retires
+  `GizmoUndoStack`, specialized builders, and unused CommandBus history hooks.
+- [`RUNTIME-202` — Retire the Sandbox runtime facade and localize feature models](RUNTIME-202-retire-sandbox-runtime-facade.md)
+  is the final feature-workflow migration/removal task: app owns Sandbox view
+  aggregation while runtime exposes narrow feature operations/snapshots.
+- [`RUNTIME-203` — Internalize one-consumer runtime composition helpers](RUNTIME-203-internalize-one-consumer-runtime-helpers.md)
+  removes public BMIs for Engine/SceneInteraction/config/device helpers after
+  their owner-level behavior tests are in place.
+- [`RUNTIME-204` — Withdraw dormant method-figure export from runtime](RUNTIME-204-withdraw-dormant-method-figure-export.md)
+  removes the test-only runtime production module and localizes any genuinely
+  used serializer to its concrete benchmark/tool.
 
 ### GPU property texture baking (retired 2026-07-21)
 
@@ -413,12 +466,12 @@ consumer lives here because `runtime` owns composition over `geometry`.
 `Extrinsic.Runtime.SpatialDebugClosestFace`. Editor method windows for the
 ported algorithms are retired `UI-024`/`UI-025`/`UI-026` under the UI backlog.
 
-- [`RUNTIME-175 — Point-cloud consolidation runtime facade and config lane`](RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
+- [`RUNTIME-175 — Point-cloud consolidation runtime operation and config lane`](RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
   is the engine-integration leaf for the LOP consolidation method family
   (`methods/METHOD-016..018`): an app-owned
   `sandbox.point_cloud_consolidation` section on the generic CORE-009 config
-  lane, an `EngineConfigControl` hot-apply path, the
-  `ApplySandboxEditorPointCloudConsolidationCommand` editor facade with
+  lane, an `EngineConfigControl` hot-apply path, a post-`RUNTIME-202` typed
+  operation using canonical `JobService` plus the common mutation transaction,
   `GeometrySources` writeback, and CPU-reference result diagnostics. It is
   gated on `CORE-009` for the section substrate and on
   `methods/METHOD-016..018` for the four reference strategies. No placeholder
@@ -432,10 +485,11 @@ ported algorithms are retired `UI-024`/`UI-025`/`UI-026` under the UI backlog.
 
 - [`RUNTIME-189 — Sandbox debug-draw view for orientation parity diagnostics`](RUNTIME-189-orientation-parity-debug-draw-view.md)
   consumes the method-owned `METHOD-032` result/diagnostics through retired
-  `RUNTIME-177`'s immediate-mode debug-draw seam. It owns deterministic
-  primitive budgeting, config/UI parity, and the opt-in `gpu;vulkan`
-  operational smoke; it does not alter orientation results or gate the method
-  reference.
+  `RUNTIME-199`'s direct-producer rule and owns its orientation-specific copied
+  snapshot/encoder. It owns
+  deterministic primitive budgeting, config/UI parity, and the opt-in
+  `gpu;vulkan` operational smoke; it does not create a generic debug registry,
+  alter orientation results, or gate the method reference.
 
 ### Parameterization family integration (Theme I, seeded 2026-07-13)
 
@@ -546,9 +600,10 @@ progressive-Poisson playground for selected point-cloud and mesh inputs.
 `RUNTIME-138` is the runtime-owned selected-entity responsiveness task. It
 makes the Sandbox editor path read cached selected-entity state, submit
 commands/jobs, and move heavy property/channel/UV/scalar derivations out of the
-ImGui callback into generation-keyed async runtime jobs. The first landed slice
-is visibility-gated model construction plus per-frame domain-window model reuse;
-the async cache/job and bounded-apply slices remain open.
+ImGui callback into generation-keyed canonical `JobService` work over
+`RUNTIME-192` property snapshots. The first landed slice is visibility-gated
+model construction plus per-frame domain-window model reuse; canonical
+property adoption, async analysis, and bounded-apply slices remain open.
 
 
 ## Cross-linked rendering tasks (runtime-owned)

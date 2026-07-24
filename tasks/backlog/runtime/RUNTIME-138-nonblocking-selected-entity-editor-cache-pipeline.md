@@ -4,6 +4,8 @@ theme: F
 depends_on:
   - ARCH-007
   - ARCH-009
+  - RUNTIME-192
+  - RUNTIME-194
 maturity_target: Operational
 ---
 # RUNTIME-138 — Nonblocking selected-entity editor cache pipeline
@@ -13,27 +15,32 @@ maturity_target: Operational
 
 ## Non-goals
 - Do not reorganize the domain-window information architecture; `UI-031` owns user-facing window/menu restructuring after this task establishes the nonblocking model.
-- Do not change geometry algorithms, method outputs, scalar colormap semantics, texture-bake outputs, or visualization adapter semantics.
+- Do not change geometry algorithms, method outputs, scalar colormap semantics,
+  texture-bake outputs, or visualization recipe semantics.
 - Do not move live ECS registry access, renderer ownership, asset ownership, or platform/window ownership into the UI layer.
 - Do not use the fixed-step `Core::FrameGraph` for optional inspector analysis; it remains frame-critical ECS/system work that blocks the current frame by design.
 - Do not claim a responsiveness improvement without before/after diagnostics from the selected-entity path.
 
 ## Context
-- Owning subsystem/layer: `runtime`, primarily
-  `Extrinsic.Runtime.SandboxEditorFacades`, `Extrinsic.Runtime.Engine`,
-  `Extrinsic.Runtime.DerivedJobGraph`, `Extrinsic.Runtime.StreamingExecutor`,
-  and selected-entity command/model helpers. App-owned `EditorShell` consumes
-  cached models but owns no live runtime state.
+- Owning subsystem/layer: `runtime`, as an implementation-owned selected
+  analysis cache that publishes pointer-free copied snapshots through the
+  relevant feature/scene owners. App-owned editor code consumes cached models
+  but owns no live runtime state; `RUNTIME-202` later removes the transitional
+  Sandbox facade.
 - Current selected-entity path does actual work inside `ImGuiAdapter::EndFrame()`: broad panel/domain models are rebuilt, property catalogs are enumerated, normal/color candidate bindings allocate scratch buffers and scan all selected vertices/properties, UV diagnostics scan texcoords, and open domain windows duplicate selected-model work.
 - Desired frame model: poll input, read cached UI/editor state, enqueue commands/job requests, apply only cheap frame-critical changes, extract/render from committed state, then drain/apply bounded async completions and launch background work.
 - The ECS registry is single-threaded. Async workers must operate on generation-stamped immutable snapshots captured on the main thread, and main-thread apply must discard stale results.
-- `StreamingExecutor` and `DerivedJobRegistry` already provide persistent async worker execution, generation-aware main-thread apply, dependency edges, snapshots, and previous-output retention. This task should reuse that shape instead of adding a parallel ad hoc scheduler.
+- `RUNTIME-194` makes `JobService` the sole persistent work lifecycle. The
+  remaining slices must use that service for immutable snapshot execution,
+  generation-aware bounded apply, dependencies, cancellation, and
+  previous-output retention; no selected-editor scheduler or registry is
+  allowed.
 - ARCH-013 re-review (2026-07-08): Decision confirmed with a re-scope note.
   The `ARCH-007` and `ARCH-009` gates held until `CommandBus` and `JobService`
   retired. Remaining slices must express "enqueue request, snapshot on the
-  main thread, apply bounded current results" through `CommandBus`/`JobService`
-  semantics or through the existing derived-job/streaming surfaces only where
-  they preserve the same snapshot/result/bounded-apply contract. No new
+  main thread, apply bounded current results" through
+  `CommandBus`/`JobService` semantics. The temporary derived-job/streaming
+  implementation is migrated and removed by `RUNTIME-194`; no new
   selected-editor bespoke queue or immediate dispatcher trigger path is
   allowed.
 
@@ -43,7 +50,10 @@ maturity_target: Operational
 - Agent/CLI: optional frame-pacing capture command is allowed if it reuses existing runtime diagnostics/control surfaces.
 
 ## Backends
-- Backend axis: CPU/runtime asynchronous jobs for selected-entity analysis. GPU/Vulkan proof is only for end-to-end responsiveness smoke; GPU compute derivations are out of scope unless routed through existing runtime derived-job/readback seams.
+- Backend axis: CPU/runtime asynchronous jobs for selected-entity analysis.
+  GPU/Vulkan proof is only for end-to-end responsiveness smoke; GPU compute
+  derivations are out of scope unless routed through the canonical
+  JobService/readback seams.
 
 ## Required changes
 - [ ] Slice A: add low-overhead selected-entity timing/counter diagnostics for editor callback time, panel/model build time, inspector/property catalog time, vertex-channel validation time, UV diagnostics time, visualization model time, ImGui copy/upload counts, scanned element counts, scratch allocation bytes, cache hit/miss counts, queued job counts, stale-discard counts, and bounded apply time.
@@ -60,11 +70,22 @@ maturity_target: Operational
 - [x] Slice C partial: partition selected-analysis cache entries by visible inspector/domain-window consumer and include that visible consumer in the selected-model cache key.
 - [ ] Slice C: extend the selected-entity editor model cache with remaining entity/source value/non-vertex binding generations and viewport/config revision where relevant.
 - [ ] Slice C: ensure cache-hit frames reuse immutable model data and perform no selected geometry/property scans or scratch-buffer allocations.
-- [ ] Slice D: split cheap metadata queries from heavy derivations. Property catalogs may enumerate names/domains/counts/value kinds, but full normal/color resolver scans, scalar domain scans, color packing validation, and UV finite checks must not run for every candidate property every frame.
-- [ ] Slice E: route heavy selected-entity derivations through `DerivedJobRegistry`/`StreamingExecutor` or a runtime editor-analysis registry with the same contract: immutable input snapshot, worker execution, generation validation, bounded main-thread apply, stale-result discard, previous-output retention, and observable pending/ready/failure state.
+- [ ] Slice D: split cheap metadata queries from heavy derivations. Reuse the
+      `RUNTIME-192` `GeometryPropertyCatalogSnapshot` for
+      names/domains/counts/value kinds; full normal/color resolver scans,
+      scalar domain scans, color packing validation, and UV finite checks must
+      not run for every candidate property every frame.
+- [ ] Slice E: route heavy selected-entity derivations through `JobService`
+      with immutable input snapshots, generation validation, bounded
+      main-thread apply, stale-result discard, previous-output retention, and
+      observable pending/ready/failure state.
 - [ ] Slice E: add async jobs for active normal binding validation, active color binding validation, scalar min/max/domain analysis, isoline scalar domain analysis, UV diagnostics, color-buffer pack validation, and large property preview sampling where those results are actually visible or requested.
-- [ ] Slice F: move selected-entity job submission to a runtime frame-work seam (`IStreamingFrameHooks::SubmitFrameWork()` or equivalent) so `ImGuiAdapter::EndFrame()` only reads cached state and enqueues requests.
-- [x] Slice F partial: add count-limited `StreamingExecutor`/`DerivedJobRegistry` main-thread apply overloads, processed-count diagnostics, and a count-limited Engine streaming maintenance drain; selected-analysis job routing remains open.
+- [ ] Slice F: move selected-entity job submission to the canonical runtime
+      JobService submission phase so `ImGuiAdapter::EndFrame()` only reads
+      cached state and enqueues requests.
+- [x] Slice F partial: the pre-consolidation executors gained count-limited
+      apply overloads and diagnostics; `RUNTIME-194` must preserve those
+      contracts while migrating them to `JobService`.
 - [ ] Slice F: add an explicit per-frame apply budget for editor/derived completions, by count or elapsed time, so a burst of completed jobs cannot stall the main loop.
 - [ ] Slice F: keep transform/gizmo/selection commands that are required for same-frame render as cheap main-thread commands, and document which work remains frame-critical.
 - [x] File or update focused graphics follow-ups for selected outline GPU work and ImGui overlay copy/upload churn rather than expanding this runtime task into renderer implementation work.
@@ -82,8 +103,11 @@ maturity_target: Operational
 - [ ] Add contract tests proving property option listing uses metadata compatibility only, while explicit active/requested validations use async job results.
 - [ ] Add tests proving async selected-analysis results apply only when the generation key is current and stale geometry/property/binding results are discarded.
 - [ ] Add tests proving repeated selected frames enqueue at most one job per cache key while a matching job is pending or ready.
-- [x] Add contract tests proving count-limited `StreamingExecutor` and `DerivedJobRegistry` apply drains process only the requested number of ready completions while preserving queued ready work.
-- [x] Add a frame-layering contract test proving the Engine streaming maintenance hook uses the count-limited apply overload.
+- [x] Historical contracts prove the pre-consolidation executors process only
+      the requested number of ready completions while preserving queued work;
+      `RUNTIME-194` owns their migration.
+- [ ] Add a canonical `JobService` integration contract proving the runtime
+      selected-analysis phase uses the count-limited apply budget.
 - [ ] Add tests proving bounded main-thread apply processes a limited number/time of completions per frame.
 - [x] Run the default CPU-supported correctness gate after implementation.
 - [ ] On a Vulkan-capable host, run a sandbox responsiveness smoke with a large selected mesh/point cloud and record before/after selected-frame diagnostics.
@@ -109,7 +133,7 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|DerivedJob|StreamingExecutor|EditorCommandHistory' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180
+ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|SelectedAnalysis|JobService|EditorCommandHistory' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180
 # On a Vulkan-capable host, after instrumentation and async cache work lands:
 cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target IntrinsicTests
@@ -143,8 +167,10 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'Sa
   counts and per-drain main-thread apply timing/result deltas. The streaming
   and derived-job apply seams now expose count-limited main-thread drain
   overloads with processed-count diagnostics, and the Engine streaming
-  maintenance hook uses a count-limited drain. Selected-analysis job routing and
-  editor-specific budget policy remain open. The cache key includes stable selected ids, the
+  maintenance hook uses a count-limited drain. Selected-analysis job routing
+  and editor-specific budget policy remain open; `RUNTIME-194` migrates that
+  historical implementation evidence to `JobService`. The cache key includes
+  stable selected ids, the
   selection controller's selected-set generation, the engine-owned
   refined-primitive generation for primitive-sensitive selected analysis, a
   runtime-computed metadata signature over selected geometry source/property
@@ -161,8 +187,10 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'Sa
   same-entity primitive refinement, source/property metadata mutation,
   direct render-lane hint mutation, progressive presentation binding mutation,
   effective visualization config/spatial-debug mutation, or visualization
-  adapter binding mutation invalidate stale entries. Full
-  generation stamps for source/property values and remaining non-vertex binding
-  revisions, remaining selected-analysis scanned-element counters, async
-  selected-analysis jobs, editor-specific bounded apply behavior, renderer selected-outline cost diagnostics, and
-  Vulkan responsiveness smoke remain open; this task is not ready to retire.
+  adapter binding mutation invalidate stale entries. `RUNTIME-192` canonical
+  property catalog/reference adoption, full generation stamps for
+  source/property values and remaining non-vertex binding revisions, remaining
+  selected-analysis scanned-element counters, async selected-analysis jobs on
+  the post-`RUNTIME-194` `JobService`, editor-specific bounded apply behavior,
+  renderer selected-outline cost diagnostics, and Vulkan responsiveness smoke
+  remain open; this task is not ready to retire.

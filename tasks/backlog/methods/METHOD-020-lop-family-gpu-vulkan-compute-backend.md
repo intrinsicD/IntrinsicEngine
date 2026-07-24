@@ -1,7 +1,7 @@
 ---
 id: METHOD-020
 theme: I
-depends_on: [METHOD-019]
+depends_on: [METHOD-019, RUNTIME-175, RUNTIME-194, RUNTIME-195]
 maturity_target: ParityProven
 ---
 # METHOD-020 — LOP-family GPU (Vulkan compute) backend and parity
@@ -18,13 +18,17 @@ maturity_target: ParityProven
 - No second config lane or editor panel. Extend the delivered
   `RUNTIME-175`/`UI-035` surfaces only after the GPU path passes parity.
 - No synchronous device-wide readback or work on the platform poll thread;
-  this task owns the runtime adapter, JobService scheduling, shaders, and
-  parity evidence.
+  this task owns the private runtime backend implementation, canonical
+  JobService scheduling/readback use, shaders, and parity evidence.
 - No speedup claim without the benchmark baseline; no new public parameters.
 
 ## Context
 - Owner/layer: `src/runtime` (RHI-allowed), following the `docs/architecture/algorithm-variant-dispatch.md` split — the CPU reference stays in `src/geometry` with no RHI, and the GPU-capable path lives where `Extrinsic::RHI::IDevice&` is allowed, gated on `IDevice::IsOperational()` with honest `ActualBackend`/`FellBackToCPU` telemetry.
-- Precedent to mirror: the K-Means GPU path (`GEOM-056` parity smoke + `Runtime.KMeansGpuBackend` explicit command recording) and progressive-Poisson `METHOD-014` (GPU operational parity). Reuse `Extrinsic.Graphics.ComputeParallelPrimitives` (`GRAPHICS-108`) for scan/compaction rather than private primitives, and drain readbacks through `Extrinsic.Runtime.AsyncBufferReadback` (`RUNTIME-137`), not `IDevice::ReadBuffer`.
+- Reuse `Extrinsic.Graphics.ComputeParallelPrimitives` (`GRAPHICS-108`) for
+  scan/compaction rather than private primitives, and drain results through the
+  `RUNTIME-195` multi-range transfer/readback operation. The old public
+  K-Means backend/queue family is explicitly not a template; `RUNTIME-196`
+  retires it.
 - The projection iteration (neighbor-weighted attraction + repulsion, or the CLOP continuous per-component term) maps to a compute dispatch over the projected set; the shared weight math from `Geometry.PointCloud.Kernels` is reproduced in the shader with the same closed forms the CPU path uses.
 - Verification requires the `ci-vulkan` preset and a Vulkan-capable host; on non-operational devices the path must fall back to the CPU reference with honest telemetry, and the parity test asserts that fallback.
 - `METHOD-019` is an evidence-ordering gate, not a promise that every
@@ -33,17 +37,18 @@ maturity_target: ParityProven
   actually exposed that strategy.
 
 ## Control surfaces
-- Config/UI/Agent: extend the runtime/app backend request with
+- Config/UI/Agent: extend the `RUNTIME-175` typed runtime/app backend request with
   `gpu_vulkan_compute` only when this implementation exists, through the
-  validated `RUNTIME-175` config/facade and `UI-035` presentation path. The
+  validated `RUNTIME-175` config/operation and `UI-035` presentation path. The
   geometry-owned CPU selector remains RHI-free.
 
 ## Backends
 - Backend axis: adds `gpu_vulkan_compute`; `cpu_reference` stays the parity oracle and the fallback target.
 
 ## Slice plan
-- **Slice A — runtime adapter/fallback.** Define the explicit record/submit/
-  readback seam and prove Null-device fallback in the default CPU gate.
+- **Slice A — private backend/fallback.** Extend the existing typed operation
+  with explicit record/submit/readback behavior and prove Null-device fallback
+  in the default CPU gate.
 - **Slice B — one-strategy Vulkan parity.** Land WLOP/LOP first with actual
   operational-device evidence and frozen tolerance.
 - **Slice C — CLOP/EAR parity.** Add each kernel path independently; reuse only
@@ -52,23 +57,27 @@ maturity_target: ParityProven
   with CPU-reference baseline/device identity before any speed claim.
 
 ## Right-sizing
-- One runtime adapter is justified by the CPU/GPU layer seam. Keep strategy
-  dispatch inside it; do not create a backend registry or per-strategy service.
-- Add one participant to the existing JobService `GpuQueue`; do not create a
-  second queue, service, or synchronous device-wide readback path.
+- One private backend implementation is justified by the CPU/GPU layer seam.
+  Keep strategy dispatch inside the `RUNTIME-175` feature operation; do not
+  export a backend adapter, registry, or per-strategy service.
+- Register one private participant with `JobService`; do not create a second
+  queue, service, or synchronous device-wide readback path.
 
 ## Required changes
-- [ ] Add `Runtime.ConsolidationGpuBackend` (module + implementation) exposing an explicit command-recording GPU projection for the consolidation strategies, taking `RHI::IDevice&`, gating on `IsOperational()`, and reusing persistent buffers across iterations.
-- [ ] Add the consolidation participant to the existing JobService `GpuQueue`;
+- [ ] Implement GPU projection as private state/implementation of the
+      `RUNTIME-175` typed consolidation operation, taking `RHI::IDevice&`,
+      gating on `IsOperational()`, and reusing persistent buffers across
+      iterations without exporting `Runtime.ConsolidationGpuBackend`.
+- [ ] Register the consolidation participant privately with `JobService`;
       submit through the real frame context and publish completed results
-      through the delivered `RUNTIME-175` ECS writeback path.
+      through the delivered `RUNTIME-175` mutation/writeback path.
 - [ ] Add the compute shader assets for the attraction/repulsion (and CLOP continuous-term) passes under `assets/shaders/`, recorded through the RHI compute path.
 - [ ] Reproduce the `Geometry.PointCloud.Kernels` weight/repulsion closed forms in-shader; document any float-precision divergence and bound it in the parity tolerance.
 - [ ] Keep every projection iteration and convergence reduction on-device;
-      drain the final result once through `AsyncBufferReadback`. No
+      drain the final result once through the `RUNTIME-195` readback operation. No
       per-iteration CPU readback may steer convergence.
 - [ ] Honest fallback + telemetry: a `Backend::GPU` request on a null/non-operational device runs the CPU reference and reports `FellBackToCPU`.
-- [ ] Extend the delivered `RUNTIME-175` config/facade and `UI-035` panel with
+- [ ] Extend the delivered `RUNTIME-175` config/operation and `UI-035` panel with
       `gpu_vulkan_compute` only after the implementation exists; all UI,
       config-file, and agent requests use the same preview/validate/apply path.
 - [ ] Update a package `method.yaml` to list `gpu_vulkan_compute` only if at
@@ -78,8 +87,8 @@ maturity_target: ParityProven
 
 ## Tests
 - [ ] `tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp`
-      labeled `gpu;vulkan` (opt-in), asserting the runtime-owned adapter's GPU
-      output matches the CPU reference within frozen per-strategy tolerances.
+      labeled `gpu;vulkan` (opt-in), asserting the typed operation's private GPU
+      path matches the CPU reference within frozen per-strategy tolerances.
 - [ ] Fallback telemetry: `Backend::GPU` requested on a non-operational/null device reports `ActualBackend == cpu_reference` and `FellBackToCPU == true`, verified in the default CPU gate (no GPU required).
 - [ ] Config/control-surface parity: Editor, AgentCli, and Programmatic requests
       produce the same validated backend request; the panel never schedules
@@ -136,8 +145,12 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 
 ## Forbidden changes
 - No divergence from the reference numerics beyond the documented parity tolerance.
-- No private scan/compaction primitives (reuse `ComputeParallelPrimitives`); no `IDevice::ReadBuffer` for the drain (use `AsyncBufferReadback`).
+- No private scan/compaction primitives (reuse `ComputeParallelPrimitives`); no
+  `IDevice::ReadBuffer` or `AsyncBufferReadback` compatibility path for the
+  drain (use `RUNTIME-195`).
 - No speedup claim without the baseline; no `Vk*` types on the public seam.
+- No public consolidation backend module, feature queue, or parallel operation
+  beside `RUNTIME-175`.
 
 ## Maturity
 - Target: `Operational` on Vulkan-capable hosts and `ParityProven` against the

@@ -3,6 +3,7 @@ id: RUNTIME-139
 theme: B
 depends_on:
   - RUNTIME-125
+  - RUNTIME-197
 maturity_target: Operational
 ---
 # RUNTIME-139 — Static AoS storage and shader operational path
@@ -19,7 +20,8 @@ maturity_target: Operational
 
 ## Context
 - Owning subsystem/layer: `graphics/renderer` for `GpuWorld` storage allocation,
-  geometry record flags, and shader variants; `runtime` extraction owns the
+  geometry record flags, shader variants, and the `RUNTIME-197` residency
+  coordinator; runtime's typed upload-plan builder owns lane selection and the
   static-to-dynamic edit trigger.
 - RUNTIME-125 retired at `CPUContracted`: benchmark smoke and planning-only
   storage/promotion contracts exist, but no AoS GPU lane is allocated and no
@@ -35,7 +37,9 @@ maturity_target: Operational
 - [ ] Add per-geometry storage-class hints that select Static=AoS only for
       benchmark-justified, proven-static geometry; Dynamic remains SoA.
 - [ ] Add an AoS managed sub-allocation path in `GpuWorld` with explicit
-      geometry-record lane flags.
+      geometry-record lane flags, selected through the one
+      `GeometryUploadPlan`/residency coordinator rather than a new AoS packer
+      or sidecar.
 - [ ] Preserve the RUNTIME-129 bake-residency contract: an AoS allocation must
       either keep and truthfully advertise equivalent separate bake-readable
       channels through `GpuGeometryResidencyView`, or remain
@@ -45,7 +49,8 @@ maturity_target: Operational
 - [ ] Add shader/pipeline variants for affected passes and keep the SoA path as
       default.
 - [ ] Implement first streaming edit promotion from AoS to SoA, including
-      de-interleave/rebind behavior and diagnostics.
+      de-interleave/rebind behavior and diagnostics through the common
+      coordinator lifecycle.
 - [ ] Preserve partial-update behavior for the default SoA lane.
 
 ## Tests
@@ -97,6 +102,8 @@ python3 tools/agents/check_task_policy.py --root . --strict
   unsupported-lane result.
 - Landing shader variants without benchmark and parity evidence.
 - Mixing unrelated renderer/runtime features.
+- Adding an AoS-specific public packer, residency service, cache, or retire
+  queue alongside `RUNTIME-197`.
 
 ## Maturity
 - Target: `Operational` on Vulkan-capable hosts; `CPUContracted` for CPU/null

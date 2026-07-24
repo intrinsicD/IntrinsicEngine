@@ -29,7 +29,9 @@ maturity_target: Operational
 - Dependencies: `ASSETIO-010` supplies primary/companion preview;
   `BUG-098` restores production hover timing; `BUG-099` closes the binary PLY
   PointCloud route; `BUG-100` makes every File / Import payload queued and
-  responsive.
+  responsive. Through `ASSETIO-010`, every successful row must exercise the
+  post-`RUNTIME-200` staged import recipe and canonical `JobService`, not a
+  compatibility `AssetImportPipeline`/IO-bridge route.
 - The current integration suite opens the real window and can observe a
   disabled hover only after forcing `DelayNone`; it never types the real path,
   selects a real combo row, clicks Import, or covers the checked-in model
@@ -57,6 +59,9 @@ maturity_target: Operational
 - [ ] For supported rows, wait with a bounded state predicate for queued
       completion and assert payload, entity count, selection, camera-focus
       request, asset queue terminal state, and relevant warnings.
+- [ ] Assert each supported row reports the staged import recipe route/stages
+      and that no old public IO bridge or monolithic model-scene handoff is
+      invoked.
 - [ ] Keep operational pixel visibility/click-pick evidence in the existing
       focused Vulkan smokes; link those tests from this matrix rather than
       recreating GPU assertions in every row.
@@ -94,6 +99,8 @@ maturity_target: Operational
       and cannot dispatch; prerequisites become enabled in linear order.
 - [ ] Supported imports traverse the actual Path/combo/Import controls and
       finish through the same queued runtime path used by the application.
+- [ ] That queued runtime path is the sole staged `AssetImportRecipe`; the
+      matrix cannot pass through a retained compatibility import pipeline.
 - [ ] Generated route-class substitutes cover local XYZ/OBJ without committing
       or assuming provenance for user datasets.
 - [ ] The real-control matrix, focused Vulkan visibility smokes, and default

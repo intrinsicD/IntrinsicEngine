@@ -11,7 +11,10 @@ map.
 
 ## Tasks
 
-No open physics backlog tasks.
+- [`PHYSICS-004` — Operational runtime physics module and bridge privatization](PHYSICS-004-operational-runtime-physics-module.md)
+  composes the retired CPU physics contracts in the real runtime lifecycle,
+  proves ECS authoring/fixed-step/writeback through `Engine::Run()`, and then
+  removes the test-only public `PhysicsBridge` surface.
 
 ## Convergence
 
@@ -26,8 +29,11 @@ No open physics backlog tasks.
 - `PHYSICS-002` is retired at `CPUContracted`; it owns deterministic CPU
   broadphase candidates, first-phase primitive contact records, and collision
   diagnostics.
-- `PHYSICS-003` is now unblocked by retired `PHYSICS-001` and `PHYSICS-002`; it
-  owns constraint, island, sleep, and solver diagnostics.
+- `PHYSICS-003` is retired; it owns constraint, island, sleep, and solver
+  diagnostics on top of retired `PHYSICS-001`/`002`.
+- `PHYSICS-004` is the operational runtime-integration leaf: physics remains
+  the simulation owner, runtime owns per-world composition/writeback, and no
+  live physics handles enter ECS.
 - ARCH-002 must not bless GPU/optimized backend tasks for any phenomenon before
   its CPU reference path exists. It retired with first non-rigid physics method
   follow-ups:

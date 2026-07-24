@@ -33,8 +33,10 @@ map.
   for filtered orientation/diagnostics; this method owns LNC indirect
   `orient3d`/`inSphere`).
 - [METHOD-014 — Progressive Poisson GPU operational parity](METHOD-014-progressive-poisson-gpu-operational-parity.md)
-  (Vulkan compute operational/parity follow-up to retired `METHOD-013`; no
-  speedup claim without benchmark baseline comparison).
+  (Vulkan compute operational/parity follow-up to retired `METHOD-013` through
+  the canonical `RUNTIME-194` work and `RUNTIME-195` readback paths; migrates
+  the post-facade typed feature operation and deletes duplicate routes after
+  parity; no speedup claim without benchmark baseline comparison).
 - [METHOD-015 — Coherent Point Drift registration family reference backend](METHOD-015-coherent-point-drift-family-reference-backend.md)
   (rigid default with affine/nonrigid in-package; gated on
   `geometry/GEOM-058` Gaussian-mixture/EM seam).
@@ -54,7 +56,9 @@ map.
   `RUNTIME-175`/`UI-035` CPU control surfaces; deliberately excludes
   opportunistic `GEOM-060`/`061` adoption).
 - [METHOD-020 — LOP-family GPU (Vulkan compute) backend and parity](METHOD-020-lop-family-gpu-vulkan-compute-backend.md)
-  (adds `gpu_vulkan_compute` with `gpu;vulkan` parity; gated on `METHOD-019`).
+  (adds a private `gpu_vulkan_compute` implementation to the `RUNTIME-175`
+  typed operation with `gpu;vulkan` parity; uses `RUNTIME-194`/`195` and adds
+  no public adapter or feature queue).
 - [METHOD-021 — ARAP (local/global) parameterization reference backend](METHOD-021-arap-parameterization-reference-backend.md)
   (adds its concrete ARAP params alternative to the retired `GEOM-063` typed
   `Geometry.Parameterization` strategy surface; gated on `geometry/GEOM-064`
@@ -70,7 +74,8 @@ map.
   against `METHOD-022`; ARAP deliberately remains reference-only).
 - [METHOD-026 — Parameterization family GPU (Vulkan compute) backend and parity](METHOD-026-parameterization-family-gpu-vulkan-compute-backend.md)
   (adds `gpu_vulkan_compute` for the iterative ARAP/SLIM strategies with
-  `gpu;vulkan` parity; gated on the SLIM-only `METHOD-025` evidence pass and
+  `gpu;vulkan` parity as a private implementation of the post-`RUNTIME-202`
+  typed operation; gated on the SLIM-only `METHOD-025` evidence pass and
   builds on retired
   `RUNTIME-176`'s delivered facade/config/result model, extending it with the
   GPU job-queue seam and extending the panel delivered by retired `UI-036`;
