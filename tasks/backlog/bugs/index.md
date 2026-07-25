@@ -5,6 +5,11 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-121` — GLM anonymous-union copy-assignment fails to compile through a C++23 module boundary](BUG-121-glm-anonymous-union-module-copy-assign.md):
+  `clang++-20` rejects `glm/detail/type_vec3.hpp`'s `union { T x, r, s; }` when the implicit copy
+  assignment for `glm::vec<3,float>` is first required in a TU that reaches the type through
+  `Extrinsic.RHI.Types`. Breaks the build of `Test.CameraModule.cpp`, so `full-cpu`, `ci-asan`,
+  and `ci-ubsan` never reach their test phase. Cold cache, so not a stale-BMI artifact.
 - [`BUG-120` — Test.WorkflowConcurrency drifted from the CPU test sources it mirrors](BUG-120-workflow-concurrency-ctest-processors-drift.md):
   two config-root function names are no longer found, and the multi-worker CTest
   `PROCESSORS` parity set differs symmetrically from the sources — including one
