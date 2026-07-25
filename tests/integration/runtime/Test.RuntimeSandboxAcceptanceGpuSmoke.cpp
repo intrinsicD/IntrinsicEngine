@@ -539,7 +539,7 @@ void SeedAcceptanceScene(Registry& scene)
     normal.Semantic = RT::ProgressiveSlotSemantic::Normal;
     normal.SourceKind = RT::ProgressiveSlotSourceKind::PropertyBake;
     normal.Property = RT::ProgressivePropertyBindingDescriptor{
-        .Domain = RT::ProgressiveGeometryDomain::MeshVertex,
+        .Domain = RT::GeometryElementDomain::MeshVertex,
         .PropertyName = "v:normal",
         .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
         .ExpectedElementCount = 3u,
@@ -565,7 +565,7 @@ void SeedAcceptanceScene(Registry& scene)
     metallic.Semantic = RT::ProgressiveSlotSemantic::Metallic;
     metallic.SourceKind = RT::ProgressiveSlotSourceKind::PropertyBake;
     metallic.Property = RT::ProgressivePropertyBindingDescriptor{
-        .Domain = RT::ProgressiveGeometryDomain::MeshVertex,
+        .Domain = RT::GeometryElementDomain::MeshVertex,
         .PropertyName = "v:metallic",
         .ExpectedValueKind = Geometry::PropertyValueKind::Float,
         .ExpectedElementCount = 3u,
@@ -582,7 +582,7 @@ void SeedAcceptanceScene(Registry& scene)
     faceScalar.Semantic = RT::ProgressiveSlotSemantic::ScalarField;
     faceScalar.SourceKind = RT::ProgressiveSlotSourceKind::PropertyBuffer;
     faceScalar.Property = RT::ProgressivePropertyBindingDescriptor{
-        .Domain = RT::ProgressiveGeometryDomain::MeshFace,
+        .Domain = RT::GeometryElementDomain::MeshFace,
         .PropertyName = "f:heat",
         .ExpectedValueKind = Geometry::PropertyValueKind::Float,
         .ExpectedElementCount = 1u,
@@ -616,7 +616,7 @@ void SeedAcceptanceScene(Registry& scene)
     edgeColor.Semantic = RT::ProgressiveSlotSemantic::LineColor;
     edgeColor.SourceKind = RT::ProgressiveSlotSourceKind::PropertyBuffer;
     edgeColor.Property = RT::ProgressivePropertyBindingDescriptor{
-        .Domain = RT::ProgressiveGeometryDomain::GraphEdge,
+        .Domain = RT::GeometryElementDomain::GraphEdge,
         .PropertyName = "e:debug_color",
         .ExpectedValueKind = Geometry::PropertyValueKind::Vec4,
         .ExpectedElementCount = 2u,
@@ -5638,7 +5638,7 @@ MakeRuntime190PresentationBindings()
     albedo.Semantic = RT::ProgressiveSlotSemantic::Albedo;
     albedo.SourceKind = RT::ProgressiveSlotSourceKind::PropertyBuffer;
     albedo.Property = RT::ProgressivePropertyBindingDescriptor{
-        .Domain = RT::ProgressiveGeometryDomain::MeshVertex,
+        .Domain = RT::GeometryElementDomain::MeshVertex,
         .PropertyName = "v:runtime190_scalar",
         .ExpectedValueKind =
             Geometry::PropertyValueKind::Float,
@@ -5979,7 +5979,7 @@ private:
         command.TargetSemantic =
             RT::ProgressiveSlotSemantic::Albedo;
         command.SourceDomain =
-            RT::ProgressiveGeometryDomain::MeshVertex;
+            RT::GeometryElementDomain::MeshVertex;
         command.ExpectedValueKind =
             Geometry::PropertyValueKind::Float;
         command.PropertyName = "v:runtime190_scalar";
@@ -5999,7 +5999,7 @@ private:
 
     [[nodiscard]] RT::SandboxEditorTextureBakeCommand
     EncodedCommand(
-        const RT::ProgressiveGeometryDomain domain,
+        const RT::GeometryElementDomain domain,
         std::string property,
         std::string output) const
     {
@@ -6026,11 +6026,11 @@ private:
         m_VertexCommand = VertexCommand(
             Extrinsic::Graphics::Colormap::Type::Viridis);
         const RT::SandboxEditorTextureBakeCommand face = EncodedCommand(
-            RT::ProgressiveGeometryDomain::MeshFace,
+            RT::GeometryElementDomain::MeshFace,
             "f:runtime190_color",
             std::string{kRuntime190FaceOutput});
         const RT::SandboxEditorTextureBakeCommand edge = EncodedCommand(
-            RT::ProgressiveGeometryDomain::MeshEdge,
+            RT::GeometryElementDomain::MeshEdge,
             "e:runtime190_color",
             std::string{kRuntime190EdgeOutput});
 
@@ -6096,7 +6096,7 @@ private:
         }
 
         const RT::SandboxEditorTextureBakeCommand edge = EncodedCommand(
-            RT::ProgressiveGeometryDomain::MeshEdge,
+            RT::GeometryElementDomain::MeshEdge,
             "e:runtime190_color",
             std::string{kRuntime190EdgeOutput});
         const RT::SandboxEditorTextureBakeCommandResult edgeResult =

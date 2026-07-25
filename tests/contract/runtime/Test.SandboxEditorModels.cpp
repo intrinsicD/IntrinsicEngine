@@ -464,7 +464,7 @@ void AddTriangleMeshSource(ECS::Scene::Registry& registry,
         normal.Semantic = Runtime::ProgressiveSlotSemantic::Normal;
         normal.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBake;
         normal.Property = Runtime::ProgressivePropertyBindingDescriptor{
-            .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+            .Domain = Runtime::GeometryElementDomain::MeshVertex,
             .PropertyName = "v:normal",
             .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
             .ExpectedElementCount = 3u,
@@ -2599,7 +2599,7 @@ TEST(SandboxEditorUi, PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection)
         });
     ASSERT_NE(normalTarget, catalog.BindingTargets.end());
     EXPECT_EQ(normalTarget->RequiredDomain,
-              Runtime::ProgressiveGeometryDomain::MeshVertex);
+              Runtime::GeometryElementDomain::MeshVertex);
     EXPECT_EQ(normalTarget->ExpectedValueKind,
               Geometry::PropertyValueKind::Vec3);
     ASSERT_FALSE(normalTarget->Options.empty());
@@ -3159,7 +3159,7 @@ TEST(SandboxEditorUi, ProgressiveInspectorReportsSlotsPropertiesAndJobs)
                 1u},
             .Key = Runtime::DerivedJobKey{
                 .EntityId = stableId,
-                .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+                .Domain = Runtime::DerivedJobScope::MeshVertex,
                 .OutputSemantic = Runtime::ProgressiveSlotSemantic::Normal,
                 .BindingGeneration = 7u,
                 .OutputName = "normal",
@@ -3314,7 +3314,7 @@ TEST(SandboxEditorUi, ProgressiveInspectorInfersGraphPointCloudAndComposition)
         .Handle = Runtime::DerivedJobHandle{77u, 1u},
         .Key = Runtime::DerivedJobKey{
             .EntityId = Runtime::SelectionController::ToStableEntityId(child),
-            .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+            .Domain = Runtime::DerivedJobScope::MeshVertex,
             .OutputSemantic = Runtime::ProgressiveSlotSemantic::Normal,
             .BindingGeneration = 7u,
             .OutputName = "normal",

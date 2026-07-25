@@ -98,8 +98,8 @@ export namespace Extrinsic::Runtime
     struct BakedPropertyTextureRecord
     {
         std::string OutputName{};
-        ProgressiveGeometryDomain SourceDomain{
-            ProgressiveGeometryDomain::MeshVertex};
+        GeometryElementDomain SourceDomain{
+            GeometryElementDomain::MeshVertex};
         std::string SourcePropertyName{};
         Geometry::PropertyValueKind ValueKind{
             Geometry::PropertyValueKind::Unknown};
@@ -160,7 +160,7 @@ export namespace Extrinsic::Runtime
     struct SelectedMeshTextureBakeRequest
     {
         std::uint32_t StableEntityId{0u};
-        ProgressiveGeometryDomain SourceDomain{ProgressiveGeometryDomain::MeshVertex};
+        GeometryElementDomain SourceDomain{GeometryElementDomain::MeshVertex};
         std::string SourcePropertyName{};
         GeometryPropertyValueKindFilter ExpectedValueKind{};
         MeshAttributeTextureBakeEncoder Encoder{MeshAttributeTextureBakeEncoder::Auto};

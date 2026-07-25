@@ -125,7 +125,7 @@ namespace
             Runtime::DerivedJobDesc desc{
                 .Key = Runtime::DerivedJobKey{
                     .EntityId = 141u,
-                    .Domain = Runtime::ProgressiveGeometryDomain::Point,
+                    .Domain = Runtime::DerivedJobScope::PointCloudPoint,
                     .OutputSemantic =
                         Runtime::ProgressiveSlotSemantic::PointColor,
                     .OutputName = "runtime_141_slow_job_probe",

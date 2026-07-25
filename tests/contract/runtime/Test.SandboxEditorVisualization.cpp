@@ -315,7 +315,7 @@ void AddTriangleMeshSource(ECS::Scene::Registry& registry,
         normal.Semantic = Runtime::ProgressiveSlotSemantic::Normal;
         normal.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBake;
         normal.Property = Runtime::ProgressivePropertyBindingDescriptor{
-            .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+            .Domain = Runtime::GeometryElementDomain::MeshVertex,
             .PropertyName = "v:normal",
             .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
             .ExpectedElementCount = 3u,
@@ -1651,7 +1651,7 @@ TEST(SandboxEditorUi, ProgressiveSlotCommandsUseCommandHistory)
                       .Semantic = Runtime::ProgressiveSlotSemantic::Albedo,
                       .SourceKind =
                           Runtime::ProgressiveSlotSourceKind::PropertyBake,
-                      .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+                      .Domain = Runtime::GeometryElementDomain::MeshVertex,
                       .ExpectedValueKind =
                           Geometry::PropertyValueKind::Vec4,
                       .PropertyName = "v:paint",
@@ -1679,7 +1679,7 @@ TEST(SandboxEditorUi, ProgressiveSlotCommandsUseCommandHistory)
                       .Semantic = Runtime::ProgressiveSlotSemantic::Albedo,
                       .SourceKind =
                           Runtime::ProgressiveSlotSourceKind::PropertyBake,
-                      .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+                      .Domain = Runtime::GeometryElementDomain::MeshVertex,
                       .ExpectedValueKind =
                           Geometry::PropertyValueKind::Vec4,
                       .PropertyName = "v:temperature",

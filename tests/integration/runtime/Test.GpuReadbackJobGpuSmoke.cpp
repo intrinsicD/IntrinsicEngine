@@ -139,7 +139,7 @@ namespace
     {
         return Runtime::DerivedJobKey{
             .EntityId = entityId,
-            .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+            .Domain = Runtime::DerivedJobScope::MeshVertex,
             .OutputSemantic = semantic,
             .EntityGeneration = 1u,
             .GeometryGeneration = 1u,

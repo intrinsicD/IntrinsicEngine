@@ -317,7 +317,7 @@ namespace
         normal.Property =
             Runtime::ProgressivePropertyBindingDescriptor{
                 .Domain =
-                    Runtime::ProgressiveGeometryDomain::MeshVertex,
+                    Runtime::GeometryElementDomain::MeshVertex,
                 .PropertyName = "v:normal",
                 .ExpectedValueKind =
                     Geometry::PropertyValueKind::Vec3,

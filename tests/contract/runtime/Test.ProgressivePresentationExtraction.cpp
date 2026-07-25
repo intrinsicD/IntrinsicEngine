@@ -97,7 +97,7 @@ namespace
 
     Runtime::ProgressiveSlotBinding PropertyBufferSlot(
         const Runtime::ProgressiveSlotSemantic semantic,
-        const Runtime::ProgressiveGeometryDomain domain,
+        const Runtime::GeometryElementDomain domain,
         const char* name,
         const Geometry::PropertyValueKind kind,
         const std::size_t count)
@@ -130,7 +130,7 @@ TEST(ProgressivePresentationExtraction, MeshDefaultsAndGeneratedTextureStateDoNo
     normal.Semantic = Runtime::ProgressiveSlotSemantic::Normal;
     normal.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBake;
     normal.Property = Runtime::ProgressivePropertyBindingDescriptor{
-        .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+        .Domain = Runtime::GeometryElementDomain::MeshVertex,
         .PropertyName = "v:normal",
         .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
         .ExpectedElementCount = 3u,
@@ -187,7 +187,7 @@ TEST(ProgressivePresentationExtraction, GraphVertexAndEdgePropertyBuffersResolve
                 .Key = "graph.points",
                 .Kind = Runtime::ProgressivePresentationKind::PointPresentation,
                 .Slots = {PropertyBufferSlot(Runtime::ProgressiveSlotSemantic::PointColor,
-                                             Runtime::ProgressiveGeometryDomain::GraphVertex,
+                                             Runtime::GeometryElementDomain::GraphNode,
                                              "v:color",
                                              Geometry::PropertyValueKind::Vec4,
                                              2u)},
@@ -196,7 +196,7 @@ TEST(ProgressivePresentationExtraction, GraphVertexAndEdgePropertyBuffersResolve
                 .Key = "graph.edges",
                 .Kind = Runtime::ProgressivePresentationKind::LinePresentation,
                 .Slots = {PropertyBufferSlot(Runtime::ProgressiveSlotSemantic::LineColor,
-                                             Runtime::ProgressiveGeometryDomain::GraphEdge,
+                                             Runtime::GeometryElementDomain::GraphEdge,
                                              "e:color",
                                              Geometry::PropertyValueKind::Vec4,
                                              1u)},
@@ -210,8 +210,8 @@ TEST(ProgressivePresentationExtraction, GraphVertexAndEdgePropertyBuffersResolve
 
     ASSERT_EQ(snapshot.Slots.size(), 2u);
     EXPECT_EQ(snapshot.Stats.PropertyBufferReadyCount, 2u);
-    EXPECT_EQ(snapshot.Slots[0].Property.Domain, Runtime::ProgressiveGeometryDomain::GraphVertex);
-    EXPECT_EQ(snapshot.Slots[1].Property.Domain, Runtime::ProgressiveGeometryDomain::GraphEdge);
+    EXPECT_EQ(snapshot.Slots[0].Property.Domain, Runtime::GeometryElementDomain::GraphNode);
+    EXPECT_EQ(snapshot.Slots[1].Property.Domain, Runtime::GeometryElementDomain::GraphEdge);
     EXPECT_TRUE(snapshot.Slots[0].PropertyBufferReady);
     EXPECT_TRUE(snapshot.Slots[1].PropertyBufferReady);
 }

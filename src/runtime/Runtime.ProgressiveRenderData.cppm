@@ -27,19 +27,6 @@ export namespace Extrinsic::Runtime
         PointCloudLeaf,
     };
 
-    enum class ProgressiveGeometryDomain : std::uint8_t
-    {
-        Unknown,
-        MeshVertex,
-        MeshEdge,
-        MeshHalfedge,
-        MeshFace,
-        MeshSurface,
-        GraphVertex,
-        GraphEdge,
-        Point,
-    };
-
     enum class ProgressiveRenderLane : std::uint8_t
     {
         Surface,
@@ -138,7 +125,7 @@ export namespace Extrinsic::Runtime
 
     struct ProgressivePropertyBindingDescriptor
     {
-        ProgressiveGeometryDomain Domain{ProgressiveGeometryDomain::Unknown};
+        GeometryElementDomain Domain{GeometryElementDomain::Unknown};
         std::string PropertyName{};
         GeometryPropertyValueKindFilter ExpectedValueKind{};
         std::size_t ExpectedElementCount{0u};
@@ -205,7 +192,6 @@ export namespace Extrinsic::Runtime
     };
 
     [[nodiscard]] std::string_view ToString(ProgressiveEntityShape value) noexcept;
-    [[nodiscard]] std::string_view ToString(ProgressiveGeometryDomain value) noexcept;
     [[nodiscard]] std::string_view ToString(ProgressiveRenderLane value) noexcept;
     [[nodiscard]] std::string_view ToString(ProgressivePresentationKind value) noexcept;
     [[nodiscard]] std::string_view ToString(ProgressiveSlotSemantic value) noexcept;
@@ -218,8 +204,6 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] bool TryParseProgressiveEntityShape(std::string_view value,
                                                       ProgressiveEntityShape& out) noexcept;
-    [[nodiscard]] bool TryParseProgressiveGeometryDomain(std::string_view value,
-                                                         ProgressiveGeometryDomain& out) noexcept;
     [[nodiscard]] bool TryParseProgressiveRenderLane(std::string_view value,
                                                      ProgressiveRenderLane& out) noexcept;
     [[nodiscard]] bool TryParseProgressivePresentationKind(std::string_view value,
@@ -238,11 +222,11 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] const Geometry::PropertySet* ResolvePropertySet(
         const ECS::Components::GeometrySources::ConstSourceView& view,
-        ProgressiveGeometryDomain domain) noexcept;
+        GeometryElementDomain domain) noexcept;
 
     [[nodiscard]] std::size_t ResolvePropertyElementCount(
         const ECS::Components::GeometrySources::ConstSourceView& view,
-        ProgressiveGeometryDomain domain) noexcept;
+        GeometryElementDomain domain) noexcept;
 
     [[nodiscard]] ProgressivePropertyResolution ResolvePropertyBinding(
         const ECS::Components::GeometrySources::ConstSourceView& view,
@@ -251,7 +235,7 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] std::vector<ProgressivePropertyOption> EnumeratePropertyOptions(
         const ECS::Components::GeometrySources::ConstSourceView& view,
-        ProgressiveGeometryDomain domain,
+        GeometryElementDomain domain,
         GeometryPropertyValueKindFilter expectedValueKind = std::nullopt,
         std::size_t expectedElementCount = 0u,
         std::uint64_t observedSourceGeneration = 0u);

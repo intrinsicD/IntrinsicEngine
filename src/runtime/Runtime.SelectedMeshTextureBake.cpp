@@ -149,26 +149,25 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] MeshAttributeTextureBakeSourceDomain ToBakeDomain(
-            const ProgressiveGeometryDomain domain,
+            const GeometryElementDomain domain,
             SelectedMeshTextureBakeStatus& status) noexcept
         {
             switch (domain)
             {
-            case ProgressiveGeometryDomain::MeshVertex:
+            case GeometryElementDomain::MeshVertex:
                 status = SelectedMeshTextureBakeStatus::Success;
                 return MeshAttributeTextureBakeSourceDomain::Vertex;
-            case ProgressiveGeometryDomain::MeshFace:
+            case GeometryElementDomain::MeshFace:
                 status = SelectedMeshTextureBakeStatus::Success;
                 return MeshAttributeTextureBakeSourceDomain::Face;
-            case ProgressiveGeometryDomain::MeshEdge:
+            case GeometryElementDomain::MeshEdge:
                 status = SelectedMeshTextureBakeStatus::Success;
                 return MeshAttributeTextureBakeSourceDomain::Edge;
-            case ProgressiveGeometryDomain::Unknown:
-            case ProgressiveGeometryDomain::MeshHalfedge:
-            case ProgressiveGeometryDomain::MeshSurface:
-            case ProgressiveGeometryDomain::GraphVertex:
-            case ProgressiveGeometryDomain::GraphEdge:
-            case ProgressiveGeometryDomain::Point:
+            case GeometryElementDomain::Unknown:
+            case GeometryElementDomain::MeshHalfedge:
+            case GeometryElementDomain::GraphNode:
+            case GeometryElementDomain::GraphEdge:
+            case GeometryElementDomain::PointCloudPoint:
                 status = SelectedMeshTextureBakeStatus::UnsupportedSourceDomain;
                 break;
             }
@@ -583,7 +582,7 @@ namespace Extrinsic::Runtime
                    request.BindGeneratedTexture &&
                    request.TargetLane == ProgressiveRenderLane::Surface &&
                    request.TargetSemantic == ProgressiveSlotSemantic::Normal &&
-                   request.SourceDomain == ProgressiveGeometryDomain::MeshVertex;
+                   request.SourceDomain == GeometryElementDomain::MeshVertex;
         }
 
         [[nodiscard]] SelectedMeshTextureBakeStatus StatusForRuntimeObjectSpaceNormalBake(
@@ -1694,7 +1693,7 @@ namespace Extrinsic::Runtime
         DerivedJobDesc desc{};
         desc.Key = DerivedJobKey{
             .EntityId = request.StableEntityId,
-            .Domain = request.SourceDomain,
+            .Domain = ToDerivedJobScope(request.SourceDomain),
             .OutputSemantic = request.TargetSemantic,
             .BindingGeneration = expectedBindingGeneration,
             .OutputName = request.SourcePropertyName,

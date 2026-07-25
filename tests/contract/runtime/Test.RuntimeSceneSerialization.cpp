@@ -499,7 +499,7 @@ namespace
         constrained.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBuffer;
         constrained.UniformDefault.Kind = Geometry::PropertyValueKind::Float;
         constrained.Property = Runtime::ProgressivePropertyBindingDescriptor{
-            .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+            .Domain = Runtime::GeometryElementDomain::MeshVertex,
             .PropertyName = "v:quality",
             .ExpectedValueKind = Geometry::PropertyValueKind::Float,
             .ExpectedElementCount = 3u,
@@ -510,7 +510,7 @@ namespace
         unconstrained.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBuffer;
         unconstrained.UniformDefault.Kind = Geometry::PropertyValueKind::Double;
         unconstrained.Property = Runtime::ProgressivePropertyBindingDescriptor{
-            .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+            .Domain = Runtime::GeometryElementDomain::MeshVertex,
             .PropertyName = "v:color",
             .ExpectedValueKind = std::nullopt,
             .ExpectedElementCount = 3u,
@@ -644,4 +644,128 @@ TEST(RuntimeSceneSerialization, ReaderStaysPinnedToLegacyValueKindWireStrings)
     EXPECT_FALSE(result.has_value())
         << "canonical value-kind names must not be accepted on the wire; the "
            "persisted format is ScalarFloat/ScalarDouble";
+}
+
+// RUNTIME-192 Slice B3 — property-domain wire format.
+//
+// The in-memory vocabulary is now GeometryElementDomain, whose names are
+// GraphNode/PointCloudPoint. The persisted format predates it and says
+// "GraphVertex"/"Point", plus a legacy "MeshSurface" that every property path
+// already treated as unsupported.
+TEST(RuntimeSceneSerialization, PropertyDomainKeepsLegacyWireStrings)
+{
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle entity = AddMeshEntity(source);
+
+    const auto slotWithDomain =
+        [](const Runtime::ProgressiveSlotSemantic semantic,
+           const Runtime::GeometryElementDomain domain)
+    {
+        Runtime::ProgressiveSlotBinding slot{};
+        slot.Semantic = semantic;
+        slot.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBuffer;
+        slot.Property = Runtime::ProgressivePropertyBindingDescriptor{
+            .Domain = domain,
+            .PropertyName = "v:field",
+            .ExpectedValueKind = Geometry::PropertyValueKind::Float,
+            .ExpectedElementCount = 3u,
+        };
+        return slot;
+    };
+
+    Runtime::ProgressivePresentationBindings bindings{};
+    bindings.Shape = Runtime::ProgressiveEntityShape::MeshLeaf;
+    bindings.Presentations.push_back(Runtime::ProgressivePresentationBinding{
+        .Key = "mesh.surface",
+        .Kind = Runtime::ProgressivePresentationKind::SurfaceMaterial,
+        .Slots = {
+            slotWithDomain(Runtime::ProgressiveSlotSemantic::ScalarField,
+                           Runtime::GeometryElementDomain::GraphNode),
+            slotWithDomain(Runtime::ProgressiveSlotSemantic::Albedo,
+                           Runtime::GeometryElementDomain::PointCloudPoint),
+        },
+    });
+    source.Raw().emplace<Runtime::ProgressivePresentationBindings>(
+        entity, std::move(bindings));
+
+    MemoryIOBackend backend;
+    ASSERT_TRUE(
+        Runtime::SaveSceneDocument(source, "domains.json", backend).has_value());
+    const std::string text = backend.Text("domains.json");
+
+    EXPECT_NE(text.find("\"GraphVertex\""), std::string::npos)
+        << "GraphNode must persist under its legacy name GraphVertex";
+    EXPECT_NE(text.find("\"Point\""), std::string::npos)
+        << "PointCloudPoint must persist under its legacy name Point";
+    EXPECT_EQ(text.find("\"domain\":\"GraphNode\""), std::string::npos);
+    EXPECT_EQ(text.find("\"domain\":\"PointCloudPoint\""), std::string::npos);
+
+    ECS::Scene::Registry loaded;
+    ASSERT_TRUE(
+        Runtime::LoadSceneDocument(loaded, "domains.json", backend).has_value());
+    const ECS::EntityHandle loadedEntity = FindEntityByName(loaded, "Mesh Entity");
+    ASSERT_NE(loadedEntity, ECS::InvalidEntityHandle);
+    const auto* roundTripped =
+        loaded.Raw().try_get<Runtime::ProgressivePresentationBindings>(loadedEntity);
+    ASSERT_NE(roundTripped, nullptr);
+    ASSERT_FALSE(roundTripped->Presentations.empty());
+    ASSERT_EQ(roundTripped->Presentations.front().Slots.size(), 2u);
+    EXPECT_EQ(roundTripped->Presentations.front().Slots[0].Property.Domain,
+              Runtime::GeometryElementDomain::GraphNode);
+    EXPECT_EQ(roundTripped->Presentations.front().Slots[1].Property.Domain,
+              Runtime::GeometryElementDomain::PointCloudPoint);
+}
+
+TEST(RuntimeSceneSerialization, LegacyMeshSurfaceDomainLoadsAsUnknown)
+{
+    // "MeshSurface" was a whole-surface job target that never resolved to a
+    // property set; every property path already reported UnsupportedDomain for
+    // it. Documents written before RUNTIME-192 may still contain it, so it must
+    // load as Unknown rather than being rejected.
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle entity = AddMeshEntity(source);
+
+    Runtime::ProgressiveSlotBinding slot{};
+    slot.Semantic = Runtime::ProgressiveSlotSemantic::Albedo;
+    slot.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBuffer;
+    slot.Property = Runtime::ProgressivePropertyBindingDescriptor{
+        .Domain = Runtime::GeometryElementDomain::MeshVertex,
+        .PropertyName = "v:color",
+        .ExpectedElementCount = 3u,
+    };
+
+    Runtime::ProgressivePresentationBindings bindings{};
+    bindings.Shape = Runtime::ProgressiveEntityShape::MeshLeaf;
+    bindings.Presentations.push_back(Runtime::ProgressivePresentationBinding{
+        .Key = "mesh.surface",
+        .Kind = Runtime::ProgressivePresentationKind::SurfaceMaterial,
+        .Slots = {slot},
+    });
+    source.Raw().emplace<Runtime::ProgressivePresentationBindings>(
+        entity, std::move(bindings));
+
+    MemoryIOBackend backend;
+    ASSERT_TRUE(
+        Runtime::SaveSceneDocument(source, "surface.json", backend).has_value());
+
+    std::string document = backend.Text("surface.json");
+    const std::size_t at = document.find("\"MeshVertex\"");
+    ASSERT_NE(at, std::string::npos);
+    document.replace(at, std::string("\"MeshVertex\"").size(), "\"MeshSurface\"");
+
+    ECS::Scene::Registry loaded;
+    const auto result = Runtime::DeserializeSceneDocument(loaded, document);
+    ASSERT_TRUE(result.has_value())
+        << "a legacy MeshSurface domain must still load: "
+        << static_cast<int>(result.error());
+
+    const ECS::EntityHandle loadedEntity = FindEntityByName(loaded, "Mesh Entity");
+    ASSERT_NE(loadedEntity, ECS::InvalidEntityHandle);
+    const auto* roundTripped =
+        loaded.Raw().try_get<Runtime::ProgressivePresentationBindings>(loadedEntity);
+    ASSERT_NE(roundTripped, nullptr);
+    ASSERT_FALSE(roundTripped->Presentations.empty());
+    ASSERT_FALSE(roundTripped->Presentations.front().Slots.empty());
+    EXPECT_EQ(roundTripped->Presentations.front().Slots.front().Property.Domain,
+              Runtime::GeometryElementDomain::Unknown);
 }

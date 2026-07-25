@@ -1321,7 +1321,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] GeometryPropertyValueKindFilter DefaultExpectedValueKindForSlot(
             ProgressiveSlotSemantic semantic) noexcept;
 
-        [[nodiscard]] ProgressiveGeometryDomain DefaultDomainForProgressiveSlot(
+        [[nodiscard]] GeometryElementDomain DefaultDomainForProgressiveSlot(
             GS::Domain sourceDomain,
             ProgressiveRenderLane lane,
             ProgressiveSlotSemantic semantic) noexcept;
@@ -1369,28 +1369,28 @@ namespace Extrinsic::Runtime
             return nullptr;
         }
 
-        [[nodiscard]] ProgressiveGeometryDomain ToProgressiveGeometryDomain(
+        [[nodiscard]] GeometryElementDomain ToGeometryElementDomain(
             const SandboxEditorPropertyCatalogDomain domain) noexcept
         {
             using Domain = SandboxEditorPropertyCatalogDomain;
             switch (domain)
             {
             case Domain::MeshVertices:
-                return ProgressiveGeometryDomain::MeshVertex;
+                return GeometryElementDomain::MeshVertex;
             case Domain::MeshEdges:
-                return ProgressiveGeometryDomain::MeshEdge;
+                return GeometryElementDomain::MeshEdge;
             case Domain::MeshHalfedges:
-                return ProgressiveGeometryDomain::MeshHalfedge;
+                return GeometryElementDomain::MeshHalfedge;
             case Domain::MeshFaces:
-                return ProgressiveGeometryDomain::MeshFace;
+                return GeometryElementDomain::MeshFace;
             case Domain::GraphVertices:
-                return ProgressiveGeometryDomain::GraphVertex;
+                return GeometryElementDomain::GraphNode;
             case Domain::GraphEdges:
-                return ProgressiveGeometryDomain::GraphEdge;
+                return GeometryElementDomain::GraphEdge;
             case Domain::PointCloudPoints:
-                return ProgressiveGeometryDomain::Point;
+                return GeometryElementDomain::PointCloudPoint;
             }
-            return ProgressiveGeometryDomain::Unknown;
+            return GeometryElementDomain::Unknown;
         }
 
         [[nodiscard]] SandboxEditorPropertyCatalogValueKind ToPropertyCatalogValueKind(
@@ -1621,7 +1621,7 @@ namespace Extrinsic::Runtime
                     .Connectivity = IsConnectivityVisualizationProperty(name),
                     .Generated = IsGeneratedCatalogProperty(name),
                     .Descriptor = ProgressivePropertyBindingDescriptor{
-                        .Domain = ToProgressiveGeometryDomain(domain),
+                        .Domain = ToGeometryElementDomain(domain),
                         .PropertyName = name,
                         .ExpectedValueKind =
                             ToGeometryPropertyValueKind(kind),
@@ -1678,8 +1678,8 @@ namespace Extrinsic::Runtime
             const GS::ConstSourceView& view,
             const ProgressiveSlotExtraction& slot)
         {
-            ProgressiveGeometryDomain domain = slot.Property.Domain;
-            if (domain == ProgressiveGeometryDomain::Unknown)
+            GeometryElementDomain domain = slot.Property.Domain;
+            if (domain == GeometryElementDomain::Unknown)
             {
                 const GS::SourceAvailability availability =
                     GS::BuildSourceAvailability(view);
@@ -1710,7 +1710,7 @@ namespace Extrinsic::Runtime
                     domain),
             };
 
-            if (domain != ProgressiveGeometryDomain::Unknown)
+            if (domain != GeometryElementDomain::Unknown)
             {
                 std::vector<ProgressivePropertyOption> options =
                     EnumeratePropertyOptions(
@@ -2626,7 +2626,7 @@ namespace Extrinsic::Runtime
             return std::nullopt;
         }
 
-        [[nodiscard]] ProgressiveGeometryDomain DefaultDomainForProgressiveSlot(
+        [[nodiscard]] GeometryElementDomain DefaultDomainForProgressiveSlot(
             const GS::Domain sourceDomain,
             const ProgressiveRenderLane lane,
             const ProgressiveSlotSemantic semantic) noexcept
@@ -2638,29 +2638,29 @@ namespace Extrinsic::Runtime
                     semantic == ProgressiveSlotSemantic::LineScalarField ||
                     semantic == ProgressiveSlotSemantic::LineWidth)
                 {
-                    return ProgressiveGeometryDomain::MeshEdge;
+                    return GeometryElementDomain::MeshEdge;
                 }
                 if (semantic == ProgressiveSlotSemantic::ScalarField)
-                    return ProgressiveGeometryDomain::MeshFace;
+                    return GeometryElementDomain::MeshFace;
                 if (lane == ProgressiveRenderLane::Edges)
-                    return ProgressiveGeometryDomain::MeshEdge;
-                return ProgressiveGeometryDomain::MeshVertex;
+                    return GeometryElementDomain::MeshEdge;
+                return GeometryElementDomain::MeshVertex;
             case GS::Domain::Graph:
                 if (lane == ProgressiveRenderLane::Edges ||
                     semantic == ProgressiveSlotSemantic::LineColor ||
                     semantic == ProgressiveSlotSemantic::LineScalarField ||
                     semantic == ProgressiveSlotSemantic::LineWidth)
                 {
-                    return ProgressiveGeometryDomain::GraphEdge;
+                    return GeometryElementDomain::GraphEdge;
                 }
-                return ProgressiveGeometryDomain::GraphVertex;
+                return GeometryElementDomain::GraphNode;
             case GS::Domain::PointCloud:
-                return ProgressiveGeometryDomain::Point;
+                return GeometryElementDomain::PointCloudPoint;
             case GS::Domain::None:
             case GS::Domain::Unknown:
                 break;
             }
-            return ProgressiveGeometryDomain::Unknown;
+            return GeometryElementDomain::Unknown;
         }
 
         [[nodiscard]] SandboxEditorProgressivePropertyOptionModel
@@ -3205,8 +3205,8 @@ namespace Extrinsic::Runtime
             const GS::ConstSourceView& view,
             const ProgressiveSlotExtraction& extractedSlot)
         {
-            ProgressiveGeometryDomain domain = extractedSlot.Property.Domain;
-            if (domain == ProgressiveGeometryDomain::Unknown)
+            GeometryElementDomain domain = extractedSlot.Property.Domain;
+            if (domain == GeometryElementDomain::Unknown)
             {
                 const GS::SourceAvailability availability =
                     GS::BuildSourceAvailability(view);
@@ -3215,7 +3215,7 @@ namespace Extrinsic::Runtime
                     extractedSlot.Lane,
                     extractedSlot.Semantic);
             }
-            if (domain == ProgressiveGeometryDomain::Unknown)
+            if (domain == GeometryElementDomain::Unknown)
                 return {};
 
             GeometryPropertyValueKindFilter expected =
@@ -3396,7 +3396,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorPropertyCatalogModel& catalog,
             const ProgressivePropertyBindingDescriptor& descriptor)
         {
-            if (descriptor.Domain == ProgressiveGeometryDomain::Unknown ||
+            if (descriptor.Domain == GeometryElementDomain::Unknown ||
                 descriptor.PropertyName.empty())
             {
                 return std::nullopt;
@@ -3898,7 +3898,7 @@ namespace Extrinsic::Runtime
             SandboxEditorTextureBakeSourceRow out{
                 .Name = row.Name,
                 .CatalogDomain = row.Domain,
-                .BakeDomain = ToProgressiveGeometryDomain(row.Domain),
+                .BakeDomain = ToGeometryElementDomain(row.Domain),
                 .ValueKind = row.ValueKind,
                 .ExpectedValueKind = ToGeometryPropertyValueKind(row.ValueKind),
                 .ElementCount = row.ElementCount,
@@ -6818,7 +6818,7 @@ namespace Extrinsic::Runtime
             return DerivedJobDesc{
                 .Key = DerivedJobKey{
                     .EntityId = state->StableEntityId,
-                    .Domain = ProgressiveGeometryDomain::Point,
+                    .Domain = DerivedJobScope::PointCloudPoint,
                     .OutputSemantic = ProgressiveSlotSemantic::Displacement,
                     .SourcePropertyGeneration =
                         state->GeometryMetadataSignature,
@@ -6951,19 +6951,19 @@ namespace Extrinsic::Runtime
             return "vertex_normals";
         }
 
-        [[nodiscard]] ProgressiveGeometryDomain VertexNormalsCpuJobDomain(
+        [[nodiscard]] GeometryElementDomain VertexNormalsCpuJobDomain(
             const SandboxEditorVertexNormalsCpuJobKind kind) noexcept
         {
             switch (kind)
             {
             case SandboxEditorVertexNormalsCpuJobKind::Mesh:
-                return ProgressiveGeometryDomain::MeshVertex;
+                return GeometryElementDomain::MeshVertex;
             case SandboxEditorVertexNormalsCpuJobKind::Graph:
-                return ProgressiveGeometryDomain::GraphVertex;
+                return GeometryElementDomain::GraphNode;
             case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
-                return ProgressiveGeometryDomain::Point;
+                return GeometryElementDomain::PointCloudPoint;
             }
-            return ProgressiveGeometryDomain::Unknown;
+            return GeometryElementDomain::Unknown;
         }
 
         [[nodiscard]] GS::Domain VertexNormalsExpectedSourceDomain(
@@ -7638,7 +7638,7 @@ namespace Extrinsic::Runtime
             return DerivedJobDesc{
                 .Key = DerivedJobKey{
                     .EntityId = state->StableEntityId,
-                    .Domain = VertexNormalsCpuJobDomain(state->Kind),
+                    .Domain = ToDerivedJobScope(VertexNormalsCpuJobDomain(state->Kind)),
                     .OutputSemantic = ProgressiveSlotSemantic::Normal,
                     .SourcePropertyGeneration =
                         state->GeometryMetadataSignature,
@@ -8810,7 +8810,7 @@ namespace Extrinsic::Runtime
             return DerivedJobDesc{
                 .Key = DerivedJobKey{
                     .EntityId = state->StableEntityId,
-                    .Domain = ProgressiveGeometryDomain::MeshSurface,
+                    .Domain = DerivedJobScope::MeshSurface,
                     .OutputSemantic = MeshCpuJobOutputSemantic(state->Kind),
                     .SourcePropertyGeneration =
                         state->GeometryMetadataSignature,
@@ -9527,7 +9527,7 @@ namespace Extrinsic::Runtime
             return DerivedJobDesc{
                 .Key = DerivedJobKey{
                     .EntityId = state->SourceStableEntityId,
-                    .Domain = ProgressiveGeometryDomain::Point,
+                    .Domain = DerivedJobScope::PointCloudPoint,
                     .OutputSemantic = ProgressiveSlotSemantic::Displacement,
                     .SourcePropertyGeneration =
                         state->SourceGeometryMetadataSignature,
@@ -14248,7 +14248,7 @@ namespace Extrinsic::Runtime
         return DerivedJobDesc{
             .Key = DerivedJobKey{
                 .EntityId = state->StableEntityId,
-                .Domain = ProgressiveGeometryDomain::MeshSurface,
+                .Domain = DerivedJobScope::MeshSurface,
                 .OutputSemantic = ProgressiveSlotSemantic::Albedo,
                 .SourcePropertyGeneration =
                     state->GeometryMetadataSignature,

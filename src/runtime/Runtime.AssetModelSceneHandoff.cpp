@@ -1331,7 +1331,7 @@ namespace Extrinsic::Runtime
             slot.Semantic = semantic;
             slot.SourceKind = ProgressiveSlotSourceKind::PropertyBake;
             slot.Property = ProgressivePropertyBindingDescriptor{
-                .Domain = ProgressiveGeometryDomain::MeshVertex,
+                .Domain = GeometryElementDomain::MeshVertex,
                 .PropertyName = propertyName,
                 .ExpectedValueKind = expectedValueKind,
             };
@@ -1617,7 +1617,7 @@ namespace Extrinsic::Runtime
             DerivedJobDesc desc{};
             desc.Key = DerivedJobKey{
                 .EntityId = stableId,
-                .Domain = ProgressiveGeometryDomain::MeshVertex,
+                .Domain = DerivedJobScope::MeshVertex,
                 .OutputSemantic = semantic,
                 .EntityGeneration = static_cast<std::uint64_t>(entity),
                 .GeometryGeneration = 1u,
@@ -1722,7 +1722,7 @@ namespace Extrinsic::Runtime
                     DerivedJobDesc schedule{};
                     schedule.Key = DerivedJobKey{
                         .EntityId = StableEntityLookup::ToRenderId(entity),
-                        .Domain = ProgressiveGeometryDomain::MeshVertex,
+                        .Domain = DerivedJobScope::MeshVertex,
                         .OutputSemantic = ProgressiveSlotSemantic::Normal,
                         .EntityGeneration = static_cast<std::uint64_t>(entity),
                         .GeometryGeneration = 1u,
@@ -1843,7 +1843,7 @@ namespace Extrinsic::Runtime
                 DerivedJobDesc bake{};
                 bake.Key = DerivedJobKey{
                     .EntityId = StableEntityLookup::ToRenderId(entity),
-                    .Domain = ProgressiveGeometryDomain::MeshVertex,
+                    .Domain = DerivedJobScope::MeshVertex,
                     .OutputSemantic = ProgressiveSlotSemantic::Normal,
                     .EntityGeneration = static_cast<std::uint64_t>(entity),
                     .GeometryGeneration = 1u,
@@ -1906,7 +1906,7 @@ namespace Extrinsic::Runtime
                 DerivedJobDesc albedoBake{};
                 albedoBake.Key = DerivedJobKey{
                     .EntityId = StableEntityLookup::ToRenderId(entity),
-                    .Domain = ProgressiveGeometryDomain::MeshVertex,
+                    .Domain = DerivedJobScope::MeshVertex,
                     .OutputSemantic = ProgressiveSlotSemantic::Albedo,
                     .EntityGeneration = static_cast<std::uint64_t>(entity),
                     .GeometryGeneration = 1u,

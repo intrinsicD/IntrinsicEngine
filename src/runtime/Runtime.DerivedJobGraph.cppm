@@ -47,10 +47,38 @@ export namespace Extrinsic::Runtime
         Cancelled,
     };
 
+    // Identity-only scope for a derived job: which part of the geometry the
+    // job operates on.
+    //
+    // This is deliberately NOT `GeometryElementDomain`, because it includes
+    // `MeshSurface` — a whole-surface job target that is not a property element
+    // domain. RUNTIME-192 kept the two apart rather than smuggling `MeshSurface`
+    // into the canonical property vocabulary, where it resolved to
+    // "unsupported" in every property path. It stays local to this module and
+    // is used only to keep job keys distinct; `RUNTIME-194` retires the derived
+    // job registry outright, so this enum is expected to be short-lived.
+    enum class DerivedJobScope : std::uint8_t
+    {
+        Unknown,
+        MeshVertex,
+        MeshEdge,
+        MeshHalfedge,
+        MeshFace,
+        MeshSurface,
+        GraphNode,
+        GraphEdge,
+        PointCloudPoint,
+    };
+
+    // A property element domain maps 1:1 onto a job scope. The reverse is not
+    // total: `MeshSurface` has no element-domain counterpart by design.
+    [[nodiscard]] DerivedJobScope ToDerivedJobScope(
+        GeometryElementDomain domain) noexcept;
+
     struct DerivedJobKey
     {
         std::uint32_t EntityId{0u};
-        ProgressiveGeometryDomain Domain{ProgressiveGeometryDomain::Unknown};
+        DerivedJobScope Domain{DerivedJobScope::Unknown};
         ProgressiveSlotSemantic OutputSemantic{ProgressiveSlotSemantic::Albedo};
         std::uint64_t EntityGeneration{0u};
         std::uint64_t GeometryGeneration{0u};

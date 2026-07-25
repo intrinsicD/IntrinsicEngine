@@ -1242,8 +1242,8 @@ export namespace Extrinsic::Runtime
         ProgressiveSlotSemantic Semantic{ProgressiveSlotSemantic::Albedo};
         ProgressiveSlotSourceKind SourceKind{
             ProgressiveSlotSourceKind::UniformDefault};
-        ProgressiveGeometryDomain RequiredDomain{
-            ProgressiveGeometryDomain::Unknown};
+        GeometryElementDomain RequiredDomain{
+            GeometryElementDomain::Unknown};
         GeometryPropertyValueKindFilter ExpectedValueKind{};
         std::size_t ExpectedElementCount{0u};
         std::vector<SandboxEditorProgressivePropertyOptionModel> Options{};
@@ -1431,7 +1431,7 @@ export namespace Extrinsic::Runtime
         std::string Name{};
         SandboxEditorPropertyCatalogDomain CatalogDomain{
             SandboxEditorPropertyCatalogDomain::MeshVertices};
-        ProgressiveGeometryDomain BakeDomain{ProgressiveGeometryDomain::Unknown};
+        GeometryElementDomain BakeDomain{GeometryElementDomain::Unknown};
         SandboxEditorPropertyCatalogValueKind ValueKind{
             SandboxEditorPropertyCatalogValueKind::Unknown};
         GeometryPropertyValueKindFilter ExpectedValueKind{};
@@ -2772,7 +2772,7 @@ export namespace Extrinsic::Runtime
         std::string PresentationKey{};
         ProgressiveSlotSemantic Semantic{ProgressiveSlotSemantic::Albedo};
         ProgressiveSlotSourceKind SourceKind{ProgressiveSlotSourceKind::PropertyBake};
-        ProgressiveGeometryDomain Domain{ProgressiveGeometryDomain::Unknown};
+        GeometryElementDomain Domain{GeometryElementDomain::Unknown};
         GeometryPropertyValueKindFilter ExpectedValueKind{};
         std::string PropertyName{};
     };
@@ -2782,7 +2782,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t StableEntityId{0u};
         std::string PresentationKey{"mesh.surface"};
         ProgressiveSlotSemantic TargetSemantic{ProgressiveSlotSemantic::Albedo};
-        ProgressiveGeometryDomain SourceDomain{ProgressiveGeometryDomain::MeshVertex};
+        GeometryElementDomain SourceDomain{GeometryElementDomain::MeshVertex};
         GeometryPropertyValueKindFilter ExpectedValueKind{};
         std::string PropertyName{};
         MeshAttributeTextureBakeEncoder Encoder{

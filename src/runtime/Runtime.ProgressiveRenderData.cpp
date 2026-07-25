@@ -61,18 +61,6 @@ namespace Extrinsic::Runtime
             {ProgressiveEntityShape::PointCloudLeaf, "PointCloudLeaf"},
         };
 
-        constexpr std::pair<ProgressiveGeometryDomain, std::string_view> kGeometryDomains[]{
-            {ProgressiveGeometryDomain::Unknown, "Unknown"},
-            {ProgressiveGeometryDomain::MeshVertex, "MeshVertex"},
-            {ProgressiveGeometryDomain::MeshEdge, "MeshEdge"},
-            {ProgressiveGeometryDomain::MeshHalfedge, "MeshHalfedge"},
-            {ProgressiveGeometryDomain::MeshFace, "MeshFace"},
-            {ProgressiveGeometryDomain::MeshSurface, "MeshSurface"},
-            {ProgressiveGeometryDomain::GraphVertex, "GraphVertex"},
-            {ProgressiveGeometryDomain::GraphEdge, "GraphEdge"},
-            {ProgressiveGeometryDomain::Point, "Point"},
-        };
-
         constexpr std::pair<ProgressiveRenderLane, std::string_view> kRenderLanes[]{
             {ProgressiveRenderLane::Surface, "Surface"},
             {ProgressiveRenderLane::Edges, "Edges"},
@@ -180,11 +168,6 @@ namespace Extrinsic::Runtime
         return EnumToString(value, kEntityShapes, "Unknown");
     }
 
-    std::string_view ToString(const ProgressiveGeometryDomain value) noexcept
-    {
-        return EnumToString(value, kGeometryDomains, "Unknown");
-    }
-
     std::string_view ToString(const ProgressiveRenderLane value) noexcept
     {
         return EnumToString(value, kRenderLanes, "Surface");
@@ -234,12 +217,6 @@ namespace Extrinsic::Runtime
                                         ProgressiveEntityShape& out) noexcept
     {
         return TryEnumFromString(value, kEntityShapes, out);
-    }
-
-    bool TryParseProgressiveGeometryDomain(const std::string_view value,
-                                           ProgressiveGeometryDomain& out) noexcept
-    {
-        return TryEnumFromString(value, kGeometryDomains, out);
     }
 
     bool TryParseProgressiveRenderLane(const std::string_view value,
@@ -297,27 +274,26 @@ namespace Extrinsic::Runtime
 
     const Geometry::PropertySet* ResolvePropertySet(
         const GS::ConstSourceView& view,
-        const ProgressiveGeometryDomain domain) noexcept
+        const GeometryElementDomain domain) noexcept
     {
         const GeometryEntityAvailability availability = BuildGeometryAvailability(view);
         switch (domain)
         {
-        case ProgressiveGeometryDomain::MeshVertex:
+        case GeometryElementDomain::MeshVertex:
             return ResolveGeometryPropertySet(availability, GeometryElementDomain::MeshVertex);
-        case ProgressiveGeometryDomain::MeshEdge:
+        case GeometryElementDomain::MeshEdge:
             return ResolveGeometryPropertySet(availability, GeometryElementDomain::MeshEdge);
-        case ProgressiveGeometryDomain::MeshHalfedge:
+        case GeometryElementDomain::MeshHalfedge:
             return ResolveGeometryPropertySet(availability, GeometryElementDomain::MeshHalfedge);
-        case ProgressiveGeometryDomain::MeshFace:
+        case GeometryElementDomain::MeshFace:
             return ResolveGeometryPropertySet(availability, GeometryElementDomain::MeshFace);
-        case ProgressiveGeometryDomain::GraphVertex:
+        case GeometryElementDomain::GraphNode:
             return ResolveGeometryPropertySet(availability, GeometryElementDomain::GraphNode);
-        case ProgressiveGeometryDomain::GraphEdge:
+        case GeometryElementDomain::GraphEdge:
             return ResolveGeometryPropertySet(availability, GeometryElementDomain::GraphEdge);
-        case ProgressiveGeometryDomain::Point:
+        case GeometryElementDomain::PointCloudPoint:
             return ResolveGeometryPropertySet(availability, GeometryElementDomain::PointCloudPoint);
-        case ProgressiveGeometryDomain::MeshSurface:
-        case ProgressiveGeometryDomain::Unknown:
+        case GeometryElementDomain::Unknown:
             return nullptr;
         }
         return nullptr;
@@ -325,7 +301,7 @@ namespace Extrinsic::Runtime
 
     std::size_t ResolvePropertyElementCount(
         const GS::ConstSourceView& view,
-        const ProgressiveGeometryDomain domain) noexcept
+        const GeometryElementDomain domain) noexcept
     {
         const Geometry::PropertySet* set = ResolvePropertySet(view, domain);
         return set ? set->Size() : 0u;
@@ -336,8 +312,7 @@ namespace Extrinsic::Runtime
         const ProgressivePropertyBindingDescriptor& descriptor,
         const std::uint64_t observedSourceGeneration)
     {
-        if (descriptor.Domain == ProgressiveGeometryDomain::Unknown ||
-            descriptor.Domain == ProgressiveGeometryDomain::MeshSurface)
+        if (descriptor.Domain == GeometryElementDomain::Unknown)
         {
             return MakeResolution(ProgressivePropertyResolutionStatus::UnsupportedDomain,
                                   Geometry::PropertyValueKind::Unknown,
@@ -415,7 +390,7 @@ namespace Extrinsic::Runtime
 
     std::vector<ProgressivePropertyOption> EnumeratePropertyOptions(
         const GS::ConstSourceView& view,
-        const ProgressiveGeometryDomain domain,
+        const GeometryElementDomain domain,
         const GeometryPropertyValueKindFilter expectedValueKind,
         const std::size_t expectedElementCount,
         const std::uint64_t observedSourceGeneration)

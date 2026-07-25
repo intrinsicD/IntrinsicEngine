@@ -237,8 +237,8 @@ namespace Extrinsic::Runtime
             std::uint32_t SchemaVersion{1u};
             std::uint32_t StableEntityId{0u};
             std::string OutputName{};
-            ProgressiveGeometryDomain SourceDomain{
-                ProgressiveGeometryDomain::Unknown};
+            GeometryElementDomain SourceDomain{
+                GeometryElementDomain::Unknown};
             std::string SourcePropertyName{};
             std::string TexcoordPropertyName{};
             Geometry::PropertyValueKind ValueKind{
@@ -753,10 +753,10 @@ namespace Extrinsic::Runtime
 
             switch (request.SourceDomain)
             {
-            case ProgressiveGeometryDomain::MeshVertex:
+            case GeometryElementDomain::MeshVertex:
                 prepared.Domain = Graphics::PropertyTextureBakeDomain::Vertex;
                 break;
-            case ProgressiveGeometryDomain::MeshFace:
+            case GeometryElementDomain::MeshFace:
             {
                 prepared.Domain = Graphics::PropertyTextureBakeDomain::Face;
                 std::vector<glm::vec4> expanded{};
@@ -774,7 +774,7 @@ namespace Extrinsic::Runtime
                 prepared.Values = std::move(expanded);
                 break;
             }
-            case ProgressiveGeometryDomain::MeshEdge:
+            case GeometryElementDomain::MeshEdge:
             {
                 prepared.Domain =
                     Graphics::PropertyTextureBakeDomain::NearestEdge;
@@ -836,12 +836,11 @@ namespace Extrinsic::Runtime
                 prepared.Values = std::move(expanded);
                 break;
             }
-            case ProgressiveGeometryDomain::Unknown:
-            case ProgressiveGeometryDomain::MeshHalfedge:
-            case ProgressiveGeometryDomain::MeshSurface:
-            case ProgressiveGeometryDomain::GraphVertex:
-            case ProgressiveGeometryDomain::GraphEdge:
-            case ProgressiveGeometryDomain::Point:
+            case GeometryElementDomain::Unknown:
+            case GeometryElementDomain::MeshHalfedge:
+            case GeometryElementDomain::GraphNode:
+            case GeometryElementDomain::GraphEdge:
+            case GeometryElementDomain::PointCloudPoint:
                 return PrepareFailure(
                     SelectedMeshTextureBakeStatus::UnsupportedSourceDomain,
                     "texture bake supports mesh vertex, edge, and face properties");

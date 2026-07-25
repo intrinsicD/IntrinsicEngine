@@ -63,7 +63,7 @@ namespace
             Runtime::DerivedJobDesc desc{
                 .Key = Runtime::DerivedJobKey{
                     .EntityId = 77u,
-                    .Domain = Runtime::ProgressiveGeometryDomain::Point,
+                    .Domain = Runtime::DerivedJobScope::PointCloudPoint,
                     .OutputSemantic = Runtime::ProgressiveSlotSemantic::PointColor,
                     .OutputName = "engine_frame_probe",
                 },

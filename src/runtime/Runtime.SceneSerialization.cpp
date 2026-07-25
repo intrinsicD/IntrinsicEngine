@@ -83,6 +83,59 @@ namespace Extrinsic::Runtime
 
         constexpr std::string_view kPropertyValueKindAnyWire = "Any";
 
+        // Legacy property-domain wire strings. Like the value kinds above these
+        // are persisted and do NOT match the canonical `GeometryElementDomain`
+        // names: the wire says "GraphVertex"/"Point" where the canonical names
+        // are GraphNode/PointCloudPoint. "MeshSurface" was a whole-surface job
+        // target that every property path already treated as unsupported, so it
+        // is accepted on read and mapped to `Unknown` — the same behavior — and
+        // is never written back.
+        constexpr std::pair<GeometryElementDomain, std::string_view>
+            kPropertyDomainWire[]{
+                {GeometryElementDomain::Unknown, "Unknown"},
+                {GeometryElementDomain::MeshVertex, "MeshVertex"},
+                {GeometryElementDomain::MeshEdge, "MeshEdge"},
+                {GeometryElementDomain::MeshHalfedge, "MeshHalfedge"},
+                {GeometryElementDomain::MeshFace, "MeshFace"},
+                {GeometryElementDomain::GraphNode, "GraphVertex"},
+                {GeometryElementDomain::GraphEdge, "GraphEdge"},
+                {GeometryElementDomain::PointCloudPoint, "Point"},
+            };
+
+        constexpr std::string_view kPropertyDomainLegacySurfaceWire = "MeshSurface";
+
+        [[nodiscard]] std::string_view PropertyDomainToWire(
+            const GeometryElementDomain value) noexcept
+        {
+            for (const auto& [domain, text] : kPropertyDomainWire)
+            {
+                if (domain == value)
+                    return text;
+            }
+            return "Unknown";
+        }
+
+        [[nodiscard]] bool TryPropertyDomainFromWire(
+            const std::string_view text,
+            GeometryElementDomain& out) noexcept
+        {
+            if (text == kPropertyDomainLegacySurfaceWire)
+            {
+                out = GeometryElementDomain::Unknown;
+                return true;
+            }
+            for (const auto& [domain, candidate] : kPropertyDomainWire)
+            {
+                if (candidate == text)
+                {
+                    out = domain;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+
         [[nodiscard]] std::string_view PropertyValueKindToWire(
             const Geometry::PropertyValueKind value) noexcept
         {
@@ -1136,7 +1189,7 @@ namespace Extrinsic::Runtime
             const ProgressivePropertyBindingDescriptor& descriptor)
         {
             return json{
-                {"domain", std::string(ToString(descriptor.Domain))},
+                {"domain", std::string(PropertyDomainToWire(descriptor.Domain))},
                 {"propertyName", descriptor.PropertyName},
                 {"expectedValueKind", std::string(PropertyValueKindFilterToWire(descriptor.ExpectedValueKind))},
                 {"expectedElementCount", descriptor.ExpectedElementCount},
@@ -1154,7 +1207,7 @@ namespace Extrinsic::Runtime
             {
                 return false;
             }
-            if (!TryParseProgressiveGeometryDomain(value["domain"].get<std::string>(),
+            if (!TryPropertyDomainFromWire(value["domain"].get<std::string>(),
                                                    out.Domain))
             {
                 return false;

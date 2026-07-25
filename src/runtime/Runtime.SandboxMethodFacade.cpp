@@ -632,26 +632,26 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        [[nodiscard]] ProgressiveGeometryDomain ToKMeansDerivedJobDomain(
+        [[nodiscard]] GeometryElementDomain ToKMeansDerivedJobDomain(
             const SandboxEditorGeometryProcessingDomain domain) noexcept
         {
             switch (domain)
             {
             case SandboxEditorGeometryProcessingDomain::MeshVertices:
-                return ProgressiveGeometryDomain::MeshVertex;
+                return GeometryElementDomain::MeshVertex;
             case SandboxEditorGeometryProcessingDomain::GraphVertices:
-                return ProgressiveGeometryDomain::GraphVertex;
+                return GeometryElementDomain::GraphNode;
             case SandboxEditorGeometryProcessingDomain::PointCloudPoints:
-                return ProgressiveGeometryDomain::Point;
+                return GeometryElementDomain::PointCloudPoint;
             case SandboxEditorGeometryProcessingDomain::None:
             case SandboxEditorGeometryProcessingDomain::MeshEdges:
             case SandboxEditorGeometryProcessingDomain::MeshHalfedges:
             case SandboxEditorGeometryProcessingDomain::MeshFaces:
             case SandboxEditorGeometryProcessingDomain::GraphEdges:
             case SandboxEditorGeometryProcessingDomain::GraphHalfedges:
-                return ProgressiveGeometryDomain::Unknown;
+                return GeometryElementDomain::Unknown;
             }
-            return ProgressiveGeometryDomain::Unknown;
+            return GeometryElementDomain::Unknown;
         }
 
         [[nodiscard]] ProgressiveSlotSemantic ToKMeansDerivedJobSemantic(
@@ -976,7 +976,7 @@ namespace Extrinsic::Runtime
             DerivedJobDesc desc{
                 .Key = DerivedJobKey{
                     .EntityId = command.StableEntityId,
-                    .Domain = ToKMeansDerivedJobDomain(command.Domain),
+                    .Domain = ToDerivedJobScope(ToKMeansDerivedJobDomain(command.Domain)),
                     .OutputSemantic = ToKMeansDerivedJobSemantic(command.Domain),
                     .OutputName = "kmeans_label",
                 },
@@ -1598,13 +1598,13 @@ namespace Extrinsic::Runtime
             MeshSurface,
         };
 
-        [[nodiscard]] ProgressiveGeometryDomain
+        [[nodiscard]] DerivedJobScope
         ToProgressivePoissonDerivedJobDomain(
             const SandboxEditorProgressivePoissonCpuJobSource source) noexcept
         {
             return source == SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
-                ? ProgressiveGeometryDomain::MeshSurface
-                : ProgressiveGeometryDomain::Point;
+                ? DerivedJobScope::MeshSurface
+                : DerivedJobScope::PointCloudPoint;
         }
 
         [[nodiscard]] const char* ProgressivePoissonOutputName(

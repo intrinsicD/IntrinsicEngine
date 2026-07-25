@@ -146,7 +146,7 @@ namespace
         normal.Semantic = Runtime::ProgressiveSlotSemantic::Normal;
         normal.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBake;
         normal.Property = Runtime::ProgressivePropertyBindingDescriptor{
-            .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+            .Domain = Runtime::GeometryElementDomain::MeshVertex,
             .PropertyName = "v:normal",
             .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
             .ExpectedElementCount = 3u,
@@ -194,7 +194,7 @@ TEST(ProgressiveRenderData, ResolvesMeshGraphAndPointCloudProperties)
     auto meshNormal = Runtime::ResolvePropertyBinding(
         meshView,
         Runtime::ProgressivePropertyBindingDescriptor{
-            .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+            .Domain = Runtime::GeometryElementDomain::MeshVertex,
             .PropertyName = "v:normal",
             .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
             .ExpectedElementCount = 3u,
@@ -205,7 +205,7 @@ TEST(ProgressiveRenderData, ResolvesMeshGraphAndPointCloudProperties)
     auto meshFace = Runtime::ResolvePropertyBinding(
         meshView,
         Runtime::ProgressivePropertyBindingDescriptor{
-            .Domain = Runtime::ProgressiveGeometryDomain::MeshFace,
+            .Domain = Runtime::GeometryElementDomain::MeshFace,
             .PropertyName = "f:heat",
             .ExpectedValueKind = Geometry::PropertyValueKind::Float,
             .ExpectedElementCount = 1u,
@@ -215,7 +215,7 @@ TEST(ProgressiveRenderData, ResolvesMeshGraphAndPointCloudProperties)
     auto graphEdge = Runtime::ResolvePropertyBinding(
         graphView,
         Runtime::ProgressivePropertyBindingDescriptor{
-            .Domain = Runtime::ProgressiveGeometryDomain::GraphEdge,
+            .Domain = Runtime::GeometryElementDomain::GraphEdge,
             .PropertyName = "e:color",
             .ExpectedValueKind = Geometry::PropertyValueKind::Vec4,
             .ExpectedElementCount = 1u,
@@ -225,7 +225,7 @@ TEST(ProgressiveRenderData, ResolvesMeshGraphAndPointCloudProperties)
     auto pointSize = Runtime::ResolvePropertyBinding(
         cloudView,
         Runtime::ProgressivePropertyBindingDescriptor{
-            .Domain = Runtime::ProgressiveGeometryDomain::Point,
+            .Domain = Runtime::GeometryElementDomain::PointCloudPoint,
             .PropertyName = "v:size",
             .ExpectedValueKind = Geometry::PropertyValueKind::Float,
             .ExpectedElementCount = 2u,
@@ -235,7 +235,7 @@ TEST(ProgressiveRenderData, ResolvesMeshGraphAndPointCloudProperties)
     auto wrongDomain = Runtime::ResolvePropertyBinding(
         graphView,
         Runtime::ProgressivePropertyBindingDescriptor{
-            .Domain = Runtime::ProgressiveGeometryDomain::Point,
+            .Domain = Runtime::GeometryElementDomain::PointCloudPoint,
             .PropertyName = "v:size",
             .ExpectedValueKind = Geometry::PropertyValueKind::Float,
         });
@@ -250,7 +250,7 @@ TEST(ProgressiveRenderData, PropertyPickerOrdersCompatibleOptionsFirstAndExplain
 
     const auto options = Runtime::EnumeratePropertyOptions(
         meshView,
-        Runtime::ProgressiveGeometryDomain::MeshVertex,
+        Runtime::GeometryElementDomain::MeshVertex,
         Geometry::PropertyValueKind::Vec3,
         3u,
         5u);
@@ -283,7 +283,7 @@ TEST(ProgressiveRenderData, PropertyPickerOrdersCompatibleOptionsFirstAndExplain
     const auto stale = Runtime::ResolvePropertyBinding(
         meshView,
         Runtime::ProgressivePropertyBindingDescriptor{
-            .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+            .Domain = Runtime::GeometryElementDomain::MeshVertex,
             .PropertyName = "v:normal",
             .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
             .ExpectedElementCount = 3u,
@@ -295,7 +295,7 @@ TEST(ProgressiveRenderData, PropertyPickerOrdersCompatibleOptionsFirstAndExplain
     const auto missing = Runtime::ResolvePropertyBinding(
         meshView,
         Runtime::ProgressivePropertyBindingDescriptor{
-            .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+            .Domain = Runtime::GeometryElementDomain::MeshVertex,
             .PropertyName = "v:missing",
             .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
         });
@@ -323,7 +323,7 @@ TEST(ProgressiveRenderData, PartialMeshProvenanceUsesAvailableSourceProperties)
     const auto vertex = Runtime::ResolvePropertyBinding(
         view,
         Runtime::ProgressivePropertyBindingDescriptor{
-            .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+            .Domain = Runtime::GeometryElementDomain::MeshVertex,
             .PropertyName = "v:heat",
             .ExpectedValueKind = Geometry::PropertyValueKind::Float,
             .ExpectedElementCount = 3u,
@@ -333,7 +333,7 @@ TEST(ProgressiveRenderData, PartialMeshProvenanceUsesAvailableSourceProperties)
     const auto face = Runtime::ResolvePropertyBinding(
         view,
         Runtime::ProgressivePropertyBindingDescriptor{
-            .Domain = Runtime::ProgressiveGeometryDomain::MeshFace,
+            .Domain = Runtime::GeometryElementDomain::MeshFace,
             .PropertyName = "f:heat",
             .ExpectedValueKind = Geometry::PropertyValueKind::Float,
             .ExpectedElementCount = 1u,
@@ -343,7 +343,7 @@ TEST(ProgressiveRenderData, PartialMeshProvenanceUsesAvailableSourceProperties)
     const auto halfedge = Runtime::ResolvePropertyBinding(
         view,
         Runtime::ProgressivePropertyBindingDescriptor{
-            .Domain = Runtime::ProgressiveGeometryDomain::MeshHalfedge,
+            .Domain = Runtime::GeometryElementDomain::MeshHalfedge,
             .PropertyName = "h:to_vertex",
             .ExpectedValueKind = Geometry::PropertyValueKind::UInt32,
         });

@@ -24,6 +24,22 @@ import Extrinsic.Runtime.StreamingExecutor;
 
 namespace Extrinsic::Runtime
 {
+    DerivedJobScope ToDerivedJobScope(const GeometryElementDomain domain) noexcept
+    {
+        switch (domain)
+        {
+        case GeometryElementDomain::MeshVertex:      return DerivedJobScope::MeshVertex;
+        case GeometryElementDomain::MeshEdge:        return DerivedJobScope::MeshEdge;
+        case GeometryElementDomain::MeshHalfedge:    return DerivedJobScope::MeshHalfedge;
+        case GeometryElementDomain::MeshFace:        return DerivedJobScope::MeshFace;
+        case GeometryElementDomain::GraphNode:       return DerivedJobScope::GraphNode;
+        case GeometryElementDomain::GraphEdge:       return DerivedJobScope::GraphEdge;
+        case GeometryElementDomain::PointCloudPoint: return DerivedJobScope::PointCloudPoint;
+        case GeometryElementDomain::Unknown:         break;
+        }
+        return DerivedJobScope::Unknown;
+    }
+
     namespace
     {
         [[nodiscard]] bool IsTerminal(const DerivedJobStatus status) noexcept

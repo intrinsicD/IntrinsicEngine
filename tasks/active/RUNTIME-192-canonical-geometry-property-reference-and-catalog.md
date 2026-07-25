@@ -59,7 +59,19 @@ each chunk builds, passes the CPU gate, and commits independently.
       because its public surface names those types and `app` may import runtime
       only. CPU gate 4245/4245.
 
-- [ ] **Slice B3 — retire `ProgressiveGeometryDomain`** (174 refs / 24 files).
+- [x] **Slice B3 — retire `ProgressiveGeometryDomain`** (174 refs / 24 files).
+      Mapped onto `GeometryElementDomain` (`GraphVertex`→`GraphNode`,
+      `Point`→`PointCloudPoint`, rest identical). `MeshSurface` was split out as
+      predicted: it is a *job scope*, so `Runtime.DerivedJobGraph` gained a
+      module-local `DerivedJobScope` (plus `ToDerivedJobScope`) for
+      `DerivedJobKey` identity, while the four property paths that listed
+      `MeshSurface` shared their body with `Unknown` and simply lost the case.
+      **Second wire-format constraint found and preserved:** the property
+      *domain* is persisted too, and its legacy strings also diverge from the
+      canonical names — the wire says `GraphVertex`/`Point`. A serializer-local
+      mapping keeps them, and legacy `MeshSurface` is accepted on read and
+      mapped to `Unknown` (the behavior every property path already had) rather
+      than rejected. Two more regression tests pin this. CPU gate 4247/4247.
 
 ### Follow-up found during Slice B2
 

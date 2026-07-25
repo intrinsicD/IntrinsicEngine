@@ -134,7 +134,7 @@ namespace
         normal.Semantic = Runtime::ProgressiveSlotSemantic::Normal;
         normal.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBake;
         normal.Property = Runtime::ProgressivePropertyBindingDescriptor{
-            .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+            .Domain = Runtime::GeometryElementDomain::MeshVertex,
             .PropertyName = "v:normal",
             .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
             .ExpectedElementCount = 3u,
@@ -201,7 +201,7 @@ namespace
         Runtime::SelectedMeshTextureBakeRequest request{};
         request.StableEntityId =
             Runtime::SelectionController::ToStableEntityId(entity);
-        request.SourceDomain = Runtime::ProgressiveGeometryDomain::MeshVertex;
+        request.SourceDomain = Runtime::GeometryElementDomain::MeshVertex;
         request.SourcePropertyName = "v:normal";
         request.ExpectedValueKind = Geometry::PropertyValueKind::Vec3;
         request.Encoder = Runtime::MeshAttributeTextureBakeEncoder::Normal;
@@ -219,7 +219,7 @@ namespace
         Runtime::SelectedMeshTextureBakeRequest request{};
         request.StableEntityId =
             Runtime::SelectionController::ToStableEntityId(entity);
-        request.SourceDomain = Runtime::ProgressiveGeometryDomain::MeshVertex;
+        request.SourceDomain = Runtime::GeometryElementDomain::MeshVertex;
         request.SourcePropertyName = "v:heat";
         request.ExpectedValueKind = Geometry::PropertyValueKind::Float;
         request.Encoder = Runtime::MeshAttributeTextureBakeEncoder::LinearScalar;
@@ -237,7 +237,7 @@ namespace
         Runtime::SelectedMeshTextureBakeRequest request{};
         request.StableEntityId =
             Runtime::SelectionController::ToStableEntityId(entity);
-        request.SourceDomain = Runtime::ProgressiveGeometryDomain::MeshVertex;
+        request.SourceDomain = Runtime::GeometryElementDomain::MeshVertex;
         request.SourcePropertyName = "v:albedo";
         request.ExpectedValueKind = Geometry::PropertyValueKind::Vec4;
         request.Width = 4u;
@@ -252,7 +252,7 @@ namespace
         const ECS::EntityHandle entity)
     {
         Runtime::SelectedMeshTextureBakeRequest request = MakeAlbedoRequest(entity);
-        request.SourceDomain = Runtime::ProgressiveGeometryDomain::MeshFace;
+        request.SourceDomain = Runtime::GeometryElementDomain::MeshFace;
         request.SourcePropertyName = "f:debug_color";
         request.ExpectedValueKind = Geometry::PropertyValueKind::Vec4;
         request.GeneratedKey = "face-albedo";
@@ -265,7 +265,7 @@ namespace
         Runtime::SelectedMeshTextureBakeRequest request{};
         request.StableEntityId =
             Runtime::SelectionController::ToStableEntityId(entity);
-        request.SourceDomain = Runtime::ProgressiveGeometryDomain::MeshVertex;
+        request.SourceDomain = Runtime::GeometryElementDomain::MeshVertex;
         request.SourcePropertyName = "v:roughness";
         request.ExpectedValueKind = Geometry::PropertyValueKind::Float;
         request.Width = 4u;
@@ -536,7 +536,7 @@ TEST(RuntimeSelectedMeshTextureBake, BuildsNearestEdgeScalarBakeRequest)
     ECS::Scene::Registry scene{};
     const ECS::EntityHandle entity = MakeMeshEntity(scene);
     Runtime::SelectedMeshTextureBakeRequest request = MakeHeatRequest(entity);
-    request.SourceDomain = Runtime::ProgressiveGeometryDomain::MeshEdge;
+    request.SourceDomain = Runtime::GeometryElementDomain::MeshEdge;
     request.SourcePropertyName = "e:weight";
     request.OutputName = "edge-weight";
 
