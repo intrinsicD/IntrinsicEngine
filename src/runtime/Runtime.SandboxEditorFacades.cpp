@@ -1393,62 +1393,39 @@ namespace Extrinsic::Runtime
             return GeometryElementDomain::Unknown;
         }
 
-        [[nodiscard]] SandboxEditorPropertyCatalogValueKind ToPropertyCatalogValueKind(
+        // Kinds the property catalog surfaces. Bool/Int32/UInt64 were never
+        // representable in the retired editor-local enum (they collapsed to
+        // Unknown), so they stay unsupported here rather than silently becoming
+        // bindable now that the canonical vocabulary can name them.
+        [[nodiscard]] bool IsPropertyCatalogSupportedKind(
             const Geometry::PropertyValueKind kind) noexcept
         {
-            using Out = SandboxEditorPropertyCatalogValueKind;
             switch (kind)
             {
             case Geometry::PropertyValueKind::Float:
-                return Out::ScalarFloat;
             case Geometry::PropertyValueKind::Double:
-                return Out::ScalarDouble;
             case Geometry::PropertyValueKind::UInt32:
-                return Out::UInt32;
             case Geometry::PropertyValueKind::Vec2:
-                return Out::Vec2;
             case Geometry::PropertyValueKind::Vec3:
-                return Out::Vec3;
             case Geometry::PropertyValueKind::Vec4:
-                return Out::Vec4;
+                return true;
             case Geometry::PropertyValueKind::Unknown:
+            case Geometry::PropertyValueKind::Bool:
+            case Geometry::PropertyValueKind::Int32:
+            case Geometry::PropertyValueKind::UInt64:
                 break;
             }
-            return Out::Unknown;
-        }
-
-        [[nodiscard]] Geometry::PropertyValueKind ToGeometryPropertyValueKind(
-            const SandboxEditorPropertyCatalogValueKind kind) noexcept
-        {
-            using Kind = SandboxEditorPropertyCatalogValueKind;
-            switch (kind)
-            {
-            case Kind::ScalarFloat:
-                return Geometry::PropertyValueKind::Float;
-            case Kind::ScalarDouble:
-                return Geometry::PropertyValueKind::Double;
-            case Kind::UInt32:
-                return Geometry::PropertyValueKind::UInt32;
-            case Kind::Vec2:
-                return Geometry::PropertyValueKind::Vec2;
-            case Kind::Vec3:
-                return Geometry::PropertyValueKind::Vec3;
-            case Kind::Vec4:
-                return Geometry::PropertyValueKind::Vec4;
-            case Kind::Unknown:
-                break;
-            }
-            return Geometry::PropertyValueKind::Unknown;
+            return false;
         }
 
         [[nodiscard]] std::uint8_t ComponentCountForPropertyCatalogKind(
-            const SandboxEditorPropertyCatalogValueKind kind) noexcept
+            const Geometry::PropertyValueKind kind) noexcept
         {
-            using Kind = SandboxEditorPropertyCatalogValueKind;
+            using Kind = Geometry::PropertyValueKind;
             switch (kind)
             {
-            case Kind::ScalarFloat:
-            case Kind::ScalarDouble:
+            case Kind::Float:
+            case Kind::Double:
             case Kind::UInt32:
                 return 1u;
             case Kind::Vec2:
@@ -1495,7 +1472,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] SandboxEditorPropertyValuePreview BuildPropertyValuePreview(
             const Geometry::PropertySet& properties,
             const std::string& name,
-            const SandboxEditorPropertyCatalogValueKind kind,
+            const Geometry::PropertyValueKind kind,
             const std::optional<std::size_t> index)
         {
             if (!index.has_value() || *index >= properties.Size())
@@ -1506,14 +1483,14 @@ namespace Extrinsic::Runtime
                 .ElementIndex = *index,
             };
 
-            using Kind = SandboxEditorPropertyCatalogValueKind;
+            using Kind = Geometry::PropertyValueKind;
             switch (kind)
             {
-            case Kind::ScalarFloat:
+            case Kind::Float:
                 if (const auto prop = properties.Get<float>(name); prop)
                     preview.Text = std::to_string(prop.Vector()[*index]);
                 break;
-            case Kind::ScalarDouble:
+            case Kind::Double:
                 if (const auto prop = properties.Get<double>(name); prop)
                     preview.Text = std::to_string(prop.Vector()[*index]);
                 break;
@@ -1603,11 +1580,9 @@ namespace Extrinsic::Runtime
         {
             for (const std::string& name : properties.Properties())
             {
-                const SandboxEditorPropertyCatalogValueKind kind =
-                    ToPropertyCatalogValueKind(
-                        DetectGeometryPropertyValueKind(properties, name));
-                const bool supported =
-                    kind != SandboxEditorPropertyCatalogValueKind::Unknown;
+                const Geometry::PropertyValueKind kind =
+                    DetectGeometryPropertyValueKind(properties, name);
+                const bool supported = IsPropertyCatalogSupportedKind(kind);
                 SandboxEditorPropertyCatalogRow row{
                     .Name = name,
                     .Domain = domain,
@@ -1623,8 +1598,7 @@ namespace Extrinsic::Runtime
                     .Descriptor = ProgressivePropertyBindingDescriptor{
                         .Domain = ToGeometryElementDomain(domain),
                         .PropertyName = name,
-                        .ExpectedValueKind =
-                            ToGeometryPropertyValueKind(kind),
+                        .ExpectedValueKind = kind,
                         .ExpectedElementCount = properties.Size(),
                     },
                     .Preview = BuildPropertyValuePreview(
@@ -1768,12 +1742,12 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] std::optional<AttributeSourceType>
         ToAttributeSourceType(
-            const SandboxEditorPropertyCatalogValueKind kind) noexcept
+            const Geometry::PropertyValueKind kind) noexcept
         {
-            using Kind = SandboxEditorPropertyCatalogValueKind;
+            using Kind = Geometry::PropertyValueKind;
             switch (kind)
             {
-            case Kind::ScalarFloat:
+            case Kind::Float:
                 return AttributeSourceType::Float32;
             case Kind::Vec2:
                 return AttributeSourceType::Vec2;
@@ -1781,7 +1755,7 @@ namespace Extrinsic::Runtime
                 return AttributeSourceType::Vec3;
             case Kind::Vec4:
                 return AttributeSourceType::Vec4;
-            case Kind::ScalarDouble:
+            case Kind::Double:
             case Kind::UInt32:
             case Kind::Unknown:
                 break;
@@ -3900,7 +3874,7 @@ namespace Extrinsic::Runtime
                 .CatalogDomain = row.Domain,
                 .BakeDomain = ToGeometryElementDomain(row.Domain),
                 .ValueKind = row.ValueKind,
-                .ExpectedValueKind = ToGeometryPropertyValueKind(row.ValueKind),
+                .ExpectedValueKind = row.ValueKind,
                 .ElementCount = row.ElementCount,
                 .Descriptor = row.Descriptor,
             };
@@ -3925,7 +3899,7 @@ namespace Extrinsic::Runtime
                 return out;
             }
             if (!row.Supported ||
-                row.ValueKind == SandboxEditorPropertyCatalogValueKind::Unknown)
+                !IsPropertyCatalogSupportedKind(row.ValueKind))
             {
                 out.Category = SandboxEditorTextureBakeSourceCategory::Unsupported;
                 out.DisabledReason = row.UnsupportedReason.empty()
@@ -12069,30 +12043,6 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorPropertyCatalogValueKind(
-        const SandboxEditorPropertyCatalogValueKind kind) noexcept
-    {
-        using Kind = SandboxEditorPropertyCatalogValueKind;
-        switch (kind)
-        {
-        case Kind::Unknown:
-            return "Unknown";
-        case Kind::ScalarFloat:
-            return "ScalarFloat";
-        case Kind::ScalarDouble:
-            return "ScalarDouble";
-        case Kind::UInt32:
-            return "UInt32";
-        case Kind::Vec2:
-            return "Vec2";
-        case Kind::Vec3:
-            return "Vec3";
-        case Kind::Vec4:
-            return "Vec4";
-        }
-        return "Unknown";
-    }
-
     const char* DebugNameForSandboxEditorBoundRenderStateRowKind(
         const SandboxEditorBoundRenderStateRowKind kind) noexcept
     {
@@ -13562,9 +13512,8 @@ namespace Extrinsic::Runtime
         if (command.PropertyName.empty())
             return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
 
-        const SandboxEditorPropertyCatalogValueKind valueKind =
-            ToPropertyCatalogValueKind(
-                DetectGeometryPropertyValueKind(*properties, command.PropertyName));
+        const Geometry::PropertyValueKind valueKind =
+            DetectGeometryPropertyValueKind(*properties, command.PropertyName);
         const std::optional<AttributeSourceType> sourceType =
             ToAttributeSourceType(valueKind);
         if (!sourceType.has_value())

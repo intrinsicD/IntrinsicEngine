@@ -1411,7 +1411,7 @@ namespace Extrinsic::Sandbox::Editor
                             row.CatalogDomain));
                     ImGui::TableSetColumnIndex(2);
                     ImGui::TextUnformatted(
-                        DebugNameForSandboxEditorPropertyCatalogValueKind(
+                        DebugNameForGeometryPropertyValueKind(
                             row.ValueKind));
                     ImGui::TableSetColumnIndex(3);
                     ImGui::TextUnformatted(row.Bakeable ? "yes" : "no");
@@ -2254,7 +2254,7 @@ namespace Extrinsic::Sandbox::Editor
                                           DebugNameForSandboxEditorPropertyCatalogDomain(
                                               row.Domain),
                                           row.Name.c_str(),
-                                          DebugNameForSandboxEditorPropertyCatalogValueKind(
+                                          DebugNameForGeometryPropertyValueKind(
                                               row.ValueKind));
                     }
                     const SandboxEditorProgressiveRenderDataModel& progressive =

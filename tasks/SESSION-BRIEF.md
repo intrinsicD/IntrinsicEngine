@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-192` — Canonical geometry-property reference and catalog (tasks/active/RUNTIME-192-canonical-geometry-property-reference-and-catalog.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -21,8 +21,8 @@ the authoritative open/unblocked view.
 - blocked by `REVIEW-003`: `GRAPHICS-125` — Memory-priced cluster hierarchy evidence (tasks/backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md)
 - blocked by `REVIEW-003`: `GRAPHICS-126` — Bandwidth-priced frame-recipe trace model (tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
 - blocked by `RUNTIME-197`: `RUNTIME-139` — Static AoS storage and shader operational path (tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md)
-- blocked by `RUNTIME-192`: `RUNTIME-197` — Unified geometry upload and residency coordinator (tasks/backlog/runtime/RUNTIME-197-unified-geometry-upload-residency-coordinator.md)
-- blocked by `RUNTIME-192`: `RUNTIME-198` — Data-driven visualization recipes (tasks/backlog/runtime/RUNTIME-198-data-driven-visualization-recipes.md)
+- unblocked: `RUNTIME-197` — Unified geometry upload and residency coordinator (tasks/backlog/runtime/RUNTIME-197-unified-geometry-upload-residency-coordinator.md)
+- blocked by `RUNTIME-193`: `RUNTIME-198` — Data-driven visualization recipes (tasks/backlog/runtime/RUNTIME-198-data-driven-visualization-recipes.md)
 
 ## Theme C — Physics readiness
 
@@ -36,13 +36,13 @@ the authoritative open/unblocked view.
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - blocked by `RUNTIME-138`: `REVIEW-003` — Architecture stability and right-sizing readiness audit (tasks/backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
-- blocked by `RUNTIME-192`: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
-- blocked by `RUNTIME-192`: `RUNTIME-191` — Unify property-to-texture baking and retire specialized paths (tasks/backlog/runtime/RUNTIME-191-unified-property-texture-bake-pipeline.md)
-- blocked by `RUNTIME-192`: `RUNTIME-193` — General geometry-presentation recipe (tasks/backlog/runtime/RUNTIME-193-general-geometry-presentation-recipe.md)
+- blocked by `RUNTIME-194`: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
+- unblocked: `RUNTIME-191` — Unify property-to-texture baking and retire specialized paths (tasks/backlog/runtime/RUNTIME-191-unified-property-texture-bake-pipeline.md)
+- unblocked: `RUNTIME-193` — General geometry-presentation recipe (tasks/backlog/runtime/RUNTIME-193-general-geometry-presentation-recipe.md)
 - unblocked: `RUNTIME-194` — Consolidate runtime work execution (tasks/backlog/runtime/RUNTIME-194-consolidate-runtime-work-execution.md)
 - blocked by `RUNTIME-194`: `RUNTIME-195` — Unified GPU-result readback (tasks/backlog/runtime/RUNTIME-195-unified-gpu-result-readback.md)
 - blocked by `BUG-095`: `RUNTIME-200` — Staged asset-import and materialization recipe (tasks/backlog/runtime/RUNTIME-200-staged-asset-import-materialization-recipe.md)
-- blocked by `RUNTIME-192`: `RUNTIME-201` — Unified editor mutation and history transaction (tasks/backlog/runtime/RUNTIME-201-unified-editor-mutation-history-transaction.md)
+- blocked by `RUNTIME-193`: `RUNTIME-201` — Unified editor mutation and history transaction (tasks/backlog/runtime/RUNTIME-201-unified-editor-mutation-history-transaction.md)
 - blocked by `RUNTIME-138`: `RUNTIME-202` — Retire the Sandbox runtime facade and localize feature models (tasks/backlog/runtime/RUNTIME-202-retire-sandbox-runtime-facade.md)
 - blocked by `RUNTIME-194`: `RUNTIME-203` — Internalize one-consumer runtime composition helpers (tasks/backlog/runtime/RUNTIME-203-internalize-one-consumer-runtime-helpers.md)
 - blocked by `BUG-096`: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
@@ -52,7 +52,7 @@ the authoritative open/unblocked view.
 
 - unblocked: `BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start (tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md)
 - blocked by `RUNTIME-194`: `BUG-095` — Direct-mesh postprocess can overwrite newer editor geometry (tasks/backlog/bugs/BUG-095-direct-mesh-postprocess-stale-overwrite.md)
-- blocked by `RUNTIME-192`: `BUG-096` — ICP point-to-plane ignores target normals (tasks/backlog/bugs/BUG-096-icp-point-to-plane-target-normals.md)
+- blocked by `RUNTIME-194`: `BUG-096` — ICP point-to-plane ignores target normals (tasks/backlog/bugs/BUG-096-icp-point-to-plane-target-normals.md)
 - unblocked: `BUG-097` — Progressive model-scene UV job publishes a zero atlas (tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md)
 - unblocked: `BUG-108` — Fibonacci sphere sampling small-count and endpoint safety (tasks/backlog/bugs/BUG-108-fibonacci-sphere-small-count-endpoints.md)
 - unblocked: `BUG-109` — Voxel downsampling invalid-input and deterministic-cell ordering (tasks/backlog/bugs/BUG-109-voxel-downsample-invalid-input-ordering.md)
@@ -105,7 +105,7 @@ the authoritative open/unblocked view.
 - blocked by `METHOD-032`: `METHOD-036` — Normal-orientation method comparison evidence (publication protocol) (tasks/backlog/methods/METHOD-036-orientation-comparison-evidence.md)
 - blocked by `METHOD-016`: `RUNTIME-175` — Point-cloud consolidation runtime operation and config lane (tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
 - blocked by `METHOD-032`: `RUNTIME-189` — Sandbox debug-draw view for orientation parity diagnostics (tasks/backlog/runtime/RUNTIME-189-orientation-parity-debug-draw-view.md)
-- blocked by `RUNTIME-192`: `RUNTIME-196` — Canonical clustering-service CPU/GPU path (tasks/backlog/runtime/RUNTIME-196-canonical-clustering-service-path.md)
+- blocked by `RUNTIME-194`: `RUNTIME-196` — Canonical clustering-service CPU/GPU path (tasks/backlog/runtime/RUNTIME-196-canonical-clustering-service-path.md)
 - blocked by `RUNTIME-175`: `UI-035` — Sandbox point-cloud consolidation editor panel (tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
 
 ## Unthemed

@@ -8,6 +8,36 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-192`](RUNTIME-192-canonical-geometry-property-reference-and-catalog.md) —
+the canonical geometry-property reference and catalog retired on 2026-07-26 at
+`Retired`. Runtime had four vocabularies for naming the same thing:
+`ProgressiveGeometryDomain`, `ProgressivePropertyValueKind`,
+`SandboxEditorVisualizationPropertyValueKind`, and
+`SandboxEditorPropertyCatalogValueKind` each mirrored a subset of
+`GeometryElementDomain` + `Geometry::PropertyValueKind`, forcing conversion
+switches and letting identical property identity drift between bake,
+presentation, visualization, and selected-analysis. All four are deleted.
+`Extrinsic.Runtime.GeometryAvailability` now owns `GeometryPropertyRef`, the
+pointer-free generation-stamped `GeometryPropertyCatalogSnapshot`,
+`GeometryPropertyValueKindFilter`, and the shared
+name/domain/value-kind/count/finite-value queries — added to the module that
+already owned `GeometryElementDomain` and resolved property sets, so the task
+created **no new module** and still removed four enums plus their switches.
+Three modelling errors were corrected rather than carried forward: `Any` was
+never a value kind but a *constraint*, and became
+`std::optional<Geometry::PropertyValueKind>`; `MeshSurface` was never an element
+domain but a derived-job scope, and moved to a module-local `DerivedJobScope`;
+and the editor catalog no longer collapses `Bool`/`Int32`/`UInt64` to `Unknown`,
+reporting the true kind while preserving the exact bindable gating. Two
+persisted wire formats surfaced mid-migration — value kinds persist as
+`ScalarFloat`/`ScalarDouble` and domains as `GraphVertex`/`Point`, neither
+matching the canonical debug names — so the mappings moved into
+`Runtime.SceneSerialization` and are pinned by five regression tests, two of
+which prove the reader *rejects* canonical spellings so a future rename of both
+writer and reader cannot silently invalidate existing scene documents. The full
+CPU gate passed 4248/4248; strict layering, test-layout, docs-sync, doc-link,
+root-hygiene, and task validators passed.
+
 [`RUNTIME-199`](RUNTIME-199-retire-dormant-spatial-debug-registry.md) — the dormant
 spatial-debug adapter registry retired on 2026-07-25 at `Retired`. A source census
 found zero production registration sites: only

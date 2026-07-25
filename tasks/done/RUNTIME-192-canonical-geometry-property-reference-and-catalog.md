@@ -6,6 +6,32 @@ maturity_target: Retired
 ---
 # RUNTIME-192 — Canonical geometry-property reference and catalog
 
+## Status
+
+- Completed and retired on 2026-07-26 at `Retired`.
+- Commit reference: this retirement commit plus the four slice commits
+  (`Slice A` contract, `B1` editor-visualization enum, `B2` progressive value
+  kind, `B3` progressive domain, `B4` editor-catalog enum).
+- Endpoint: `Extrinsic.Runtime.GeometryAvailability` is the single owner of
+  `GeometryPropertyRef`, `GeometryPropertyCatalogSnapshot`,
+  `GeometryPropertyValueKindFilter`, and the shared resolution queries. **No new
+  module was created** — the canonical vocabulary landed beside
+  `GeometryElementDomain` in the module that already resolved it, so the task
+  added zero files while deleting four duplicate enums and their conversion
+  switches.
+- Two persisted wire formats were discovered mid-migration and preserved
+  (property value kind and property domain); both mappings are owned by
+  `Runtime.SceneSerialization` and covered by five regression tests, including
+  guards proving the reader rejects the canonical names so a future
+  "modernization" cannot silently invalidate existing scene documents.
+- Verification evidence:
+  - clean `IntrinsicTests` build;
+  - CPU gate **4248/4248** (`-LE 'gpu|vulkan|slow|flaky-quarantine'`), one skip
+    (`GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl`, headless host);
+  - strict layering (0 violations), test-layout, docs-sync, doc-link,
+    root-hygiene, task-policy, task-state-link, and maturity checks passed;
+  - module inventory regenerated at 388 modules.
+
 ## Progress
 
 Promoted to active 2026-07-25. Migration is chunked per duplicated vocabulary so
@@ -72,6 +98,21 @@ each chunk builds, passes the CPU gate, and commits independently.
       mapping keeps them, and legacy `MeshSurface` is accepted on read and
       mapped to `Unknown` (the behavior every property path already had) rather
       than rejected. Two more regression tests pin this. CPU gate 4247/4247.
+
+- [x] **Slice B4 — retire `SandboxEditorPropertyCatalogValueKind`** (34 refs / 5 files).
+      The last duplicate, found while migrating B2. Its two converters became
+      identity functions and were deleted. One deliberate behavior improvement:
+      the catalog previously collapsed `Bool`/`Int32`/`UInt64` to `Unknown`
+      because its enum could not represent them; it now reports the true kind
+      while `IsPropertyCatalogSupportedKind` preserves the exact
+      supported/bindable gating, so an `int32` property stays unbindable and is
+      merely named accurately. `Test.SandboxEditorModels.cpp` was updated to
+      assert that stronger contract.
+- [x] **Closure evidence.** `RuntimeEngineLayering.NoDuplicateGeometryPropertyVocabularyRemains`
+      proves no duplicate domain/value-kind enum or conversion switch remains,
+      that the canonical vocabulary lives in one module, that `MeshSurface` is a
+      job scope and not an element domain, and that the serializer still owns the
+      legacy wire spellings.
 
 ### Follow-up found during Slice B2
 
@@ -147,54 +188,54 @@ each chunk builds, passes the CPU gate, and commits independently.
 
 ## Required changes
 
-- [ ] Export one semantic `GeometryPropertyRef` using
+- [x] Export one semantic `GeometryPropertyRef` using
       `GeometryElementDomain`, `Geometry::PropertyValueKind`, and a stable
       property name. It contains no entity, pointer, count, generation,
       storage, material, or visualization state and is safe to place in
       desired authoring recipes.
-- [ ] Export one pointer-free `GeometryPropertyCatalogSnapshot` with stable
+- [x] Export one pointer-free `GeometryPropertyCatalogSnapshot` with stable
       ordering, source identity, availability/source generation, and resolved
       entries pairing each plain reference with element count and property
       generation; keep live property storage and ECS handles out.
-- [ ] Centralize name/domain/value-kind/count/finite-value compatibility
+- [x] Centralize name/domain/value-kind/count/finite-value compatibility
       queries as pure functions over the existing availability/property views.
-- [ ] Migrate `Runtime.TextureBakeModule`, selected-entity analysis and
+- [x] Migrate `Runtime.TextureBakeModule`, selected-entity analysis and
       readiness, progressive presentation, visualization extraction, and
       vertex-attribute candidate enumeration to the canonical reference.
-- [ ] Delete `ProgressiveGeometryDomain`,
+- [x] Delete `ProgressiveGeometryDomain`,
       `ProgressivePropertyValueKind`,
       `SandboxEditorVisualizationPropertyValueKind`, and equivalent
       bake/editor aliases after every production caller uses the canonical
       contract.
-- [ ] Keep provenance domain, sampling domain, structural vertex channels,
+- [x] Keep provenance domain, sampling domain, structural vertex channels,
       material channels, and visualization output meaning as distinct typed
       fields where a consumer actually needs them.
 
 ## Tests
 
-- [ ] Unit contracts cover every supported element domain and property value
+- [x] Unit contracts cover every supported element domain and property value
       kind, deterministic catalog order, stale snapshot/generation rejection,
       missing property, wrong domain/kind/count, and non-finite diagnostics.
-- [ ] Cross-consumer parity tests prove one reference resolves identically for
+- [x] Cross-consumer parity tests prove one reference resolves identically for
       bake, presentation, visualization, and selected-analysis validation.
-- [ ] Structural tests or strict source scans prove no duplicate runtime
+- [x] Structural tests or strict source scans prove no duplicate runtime
       property-domain/value-kind enum or conversion switch remains.
 
 ## Docs
 
-- [ ] Document the property-reference contract and the intentionally separate
+- [x] Document the property-reference contract and the intentionally separate
       domain/channel vocabularies in `src/runtime/README.md`.
-- [ ] Update affected architecture docs and regenerate
+- [x] Update affected architecture docs and regenerate
       `docs/api/generated/module_inventory.md`.
-- [ ] Refresh task indexes, the session brief, and retirement records.
+- [x] Refresh task indexes, the session brief, and retirement records.
 
 ## Acceptance criteria
 
-- [ ] Every runtime feature that names a geometry property uses
+- [x] Every runtime feature that names a geometry property uses
       `GeometryPropertyRef` and the shared catalog/resolver.
-- [ ] Property meaning is prepared by callers and is not encoded as a
+- [x] Property meaning is prepared by callers and is not encoded as a
       specialized runtime path or duplicate enum.
-- [ ] The old progressive/editor/bake property identity vocabularies and all
+- [x] The old progressive/editor/bake property identity vocabularies and all
       compatibility aliases are deleted after tests pass.
 
 ## Verification

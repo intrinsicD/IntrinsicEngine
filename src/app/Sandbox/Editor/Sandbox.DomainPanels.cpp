@@ -270,7 +270,7 @@ void DrawPropertyCatalogRows(const SandboxEditorPropertyCatalogModel &catalog) {
       ImGui::TableSetColumnIndex(2);
       ImGui::Text(
           "%s/%u",
-          DebugNameForSandboxEditorPropertyCatalogValueKind(row.ValueKind),
+          DebugNameForGeometryPropertyValueKind(row.ValueKind),
           row.ComponentCount);
       ImGui::TableSetColumnIndex(3);
       ImGui::Text("%zu", row.ElementCount);
@@ -375,7 +375,7 @@ void DrawVertexChannelBindingTargets(
           ImGui::BeginDisabled();
         const std::string label =
             option.PropertyName + " (" +
-            DebugNameForSandboxEditorPropertyCatalogValueKind(
+            DebugNameForGeometryPropertyValueKind(
                 option.ValueKind) +
             ", " + std::to_string(option.ElementCount) + ")";
         if (ImGui::Selectable(label.c_str(), selected) && option.Compatible &&
@@ -1050,7 +1050,7 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
           DebugNameForSandboxEditorPropertyCatalogDomain(row.CatalogDomain));
       ImGui::TableSetColumnIndex(2);
       ImGui::TextUnformatted(
-          DebugNameForSandboxEditorPropertyCatalogValueKind(row.ValueKind));
+          DebugNameForGeometryPropertyValueKind(row.ValueKind));
       ImGui::TableSetColumnIndex(3);
       ImGui::TextUnformatted(row.Bakeable ? "yes" : "no");
       ImGui::TableSetColumnIndex(4);

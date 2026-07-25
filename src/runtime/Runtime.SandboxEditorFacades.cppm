@@ -1189,22 +1189,9 @@ export namespace Extrinsic::Runtime
         PointCloudPoints,
     };
 
-    enum class SandboxEditorPropertyCatalogValueKind : std::uint8_t
-    {
-        Unknown,
-        ScalarFloat,
-        ScalarDouble,
-        UInt32,
-        Vec2,
-        Vec3,
-        Vec4,
-    };
-
     [[nodiscard]] const char* DebugNameForSandboxEditorPropertyCatalogDomain(
         SandboxEditorPropertyCatalogDomain domain) noexcept;
 
-    [[nodiscard]] const char* DebugNameForSandboxEditorPropertyCatalogValueKind(
-        SandboxEditorPropertyCatalogValueKind kind) noexcept;
 
     struct SandboxEditorPropertyValuePreview
     {
@@ -1218,8 +1205,8 @@ export namespace Extrinsic::Runtime
         std::string Name{};
         SandboxEditorPropertyCatalogDomain Domain{
             SandboxEditorPropertyCatalogDomain::MeshVertices};
-        SandboxEditorPropertyCatalogValueKind ValueKind{
-            SandboxEditorPropertyCatalogValueKind::Unknown};
+        Geometry::PropertyValueKind ValueKind{
+            Geometry::PropertyValueKind::Unknown};
         std::size_t ElementCount{0u};
         std::uint8_t ComponentCount{0u};
         bool Supported{false};
@@ -1254,8 +1241,8 @@ export namespace Extrinsic::Runtime
         std::string PropertyName{};
         SandboxEditorPropertyCatalogDomain Domain{
             SandboxEditorPropertyCatalogDomain::MeshVertices};
-        SandboxEditorPropertyCatalogValueKind ValueKind{
-            SandboxEditorPropertyCatalogValueKind::Unknown};
+        Geometry::PropertyValueKind ValueKind{
+            Geometry::PropertyValueKind::Unknown};
         AttributeSourceType SourceType{AttributeSourceType::Vec3};
         std::size_t ElementCount{0u};
         AttributeBindResult Resolver{};
@@ -1432,8 +1419,8 @@ export namespace Extrinsic::Runtime
         SandboxEditorPropertyCatalogDomain CatalogDomain{
             SandboxEditorPropertyCatalogDomain::MeshVertices};
         GeometryElementDomain BakeDomain{GeometryElementDomain::Unknown};
-        SandboxEditorPropertyCatalogValueKind ValueKind{
-            SandboxEditorPropertyCatalogValueKind::Unknown};
+        Geometry::PropertyValueKind ValueKind{
+            Geometry::PropertyValueKind::Unknown};
         GeometryPropertyValueKindFilter ExpectedValueKind{};
         std::size_t ElementCount{0u};
 

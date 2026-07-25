@@ -1791,3 +1791,63 @@ TEST(RuntimeEngineLayering, RetiredSpatialDebugRegistryHasNoProductionSurface)
         ReadFile(RepoRoot() / "src/graphics/renderer/Graphics.Renderer.cppm");
     EXPECT_NE(rendererInterface.find("SpatialDebugBounds"), std::string::npos);
 }
+
+// RUNTIME-192 — one canonical geometry-property vocabulary.
+//
+// Bake, presentation, visualization, and selected-analysis each used to mirror
+// a subset of GeometryElementDomain + Geometry::PropertyValueKind behind its own
+// enum, forcing conversion switches and letting otherwise identical property
+// identity drift between consumers. This pins the retirement so a new duplicate
+// cannot reappear.
+TEST(RuntimeEngineLayering, NoDuplicateGeometryPropertyVocabularyRemains)
+{
+    const std::array<std::filesystem::path, 6> sources{
+        RepoRoot() / "src/runtime/Runtime.ProgressiveRenderData.cppm",
+        RepoRoot() / "src/runtime/Runtime.ProgressiveRenderData.cpp",
+        RepoRoot() / "src/runtime/Runtime.SandboxEditorFacades.cppm",
+        RepoRoot() / "src/runtime/Runtime.SandboxEditorFacades.cpp",
+        RepoRoot() / "src/runtime/Runtime.SelectedMeshTextureBake.cppm",
+        RepoRoot() / "src/runtime/Runtime.TextureBakeModule.cpp",
+    };
+
+    for (const auto& path : sources)
+    {
+        const std::string content = ReadFile(path);
+        EXPECT_EQ(content.find("ProgressiveGeometryDomain"), std::string::npos)
+            << path.string();
+        EXPECT_EQ(content.find("ProgressivePropertyValueKind"), std::string::npos)
+            << path.string();
+        EXPECT_EQ(content.find("SandboxEditorVisualizationPropertyValueKind"),
+                  std::string::npos)
+            << path.string();
+        EXPECT_EQ(content.find("SandboxEditorPropertyCatalogValueKind"),
+                  std::string::npos)
+            << path.string();
+    }
+
+    // The canonical vocabulary and its constraint form live in one place.
+    const std::string availability =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.GeometryAvailability.cppm");
+    EXPECT_NE(availability.find("struct GeometryPropertyRef"), std::string::npos);
+    EXPECT_NE(availability.find("GeometryPropertyCatalogSnapshot"),
+              std::string::npos);
+    EXPECT_NE(availability.find("using GeometryPropertyValueKindFilter"),
+              std::string::npos);
+
+    // MeshSurface is a derived-job scope, never a property element domain.
+    EXPECT_EQ(availability.find("MeshSurface"), std::string::npos);
+    const std::string derivedJobs =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.DerivedJobGraph.cppm");
+    EXPECT_NE(derivedJobs.find("enum class DerivedJobScope"), std::string::npos);
+    EXPECT_NE(derivedJobs.find("MeshSurface"), std::string::npos);
+
+    // The persisted wire format keeps its legacy spellings, and they are owned
+    // by the serializer rather than derived from the canonical debug names.
+    const std::string serialization =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.SceneSerialization.cpp");
+    EXPECT_NE(serialization.find("\"ScalarFloat\""), std::string::npos);
+    EXPECT_NE(serialization.find("\"ScalarDouble\""), std::string::npos);
+    EXPECT_NE(serialization.find("\"GraphVertex\""), std::string::npos);
+    EXPECT_NE(serialization.find("kPropertyValueKindWire"), std::string::npos);
+    EXPECT_NE(serialization.find("kPropertyDomainWire"), std::string::npos);
+}

@@ -42,7 +42,7 @@ startup/shutdown.
 | `Extrinsic.Runtime.SelectedMeshTextureBake` | Runtime-owned DTO and validation surface shared by the selected-editor facade and `TextureBakeModule`. It exports request/result/status records, baked-texture catalogs and consumers, representation/compatibility helpers, raw-versus-encoded storage, scalar colormap and normal-space metadata, and the older direct CPU/normal-queue command for compatibility tests. Live editor commands always call the published `TextureBakeService`; they never bypass an unavailable module through the CPU helper. Source normals must already exist as properties: object- or world-space normals are not synthesized implicitly before baking. |
 | `Extrinsic.Runtime.ProgressiveRenderData` | Data-only progressive render-data contract accepted by ADR-0021 and implemented by `RUNTIME-111`. Exports entity shape, geometry-domain, lane, presentation-kind, slot semantic/source/readiness, generated-output policy/provenance, job-domain metadata, `ProgressivePresentationBindings`, property binding descriptors, property compatibility resolution, and compatible-first property option enumeration. Descriptors persist asset ids, names, value kinds, counts, defaults, readiness, and generated-output policy; they never persist raw property pointers, borrowed property views, transient worker/job state, graphics handles, RHI/Vulkan objects, or live `AssetService` ownership. |
 | `Extrinsic.Runtime.RenderArtifactPublication` | Runtime-owned render artifact publication contract (`RUNTIME-127`). Exports an artifact registry keyed by renderer id, snapshot id, view/output recipe id, source revisions, and output purpose; lifecycle kinds for transient frames, cached frames, saved files, preview-only outputs, dataset/batch outputs, readback/metric outputs, and candidate project results; UI-facing states for unpublished, stale, canceled, failed, superseded, published, and applied artifacts; explicit provenance-carrying publish/apply/undo commands; and an audit log. Registration never mutates project data. Applying a candidate artifact authorizes a project mutation for the caller-owned command path and records undo/audit metadata, but the registry itself does not import UI, renderer backends, ECS mutation callbacks, or project persistence. |
-| `Extrinsic.Runtime.GeometryAvailability` | Runtime-owned geometry availability resolver (`RUNTIME-117`). Exports CPU source/provenance queries, property-domain support, element counts, and `Surface`/`Edges`/`Points` render-lane readiness from ECS `GeometrySources` plus promoted `RenderSurface`, `RenderEdges`, and `RenderPoints` components. Runtime extraction, progressive property resolution, and Sandbox editor facade command preflight consume this resolver so mesh vertices, graph nodes, and point-cloud points can satisfy point-lane consumers without using exact `GeometrySources::ActiveDomain()` as the common capability gate. |
+| `Extrinsic.Runtime.GeometryAvailability` | Runtime-owned geometry availability resolver (`RUNTIME-117`). Exports CPU source/provenance queries, property-domain support, element counts, and `Surface`/`Edges`/`Points` render-lane readiness from ECS `GeometrySources` plus promoted `RenderSurface`, `RenderEdges`, and `RenderPoints` components. Runtime extraction, progressive property resolution, and Sandbox editor facade command preflight consume this resolver so mesh vertices, graph nodes, and point-cloud points can satisfy point-lane consumers without using exact `GeometrySources::ActiveDomain()` as the common capability gate. It is additionally the single owner of the canonical geometry-property vocabulary (`RUNTIME-192`): `GeometryPropertyRef` (element domain + name + value kind and nothing else, so it is safe inside a desired-state authoring recipe), the pointer-free `GeometryPropertyCatalogSnapshot` (deterministically ordered by domain then name, carrying source identity and generations so callers revalidate by comparing generations rather than dereferencing), `GeometryPropertyValueKindFilter` (`std::optional<Geometry::PropertyValueKind>`, where `std::nullopt` means unconstrained), and the shared name/domain/value-kind/count/finite-value resolution queries. Every runtime feature that names a geometry property -- bake, presentation, visualization, selected analysis, vertex-channel binding -- resolves through this module. |
 | `Extrinsic.Runtime.ProgressivePresentationExtraction` | Descriptor-to-snapshot resolver for progressive presentation state (`RUNTIME-113`). Exports `BuildProgressivePresentationSnapshot(...)`, slot extraction records, and stats for defaults, pending slots, ready textures, ready property buffers, unsupported slots, diagnostics, and previous-output retention. Mesh surface slots can resolve uniform defaults, authored/generated texture assets, property-bake pending/ready state, and unsupported direct property-buffer diagnostics; graph vertex/edge and point-cloud domains resolve direct property-buffer descriptors independently so vertex/point and edge/line presentations can carry separate colors, scalar fields, sizes, widths, or normal/orientation data. |
 | `Extrinsic.Runtime.DerivedJobGraph` | Runtime-owned derived-work scheduler over `Runtime.StreamingExecutor` (`RUNTIME-112`). Exports stable `DerivedJobKey`/`DerivedJobRecord` vocabulary, generation-qualified `WorldHandle` scope on descriptors/snapshots, CPU job submission, explicit dependencies, follow-up scheduling, per-entity/global snapshots, per-world cancellation, stale apply validation, previous-output retention, main-thread apply with unbounded and count-limited drain overloads, non-blocking readback parking/resume for `RUNTIME-126`, readback diagnostics, aggregate queued/running/applying/terminal job counts, per-drain and cumulative main-thread apply result deltas/timing/processed counts, and deterministic diagnostics for unsupported `GpuCompute`, `GpuGraphics`, and unresolved `Auto` domains. The registry owns no texture uploads, graphics resources, or persisted scene state; GPU-capable domains are metadata until a concrete backend task provides an implementation. |
 | `Extrinsic.Runtime.GpuReadbackJob` | Runtime-owned GPU-result write-back helper (`RUNTIME-126`). Exports backend-neutral property-binding validation and submission helpers that compose `DerivedJobRegistry`, `Runtime.StreamingExecutor`, GRAPHICS-096 async readback delivery, GRAPHICS-098 `GpuTransfer`, and GRAPHICS-095 buffer-dimension checks. A submitted readback job issues a graphics public API readback, parks in `WaitingForReadback`, resumes only after `DrainReadbacks()` observes delivered bytes, and writes the result into a count-matched `Geometry::PropertyRegistry` property on the main-thread apply lane. Callers that own a derived-job registry must drain transfer completions first, then call `DerivedJobRegistry::DrainReadbacks()`, then `ApplyMainThreadResults()` so follow-up jobs remain blocked until the write-back has applied. Runtime does not import Vulkan or graphics backend internals for this path; follow-up CPU->GPU visibility continues through the existing property binding/upload surfaces rather than a special readback upload lane. See ADR-0023 and the RUNTIME-112 / GRAPHICS-096 / GRAPHICS-098 task lineage for the reuse-not-reinvent contract. |
@@ -1864,3 +1864,42 @@ selected-entity scratch, selection-click interlock, and extraction packet
 submission now live in `Extrinsic.Runtime.GizmoInteraction` plus
 `Extrinsic.Runtime.GizmoFrameService`. Graphics consumes only copied
 `TransformGizmoRenderPacket` spans.
+
+## Geometry-property vocabularies (RUNTIME-192)
+
+`Extrinsic.Runtime.GeometryAvailability` owns the one way to *name* a geometry
+property. The progressive, editor-visualization, editor-catalog, and bake
+modules previously each mirrored a subset of it, which forced conversion
+switches and let identical property identity drift between consumers; those
+duplicates are retired and
+`RuntimeEngineLayering.NoDuplicateGeometryPropertyVocabularyRemains` keeps them
+from reappearing.
+
+Vocabularies that stay deliberately separate, because they answer different
+questions:
+
+| Vocabulary | Question it answers |
+| --- | --- |
+| `Runtime::GeometryElementDomain` | Which element domain does this property live on? |
+| `Geometry::PropertyValueKind` | What is the property's value type? |
+| `GeometryPropertyValueKindFilter` | What value type is *acceptable* here? (`nullopt` = any) |
+| `GeometrySources::Domain` | Where did this geometry come from (provenance)? |
+| `Runtime::GeometryRenderLane` | Which render lane consumes it? |
+| `Runtime::VertexChannel` | Which structural vertex stream? |
+| `Graphics::MaterialChannel` | Which material slot? |
+| `Runtime::DerivedJobScope` | Which part of the geometry does a derived job operate on? |
+
+Two of these carry non-obvious constraints:
+
+- **`DerivedJobScope` is not an element domain.** It includes `MeshSurface`, a
+  whole-surface job target that resolves to "unsupported" in every property
+  path. It exists only for derived-job key identity and stays local to
+  `Runtime.DerivedJobGraph`.
+- **The persisted scene format uses legacy spellings.** Property value kinds
+  persist as `ScalarFloat`/`ScalarDouble` (not the canonical `Float`/`Double`),
+  domains persist as `GraphVertex`/`Point` (not `GraphNode`/`PointCloudPoint`),
+  and a legacy `MeshSurface` domain is accepted on read and mapped to `Unknown`.
+  That mapping is owned by `Runtime.SceneSerialization` and must never be
+  derived from `DebugNameForGeometryPropertyValueKind`; regression tests in
+  `Test.RuntimeSceneSerialization.cpp` pin the strings and prove the reader
+  rejects canonical names.

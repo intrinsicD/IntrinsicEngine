@@ -29,10 +29,6 @@ lands and tests the general path, migrates real production workflows, proves
 parity, and only then deletes the specialized/forwarding path in a separate
 cleanup slice:
 
-- [`RUNTIME-192` — Canonical geometry-property reference and catalog](RUNTIME-192-canonical-geometry-property-reference-and-catalog.md)
-  removes duplicate editor/progressive/bake property-domain and value-kind
-  vocabularies without conflating provenance, raster, material, or
-  visualization semantics.
 - [`RUNTIME-193` — General geometry-presentation recipe](RUNTIME-193-general-geometry-presentation-recipe.md)
   replaces the generally used progressive-named presentation modules with one
   desired-state recipe plus copied operational snapshot.
@@ -64,6 +60,15 @@ cleanup slice:
 - [`RUNTIME-203` — Internalize one-consumer runtime composition helpers](RUNTIME-203-internalize-one-consumer-runtime-helpers.md)
   removes public BMIs for Engine/SceneInteraction/config/device helpers after
   their owner-level behavior tests are in place.
+
+### Canonical geometry-property vocabulary (retired 2026-07-26)
+
+- [`RUNTIME-192`](../../done/RUNTIME-192-canonical-geometry-property-reference-and-catalog.md)
+  deleted all four duplicate property-domain/value-kind vocabularies and made
+  `Extrinsic.Runtime.GeometryAvailability` the single owner of
+  `GeometryPropertyRef`, the generation-stamped catalog snapshot, and the shared
+  resolution queries — without creating a new module. `MeshSurface` moved to a
+  derived-job scope and the persisted wire spellings were preserved.
 
 ### Dormant-surface retirements (retired 2026-07-25)
 

@@ -2491,7 +2491,7 @@ TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
 TEST(SandboxEditorUi, PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection)
 {
     using Domain = Runtime::SandboxEditorPropertyCatalogDomain;
-    using Kind = Runtime::SandboxEditorPropertyCatalogValueKind;
+    using Kind = Geometry::PropertyValueKind;
 
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
@@ -2564,8 +2564,14 @@ TEST(SandboxEditorUi, PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection)
     const auto* unsupported =
         FindCatalogProperty(catalog, Domain::MeshVertices, "v:unsupported_int");
     ASSERT_NE(unsupported, nullptr);
-    EXPECT_EQ(unsupported->ValueKind, Kind::Unknown);
+    // RUNTIME-192 B4: the catalog now reports the property's true kind instead
+    // of collapsing every non-bindable type to Unknown, which the retired
+    // editor-local enum could not represent. Bindability is still gated by
+    // Supported/UnsupportedReason, so the contract that matters is unchanged --
+    // an int32 property remains unbindable, it is just named accurately now.
+    EXPECT_EQ(unsupported->ValueKind, Kind::Int32);
     EXPECT_FALSE(unsupported->Supported);
+    EXPECT_FALSE(unsupported->Bindable);
     EXPECT_FALSE(unsupported->UnsupportedReason.empty());
 
     const auto* edgeV0 =
@@ -2619,14 +2625,14 @@ TEST(SandboxEditorUi, PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection)
     EXPECT_STREQ(Runtime::DebugNameForSandboxEditorPropertyCatalogDomain(
                      Domain::MeshHalfedges),
                  "MeshHalfedges");
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorPropertyCatalogValueKind(
+    EXPECT_STREQ(Runtime::DebugNameForGeometryPropertyValueKind(
                      Kind::Vec2),
                  "Vec2");
 }
 TEST(SandboxEditorUi, PropertyCatalogReportsGraphAndPointCloudDomains)
 {
     using Domain = Runtime::SandboxEditorPropertyCatalogDomain;
-    using Kind = Runtime::SandboxEditorPropertyCatalogValueKind;
+    using Kind = Geometry::PropertyValueKind;
 
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
