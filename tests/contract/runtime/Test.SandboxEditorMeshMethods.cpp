@@ -479,7 +479,7 @@ void ExpectPositionsExactlyEqual(
         albedo.Semantic = Runtime::ProgressiveSlotSemantic::Albedo;
         albedo.SourceKind = Runtime::ProgressiveSlotSourceKind::UniformDefault;
         albedo.UniformDefault = Runtime::ProgressiveDefaultValue{
-            .Kind = Runtime::ProgressivePropertyValueKind::Vec4,
+            .Kind = Geometry::PropertyValueKind::Vec4,
             .Vector = glm::vec4{0.2f, 0.4f, 0.8f, 1.0f},
         };
         albedo.Readiness = Runtime::ProgressiveReadinessState::DefaultValue;
@@ -492,7 +492,7 @@ void ExpectPositionsExactlyEqual(
         normal.Property = Runtime::ProgressivePropertyBindingDescriptor{
             .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
             .PropertyName = "v:normal",
-            .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec3,
+            .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
             .ExpectedElementCount = 3u,
         };
         normal.Readiness = Runtime::ProgressiveReadinessState::Pending;
@@ -3829,7 +3829,7 @@ TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRequireRuntimeModule)
     ASSERT_NE(paint, nullptr);
     EXPECT_TRUE(paint->Bakeable);
     EXPECT_EQ(paint->BakeDomain, Runtime::ProgressiveGeometryDomain::MeshVertex);
-    EXPECT_EQ(paint->ExpectedValueKind, Runtime::ProgressivePropertyValueKind::Vec4);
+    EXPECT_EQ(paint->ExpectedValueKind, Geometry::PropertyValueKind::Vec4);
 
     const Runtime::SandboxEditorTextureBakeSourceRow* position =
         FindTextureBakeSource(bake, std::string{PN::kPosition});
@@ -3849,7 +3849,7 @@ TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRequireRuntimeModule)
                 .PresentationKey = "mesh.surface",
                 .TargetSemantic = Runtime::ProgressiveSlotSemantic::Albedo,
                 .SourceDomain = Runtime::ProgressiveGeometryDomain::MeshVertex,
-                .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec4,
+                .ExpectedValueKind = Geometry::PropertyValueKind::Vec4,
                 .PropertyName = "v:paint",
                 .Encoder = Runtime::MeshAttributeTextureBakeEncoder::RgbaColor,
                 .Width = 4u,
@@ -3942,7 +3942,7 @@ TEST(SandboxEditorUi, TextureBakeFacadeDoesNotBypassUnavailableRuntimeModule)
                 .SourceDomain =
                     Runtime::ProgressiveGeometryDomain::MeshVertex,
                 .ExpectedValueKind =
-                    Runtime::ProgressivePropertyValueKind::Vec3,
+                    Geometry::PropertyValueKind::Vec3,
                 .PropertyName = "v:normal",
                 .Encoder = Runtime::MeshAttributeTextureBakeEncoder::Normal,
                 .Width = 64u,
@@ -3996,7 +3996,7 @@ TEST(SandboxEditorUi, UnavailableTextureBakeModuleHasNoCpuFallback)
                 .SourceDomain =
                     Runtime::ProgressiveGeometryDomain::MeshVertex,
                 .ExpectedValueKind =
-                    Runtime::ProgressivePropertyValueKind::Vec3,
+                    Geometry::PropertyValueKind::Vec3,
                 .PropertyName = "v:normal",
                 .Encoder = Runtime::MeshAttributeTextureBakeEncoder::Normal,
                 .Width = 64u,
@@ -4047,7 +4047,7 @@ TEST(SandboxEditorUi, QueueBackedNormalBakeRejectsNoncanonicalOrMissingChannels)
         Runtime::ProgressiveGeometryDomain::MeshVertex;
     request.SourcePropertyName = "v:normal";
     request.ExpectedValueKind =
-        Runtime::ProgressivePropertyValueKind::Vec3;
+        Geometry::PropertyValueKind::Vec3;
     request.Encoder = Runtime::MeshAttributeTextureBakeEncoder::Normal;
     request.TexcoordPropertyName = "v:secondary_texcoord";
     request.Width = 64u;
@@ -4115,7 +4115,7 @@ TEST(SandboxEditorUi, TextureBakeModuleAvailabilityPrecedesAssetCreation)
                 .SourceDomain =
                     Runtime::ProgressiveGeometryDomain::MeshVertex,
                 .ExpectedValueKind =
-                    Runtime::ProgressivePropertyValueKind::Vec4,
+                    Geometry::PropertyValueKind::Vec4,
                 .PropertyName = "v:paint",
                 .Encoder =
                     Runtime::MeshAttributeTextureBakeEncoder::RgbaColor,
@@ -4183,7 +4183,7 @@ TEST(SandboxEditorUi, TextureBakeRequiresOperationalGpuBackend)
                 .PresentationKey = "mesh.surface",
                 .TargetSemantic = Runtime::ProgressiveSlotSemantic::Albedo,
                 .SourceDomain = Runtime::ProgressiveGeometryDomain::MeshVertex,
-                .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec4,
+                .ExpectedValueKind = Geometry::PropertyValueKind::Vec4,
                 .PropertyName = "v:paint",
                 .Encoder = Runtime::MeshAttributeTextureBakeEncoder::RgbaColor,
                 .Width = 4u,

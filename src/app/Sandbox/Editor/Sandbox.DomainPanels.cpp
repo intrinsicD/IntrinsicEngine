@@ -315,7 +315,8 @@ void DrawPropertyBindingTargets(
                 std::string(ToString(target.Lane)).c_str(),
                 target.PresentationKey.c_str(),
                 std::string(ToString(target.Semantic)).c_str(),
-                std::string(ToString(target.ExpectedValueKind)).c_str(),
+                DebugNameForGeometryPropertyValueKindFilter(
+                    target.ExpectedValueKind),
                 target.ExpectedElementCount);
     for (const SandboxEditorProgressivePropertyOptionModel &option :
          target.Options) {
@@ -686,12 +687,12 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
         }};
         const BakedPropertyTextureRepresentation representation =
             ResolveBakedPropertyTextureRepresentation(
-                selectedSource->ExpectedValueKind,
+                selectedSource->ResolvedExpectedValueKind(),
                 kTextureBakeStorageModes[static_cast<std::size_t>(storageIndex)],
                 kTextureBakeEncoders[static_cast<std::size_t>(encoderIndex)],
                 consumer);
         return IsBakedPropertyTextureConsumerCompatible(
-            consumer.front(), selectedSource->ExpectedValueKind,
+            consumer.front(), selectedSource->ResolvedExpectedValueKind(),
             representation.Storage, representation.Encoder);
       };
 
@@ -755,14 +756,14 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
           return false;
         const BakedPropertyTextureRepresentation representation =
             ResolveBakedPropertyTextureRepresentation(
-                selectedSource->ExpectedValueKind,
+                selectedSource->ResolvedExpectedValueKind(),
                 kTextureBakeStorageModes[static_cast<std::size_t>(storageIndex)],
                 kTextureBakeEncoders[static_cast<std::size_t>(encoderIndex)],
                 values);
         return std::ranges::all_of(
             values, [&](const BakedPropertyTextureConsumer &consumer) {
               return IsBakedPropertyTextureConsumerCompatible(
-                  consumer, selectedSource->ExpectedValueKind,
+                  consumer, selectedSource->ResolvedExpectedValueKind(),
                   representation.Storage, representation.Encoder);
             });
       };
@@ -845,7 +846,7 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
                 kTextureBakeTargetSemantics[static_cast<std::size_t>(
                     semanticIndex)],
             .SourceDomain = selectedSource->BakeDomain,
-            .ExpectedValueKind = selectedSource->ExpectedValueKind,
+            .ExpectedValueKind = selectedSource->ResolvedExpectedValueKind(),
             .PropertyName = selectedSource->Name,
             .Encoder =
                 kTextureBakeEncoders[static_cast<std::size_t>(encoderIndex)],
@@ -984,8 +985,8 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
 
       const bool rawScalar =
           record.Storage == SelectedMeshTextureBakeStorage::RawFloat &&
-          (record.ValueKind == ProgressivePropertyValueKind::ScalarFloat ||
-           record.ValueKind == ProgressivePropertyValueKind::ScalarDouble);
+          (record.ValueKind == Geometry::PropertyValueKind::Float ||
+           record.ValueKind == Geometry::PropertyValueKind::Double);
       if (rawScalar) {
         int recordColormap = 0;
         for (const BakedPropertyTextureConsumer &consumer : nextConsumers) {

@@ -124,7 +124,7 @@ namespace
         Runtime::ProgressiveSlotBinding albedo{};
         albedo.Semantic = Runtime::ProgressiveSlotSemantic::Albedo;
         albedo.SourceKind = Runtime::ProgressiveSlotSourceKind::UniformDefault;
-        albedo.UniformDefault.Kind = Runtime::ProgressivePropertyValueKind::Vec4;
+        albedo.UniformDefault.Kind = Geometry::PropertyValueKind::Vec4;
         albedo.UniformDefault.Vector = glm::vec4{1.0f};
         albedo.Readiness = Runtime::ProgressiveReadinessState::DefaultValue;
         albedo.Provenance =
@@ -136,7 +136,7 @@ namespace
         normal.Property = Runtime::ProgressivePropertyBindingDescriptor{
             .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
             .PropertyName = "v:normal",
-            .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec3,
+            .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
             .ExpectedElementCount = 3u,
         };
         normal.Readiness = Runtime::ProgressiveReadinessState::Pending;
@@ -149,7 +149,7 @@ namespace
         roughness.Semantic = Runtime::ProgressiveSlotSemantic::Roughness;
         roughness.SourceKind = Runtime::ProgressiveSlotSourceKind::UniformDefault;
         roughness.UniformDefault.Kind =
-            Runtime::ProgressivePropertyValueKind::ScalarFloat;
+            Geometry::PropertyValueKind::Float;
         roughness.UniformDefault.Scalar = 0.5;
         roughness.Readiness = Runtime::ProgressiveReadinessState::DefaultValue;
         roughness.Provenance =
@@ -159,7 +159,7 @@ namespace
         metallic.Semantic = Runtime::ProgressiveSlotSemantic::Metallic;
         metallic.SourceKind = Runtime::ProgressiveSlotSourceKind::UniformDefault;
         metallic.UniformDefault.Kind =
-            Runtime::ProgressivePropertyValueKind::ScalarFloat;
+            Geometry::PropertyValueKind::Float;
         metallic.UniformDefault.Scalar = 0.0;
         metallic.Readiness = Runtime::ProgressiveReadinessState::DefaultValue;
         metallic.Provenance =
@@ -203,7 +203,7 @@ namespace
             Runtime::SelectionController::ToStableEntityId(entity);
         request.SourceDomain = Runtime::ProgressiveGeometryDomain::MeshVertex;
         request.SourcePropertyName = "v:normal";
-        request.ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec3;
+        request.ExpectedValueKind = Geometry::PropertyValueKind::Vec3;
         request.Encoder = Runtime::MeshAttributeTextureBakeEncoder::Normal;
         request.Width = 4u;
         request.Height = 4u;
@@ -221,7 +221,7 @@ namespace
             Runtime::SelectionController::ToStableEntityId(entity);
         request.SourceDomain = Runtime::ProgressiveGeometryDomain::MeshVertex;
         request.SourcePropertyName = "v:heat";
-        request.ExpectedValueKind = Runtime::ProgressivePropertyValueKind::ScalarFloat;
+        request.ExpectedValueKind = Geometry::PropertyValueKind::Float;
         request.Encoder = Runtime::MeshAttributeTextureBakeEncoder::LinearScalar;
         request.Width = 4u;
         request.Height = 4u;
@@ -239,7 +239,7 @@ namespace
             Runtime::SelectionController::ToStableEntityId(entity);
         request.SourceDomain = Runtime::ProgressiveGeometryDomain::MeshVertex;
         request.SourcePropertyName = "v:albedo";
-        request.ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec4;
+        request.ExpectedValueKind = Geometry::PropertyValueKind::Vec4;
         request.Width = 4u;
         request.Height = 4u;
         request.TargetPresentationKey = "mesh.surface";
@@ -254,7 +254,7 @@ namespace
         Runtime::SelectedMeshTextureBakeRequest request = MakeAlbedoRequest(entity);
         request.SourceDomain = Runtime::ProgressiveGeometryDomain::MeshFace;
         request.SourcePropertyName = "f:debug_color";
-        request.ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec4;
+        request.ExpectedValueKind = Geometry::PropertyValueKind::Vec4;
         request.GeneratedKey = "face-albedo";
         return request;
     }
@@ -267,7 +267,7 @@ namespace
             Runtime::SelectionController::ToStableEntityId(entity);
         request.SourceDomain = Runtime::ProgressiveGeometryDomain::MeshVertex;
         request.SourcePropertyName = "v:roughness";
-        request.ExpectedValueKind = Runtime::ProgressivePropertyValueKind::ScalarFloat;
+        request.ExpectedValueKind = Geometry::PropertyValueKind::Float;
         request.Width = 4u;
         request.Height = 4u;
         request.TargetPresentationKey = "mesh.surface";
@@ -351,7 +351,7 @@ TEST(RuntimeSelectedMeshTextureBake, RepresentationDefaultsPreserveRawScalarData
     };
     const Runtime::BakedPropertyTextureRepresentation representation =
         Runtime::ResolveBakedPropertyTextureRepresentation(
-            Runtime::ProgressivePropertyValueKind::ScalarFloat,
+            Geometry::PropertyValueKind::Float,
             Runtime::SelectedMeshTextureBakeStorage::Auto,
             Runtime::MeshAttributeTextureBakeEncoder::Auto,
             consumers);
@@ -364,12 +364,12 @@ TEST(RuntimeSelectedMeshTextureBake, RepresentationDefaultsPreserveRawScalarData
         Runtime::MeshAttributeTextureBakeEncoder::LinearScalar);
     EXPECT_TRUE(Runtime::IsBakedPropertyTextureConsumerCompatible(
         consumers[0],
-        Runtime::ProgressivePropertyValueKind::ScalarFloat,
+        Geometry::PropertyValueKind::Float,
         representation.Storage,
         representation.Encoder));
     EXPECT_TRUE(Runtime::IsBakedPropertyTextureConsumerCompatible(
         consumers[1],
-        Runtime::ProgressivePropertyValueKind::ScalarFloat,
+        Geometry::PropertyValueKind::Float,
         representation.Storage,
         representation.Encoder));
 }
@@ -383,7 +383,7 @@ TEST(RuntimeSelectedMeshTextureBake, NormalAndLabelDefaultsChooseEncodedStorage)
         },
     };
     const auto normal = Runtime::ResolveBakedPropertyTextureRepresentation(
-        Runtime::ProgressivePropertyValueKind::Vec3,
+        Geometry::PropertyValueKind::Vec3,
         Runtime::SelectedMeshTextureBakeStorage::Auto,
         Runtime::MeshAttributeTextureBakeEncoder::Auto,
         normalConsumer);
@@ -395,7 +395,7 @@ TEST(RuntimeSelectedMeshTextureBake, NormalAndLabelDefaultsChooseEncodedStorage)
         Runtime::MeshAttributeTextureBakeEncoder::Normal);
     EXPECT_TRUE(Runtime::IsBakedPropertyTextureConsumerCompatible(
         normalConsumer.front(),
-        Runtime::ProgressivePropertyValueKind::Vec3,
+        Geometry::PropertyValueKind::Vec3,
         normal.Storage,
         normal.Encoder));
 
@@ -406,7 +406,7 @@ TEST(RuntimeSelectedMeshTextureBake, NormalAndLabelDefaultsChooseEncodedStorage)
         },
     };
     const auto label = Runtime::ResolveBakedPropertyTextureRepresentation(
-        Runtime::ProgressivePropertyValueKind::UInt32,
+        Geometry::PropertyValueKind::UInt32,
         Runtime::SelectedMeshTextureBakeStorage::Auto,
         Runtime::MeshAttributeTextureBakeEncoder::Auto,
         albedoConsumer);
@@ -423,39 +423,38 @@ TEST(RuntimeSelectedMeshTextureBake,
 {
     using Runtime::IsBakedPropertyTextureRepresentationCompatible;
     using Runtime::MeshAttributeTextureBakeEncoder;
-    using Runtime::ProgressivePropertyValueKind;
     using Runtime::SelectedMeshTextureBakeStorage;
 
     EXPECT_TRUE(IsBakedPropertyTextureRepresentationCompatible(
-        ProgressivePropertyValueKind::ScalarFloat,
+        Geometry::PropertyValueKind::Float,
         SelectedMeshTextureBakeStorage::RawFloat,
         MeshAttributeTextureBakeEncoder::LinearScalar));
     EXPECT_FALSE(IsBakedPropertyTextureRepresentationCompatible(
-        ProgressivePropertyValueKind::ScalarFloat,
+        Geometry::PropertyValueKind::Float,
         SelectedMeshTextureBakeStorage::RawFloat,
         MeshAttributeTextureBakeEncoder::Normal));
     EXPECT_TRUE(IsBakedPropertyTextureRepresentationCompatible(
-        ProgressivePropertyValueKind::ScalarFloat,
+        Geometry::PropertyValueKind::Float,
         SelectedMeshTextureBakeStorage::EncodedRgba,
         MeshAttributeTextureBakeEncoder::ScalarColormap));
     EXPECT_FALSE(IsBakedPropertyTextureRepresentationCompatible(
-        ProgressivePropertyValueKind::UInt32,
+        Geometry::PropertyValueKind::UInt32,
         SelectedMeshTextureBakeStorage::RawFloat,
         MeshAttributeTextureBakeEncoder::LabelPalette));
     EXPECT_TRUE(IsBakedPropertyTextureRepresentationCompatible(
-        ProgressivePropertyValueKind::UInt32,
+        Geometry::PropertyValueKind::UInt32,
         SelectedMeshTextureBakeStorage::EncodedRgba,
         MeshAttributeTextureBakeEncoder::LabelPalette));
     EXPECT_TRUE(IsBakedPropertyTextureRepresentationCompatible(
-        ProgressivePropertyValueKind::Vec3,
+        Geometry::PropertyValueKind::Vec3,
         SelectedMeshTextureBakeStorage::EncodedRgba,
         MeshAttributeTextureBakeEncoder::Normal));
     EXPECT_FALSE(IsBakedPropertyTextureRepresentationCompatible(
-        ProgressivePropertyValueKind::Vec4,
+        Geometry::PropertyValueKind::Vec4,
         SelectedMeshTextureBakeStorage::EncodedRgba,
         MeshAttributeTextureBakeEncoder::Normal));
     EXPECT_FALSE(IsBakedPropertyTextureRepresentationCompatible(
-        ProgressivePropertyValueKind::Vec3,
+        Geometry::PropertyValueKind::Vec3,
         SelectedMeshTextureBakeStorage::Auto,
         MeshAttributeTextureBakeEncoder::Vector3));
 }
@@ -563,7 +562,7 @@ TEST(RuntimeSelectedMeshTextureBake, IncompatibleMaterialSlotEncodersFailClosed)
 
     Runtime::SelectedMeshTextureBakeRequest badRoughness = MakeRoughnessRequest(entity);
     badRoughness.SourcePropertyName = "v:normal";
-    badRoughness.ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec3;
+    badRoughness.ExpectedValueKind = Geometry::PropertyValueKind::Vec3;
     badRoughness.Encoder = Runtime::MeshAttributeTextureBakeEncoder::Normal;
     EXPECT_EQ(
         Runtime::BuildSelectedMeshTextureBakeRequest(scene, badRoughness).Status,

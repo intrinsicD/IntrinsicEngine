@@ -122,20 +122,20 @@ namespace Extrinsic::Runtime
             return false;
         }
 
-        [[nodiscard]] ProgressivePropertyValueKind DefaultExpectedKindForSemantic(
+        [[nodiscard]] GeometryPropertyValueKindFilter DefaultExpectedKindForSemantic(
             const ProgressiveSlotSemantic semantic) noexcept
         {
             switch (semantic)
             {
             case ProgressiveSlotSemantic::Normal:
-                return ProgressivePropertyValueKind::Vec3;
+                return Geometry::PropertyValueKind::Vec3;
             case ProgressiveSlotSemantic::Roughness:
             case ProgressiveSlotSemantic::Metallic:
             case ProgressiveSlotSemantic::ScalarField:
             case ProgressiveSlotSemantic::Displacement:
-                return ProgressivePropertyValueKind::ScalarFloat;
+                return Geometry::PropertyValueKind::Float;
             case ProgressiveSlotSemantic::Albedo:
-                return ProgressivePropertyValueKind::Any;
+                return std::nullopt;
             case ProgressiveSlotSemantic::PointColor:
             case ProgressiveSlotSemantic::PointScalarField:
             case ProgressiveSlotSemantic::PointSize:
@@ -143,9 +143,9 @@ namespace Extrinsic::Runtime
             case ProgressiveSlotSemantic::LineColor:
             case ProgressiveSlotSemantic::LineScalarField:
             case ProgressiveSlotSemantic::LineWidth:
-                return ProgressivePropertyValueKind::Any;
+                return std::nullopt;
             }
-            return ProgressivePropertyValueKind::Any;
+            return std::nullopt;
         }
 
         [[nodiscard]] MeshAttributeTextureBakeSourceDomain ToBakeDomain(
@@ -176,23 +176,22 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] MeshAttributeTextureBakeValueKind ToBakeValueKind(
-            const ProgressivePropertyValueKind kind) noexcept
+            const Geometry::PropertyValueKind kind) noexcept
         {
             switch (kind)
             {
-            case ProgressivePropertyValueKind::ScalarFloat:
-            case ProgressivePropertyValueKind::ScalarDouble:
+            case Geometry::PropertyValueKind::Float:
+            case Geometry::PropertyValueKind::Double:
                 return MeshAttributeTextureBakeValueKind::Scalar;
-            case ProgressivePropertyValueKind::UInt32:
+            case Geometry::PropertyValueKind::UInt32:
                 return MeshAttributeTextureBakeValueKind::Label;
-            case ProgressivePropertyValueKind::Vec2:
+            case Geometry::PropertyValueKind::Vec2:
                 return MeshAttributeTextureBakeValueKind::Vector2;
-            case ProgressivePropertyValueKind::Vec3:
+            case Geometry::PropertyValueKind::Vec3:
                 return MeshAttributeTextureBakeValueKind::Vector3;
-            case ProgressivePropertyValueKind::Vec4:
+            case Geometry::PropertyValueKind::Vec4:
                 return MeshAttributeTextureBakeValueKind::Vector4;
-            case ProgressivePropertyValueKind::Any:
-            case ProgressivePropertyValueKind::Unknown:
+            case Geometry::PropertyValueKind::Unknown:
                 break;
             }
             return MeshAttributeTextureBakeValueKind::Auto;
@@ -200,7 +199,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] bool EncoderCanHandle(
             const MeshAttributeTextureBakeEncoder encoder,
-            const ProgressivePropertyValueKind kind) noexcept
+            const Geometry::PropertyValueKind kind) noexcept
         {
             if (encoder == MeshAttributeTextureBakeEncoder::Auto)
                 return true;
@@ -209,33 +208,33 @@ namespace Extrinsic::Runtime
             {
             case MeshAttributeTextureBakeEncoder::LinearScalar:
             case MeshAttributeTextureBakeEncoder::ScalarColormap:
-                return kind == ProgressivePropertyValueKind::ScalarFloat ||
-                       kind == ProgressivePropertyValueKind::ScalarDouble;
+                return kind == Geometry::PropertyValueKind::Float ||
+                       kind == Geometry::PropertyValueKind::Double;
             case MeshAttributeTextureBakeEncoder::LabelPalette:
-                return kind == ProgressivePropertyValueKind::UInt32;
+                return kind == Geometry::PropertyValueKind::UInt32;
             case MeshAttributeTextureBakeEncoder::Vector2:
-                return kind == ProgressivePropertyValueKind::Vec2;
+                return kind == Geometry::PropertyValueKind::Vec2;
             case MeshAttributeTextureBakeEncoder::Vector3:
             case MeshAttributeTextureBakeEncoder::Normal:
-                return kind == ProgressivePropertyValueKind::Vec3;
+                return kind == Geometry::PropertyValueKind::Vec3;
             case MeshAttributeTextureBakeEncoder::RgbaColor:
-                return kind == ProgressivePropertyValueKind::Vec3 ||
-                       kind == ProgressivePropertyValueKind::Vec4;
+                return kind == Geometry::PropertyValueKind::Vec3 ||
+                       kind == Geometry::PropertyValueKind::Vec4;
             case MeshAttributeTextureBakeEncoder::Auto:
                 break;
             }
             return false;
         }
 
-        [[nodiscard]] bool IsScalarKind(const ProgressivePropertyValueKind kind) noexcept
+        [[nodiscard]] bool IsScalarKind(const Geometry::PropertyValueKind kind) noexcept
         {
-            return kind == ProgressivePropertyValueKind::ScalarFloat ||
-                   kind == ProgressivePropertyValueKind::ScalarDouble;
+            return kind == Geometry::PropertyValueKind::Float ||
+                   kind == Geometry::PropertyValueKind::Double;
         }
 
         [[nodiscard]] MeshAttributeTextureBakeEncoder ResolveMaterialSlotEncoder(
             const SelectedMeshTextureBakeRequest& request,
-            const ProgressivePropertyValueKind kind) noexcept
+            const Geometry::PropertyValueKind kind) noexcept
         {
             if (request.Encoder != MeshAttributeTextureBakeEncoder::Auto)
                 return request.Encoder;
@@ -249,24 +248,23 @@ namespace Extrinsic::Runtime
             case ProgressiveSlotSemantic::Displacement:
                 return MeshAttributeTextureBakeEncoder::LinearScalar;
             case ProgressiveSlotSemantic::ScalarField:
-                return kind == ProgressivePropertyValueKind::UInt32
+                return kind == Geometry::PropertyValueKind::UInt32
                     ? MeshAttributeTextureBakeEncoder::LabelPalette
                     : MeshAttributeTextureBakeEncoder::LinearScalar;
             case ProgressiveSlotSemantic::Albedo:
                 switch (kind)
                 {
-                case ProgressivePropertyValueKind::ScalarFloat:
-                case ProgressivePropertyValueKind::ScalarDouble:
+                case Geometry::PropertyValueKind::Float:
+                case Geometry::PropertyValueKind::Double:
                     return MeshAttributeTextureBakeEncoder::LinearScalar;
-                case ProgressivePropertyValueKind::UInt32:
+                case Geometry::PropertyValueKind::UInt32:
                     return MeshAttributeTextureBakeEncoder::LabelPalette;
-                case ProgressivePropertyValueKind::Vec3:
-                case ProgressivePropertyValueKind::Vec4:
+                case Geometry::PropertyValueKind::Vec3:
+                case Geometry::PropertyValueKind::Vec4:
                     return MeshAttributeTextureBakeEncoder::RgbaColor;
-                case ProgressivePropertyValueKind::Vec2:
+                case Geometry::PropertyValueKind::Vec2:
                     return MeshAttributeTextureBakeEncoder::Vector2;
-                case ProgressivePropertyValueKind::Any:
-                case ProgressivePropertyValueKind::Unknown:
+                    case Geometry::PropertyValueKind::Unknown:
                     break;
                 }
                 break;
@@ -285,7 +283,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] SelectedMeshTextureBakeStatus ValidateTargetSlotCompatibility(
             const ProgressiveSlotSemantic semantic,
-            const ProgressivePropertyValueKind kind,
+            const Geometry::PropertyValueKind kind,
             const MeshAttributeTextureBakeEncoder encoder,
             std::string& diagnostic)
         {
@@ -299,7 +297,7 @@ namespace Extrinsic::Runtime
             switch (semantic)
             {
             case ProgressiveSlotSemantic::Normal:
-                if (kind == ProgressivePropertyValueKind::Vec3 &&
+                if (kind == Geometry::PropertyValueKind::Vec3 &&
                     encoder == MeshAttributeTextureBakeEncoder::Normal)
                 {
                     return SelectedMeshTextureBakeStatus::Success;
@@ -317,10 +315,10 @@ namespace Extrinsic::Runtime
                 if ((IsScalarKind(kind) &&
                      (encoder == MeshAttributeTextureBakeEncoder::LinearScalar ||
                       encoder == MeshAttributeTextureBakeEncoder::ScalarColormap)) ||
-                    (kind == ProgressivePropertyValueKind::UInt32 &&
+                    (kind == Geometry::PropertyValueKind::UInt32 &&
                      encoder == MeshAttributeTextureBakeEncoder::LabelPalette) ||
-                    ((kind == ProgressivePropertyValueKind::Vec3 ||
-                      kind == ProgressivePropertyValueKind::Vec4) &&
+                    ((kind == Geometry::PropertyValueKind::Vec3 ||
+                      kind == Geometry::PropertyValueKind::Vec4) &&
                      encoder == MeshAttributeTextureBakeEncoder::RgbaColor))
                 {
                     return SelectedMeshTextureBakeStatus::Success;
@@ -330,7 +328,7 @@ namespace Extrinsic::Runtime
                 if ((IsScalarKind(kind) &&
                      (encoder == MeshAttributeTextureBakeEncoder::LinearScalar ||
                       encoder == MeshAttributeTextureBakeEncoder::ScalarColormap)) ||
-                    (kind == ProgressivePropertyValueKind::UInt32 &&
+                    (kind == Geometry::PropertyValueKind::UInt32 &&
                      encoder == MeshAttributeTextureBakeEncoder::LabelPalette))
                 {
                     return SelectedMeshTextureBakeStatus::Success;
@@ -1246,7 +1244,7 @@ namespace Extrinsic::Runtime
 
     BakedPropertyTextureRepresentation
     ResolveBakedPropertyTextureRepresentation(
-        const ProgressivePropertyValueKind valueKind,
+        const Geometry::PropertyValueKind valueKind,
         const SelectedMeshTextureBakeStorage requestedStorage,
         const MeshAttributeTextureBakeEncoder requestedEncoder,
         const std::span<const BakedPropertyTextureConsumer> consumers) noexcept
@@ -1276,7 +1274,7 @@ namespace Extrinsic::Runtime
         {
             representation.Storage =
                 hasNormalConsumer ||
-                    valueKind == ProgressivePropertyValueKind::UInt32
+                    valueKind == Geometry::PropertyValueKind::UInt32
                 ? SelectedMeshTextureBakeStorage::EncodedRgba
                 : SelectedMeshTextureBakeStorage::RawFloat;
         }
@@ -1288,7 +1286,7 @@ namespace Extrinsic::Runtime
         {
             representation.Encoder = MeshAttributeTextureBakeEncoder::Normal;
         }
-        else if (valueKind == ProgressivePropertyValueKind::UInt32)
+        else if (valueKind == Geometry::PropertyValueKind::UInt32)
         {
             representation.Encoder =
                 MeshAttributeTextureBakeEncoder::LabelPalette;
@@ -1302,15 +1300,15 @@ namespace Extrinsic::Runtime
                     ? MeshAttributeTextureBakeEncoder::ScalarColormap
                     : MeshAttributeTextureBakeEncoder::LinearScalar;
         }
-        else if (valueKind == ProgressivePropertyValueKind::Vec2)
+        else if (valueKind == Geometry::PropertyValueKind::Vec2)
         {
             representation.Encoder = MeshAttributeTextureBakeEncoder::Vector2;
         }
-        else if (valueKind == ProgressivePropertyValueKind::Vec3)
+        else if (valueKind == Geometry::PropertyValueKind::Vec3)
         {
             representation.Encoder = MeshAttributeTextureBakeEncoder::Vector3;
         }
-        else if (valueKind == ProgressivePropertyValueKind::Vec4)
+        else if (valueKind == Geometry::PropertyValueKind::Vec4)
         {
             representation.Encoder = MeshAttributeTextureBakeEncoder::RgbaColor;
         }
@@ -1319,7 +1317,7 @@ namespace Extrinsic::Runtime
 
     bool IsBakedPropertyTextureConsumerCompatible(
         const BakedPropertyTextureConsumer& consumer,
-        const ProgressivePropertyValueKind valueKind,
+        const Geometry::PropertyValueKind valueKind,
         const SelectedMeshTextureBakeStorage storage,
         const MeshAttributeTextureBakeEncoder encoder) noexcept
     {
@@ -1336,7 +1334,7 @@ namespace Extrinsic::Runtime
         switch (consumer.Semantic)
         {
         case ProgressiveSlotSemantic::Normal:
-            return valueKind == ProgressivePropertyValueKind::Vec3 &&
+            return valueKind == Geometry::PropertyValueKind::Vec3 &&
                    storage == SelectedMeshTextureBakeStorage::EncodedRgba &&
                    encoder == MeshAttributeTextureBakeEncoder::Normal;
         case ProgressiveSlotSemantic::Roughness:
@@ -1349,7 +1347,7 @@ namespace Extrinsic::Runtime
                     (raw ||
                      encoder == MeshAttributeTextureBakeEncoder::LinearScalar ||
                      encoder == MeshAttributeTextureBakeEncoder::ScalarColormap)) ||
-                   (valueKind == ProgressivePropertyValueKind::UInt32 &&
+                   (valueKind == Geometry::PropertyValueKind::UInt32 &&
                     !raw &&
                     encoder == MeshAttributeTextureBakeEncoder::LabelPalette);
         case ProgressiveSlotSemantic::Albedo:
@@ -1359,25 +1357,25 @@ namespace Extrinsic::Runtime
                        encoder == MeshAttributeTextureBakeEncoder::LinearScalar ||
                        encoder == MeshAttributeTextureBakeEncoder::ScalarColormap;
             }
-            if (valueKind == ProgressivePropertyValueKind::UInt32)
+            if (valueKind == Geometry::PropertyValueKind::UInt32)
             {
                 return !raw &&
                        encoder == MeshAttributeTextureBakeEncoder::LabelPalette;
             }
-            if (valueKind == ProgressivePropertyValueKind::Vec2)
+            if (valueKind == Geometry::PropertyValueKind::Vec2)
             {
                 return raw ||
                        encoder == MeshAttributeTextureBakeEncoder::Vector2 ||
                        encoder == MeshAttributeTextureBakeEncoder::RgbaColor;
             }
-            if (valueKind == ProgressivePropertyValueKind::Vec3)
+            if (valueKind == Geometry::PropertyValueKind::Vec3)
             {
                 return raw ||
                        encoder == MeshAttributeTextureBakeEncoder::Vector3 ||
                        encoder == MeshAttributeTextureBakeEncoder::RgbaColor ||
                        encoder == MeshAttributeTextureBakeEncoder::Normal;
             }
-            return valueKind == ProgressivePropertyValueKind::Vec4 &&
+            return valueKind == Geometry::PropertyValueKind::Vec4 &&
                    (raw ||
                     encoder == MeshAttributeTextureBakeEncoder::RgbaColor);
         case ProgressiveSlotSemantic::Displacement:
@@ -1394,7 +1392,7 @@ namespace Extrinsic::Runtime
     }
 
     bool IsBakedPropertyTextureRepresentationCompatible(
-        const ProgressivePropertyValueKind valueKind,
+        const Geometry::PropertyValueKind valueKind,
         const SelectedMeshTextureBakeStorage storage,
         const MeshAttributeTextureBakeEncoder encoder) noexcept
     {
@@ -1408,19 +1406,18 @@ namespace Extrinsic::Runtime
         {
             switch (valueKind)
             {
-            case ProgressivePropertyValueKind::ScalarFloat:
-            case ProgressivePropertyValueKind::ScalarDouble:
+            case Geometry::PropertyValueKind::Float:
+            case Geometry::PropertyValueKind::Double:
                 return encoder ==
                     MeshAttributeTextureBakeEncoder::LinearScalar;
-            case ProgressivePropertyValueKind::Vec2:
+            case Geometry::PropertyValueKind::Vec2:
                 return encoder == MeshAttributeTextureBakeEncoder::Vector2;
-            case ProgressivePropertyValueKind::Vec3:
+            case Geometry::PropertyValueKind::Vec3:
                 return encoder == MeshAttributeTextureBakeEncoder::Vector3;
-            case ProgressivePropertyValueKind::Vec4:
+            case Geometry::PropertyValueKind::Vec4:
                 return encoder == MeshAttributeTextureBakeEncoder::RgbaColor;
-            case ProgressivePropertyValueKind::UInt32:
-            case ProgressivePropertyValueKind::Any:
-            case ProgressivePropertyValueKind::Unknown:
+            case Geometry::PropertyValueKind::UInt32:
+            case Geometry::PropertyValueKind::Unknown:
                 return false;
             }
             return false;
@@ -1431,26 +1428,25 @@ namespace Extrinsic::Runtime
 
         switch (valueKind)
         {
-        case ProgressivePropertyValueKind::ScalarFloat:
-        case ProgressivePropertyValueKind::ScalarDouble:
+        case Geometry::PropertyValueKind::Float:
+        case Geometry::PropertyValueKind::Double:
             return encoder ==
                        MeshAttributeTextureBakeEncoder::LinearScalar ||
                    encoder ==
                        MeshAttributeTextureBakeEncoder::ScalarColormap;
-        case ProgressivePropertyValueKind::UInt32:
+        case Geometry::PropertyValueKind::UInt32:
             return encoder ==
                 MeshAttributeTextureBakeEncoder::LabelPalette;
-        case ProgressivePropertyValueKind::Vec2:
+        case Geometry::PropertyValueKind::Vec2:
             return encoder == MeshAttributeTextureBakeEncoder::Vector2 ||
                    encoder == MeshAttributeTextureBakeEncoder::RgbaColor;
-        case ProgressivePropertyValueKind::Vec3:
+        case Geometry::PropertyValueKind::Vec3:
             return encoder == MeshAttributeTextureBakeEncoder::Vector3 ||
                    encoder == MeshAttributeTextureBakeEncoder::RgbaColor ||
                    encoder == MeshAttributeTextureBakeEncoder::Normal;
-        case ProgressivePropertyValueKind::Vec4:
+        case Geometry::PropertyValueKind::Vec4:
             return encoder == MeshAttributeTextureBakeEncoder::RgbaColor;
-        case ProgressivePropertyValueKind::Any:
-        case ProgressivePropertyValueKind::Unknown:
+        case Geometry::PropertyValueKind::Unknown:
             return false;
         }
         return false;
@@ -1534,8 +1530,8 @@ namespace Extrinsic::Runtime
 
         const std::size_t expectedCount =
             ResolvePropertyElementCount(view, request.SourceDomain);
-        ProgressivePropertyValueKind expectedKind = request.ExpectedValueKind;
-        if (expectedKind == ProgressivePropertyValueKind::Any)
+        GeometryPropertyValueKindFilter expectedKind = request.ExpectedValueKind;
+        if (!expectedKind.has_value())
             expectedKind = DefaultExpectedKindForSemantic(request.TargetSemantic);
 
         ProgressivePropertyBindingDescriptor descriptor{

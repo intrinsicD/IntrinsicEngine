@@ -33,6 +33,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
+import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.SceneSerialization;
 import Geometry.Properties;
 
@@ -474,4 +475,173 @@ TEST(RuntimeSceneSerialization, InvalidDocumentsFailClosed)
         R"({"version":1,"entities":[{"id":0,"geometrySources":{"domain":"Mesh"}}]})");
     EXPECT_FALSE(badGeometry.has_value());
     EXPECT_EQ(badGeometry.error(), Core::ErrorCode::InvalidFormat);
+}
+
+
+// ============================================================================
+// RUNTIME-192 Slice B2 — property value-kind wire-format compatibility.
+//
+// The in-memory vocabulary moved to Geometry::PropertyValueKind, whose debug
+// names are "Float"/"Double". The persisted scene format predates that and
+// says "ScalarFloat"/"ScalarDouble", with "Any" for an unconstrained
+// expectation. These pin the wire strings so the migration cannot silently
+// invalidate existing scene documents.
+// ============================================================================
+
+namespace
+{
+    ECS::EntityHandle AddProgressiveBindingEntity(ECS::Scene::Registry& scene)
+    {
+        const ECS::EntityHandle entity = AddMeshEntity(scene);
+
+        Runtime::ProgressiveSlotBinding constrained{};
+        constrained.Semantic = Runtime::ProgressiveSlotSemantic::ScalarField;
+        constrained.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBuffer;
+        constrained.UniformDefault.Kind = Geometry::PropertyValueKind::Float;
+        constrained.Property = Runtime::ProgressivePropertyBindingDescriptor{
+            .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+            .PropertyName = "v:quality",
+            .ExpectedValueKind = Geometry::PropertyValueKind::Float,
+            .ExpectedElementCount = 3u,
+        };
+
+        Runtime::ProgressiveSlotBinding unconstrained{};
+        unconstrained.Semantic = Runtime::ProgressiveSlotSemantic::Albedo;
+        unconstrained.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBuffer;
+        unconstrained.UniformDefault.Kind = Geometry::PropertyValueKind::Double;
+        unconstrained.Property = Runtime::ProgressivePropertyBindingDescriptor{
+            .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+            .PropertyName = "v:color",
+            .ExpectedValueKind = std::nullopt,
+            .ExpectedElementCount = 3u,
+        };
+
+        Runtime::ProgressivePresentationBindings bindings{};
+        bindings.Shape = Runtime::ProgressiveEntityShape::MeshLeaf;
+        bindings.Presentations.push_back(Runtime::ProgressivePresentationBinding{
+            .Key = "mesh.surface",
+            .Kind = Runtime::ProgressivePresentationKind::SurfaceMaterial,
+            .Slots = {constrained, unconstrained},
+        });
+        bindings.Lanes.push_back(Runtime::ProgressiveRenderLaneBinding{
+            .Lane = Runtime::ProgressiveRenderLane::Surface,
+            .PresentationKey = "mesh.surface",
+        });
+
+        scene.Raw().emplace<Runtime::ProgressivePresentationBindings>(
+            entity, std::move(bindings));
+        return entity;
+    }
+
+    [[nodiscard]] const Runtime::ProgressiveSlotBinding* FindSlot(
+        const Runtime::ProgressivePresentationBindings& bindings,
+        const Runtime::ProgressiveSlotSemantic semantic) noexcept
+    {
+        for (const auto& presentation : bindings.Presentations)
+        {
+            for (const auto& slot : presentation.Slots)
+            {
+                if (slot.Semantic == semantic)
+                    return &slot;
+            }
+        }
+        return nullptr;
+    }
+}
+
+TEST(RuntimeSceneSerialization, PropertyValueKindKeepsLegacyWireStrings)
+{
+    ECS::Scene::Registry source;
+    (void)AddProgressiveBindingEntity(source);
+
+    MemoryIOBackend backend;
+    const auto saved = Runtime::SaveSceneDocument(source, "progressive.json", backend);
+    ASSERT_TRUE(saved.has_value()) << static_cast<int>(saved.error());
+
+    const std::string text = backend.Text("progressive.json");
+
+    // The canonical debug names are "Float"/"Double"; the wire must NOT use
+    // them, or documents written by older builds stop loading.
+    EXPECT_NE(text.find("\"ScalarFloat\""), std::string::npos)
+        << "float expectation must persist as ScalarFloat";
+    EXPECT_NE(text.find("\"ScalarDouble\""), std::string::npos)
+        << "double default must persist as ScalarDouble";
+    EXPECT_NE(text.find("\"Any\""), std::string::npos)
+        << "unconstrained expectation must persist as Any";
+    EXPECT_EQ(text.find("\"expectedValueKind\":\"Float\""), std::string::npos);
+    EXPECT_EQ(text.find("\"kind\":\"Double\""), std::string::npos);
+}
+
+TEST(RuntimeSceneSerialization, PropertyValueKindRoundTripsThroughLegacyWire)
+{
+    ECS::Scene::Registry source;
+    (void)AddProgressiveBindingEntity(source);
+
+    MemoryIOBackend backend;
+    ASSERT_TRUE(
+        Runtime::SaveSceneDocument(source, "progressive.json", backend).has_value());
+
+    ECS::Scene::Registry loaded;
+    const auto result =
+        Runtime::LoadSceneDocument(loaded, "progressive.json", backend);
+    ASSERT_TRUE(result.has_value()) << static_cast<int>(result.error());
+
+    const ECS::EntityHandle entity = FindEntityByName(loaded, "Mesh Entity");
+    ASSERT_NE(entity, ECS::InvalidEntityHandle);
+    const auto* bindings =
+        loaded.Raw().try_get<Runtime::ProgressivePresentationBindings>(entity);
+    ASSERT_NE(bindings, nullptr);
+
+    const auto* constrained =
+        FindSlot(*bindings, Runtime::ProgressiveSlotSemantic::ScalarField);
+    ASSERT_NE(constrained, nullptr);
+    ASSERT_TRUE(constrained->Property.ExpectedValueKind.has_value());
+    EXPECT_EQ(*constrained->Property.ExpectedValueKind,
+              Geometry::PropertyValueKind::Float);
+    EXPECT_EQ(constrained->UniformDefault.Kind, Geometry::PropertyValueKind::Float);
+
+    // "Any" must come back as an unconstrained filter, not as a concrete kind.
+    const auto* unconstrained =
+        FindSlot(*bindings, Runtime::ProgressiveSlotSemantic::Albedo);
+    ASSERT_NE(unconstrained, nullptr);
+    EXPECT_FALSE(unconstrained->Property.ExpectedValueKind.has_value());
+    EXPECT_EQ(unconstrained->UniformDefault.Kind,
+              Geometry::PropertyValueKind::Double);
+}
+
+TEST(RuntimeSceneSerialization, ReaderStaysPinnedToLegacyValueKindWireStrings)
+{
+    // Round-tripping alone would still pass if someone "modernized" BOTH the
+    // writer and the reader to the canonical Float/Double names — while
+    // silently invalidating every document written by an older build. This
+    // pins the reader to the legacy vocabulary: a document using the canonical
+    // names must be rejected, not quietly accepted.
+    ECS::Scene::Registry source;
+    (void)AddProgressiveBindingEntity(source);
+
+    MemoryIOBackend backend;
+    ASSERT_TRUE(
+        Runtime::SaveSceneDocument(source, "progressive.json", backend).has_value());
+
+    std::string document = backend.Text("progressive.json");
+    ASSERT_NE(document.find("\"ScalarFloat\""), std::string::npos);
+
+    const auto replaceAll = [](std::string& text,
+                               const std::string& from,
+                               const std::string& to)
+    {
+        for (std::size_t at = text.find(from); at != std::string::npos;
+             at = text.find(from, at + to.size()))
+        {
+            text.replace(at, from.size(), to);
+        }
+    };
+    replaceAll(document, "\"ScalarFloat\"", "\"Float\"");
+    replaceAll(document, "\"ScalarDouble\"", "\"Double\"");
+
+    ECS::Scene::Registry loaded;
+    const auto result = Runtime::DeserializeSceneDocument(loaded, document);
+    EXPECT_FALSE(result.has_value())
+        << "canonical value-kind names must not be accepted on the wire; the "
+           "persisted format is ScalarFloat/ScalarDouble";
 }

@@ -15,6 +15,7 @@ import Extrinsic.Asset.Service;
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Colormap;
+import Geometry.Properties;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -100,8 +101,8 @@ export namespace Extrinsic::Runtime
         ProgressiveGeometryDomain SourceDomain{
             ProgressiveGeometryDomain::MeshVertex};
         std::string SourcePropertyName{};
-        ProgressivePropertyValueKind ValueKind{
-            ProgressivePropertyValueKind::Unknown};
+        Geometry::PropertyValueKind ValueKind{
+            Geometry::PropertyValueKind::Unknown};
         std::string TexcoordPropertyName{"v:texcoord"};
         SelectedMeshTextureBakeStorage Storage{
             SelectedMeshTextureBakeStorage::Auto};
@@ -140,19 +141,19 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] BakedPropertyTextureRepresentation
         ResolveBakedPropertyTextureRepresentation(
-            ProgressivePropertyValueKind valueKind,
+            Geometry::PropertyValueKind valueKind,
             SelectedMeshTextureBakeStorage requestedStorage,
             MeshAttributeTextureBakeEncoder requestedEncoder,
             std::span<const BakedPropertyTextureConsumer> consumers) noexcept;
 
     [[nodiscard]] bool IsBakedPropertyTextureRepresentationCompatible(
-        ProgressivePropertyValueKind valueKind,
+        Geometry::PropertyValueKind valueKind,
         SelectedMeshTextureBakeStorage storage,
         MeshAttributeTextureBakeEncoder encoder) noexcept;
 
     [[nodiscard]] bool IsBakedPropertyTextureConsumerCompatible(
         const BakedPropertyTextureConsumer& consumer,
-        ProgressivePropertyValueKind valueKind,
+        Geometry::PropertyValueKind valueKind,
         SelectedMeshTextureBakeStorage storage,
         MeshAttributeTextureBakeEncoder encoder) noexcept;
 
@@ -161,7 +162,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t StableEntityId{0u};
         ProgressiveGeometryDomain SourceDomain{ProgressiveGeometryDomain::MeshVertex};
         std::string SourcePropertyName{};
-        ProgressivePropertyValueKind ExpectedValueKind{ProgressivePropertyValueKind::Any};
+        GeometryPropertyValueKindFilter ExpectedValueKind{};
         MeshAttributeTextureBakeEncoder Encoder{MeshAttributeTextureBakeEncoder::Auto};
         MeshAttributeTextureBakeValueKind ValueKind{MeshAttributeTextureBakeValueKind::Auto};
         MeshAttributeTextureBakeRangePolicy RangePolicy{MeshAttributeTextureBakeRangePolicy::AutoFinite};

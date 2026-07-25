@@ -99,7 +99,7 @@ namespace
         const Runtime::ProgressiveSlotSemantic semantic,
         const Runtime::ProgressiveGeometryDomain domain,
         const char* name,
-        const Runtime::ProgressivePropertyValueKind kind,
+        const Geometry::PropertyValueKind kind,
         const std::size_t count)
     {
         Runtime::ProgressiveSlotBinding slot{};
@@ -132,7 +132,7 @@ TEST(ProgressivePresentationExtraction, MeshDefaultsAndGeneratedTextureStateDoNo
     normal.Property = Runtime::ProgressivePropertyBindingDescriptor{
         .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
         .PropertyName = "v:normal",
-        .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec3,
+        .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
         .ExpectedElementCount = 3u,
     };
     normal.GeneratedTexture = Extrinsic::Assets::AssetId{42u, 1u};
@@ -189,7 +189,7 @@ TEST(ProgressivePresentationExtraction, GraphVertexAndEdgePropertyBuffersResolve
                 .Slots = {PropertyBufferSlot(Runtime::ProgressiveSlotSemantic::PointColor,
                                              Runtime::ProgressiveGeometryDomain::GraphVertex,
                                              "v:color",
-                                             Runtime::ProgressivePropertyValueKind::Vec4,
+                                             Geometry::PropertyValueKind::Vec4,
                                              2u)},
             },
             Runtime::ProgressivePresentationBinding{
@@ -198,7 +198,7 @@ TEST(ProgressivePresentationExtraction, GraphVertexAndEdgePropertyBuffersResolve
                 .Slots = {PropertyBufferSlot(Runtime::ProgressiveSlotSemantic::LineColor,
                                              Runtime::ProgressiveGeometryDomain::GraphEdge,
                                              "e:color",
-                                             Runtime::ProgressivePropertyValueKind::Vec4,
+                                             Geometry::PropertyValueKind::Vec4,
                                              1u)},
             },
         },

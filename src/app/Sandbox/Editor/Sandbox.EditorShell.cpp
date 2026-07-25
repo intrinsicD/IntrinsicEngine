@@ -918,7 +918,7 @@ namespace Extrinsic::Sandbox::Editor
                     }};
                     const BakedPropertyTextureRepresentation representation =
                         ResolveBakedPropertyTextureRepresentation(
-                            selectedSource->ExpectedValueKind,
+                            selectedSource->ResolvedExpectedValueKind(),
                             kTextureBakeStorageModes[
                                 static_cast<std::size_t>(storageIndex)],
                             kTextureBakeEncoders[
@@ -926,7 +926,7 @@ namespace Extrinsic::Sandbox::Editor
                             consumer);
                     return IsBakedPropertyTextureConsumerCompatible(
                         consumer.front(),
-                        selectedSource->ExpectedValueKind,
+                        selectedSource->ResolvedExpectedValueKind(),
                         representation.Storage,
                         representation.Encoder);
                 };
@@ -1002,7 +1002,7 @@ namespace Extrinsic::Sandbox::Editor
                         return false;
                     const BakedPropertyTextureRepresentation representation =
                         ResolveBakedPropertyTextureRepresentation(
-                            selectedSource->ExpectedValueKind,
+                            selectedSource->ResolvedExpectedValueKind(),
                             kTextureBakeStorageModes[
                                 static_cast<std::size_t>(storageIndex)],
                             kTextureBakeEncoders[
@@ -1014,7 +1014,7 @@ namespace Extrinsic::Sandbox::Editor
                         {
                             return IsBakedPropertyTextureConsumerCompatible(
                                 consumer,
-                                selectedSource->ExpectedValueKind,
+                                selectedSource->ResolvedExpectedValueKind(),
                                 representation.Storage,
                                 representation.Encoder);
                         });
@@ -1126,7 +1126,7 @@ namespace Extrinsic::Sandbox::Editor
                             kTextureBakeTargetSemantics[
                                 static_cast<std::size_t>(semanticIndex)],
                         .SourceDomain = selectedSource->BakeDomain,
-                        .ExpectedValueKind = selectedSource->ExpectedValueKind,
+                        .ExpectedValueKind = selectedSource->ResolvedExpectedValueKind(),
                         .PropertyName = selectedSource->Name,
                         .Encoder =
                             kTextureBakeEncoders[
@@ -1320,9 +1320,9 @@ namespace Extrinsic::Sandbox::Editor
                         record.Storage ==
                             SelectedMeshTextureBakeStorage::RawFloat &&
                         (record.ValueKind ==
-                             ProgressivePropertyValueKind::ScalarFloat ||
+                             Geometry::PropertyValueKind::Float ||
                          record.ValueKind ==
-                             ProgressivePropertyValueKind::ScalarDouble);
+                             Geometry::PropertyValueKind::Double);
                     if (rawScalar)
                     {
                         int recordColormap = 0;
@@ -2314,7 +2314,7 @@ namespace Extrinsic::Sandbox::Editor
                                 {
                                     ProgressiveDefaultValue value =
                                         slot.UniformDefault;
-                                    value.Kind = ProgressivePropertyValueKind::Vec4;
+                                    value.Kind = Geometry::PropertyValueKind::Vec4;
                                     value.Vector = color;
                                     (void)ApplySandboxEditorProgressiveSlotDefaultCommand(
                                         *context,

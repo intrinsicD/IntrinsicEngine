@@ -148,7 +148,7 @@ namespace
         normal.Property = Runtime::ProgressivePropertyBindingDescriptor{
             .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
             .PropertyName = "v:normal",
-            .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec3,
+            .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
             .ExpectedElementCount = 3u,
             .SourceGeneration = 12u,
         };
@@ -161,7 +161,7 @@ namespace
         Runtime::ProgressiveSlotBinding color{};
         color.Semantic = Runtime::ProgressiveSlotSemantic::Albedo;
         color.SourceKind = Runtime::ProgressiveSlotSourceKind::UniformDefault;
-        color.UniformDefault.Kind = Runtime::ProgressivePropertyValueKind::Vec4;
+        color.UniformDefault.Kind = Geometry::PropertyValueKind::Vec4;
         color.UniformDefault.Vector = glm::vec4{0.2f, 0.4f, 0.6f, 1.0f};
 
         return Runtime::ProgressivePresentationBindings{
@@ -196,18 +196,18 @@ TEST(ProgressiveRenderData, ResolvesMeshGraphAndPointCloudProperties)
         Runtime::ProgressivePropertyBindingDescriptor{
             .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
             .PropertyName = "v:normal",
-            .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec3,
+            .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
             .ExpectedElementCount = 3u,
         });
     EXPECT_TRUE(meshNormal.Compatible());
-    EXPECT_EQ(meshNormal.ActualValueKind, Runtime::ProgressivePropertyValueKind::Vec3);
+    EXPECT_EQ(meshNormal.ActualValueKind, Geometry::PropertyValueKind::Vec3);
 
     auto meshFace = Runtime::ResolvePropertyBinding(
         meshView,
         Runtime::ProgressivePropertyBindingDescriptor{
             .Domain = Runtime::ProgressiveGeometryDomain::MeshFace,
             .PropertyName = "f:heat",
-            .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::ScalarFloat,
+            .ExpectedValueKind = Geometry::PropertyValueKind::Float,
             .ExpectedElementCount = 1u,
         });
     EXPECT_TRUE(meshFace.Compatible());
@@ -217,7 +217,7 @@ TEST(ProgressiveRenderData, ResolvesMeshGraphAndPointCloudProperties)
         Runtime::ProgressivePropertyBindingDescriptor{
             .Domain = Runtime::ProgressiveGeometryDomain::GraphEdge,
             .PropertyName = "e:color",
-            .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec4,
+            .ExpectedValueKind = Geometry::PropertyValueKind::Vec4,
             .ExpectedElementCount = 1u,
         });
     EXPECT_TRUE(graphEdge.Compatible());
@@ -227,7 +227,7 @@ TEST(ProgressiveRenderData, ResolvesMeshGraphAndPointCloudProperties)
         Runtime::ProgressivePropertyBindingDescriptor{
             .Domain = Runtime::ProgressiveGeometryDomain::Point,
             .PropertyName = "v:size",
-            .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::ScalarFloat,
+            .ExpectedValueKind = Geometry::PropertyValueKind::Float,
             .ExpectedElementCount = 2u,
         });
     EXPECT_TRUE(pointSize.Compatible());
@@ -237,7 +237,7 @@ TEST(ProgressiveRenderData, ResolvesMeshGraphAndPointCloudProperties)
         Runtime::ProgressivePropertyBindingDescriptor{
             .Domain = Runtime::ProgressiveGeometryDomain::Point,
             .PropertyName = "v:size",
-            .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::ScalarFloat,
+            .ExpectedValueKind = Geometry::PropertyValueKind::Float,
         });
     EXPECT_EQ(wrongDomain.Status, Runtime::ProgressivePropertyResolutionStatus::DomainUnavailable);
 }
@@ -251,7 +251,7 @@ TEST(ProgressiveRenderData, PropertyPickerOrdersCompatibleOptionsFirstAndExplain
     const auto options = Runtime::EnumeratePropertyOptions(
         meshView,
         Runtime::ProgressiveGeometryDomain::MeshVertex,
-        Runtime::ProgressivePropertyValueKind::Vec3,
+        Geometry::PropertyValueKind::Vec3,
         3u,
         5u);
 
@@ -266,14 +266,14 @@ TEST(ProgressiveRenderData, PropertyPickerOrdersCompatibleOptionsFirstAndExplain
         {
             sawHeatMismatch = true;
             EXPECT_FALSE(option.Compatible);
-            EXPECT_EQ(option.ActualValueKind, Runtime::ProgressivePropertyValueKind::ScalarFloat);
+            EXPECT_EQ(option.ActualValueKind, Geometry::PropertyValueKind::Float);
             EXPECT_FALSE(option.DisabledReason.empty());
         }
         if (option.Descriptor.PropertyName == "v:name")
         {
             sawUnsupported = true;
             EXPECT_FALSE(option.Compatible);
-            EXPECT_EQ(option.ActualValueKind, Runtime::ProgressivePropertyValueKind::Unknown);
+            EXPECT_EQ(option.ActualValueKind, Geometry::PropertyValueKind::Unknown);
             EXPECT_FALSE(option.DisabledReason.empty());
         }
     }
@@ -285,7 +285,7 @@ TEST(ProgressiveRenderData, PropertyPickerOrdersCompatibleOptionsFirstAndExplain
         Runtime::ProgressivePropertyBindingDescriptor{
             .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
             .PropertyName = "v:normal",
-            .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec3,
+            .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
             .ExpectedElementCount = 3u,
             .SourceGeneration = 4u,
         },
@@ -297,7 +297,7 @@ TEST(ProgressiveRenderData, PropertyPickerOrdersCompatibleOptionsFirstAndExplain
         Runtime::ProgressivePropertyBindingDescriptor{
             .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
             .PropertyName = "v:missing",
-            .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec3,
+            .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
         });
     EXPECT_EQ(missing.Status, Runtime::ProgressivePropertyResolutionStatus::MissingProperty);
 }
@@ -325,7 +325,7 @@ TEST(ProgressiveRenderData, PartialMeshProvenanceUsesAvailableSourceProperties)
         Runtime::ProgressivePropertyBindingDescriptor{
             .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
             .PropertyName = "v:heat",
-            .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::ScalarFloat,
+            .ExpectedValueKind = Geometry::PropertyValueKind::Float,
             .ExpectedElementCount = 3u,
         });
     EXPECT_TRUE(vertex.Compatible());
@@ -335,7 +335,7 @@ TEST(ProgressiveRenderData, PartialMeshProvenanceUsesAvailableSourceProperties)
         Runtime::ProgressivePropertyBindingDescriptor{
             .Domain = Runtime::ProgressiveGeometryDomain::MeshFace,
             .PropertyName = "f:heat",
-            .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::ScalarFloat,
+            .ExpectedValueKind = Geometry::PropertyValueKind::Float,
             .ExpectedElementCount = 1u,
         });
     EXPECT_TRUE(face.Compatible());
@@ -345,7 +345,7 @@ TEST(ProgressiveRenderData, PartialMeshProvenanceUsesAvailableSourceProperties)
         Runtime::ProgressivePropertyBindingDescriptor{
             .Domain = Runtime::ProgressiveGeometryDomain::MeshHalfedge,
             .PropertyName = "h:to_vertex",
-            .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::UInt32,
+            .ExpectedValueKind = Geometry::PropertyValueKind::UInt32,
         });
     EXPECT_EQ(halfedge.Status, Runtime::ProgressivePropertyResolutionStatus::DomainUnavailable);
 }

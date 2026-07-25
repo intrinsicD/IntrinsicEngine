@@ -530,7 +530,7 @@ void SeedAcceptanceScene(Registry& scene)
     albedo.Semantic = RT::ProgressiveSlotSemantic::Albedo;
     albedo.SourceKind = RT::ProgressiveSlotSourceKind::UniformDefault;
     albedo.UniformDefault = RT::ProgressiveDefaultValue{
-        .Kind = RT::ProgressivePropertyValueKind::Vec4,
+        .Kind = Geometry::PropertyValueKind::Vec4,
         .Vector = glm::vec4{0.25f, 0.45f, 0.85f, 1.0f},
     };
     albedo.Readiness = RT::ProgressiveReadinessState::DefaultValue;
@@ -541,7 +541,7 @@ void SeedAcceptanceScene(Registry& scene)
     normal.Property = RT::ProgressivePropertyBindingDescriptor{
         .Domain = RT::ProgressiveGeometryDomain::MeshVertex,
         .PropertyName = "v:normal",
-        .ExpectedValueKind = RT::ProgressivePropertyValueKind::Vec3,
+        .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
         .ExpectedElementCount = 3u,
     };
     normal.GeneratedPolicy =
@@ -567,7 +567,7 @@ void SeedAcceptanceScene(Registry& scene)
     metallic.Property = RT::ProgressivePropertyBindingDescriptor{
         .Domain = RT::ProgressiveGeometryDomain::MeshVertex,
         .PropertyName = "v:metallic",
-        .ExpectedValueKind = RT::ProgressivePropertyValueKind::ScalarFloat,
+        .ExpectedValueKind = Geometry::PropertyValueKind::Float,
         .ExpectedElementCount = 3u,
     };
     metallic.GeneratedTexture = Assets::AssetId{502u, 1u};
@@ -584,7 +584,7 @@ void SeedAcceptanceScene(Registry& scene)
     faceScalar.Property = RT::ProgressivePropertyBindingDescriptor{
         .Domain = RT::ProgressiveGeometryDomain::MeshFace,
         .PropertyName = "f:heat",
-        .ExpectedValueKind = RT::ProgressivePropertyValueKind::ScalarFloat,
+        .ExpectedValueKind = Geometry::PropertyValueKind::Float,
         .ExpectedElementCount = 1u,
     };
     faceScalar.Readiness = RT::ProgressiveReadinessState::Ready;
@@ -618,7 +618,7 @@ void SeedAcceptanceScene(Registry& scene)
     edgeColor.Property = RT::ProgressivePropertyBindingDescriptor{
         .Domain = RT::ProgressiveGeometryDomain::GraphEdge,
         .PropertyName = "e:debug_color",
-        .ExpectedValueKind = RT::ProgressivePropertyValueKind::Vec4,
+        .ExpectedValueKind = Geometry::PropertyValueKind::Vec4,
         .ExpectedElementCount = 2u,
     };
     edgeColor.Readiness = RT::ProgressiveReadinessState::Ready;
@@ -5641,7 +5641,7 @@ MakeRuntime190PresentationBindings()
         .Domain = RT::ProgressiveGeometryDomain::MeshVertex,
         .PropertyName = "v:runtime190_scalar",
         .ExpectedValueKind =
-            RT::ProgressivePropertyValueKind::ScalarFloat,
+            Geometry::PropertyValueKind::Float,
         .ExpectedElementCount = 3u,
     };
     albedo.Readiness = RT::ProgressiveReadinessState::Ready;
@@ -5981,7 +5981,7 @@ private:
         command.SourceDomain =
             RT::ProgressiveGeometryDomain::MeshVertex;
         command.ExpectedValueKind =
-            RT::ProgressivePropertyValueKind::ScalarFloat;
+            Geometry::PropertyValueKind::Float;
         command.PropertyName = "v:runtime190_scalar";
         command.RangePolicy =
             RT::MeshAttributeTextureBakeRangePolicy::Manual;
@@ -6007,7 +6007,7 @@ private:
         command.StableEntityId = m_StableEntityId;
         command.SourceDomain = domain;
         command.ExpectedValueKind =
-            RT::ProgressivePropertyValueKind::Vec4;
+            Geometry::PropertyValueKind::Vec4;
         command.PropertyName = std::move(property);
         command.Encoder =
             RT::MeshAttributeTextureBakeEncoder::RgbaColor;

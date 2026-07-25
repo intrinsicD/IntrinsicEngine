@@ -79,17 +79,6 @@ namespace Extrinsic::Runtime
             {ProgressiveRenderLane::Points, "Points"},
         };
 
-        constexpr std::pair<ProgressivePropertyValueKind, std::string_view> kValueKinds[]{
-            {ProgressivePropertyValueKind::Any, "Any"},
-            {ProgressivePropertyValueKind::Unknown, "Unknown"},
-            {ProgressivePropertyValueKind::ScalarFloat, "ScalarFloat"},
-            {ProgressivePropertyValueKind::ScalarDouble, "ScalarDouble"},
-            {ProgressivePropertyValueKind::UInt32, "UInt32"},
-            {ProgressivePropertyValueKind::Vec2, "Vec2"},
-            {ProgressivePropertyValueKind::Vec3, "Vec3"},
-            {ProgressivePropertyValueKind::Vec4, "Vec4"},
-        };
-
         constexpr std::pair<ProgressivePresentationKind, std::string_view> kPresentationKinds[]{
             {ProgressivePresentationKind::SurfaceMaterial, "SurfaceMaterial"},
             {ProgressivePresentationKind::PointPresentation, "PointPresentation"},
@@ -163,15 +152,15 @@ namespace Extrinsic::Runtime
             {ProgressivePropertyResolutionStatus::StaleGeneration, "StaleGeneration"},
         };
 
-        [[nodiscard]] bool KindMatches(const ProgressivePropertyValueKind expected,
-                                       const ProgressivePropertyValueKind actual) noexcept
+        [[nodiscard]] bool KindMatches(const GeometryPropertyValueKindFilter expected,
+                                       const Geometry::PropertyValueKind actual) noexcept
         {
-            return expected == ProgressivePropertyValueKind::Any || expected == actual;
+            return MatchesGeometryPropertyValueKind(expected, actual);
         }
 
         [[nodiscard]] ProgressivePropertyResolution MakeResolution(
             const ProgressivePropertyResolutionStatus status,
-            const ProgressivePropertyValueKind actual,
+            const Geometry::PropertyValueKind actual,
             const std::size_t count,
             const std::uint64_t observedGeneration,
             std::string diagnostic)
@@ -199,11 +188,6 @@ namespace Extrinsic::Runtime
     std::string_view ToString(const ProgressiveRenderLane value) noexcept
     {
         return EnumToString(value, kRenderLanes, "Surface");
-    }
-
-    std::string_view ToString(const ProgressivePropertyValueKind value) noexcept
-    {
-        return EnumToString(value, kValueKinds, "Unknown");
     }
 
     std::string_view ToString(const ProgressivePresentationKind value) noexcept
@@ -262,12 +246,6 @@ namespace Extrinsic::Runtime
                                        ProgressiveRenderLane& out) noexcept
     {
         return TryEnumFromString(value, kRenderLanes, out);
-    }
-
-    bool TryParseProgressivePropertyValueKind(const std::string_view value,
-                                              ProgressivePropertyValueKind& out) noexcept
-    {
-        return TryEnumFromString(value, kValueKinds, out);
     }
 
     bool TryParseProgressivePresentationKind(const std::string_view value,
@@ -353,25 +331,6 @@ namespace Extrinsic::Runtime
         return set ? set->Size() : 0u;
     }
 
-    ProgressivePropertyValueKind DetectPropertyValueKind(
-        const Geometry::PropertySet& properties,
-        const std::string_view propertyName)
-    {
-        if (properties.Get<float>(propertyName).IsValid())
-            return ProgressivePropertyValueKind::ScalarFloat;
-        if (properties.Get<double>(propertyName).IsValid())
-            return ProgressivePropertyValueKind::ScalarDouble;
-        if (properties.Get<std::uint32_t>(propertyName).IsValid())
-            return ProgressivePropertyValueKind::UInt32;
-        if (properties.Get<glm::vec2>(propertyName).IsValid())
-            return ProgressivePropertyValueKind::Vec2;
-        if (properties.Get<glm::vec3>(propertyName).IsValid())
-            return ProgressivePropertyValueKind::Vec3;
-        if (properties.Get<glm::vec4>(propertyName).IsValid())
-            return ProgressivePropertyValueKind::Vec4;
-        return ProgressivePropertyValueKind::Unknown;
-    }
-
     ProgressivePropertyResolution ResolvePropertyBinding(
         const GS::ConstSourceView& view,
         const ProgressivePropertyBindingDescriptor& descriptor,
@@ -381,7 +340,7 @@ namespace Extrinsic::Runtime
             descriptor.Domain == ProgressiveGeometryDomain::MeshSurface)
         {
             return MakeResolution(ProgressivePropertyResolutionStatus::UnsupportedDomain,
-                                  ProgressivePropertyValueKind::Unknown,
+                                  Geometry::PropertyValueKind::Unknown,
                                   0u,
                                   observedSourceGeneration,
                                   "unsupported property domain");
@@ -391,7 +350,7 @@ namespace Extrinsic::Runtime
         if (properties == nullptr)
         {
             return MakeResolution(ProgressivePropertyResolutionStatus::DomainUnavailable,
-                                  ProgressivePropertyValueKind::Unknown,
+                                  Geometry::PropertyValueKind::Unknown,
                                   0u,
                                   observedSourceGeneration,
                                   "geometry domain is unavailable on this entity");
@@ -402,7 +361,7 @@ namespace Extrinsic::Runtime
             descriptor.SourceGeneration != observedSourceGeneration)
         {
             return MakeResolution(ProgressivePropertyResolutionStatus::StaleGeneration,
-                                  ProgressivePropertyValueKind::Unknown,
+                                  Geometry::PropertyValueKind::Unknown,
                                   properties->Size(),
                                   observedSourceGeneration,
                                   "source generation is stale");
@@ -411,15 +370,15 @@ namespace Extrinsic::Runtime
         if (!properties->Exists(descriptor.PropertyName))
         {
             return MakeResolution(ProgressivePropertyResolutionStatus::MissingProperty,
-                                  ProgressivePropertyValueKind::Unknown,
+                                  Geometry::PropertyValueKind::Unknown,
                                   properties->Size(),
                                   observedSourceGeneration,
                                   "property is missing");
         }
 
-        const ProgressivePropertyValueKind actual =
-            DetectPropertyValueKind(*properties, descriptor.PropertyName);
-        if (actual == ProgressivePropertyValueKind::Unknown)
+        const Geometry::PropertyValueKind actual =
+            DetectGeometryPropertyValueKind(*properties, descriptor.PropertyName);
+        if (actual == Geometry::PropertyValueKind::Unknown)
         {
             return MakeResolution(ProgressivePropertyResolutionStatus::UnsupportedType,
                                   actual,
@@ -457,7 +416,7 @@ namespace Extrinsic::Runtime
     std::vector<ProgressivePropertyOption> EnumeratePropertyOptions(
         const GS::ConstSourceView& view,
         const ProgressiveGeometryDomain domain,
-        const ProgressivePropertyValueKind expectedValueKind,
+        const GeometryPropertyValueKindFilter expectedValueKind,
         const std::size_t expectedElementCount,
         const std::uint64_t observedSourceGeneration)
     {

@@ -453,7 +453,7 @@ void AddTriangleMeshSource(ECS::Scene::Registry& registry,
         albedo.Semantic = Runtime::ProgressiveSlotSemantic::Albedo;
         albedo.SourceKind = Runtime::ProgressiveSlotSourceKind::UniformDefault;
         albedo.UniformDefault = Runtime::ProgressiveDefaultValue{
-            .Kind = Runtime::ProgressivePropertyValueKind::Vec4,
+            .Kind = Geometry::PropertyValueKind::Vec4,
             .Vector = glm::vec4{0.2f, 0.4f, 0.8f, 1.0f},
         };
         albedo.Readiness = Runtime::ProgressiveReadinessState::DefaultValue;
@@ -466,7 +466,7 @@ void AddTriangleMeshSource(ECS::Scene::Registry& registry,
         normal.Property = Runtime::ProgressivePropertyBindingDescriptor{
             .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
             .PropertyName = "v:normal",
-            .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec3,
+            .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
             .ExpectedElementCount = 3u,
         };
         normal.Readiness = Runtime::ProgressiveReadinessState::Pending;
@@ -2601,7 +2601,7 @@ TEST(SandboxEditorUi, PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection)
     EXPECT_EQ(normalTarget->RequiredDomain,
               Runtime::ProgressiveGeometryDomain::MeshVertex);
     EXPECT_EQ(normalTarget->ExpectedValueKind,
-              Runtime::ProgressivePropertyValueKind::Vec3);
+              Geometry::PropertyValueKind::Vec3);
     ASSERT_FALSE(normalTarget->Options.empty());
     EXPECT_TRUE(normalTarget->Options.front().Compatible);
 

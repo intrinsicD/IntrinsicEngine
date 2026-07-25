@@ -13,6 +13,7 @@ export module Extrinsic.Runtime.ProgressiveRenderData;
 
 export import Extrinsic.Asset.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
+export import Extrinsic.Runtime.GeometryAvailability;
 import Geometry.Properties;
 
 export namespace Extrinsic::Runtime
@@ -44,18 +45,6 @@ export namespace Extrinsic::Runtime
         Surface,
         Edges,
         Points,
-    };
-
-    enum class ProgressivePropertyValueKind : std::uint8_t
-    {
-        Any,
-        Unknown,
-        ScalarFloat,
-        ScalarDouble,
-        UInt32,
-        Vec2,
-        Vec3,
-        Vec4,
     };
 
     enum class ProgressivePresentationKind : std::uint8_t
@@ -141,7 +130,7 @@ export namespace Extrinsic::Runtime
 
     struct ProgressiveDefaultValue
     {
-        ProgressivePropertyValueKind Kind{ProgressivePropertyValueKind::Vec4};
+        Geometry::PropertyValueKind Kind{Geometry::PropertyValueKind::Vec4};
         glm::vec4 Vector{1.0f, 1.0f, 1.0f, 1.0f};
         double Scalar{1.0};
         std::uint32_t UInt{0u};
@@ -151,7 +140,7 @@ export namespace Extrinsic::Runtime
     {
         ProgressiveGeometryDomain Domain{ProgressiveGeometryDomain::Unknown};
         std::string PropertyName{};
-        ProgressivePropertyValueKind ExpectedValueKind{ProgressivePropertyValueKind::Any};
+        GeometryPropertyValueKindFilter ExpectedValueKind{};
         std::size_t ExpectedElementCount{0u};
         std::uint64_t SourceGeneration{0u};
     };
@@ -159,7 +148,7 @@ export namespace Extrinsic::Runtime
     struct ProgressivePropertyResolution
     {
         ProgressivePropertyResolutionStatus Status{ProgressivePropertyResolutionStatus::DomainUnavailable};
-        ProgressivePropertyValueKind ActualValueKind{ProgressivePropertyValueKind::Unknown};
+        Geometry::PropertyValueKind ActualValueKind{Geometry::PropertyValueKind::Unknown};
         std::size_t ElementCount{0u};
         std::uint64_t ObservedSourceGeneration{0u};
         std::string Diagnostic{};
@@ -173,7 +162,7 @@ export namespace Extrinsic::Runtime
     struct ProgressivePropertyOption
     {
         ProgressivePropertyBindingDescriptor Descriptor{};
-        ProgressivePropertyValueKind ActualValueKind{ProgressivePropertyValueKind::Unknown};
+        Geometry::PropertyValueKind ActualValueKind{Geometry::PropertyValueKind::Unknown};
         std::size_t ElementCount{0u};
         bool Compatible{false};
         std::string DisabledReason{};
@@ -218,7 +207,6 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::string_view ToString(ProgressiveEntityShape value) noexcept;
     [[nodiscard]] std::string_view ToString(ProgressiveGeometryDomain value) noexcept;
     [[nodiscard]] std::string_view ToString(ProgressiveRenderLane value) noexcept;
-    [[nodiscard]] std::string_view ToString(ProgressivePropertyValueKind value) noexcept;
     [[nodiscard]] std::string_view ToString(ProgressivePresentationKind value) noexcept;
     [[nodiscard]] std::string_view ToString(ProgressiveSlotSemantic value) noexcept;
     [[nodiscard]] std::string_view ToString(ProgressiveSlotSourceKind value) noexcept;
@@ -234,8 +222,6 @@ export namespace Extrinsic::Runtime
                                                          ProgressiveGeometryDomain& out) noexcept;
     [[nodiscard]] bool TryParseProgressiveRenderLane(std::string_view value,
                                                      ProgressiveRenderLane& out) noexcept;
-    [[nodiscard]] bool TryParseProgressivePropertyValueKind(std::string_view value,
-                                                            ProgressivePropertyValueKind& out) noexcept;
     [[nodiscard]] bool TryParseProgressivePresentationKind(std::string_view value,
                                                            ProgressivePresentationKind& out) noexcept;
     [[nodiscard]] bool TryParseProgressiveSlotSemantic(std::string_view value,
@@ -258,10 +244,6 @@ export namespace Extrinsic::Runtime
         const ECS::Components::GeometrySources::ConstSourceView& view,
         ProgressiveGeometryDomain domain) noexcept;
 
-    [[nodiscard]] ProgressivePropertyValueKind DetectPropertyValueKind(
-        const Geometry::PropertySet& properties,
-        std::string_view propertyName);
-
     [[nodiscard]] ProgressivePropertyResolution ResolvePropertyBinding(
         const ECS::Components::GeometrySources::ConstSourceView& view,
         const ProgressivePropertyBindingDescriptor& descriptor,
@@ -270,7 +252,7 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::vector<ProgressivePropertyOption> EnumeratePropertyOptions(
         const ECS::Components::GeometrySources::ConstSourceView& view,
         ProgressiveGeometryDomain domain,
-        ProgressivePropertyValueKind expectedValueKind = ProgressivePropertyValueKind::Any,
+        GeometryPropertyValueKindFilter expectedValueKind = std::nullopt,
         std::size_t expectedElementCount = 0u,
         std::uint64_t observedSourceGeneration = 0u);
 

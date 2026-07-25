@@ -304,7 +304,7 @@ void AddTriangleMeshSource(ECS::Scene::Registry& registry,
         albedo.Semantic = Runtime::ProgressiveSlotSemantic::Albedo;
         albedo.SourceKind = Runtime::ProgressiveSlotSourceKind::UniformDefault;
         albedo.UniformDefault = Runtime::ProgressiveDefaultValue{
-            .Kind = Runtime::ProgressivePropertyValueKind::Vec4,
+            .Kind = Geometry::PropertyValueKind::Vec4,
             .Vector = glm::vec4{0.2f, 0.4f, 0.8f, 1.0f},
         };
         albedo.Readiness = Runtime::ProgressiveReadinessState::DefaultValue;
@@ -317,7 +317,7 @@ void AddTriangleMeshSource(ECS::Scene::Registry& registry,
         normal.Property = Runtime::ProgressivePropertyBindingDescriptor{
             .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
             .PropertyName = "v:normal",
-            .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec3,
+            .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
             .ExpectedElementCount = 3u,
         };
         normal.Readiness = Runtime::ProgressiveReadinessState::Pending;
@@ -1610,7 +1610,7 @@ TEST(SandboxEditorUi, ProgressiveSlotCommandsUseCommandHistory)
     context.CommandHistory = &history;
 
     const Runtime::ProgressiveDefaultValue newColor{
-        .Kind = Runtime::ProgressivePropertyValueKind::Vec4,
+        .Kind = Geometry::PropertyValueKind::Vec4,
         .Vector = glm::vec4{0.9f, 0.1f, 0.2f, 1.0f},
     };
     EXPECT_EQ(Runtime::ApplySandboxEditorProgressiveSlotDefaultCommand(
@@ -1653,7 +1653,7 @@ TEST(SandboxEditorUi, ProgressiveSlotCommandsUseCommandHistory)
                           Runtime::ProgressiveSlotSourceKind::PropertyBake,
                       .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
                       .ExpectedValueKind =
-                          Runtime::ProgressivePropertyValueKind::Vec4,
+                          Geometry::PropertyValueKind::Vec4,
                       .PropertyName = "v:paint",
                   }),
               Runtime::SandboxEditorCommandStatus::Applied);
@@ -1681,7 +1681,7 @@ TEST(SandboxEditorUi, ProgressiveSlotCommandsUseCommandHistory)
                           Runtime::ProgressiveSlotSourceKind::PropertyBake,
                       .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
                       .ExpectedValueKind =
-                          Runtime::ProgressivePropertyValueKind::Vec4,
+                          Geometry::PropertyValueKind::Vec4,
                       .PropertyName = "v:temperature",
                   }),
               Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);

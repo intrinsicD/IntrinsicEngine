@@ -56,6 +56,82 @@ namespace Extrinsic::Runtime
 
         using json = nlohmann::json;
 
+        // ------------------------------------------------------------------
+        // RUNTIME-192 — legacy property value-kind wire format.
+        //
+        // These strings are a PERSISTED scene-document format. They predate the
+        // canonical `Geometry::PropertyValueKind` vocabulary and deliberately do
+        // NOT match its debug names: the wire says "ScalarFloat"/"ScalarDouble"
+        // where the canonical names are "Float"/"Double". Changing them would
+        // silently fail to load every existing scene document, so the mapping
+        // lives here — owned by the serializer — rather than being derived from
+        // `DebugNameForGeometryPropertyValueKind`.
+        //
+        // The filter form additionally persists "Any" for an unconstrained
+        // expectation (`std::nullopt`).
+        // ------------------------------------------------------------------
+        constexpr std::pair<Geometry::PropertyValueKind, std::string_view>
+            kPropertyValueKindWire[]{
+                {Geometry::PropertyValueKind::Unknown, "Unknown"},
+                {Geometry::PropertyValueKind::Float, "ScalarFloat"},
+                {Geometry::PropertyValueKind::Double, "ScalarDouble"},
+                {Geometry::PropertyValueKind::UInt32, "UInt32"},
+                {Geometry::PropertyValueKind::Vec2, "Vec2"},
+                {Geometry::PropertyValueKind::Vec3, "Vec3"},
+                {Geometry::PropertyValueKind::Vec4, "Vec4"},
+            };
+
+        constexpr std::string_view kPropertyValueKindAnyWire = "Any";
+
+        [[nodiscard]] std::string_view PropertyValueKindToWire(
+            const Geometry::PropertyValueKind value) noexcept
+        {
+            for (const auto& [kind, text] : kPropertyValueKindWire)
+            {
+                if (kind == value)
+                    return text;
+            }
+            return "Unknown";
+        }
+
+        [[nodiscard]] bool TryPropertyValueKindFromWire(
+            const std::string_view text,
+            Geometry::PropertyValueKind& out) noexcept
+        {
+            for (const auto& [kind, candidate] : kPropertyValueKindWire)
+            {
+                if (candidate == text)
+                {
+                    out = kind;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        [[nodiscard]] std::string_view PropertyValueKindFilterToWire(
+            const GeometryPropertyValueKindFilter value) noexcept
+        {
+            return value.has_value() ? PropertyValueKindToWire(*value)
+                                     : kPropertyValueKindAnyWire;
+        }
+
+        [[nodiscard]] bool TryPropertyValueKindFilterFromWire(
+            const std::string_view text,
+            GeometryPropertyValueKindFilter& out) noexcept
+        {
+            if (text == kPropertyValueKindAnyWire)
+            {
+                out = std::nullopt;
+                return true;
+            }
+            Geometry::PropertyValueKind kind{};
+            if (!TryPropertyValueKindFromWire(text, kind))
+                return false;
+            out = kind;
+            return true;
+        }
+
         constexpr std::uint32_t kSceneDocumentVersion = 1u;
         constexpr std::uint32_t kInvalidSerializedId = 0xFFFFFFFFu;
 
@@ -175,7 +251,7 @@ namespace Extrinsic::Runtime
             const ProgressiveDefaultValue& value)
         {
             return json{
-                {"kind", std::string(ToString(value.Kind))},
+                {"kind", std::string(PropertyValueKindToWire(value.Kind))},
                 {"vector", Vec4ToJson(value.Vector)},
                 {"scalar", value.Scalar},
                 {"uint", value.UInt},
@@ -191,8 +267,8 @@ namespace Extrinsic::Runtime
             if (value.contains("kind"))
             {
                 if (!value["kind"].is_string() ||
-                    !TryParseProgressivePropertyValueKind(value["kind"].get<std::string>(),
-                                                          out.Kind))
+                    !TryPropertyValueKindFromWire(value["kind"].get<std::string>(),
+                                                  out.Kind))
                 {
                     return false;
                 }
@@ -1062,7 +1138,7 @@ namespace Extrinsic::Runtime
             return json{
                 {"domain", std::string(ToString(descriptor.Domain))},
                 {"propertyName", descriptor.PropertyName},
-                {"expectedValueKind", std::string(ToString(descriptor.ExpectedValueKind))},
+                {"expectedValueKind", std::string(PropertyValueKindFilterToWire(descriptor.ExpectedValueKind))},
                 {"expectedElementCount", descriptor.ExpectedElementCount},
                 {"sourceGeneration", descriptor.SourceGeneration},
             };
@@ -1087,8 +1163,9 @@ namespace Extrinsic::Runtime
             if (value.contains("expectedValueKind"))
             {
                 if (!value["expectedValueKind"].is_string() ||
-                    !TryParseProgressivePropertyValueKind(value["expectedValueKind"].get<std::string>(),
-                                                          out.ExpectedValueKind))
+                    !TryPropertyValueKindFilterFromWire(
+                        value["expectedValueKind"].get<std::string>(),
+                        out.ExpectedValueKind))
                 {
                     return false;
                 }

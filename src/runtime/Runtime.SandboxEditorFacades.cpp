@@ -1318,7 +1318,7 @@ namespace Extrinsic::Runtime
             return out;
         }
 
-        [[nodiscard]] ProgressivePropertyValueKind DefaultExpectedValueKindForSlot(
+        [[nodiscard]] GeometryPropertyValueKindFilter DefaultExpectedValueKindForSlot(
             ProgressiveSlotSemantic semantic) noexcept;
 
         [[nodiscard]] ProgressiveGeometryDomain DefaultDomainForProgressiveSlot(
@@ -1394,52 +1394,51 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] SandboxEditorPropertyCatalogValueKind ToPropertyCatalogValueKind(
-            const ProgressivePropertyValueKind kind) noexcept
+            const Geometry::PropertyValueKind kind) noexcept
         {
             using Out = SandboxEditorPropertyCatalogValueKind;
             switch (kind)
             {
-            case ProgressivePropertyValueKind::ScalarFloat:
+            case Geometry::PropertyValueKind::Float:
                 return Out::ScalarFloat;
-            case ProgressivePropertyValueKind::ScalarDouble:
+            case Geometry::PropertyValueKind::Double:
                 return Out::ScalarDouble;
-            case ProgressivePropertyValueKind::UInt32:
+            case Geometry::PropertyValueKind::UInt32:
                 return Out::UInt32;
-            case ProgressivePropertyValueKind::Vec2:
+            case Geometry::PropertyValueKind::Vec2:
                 return Out::Vec2;
-            case ProgressivePropertyValueKind::Vec3:
+            case Geometry::PropertyValueKind::Vec3:
                 return Out::Vec3;
-            case ProgressivePropertyValueKind::Vec4:
+            case Geometry::PropertyValueKind::Vec4:
                 return Out::Vec4;
-            case ProgressivePropertyValueKind::Any:
-            case ProgressivePropertyValueKind::Unknown:
+            case Geometry::PropertyValueKind::Unknown:
                 break;
             }
             return Out::Unknown;
         }
 
-        [[nodiscard]] ProgressivePropertyValueKind ToProgressivePropertyValueKind(
+        [[nodiscard]] Geometry::PropertyValueKind ToGeometryPropertyValueKind(
             const SandboxEditorPropertyCatalogValueKind kind) noexcept
         {
             using Kind = SandboxEditorPropertyCatalogValueKind;
             switch (kind)
             {
             case Kind::ScalarFloat:
-                return ProgressivePropertyValueKind::ScalarFloat;
+                return Geometry::PropertyValueKind::Float;
             case Kind::ScalarDouble:
-                return ProgressivePropertyValueKind::ScalarDouble;
+                return Geometry::PropertyValueKind::Double;
             case Kind::UInt32:
-                return ProgressivePropertyValueKind::UInt32;
+                return Geometry::PropertyValueKind::UInt32;
             case Kind::Vec2:
-                return ProgressivePropertyValueKind::Vec2;
+                return Geometry::PropertyValueKind::Vec2;
             case Kind::Vec3:
-                return ProgressivePropertyValueKind::Vec3;
+                return Geometry::PropertyValueKind::Vec3;
             case Kind::Vec4:
-                return ProgressivePropertyValueKind::Vec4;
+                return Geometry::PropertyValueKind::Vec4;
             case Kind::Unknown:
                 break;
             }
-            return ProgressivePropertyValueKind::Unknown;
+            return Geometry::PropertyValueKind::Unknown;
         }
 
         [[nodiscard]] std::uint8_t ComponentCountForPropertyCatalogKind(
@@ -1606,7 +1605,7 @@ namespace Extrinsic::Runtime
             {
                 const SandboxEditorPropertyCatalogValueKind kind =
                     ToPropertyCatalogValueKind(
-                        DetectPropertyValueKind(properties, name));
+                        DetectGeometryPropertyValueKind(properties, name));
                 const bool supported =
                     kind != SandboxEditorPropertyCatalogValueKind::Unknown;
                 SandboxEditorPropertyCatalogRow row{
@@ -1625,7 +1624,7 @@ namespace Extrinsic::Runtime
                         .Domain = ToProgressiveGeometryDomain(domain),
                         .PropertyName = name,
                         .ExpectedValueKind =
-                            ToProgressivePropertyValueKind(kind),
+                            ToGeometryPropertyValueKind(kind),
                         .ExpectedElementCount = properties.Size(),
                     },
                     .Preview = BuildPropertyValuePreview(
@@ -1690,10 +1689,10 @@ namespace Extrinsic::Runtime
                     slot.Semantic);
             }
 
-            ProgressivePropertyValueKind expected =
+            GeometryPropertyValueKindFilter expected =
                 slot.Property.ExpectedValueKind;
-            if (expected == ProgressivePropertyValueKind::Any ||
-                expected == ProgressivePropertyValueKind::Unknown)
+            if (!expected.has_value() ||
+                *expected == Geometry::PropertyValueKind::Unknown)
             {
                 expected = DefaultExpectedValueKindForSlot(slot.Semantic);
             }
@@ -2602,18 +2601,18 @@ namespace Extrinsic::Runtime
         constexpr std::string_view kUvRegenerationJobOutputName{
             "uv_regeneration"};
 
-        [[nodiscard]] ProgressivePropertyValueKind DefaultExpectedValueKindForSlot(
+        [[nodiscard]] GeometryPropertyValueKindFilter DefaultExpectedValueKindForSlot(
             const ProgressiveSlotSemantic semantic) noexcept
         {
             switch (semantic)
             {
             case ProgressiveSlotSemantic::Normal:
             case ProgressiveSlotSemantic::PointNormalOrientation:
-                return ProgressivePropertyValueKind::Vec3;
+                return Geometry::PropertyValueKind::Vec3;
             case ProgressiveSlotSemantic::Albedo:
             case ProgressiveSlotSemantic::PointColor:
             case ProgressiveSlotSemantic::LineColor:
-                return ProgressivePropertyValueKind::Vec4;
+                return Geometry::PropertyValueKind::Vec4;
             case ProgressiveSlotSemantic::Roughness:
             case ProgressiveSlotSemantic::Metallic:
             case ProgressiveSlotSemantic::ScalarField:
@@ -2622,9 +2621,9 @@ namespace Extrinsic::Runtime
             case ProgressiveSlotSemantic::PointSize:
             case ProgressiveSlotSemantic::LineScalarField:
             case ProgressiveSlotSemantic::LineWidth:
-                return ProgressivePropertyValueKind::ScalarFloat;
+                return Geometry::PropertyValueKind::Float;
             }
-            return ProgressivePropertyValueKind::Any;
+            return std::nullopt;
         }
 
         [[nodiscard]] ProgressiveGeometryDomain DefaultDomainForProgressiveSlot(
@@ -3219,10 +3218,10 @@ namespace Extrinsic::Runtime
             if (domain == ProgressiveGeometryDomain::Unknown)
                 return {};
 
-            ProgressivePropertyValueKind expected =
+            GeometryPropertyValueKindFilter expected =
                 extractedSlot.Property.ExpectedValueKind;
-            if (expected == ProgressivePropertyValueKind::Any ||
-                expected == ProgressivePropertyValueKind::Unknown)
+            if (!expected.has_value() ||
+                *expected == Geometry::PropertyValueKind::Unknown)
             {
                 expected = DefaultExpectedValueKindForSlot(extractedSlot.Semantic);
             }
@@ -3901,7 +3900,7 @@ namespace Extrinsic::Runtime
                 .CatalogDomain = row.Domain,
                 .BakeDomain = ToProgressiveGeometryDomain(row.Domain),
                 .ValueKind = row.ValueKind,
-                .ExpectedValueKind = ToProgressivePropertyValueKind(row.ValueKind),
+                .ExpectedValueKind = ToGeometryPropertyValueKind(row.ValueKind),
                 .ElementCount = row.ElementCount,
                 .Descriptor = row.Descriptor,
             };
@@ -13565,7 +13564,7 @@ namespace Extrinsic::Runtime
 
         const SandboxEditorPropertyCatalogValueKind valueKind =
             ToPropertyCatalogValueKind(
-                DetectPropertyValueKind(*properties, command.PropertyName));
+                DetectGeometryPropertyValueKind(*properties, command.PropertyName));
         const std::optional<AttributeSourceType> sourceType =
             ToAttributeSourceType(valueKind);
         if (!sourceType.has_value())

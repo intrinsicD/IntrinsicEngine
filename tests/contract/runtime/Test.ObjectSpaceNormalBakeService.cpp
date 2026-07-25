@@ -320,7 +320,7 @@ namespace
                     Runtime::ProgressiveGeometryDomain::MeshVertex,
                 .PropertyName = "v:normal",
                 .ExpectedValueKind =
-                    Runtime::ProgressivePropertyValueKind::Vec3,
+                    Geometry::PropertyValueKind::Vec3,
                 .ExpectedElementCount = 3u,
             };
         normal.GeneratedPolicy =

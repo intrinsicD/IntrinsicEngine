@@ -1297,7 +1297,7 @@ namespace Extrinsic::Runtime
             ProgressiveSlotBinding slot{};
             slot.Semantic = ProgressiveSlotSemantic::Albedo;
             slot.SourceKind = ProgressiveSlotSourceKind::UniformDefault;
-            slot.UniformDefault.Kind = ProgressivePropertyValueKind::Vec4;
+            slot.UniformDefault.Kind = Geometry::PropertyValueKind::Vec4;
             slot.UniformDefault.Vector = glm::vec4{
                 material.BaseColorFactor[0],
                 material.BaseColorFactor[1],
@@ -1315,7 +1315,7 @@ namespace Extrinsic::Runtime
             ProgressiveSlotBinding slot{};
             slot.Semantic = semantic;
             slot.SourceKind = ProgressiveSlotSourceKind::UniformDefault;
-            slot.UniformDefault.Kind = ProgressivePropertyValueKind::ScalarFloat;
+            slot.UniformDefault.Kind = Geometry::PropertyValueKind::Float;
             slot.UniformDefault.Scalar = value;
             slot.Readiness = ProgressiveReadinessState::DefaultValue;
             return slot;
@@ -1324,7 +1324,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] ProgressiveSlotBinding PendingPropertyBakeSlot(
             const ProgressiveSlotSemantic semantic,
             const std::string& propertyName,
-            const ProgressivePropertyValueKind expectedValueKind,
+            const GeometryPropertyValueKindFilter expectedValueKind,
             const std::string_view diagnostic)
         {
             ProgressiveSlotBinding slot{};
@@ -1374,7 +1374,7 @@ namespace Extrinsic::Runtime
                 slots.push_back(PendingPropertyBakeSlot(
                     ProgressiveSlotSemantic::Albedo,
                     options.GeneratedAlbedoPropertyName,
-                    ProgressivePropertyValueKind::Any,
+                    std::nullopt,
                     primitive.HasResolvedTexcoords
                         ? "waiting for vertex color albedo bake"
                         : "waiting for generated UV atlas before vertex color albedo bake"));
@@ -1388,7 +1388,7 @@ namespace Extrinsic::Runtime
                 : PendingPropertyBakeSlot(
                     ProgressiveSlotSemantic::Normal,
                     options.GeneratedNormalPropertyName,
-                    ProgressivePropertyValueKind::Vec3,
+                    Geometry::PropertyValueKind::Vec3,
                     primitive.HasResolvedTexcoords
                         ? "waiting for vertex normals before normal-map bake"
                         : "waiting for generated UV atlas and vertex normals before normal-map bake"));

@@ -36,29 +36,39 @@ each chunk builds, passes the CPU gate, and commits independently.
       canonical kind through without importing `Geometry.Properties` — the
       `ExtrinsicSandboxAppStaysRuntimeOnly` structural test enforces this and
       caught a first attempt that imported it.
-- [ ] **Slice B2 — retire `ProgressivePropertyValueKind`** (279 refs / 19 files).
-      Value mapping is mechanical: `ScalarFloat`→`Float`, `ScalarDouble`→`Double`,
-      `UInt32`/`Vec2`/`Vec3`/`Vec4`/`Unknown` identical. Two non-mechanical parts:
-      - `Any` → `GeometryPropertyValueKindFilter` (`std::nullopt`). Affects the
-        `ExpectedValueKind` fields on `ProgressivePropertyBindingDescriptor`,
-        `SelectedMeshTextureBake`, and four `SandboxEditorFacades` structs, the
-        `expectedValueKind = Any` default parameters, and the
-        `expected == Any || expected == actual` comparisons (replace with
-        `MatchesGeometryPropertyValueKind`). Fields named `ActualValueKind` /
-        `Kind` / `ValueKind` take the plain canonical kind, not the filter.
-      - **Wire-format constraint (verified).** `ToString` /
-        `TryParseProgressivePropertyValueKind` back a *persisted* scene-file
-        format: `Runtime.SceneSerialization.cpp` parses the JSON fields `"kind"`
-        (line ~194) and `"expectedValueKind"` (line ~1090) with the legacy
-        strings `"Any" | "Unknown" | "ScalarFloat" | "ScalarDouble" | "UInt32" |
-        "Vec2" | "Vec3" | "Vec4"`. Migrating the in-memory type must **not**
-        change those strings, or existing scene documents fail to load. Keep a
-        serialization-local mapping between the canonical kind/filter and the
-        legacy wire strings; do **not** derive the wire string from
-        `DebugNameForGeometryPropertyValueKind`, which yields `Float`/`Double`.
-        A round-trip test over a scene document written before this slice is the
-        acceptance evidence.
+- [x] **Slice B2 — retire `ProgressivePropertyValueKind`** (279 refs / 19 files).
+      Value mapping was mechanical (`ScalarFloat`→`Float`, `ScalarDouble`→`Double`,
+      rest identical). `Any` became `GeometryPropertyValueKindFilter`
+      (`std::nullopt`): `ExpectedValueKind` fields on the binding descriptor,
+      selected-mesh bake request, and four editor models now carry a constraint,
+      while `ActualValueKind`/`Kind`/`ValueKind` carry a resolved kind. Every
+      `case Any:` was an unreachable branch sharing its body with `case Unknown:`,
+      so dropping it is behavior-preserving; where a *resolved* kind is still
+      required (bake representation APIs) the constraint resolves via
+      `ResolvedExpectedValueKind()` → `value_or(Unknown)`, which lands on that
+      same shared branch. The duplicate `DetectPropertyValueKind` was deleted in
+      favor of the canonical `DetectGeometryPropertyValueKind`.
+      **Wire format preserved:** the legacy strings moved into
+      `Runtime.SceneSerialization.cpp` as a file-local mapping owned by the
+      serializer, so the persisted format still reads/writes
+      `ScalarFloat`/`ScalarDouble`/`Any`. Three regression tests pin it: the
+      emitted strings, a full round trip, and a guard proving the reader
+      *rejects* canonical `Float`/`Double` names (so a future "modernization" of
+      both writer and reader cannot silently invalidate old documents).
+      `Runtime.GeometryAvailability` now re-exports `Geometry.Properties`,
+      because its public surface names those types and `app` may import runtime
+      only. CPU gate 4245/4245.
+
 - [ ] **Slice B3 — retire `ProgressiveGeometryDomain`** (174 refs / 24 files).
+
+### Follow-up found during Slice B2
+
+- **`SandboxEditorPropertyCatalogValueKind` is a third duplicate** of the same
+  vocabulary (`ScalarFloat`/`ScalarDouble`/`UInt32`/`Vec2`/`Vec3`/`Vec4`/`Unknown`,
+  converted by `ToGeometryPropertyValueKind` in `Runtime.SandboxEditorFacades.cpp`).
+  It is out of scope for B2/B3 but is exactly the "equivalent bake/editor alias"
+  this task's Required-changes list targets, so it should be retired in a
+  Slice B4 before the task closes.
 
 ### Design decisions taken in Slice A
 

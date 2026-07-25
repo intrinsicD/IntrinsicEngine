@@ -14,7 +14,10 @@ export module Extrinsic.Runtime.GeometryAvailability;
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.Component.RenderGeometry;
-import Geometry.Properties;
+// Re-exported: this module's public surface names Geometry::PropertySet and
+// Geometry::PropertyValueKind, so consumers (including `app`, which may
+// import runtime only) must be able to name them through this module.
+export import Geometry.Properties;
 
 export namespace Extrinsic::Runtime
 {
@@ -225,6 +228,10 @@ export namespace Extrinsic::Runtime
     // because every current caller feeds it to a printf-style UI format.
     [[nodiscard]] const char* DebugNameForGeometryPropertyValueKind(
         Geometry::PropertyValueKind kind) noexcept;
+
+    // Display name for a kind *constraint*; unconstrained renders as "Any".
+    [[nodiscard]] const char* DebugNameForGeometryPropertyValueKindFilter(
+        GeometryPropertyValueKindFilter filter) noexcept;
 
     [[nodiscard]] bool MatchesGeometryPropertyValueKind(
         GeometryPropertyValueKindFilter expected,

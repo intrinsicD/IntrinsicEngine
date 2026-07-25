@@ -379,6 +379,14 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
+    const char* DebugNameForGeometryPropertyValueKindFilter(
+        const GeometryPropertyValueKindFilter filter) noexcept
+    {
+        return filter.has_value()
+                   ? DebugNameForGeometryPropertyValueKind(*filter)
+                   : "Any";
+    }
+
     bool MatchesGeometryPropertyValueKind(
         const GeometryPropertyValueKindFilter expected,
         const Geometry::PropertyValueKind actual) noexcept

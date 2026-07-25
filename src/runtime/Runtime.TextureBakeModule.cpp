@@ -190,10 +190,10 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool IsScalar(
-            const ProgressivePropertyValueKind kind) noexcept
+            const Geometry::PropertyValueKind kind) noexcept
         {
-            return kind == ProgressivePropertyValueKind::ScalarFloat ||
-                   kind == ProgressivePropertyValueKind::ScalarDouble;
+            return kind == Geometry::PropertyValueKind::Float ||
+                   kind == Geometry::PropertyValueKind::Double;
         }
 
         [[nodiscard]] SelectedMeshTextureBakeStatus StatusForResolution(
@@ -221,7 +221,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] bool ConsumerCompatible(
             const BakedPropertyTextureConsumer& consumer,
-            const ProgressivePropertyValueKind valueKind,
+            const Geometry::PropertyValueKind valueKind,
             const SelectedMeshTextureBakeStorage storage,
             const MeshAttributeTextureBakeEncoder encoder) noexcept
         {
@@ -241,8 +241,8 @@ namespace Extrinsic::Runtime
                 ProgressiveGeometryDomain::Unknown};
             std::string SourcePropertyName{};
             std::string TexcoordPropertyName{};
-            ProgressivePropertyValueKind ValueKind{
-                ProgressivePropertyValueKind::Unknown};
+            Geometry::PropertyValueKind ValueKind{
+                Geometry::PropertyValueKind::Unknown};
             SelectedMeshTextureBakeStorage Storage{
                 SelectedMeshTextureBakeStorage::Auto};
             MeshAttributeTextureBakeEncoder Encoder{
@@ -263,8 +263,8 @@ namespace Extrinsic::Runtime
         {
             SelectedMeshTextureBakeStatus Status{
                 SelectedMeshTextureBakeStatus::Success};
-            ProgressivePropertyValueKind ValueKind{
-                ProgressivePropertyValueKind::Unknown};
+            Geometry::PropertyValueKind ValueKind{
+                Geometry::PropertyValueKind::Unknown};
             SelectedMeshTextureBakeStorage Storage{
                 SelectedMeshTextureBakeStorage::RawFloat};
             MeshAttributeTextureBakeEncoder Encoder{
@@ -311,7 +311,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool CopyPropertyValues(
             const Geometry::ConstPropertySet& properties,
             const std::string& name,
-            const ProgressivePropertyValueKind kind,
+            const Geometry::PropertyValueKind kind,
             std::vector<glm::vec4>& values)
         {
             values.clear();
@@ -324,7 +324,7 @@ namespace Extrinsic::Runtime
 
             switch (kind)
             {
-            case ProgressivePropertyValueKind::ScalarFloat:
+            case Geometry::PropertyValueKind::Float:
                 if (const auto property = properties.Get<float>(name))
                 {
                     append(property.Vector(), [](const float value)
@@ -334,7 +334,7 @@ namespace Extrinsic::Runtime
                     return true;
                 }
                 break;
-            case ProgressivePropertyValueKind::ScalarDouble:
+            case Geometry::PropertyValueKind::Double:
                 if (const auto property = properties.Get<double>(name))
                 {
                     append(property.Vector(), [](const double value)
@@ -345,7 +345,7 @@ namespace Extrinsic::Runtime
                     return true;
                 }
                 break;
-            case ProgressivePropertyValueKind::UInt32:
+            case Geometry::PropertyValueKind::UInt32:
                 if (const auto property = properties.Get<std::uint32_t>(name))
                 {
                     append(property.Vector(), [](const std::uint32_t value)
@@ -356,7 +356,7 @@ namespace Extrinsic::Runtime
                     return true;
                 }
                 break;
-            case ProgressivePropertyValueKind::Vec2:
+            case Geometry::PropertyValueKind::Vec2:
                 if (const auto property = properties.Get<glm::vec2>(name))
                 {
                     append(property.Vector(), [](const glm::vec2 value)
@@ -366,7 +366,7 @@ namespace Extrinsic::Runtime
                     return true;
                 }
                 break;
-            case ProgressivePropertyValueKind::Vec3:
+            case Geometry::PropertyValueKind::Vec3:
                 if (const auto property = properties.Get<glm::vec3>(name))
                 {
                     append(property.Vector(), [](const glm::vec3 value)
@@ -376,7 +376,7 @@ namespace Extrinsic::Runtime
                     return true;
                 }
                 break;
-            case ProgressivePropertyValueKind::Vec4:
+            case Geometry::PropertyValueKind::Vec4:
                 if (const auto property = properties.Get<glm::vec4>(name))
                 {
                     append(property.Vector(), [](const glm::vec4 value)
@@ -386,8 +386,7 @@ namespace Extrinsic::Runtime
                     return true;
                 }
                 break;
-            case ProgressivePropertyValueKind::Any:
-            case ProgressivePropertyValueKind::Unknown:
+            case Geometry::PropertyValueKind::Unknown:
                 break;
             }
             return false;
@@ -697,7 +696,7 @@ namespace Extrinsic::Runtime
                     SelectedMeshTextureBakeStatus::MismatchedPropertyCount,
                     "texture bake source property count changed during preparation");
             }
-            if (prepared.ValueKind != ProgressivePropertyValueKind::UInt32 &&
+            if (prepared.ValueKind != Geometry::PropertyValueKind::UInt32 &&
                 !std::ranges::all_of(
                     prepared.Values,
                     [](const glm::vec4 value) noexcept
@@ -850,29 +849,28 @@ namespace Extrinsic::Runtime
 
             switch (prepared.ValueKind)
             {
-            case ProgressivePropertyValueKind::ScalarFloat:
-            case ProgressivePropertyValueKind::ScalarDouble:
+            case Geometry::PropertyValueKind::Float:
+            case Geometry::PropertyValueKind::Double:
                 prepared.GpuValueKind =
                     Graphics::PropertyTextureBakeValueKind::Scalar;
                 break;
-            case ProgressivePropertyValueKind::UInt32:
+            case Geometry::PropertyValueKind::UInt32:
                 prepared.GpuValueKind =
                     Graphics::PropertyTextureBakeValueKind::Label;
                 break;
-            case ProgressivePropertyValueKind::Vec2:
+            case Geometry::PropertyValueKind::Vec2:
                 prepared.GpuValueKind =
                     Graphics::PropertyTextureBakeValueKind::Vector2;
                 break;
-            case ProgressivePropertyValueKind::Vec3:
+            case Geometry::PropertyValueKind::Vec3:
                 prepared.GpuValueKind =
                     Graphics::PropertyTextureBakeValueKind::Vector3;
                 break;
-            case ProgressivePropertyValueKind::Vec4:
+            case Geometry::PropertyValueKind::Vec4:
                 prepared.GpuValueKind =
                     Graphics::PropertyTextureBakeValueKind::Vector4;
                 break;
-            case ProgressivePropertyValueKind::Any:
-            case ProgressivePropertyValueKind::Unknown:
+            case Geometry::PropertyValueKind::Unknown:
                 return PrepareFailure(
                     SelectedMeshTextureBakeStatus::UnsupportedPropertyType,
                     "texture bake property type is not GPU-rasterizable");
@@ -903,20 +901,19 @@ namespace Extrinsic::Runtime
                     Graphics::PropertyTextureBakeEncoding::Raw;
                 switch (prepared.ValueKind)
                 {
-                case ProgressivePropertyValueKind::ScalarFloat:
-                case ProgressivePropertyValueKind::ScalarDouble:
-                case ProgressivePropertyValueKind::UInt32:
+                case Geometry::PropertyValueKind::Float:
+                case Geometry::PropertyValueKind::Double:
+                case Geometry::PropertyValueKind::UInt32:
                     prepared.Format = RHI::Format::R32_FLOAT;
                     break;
-                case ProgressivePropertyValueKind::Vec2:
+                case Geometry::PropertyValueKind::Vec2:
                     prepared.Format = RHI::Format::RG32_FLOAT;
                     break;
-                case ProgressivePropertyValueKind::Vec3:
-                case ProgressivePropertyValueKind::Vec4:
+                case Geometry::PropertyValueKind::Vec3:
+                case Geometry::PropertyValueKind::Vec4:
                     prepared.Format = RHI::Format::RGBA32_FLOAT;
                     break;
-                case ProgressivePropertyValueKind::Any:
-                case ProgressivePropertyValueKind::Unknown:
+                case Geometry::PropertyValueKind::Unknown:
                     break;
                 }
             }

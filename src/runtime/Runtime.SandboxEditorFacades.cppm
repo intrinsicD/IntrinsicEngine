@@ -1171,8 +1171,8 @@ export namespace Extrinsic::Runtime
     struct SandboxEditorProgressivePropertyOptionModel
     {
         ProgressivePropertyBindingDescriptor Descriptor{};
-        ProgressivePropertyValueKind ActualValueKind{
-            ProgressivePropertyValueKind::Unknown};
+        Geometry::PropertyValueKind ActualValueKind{
+            Geometry::PropertyValueKind::Unknown};
         std::size_t ElementCount{0u};
         bool Compatible{false};
         std::string DisabledReason{};
@@ -1244,8 +1244,7 @@ export namespace Extrinsic::Runtime
             ProgressiveSlotSourceKind::UniformDefault};
         ProgressiveGeometryDomain RequiredDomain{
             ProgressiveGeometryDomain::Unknown};
-        ProgressivePropertyValueKind ExpectedValueKind{
-            ProgressivePropertyValueKind::Any};
+        GeometryPropertyValueKindFilter ExpectedValueKind{};
         std::size_t ExpectedElementCount{0u};
         std::vector<SandboxEditorProgressivePropertyOptionModel> Options{};
     };
@@ -1435,9 +1434,20 @@ export namespace Extrinsic::Runtime
         ProgressiveGeometryDomain BakeDomain{ProgressiveGeometryDomain::Unknown};
         SandboxEditorPropertyCatalogValueKind ValueKind{
             SandboxEditorPropertyCatalogValueKind::Unknown};
-        ProgressivePropertyValueKind ExpectedValueKind{
-            ProgressivePropertyValueKind::Any};
+        GeometryPropertyValueKindFilter ExpectedValueKind{};
         std::size_t ElementCount{0u};
+
+        // The bake representation APIs need a resolved kind, not a
+        // constraint. An unconstrained expectation resolves to `Unknown`,
+        // which those APIs already treat as "no usable representation" —
+        // the same branch the retired `Any` enumerator shared with `Unknown`.
+        [[nodiscard]] Geometry::PropertyValueKind
+            ResolvedExpectedValueKind() const noexcept
+        {
+            return ExpectedValueKind.value_or(
+                Geometry::PropertyValueKind::Unknown);
+        }
+
         SandboxEditorTextureBakeSourceCategory Category{
             SandboxEditorTextureBakeSourceCategory::Unsupported};
         bool Bakeable{false};
@@ -2763,8 +2773,7 @@ export namespace Extrinsic::Runtime
         ProgressiveSlotSemantic Semantic{ProgressiveSlotSemantic::Albedo};
         ProgressiveSlotSourceKind SourceKind{ProgressiveSlotSourceKind::PropertyBake};
         ProgressiveGeometryDomain Domain{ProgressiveGeometryDomain::Unknown};
-        ProgressivePropertyValueKind ExpectedValueKind{
-            ProgressivePropertyValueKind::Any};
+        GeometryPropertyValueKindFilter ExpectedValueKind{};
         std::string PropertyName{};
     };
 
@@ -2774,8 +2783,7 @@ export namespace Extrinsic::Runtime
         std::string PresentationKey{"mesh.surface"};
         ProgressiveSlotSemantic TargetSemantic{ProgressiveSlotSemantic::Albedo};
         ProgressiveGeometryDomain SourceDomain{ProgressiveGeometryDomain::MeshVertex};
-        ProgressivePropertyValueKind ExpectedValueKind{
-            ProgressivePropertyValueKind::Any};
+        GeometryPropertyValueKindFilter ExpectedValueKind{};
         std::string PropertyName{};
         MeshAttributeTextureBakeEncoder Encoder{
             MeshAttributeTextureBakeEncoder::Auto};
