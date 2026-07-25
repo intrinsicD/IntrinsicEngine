@@ -284,6 +284,30 @@ For each change:
 - Do not claim performance wins without baseline comparison.
 - Validate manifests and result payloads with `python3 tools/benchmark/validate_benchmark_manifests.py` and
   `python3 tools/benchmark/validate_benchmark_results.py`.
+- A benchmark result that becomes a repeatable claim also owes an `ara/logic/claims.md` row (§8b).
+
+## 8b. Research claim and evidence protocol
+
+Research, performance, parity, and capability statements are tracked in the Agent-Native Research
+Artifact under `ara/`. `ara/logic/claims.md` is the claim ledger: each `C<NN>` row carries a
+statement, a disposition, a falsification criterion, and a `Proof` binding to artifacts that exist
+in the tree. `ara/staging/observations.yaml` holds `O<NN>` observations awaiting closure;
+`ara/logic/solution/` crystallizes constraints (`K<NN>`), architecture statements (`A<NN>`), and
+heuristics (`H<NN>`).
+
+- A number or capability statement entering `README.md`, `docs/`, a method report, or a task status
+  line needs a claim row first. A commit message is not a claim record.
+- A gate that rejected a hypothesis gets a `refuted` row with the gate that killed it, not a
+  silently dropped branch.
+- A `supported` or `refuted` claim must cite at least one repository path that exists; moving a
+  cited artifact means updating the claim in the same change.
+- Benchmark-backed claims still owe the manifest and baseline comparison required by §8.
+- CPU, GPU/Vulkan, and sanitizer results are distinct evidence classes; a claim must say which one
+  it rests on.
+
+`python3 tools/agents/check_ara_claims.py --root . --strict` validates the ledger structure and
+runs strict in `ci-docs.yml`. The authoritative policy, record format, and anti-patterns live in
+`docs/agent/ara-evidence-policy.md`.
 
 ## 9. Documentation sync protocol
 
@@ -386,6 +410,7 @@ Read this `AGENTS.md` file at the start of every session/task; it is the authori
 | `docs/agent/benchmark-workflow.md`            | Adding, changing, or running benchmark harnesses, manifests, datasets, baselines, or reports.                                                                                                                           |
 | `docs/agent/benchmark-review-checklist.md`    | Reviewing benchmark changes or performance claims before commit or PR.                                                                                                                                                  |
 | `docs/agent/docs-sync-policy.md`              | Moving files, changing public APIs/module surfaces, updating docs, or deciding whether generated inventories/manifests must be refreshed.                                                                               |
+| `docs/agent/ara-evidence-policy.md`           | Stating a research/performance/parity/capability result, closing a method or benchmark task, or promoting a claim into README, docs, a method report, or a task status — the `ara/` claim-ledger record format and anti-patterns. |
 | `docs/agent/roles.md`                         | Clarifying agent responsibilities, handoff expectations, or role-specific workflow questions.                                                                                                                           |
 | `docs/agent/agent-output-review-checklist.md` | Running the weekly human-led audit of recent agent-authored slices for cross-PR scope drift, documented-but-untested claims, and process anti-patterns not visible in a single PR review.                               |
 | `docs/agent/drift-audit-checklist.md`         | Running the recurring whole-tree repo-state drift audit (inventory drift, retired allowlist owners, stale `(planned)` markers, dead seams, untracked TODO/shim markers, naming/cross-doc rot). State-scoped; additive to the weekly sweep. |

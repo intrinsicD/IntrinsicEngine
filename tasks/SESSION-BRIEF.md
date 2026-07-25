@@ -113,6 +113,8 @@ the authoritative open/unblocked view.
 
 ## Unthemed
 
+- unblocked: `BUG-119` — Test.CheckTaskStateLinks asserts an inline SHA expression the docs-sync step no longer uses (tasks/backlog/bugs/BUG-119-check-task-state-links-docs-sync-env-assertion.md)
+- unblocked: `BUG-120` — Test.WorkflowConcurrency drifted from the CPU test sources it mirrors (tasks/backlog/bugs/BUG-120-workflow-concurrency-ctest-processors-drift.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 
 ## Audits

@@ -5,6 +5,15 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-120` — Test.WorkflowConcurrency drifted from the CPU test sources it mirrors](BUG-120-workflow-concurrency-ctest-processors-drift.md):
+  two config-root function names are no longer found, and the multi-worker CTest
+  `PROCESSORS` parity set differs symmetrically from the sources — including one
+  case whose reservation changed from 3 to 4. Reconcile per case; a raised
+  budget owes the matched sanitizer evidence `AGENTS.md` §7 requires.
+- [`BUG-119` — Test.CheckTaskStateLinks asserts an inline SHA expression the docs-sync step no longer uses](BUG-119-check-task-state-links-docs-sync-env-assertion.md):
+  the test greps the docs-sync `run:` body for `github.event.pull_request.base.sha`,
+  but the workflow now binds base/head through step-level `env:`. The routing is
+  correct and fails closed; assert the `env:` binding instead of the literal.
 - [`BUG-118` — GLFW X11 input-method LeakSanitizer recurrence](BUG-118-glfw-x11-input-method-lsan-recurrence.md):
   the standalone lifetime contract again retains the unsuppressed 408-byte
   libX11 input-method allocation despite proving process-static

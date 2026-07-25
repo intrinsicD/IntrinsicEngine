@@ -56,6 +56,19 @@ or asserted. Name `Scaffolded`, `CPUContracted`, `Operational`, `ParityProven`,
 or `Retired` when maturity is involved. An asserted row, missing backend, or
 missing maturity boundary is already a finding.
 
+Run the ledger's own structural gate before reading it as authoritative:
+
+```bash
+python3 tools/agents/check_ara_claims.py --root . --strict
+```
+
+It verifies claim-field completeness, the status vocabulary, dependency
+resolution across the `C`/`K`/`A`/`H` namespaces, proof-path existence, and
+staging-ID resolution. The record format, disposition vocabulary, and
+anti-patterns are in `references/ara-evidence-policy.md` (canonical source:
+`docs/agent/ara-evidence-policy.md`). A quantitative statement in public prose
+with no `C<NN>` row is a finding on its own.
+
 ### 2. Check the property independently
 
 Recompute metrics and acceptance predicates from machine-readable result JSON,
@@ -144,4 +157,6 @@ to promote each pending maturity or performance row.
 workflows · `methods/**/method.yaml` and reports — claim/backend contracts ·
 `benchmarks/**/manifests/`, `benchmarks/baselines/`, `benchmarks/reports/` —
 measurement lineage · `tools/benchmark/validate_benchmark_{manifests,results}.py`
-— schema gates · `ara/logic/claims.md`, `ara/evidence/` — research evidence.
+— schema gates · `ara/logic/claims.md`, `ara/evidence/` — research evidence ·
+`AGENTS.md` §8b and `references/ara-evidence-policy.md` — claim-ledger policy ·
+`tools/agents/check_ara_claims.py` — ledger structural gate.
