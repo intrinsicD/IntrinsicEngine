@@ -31,3 +31,13 @@ tools/**:
     - docs/architecture/ci.md
     - docs/agent/review-checklist.md
     - tasks/**
+
+# A change to the claim ledger or its layers must move the policy, a task, or the evidence index
+# with it — a claim edited with no accompanying record is the drift this rule exists to catch.
+ara/logic/**:
+  one_of:
+    - docs/agent/ara-evidence-policy.md
+    - ara/evidence/**
+    - ara/staging/observations.yaml
+    - ara/trace/**
+    - tasks/**

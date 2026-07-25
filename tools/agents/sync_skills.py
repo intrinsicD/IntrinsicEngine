@@ -41,6 +41,7 @@ REFERENCE_MAP = {
     "docs/agent/benchmark-workflow.md": "intrinsicengine-benchmark/references/benchmark-workflow.md",
     "docs/agent/benchmark-review-checklist.md": "intrinsicengine-benchmark/references/benchmark-review-checklist.md",
     "docs/agent/docs-sync-policy.md": "intrinsicengine-docs-sync/references/docs-sync-policy.md",
+    "docs/agent/ara-evidence-policy.md": "intrinsicengine-results-audit/references/ara-evidence-policy.md",
 }
 
 SKILLS_ROOT = "tools/agents/skills"
