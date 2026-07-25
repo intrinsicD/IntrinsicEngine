@@ -42,12 +42,10 @@ the authoritative open/unblocked view.
 - blocked by `RUNTIME-192`: `RUNTIME-193` — General geometry-presentation recipe (tasks/backlog/runtime/RUNTIME-193-general-geometry-presentation-recipe.md)
 - unblocked: `RUNTIME-194` — Consolidate runtime work execution (tasks/backlog/runtime/RUNTIME-194-consolidate-runtime-work-execution.md)
 - blocked by `RUNTIME-194`: `RUNTIME-195` — Unified GPU-result readback (tasks/backlog/runtime/RUNTIME-195-unified-gpu-result-readback.md)
-- unblocked: `RUNTIME-199` — Retire dormant spatial-debug adapter registry (tasks/backlog/runtime/RUNTIME-199-retire-dormant-spatial-debug-registry.md)
 - blocked by `BUG-095`: `RUNTIME-200` — Staged asset-import and materialization recipe (tasks/backlog/runtime/RUNTIME-200-staged-asset-import-materialization-recipe.md)
 - blocked by `RUNTIME-192`: `RUNTIME-201` — Unified editor mutation and history transaction (tasks/backlog/runtime/RUNTIME-201-unified-editor-mutation-history-transaction.md)
 - blocked by `RUNTIME-138`: `RUNTIME-202` — Retire the Sandbox runtime facade and localize feature models (tasks/backlog/runtime/RUNTIME-202-retire-sandbox-runtime-facade.md)
 - blocked by `RUNTIME-194`: `RUNTIME-203` — Internalize one-consumer runtime composition helpers (tasks/backlog/runtime/RUNTIME-203-internalize-one-consumer-runtime-helpers.md)
-- unblocked: `RUNTIME-204` — Withdraw dormant method-figure export from runtime (tasks/backlog/runtime/RUNTIME-204-withdraw-dormant-method-figure-export.md)
 - blocked by `BUG-096`: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
 - blocked by `RUNTIME-201`: `UI-038` — Progressive Poisson destructive-conversion safety (tasks/backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md)
 
@@ -107,7 +105,7 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-035` — Parametric Gauss (winding-number) orientation baseline (reference backend) (tasks/backlog/methods/METHOD-035-pgr-winding-number-orientation-baseline.md)
 - blocked by `METHOD-032`: `METHOD-036` — Normal-orientation method comparison evidence (publication protocol) (tasks/backlog/methods/METHOD-036-orientation-comparison-evidence.md)
 - blocked by `METHOD-016`: `RUNTIME-175` — Point-cloud consolidation runtime operation and config lane (tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
-- blocked by `RUNTIME-199`: `RUNTIME-189` — Sandbox debug-draw view for orientation parity diagnostics (tasks/backlog/runtime/RUNTIME-189-orientation-parity-debug-draw-view.md)
+- blocked by `METHOD-032`: `RUNTIME-189` — Sandbox debug-draw view for orientation parity diagnostics (tasks/backlog/runtime/RUNTIME-189-orientation-parity-debug-draw-view.md)
 - blocked by `RUNTIME-192`: `RUNTIME-196` — Canonical clustering-service CPU/GPU path (tasks/backlog/runtime/RUNTIME-196-canonical-clustering-service-path.md)
 - blocked by `RUNTIME-175`: `UI-035` — Sandbox point-cloud consolidation editor panel (tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
 

@@ -1558,8 +1558,7 @@ Concretely:
   follows. Concrete camera controllers (orbit, fly, free-look,
   top-down) live as runtime modules under the planned umbrella
   module name `Extrinsic.Runtime.CameraControllers`, mirroring the
-  `Extrinsic.Runtime.SpatialDebugAdapters` pattern from
-  `GRAPHICS-011Q`, the `Extrinsic.Runtime.VisualizationAdapters`
+  `Extrinsic.Runtime.VisualizationAdapters`
   pattern from `GRAPHICS-014Q`, and the
   `Extrinsic.Runtime.AssetBridges.Texture` pattern from
   `GRAPHICS-015Q`. Controllers read platform input deltas through
@@ -1634,13 +1633,14 @@ Concretely:
   transient debug packet vectors plus deterministic diagnostics. It does not
   import geometry tree implementations, runtime, editor UI, or ECS ownership;
   higher layers/adapters translate their structures into these snapshot
-  records. Per `GRAPHICS-011Q`, concrete BVH/KD-tree/octree/convex-hull
-  adapters live in **runtime extraction** (planned umbrella module name
-  `Extrinsic.Runtime.SpatialDebugAdapters`) — not in `src/geometry` and not
-  in `src/graphics` — because runtime is the only layer permitted to import
-  both geometry tree implementations and the graphics packet types. Adapters
-  may apply CPU-side pre-filters (leaf-only, occupancy-only, capped depth) and
-  surface adapter-side statistics through `RuntimeRenderExtractionStats`; the
+  records. Per `GRAPHICS-011Q`, any concrete geometry-tree adapter belongs in
+  **runtime extraction** — not in `src/geometry` and not in `src/graphics` —
+  because runtime is the only layer permitted to import both geometry tree
+  implementations and the graphics packet types. `RUNTIME-199` retired the
+  speculative `Extrinsic.Runtime.SpatialDebugAdapters` registry and its
+  BVH/KD-tree/octree/convex-hull adapters because no production workflow ever
+  registered one; a future feature that needs them owns a concrete record and
+  converts it directly to these packets. The
   graphics-side `SpatialDebugVisualizerOptions` budget and
   `SpatialDebugVisualizerDiagnostics` remain the single graphics-visible
   truncation/diagnostics surfaces, and the input record types are frozen by
@@ -1678,9 +1678,8 @@ Concretely:
   (`VisualizationAttributeBuffers`, `VisualizationScalars`,
   `VisualizationColors`, `VisualizationVectorFields`, `VisualizationIsolines`,
   `VisualizationHtexAtlases`, `VisualizationFragmentBakeAtlases`); concrete
-  producer adapters live under a planned `Extrinsic.Runtime.VisualizationAdapters`
-  umbrella, mirroring the `Extrinsic.Runtime.SpatialDebugAdapters` pattern from
-  `GRAPHICS-011Q`. Editor/app code provides user-facing surfaces (selected
+  producer adapters live under the `Extrinsic.Runtime.VisualizationAdapters`
+  umbrella. Editor/app code provides user-facing surfaces (selected
   attribute, colormap, scalar range, isoline parameters, vector-field
   scale/color, Htex regeneration request) and funnels them into the runtime
   adapter as pre-filter inputs; graphics never imports geometry algorithm

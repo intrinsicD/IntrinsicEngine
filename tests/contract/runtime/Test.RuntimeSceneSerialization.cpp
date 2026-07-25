@@ -21,7 +21,6 @@ import Extrinsic.ECS.Component.Light;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.RigidBody;
 import Extrinsic.ECS.Component.ShadowCaster;
-import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
@@ -425,7 +424,6 @@ TEST(RuntimeSceneSerialization, UnsupportedPersistenceFamiliesReportDiagnosticsA
         entity,
         Collider::Component{{Collider::MakeSphere(0.5f)}, true});
     raw.emplace<RigidBody::Component>(entity, RigidBody::MakeDynamic(1.0f));
-    raw.emplace<ECSC::SpatialDebugBinding>(entity);
     raw.emplace<AssetInstance::Source>(entity, AssetInstance::Source{.AssetId = 42u});
 
     MemoryIOBackend backend;
@@ -436,7 +434,6 @@ TEST(RuntimeSceneSerialization, UnsupportedPersistenceFamiliesReportDiagnosticsA
     EXPECT_EQ(saved->Stats.UnsupportedLightEntities, 1u);
     EXPECT_EQ(saved->Stats.UnsupportedShadowEntities, 1u);
     EXPECT_EQ(saved->Stats.UnsupportedPhysicsEntities, 1u);
-    EXPECT_EQ(saved->Stats.UnsupportedSpatialDebugEntities, 1u);
     EXPECT_EQ(saved->Stats.UnsupportedAssetInstanceEntities, 1u);
 
     const nlohmann::json parsed = nlohmann::json::parse(backend.Text("unsupported.json"));
@@ -444,7 +441,6 @@ TEST(RuntimeSceneSerialization, UnsupportedPersistenceFamiliesReportDiagnosticsA
     EXPECT_EQ(parsed["stats"]["unsupportedLightEntities"].get<std::uint32_t>(), 1u);
     EXPECT_EQ(parsed["stats"]["unsupportedShadowEntities"].get<std::uint32_t>(), 1u);
     EXPECT_EQ(parsed["stats"]["unsupportedPhysicsEntities"].get<std::uint32_t>(), 1u);
-    EXPECT_EQ(parsed["stats"]["unsupportedSpatialDebugEntities"].get<std::uint32_t>(), 1u);
     EXPECT_EQ(parsed["stats"]["unsupportedAssetInstanceEntities"].get<std::uint32_t>(), 1u);
 
     ECS::Scene::Registry loaded;
@@ -457,7 +453,6 @@ TEST(RuntimeSceneSerialization, UnsupportedPersistenceFamiliesReportDiagnosticsA
     EXPECT_FALSE(loadedRaw.any_of<Shadows::CasterTag>(loadedEntity));
     EXPECT_FALSE(loadedRaw.any_of<Collider::Component>(loadedEntity));
     EXPECT_FALSE(loadedRaw.any_of<RigidBody::Component>(loadedEntity));
-    EXPECT_FALSE(loadedRaw.any_of<ECSC::SpatialDebugBinding>(loadedEntity));
     EXPECT_FALSE(loadedRaw.any_of<AssetInstance::Source>(loadedEntity));
 }
 

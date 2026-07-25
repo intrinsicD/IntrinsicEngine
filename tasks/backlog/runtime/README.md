@@ -51,10 +51,6 @@ cleanup slice:
 - [`RUNTIME-198` — Data-driven visualization recipes](RUNTIME-198-data-driven-visualization-recipes.md)
   replaces the zero-production-registration adapter interface/registry with a
   closed recipe variant and pure packet encoders.
-- [`RUNTIME-199` — Retire dormant spatial-debug adapter registry](RUNTIME-199-retire-dormant-spatial-debug-registry.md)
-  removes opaque bindings, the zero-production adapter registry, all
-  unconsumed adapters, and the dormant closest-face runtime surface without
-  prebuilding a replacement.
 - [`RUNTIME-200` — Staged asset-import and materialization recipe](RUNTIME-200-staged-asset-import-materialization-recipe.md)
   unifies route/decode/materialize/author/postprocess/residency/completion and
   deletes the role callback/IO bridge/monolithic handoff paths after workflow
@@ -68,9 +64,17 @@ cleanup slice:
 - [`RUNTIME-203` — Internalize one-consumer runtime composition helpers](RUNTIME-203-internalize-one-consumer-runtime-helpers.md)
   removes public BMIs for Engine/SceneInteraction/config/device helpers after
   their owner-level behavior tests are in place.
-- [`RUNTIME-204` — Withdraw dormant method-figure export from runtime](RUNTIME-204-withdraw-dormant-method-figure-export.md)
-  removes the test-only runtime production module and localizes any genuinely
-  used serializer to its concrete benchmark/tool.
+
+### Dormant-surface retirements (retired 2026-07-25)
+
+- [`RUNTIME-199`](../../done/RUNTIME-199-retire-dormant-spatial-debug-registry.md)
+  deleted the zero-production spatial-debug adapter registry, its four
+  unconsumed tree/hull adapters, the opaque ECS binding, the dormant
+  closest-face surface, and both dead Sandbox controls. The graphics
+  packet/pass contract is preserved and default-empty; ADR-0008 was amended.
+- [`RUNTIME-204`](../../done/RUNTIME-204-withdraw-dormant-method-figure-export.md)
+  deleted the test-only `Runtime.MethodFigureExport` module; the census found
+  no benchmark/tool consumer, so no serializer needed relocation.
 
 ### GPU property texture baking (retired 2026-07-21)
 

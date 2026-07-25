@@ -1,6 +1,6 @@
 # ADR 0008 — Spatial Debug Visualizer Runtime Adapters
 
-- **Status:** Accepted
+- **Status:** Accepted; amended 2026-07-25 by `RUNTIME-199` (see "Amendment" below). The graphics-side packet contract stands; the runtime adapter umbrella was built, found to have no production producer, and retired.
 - **Date:** 2026-05-17
 - **Owners:** Runtime extraction (adapter ownership), Graphics (frozen `Extrinsic.Graphics.SpatialDebugVisualizers` packet contract)
 - **Related tasks:** [`tasks/done/GRAPHICS-011`](../../tasks/archive/GRAPHICS-011-spatial-debug-visualizers.md), [`GRAPHICS-011Q`](../../tasks/archive/GRAPHICS-011Q-spatial-debug-adapter-clarifications.md)
@@ -108,10 +108,40 @@ Positive:
 Trade-offs and risks:
 
 - Editor toggles that previously poked directly at graphics options now must round-trip through the runtime adapter. This is a deliberate cost of the layering rule; editors that work around it (e.g. by stashing graphics options in a sidecar) are violating §1 and should be rejected in review.
-- The `Extrinsic.Runtime.SpatialDebugAdapters` umbrella is **planned** — no concrete module exists yet. The naming and module-placement decision in §2 must be respected when the umbrella lands; if a different name is chosen first, this ADR must be amended rather than silently superseded.
+- The `Extrinsic.Runtime.SpatialDebugAdapters` umbrella was subsequently built under `RUNTIME-082` and retired under `RUNTIME-199`; see "Amendment" below.
 - The pre-filter / truncation split makes adapter authors responsible for keeping their pre-filter counts and graphics' truncation counts coherent — for example, the adapter must not silently feed truncated records back through a second pass that would also be counted against `TruncatedLineBudget`. Reviewers must check that adapters report pre-filter rejections only through `RuntimeRenderExtractionStats` (or sibling).
 
-Follow-up tasks required: none from this ADR. The concrete `Extrinsic.Runtime.SpatialDebugAdapters` module(s) land as a future runtime task under `tasks/backlog/runtime/`; no graphics-side change is required.
+Follow-up tasks required: none from this ADR. The concrete module landed under `RUNTIME-082` and was retired under `RUNTIME-199`; no graphics-side change was required in either direction.
+
+## Amendment — 2026-07-25 (`RUNTIME-199`)
+
+`RUNTIME-082` built the `Extrinsic.Runtime.SpatialDebugAdapters` umbrella this ADR
+specified: the `ISpatialDebugAdapter` interface, BVH/KD-tree/octree/convex-hull
+adapters, an opaque-key `SpatialDebugAdapterRegistry` mirrored into
+`RenderExtractionCache`, and an `ECS::Components::SpatialDebugBinding` component.
+
+A source census found **no production registration site** — only tests ever
+registered an adapter, while the Sandbox exposed an "Enable BVH debug" control
+that authored a binding key nothing could resolve. `RUNTIME-199` therefore
+deleted the interface, all four adapters, the registry, the ECS binding
+component, and the dead editor/serialization/UI plumbing, without introducing a
+replacement abstraction.
+
+What this ADR still governs, unchanged:
+
+- §1 layering: a concrete geometry-tree→packet adapter belongs in **runtime**,
+  never in `graphics` or `geometry`. This remains the rule for any future
+  producer.
+- The frozen `Extrinsic.Graphics.SpatialDebugVisualizers` packet contract and its
+  `Build*Wireframes` builders, which were never runtime-coupled and stay intact.
+- The `RuntimeRenderSnapshotBatch::SpatialDebug*` spans, which remain declared
+  and default-empty until a real producer exists.
+
+What is superseded: §2's assumption that a *general, registry-based* adapter
+umbrella is the right shape. The evidence says the generic indirection was
+speculative. A future feature that needs spatial-debug rendering (for example
+`RUNTIME-189`) owns a concrete copied record and converts it directly to the
+existing packets — no interface, no opaque key, no registry.
 
 ## Alternatives Considered
 

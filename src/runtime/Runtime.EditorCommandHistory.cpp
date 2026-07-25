@@ -149,31 +149,6 @@ namespace Extrinsic::Runtime
             return EditorCommandHistoryStatus::Applied;
         }
 
-        [[nodiscard]] EditorCommandHistoryStatus ApplySpatialDebugBinding(
-            ECS::Scene::Registry* scene,
-            const std::uint32_t stableEntityId,
-            const std::optional<ECSC::SpatialDebugBinding>& value)
-        {
-            if (scene == nullptr)
-                return EditorCommandHistoryStatus::MissingScene;
-
-            entt::registry& raw = scene->Raw();
-            const ECS::EntityHandle entity = ResolveLiveEntity(*scene, stableEntityId);
-            if (entity == ECS::InvalidEntityHandle)
-                return EditorCommandHistoryStatus::StaleEntity;
-
-            if (!value.has_value())
-            {
-                if (!raw.all_of<ECSC::SpatialDebugBinding>(entity))
-                    return EditorCommandHistoryStatus::NoChange;
-                raw.remove<ECSC::SpatialDebugBinding>(entity);
-                return EditorCommandHistoryStatus::Applied;
-            }
-
-            raw.emplace_or_replace<ECSC::SpatialDebugBinding>(entity, *value);
-            return EditorCommandHistoryStatus::Applied;
-        }
-
     }
 
     const char* DebugNameForEditorCommandHistoryStatus(
@@ -468,27 +443,6 @@ namespace Extrinsic::Runtime
             .Undo = [command]()
             {
                 return ApplyVisualizationConfig(command.Scene,
-                                                command.StableEntityId,
-                                                command.Before);
-            },
-            .Dirtying = true,
-        };
-    }
-
-    EditorCommandRecord MakeSpatialDebugBindingCommand(
-        EditorSpatialDebugBindingCommand command)
-    {
-        return EditorCommandRecord{
-            .Label = NonEmptyLabel(std::move(command.Label)),
-            .Redo = [command]()
-            {
-                return ApplySpatialDebugBinding(command.Scene,
-                                                command.StableEntityId,
-                                                command.After);
-            },
-            .Undo = [command]()
-            {
-                return ApplySpatialDebugBinding(command.Scene,
                                                 command.StableEntityId,
                                                 command.Before);
             },

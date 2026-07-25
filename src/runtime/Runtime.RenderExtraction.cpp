@@ -29,7 +29,6 @@ import Extrinsic.ECS.Components.AssetInstance;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
-import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Component.Culling.World;
@@ -60,7 +59,6 @@ import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
 import Extrinsic.Runtime.RenderWorldPool;
-import Extrinsic.Runtime.SpatialDebugAdapters;
 import Extrinsic.Runtime.VisualizationAdapters;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.WorldHandle;
@@ -214,31 +212,6 @@ namespace Extrinsic::Runtime
     RenderExtractionCache::GetProceduralGeometryCacheForTest() const noexcept
     {
         return m_State->GetProceduralGeometryCacheForTest();
-    }
-
-    void RenderExtractionCache::RegisterSpatialDebugAdapter(
-        const std::uint64_t key,
-        std::unique_ptr<ISpatialDebugAdapter> adapter)
-    {
-        m_State->RegisterSpatialDebugAdapter(key, std::move(adapter));
-    }
-
-    bool RenderExtractionCache::UnregisterSpatialDebugAdapter(
-        const std::uint64_t key) noexcept
-    {
-        return m_State->UnregisterSpatialDebugAdapter(key);
-    }
-
-    std::size_t
-    RenderExtractionCache::GetSpatialDebugAdapterCount() const noexcept
-    {
-        return m_State->GetSpatialDebugAdapterCount();
-    }
-
-    const SpatialDebugAdapterRegistry&
-    RenderExtractionCache::GetSpatialDebugRegistryForTest() const noexcept
-    {
-        return m_State->GetSpatialDebugRegistryForTest();
     }
 
     void RenderExtractionCache::RegisterVisualizationAdapter(
@@ -1478,8 +1451,6 @@ namespace Extrinsic::Runtime
 
         RetireMissingRenderables(m_LiveRenderableKeys, renderer, stats);
 
-        ExtractSpatialDebug(registry, stats);
-
         FinalizeAndSubmitSnapshot(renderer,
                                   runtimeSnapshotStorageSlot,
                                   stats);
@@ -2163,19 +2134,6 @@ namespace Extrinsic::Runtime
         const std::uint32_t runtimeSnapshotStorageSlot,
         RuntimeRenderExtractionStats& stats)
     {
-        stats.SpatialDebugBoundsCount =
-            static_cast<std::uint32_t>(m_SpatialDebugBatch.Bounds.size());
-        stats.SpatialDebugHierarchyNodeCount =
-            static_cast<std::uint32_t>(m_SpatialDebugBatch.HierarchyNodes.size());
-        stats.SpatialDebugSplitPlaneCount =
-            static_cast<std::uint32_t>(m_SpatialDebugBatch.SplitPlanes.size());
-        stats.SpatialDebugConvexHullVertexCount =
-            static_cast<std::uint32_t>(m_SpatialDebugBatch.ConvexHullVertices.size());
-        stats.SpatialDebugConvexHullEdgeCount =
-            static_cast<std::uint32_t>(m_SpatialDebugBatch.ConvexHullEdges.size());
-        stats.SpatialDebugPointMarkerCount =
-            static_cast<std::uint32_t>(m_SpatialDebugBatch.PointMarkers.size());
-
         stats.VisualizationAttributeBufferPacketCount =
             static_cast<std::uint32_t>(m_VisualizationState->Batch.AttributeBuffers.size());
         stats.VisualizationScalarPacketCount =
@@ -2259,12 +2217,6 @@ namespace Extrinsic::Runtime
                 ? std::span<const Graphics::TransformGizmoRenderPacket>{
                       m_SceneInteraction.GizmoDrawPackets}
                 : std::span<const Graphics::TransformGizmoRenderPacket>{},
-            .SpatialDebugBounds             = m_SpatialDebugBatch.Bounds,
-            .SpatialDebugHierarchyNodes     = m_SpatialDebugBatch.HierarchyNodes,
-            .SpatialDebugSplitPlanes        = m_SpatialDebugBatch.SplitPlanes,
-            .SpatialDebugConvexHullVertices = m_SpatialDebugBatch.ConvexHullVertices,
-            .SpatialDebugConvexHullEdges    = m_SpatialDebugBatch.ConvexHullEdges,
-            .SpatialDebugPointMarkers       = m_SpatialDebugBatch.PointMarkers,
         };
         if (interactionMatches)
         {
@@ -2404,7 +2356,6 @@ namespace Extrinsic::Runtime
         m_Visualizations.clear();
         m_Lights.clear();
 
-        m_SpatialDebugBatch.Clear();
         if (!m_VisualizationState->Bindings.empty())
         {
             ++m_VisualizationState->BindingRevision;
@@ -2421,11 +2372,6 @@ namespace Extrinsic::Runtime
     {
         ClearSceneState(renderer);
 
-        // RUNTIME-082 Slice D — shutdown drops owned adapters + clears the
-        // registry mirrors. Scene replacement intentionally preserves these
-        // registrations; full renderer teardown owns their destruction.
-        m_SpatialDebugRegistry.Clear();
-        m_SpatialDebugAdapters.clear();
         m_VisualizationState->Registry.Clear();
         m_VisualizationState->Adapters.clear();
     }

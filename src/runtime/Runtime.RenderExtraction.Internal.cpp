@@ -42,7 +42,6 @@ import Extrinsic.Runtime.PointCloudGeometryPacker;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
 import Extrinsic.Runtime.RenderWorldPool;
-import Extrinsic.Runtime.SpatialDebugAdapters;
 import Extrinsic.Runtime.VisualizationAdapters;
 import Extrinsic.Runtime.WorldHandle;
 
@@ -162,14 +161,6 @@ namespace Extrinsic::Runtime
                 std::uint32_t stableEntityId) const noexcept;
         [[nodiscard]] const ProceduralGeometryCache&
             GetProceduralGeometryCacheForTest() const noexcept;
-
-        void RegisterSpatialDebugAdapter(
-            std::uint64_t key,
-            std::unique_ptr<ISpatialDebugAdapter> adapter);
-        bool UnregisterSpatialDebugAdapter(std::uint64_t key) noexcept;
-        [[nodiscard]] std::size_t GetSpatialDebugAdapterCount() const noexcept;
-        [[nodiscard]] const SpatialDebugAdapterRegistry&
-            GetSpatialDebugRegistryForTest() const noexcept;
 
         void RegisterVisualizationAdapter(
             std::uint64_t key,
@@ -321,9 +312,6 @@ namespace Extrinsic::Runtime
             Graphics::IRenderer& renderer,
             Graphics::GpuAssetCache* gpuAssets,
             RuntimeRenderExtractionStats& stats);
-        void ExtractSpatialDebug(
-            entt::registry& registry,
-            RuntimeRenderExtractionStats& stats);
         void FinalizeAndSubmitSnapshot(
             Graphics::IRenderer& renderer,
             std::uint32_t runtimeSnapshotStorageSlot,
@@ -367,13 +355,6 @@ namespace Extrinsic::Runtime
             std::uint32_t,
             Graphics::MaterialTextureAssetBindings>
             m_MaterialTextureBindings{};
-
-        std::unordered_map<
-            std::uint64_t,
-            std::unique_ptr<ISpatialDebugAdapter>>
-            m_SpatialDebugAdapters{};
-        SpatialDebugAdapterRegistry m_SpatialDebugRegistry{};
-        SpatialDebugSnapshotBatch m_SpatialDebugBatch{};
 
         struct VisualizationAdapterState
         {

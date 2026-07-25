@@ -1739,3 +1739,55 @@ TEST(RuntimeEngineLayering, RenderGraphStaysOutOfECSAndCoreStaysOutOfGpuBarriers
         EXPECT_EQ(content.find("Vk"), std::string::npos) << path.string();
     }
 }
+
+// RUNTIME-199 — the spatial-debug adapter registry was retired because no
+// production workflow ever registered an adapter. This pins the deletion so a
+// future change cannot silently resurrect the interface, the opaque ECS
+// binding, or the dormant closest-face module. The graphics-side
+// `SpatialDebugVisualizers` packet contract is deliberately NOT covered here:
+// it survives untouched and its spans stay declared-but-empty until a real
+// producer exists.
+TEST(RuntimeEngineLayering, RetiredSpatialDebugRegistryHasNoProductionSurface)
+{
+    const auto moduleInventory =
+        ReadFile(RepoRoot() / "docs/api/generated/module_inventory.md");
+    const auto runtimeCMake = ReadFile(RepoRoot() / "src/runtime/CMakeLists.txt");
+    const auto ecsComponentsCMake =
+        ReadFile(RepoRoot() / "src/ecs/Components/CMakeLists.txt");
+    const auto extractionInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.RenderExtraction.cppm");
+    const auto editorHistoryInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.EditorCommandHistory.cppm");
+    const auto sandboxFacadeInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxEditorFacades.cppm");
+
+    // No retired module is published.
+    EXPECT_EQ(moduleInventory.find("Extrinsic.Runtime.SpatialDebugAdapters"),
+              std::string::npos);
+    EXPECT_EQ(moduleInventory.find("Extrinsic.Runtime.SpatialDebugClosestFace"),
+              std::string::npos);
+    EXPECT_EQ(moduleInventory.find("Extrinsic.ECS.Component.SpatialDebugBinding"),
+              std::string::npos);
+
+    // No retired translation unit is built.
+    EXPECT_EQ(runtimeCMake.find("SpatialDebug"), std::string::npos);
+    EXPECT_EQ(ecsComponentsCMake.find("SpatialDebugBinding"), std::string::npos);
+
+    // No adapter interface, opaque key registry, or registration surface.
+    EXPECT_EQ(extractionInterface.find("ISpatialDebugAdapter"), std::string::npos);
+    EXPECT_EQ(extractionInterface.find("SpatialDebugAdapterRegistry"),
+              std::string::npos);
+    EXPECT_EQ(extractionInterface.find("RegisterSpatialDebugAdapter"),
+              std::string::npos);
+    EXPECT_EQ(extractionInterface.find("SpatialDebugBindingsObserved"),
+              std::string::npos);
+
+    // No opaque binding survives in the editor command/model surfaces.
+    EXPECT_EQ(editorHistoryInterface.find("SpatialDebug"), std::string::npos);
+    EXPECT_EQ(sandboxFacadeInterface.find("SpatialDebug"), std::string::npos);
+
+    // The graphics packet contract that RUNTIME-199 preserved is still present.
+    const auto rendererInterface =
+        ReadFile(RepoRoot() / "src/graphics/renderer/Graphics.Renderer.cppm");
+    EXPECT_NE(rendererInterface.find("SpatialDebugBounds"), std::string::npos);
+}

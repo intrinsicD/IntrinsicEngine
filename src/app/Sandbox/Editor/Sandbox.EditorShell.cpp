@@ -3056,44 +3056,9 @@ namespace Extrinsic::Sandbox::Editor
                                 DebugNameForSandboxEditorGeometryDomain(
                                     frame.Visualization.SelectedDomain));
 
-                    if (frame.Visualization.SpatialDebug.HasBinding)
-                    {
-                        ImGui::Text("Spatial debug: %s key=%llu",
-                                    DebugNameForSandboxEditorSpatialDebugKind(
-                                        frame.Visualization.SpatialDebug.Kind),
-                                    static_cast<unsigned long long>(
-                                        frame.Visualization.SpatialDebug.RegistryKey));
-                    }
-                    else
-                    {
-                        ImGui::TextDisabled("Spatial debug: disabled");
-                    }
-
                     if (context != nullptr &&
                         frame.Visualization.GeometryDomainControlsAvailable)
                     {
-                        if (ImGui::Button("Enable BVH debug"))
-                        {
-                            (void)ApplySandboxEditorSpatialDebugBindingCommand(
-                                *context,
-                                SandboxEditorSpatialDebugBindingCommand{
-                                    .StableEntityId =
-                                        frame.Visualization.SelectedStableId,
-                                    .EnableBinding = true,
-                                });
-                        }
-                        ImGui::SameLine();
-                        if (ImGui::Button("Clear debug"))
-                        {
-                            (void)ApplySandboxEditorSpatialDebugBindingCommand(
-                                *context,
-                                SandboxEditorSpatialDebugBindingCommand{
-                                    .StableEntityId =
-                                        frame.Visualization.SelectedStableId,
-                                    .EnableBinding = false,
-                                });
-                        }
-
                         if (frame.Visualization.Visualization.HasConfig)
                         {
                             ImGui::Text("Visualization: %s",

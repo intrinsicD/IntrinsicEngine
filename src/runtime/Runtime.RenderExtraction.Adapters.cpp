@@ -19,7 +19,6 @@ import :Internal;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
-import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.GpuWorld;
@@ -43,7 +42,6 @@ import Extrinsic.Runtime.PointCloudGeometryPacker;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
 import Extrinsic.Runtime.RenderWorldPool;
-import Extrinsic.Runtime.SpatialDebugAdapters;
 import Extrinsic.Runtime.VisualizationAdapters;
 import Extrinsic.Runtime.WorldHandle;
 
@@ -134,43 +132,6 @@ namespace Extrinsic::Runtime
             perAdapter.ScalarValueScanCount;
     }
 
-    void RenderExtractionCache::State::RegisterSpatialDebugAdapter(
-        const std::uint64_t key,
-        std::unique_ptr<ISpatialDebugAdapter> adapter)
-    {
-        m_SpatialDebugRegistry.Unregister(key);
-        auto [it, inserted] =
-            m_SpatialDebugAdapters.insert_or_assign(
-                key,
-                std::move(adapter));
-        (void)inserted;
-        if (it->second)
-        {
-            m_SpatialDebugRegistry.Register(key, *it->second);
-        }
-    }
-
-    bool RenderExtractionCache::State::UnregisterSpatialDebugAdapter(
-        const std::uint64_t key) noexcept
-    {
-        m_SpatialDebugRegistry.Unregister(key);
-        return m_SpatialDebugAdapters.erase(key) != 0u;
-    }
-
-    std::size_t
-    RenderExtractionCache::State::GetSpatialDebugAdapterCount()
-        const noexcept
-    {
-        return m_SpatialDebugAdapters.size();
-    }
-
-    const SpatialDebugAdapterRegistry&
-    RenderExtractionCache::State::GetSpatialDebugRegistryForTest()
-        const noexcept
-    {
-        return m_SpatialDebugRegistry;
-    }
-
     void RenderExtractionCache::State::RegisterVisualizationAdapter(
         const std::uint64_t key,
         std::unique_ptr<IVisualizationAdapter> adapter)
@@ -247,54 +208,4 @@ namespace Extrinsic::Runtime
         return m_VisualizationState->BindingRevision;
     }
 
-    void RenderExtractionCache::State::ExtractSpatialDebug(
-        entt::registry& registry,
-        RuntimeRenderExtractionStats& stats)
-    {
-        m_SpatialDebugBatch.Clear();
-        auto spatialDebugView =
-            registry.view<ECS::Components::SpatialDebugBinding>();
-        for (const entt::entity entity : spatialDebugView)
-        {
-            if (!registry.valid(entity))
-            {
-                ++stats.SkippedInvalidEntityCount;
-                continue;
-            }
-
-            const auto& binding =
-                spatialDebugView
-                    .get<ECS::Components::SpatialDebugBinding>(entity);
-            ++stats.SpatialDebugBindingsObserved;
-
-            const auto* adapter =
-                m_SpatialDebugRegistry.Find(binding.RegistryKey);
-            if (adapter == nullptr)
-            {
-                ++stats.SpatialDebugMissingAdapterCount;
-                continue;
-            }
-
-            const SpatialDebugAdapterOptions options{
-                .LeafOnly = binding.LeafOnly,
-                .OccupancyOnly = binding.OccupancyOnly,
-                .MaxDepth = binding.MaxDepth,
-            };
-            SpatialDebugAdapterStats perAdapter{};
-            adapter->Append(
-                m_SpatialDebugBatch,
-                options,
-                perAdapter);
-            ++stats.SpatialDebugAdaptersInvoked;
-
-            stats.SpatialDebugLeafNodeAccumulator +=
-                perAdapter.LeafNodeCount;
-            stats.SpatialDebugInnerNodeAccumulator +=
-                perAdapter.InnerNodeCount;
-            stats.SpatialDebugEmptyNodeSkippedAccumulator +=
-                perAdapter.EmptyNodeSkippedCount;
-            stats.SpatialDebugDepthCapTruncationAccumulator +=
-                perAdapter.DepthCapTruncationCount;
-        }
-    }
 }

@@ -1567,16 +1567,6 @@ void DrawDomainVisualizationControls(
     const SandboxEditorContext &context) {
   const SandboxEditorVisualizationModel &visualization = model.Visualization;
 
-  if (visualization.SpatialDebug.HasBinding) {
-    ImGui::Text("Spatial debug: %s key=%llu",
-                DebugNameForSandboxEditorSpatialDebugKind(
-                    visualization.SpatialDebug.Kind),
-                static_cast<unsigned long long>(
-                    visualization.SpatialDebug.RegistryKey));
-  } else {
-    ImGui::TextDisabled("Spatial debug: disabled");
-  }
-
   if (visualization.Visualization.HasConfig) {
     ImGui::Text("Visualization: %s",
                 DebugNameForSandboxEditorVisualizationColorSource(
@@ -1589,22 +1579,6 @@ void DrawDomainVisualizationControls(
                                     model.VisualizationControlsAvailable;
   if (!canEditVisualization)
     ImGui::BeginDisabled();
-
-  if (ImGui::Button("Enable BVH debug") && canEditVisualization) {
-    (void)ApplySandboxEditorSpatialDebugBindingCommand(
-        context, SandboxEditorSpatialDebugBindingCommand{
-                     .StableEntityId = model.SelectedStableId,
-                     .EnableBinding = true,
-                 });
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Clear debug") && canEditVisualization) {
-    (void)ApplySandboxEditorSpatialDebugBindingCommand(
-        context, SandboxEditorSpatialDebugBindingCommand{
-                     .StableEntityId = model.SelectedStableId,
-                     .EnableBinding = false,
-                 });
-  }
 
   if (ImGui::Button("Uniform color") && canEditVisualization) {
     (void)ApplySandboxEditorVisualizationConfigCommand(

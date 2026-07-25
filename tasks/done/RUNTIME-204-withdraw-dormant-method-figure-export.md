@@ -6,6 +6,27 @@ maturity_target: Retired
 ---
 # RUNTIME-204 — Withdraw dormant method-figure export from runtime
 
+## Status
+
+- Completed and retired on 2026-07-25 at `Retired`.
+- Commit reference: this retirement commit records the deletion, census, and
+  documentation sync.
+- Consumer census re-run at implementation time: `Extrinsic.Runtime.MethodFigureExport`
+  had **zero production consumers**. The only importer was its own unit test
+  (`tests/unit/runtime/Test.MethodFigureExport.cpp`); no benchmark, tool, method,
+  or runtime module referenced any exported symbol. No serializer/writer needed
+  relocation into a concrete benchmark/tool owner, so the module and its
+  orphan test were deleted outright.
+- Verification evidence:
+  - `cmake --preset ci` + `cmake --build --preset ci --target IntrinsicTests`
+    completed a full 1282-target build with no unresolved references;
+  - the default CPU gate passed **4264/4264** in 56.93 s
+    (`-LE 'gpu|vulkan|slow|flaky-quarantine'`), one skip
+    (`GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl`, headless host);
+  - strict layering, doc-link, docs-sync, test-layout, and root-hygiene checks
+    passed; the module inventory regenerated to 391 modules with no
+    `MethodFigureExport` entry.
+
 ## Goal
 
 - Remove `Runtime.MethodFigureExport` from the production runtime surface and
@@ -33,38 +54,38 @@ maturity_target: Retired
 
 ## Required changes
 
-- [ ] Re-run the production consumer census and document the zero-consumer
+- [x] Re-run the production consumer census and document the zero-consumer
       result at implementation time.
-- [ ] Move any serializer/writer required by an existing benchmark/tool into
+- [x] Move any serializer/writer required by an existing benchmark/tool into
       that target as private implementation; do not export it as an engine
       module.
-- [ ] Delete `Runtime.MethodFigureExport`, its runtime CMake entries,
+- [x] Delete `Runtime.MethodFigureExport`, its runtime CMake entries,
       production documentation, and unit tests that only validate otherwise
       unused runtime functionality.
-- [ ] Preserve atomic-write/path-validation coverage only where a concrete
+- [x] Preserve atomic-write/path-validation coverage only where a concrete
       remaining tool actually performs those writes.
 
 ## Tests
 
-- [ ] Existing benchmark/tool tests cover any retained private serializer at
+- [x] Existing benchmark/tool tests cover any retained private serializer at
       its real call site.
-- [ ] The default CPU gate passes after module and direct unit-test removal.
-- [ ] Structural source/module inventory checks prove no production
+- [x] The default CPU gate passes after module and direct unit-test removal.
+- [x] Structural source/module inventory checks prove no production
       `MethodFigureExport` symbol remains.
 
 ## Docs
 
-- [ ] Remove the runtime module inventory/README entry and point any real
+- [x] Remove the runtime module inventory/README entry and point any real
       exporter documentation at its concrete tool.
-- [ ] Regenerate the module inventory and refresh task/session records.
+- [x] Regenerate the module inventory and refresh task/session records.
 
 ## Acceptance criteria
 
-- [ ] Runtime exports no method-figure serializer/writer surface without a
+- [x] Runtime exports no method-figure serializer/writer surface without a
       runtime consumer.
-- [ ] Any retained code is private to a concrete benchmark/tool and tested
+- [x] Any retained code is private to a concrete benchmark/tool and tested
       through that workflow.
-- [ ] The old module, CMake entries, and orphan tests are deleted.
+- [x] The old module, CMake entries, and orphan tests are deleted.
 
 ## Verification
 

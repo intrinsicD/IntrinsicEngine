@@ -11,7 +11,7 @@ Root scanned: `src`
 | `app` | 7 |
 | `assets` | 12 |
 | `core` | 41 |
-| `ecs` | 28 |
+| `ecs` | 27 |
 | `geometry` | 103 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 83 |
+| `runtime` | 80 |
 
 ## Modules
 
@@ -101,7 +101,6 @@ Root scanned: `src`
 | `Extrinsic.ECS.Component.RigidBody` | `src/ecs/Components/ECS.Component.RigidBody.cppm` | `ecs` |
 | `Extrinsic.ECS.Components.Selection` | `src/ecs/Components/ECS.Component.Selection.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.ShadowCaster` | `src/ecs/Components/ECS.Component.ShadowCaster.cppm` | `ecs` |
-| `Extrinsic.ECS.Component.SpatialDebugBinding` | `src/ecs/Components/ECS.Component.SpatialDebugBinding.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.StableId` | `src/ecs/Components/ECS.Component.StableId.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.Transform` | `src/ecs/Components/ECS.Component.Transform.Local.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.Transform.WorldMatrix` | `src/ecs/Components/ECS.Component.Transform.World.cppm` | `ecs` |
@@ -377,7 +376,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.MeshAttributeTextureBake` | `src/runtime/Runtime.MeshAttributeTextureBake.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshGeometryPacker` | `src/runtime/Runtime.MeshGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshPrimitiveViewPacker` | `src/runtime/Runtime.MeshPrimitiveViewPacker.cppm` | `runtime` |
-| `Extrinsic.Runtime.MethodFigureExport` | `src/runtime/Runtime.MethodFigureExport.cppm` | `runtime` |
 | `Extrinsic.Runtime.Module` | `src/runtime/Runtime.Module.cppm` | `runtime` |
 | `Extrinsic.Runtime.ModuleSchedule` | `src/runtime/Runtime.ModuleSchedule.cppm` | `runtime` |
 | `Extrinsic.Runtime.ObjectSpaceNormalBakeBinding` | `src/runtime/Runtime.ObjectSpaceNormalBakeBinding.cppm` | `runtime` |
@@ -415,8 +413,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.WorldRegistry` | `src/runtime/Runtime.WorldRegistry.cppm` | `runtime` |
 | `Extrinsic.Runtime.SceneDocumentModule` | `src/runtime/Scene/Runtime.SceneDocumentModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.SceneInteractionModule` | `src/runtime/Scene/Runtime.SceneInteractionModule.cppm` | `runtime` |
-| `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
-| `Extrinsic.Runtime.SpatialDebugClosestFace` | `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **392**
+Total modules: **388**

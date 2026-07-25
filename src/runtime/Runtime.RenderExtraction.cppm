@@ -22,7 +22,6 @@ export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.RenderWorldPool;
-import Extrinsic.Runtime.SpatialDebugAdapters;
 import Extrinsic.Runtime.WorldHandle;
 export import Extrinsic.Runtime.VisualizationAdapters;
 
@@ -220,27 +219,6 @@ export namespace Extrinsic::Runtime
         std::uint32_t MeshVertexViewFailedPack{0};
         std::uint32_t MeshVertexViewMissingPositions{0};
         std::uint32_t MeshPrimitiveViewFreeRetires{0};
-
-        // RUNTIME-082 Slice D — spatial-debug adapter pump counters. Folded
-        // per-frame from the active adapter set against the entity view of
-        // `ECS::Components::SpatialDebugBinding`. The accumulator fields
-        // mirror `SpatialDebugAdapterStats` summed across every invoked
-        // adapter; the count fields mirror the per-frame submitted batch
-        // span sizes (so they remain consistent with what the renderer
-        // sees in `RuntimeRenderSnapshotBatch`).
-        std::uint32_t SpatialDebugBindingsObserved{0};
-        std::uint32_t SpatialDebugAdaptersInvoked{0};
-        std::uint32_t SpatialDebugMissingAdapterCount{0};
-        std::uint32_t SpatialDebugBoundsCount{0};
-        std::uint32_t SpatialDebugHierarchyNodeCount{0};
-        std::uint32_t SpatialDebugSplitPlaneCount{0};
-        std::uint32_t SpatialDebugConvexHullVertexCount{0};
-        std::uint32_t SpatialDebugConvexHullEdgeCount{0};
-        std::uint32_t SpatialDebugPointMarkerCount{0};
-        std::uint32_t SpatialDebugLeafNodeAccumulator{0};
-        std::uint32_t SpatialDebugInnerNodeAccumulator{0};
-        std::uint32_t SpatialDebugEmptyNodeSkippedAccumulator{0};
-        std::uint32_t SpatialDebugDepthCapTruncationAccumulator{0};
 
         // RUNTIME-083 Slices B/E — runtime visualization adapter pump counters.
         // `VisualizationAdapterScalarConfigsObserved` preserves the original
@@ -529,26 +507,6 @@ export namespace Extrinsic::Runtime
             FindGpuRenderableAvailability(std::uint32_t stableEntityId) const noexcept;
 
         [[nodiscard]] const ProceduralGeometryCache& GetProceduralGeometryCacheForTest() const noexcept;
-
-        // RUNTIME-082 Slice D — adapter-ownership surface.
-        //
-        // The cache owns adapter instances via `std::unique_ptr` and mirrors
-        // each registration into an embedded `SpatialDebugAdapterRegistry`
-        // that the extraction pump consults per
-        // `ECS::Components::SpatialDebugBinding`. Callers transfer adapter
-        // ownership at registration time; `Unregister` destroys the adapter
-        // instance and clears the registry slot. Re-registering an existing
-        // key replaces (and destroys) the prior adapter.
-        //
-        // The source geometry tree the adapter wraps remains caller-owned;
-        // callers must `UnregisterSpatialDebugAdapter` before the source tree
-        // is destroyed to avoid the adapter dereferencing freed memory on
-        // the next `ExtractAndSubmit`.
-        void RegisterSpatialDebugAdapter(std::uint64_t key,
-                                          std::unique_ptr<ISpatialDebugAdapter> adapter);
-        bool UnregisterSpatialDebugAdapter(std::uint64_t key) noexcept;
-        [[nodiscard]] std::size_t GetSpatialDebugAdapterCount() const noexcept;
-        [[nodiscard]] const SpatialDebugAdapterRegistry& GetSpatialDebugRegistryForTest() const noexcept;
 
         enum class VisualizationAdapterBindingKind : std::uint8_t
         {

@@ -38,7 +38,6 @@ import Extrinsic.ECS.Component.Culling.Local;
 import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.MetaData;
-import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
@@ -1234,76 +1233,6 @@ TEST(SandboxEditorUi, PrimitiveViewCommandTranslatesToRenderHintComponents)
                       .EnableEdgeView = true,
                   }),
               Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
-}
-TEST(SandboxEditorUi, SpatialDebugBindingCommandRoutesThroughSelectedEntity)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "DebugMesh");
-    AddTriangleMeshSource(registry, mesh);
-    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
-    const std::uint32_t stableId =
-        Runtime::SelectionController::ToStableEntityId(mesh);
-
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    context.VisualizationCommandsAvailable = true;
-
-    Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
-    ASSERT_TRUE(frame.Visualization.GeometryDomainControlsAvailable);
-    ASSERT_TRUE(frame.Visualization.HasSelectedEntity);
-    EXPECT_FALSE(frame.Visualization.SpatialDebug.HasBinding);
-
-    const Runtime::SandboxEditorSpatialDebugBindingCommand enable{
-        .StableEntityId = stableId,
-        .EnableBinding = true,
-        .Kind = ECSC::SpatialDebugGeometryKind::Octree,
-        .RegistryKey = 42u,
-        .LeafOnly = true,
-        .OccupancyOnly = true,
-        .MaxDepth = 7u,
-    };
-
-    EXPECT_EQ(Runtime::ApplySandboxEditorSpatialDebugBindingCommand(
-                  context,
-                  enable),
-              Runtime::SandboxEditorCommandStatus::Applied);
-    ASSERT_TRUE(registry.Raw().all_of<ECSC::SpatialDebugBinding>(mesh));
-    const auto& binding =
-        registry.Raw().get<ECSC::SpatialDebugBinding>(mesh);
-    EXPECT_EQ(binding.Kind, ECSC::SpatialDebugGeometryKind::Octree);
-    EXPECT_EQ(binding.RegistryKey, 42u);
-    EXPECT_TRUE(binding.LeafOnly);
-    EXPECT_TRUE(binding.OccupancyOnly);
-    EXPECT_EQ(binding.MaxDepth, 7u);
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorSpatialDebugKind(
-                     binding.Kind),
-                 "Octree");
-
-    frame = Runtime::BuildSandboxEditorPanelFrame(context);
-    ASSERT_TRUE(frame.Visualization.SpatialDebug.HasBinding);
-    EXPECT_EQ(frame.Visualization.SpatialDebug.RegistryKey, 42u);
-
-    EXPECT_EQ(Runtime::ApplySandboxEditorSpatialDebugBindingCommand(
-                  context,
-                  enable),
-              Runtime::SandboxEditorCommandStatus::NoChange);
-
-    EXPECT_EQ(Runtime::ApplySandboxEditorSpatialDebugBindingCommand(
-                  context,
-                  Runtime::SandboxEditorSpatialDebugBindingCommand{
-                      .StableEntityId = stableId,
-                      .EnableBinding = false,
-                  }),
-              Runtime::SandboxEditorCommandStatus::Applied);
-    EXPECT_FALSE(registry.Raw().all_of<ECSC::SpatialDebugBinding>(mesh));
-
-    Runtime::SandboxEditorContext unavailable = context;
-    unavailable.VisualizationCommandsAvailable = false;
-    EXPECT_EQ(Runtime::ApplySandboxEditorSpatialDebugBindingCommand(
-                  unavailable,
-                  enable),
-              Runtime::SandboxEditorCommandStatus::MissingVisualizationCommands);
 }
 TEST(SandboxEditorUi, VisualizationConfigCommandRoutesThroughSelectedEntity)
 {

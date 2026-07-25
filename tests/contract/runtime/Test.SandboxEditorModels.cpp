@@ -38,7 +38,6 @@ import Extrinsic.ECS.Component.Culling.Local;
 import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.MetaData;
-import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
@@ -2009,69 +2008,6 @@ TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnLaneOverrideSignature)
     EXPECT_EQ(cacheStats.VisualizationModelCacheMisses, 2u);
     EXPECT_EQ(cacheStats.VisualizationModelCacheHits, 1u);
 }
-TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnSpatialDebugSignature)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
-    AddTriangleMeshSource(registry, mesh);
-    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
-
-    Runtime::SandboxEditorSelectedModelCache cache{};
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    context.SelectedModelCache = &cache;
-    context.VisualizationCommandsAvailable = true;
-
-    const Runtime::SandboxEditorPanelFrame first =
-        Runtime::BuildSandboxEditorPanelFrame(
-            context,
-            MakeOnlyVisualizationModelBuildRequest());
-    ASSERT_TRUE(first.Visualization.HasSelectedEntity);
-    EXPECT_FALSE(first.Visualization.SpatialDebug.HasBinding);
-    EXPECT_EQ(first.ModelBuildStats.VisualizationModelCacheMisses, 1u);
-    EXPECT_EQ(first.ModelBuildStats.VisualizationModelBuilds, 1u);
-
-    const Runtime::SandboxEditorPanelFrame cached =
-        Runtime::BuildSandboxEditorPanelFrame(
-            context,
-            MakeOnlyVisualizationModelBuildRequest());
-    ASSERT_TRUE(cached.Visualization.HasSelectedEntity);
-    EXPECT_EQ(cached.ModelBuildStats.VisualizationModelCacheHits, 1u);
-    EXPECT_EQ(cached.ModelBuildStats.VisualizationModelBuilds, 0u);
-
-    registry.Raw().emplace_or_replace<ECSC::SpatialDebugBinding>(
-        mesh,
-        ECSC::SpatialDebugBinding{
-            .Kind = ECSC::SpatialDebugGeometryKind::Octree,
-            .RegistryKey = 0xBEEFu,
-            .LeafOnly = true,
-            .OccupancyOnly = true,
-            .MaxDepth = 12u,
-        });
-
-    const Runtime::SandboxEditorPanelFrame changed =
-        Runtime::BuildSandboxEditorPanelFrame(
-            context,
-            MakeOnlyVisualizationModelBuildRequest());
-    ASSERT_TRUE(changed.Visualization.HasSelectedEntity);
-    EXPECT_EQ(changed.ModelBuildStats.VisualizationModelCacheMisses, 1u);
-    EXPECT_EQ(changed.ModelBuildStats.VisualizationModelCacheHits, 0u);
-    EXPECT_EQ(changed.ModelBuildStats.VisualizationModelBuilds, 1u);
-    ASSERT_TRUE(changed.Visualization.SpatialDebug.HasBinding);
-    EXPECT_EQ(changed.Visualization.SpatialDebug.Kind,
-              ECSC::SpatialDebugGeometryKind::Octree);
-    EXPECT_EQ(changed.Visualization.SpatialDebug.RegistryKey, 0xBEEFu);
-    EXPECT_TRUE(changed.Visualization.SpatialDebug.LeafOnly);
-    EXPECT_TRUE(changed.Visualization.SpatialDebug.OccupancyOnly);
-    EXPECT_EQ(changed.Visualization.SpatialDebug.MaxDepth, 12u);
-
-    const Runtime::SandboxEditorSelectedModelCacheStats cacheStats =
-        cache.Stats();
-    EXPECT_EQ(cacheStats.VisualizationModelCacheMisses, 2u);
-    EXPECT_EQ(cacheStats.VisualizationModelCacheHits, 1u);
-    EXPECT_EQ(cacheStats.Entries, 1u);
-}
 TEST(SandboxEditorUi, VisualizationModelCacheInvalidatesOnAdapterBindingRevision)
 {
     using Binding = Runtime::RenderExtractionCache::VisualizationAdapterBinding;
@@ -2837,12 +2773,6 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
     const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
     AddTriangleMeshSource(registry, mesh);
     registry.Raw().emplace<G::RenderSurface>(mesh);
-    registry.Raw().emplace<ECSC::SpatialDebugBinding>(
-        mesh,
-        ECSC::SpatialDebugBinding{
-            .Kind = ECSC::SpatialDebugGeometryKind::Bvh,
-            .RegistryKey = 77u,
-        });
     G::VisualizationConfig meshVisualization{};
     meshVisualization.Source = G::VisualizationConfig::ColorSource::UniformColor;
     meshVisualization.Color = glm::vec4{1.0f};
@@ -2892,8 +2822,6 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
     EXPECT_FALSE(meshModel.HasPrimitiveViewSettings);
     EXPECT_TRUE(meshModel.VisualizationControlsAvailable);
     EXPECT_TRUE(meshModel.Visualization.HasSelectedEntity);
-    EXPECT_TRUE(meshModel.Visualization.SpatialDebug.HasBinding);
-    EXPECT_EQ(meshModel.Visualization.SpatialDebug.RegistryKey, 77u);
     EXPECT_TRUE(meshModel.Visualization.Visualization.HasConfig);
     ASSERT_TRUE(meshModel.Primitive.HasPrimitive);
     EXPECT_TRUE(meshModel.Primitive.HasFaceId);

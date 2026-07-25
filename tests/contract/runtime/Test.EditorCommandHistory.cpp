@@ -8,7 +8,6 @@
 #include <glm/gtc/quaternion.hpp>
 
 import Extrinsic.ECS.Component.Hierarchy;
-import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
@@ -187,20 +186,6 @@ TEST(EditorCommandHistory, VisualizationSpatialAndPrimitiveAdaptersAreReversible
     EXPECT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(entity));
     ASSERT_TRUE(history.Undo().Succeeded());
     EXPECT_FALSE(registry.Raw().all_of<G::VisualizationConfig>(entity));
-
-    ECSC::SpatialDebugBinding binding{};
-    binding.RegistryKey = 42u;
-    ASSERT_TRUE(history.Execute(
-        Runtime::MakeSpatialDebugBindingCommand(
-            Runtime::EditorSpatialDebugBindingCommand{
-                .Scene = &registry,
-                .StableEntityId = stableId,
-                .Before = std::nullopt,
-                .After = binding,
-            })).Succeeded());
-    EXPECT_TRUE(registry.Raw().all_of<ECSC::SpatialDebugBinding>(entity));
-    ASSERT_TRUE(history.Undo().Succeeded());
-    EXPECT_FALSE(registry.Raw().all_of<ECSC::SpatialDebugBinding>(entity));
 
     Runtime::MeshPrimitiveViewSettings stored{};
     auto setSettings = [&stored](std::uint32_t, Runtime::MeshPrimitiveViewSettings next)

@@ -25,7 +25,6 @@ target_sources(${target_name}
         Runtime.JobServiceGpuQueueBridge.cppm
         Modules/Clustering/Runtime.ClusteringModule.cppm
         Runtime.MeshAttributeTextureBake.cppm
-        Runtime.MethodFigureExport.cppm
         Runtime.ObjectSpaceNormalBakeBinding.cppm
         Runtime.ObjectSpaceNormalBakeQueue.cppm
         Runtime.ObjectSpaceNormalBakeService.cppm
@@ -88,8 +87,6 @@ target_sources(${target_name}
         Runtime.VertexAttributeBinding.cppm
         Runtime.VertexChannelBindings.cppm
         Runtime.VertexChannelStreams.cppm
-        SpatialDebug/Runtime.SpatialDebugAdapters.cppm
-        SpatialDebug/Runtime.SpatialDebugClosestFace.cppm
         Visualization/Runtime.VisualizationAdapters.cppm
         PRIVATE
         FILE_SET render_extraction_impl TYPE CXX_MODULES FILES
@@ -112,7 +109,6 @@ target_sources(${target_name}
         Runtime.JobServiceGpuQueueBridge.cpp
         Modules/Clustering/Runtime.ClusteringModule.cpp
         Runtime.MeshAttributeTextureBake.cpp
-        Runtime.MethodFigureExport.cpp
         Runtime.ObjectSpaceNormalBakeBinding.cpp
         Runtime.ObjectSpaceNormalBakeQueue.cpp
         Runtime.ObjectSpaceNormalBakeService.cpp
@@ -180,8 +176,6 @@ target_sources(${target_name}
         Runtime.TextureBakeModule.cpp
         Runtime.VertexAttributeBinding.cpp
         Runtime.VertexChannelStreams.cpp
-        SpatialDebug/Runtime.SpatialDebugAdapters.cpp
-        SpatialDebug/Runtime.SpatialDebugClosestFace.cpp
         Visualization/Runtime.VisualizationAdapters.cpp
 )
 

@@ -28,7 +28,6 @@ The handoff question matters because three different domains touch this seam:
 
 Concrete camera controllers (orbit, fly, free-look, top-down) live as runtime modules under `Extrinsic.Runtime.CameraControllers`. The naming mirrors the runtime-adapter pattern already used by:
 
-- `Extrinsic.Runtime.SpatialDebugAdapters` (`GRAPHICS-011Q`).
 - `Extrinsic.Runtime.VisualizationAdapters` (`GRAPHICS-014Q`).
 - `Extrinsic.Runtime.AssetBridges.Texture` (`GRAPHICS-015Q`).
 

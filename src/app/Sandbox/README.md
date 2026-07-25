@@ -134,8 +134,7 @@ local-transform edit commands through
 runtime-owned seams, replaces runtime camera-controller slots through the
 optional service-registry lookup, toggles persistent mesh edge/vertex primitive
 views by authoring ECS `RenderEdges` / `RenderPoints` through runtime
-command/history seams, routes selected-entity spatial-debug options through
-`SpatialDebugBinding`, routes material/scalar/color visualization choices
+command/history seams, routes material/scalar/color visualization choices
 through `VisualizationConfig`, routes visualization adapter bindings through
 runtime extraction-cache state, and submits frame-driven file/import commands
 through the exact published `AssetImportPipeline::QueueGeometryImport(...)` or

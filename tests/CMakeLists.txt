@@ -232,7 +232,6 @@ intrinsic_test_object_lib(EcsContractTestObjs
     # broader runtime/graphics integration targets.
 if(TARGET ExtrinsicRuntime)
     set(_runtime_unit_test_files
-        Test.MethodFigureExport.cpp
         Test.RegistrationAlignment.cpp
     )
     intrinsic_resolve_test_sources(_runtime_unit_test_sources
@@ -326,8 +325,6 @@ if(TARGET ExtrinsicRuntime)
         Test.SelectionReadbackCorrelation.cpp
         Test.SelectionSnapshotExtraction.cpp
         Test.SelectionStableLookupComposition.cpp
-        Test.SpatialDebugAdapters.cpp
-        Test.SpatialDebugClosestFace.cpp
         Test.StableEntityLookup.cpp
         Test.VertexAttributeBinding.cpp
         Test.VertexChannelStreams.cpp

@@ -8,6 +8,45 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-199`](RUNTIME-199-retire-dormant-spatial-debug-registry.md) — the dormant
+spatial-debug adapter registry retired on 2026-07-25 at `Retired`. A source census
+found zero production registration sites: only
+`Test.RuntimeRenderExtraction.cpp` ever called `RegisterSpatialDebugAdapter`,
+while the Sandbox shipped "Enable BVH debug" / "Clear debug" buttons that
+authored an opaque `SpatialDebugBinding` key nothing could resolve, so the
+control could only ever increment `SpatialDebugMissingAdapterCount`. The
+`ISpatialDebugAdapter` interface, all four BVH/KD-tree/octree/convex-hull
+adapters, the opaque-key registry, `Runtime.SpatialDebugClosestFace`, the ECS
+binding component, the extraction pump and its thirteen stats counters, the
+editor undo/redo command, the selected-model cache signature contribution, the
+serialization counter, and both UI control sites are deleted with no replacement
+abstraction. The frozen graphics `SpatialDebugVisualizers` packet/pass contract
+and the `RuntimeRenderSnapshotBatch::SpatialDebug*` spans are deliberately
+preserved and now default-empty until a real producer exists; geometry query
+coverage stays with the geometry owner. ADR-0008 was amended per its own
+amendment clause rather than silently superseded, recording that the
+registry-based umbrella shape was speculative and that a future producer (for
+example `RUNTIME-189`) owns a concrete copied record instead. The full CPU gate
+passed 4236/4236 in 61.97 seconds after a clean 1287-target build: the
+4264 → 4235 delta is exactly the 29 deleted dead-surface cases, and the +1 is a
+new `RetiredSpatialDebugRegistryHasNoProductionSurface` structural test that
+pins the deletion while asserting the preserved graphics packet contract. Strict layering
+(0 violations across 6695 references), doc-link, docs-sync, test-layout, and
+root-hygiene checks passed; the module inventory dropped to 388 modules.
+
+[`RUNTIME-204`](RUNTIME-204-withdraw-dormant-method-figure-export.md) — the dormant
+runtime method-figure export seam retired on 2026-07-25 at `Retired`. The
+consumer census confirmed `Extrinsic.Runtime.MethodFigureExport` had no
+production caller; its sole importer was its own unit test. Because no
+benchmark or tool actually performed the serialization, nothing needed
+relocation into a concrete owner, so the module, its CMake entries, its
+`docs/methods/figure-data-export.md` page, and the orphan unit test were deleted
+rather than preserved as a presumed future extension. `RenderArtifactRegistry`
+and render-artifact publication keep their real runtime ownership and were not
+touched. The full CPU gate passed 4264/4264 in 56.93 seconds after a clean
+1282-target build; strict layering, doc-link, docs-sync, test-layout, and
+root-hygiene checks passed, and the module inventory regenerated to 391 modules.
+
 [`RUNTIME-190`](RUNTIME-190-gpu-property-texture-bake-module.md) — GPU property
 texture baking retired on 2026-07-21 at `Operational`. One app-composed
 `TextureBakeModule` now owns the generalized GPU UV-raster participant,

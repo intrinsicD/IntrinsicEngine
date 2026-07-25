@@ -10,7 +10,6 @@ module;
 
 export module Extrinsic.Runtime.EditorCommandHistory;
 
-import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
@@ -159,15 +158,6 @@ export namespace Extrinsic::Runtime
         std::string Label{"Change Visualization"};
     };
 
-    struct EditorSpatialDebugBindingCommand
-    {
-        ECS::Scene::Registry* Scene{nullptr};
-        std::uint32_t StableEntityId{0u};
-        std::optional<ECS::Components::SpatialDebugBinding> Before{};
-        std::optional<ECS::Components::SpatialDebugBinding> After{};
-        std::string Label{"Change Spatial Debug Binding"};
-    };
-
     enum class EditorHierarchyDeletePolicy : std::uint8_t
     {
         DeleteDescendants,
@@ -191,8 +181,6 @@ export namespace Extrinsic::Runtime
         EditorPrimitiveViewSettingsCommand command);
     [[nodiscard]] EditorCommandRecord MakeVisualizationConfigCommand(
         EditorVisualizationConfigCommand command);
-    [[nodiscard]] EditorCommandRecord MakeSpatialDebugBindingCommand(
-        EditorSpatialDebugBindingCommand command);
     [[nodiscard]] EditorCommandRecord MakeCompoundEditorCommand(
         std::string label,
         std::vector<EditorCommandRecord> commands);

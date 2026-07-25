@@ -425,15 +425,16 @@ namespace Extrinsic::Graphics
         std::span<const DebugTrianglePacket>     DebugTriangles{};
         std::span<const TransformGizmoRenderPacket> TransformGizmos{};
 
-        // RUNTIME-082 Slice D — spatial-debug snapshot spans produced by
-        // the runtime adapter pump. Aggregated by
-        // `RenderExtractionCache::ExtractAndSubmit` from per-entity
-        // `ECS::Components::SpatialDebugBinding` lookups through the
-        // cache-owned `SpatialDebugAdapterRegistry`. Consumers that build
-        // wireframe packets feed these into
+        // Spatial-debug snapshot spans. Consumers that build wireframe
+        // packets feed these into
         // `BuildSpatialDebug{Bounds,Hierarchy,SplitPlane,ConvexHull,...}Wireframes`.
-        // Default-empty for backends and tests that do not exercise the
-        // pump.
+        //
+        // `RUNTIME-199` retired the runtime adapter registry that used to
+        // populate these spans, so no producer is currently composed and they
+        // stay default-empty. The packet contract is deliberately preserved:
+        // a feature that owns a concrete spatial-debug record (for example
+        // `RUNTIME-189`) fills them directly rather than through a generic
+        // adapter registry.
         std::span<const SpatialDebugAabb>          SpatialDebugBounds{};
         std::span<const SpatialDebugHierarchyNode> SpatialDebugHierarchyNodes{};
         std::span<const SpatialDebugSplitPlane>    SpatialDebugSplitPlanes{};

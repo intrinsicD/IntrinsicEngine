@@ -24,7 +24,6 @@ import Extrinsic.ECS.Component.Light;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.RigidBody;
 import Extrinsic.ECS.Component.ShadowCaster;
-import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Components.AssetInstance;
@@ -250,10 +249,6 @@ namespace Extrinsic::Runtime
                     sourceEntity, destinationEntity);
                 CopySerializableComponent<
                     ECSC::RigidBody::Component>(
-                    sourceRaw, destinationRaw,
-                    sourceEntity, destinationEntity);
-                CopySerializableComponent<
-                    ECSC::SpatialDebugBinding>(
                     sourceRaw, destinationRaw,
                     sourceEntity, destinationEntity);
                 CopySerializableComponent<

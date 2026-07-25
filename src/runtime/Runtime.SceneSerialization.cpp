@@ -32,7 +32,6 @@ import Extrinsic.ECS.Component.Collider;
 import Extrinsic.ECS.Component.Light;
 import Extrinsic.ECS.Component.RigidBody;
 import Extrinsic.ECS.Component.ShadowCaster;
-import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Hierarchy.Mutation;
@@ -1797,12 +1796,6 @@ namespace Extrinsic::Runtime
                 unsupported = true;
             }
 
-            if (raw.any_of<ECSC::SpatialDebugBinding>(entity))
-            {
-                ++stats.UnsupportedSpatialDebugEntities;
-                unsupported = true;
-            }
-
             if (raw.any_of<ECSC::AssetInstance::Source>(entity))
             {
                 ++stats.UnsupportedAssetInstanceEntities;
@@ -2037,7 +2030,6 @@ namespace Extrinsic::Runtime
             {"unsupportedLightEntities", stats.UnsupportedLightEntities},
             {"unsupportedShadowEntities", stats.UnsupportedShadowEntities},
             {"unsupportedPhysicsEntities", stats.UnsupportedPhysicsEntities},
-            {"unsupportedSpatialDebugEntities", stats.UnsupportedSpatialDebugEntities},
             {"unsupportedAssetInstanceEntities", stats.UnsupportedAssetInstanceEntities},
         };
         return root.dump(2);
@@ -2086,8 +2078,6 @@ namespace Extrinsic::Runtime
                 statsJson.value("unsupportedShadowEntities", 0u);
             stats.UnsupportedPhysicsEntities =
                 statsJson.value("unsupportedPhysicsEntities", 0u);
-            stats.UnsupportedSpatialDebugEntities =
-                statsJson.value("unsupportedSpatialDebugEntities", 0u);
             stats.UnsupportedAssetInstanceEntities =
                 statsJson.value("unsupportedAssetInstanceEntities", 0u);
         }

@@ -37,7 +37,6 @@ import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.MetaData;
-import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
@@ -800,42 +799,6 @@ namespace Extrinsic::Runtime
                 SandboxEditorSceneFileCommand{.Path = event.Path},
                 result);
             return result;
-        }
-
-        [[nodiscard]] SandboxEditorSpatialDebugBindingModel FromSpatialDebugBinding(
-            const ECSC::SpatialDebugBinding& binding) noexcept
-        {
-            return SandboxEditorSpatialDebugBindingModel{
-                .HasBinding = true,
-                .Kind = binding.Kind,
-                .RegistryKey = binding.RegistryKey,
-                .LeafOnly = binding.LeafOnly,
-                .OccupancyOnly = binding.OccupancyOnly,
-                .MaxDepth = binding.MaxDepth,
-            };
-        }
-
-        [[nodiscard]] ECSC::SpatialDebugBinding ToSpatialDebugBinding(
-            const SandboxEditorSpatialDebugBindingCommand& command) noexcept
-        {
-            return ECSC::SpatialDebugBinding{
-                .Kind = command.Kind,
-                .RegistryKey = command.RegistryKey,
-                .LeafOnly = command.LeafOnly,
-                .OccupancyOnly = command.OccupancyOnly,
-                .MaxDepth = command.MaxDepth,
-            };
-        }
-
-        [[nodiscard]] bool SameSpatialDebugBinding(
-            const ECSC::SpatialDebugBinding& lhs,
-            const ECSC::SpatialDebugBinding& rhs) noexcept
-        {
-            return lhs.Kind == rhs.Kind &&
-                   lhs.RegistryKey == rhs.RegistryKey &&
-                   lhs.LeafOnly == rhs.LeafOnly &&
-                   lhs.OccupancyOnly == rhs.OccupancyOnly &&
-                   lhs.MaxDepth == rhs.MaxDepth;
         }
 
         [[nodiscard]] SandboxEditorVisualizationConfigModel FromVisualizationConfig(
@@ -4445,26 +4408,6 @@ namespace Extrinsic::Runtime
             MixSignatureFloat(signature, config->Scalar.Isolines.Width);
         }
 
-        void AppendSpatialDebugBindingSignature(
-            std::uint64_t& signature,
-            const ECSC::SpatialDebugBinding* binding) noexcept
-        {
-            if (binding == nullptr)
-            {
-                MixSignature(signature, 0u);
-                return;
-            }
-
-            MixSignature(signature, 1u);
-            MixSignature(signature,
-                         static_cast<std::uint64_t>(binding->Kind));
-            MixSignature(signature, binding->RegistryKey);
-            MixSignature(signature, binding->LeafOnly ? 1u : 0u);
-            MixSignature(signature, binding->OccupancyOnly ? 1u : 0u);
-            MixSignature(signature,
-                         static_cast<std::uint64_t>(binding->MaxDepth));
-        }
-
         [[nodiscard]] std::uint64_t VisualizationStateSignatureForEntity(
             const entt::registry& raw,
             const ECS::EntityHandle entity,
@@ -4475,9 +4418,6 @@ namespace Extrinsic::Runtime
                 return 0u;
 
             std::uint64_t signature = kSandboxEditorSignatureOffset;
-            AppendSpatialDebugBindingSignature(
-                signature,
-                raw.try_get<ECSC::SpatialDebugBinding>(entity));
             AppendVisualizationConfigSignature(
                 signature,
                 EffectiveVisualizationConfigForTarget(raw, entity, target));
@@ -10688,13 +10628,6 @@ namespace Extrinsic::Runtime
                           return out;
                       }();
 
-            if (const auto* binding =
-                    raw.try_get<ECSC::SpatialDebugBinding>(*selected);
-                binding != nullptr)
-            {
-                model.SpatialDebug = FromSpatialDebugBinding(*binding);
-            }
-
             model.Visualization =
                 BuildVisualizationConfigModelForTarget(raw, *selected, target);
             if (model.AdapterBindingControlsAvailable)
@@ -12015,23 +11948,6 @@ namespace Extrinsic::Runtime
             return "FreeLook";
         case Core::Config::CameraControllerKind::TopDown:
             return "TopDown";
-        }
-        return "Unknown";
-    }
-
-    const char* DebugNameForSandboxEditorSpatialDebugKind(
-        const ECSC::SpatialDebugGeometryKind kind) noexcept
-    {
-        switch (kind)
-        {
-        case ECSC::SpatialDebugGeometryKind::Bvh:
-            return "Bvh";
-        case ECSC::SpatialDebugGeometryKind::KdTree:
-            return "KdTree";
-        case ECSC::SpatialDebugGeometryKind::Octree:
-            return "Octree";
-        case ECSC::SpatialDebugGeometryKind::ConvexHull:
-            return "ConvexHull";
         }
         return "Unknown";
     }
@@ -13394,67 +13310,6 @@ namespace Extrinsic::Runtime
             context,
             ToSandboxEditorCommandStatus(
                 ApplyRenderHintState(context.Scene, command.StableEntityId, after)));
-    }
-
-    SandboxEditorCommandStatus ApplySandboxEditorSpatialDebugBindingCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorSpatialDebugBindingCommand& command)
-    {
-        if (!context.VisualizationCommandsAvailable)
-            return SandboxEditorCommandStatus::MissingVisualizationCommands;
-        if (context.Scene == nullptr)
-            return SandboxEditorCommandStatus::MissingScene;
-
-        entt::registry& raw = context.Scene->Raw();
-        const ECS::EntityHandle entity =
-            SelectionController::ToEntityHandle(command.StableEntityId);
-        if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
-            return SandboxEditorCommandStatus::StaleEntity;
-
-        const auto* current = raw.try_get<ECSC::SpatialDebugBinding>(entity);
-        const std::optional<ECSC::SpatialDebugBinding> before =
-            current != nullptr
-                ? std::optional<ECSC::SpatialDebugBinding>{*current}
-                : std::nullopt;
-        const std::optional<ECSC::SpatialDebugBinding> after =
-            command.EnableBinding
-                ? std::optional<ECSC::SpatialDebugBinding>{ToSpatialDebugBinding(command)}
-                : std::nullopt;
-
-        if (!after.has_value())
-        {
-            if (!before.has_value())
-                return SandboxEditorCommandStatus::NoChange;
-        }
-        else if (before.has_value() &&
-                 SameSpatialDebugBinding(*before, *after))
-        {
-            return SandboxEditorCommandStatus::NoChange;
-        }
-
-        if (context.CommandHistory != nullptr)
-        {
-            const EditorCommandHistoryResult result =
-                context.CommandHistory->Execute(
-                    MakeSpatialDebugBindingCommand(
-                        EditorSpatialDebugBindingCommand{
-                            .Scene = context.Scene,
-                            .StableEntityId = command.StableEntityId,
-                            .Before = before,
-                            .After = after,
-                            .Label = "Change Spatial Debug Binding",
-                        }));
-            return InvalidateSelectedModelCacheIfApplied(
-                context,
-                ToSandboxEditorCommandStatus(result.Status));
-        }
-
-        if (after.has_value())
-            raw.emplace_or_replace<ECSC::SpatialDebugBinding>(entity, *after);
-        else
-            raw.remove<ECSC::SpatialDebugBinding>(entity);
-        InvalidateSelectedModelCache(context);
-        return SandboxEditorCommandStatus::Applied;
     }
 
     SandboxEditorCommandStatus ApplySandboxEditorVisualizationConfigCommand(

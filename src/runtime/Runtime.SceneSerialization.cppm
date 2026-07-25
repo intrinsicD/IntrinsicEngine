@@ -27,7 +27,6 @@ export namespace Extrinsic::Runtime
         std::uint32_t UnsupportedLightEntities{0u};
         std::uint32_t UnsupportedShadowEntities{0u};
         std::uint32_t UnsupportedPhysicsEntities{0u};
-        std::uint32_t UnsupportedSpatialDebugEntities{0u};
         std::uint32_t UnsupportedAssetInstanceEntities{0u};
     };
 
