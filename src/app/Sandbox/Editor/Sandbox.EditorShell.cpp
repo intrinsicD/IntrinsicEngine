@@ -21,6 +21,7 @@ module Extrinsic.Sandbox.Editor.Shell;
 
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorWindowRegistry;
+import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -1463,7 +1464,7 @@ namespace Extrinsic::Sandbox::Editor
                             property.Name.c_str(),
                             DebugNameForSandboxEditorVisualizationPropertyDomain(
                                 property.Domain),
-                            DebugNameForSandboxEditorVisualizationPropertyValueKind(
+                            DebugNameForGeometryPropertyValueKind(
                                 property.ValueKind),
                             static_cast<unsigned long long>(
                                 property.ElementCount));

@@ -267,15 +267,6 @@ export namespace Extrinsic::Runtime
         PointCloudPoints,
     };
 
-    enum class SandboxEditorVisualizationPropertyValueKind : std::uint8_t
-    {
-        ScalarFloat,
-        ScalarDouble,
-        Vec3,
-        Vec4,
-        UInt32,
-    };
-
     enum class SandboxEditorVisualizationPropertyPreset : std::uint8_t
     {
         Scalar,
@@ -293,9 +284,6 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationPropertyDomain(
         SandboxEditorVisualizationPropertyDomain domain) noexcept;
-
-    [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationPropertyValueKind(
-        SandboxEditorVisualizationPropertyValueKind kind) noexcept;
 
     [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationPropertyPreset(
         SandboxEditorVisualizationPropertyPreset preset) noexcept;
@@ -2188,8 +2176,8 @@ export namespace Extrinsic::Runtime
         std::string Name{};
         SandboxEditorVisualizationPropertyDomain Domain{
             SandboxEditorVisualizationPropertyDomain::MeshVertices};
-        SandboxEditorVisualizationPropertyValueKind ValueKind{
-            SandboxEditorVisualizationPropertyValueKind::ScalarFloat};
+        Geometry::PropertyValueKind ValueKind{
+            Geometry::PropertyValueKind::Float};
         std::size_t ElementCount{0u};
         bool ScalarPresetAvailable{false};
         bool IsolinePresetAvailable{false};

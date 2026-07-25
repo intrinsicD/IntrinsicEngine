@@ -2364,7 +2364,7 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
 TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
 {
     using Domain = Runtime::SandboxEditorVisualizationPropertyDomain;
-    using Kind = Runtime::SandboxEditorVisualizationPropertyValueKind;
+    using Kind = Geometry::PropertyValueKind;
 
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
@@ -2406,7 +2406,7 @@ TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
               nullptr);
     const auto* scalar =
         FindVisualizationProperty(properties, Domain::MeshVertices, "v:temperature");
-    EXPECT_EQ(scalar->ValueKind, Kind::ScalarFloat);
+    EXPECT_EQ(scalar->ValueKind, Kind::Float);
     EXPECT_TRUE(scalar->ScalarPresetAvailable);
     EXPECT_TRUE(scalar->IsolinePresetAvailable);
     EXPECT_FALSE(scalar->ColorBufferPresetAvailable);
@@ -2434,7 +2434,7 @@ TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
     const auto* edgeWeight =
         FindVisualizationProperty(properties, Domain::MeshEdges, "e:weight");
     ASSERT_NE(edgeWeight, nullptr);
-    EXPECT_EQ(edgeWeight->ValueKind, Kind::ScalarDouble);
+    EXPECT_EQ(edgeWeight->ValueKind, Kind::Double);
     EXPECT_TRUE(edgeWeight->ScalarPresetAvailable);
     EXPECT_EQ(FindVisualizationProperty(properties,
                                         Domain::MeshEdges,
@@ -2485,8 +2485,7 @@ TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
     EXPECT_STREQ(Runtime::DebugNameForSandboxEditorVisualizationPropertyDomain(
                      Domain::PointCloudPoints),
                  "PointCloudPoints");
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorVisualizationPropertyValueKind(
-                     Kind::Vec4),
+    EXPECT_STREQ(Runtime::DebugNameForGeometryPropertyValueKind(Kind::Vec4),
                  "Vec4");
 }
 TEST(SandboxEditorUi, PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection)

@@ -22,7 +22,20 @@ each chunk builds, passes the CPU gate, and commits independently.
       identity, and each distinct failure mode (unsupported domain, missing
       name, missing property, kind mismatch, count mismatch, non-finite).
       CPU gate 4242/4242.
-- [ ] **Slice B1 — retire `SandboxEditorVisualizationPropertyValueKind`** (25 refs / 5 files).
+- [x] **Slice B1 — retire `SandboxEditorVisualizationPropertyValueKind`** (25 refs / 5 files).
+      The editor-local enum was a strict subset of `Geometry::PropertyValueKind`
+      (`ScalarFloat`→`Float`, `ScalarDouble`→`Double`, `Vec3`/`Vec4`/`UInt32`
+      identical), so the model field now carries the canonical kind and the
+      hand-rolled `DetectVisualizationPropertyKind` was replaced by
+      `DetectGeometryPropertyValueKind`. Kinds outside the visualization-capable
+      set (`Bool`/`Int32`/`UInt64`/`Vec2`) fall through the existing
+      scalar/color/vector/integer predicates and are skipped, preserving the
+      old `nullopt` behavior. The per-editor debug name became one shared
+      `DebugNameForGeometryPropertyValueKind`. CPU gate 4242/4242.
+      Note: `app` may import runtime only, so the Sandbox panels pass the
+      canonical kind through without importing `Geometry.Properties` — the
+      `ExtrinsicSandboxAppStaysRuntimeOnly` structural test enforces this and
+      caught a first attempt that imported it.
 - [ ] **Slice B2 — retire `ProgressivePropertyValueKind`** (279 refs / 19 files).
 - [ ] **Slice B3 — retire `ProgressiveGeometryDomain`** (174 refs / 24 files).
 

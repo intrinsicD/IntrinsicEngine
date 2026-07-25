@@ -1076,31 +1076,11 @@ namespace Extrinsic::Runtime
                    name == "p:position";
         }
 
-        [[nodiscard]] std::optional<SandboxEditorVisualizationPropertyValueKind>
-        DetectVisualizationPropertyKind(
-            const Geometry::PropertySet& properties,
-            const std::string& name)
-        {
-            if (properties.Get<float>(name))
-                return SandboxEditorVisualizationPropertyValueKind::ScalarFloat;
-            if (properties.Get<double>(name))
-                return SandboxEditorVisualizationPropertyValueKind::ScalarDouble;
-            if (properties.Get<glm::vec3>(name))
-                return SandboxEditorVisualizationPropertyValueKind::Vec3;
-            if (properties.Get<glm::vec4>(name))
-                return SandboxEditorVisualizationPropertyValueKind::Vec4;
-            if (properties.Get<std::uint32_t>(name))
-                return SandboxEditorVisualizationPropertyValueKind::UInt32;
-            return std::nullopt;
-        }
-
         [[nodiscard]] bool IsScalarVisualizationKind(
-            const SandboxEditorVisualizationPropertyValueKind kind) noexcept
+            const Geometry::PropertyValueKind kind) noexcept
         {
-            return kind ==
-                       SandboxEditorVisualizationPropertyValueKind::ScalarFloat ||
-                   kind ==
-                       SandboxEditorVisualizationPropertyValueKind::ScalarDouble;
+            return kind == Geometry::PropertyValueKind::Float ||
+                   kind == Geometry::PropertyValueKind::Double;
         }
 
         [[nodiscard]] bool DomainSupportsVisualizationConfig(
@@ -1288,25 +1268,27 @@ namespace Extrinsic::Runtime
 
             for (const std::string& name : properties.Properties())
             {
-                const std::optional<SandboxEditorVisualizationPropertyValueKind>
-                    kind = DetectVisualizationPropertyKind(properties, name);
-                if (!kind.has_value())
+                // Kinds outside the visualization-capable set (Bool, Int32,
+                // UInt64, Vec2) fall through every predicate below and are
+                // skipped, exactly as the retired editor-local enum did by
+                // returning nullopt for them.
+                const Geometry::PropertyValueKind kind =
+                    DetectGeometryPropertyValueKind(properties, name);
+                if (kind == Geometry::PropertyValueKind::Unknown)
                     continue;
 
                 const bool internal = IsInternalVisualizationProperty(name);
                 const bool connectivity =
                     IsConnectivityVisualizationProperty(name);
                 const bool scalar =
-                    !internal && IsScalarVisualizationKind(*kind);
+                    !internal && IsScalarVisualizationKind(kind);
                 const bool color =
-                    !internal &&
-                    *kind == SandboxEditorVisualizationPropertyValueKind::Vec4;
+                    !internal && kind == Geometry::PropertyValueKind::Vec4;
                 const bool vector =
-                    !connectivity &&
-                    *kind == SandboxEditorVisualizationPropertyValueKind::Vec3;
+                    !connectivity && kind == Geometry::PropertyValueKind::Vec3;
                 const bool integer =
                     !internal && !connectivity &&
-                    *kind == SandboxEditorVisualizationPropertyValueKind::UInt32;
+                    kind == Geometry::PropertyValueKind::UInt32;
                 if (!scalar && !color && !vector && !integer)
                 {
                     continue;
@@ -1315,7 +1297,7 @@ namespace Extrinsic::Runtime
                 out.push_back(SandboxEditorVisualizationPropertyInfo{
                     .Name = name,
                     .Domain = domain,
-                    .ValueKind = *kind,
+                    .ValueKind = kind,
                     .ElementCount = properties.Size(),
                     .ScalarPresetAvailable = scalar,
                     .IsolinePresetAvailable = scalar,
@@ -12026,26 +12008,6 @@ namespace Extrinsic::Runtime
             return "GraphEdges";
         case Domain::PointCloudPoints:
             return "PointCloudPoints";
-        }
-        return "Unknown";
-    }
-
-    const char* DebugNameForSandboxEditorVisualizationPropertyValueKind(
-        const SandboxEditorVisualizationPropertyValueKind kind) noexcept
-    {
-        using Kind = SandboxEditorVisualizationPropertyValueKind;
-        switch (kind)
-        {
-        case Kind::ScalarFloat:
-            return "ScalarFloat";
-        case Kind::ScalarDouble:
-            return "ScalarDouble";
-        case Kind::Vec3:
-            return "Vec3";
-        case Kind::Vec4:
-            return "Vec4";
-        case Kind::UInt32:
-            return "UInt32";
         }
         return "Unknown";
     }

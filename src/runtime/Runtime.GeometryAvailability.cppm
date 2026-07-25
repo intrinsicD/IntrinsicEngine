@@ -221,6 +221,11 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::string_view ToString(
         GeometryPropertyResolutionStatus status) noexcept;
 
+    // Shared display name for the canonical value kind. Returns `const char*`
+    // because every current caller feeds it to a printf-style UI format.
+    [[nodiscard]] const char* DebugNameForGeometryPropertyValueKind(
+        Geometry::PropertyValueKind kind) noexcept;
+
     [[nodiscard]] bool MatchesGeometryPropertyValueKind(
         GeometryPropertyValueKindFilter expected,
         Geometry::PropertyValueKind actual) noexcept;

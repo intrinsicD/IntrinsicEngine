@@ -21,6 +21,7 @@ import Extrinsic.Sandbox.Editor.Shell;
 
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorPropertyWidgets;
+import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -1304,8 +1305,7 @@ void DrawVisualizationPropertyPresets(
     ImGui::Text(
         "%s  [%s, %s, %llu]", property.Name.c_str(),
         DebugNameForSandboxEditorVisualizationPropertyDomain(property.Domain),
-        DebugNameForSandboxEditorVisualizationPropertyValueKind(
-            property.ValueKind),
+        DebugNameForGeometryPropertyValueKind(property.ValueKind),
         static_cast<unsigned long long>(property.ElementCount));
 
     bool wroteButton = false;
