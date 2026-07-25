@@ -83,6 +83,9 @@ jobs:
       - name: Validate agent skill mirrors
         run: python3 tools/agents/sync_skills.py --check
 
+      - name: Validate ARA claim ledger (strict mode)
+        run: python3 tools/agents/check_ara_claims.py --root . --strict
+
       - name: Validate Codex config (strict mode)
         run: python3 tools/agents/check_codex_config.py --root . --strict
 
@@ -110,6 +113,7 @@ jobs:
         run: |
           python3 tests/regression/tooling/Test.CheckTaskStateLinks.py
           python3 tests/regression/tooling/Test.CheckKernelConvergence.py
+          python3 tests/regression/tooling/Test.CheckAraClaims.py
 
       - name: Validate CI timing, benchmark result, and ccache policy
         run: |
