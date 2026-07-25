@@ -6,6 +6,43 @@ maturity_target: Retired
 ---
 # RUNTIME-192 — Canonical geometry-property reference and catalog
 
+## Progress
+
+Promoted to active 2026-07-25. Migration is chunked per duplicated vocabulary so
+each chunk builds, passes the CPU gate, and commits independently.
+
+- [x] **Slice A — contract.** Canonical `GeometryPropertyRef`,
+      `GeometryPropertyCatalogSnapshot`, `GeometryPropertyResolution`, and the
+      centralized name/domain/value-kind/count/finite-value queries landed in the
+      existing `Extrinsic.Runtime.GeometryAvailability` module. Deliberately **no
+      new module**: `GeometryAvailability` already owns `GeometryElementDomain`
+      and is the resolver, so the canonical vocabulary belongs beside it and the
+      slice adds zero files. Six contract tests cover every element domain and
+      value kind, deterministic catalog order, source/property generation
+      identity, and each distinct failure mode (unsupported domain, missing
+      name, missing property, kind mismatch, count mismatch, non-finite).
+      CPU gate 4242/4242.
+- [ ] **Slice B1 — retire `SandboxEditorVisualizationPropertyValueKind`** (25 refs / 5 files).
+- [ ] **Slice B2 — retire `ProgressivePropertyValueKind`** (279 refs / 19 files).
+- [ ] **Slice B3 — retire `ProgressiveGeometryDomain`** (174 refs / 24 files).
+
+### Design decisions taken in Slice A
+
+- **`Any` is a filter, not a value kind.** `ProgressivePropertyValueKind::Any`
+  put "no constraint" alongside real kinds, so every switch over it carried an
+  unreachable case. The canonical form is
+  `GeometryPropertyValueKindFilter = std::optional<Geometry::PropertyValueKind>`,
+  where `std::nullopt` means unconstrained.
+- **`MeshSurface` is a job scope, not a property domain.** Census showed
+  `ProgressiveGeometryDomain::MeshSurface` resolves to `nullptr` /
+  `UnsupportedDomain` in every property path and is only ever used as a
+  `DerivedJobKey` discriminator. It must **not** enter `GeometryElementDomain`.
+  Slice B3 gives `DerivedJobKey` its own local scope enum instead — noting that
+  `RUNTIME-194` deletes `Runtime.DerivedJobGraph` outright, so that enum should
+  stay module-private and short-lived.
+- **Finite-value scanning is opt-in** (`requireFiniteValues`) because it is O(n)
+  over the property and only bake-like consumers need it.
+
 ## Goal
 
 - Establish one pointer-free semantic runtime vocabulary for referring to a
