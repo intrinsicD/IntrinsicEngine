@@ -37,6 +37,27 @@ each chunk builds, passes the CPU gate, and commits independently.
       `ExtrinsicSandboxAppStaysRuntimeOnly` structural test enforces this and
       caught a first attempt that imported it.
 - [ ] **Slice B2 — retire `ProgressivePropertyValueKind`** (279 refs / 19 files).
+      Value mapping is mechanical: `ScalarFloat`→`Float`, `ScalarDouble`→`Double`,
+      `UInt32`/`Vec2`/`Vec3`/`Vec4`/`Unknown` identical. Two non-mechanical parts:
+      - `Any` → `GeometryPropertyValueKindFilter` (`std::nullopt`). Affects the
+        `ExpectedValueKind` fields on `ProgressivePropertyBindingDescriptor`,
+        `SelectedMeshTextureBake`, and four `SandboxEditorFacades` structs, the
+        `expectedValueKind = Any` default parameters, and the
+        `expected == Any || expected == actual` comparisons (replace with
+        `MatchesGeometryPropertyValueKind`). Fields named `ActualValueKind` /
+        `Kind` / `ValueKind` take the plain canonical kind, not the filter.
+      - **Wire-format constraint (verified).** `ToString` /
+        `TryParseProgressivePropertyValueKind` back a *persisted* scene-file
+        format: `Runtime.SceneSerialization.cpp` parses the JSON fields `"kind"`
+        (line ~194) and `"expectedValueKind"` (line ~1090) with the legacy
+        strings `"Any" | "Unknown" | "ScalarFloat" | "ScalarDouble" | "UInt32" |
+        "Vec2" | "Vec3" | "Vec4"`. Migrating the in-memory type must **not**
+        change those strings, or existing scene documents fail to load. Keep a
+        serialization-local mapping between the canonical kind/filter and the
+        legacy wire strings; do **not** derive the wire string from
+        `DebugNameForGeometryPropertyValueKind`, which yields `Float`/`Double`.
+        A round-trip test over a scene document written before this slice is the
+        acceptance evidence.
 - [ ] **Slice B3 — retire `ProgressiveGeometryDomain`** (174 refs / 24 files).
 
 ### Design decisions taken in Slice A
