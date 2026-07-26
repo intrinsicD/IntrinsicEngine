@@ -14,12 +14,30 @@ derivable from the tree.
 
 ### Where the work stands
 
-- Last commit: `2214ddf9` (RUNTIME-194 Slice A). Working tree clean.
-- Default CPU gate: **4255/4255**, one skip
+Updated 2026-07-26 (second session).
+
+- Last commit: `6cb2152b` (Slice B1). Working tree clean.
+- Default CPU gate: **4260/4260**, one skip
   (`GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl`, expected on a
   headless host). Strict layering, docs-sync, test-layout, root-hygiene, and all
   task validators pass.
-- Slice A is landed and committed. **Slice B has not been started.**
+- Slice A landed in `2214ddf9`. **Slice B is in progress**: `B0` (`73dedb2a`,
+  the unpublished-finalizer contract gap) and `B1` (`6cb2152b`,
+  `VisualizationAdapters`) are landed. `B2`–`B5` remain — see the per-lane
+  checklist under `## Progress`, which carries the reasoning for each.
+
+### Next action
+
+Take `B3` (`SceneDocumentModule`, two submit sites) before the coupled
+`B2`+`B4` import lane. Reason: `B3` is the first lane that actually uses
+`FinalizeUnpublishedOnMainThread` in production, so it validates `B0` against a
+real consumer while still being confined to one module — whereas `B2`+`B4` must
+flip two public structs in `AssetImportPipeline`'s interface at once.
+
+Read `## Progress` -> Slice B for the lane list, the two standing obligations
+every lane owes (the `ProductionAsyncSubmissionsCarryOwningWorldScope`
+source-text assertions and `src/runtime/README.md`), and the B0 lesson about
+never asserting on a fixed drain count.
 
 ### Verify the checkpoint before changing anything
 
