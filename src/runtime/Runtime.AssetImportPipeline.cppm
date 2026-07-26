@@ -28,10 +28,10 @@ import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 import Geometry.HalfedgeMesh.IO;
@@ -73,7 +73,7 @@ namespace Extrinsic::Runtime
 
     export struct RuntimePostImportProcessorServices
     {
-        StreamingExecutor* Streaming{};
+        JobService* Jobs{};
         WorldHandle World{DefaultWorldHandle};
         Assets::AssetService* AssetService{};
         Graphics::GpuAssetCache* GpuAssetCache{};
@@ -215,7 +215,7 @@ namespace Extrinsic::Runtime
     {
         const bool* Initialized{};
         const Core::Config::EngineConfig* Config{};
-        StreamingExecutor* Streaming{};
+        JobService* Jobs{};
         WorldRegistry* Worlds{};
         WorldHandle World{DefaultWorldHandle};
         Assets::AssetService* AssetService{};
@@ -355,7 +355,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] Core::Result CancelAssetImportImpl(
             RuntimeAssetIngestHandle operation,
             bool allowWaitingForMainThreadApply);
-        void FinalizeCancelledStreamingImport(
+        void FinalizeUnpublishedImport(
             RuntimeAssetIngestHandle operation,
             RuntimeAssetImportRequest request);
         void RecordAssetImportEvent(
@@ -369,7 +369,7 @@ namespace Extrinsic::Runtime
 
         BorrowedBool m_Initialized{};
         BorrowedSubsystem<const Core::Config::EngineConfig> m_Config{};
-        BorrowedSubsystem<StreamingExecutor> m_StreamingExecutor{};
+        BorrowedSubsystem<JobService> m_Jobs{};
         BorrowedSubsystem<WorldRegistry> m_WorldRegistry{};
         WorldHandle m_World{DefaultWorldHandle};
         std::uint64_t m_TargetBindingEpoch{0u};
@@ -397,12 +397,12 @@ namespace Extrinsic::Runtime
         std::vector<RuntimeImportCompletedHandlerRecord>
             m_ImportCompletedHandlers{};
         std::uint64_t m_NextImportCompletedHandlerHandle{1u};
-        struct RuntimeAssetImportStreamingTask
+        struct RuntimeAssetImportJobRecord
         {
             RuntimeAssetIngestHandle Ingest{};
-            StreamingTaskHandle Streaming{};
+            JobToken Job{};
         };
-        std::vector<RuntimeAssetImportStreamingTask> m_AssetImportStreamingTasks{};
+        std::vector<RuntimeAssetImportJobRecord> m_AssetImportJobs{};
         std::optional<RuntimeAssetImportEvent> m_LastAssetImportEvent{};
         std::uint64_t m_AssetImportEventSequence{0};
     };

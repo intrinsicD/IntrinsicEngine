@@ -45,10 +45,11 @@ import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.AssetModelTextureIO;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraFocusCommand;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.WorldRegistry;
 import Geometry.Graph;
 import Geometry.Graph.IO;
@@ -284,27 +285,45 @@ namespace Extrinsic::Runtime
             }
         }
 
-        [[nodiscard]] bool StreamingTaskStateCanCancel(
-            const StreamingTaskState state) noexcept
+        // A decode job is cancellable until its result is queued for the
+        // main-thread drain. `AwaitingGate` is the `JobService` equivalent of
+        // the retired executor's `WaitingForMainThreadApply`: the worker is
+        // done and the next drain decides the outcome, so cancelling there is
+        // reserved for shutdown. `AwaitingApply` is parked work whose readiness
+        // gate has not opened, which is still cancellable.
+        [[nodiscard]] bool JobStateCanCancel(const JobState state) noexcept
         {
             switch (state)
             {
-            case StreamingTaskState::Pending:
-            case StreamingTaskState::Ready:
-            case StreamingTaskState::Running:
-            case StreamingTaskState::WaitingForReadback:
+            case JobState::AwaitingDependencies:
+            case JobState::Queued:
+            case JobState::Running:
+            case JobState::AwaitingApply:
                 return true;
-            case StreamingTaskState::WaitingForMainThreadApply:
-            case StreamingTaskState::WaitingForGpuUpload:
-            case StreamingTaskState::Complete:
-            case StreamingTaskState::Failed:
-            case StreamingTaskState::Cancelled:
+            case JobState::Invalid:
+            case JobState::AwaitingGate:
+            case JobState::Published:
+            case JobState::Dropped:
+            case JobState::Cancelled:
+            case JobState::Rejected:
+            case JobState::StaleDiscarded:
                 return false;
             }
             return false;
         }
 
-        [[nodiscard]] bool QueueStageCanUseStreamingCancellation(
+        // A queued import carries its outcome in the shared state record the
+        // job's callbacks capture, so the result envelope only has to prove
+        // that the decode body ran — an empty envelope is how `JobService`
+        // reports a dropped job. It names the ingest record it belongs to so
+        // the completion publisher can reject a foreign payload rather than
+        // apply it against the wrong request.
+        struct QueuedImportDecodeDone
+        {
+            RuntimeAssetIngestHandle Ingest{};
+        };
+
+        [[nodiscard]] bool QueueStageCanUseAsyncCancellation(
             const RuntimeAssetImportQueueStage stage) noexcept
         {
             switch (stage)
@@ -1018,7 +1037,7 @@ namespace Extrinsic::Runtime
             Graphics::GpuAssetCache& gpuAssetCache,
             RenderExtractionCache& extraction,
             ECS::Scene::Registry& scene,
-            StreamingExecutor* streamingExecutor,
+            JobService* jobs,
             const WorldHandle world,
             const std::span<const RuntimeImportEntityAuthoringPolicyRecord>
                 importEntityPolicies,
@@ -1033,7 +1052,7 @@ namespace Extrinsic::Runtime
                 .Scene = &scene,
             };
             RuntimePostImportProcessorServices postImportServices{
-                .Streaming = streamingExecutor,
+                .Jobs = jobs,
                 .World = world,
                 .AssetService = &assetService,
                 .GpuAssetCache = &gpuAssetCache,
@@ -1463,7 +1482,7 @@ namespace Extrinsic::Runtime
             m_TargetBindingEpoch = 1u;
         m_Initialized = BorrowedBool{dependencies.Initialized};
         m_Config = BorrowedSubsystem<const Core::Config::EngineConfig>{dependencies.Config};
-        m_StreamingExecutor = BorrowedSubsystem<StreamingExecutor>{dependencies.Streaming};
+        m_Jobs = BorrowedSubsystem<JobService>{dependencies.Jobs};
         m_WorldRegistry = BorrowedSubsystem<WorldRegistry>{dependencies.Worlds};
         m_World = dependencies.World;
         m_AssetService = BorrowedSubsystem<Assets::AssetService>{dependencies.AssetService};
@@ -1709,20 +1728,13 @@ namespace Extrinsic::Runtime
         RuntimeAssetImportQueueSnapshot snapshot =
             m_AssetIngestStateMachine.SnapshotQueue();
 
-        struct PendingStreamingStateQuery
+        // The retired executor offered a batched `GetStates(handles)` that this
+        // read collected work for; `JobService` exposes only the single-token
+        // query, and a queue snapshot for the import UI holds a handful of
+        // entries, so the two-pass collection collapses into one loop rather
+        // than earning a new batch API on the service.
+        for (RuntimeAssetImportQueueEntry& entry : snapshot.Entries)
         {
-            std::size_t EntryIndex = 0u;
-            StreamingTaskHandle Streaming{};
-        };
-
-        std::vector<PendingStreamingStateQuery> pendingStreamingQueries{};
-        pendingStreamingQueries.reserve(snapshot.Entries.size());
-
-        for (std::size_t entryIndex = 0u;
-             entryIndex < snapshot.Entries.size();
-             ++entryIndex)
-        {
-            RuntimeAssetImportQueueEntry& entry = snapshot.Entries[entryIndex];
             if (entry.TerminalStatus != RuntimeAssetImportQueueTerminalStatus::None)
             {
                 entry.CanCancel = false;
@@ -1732,54 +1744,26 @@ namespace Extrinsic::Runtime
             }
 
             const auto taskIt = std::find_if(
-                m_AssetImportStreamingTasks.begin(),
-                m_AssetImportStreamingTasks.end(),
-                [&entry](const RuntimeAssetImportStreamingTask& task)
+                m_AssetImportJobs.begin(),
+                m_AssetImportJobs.end(),
+                [&entry](const RuntimeAssetImportJobRecord& task)
                 {
                     return task.Ingest == entry.Operation;
                 });
 
-            if (taskIt == m_AssetImportStreamingTasks.end() ||
-                !taskIt->Streaming.IsValid() ||
-                !m_StreamingExecutor)
+            if (taskIt == m_AssetImportJobs.end() ||
+                !taskIt->Job.IsValid() ||
+                !m_Jobs)
             {
                 entry.CanCancel = false;
                 entry.CancelDisabledReason =
-                    "Import is running synchronously or has no cancellable streaming task.";
+                    "Import is running synchronously or has no cancellable decode job.";
                 continue;
             }
 
-            pendingStreamingQueries.push_back(PendingStreamingStateQuery{
-                .EntryIndex = entryIndex,
-                .Streaming = taskIt->Streaming,
-            });
-        }
-
-        std::vector<StreamingTaskHandle> streamingHandles{};
-        streamingHandles.reserve(pendingStreamingQueries.size());
-        for (const PendingStreamingStateQuery& query : pendingStreamingQueries)
-        {
-            streamingHandles.push_back(query.Streaming);
-        }
-
-        const std::vector<StreamingTaskState> streamingStates =
-            m_StreamingExecutor && !streamingHandles.empty()
-                ? m_StreamingExecutor->GetStates(streamingHandles)
-                : std::vector<StreamingTaskState>{};
-
-        for (std::size_t queryIndex = 0u;
-             queryIndex < pendingStreamingQueries.size();
-             ++queryIndex)
-        {
-            RuntimeAssetImportQueueEntry& entry =
-                snapshot.Entries[pendingStreamingQueries[queryIndex].EntryIndex];
-            const StreamingTaskState streamingState =
-                queryIndex < streamingStates.size()
-                    ? streamingStates[queryIndex]
-                    : StreamingTaskState::Cancelled;
             entry.CanCancel =
-                QueueStageCanUseStreamingCancellation(entry.Stage) &&
-                StreamingTaskStateCanCancel(streamingState);
+                QueueStageCanUseAsyncCancellation(entry.Stage) &&
+                JobStateCanCancel(m_Jobs->GetState(taskIt->Job));
             if (!entry.CanCancel)
             {
                 entry.CancelDisabledReason =
@@ -1807,8 +1791,8 @@ namespace Extrinsic::Runtime
 
     void AssetImportPipeline::CancelActiveAssetImportsForShutdown()
     {
-        for (const RuntimeAssetImportStreamingTask& task :
-             m_AssetImportStreamingTasks)
+        for (const RuntimeAssetImportJobRecord& task :
+             m_AssetImportJobs)
         {
             const std::optional<RuntimeAssetIngestRecord> record =
                 m_AssetIngestStateMachine.Snapshot(task.Ingest);
@@ -1834,29 +1818,28 @@ namespace Extrinsic::Runtime
         }
 
         auto taskIt = std::find_if(
-            m_AssetImportStreamingTasks.begin(),
-            m_AssetImportStreamingTasks.end(),
-            [operation](const RuntimeAssetImportStreamingTask& task)
+            m_AssetImportJobs.begin(),
+            m_AssetImportJobs.end(),
+            [operation](const RuntimeAssetImportJobRecord& task)
             {
                 return task.Ingest == operation;
             });
-        if (taskIt == m_AssetImportStreamingTasks.end() ||
-            !taskIt->Streaming.IsValid() ||
-            !m_StreamingExecutor)
+        if (taskIt == m_AssetImportJobs.end() ||
+            !taskIt->Job.IsValid() ||
+            !m_Jobs)
         {
             return Core::Err(Core::ErrorCode::InvalidState);
         }
 
-        const StreamingTaskState state =
-            m_StreamingExecutor->GetState(taskIt->Streaming);
-        if (!StreamingTaskStateCanCancel(state) &&
+        const JobState state = m_Jobs->GetState(taskIt->Job);
+        if (!JobStateCanCancel(state) &&
             !(allowWaitingForMainThreadApply &&
-              state == StreamingTaskState::WaitingForMainThreadApply))
+              state == JobState::AwaitingGate))
         {
             return Core::Err(Core::ErrorCode::InvalidState);
         }
 
-        m_StreamingExecutor->Cancel(taskIt->Streaming);
+        (void)m_Jobs->Cancel(taskIt->Job);
         RuntimeAssetIngestTransition cancelled =
             m_AssetIngestStateMachine.Cancel(operation);
         const bool cancelledRecord =
@@ -1877,7 +1860,7 @@ namespace Extrinsic::Runtime
         return Core::Ok();
     }
 
-    void AssetImportPipeline::FinalizeCancelledStreamingImport(
+    void AssetImportPipeline::FinalizeUnpublishedImport(
         const RuntimeAssetIngestHandle operation,
         RuntimeAssetImportRequest request)
     {
@@ -2039,7 +2022,7 @@ namespace Extrinsic::Runtime
         ECS::Scene::Registry* const submissionScene = m_Scene.get();
         const std::uint64_t submissionBindingEpoch = m_TargetBindingEpoch;
         if (!m_Initialized ||
-            !m_StreamingExecutor ||
+            !m_Jobs ||
             !m_AssetService ||
             !m_GpuAssetCache ||
             !m_RenderExtraction ||
@@ -2122,19 +2105,20 @@ namespace Extrinsic::Runtime
         auto beforeDecodeHook =
             m_QueuedGeometryImportBeforeDecodeHookForTest;
 
-        const StreamingTaskHandle handle = m_StreamingExecutor->Submit(
-            StreamingTaskDesc{
-                .Name = "Runtime.ImportGeometry." +
+        const JobToken handle = m_Jobs->Submit(
+            JobDesc{
+                .DebugName = "Runtime.ImportGeometry." +
                     FileNameFromPath(request.Path),
-                .Kind = RuntimeTaskKinds::AssetDecode,
-                .Priority = Core::Dag::TaskPriority::Normal,
-                .EstimatedCost = 4u,
                 .Scope = submissionWorld,
-                .Execute = [
+                .Priority = Core::Dag::TaskPriority::Normal,
+                .Kind = RuntimeTaskKinds::AssetDecode,
+                .EstimatedCost = 4u,
+                .Work = [
                     state,
                     path = request.Path,
                     beforeDecodeHook = std::move(beforeDecodeHook),
-                    payloadKinds = std::move(payloadKinds)]() mutable -> StreamingResult
+                    payloadKinds = std::move(payloadKinds)](
+                        const JobCancellation&) mutable
                 {
                     if (beforeDecodeHook)
                         beforeDecodeHook(state->Request);
@@ -2151,32 +2135,38 @@ namespace Extrinsic::Runtime
                         {
                             state->Decoded = std::move(*decoded);
                             state->Error = Core::ErrorCode::Success;
-                            return StreamingResult{
-                                StreamingCpuPayloadReady{.PayloadToken = 0u}};
+                            break;
                         }
                         lastError = decoded.error();
                     }
 
-                    state->Error = lastError;
-                    return StreamingResult{
-                        StreamingCpuPayloadReady{.PayloadToken = 0u}};
+                    if (!state->Decoded.has_value())
+                        state->Error = lastError;
+                    return JobResultEnvelope::Make<QueuedImportDecodeDone>(
+                        QueuedImportDecodeDone{
+                            .Ingest = state->IngestHandle,
+                        });
                 },
-                .ApplyOnMainThread = [
+                .PublishCompletion = [
                     this,
                     state,
                     submissionWorld,
                     submissionScene,
-                    submissionBindingEpoch](StreamingResult&& streamingResult) mutable
+                    submissionBindingEpoch](
+                        KernelEventBus&,
+                        const JobResultEnvelope& envelope) -> bool
                 {
+                    const QueuedImportDecodeDone* const done =
+                        envelope.TryGet<QueuedImportDecodeDone>();
+                    if (done == nullptr || done->Ingest != state->IngestHandle)
+                        return false;
+
                     Core::Expected<RuntimeAssetImportResult> result =
-                        Core::Err<RuntimeAssetImportResult>(
-                            streamingResult.has_value()
-                                ? state->Error
-                                : streamingResult.error());
+                        Core::Err<RuntimeAssetImportResult>(state->Error);
                     RuntimeAssetIngestDiagnostic eventDiagnostic =
                         DiagnosticForImportError(result.error());
 
-                    if (!streamingResult.has_value() || !state->Decoded.has_value())
+                    if (!state->Decoded.has_value())
                     {
                         RuntimeAssetIngestTransition failed =
                             result.error() == Core::ErrorCode::FileNotFound
@@ -2191,7 +2181,7 @@ namespace Extrinsic::Runtime
                             state->Request,
                             result,
                             eventDiagnostic);
-                        return;
+                        return true;
                     }
 
                     RuntimeAssetIngestTransition decodeComplete =
@@ -2206,7 +2196,7 @@ namespace Extrinsic::Runtime
                             state->Request,
                             result,
                             decodeComplete.Diagnostic);
-                        return;
+                        return true;
                     }
 
                     RuntimeAssetIngestTransition applying =
@@ -2219,7 +2209,7 @@ namespace Extrinsic::Runtime
                             state->Request,
                             result,
                             applying.Diagnostic);
-                        return;
+                        return true;
                     }
 
                     if (!IsCurrentSubmissionTarget(
@@ -2238,7 +2228,7 @@ namespace Extrinsic::Runtime
                             state->Request,
                             result,
                             failed.Diagnostic);
-                        return;
+                        return true;
                     }
 
                     auto materialized = MaterializeDecodedGeometryImport(
@@ -2246,7 +2236,7 @@ namespace Extrinsic::Runtime
                         *m_GpuAssetCache,
                         m_RenderExtraction,
                         *submissionScene,
-                        m_StreamingExecutor.get(),
+                        m_Jobs.get(),
                         submissionWorld,
                         m_ImportEntityAuthoringPolicies,
                         m_PostImportProcessors,
@@ -2325,13 +2315,14 @@ namespace Extrinsic::Runtime
                         state->Request,
                         result,
                         eventDiagnostic);
+                    return true;
                 },
-                .FinalizeCancellationOnMainThread = [
+                .FinalizeUnpublishedOnMainThread = [
                     this,
                     operation = state->IngestHandle,
                     cancelledRequest = request]() mutable
                 {
-                    FinalizeCancelledStreamingImport(
+                    FinalizeUnpublishedImport(
                         operation,
                         std::move(cancelledRequest));
                 },
@@ -2361,9 +2352,9 @@ namespace Extrinsic::Runtime
                 Core::ErrorCode::InvalidState);
         }
 
-        m_AssetImportStreamingTasks.push_back(RuntimeAssetImportStreamingTask{
+        m_AssetImportJobs.push_back(RuntimeAssetImportJobRecord{
             .Ingest = state->IngestHandle,
-            .Streaming = handle,
+            .Job = handle,
         });
 
         if (source == RuntimeAssetIngestSource::DroppedFile)
@@ -2444,7 +2435,7 @@ namespace Extrinsic::Runtime
         ECS::Scene::Registry* const submissionScene = m_Scene.get();
         const std::uint64_t submissionBindingEpoch = m_TargetBindingEpoch;
         if (!m_Initialized ||
-            !m_StreamingExecutor ||
+            !m_Jobs ||
             !m_AssetService ||
             !m_GpuAssetCache ||
             !m_AssetModelTextureHandoff ||
@@ -2521,28 +2512,36 @@ namespace Extrinsic::Runtime
         RuntimeIOBackendFactory ioBackendFactory =
             m_ModelTextureImportIOBackendFactoryForTest;
 
-        const StreamingTaskHandle handle = m_StreamingExecutor->Submit(
-            StreamingTaskDesc{
-                .Name = "Runtime.ImportModelTexture." +
+        const JobToken handle = m_Jobs->Submit(
+            JobDesc{
+                .DebugName = "Runtime.ImportModelTexture." +
                     FileNameFromPath(request.Path),
-                .Kind = RuntimeTaskKinds::AssetDecode,
-                .Priority = Core::Dag::TaskPriority::Normal,
-                .EstimatedCost = 4u,
                 .Scope = submissionWorld,
-                .Execute = [
+                .Priority = Core::Dag::TaskPriority::Normal,
+                .Kind = RuntimeTaskKinds::AssetDecode,
+                .EstimatedCost = 4u,
+                .Work = [
                     state,
                     ioBackendFactory = std::move(ioBackendFactory),
                     path = request.Path,
-                    payloadKind = request.PayloadKind]() mutable -> StreamingResult
+                    payloadKind = request.PayloadKind](
+                        const JobCancellation&) mutable
                 {
+                    const auto decodeDone = [&state]
+                    {
+                        return JobResultEnvelope::Make<QueuedImportDecodeDone>(
+                            QueuedImportDecodeDone{
+                                .Ingest = state->IngestHandle,
+                            });
+                    };
+
                     Assets::AssetModelTextureIOBridge bridge;
                     if (Core::Result registered =
                             RegisterPromotedModelTextureIOCallbacks(bridge);
                         !registered.has_value())
                     {
                         state->Error = registered.error();
-                        return StreamingResult{
-                            StreamingCpuPayloadReady{.PayloadToken = 0u}};
+                        return decodeDone();
                     }
 
                     std::unique_ptr<Core::IO::IIOBackend> backend =
@@ -2552,8 +2551,7 @@ namespace Extrinsic::Runtime
                     if (!backend)
                     {
                         state->Error = Core::ErrorCode::InvalidState;
-                        return StreamingResult{
-                            StreamingCpuPayloadReady{.PayloadToken = 0u}};
+                        return decodeDone();
                     }
 
                     if (payloadKind == Assets::AssetPayloadKind::ModelScene)
@@ -2562,8 +2560,7 @@ namespace Extrinsic::Runtime
                         if (!decoded.has_value())
                         {
                             state->Error = decoded.error();
-                            return StreamingResult{
-                                StreamingCpuPayloadReady{.PayloadToken = 0u}};
+                            return decodeDone();
                         }
 
                         state->Decoded = DecodedModelTextureImport{
@@ -2578,8 +2575,7 @@ namespace Extrinsic::Runtime
                         if (!decoded.has_value())
                         {
                             state->Error = decoded.error();
-                            return StreamingResult{
-                                StreamingCpuPayloadReady{.PayloadToken = 0u}};
+                            return decodeDone();
                         }
 
                         state->Decoded = DecodedModelTextureImport{
@@ -2590,26 +2586,29 @@ namespace Extrinsic::Runtime
                     }
 
                     state->Error = Core::ErrorCode::Success;
-                    return StreamingResult{
-                        StreamingCpuPayloadReady{.PayloadToken = 0u}};
+                    return decodeDone();
                 },
-                .ApplyOnMainThread = [
+                .PublishCompletion = [
                     this,
                     state,
                     existingAsset,
                     submissionWorld,
                     submissionScene,
-                    submissionBindingEpoch](StreamingResult&& streamingResult) mutable
+                    submissionBindingEpoch](
+                        KernelEventBus&,
+                        const JobResultEnvelope& envelope) -> bool
                 {
+                    const QueuedImportDecodeDone* const done =
+                        envelope.TryGet<QueuedImportDecodeDone>();
+                    if (done == nullptr || done->Ingest != state->IngestHandle)
+                        return false;
+
                     Core::Expected<RuntimeAssetImportResult> result =
-                        Core::Err<RuntimeAssetImportResult>(
-                            streamingResult.has_value()
-                                ? state->Error
-                                : streamingResult.error());
+                        Core::Err<RuntimeAssetImportResult>(state->Error);
                     RuntimeAssetIngestDiagnostic eventDiagnostic =
                         DiagnosticForImportError(result.error());
 
-                    if (!streamingResult.has_value() || !state->Decoded.has_value())
+                    if (!state->Decoded.has_value())
                     {
                         RuntimeAssetIngestTransition failed{};
                         if (result.error() == Core::ErrorCode::FileNotFound)
@@ -2635,7 +2634,7 @@ namespace Extrinsic::Runtime
                             state->Request,
                             result,
                             eventDiagnostic);
-                        return;
+                        return true;
                     }
 
                     RuntimeAssetIngestTransition decodeComplete =
@@ -2650,7 +2649,7 @@ namespace Extrinsic::Runtime
                             state->Request,
                             result,
                             decodeComplete.Diagnostic);
-                        return;
+                        return true;
                     }
 
                     RuntimeAssetIngestTransition applying =
@@ -2663,7 +2662,7 @@ namespace Extrinsic::Runtime
                             state->Request,
                             result,
                             applying.Diagnostic);
-                        return;
+                        return true;
                     }
 
                     if (!IsCurrentSubmissionTarget(
@@ -2682,7 +2681,7 @@ namespace Extrinsic::Runtime
                             state->Request,
                             result,
                             failed.Diagnostic);
-                        return;
+                        return true;
                     }
 
                     if (state->Decoded->PayloadKind ==
@@ -2763,13 +2762,15 @@ namespace Extrinsic::Runtime
                         state->Request,
                         result,
                         eventDiagnostic);
+                    return true;
                 },
-                .FinalizeCancellationOnMainThread = [
+
+                .FinalizeUnpublishedOnMainThread = [
                     this,
                     operation = state->IngestHandle,
                     cancelledRequest = request]() mutable
                 {
-                    FinalizeCancelledStreamingImport(
+                    FinalizeUnpublishedImport(
                         operation,
                         std::move(cancelledRequest));
                 },
@@ -2799,9 +2800,9 @@ namespace Extrinsic::Runtime
                 Core::ErrorCode::InvalidState);
         }
 
-        m_AssetImportStreamingTasks.push_back(RuntimeAssetImportStreamingTask{
+        m_AssetImportJobs.push_back(RuntimeAssetImportJobRecord{
             .Ingest = state->IngestHandle,
-            .Streaming = handle,
+            .Job = handle,
         });
 
         Core::Log::Info(
@@ -3133,7 +3134,7 @@ namespace Extrinsic::Runtime
                 *m_GpuAssetCache,
                 m_RenderExtraction,
                 *m_Scene,
-                m_StreamingExecutor.get(),
+                m_Jobs.get(),
                 m_World,
                 m_ImportEntityAuthoringPolicies,
                 m_PostImportProcessors,

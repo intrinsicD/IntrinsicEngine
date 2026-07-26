@@ -943,7 +943,7 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     const auto assetWorkflow =
         ReadFile(RepoRoot() / "src/runtime/Runtime.AssetWorkflowModule.cpp");
 
-    EXPECT_EQ(CountOccurrences(assetImport, "StreamingTaskDesc{"), 2u);
+    EXPECT_EQ(CountOccurrences(assetImport, "JobDesc{"), 2u);
     EXPECT_EQ(
         CountOccurrences(assetImport, ".Scope = submissionWorld"),
         2u);
@@ -953,7 +953,7 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     // designator rather than MakeCpuJobDesc's positional scope argument.
     EXPECT_EQ(CountOccurrences(sceneDocument, "JobDesc{"), 2u);
     EXPECT_EQ(CountOccurrences(sceneDocument, ".Scope = world"), 2u);
-    EXPECT_EQ(CountOccurrences(sandboxPolicies, "StreamingTaskDesc{"), 1u);
+    EXPECT_EQ(CountOccurrences(sandboxPolicies, "JobDesc{"), 1u);
     EXPECT_EQ(CountOccurrences(sandboxPolicies, ".Scope = world"), 1u);
     EXPECT_EQ(CountOccurrences(visualization, "JobDesc{"), 1u);
     EXPECT_EQ(CountOccurrences(visualization, ".Scope = world"), 1u);
@@ -1605,9 +1605,6 @@ TEST(RuntimeEngineLayering,
                   "Require<EditorCommandHistory>"),
               std::string::npos);
     EXPECT_NE(workflowResolve.find(
-                  "Find<StreamingExecutor>()"),
-              std::string::npos);
-    EXPECT_NE(workflowResolve.find(
                   "Find<SelectionController>()"),
               std::string::npos);
     EXPECT_NE(workflowResolve.find(
@@ -1624,8 +1621,6 @@ TEST(RuntimeEngineLayering,
         workflowAnnouncement.find("SceneHandoff.reset();");
     const auto releaseDocument =
         workflowAnnouncement.find("ReleaseDocumentParticipant();");
-    const auto clearStreaming =
-        workflowAnnouncement.find("Streaming = nullptr;");
     const auto clearSelection =
         workflowAnnouncement.find("Selection = nullptr;");
     ASSERT_NE(cancelImports, std::string::npos);
@@ -1633,14 +1628,12 @@ TEST(RuntimeEngineLayering,
     ASSERT_NE(stopCallbacks, std::string::npos);
     ASSERT_NE(detachScene, std::string::npos);
     ASSERT_NE(releaseDocument, std::string::npos);
-    ASSERT_NE(clearStreaming, std::string::npos);
     ASSERT_NE(clearSelection, std::string::npos);
     EXPECT_LT(cancelImports, detachPipeline);
     EXPECT_LT(detachPipeline, stopCallbacks);
     EXPECT_LT(stopCallbacks, detachScene);
     EXPECT_LT(detachScene, releaseDocument);
-    EXPECT_LT(releaseDocument, clearStreaming);
-    EXPECT_LT(clearStreaming, clearSelection);
+    EXPECT_LT(releaseDocument, clearSelection);
 
     const auto markUninitialized =
         announcement.find("m_Impl->m_Initialized = false;");

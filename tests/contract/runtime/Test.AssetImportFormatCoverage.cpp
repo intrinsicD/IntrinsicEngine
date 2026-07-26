@@ -251,15 +251,28 @@ namespace
                 m_DestroyRequested = true;
             }
 
+            // World retirement requests cancellation while the decode worker is
+            // still blocked in the test hook. RUNTIME-194 Slice B4 moved this
+            // lane to JobService, which claims a job's unpublished finalizer at
+            // the terminal transition rather than at the cancel request, so the
+            // queue entry terminalizes once the worker returns and observes the
+            // cancel flag — never by applying its decode result. Release the
+            // worker as soon as the world is gone, then wait for that terminal.
+            if (m_DestroyRequested &&
+                !m_WorkerReleased &&
+                !engine.Worlds().Contains(m_SubmissionWorld))
+            {
+                m_ReleaseWorker->store(true, std::memory_order_release);
+                m_WorkerReleased = true;
+            }
+
             const Runtime::RuntimeAssetImportQueueSnapshot queue =
                 RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).GetAssetImportQueueSnapshot();
-            if (m_DestroyRequested &&
-                !engine.Worlds().Contains(m_SubmissionWorld) &&
+            if (m_WorkerReleased &&
                 queue.Entries.size() == 1u &&
                 queue.ActiveCount == 0u &&
                 queue.TerminalCount == 1u)
             {
-                m_ReleaseWorker->store(true, std::memory_order_release);
                 m_Satisfied = true;
                 engine.RequestExit();
                 return;
@@ -291,6 +304,7 @@ namespace
         std::uint32_t m_ObservedFrames{0u};
         bool m_Armed{false};
         bool m_DestroyRequested{false};
+        bool m_WorkerReleased{false};
         bool m_Satisfied{false};
         bool m_TimedOut{false};
     };
@@ -1978,7 +1992,7 @@ TEST(RuntimeAssetImportFormatCoverage, PostImportProcessorsRunInOrderAndCanUnreg
                     EXPECT_NE(context.MeshPayload, nullptr);
                     if (context.MeshPayload != nullptr)
                         EXPECT_GT(context.MeshPayload->Vertices.Size(), 0u);
-                    EXPECT_NE(services.Streaming, nullptr);
+                    EXPECT_NE(services.Jobs, nullptr);
                     EXPECT_NE(services.AssetService, nullptr);
                     EXPECT_NE(services.GpuAssetCache, nullptr);
                     EXPECT_NE(services.RenderExtraction, nullptr);

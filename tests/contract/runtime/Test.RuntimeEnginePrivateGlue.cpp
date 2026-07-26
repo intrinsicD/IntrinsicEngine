@@ -794,9 +794,6 @@ TEST(RuntimeEnginePrivateGlue,
               std::string::npos);
 
     EXPECT_NE(workflowImpl.find(
-                  "setup.Services().Find<StreamingExecutor>()"),
-              std::string::npos);
-    EXPECT_NE(workflowImpl.find(
                   "setup.Services().Find<SelectionController>()"),
               std::string::npos);
     EXPECT_NE(engineImpl.find(

@@ -30,7 +30,6 @@ import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
@@ -54,7 +53,6 @@ namespace Extrinsic::Runtime
 
             SceneDocumentModule* Documents{nullptr};
             EditorCommandHistory* History{nullptr};
-            StreamingExecutor* Streaming{nullptr};
             SelectionController* Selection{nullptr};
 
             std::unique_ptr<Assets::AssetService> Assets{};
@@ -181,7 +179,7 @@ namespace Extrinsic::Runtime
                     AssetImportPipelineDependencies{
                         .Initialized = Initialized,
                         .Config = Config,
-                        .Streaming = Streaming,
+                        .Jobs = Jobs,
                         .Worlds = Worlds,
                         .World = BoundWorld,
                         .AssetService = Assets.get(),
@@ -317,7 +315,6 @@ namespace Extrinsic::Runtime
 
                 Documents = nullptr;
                 History = nullptr;
-                Streaming = nullptr;
                 Selection = nullptr;
                 Config = nullptr;
                 Initialized = nullptr;
@@ -748,8 +745,6 @@ namespace Extrinsic::Runtime
         auto& state = *m_Impl->Shared;
         state.Documents = &documents->get();
         state.History = &history->get();
-        state.Streaming =
-            setup.Services().Find<StreamingExecutor>();
         state.Selection =
             setup.Services().Find<SelectionController>();
         state.TextureBake =

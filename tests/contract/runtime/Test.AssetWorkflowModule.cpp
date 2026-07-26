@@ -442,7 +442,6 @@ namespace
 
         [[nodiscard]] Core::Result RegisterModules(
             const bool assetFirst = true,
-            const bool provideStreaming = false,
             const bool provideSelection = false)
         {
             Services.BeginRegistration();
@@ -450,19 +449,6 @@ namespace
                 !builtins.has_value())
             {
                 return builtins;
-            }
-            if (provideStreaming)
-            {
-                Streaming =
-                    std::make_unique<Runtime::StreamingExecutor>();
-                if (Core::Result provided =
-                        Services.Provide<
-                            Runtime::StreamingExecutor>(
-                                *Streaming, "Test.Async");
-                    !provided.has_value())
-                {
-                    return provided;
-                }
             }
             if (provideSelection)
             {
@@ -560,13 +546,11 @@ namespace
 
         [[nodiscard]] Core::Result Start(
             const bool assetFirst = true,
-            const bool provideStreaming = false,
             const bool provideSelection = false)
         {
             if (Core::Result registered =
                     RegisterModules(
                         assetFirst,
-                        provideStreaming,
                         provideSelection);
                 !registered.has_value())
             {
@@ -607,8 +591,6 @@ namespace
             }
 
             Announce();
-            if (Streaming)
-                Streaming->ShutdownAndDrain();
             (void)QuiesceGpuParticipants();
             Runtime::RuntimeModuleShutdownContext context{
                 .Commands = Commands,
@@ -624,7 +606,6 @@ namespace
             if (DocumentRegistered)
                 Document.OnShutdown(context);
             Services.Reset();
-            Streaming.reset();
             Selection.reset();
             AssetRegistered = false;
             AssetResolved = false;
@@ -648,7 +629,6 @@ namespace
         Runtime::AssetWorkflowModule Asset{};
         Runtime::TextureBakeModule TextureBake{};
         Runtime::SceneDocumentModule Document{};
-        std::unique_ptr<Runtime::StreamingExecutor> Streaming{};
         std::unique_ptr<Runtime::SelectionController> Selection{};
         Runtime::WorldHandle InitialWorld{};
         std::uint64_t GpuIdleWaits{0u};
@@ -753,7 +733,6 @@ TEST(AssetWorkflowModule,
     DirectHarness harness;
     ASSERT_TRUE(harness.Start(
         /*assetFirst=*/true,
-        /*provideStreaming=*/false,
         /*provideSelection=*/false).has_value());
 
     Assets::AssetService* const firstAssets =
@@ -768,9 +747,6 @@ TEST(AssetWorkflowModule,
     ASSERT_NE(firstPipeline, nullptr);
     ASSERT_NE(firstCache, nullptr);
     ASSERT_NE(firstHooks, nullptr);
-    EXPECT_EQ(
-        harness.Services.Find<Runtime::StreamingExecutor>(),
-        nullptr);
     EXPECT_EQ(
         harness.Services.Find<Runtime::SelectionController>(),
         nullptr);
@@ -1534,15 +1510,8 @@ TEST(AssetWorkflowModule,
     DirectHarness harness;
     harness.Services.BeginRegistration();
     ASSERT_TRUE(harness.ProvideBuiltins().has_value());
-    harness.Streaming =
-        std::make_unique<Runtime::StreamingExecutor>();
     harness.Selection =
         std::make_unique<Runtime::SelectionController>();
-    ASSERT_TRUE(
-        harness.Services
-            .Provide<Runtime::StreamingExecutor>(
-                *harness.Streaming, "Test.Async")
-            .has_value());
     ASSERT_TRUE(
         harness.Services
             .Provide<Runtime::SelectionController>(
@@ -1610,9 +1579,6 @@ TEST(AssetWorkflowModule,
     Runtime::AssetImportPipeline* const pipeline =
         harness.Services.Find<Runtime::AssetImportPipeline>();
     ASSERT_NE(pipeline, nullptr);
-    EXPECT_EQ(
-        harness.Services.Find<Runtime::StreamingExecutor>(),
-        harness.Streaming.get());
     EXPECT_EQ(
         harness.Services.Find<Runtime::SelectionController>(),
         harness.Selection.get());
@@ -1977,14 +1943,10 @@ TEST(AssetWorkflowModule,
         Runtime::AssetImportPipeline* const pipeline =
             harness.Services.Find<
                 Runtime::AssetImportPipeline>();
-        Runtime::StreamingExecutor* const streaming =
-            harness.Services.Find<
-                Runtime::StreamingExecutor>();
         Runtime::EditorCommandHistory* const history =
             harness.Services.Find<
                 Runtime::EditorCommandHistory>();
         ASSERT_NE(pipeline, nullptr);
-        ASSERT_NE(streaming, nullptr);
         ASSERT_NE(history, nullptr);
 
         std::atomic_bool workerStarted{false};
@@ -2017,7 +1979,7 @@ TEST(AssetWorkflowModule,
                 });
         ASSERT_TRUE(queued.has_value())
             << static_cast<int>(queued.error());
-        streaming->PumpBackground(1u);
+        // JobService dispatches at submit; no background pump to drive.
         ASSERT_TRUE(WaitUntil(workerStarted));
 
         harness.Announce();
@@ -2209,7 +2171,7 @@ TEST(AssetWorkflowModule,
 }
 
 TEST(AssetWorkflowModule,
-     OmittedAssetWorkflowPlatformDropFailsClosedWithoutStreamingOrSceneMutation)
+     OmittedAssetWorkflowPlatformDropFailsClosedWithoutQueuedWorkOrSceneMutation)
 {
     TempObjFile mesh{"runtime183-omitted-drop.obj"};
     auto application =
@@ -2232,14 +2194,13 @@ TEST(AssetWorkflowModule,
         engine.Services().Find<Core::IAssetFrameHooks>(),
         nullptr);
 
-    Runtime::StreamingExecutor* const streaming =
-        engine.Services().Find<Runtime::StreamingExecutor>();
-    ASSERT_NE(streaming, nullptr);
     ECS::Scene::Registry* const scene =
         engine.Worlds().Get(engine.ActiveWorld());
     ASSERT_NE(scene, nullptr);
-    const auto beforeStreaming =
-        streaming->GetDiagnostics();
+    // The import lane runs on the kernel-owned JobService (RUNTIME-194 Slice
+    // B4), so "the drop queued nothing" is measured there rather than on the
+    // retired executor's diagnostics.
+    const Runtime::JobServiceStats beforeJobs = engine.Jobs().Stats();
     const std::size_t beforeEntities =
         EntityCount(*scene);
 
@@ -2249,20 +2210,10 @@ TEST(AssetWorkflowModule,
         });
     engine.Run();
 
-    const auto afterStreaming =
-        streaming->GetDiagnostics();
-    EXPECT_EQ(
-        afterStreaming.SlotCount,
-        beforeStreaming.SlotCount);
-    EXPECT_EQ(
-        afterStreaming.ActiveSlotCount,
-        beforeStreaming.ActiveSlotCount);
-    EXPECT_EQ(
-        afterStreaming.ReadyTaskCount,
-        beforeStreaming.ReadyTaskCount);
-    EXPECT_EQ(
-        afterStreaming.ReadyForApplyCount,
-        beforeStreaming.ReadyForApplyCount);
+    const Runtime::JobServiceStats afterJobs = engine.Jobs().Stats();
+    EXPECT_EQ(afterJobs.SubmittedJobs, beforeJobs.SubmittedJobs);
+    EXPECT_EQ(afterJobs.InFlightJobs, beforeJobs.InFlightJobs);
+    EXPECT_EQ(afterJobs.RejectedJobs, beforeJobs.RejectedJobs);
     EXPECT_EQ(EntityCount(*scene), beforeEntities);
     engine.Shutdown();
 }

@@ -38,11 +38,12 @@ import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.InputActions;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.IO;
@@ -217,8 +218,16 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        // The deferred post-process only carries its outcome forward in the
+        // shared state record its callbacks capture; the envelope proves the
+        // worker body ran, since an empty envelope is a dropped job.
+        struct DirectMeshPostProcessDone
+        {
+            ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
+        };
+
         void QueueDirectMeshPostProcess(
-            StreamingExecutor* streamingExecutor,
+            JobService* jobs,
             const WorldHandle world,
             ECS::Scene::Registry& scene,
             RuntimeObjectSpaceNormalBakeQueue* objectSpaceNormalBakeQueue,
@@ -229,7 +238,7 @@ namespace Extrinsic::Runtime
             const Geometry::MeshIO::MeshIOResult& meshPayload,
             const ECS::EntityHandle entity)
         {
-            if (streamingExecutor == nullptr ||
+            if (jobs == nullptr ||
                 entity == ECS::InvalidEntityHandle)
             {
                 return;
@@ -242,17 +251,16 @@ namespace Extrinsic::Runtime
             const bool guardObjectSpaceNormalBakeLifetime =
                 objectSpaceNormalBakeLifetime.use_count() != 0u;
 
-            const StreamingTaskHandle handle = streamingExecutor->Submit(
-                StreamingTaskDesc{
-                    .Name = "Runtime.DirectMeshPostProcess." +
+            const JobToken handle = jobs->Submit(
+                JobDesc{
+                    .DebugName = "Runtime.DirectMeshPostProcess." +
                         FileNameFromPath(state->Path),
-                    .Kind = RuntimeTaskKinds::AssetDecode,
-                    .Priority = Core::Dag::TaskPriority::Low,
-                    .EstimatedCost = 8u,
                     .Scope = world,
-                    .Execute =
-                        [state]() mutable
-                            -> StreamingResult
+                    .Priority = Core::Dag::TaskPriority::Low,
+                    .Kind = RuntimeTaskKinds::AssetDecode,
+                    .EstimatedCost = 8u,
+                    .Work =
+                        [state](const JobCancellation&)
                         {
                             auto materialized =
                                 BuildRuntimeHalfedgeMeshMaterialization(
@@ -261,19 +269,23 @@ namespace Extrinsic::Runtime
                                         .AllowDisconnectedRenderableFallback =
                                             true,
                                     });
-                            if (!materialized.has_value())
+                            if (materialized.has_value())
+                            {
+                                state->Materialized = std::move(*materialized);
+                                state->Error = Core::ErrorCode::Success;
+                            }
+                            else
                             {
                                 state->Error = materialized.error();
-                                return StreamingResult{
-                                    StreamingCpuPayloadReady{.PayloadToken = 0u}};
                             }
 
-                            state->Materialized = std::move(*materialized);
-                            state->Error = Core::ErrorCode::Success;
-                            return StreamingResult{
-                                StreamingCpuPayloadReady{.PayloadToken = 0u}};
+                            return JobResultEnvelope::Make<
+                                DirectMeshPostProcessDone>(
+                                DirectMeshPostProcessDone{
+                                    .Entity = state->Entity,
+                                });
                         },
-                    .ApplyOnMainThread =
+                    .PublishCompletion =
                         [
                             state,
                             &scene,
@@ -283,25 +295,30 @@ namespace Extrinsic::Runtime
                             objectSpaceNormalBakeDevice,
                             objectSpaceNormalBakeLifetime,
                             guardObjectSpaceNormalBakeLifetime](
-                                StreamingResult&& result) mutable
+                                KernelEventBus&,
+                                const JobResultEnvelope& envelope) -> bool
                         {
-                            if (!result.has_value() ||
-                                state->Error != Core::ErrorCode::Success ||
+                            const DirectMeshPostProcessDone* const done =
+                                envelope.TryGet<DirectMeshPostProcessDone>();
+                            if (done == nullptr ||
+                                done->Entity != state->Entity)
+                            {
+                                return false;
+                            }
+
+                            if (state->Error != Core::ErrorCode::Success ||
                                 !state->Materialized.has_value())
                             {
                                 Core::Log::Warn(
                                     "[Runtime] Deferred mesh post-process failed: path='{}' error={}",
                                     state->Path,
-                                    Core::Error::ToString(
-                                        result.has_value()
-                                            ? state->Error
-                                            : result.error()));
-                                return;
+                                    Core::Error::ToString(state->Error));
+                                return true;
                             }
 
                             if (!scene.IsValid(state->Entity))
                             {
-                                return;
+                                return true;
                             }
 
                             auto& raw = scene.Raw();
@@ -330,7 +347,7 @@ namespace Extrinsic::Runtime
                                 if (guardObjectSpaceNormalBakeLifetime &&
                                     producerLifetime == nullptr)
                                 {
-                                    return;
+                                    return true;
                                 }
                                 RuntimeObjectSpaceNormalBakeRequestBuildResult
                                     request =
@@ -345,7 +362,7 @@ namespace Extrinsic::Runtime
                                         "[Runtime] Direct mesh object-space normal bake request is invalid: path='{}' diagnostic='{}'",
                                         state->Path,
                                         request.Diagnostic);
-                                    return;
+                                    return true;
                                 }
 
                                 const RuntimeObjectSpaceNormalBakeResult queued =
@@ -367,14 +384,13 @@ namespace Extrinsic::Runtime
                                             queued.Status),
                                         queued.Diagnostic);
                                 }
-                                return;
                             }
+                            return true;
                         },
                 });
 
             if (handle.IsValid())
             {
-                streamingExecutor->PumpBackground(1u);
                 Core::Log::Info(
                     "[Runtime] Queued direct mesh post-process: path='{}'",
                     state->Path);
@@ -552,7 +568,7 @@ namespace Extrinsic::Runtime
                 {
                     if (context.MeshPayload == nullptr)
                         return Core::Ok();
-                    if (services.Streaming == nullptr ||
+                    if (services.Jobs == nullptr ||
                         services.Scene == nullptr)
                     {
                         return Core::Err(
@@ -560,7 +576,7 @@ namespace Extrinsic::Runtime
                     }
 
                     QueueDirectMeshPostProcess(
-                        services.Streaming,
+                        services.Jobs,
                         services.World,
                         *services.Scene,
                         services.ObjectSpaceNormalBakeQueue,

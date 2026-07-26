@@ -20,28 +20,47 @@ Updated 2026-07-26 (third session).
   (`GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl`, expected on a
   headless host). Strict layering, docs-sync, test-layout, root-hygiene, and all
   task validators pass.
-- Slice A landed in `2214ddf9`. **Slice B is in progress**: `B0` (`73dedb2a`,
+- Slice A landed in `2214ddf9`. **Slice B is nearly done**: `B0` (`73dedb2a`,
   the unpublished-finalizer contract gap), `B1` (`6cb2152b`,
-  `VisualizationAdapters`), and `B3` (`SceneDocumentModule`) are landed.
-  `B2`, `B4`, `B5` remain — see the per-lane checklist under `## Progress`,
-  which carries the reasoning for each.
+  `VisualizationAdapters`), `B3` (`b09cee58`, `SceneDocumentModule`), and
+  `B2`+`B4` (the import lane) are landed. **All six production
+  `StreamingExecutor::Submit` sites are migrated.** Only `B5`
+  (`DerivedJobRegistry` consumers) remains.
 
 ### Next action
 
-Take the coupled `B2`+`B4` lane (`SandboxDefaultPolicies` deferred mesh
-post-process plus `AssetImportPipeline`'s two queued-import sites). They flip
-`RuntimePostImportProcessorServices` and `AssetImportPipelineDependencies` from
-`StreamingExecutor* Streaming` to `JobService* Jobs` together; see the `B2`
-entry for why no dual-field shim is needed. `B5` (`DerivedJobRegistry`
-consumers) is the last and largest lane.
+Take `B5`, the last and largest lane: the `DerivedJobRegistry` consumers
+(30 src/test files at the last census). Re-run the census first, since the
+earlier counts predate B1–B4:
+
+```bash
+grep -rln "DerivedJobRegistry\|Runtime.DerivedJobGraph" src/ tests/ --include=*.cpp --include=*.cppm
+```
+
+Two behaviours to preserve, both already expressible on `JobService`:
+`DerivedJobRegistry::ValidateOnMainThread`'s five-way staleness reason maps onto
+`ValidateBeforeApply` returning `JobApplyValidation` (discard, never apply, when
+not `Current`), and `ApplyMainThreadResults(maxApplyCount)` maps onto
+`DrainCompletions(events, maxApplyCount)`. After `B5`, `StreamingExecutor` has
+no consumer left and Slice C can delete both modules.
 
 Read `## Progress` -> Slice B for the lane list, the two standing obligations
 every lane owes (the `ProductionAsyncSubmissionsCarryOwningWorldScope`
-source-text assertions and `src/runtime/README.md`), and the B0 lesson about
-never asserting on a fixed drain count. B3 adds a third recurring lesson: a
-lane may only assert an exact terminal `JobState` when nothing else in the test
-can reach the consumer first — an observer that revalidates its own binding can
-cancel the job before the drain classifies it (see the B3 entry).
+source-text assertions and `src/runtime/README.md`), and these accumulated
+lessons:
+
+- **B0** — never assert on a fixed drain count; drain until terminal.
+- **B3** — only assert an exact terminal `JobState` when nothing else in the
+  test can reach the consumer first. An observer that revalidates its own
+  binding can cancel the job before the drain classifies it.
+- **B4** — `ValidateBeforeApply` is the right home for a staleness check only
+  when the consumer wants a *silent* discard. When the consumer instead reports
+  the stale apply with its own diagnostic, keep the check inside the publish
+  body, or the finalizer's terminal diagnostic replaces it.
+- **B4** — `JobService` claims a job's unpublished finalizer at the terminal
+  transition, not at the cancel request, so a consumer's visible state
+  terminalizes only once the worker returns. Any test that cancels a *blocked*
+  worker and then waits for terminal before releasing it will deadlock.
 
 ### Verify the checkpoint before changing anything
 
@@ -120,7 +139,9 @@ expressible on `JobService`:
   `DrainCompletions(events, maxApplyCount)`.
 
 `Runtime.AsyncWorkModule` currently composes both old executors; it is reduced to
-the single-service lifecycle in Slice C, not Slice B.
+the single-service lifecycle in Slice C, not Slice B. After `B2`+`B4` it no
+longer borrows `StreamingExecutor` for the import pipeline, so the executor's
+only remaining consumer is `DerivedJobGraph`.
 
 ### Do not
 
@@ -175,11 +196,15 @@ and commits independently.
 
       Production `StreamingExecutor::Submit` sites, which are the actual lane
       list (6 total):
-      - `Runtime.SandboxDefaultPolicies.cpp:246` — deferred mesh post-process
+      - ~~`Runtime.SandboxDefaultPolicies.cpp:246`~~ — migrated by `B2`
       - ~~`Runtime.VisualizationAdapters.cpp:548`~~ — migrated by `B1`
       - ~~`Runtime.SceneDocumentModule.cpp:805`, `:1015`~~ — migrated by `B3`
-      - `Runtime.AssetImportPipeline.cpp:2126` (queued geometry import),
-        `:2525` (queued model-texture import)
+      - ~~`Runtime.AssetImportPipeline.cpp:2126`, `:2525`~~ — migrated by `B4`
+
+      All six production `StreamingExecutor::Submit` sites are now on
+      `JobService`; `B5` (`DerivedJobRegistry` consumers) is the only lane left,
+      and `StreamingExecutor` survives only because `DerivedJobGraph` composes
+      it.
 
       - [x] **B0 — close the unpublished-finalizer contract gap.** Found while
             scoping B: four of those six sites use
@@ -334,17 +359,85 @@ and commits independently.
             `SceneDocumentModule.*` + `RuntimeSceneLifecycle.*` 0/40 failures
             under stress. `src/runtime/README.md` updated in the same commit;
             module inventory unchanged.
-      - [ ] **B2** — `SandboxDefaultPolicies` deferred mesh post-process.
-            Coupled to B4: its executor pointer arrives through
-            `RuntimePostImportProcessorServices::Streaming`, which
-            `AssetImportPipeline` populates, so both structs
-            (`RuntimePostImportProcessorServices`,
-            `AssetImportPipelineDependencies`) flip from `StreamingExecutor*
-            Streaming` to `JobService* Jobs` together with B4. No dual-field
-            shim is needed: `AssetWorkflowModule` already holds both a
-            `JobService*` (`state.Jobs = &setup.Jobs()`) and the executor at the
-            wiring point, so the call site just passes the one it already has.
-      - [ ] **B4** — `AssetImportPipeline` (both sites).
+      - [x] **B2 + B4 — the import lane, migrated as one change.** Taken
+            together as planned: `SandboxDefaultPolicies`' deferred mesh
+            post-process receives its executor through
+            `RuntimePostImportProcessorServices`, which `AssetImportPipeline`
+            populates, so both structs flip from `StreamingExecutor* Streaming`
+            to `JobService* Jobs` at once. No dual-field shim was needed —
+            `AssetWorkflowModule` already held `state.Jobs = &setup.Jobs()`, so
+            the wiring point just passes the pointer it already had, and its
+            `Streaming` member, its `Find<StreamingExecutor>()` resolve, and its
+            shutdown clear all disappear.
+
+            Three submit sites moved (`Runtime.ImportGeometry`,
+            `Runtime.ImportModelTexture`, `Runtime.DirectMeshPostProcess`) with
+            the same mapping as B3. `QueuedImportDecodeDone` /
+            `DirectMeshPostProcessDone` envelopes name the ingest handle /
+            entity they belong to, and each `PublishCompletion` rejects a
+            foreign payload instead of applying it against the wrong request.
+
+            **Unlike B3, the staleness check stays inside the publish body.**
+            `IsCurrentSubmissionTarget` is not a silent discard here: the import
+            first drives the ingest state machine (`CompleteDecode`,
+            `BeginApply`) and then records a `FailApply` with an observable
+            diagnostic. Routing that through `ValidateBeforeApply` would replace
+            the visible failure with the finalizer's `Cancelled` diagnostic, so
+            the fail-closed revalidation seam is deliberately not used on this
+            lane.
+
+            Renames that follow the surface change:
+            `m_StreamingExecutor` -> `m_Jobs`,
+            `RuntimeAssetImportStreamingTask{Ingest, Streaming}` ->
+            `RuntimeAssetImportJobRecord{Ingest, Job}`,
+            `StreamingTaskStateCanCancel` -> `JobStateCanCancel`,
+            `QueueStageCanUseStreamingCancellation` ->
+            `QueueStageCanUseAsyncCancellation`,
+            `FinalizeCancelledStreamingImport` -> `FinalizeUnpublishedImport`.
+            Cancellability maps `Pending/Ready/Running/WaitingForReadback` onto
+            `AwaitingDependencies/Queued/Running/AwaitingApply`, and
+            `WaitingForMainThreadApply` — the state `CancelActiveAssetImportsForShutdown`
+            is allowed to cancel from — onto `AwaitingGate`.
+
+            `GetAssetImportQueueSnapshot` used the executor's batched
+            `GetStates(handles)`, which `JobService` does not have. The two-pass
+            collect-then-query loop collapses into one loop over per-token
+            `GetState`; a queue snapshot for the import UI holds a handful of
+            entries, so this does not earn a new batch API on the service.
+
+            **One real behaviour change, in world retirement.**
+            `StreamingExecutor::RetireWorld` marked a *running* task `Cancelled`
+            immediately and made its finalizer drainable while the worker was
+            still inside `Execute`. `JobService` claims the unpublished
+            finalizer at the terminal transition instead — deliberately, since
+            running consumer reconciliation while the worker still owns the
+            shared state record is the race `B0` was written to avoid. So a
+            retired world now cancels the decode immediately but the visible
+            ingest record terminalizes once the worker returns and observes the
+            flag. The import still cannot materialize (cancel plus
+            submission-target revalidation), and shutdown is unaffected because
+            `CancelActiveAssetImportsForShutdown` terminalizes the ingest record
+            directly rather than waiting on the job.
+            `RetiredWorldImportTerminalizesQueueState` blocked its decode worker
+            and waited for the terminal *before* releasing it, which now
+            deadlocks by construction; it releases the worker once the world is
+            gone and then waits, which additionally exercises the post-run
+            cancel path. Every other assertion in it is unchanged.
+
+            Test scaffolding that became vacuous was removed rather than left
+            asserting on a service nothing reads: `DirectHarness`'s
+            `provideStreaming` flag and `Streaming` member, the
+            `Find<StreamingExecutor>()` identity checks, a now-dead
+            `PumpBackground` drive, and the structural assertions that
+            `AssetWorkflowModule` resolves and clears a `StreamingExecutor`.
+            `OmittedAssetWorkflowPlatformDropFailsClosedWithout...` measured the
+            executor's diagnostics to prove a drop queued nothing; it now
+            measures `JobServiceStats` and is renamed accordingly.
+
+            CPU gate 4262/4262, one expected headless skip;
+            `RuntimeAssetImportFormatCoverage.*` + `AssetWorkflowModule.*` 0/30
+            failures under stress. `src/runtime/README.md` updated in the same
+            commit; module inventory unchanged.
       - [ ] **B5** — `DerivedJobRegistry` consumers.
 - [ ] **Slice C — cleanup.** Delete `Runtime.StreamingExecutor`,
       `Runtime.DerivedJobGraph`, their bridges/DTOs and CMake/test entries, and
