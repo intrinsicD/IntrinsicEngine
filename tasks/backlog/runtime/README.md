@@ -32,9 +32,6 @@ cleanup slice:
 - [`RUNTIME-193` — General geometry-presentation recipe](RUNTIME-193-general-geometry-presentation-recipe.md)
   replaces the generally used progressive-named presentation modules with one
   desired-state recipe plus copied operational snapshot.
-- [`RUNTIME-194` — Consolidate runtime work execution](RUNTIME-194-consolidate-runtime-work-execution.md)
-  deepens `JobService`, migrates all production jobs, and retires
-  `StreamingExecutor`/`DerivedJobRegistry`.
 - [`RUNTIME-195` — Unified GPU-result readback](RUNTIME-195-unified-gpu-result-readback.md)
   integrates one multi-range transfer wait with `JobService` and retires
   `AsyncBufferReadback`, `GpuReadbackJob`, and blocking compute-result reads.

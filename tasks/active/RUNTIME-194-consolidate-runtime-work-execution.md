@@ -6,6 +6,56 @@ maturity_target: Retired
 ---
 # RUNTIME-194 — Consolidate runtime work execution
 
+## Progress
+
+Promoted to active 2026-07-26. Chunked so each step builds, passes the CPU gate,
+and commits independently.
+
+- [x] **Slice A — complete the `JobService` contract.** `JobService` already had
+      submit/cancel/world-scope/typed-result/GPU-participant/stats. Slice A added
+      the capabilities that previously existed only on `StreamingExecutor` and
+      `DerivedJobRegistry`:
+      - `JobDependency` edges, with release performed by the completion drain
+        (so chain ordering is deterministic and main-thread-ordered instead of
+        racing between workers), and a dependent **cancelled** when its upstream
+        reaches a terminal state other than `Published` — a chain never applies
+        half its work against inputs that were never produced;
+      - `Core::Dag::TaskPriority` / `TaskKind` / `EstimatedCost` scheduling
+        metadata, and `RuntimeTaskKinds` **moved** from `StreamingExecutor` to
+        `JobService` (the surviving surface), re-exported by `StreamingExecutor`
+        until it retires;
+      - bounded main-thread apply, `DrainCompletions(events, maxApplyCount)`,
+        which takes a budget off the front and leaves the remainder queued so a
+        completion burst cannot stall a frame;
+      - parked work via `IsReadyToApply`, for results that finished but cannot
+        be applied yet (for example a GPU readback that has not landed);
+      - fail-closed revalidation via `ValidateBeforeApply` plus a world/document
+        epoch (`AdvanceWorldGeneration`/`CancellationGeneration`), so a result
+        captured before a world replacement is discarded as `StaleDiscarded`
+        rather than mutating the replacement;
+      - `ReportProgress`/`GetProgress`, and lane diagnostics
+        (`AwaitingDependencyJobs`, `AwaitingApplyJobs`, `StaleDiscardedJobs`,
+        `LastDrainParked/StaleDiscarded/Budget`).
+      Seven contract tests cover dependency gating, dependency cancellation,
+      bounded apply, parking, stale-epoch discard, fail-closed validation with
+      no double-apply, and progress. CPU gate 4255/4255.
+
+      Implementation note found while testing: dependency release must run
+      **after** publication within a drain, otherwise a dependency retired by
+      that drain costs its dependents an extra frame.
+- [ ] **Slice B — production migration.** Move asset read/import processing,
+      selected-entity analysis, clustering/method jobs, and existing derived
+      chains onto `JobService` lane by lane, with parity and shutdown tests.
+      Consumer census: `StreamingExecutor` has 17 src/test files,
+      `DerivedJobRegistry` 30.
+- [ ] **Slice C — cleanup.** Delete `Runtime.StreamingExecutor`,
+      `Runtime.DerivedJobGraph`, their bridges/DTOs and CMake/test entries, and
+      reduce `AsyncWorkModule` to the single-service lifecycle. `RUNTIME-203`
+      separately internalizes `JobServiceGpuQueueBridge`. Old files are
+      quarantined under `experimental/to_delete/` rather than deleted outright.
+      Note: `DerivedJobScope` (added by `RUNTIME-192` for `DerivedJobKey`
+      identity) disappears with `Runtime.DerivedJobGraph`.
+
 ## Goal
 
 - Make `JobService` the one runtime execution/lifecycle surface for background

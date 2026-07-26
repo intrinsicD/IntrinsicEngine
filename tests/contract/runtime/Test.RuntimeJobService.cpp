@@ -1,10 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -733,4 +735,285 @@ TEST(RuntimeJobService, EngineCompletionGatePublishesBeforePumpBOnMainThread)
     EXPECT_GE(appPtr->Stats.PublishedCompletions, 1u);
 
     engine.Shutdown();
+}
+
+// ============================================================================
+// RUNTIME-194 Slice A — the completed JobService execution contract.
+//
+// These pin the capabilities that previously only existed on StreamingExecutor
+// and DerivedJobRegistry: dependency edges, bounded main-thread apply, parked
+// work, fail-closed epoch revalidation, and progress.
+// ============================================================================
+
+namespace
+{
+    struct CountedResult
+    {
+        int Value{0};
+    };
+
+    struct CountedCompleted
+    {
+        int Value{0};
+    };
+
+    // Submits a job that simply yields `value`, recording publication order.
+    [[nodiscard]] Runtime::JobDesc MakeCountingJob(
+        std::string name,
+        const int value,
+        std::vector<int>& publishOrder)
+    {
+        Runtime::JobDesc desc =
+            Runtime::MakeCpuJobDesc<CountedResult>(
+                std::move(name),
+                Runtime::DefaultWorldHandle,
+                [value](const Runtime::JobCancellation&)
+                { return CountedResult{.Value = value}; },
+                [](const CountedResult& result)
+                { return CountedCompleted{.Value = result.Value}; });
+
+        auto inner = std::move(desc.PublishCompletion);
+        desc.PublishCompletion =
+            [inner = std::move(inner), &publishOrder, value](
+                Runtime::KernelEventBus& events,
+                const Runtime::JobResultEnvelope& envelope) mutable -> bool
+        {
+            const bool published = inner(events, envelope);
+            if (published)
+                publishOrder.push_back(value);
+            return published;
+        };
+        return desc;
+    }
+}
+
+TEST(RuntimeJobService, DependenciesGateDispatchUntilUpstreamPublishes)
+{
+    SchedulerScope scheduler{2};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+
+    std::vector<int> publishOrder;
+    const Runtime::JobToken first =
+        jobs.Submit(MakeCountingJob("dependency.first", 1, publishOrder));
+    ASSERT_TRUE(first.IsValid());
+
+    Runtime::JobDesc dependentDesc =
+        MakeCountingJob("dependency.second", 2, publishOrder);
+    dependentDesc.DependsOn.push_back(
+        Runtime::JobDependency{.Job = first, .Reason = "needs first"});
+    const Runtime::JobToken second = jobs.Submit(std::move(dependentDesc));
+    ASSERT_TRUE(second.IsValid());
+
+    // The dependent job must not be queued while its dependency is unfinished.
+    EXPECT_EQ(jobs.GetState(second), Runtime::JobState::AwaitingDependencies);
+    EXPECT_EQ(jobs.Stats().AwaitingDependencyJobs, 1u);
+
+    ASSERT_TRUE(WaitUntil([&] { return jobs.GetState(first) ==
+                                       Runtime::JobState::AwaitingGate; }));
+    EXPECT_EQ(jobs.DrainCompletions(events), 1u);
+    EXPECT_EQ(jobs.GetState(first), Runtime::JobState::Published);
+
+    // The drain that retired the dependency also releases the dependent.
+    ASSERT_TRUE(WaitUntil([&] { return jobs.GetState(second) ==
+                                       Runtime::JobState::AwaitingGate; }));
+    EXPECT_EQ(jobs.DrainCompletions(events), 1u);
+
+    ASSERT_EQ(publishOrder.size(), 2u);
+    EXPECT_EQ(publishOrder[0], 1);
+    EXPECT_EQ(publishOrder[1], 2);
+    EXPECT_EQ(jobs.Stats().AwaitingDependencyJobs, 0u);
+}
+
+TEST(RuntimeJobService, DependentIsCancelledWhenUpstreamDoesNotPublish)
+{
+    SchedulerScope scheduler{2};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+
+    std::vector<int> publishOrder;
+    const Runtime::JobToken first =
+        jobs.Submit(MakeCountingJob("cancelled.first", 1, publishOrder));
+    ASSERT_TRUE(first.IsValid());
+
+    Runtime::JobDesc dependentDesc =
+        MakeCountingJob("cancelled.second", 2, publishOrder);
+    dependentDesc.DependsOn.push_back(
+        Runtime::JobDependency{.Job = first, .Reason = "needs first"});
+    const Runtime::JobToken second = jobs.Submit(std::move(dependentDesc));
+    ASSERT_TRUE(second.IsValid());
+
+    // Cancelling the upstream must not leave the dependent runnable: a chain
+    // never applies half its work against inputs that were never produced.
+    EXPECT_TRUE(jobs.Cancel(first));
+    (void)jobs.DrainCompletions(events);
+    (void)jobs.DrainCompletions(events);
+
+    EXPECT_EQ(jobs.GetState(second), Runtime::JobState::Cancelled);
+    EXPECT_TRUE(publishOrder.empty());
+    EXPECT_GE(jobs.Stats().DependencyCancelledJobs, 1u);
+}
+
+TEST(RuntimeJobService, BoundedApplyLimitsWorkPerDrainWithoutStarving)
+{
+    SchedulerScope scheduler{2};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+
+    std::vector<int> publishOrder;
+    constexpr int kJobCount = 5;
+    for (int i = 0; i < kJobCount; ++i)
+    {
+        const Runtime::JobToken token = jobs.Submit(
+            MakeCountingJob("bounded." + std::to_string(i), i, publishOrder));
+        ASSERT_TRUE(token.IsValid());
+    }
+
+    ASSERT_TRUE(WaitUntil([&]
+    {
+        return jobs.Stats().InFlightJobs == 0u ||
+               jobs.Stats().AwaitingGateJobs +
+                       jobs.Stats().PublishedCompletions >=
+                   static_cast<std::uint64_t>(kJobCount);
+    }));
+
+    // A burst of completions must not all land in one frame.
+    const std::uint64_t firstDrain = jobs.DrainCompletions(events, 2u);
+    EXPECT_LE(firstDrain, 2u);
+    EXPECT_EQ(jobs.Stats().LastDrainBudget, 2u);
+
+    std::uint64_t total = firstDrain;
+    for (int guard = 0; guard < 16 && total < kJobCount; ++guard)
+        total += jobs.DrainCompletions(events, 2u);
+
+    // Everything still arrives exactly once. Completion order follows worker
+    // finish order, not submission order — the pool is concurrent — so the
+    // contract bounding must preserve is "nothing dropped, nothing duplicated",
+    // not a sequence.
+    EXPECT_EQ(total, static_cast<std::uint64_t>(kJobCount));
+    ASSERT_EQ(publishOrder.size(), static_cast<std::size_t>(kJobCount));
+    std::vector<int> seen = publishOrder;
+    std::sort(seen.begin(), seen.end());
+    for (int i = 0; i < kJobCount; ++i)
+        EXPECT_EQ(seen[static_cast<std::size_t>(i)], i);
+}
+
+TEST(RuntimeJobService, NotReadyResultsParkInsteadOfApplyingOrBlocking)
+{
+    SchedulerScope scheduler{2};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+
+    std::vector<int> publishOrder;
+    std::atomic<bool> ready{false};
+
+    Runtime::JobDesc desc = MakeCountingJob("parked", 7, publishOrder);
+    desc.IsReadyToApply = [&ready] { return ready.load(std::memory_order_acquire); };
+    const Runtime::JobToken token = jobs.Submit(std::move(desc));
+    ASSERT_TRUE(token.IsValid());
+
+    ASSERT_TRUE(WaitUntil([&] { return jobs.GetState(token) ==
+                                       Runtime::JobState::AwaitingGate; }));
+
+    EXPECT_EQ(jobs.DrainCompletions(events), 0u);
+    EXPECT_EQ(jobs.GetState(token), Runtime::JobState::AwaitingApply);
+    EXPECT_EQ(jobs.Stats().LastDrainParked, 1u);
+    EXPECT_TRUE(publishOrder.empty());
+
+    ready.store(true, std::memory_order_release);
+    EXPECT_EQ(jobs.DrainCompletions(events), 1u);
+    EXPECT_EQ(jobs.GetState(token), Runtime::JobState::Published);
+    ASSERT_EQ(publishOrder.size(), 1u);
+    EXPECT_EQ(publishOrder[0], 7);
+}
+
+TEST(RuntimeJobService, StaleWorldEpochDiscardsResultBeforeItCanMutate)
+{
+    SchedulerScope scheduler{2};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+
+    const Runtime::WorldHandle world = Runtime::DefaultWorldHandle;
+    const std::uint64_t epoch = jobs.AdvanceWorldGeneration(world);
+    EXPECT_EQ(jobs.WorldGeneration(world), epoch);
+
+    std::vector<int> publishOrder;
+    Runtime::JobDesc desc = MakeCountingJob("stale", 3, publishOrder);
+    desc.Scope = world;
+    desc.CancellationGeneration = epoch;
+    const Runtime::JobToken token = jobs.Submit(std::move(desc));
+    ASSERT_TRUE(token.IsValid());
+
+    ASSERT_TRUE(WaitUntil([&] { return jobs.GetState(token) ==
+                                       Runtime::JobState::AwaitingGate; }));
+
+    // World replacement between capture and apply must discard the result.
+    (void)jobs.AdvanceWorldGeneration(world);
+
+    EXPECT_EQ(jobs.DrainCompletions(events), 0u);
+    EXPECT_EQ(jobs.GetState(token), Runtime::JobState::StaleDiscarded);
+    EXPECT_TRUE(publishOrder.empty());
+    EXPECT_EQ(jobs.Stats().LastDrainStaleDiscarded, 1u);
+}
+
+TEST(RuntimeJobService, ValidateBeforeApplyIsFailClosedAndAppliesOnlyOnce)
+{
+    SchedulerScope scheduler{2};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+
+    std::vector<int> publishOrder;
+    int validationCalls = 0;
+
+    Runtime::JobDesc desc = MakeCountingJob("validated", 11, publishOrder);
+    desc.ValidateBeforeApply = [&validationCalls]
+    {
+        ++validationCalls;
+        return Runtime::JobApplyValidation::StaleGeneration;
+    };
+    const Runtime::JobToken token = jobs.Submit(std::move(desc));
+    ASSERT_TRUE(token.IsValid());
+
+    ASSERT_TRUE(WaitUntil([&] { return jobs.GetState(token) ==
+                                       Runtime::JobState::AwaitingGate; }));
+
+    EXPECT_EQ(jobs.DrainCompletions(events), 0u);
+    EXPECT_EQ(validationCalls, 1);
+    EXPECT_EQ(jobs.GetState(token), Runtime::JobState::StaleDiscarded);
+    EXPECT_TRUE(publishOrder.empty());
+
+    // A discarded record is terminal: further drains must not re-apply it.
+    EXPECT_EQ(jobs.DrainCompletions(events), 0u);
+    EXPECT_EQ(validationCalls, 1);
+    EXPECT_TRUE(publishOrder.empty());
+}
+
+TEST(RuntimeJobService, ProgressIsReportableFromWorkAndReadableOnMainThread)
+{
+    SchedulerScope scheduler{2};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+
+    std::vector<int> publishOrder;
+    EXPECT_FLOAT_EQ(jobs.GetProgress(Runtime::JobToken{}).Normalized, 0.0f);
+
+    const Runtime::JobToken token =
+        jobs.Submit(MakeCountingJob("progress", 5, publishOrder));
+    ASSERT_TRUE(token.IsValid());
+
+    jobs.ReportProgress(token,
+                        Runtime::JobProgress{.Normalized = 0.25f,
+                                             .Determinate = true});
+    const Runtime::JobProgress quarter = jobs.GetProgress(token);
+    EXPECT_FLOAT_EQ(quarter.Normalized, 0.25f);
+    EXPECT_TRUE(quarter.Determinate);
+
+    jobs.ReportProgress(token,
+                        Runtime::JobProgress{.Normalized = 0.0f,
+                                             .Determinate = false});
+    EXPECT_FALSE(jobs.GetProgress(token).Determinate);
+
+    ASSERT_TRUE(WaitUntil([&] { return jobs.GetState(token) ==
+                                       Runtime::JobState::AwaitingGate; }));
+    EXPECT_EQ(jobs.DrainCompletions(events), 1u);
 }

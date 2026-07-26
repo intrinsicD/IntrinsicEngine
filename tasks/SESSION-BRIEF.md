@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `RUNTIME-194` — Consolidate runtime work execution (tasks/active/RUNTIME-194-consolidate-runtime-work-execution.md)
 
 ## Theme B — Rendering modernization
 
@@ -39,7 +39,6 @@ the authoritative open/unblocked view.
 - blocked by `RUNTIME-194`: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
 - unblocked: `RUNTIME-191` — Unify property-to-texture baking and retire specialized paths (tasks/backlog/runtime/RUNTIME-191-unified-property-texture-bake-pipeline.md)
 - unblocked: `RUNTIME-193` — General geometry-presentation recipe (tasks/backlog/runtime/RUNTIME-193-general-geometry-presentation-recipe.md)
-- unblocked: `RUNTIME-194` — Consolidate runtime work execution (tasks/backlog/runtime/RUNTIME-194-consolidate-runtime-work-execution.md)
 - blocked by `RUNTIME-194`: `RUNTIME-195` — Unified GPU-result readback (tasks/backlog/runtime/RUNTIME-195-unified-gpu-result-readback.md)
 - blocked by `BUG-095`: `RUNTIME-200` — Staged asset-import and materialization recipe (tasks/backlog/runtime/RUNTIME-200-staged-asset-import-materialization-recipe.md)
 - blocked by `RUNTIME-193`: `RUNTIME-201` — Unified editor mutation and history transaction (tasks/backlog/runtime/RUNTIME-201-unified-editor-mutation-history-transaction.md)

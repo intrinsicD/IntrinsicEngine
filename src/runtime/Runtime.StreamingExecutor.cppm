@@ -13,21 +13,13 @@ export module Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.StrongHandle;
+// RUNTIME-194 moved RuntimeTaskKinds to the surviving execution surface;
+// re-exported so existing consumers keep compiling until this module retires.
+export import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.WorldHandle;
 
 export namespace Extrinsic::Runtime
 {
-    namespace RuntimeTaskKinds
-    {
-        inline constexpr Core::Dag::TaskKind Generic{0u};
-        inline constexpr Core::Dag::TaskKind AssetIO{1u};
-        inline constexpr Core::Dag::TaskKind AssetDecode{2u};
-        inline constexpr Core::Dag::TaskKind AssetUpload{3u};
-        inline constexpr Core::Dag::TaskKind GeometryProcess{4u};
-        inline constexpr Core::Dag::TaskKind PhysicsStep{5u};
-        inline constexpr Core::Dag::TaskKind RenderPass{6u};
-    }
-
     struct StreamingTaskTag;
     using StreamingTaskHandle = Core::StrongHandle<StreamingTaskTag>;
 

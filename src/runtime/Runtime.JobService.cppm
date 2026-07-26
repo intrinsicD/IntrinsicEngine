@@ -9,9 +9,11 @@ module;
 #include <string_view>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 export module Extrinsic.Runtime.JobService;
 
+import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.Core.StrongHandle;
 import Extrinsic.RHI.CommandContext;
@@ -20,6 +22,20 @@ import Extrinsic.Runtime.WorldHandle;
 
 namespace Extrinsic::Runtime
 {
+    // Execution-lane taxonomy. RUNTIME-194 moved this from
+    // `Runtime.StreamingExecutor` to the one surviving execution surface;
+    // `StreamingExecutor` re-exports it until that module is retired.
+    export namespace RuntimeTaskKinds
+    {
+        inline constexpr Core::Dag::TaskKind Generic{0u};
+        inline constexpr Core::Dag::TaskKind AssetIO{1u};
+        inline constexpr Core::Dag::TaskKind AssetDecode{2u};
+        inline constexpr Core::Dag::TaskKind AssetUpload{3u};
+        inline constexpr Core::Dag::TaskKind GeometryProcess{4u};
+        inline constexpr Core::Dag::TaskKind PhysicsStep{5u};
+        inline constexpr Core::Dag::TaskKind RenderPass{6u};
+    }
+
     export struct JobTokenTag;
     export using JobToken = Core::StrongHandle<JobTokenTag>;
 
@@ -50,13 +66,48 @@ namespace Extrinsic::Runtime
     export enum class JobState : std::uint8_t
     {
         Invalid,
+        // Submitted, but at least one dependency has not finished. Released to
+        // `Queued` by a completion drain, so dependency release is deterministic
+        // and main-thread-ordered rather than racing on a worker.
+        AwaitingDependencies,
         Queued,
         Running,
         AwaitingGate,
+        // Finished on a worker, but the caller's readiness gate says the result
+        // cannot be applied yet (for example a GPU readback that has not landed).
+        // The record stays parked across drains without blocking the queue.
+        AwaitingApply,
         Published,
         Dropped,
         Cancelled,
         Rejected,
+        // Revalidation on the main thread rejected the result before it was
+        // allowed to mutate anything.
+        StaleDiscarded,
+    };
+
+    export struct JobDependency
+    {
+        JobToken    Job{};
+        std::string Reason{};
+    };
+
+    // Fail-closed revalidation run on the main thread immediately before a
+    // result is allowed to mutate anything. Anything other than `Current`
+    // discards the result without applying it.
+    export enum class JobApplyValidation : std::uint8_t
+    {
+        Current,
+        Cancelled,
+        StaleWorld,
+        StaleGeneration,
+        MissingTarget,
+    };
+
+    export struct JobProgress
+    {
+        float Normalized{0.0f};
+        bool  Determinate{true};
     };
 
     export class JobCancellation
@@ -127,8 +178,32 @@ namespace Extrinsic::Runtime
         std::string DebugName{};
         JobTarget Target{JobTarget::CpuPool};
         WorldHandle Scope{DefaultWorldHandle};
+
+        // Scheduling metadata. Dependencies must all reach a terminal state
+        // before this job is queued; a dependency that cancels or is discarded
+        // cancels this job too, so a chain never applies half its work.
+        std::vector<JobDependency> DependsOn{};
+        Core::Dag::TaskPriority Priority{Core::Dag::TaskPriority::Normal};
+        Core::Dag::TaskKind Kind{RuntimeTaskKinds::Generic};
+        std::uint32_t EstimatedCost{1u};
+
+        // Document/world epoch captured at submit time. A drain compares it
+        // against the service's current generation for the job's world and
+        // discards results captured before a world replacement.
+        std::uint64_t CancellationGeneration{0u};
+
         std::move_only_function<JobResultEnvelope(const JobCancellation&)>
             Work{};
+
+        // Optional readiness gate consulted on the main thread. Returning false
+        // parks the finished result for a later drain instead of applying it.
+        std::move_only_function<bool()> IsReadyToApply{};
+
+        // Optional fail-closed revalidation, consulted immediately before
+        // publication. Callers use it to re-check generations they captured in
+        // their immutable snapshot.
+        std::move_only_function<JobApplyValidation()> ValidateBeforeApply{};
+
         std::move_only_function<bool(KernelEventBus&, const JobResultEnvelope&)>
             PublishCompletion{};
     };
@@ -189,6 +264,13 @@ namespace Extrinsic::Runtime
         std::uint64_t LastDrainPublished{0};
         std::uint64_t LastDrainDropped{0};
         std::uint64_t ReapedJobs{0};
+        std::uint64_t AwaitingDependencyJobs{0};
+        std::uint64_t AwaitingApplyJobs{0};
+        std::uint64_t StaleDiscardedJobs{0};
+        std::uint64_t DependencyCancelledJobs{0};
+        std::uint64_t LastDrainParked{0};
+        std::uint64_t LastDrainStaleDiscarded{0};
+        std::uint64_t LastDrainBudget{0};
     };
 
     export struct JobServiceTestHooks
@@ -216,8 +298,24 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool IsComplete(JobToken token) const;
         [[nodiscard]] JobState GetState(JobToken token) const;
 
+        // Unbounded drain. Prefer the bounded overload on the frame path.
         [[nodiscard]] std::uint64_t DrainCompletions(KernelEventBus& events);
+
+        // Bounded main-thread apply: applies at most `maxApplyCount` results and
+        // leaves the rest queued for the next drain, so a completion burst can
+        // never stall a frame. `maxApplyCount == 0` means unbounded.
+        [[nodiscard]] std::uint64_t DrainCompletions(KernelEventBus& events,
+                                                     std::uint64_t maxApplyCount);
         [[nodiscard]] std::uint64_t ReapCompleted();
+
+        // Worker-callable progress reporting; `GetProgress` is main-thread safe.
+        void ReportProgress(JobToken token, JobProgress progress);
+        [[nodiscard]] JobProgress GetProgress(JobToken token) const;
+
+        // Bumps the epoch for `world`, so results captured before the bump are
+        // discarded by revalidation instead of mutating replaced state.
+        std::uint64_t AdvanceWorldGeneration(WorldHandle world);
+        [[nodiscard]] std::uint64_t WorldGeneration(WorldHandle world) const;
 
         [[nodiscard]] JobServiceStats Stats() const;
 
@@ -234,6 +332,20 @@ namespace Extrinsic::Runtime
 
     private:
         struct SharedState;
+        struct JobRecord;
+
+        // Defined in the implementation unit; queues a record whose
+        // dependencies are satisfied onto the shared CPU pool.
+        static void DispatchJob(const std::shared_ptr<SharedState>& state,
+                                const std::shared_ptr<JobRecord>& job);
+
+        // Releases dependency-blocked jobs whose upstream work is terminal, and
+        // cancels those whose upstream did not publish.
+        void ReleaseSatisfiedDependencies();
+
+        [[nodiscard]] JobApplyValidation ResolveApplyValidation(
+            JobRecord& job) const;
+
         std::shared_ptr<SharedState> m_State;
     };
 }

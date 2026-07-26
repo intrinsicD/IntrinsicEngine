@@ -30,34 +30,49 @@ namespace Extrinsic::Runtime
             case JobState::Dropped:
             case JobState::Cancelled:
             case JobState::Rejected:
+            case JobState::StaleDiscarded:
                 return true;
             case JobState::Invalid:
+            case JobState::AwaitingDependencies:
             case JobState::Queued:
             case JobState::Running:
             case JobState::AwaitingGate:
+            case JobState::AwaitingApply:
                 return false;
             }
             return false;
         }
     }
 
+    struct JobService::JobRecord
+    {
+        JobToken Token{};
+        WorldHandle Scope{DefaultWorldHandle};
+        JobTarget Target{JobTarget::CpuPool};
+        std::string DebugName{};
+        std::move_only_function<JobResultEnvelope(const JobCancellation&)>
+            Work{};
+        std::move_only_function<bool(KernelEventBus&,
+                                     const JobResultEnvelope&)>
+            PublishCompletion{};
+        std::shared_ptr<std::atomic<bool>> CancelRequested{
+            std::make_shared<std::atomic<bool>>(false)};
+        std::atomic<JobState> State{JobState::Queued};
+
+        // RUNTIME-194 scheduling/lifecycle additions.
+        std::vector<JobToken> DependsOn{};
+        Core::Dag::TaskPriority Priority{Core::Dag::TaskPriority::Normal};
+        Core::Dag::TaskKind Kind{RuntimeTaskKinds::Generic};
+        std::uint32_t EstimatedCost{1u};
+        std::uint64_t CancellationGeneration{0u};
+        std::move_only_function<bool()> IsReadyToApply{};
+        std::move_only_function<JobApplyValidation()> ValidateBeforeApply{};
+        std::atomic<float> ProgressNormalized{0.0f};
+        std::atomic<bool> ProgressDeterminate{true};
+    };
+
     struct JobService::SharedState
     {
-        struct JobRecord
-        {
-            JobToken Token{};
-            WorldHandle Scope{DefaultWorldHandle};
-            JobTarget Target{JobTarget::CpuPool};
-            std::string DebugName{};
-            std::move_only_function<JobResultEnvelope(const JobCancellation&)>
-                Work{};
-            std::move_only_function<bool(KernelEventBus&,
-                                         const JobResultEnvelope&)>
-                PublishCompletion{};
-            std::shared_ptr<std::atomic<bool>> CancelRequested{
-                std::make_shared<std::atomic<bool>>(false)};
-            std::atomic<JobState> State{JobState::Queued};
-        };
 
         struct CompletionRecord
         {
@@ -85,6 +100,12 @@ namespace Extrinsic::Runtime
         std::vector<CompletionRecord> CompletionQueue{};
         std::uint32_t NextTokenIndex{0u};
         std::uint32_t NextGpuQueueParticipantIndex{0u};
+        // Jobs whose dependencies have not all reached a terminal state.
+        std::vector<std::shared_ptr<JobRecord>> PendingDependencies{};
+        std::unordered_map<WorldHandle,
+                           std::uint64_t,
+                           Core::StrongHandleHash<WorldHandleTag>>
+            WorldGenerations{};
         JobServiceStats Stats{};
         JobServiceTestHooks TestHooks{};
     };
@@ -141,7 +162,7 @@ namespace Extrinsic::Runtime
             return {};
         }
 
-        auto job = std::make_shared<SharedState::JobRecord>();
+        auto job = std::make_shared<JobService::JobRecord>();
         {
             std::lock_guard lock(m_State->Mutex);
             job->Token = JobToken{m_State->NextTokenIndex++, 1u};
@@ -150,11 +171,43 @@ namespace Extrinsic::Runtime
             job->DebugName = std::move(desc.DebugName);
             job->Work = std::move(desc.Work);
             job->PublishCompletion = std::move(desc.PublishCompletion);
+            job->Priority = desc.Priority;
+            job->Kind = desc.Kind;
+            job->EstimatedCost = desc.EstimatedCost;
+            job->CancellationGeneration = desc.CancellationGeneration;
+            job->IsReadyToApply = std::move(desc.IsReadyToApply);
+            job->ValidateBeforeApply = std::move(desc.ValidateBeforeApply);
+            job->DependsOn.reserve(desc.DependsOn.size());
+            for (const JobDependency& dependency : desc.DependsOn)
+            {
+                if (dependency.Job.IsValid())
+                    job->DependsOn.push_back(dependency.Job);
+            }
             m_State->Jobs.emplace(job->Token, job);
             m_State->Stats.SubmittedJobs += 1;
+
+            if (!job->DependsOn.empty())
+            {
+                // Held until a drain observes every dependency terminal. Doing
+                // the release on the main thread keeps chain ordering
+                // deterministic instead of racing between workers.
+                job->State.store(JobState::AwaitingDependencies,
+                                 std::memory_order_release);
+                m_State->PendingDependencies.push_back(job);
+                m_State->Stats.AwaitingDependencyJobs += 1;
+                return job->Token;
+            }
         }
 
-        const std::shared_ptr<SharedState> state = m_State;
+        DispatchJob(m_State, job);
+        return job->Token;
+    }
+
+    void JobService::DispatchJob(
+        const std::shared_ptr<SharedState>& state,
+        const std::shared_ptr<JobService::JobRecord>& job)
+    {
+        job->State.store(JobState::Queued, std::memory_order_release);
         Core::Tasks::Scheduler::Dispatch([state, job]() mutable
         {
             if (job->CancelRequested->load(std::memory_order_acquire))
@@ -201,8 +254,6 @@ namespace Extrinsic::Runtime
             if (state->TestHooks.AfterCompletionQueued)
                 state->TestHooks.AfterCompletionQueued(job->Token);
         });
-
-        return job->Token;
     }
 
     bool JobService::Cancel(const JobToken token)
@@ -210,7 +261,7 @@ namespace Extrinsic::Runtime
         if (!token.IsValid() || !m_State)
             return false;
 
-        std::shared_ptr<SharedState::JobRecord> job;
+        std::shared_ptr<JobService::JobRecord> job;
         {
             std::lock_guard lock(m_State->Mutex);
             const auto it = m_State->Jobs.find(token);
@@ -298,25 +349,56 @@ namespace Extrinsic::Runtime
 
     std::uint64_t JobService::DrainCompletions(KernelEventBus& events)
     {
+        return DrainCompletions(events, 0u);
+    }
+
+    std::uint64_t JobService::DrainCompletions(KernelEventBus& events,
+                                               const std::uint64_t maxApplyCount)
+    {
         if (!m_State)
             return 0;
 
         std::vector<SharedState::CompletionRecord> batch;
+        std::vector<SharedState::CompletionRecord> deferred;
         {
             std::lock_guard lock(m_State->Mutex);
-            batch.swap(m_State->CompletionQueue);
+            if (maxApplyCount == 0u ||
+                m_State->CompletionQueue.size() <= maxApplyCount)
+            {
+                batch.swap(m_State->CompletionQueue);
+            }
+            else
+            {
+                // Bounded apply: take the budget off the front and leave the
+                // remainder queued in order, so a completion burst cannot stall
+                // a frame and no record is starved.
+                const auto budget = static_cast<std::size_t>(maxApplyCount);
+                batch.assign(
+                    std::make_move_iterator(m_State->CompletionQueue.begin()),
+                    std::make_move_iterator(m_State->CompletionQueue.begin() +
+                                            static_cast<std::ptrdiff_t>(budget)));
+                m_State->CompletionQueue.erase(
+                    m_State->CompletionQueue.begin(),
+                    m_State->CompletionQueue.begin() +
+                        static_cast<std::ptrdiff_t>(budget));
+            }
             m_State->Stats.CompletionDrains += 1;
             m_State->Stats.LastDrainFinished =
                 static_cast<std::uint64_t>(batch.size());
             m_State->Stats.LastDrainPublished = 0;
             m_State->Stats.LastDrainDropped = 0;
+            m_State->Stats.LastDrainParked = 0;
+            m_State->Stats.LastDrainStaleDiscarded = 0;
+            m_State->Stats.LastDrainBudget = maxApplyCount;
         }
 
         std::uint64_t published = 0;
         std::uint64_t dropped = 0;
-        for (const SharedState::CompletionRecord& completion : batch)
+        std::uint64_t parked = 0;
+        std::uint64_t staleDiscarded = 0;
+        for (SharedState::CompletionRecord& completion : batch)
         {
-            const std::shared_ptr<SharedState::JobRecord>& job = completion.Job;
+            const std::shared_ptr<JobRecord>& job = completion.Job;
             if (!job)
             {
                 dropped += 1;
@@ -327,6 +409,29 @@ namespace Extrinsic::Runtime
             {
                 job->State.store(JobState::Cancelled, std::memory_order_release);
                 dropped += 1;
+                continue;
+            }
+
+            // Readiness gate: park rather than apply, and rather than block.
+            if (job->IsReadyToApply && !job->IsReadyToApply())
+            {
+                job->State.store(JobState::AwaitingApply,
+                                 std::memory_order_release);
+                deferred.push_back(std::move(completion));
+                parked += 1;
+                continue;
+            }
+
+            // Fail-closed revalidation before anything is allowed to mutate.
+            const JobApplyValidation validation =
+                ResolveApplyValidation(*job);
+            if (validation != JobApplyValidation::Current)
+            {
+                job->State.store(validation == JobApplyValidation::Cancelled
+                                     ? JobState::Cancelled
+                                     : JobState::StaleDiscarded,
+                                 std::memory_order_release);
+                staleDiscarded += 1;
                 continue;
             }
 
@@ -351,13 +456,191 @@ namespace Extrinsic::Runtime
 
         {
             std::lock_guard lock(m_State->Mutex);
+            // Parked records go back to the front so they keep their place
+            // ahead of results that finished later.
+            if (!deferred.empty())
+            {
+                m_State->CompletionQueue.insert(
+                    m_State->CompletionQueue.begin(),
+                    std::make_move_iterator(deferred.begin()),
+                    std::make_move_iterator(deferred.end()));
+            }
             m_State->Stats.CompletedJobs += published;
             m_State->Stats.PublishedCompletions += published;
             m_State->Stats.DroppedCompletions += dropped;
+            m_State->Stats.StaleDiscardedJobs += staleDiscarded;
+            m_State->Stats.AwaitingApplyJobs =
+                static_cast<std::uint64_t>(deferred.size());
             m_State->Stats.LastDrainPublished = published;
             m_State->Stats.LastDrainDropped = dropped;
+            m_State->Stats.LastDrainParked = parked;
+            m_State->Stats.LastDrainStaleDiscarded = staleDiscarded;
         }
+
+        // Runs after publication so a dependency retired by this very drain
+        // releases its dependents now, rather than costing them a extra frame.
+        ReleaseSatisfiedDependencies();
+
         return published;
+    }
+
+    JobApplyValidation JobService::ResolveApplyValidation(JobRecord& job) const
+    {
+        if (job.CancelRequested->load(std::memory_order_acquire))
+            return JobApplyValidation::Cancelled;
+
+        // Epoch check: a result captured before its world was replaced must
+        // never mutate the replacement.
+        if (job.CancellationGeneration != 0u)
+        {
+            std::lock_guard lock(m_State->Mutex);
+            const auto it = m_State->WorldGenerations.find(job.Scope);
+            const std::uint64_t current =
+                it == m_State->WorldGenerations.end() ? 0u : it->second;
+            if (current != 0u && current != job.CancellationGeneration)
+                return JobApplyValidation::StaleWorld;
+        }
+
+        if (job.ValidateBeforeApply)
+            return job.ValidateBeforeApply();
+
+        return JobApplyValidation::Current;
+    }
+
+    void JobService::ReleaseSatisfiedDependencies()
+    {
+        if (!m_State)
+            return;
+
+        std::vector<std::shared_ptr<JobRecord>> ready;
+        std::vector<std::shared_ptr<JobRecord>> cancelled;
+        {
+            std::lock_guard lock(m_State->Mutex);
+            std::vector<std::shared_ptr<JobRecord>> stillPending;
+            stillPending.reserve(m_State->PendingDependencies.size());
+
+            for (auto& job : m_State->PendingDependencies)
+            {
+                if (!job)
+                    continue;
+                if (job->CancelRequested->load(std::memory_order_acquire))
+                {
+                    cancelled.push_back(job);
+                    continue;
+                }
+
+                bool allTerminal = true;
+                bool anyFailed = false;
+                for (const JobToken dependency : job->DependsOn)
+                {
+                    const auto it = m_State->Jobs.find(dependency);
+                    if (it == m_State->Jobs.end() || !it->second)
+                        continue;  // reaped: treat as satisfied
+                    const JobState state =
+                        it->second->State.load(std::memory_order_acquire);
+                    if (!IsTerminal(state))
+                    {
+                        allTerminal = false;
+                        break;
+                    }
+                    if (state != JobState::Published)
+                        anyFailed = true;
+                }
+
+                if (!allTerminal)
+                {
+                    stillPending.push_back(job);
+                    continue;
+                }
+
+                if (anyFailed)
+                {
+                    // A chain never applies half its work: if an upstream job
+                    // did not publish, its dependents are cancelled rather than
+                    // run against inputs that were never produced.
+                    (void)job->CancelRequested->exchange(
+                        true, std::memory_order_acq_rel);
+                    cancelled.push_back(job);
+                    continue;
+                }
+
+                ready.push_back(job);
+            }
+
+            m_State->PendingDependencies.swap(stillPending);
+            m_State->Stats.AwaitingDependencyJobs =
+                static_cast<std::uint64_t>(m_State->PendingDependencies.size());
+            m_State->Stats.DependencyCancelledJobs +=
+                static_cast<std::uint64_t>(cancelled.size());
+            m_State->Stats.CancelledJobs +=
+                static_cast<std::uint64_t>(cancelled.size());
+        }
+
+        for (const auto& job : cancelled)
+            job->State.store(JobState::Cancelled, std::memory_order_release);
+        for (const auto& job : ready)
+            DispatchJob(m_State, job);
+    }
+
+    void JobService::ReportProgress(const JobToken token,
+                                    const JobProgress progress)
+    {
+        if (!token.IsValid() || !m_State)
+            return;
+
+        std::shared_ptr<JobRecord> job;
+        {
+            std::lock_guard lock(m_State->Mutex);
+            const auto it = m_State->Jobs.find(token);
+            if (it == m_State->Jobs.end())
+                return;
+            job = it->second;
+        }
+        if (!job)
+            return;
+        job->ProgressNormalized.store(progress.Normalized,
+                                      std::memory_order_release);
+        job->ProgressDeterminate.store(progress.Determinate,
+                                       std::memory_order_release);
+    }
+
+    JobProgress JobService::GetProgress(const JobToken token) const
+    {
+        if (!token.IsValid() || !m_State)
+            return {};
+
+        std::shared_ptr<JobRecord> job;
+        {
+            std::lock_guard lock(m_State->Mutex);
+            const auto it = m_State->Jobs.find(token);
+            if (it == m_State->Jobs.end())
+                return {};
+            job = it->second;
+        }
+        if (!job)
+            return {};
+        return JobProgress{
+            .Normalized = job->ProgressNormalized.load(std::memory_order_acquire),
+            .Determinate =
+                job->ProgressDeterminate.load(std::memory_order_acquire),
+        };
+    }
+
+    std::uint64_t JobService::AdvanceWorldGeneration(const WorldHandle world)
+    {
+        if (!world.IsValid() || !m_State)
+            return 0;
+        std::lock_guard lock(m_State->Mutex);
+        return ++m_State->WorldGenerations[world];
+    }
+
+    std::uint64_t JobService::WorldGeneration(const WorldHandle world) const
+    {
+        if (!world.IsValid() || !m_State)
+            return 0;
+        std::lock_guard lock(m_State->Mutex);
+        const auto it = m_State->WorldGenerations.find(world);
+        return it == m_State->WorldGenerations.end() ? 0u : it->second;
     }
 
     std::uint64_t JobService::ReapCompleted()
@@ -369,7 +652,7 @@ namespace Extrinsic::Runtime
         std::lock_guard lock(m_State->Mutex);
         for (auto it = m_State->Jobs.begin(); it != m_State->Jobs.end();)
         {
-            const std::shared_ptr<SharedState::JobRecord>& job = it->second;
+            const std::shared_ptr<JobService::JobRecord>& job = it->second;
             if (!job ||
                 IsTerminal(job->State.load(std::memory_order_acquire)))
             {
