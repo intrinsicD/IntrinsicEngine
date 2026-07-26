@@ -206,6 +206,23 @@ namespace Extrinsic::Runtime
 
         std::move_only_function<bool(KernelEventBus&, const JobResultEnvelope&)>
             PublishCompletion{};
+
+        // Main-thread reconciliation for a job that terminates *without*
+        // publishing: cancelled, discarded as stale, dependency-cancelled, or
+        // dropped. Exactly one of `PublishCompletion` and this runs per
+        // submitted job, both on the main thread from a completion drain, so a
+        // consumer that owns control state (an ingest state machine, a pending
+        // request slot) can never be left waiting on a result that will never
+        // arrive. Invoked outside the service lock, so it may submit or cancel.
+        //
+        // This is the superset of the retired
+        // `StreamingTaskDesc::FinalizeCancellationOnMainThread`, which fired on
+        // explicit cancellation only; staleness discard is a `JobService`
+        // terminal state that a cancellation-only hook would leak.
+        //
+        // Not called when `Submit` rejects the job — that is reported
+        // synchronously by an invalid `JobToken`.
+        std::move_only_function<void()> FinalizeUnpublishedOnMainThread{};
     };
 
     export struct GpuQueueParticipantDesc
@@ -271,6 +288,9 @@ namespace Extrinsic::Runtime
         std::uint64_t LastDrainParked{0};
         std::uint64_t LastDrainStaleDiscarded{0};
         std::uint64_t LastDrainBudget{0};
+        std::uint64_t FinalizedUnpublishedJobs{0};
+        std::uint64_t PendingUnpublishedFinalizers{0};
+        std::uint64_t LastDrainFinalizedUnpublished{0};
     };
 
     export struct JobServiceTestHooks
@@ -342,6 +362,17 @@ namespace Extrinsic::Runtime
         // Releases dependency-blocked jobs whose upstream work is terminal, and
         // cancels those whose upstream did not publish.
         void ReleaseSatisfiedDependencies();
+
+        // Claims `job`'s unpublished-finalizer exactly once and queues it for
+        // the next main-thread drain. Callable from a worker; the caller must
+        // hold the state mutex.
+        static void QueueUnpublishedFinalizerLocked(
+            SharedState& state,
+            const std::shared_ptr<JobRecord>& job);
+
+        // Runs queued unpublished finalizers on the main thread, outside the
+        // service lock. Returns how many ran.
+        [[nodiscard]] std::uint64_t RunUnpublishedFinalizers();
 
         [[nodiscard]] JobApplyValidation ResolveApplyValidation(
             JobRecord& job) const;

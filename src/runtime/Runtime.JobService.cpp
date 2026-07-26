@@ -69,6 +69,12 @@ namespace Extrinsic::Runtime
         std::move_only_function<JobApplyValidation()> ValidateBeforeApply{};
         std::atomic<float> ProgressNormalized{0.0f};
         std::atomic<bool> ProgressDeterminate{true};
+        std::move_only_function<void()> FinalizeUnpublishedOnMainThread{};
+        // Set when the finalizer has been queued, so the several terminal-
+        // unpublished paths (worker cancel, drain cancel, stale discard,
+        // dependency cancel, drop) can each try to claim it and exactly one
+        // wins.
+        std::atomic<bool> FinalizerClaimed{false};
     };
 
     struct JobService::SharedState
@@ -102,6 +108,9 @@ namespace Extrinsic::Runtime
         std::uint32_t NextGpuQueueParticipantIndex{0u};
         // Jobs whose dependencies have not all reached a terminal state.
         std::vector<std::shared_ptr<JobRecord>> PendingDependencies{};
+        // Jobs that terminated without publishing and owe their consumer one
+        // main-thread finalizer call.
+        std::vector<std::shared_ptr<JobRecord>> PendingFinalizers{};
         std::unordered_map<WorldHandle,
                            std::uint64_t,
                            Core::StrongHandleHash<WorldHandleTag>>
@@ -121,6 +130,52 @@ namespace Extrinsic::Runtime
     bool JobCancellation::IsCancelled() const noexcept
     {
         return m_Flag && m_Flag->load(std::memory_order_acquire);
+    }
+
+    void JobService::QueueUnpublishedFinalizerLocked(
+        SharedState& state,
+        const std::shared_ptr<JobRecord>& job)
+    {
+        if (!job || !job->FinalizeUnpublishedOnMainThread)
+            return;
+        if (job->FinalizerClaimed.exchange(true, std::memory_order_acq_rel))
+            return;
+        state.PendingFinalizers.push_back(job);
+        state.Stats.PendingUnpublishedFinalizers =
+            static_cast<std::uint64_t>(state.PendingFinalizers.size());
+    }
+
+    std::uint64_t JobService::RunUnpublishedFinalizers()
+    {
+        if (!m_State)
+            return 0;
+
+        std::vector<std::shared_ptr<JobRecord>> pending;
+        {
+            std::lock_guard lock(m_State->Mutex);
+            pending.swap(m_State->PendingFinalizers);
+            m_State->Stats.PendingUnpublishedFinalizers = 0;
+        }
+
+        std::uint64_t finalized = 0;
+        for (const auto& job : pending)
+        {
+            if (!job || !job->FinalizeUnpublishedOnMainThread)
+                continue;
+            // Outside the lock: a finalizer may submit or cancel work. Released
+            // afterwards so the consumer's captured state does not outlive the
+            // one call it is entitled to.
+            job->FinalizeUnpublishedOnMainThread();
+            job->FinalizeUnpublishedOnMainThread = {};
+            finalized += 1;
+        }
+
+        if (finalized != 0)
+        {
+            std::lock_guard lock(m_State->Mutex);
+            m_State->Stats.FinalizedUnpublishedJobs += finalized;
+        }
+        return finalized;
     }
 
     JobToken JobService::Submit(JobDesc desc)
@@ -177,6 +232,8 @@ namespace Extrinsic::Runtime
             job->CancellationGeneration = desc.CancellationGeneration;
             job->IsReadyToApply = std::move(desc.IsReadyToApply);
             job->ValidateBeforeApply = std::move(desc.ValidateBeforeApply);
+            job->FinalizeUnpublishedOnMainThread =
+                std::move(desc.FinalizeUnpublishedOnMainThread);
             job->DependsOn.reserve(desc.DependsOn.size());
             for (const JobDependency& dependency : desc.DependsOn)
             {
@@ -213,6 +270,8 @@ namespace Extrinsic::Runtime
             if (job->CancelRequested->load(std::memory_order_acquire))
             {
                 job->State.store(JobState::Cancelled, std::memory_order_release);
+                std::lock_guard lock(state->Mutex);
+                QueueUnpublishedFinalizerLocked(*state, job);
                 return;
             }
 
@@ -224,6 +283,8 @@ namespace Extrinsic::Runtime
             if (job->CancelRequested->load(std::memory_order_acquire))
             {
                 job->State.store(JobState::Cancelled, std::memory_order_release);
+                std::lock_guard lock(state->Mutex);
+                QueueUnpublishedFinalizerLocked(*state, job);
                 return;
             }
 
@@ -232,6 +293,7 @@ namespace Extrinsic::Runtime
                 job->State.store(JobState::Dropped, std::memory_order_release);
                 std::lock_guard lock(state->Mutex);
                 state->Stats.DroppedCompletions += 1;
+                QueueUnpublishedFinalizerLocked(*state, job);
                 Core::Log::Error(
                     "[JobService] Job '{}' produced an empty result envelope; "
                     "completion dropped.",
@@ -396,6 +458,10 @@ namespace Extrinsic::Runtime
         std::uint64_t dropped = 0;
         std::uint64_t parked = 0;
         std::uint64_t staleDiscarded = 0;
+        // Terminated without publishing in this batch; each owes its consumer
+        // one finalizer call. Collected here and queued under the epilogue lock
+        // rather than locking per record.
+        std::vector<std::shared_ptr<JobRecord>> unpublished;
         for (SharedState::CompletionRecord& completion : batch)
         {
             const std::shared_ptr<JobRecord>& job = completion.Job;
@@ -408,6 +474,7 @@ namespace Extrinsic::Runtime
             if (job->CancelRequested->load(std::memory_order_acquire))
             {
                 job->State.store(JobState::Cancelled, std::memory_order_release);
+                unpublished.push_back(job);
                 dropped += 1;
                 continue;
             }
@@ -431,6 +498,7 @@ namespace Extrinsic::Runtime
                                      ? JobState::Cancelled
                                      : JobState::StaleDiscarded,
                                  std::memory_order_release);
+                unpublished.push_back(job);
                 staleDiscarded += 1;
                 continue;
             }
@@ -445,6 +513,7 @@ namespace Extrinsic::Runtime
             else
             {
                 job->State.store(JobState::Dropped, std::memory_order_release);
+                unpublished.push_back(job);
                 dropped += 1;
                 Core::Log::Error(
                     "[JobService] Job '{}' completion publisher rejected result "
@@ -475,11 +544,22 @@ namespace Extrinsic::Runtime
             m_State->Stats.LastDrainDropped = dropped;
             m_State->Stats.LastDrainParked = parked;
             m_State->Stats.LastDrainStaleDiscarded = staleDiscarded;
+            for (const auto& job : unpublished)
+                QueueUnpublishedFinalizerLocked(*m_State, job);
         }
 
         // Runs after publication so a dependency retired by this very drain
         // releases its dependents now, rather than costing them a extra frame.
         ReleaseSatisfiedDependencies();
+
+        // Last, so cancellations that this drain itself produced — including
+        // the dependency cancellations released just above — reconcile their
+        // consumer's control state in the same drain instead of the next one.
+        const std::uint64_t finalized = RunUnpublishedFinalizers();
+        {
+            std::lock_guard lock(m_State->Mutex);
+            m_State->Stats.LastDrainFinalizedUnpublished = finalized;
+        }
 
         return published;
     }
@@ -574,6 +654,10 @@ namespace Extrinsic::Runtime
                 static_cast<std::uint64_t>(cancelled.size());
             m_State->Stats.CancelledJobs +=
                 static_cast<std::uint64_t>(cancelled.size());
+            // These never dispatched, so no worker path will ever reach them;
+            // this is their only chance to owe their consumer a finalizer.
+            for (const auto& job : cancelled)
+                QueueUnpublishedFinalizerLocked(*m_State, job);
         }
 
         for (const auto& job : cancelled)

@@ -150,6 +150,82 @@ and commits independently.
       chains onto `JobService` lane by lane, with parity and shutdown tests.
       Consumer census: `StreamingExecutor` has 17 src/test files,
       `DerivedJobRegistry` 30.
+
+      Production `StreamingExecutor::Submit` sites, which are the actual lane
+      list (6 total):
+      - `Runtime.SandboxDefaultPolicies.cpp:246` — deferred mesh post-process
+      - `Runtime.VisualizationAdapters.cpp:548`
+      - `Runtime.SceneDocumentModule.cpp:805`, `:1015`
+      - `Runtime.AssetImportPipeline.cpp:2126` (queued geometry import),
+        `:2525` (queued model-texture import)
+
+      - [x] **B0 — close the unpublished-finalizer contract gap.** Found while
+            scoping B: four of those six sites use
+            `StreamingTaskDesc::FinalizeCancellationOnMainThread` to reconcile
+            control state they own (the ingest state machine, pending-request
+            slots) when a task never applies, and `JobService` had no
+            equivalent — a migration without it would leave importers waiting
+            forever on a result that will never arrive. Added
+            `JobDesc::FinalizeUnpublishedOnMainThread` with the contract
+            **exactly one of `PublishCompletion` and
+            `FinalizeUnpublishedOnMainThread` runs per submitted job, both on
+            the main thread from a completion drain**.
+
+            Deliberately a superset of the old hook: the old one fired on
+            explicit cancellation only, but `JobService` can also terminate a
+            job as `StaleDiscarded` (epoch/validation) or `Dropped`, and a
+            cancellation-only hook leaks consumer state on those paths. Hence
+            the name — it keys on "terminated unpublished", not "cancelled".
+
+            All five terminal-unpublished paths claim the finalizer exactly once
+            through `FinalizerClaimed`: worker pre-run cancel, worker post-run
+            cancel, empty-envelope drop, drain cancel/stale-discard/publish
+            reject, and dependency cancellation. Worker paths queue it for the
+            main thread rather than running it inline. Finalizers run at the
+            **end** of a drain, after `ReleaseSatisfiedDependencies`, so a
+            dependency cancellation produced by that same drain reconciles now
+            instead of costing an extra frame (same ordering reason as Slice A's
+            dependency-release note), and outside the service lock so a
+            finalizer may itself submit or cancel. Diagnostics:
+            `FinalizedUnpublishedJobs`, `PendingUnpublishedFinalizers`,
+            `LastDrainFinalizedUnpublished`.
+
+            Five contract tests: pre-start cancel, post-finish cancel,
+            stale discard, dependency cancellation in the same drain, and
+            published-job-never-finalizes. CPU gate 4260/4260.
+
+            **Also fixed a pre-existing race in Slice A's own test.**
+            `DependentIsCancelledWhenUpstreamDoesNotPublish` (landed in
+            `2214ddf9`) called `DrainCompletions` exactly twice and then asserted
+            the dependent was `Cancelled`. The dependency-release pass only acts
+            on upstreams that already reached a terminal state, and whether the
+            cancelled upstream gets there without a drain (the worker observed
+            the cancel flag) or needs one (the worker had already queued its
+            result at the gate) is a worker interleaving the test does not
+            control — so two fixed drains could both run before the upstream was
+            terminal, leaving the dependent `AwaitingDependencies`.
+
+            Measured on this machine, per-test binary, 40 runs each:
+            **16/40 failures at `2214ddf9` with no source change**, and 32/40
+            once this slice's edits perturbed the timing. It passed the single
+            gate run recorded in the handoff by luck. Both this test and the new
+            dependency-cancellation test now drain inside `WaitUntil` until the
+            dependent is terminal instead of a fixed number of times: 0/50
+            failures each, and 0/50 for the whole `RuntimeJobService.*` suite.
+
+            The service itself was correct — dependents legitimately wait for a
+            later drain when their upstream is still running — so this was a
+            test-synchronisation defect only, and no production behaviour
+            changed. No `BUG-` task was filed because the defect is in this
+            task's own Slice A test and is fixed here; the evidence is recorded
+            above rather than in a task that would open and close in one session.
+            Lesson for the remaining lanes: assert on a drained-until-terminal
+            condition, never on a fixed drain count.
+      - [ ] **B1** — `SandboxDefaultPolicies` deferred mesh post-process.
+      - [ ] **B2** — `VisualizationAdapters`.
+      - [ ] **B3** — `SceneDocumentModule` (both sites).
+      - [ ] **B4** — `AssetImportPipeline` (both sites).
+      - [ ] **B5** — `DerivedJobRegistry` consumers.
 - [ ] **Slice C — cleanup.** Delete `Runtime.StreamingExecutor`,
       `Runtime.DerivedJobGraph`, their bridges/DTOs and CMake/test entries, and
       reduce `AsyncWorkModule` to the single-service lifecycle. `RUNTIME-203`

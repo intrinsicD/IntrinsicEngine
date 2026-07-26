@@ -846,8 +846,19 @@ TEST(RuntimeJobService, DependentIsCancelledWhenUpstreamDoesNotPublish)
     // Cancelling the upstream must not leave the dependent runnable: a chain
     // never applies half its work against inputs that were never produced.
     EXPECT_TRUE(jobs.Cancel(first));
-    (void)jobs.DrainCompletions(events);
-    (void)jobs.DrainCompletions(events);
+
+    // Drain until the dependent is terminal rather than a fixed number of
+    // times. The dependency-release pass only acts on upstreams that have
+    // already reached a terminal state, and whether `first` gets there without
+    // a drain (worker observed the cancel) or needs one (worker had already
+    // queued its result at the gate) depends on a worker interleaving this test
+    // does not control. Two unconditional drains raced that interleaving and
+    // failed ~40% of runs.
+    ASSERT_TRUE(WaitUntil([&]
+    {
+        (void)jobs.DrainCompletions(events);
+        return jobs.IsComplete(second);
+    }));
 
     EXPECT_EQ(jobs.GetState(second), Runtime::JobState::Cancelled);
     EXPECT_TRUE(publishOrder.empty());
@@ -1016,4 +1027,195 @@ TEST(RuntimeJobService, ProgressIsReportableFromWorkAndReadableOnMainThread)
     ASSERT_TRUE(WaitUntil([&] { return jobs.GetState(token) ==
                                        Runtime::JobState::AwaitingGate; }));
     EXPECT_EQ(jobs.DrainCompletions(events), 1u);
+}
+
+// ============================================================================
+// RUNTIME-194 Slice B — the unpublished-completion finalizer.
+//
+// Four of the six production StreamingExecutor submit sites relied on
+// `StreamingTaskDesc::FinalizeCancellationOnMainThread` to reconcile control
+// state they own (an ingest state machine, a pending-request slot) when a task
+// never applied. These pin the JobService replacement, whose contract is
+// stronger: exactly one of PublishCompletion and FinalizeUnpublishedOnMainThread
+// runs per submitted job, both on the main thread.
+// ============================================================================
+
+namespace
+{
+    struct FinalizerProbe
+    {
+        int Calls{0};
+        std::thread::id Thread{};
+
+        [[nodiscard]] auto Hook()
+        {
+            return [this]
+            {
+                ++Calls;
+                Thread = std::this_thread::get_id();
+            };
+        }
+    };
+}
+
+TEST(RuntimeJobService, CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing)
+{
+    SchedulerScope scheduler{2};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+
+    std::vector<int> publishOrder;
+    FinalizerProbe probe;
+
+    Runtime::JobDesc desc = MakeCountingJob("finalize.precancel", 1, publishOrder);
+    desc.FinalizeUnpublishedOnMainThread = probe.Hook();
+    const Runtime::JobToken token = jobs.Submit(std::move(desc));
+    ASSERT_TRUE(token.IsValid());
+
+    EXPECT_TRUE(jobs.Cancel(token));
+
+    // The worker observes the cancel and never queues a completion record, so
+    // the finalizer is the only thing that can unblock the consumer.
+    ASSERT_TRUE(WaitUntil([&] { return jobs.GetState(token) ==
+                                       Runtime::JobState::Cancelled; }));
+
+    EXPECT_EQ(jobs.DrainCompletions(events), 0u);
+    EXPECT_EQ(probe.Calls, 1);
+    EXPECT_EQ(probe.Thread, std::this_thread::get_id());
+    EXPECT_TRUE(publishOrder.empty());
+    EXPECT_EQ(jobs.Stats().LastDrainFinalizedUnpublished, 1u);
+
+    // Exactly once: later drains must not re-finalize a terminal record.
+    EXPECT_EQ(jobs.DrainCompletions(events), 0u);
+    EXPECT_EQ(probe.Calls, 1);
+    EXPECT_EQ(jobs.Stats().FinalizedUnpublishedJobs, 1u);
+}
+
+TEST(RuntimeJobService, CancelAfterWorkerFinishFinalizesExactlyOnce)
+{
+    SchedulerScope scheduler{2};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+
+    std::vector<int> publishOrder;
+    FinalizerProbe probe;
+
+    Runtime::JobDesc desc = MakeCountingJob("finalize.postfinish", 2, publishOrder);
+    desc.FinalizeUnpublishedOnMainThread = probe.Hook();
+    const Runtime::JobToken token = jobs.Submit(std::move(desc));
+    ASSERT_TRUE(token.IsValid());
+
+    // Cancel once the result is already queued at the gate: the drain suppresses
+    // publication, and the finalizer still owes the consumer its one call.
+    ASSERT_TRUE(WaitUntil([&] { return jobs.GetState(token) ==
+                                       Runtime::JobState::AwaitingGate; }));
+    EXPECT_TRUE(jobs.Cancel(token));
+
+    EXPECT_EQ(jobs.DrainCompletions(events), 0u);
+    EXPECT_EQ(jobs.GetState(token), Runtime::JobState::Cancelled);
+    EXPECT_EQ(probe.Calls, 1);
+    EXPECT_EQ(probe.Thread, std::this_thread::get_id());
+    EXPECT_TRUE(publishOrder.empty());
+}
+
+TEST(RuntimeJobService, StaleDiscardFinalizesSoConsumerStateCannotLeak)
+{
+    SchedulerScope scheduler{2};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+
+    const Runtime::WorldHandle world = Runtime::DefaultWorldHandle;
+    const std::uint64_t epoch = jobs.AdvanceWorldGeneration(world);
+
+    std::vector<int> publishOrder;
+    FinalizerProbe probe;
+
+    Runtime::JobDesc desc = MakeCountingJob("finalize.stale", 3, publishOrder);
+    desc.Scope = world;
+    desc.CancellationGeneration = epoch;
+    desc.FinalizeUnpublishedOnMainThread = probe.Hook();
+    const Runtime::JobToken token = jobs.Submit(std::move(desc));
+    ASSERT_TRUE(token.IsValid());
+
+    ASSERT_TRUE(WaitUntil([&] { return jobs.GetState(token) ==
+                                       Runtime::JobState::AwaitingGate; }));
+
+    // This is the case a cancellation-only hook leaked: the job was never
+    // cancelled, it was discarded as stale, and the consumer would have waited
+    // forever on a result that is now forbidden to apply.
+    (void)jobs.AdvanceWorldGeneration(world);
+
+    EXPECT_EQ(jobs.DrainCompletions(events), 0u);
+    EXPECT_EQ(jobs.GetState(token), Runtime::JobState::StaleDiscarded);
+    EXPECT_EQ(probe.Calls, 1);
+    EXPECT_TRUE(publishOrder.empty());
+}
+
+TEST(RuntimeJobService, DependencyCancelledJobFinalizesInTheSameDrain)
+{
+    SchedulerScope scheduler{2};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+
+    std::vector<int> publishOrder;
+    FinalizerProbe probe;
+
+    const Runtime::JobToken first =
+        jobs.Submit(MakeCountingJob("finalize.chain.first", 1, publishOrder));
+    ASSERT_TRUE(first.IsValid());
+
+    Runtime::JobDesc dependentDesc =
+        MakeCountingJob("finalize.chain.second", 2, publishOrder);
+    dependentDesc.DependsOn.push_back(
+        Runtime::JobDependency{.Job = first, .Reason = "needs first"});
+    dependentDesc.FinalizeUnpublishedOnMainThread = probe.Hook();
+    const Runtime::JobToken second = jobs.Submit(std::move(dependentDesc));
+    ASSERT_TRUE(second.IsValid());
+
+    EXPECT_TRUE(jobs.Cancel(first));
+
+    // The dependent never dispatched, so the dependency-release pass is the only
+    // path that can reach it. Finalizers run after that pass within the same
+    // drain, so the consumer is not left blocked for an extra frame. Drain until
+    // the dependent is terminal — see the note in
+    // DependentIsCancelledWhenUpstreamDoesNotPublish for why a fixed drain count
+    // races the worker interleaving.
+    ASSERT_TRUE(WaitUntil([&]
+    {
+        (void)jobs.DrainCompletions(events);
+        return jobs.IsComplete(second);
+    }));
+
+    EXPECT_EQ(jobs.GetState(second), Runtime::JobState::Cancelled);
+    EXPECT_EQ(probe.Calls, 1);
+    EXPECT_EQ(probe.Thread, std::this_thread::get_id());
+    EXPECT_TRUE(publishOrder.empty());
+}
+
+TEST(RuntimeJobService, PublishedJobNeverRunsTheUnpublishedFinalizer)
+{
+    SchedulerScope scheduler{2};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+
+    std::vector<int> publishOrder;
+    FinalizerProbe probe;
+
+    Runtime::JobDesc desc = MakeCountingJob("finalize.published", 9, publishOrder);
+    desc.FinalizeUnpublishedOnMainThread = probe.Hook();
+    const Runtime::JobToken token = jobs.Submit(std::move(desc));
+    ASSERT_TRUE(token.IsValid());
+
+    ASSERT_TRUE(WaitUntil([&] { return jobs.GetState(token) ==
+                                       Runtime::JobState::AwaitingGate; }));
+
+    EXPECT_EQ(jobs.DrainCompletions(events), 1u);
+    EXPECT_EQ(jobs.GetState(token), Runtime::JobState::Published);
+    ASSERT_EQ(publishOrder.size(), 1u);
+    EXPECT_EQ(publishOrder[0], 9);
+
+    // Exactly one of the two runs, so a consumer can treat the finalizer as an
+    // unambiguous "this will never apply" signal.
+    EXPECT_EQ(probe.Calls, 0);
+    EXPECT_EQ(jobs.Stats().FinalizedUnpublishedJobs, 0u);
 }
