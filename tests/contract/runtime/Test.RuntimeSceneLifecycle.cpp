@@ -182,6 +182,48 @@ namespace
         bool m_TimedOut{false};
     };
 
+    template <typename Predicate>
+    [[nodiscard]] bool WaitUntil(
+        Predicate&& predicate,
+        const std::chrono::milliseconds timeout = std::chrono::seconds(5))
+    {
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        while (!predicate())
+        {
+            if (std::chrono::steady_clock::now() >= deadline)
+                return false;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        return true;
+    }
+
+    // The worker body has finished and the record is parked at the main-thread
+    // apply gate, so the next drain decides its outcome.
+    [[nodiscard]] bool WaitUntilAwaitingGate(Runtime::JobService& jobs,
+                                             const Runtime::JobToken task)
+    {
+        return WaitUntil(
+            [&jobs, task]
+            {
+                return jobs.GetState(task) == Runtime::JobState::AwaitingGate;
+            });
+    }
+
+    // Drain until the job is terminal rather than a fixed number of times: a
+    // drain only advances records the worker has already queued, so a fixed
+    // count races the worker (RUNTIME-194 Slice B0).
+    [[nodiscard]] bool DrainUntilTerminal(Runtime::JobService& jobs,
+                                          Runtime::KernelEventBus& events,
+                                          const Runtime::JobToken task)
+    {
+        return WaitUntil(
+            [&jobs, &events, task]
+            {
+                (void)jobs.DrainCompletions(events);
+                return jobs.IsComplete(task);
+            });
+    }
+
     class TempSceneFile final
     {
     public:
@@ -622,8 +664,6 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadRejectsActiveWorldSwitchBeforeApply)
     engine.Initialize();
     Runtime::SceneDocumentModule& document =
         *engine.Services().Find<Runtime::SceneDocumentModule>();
-    Runtime::StreamingExecutor& streaming =
-        *engine.Services().Find<Runtime::StreamingExecutor>();
 
     const Runtime::WorldHandle submissionWorld = engine.ActiveWorld();
     ECS::Scene::Registry* const submissionScene =
@@ -647,13 +687,7 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadRejectsActiveWorldSwitchBeforeApply)
     auto queued = document.QueueSceneLoadFromPath(
         validScene.Path.string());
     ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
-    streaming.PumpBackground(1u);
-    if (Core::Tasks::Scheduler::IsInitialized())
-        Core::Tasks::Scheduler::WaitForAll();
-    streaming.DrainCompletions();
-    ASSERT_EQ(
-        streaming.GetState(queued->Task),
-        Runtime::StreamingTaskState::WaitingForMainThreadApply);
+    ASSERT_TRUE(WaitUntilAwaitingGate(engine.Jobs(), queued->Task));
 
     ASSERT_TRUE(
         engine.Worlds().RequestSetActiveWorld(replacementWorld).has_value());
@@ -670,7 +704,15 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadRejectsActiveWorldSwitchBeforeApply)
     // commit, even though ActiveWorldChanged is still waiting in the event
     // queue. The stale callback must not repopulate last-event state.
     EXPECT_FALSE(document.GetLastSceneFileEvent().has_value());
-    streaming.ApplyMainThreadResults();
+    ASSERT_TRUE(DrainUntilTerminal(
+        engine.Jobs(), engine.Events(), queued->Task));
+    // The result never published: the direct validation above already rebound
+    // and cancelled the owned task, and had it survived to the drain the
+    // captured-binding revalidation would have discarded it as stale. Either
+    // terminal route runs the unpublished finalizer, which records no event
+    // because the binding it captured is gone.
+    EXPECT_NE(engine.Jobs().GetState(queued->Task),
+              Runtime::JobState::Published);
     EXPECT_FALSE(document.GetLastSceneFileEvent().has_value());
 
     EXPECT_TRUE(SceneContainsNamedEntity(
@@ -681,6 +723,64 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadRejectsActiveWorldSwitchBeforeApply)
         "Replacement World Marker"));
     EXPECT_FALSE(SceneContainsNamedEntity(*submissionScene, "Wrong World Load"));
     EXPECT_FALSE(SceneContainsNamedEntity(*replacementScene, "Wrong World Load"));
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeSceneLifecycle,
+     QueuedSceneLoadIsDiscardedByDrainRevalidationAlone)
+{
+    // The sibling test lets a public document call observe the switched world
+    // first, which reconciles the binding and cancels the owned task before the
+    // drain ever sees it. Nothing here touches the module between the world
+    // switch and the drain, and ActiveWorldChanged is never pumped, so the only
+    // thing standing between a stale snapshot and the replacement registry is
+    // JobService's fail-closed revalidation immediately before apply.
+    TempSceneFile validScene(
+        "runtime194_drain_revalidated_scene_load.json",
+        R"({"version":1,"entities":[{"id":0,"name":"Revalidated Load"}]})");
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig());
+    engine.EmplaceModule<Runtime::AsyncWorkModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    Runtime::SceneDocumentModule& document =
+        *engine.Services().Find<Runtime::SceneDocumentModule>();
+
+    const Runtime::WorldHandle submissionWorld = engine.ActiveWorld();
+    ECS::Scene::Registry* const submissionScene =
+        engine.Worlds().Get(submissionWorld);
+    ASSERT_NE(submissionScene, nullptr);
+    const Runtime::WorldHandle replacementWorld =
+        engine.Worlds().CreateWorld("Replacement");
+    ECS::Scene::Registry* const replacementScene =
+        engine.Worlds().Get(replacementWorld);
+    ASSERT_NE(replacementScene, nullptr);
+
+    auto queued = document.QueueSceneLoadFromPath(validScene.Path.string());
+    ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
+    ASSERT_TRUE(WaitUntilAwaitingGate(engine.Jobs(), queued->Task));
+
+    ASSERT_TRUE(
+        engine.Worlds().RequestSetActiveWorld(replacementWorld).has_value());
+    EXPECT_EQ(
+        engine.Worlds()
+            .ApplyMaintenance(engine.Events(), engine.Jobs())
+            .AppliedActiveWorldChanges,
+        1u);
+
+    ASSERT_TRUE(DrainUntilTerminal(
+        engine.Jobs(), engine.Events(), queued->Task));
+    EXPECT_EQ(engine.Jobs().GetState(queued->Task),
+              Runtime::JobState::StaleDiscarded);
+    EXPECT_EQ(engine.Jobs().Stats().StaleDiscardedJobs, 1u);
+    EXPECT_EQ(engine.Jobs().Stats().PublishedCompletions, 0u);
+    EXPECT_EQ(engine.Jobs().Stats().FinalizedUnpublishedJobs, 1u);
+
+    EXPECT_FALSE(document.GetLastSceneFileEvent().has_value());
+    EXPECT_FALSE(
+        SceneContainsNamedEntity(*submissionScene, "Revalidated Load"));
+    EXPECT_FALSE(
+        SceneContainsNamedEntity(*replacementScene, "Revalidated Load"));
 
     engine.Shutdown();
 }
@@ -704,18 +804,10 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadRejectsAwayAndBackBindingEpoch)
     ECS::Scene::Registry* const activeScene =
         worlds.Get(submissionWorld);
     ASSERT_NE(activeScene, nullptr);
-    Runtime::StreamingExecutor& streaming =
-        *engine.Services().Find<Runtime::StreamingExecutor>();
     auto queued = document.QueueSceneLoadFromPath(validScene.Path.string());
     ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
 
-    streaming.PumpBackground(1u);
-    if (Core::Tasks::Scheduler::IsInitialized())
-        Core::Tasks::Scheduler::WaitForAll();
-    streaming.DrainCompletions();
-    ASSERT_EQ(
-        streaming.GetState(queued->Task),
-        Runtime::StreamingTaskState::WaitingForMainThreadApply);
+    ASSERT_TRUE(WaitUntilAwaitingGate(engine.Jobs(), queued->Task));
 
     ASSERT_TRUE(worlds.RequestSetActiveWorld(awayWorld).has_value());
     EXPECT_EQ(
@@ -731,7 +823,10 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadRejectsAwayAndBackBindingEpoch)
         1u);
     EXPECT_FALSE(document.GetLastSceneFileEvent().has_value());
 
-    streaming.ApplyMainThreadResults();
+    ASSERT_TRUE(DrainUntilTerminal(
+        engine.Jobs(), engine.Events(), queued->Task));
+    EXPECT_NE(engine.Jobs().GetState(queued->Task),
+              Runtime::JobState::Published);
     const std::optional<Runtime::RuntimeSceneFileEvent>& event =
         document.GetLastSceneFileEvent();
     EXPECT_FALSE(event.has_value());
@@ -751,21 +846,21 @@ TEST(RuntimeSceneLifecycle, RetiredQueuedSceneSavePublishesTerminalEvent)
     engine.Initialize();
     Runtime::SceneDocumentModule& document =
         *engine.Services().Find<Runtime::SceneDocumentModule>();
-    Runtime::StreamingExecutor& streaming =
-        *engine.Services().Find<Runtime::StreamingExecutor>();
     const Runtime::WorldHandle world = engine.ActiveWorld();
     auto queued =
         document.QueueSceneSaveToPath(savedScene.Path.string());
     ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
     ASSERT_FALSE(document.GetLastSceneFileEvent().has_value());
 
-    EXPECT_EQ(streaming.RetireWorld(world), 1u);
-    EXPECT_EQ(
-        streaming.GetState(queued->Task),
-        Runtime::StreamingTaskState::Cancelled);
+    // World retirement cancels the job wherever it is: the drain refuses to
+    // publish a cancelled record even if its worker already finished.
+    EXPECT_EQ(engine.Jobs().CancelAllForWorld(world), 1u);
     EXPECT_FALSE(document.GetLastSceneFileEvent().has_value());
 
-    streaming.ApplyMainThreadResults();
+    ASSERT_TRUE(DrainUntilTerminal(
+        engine.Jobs(), engine.Events(), queued->Task));
+    EXPECT_EQ(engine.Jobs().GetState(queued->Task),
+              Runtime::JobState::Cancelled);
     const std::optional<Runtime::RuntimeSceneFileEvent>& event =
         document.GetLastSceneFileEvent();
     ASSERT_TRUE(event.has_value());
@@ -776,7 +871,9 @@ TEST(RuntimeSceneLifecycle, RetiredQueuedSceneSavePublishesTerminalEvent)
     EXPECT_EQ(event->Error, Core::ErrorCode::InvalidState);
     EXPECT_FALSE(event->SaveResult.has_value());
 
-    streaming.ApplyMainThreadResults();
+    // The unpublished finalizer is claimed exactly once, so a later drain
+    // cannot record a second terminal event for the same operation.
+    (void)engine.Jobs().DrainCompletions(engine.Events());
     ASSERT_TRUE(document.GetLastSceneFileEvent().has_value());
     EXPECT_EQ(document.GetLastSceneFileEvent()->Sequence, 1u);
     engine.Shutdown();

@@ -34,12 +34,12 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.ServiceRegistry;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 
@@ -261,7 +261,7 @@ namespace Extrinsic::Runtime
         struct QueuedSceneLoadState
         {
             std::string Path{};
-            StreamingTaskHandle Task{};
+            JobToken Task{};
             ECS::Scene::Registry LoadedScene{};
             std::optional<SceneDeserializationResult> Result{};
             Core::ErrorCode Error{Core::ErrorCode::Unknown};
@@ -270,10 +270,20 @@ namespace Extrinsic::Runtime
         struct QueuedSceneSaveState
         {
             std::string Path{};
-            StreamingTaskHandle Task{};
+            JobToken Task{};
             ECS::Scene::Registry Snapshot{};
             std::optional<SceneSerializationResult> Result{};
             Core::ErrorCode Error{Core::ErrorCode::Unknown};
+        };
+
+        // The queued scene operations carry their outcome in the shared
+        // operation record the job's callbacks capture, so the result envelope
+        // only has to prove that the worker body ran to completion: an empty
+        // envelope is how `JobService` reports a dropped job.
+        struct QueuedSceneFileWorkDone
+        {
+            RuntimeSceneFileOperation Operation{
+                RuntimeSceneFileOperation::None};
         };
 
         struct ParticipantInvocation
@@ -300,7 +310,7 @@ namespace Extrinsic::Runtime
         struct State
         {
             WorldRegistry* Worlds{nullptr};
-            StreamingExecutor* Streaming{nullptr};
+            JobService* Jobs{nullptr};
             EditorCommandHistory History{};
             WorldHandle BoundWorld{};
             ECS::Scene::Registry* BoundRegistry{nullptr};
@@ -309,7 +319,7 @@ namespace Extrinsic::Runtime
             std::string CurrentDocumentPath{};
             std::optional<RuntimeSceneFileEvent> LastEvent{};
             std::uint64_t EventSequence{0u};
-            std::vector<StreamingTaskHandle> OwnedTasks{};
+            std::vector<JobToken> OwnedTasks{};
             std::vector<ParticipantSlot> ParticipantSlots{};
             std::vector<std::uint32_t> FreeParticipantSlots{};
             std::uint64_t NextParticipantSequence{1u};
@@ -324,16 +334,16 @@ namespace Extrinsic::Runtime
 
             void CancelOwnedTasks()
             {
-                std::vector<StreamingTaskHandle> tasks =
+                std::vector<JobToken> tasks =
                     std::exchange(
                         OwnedTasks,
-                        std::vector<StreamingTaskHandle>{});
-                if (Streaming == nullptr)
+                        std::vector<JobToken>{});
+                if (Jobs == nullptr)
                     return;
-                for (const StreamingTaskHandle task : tasks)
+                for (const JobToken task : tasks)
                 {
                     if (task.IsValid())
-                        Streaming->Cancel(task);
+                        (void)Jobs->Cancel(task);
                 }
             }
 
@@ -389,8 +399,33 @@ namespace Extrinsic::Runtime
                        Worlds->Get(world) == registry;
             }
 
+            // `JobService`'s fail-closed revalidation seam for a queued
+            // document operation: it runs on the main thread immediately
+            // before the result would be allowed to mutate anything, and
+            // anything other than `Current` discards the result and routes the
+            // job to its unpublished finalizer instead.
+            [[nodiscard]] static JobApplyValidation
+            ValidateCapturedBinding(
+                const std::weak_ptr<State>& weakState,
+                const std::uint64_t moduleGeneration,
+                const std::uint64_t bindingEpoch,
+                const WorldHandle world,
+                const ECS::Scene::Registry* const registry)
+            {
+                const auto locked = weakState.lock();
+                if (!locked)
+                    return JobApplyValidation::MissingTarget;
+                return locked->MatchesCapturedBinding(
+                           moduleGeneration,
+                           bindingEpoch,
+                           world,
+                           registry)
+                    ? JobApplyValidation::Current
+                    : JobApplyValidation::StaleGeneration;
+            }
+
             void ForgetOwnedTask(
-                const StreamingTaskHandle task)
+                const JobToken task)
             {
                 std::erase(OwnedTasks, task);
             }
@@ -717,8 +752,9 @@ namespace Extrinsic::Runtime
             return Core::Err(Core::ErrorCode::InvalidState);
         }
 
-        m_Impl->Shared->Streaming =
-            setup.Services().Find<StreamingExecutor>();
+        // The kernel owns the one execution service, so queued document IO no
+        // longer depends on an optional async module being composed.
+        m_Impl->Shared->Jobs = &setup.Jobs();
         return Core::Ok();
     }
 
@@ -775,7 +811,7 @@ namespace Extrinsic::Runtime
         const auto state =
             m_Impl ? m_Impl->Shared : nullptr;
         if (!state || !state->ValidateBinding() ||
-            state->Streaming == nullptr)
+            state->Jobs == nullptr)
         {
             return Core::Err<RuntimeQueuedSceneFileOperation>(
                 Core::ErrorCode::InvalidState);
@@ -800,18 +836,18 @@ namespace Extrinsic::Runtime
             *registry, operation->Snapshot);
 
         const std::weak_ptr<Impl::State> weakState = state;
-        const StreamingTaskHandle handle =
-            state->Streaming->Submit(
-                StreamingTaskDesc{
-                    .Name = "Runtime.SceneSave." +
+        const JobToken handle =
+            state->Jobs->Submit(
+                JobDesc{
+                    .DebugName = "Runtime.SceneSave." +
                         FileNameFromPath(operation->Path),
-                    .Kind = RuntimeTaskKinds::AssetDecode,
+                    .Scope = world,
                     .Priority =
                         Core::Dag::TaskPriority::Normal,
+                    .Kind = RuntimeTaskKinds::AssetDecode,
                     .EstimatedCost = 3u,
-                    .Scope = world,
-                    .Execute =
-                        [operation]() mutable -> StreamingResult
+                    .Work =
+                        [operation](const JobCancellation&)
                         {
                             Core::IO::FileIOBackend backend;
                             auto saved = SaveSceneDocument(
@@ -829,43 +865,55 @@ namespace Extrinsic::Runtime
                                 operation->Error =
                                     Core::ErrorCode::Success;
                             }
-                            return StreamingResult{
-                                StreamingCpuPayloadReady{
-                                    .PayloadToken = 0u}};
+                            return JobResultEnvelope::Make<
+                                QueuedSceneFileWorkDone>(
+                                QueuedSceneFileWorkDone{
+                                    .Operation =
+                                        RuntimeSceneFileOperation::Save,
+                                });
                         },
-                    .ApplyOnMainThread =
+                    .ValidateBeforeApply =
                         [weakState,
-                         operation,
                          world,
                          registry,
                          bindingEpoch,
-                         moduleGeneration](
-                            StreamingResult&& result) mutable
+                         moduleGeneration]
                         {
-                            const auto locked =
-                                weakState.lock();
-                            if (!locked)
-                                return;
-                            locked->ForgetOwnedTask(
-                                operation->Task);
-                            const bool bindingMatches =
-                                locked->MatchesCapturedBinding(
+                            return Impl::State::
+                                ValidateCapturedBinding(
+                                    weakState,
                                     moduleGeneration,
                                     bindingEpoch,
                                     world,
                                     registry);
-                            if (!bindingMatches)
-                                return;
+                        },
+                    .PublishCompletion =
+                        [weakState, operation](
+                            KernelEventBus&,
+                            const JobResultEnvelope& result) -> bool
+                        {
+                            const QueuedSceneFileWorkDone* const done =
+                                result.TryGet<QueuedSceneFileWorkDone>();
+                            if (done == nullptr ||
+                                done->Operation !=
+                                    RuntimeSceneFileOperation::Save)
+                            {
+                                return false;
+                            }
+
+                            const auto locked =
+                                weakState.lock();
+                            if (!locked)
+                                return true;
+                            locked->ForgetOwnedTask(
+                                operation->Task);
 
                             Core::Expected<
                                 SceneSerializationResult> saved =
                                 Core::Err<
                                     SceneSerializationResult>(
-                                    result.has_value()
-                                        ? operation->Error
-                                        : result.error());
-                            if (result.has_value() &&
-                                operation->Error ==
+                                    operation->Error);
+                            if (operation->Error ==
                                     Core::ErrorCode::Success &&
                                 operation->Result.has_value())
                             {
@@ -889,8 +937,9 @@ namespace Extrinsic::Runtime
                                 event.SaveResult = *saved;
                             locked->RecordSceneFileEvent(
                                 std::move(event));
+                            return true;
                         },
-                    .FinalizeCancellationOnMainThread =
+                    .FinalizeUnpublishedOnMainThread =
                         [weakState,
                          operation,
                          world,
@@ -987,7 +1036,7 @@ namespace Extrinsic::Runtime
         const auto state =
             m_Impl ? m_Impl->Shared : nullptr;
         if (!state || !state->ValidateBinding() ||
-            state->Streaming == nullptr)
+            state->Jobs == nullptr)
         {
             return Core::Err<RuntimeQueuedSceneFileOperation>(
                 Core::ErrorCode::InvalidState);
@@ -1010,18 +1059,18 @@ namespace Extrinsic::Runtime
         operation->Path = std::move(path);
 
         const std::weak_ptr<Impl::State> weakState = state;
-        const StreamingTaskHandle handle =
-            state->Streaming->Submit(
-                StreamingTaskDesc{
-                    .Name = "Runtime.SceneLoad." +
+        const JobToken handle =
+            state->Jobs->Submit(
+                JobDesc{
+                    .DebugName = "Runtime.SceneLoad." +
                         FileNameFromPath(operation->Path),
-                    .Kind = RuntimeTaskKinds::AssetDecode,
+                    .Scope = world,
                     .Priority =
                         Core::Dag::TaskPriority::Normal,
+                    .Kind = RuntimeTaskKinds::AssetDecode,
                     .EstimatedCost = 4u,
-                    .Scope = world,
-                    .Execute =
-                        [operation]() mutable -> StreamingResult
+                    .Work =
+                        [operation](const JobCancellation&)
                         {
                             Core::IO::FileIOBackend backend;
                             auto loaded = LoadSceneDocument(
@@ -1039,43 +1088,55 @@ namespace Extrinsic::Runtime
                                 operation->Error =
                                     Core::ErrorCode::Success;
                             }
-                            return StreamingResult{
-                                StreamingCpuPayloadReady{
-                                    .PayloadToken = 0u}};
+                            return JobResultEnvelope::Make<
+                                QueuedSceneFileWorkDone>(
+                                QueuedSceneFileWorkDone{
+                                    .Operation =
+                                        RuntimeSceneFileOperation::Load,
+                                });
                         },
-                    .ApplyOnMainThread =
+                    .ValidateBeforeApply =
                         [weakState,
-                         operation,
                          world,
                          registry,
                          bindingEpoch,
-                         moduleGeneration](
-                            StreamingResult&& result) mutable
+                         moduleGeneration]
                         {
-                            const auto locked =
-                                weakState.lock();
-                            if (!locked)
-                                return;
-                            locked->ForgetOwnedTask(
-                                operation->Task);
-                            const bool bindingMatches =
-                                locked->MatchesCapturedBinding(
+                            return Impl::State::
+                                ValidateCapturedBinding(
+                                    weakState,
                                     moduleGeneration,
                                     bindingEpoch,
                                     world,
                                     registry);
-                            if (!bindingMatches)
-                                return;
+                        },
+                    .PublishCompletion =
+                        [weakState, operation](
+                            KernelEventBus&,
+                            const JobResultEnvelope& result) -> bool
+                        {
+                            const QueuedSceneFileWorkDone* const done =
+                                result.TryGet<QueuedSceneFileWorkDone>();
+                            if (done == nullptr ||
+                                done->Operation !=
+                                    RuntimeSceneFileOperation::Load)
+                            {
+                                return false;
+                            }
+
+                            const auto locked =
+                                weakState.lock();
+                            if (!locked)
+                                return true;
+                            locked->ForgetOwnedTask(
+                                operation->Task);
 
                             Core::Expected<
                                 SceneDeserializationResult> loaded =
                                 Core::Err<
                                     SceneDeserializationResult>(
-                                    result.has_value()
-                                        ? operation->Error
-                                        : result.error());
-                            if (result.has_value() &&
-                                operation->Error ==
+                                    operation->Error);
+                            if (operation->Error ==
                                     Core::ErrorCode::Success &&
                                 operation->Result.has_value())
                             {
@@ -1106,8 +1167,9 @@ namespace Extrinsic::Runtime
                                 event.LoadResult = *loaded;
                             locked->RecordSceneFileEvent(
                                 std::move(event));
+                            return true;
                         },
-                    .FinalizeCancellationOnMainThread =
+                    .FinalizeUnpublishedOnMainThread =
                         [weakState,
                          operation,
                          world,

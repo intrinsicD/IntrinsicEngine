@@ -59,7 +59,6 @@ import Extrinsic.Runtime.RenderArtifactPublication;
 export import Extrinsic.Runtime.SandboxConfigSections;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
@@ -1540,7 +1539,7 @@ export namespace Extrinsic::Runtime
     {
         SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
         SandboxEditorSceneFileOperation Operation{SandboxEditorSceneFileOperation::Save};
-        StreamingTaskHandle Task{};
+        JobToken Task{};
         SceneSerializationStats Stats{};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};

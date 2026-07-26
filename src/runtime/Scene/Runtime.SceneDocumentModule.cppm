@@ -12,9 +12,9 @@ export module Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.StrongHandle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.SceneSerialization;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.WorldHandle;
 
 namespace Extrinsic::Runtime
@@ -28,7 +28,7 @@ namespace Extrinsic::Runtime
 
     export struct RuntimeQueuedSceneFileOperation
     {
-        StreamingTaskHandle Task{};
+        JobToken Task{};
         RuntimeSceneFileOperation Operation{RuntimeSceneFileOperation::None};
     };
 
@@ -36,7 +36,7 @@ namespace Extrinsic::Runtime
     {
         std::uint64_t Sequence{0};
         RuntimeSceneFileOperation Operation{RuntimeSceneFileOperation::None};
-        StreamingTaskHandle Task{};
+        JobToken Task{};
         std::string Path{};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::optional<SceneSerializationResult> SaveResult{};

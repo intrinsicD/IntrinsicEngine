@@ -80,6 +80,7 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.InputActions;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressiveRenderData;
@@ -92,7 +93,6 @@ import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Graph.Vertex.Normals;
@@ -1916,7 +1916,7 @@ TEST(SandboxEditorUi, SceneLoadCommandTreatsAsyncPendingAsNonFailure)
     Runtime::SelectionController selection;
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
 
-    const Runtime::StreamingTaskHandle queuedTask{42u, 7u};
+    const Runtime::JobToken queuedTask{42u, 7u};
     context.SceneFileCommands = Runtime::SandboxEditorSceneFileCommandSurface{
         .Save =
             [](const Runtime::SandboxEditorSceneFileCommand&)
@@ -1968,7 +1968,7 @@ TEST(SandboxEditorUi, SceneSaveCommandTreatsAsyncPendingAsNonFailure)
     Runtime::SelectionController selection;
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
 
-    const Runtime::StreamingTaskHandle queuedTask{43u, 7u};
+    const Runtime::JobToken queuedTask{43u, 7u};
     context.SceneFileCommands = Runtime::SandboxEditorSceneFileCommandSurface{
         .Save =
             [queuedTask](const Runtime::SandboxEditorSceneFileCommand&)

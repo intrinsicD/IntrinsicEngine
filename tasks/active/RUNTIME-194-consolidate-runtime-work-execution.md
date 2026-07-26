@@ -14,30 +14,34 @@ derivable from the tree.
 
 ### Where the work stands
 
-Updated 2026-07-26 (second session).
+Updated 2026-07-26 (third session).
 
-- Last commit: `6cb2152b` (Slice B1). Working tree clean.
-- Default CPU gate: **4260/4260**, one skip
+- Default CPU gate: **4262/4262**, one skip
   (`GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl`, expected on a
   headless host). Strict layering, docs-sync, test-layout, root-hygiene, and all
   task validators pass.
 - Slice A landed in `2214ddf9`. **Slice B is in progress**: `B0` (`73dedb2a`,
-  the unpublished-finalizer contract gap) and `B1` (`6cb2152b`,
-  `VisualizationAdapters`) are landed. `B2`–`B5` remain — see the per-lane
-  checklist under `## Progress`, which carries the reasoning for each.
+  the unpublished-finalizer contract gap), `B1` (`6cb2152b`,
+  `VisualizationAdapters`), and `B3` (`SceneDocumentModule`) are landed.
+  `B2`, `B4`, `B5` remain — see the per-lane checklist under `## Progress`,
+  which carries the reasoning for each.
 
 ### Next action
 
-Take `B3` (`SceneDocumentModule`, two submit sites) before the coupled
-`B2`+`B4` import lane. Reason: `B3` is the first lane that actually uses
-`FinalizeUnpublishedOnMainThread` in production, so it validates `B0` against a
-real consumer while still being confined to one module — whereas `B2`+`B4` must
-flip two public structs in `AssetImportPipeline`'s interface at once.
+Take the coupled `B2`+`B4` lane (`SandboxDefaultPolicies` deferred mesh
+post-process plus `AssetImportPipeline`'s two queued-import sites). They flip
+`RuntimePostImportProcessorServices` and `AssetImportPipelineDependencies` from
+`StreamingExecutor* Streaming` to `JobService* Jobs` together; see the `B2`
+entry for why no dual-field shim is needed. `B5` (`DerivedJobRegistry`
+consumers) is the last and largest lane.
 
 Read `## Progress` -> Slice B for the lane list, the two standing obligations
 every lane owes (the `ProductionAsyncSubmissionsCarryOwningWorldScope`
 source-text assertions and `src/runtime/README.md`), and the B0 lesson about
-never asserting on a fixed drain count.
+never asserting on a fixed drain count. B3 adds a third recurring lesson: a
+lane may only assert an exact terminal `JobState` when nothing else in the test
+can reach the consumer first — an observer that revalidates its own binding can
+cancel the job before the drain classifies it (see the B3 entry).
 
 ### Verify the checkpoint before changing anything
 
@@ -172,8 +176,8 @@ and commits independently.
       Production `StreamingExecutor::Submit` sites, which are the actual lane
       list (6 total):
       - `Runtime.SandboxDefaultPolicies.cpp:246` — deferred mesh post-process
-      - `Runtime.VisualizationAdapters.cpp:548`
-      - `Runtime.SceneDocumentModule.cpp:805`, `:1015`
+      - ~~`Runtime.VisualizationAdapters.cpp:548`~~ — migrated by `B1`
+      - ~~`Runtime.SceneDocumentModule.cpp:805`, `:1015`~~ — migrated by `B3`
       - `Runtime.AssetImportPipeline.cpp:2126` (queued geometry import),
         `:2525` (queued model-texture import)
 
@@ -260,6 +264,76 @@ and commits independently.
               only the desc-type token, one lane at a time.
             - `src/runtime/README.md` describes these seams by executor name and
               must be updated in the same commit (docs-sync).
+      - [x] **B3 — `SceneDocumentModule`, both submit sites.** Taken before the
+            coupled `B2`+`B4` lane because it is the first production consumer
+            of `FinalizeUnpublishedOnMainThread`, so it validates `B0` against a
+            real consumer while staying inside one module.
+
+            The old shape mapped across cleanly: `.Execute` -> `.Work`,
+            `.ApplyOnMainThread` -> `.PublishCompletion`,
+            `.FinalizeCancellationOnMainThread` ->
+            `.FinalizeUnpublishedOnMainThread`. The envelope carries only a
+            `QueuedSceneFileWorkDone` marker — the operation's outcome already
+            lives in the shared `QueuedScene{Load,Save}State` the callbacks
+            capture, and the envelope's real job here is to be non-empty, since
+            an empty envelope is how `JobService` reports a dropped job.
+
+            The one non-mechanical change: the captured-binding check moved out
+            of the apply callback into `JobDesc::ValidateBeforeApply`, which is
+            the seam the task's required changes name. It maps
+            `MatchesCapturedBinding` onto `JobApplyValidation` (`Current` /
+            `StaleGeneration`, and `MissingTarget` when the module's state is
+            already gone), so a stale result is discarded *before* it can mutate
+            anything instead of being defended against inside the mutating
+            callback. Behaviour is preserved either way, because the finalizer
+            re-checks the same binding and records nothing when it no longer
+            holds.
+
+            **The lane also retired the module's "optional async" concept.**
+            The executor arrived through
+            `setup.Services().Find<StreamingExecutor>()`, an optional module's
+            service; `JobService` is a kernel facility reached through
+            `setup.Jobs()`, so it is never absent after resolution and the
+            null-executor branch had no production reachability left. The
+            remaining null window — registered but not yet resolved, when the
+            module is already published as a service — is real and still fails
+            closed, now covered by
+            `SceneDocumentModule.QueuedDocumentIoFailsClosedBeforeResolution`
+            through a new register-without-resolve harness entry point. The old
+            `PublishesExactServicesSupportsOptionalAsyncAndWithdraws` lost its
+            middle clause and its name.
+
+            `RuntimeSceneFileEvent::Task`,
+            `RuntimeQueuedSceneFileOperation::Task`, and
+            `SandboxEditorSceneFileResult::Task` change from
+            `StreamingTaskHandle` to `JobToken`; that last one is why
+            `SandboxEditorFacades` is in this diff at all, and its now-unused
+            `StreamingExecutor` imports are dropped (it still gets
+            `RuntimeTaskKinds` from `JobService` directly).
+
+            Test-side, three lifecycle tests drove the executor by hand
+            (`PumpBackground` + `DrainCompletions` + `ApplyMainThreadResults`).
+            `JobService` dispatches at submit, so they now wait for
+            `AwaitingGate` and drain until terminal, per B0's lesson.
+            `RetireWorld` became `CancelAllForWorld` — production already routes
+            world destruction there through `WorldRegistry::ApplyMaintenance`.
+
+            Two of those tests could no longer assert an exact terminal state:
+            their `GetLastSceneFileEvent()` call itself revalidates the binding,
+            which rebinds and cancels the owned task before the drain sees it,
+            so the job ends `Cancelled` rather than `StaleDiscarded`. Both
+            routes run the finalizer and record no event, so they assert the
+            invariant that actually matters (never `Published`, no event). To
+            keep the new revalidation seam directly covered rather than
+            incidentally, `QueuedSceneLoadIsDiscardedByDrainRevalidationAlone`
+            switches the world and drains without touching the module or
+            pumping `ActiveWorldChanged`, and asserts `StaleDiscarded` plus the
+            stale-discard/published/finalized counters.
+
+            CPU gate 4262/4262 (+2 tests), one expected headless skip;
+            `SceneDocumentModule.*` + `RuntimeSceneLifecycle.*` 0/40 failures
+            under stress. `src/runtime/README.md` updated in the same commit;
+            module inventory unchanged.
       - [ ] **B2** — `SandboxDefaultPolicies` deferred mesh post-process.
             Coupled to B4: its executor pointer arrives through
             `RuntimePostImportProcessorServices::Streaming`, which
@@ -270,7 +344,6 @@ and commits independently.
             shim is needed: `AssetWorkflowModule` already holds both a
             `JobService*` (`state.Jobs = &setup.Jobs()`) and the executor at the
             wiring point, so the call site just passes the one it already has.
-      - [ ] **B3** — `SceneDocumentModule` (both sites).
       - [ ] **B4** — `AssetImportPipeline` (both sites).
       - [ ] **B5** — `DerivedJobRegistry` consumers.
 - [ ] **Slice C — cleanup.** Delete `Runtime.StreamingExecutor`,

@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -29,7 +30,6 @@ import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.ServiceRegistry;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 
@@ -39,6 +39,55 @@ namespace
     namespace ECS = Extrinsic::ECS;
     namespace ECSC = Extrinsic::ECS::Components;
     namespace Runtime = Extrinsic::Runtime;
+
+    using namespace std::chrono_literals;
+
+    template <typename Predicate>
+    [[nodiscard]] bool WaitUntil(
+        Predicate&& predicate,
+        const std::chrono::milliseconds timeout = 5s)
+    {
+        const auto deadline =
+            std::chrono::steady_clock::now() + timeout;
+        while (!predicate())
+        {
+            if (std::chrono::steady_clock::now() >= deadline)
+                return false;
+            std::this_thread::sleep_for(1ms);
+        }
+        return true;
+    }
+
+    // Whether the worker body has finished and the record is parked at the
+    // main-thread apply gate. Queued document operations must reach this state
+    // before a test can decide what the next drain observes.
+    [[nodiscard]] bool WaitUntilAwaitingGate(
+        Runtime::JobService& jobs,
+        const Runtime::JobToken task)
+    {
+        return WaitUntil(
+            [&jobs, task]
+            {
+                return jobs.GetState(task) ==
+                       Runtime::JobState::AwaitingGate;
+            });
+    }
+
+    // Drain until the job is terminal rather than a fixed number of times: a
+    // completion drain only advances records the worker has already queued, so
+    // a fixed count races the worker (RUNTIME-194 Slice B0).
+    [[nodiscard]] bool DrainUntilTerminal(
+        Runtime::JobService& jobs,
+        Runtime::KernelEventBus& events,
+        const Runtime::JobToken task)
+    {
+        return WaitUntil(
+            [&jobs, &events, task]
+            {
+                (void)jobs.DrainCompletions(events);
+                return jobs.IsComplete(task);
+            });
+    }
 
     class TempSceneFile final
     {
@@ -105,15 +154,9 @@ namespace
 
     struct ModuleHarness
     {
-        explicit ModuleHarness(
-            const bool provideStreaming = false)
+        ModuleHarness()
         {
             World = Worlds.CreateWorld("SceneDocumentTest");
-            if (provideStreaming)
-            {
-                Streaming =
-                    std::make_unique<Runtime::StreamingExecutor>();
-            }
         }
 
         [[nodiscard]] Runtime::EngineSetup MakeSetup()
@@ -129,21 +172,31 @@ namespace
             };
         }
 
+        // Registers the module without resolving it, so the fail-closed path
+        // for a module whose dependencies are not yet wired stays reachable.
+        [[nodiscard]] Core::Result Register()
+        {
+            Services.BeginRegistration();
+            if (!Module)
+            {
+                Module =
+                    std::make_unique<
+                        Runtime::SceneDocumentModule>();
+            }
+            Runtime::EngineSetup setup = MakeSetup();
+            if (Core::Result registered =
+                    Module->OnRegister(setup);
+                !registered.has_value())
+            {
+                return registered;
+            }
+            Started = true;
+            return Core::Ok();
+        }
+
         [[nodiscard]] Core::Result Start()
         {
             Services.BeginRegistration();
-            if (Streaming)
-            {
-                if (Core::Result provided =
-                        Services.Provide<
-                            Runtime::StreamingExecutor>(
-                            *Streaming, "Test.Async");
-                    !provided.has_value())
-                {
-                    return provided;
-                }
-            }
-
             if (!Module)
             {
                 Module =
@@ -205,7 +258,6 @@ namespace
         Runtime::JobService Jobs{};
         Runtime::WorldRegistry Worlds{};
         Runtime::ServiceRegistry Services{};
-        std::unique_ptr<Runtime::StreamingExecutor> Streaming{};
         std::unique_ptr<Runtime::SceneDocumentModule> Module{};
         Runtime::WorldHandle World{};
         bool Started{false};
@@ -228,7 +280,7 @@ namespace
 }
 
 TEST(SceneDocumentModule,
-     PublishesExactServicesSupportsOptionalAsyncAndWithdraws)
+     PublishesExactServicesAndWithdraws)
 {
     ModuleHarness harness;
     EXPECT_EQ(
@@ -248,13 +300,6 @@ TEST(SceneDocumentModule,
     EXPECT_TRUE(
         harness.Module->NewSceneDocument().has_value());
 
-    const auto queued =
-        harness.Module->QueueSceneSaveToPath(
-            "not-submitted.scene");
-    ASSERT_FALSE(queued.has_value());
-    EXPECT_EQ(
-        queued.error(), Core::ErrorCode::InvalidState);
-
     harness.Stop();
     EXPECT_EQ(
         harness.Services
@@ -272,6 +317,35 @@ TEST(SceneDocumentModule,
             ->Snapshot();
     EXPECT_EQ(snapshot.Revision, 0u);
     EXPECT_FALSE(snapshot.HasActivePath);
+}
+
+TEST(SceneDocumentModule,
+     QueuedDocumentIoFailsClosedBeforeResolution)
+{
+    // The module publishes itself during registration, so a caller can reach
+    // the queued surface before the kernel's execution service has been
+    // resolved. RUNTIME-194 removed the optional async executor, and this is
+    // the one remaining path where no service is bound: it must still fail
+    // closed rather than submit to nothing.
+    ModuleHarness harness;
+    ASSERT_TRUE(harness.Register().has_value());
+    Runtime::SceneDocumentModule* const documents =
+        harness.Services.Find<Runtime::SceneDocumentModule>();
+    ASSERT_EQ(documents, harness.Module.get());
+
+    const auto queuedSave =
+        documents->QueueSceneSaveToPath("not-submitted.scene");
+    ASSERT_FALSE(queuedSave.has_value());
+    EXPECT_EQ(
+        queuedSave.error(), Core::ErrorCode::InvalidState);
+
+    const auto queuedLoad =
+        documents->QueueSceneLoadFromPath("not-submitted.scene");
+    ASSERT_FALSE(queuedLoad.has_value());
+    EXPECT_EQ(
+        queuedLoad.error(), Core::ErrorCode::InvalidState);
+
+    EXPECT_EQ(harness.Jobs.Stats().SubmittedJobs, 0u);
 }
 
 TEST(SceneDocumentModule,
@@ -561,7 +635,7 @@ TEST(SceneDocumentModule,
     if (!schedulerWasInitialized)
         Core::Tasks::Scheduler::Initialize(1u);
 
-    ModuleHarness harness(true);
+    ModuleHarness harness;
     ASSERT_TRUE(harness.Start().has_value());
     ECS::Scene::Registry* const scene =
         harness.Worlds.Get(harness.World);
@@ -574,17 +648,13 @@ TEST(SceneDocumentModule,
         harness.Module->QueueSceneLoadFromPath(
             valid.Path.string());
     ASSERT_TRUE(queued.has_value());
-    harness.Streaming->PumpBackground(1u);
-    Core::Tasks::Scheduler::WaitForAll();
-    harness.Streaming->DrainCompletions();
-    ASSERT_EQ(
-        harness.Streaming->GetState(queued->Task),
-        Runtime::StreamingTaskState::
-            WaitingForMainThreadApply);
+    ASSERT_TRUE(
+        WaitUntilAwaitingGate(harness.Jobs, queued->Task));
 
     harness.Stop();
     harness.Module.reset();
-    harness.Streaming->ApplyMainThreadResults();
+    ASSERT_TRUE(DrainUntilTerminal(
+        harness.Jobs, harness.Events, queued->Task));
 
     EXPECT_TRUE(scene->IsValid(marker));
     EXPECT_TRUE(ContainsNamedEntity(*scene, "Marker"));
@@ -610,21 +680,14 @@ TEST(SceneDocumentModule,
     Runtime::SceneDocumentModule& documents =
         *engine.Services()
              .Find<Runtime::SceneDocumentModule>();
-    Runtime::StreamingExecutor& streaming =
-        *engine.Services()
-             .Find<Runtime::StreamingExecutor>();
     const auto complete =
-        [&streaming](const Runtime::StreamingTaskHandle task)
+        [&engine](const Runtime::JobToken task)
         {
-            streaming.PumpBackground(1u);
-            if (Core::Tasks::Scheduler::IsInitialized())
-                Core::Tasks::Scheduler::WaitForAll();
-            streaming.DrainCompletions();
+            ASSERT_TRUE(DrainUntilTerminal(
+                engine.Jobs(), engine.Events(), task));
             ASSERT_EQ(
-                streaming.GetState(task),
-                Runtime::StreamingTaskState::
-                    WaitingForMainThreadApply);
-            streaming.ApplyMainThreadResults();
+                engine.Jobs().GetState(task),
+                Runtime::JobState::Published);
         };
 
     const auto firstQueued =
