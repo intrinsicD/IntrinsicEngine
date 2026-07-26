@@ -17,6 +17,12 @@ maturity_target: Retired
   or runtime module referenced any exported symbol. No serializer/writer needed
   relocation into a concrete benchmark/tool owner, so the module and its
   orphan test were deleted outright.
+- Quarantine: the deleted files were copied to `experimental/to_delete/` with
+  their repository paths preserved, at the owner's request, instead of being
+  removed outright. That directory is **gitignored**, so those copies exist only
+  on the machine where the work was done and are absent from a fresh clone; the
+  files are already removed from the tree by this retirement commit. They are
+  retired surfaces kept for review only — never restore from them.
 - Verification evidence:
   - `cmake --preset ci` + `cmake --build --preset ci --target IntrinsicTests`
     completed a full 1282-target build with no unresolved references;
