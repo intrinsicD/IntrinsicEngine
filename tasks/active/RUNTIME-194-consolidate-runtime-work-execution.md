@@ -221,8 +221,37 @@ and commits independently.
             above rather than in a task that would open and close in one session.
             Lesson for the remaining lanes: assert on a drained-until-terminal
             condition, never on a fixed drain count.
-      - [ ] **B1** — `SandboxDefaultPolicies` deferred mesh post-process.
-      - [ ] **B2** — `VisualizationAdapters`.
+      - [x] **B1 — `VisualizationAdapters` Htex-recreate receipt.** Taken first
+            because it is the only lane with no cross-module coupling:
+            `HtexMetadataAdapter`'s executor pointer is null on every production
+            path (the only non-null construction is one contract test), and the
+            submitted task is a pure scheduling receipt with no
+            `ApplyOnMainThread` and no cancellation finalizer.
+            `StreamingExecutor*` -> `JobService*`, `StreamingTaskHandle
+            LastHtexRecreateTask` -> `JobToken`, and the submission uses an
+            explicit `JobDesc{...}` rather than `MakeCpuJobDesc` so the
+            `.Scope = world` designator survives — see the structural-test note
+            below. CPU gate 4260/4260; the migrated test 0/30 under stress.
+
+            Two obligations this lane surfaced that every later lane also owes:
+            - `RuntimeEngineLayering.ProductionAsyncSubmissionsCarryOwningWorldScope`
+              asserts per-file source-text counts of `StreamingTaskDesc{` and
+              `.Scope = ...`. Its invariant (every production async submission
+              carries its owning world scope) is unchanged by the migration, so
+              keep the `.Scope =` designator form in migrated code and update
+              only the desc-type token, one lane at a time.
+            - `src/runtime/README.md` describes these seams by executor name and
+              must be updated in the same commit (docs-sync).
+      - [ ] **B2** — `SandboxDefaultPolicies` deferred mesh post-process.
+            Coupled to B4: its executor pointer arrives through
+            `RuntimePostImportProcessorServices::Streaming`, which
+            `AssetImportPipeline` populates, so both structs
+            (`RuntimePostImportProcessorServices`,
+            `AssetImportPipelineDependencies`) flip from `StreamingExecutor*
+            Streaming` to `JobService* Jobs` together with B4. No dual-field
+            shim is needed: `AssetWorkflowModule` already holds both a
+            `JobService*` (`state.Jobs = &setup.Jobs()`) and the executor at the
+            wiring point, so the call site just passes the one it already has.
       - [ ] **B3** — `SceneDocumentModule` (both sites).
       - [ ] **B4** — `AssetImportPipeline` (both sites).
       - [ ] **B5** — `DerivedJobRegistry` consumers.

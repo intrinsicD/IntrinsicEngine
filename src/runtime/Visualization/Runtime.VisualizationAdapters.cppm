@@ -16,7 +16,7 @@ import Geometry.Properties;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.VisualizationPackets;
-import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.WorldHandle;
 
 export namespace Extrinsic::Runtime
@@ -106,7 +106,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t RobustAutoRangeClampedCount{0u};
         std::uint64_t ScalarValueScanCount{0u};
         std::uint32_t HtexRecreateScheduledCount{0u};
-        StreamingTaskHandle LastHtexRecreateTask{};
+        JobToken LastHtexRecreateTask{};
     };
 
     class IVisualizationAdapter
@@ -188,7 +188,7 @@ export namespace Extrinsic::Runtime
     {
     public:
         explicit HtexMetadataAdapter(
-            StreamingExecutor* executor = nullptr,
+            JobService* jobs = nullptr,
             WorldHandle world = DefaultWorldHandle) noexcept;
 
         void Append(VisualizationAdapterBatch& out,
@@ -196,7 +196,7 @@ export namespace Extrinsic::Runtime
                     VisualizationAdapterStats& stats) const override;
 
     private:
-        StreamingExecutor* m_Executor{nullptr};
+        JobService* m_Jobs{nullptr};
         WorldHandle m_World{DefaultWorldHandle};
     };
 

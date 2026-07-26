@@ -20,7 +20,8 @@ module Extrinsic.Runtime.VisualizationAdapters;
 import Extrinsic.ECS.Components.GeometrySources;
 import Geometry.Properties;
 import Extrinsic.Graphics.VisualizationPackets;
-import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 
 namespace Extrinsic::Runtime
 {
@@ -532,40 +533,60 @@ namespace Extrinsic::Runtime
             return options.AtlasWidth > 0u && options.AtlasHeight > 0u;
         }
 
+        // Scheduling receipt for an Htex regeneration request. The adapter is
+        // CPU-contracted: it proves the request was accepted and scheduled, and
+        // deliberately does not run a regeneration algorithm, so the job body
+        // only carries the caller's payload token forward.
+        struct HtexRecreateScheduled
+        {
+            std::uint64_t PayloadToken{0u};
+        };
+
         [[nodiscard]] bool ScheduleHtexRecreate(
-            StreamingExecutor* executor,
+            JobService* jobs,
             const WorldHandle world,
             const std::string& packetName,
             const VisualizationAdapterOptions& options,
             VisualizationAdapterStats& stats)
         {
-            if (executor == nullptr)
+            if (jobs == nullptr)
             {
                 ++stats.InvalidResourceCount;
                 return false;
             }
 
-            const StreamingTaskHandle handle = executor->Submit(StreamingTaskDesc{
-                .Name = packetName.empty()
+            const JobToken token = jobs->Submit(JobDesc{
+                .DebugName = packetName.empty()
                     ? std::string{"Visualization.HtexRecreate"}
                     : std::string{"Visualization.HtexRecreate."} + packetName,
-                .EstimatedCost = 1u,
                 .Scope = world,
-                .Execute = [payloadToken = options.HtexRecreatePayloadToken]()
+                .EstimatedCost = 1u,
+                .Work = [payloadToken = options.HtexRecreatePayloadToken](
+                            const JobCancellation&)
                 {
-                    return StreamingResult{
-                        StreamingCpuPayloadReady{.PayloadToken = payloadToken}};
+                    return JobResultEnvelope::Make<HtexRecreateScheduled>(
+                        HtexRecreateScheduled{.PayloadToken = payloadToken});
+                },
+                .PublishCompletion = [](KernelEventBus& events,
+                                        const JobResultEnvelope& result) -> bool
+                {
+                    const HtexRecreateScheduled* payload =
+                        result.TryGet<HtexRecreateScheduled>();
+                    if (payload == nullptr)
+                        return false;
+                    events.Publish(*payload);
+                    return true;
                 },
             });
 
-            if (!handle.IsValid())
+            if (!token.IsValid())
             {
                 ++stats.InvalidResourceCount;
                 return false;
             }
 
             ++stats.HtexRecreateScheduledCount;
-            stats.LastHtexRecreateTask = handle;
+            stats.LastHtexRecreateTask = token;
             return true;
         }
     }
@@ -887,9 +908,9 @@ namespace Extrinsic::Runtime
     }
 
     HtexMetadataAdapter::HtexMetadataAdapter(
-        StreamingExecutor* executor,
+        JobService* jobs,
         const WorldHandle world) noexcept
-        : m_Executor(executor)
+        : m_Jobs(jobs)
         , m_World(world)
     {
     }
@@ -954,7 +975,7 @@ namespace Extrinsic::Runtime
                 break;
             case Graphics::VisualizationFragmentBakeMapping::RecreateHtex:
                 if (!ScheduleHtexRecreate(
-                        m_Executor, m_World, name, options, stats))
+                        m_Jobs, m_World, name, options, stats))
                     return;
                 break;
             default:

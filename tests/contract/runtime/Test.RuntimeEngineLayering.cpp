@@ -951,7 +951,11 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     EXPECT_EQ(CountOccurrences(sceneDocument, ".Scope = world"), 2u);
     EXPECT_EQ(CountOccurrences(sandboxPolicies, "StreamingTaskDesc{"), 1u);
     EXPECT_EQ(CountOccurrences(sandboxPolicies, ".Scope = world"), 1u);
-    EXPECT_EQ(CountOccurrences(visualization, "StreamingTaskDesc{"), 1u);
+    // RUNTIME-194 Slice B migrates these submissions to JobService lane by lane.
+    // The invariant under test is unchanged — every production async submission
+    // carries its owning world scope — so migrated lanes keep the `.Scope =`
+    // designator rather than MakeCpuJobDesc's positional scope argument.
+    EXPECT_EQ(CountOccurrences(visualization, "JobDesc{"), 1u);
     EXPECT_EQ(CountOccurrences(visualization, ".Scope = world"), 1u);
 
     EXPECT_EQ(CountOccurrences(modelHandoff, "DerivedJobDesc "), 4u);

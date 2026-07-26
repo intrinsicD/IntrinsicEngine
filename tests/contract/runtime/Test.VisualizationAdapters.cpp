@@ -1,17 +1,21 @@
+#include <chrono>
 #include <cstdint>
 #include <limits>
 #include <string>
+#include <thread>
 
 #include <gtest/gtest.h>
 #include <glm/glm.hpp>
 
 import Geometry.Properties;
 import Extrinsic.Asset.Registry;
+import Extrinsic.Core.Tasks;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.VisualizationPackets;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.VisualizationAdapters;
-import Extrinsic.Runtime.StreamingExecutor;
 
 namespace Assets = Extrinsic::Assets;
 namespace G = Extrinsic::Graphics;
@@ -20,6 +24,42 @@ namespace PN = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
 
 namespace
 {
+    using namespace std::chrono_literals;
+
+    class SchedulerScope final
+    {
+    public:
+        explicit SchedulerScope(const unsigned workers = 1)
+        {
+            if (Extrinsic::Core::Tasks::Scheduler::IsInitialized())
+                Extrinsic::Core::Tasks::Scheduler::Shutdown();
+            Extrinsic::Core::Tasks::Scheduler::Initialize(workers);
+        }
+
+        ~SchedulerScope()
+        {
+            Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+            Extrinsic::Core::Tasks::Scheduler::Shutdown();
+        }
+
+        SchedulerScope(const SchedulerScope&) = delete;
+        SchedulerScope& operator=(const SchedulerScope&) = delete;
+    };
+
+    template <typename Predicate>
+    [[nodiscard]] bool WaitUntil(Predicate&& predicate,
+                                 const std::chrono::milliseconds timeout = 2s)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        while (!predicate())
+        {
+            if (std::chrono::steady_clock::now() >= deadline)
+                return false;
+            std::this_thread::sleep_for(1ms);
+        }
+        return true;
+    }
+
     [[nodiscard]] Geometry::PropertySet MakeScalarProperties()
     {
         Geometry::PropertySet properties;
@@ -897,8 +937,10 @@ TEST(VisualizationAdapters, HtexMetadataAdapterAppendsPreviewAndUvBakePackets)
 
 TEST(VisualizationAdapters, HtexMetadataAdapterSchedulesRecreateHtexTask)
 {
-    R::StreamingExecutor executor{};
-    const R::HtexMetadataAdapter adapter{&executor};
+    SchedulerScope scheduler{1};
+    R::JobService jobs{};
+    R::KernelEventBus events{};
+    const R::HtexMetadataAdapter adapter{&jobs};
 
     R::VisualizationAdapterBatch batch{};
     R::VisualizationAdapterStats stats{};
@@ -923,13 +965,18 @@ TEST(VisualizationAdapters, HtexMetadataAdapterSchedulesRecreateHtexTask)
               G::VisualizationFragmentBakeMapping::RecreateHtex);
     EXPECT_EQ(stats.PacketAppendCount, 1u);
     EXPECT_EQ(stats.HtexRecreateScheduledCount, 1u);
-    const R::StreamingTaskHandle task = stats.LastHtexRecreateTask;
+    const R::JobToken task = stats.LastHtexRecreateTask;
     EXPECT_TRUE(task.IsValid());
-    EXPECT_EQ(executor.GetState(task), R::StreamingTaskState::Pending);
 
-    executor.PumpBackground(1u);
-    executor.DrainCompletions();
-    EXPECT_EQ(executor.GetState(task), R::StreamingTaskState::Complete);
+    // The receipt must actually reach the main-thread apply gate and publish;
+    // drain until it is terminal rather than a fixed number of times, so the
+    // assertion does not race the worker.
+    ASSERT_TRUE(WaitUntil([&]
+    {
+        (void)jobs.DrainCompletions(events);
+        return jobs.IsComplete(task);
+    }));
+    EXPECT_EQ(jobs.GetState(task), R::JobState::Published);
 
     const G::VisualizationDiagnostics diagnostics =
         G::ValidateVisualizationPackets(batch.AsPacketBatch());
