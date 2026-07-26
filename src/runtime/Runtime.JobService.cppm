@@ -3,6 +3,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <atomic>
+#include <chrono>
 #include <functional>
 #include <memory>
 #include <string>
@@ -264,6 +265,24 @@ namespace Extrinsic::Runtime
         return desc;
     }
 
+    // Read-only per-job view for queue UIs and for shutdown paths that must
+    // enumerate survivors. RUNTIME-194 Slice B5 moved this off
+    // `DerivedJobRegistry::SnapshotAll()`; the record is deliberately generic —
+    // domain identity (which entity, which output) stays with the consumer that
+    // submitted the job, not on the execution service.
+    export struct JobSnapshot
+    {
+        JobToken      Token{};
+        std::string   DebugName{};
+        JobState      State{JobState::Invalid};
+        WorldHandle   Scope{DefaultWorldHandle};
+        JobProgress   Progress{};
+        // Age since submit, measured when the snapshot is taken. It keeps
+        // growing after a job reaches a terminal state, matching the retired
+        // registry's semantics.
+        std::uint64_t ElapsedMilliseconds{0};
+    };
+
     export struct JobServiceStats
     {
         std::uint64_t SubmittedJobs{0};
@@ -338,6 +357,11 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::uint64_t WorldGeneration(WorldHandle world) const;
 
         [[nodiscard]] JobServiceStats Stats() const;
+
+        // Every job the service still retains, ordered by token so a queue view
+        // is stable across frames. Reaped jobs are gone; call `ReapCompleted()`
+        // deliberately rather than relying on this to prune.
+        [[nodiscard]] std::vector<JobSnapshot> SnapshotAll() const;
 
         [[nodiscard]] GpuQueueParticipantHandle RegisterGpuQueueParticipant(
             GpuQueueParticipantDesc desc);

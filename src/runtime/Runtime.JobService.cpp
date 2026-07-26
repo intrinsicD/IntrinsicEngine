@@ -2,6 +2,7 @@ module;
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -69,6 +70,7 @@ namespace Extrinsic::Runtime
         std::move_only_function<JobApplyValidation()> ValidateBeforeApply{};
         std::atomic<float> ProgressNormalized{0.0f};
         std::atomic<bool> ProgressDeterminate{true};
+        std::chrono::steady_clock::time_point SubmittedAt{};
         std::move_only_function<void()> FinalizeUnpublishedOnMainThread{};
         // Set when the finalizer has been queued, so the several terminal-
         // unpublished paths (worker cancel, drain cancel, stale discard,
@@ -224,6 +226,7 @@ namespace Extrinsic::Runtime
             job->Scope = desc.Scope.IsValid() ? desc.Scope : DefaultWorldHandle;
             job->Target = desc.Target;
             job->DebugName = std::move(desc.DebugName);
+            job->SubmittedAt = std::chrono::steady_clock::now();
             job->Work = std::move(desc.Work);
             job->PublishCompletion = std::move(desc.PublishCompletion);
             job->Priority = desc.Priority;
@@ -787,6 +790,54 @@ namespace Extrinsic::Runtime
             }
         }
         return stats;
+    }
+
+    std::vector<JobSnapshot> JobService::SnapshotAll() const
+    {
+        if (!m_State)
+            return {};
+
+        const auto now = std::chrono::steady_clock::now();
+
+        std::vector<JobSnapshot> snapshots;
+        {
+            std::lock_guard lock(m_State->Mutex);
+            snapshots.reserve(m_State->Jobs.size());
+            for (const auto& [token, job] : m_State->Jobs)
+            {
+                if (!job)
+                    continue;
+                const auto elapsed =
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        now - job->SubmittedAt);
+                snapshots.push_back(JobSnapshot{
+                    .Token = token,
+                    .DebugName = job->DebugName,
+                    .State = job->State.load(std::memory_order_acquire),
+                    .Scope = job->Scope,
+                    .Progress =
+                        JobProgress{
+                            .Normalized = job->ProgressNormalized.load(
+                                std::memory_order_acquire),
+                            .Determinate = job->ProgressDeterminate.load(
+                                std::memory_order_acquire),
+                        },
+                    .ElapsedMilliseconds = static_cast<std::uint64_t>(
+                        std::max<std::int64_t>(0, elapsed.count())),
+                });
+            }
+        }
+
+        // Token order, not map order: a queue view must not reshuffle its rows
+        // between frames just because the hash map rehashed.
+        std::sort(
+            snapshots.begin(),
+            snapshots.end(),
+            [](const JobSnapshot& lhs, const JobSnapshot& rhs)
+            {
+                return lhs.Token < rhs.Token;
+            });
+        return snapshots;
     }
 
     GpuQueueParticipantHandle JobService::RegisterGpuQueueParticipant(

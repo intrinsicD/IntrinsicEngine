@@ -1219,3 +1219,95 @@ TEST(RuntimeJobService, PublishedJobNeverRunsTheUnpublishedFinalizer)
     EXPECT_EQ(probe.Calls, 0);
     EXPECT_EQ(jobs.Stats().FinalizedUnpublishedJobs, 0u);
 }
+
+TEST(RuntimeJobService, SnapshotAllEnumeratesRetainedJobsInTokenOrder)
+{
+    // RUNTIME-194 Slice B5 moved queue visibility here from
+    // `DerivedJobRegistry::SnapshotAll()`. The editor queue view and the
+    // shutdown survivor sweep both read this, so it has to enumerate every
+    // retained job — including terminal ones — in an order that does not
+    // reshuffle between frames.
+    SchedulerScope scheduler{2};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+
+    EXPECT_TRUE(jobs.SnapshotAll().empty());
+
+    std::vector<int> publishOrder;
+    const Runtime::WorldHandle world{7u, 1u};
+
+    Runtime::JobDesc first = MakeCountingJob("snapshot.first", 1, publishOrder);
+    first.Scope = world;
+    const Runtime::JobToken firstToken = jobs.Submit(std::move(first));
+    ASSERT_TRUE(firstToken.IsValid());
+
+    const Runtime::JobToken secondToken =
+        jobs.Submit(MakeCountingJob("snapshot.second", 2, publishOrder));
+    ASSERT_TRUE(secondToken.IsValid());
+
+    ASSERT_TRUE(WaitUntil(
+        [&]
+        {
+            return jobs.GetState(firstToken) == Runtime::JobState::AwaitingGate &&
+                   jobs.GetState(secondToken) == Runtime::JobState::AwaitingGate;
+        }));
+
+    std::vector<Runtime::JobSnapshot> pending = jobs.SnapshotAll();
+    ASSERT_EQ(pending.size(), 2u);
+    EXPECT_LT(pending[0].Token, pending[1].Token);
+    EXPECT_EQ(pending[0].Token, firstToken);
+    EXPECT_EQ(pending[0].DebugName, "snapshot.first");
+    EXPECT_EQ(pending[0].Scope, world);
+    EXPECT_EQ(pending[0].State, Runtime::JobState::AwaitingGate);
+    EXPECT_EQ(pending[1].Token, secondToken);
+    EXPECT_EQ(pending[1].DebugName, "snapshot.second");
+    EXPECT_EQ(pending[1].Scope, Runtime::DefaultWorldHandle);
+
+    // Terminal jobs stay visible until they are deliberately reaped, so a
+    // queue view can show a completed row and the shutdown sweep can still see
+    // what survived.
+    EXPECT_EQ(jobs.DrainCompletions(events), 2u);
+    const std::vector<Runtime::JobSnapshot> published = jobs.SnapshotAll();
+    ASSERT_EQ(published.size(), 2u);
+    EXPECT_EQ(published[0].State, Runtime::JobState::Published);
+    EXPECT_EQ(published[1].State, Runtime::JobState::Published);
+
+    EXPECT_EQ(jobs.ReapCompleted(), 2u);
+    EXPECT_TRUE(jobs.SnapshotAll().empty());
+}
+
+TEST(RuntimeJobService, SnapshotAllCarriesReportedProgressAndAge)
+{
+    SchedulerScope scheduler{2};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+
+    std::vector<int> publishOrder;
+    const Runtime::JobToken token =
+        jobs.Submit(MakeCountingJob("snapshot.progress", 3, publishOrder));
+    ASSERT_TRUE(token.IsValid());
+
+    jobs.ReportProgress(token, Runtime::JobProgress{
+                                   .Normalized = 0.25f,
+                                   .Determinate = false,
+                               });
+
+    ASSERT_TRUE(WaitUntil(
+        [&]
+        {
+            const std::vector<Runtime::JobSnapshot> snapshot = jobs.SnapshotAll();
+            return snapshot.size() == 1u &&
+                   snapshot[0].ElapsedMilliseconds >= 1u;
+        }));
+
+    const std::vector<Runtime::JobSnapshot> snapshot = jobs.SnapshotAll();
+    ASSERT_EQ(snapshot.size(), 1u);
+    EXPECT_FLOAT_EQ(snapshot[0].Progress.Normalized, 0.25f);
+    EXPECT_FALSE(snapshot[0].Progress.Determinate);
+
+    ASSERT_TRUE(WaitUntil([&]
+    {
+        (void)jobs.DrainCompletions(events);
+        return jobs.IsComplete(token);
+    }));
+}

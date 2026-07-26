@@ -438,7 +438,111 @@ and commits independently.
             `RuntimeAssetImportFormatCoverage.*` + `AssetWorkflowModule.*` 0/30
             failures under stress. `src/runtime/README.md` updated in the same
             commit; module inventory unchanged.
-      - [ ] **B5** — `DerivedJobRegistry` consumers.
+      - [ ] **B5** — `DerivedJobRegistry` consumers. Census re-run after
+            `B2`/`B4` landed; this lane is a different shape from `B1`–`B4` and
+            must be sub-sliced.
+
+            **`DerivedJobRegistry` is not a second executor — it is a derived-work
+            domain layer built on one.** `B1`–`B4` were submit-site swaps because
+            `StreamingExecutor` and `JobService` model the same thing. The
+            registry additionally owns vocabulary no consumer can drop by
+            swapping a `Submit` call:
+            - `DerivedJobKey` identity (entity id + `DerivedJobScope` +
+              `ProgressiveSlotSemantic` + four generations + output name), used
+              for dedup and staleness;
+            - `CancelForEntity(entityId)` and `SnapshotEntity(entityId)`;
+            - `SnapshotAll()` -> `DerivedJobQueueSnapshot`
+              (`DerivedJobSnapshot` per job: name, status, resolved job domain,
+              progress, elapsed ms, diagnostic, dependencies) plus
+              `DerivedJobQueueDiagnostics`;
+            - `SubmitFollowUp(parent, desc, reason)`;
+            - `HasPreviousOutput` retention;
+            - readback parking (`IsReadbackReady` / `DrainReadbacks`).
+
+            `JobService` already covers follow-ups (`DependsOn`), readback
+            parking (`IsReadyToApply`), and staleness (`ValidateBeforeApply`).
+            It has **no** keyed identity, no entity-scoped cancel, and no job
+            enumeration — it exposes `GetState`/`GetProgress`/`Stats` per token
+            only.
+
+            Production consumer census (~30 `DerivedJobDesc` construction sites
+            in 5 files, plus two app panels):
+            - `Runtime.GpuReadbackJob.cpp` — 1 desc; uses
+              `ValidateOnMainThread`, `IsReadbackReady`, `HasPreviousOutput`
+            - `Runtime.AssetModelSceneHandoff.cpp` — 4 descs; dependency chains
+            - `Runtime.SelectedMeshTextureBake.cpp` — 1 desc
+            - `Runtime.SandboxMethodFacade.cpp` — 2 descs + `DerivedJobSnapshot`
+              for editor messages
+            - `Runtime.SandboxEditorFacades.{cpp,cppm}` — ~23 desc sites plus
+              the whole editor presentation layer: `DerivedJobCommands`,
+              `DerivedJobHandleToMessage`, `DerivedJobStateSignature`, and
+              `SandboxEditorSession::m_DerivedJobSnapshot`
+            - `src/app/Sandbox/Editor/Sandbox.{DomainPanels,EditorShell}.cpp` —
+              render `SandboxEditorBoundRenderStateRowKind::DerivedJob` rows
+            - `Runtime.AsyncWorkModule.cpp` — drains, then cancels every
+              survivor returned by `SnapshotAll()` at the shutdown boundary
+
+            **The blocking design question is queue visibility.** The Sandbox
+            editor renders one queue view fed by `SnapshotAll()` across *every*
+            consumer's jobs, and `AsyncWorkModule` uses the same enumeration to
+            cancel survivors at shutdown. No consumer can move off the registry
+            in isolation without deciding where that enumeration lives
+            afterwards, so this is not sliceable per consumer until it is
+            settled. Options considered:
+            - **(a)** `JobService` grows a read-only `SnapshotAll()` returning
+              generic per-job records (token, debug name, state, scope,
+              progress, elapsed). It already stores all of that except elapsed.
+              One surface, and the editor row model maps from the generic
+              snapshot; key identity and entity-scoped cancel move into the
+              consumers that need them (they already hold per-request state).
+            - **(b)** A thin runtime-owned `DerivedJobIndex` that composes
+              `JobService` and keeps key -> `JobToken` plus the snapshot
+              projection. Smallest service change, but it is a new named runtime
+              type doing exactly the indirection this task exists to remove.
+            - **(c)** Push keying and snapshot state entirely into each
+              consumer. Keeps `JobService` untouched, but each consumer
+              re-implements enumeration and the single editor queue view has to
+              be stitched from several sources.
+
+            **Owner chose (a)** (2026-07-27), with key identity and
+            entity-scoped cancel pushed to the consumers that already hold
+            per-request state, and the lane sub-sliced with a commit per
+            consumer.
+
+            - [x] **B5-0 — `JobService::SnapshotAll()`.** The enabling change,
+                  landed on its own so the consumer sub-slices are pure
+                  migrations. Adds `JobSnapshot` (token, debug name, state,
+                  scope, progress, elapsed) and
+                  `std::vector<JobSnapshot> SnapshotAll() const`, plus a
+                  `SubmittedAt` steady-clock stamp on the job record.
+
+                  Deliberately generic: no key, no entity id, no domain. Which
+                  entity or output a job belongs to is the submitting
+                  consumer's business, and putting it on the execution service
+                  is what made `DerivedJobRegistry` a second scheduler in the
+                  first place.
+
+                  `ElapsedMilliseconds` is age-since-submit measured when the
+                  snapshot is taken, and keeps growing after a job is terminal —
+                  the retired registry's exact semantics, so the editor's queue
+                  rows do not change meaning. Results are sorted by token so a
+                  queue view does not reshuffle when the hash map rehashes.
+                  Terminal jobs stay visible until `ReapCompleted()`, which is
+                  what lets `AsyncWorkModule`'s shutdown sweep still see
+                  survivors.
+
+                  Two contract tests: enumeration/ordering/reap lifecycle, and
+                  progress + age propagation. CPU gate 4264/4264.
+            - [ ] **B5a** — `Runtime.GpuReadbackJob` (1 desc; readback parking
+                  and staleness map onto `IsReadyToApply` /
+                  `ValidateBeforeApply`).
+            - [ ] **B5b** — `Runtime.AssetModelSceneHandoff` (4 descs,
+                  dependency chains).
+            - [ ] **B5c** — `Runtime.SelectedMeshTextureBake` (1 desc).
+            - [ ] **B5d** — `Runtime.SandboxMethodFacade` (2 descs + editor
+                  messages).
+            - [ ] **B5e** — `Runtime.SandboxEditorFacades` + the two Sandbox app
+                  panels + `AsyncWorkModule`'s shutdown survivor sweep.
 - [ ] **Slice C — cleanup.** Delete `Runtime.StreamingExecutor`,
       `Runtime.DerivedJobGraph`, their bridges/DTOs and CMake/test entries, and
       reduce `AsyncWorkModule` to the single-service lifecycle. `RUNTIME-203`
