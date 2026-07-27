@@ -504,12 +504,17 @@ and CPU fallback reason. Slice B adds
 storage-buffer layout, BDA push/state records, shader asset paths, and per-level
 build/accept plus GRAPHICS-108 compaction dispatch plans. Slice C.2 adds the
 runtime-owned executable-resource seam: SoA position uploads, initial remaining
-keys, output-count initialization, pass recording, and readback-copy targets for
-`order`/`level_offsets`/`splat_radii`. Slice D.1 adds parsed readback payloads
+keys, output-count initialization, pass recording, and production result buffers
+for `order`/`level_offsets`/`splat_radii`. Slice D.1 adds parsed readback payloads
 and CPU-reference parity diagnostics for `order`, `level_offsets`, `splat_radii`,
-and per-level Poisson guarantees. Public Sandbox execution still reports CPU
-fallback for `gpu_vulkan_compute` requests until operational Vulkan parity tests
-land, but users can select either backend and inspect the requested-vs-actual
+and per-level Poisson guarantees. RUNTIME-195 removes the three duplicate
+host-visible readback targets, their pre-copies, and the blocking result
+`IDevice::ReadBuffer` calls: one copied `Graphics::GpuTransfer` batch now drains
+the three production buffers, while the method adapter owns typed validation.
+Its actual-Vulkan smoke uses a CPU-reference-shaped seeded payload and therefore
+proves transport/parser operation only. Public Sandbox execution still reports
+CPU fallback for `gpu_vulkan_compute` requests until METHOD-014 proves compute
+parity, but users can select either backend and inspect the requested-vs-actual
 backend readout.
 
 ### Sandbox Editor Mesh Curvature

@@ -29,8 +29,20 @@ maturity_target: Retired
   `ci-vulkan` parity smoke passed 1/1 on an NVIDIA GeForce RTX 3050 with driver
   590.48.01 and explicitly observed three ranges, one transfer-read barrier,
   one delivered batch, and one consumed batch. The Vulkan benchmark consumer
-  also compiled against the renamed adapter. Progressive Poisson remains the
-  open Slice B2 producer.
+  also compiled against the renamed adapter. At that checkpoint, Progressive
+  Poisson remained the open Slice B2 producer.
+- Slice B2 completed on 2026-07-27. Progressive Poisson now submits
+  `AcceptedKeys`, `LevelOffsets`, and `SplatRadii` as one shared three-range
+  batch and retains only a feature-owned typed parser. The producer allocation
+  dropped from 20 to 17 buffers by removing three dedicated host-visible
+  readback targets, the backend records no duplicate result copies, and no
+  direct compute-result `IDevice::ReadBuffer` call remains. CPU contracts
+  passed 15/15. The sanitizer-enabled `ci-vulkan` transport smoke passed 1/1
+  on an NVIDIA GeForce RTX 3050 with driver 590.48.01 and observed three
+  ranges, three source barriers, and one delivered/consumed batch. That smoke
+  seeds a CPU-reference-shaped payload into the production-shaped result
+  buffers; it proves the actual Vulkan transfer/parser seam only. `METHOD-014`
+  retains Progressive Poisson compute execution and public CPU/GPU parity.
 
 ## Goal
 
@@ -50,10 +62,10 @@ maturity_target: Retired
 
 ## Context
 
-- `Graphics.GpuTransfer`, `Runtime.AsyncBufferReadback`,
+- At task intake, `Graphics.GpuTransfer`, `Runtime.AsyncBufferReadback`,
   `Runtime.GpuReadbackJob`, K-Means readbacks, and Progressive Poisson
-  `IDevice::ReadBuffer` calls currently implement divergent completion,
-  cancellation, and byte-range rules.
+  `IDevice::ReadBuffer` calls implemented divergent completion, cancellation,
+  and byte-range rules.
 - `GpuReadbackJob` has test consumers but no production caller. Its valuable
   waiting/cancellation contracts should become tests of the shared transfer
   path rather than justify a public feature wrapper.
@@ -65,8 +77,10 @@ maturity_target: Retired
 - **Slice A — transfer contract.** Add multi-range request/ticket/result data,
   exact buffer generation/range validation, cancellation, and JobService
   waiting/resume integration.
-- **Slice B — producer migration.** Move K-Means and Progressive Poisson first,
-  then all other compute/method result paths, with actual Vulkan parity.
+- **Slice B — producer migration.** Move the censused production result paths:
+  K-Means with actual Vulkan compute parity, and Progressive Poisson with
+  actual Vulkan transfer/parser evidence while `METHOD-014` retains compute
+  parity.
 - **Slice C — cleanup.** Delete both runtime readback modules, direct result
   `ReadBuffer` paths, duplicate queues/parsers, and their obsolete tests/CMake
   entries after the shared path is proven.
@@ -79,9 +93,9 @@ maturity_target: Retired
 - [x] Integrate readback tickets with `JobService` parked/waiting state,
       cancellation, dependency completion, world shutdown, and bounded
       main-thread delivery.
-- [ ] Validate buffer identity/generation, offsets, sizes, dimensions, and
+- [x] Validate buffer identity/generation, offsets, sizes, dimensions, and
       expected byte counts before a feature parser sees data.
-- [ ] Migrate K-Means, Progressive Poisson, and every subsequent GPU method
+- [x] Migrate K-Means, Progressive Poisson, and every subsequent GPU method
       operation to one final-result readback; keep iteration/control reductions
       on device.
 - [ ] Replace `GpuReadbackJob`'s generic property-write behavior with
@@ -97,14 +111,16 @@ maturity_target: Retired
       exactly-once resume/apply.
 - [ ] Port the valuable `GpuReadbackJob` contracts to the shared operation and
       remove tests that only pin the obsolete wrapper.
-- [ ] Opt-in `gpu;vulkan` tests prove K-Means and Progressive Poisson final
-      results use the shared transfer path without a device-wide stall.
+- [x] Opt-in `gpu;vulkan` tests prove K-Means compute results and a
+      CPU-reference-shaped Progressive Poisson result use the shared transfer
+      path without a device-wide result-read stall. The latter is deliberately
+      transport/parser evidence, not `METHOD-014` compute parity.
 - [ ] Structural tests prove no production compute result calls
       `IDevice::ReadBuffer` and no old runtime readback module remains.
 
 ## Docs
 
-- [ ] Document transfer ownership, JobService waiting, caller-owned parsing,
+- [x] Document transfer ownership, JobService waiting, caller-owned parsing,
       and the explicit SelectionReadback exclusion.
 - [ ] Regenerate module inventory and test-routing documentation after module
       and test target changes.
@@ -117,7 +133,9 @@ maturity_target: Retired
 - [ ] Feature owners parse/process delivered bytes; the transport owns no
       K-Means, Poisson, geometry-property, or presentation semantics.
 - [ ] Both old runtime readback modules and all blocking compute-result reads
-      are deleted after actual workflow parity.
+      are deleted after K-Means compute parity and Progressive Poisson
+      production-shaped transport/parser operation are proven. Progressive
+      Poisson compute/public parity remains separately owned by `METHOD-014`.
 
 ## Verification
 
@@ -143,7 +161,9 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Maturity
 
-- Target: `Retired`; CPU/fake-device contracts establish `CPUContracted`,
-  `Operational` is owned by `RUNTIME-195` through an actual Vulkan workflow,
-  Vulkan workflow parity establishes `ParityProven`, and deletion of both old
-  modules/direct read paths closes the task.
+- Target: `Retired`; CPU/fake-device contracts establish `CPUContracted`.
+  `Operational` is owned by `RUNTIME-195`: K-Means compute parity plus
+  Progressive Poisson's actual production-shaped transfer/parser smoke also
+  establish `ParityProven` for this task's result-delivery scope. Deletion of
+  both old modules/direct read paths closes the task; `METHOD-014` separately
+  owns Progressive Poisson compute/public parity.

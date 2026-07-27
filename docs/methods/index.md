@@ -77,8 +77,12 @@ This index is the canonical entry point for method/paper implementation document
   [`METHOD-013`](../../tasks/archive/METHOD-013-progressive-poisson-disk-gpu-backend.md):
   requested-vs-actual backend diagnostics, CPU fallback for
   `gpu_vulkan_compute` requests, recordable Vulkan shader/layout dispatch
-  seams, runtime-owned SoA uploads, readback-copy targets, parsed readback
-  payloads, and CPU-reference parity diagnostics are in place. Public GPU
-  execution, `gpu;vulkan` parity tests, and benchmark metric extension are owned
-  by open follow-up
+  seams, runtime-owned SoA uploads, parsed readback payloads, and CPU-reference
+  parity diagnostics are in place. RUNTIME-195 replaces the three duplicate
+  readback targets/copies and direct blocking result read with one shared
+  three-range `Graphics.GpuTransfer` batch. A sanitizer-enabled actual-Vulkan
+  smoke proves that transport/parser seam with a CPU-reference-shaped seeded
+  payload; it does not claim compute parity. Public GPU execution,
+  compute-result `gpu;vulkan` parity tests, and benchmark metric extension are
+  owned by open follow-up
   [`METHOD-014`](../../tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md).

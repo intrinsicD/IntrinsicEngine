@@ -771,6 +771,25 @@ if(TARGET ExtrinsicRuntime AND TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLAT
     )
 endif()
 
+# RUNTIME-195 Slice B2 — opt-in actual-Vulkan transport of a
+# CPU-reference-shaped Progressive Poisson result. METHOD-014 retains compute
+# execution/public parity; this target proves the shared three-range batch and
+# typed parser without a blocking IDevice::ReadBuffer result call.
+if(TARGET ExtrinsicRuntime AND TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
+    set(_runtime_progressive_poisson_result_gpu_smoke_test_files
+        Test.ProgressivePoissonGpuResultReadbackGpuSmoke.cpp
+    )
+    intrinsic_resolve_test_sources(_runtime_progressive_poisson_result_gpu_smoke_test_sources
+        SEARCH_DIRS integration/runtime
+        FILES ${_runtime_progressive_poisson_result_gpu_smoke_test_files}
+    )
+    intrinsic_test_object_lib(RuntimeProgressivePoissonResultGpuSmokeTestObjs
+        SOURCES
+            ${_runtime_progressive_poisson_result_gpu_smoke_test_sources}
+        DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore IntrinsicProgressivePoissonReference glm::glm
+    )
+endif()
+
 set(_graphics_unit_test_files
     Test.RHI.BufferManager.cpp
     Test.RHI.SamplerManager.cpp
@@ -1306,6 +1325,14 @@ if(TARGET RuntimeKMeansGpuSmokeTestObjs)
         LABELS gpu vulkan integration runtime geometry
     )
     intrinsic_add_glsl_shaders(IntrinsicRuntimeKMeansGpuSmokeTests)
+endif()
+
+if(TARGET RuntimeProgressivePoissonResultGpuSmokeTestObjs)
+    intrinsic_test_executable(IntrinsicRuntimeProgressivePoissonResultGpuSmokeTests
+        OBJECTS RuntimeProgressivePoissonResultGpuSmokeTestObjs
+        LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore IntrinsicProgressivePoissonReference
+        LABELS gpu vulkan integration runtime geometry
+    )
 endif()
 
 if(TARGET RuntimeGpuReadbackSmokeTestObjs)

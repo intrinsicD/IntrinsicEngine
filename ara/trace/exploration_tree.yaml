@@ -6689,3 +6689,28 @@ tree:
       exactly-once consume. This evidence does not cover Progressive Poisson or
       complete RUNTIME-195 retirement.
     status: resolved
+  - id: N282
+    type: experiment
+    title: "Migrate Progressive Poisson to one operational GPU-result batch"
+    provenance: ai-executed
+    timestamp: "2026-07-27T22:19+02:00"
+    also_depends_on: [N280, N281]
+    evidence:
+      - "tasks/active/RUNTIME-195-unified-gpu-result-readback.md"
+      - "src/runtime/Runtime.ProgressivePoissonGpuBackend.cppm"
+      - "src/runtime/Runtime.ProgressivePoissonGpuBackend.cpp"
+      - "tests/contract/runtime/Test.ProgressivePoissonGpuBackend.cpp"
+      - "tests/integration/runtime/Test.ProgressivePoissonGpuResultReadbackGpuSmoke.cpp"
+      - "cmake --build --preset ci-vulkan --target IntrinsicRuntimeProgressivePoissonResultGpuSmokeTests"
+      - "ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R ProgressivePoissonGpuResultReadbackGpuSmoke --timeout 180"
+      - "NVIDIA GeForce RTX 3050, driver 590.48.01"
+    result: >
+      Progressive Poisson now submits AcceptedKeys, LevelOffsets, and
+      SplatRadii as one shared copied result batch and retains only typed
+      structural parsing. Its 15 CPU/fake-queue contracts passed. The
+      ASan+UBSan promoted-Vulkan transport smoke passed 1/1 on the named GPU
+      and asserted three ranges, three source barriers, one delivered batch,
+      and one exactly-once consume. The smoke uses a CPU-reference-shaped
+      seeded payload and therefore proves the actual transfer/parser path, not
+      Progressive Poisson compute or public parity; METHOD-014 retains those.
+    status: resolved

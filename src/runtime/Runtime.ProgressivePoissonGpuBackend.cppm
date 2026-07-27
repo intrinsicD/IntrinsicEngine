@@ -1,5 +1,6 @@
 module;
 
+#include <array>
 #include <cstdint>
 #include <span>
 #include <string>
@@ -10,6 +11,7 @@ module;
 export module Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 
 import Extrinsic.Graphics.ComputeParallelPrimitives;
+import Extrinsic.Graphics.GpuTransfer;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
@@ -267,17 +269,7 @@ export namespace Extrinsic::Runtime
     struct ProgressivePoissonGpuExecutionResources
     {
         ProgressivePoissonGpuResourceSet Resources{};
-        RHI::BufferHandle OrderReadback{};
-        RHI::BufferHandle LevelOffsetsReadback{};
-        RHI::BufferHandle SplatRadiiReadback{};
         std::vector<RHI::BufferManager::BufferLease> Leases{};
-
-        [[nodiscard]] bool HasReadbackTargets() const noexcept
-        {
-            return OrderReadback.IsValid() &&
-                   LevelOffsetsReadback.IsValid() &&
-                   SplatRadiiReadback.IsValid();
-        }
     };
 
     struct ProgressivePoissonGpuExecutionDesc
@@ -296,9 +288,7 @@ export namespace Extrinsic::Runtime
         bool Recorded{false};
         bool CpuFallbackRecommended{true};
         bool UploadedInputs{false};
-        bool ReadbackCopiesRecorded{false};
         std::uint32_t UploadWriteCount{0u};
-        std::uint32_t ReadbackCopyCount{0u};
         ProgressivePoissonGpuDispatchPlan Plan{};
         ProgressivePoissonGpuRecordResult Record{};
         ProgressivePoissonGpuExecutionResources Resources{};
@@ -307,15 +297,6 @@ export namespace Extrinsic::Runtime
         {
             return Status == ProgressivePoissonGpuStatus::Success;
         }
-    };
-
-    struct ProgressivePoissonGpuReadbackDesc
-    {
-        RHI::IDevice* Device{nullptr};
-        RHI::BufferHandle OrderReadback{};
-        RHI::BufferHandle LevelOffsetsReadback{};
-        RHI::BufferHandle SplatRadiiReadback{};
-        ProgressivePoissonGpuDispatchPlan Plan{};
     };
 
     struct ProgressivePoissonGpuReadbackResult
@@ -334,6 +315,41 @@ export namespace Extrinsic::Runtime
         {
             return Status == ProgressivePoissonGpuStatus::Success;
         }
+    };
+
+    // Feature-owned typed adapter over one Graphics.GpuTransfer multi-range
+    // batch. Transport completion, cancellation, and byte ownership stay in the
+    // shared facade; this adapter owns only Poisson result-range selection and
+    // structural parsing. METHOD-014 owns public compute-result parity.
+    class ProgressivePoissonGpuResultReadback
+    {
+    public:
+        explicit ProgressivePoissonGpuResultReadback(
+            Extrinsic::Graphics::GpuTransfer& transfer) noexcept;
+        ~ProgressivePoissonGpuResultReadback();
+
+        ProgressivePoissonGpuResultReadback(
+            const ProgressivePoissonGpuResultReadback&) = delete;
+        ProgressivePoissonGpuResultReadback& operator=(
+            const ProgressivePoissonGpuResultReadback&) = delete;
+
+        [[nodiscard]] bool Enqueue(
+            RHI::ICommandContext& cmd,
+            const ProgressivePoissonGpuExecutionResources& resources,
+            const ProgressivePoissonGpuDispatchPlan& plan);
+        [[nodiscard]] bool Poll() noexcept;
+        void Reset() noexcept;
+
+        [[nodiscard]] bool IsReady() const noexcept;
+        [[nodiscard]] ProgressivePoissonGpuReadbackResult Collect(
+            const ProgressivePoissonGpuDispatchPlan& plan);
+
+    private:
+        Extrinsic::Graphics::GpuTransfer* m_Transfer{nullptr};
+        std::array<Extrinsic::Graphics::GpuTransferReadbackRangeDesc, 3u>
+            m_Ranges{};
+        Extrinsic::Graphics::GpuTransferReadbackBatchTicket m_Ticket{};
+        bool m_EmptyReady{false};
     };
 
     struct ProgressivePoissonGpuReferenceView
@@ -401,10 +417,6 @@ export namespace Extrinsic::Runtime
         const ProgressivePoissonGpuBufferLayout& layout,
         const char* debugName = "ProgressivePoissonGpu.Work") noexcept;
 
-    [[nodiscard]] RHI::BufferDesc BuildProgressivePoissonGpuReadbackBufferDesc(
-        std::uint64_t sizeBytes,
-        const char* debugName = "ProgressivePoissonGpu.Readback") noexcept;
-
     [[nodiscard]] RHI::PipelineDesc BuildProgressivePoissonBuildCellsPipelineDesc(
         const char* shaderPath =
             "shaders/progressive_poisson_build_cells.comp.spv");
@@ -429,10 +441,6 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] ProgressivePoissonGpuExecutionResult
     RecordProgressivePoissonGpuExecution(
         const ProgressivePoissonGpuExecutionDesc& desc);
-
-    [[nodiscard]] ProgressivePoissonGpuReadbackResult
-    ReadProgressivePoissonGpuReadbacks(
-        const ProgressivePoissonGpuReadbackDesc& desc);
 
     [[nodiscard]] ProgressivePoissonGpuParityDiagnostics
     CompareProgressivePoissonGpuOutputToReference(

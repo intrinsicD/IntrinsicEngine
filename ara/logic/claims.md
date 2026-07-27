@@ -121,8 +121,8 @@
   after exact generational-handle, descriptor, access, range, and byte-count
   revalidation, and composes with canonical `JobService` parked publication,
   dependency release, world cancellation, and exactly-once consumption.
-- **Status**: supported — CPU/fake-queue contract only; production K-Means and
-  Progressive Poisson migration and GPU/Vulkan operation remain unproven
+- **Status**: supported — CPU/fake-queue contract only; operational production
+  evidence is tracked separately by C08 and C09
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: A malformed or stale request exposes bytes, a
@@ -161,3 +161,30 @@
 - **Dependencies**: [C07]
 - **Tags**: K-Means, graphics, runtime, GPU readback, Vulkan, parity
 - **From staging**: O63
+
+## C09: Progressive Poisson result transport operates on Vulkan
+- **Statement**: The Progressive Poisson GPU backend exposes its
+  `AcceptedKeys`, `LevelOffsets`, and `SplatRadii` production buffers to one
+  copied `Graphics.GpuTransfer` batch, consumes that batch exactly once in its
+  typed adapter, and allocates or records no duplicate result buffers/copies or
+  blocking `IDevice::ReadBuffer` result path. An actual Vulkan smoke transports
+  and parses a CPU-reference-shaped payload through those three buffers.
+- **Status**: supported — ASan+UBSan promoted Vulkan transport/parser evidence
+  on NVIDIA GeForce RTX 3050, driver 590.48.01; the payload is seeded and this
+  is not Progressive Poisson compute or public CPU/GPU parity
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The backend reintroduces duplicate readback
+  targets or result pre-copies, calls blocking `IDevice::ReadBuffer` for its
+  result, submits more than one logical batch, consumes the result more than
+  once, or the actual-Vulkan transport fixture does not reproduce the seeded
+  CPU-reference-shaped order, level offsets, and splat radii.
+- **Proof**: [tasks/active/RUNTIME-195-unified-gpu-result-readback.md,
+  src/runtime/Runtime.ProgressivePoissonGpuBackend.cppm,
+  src/runtime/Runtime.ProgressivePoissonGpuBackend.cpp,
+  tests/contract/runtime/Test.ProgressivePoissonGpuBackend.cpp,
+  tests/integration/runtime/Test.ProgressivePoissonGpuResultReadbackGpuSmoke.cpp]
+- **Dependencies**: [C07]
+- **Tags**: Progressive Poisson, graphics, runtime, GPU readback, Vulkan,
+  transport
+- **From staging**: O64

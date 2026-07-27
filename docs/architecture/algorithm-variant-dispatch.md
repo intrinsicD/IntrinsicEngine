@@ -261,6 +261,13 @@ Feature adapters own typed parsing; the transport owns no method semantics.
 `IDevice::ReadBuffer` remains the explicit-stall escape hatch. See
 `docs/reviews/2026-07-01-gpu-geometry-backend-io-audit.md` Finding 1.
 
+Capability evidence remains method-specific. K-Means has an actual-Vulkan
+compute-to-result parity smoke over its shared batch. Progressive Poisson's
+RUNTIME-195 smoke instead seeds a CPU-reference-shaped payload into the three
+production-shaped output buffers and proves only the real transfer queue plus
+typed parser; METHOD-014 still owns compute execution and public CPU/GPU parity.
+Do not promote transport evidence into an algorithm-parity claim.
+
 ## Config And Agent Lane
 
 For a family with a justified backend seam, the backend field on the algorithm

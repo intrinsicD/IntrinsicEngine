@@ -4,6 +4,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <span>
 #include <string>
@@ -15,7 +16,9 @@ module;
 module Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 
 import Extrinsic.Graphics.ComputeParallelPrimitives;
+import Extrinsic.Graphics.GpuTransfer;
 import Extrinsic.RHI.BufferManager;
+import Extrinsic.RHI.BufferTransfer;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
@@ -347,6 +350,59 @@ namespace Extrinsic::Runtime
             };
         }
 
+        [[nodiscard]] RHI::BufferHandle HandleForRole(
+            const ProgressivePoissonGpuResourceSet& resources,
+            const ProgressivePoissonGpuBufferRole role) noexcept
+        {
+            switch (role)
+            {
+            case ProgressivePoissonGpuBufferRole::AcceptedKeys:
+                return resources.AcceptedKeys;
+            case ProgressivePoissonGpuBufferRole::LevelOffsets:
+                return resources.LevelOffsets;
+            case ProgressivePoissonGpuBufferRole::SplatRadii:
+                return resources.SplatRadii;
+            default:
+                return {};
+            }
+        }
+
+        [[nodiscard]] Graphics::GpuTransferReadbackRangeDesc
+        MakeRoleReadbackRange(
+            const ProgressivePoissonGpuExecutionResources& resources,
+            const ProgressivePoissonGpuDispatchPlan& plan,
+            const ProgressivePoissonGpuBufferRole role)
+        {
+            const std::uint64_t sizeBytes = SizeForRole(plan.Layout, role);
+            return Graphics::GpuTransferReadbackRangeDesc{
+                .Source = HandleForRole(resources.Resources, role),
+                .SourceDesc = BuildRoleBufferDesc(role, sizeBytes),
+                .SourceRange = RHI::BufferRange{
+                    .OffsetBytes = 0u,
+                    .SizeBytes = sizeBytes,
+                },
+                .SourceAccess = RHI::MemoryAccess::ShaderWrite,
+            };
+        }
+
+        template <class T>
+        [[nodiscard]] bool CopyTypedReadback(
+            const std::span<const std::byte> source,
+            const std::size_t expectedCount,
+            std::vector<T>& destination)
+        {
+            if (source.size_bytes() != expectedCount * sizeof(T))
+                return false;
+            destination.resize(expectedCount);
+            if (!destination.empty())
+            {
+                std::memcpy(destination.data(),
+                            source.data(),
+                            source.size_bytes());
+            }
+            return true;
+        }
+
         [[nodiscard]] bool CreateOwnedBuffer(
             RHI::BufferManager& buffers,
             const RHI::BufferDesc& desc,
@@ -473,27 +529,7 @@ namespace Extrinsic::Runtime
                 return false;
             }
 
-            return CreateOwnedBuffer(
-                       buffers,
-                       BuildProgressivePoissonGpuReadbackBufferDesc(
-                           Uint32Bytes(plan.InputCount),
-                           "ProgressivePoissonGpu.Order.Readback"),
-                       out.OrderReadback,
-                       out.Leases) &&
-                   CreateOwnedBuffer(
-                       buffers,
-                       BuildProgressivePoissonGpuReadbackBufferDesc(
-                           Uint32Bytes(plan.Layout.MaxLevels + 1u),
-                           "ProgressivePoissonGpu.LevelOffsets.Readback"),
-                       out.LevelOffsetsReadback,
-                       out.Leases) &&
-                   CreateOwnedBuffer(
-                       buffers,
-                       BuildProgressivePoissonGpuReadbackBufferDesc(
-                           FloatBytes(plan.InputCount),
-                           "ProgressivePoissonGpu.SplatRadii.Readback"),
-                       out.SplatRadiiReadback,
-                       out.Leases);
+            return true;
         }
 
         void UploadExecutionInputs(
@@ -538,66 +574,6 @@ namespace Extrinsic::Runtime
             const std::uint32_t zero32 = 0u;
             write(resources.Resources.OutputCount, &zero32, sizeof(zero32));
             result.UploadedInputs = true;
-        }
-
-        void RecordExecutionReadbacks(
-            RHI::ICommandContext& cmd,
-            const ProgressivePoissonGpuDispatchPlan& plan,
-            const ProgressivePoissonGpuExecutionResources& resources,
-            ProgressivePoissonGpuExecutionResult& result)
-        {
-            if (plan.InputCount == 0u)
-            {
-                return;
-            }
-
-            cmd.BufferBarrier(resources.Resources.AcceptedKeys,
-                              RHI::MemoryAccess::ShaderWrite,
-                              RHI::MemoryAccess::TransferRead);
-            cmd.BufferBarrier(resources.Resources.LevelOffsets,
-                              RHI::MemoryAccess::ShaderWrite,
-                              RHI::MemoryAccess::TransferRead);
-            cmd.BufferBarrier(resources.Resources.SplatRadii,
-                              RHI::MemoryAccess::ShaderWrite,
-                              RHI::MemoryAccess::TransferRead);
-
-            cmd.CopyBuffer(resources.Resources.AcceptedKeys,
-                           resources.OrderReadback,
-                           0u,
-                           0u,
-                           Uint32Bytes(plan.InputCount));
-            ++result.ReadbackCopyCount;
-
-            cmd.CopyBuffer(resources.Resources.LevelOffsets,
-                           resources.LevelOffsetsReadback,
-                           0u,
-                           0u,
-                           Uint32Bytes(plan.Layout.MaxLevels + 1u));
-            ++result.ReadbackCopyCount;
-
-            cmd.CopyBuffer(resources.Resources.SplatRadii,
-                           resources.SplatRadiiReadback,
-                           0u,
-                           0u,
-                           FloatBytes(plan.InputCount));
-            ++result.ReadbackCopyCount;
-
-            result.ReadbackCopiesRecorded = result.ReadbackCopyCount == 3u;
-        }
-
-        template <typename T>
-        void ReadBufferVector(RHI::IDevice& device,
-                              const RHI::BufferHandle handle,
-                              std::vector<T>& values)
-        {
-            if (!values.empty())
-            {
-                device.ReadBuffer(
-                    handle,
-                    values.data(),
-                    static_cast<std::uint64_t>(values.size()) * sizeof(T),
-                    0u);
-            }
         }
 
         [[nodiscard]] bool LevelOffsetsAreMonotonic(
@@ -1036,19 +1012,6 @@ namespace Extrinsic::Runtime
         };
     }
 
-    RHI::BufferDesc BuildProgressivePoissonGpuReadbackBufferDesc(
-        const std::uint64_t sizeBytes,
-        const char* debugName) noexcept
-    {
-        return RHI::BufferDesc{
-            .SizeBytes = sizeBytes,
-            .Usage = RHI::BufferUsage::TransferDst |
-                     RHI::BufferUsage::TransferSrc,
-            .HostVisible = true,
-            .DebugName = debugName,
-        };
-    }
-
     RHI::PipelineDesc BuildProgressivePoissonBuildCellsPipelineDesc(
         const char* shaderPath)
     {
@@ -1385,36 +1348,112 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        RecordExecutionReadbacks(*desc.CommandContext,
-                                 plan,
-                                 result.Resources,
-                                 result);
-        result.Recorded = result.Record.Recorded && result.ReadbackCopiesRecorded;
+        result.Recorded = result.Record.Recorded;
         return result;
     }
 
-    ProgressivePoissonGpuReadbackResult ReadProgressivePoissonGpuReadbacks(
-        const ProgressivePoissonGpuReadbackDesc& desc)
+    ProgressivePoissonGpuResultReadback::ProgressivePoissonGpuResultReadback(
+        Extrinsic::Graphics::GpuTransfer& transfer) noexcept
+        : m_Transfer(&transfer)
     {
-        if (desc.Device == nullptr)
+    }
+
+    ProgressivePoissonGpuResultReadback::~ProgressivePoissonGpuResultReadback()
+    {
+        Reset();
+    }
+
+    bool ProgressivePoissonGpuResultReadback::Enqueue(
+        RHI::ICommandContext& cmd,
+        const ProgressivePoissonGpuExecutionResources& resources,
+        const ProgressivePoissonGpuDispatchPlan& plan)
+    {
+        if (m_Transfer == nullptr || !plan.IsValid() ||
+            m_Ticket.IsValid() || m_EmptyReady)
         {
-            return ReadbackStatus(ProgressivePoissonGpuStatus::MissingDevice,
-                                  "Progressive Poisson GPU readback requires an RHI device.");
-        }
-        if (!desc.Device->IsOperational())
-        {
-            return ReadbackStatus(ProgressivePoissonGpuStatus::DeviceUnavailable,
-                                  "Progressive Poisson GPU readback requires an operational RHI device.");
-        }
-        if (!desc.Plan.IsValid())
-        {
-            return ReadbackStatus(desc.Plan.Status,
-                                  "Progressive Poisson GPU readback requires a valid dispatch plan.");
+            return false;
         }
 
-        const std::uint32_t inputCount = desc.Plan.InputCount;
-        if (inputCount == 0u)
+        if (plan.InputCount == 0u)
         {
+            m_EmptyReady = true;
+            return true;
+        }
+
+        m_Ranges = {
+            MakeRoleReadbackRange(
+                resources,
+                plan,
+                ProgressivePoissonGpuBufferRole::AcceptedKeys),
+            MakeRoleReadbackRange(
+                resources,
+                plan,
+                ProgressivePoissonGpuBufferRole::LevelOffsets),
+            MakeRoleReadbackRange(
+                resources,
+                plan,
+                ProgressivePoissonGpuBufferRole::SplatRadii),
+        };
+        if (std::any_of(m_Ranges.begin(),
+                        m_Ranges.end(),
+                        [](const Graphics::GpuTransferReadbackRangeDesc& range)
+                        {
+                            return !range.Source.IsValid() ||
+                                   range.SourceRange.SizeBytes == 0u;
+                        }))
+        {
+            m_Ranges = {};
+            return false;
+        }
+
+        m_Ticket = m_Transfer->ScheduleReadbackBatch(
+            cmd,
+            Graphics::GpuTransferReadbackBatchDesc{.Ranges = m_Ranges});
+        return m_Ticket.IsValid();
+    }
+
+    bool ProgressivePoissonGpuResultReadback::Poll() noexcept
+    {
+        return IsReady();
+    }
+
+    void ProgressivePoissonGpuResultReadback::Reset() noexcept
+    {
+        if (m_Transfer != nullptr && m_Ticket.IsValid())
+            (void)m_Transfer->CancelReadbackBatch(m_Ticket);
+        m_Ranges = {};
+        m_Ticket = {};
+        m_EmptyReady = false;
+    }
+
+    bool ProgressivePoissonGpuResultReadback::IsReady() const noexcept
+    {
+        return m_EmptyReady ||
+               (m_Transfer != nullptr &&
+                m_Transfer->ReadbackBatchState(m_Ticket) ==
+                    Graphics::GpuTransferReadbackBatchState::Ready);
+    }
+
+    ProgressivePoissonGpuReadbackResult
+    ProgressivePoissonGpuResultReadback::Collect(
+        const ProgressivePoissonGpuDispatchPlan& plan)
+    {
+        if (!plan.IsValid())
+        {
+            return ReadbackStatus(
+                plan.Status,
+                "Progressive Poisson GPU result collection requires a valid dispatch plan.");
+        }
+
+        if (plan.InputCount == 0u)
+        {
+            if (!m_EmptyReady)
+            {
+                return ReadbackStatus(
+                    ProgressivePoissonGpuStatus::InvalidReadback,
+                    "Progressive Poisson GPU empty result is not ready or was already consumed.");
+            }
+            m_EmptyReady = false;
             return ProgressivePoissonGpuReadbackResult{
                 .Status = ProgressivePoissonGpuStatus::Success,
                 .Read = true,
@@ -1425,26 +1464,47 @@ namespace Extrinsic::Runtime
             };
         }
 
-        if (!desc.OrderReadback.IsValid() ||
-            !desc.LevelOffsetsReadback.IsValid() ||
-            !desc.SplatRadiiReadback.IsValid())
+        if (!IsReady())
         {
-            return ReadbackStatus(ProgressivePoissonGpuStatus::InvalidGpuResource,
-                                  "Progressive Poisson GPU readback requires valid readback buffers.");
+            return ReadbackStatus(
+                ProgressivePoissonGpuStatus::InvalidReadback,
+                "Progressive Poisson GPU result batch is not ready or was already consumed.");
         }
 
-        std::vector<std::uint32_t> order(inputCount, 0u);
-        std::vector<std::uint32_t> levelOffsets(desc.Plan.Layout.MaxLevels + 1u, 0u);
-        std::vector<float> splatRadii(inputCount, 0.0f);
+        Graphics::GpuTransferReadbackBatchResult batch{};
+        if (m_Transfer == nullptr ||
+            !m_Transfer->ConsumeReadbackBatch(m_Ticket, m_Ranges, batch))
+        {
+            return ReadbackStatus(
+                ProgressivePoissonGpuStatus::InvalidReadback,
+                "Progressive Poisson GPU result batch failed exact transport validation.");
+        }
 
-        ReadBufferVector(*desc.Device, desc.OrderReadback, order);
-        ReadBufferVector(*desc.Device, desc.LevelOffsetsReadback, levelOffsets);
-        ReadBufferVector(*desc.Device, desc.SplatRadiiReadback, splatRadii);
+        m_Ranges = {};
+        m_Ticket = {};
+        std::vector<std::uint32_t> order{};
+        std::vector<std::uint32_t> levelOffsets{};
+        std::vector<float> splatRadii{};
+        if (!CopyTypedReadback<std::uint32_t>(batch.Bytes(0u),
+                                             plan.InputCount,
+                                             order) ||
+            !CopyTypedReadback<std::uint32_t>(
+                batch.Bytes(1u),
+                static_cast<std::size_t>(plan.Layout.MaxLevels) + 1u,
+                levelOffsets) ||
+            !CopyTypedReadback<float>(batch.Bytes(2u),
+                                      plan.InputCount,
+                                      splatRadii))
+        {
+            return ReadbackStatus(
+                ProgressivePoissonGpuStatus::InvalidReadback,
+                "Progressive Poisson GPU result byte sizes do not match the dispatch plan.");
+        }
 
         return ValidateReadbackPayload(std::move(order),
                                        std::move(levelOffsets),
                                        std::move(splatRadii),
-                                       inputCount);
+                                       plan.InputCount);
     }
 
     ProgressivePoissonGpuParityDiagnostics

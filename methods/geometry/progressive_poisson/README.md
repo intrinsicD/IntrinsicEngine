@@ -12,7 +12,7 @@ level — instant level-of-detail via a single index cutoff.
 | Backend | Status | Owning task |
 | --- | --- | --- |
 | `cpu_reference` | reference (canonical truth) | METHOD-012 |
-| `gpu_vulkan_compute` | recordable Vulkan dispatch + parsed readback/parity-diagnostic seam; CPU fallback until operational parity lands | METHOD-013 |
+| `gpu_vulkan_compute` | recordable Vulkan dispatch + operational shared result-transport/parser seam; CPU fallback until compute parity lands | METHOD-013 / METHOD-014 |
 
 This directory holds the **paper intake** (`paper.md`), the **manifest**
 (`method.yaml`), and the METHOD-012 CPU reference implementation under
@@ -20,7 +20,10 @@ This directory holds the **paper intake** (`paper.md`), the **manifest**
 correctness tests and smoke benchmarks. METHOD-013 owns the runtime/config
 backend selection contract, CPU fallback diagnostics, the Vulkan shader/layout
 planning and recording seams, parsed GPU readback payloads, and the future
-operational Vulkan parity reporting slice.
+operational Vulkan parity reporting slice. RUNTIME-195 replaces the three
+dedicated readback targets and blocking result reads with one shared async
+three-range transfer batch; METHOD-014 retains compute execution and public
+CPU/GPU parity.
 
 ## Enabling work (engine backlog)
 
@@ -69,12 +72,15 @@ requesting `gpu_vulkan_compute` builds against a runtime recordable dispatch
 contract (`Runtime.ProgressivePoissonGpuBackend`) that pins storage-buffer
 layout, BDA push/state records, shader asset paths, per-level build/accept
 dispatches, accepted/remaining GRAPHICS-108 stream-compaction delegation,
-runtime-owned SoA position uploads, and readback-copy targets for
-`order`/`level_offsets`/`splat_radii`. The runtime seam can parse those
-readback buffers and compare them against CPU-reference `order`,
-`level_offsets`, `splat_radii`, and per-level Poisson guarantees. Public
-Sandbox execution still returns the CPU reference fallback until an operational
-`gpu;vulkan` parity test proves the Vulkan output path.
+runtime-owned SoA position uploads, and production result buffers for
+`order`/`level_offsets`/`splat_radii`. RUNTIME-195 drains those three ranges as
+one copied `Graphics.GpuTransfer` batch and leaves structural parsing in the
+method adapter; it allocates no duplicate host-visible readback buffers and
+uses no blocking result `IDevice::ReadBuffer`. An actual sanitizer-enabled
+Vulkan smoke seeds a CPU-reference-shaped payload into the production-shaped
+buffers and proves the transfer/parser seam. It is not compute parity: public
+Sandbox execution still returns the CPU reference fallback until METHOD-014
+proves the Vulkan compute output path against the CPU reference.
 
 Widget edits preview and hot-apply a serialized `EngineConfig` through
 `Engine::PreviewEngineConfigControlDocument` and
@@ -84,7 +90,8 @@ config path before invoking the command. The Sandbox backend selector writes
 that same config field, and the result readout shows requested backend, actual
 backend, and CPU fallback reason when present. METHOD-013 owns the backend
 command/config seam, planning-only Vulkan-compute seam, executable backend, and
-CPU/GPU parity.
+CPU/GPU parity lineage; METHOD-014 owns the remaining operational compute and
+public parity work.
 
 ## Known limitations
 

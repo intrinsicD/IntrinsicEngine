@@ -3,8 +3,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <deque>
 #include <span>
 #include <string>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -12,8 +15,10 @@
 
 import Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 import Extrinsic.Graphics.ComputeParallelPrimitives;
+import Extrinsic.Graphics.GpuTransfer;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.TransferQueue;
 
 #include "MockRHI.hpp"
 
@@ -119,17 +124,115 @@ namespace
         return it == device.BufferWrites.end() ? nullptr : &*it;
     }
 
+    class MockReadbackTransferQueue final : public RHI::ITransferQueue
+    {
+    public:
+        std::unordered_map<std::uint32_t, std::vector<std::byte>> BufferContents{};
+        std::uint32_t DownloadCalls{0u};
+
+        [[nodiscard]] RHI::TransferToken UploadBuffer(
+            RHI::BufferHandle, const void*, std::uint64_t, std::uint64_t) override
+        {
+            return {};
+        }
+
+        [[nodiscard]] RHI::TransferToken UploadBuffer(
+            RHI::BufferHandle, std::span<const std::byte>, std::uint64_t) override
+        {
+            return {};
+        }
+
+        [[nodiscard]] RHI::TransferToken UploadTexture(
+            RHI::TextureHandle, const void*, std::uint64_t, std::uint32_t,
+            std::uint32_t) override
+        {
+            return {};
+        }
+
+        [[nodiscard]] RHI::TransferToken UploadTextureFullChain(
+            RHI::TextureHandle, std::span<const std::byte>) override
+        {
+            return {};
+        }
+
+        [[nodiscard]] bool IsComplete(RHI::TransferToken token) const override
+        {
+            return !token.IsValid();
+        }
+
+        void CollectCompleted() override
+        {
+            while (!m_PendingReadbacks.empty())
+            {
+                PendingReadback pending = std::move(m_PendingReadbacks.front());
+                m_PendingReadbacks.pop_front();
+                pending.Sink.Deliver(std::span<const std::byte>{pending.Bytes});
+                m_CompletedReadback =
+                    std::max(m_CompletedReadback, pending.Token.Value);
+            }
+        }
+
+        [[nodiscard]] RHI::ReadbackToken DownloadBuffer(
+            const RHI::BufferHandle src,
+            const std::uint64_t size,
+            const std::uint64_t offset,
+            RHI::ReadbackSink sink) override
+        {
+            if (!src.IsValid() || size == 0u || !sink.IsValidForSize(size))
+                return {};
+
+            std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+            if (const auto it = BufferContents.find(src.Index);
+                it != BufferContents.end())
+            {
+                const std::vector<std::byte>& contents = it->second;
+                if (offset + size > contents.size())
+                    return {};
+                std::copy_n(
+                    contents.begin() + static_cast<std::ptrdiff_t>(offset),
+                    bytes.size(),
+                    bytes.begin());
+            }
+
+            const RHI::ReadbackToken token{++m_NextReadback};
+            m_PendingReadbacks.push_back(PendingReadback{
+                .Token = token,
+                .Sink = std::move(sink),
+                .Bytes = std::move(bytes),
+            });
+            ++DownloadCalls;
+            return token;
+        }
+
+        [[nodiscard]] bool IsComplete(RHI::ReadbackToken token) const override
+        {
+            return !token.IsValid() || token.Value <= m_CompletedReadback;
+        }
+
+    private:
+        struct PendingReadback
+        {
+            RHI::ReadbackToken Token{};
+            RHI::ReadbackSink Sink{};
+            std::vector<std::byte> Bytes{};
+        };
+
+        std::deque<PendingReadback> m_PendingReadbacks{};
+        std::uint64_t m_NextReadback{0u};
+        std::uint64_t m_CompletedReadback{0u};
+    };
+
     template <typename T>
-    void SeedBufferContents(Tests::MockDevice& device,
-                            const RHI::BufferHandle handle,
-                            const std::span<const T> values)
+    void SeedTransferContents(MockReadbackTransferQueue& queue,
+                              const RHI::BufferHandle handle,
+                              const std::span<const T> values)
     {
         std::vector<std::byte> bytes(values.size_bytes());
         if (!values.empty())
         {
             std::memcpy(bytes.data(), values.data(), values.size_bytes());
         }
-        device.BufferContents[handle.Index] = std::move(bytes);
+        queue.BufferContents[handle.Index] = std::move(bytes);
     }
 
     [[nodiscard]] const Runtime::ProgressivePoissonGpuBufferSpan* FindSpan(
@@ -275,15 +378,6 @@ TEST(ProgressivePoissonGpuBackend, BuildsBufferAndPipelineDescriptors)
     EXPECT_EQ(work.SizeBytes, plan.Layout.WorkBufferBytes);
     EXPECT_TRUE(RHI::HasUsage(work.Usage, RHI::BufferUsage::Storage));
     EXPECT_TRUE(RHI::HasUsage(work.Usage, RHI::BufferUsage::TransferSrc));
-
-    const RHI::BufferDesc readback =
-        Runtime::BuildProgressivePoissonGpuReadbackBufferDesc(
-            64u,
-            "ProgressivePoissonGpu.Test.Readback");
-    EXPECT_EQ(readback.SizeBytes, 64u);
-    EXPECT_TRUE(readback.HostVisible);
-    EXPECT_TRUE(RHI::HasUsage(readback.Usage, RHI::BufferUsage::TransferDst));
-    EXPECT_TRUE(RHI::HasUsage(readback.Usage, RHI::BufferUsage::TransferSrc));
 
     const RHI::PipelineDesc build =
         Runtime::BuildProgressivePoissonBuildCellsPipelineDesc();
@@ -432,7 +526,7 @@ TEST(ProgressivePoissonGpuBackend,
 }
 
 TEST(ProgressivePoissonGpuBackend,
-     ExecutionAllocatesUploadsRecordsAndCopiesReadbacks)
+     ExecutionAllocatesUploadsAndRecordsWithoutDuplicateReadbackCopies)
 {
     Tests::MockDevice device{};
     RHI::BufferManager buffers{device};
@@ -467,14 +561,14 @@ TEST(ProgressivePoissonGpuBackend,
     EXPECT_TRUE(result.Recorded);
     EXPECT_TRUE(result.CpuFallbackRecommended);
     EXPECT_TRUE(result.UploadedInputs);
-    EXPECT_TRUE(result.ReadbackCopiesRecorded);
     EXPECT_TRUE(result.Record.Recorded);
-    EXPECT_TRUE(result.Resources.HasReadbackTargets());
     EXPECT_EQ(result.UploadWriteCount, 5u);
-    EXPECT_EQ(result.ReadbackCopyCount, 3u);
-    EXPECT_EQ(result.Resources.Leases.size(), 20u);
-    EXPECT_EQ(device.CreateBufferCount, 20);
+    EXPECT_EQ(result.Resources.Leases.size(), 17u);
+    EXPECT_EQ(device.CreateBufferCount, 17);
     EXPECT_EQ(device.DestroyBufferCount, 0);
+    EXPECT_TRUE(result.Resources.Resources.AcceptedKeys.IsValid());
+    EXPECT_TRUE(result.Resources.Resources.LevelOffsets.IsValid());
+    EXPECT_TRUE(result.Resources.Resources.SplatRadii.IsValid());
 
     const Tests::MockDevice::BufferWriteRecord* xWrite =
         FindWrite(device, result.Resources.Resources.PositionX);
@@ -515,25 +609,7 @@ TEST(ProgressivePoissonGpuBackend,
               device.GetBufferDeviceAddress(
                   result.Resources.Resources.LevelOffsets));
 
-    ASSERT_EQ(device.CommandContext.CopyBufferRecords.size(), 3u);
-    EXPECT_EQ(device.CommandContext.CopyBufferRecords[0].Src,
-              result.Resources.Resources.AcceptedKeys);
-    EXPECT_EQ(device.CommandContext.CopyBufferRecords[0].Dst,
-              result.Resources.OrderReadback);
-    EXPECT_EQ(device.CommandContext.CopyBufferRecords[0].Size,
-              3u * sizeof(std::uint32_t));
-    EXPECT_EQ(device.CommandContext.CopyBufferRecords[1].Src,
-              result.Resources.Resources.LevelOffsets);
-    EXPECT_EQ(device.CommandContext.CopyBufferRecords[1].Dst,
-              result.Resources.LevelOffsetsReadback);
-    EXPECT_EQ(device.CommandContext.CopyBufferRecords[1].Size,
-              2u * sizeof(std::uint32_t));
-    EXPECT_EQ(device.CommandContext.CopyBufferRecords[2].Src,
-              result.Resources.Resources.SplatRadii);
-    EXPECT_EQ(device.CommandContext.CopyBufferRecords[2].Dst,
-              result.Resources.SplatRadiiReadback);
-    EXPECT_EQ(device.CommandContext.CopyBufferRecords[2].Size,
-              3u * sizeof(float));
+    EXPECT_TRUE(device.CommandContext.CopyBufferRecords.empty());
 }
 
 TEST(ProgressivePoissonGpuBackend,
@@ -665,7 +741,7 @@ TEST(ProgressivePoissonGpuBackend,
 }
 
 TEST(ProgressivePoissonGpuBackend,
-     ReadbackParsesAcceptedPrefixAndValidatesShape)
+     SharedResultBatchParsesAcceptedPrefixAndValidatesShape)
 {
     Tests::MockDevice device{};
 
@@ -684,20 +760,30 @@ TEST(ProgressivePoissonGpuBackend,
     const std::array<std::uint32_t, 4> orderData{{2u, 0u, 1u, 99u}};
     const std::array<std::uint32_t, 3> levelOffsets{{0u, 1u, 3u}};
     const std::array<float, 4> splatData{{0.25f, 0.5f, 0.75f, 0.0f}};
-    SeedBufferContents(device, order, std::span<const std::uint32_t>{orderData});
-    SeedBufferContents(device, offsets,
-                       std::span<const std::uint32_t>{levelOffsets});
-    SeedBufferContents(device, splats, std::span<const float>{splatData});
+    MockReadbackTransferQueue queue{};
+    SeedTransferContents(queue,
+                         order,
+                         std::span<const std::uint32_t>{orderData});
+    SeedTransferContents(queue,
+                         offsets,
+                         std::span<const std::uint32_t>{levelOffsets});
+    SeedTransferContents(queue,
+                         splats,
+                         std::span<const float>{splatData});
+    Graphics::GpuTransfer transfer{queue};
+    Runtime::ProgressivePoissonGpuResultReadback readback{transfer};
+    Runtime::ProgressivePoissonGpuExecutionResources resources{};
+    resources.Resources.AcceptedKeys = order;
+    resources.Resources.LevelOffsets = offsets;
+    resources.Resources.SplatRadii = splats;
 
+    ASSERT_TRUE(readback.Enqueue(device.CommandContext, resources, plan));
+    EXPECT_FALSE(readback.Poll());
+    queue.CollectCompleted();
+    transfer.DrainCompleted(device.CommandContext);
+    ASSERT_TRUE(readback.Poll());
     const Runtime::ProgressivePoissonGpuReadbackResult result =
-        Runtime::ReadProgressivePoissonGpuReadbacks(
-            Runtime::ProgressivePoissonGpuReadbackDesc{
-                .Device = &device,
-                .OrderReadback = order,
-                .LevelOffsetsReadback = offsets,
-                .SplatRadiiReadback = splats,
-                .Plan = plan,
-            });
+        readback.Collect(plan);
 
     ASSERT_TRUE(result.Succeeded()) << result.Diagnostic;
     EXPECT_TRUE(result.Read);
@@ -709,6 +795,11 @@ TEST(ProgressivePoissonGpuBackend,
               result.LevelOffsets);
     EXPECT_EQ((std::vector<float>{0.25f, 0.5f, 0.75f}),
               result.SplatRadii);
+    EXPECT_EQ(queue.DownloadCalls, 3u);
+    const Graphics::GpuTransferDiagnostics diagnostics =
+        transfer.GetDiagnostics();
+    EXPECT_EQ(diagnostics.ReadbackBatchesIssued, 1u);
+    EXPECT_EQ(diagnostics.ReadbackBatchesConsumed, 1u);
 }
 
 TEST(ProgressivePoissonGpuBackend,
@@ -729,21 +820,29 @@ TEST(ProgressivePoissonGpuBackend,
     const std::array<std::uint32_t, 2> duplicateOrder{{1u, 1u}};
     const std::array<std::uint32_t, 2> levelOffsets{{0u, 2u}};
     const std::array<float, 2> splatData{{0.5f, 0.5f}};
-    SeedBufferContents(device, order,
-                       std::span<const std::uint32_t>{duplicateOrder});
-    SeedBufferContents(device, offsets,
-                       std::span<const std::uint32_t>{levelOffsets});
-    SeedBufferContents(device, splats, std::span<const float>{splatData});
+    MockReadbackTransferQueue queue{};
+    SeedTransferContents(queue,
+                         order,
+                         std::span<const std::uint32_t>{duplicateOrder});
+    SeedTransferContents(queue,
+                         offsets,
+                         std::span<const std::uint32_t>{levelOffsets});
+    SeedTransferContents(queue,
+                         splats,
+                         std::span<const float>{splatData});
+    Graphics::GpuTransfer transfer{queue};
+    Runtime::ProgressivePoissonGpuResultReadback readback{transfer};
+    Runtime::ProgressivePoissonGpuExecutionResources resources{};
+    resources.Resources.AcceptedKeys = order;
+    resources.Resources.LevelOffsets = offsets;
+    resources.Resources.SplatRadii = splats;
 
+    ASSERT_TRUE(readback.Enqueue(device.CommandContext, resources, plan));
+    queue.CollectCompleted();
+    transfer.DrainCompleted(device.CommandContext);
+    ASSERT_TRUE(readback.Poll());
     const Runtime::ProgressivePoissonGpuReadbackResult result =
-        Runtime::ReadProgressivePoissonGpuReadbacks(
-            Runtime::ProgressivePoissonGpuReadbackDesc{
-                .Device = &device,
-                .OrderReadback = order,
-                .LevelOffsetsReadback = offsets,
-                .SplatRadiiReadback = splats,
-                .Plan = plan,
-            });
+        readback.Collect(plan);
 
     EXPECT_EQ(result.Status, Runtime::ProgressivePoissonGpuStatus::InvalidReadback);
     EXPECT_FALSE(result.StructurallyValid);
