@@ -1767,6 +1767,18 @@ Concretely:
   `DownloadBuffer()` through the GRAPHICS-096 readback ring; callers observe
   facade `GpuTransferReadbackTicket` delivery after the post-queue drain rather
   than handling raw readback tokens.
+- `ScheduleReadbackBatch(...)` is the copied multi-range form for one logical
+  compute or method result. It preserves request order, deduplicates the
+  transfer-read barrier for repeated source handles, and owns every destination
+  byte vector until all underlying tokens complete. `ReadbackBatchState(...)`
+  provides the non-blocking readiness predicate used by runtime `JobService`
+  publication; `ConsumeReadbackBatch(...)` revalidates the exact generational
+  handles, descriptor shapes, accesses, ranges, and total byte count before
+  moving the bytes to the feature owner exactly once. Cancellation suppresses
+  consumption but retains in-flight sink storage until delivery. Typed parsing
+  stays with the K-Means, Poisson, or other feature owner; the transfer facade
+  contains no method semantics. Frame-correlated renderer picking remains on
+  `SelectionReadback` and is intentionally excluded from this operation.
 - Promoted visualization resolves material, uniform, scalar-field, and
   per-element RGBA color sources through `GpuEntityConfig` and the shared
   `assets/shaders/common/gpu_scene.glsl` helper in the promoted surface

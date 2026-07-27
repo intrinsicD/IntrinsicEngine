@@ -6639,3 +6639,28 @@ tree:
       test-layout, root-hygiene, task-policy, ARA, docs-link, routing, and module
       inventory checks passed. No GPU/Vulkan selector was run for Slice C.
     status: resolved
+  - id: N280
+    type: experiment
+    title: "Contract the shared multi-range GPU-result readback transport"
+    provenance: ai-executed
+    timestamp: "2026-07-27T21:35+02:00"
+    also_depends_on: [N279]
+    evidence:
+      - "tasks/active/RUNTIME-195-unified-gpu-result-readback.md"
+      - "src/graphics/renderer/Graphics.GpuTransfer.cppm"
+      - "src/graphics/renderer/Graphics.GpuTransfer.cpp"
+      - "tests/contract/graphics/Test.GpuTransferFacade.cpp"
+      - "tests/contract/runtime/Test.GpuReadbackJob.cpp"
+      - "ctest --test-dir build/ci --output-on-failure -R '^(GpuTransferFacade|GpuResultReadbackJob|GpuReadbackJob)\\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicCpuTests"
+      - "strict layering, task-policy, test-layout, and documentation-link checks"
+    result: >
+      The existing graphics transfer facade now represents one logical result
+      as an ordered batch of copied buffer ranges. CPU/fake-queue contracts
+      passed 14/14 and cover malformed ranges, incomplete delivery,
+      cancellation storage lifetime, stale generations, exactly-once
+      consumption, parked JobService publication, dependent release, and world
+      cancellation. This is CPU-supported contract evidence only; K-Means and
+      Progressive Poisson production migration and operational Vulkan parity
+      remain open in RUNTIME-195.
+    status: resolved

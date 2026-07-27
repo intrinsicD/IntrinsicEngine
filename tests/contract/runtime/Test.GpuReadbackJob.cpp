@@ -25,6 +25,7 @@ import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.GpuReadbackJob;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
+import Extrinsic.Runtime.WorldHandle;
 import Geometry.Properties;
 
 namespace
@@ -86,6 +87,11 @@ namespace
     struct FollowUpRan
     {
         int Unused{0};
+    };
+
+    struct ReadbackBatchIssued
+    {
+        std::uint64_t TicketId{0u};
     };
 
     [[nodiscard]] RHI::BufferDesc BufferDesc(const std::uint64_t size,
@@ -535,4 +541,225 @@ TEST(GpuReadbackJob, CancelledParkedReadbackDoesNotWriteProperty)
     ASSERT_EQ(snapshot.size(), 1u);
     EXPECT_EQ(snapshot[0].Token, handle);
     EXPECT_EQ(snapshot[0].State, Runtime::JobState::Cancelled);
+}
+
+TEST(GpuResultReadbackJob, BatchParksAndReleasesDependentAfterExactConsumption)
+{
+    SchedulerScope scheduler{1};
+    Harness harness;
+
+    const std::array firstValues{std::uint32_t{4u}, std::uint32_t{9u}};
+    const std::array secondValues{2.5f, 7.5f};
+    const RHI::BufferHandle first = harness.Queue.AddBuffer(
+        BytesOf<std::uint32_t>(std::span<const std::uint32_t>{firstValues}),
+        RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc);
+    const RHI::BufferHandle second = harness.Queue.AddBuffer(
+        BytesOf<float>(std::span<const float>{secondValues}),
+        RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc);
+    const RHI::BufferDesc* firstDesc = harness.Queue.GetDesc(first);
+    const RHI::BufferDesc* secondDesc = harness.Queue.GetDesc(second);
+    ASSERT_NE(firstDesc, nullptr);
+    ASSERT_NE(secondDesc, nullptr);
+
+    const std::array ranges{
+        Graphics::GpuTransferReadbackRangeDesc{
+            .Source = first,
+            .SourceDesc = *firstDesc,
+            .SourceRange = {.OffsetBytes = 0u,
+                            .SizeBytes = sizeof(firstValues)},
+        },
+        Graphics::GpuTransferReadbackRangeDesc{
+            .Source = second,
+            .SourceDesc = *secondDesc,
+            .SourceRange = {.OffsetBytes = 0u,
+                            .SizeBytes = sizeof(secondValues)},
+        },
+    };
+    const Graphics::GpuTransferReadbackBatchTicket ticket =
+        harness.Transfer.ScheduleReadbackBatch(
+            harness.CommandContext,
+            Graphics::GpuTransferReadbackBatchDesc{.Ranges = ranges});
+    ASSERT_TRUE(ticket.IsValid());
+
+    std::uint32_t applyCount = 0u;
+    std::vector<std::vector<std::byte>> consumedRanges{};
+    Runtime::JobDesc readback{};
+    readback.DebugName = "shared multi-range result readback";
+    readback.Work = [ticket](const Runtime::JobCancellation&)
+    {
+        return Runtime::JobResultEnvelope::Make<ReadbackBatchIssued>(
+            ReadbackBatchIssued{.TicketId = ticket.Id});
+    };
+    readback.IsReadyToApply = [&transfer = harness.Transfer, ticket]
+    {
+        return transfer.ReadbackBatchState(ticket) ==
+               Graphics::GpuTransferReadbackBatchState::Ready;
+    };
+    readback.PublishCompletion =
+        [&transfer = harness.Transfer,
+         ranges,
+         ticket,
+         &applyCount,
+         &consumedRanges](Runtime::KernelEventBus&,
+                          const Runtime::JobResultEnvelope& envelope)
+    {
+        const ReadbackBatchIssued* issued =
+            envelope.TryGet<ReadbackBatchIssued>();
+        if (issued == nullptr || issued->TicketId != ticket.Id)
+            return false;
+
+        Graphics::GpuTransferReadbackBatchResult result{};
+        if (!transfer.ConsumeReadbackBatch(ticket, ranges, result))
+            return false;
+        ++applyCount;
+        consumedRanges = std::move(result.Ranges);
+        return true;
+    };
+    readback.FinalizeUnpublishedOnMainThread =
+        [&transfer = harness.Transfer, ticket]
+    {
+        (void)transfer.CancelReadbackBatch(ticket);
+    };
+
+    const Runtime::JobToken readbackToken =
+        harness.Jobs.Submit(std::move(readback));
+    ASSERT_TRUE(readbackToken.IsValid());
+
+    std::vector<std::string> order{};
+    Runtime::JobDesc dependent{};
+    dependent.DebugName = "consume shared result";
+    dependent.DependsOn.push_back(Runtime::JobDependency{
+        .Job = readbackToken,
+        .Reason = "shared result delivered",
+    });
+    dependent.Work = [&order](const Runtime::JobCancellation&)
+    {
+        order.push_back("worker");
+        return Runtime::JobResultEnvelope::Make<FollowUpRan>(FollowUpRan{});
+    };
+    dependent.PublishCompletion =
+        [&order](Runtime::KernelEventBus&,
+                 const Runtime::JobResultEnvelope&) -> bool
+    {
+        order.push_back("apply");
+        return true;
+    };
+    const Runtime::JobToken dependentToken =
+        harness.Jobs.Submit(std::move(dependent));
+    ASSERT_TRUE(dependentToken.IsValid());
+
+    ASSERT_TRUE(WaitUntilReadbackIssued(harness.Jobs, readbackToken));
+    EXPECT_EQ(harness.Jobs.DrainCompletions(harness.Events), 0u);
+    EXPECT_EQ(harness.Jobs.GetState(readbackToken),
+              Runtime::JobState::AwaitingApply);
+    EXPECT_EQ(harness.Jobs.GetState(dependentToken),
+              Runtime::JobState::AwaitingDependencies);
+    EXPECT_TRUE(order.empty());
+
+    harness.Queue.CollectCompleted();
+    harness.Transfer.DrainCompleted(harness.CommandContext);
+    EXPECT_EQ(harness.Jobs.DrainCompletions(harness.Events), 1u);
+    EXPECT_EQ(harness.Jobs.GetState(readbackToken),
+              Runtime::JobState::Published);
+
+    ASSERT_TRUE(WaitUntil(
+        [&]
+        {
+            (void)harness.Jobs.DrainCompletions(harness.Events);
+            return harness.Jobs.IsComplete(dependentToken);
+        }));
+    EXPECT_EQ(applyCount, 1u);
+    ASSERT_EQ(consumedRanges.size(), 2u);
+    EXPECT_EQ(consumedRanges[0],
+              BytesOf<std::uint32_t>(
+                  std::span<const std::uint32_t>{firstValues}));
+    EXPECT_EQ(consumedRanges[1],
+              BytesOf<float>(std::span<const float>{secondValues}));
+    ASSERT_EQ(order.size(), 2u);
+    EXPECT_EQ(order[0], "worker");
+    EXPECT_EQ(order[1], "apply");
+    EXPECT_EQ(harness.Transfer.ReadbackBatchState(ticket),
+              Graphics::GpuTransferReadbackBatchState::Consumed);
+
+    EXPECT_EQ(harness.Jobs.DrainCompletions(harness.Events), 0u);
+    EXPECT_EQ(applyCount, 1u);
+}
+
+TEST(GpuResultReadbackJob, WorldCancellationCancelsPendingTransportBatch)
+{
+    SchedulerScope scheduler{1};
+    Harness harness;
+
+    const std::array sourceValues{std::uint32_t{17u}};
+    const RHI::BufferHandle source = harness.Queue.AddBuffer(
+        BytesOf<std::uint32_t>(std::span<const std::uint32_t>{sourceValues}),
+        RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc);
+    const RHI::BufferDesc* sourceDesc = harness.Queue.GetDesc(source);
+    ASSERT_NE(sourceDesc, nullptr);
+    const std::array ranges{
+        Graphics::GpuTransferReadbackRangeDesc{
+            .Source = source,
+            .SourceDesc = *sourceDesc,
+            .SourceRange = {.OffsetBytes = 0u,
+                            .SizeBytes = sizeof(sourceValues)},
+        },
+    };
+    const Graphics::GpuTransferReadbackBatchTicket ticket =
+        harness.Transfer.ScheduleReadbackBatch(
+            harness.CommandContext,
+            Graphics::GpuTransferReadbackBatchDesc{.Ranges = ranges});
+    ASSERT_TRUE(ticket.IsValid());
+
+    constexpr Runtime::WorldHandle world{7u, 1u};
+    std::uint32_t publishCount = 0u;
+    std::uint32_t finalizerCount = 0u;
+    Runtime::JobDesc readback{};
+    readback.DebugName = "world-scoped shared result readback";
+    readback.Scope = world;
+    readback.CancellationGeneration = harness.Jobs.WorldGeneration(world);
+    readback.Work = [ticket](const Runtime::JobCancellation&)
+    {
+        return Runtime::JobResultEnvelope::Make<ReadbackBatchIssued>(
+            ReadbackBatchIssued{.TicketId = ticket.Id});
+    };
+    readback.IsReadyToApply = [&transfer = harness.Transfer, ticket]
+    {
+        return transfer.ReadbackBatchState(ticket) ==
+               Graphics::GpuTransferReadbackBatchState::Ready;
+    };
+    readback.PublishCompletion =
+        [&publishCount](Runtime::KernelEventBus&,
+                        const Runtime::JobResultEnvelope&) -> bool
+    {
+        ++publishCount;
+        return true;
+    };
+    readback.FinalizeUnpublishedOnMainThread =
+        [&transfer = harness.Transfer, ticket, &finalizerCount]
+    {
+        ++finalizerCount;
+        (void)transfer.CancelReadbackBatch(ticket);
+    };
+
+    const Runtime::JobToken token = harness.Jobs.Submit(std::move(readback));
+    ASSERT_TRUE(token.IsValid());
+    ASSERT_TRUE(WaitUntilReadbackIssued(harness.Jobs, token));
+    EXPECT_EQ(harness.Jobs.DrainCompletions(harness.Events), 0u);
+    EXPECT_EQ(harness.Jobs.GetState(token), Runtime::JobState::AwaitingApply);
+
+    EXPECT_EQ(harness.Jobs.CancelAllForWorld(world), 1u);
+    EXPECT_EQ(harness.Jobs.DrainCompletions(harness.Events), 0u);
+    EXPECT_EQ(harness.Jobs.GetState(token), Runtime::JobState::Cancelled);
+    EXPECT_EQ(finalizerCount, 1u);
+    EXPECT_EQ(publishCount, 0u);
+    EXPECT_EQ(harness.Transfer.ReadbackBatchState(ticket),
+              Graphics::GpuTransferReadbackBatchState::Cancelled);
+
+    harness.Queue.CollectCompleted();
+    harness.Transfer.DrainCompleted(harness.CommandContext);
+    EXPECT_EQ(harness.Jobs.DrainCompletions(harness.Events), 0u);
+    EXPECT_EQ(finalizerCount, 1u);
+    EXPECT_EQ(publishCount, 0u);
+    EXPECT_EQ(harness.Transfer.ReadbackBatchState(ticket),
+              Graphics::GpuTransferReadbackBatchState::Cancelled);
 }

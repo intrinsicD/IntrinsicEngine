@@ -38,7 +38,7 @@ cleanup slice:
   and cancels shutdown survivors, and the duplicate streaming/derived-job
   systems are deleted. It supplies the execution prerequisite for the
   remaining consolidation tasks below.
-- [`RUNTIME-195` — Unified GPU-result readback](RUNTIME-195-unified-gpu-result-readback.md)
+- [`RUNTIME-195` — Unified GPU-result readback](../../active/RUNTIME-195-unified-gpu-result-readback.md)
   integrates one multi-range transfer wait with `JobService` and retires
   `AsyncBufferReadback`, `GpuReadbackJob`, and blocking compute-result reads.
 - [`RUNTIME-196` — Canonical clustering-service CPU/GPU path](RUNTIME-196-canonical-clustering-service-path.md)

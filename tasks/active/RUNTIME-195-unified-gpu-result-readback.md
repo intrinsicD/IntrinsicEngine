@@ -6,6 +6,22 @@ maturity_target: Retired
 ---
 # RUNTIME-195 — Unified GPU-result readback
 
+## Status
+
+- Promoted to active on 2026-07-27 after retired `RUNTIME-194` supplied the
+  single `JobService` lifecycle.
+- Slice A completed on 2026-07-27. The initial census found three production result
+  paths: K-Means owns three `AsyncBufferReadback` instances, Progressive
+  Poisson owns the only direct compute-result `IDevice::ReadBuffer` call, and
+  `GpuReadbackJob` has test consumers only. Renderer selection readback remains
+  excluded by the task contract.
+- `Graphics.GpuTransfer` now owns ordered, copied multi-range batches with
+  exact generational-handle/range revalidation, cancellation, and exactly-once
+  consumption. Generic `JobService` contracts prove parked publication,
+  dependent release, bounded main-thread delivery, and world-cancellation
+  cleanup without adding a second runtime service. Focused CPU evidence:
+  `GpuTransferFacade.*` 8/8 and `GpuReadbackJob.*|GpuResultReadbackJob.*` 6/6.
+
 ## Goal
 
 - Provide one backend-neutral, multi-range GPU transfer/readback operation that
@@ -47,10 +63,10 @@ maturity_target: Retired
 
 ## Required changes
 
-- [ ] Extend the existing graphics transfer seam with one backend-neutral
+- [x] Extend the existing graphics transfer seam with one backend-neutral
       multi-range readback description and copied completion result; expose no
       Vulkan types or backend internals.
-- [ ] Integrate readback tickets with `JobService` parked/waiting state,
+- [x] Integrate readback tickets with `JobService` parked/waiting state,
       cancellation, dependency completion, world shutdown, and bounded
       main-thread delivery.
 - [ ] Validate buffer identity/generation, offsets, sizes, dimensions, and
@@ -66,7 +82,7 @@ maturity_target: Retired
 
 ## Tests
 
-- [ ] CPU/fake-device tests cover multi-range ordering, malformed ranges,
+- [x] CPU/fake-device tests cover multi-range ordering, malformed ranges,
       incomplete delivery, cancellation, stale buffers, dependent work, and
       exactly-once resume/apply.
 - [ ] Port the valuable `GpuReadbackJob` contracts to the shared operation and

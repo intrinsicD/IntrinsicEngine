@@ -499,3 +499,239 @@ TEST(GpuTransferFacade, InvalidRangesFailClosedAndUpdateDiagnostics)
     EXPECT_EQ(diagnostics.ReadbacksDropped, 1u);
     EXPECT_EQ(diagnostics.ReadbackBarriersEmitted, 0u);
 }
+
+TEST(GpuTransferFacade, MultiRangeBatchPreservesOrderAndConsumesExactlyOnce)
+{
+    MockTransferQueue queue;
+    Graphics::GpuTransfer transfer{queue};
+    RecordingCommandContext cmd;
+
+    const RHI::BufferHandle first = queue.AddBuffer({
+        std::byte{0x01}, std::byte{0x02}, std::byte{0x03}, std::byte{0x04},
+        std::byte{0x05}, std::byte{0x06}, std::byte{0x07}, std::byte{0x08},
+        std::byte{0x09}, std::byte{0x0a},
+    }, RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc);
+    const RHI::BufferHandle second = queue.AddBuffer({
+        std::byte{0x11}, std::byte{0x12}, std::byte{0x13}, std::byte{0x14},
+    }, RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc);
+    const RHI::BufferDesc* firstDesc = queue.GetDesc(first);
+    const RHI::BufferDesc* secondDesc = queue.GetDesc(second);
+    ASSERT_NE(firstDesc, nullptr);
+    ASSERT_NE(secondDesc, nullptr);
+
+    const std::array ranges{
+        Graphics::GpuTransferReadbackRangeDesc{
+            .Source = first,
+            .SourceDesc = *firstDesc,
+            .SourceRange = {.OffsetBytes = 2u, .SizeBytes = 3u},
+        },
+        Graphics::GpuTransferReadbackRangeDesc{
+            .Source = second,
+            .SourceDesc = *secondDesc,
+            .SourceRange = {.OffsetBytes = 1u, .SizeBytes = 2u},
+        },
+        Graphics::GpuTransferReadbackRangeDesc{
+            .Source = first,
+            .SourceDesc = *firstDesc,
+            .SourceRange = {.OffsetBytes = 8u, .SizeBytes = 2u},
+        },
+    };
+
+    const Graphics::GpuTransferReadbackBatchTicket ticket =
+        transfer.ScheduleReadbackBatch(
+            cmd,
+            Graphics::GpuTransferReadbackBatchDesc{.Ranges = ranges});
+    ASSERT_TRUE(ticket.IsValid());
+    EXPECT_EQ(ticket.RangeCount, 3u);
+    EXPECT_EQ(ticket.TotalSizeBytes, 7u);
+    EXPECT_EQ(transfer.ReadbackBatchState(ticket),
+              Graphics::GpuTransferReadbackBatchState::Pending);
+
+    // The repeated first source shares one transfer-read bracket.
+    ASSERT_EQ(cmd.Events.size(), 2u);
+    EXPECT_EQ(cmd.Events[0].Buffer, first);
+    EXPECT_EQ(cmd.Events[1].Buffer, second);
+
+    Graphics::GpuTransferReadbackBatchResult result{};
+    EXPECT_FALSE(transfer.ConsumeReadbackBatch(ticket, ranges, result));
+    EXPECT_FALSE(result.IsValid());
+
+    queue.CollectCompleted();
+    EXPECT_EQ(transfer.ReadbackBatchState(ticket),
+              Graphics::GpuTransferReadbackBatchState::Pending);
+    transfer.DrainCompleted(cmd);
+    EXPECT_EQ(transfer.ReadbackBatchState(ticket),
+              Graphics::GpuTransferReadbackBatchState::Ready);
+
+    ASSERT_TRUE(transfer.ConsumeReadbackBatch(ticket, ranges, result));
+    ASSERT_TRUE(result.IsValid());
+    EXPECT_EQ(result.Ranges[0],
+              (std::vector<std::byte>{
+                  std::byte{0x03}, std::byte{0x04}, std::byte{0x05}}));
+    EXPECT_EQ(result.Ranges[1],
+              (std::vector<std::byte>{std::byte{0x12}, std::byte{0x13}}));
+    EXPECT_EQ(result.Ranges[2],
+              (std::vector<std::byte>{std::byte{0x09}, std::byte{0x0a}}));
+    EXPECT_EQ(transfer.ReadbackBatchState(ticket),
+              Graphics::GpuTransferReadbackBatchState::Consumed);
+
+    Graphics::GpuTransferReadbackBatchResult duplicate{};
+    EXPECT_FALSE(transfer.ConsumeReadbackBatch(ticket, ranges, duplicate));
+    EXPECT_FALSE(duplicate.IsValid());
+
+    const Graphics::GpuTransferDiagnostics diagnostics =
+        transfer.GetDiagnostics();
+    EXPECT_EQ(diagnostics.ReadbacksIssued, 3u);
+    EXPECT_EQ(diagnostics.ReadbacksDelivered, 3u);
+    EXPECT_EQ(diagnostics.ReadbackBarriersEmitted, 2u);
+    EXPECT_EQ(diagnostics.ReadbackBatchesIssued, 1u);
+    EXPECT_EQ(diagnostics.ReadbackBatchesDelivered, 1u);
+    EXPECT_EQ(diagnostics.ReadbackBatchesConsumed, 1u);
+    EXPECT_EQ(diagnostics.ReadbackBatchValidationFailures, 0u);
+    EXPECT_EQ(diagnostics.PendingReadbackHighWater, 3u);
+}
+
+TEST(GpuTransferFacade, MultiRangeBatchRejectsMalformedAndContradictoryRanges)
+{
+    MockTransferQueue queue;
+    Graphics::GpuTransfer transfer{queue};
+    RecordingCommandContext cmd;
+
+    EXPECT_FALSE(transfer.ScheduleReadbackBatch(
+        cmd, Graphics::GpuTransferReadbackBatchDesc{}));
+
+    const RHI::BufferHandle source = queue.AddBuffer({
+        std::byte{0x01}, std::byte{0x02}, std::byte{0x03}, std::byte{0x04},
+    }, RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc);
+    const RHI::BufferDesc* sourceDesc = queue.GetDesc(source);
+    ASSERT_NE(sourceDesc, nullptr);
+
+    const std::array malformed{
+        Graphics::GpuTransferReadbackRangeDesc{
+            .Source = source,
+            .SourceDesc = *sourceDesc,
+            .SourceRange = {.OffsetBytes = 3u, .SizeBytes = 2u},
+        },
+    };
+    EXPECT_FALSE(transfer.ScheduleReadbackBatch(
+        cmd,
+        Graphics::GpuTransferReadbackBatchDesc{.Ranges = malformed}));
+
+    RHI::BufferDesc contradictoryDesc = *sourceDesc;
+    contradictoryDesc.SizeBytes += 4u;
+    const std::array contradictory{
+        Graphics::GpuTransferReadbackRangeDesc{
+            .Source = source,
+            .SourceDesc = *sourceDesc,
+            .SourceRange = {.OffsetBytes = 0u, .SizeBytes = 1u},
+        },
+        Graphics::GpuTransferReadbackRangeDesc{
+            .Source = source,
+            .SourceDesc = contradictoryDesc,
+            .SourceRange = {.OffsetBytes = 1u, .SizeBytes = 1u},
+        },
+    };
+    EXPECT_FALSE(transfer.ScheduleReadbackBatch(
+        cmd,
+        Graphics::GpuTransferReadbackBatchDesc{.Ranges = contradictory}));
+
+    const Graphics::GpuTransferDiagnostics diagnostics =
+        transfer.GetDiagnostics();
+    EXPECT_EQ(diagnostics.ReadbacksDropped, 3u);
+    EXPECT_EQ(diagnostics.ReadbacksIssued, 0u);
+    EXPECT_EQ(diagnostics.ReadbackBatchesIssued, 0u);
+    EXPECT_TRUE(cmd.Events.empty());
+}
+
+TEST(GpuTransferFacade, CancelledBatchRetainsSinkStorageUntilTransferRetires)
+{
+    MockTransferQueue queue;
+    Graphics::GpuTransfer transfer{queue};
+    RecordingCommandContext cmd;
+
+    const RHI::BufferHandle source = queue.AddBuffer({
+        std::byte{0x21}, std::byte{0x22}, std::byte{0x23}, std::byte{0x24},
+    }, RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc);
+    const RHI::BufferDesc* sourceDesc = queue.GetDesc(source);
+    ASSERT_NE(sourceDesc, nullptr);
+    const std::array ranges{
+        Graphics::GpuTransferReadbackRangeDesc{
+            .Source = source,
+            .SourceDesc = *sourceDesc,
+            .SourceRange = {.OffsetBytes = 0u, .SizeBytes = 4u},
+        },
+    };
+
+    const Graphics::GpuTransferReadbackBatchTicket ticket =
+        transfer.ScheduleReadbackBatch(
+            cmd,
+            Graphics::GpuTransferReadbackBatchDesc{.Ranges = ranges});
+    ASSERT_TRUE(ticket.IsValid());
+    EXPECT_TRUE(transfer.CancelReadbackBatch(ticket));
+    EXPECT_FALSE(transfer.CancelReadbackBatch(ticket));
+    EXPECT_EQ(transfer.ReadbackBatchState(ticket),
+              Graphics::GpuTransferReadbackBatchState::Cancelled);
+
+    Graphics::GpuTransferReadbackBatchResult result{};
+    EXPECT_FALSE(transfer.ConsumeReadbackBatch(ticket, ranges, result));
+    queue.CollectCompleted();
+    transfer.DrainCompleted(cmd);
+    EXPECT_EQ(transfer.ReadbackBatchState(ticket),
+              Graphics::GpuTransferReadbackBatchState::Cancelled);
+    EXPECT_FALSE(transfer.ConsumeReadbackBatch(ticket, ranges, result));
+
+    const Graphics::GpuTransferDiagnostics diagnostics =
+        transfer.GetDiagnostics();
+    EXPECT_EQ(diagnostics.ReadbacksIssued, 1u);
+    EXPECT_EQ(diagnostics.ReadbacksDelivered, 1u);
+    EXPECT_EQ(diagnostics.ReadbackBatchesIssued, 1u);
+    EXPECT_EQ(diagnostics.ReadbackBatchesCancelled, 1u);
+    EXPECT_EQ(diagnostics.ReadbackBatchesDelivered, 0u);
+    EXPECT_EQ(diagnostics.ReadbackBatchesConsumed, 0u);
+}
+
+TEST(GpuTransferFacade, ConsumeRejectsStaleBufferGenerationBeforeExposingBytes)
+{
+    MockTransferQueue queue;
+    Graphics::GpuTransfer transfer{queue};
+    RecordingCommandContext cmd;
+
+    const RHI::BufferHandle source = queue.AddBuffer({
+        std::byte{0x31}, std::byte{0x32}, std::byte{0x33}, std::byte{0x34},
+    }, RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc);
+    const RHI::BufferDesc* sourceDesc = queue.GetDesc(source);
+    ASSERT_NE(sourceDesc, nullptr);
+    const std::array ranges{
+        Graphics::GpuTransferReadbackRangeDesc{
+            .Source = source,
+            .SourceDesc = *sourceDesc,
+            .SourceRange = {.OffsetBytes = 0u, .SizeBytes = 4u},
+        },
+    };
+
+    const Graphics::GpuTransferReadbackBatchTicket ticket =
+        transfer.ScheduleReadbackBatch(
+            cmd,
+            Graphics::GpuTransferReadbackBatchDesc{.Ranges = ranges});
+    ASSERT_TRUE(ticket.IsValid());
+    queue.CollectCompleted();
+    transfer.DrainCompleted(cmd);
+    ASSERT_EQ(transfer.ReadbackBatchState(ticket),
+              Graphics::GpuTransferReadbackBatchState::Ready);
+
+    auto staleRanges = ranges;
+    ++staleRanges[0].Source.Generation;
+    Graphics::GpuTransferReadbackBatchResult result{};
+    EXPECT_FALSE(transfer.ConsumeReadbackBatch(ticket, staleRanges, result));
+    EXPECT_FALSE(result.IsValid());
+    EXPECT_EQ(transfer.ReadbackBatchState(ticket),
+              Graphics::GpuTransferReadbackBatchState::Ready);
+
+    ASSERT_TRUE(transfer.ConsumeReadbackBatch(ticket, ranges, result));
+    ASSERT_TRUE(result.IsValid());
+    EXPECT_EQ(result.Ranges[0],
+              (std::vector<std::byte>{
+                  std::byte{0x31}, std::byte{0x32},
+                  std::byte{0x33}, std::byte{0x34}}));
+    EXPECT_EQ(transfer.GetDiagnostics().ReadbackBatchValidationFailures, 1u);
+}

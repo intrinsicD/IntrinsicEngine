@@ -72,6 +72,20 @@ Graphics is organized into explicit sublayers:
   retains its existing managed geometry upload barriers. This prevents the
   BUG-049 missing/eager-barrier class from recurring without adding a new RHI
   surface.
+- Compute and method result owners use the facade's multi-range batch operation
+  when one logical result spans several buffers or disjoint ranges. The facade
+  owns copied host storage across the asynchronous transfer, preserves range
+  order, and exposes bytes exactly once only after the caller revalidates the
+  scheduled generational handles, descriptor shapes, accesses, and byte ranges.
+  Cancellation suppresses consumption while retaining any in-flight sink
+  storage until its transfer token retires. Runtime composes that ticket with a
+  canonical `JobService` job: readiness parks publication, the main-thread
+  publish callback performs caller-owned typed parsing, and the unpublished
+  finalizer cancels the ticket during job or world teardown. The transport owns
+  no method or geometry-property semantics.
+- Renderer picking remains deliberately outside this result lifecycle.
+  `SelectionReadback` owns frame correlation and selection-specific policy;
+  RUNTIME-195 does not fold it into compute-result batches.
 
 ## Vulkan operational readiness and runtime fallback
 

@@ -114,3 +114,26 @@
 - **Dependencies**: [K05]
 - **Tags**: runtime, JobService, CPU-supported, lifecycle, retirement
 - **From staging**: O61
+
+## C07: Multi-range GPU-result readback has a CPU-supported transport contract
+- **Statement**: In CPU/fake-queue contracts, `Graphics.GpuTransfer` represents
+  one logical GPU result as ordered copied ranges, exposes those bytes only
+  after exact generational-handle, descriptor, access, range, and byte-count
+  revalidation, and composes with canonical `JobService` parked publication,
+  dependency release, world cancellation, and exactly-once consumption.
+- **Status**: supported — CPU/fake-queue contract only; production K-Means and
+  Progressive Poisson migration and GPU/Vulkan operation remain unproven
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A malformed or stale request exposes bytes, a
+  cancelled in-flight sink loses required storage or remains consumable, a
+  batch consumes twice, a dependent releases before successful publication, or
+  world cancellation permits later publication.
+- **Proof**: [tasks/active/RUNTIME-195-unified-gpu-result-readback.md,
+  src/graphics/renderer/Graphics.GpuTransfer.cppm,
+  src/graphics/renderer/Graphics.GpuTransfer.cpp,
+  tests/contract/graphics/Test.GpuTransferFacade.cpp,
+  tests/contract/runtime/Test.GpuReadbackJob.cpp]
+- **Dependencies**: [C06]
+- **Tags**: graphics, runtime, GPU readback, JobService, CPU-supported
+- **From staging**: O62

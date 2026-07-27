@@ -833,3 +833,21 @@ observations:
     promoted_to: "logic/claims.md:C06"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O62
+    timestamp: "2026-07-27T21:35+02:00"
+    provenance: ai-executed
+    content: >
+      One backend-neutral graphics transfer batch can carry multiple ordered
+      GPU-result ranges through copied host storage, exact generational
+      revalidation, cancellation, and exactly-once consumption while canonical
+      JobService callbacks own waiting, world teardown, and typed publication.
+    context: >
+      RUNTIME-195 Slice A implementation, 14 focused CPU/fake-queue contracts,
+      live CPU test-routing reconciliation, and strict structural checks. No
+      production method consumer or Vulkan capability claim is included yet.
+    potential_type: claim
+    bound_to: [N280]
+    promoted: true
+    promoted_to: "logic/claims.md:C07"
+    crystallized_via: artifact-commitment
+    stale: false
