@@ -41,7 +41,7 @@ Runtime is the only layer permitted to import **both** PropertySet / geometry al
 
 Editor / app code may own user-facing surfaces — selected attribute name, colormap selection, scalar range, isoline value count, vector-field scale / color, Htex regeneration request flag — but funnels them through the runtime adapter as pre-filter inputs rather than calling graphics-side packet builders directly.
 
-Async visualization baking (Htex regeneration, isoline extraction, vector-field generation when expensive) remains **CPU / runtime-only** per the existing legacy-feature classification, scheduled through `Extrinsic.Runtime.StreamingExecutor` rather than on a render-graph pass.
+Async visualization baking (Htex regeneration, isoline extraction, vector-field generation when expensive) remains **CPU / runtime-only** per the existing legacy-feature classification, scheduled through `Extrinsic.Runtime.JobService` rather than on a render-graph pass.
 
 ### 2. Centralized validation in graphics; no runtime/upload filtering
 
@@ -106,7 +106,7 @@ Default runtime-side policy:
 
 - Runtime extraction submits the `FragmentBakeAtlasPacket` with `Mapping = RecreateHtex` (and `MeshHasTexcoords` set to its true value, which may be `true` when the user explicitly requested Htex regeneration on a mesh that already has UVs).
 - Graphics increments `VisualizationDiagnostics::HtexRecreateRequestCount` and accepts the descriptor **without** owning the Htex regeneration algorithm.
-- Concrete Htex regeneration is scheduled by runtime / geometry on a background streaming task through `Extrinsic.Runtime.StreamingExecutor` (the existing classification of "async visualization baking" as CPU / runtime-only). The runtime / editor surface owns the dirty-domain stamp that triggers regeneration.
+- Concrete Htex regeneration is scheduled by runtime / geometry on a background task through `Extrinsic.Runtime.JobService` (the existing classification of "async visualization baking" as CPU / runtime-only). The runtime / editor surface owns the dirty-domain stamp that triggers regeneration.
 - Once regeneration completes, the next extraction frame submits the `FragmentBakeAtlasPacket` with `Mapping = ExistingHtex`.
 
 UV-backed bakes require `MeshHasTexcoords = true` and a non-zero `TexcoordBufferBDA`. Missing or invalid texcoords increment `VisualizationDiagnostics::MissingTexcoordCount` and the packet is rejected from the consumed snapshot. `GRAPHICS-088` extends the data-only descriptor with optional resolved-UV metadata: `TexcoordProvenance` distinguishes authored, generated-atlas, runtime-resolved, and unknown UV sources; `TexcoordDirtyStamp` carries the texcoord producer's stable dirty stamp when one exists; `SourceAttributeDirtyStamp` carries the baked source attribute's dirty stamp; `AtlasTextureAsset` may name the generated texture asset that later residency resolves through `Graphics.GpuAssetCache`; and `VisualizationGeneratedTextureSemantic` classifies scalar, label, vector, standard material, or displacement intent. These fields do not make Htex implicit, do not let graphics generate UVs, and do not add new shader features by themselves.
@@ -142,7 +142,7 @@ Follow-up tasks required: none from this ADR. Concrete `Extrinsic.Runtime.Visual
 - **Runtime-side packet filtering.** Rejected per §2: would create two filtering seams (runtime + graphics) that can disagree silently and would force the diagnostics counters to be reconciled across layers.
 - **Vector-field / isoline overlays routed through retained `GpuRender_Line` / `GpuRender_Point` cull buckets.** Rejected per §3: would conflate transient overlay traffic with retained scene draws, poison cull-bucket counts, and force retained-resource churn each frame.
 - **Per-packet pipeline variant flag in `VisualizationPackets` for depth-tested vs always-on-top.** Rejected per §5: would introduce a third variant policy alongside the transient-debug one from `GRAPHICS-010Q`; the same two-pipeline-variant policy is reused at pass-recording time.
-- **Graphics owns Htex regeneration.** Rejected per §4: Htex regeneration is a CPU / geometry algorithm scheduled through `Extrinsic.Runtime.StreamingExecutor`; graphics has no business owning a geometry algorithm or its dirty-domain stamp.
+- **Graphics owns Htex regeneration.** Rejected per §4: Htex regeneration is a CPU / geometry algorithm scheduled through `Extrinsic.Runtime.JobService`; graphics has no business owning a geometry algorithm or its dirty-domain stamp.
 - **Runtime-side `VisualizationOverlayUploadDiagnostics` mirror.** Rejected per §3: diagnostics belong on the backend-local helper (under `GRAPHICS-018` scope) so they stay co-located with the transient buffer recycling counters; a runtime-side mirror would duplicate state without a clear owner.
 
 ## Validation

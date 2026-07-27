@@ -259,7 +259,6 @@ if(TARGET ExtrinsicRuntime)
         Test.AssetModelTextureHandoff.cpp
         Test.AssetModelTextureIO.cpp
         Test.AsyncWorkModule.cpp
-        Test.DerivedJobGraph.cpp
         Test.EditorCommandHistory.cpp
         Test.EditorPropertyWidgets.cpp
         Test.EditorUiHost.cpp
@@ -974,7 +973,6 @@ if(TARGET ExtrinsicRuntime)
         Test.CoreFrameGraphParallel.cpp
         Test.CoreGraphStress.cpp
         Test.CoreProcess.cpp
-        Test.RuntimeStreamingExecutor.cpp
     )
     intrinsic_resolve_test_sources(_runtime_integration_cpu_test_sources
         SEARCH_DIRS integration/runtime

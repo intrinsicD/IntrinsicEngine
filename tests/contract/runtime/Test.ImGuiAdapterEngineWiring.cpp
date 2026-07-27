@@ -44,12 +44,13 @@ import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraModule;
-import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.GizmoInteraction;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
@@ -104,12 +105,12 @@ namespace
     };
 
     [[nodiscard]] bool IsWorkerRunningStatus(
-        const Runtime::DerivedJobStatus status) noexcept
+        const Runtime::JobState status) noexcept
     {
-        return status == Runtime::DerivedJobStatus::Running;
+        return status == Runtime::JobState::Running;
     }
 
-    class SlowDerivedJobApplication final : public Intrinsic::Tests::RuntimeTestModule
+    class SlowJobApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         static constexpr std::uint32_t kMaxFrames = 512u;
@@ -119,38 +120,34 @@ namespace
         void Resolve() override
         {
             auto& engine = Kernel();
-            Jobs         = engine.Services().Find<Runtime::DerivedJobRegistry>();
+            Jobs = engine.Services().Find<Runtime::JobService>();
             ASSERT_NE(Jobs, nullptr);
 
-            Runtime::DerivedJobDesc desc{
-                .Key = Runtime::DerivedJobKey{
-                    .EntityId = 141u,
-                    .Domain = Runtime::DerivedJobScope::PointCloudPoint,
-                    .OutputSemantic =
-                        Runtime::ProgressiveSlotSemantic::PointColor,
-                    .OutputName = "runtime_141_slow_job_probe",
-                },
-                .Name = "RUNTIME-141 slow editor method job",
+            Runtime::JobDesc desc{
+                .DebugName = "RUNTIME-141 slow editor method job",
                 .Scope = engine.ActiveWorld(),
-                .Execute =
-                    [this]() -> Runtime::DerivedJobWorkerResult
+                .Kind = Runtime::RuntimeTaskKinds::GeometryProcess,
+                .Work =
+                    [this](const Runtime::JobCancellation&)
+                        -> Runtime::JobResultEnvelope
                     {
                         WorkerRuns.fetch_add(1u, std::memory_order_relaxed);
                         std::this_thread::sleep_for(kWorkerSleep);
-                        return Runtime::DerivedJobOutput{
-                            .PayloadToken = 141u,
-                            .NormalizedProgress = 1.0f,
-                            .ProgressDeterminate = true,
-                            .Diagnostic = "slow probe complete",
-                        };
+                        return Runtime::JobResultEnvelope::Make<std::uint64_t>(
+                            141u);
                     },
-                .ApplyOnMainThread =
-                    [this](Runtime::DerivedJobApplyContext& context)
-                        -> Core::Result
+                .PublishCompletion =
+                    [this](Runtime::KernelEventBus&,
+                           const Runtime::JobResultEnvelope& result) -> bool
                     {
-                        EXPECT_EQ(context.Output.PayloadToken, 141u);
+                        const std::uint64_t* payload =
+                            result.TryGet<std::uint64_t>();
+                        EXPECT_NE(payload, nullptr);
+                        if (payload == nullptr)
+                            return false;
+                        EXPECT_EQ(*payload, 141u);
                         ApplyRuns.fetch_add(1u, std::memory_order_relaxed);
-                        return Core::Ok();
+                        return true;
                     },
             };
             Handle = Jobs->Submit(std::move(desc));
@@ -174,7 +171,7 @@ namespace
                 }
             }
 
-            const Runtime::DerivedJobStatus status = CurrentStatus(engine);
+            const Runtime::JobState status = CurrentStatus();
             const bool workerRunning = IsWorkerRunningStatus(status);
             if (workerRunning)
             {
@@ -194,8 +191,8 @@ namespace
 
         void Shutdown() override {}
 
-        Runtime::DerivedJobHandle Handle{};
-        Runtime::DerivedJobRegistry* Jobs{};
+        Runtime::JobToken Handle{};
+        Runtime::JobService* Jobs{};
         std::atomic<std::uint32_t> WorkerRuns{0u};
         std::atomic<std::uint32_t> ApplyRuns{0u};
         std::uint32_t VariableTicks{0u};
@@ -203,21 +200,11 @@ namespace
         bool ObservedRenderAdvanceWhileWorkerRunning{false};
 
     private:
-        [[nodiscard]] Runtime::DerivedJobStatus CurrentStatus(
-            Engine&) const
+        [[nodiscard]] Runtime::JobState CurrentStatus() const
         {
             if (Jobs == nullptr)
-                return Runtime::DerivedJobStatus::Cancelled;
-            const Runtime::DerivedJobQueueSnapshot snapshot =
-                Jobs->SnapshotAll();
-            for (const Runtime::DerivedJobSnapshot& entry : snapshot.Entries)
-            {
-                if (entry.Handle == Handle)
-                {
-                    return entry.Status;
-                }
-            }
-            return Runtime::DerivedJobStatus::Cancelled;
+                return Runtime::JobState::Invalid;
+            return Jobs->GetState(Handle);
         }
 
         bool PreviousTickEnteredRenderWithRunningJob{false};
@@ -607,10 +594,10 @@ TEST(ImGuiAdapterEngineWiring, FramePacingDiagnosticsPopulateOnNullBackend)
 }
 
 TEST(ImGuiAdapterEngineWiring,
-     EditorCallbackStaysBoundedAndRenderAdvancesWhileDerivedJobRuns)
+     EditorCallbackStaysBoundedAndRenderAdvancesWhileJobRuns)
 {
-    auto app = std::make_unique<SlowDerivedJobApplication>();
-    SlowDerivedJobApplication* appPtr = app.get();
+    auto app = std::make_unique<SlowJobApplication>();
+    SlowJobApplication* appPtr = app.get();
     Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(app));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Runtime::EditorUiModule>();
@@ -655,9 +642,7 @@ TEST(ImGuiAdapterEngineWiring,
     engine.Run();
 
     ASSERT_NE(appPtr->Jobs, nullptr);
-    const Runtime::DerivedJobQueueSnapshot jobs = appPtr->Jobs->SnapshotAll();
-    ASSERT_EQ(jobs.Entries.size(), 1u);
-    EXPECT_EQ(jobs.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    EXPECT_TRUE(appPtr->Handle.IsValid());
     EXPECT_EQ(appPtr->WorkerRuns.load(std::memory_order_relaxed), 1u);
     EXPECT_EQ(appPtr->ApplyRuns.load(std::memory_order_relaxed), 1u);
     EXPECT_GT(appPtr->VariableTicks, 1u);

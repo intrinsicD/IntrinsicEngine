@@ -109,10 +109,6 @@ CPU_SOURCE_OWNERS = {
         "RuntimeGraphicsCpuTestObjs",
         "IntrinsicRuntimeGraphicsCpuTests",
     ),
-    "Test.RuntimeStreamingExecutor.cpp": (
-        "RuntimeIntegrationCpuTestObjs",
-        "IntrinsicRuntimeIntegrationTests",
-    ),
 }
 CPU_RECLASSIFIED_SOURCES = frozenset(CPU_SOURCE_OWNERS)
 RHI_MANAGER_SOURCES = frozenset(
@@ -190,12 +186,12 @@ AFFECTED_SHARED_SUITES = {
 AFFECTED_TARGET_CASE_COUNTS = {
     "IntrinsicGraphicsIntegrationCpuTests": 74,
     "IntrinsicGraphicsUnitTests": 20,
-    "IntrinsicRuntimeContractTests": 28,
+    "IntrinsicRuntimeContractTests": 34,
     "IntrinsicRuntimeGpuReadbackSmokeTests": 1,
     "IntrinsicRuntimeGraphicsCpuTests": 9,
-    "IntrinsicRuntimeIntegrationTests": 105,
+    "IntrinsicRuntimeIntegrationTests": 83,
 }
-EXPECTED_AFFECTED_CASE_COUNT = 237
+EXPECTED_AFFECTED_CASE_COUNT = 221
 
 AggregatePredicate = Callable[[frozenset[str]], bool]
 

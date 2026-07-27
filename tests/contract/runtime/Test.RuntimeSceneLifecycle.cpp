@@ -13,7 +13,6 @@
 
 #include "RuntimeTestModule.hpp"
 
-import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
@@ -27,7 +26,6 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.AssetWorkflowModule;
-import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.JobService;
@@ -38,7 +36,6 @@ import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 
@@ -51,44 +48,39 @@ namespace Sel = Extrinsic::ECS::Components::Selection;
 
 namespace
 {
-    class DerivedJobFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
+    class JobFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
         void Resolve() override
         {
             auto& engine = Kernel();
-            Jobs         = engine.Services().Find<Runtime::DerivedJobRegistry>();
+            Jobs = engine.Services().Find<Runtime::JobService>();
             ASSERT_NE(Jobs, nullptr);
 
-            Runtime::DerivedJobDesc desc{
-                .Key = Runtime::DerivedJobKey{
-                    .EntityId = 77u,
-                    .Domain = Runtime::DerivedJobScope::PointCloudPoint,
-                    .OutputSemantic = Runtime::ProgressiveSlotSemantic::PointColor,
-                    .OutputName = "engine_frame_probe",
-                },
-                .Name = "Engine.Frame.DerivedJob",
-                .Kind = Runtime::RuntimeTaskKinds::GeometryProcess,
-                .Priority = Core::Dag::TaskPriority::Normal,
+            Runtime::JobDesc desc{
+                .DebugName = "Engine.Frame.JobService",
                 .Scope = engine.ActiveWorld(),
-                .Execute =
-                    [this]() -> Runtime::DerivedJobWorkerResult
+                .Kind = Runtime::RuntimeTaskKinds::GeometryProcess,
+                .Work =
+                    [this](const Runtime::JobCancellation&)
+                        -> Runtime::JobResultEnvelope
                     {
                         WorkerRuns.fetch_add(1u, std::memory_order_relaxed);
-                        return Runtime::DerivedJobOutput{
-                            .PayloadToken = 42u,
-                            .NormalizedProgress = 1.0f,
-                            .ProgressDeterminate = true,
-                            .Diagnostic = "ready",
-                        };
+                        return Runtime::JobResultEnvelope::Make<std::uint64_t>(
+                            42u);
                     },
-                .ApplyOnMainThread =
-                    [this](Runtime::DerivedJobApplyContext& context)
-                        -> Core::Result
+                .PublishCompletion =
+                    [this](Runtime::KernelEventBus&,
+                           const Runtime::JobResultEnvelope& result) -> bool
                     {
-                        EXPECT_EQ(context.Output.PayloadToken, 42u);
+                        const std::uint64_t* payload =
+                            result.TryGet<std::uint64_t>();
+                        EXPECT_NE(payload, nullptr);
+                        if (payload == nullptr)
+                            return false;
+                        EXPECT_EQ(*payload, 42u);
                         ApplyRuns.fetch_add(1u, std::memory_order_relaxed);
-                        return Core::Ok();
+                        return true;
                     },
             };
             Handle = Jobs->Submit(std::move(desc));
@@ -105,8 +97,8 @@ namespace
 
         void Shutdown() override {}
 
-        Runtime::DerivedJobHandle Handle{};
-        Runtime::DerivedJobRegistry* Jobs{};
+        Runtime::JobToken Handle{};
+        Runtime::JobService* Jobs{};
         std::atomic<std::uint32_t> WorkerRuns{0u};
         std::atomic<std::uint32_t> ApplyRuns{0u};
         std::uint32_t Frames{0u};
@@ -274,10 +266,10 @@ namespace
     }
 }
 
-TEST(RuntimeDerivedJobEngineWiring, RunFrameAppliesSubmittedDerivedJob)
+TEST(RuntimeJobServiceEngineWiring, RunFrameAppliesSubmittedJob)
 {
-    auto application = std::make_unique<DerivedJobFrameApplication>();
-    DerivedJobFrameApplication* app = application.get();
+    auto application = std::make_unique<JobFrameApplication>();
+    JobFrameApplication* app = application.get();
     Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(application));
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.Initialize();
@@ -289,12 +281,9 @@ TEST(RuntimeDerivedJobEngineWiring, RunFrameAppliesSubmittedDerivedJob)
     engine.Run();
 
     ASSERT_NE(app->Jobs, nullptr);
-    const Runtime::DerivedJobQueueSnapshot snapshot = app->Jobs->SnapshotAll();
-    ASSERT_EQ(snapshot.Entries.size(), 1u);
-    EXPECT_EQ(snapshot.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
     EXPECT_EQ(app->WorkerRuns.load(std::memory_order_relaxed), 1u);
     EXPECT_EQ(app->ApplyRuns.load(std::memory_order_relaxed), 1u);
-    EXPECT_GT(snapshot.Diagnostics.ApplyMainThreadCalls, 0u);
+    EXPECT_GT(app->Jobs->Stats().CompletionDrains, 0u);
 
     engine.Shutdown();
 }
@@ -381,9 +370,8 @@ TEST(RuntimeSceneLifecycle, EngineRunsWithoutOptionalAsyncWorkModule)
     Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(application));
     engine.Initialize();
 
-    EXPECT_EQ(engine.Services().Find<Runtime::StreamingExecutor>(), nullptr);
-    EXPECT_EQ(engine.Services().Find<Runtime::DerivedJobRegistry>(), nullptr);
-    EXPECT_EQ(engine.Services().Find<Core::IStreamingFrameHooks>(), nullptr);
+    EXPECT_EQ(engine.Services().Find<Runtime::JobService>(), nullptr);
+    EXPECT_NE(&engine.Jobs(), nullptr);
 
     engine.Run();
     EXPECT_TRUE(app->ConditionSatisfied());

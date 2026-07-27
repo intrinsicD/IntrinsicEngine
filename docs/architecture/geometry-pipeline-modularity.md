@@ -154,16 +154,16 @@ family*, not a universal DAG engine.
 | Reused kernels (no new math) | **geometry** | `Geometry.Robust`, `Geometry.KDTree`, `Geometry.RotationAveraging`, `Geometry.PointCloud.Features`, `Geometry.MeshClosestFace`, `Geometry.Rotation`, `Geometry.Sparse`/`Geometry.Linalg` |
 | Data-driven **param schema** (key/type/default/label/range) | **geometry-local** initially; promote to `core` on a second consumer | new `Geometry.Registration` descriptor types |
 | GPU-capable overloads + `IDevice::IsOperational()` fallback | **runtime** | `Runtime.RegistrationBackend` (mirrors `Runtime.KMeansBackend`) |
-| Heavy/async execution (large clouds, coarse RANSAC, BVH builds) | **runtime** | `Runtime.DerivedJobGraph` (do not invent a fourth graph system) |
+| Heavy/async execution (large clouds, coarse RANSAC, BVH builds) | **runtime** | `Runtime.JobService` (do not invent another graph system) |
 | Runtime panel model + typed command facade | **runtime** | `Extrinsic.Runtime.SandboxEditorFacades`; split focused private implementation units as families grow |
 | UI (thin schema-reflecting adapter) | **app** | `Extrinsic.Sandbox.Editor.MeshProcessingPanels`, registered through `Extrinsic.Sandbox.Editor.Shell` |
 | Serializable pipeline config (files/CLI/agent lane) | **runtime** | route through the `Engine` preview→apply facade with `RuntimeConfigControlSource` |
 | Named papers (TEASER, FGR, CPD, non-rigid) | **methods** | `methods/geometry/…` + `method.yaml`, under the method contract |
 
 `Geometry.MeshOperator` stays a shared *result* record — do not overload it into
-a base class. `DerivedJobGraph` is the *execution* substrate, not the composition
-contract: the pipeline driver is a plain geometry function; runtime *wraps* a
-heavy invocation in a `DerivedJob` when async is needed.
+a base class. `JobService` is the *execution* substrate, not the composition
+contract: the pipeline driver is a plain geometry function; runtime wraps a
+heavy invocation in a `JobDesc` when async is needed.
 
 ### 3.3 The Stage contract — choose the mechanism per axis
 
@@ -497,8 +497,9 @@ is allocated per slice (the `GRAPHICS-072/073/074` series pattern).
    `ActualBackend`/`FellBackToCPU` commits to the Algorithm-Variant-Dispatch
    contract: every result reports the backend that actually ran; a GPU request
    resolving to CPU is valid only when telemetry says so (KMeans precedent). The
-   `DerivedJobRegistry` GPU domain is declared-but-not-operational, so a GPU
-   *async* job is blocked until that infra lands; the CPU async path works today.
+   `JobService` exposes an explicit `GpuQueue` target, but an async GPU algorithm
+   still needs a concrete registered GPU participant/backend; the CPU async path
+   works independently today.
 6. **Method-contract boundary.** The moment TEASER/FGR/CPD/symmetric-P2Plane/
    non-rigid are implemented, `AGENTS.md` §6 and the method workflow bind them
    (CPU reference first → tests → benchmark manifest → parity → limitations doc).

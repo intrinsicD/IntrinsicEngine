@@ -1725,7 +1725,7 @@ Concretely:
   graphics-side UV generation or new shading features. `RecreateHtex` is an
   explicit user-driven request
   scheduled by runtime/geometry on a background task through
-  `Extrinsic.Runtime.StreamingExecutor` (async visualization baking remains
+  `Extrinsic.Runtime.JobService` (async visualization baking remains
   CPU/runtime-only). Graphics increments
   `VisualizationDiagnostics::HtexRecreateRequestCount` and accepts the
   descriptor without owning the Htex regeneration algorithm; once regeneration
@@ -1904,7 +1904,7 @@ Concretely:
   `Extrinsic.Runtime.AssetBridges.Texture` subscribe to texture-typed
   `AssetEvent::Ready`, build `GpuTextureRequest`, and call
   `cache.RequestUpload(req)` synchronously; heavy CPU decoding may be
-  queued through `Extrinsic.Runtime.StreamingExecutor`; graphics never
+  queued through `Extrinsic.Runtime.JobService`; graphics never
   imports `AssetService`/`AssetEventBus` and never schedules CPU work).
   If `InitializeFallbackTexture()` fails, `FallbackTextureReady = false`
   and `GetViewOrFallback()` returns `GpuAssetFallbackReason::Unavailable`,

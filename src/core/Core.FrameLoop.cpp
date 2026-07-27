@@ -47,16 +47,10 @@ namespace Extrinsic::Core
 
     void ExecuteMaintenanceContract(
         ITransferFrameHooks& transfer,
-        IStreamingFrameHooks& streaming,
-        IAssetFrameHooks& assets,
-        std::uint32_t maxStreamingLaunches)
+        IAssetFrameHooks& assets)
     {
         transfer.CollectCompletedTransfers();
-        streaming.DrainCompletions();
-        streaming.ApplyMainThreadResults();
         assets.TickAssets();
-        streaming.SubmitFrameWork();
-        streaming.PumpBackground(maxStreamingLaunches);
     }
 
     bool ExecuteOperationalTransitionContract(IOperationalTransitionHooks& hooks)
@@ -78,10 +72,8 @@ namespace Extrinsic::Core
 
     void ExecuteShutdownContract(IShutdownHooks& hooks)
     {
-        hooks.ShutdownStreaming();
+        hooks.ShutdownRuntimeModules();
         hooks.DestroyScene();
-        hooks.DestroyAssets();
-        hooks.DestroyStreamingState();
         hooks.DestroyFrameGraph();
         hooks.ShutdownRenderer();
         hooks.ShutdownDevice();

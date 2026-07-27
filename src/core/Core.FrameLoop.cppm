@@ -75,22 +75,9 @@ namespace Extrinsic::Core
         virtual void TickAssets() = 0;
     };
 
-    export class IStreamingFrameHooks
-    {
-    public:
-        virtual ~IStreamingFrameHooks() = default;
-
-        virtual void DrainCompletions() = 0;
-        virtual void ApplyMainThreadResults() = 0;
-        virtual void SubmitFrameWork() = 0;
-        virtual void PumpBackground(std::uint32_t maxLaunches) = 0;
-    };
-
     export void ExecuteMaintenanceContract(
         ITransferFrameHooks& transfer,
-        IStreamingFrameHooks& streaming,
-        IAssetFrameHooks& assets,
-        std::uint32_t maxStreamingLaunches);
+        IAssetFrameHooks& assets);
 
     export class IOperationalTransitionHooks
     {
@@ -112,10 +99,8 @@ namespace Extrinsic::Core
     public:
         virtual ~IShutdownHooks() = default;
 
-        virtual void ShutdownStreaming() = 0;
+        virtual void ShutdownRuntimeModules() = 0;
         virtual void DestroyScene() = 0;
-        virtual void DestroyAssets() = 0;
-        virtual void DestroyStreamingState() = 0;
         virtual void DestroyFrameGraph() = 0;
         virtual void ShutdownRenderer() = 0;
         virtual void ShutdownDevice() = 0;

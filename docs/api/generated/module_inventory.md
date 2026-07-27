@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 80 |
+| `runtime` | 78 |
 
 ## Modules
 
@@ -356,7 +356,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.AsyncBufferReadback` | `src/runtime/Runtime.AsyncBufferReadback.cppm` | `runtime` |
 | `Extrinsic.Runtime.AsyncWorkModule` | `src/runtime/Runtime.AsyncWorkModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.CommandBus` | `src/runtime/Runtime.CommandBus.cppm` | `runtime` |
-| `Extrinsic.Runtime.DerivedJobGraph` | `src/runtime/Runtime.DerivedJobGraph.cppm` | `runtime` |
 | `Extrinsic.Runtime.DeviceBootstrap` | `src/runtime/Runtime.DeviceBootstrap.cppm` | `runtime` |
 | `Extrinsic.Runtime.EcsSystemBundle` | `src/runtime/Runtime.EcsSystemBundle.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorCommandHistory` | `src/runtime/Runtime.EditorCommandHistory.cppm` | `runtime` |
@@ -404,7 +403,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SelectionReadback` | `src/runtime/Runtime.SelectionReadback.cppm` | `runtime` |
 | `Extrinsic.Runtime.ServiceRegistry` | `src/runtime/Runtime.ServiceRegistry.cppm` | `runtime` |
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Runtime.StableEntityLookup.cppm` | `runtime` |
-| `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 | `Extrinsic.Runtime.TextureBakeModule` | `src/runtime/Runtime.TextureBakeModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexAttributeBinding` | `src/runtime/Runtime.VertexAttributeBinding.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexChannelBindings` | `src/runtime/Runtime.VertexChannelBindings.cppm` | `runtime` |
@@ -415,4 +413,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SceneInteractionModule` | `src/runtime/Scene/Runtime.SceneInteractionModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **388**
+Total modules: **386**

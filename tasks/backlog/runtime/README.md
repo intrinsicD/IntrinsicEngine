@@ -32,6 +32,12 @@ cleanup slice:
 - [`RUNTIME-193` — General geometry-presentation recipe](RUNTIME-193-general-geometry-presentation-recipe.md)
   replaces the generally used progressive-named presentation modules with one
   desired-state recipe plus copied operational snapshot.
+- [`RUNTIME-194` — Consolidate runtime work execution](../../done/RUNTIME-194-consolidate-runtime-work-execution.md)
+  is retired: the kernel-owned `JobService` is the single runtime work
+  lifecycle, `AsyncWorkModule` only publishes/withdraws that borrowed service
+  and cancels shutdown survivors, and the duplicate streaming/derived-job
+  systems are deleted. It supplies the execution prerequisite for the
+  remaining consolidation tasks below.
 - [`RUNTIME-195` — Unified GPU-result readback](RUNTIME-195-unified-gpu-result-readback.md)
   integrates one multi-range transfer wait with `JobService` and retires
   `AsyncBufferReadback`, `GpuReadbackJob`, and blocking compute-result reads.
@@ -145,9 +151,12 @@ input interlock, plus render-extraction cache ownership, render-world pool
 state, last extraction stats, frame-index ownership, GPU asset cache ownership,
 asset-event listener wiring, model texture/model scene handoff ownership,
 pending material-binding re-resolution, and asset-residency teardown ordering,
-plus persistent `StreamingExecutor` / `DerivedJobRegistry` ownership,
-maintenance drains, shutdown reset, and derived-job facade delegation now live
-outside `Runtime.Engine.cpp`.
+were moved behind dedicated subsystem owners rather than public Engine facades.
+Retired `RUNTIME-194` supersedes the former async-work endpoint: the one
+kernel-owned `JobService` remains physically in `Runtime.Engine.cpp`, Engine
+performs its bounded completion drain, `AsyncWorkModule` owns only optional
+publication/cancellation lifecycle, and the duplicate `StreamingExecutor` /
+`DerivedJobRegistry` systems and maintenance hook are gone.
 Retired `RUNTIME-129` supplies the production Vulkan bake plan-provider wiring.
 Retired `GRAPHICS-128` supplies the nonzero shared-index-slice command
 contract; retired `RUNTIME-183` supplies the accepted app-composed
@@ -234,6 +243,10 @@ derived-job facade delegation first moved behind
 `Extrinsic.Runtime.AsyncWorkService`. Retired `RUNTIME-179` folded that interim
 service into the app-composed `AsyncWorkModule`, added world-qualified
 retirement, and removed the Engine facades.
+Retired `RUNTIME-194` then collapsed both execution systems into the
+kernel-owned `JobService`; `AsyncWorkModule` now publishes/withdraws the
+borrowed service and requests survivor cancellation without owning a worker
+system.
 
 ### ADR-0027 app-composition convergence (seeded 2026-07-18)
 
@@ -245,8 +258,11 @@ consumer or disappear. Extension-pass registration, a priority input chain,
 `InlineModule`, and `WorldSwitchModule` are deferred behind named real-consumer
 triggers. The implementation graph is:
 
-- Retired `RUNTIME-179` composes the global streaming/derived-job owner and
-  removes its Engine facades.
+- Retired `RUNTIME-179` was the intermediate app-composed
+  streaming/derived-job owner and removed its Engine facades. Retired
+  `RUNTIME-194` subsequently deleted both systems, retained one kernel-owned
+  `JobService`, and reduced `AsyncWorkModule` to optional service publication
+  and shutdown cancellation.
 - Retired `RUNTIME-180` — compose global
   viewport/controller state with world-qualified targets and move initial
   reference content to app bootstrap.
@@ -366,10 +382,12 @@ transitive kernel-convergence prerequisite is therefore satisfied.
   behavior when the optional module is omitted. Engine has no control facade,
   registry, or accessor.
 - [`RUNTIME-179` — Extract the async-work composition module](../../done/RUNTIME-179-extract-async-work-module.md)
-  (done, 2026-07-19, `Operational`): one app-composed `AsyncWorkModule` owns
-  streaming/derived work, maintenance, shutdown drain, world-retirement
-  cancellation, and stale-commit rejection. Engine retains only the optional
-  domain-free maintenance-hook lookup.
+  (done, 2026-07-19, `Operational`; historical intermediate): one app-composed
+  `AsyncWorkModule` owned streaming/derived work, maintenance, shutdown drain,
+  world-retirement cancellation, and stale-commit rejection. Retired
+  `RUNTIME-194` supersedes that shape: both worker systems and the optional
+  maintenance hook are deleted, Engine retains one kernel `JobService`, and
+  the module only publishes/withdraws it and cancels shutdown survivors.
 - [RUNTIME-165 — Extract async work service out of Engine](../../archive/RUNTIME-165-extract-async-work-service.md)
   (done, 2026-07-09, `Operational`): persistent `StreamingExecutor` /
   `DerivedJobRegistry` ownership, maintenance-lane completion/readback drains,

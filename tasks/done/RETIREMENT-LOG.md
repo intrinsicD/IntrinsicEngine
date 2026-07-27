@@ -8,6 +8,23 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-194`](RUNTIME-194-consolidate-runtime-work-execution.md) — duplicate
+runtime work execution retired on 2026-07-27 at `Retired`. The kernel-owned
+`JobService` is now the single submission, dependency, cancellation, progress,
+readiness, and bounded main-thread publication surface. Engine drains at most
+eight completions before event pump B; app-composed `AsyncWorkModule` publishes
+and withdraws that borrowed service and cancels shutdown survivors. The
+`StreamingExecutor`, `DerivedJobGraph` / `DerivedJobRegistry`, their dedicated
+tests and CMake entries, `Core::IStreamingFrameHooks`, and empty shutdown
+facades are removed; local path-preserving quarantine copies remain under
+gitignored `experimental/to_delete/`. Focused JobService/AsyncWork coverage
+passed 56/56, the slow non-blocking frame test passed, all four AsyncWork tests
+survived 50 repetitions each, and the default CPU-supported selector passed
+4231/4231 with one expected headless GLFW skip. Strict layering, test-layout,
+root-hygiene, task-policy, ARA, doc-link, module-inventory, and test-routing
+checks passed. No Slice C GPU/Vulkan selector was run, so this retirement makes
+no new Vulkan-execution claim; `RUNTIME-195` retains that separate follow-up.
+
 [`RUNTIME-192`](RUNTIME-192-canonical-geometry-property-reference-and-catalog.md) —
 the canonical geometry-property reference and catalog retired on 2026-07-26 at
 `Retired`. Runtime had four vocabularies for naming the same thing:

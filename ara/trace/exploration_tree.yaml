@@ -6608,3 +6608,34 @@ tree:
       - "git push origin main advanced 95897f6c to 9d7638ab"
       - "post-push main...origin/main returned 0 0"
     status: resolved
+  - id: N279
+    type: experiment
+    title: "Retire duplicate runtime work-execution systems"
+    provenance: ai-executed
+    timestamp: "2026-07-27T21:10+02:00"
+    also_depends_on: [N277]
+    evidence:
+      - "tasks/done/RUNTIME-194-consolidate-runtime-work-execution.md"
+      - "src/runtime/Runtime.JobService.cppm"
+      - "src/runtime/Runtime.AsyncWorkModule.cpp"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "tests/contract/runtime/Test.RuntimeJobService.cpp"
+      - "tests/contract/runtime/Test.AsyncWorkModule.cpp"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "tests/contract/runtime/Test.ImGuiAdapterEngineWiring.cpp"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicCpuTests"
+    result: >
+      All production work lanes and shutdown ownership use JobService. Engine
+      performs one completion drain capped at eight publications per frame,
+      AsyncWorkModule publishes the borrowed kernel service and cancels
+      survivors on shutdown, and the two superseded module pairs plus their
+      dedicated tests are removed from source and CMake. Focused coverage
+      passed 56/56, the slow non-blocking frame test passed, all four AsyncWork
+      tests survived 50 repetitions each, and the default CPU-supported gate
+      passed 4,231/4,231 with one expected headless GLFW skip. Strict layering,
+      test-layout, root-hygiene, task-policy, ARA, docs-link, routing, and module
+      inventory checks passed. No GPU/Vulkan selector was run for Slice C.
+    status: resolved

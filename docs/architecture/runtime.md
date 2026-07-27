@@ -185,22 +185,20 @@ injection, while the queue class is private implementation glue attached to that
 module. Its Sandbox-owned `JobService` `GpuQueue` participant still records and
 drains Vulkan K-Means work inside the normal renderer frame context.
 
-`Extrinsic.Runtime.AsyncWorkModule` is the global app-composed owner for the
-persistent `StreamingExecutor` and `DerivedJobRegistry`. Sandbox explicitly
-composes it; Engine never imports or names the concrete module. Registration
-runs after the boot world exists and before asset/document dependencies borrow
-the module's `StreamingExecutor` and `DerivedJobRegistry` services. The module
-also provides the existing domain-free `Core::IStreamingFrameHooks` capability,
-which lets Engine preserve the core Maintenance contract's exact transfer
-collect → async drain/apply → asset tick → async submit/pump order without a
-module-specific branch or forwarding object. The capability is optional: an
-application that omits the module still performs transfer collection followed
-by the asset tick.
+`Extrinsic.Runtime.AsyncWorkModule` is the app-composed lifecycle owner for the
+kernel's single persistent `JobService`. Sandbox explicitly composes it; Engine
+never imports or names the concrete module. Registration publishes the exact
+borrowed kernel service before asset/document dependencies resolve it, and
+shutdown withdraws that registration and cancels every surviving job. Engine
+drains at most eight completed jobs before the second event pump, so completion
+application is deterministic and bounded without a parallel frame-hook path.
+An application that omits the module retains the kernel service for direct
+Engine use but publishes no app-registry job capability.
 
 `Extrinsic.Runtime.SceneDocumentModule` is the optional app-composed document
 owner. Registration binds the exact active `{WorldHandle, Registry*}` and
 publishes the concrete module plus its exact owned `EditorCommandHistory`;
-resolution optionally discovers `StreamingExecutor`. Document path, last file
+resolution optionally discovers `JobService`. Document path, last file
 event and sequence, history, and queued-operation handles belong to one binding
 epoch. A direct active-handle or registry mismatch advances the epoch, cancels
 owned tasks, and resets that complete durable state before rebinding. There is
@@ -355,7 +353,7 @@ It is intentionally not exported as public runtime API.
 
 Dropped asset imports, Sandbox editor model-scene/texture import commands, and
 Sandbox editor scene-file save/open commands use the persistent runtime
-`StreamingExecutor` instead of doing file IO or decode/parse/serialize work
+`JobService` instead of doing file IO or decode/parse/serialize work
 directly from the platform-event or ImGui-callback phase. Geometry,
 model-scene, and texture drops plus queued editor model/texture imports create
 ingest records and route diagnostics on the frame thread, run file read/decode
@@ -383,7 +381,7 @@ before creating any scene entities.
 After a geometry payload creates an entity, runtime invokes ordered
 import-authoring policies, populates the decoded geometry, then invokes ordered
 post-import processors with the decoded payload context. Processors may enqueue
-deferred work through `StreamingExecutor`, but the main-thread apply boundary
+deferred work through `JobService`, but the main-thread apply boundary
 remains the only place that mutates imported ECS or asset state. Once the import
 is materialized, ordered import-completed handlers receive the created entity
 span plus an optional focus target. Sandbox/default composition installs the
@@ -522,27 +520,21 @@ still live. A retired original world is a safe no-op; the active replacement
 world is never used as a substitute. Generic Engine neither interprets this
 config section nor owns reference population/seed state.
 
-The global `AsyncWorkModule` reacts to `WorldWillBeDestroyed` at the next
-main-thread event pump. Every production streaming/derived descriptor carries
-the actual owning `WorldHandle`; the module first cancels matching derived
-records and then retires the same generation-qualified scope in the executor.
-Retirement cancels queued, running, readback-waiting, and apply-ready records,
-rejects later submissions to that retired handle, and is checked again
-immediately before a main-thread apply callback is removed from the queue.
-Workers retain only copied task inputs plus the handle value and never borrow
-`WorldRegistry` or an ECS registry. Reinitializing the module creates a fresh
-executor lifetime and clears the retired-scope set; recycling a world index
-with a newer generation never inherits retirement state.
+`WorldRegistry` publishes `WorldWillBeDestroyed` and then asks the kernel
+`JobService` to cancel every job scoped to that exact generation-qualified
+`WorldHandle`. Queued, running, readiness-gated, and apply-ready records all
+converge on the same terminal cancellation path. Workers retain only copied
+task inputs plus handle values and never borrow `WorldRegistry` or an ECS
+registry.
 
-Normal apply remains suppressed for every cancelled task. A descriptor whose
-consumer owns separate visible control state may opt into
-`FinalizeCancellationOnMainThread`; the executor queues that callback exactly
-once, drains it outside the executor lock before normal bounded applies, and
-does not charge it to the result-apply budget. Asset ingest uses the callback
-only to transition its queue record to `Cancelled` and publish the terminal
-`RuntimeAssetImportEvent`; scene IO uses it only to publish a terminal failure
-event. Neither callback owns decoded payload commit or borrows the retiring
-world.
+Normal apply remains suppressed for every cancelled or stale task. A descriptor
+whose consumer owns separate visible control state may provide
+`FinalizeUnpublishedOnMainThread`; `JobService` invokes it exactly once outside
+the service lock when cancellation, dependency cancellation, or stale-result
+discard prevents publication. Asset ingest uses the finalizer only to reconcile
+its queue record and publish the terminal event; scene IO uses it only to
+publish terminal failure state. Neither finalizer owns decoded payload commit
+or borrows the retiring world.
 
 Active-world asset-import and scene-document operations additionally capture
 the submission `{WorldHandle, Scene::Registry*}` pair on the main thread.
@@ -557,9 +549,8 @@ without retirement therefore suppresses the stale scene callback; decoded work
 cannot be redirected into the new active scene or mutate its path, event, or
 history. No callback captures `this` or a raw document-state pointer.
 
-Derived-job cancellation is terminal and authoritative. If a running worker
-returns an error after cancellation, neither worker-result bookkeeping nor the
-main-thread apply path may replace `Cancelled` with `Failed` or `Complete`.
+Job cancellation is terminal and authoritative. A worker result that arrives
+after cancellation cannot publish or replace the terminal `Cancelled` state.
 
 ### Camera focus command
 

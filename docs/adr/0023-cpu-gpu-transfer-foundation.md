@@ -11,6 +11,15 @@
   with explicit dependencies + follow-up scheduling, done), and GRAPHICS-084
   (visualization property-buffer residency + dimension-match validation, done).
 
+## Implementation amendment: RUNTIME-194
+
+The `StreamingExecutor` / `DerivedJobRegistry` scheduling references below are
+historical descriptions of the spine available when this ADR was written.
+`RUNTIME-194` retired both surfaces after migrating their production workflows;
+`Runtime.JobService` now owns deferred execution, dependency chains, readiness
+gates, cancellation, progress, and bounded main-thread publication. The RHI and
+renderer transfer ownership decisions in this ADR are unchanged.
+
 ## Context
 
 The goal is a CPU↔GPU data-transfer foundation that is **asynchronous in both

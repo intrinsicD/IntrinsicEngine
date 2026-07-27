@@ -133,7 +133,7 @@ Bridges:
 3. Construct a `GpuTextureRequest`.
 4. Call `cache.RequestUpload(req)` **synchronously** from the asset-event handler thread.
 
-Heavy CPU decoding may be queued through `Extrinsic.Runtime.StreamingExecutor`, but the final `RequestUpload` call is always synchronous from runtime, and graphics never imports `AssetService` or `AssetEventBus`.
+Heavy CPU decoding may be queued through `Extrinsic.Runtime.JobService`, but the final `RequestUpload` call is always synchronous from runtime, and graphics never imports `AssetService` or `AssetEventBus`.
 
 `AssetEvent::Destroyed` flows to `cache.NotifyDestroyed(id)` which queues live leases for retirement. Graphics never schedules CPU work, never reads priority data, and never owns asset event subscription.
 

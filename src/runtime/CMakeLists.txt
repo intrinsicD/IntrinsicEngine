@@ -19,7 +19,6 @@ target_sources(${target_name}
         Runtime.AssetModelTextureHandoff.cppm
         Runtime.AssetModelTextureIO.cppm
         Runtime.CommandBus.cppm
-        Runtime.DerivedJobGraph.cppm
         Runtime.DeviceBootstrap.cppm
         Runtime.JobService.cppm
         Runtime.JobServiceGpuQueueBridge.cppm
@@ -82,7 +81,6 @@ target_sources(${target_name}
         Runtime.SelectionReadback.cppm
         Runtime.SelectionController.cppm
         Runtime.StableEntityLookup.cppm
-        Runtime.StreamingExecutor.cppm
         Runtime.TextureBakeModule.cppm
         Runtime.VertexAttributeBinding.cppm
         Runtime.VertexChannelBindings.cppm
@@ -103,7 +101,6 @@ target_sources(${target_name}
         Runtime.AssetModelTextureHandoff.cpp
         Runtime.AssetModelTextureIO.cpp
         Runtime.CommandBus.cpp
-        Runtime.DerivedJobGraph.cpp
         Runtime.DeviceBootstrap.cpp
         Runtime.JobService.cpp
         Runtime.JobServiceGpuQueueBridge.cpp
@@ -172,7 +169,6 @@ target_sources(${target_name}
         Runtime.SelectionReadback.cpp
         Runtime.SelectionController.cpp
         Runtime.StableEntityLookup.cpp
-        Runtime.StreamingExecutor.cpp
         Runtime.TextureBakeModule.cpp
         Runtime.VertexAttributeBinding.cpp
         Runtime.VertexChannelStreams.cpp

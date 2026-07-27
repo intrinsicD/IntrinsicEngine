@@ -420,7 +420,10 @@ TEST(RuntimeModule, EnginePublishesOnlyConsumedBuiltInServices)
     EXPECT_EQ(engine.Services().Find<Runtime::CommandBus>(), nullptr);
     EXPECT_EQ(engine.Services().Find<Runtime::KernelEventBus>(), nullptr);
     EXPECT_EQ(engine.Services().Find<Runtime::WorldRegistry>(), nullptr);
-    EXPECT_EQ(engine.Services().Find<Runtime::JobService>(), &engine.Jobs());
+    // The kernel retains JobService, but only AsyncWorkModule publishes it for
+    // app-composed consumers. This no-module engine must expose no borrowed
+    // registry entry.
+    EXPECT_EQ(engine.Services().Find<Runtime::JobService>(), nullptr);
     EXPECT_EQ(engine.Services().Find<RHI::IDevice>(), &engine.GetDevice());
     EXPECT_NE(engine.Services().Find<Runtime::RenderExtractionCache>(), nullptr);
 

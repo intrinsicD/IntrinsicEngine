@@ -100,29 +100,6 @@ namespace
         Trace& m_Trace;
     };
 
-    class FakeStreamingHooks final : public Extrinsic::Core::IStreamingFrameHooks
-    {
-    public:
-        explicit FakeStreamingHooks(Trace& trace)
-            : m_Trace(trace)
-        {
-        }
-
-        void DrainCompletions() override { m_Trace.emplace_back("streaming:drain_completions"); }
-        void ApplyMainThreadResults() override { m_Trace.emplace_back("streaming:apply_main_thread_results"); }
-        void SubmitFrameWork() override { m_Trace.emplace_back("streaming:submit_frame_work"); }
-        void PumpBackground(std::uint32_t maxLaunches) override
-        {
-            PumpLaunches = maxLaunches;
-            m_Trace.emplace_back("streaming:pump_background");
-        }
-
-        std::uint32_t PumpLaunches{0};
-
-    private:
-        Trace& m_Trace;
-    };
-
     class FakeOperationalTransitionHooks final : public Extrinsic::Core::IOperationalTransitionHooks
     {
     public:
@@ -169,10 +146,8 @@ namespace
         {
         }
 
-        void ShutdownStreaming() override { m_Trace.emplace_back("shutdown:streaming_shutdown_and_drain"); }
+        void ShutdownRuntimeModules() override { m_Trace.emplace_back("shutdown:runtime_modules"); }
         void DestroyScene() override { m_Trace.emplace_back("shutdown:destroy_scene"); }
-        void DestroyAssets() override { m_Trace.emplace_back("shutdown:destroy_assets"); }
-        void DestroyStreamingState() override { m_Trace.emplace_back("shutdown:destroy_streaming_state"); }
         void DestroyFrameGraph() override { m_Trace.emplace_back("shutdown:destroy_frame_graph"); }
         void ShutdownRenderer() override { m_Trace.emplace_back("shutdown:renderer"); }
         void ShutdownDevice() override { m_Trace.emplace_back("shutdown:device"); }
@@ -260,23 +235,17 @@ TEST(RuntimeFrameLoopContract, RenderFrameSkipsExtractionWhenBeginFrameFails)
     EXPECT_EQ(trace, Trace{"renderer:begin_frame"});
 }
 
-TEST(RuntimeFrameLoopContract, MaintenanceOrdersTransferStreamingAssetHooks)
+TEST(RuntimeFrameLoopContract, MaintenanceOrdersTransferBeforeAssetHooks)
 {
     Trace trace;
     FakeTransferHooks transfer(trace);
-    FakeStreamingHooks streaming(trace);
     FakeAssetHooks assets(trace);
 
-    Extrinsic::Core::ExecuteMaintenanceContract(transfer, streaming, assets, 8);
+    Extrinsic::Core::ExecuteMaintenanceContract(transfer, assets);
 
-    EXPECT_EQ(streaming.PumpLaunches, 8u);
     EXPECT_EQ(trace, (Trace{
                          "transfer:collect_completed",
-                         "streaming:drain_completions",
-                         "streaming:apply_main_thread_results",
                          "assets:tick",
-                         "streaming:submit_frame_work",
-                         "streaming:pump_background",
                      }));
 }
 
@@ -330,7 +299,7 @@ TEST(RuntimeFrameLoopContract, OperationalTransitionDoesNotMarkRendererWhenRebui
                      }));
 }
 
-TEST(RuntimeFrameLoopContract, ShutdownOrdersStreamingAndSubsystemTeardown)
+TEST(RuntimeFrameLoopContract, ShutdownOrdersRuntimeModulesAndSubsystemTeardown)
 {
     Trace trace;
     FakeShutdownHooks shutdown(trace);
@@ -338,10 +307,8 @@ TEST(RuntimeFrameLoopContract, ShutdownOrdersStreamingAndSubsystemTeardown)
     Extrinsic::Core::ExecuteShutdownContract(shutdown);
 
     EXPECT_EQ(trace, (Trace{
-                         "shutdown:streaming_shutdown_and_drain",
+                         "shutdown:runtime_modules",
                          "shutdown:destroy_scene",
-                         "shutdown:destroy_assets",
-                         "shutdown:destroy_streaming_state",
                          "shutdown:destroy_frame_graph",
                          "shutdown:renderer",
                          "shutdown:device",

@@ -178,13 +178,13 @@ snapshot carries no temporary debt.
       composes `Runtime::ClusteringModule`, and `Runtime.Engine.cppm` / `.cpp`
       contain no `KMeans` or `Runtime.ClusteringModule` tokens; the module
       object is global and its jobs/commits are qualified by `WorldHandle`)
-- [x] AsyncWork — `RUNTIME-179`; app-composed global `AsyncWorkModule` owns
-      `StreamingExecutor` plus `DerivedJobRegistry`, publishes their narrow
-      services and the existing Maintenance hook capability, and cancels
-      generation-qualified queued/running/readback/apply work on
-      `WorldWillBeDestroyed`. Engine never names the concrete module; omitted
-      composition retains transfer collection followed by the optional asset
-      hook and unconditional render-extraction geometry retirement.
+- [x] AsyncWork — `RUNTIME-179`, consolidated by `RUNTIME-194`; app-composed
+      global `AsyncWorkModule` publishes the kernel's single borrowed
+      `JobService`, withdraws it and cancels survivors during shutdown, while
+      `WorldRegistry` cancels generation-qualified jobs when a world retires.
+      Engine never names the concrete module and performs one bounded completion
+      drain per frame; omitted composition retains the kernel service but
+      publishes no app-registry job capability.
 - [x] SceneDocument — `RUNTIME-172`; app-composed `SceneDocumentModule`
       publishes its exact history and owns one validated active-world binding
       for path, file event/sequence, history, and optional queued scene IO.

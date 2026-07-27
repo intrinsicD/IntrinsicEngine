@@ -68,6 +68,11 @@ import Extrinsic.ECS.Scene.Registry;
 
 namespace Extrinsic::Runtime
 {
+    namespace
+    {
+        constexpr std::uint32_t kJobCompletionApplyBudgetPerFrame = 8u;
+    }
+
     struct Engine::Impl
     {
         explicit Impl(Core::Config::EngineConfig config)
@@ -222,9 +227,6 @@ namespace Extrinsic::Runtime
                 std::terminate();
             }
         };
-        requireProvide(m_Impl->m_ServiceRegistry.Provide<JobService>(
-                           m_Impl->m_JobService, "Engine"),
-                       "JobService");
         requireProvide(m_Impl->m_ServiceRegistry.Provide<RenderExtractionCache>(
                            m_Impl->m_RenderExtractionService.Cache(), "Engine"),
                        "RenderExtractionCache");
@@ -608,7 +610,7 @@ namespace Extrinsic::Runtime
                 , Scene(scene)
             {
             }
-            void ShutdownStreaming() override
+            void ShutdownRuntimeModules() override
             {
                 Owner.ShutdownRuntimeModules();
             }
@@ -616,11 +618,6 @@ namespace Extrinsic::Runtime
             {
                 Scene = nullptr;
                 Worlds.Clear();
-            }
-            void DestroyAssets() override {}
-            void DestroyStreamingState() override
-            {
-                // App-composed async work resets in module OnShutdown.
             }
             void DestroyFrameGraph() override { FrameGraph.reset(); }
             void ShutdownRenderer() override
@@ -778,7 +775,9 @@ namespace Extrinsic::Runtime
         // Workers deposit opaque results into JobService. The main thread
         // checks token/world cancellation here and publishes completion events
         // only for survivors, so pump B owns all completion commits.
-        (void)m_Impl->m_JobService.DrainCompletions(m_Impl->m_KernelEvents);
+        (void)m_Impl->m_JobService.DrainCompletions(
+            m_Impl->m_KernelEvents,
+            kJobCompletionApplyBudgetPerFrame);
 
         // ── Event pump B (post-sim; ARCH-008 / ADR-0024 D7) ───────────────
         // Simulation/job events reach runtime modules before UI/extraction.
@@ -967,20 +966,7 @@ namespace Extrinsic::Runtime
                               m_Impl->m_RenderExtractionService.Cache(),
                               *m_Impl->m_Renderer);
         const auto maintenanceBegin = std::chrono::steady_clock::now();
-        if (Core::IStreamingFrameHooks* streamingHooks =
-                m_Impl->m_ServiceRegistry.Find<Core::IStreamingFrameHooks>();
-            streamingHooks != nullptr)
-        {
-            Core::ExecuteMaintenanceContract(
-                transferHooks, *streamingHooks, assetHooks, 8u);
-        }
-        else
-        {
-            // Async work is app-optional. Preserve the non-async portions of
-            // the Maintenance lane without installing a fake hook provider.
-            transferHooks.CollectCompletedTransfers();
-            assetHooks.TickAssets();
-        }
+        Core::ExecuteMaintenanceContract(transferHooks, assetHooks);
         // ARCH-009 — drop terminal job records after the frame has observed
         // their completion/cancellation state. Does not wait on workers.
         (void)m_Impl->m_JobService.ReapCompleted();

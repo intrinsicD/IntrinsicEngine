@@ -23,9 +23,8 @@ import Extrinsic.Runtime.WorldHandle;
 
 namespace Extrinsic::Runtime
 {
-    // Execution-lane taxonomy. RUNTIME-194 moved this from
-    // `Runtime.StreamingExecutor` to the one surviving execution surface;
-    // `StreamingExecutor` re-exports it until that module is retired.
+    // Execution-lane taxonomy retained by the one surviving runtime execution
+    // surface after RUNTIME-194 retired the duplicate schedulers.
     export namespace RuntimeTaskKinds
     {
         inline constexpr Core::Dag::TaskKind Generic{0u};

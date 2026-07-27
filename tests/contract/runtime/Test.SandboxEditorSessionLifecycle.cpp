@@ -215,9 +215,9 @@ TEST(SandboxEditorSession, AttachPrepareDetachBoundsPreparedFrameLifetime)
         [&sawPreparedContext](Runtime::SandboxEditorPreparedFrameView frame)
         {
             sawPreparedContext = frame.Context.Scene != nullptr;
-            EXPECT_TRUE(frame.Context.JobCommands.Available());
-            EXPECT_TRUE(frame.Context.JobCommands.FindActive);
-            EXPECT_TRUE(frame.Context.JobCommands.SnapshotEntity);
+            EXPECT_FALSE(frame.Context.JobCommands.Available());
+            EXPECT_FALSE(frame.Context.JobCommands.FindActive);
+            EXPECT_FALSE(frame.Context.JobCommands.SnapshotEntity);
             EXPECT_FALSE(
                 frame.Context.RenderRecipeCommandsAvailable);
             EXPECT_FALSE(

@@ -87,3 +87,30 @@
 - **Dependencies**: []
 - **Tags**: geometry, scientific fields, mipmaps, invariants, visualization
 - **From staging**: O45
+
+## C06: Runtime background work has one CPU-supported lifecycle
+- **Statement**: In the default CPU-supported runtime contract, production
+  asynchronous workflows use the kernel-owned `JobService`; Engine applies at
+  most eight completions before event pump B, `AsyncWorkModule` publishes and
+  withdraws that borrowed service and cancels shutdown survivors, and the
+  superseded `StreamingExecutor` and `DerivedJobGraph` modules are absent from
+  source, CMake registration, dedicated tests, and the generated inventory.
+- **Status**: supported — CPU-supported runtime scope; no new GPU/Vulkan
+  execution claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A production workflow imports or submits through
+  either retired surface, either module returns to source/CMake/inventory, the
+  frame path performs an unbounded completion drain, or cancellation/staleness
+  permits a result to publish more than once.
+- **Proof**: [tasks/done/RUNTIME-194-consolidate-runtime-work-execution.md,
+  src/runtime/Runtime.AsyncWorkModule.cpp,
+  src/runtime/Runtime.Engine.cpp,
+  tests/contract/runtime/Test.RuntimeJobService.cpp,
+  tests/contract/runtime/Test.AsyncWorkModule.cpp,
+  tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
+  tests/contract/runtime/Test.ImGuiAdapterEngineWiring.cpp,
+  docs/api/generated/module_inventory.md]
+- **Dependencies**: [K05]
+- **Tags**: runtime, JobService, CPU-supported, lifecycle, retirement
+- **From staging**: O61

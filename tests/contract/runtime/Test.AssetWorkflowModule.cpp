@@ -56,7 +56,6 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StableEntityLookup;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
@@ -293,7 +292,7 @@ namespace
     struct ShutdownOrderObservation
     {
         bool Seen{false};
-        bool StreamingWithdrawn{false};
+        bool JobServiceWithdrawn{false};
         bool AssetServicesStillPublished{false};
     };
 
@@ -330,9 +329,9 @@ namespace
             Runtime::RuntimeModuleShutdownContext& context) override
         {
             Observation.Seen = true;
-            Observation.StreamingWithdrawn =
+            Observation.JobServiceWithdrawn =
                 context.Services
-                    .Find<Runtime::StreamingExecutor>() ==
+                    .Find<Runtime::JobService>() ==
                 nullptr;
             Observation.AssetServicesStillPublished =
                 context.Services.Find<Assets::AssetService>() !=
@@ -2052,7 +2051,7 @@ TEST(AssetWorkflowModule,
             nullptr);
         EXPECT_EQ(
             harness.Services.Find<
-                Runtime::StreamingExecutor>(),
+                Runtime::JobService>(),
             nullptr);
 
         pipeline->
@@ -2105,9 +2104,7 @@ TEST(AssetWorkflowModule,
                 .Find<Core::IAssetFrameHooks>() == nullptr,
             omitted == OmittedOwner::AssetWorkflow);
         EXPECT_EQ(
-            engine.Services()
-                    .Find<Core::IStreamingFrameHooks>() ==
-                nullptr,
+            engine.Services().Find<Runtime::JobService>() == nullptr,
             omitted == OmittedOwner::AsyncWork);
 
         Runtime::RenderExtractionCache* const extraction =
@@ -2165,7 +2162,7 @@ TEST(AssetWorkflowModule,
     engine.Shutdown();
 
     EXPECT_TRUE(observation.Seen);
-    EXPECT_TRUE(observation.StreamingWithdrawn);
+    EXPECT_TRUE(observation.JobServiceWithdrawn);
     EXPECT_TRUE(
         observation.AssetServicesStillPublished);
 }

@@ -61,6 +61,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.InputActions;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxEditorFacades;
@@ -69,7 +70,6 @@ import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StableEntityLookup;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
@@ -1869,11 +1869,9 @@ TEST(RuntimeAssetImportFormatCoverage, ExplicitCancelPublishesOneTerminalEvent)
         cancelledEvent->IngestDiagnostic,
         Runtime::RuntimeAssetIngestDiagnostic::Cancelled);
 
-    Runtime::StreamingExecutor* const streaming =
-        engine.Services().Find<Runtime::StreamingExecutor>();
-    ASSERT_NE(streaming, nullptr);
-    streaming->ApplyMainThreadResults();
-    streaming->ApplyMainThreadResults();
+    Core::Tasks::Scheduler::WaitForAll();
+    (void)engine.Jobs().DrainCompletions(engine.Events());
+    (void)engine.Jobs().DrainCompletions(engine.Events());
 
     const std::optional<Runtime::RuntimeAssetImportEvent>& afterFinalizer =
         pipeline.GetLastAssetImportEvent();

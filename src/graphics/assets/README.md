@@ -179,7 +179,7 @@ renderables.
   asset already `GpuUploading` or `Ready` are idempotent. RGB8 and unknown
   texture payload formats fail closed before a graphics upload is requested.
   Heavy CPU decoding may be queued through
-  `Extrinsic.Runtime.StreamingExecutor` (the same async surface used for
+  `Extrinsic.Runtime.JobService` (the same async surface used for
   visualization baking under `GRAPHICS-014Q`), but the final `RequestUpload`
   call is always synchronous from runtime; graphics never schedules CPU work
   and never imports `AssetService` or `AssetEventBus`.

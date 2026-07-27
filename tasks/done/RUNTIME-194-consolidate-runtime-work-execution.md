@@ -6,179 +6,37 @@ maturity_target: Retired
 ---
 # RUNTIME-194 — Consolidate runtime work execution
 
-## Session handoff (written 2026-07-27)
+## Status
 
-Everything a fresh session needs to resume this task. Read `AGENTS.md` and
-`tasks/SESSION-BRIEF.md` first as usual; this section only covers what is not
-derivable from the tree.
-
-### Where the work stands
-
-Updated 2026-07-27 (fifth session).
-
-- Default CPU gate: **4265/4265**, one skip
-  (`GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl`, expected on a
-  headless host). Strict layering, docs-sync, test-layout, root-hygiene, and all
-  task validators pass.
-- Slice A landed in `2214ddf9`. **Slice B is complete**: `B0`
-  (`73dedb2a`), `B1` (`6cb2152b`), `B3` (`b09cee58`), `B2`+`B4` (`6db202c6`),
-  `B5-0` (`0eb46f32`, `JobService::SnapshotAll()`), `B5a` (`7f78963d`,
-  `GpuReadbackJob`), `B5b` (`15beaef5`, `AssetModelSceneHandoff`), and `B5c`
-  (`SelectedMeshTextureBake`) are landed. `B5d-1a` through `B5d-1d` are also
-  landed: **all six production `StreamingExecutor::Submit` sites and every
-  production editor descriptor factory are migrated.** `B5d-1z` closed the
-  editor window and `B5d-2` moved the shutdown survivor sweep. Slice C can now
-  retire the old modules.
-
-### Next action
-
-Take **Slice C — cleanup**, the next unchecked batch in `## Progress`. Rerun the
-source census, quarantine the four retired module source files under
-`experimental/to_delete/` with paths preserved, remove their CMake entries and
-dedicated tests, and reduce `AsyncWorkModule` to the single `JobService`
-lifecycle. Remove legacy-only test imports/assertions and regenerate the module
-inventory. Do not internalize `JobServiceGpuQueueBridge`; `RUNTIME-203` owns
-that separate cleanup.
-
-Note that `B5a`–`B5c` were all lanes with **no production caller**, which is why
-they moved cleanly and are weaker evidence than they look. `B5d` is the live
-editor path, so its existing contract tests are behaviour tests, not shape
-tests.
-
-Two behaviours to preserve, both already expressible on `JobService`:
-`DerivedJobRegistry::ValidateOnMainThread`'s five-way staleness reason maps onto
-`ValidateBeforeApply` returning `JobApplyValidation` (discard, never apply, when
-not `Current`), and `ApplyMainThreadResults(maxApplyCount)` maps onto
-`DrainCompletions(events, maxApplyCount)`.
-
-Read `## Progress` -> Slice B for the lane list, the two standing obligations
-every lane owes (the `ProductionAsyncSubmissionsCarryOwningWorldScope`
-source-text assertions and `src/runtime/README.md`), and these accumulated
-lessons:
-
-- **B0** — never assert on a fixed drain count; drain until terminal. This bites
-  hardest on dependency chains, which release one level per drain.
-- **B3** — only assert an exact terminal `JobState` when nothing else in the
-  test can reach the consumer first. An observer that revalidates its own
-  binding can cancel the job before the drain classifies it.
-- **B4** — `ValidateBeforeApply` is the right home for a staleness check only
-  when the consumer wants a *silent* discard. When the consumer instead reports
-  the stale apply with its own diagnostic, keep the check inside the publish
-  body, or the finalizer's terminal diagnostic replaces it.
-- **B4** — `JobService` claims a job's unpublished finalizer at the terminal
-  transition, not at the cancel request, so a consumer's visible state
-  terminalizes only once the worker returns. Any test that cancels a *blocked*
-  worker and then waits for terminal before releasing it will deadlock.
-- **B5b** — **`JobService` has no inline fallback.** `StreamingExecutor` ran its
-  work inline when `Core::Tasks::Scheduler` was uninitialized;
-  `JobService::DispatchJob` always calls `Scheduler::Dispatch`, and
-  `DispatchInternal` silently drops the task with no scheduler, so the job hangs
-  in `Queued`. Any migrated test in a binary without a global scheduler needs a
-  `SchedulerScope`.
-- **B5b** — a job whose apply body ignores its payload still needs a populated
-  result envelope; an empty envelope is how `JobService` reports a dropped job.
-- **B5b** — `DerivedJobDesc` defaulted `Kind` to `GeometryProcess` while
-  `JobDesc` defaults to `Generic`. Set `Kind` explicitly or the lane taxonomy
-  silently changes.
-- **B5c** — **declare `SchedulerScope` last in a test.** Its destructor
-  quiesces the pool, so it must run while every object a worker can still
-  reach is alive. A live scheduler also flips `AssetService::Load` from inline
-  to a worker decode, so a scheduler outliving its `AssetService` is a real
-  use-after-free — it cost ~35% hung/aborted runs before the ordering was
-  fixed.
-- **B5d-1d** — after submit, even a freshly queued rerun may already be
-  `Running`; assert the active-state contract unless the test owns an explicit
-  worker gate. The `SandboxEditorUi.*` stress run exposed and repaired one
-  exact-`Queued` assertion left behind by `B5d-1a`.
-
-### Verify the checkpoint before changing anything
-
-```bash
-cmake --preset ci
-cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
-python3 tools/repo/check_layering.py --root src --strict
-```
-
-### Known environment facts (do not re-diagnose these)
-
-- **`BUG-121` fails CI but not here.** `full-cpu`, `ci-asan`, and `ci-ubsan` fail
-  on a GLM anonymous-union copy-assignment defect through a C++23 module
-  boundary under **clang-20**. This machine's preset resolves **clang++-23**, so
-  it does not reproduce locally and is unrelated to RUNTIME-192/194. It is filed
-  and unblocked as its own task — do not fold a fix into this one.
-- **Quarantined files are local-only.** `experimental/` is gitignored, so the
-  files listed under "Quarantine" below exist on this machine only and are
-  absent from a fresh clone. They are already removed from git history by their
-  retirement commits; the copies are purely so the owner can review before
-  deleting. Never restore from them — they are retired surfaces.
-
-### Quarantine (`experimental/to_delete/`, paths preserved)
-
-Eleven files from `RUNTIME-199` / `RUNTIME-204`, awaiting the owner's manual
-deletion:
-
-- `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.{cpp,cppm}`
-- `src/runtime/SpatialDebug/Runtime.SpatialDebugClosestFace.{cpp,cppm}`
-- `src/ecs/Components/ECS.Component.SpatialDebugBinding.cppm`
-- `src/runtime/Runtime.MethodFigureExport.{cpp,cppm}`
-- `tests/contract/runtime/Test.SpatialDebugAdapters.cpp`
-- `tests/contract/runtime/Test.SpatialDebugClosestFace.cpp`
-- `tests/unit/runtime/Test.MethodFigureExport.cpp`
-- `docs/methods/figure-data-export.md`
-
-The owner asked that retired files be moved here rather than deleted outright.
-Repo-root `to_delete/` is **not** an option: `check_root_hygiene.py --strict`
-enforces an exact top-level allowlist and would fail. Apply the same convention
-to Slice C's deletions.
-
-### Prerequisites already satisfied by RUNTIME-192 (retired 2026-07-26)
-
-- `RuntimeTaskKinds` **already moved** from `Runtime.StreamingExecutor` to
-  `Runtime.JobService`; `StreamingExecutor` only re-exports it. Deleting
-  `StreamingExecutor` in Slice C will not strand the taxonomy.
-- `DerivedJobScope` lives in `Runtime.DerivedJobGraph` and exists solely for
-  `DerivedJobKey` identity (it carries `MeshSurface`, which is a job scope and
-  deliberately not a property element domain). It disappears with that module in
-  Slice C — do not promote it to a general vocabulary.
-
-### Doing Slice B
-
-Migrate lane by lane, keeping the gate green and committing per lane; do not
-attempt all consumers in one change. The `JobService` capabilities each lane
-needs already exist (see Slice A below): dependencies, priority/kind/cost,
-bounded apply, parked work, `ValidateBeforeApply` + world epoch, progress.
-
-Start by re-running the census, since it drives the order:
-
-```bash
-grep -rln "StreamingExecutor" src/ tests/ --include=*.cpp --include=*.cppm
-grep -rln "DerivedJobRegistry\|Runtime.DerivedJobGraph" src/ tests/ --include=*.cpp --include=*.cppm
-```
-
-Two behaviours the old surfaces have that migrations must preserve, both now
-expressible on `JobService`:
-
-- `DerivedJobRegistry::ValidateOnMainThread` returns a five-way staleness reason
-  (missing entity, stale entity/geometry/source-property/binding generation).
-  Map it onto `ValidateBeforeApply` returning `JobApplyValidation`; the result
-  must be discarded, never applied, when it is not `Current`.
-- `StreamingExecutor::ApplyMainThreadResults(maxApplyCount)` is the bounded
-  apply the frame path relies on. Its replacement is
-  `DrainCompletions(events, maxApplyCount)`.
-
-`Runtime.AsyncWorkModule` currently composes both old executors; it is reduced to
-the single-service lifecycle in Slice C, not Slice B. After `B2`+`B4` it no
-longer borrows `StreamingExecutor` for the import pipeline, so the executor's
-only remaining consumer is `DerivedJobGraph`.
-
-### Do not
-
-- Delete `StreamingExecutor` or `DerivedJobGraph` before their production
-  workflows and failure/lifetime tests run through `JobService` (see
-  `## Forbidden changes`).
-- Add a fourth scheduler, a per-feature worker pool, or a blocking frame wait.
-- Weaken or exclude a gate to get green.
+- Completed and retired on 2026-07-27 at `Retired`.
+- Commit reference: this retirement commit plus the Slice A/B commits recorded
+  in `## Progress`.
+- Endpoint: the kernel-owned `JobService` is the sole runtime work lifecycle for
+  CPU work, dependency chains, GPU participants, cancellation, progress,
+  readiness gates, and bounded main-thread publication. Engine applies at most
+  eight completions before event pump B; `AsyncWorkModule` publishes and
+  withdraws that exact borrowed service and cancels shutdown survivors.
+- `Runtime.StreamingExecutor`, `Runtime.DerivedJobGraph`, their CMake entries,
+  dedicated tests, `Core::IStreamingFrameHooks`, and empty shutdown facades are
+  removed. The four module sources and two dedicated tests have local-only,
+  path-preserving copies under gitignored `experimental/to_delete/`.
+- Verification evidence:
+  - clean `IntrinsicTests` build with the preset-selected Clang 23 toolchain;
+  - focused JobService/AsyncWork selector **56/56**, the explicit slow
+    non-blocking frame test **1/1**, and all four AsyncWork lifecycle tests
+    surviving **50 consecutive repetitions each**;
+  - default CPU-supported gate **4231/4231**, with the expected headless-host
+    skip for `GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl`;
+  - test-routing reconciliation covered 27 targets, 4,230 cases, and 341 source
+    files; its 19 hermetic regressions passed;
+  - strict layering (742 files, 6,633 source references, 85 CMake links, zero
+    violations), test-layout, root-hygiene, task-policy, ARA, and doc-link
+    checks passed;
+  - generated module inventory refreshed at 386 modules.
+- Evidence scope: this retirement is proven by CPU-supported contracts and real
+  Engine frame/lifecycle tests. No GPU/Vulkan selector was run for Slice C, so
+  this status makes no new claim of Vulkan execution; `RUNTIME-195` retains the
+  separate unified GPU-result/readback follow-up.
 
 ## Progress
 
@@ -995,7 +853,7 @@ and commits independently.
                   Unlike `B5a`–`B5c`, this lane has live production callers, so
                   the existing `SandboxEditorUi.*` / `SandboxEditor*` contract
                   tests are behaviour tests, not shape tests.
-- [ ] **Slice C — cleanup.** Delete `Runtime.StreamingExecutor`,
+- [x] **Slice C — cleanup.** Delete `Runtime.StreamingExecutor`,
       `Runtime.DerivedJobGraph`, their bridges/DTOs and CMake/test entries, and
       reduce `AsyncWorkModule` to the single-service lifecycle. `RUNTIME-203`
       separately internalizes `JobServiceGpuQueueBridge`. Old files are
@@ -1044,52 +902,52 @@ and commits independently.
 
 ## Required changes
 
-- [ ] Extend `JobService` with the smallest plain request/result records needed
+- [x] Extend `JobService` with the smallest plain request/result records needed
       for dependency edges, priority, world/document epoch, cancellation,
       progress, parked/waiting work, and bounded main-thread apply.
-- [ ] Preserve immutable main-thread snapshot capture and fail-closed
+- [x] Preserve immutable main-thread snapshot capture and fail-closed
       generation revalidation before any result mutation.
-- [ ] Provide deterministic lane/budget diagnostics without exposing worker
+- [x] Provide deterministic lane/budget diagnostics without exposing worker
       objects or adding feature-named queue APIs.
-- [ ] Migrate asset reads/import processing, selected-entity analysis,
+- [x] Migrate asset reads/import processing, selected-entity analysis,
       clustering/method jobs, and follow-up chains to the one service.
-- [ ] Preserve GPU participant recording through the existing renderer frame
+- [x] Preserve GPU participant recording through the existing renderer frame
       context; GPU completion/readback integration is completed by
       `RUNTIME-195`.
-- [ ] Delete `Runtime.StreamingExecutor`, `Runtime.DerivedJobGraph` /
+- [x] Delete `Runtime.StreamingExecutor`, `Runtime.DerivedJobGraph` /
       `DerivedJobRegistry`, and all cross-scheduler adapters after migration.
       `RUNTIME-203` separately internalizes the remaining one-consumer
       `JobServiceGpuQueueBridge` public surface after this task fixes its final
       ownership.
-- [ ] Keep `AsyncWorkModule` only as the app-composed owner of `JobService`
+- [x] Keep `AsyncWorkModule` only as the app-composed owner of `JobService`
       lifecycle/configuration and remove every otherwise empty facade method.
 
 ## Tests
 
-- [ ] Contract tests cover dependency ordering, priority, cancellation,
+- [x] Contract tests cover dependency ordering, priority, cancellation,
       world replacement, stale completion, progress, parked work, bounded
       apply, and shutdown with no result applied twice.
-- [ ] Migration parity tests cover import IO, selected analysis, method
+- [x] Migration parity tests cover import IO, selected analysis, method
       follow-ups, and GPU participant scheduling through the same service.
-- [ ] Frame-loop tests prove no global wait or unbounded completion drain is
+- [x] Frame-loop tests prove no global wait or unbounded completion drain is
       introduced.
-- [ ] Structural tests prove the old executor/registry and bridge names have no
+- [x] Structural tests prove the old executor/registry and bridge names have no
       production imports after deletion.
 
 ## Docs
 
-- [ ] Update runtime kernel/work lifecycle documentation and remove the
+- [x] Update runtime kernel/work lifecycle documentation and remove the
       three-scheduler ordering instructions.
-- [ ] Regenerate the module inventory and update all affected task/docs links.
-- [ ] Refresh task indexes, session brief, and retirement records.
+- [x] Regenerate the module inventory and update all affected task/docs links.
+- [x] Refresh task indexes, session brief, and retirement records.
 
 ## Acceptance criteria
 
-- [ ] Every runtime asynchronous operation is submitted, observed, cancelled,
+- [x] Every runtime asynchronous operation is submitted, observed, cancelled,
       and applied through `JobService`.
-- [ ] `AsyncWorkModule` owns one real service lifecycle, not parallel worker
+- [x] `AsyncWorkModule` owns one real service lifecycle, not parallel worker
       systems.
-- [ ] `StreamingExecutor`, `DerivedJobRegistry`, and cross-scheduler adapters
+- [x] `StreamingExecutor`, `DerivedJobRegistry`, and cross-scheduler adapters
       are deleted after migrated tests pass.
 
 ## Verification

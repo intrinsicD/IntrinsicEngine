@@ -814,3 +814,22 @@ observations:
     promoted_to: "logic/solution/constraints.md:K23"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O61
+    timestamp: "2026-07-27T21:10+02:00"
+    provenance: ai-executed
+    content: >
+      Production runtime background work now converges on the kernel-owned
+      JobService with bounded Engine publication and app-composed service
+      lifecycle; the duplicate StreamingExecutor and DerivedJobGraph systems
+      have no remaining source, build, dedicated-test, or module-inventory
+      surface.
+    context: >
+      RUNTIME-194 production migration, Slice C deletion, focused lifecycle and
+      frame-path tests, the complete CPU-supported selector, and strict
+      structural verification. No Slice C GPU/Vulkan selector was executed.
+    potential_type: claim
+    bound_to: [N279]
+    promoted: true
+    promoted_to: "logic/claims.md:C06"
+    crystallized_via: artifact-commitment
+    stale: false
