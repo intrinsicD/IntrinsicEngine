@@ -2,15 +2,18 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <span>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
 import Extrinsic.Core.Error;
+import Extrinsic.Core.Tasks;
 import Extrinsic.Graphics.GpuTransfer;
 import Extrinsic.RHI.BufferTransfer;
 import Extrinsic.RHI.CommandContext;
@@ -19,10 +22,9 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
-import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.GpuReadbackJob;
-import Extrinsic.Runtime.ProgressiveRenderData;
-import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Geometry.Properties;
 
 namespace
@@ -32,22 +34,59 @@ namespace
     namespace RHI = Extrinsic::RHI;
     namespace Runtime = Extrinsic::Runtime;
 
-    [[nodiscard]] Runtime::DerivedJobKey MakeKey(
-        const std::uint32_t entityId,
-        const Runtime::ProgressiveSlotSemantic semantic =
-            Runtime::ProgressiveSlotSemantic::Albedo)
+    using namespace std::chrono_literals;
+
+    class SchedulerScope final
     {
-        return Runtime::DerivedJobKey{
-            .EntityId = entityId,
-            .Domain = Runtime::DerivedJobScope::MeshVertex,
-            .OutputSemantic = semantic,
-            .EntityGeneration = 1u,
-            .GeometryGeneration = 1u,
-            .SourcePropertyGeneration = 1u,
-            .BindingGeneration = 1u,
-            .OutputName = std::string{Runtime::ToString(semantic)},
-        };
+    public:
+        explicit SchedulerScope(const unsigned workers = 1)
+        {
+            if (Extrinsic::Core::Tasks::Scheduler::IsInitialized())
+                Extrinsic::Core::Tasks::Scheduler::Shutdown();
+            Extrinsic::Core::Tasks::Scheduler::Initialize(workers);
+        }
+
+        ~SchedulerScope()
+        {
+            Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+            Extrinsic::Core::Tasks::Scheduler::Shutdown();
+        }
+
+        SchedulerScope(const SchedulerScope&) = delete;
+        SchedulerScope& operator=(const SchedulerScope&) = delete;
+    };
+
+    template <typename Predicate>
+    [[nodiscard]] bool WaitUntil(Predicate&& predicate,
+                                 const std::chrono::milliseconds timeout = 5s)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        while (!predicate())
+        {
+            if (std::chrono::steady_clock::now() >= deadline)
+                return false;
+            std::this_thread::sleep_for(1ms);
+        }
+        return true;
     }
+
+    // The readback body runs on a worker. Observing the record at the
+    // main-thread apply gate is the synchronising edge after which the command
+    // context it recorded into can be read from this thread.
+    [[nodiscard]] bool WaitUntilReadbackIssued(Runtime::JobService& jobs,
+                                               const Runtime::JobToken token)
+    {
+        return WaitUntil(
+            [&jobs, token]
+            {
+                return jobs.GetState(token) == Runtime::JobState::AwaitingGate;
+            });
+    }
+
+    struct FollowUpRan
+    {
+        int Unused{0};
+    };
 
     [[nodiscard]] RHI::BufferDesc BufferDesc(const std::uint64_t size,
                                              const RHI::BufferUsage usage)
@@ -262,8 +301,8 @@ namespace
         MockTransferQueue Queue{};
         Graphics::GpuTransfer Transfer{Queue};
         RecordingCommandContext CommandContext{};
-        Runtime::StreamingExecutor Executor{};
-        Runtime::DerivedJobRegistry Jobs{Executor};
+        Runtime::JobService Jobs{};
+        Runtime::KernelEventBus Events{};
     };
 
     [[nodiscard]] Runtime::GpuReadbackJobDesc MakeFloatReadback(
@@ -274,7 +313,6 @@ namespace
         const std::uint64_t byteCount)
     {
         return Runtime::GpuReadbackJobDesc{
-            .Key = MakeKey(10u),
             .Name = "read back scalar field",
             .Transfer = &harness.Transfer,
             .CommandContext = &harness.CommandContext,
@@ -293,6 +331,7 @@ namespace
 
 TEST(GpuReadbackJob, IncompleteReadbackParksAndAppliesOnlyAfterDelivery)
 {
+    SchedulerScope scheduler{1};
     Harness harness;
     Geometry::PropertySet properties;
     properties.Resize(4u);
@@ -313,35 +352,28 @@ TEST(GpuReadbackJob, IncompleteReadbackParksAndAppliesOnlyAfterDelivery)
         source,
         *sourceDesc,
         static_cast<std::uint64_t>(sourceValues.size() * sizeof(float)));
-    desc.ApplyAfterWrite = [&applyCount](Runtime::DerivedJobApplyContext&) -> Core::Result
+    desc.ApplyAfterWrite = [&applyCount]() -> Core::Result
     {
         ++applyCount;
         return Core::Ok();
     };
 
-    const Runtime::DerivedJobHandle handle =
+    const Runtime::JobToken handle =
         Runtime::SubmitGpuReadbackJob(harness.Jobs, std::move(desc));
     ASSERT_TRUE(handle.IsValid());
 
-    harness.Jobs.Pump(1u);
-    harness.Jobs.DrainCompletions();
+    ASSERT_TRUE(WaitUntilReadbackIssued(harness.Jobs, handle));
     ASSERT_EQ(harness.CommandContext.Barriers.size(), 1u);
     EXPECT_EQ(harness.CommandContext.Barriers[0].Buffer, source);
     EXPECT_EQ(harness.CommandContext.Barriers[0].Before, RHI::MemoryAccess::ShaderWrite);
     EXPECT_EQ(harness.CommandContext.Barriers[0].After, RHI::MemoryAccess::TransferRead);
 
-    auto waiting = harness.Jobs.Snapshot(handle);
-    ASSERT_TRUE(waiting.has_value());
-    EXPECT_TRUE(waiting->IsReadbackJob);
-    EXPECT_EQ(waiting->Status, Runtime::DerivedJobStatus::Applying);
-    EXPECT_EQ(waiting->ExecutionState, Runtime::StreamingTaskState::WaitingForReadback);
-
-    const Runtime::DerivedJobQueueSnapshot queued = harness.Jobs.SnapshotAll();
-    EXPECT_EQ(queued.Readbacks.Issued, 1u);
-    EXPECT_EQ(queued.Readbacks.Waiting, 1u);
-    EXPECT_EQ(queued.Readbacks.Completed, 0u);
-
-    harness.Jobs.ApplyMainThreadResults();
+    // The transfer has not landed, so the readiness gate parks the finished
+    // result instead of applying it — and instead of blocking the drain.
+    EXPECT_EQ(harness.Jobs.DrainCompletions(harness.Events), 0u);
+    EXPECT_EQ(harness.Jobs.GetState(handle), Runtime::JobState::AwaitingApply);
+    EXPECT_EQ(harness.Jobs.Stats().LastDrainParked, 1u);
+    EXPECT_EQ(harness.Jobs.Stats().AwaitingApplyJobs, 1u);
     EXPECT_EQ(applyCount, 0u);
     for (float value : target.Vector())
     {
@@ -350,13 +382,8 @@ TEST(GpuReadbackJob, IncompleteReadbackParksAndAppliesOnlyAfterDelivery)
 
     harness.Queue.CollectCompleted();
     harness.Transfer.DrainCompleted(harness.CommandContext);
-    harness.Jobs.DrainReadbacks();
 
-    auto ready = harness.Jobs.Snapshot(handle);
-    ASSERT_TRUE(ready.has_value());
-    EXPECT_EQ(ready->ExecutionState, Runtime::StreamingTaskState::WaitingForMainThreadApply);
-
-    harness.Jobs.ApplyMainThreadResults();
+    EXPECT_EQ(harness.Jobs.DrainCompletions(harness.Events), 1u);
 
     EXPECT_EQ(applyCount, 1u);
     ASSERT_EQ(target.Vector().size(), sourceValues.size());
@@ -364,8 +391,8 @@ TEST(GpuReadbackJob, IncompleteReadbackParksAndAppliesOnlyAfterDelivery)
     {
         EXPECT_FLOAT_EQ(target.Vector()[i], sourceValues[i]);
     }
-    EXPECT_EQ(harness.Jobs.GetStatus(handle), Runtime::DerivedJobStatus::Complete);
-    EXPECT_EQ(harness.Jobs.SnapshotAll().Readbacks.Completed, 1u);
+    EXPECT_EQ(harness.Jobs.GetState(handle), Runtime::JobState::Published);
+    EXPECT_EQ(harness.Jobs.Stats().AwaitingApplyJobs, 0u);
 }
 
 TEST(GpuReadbackJob, PropertyBindingFailsClosedOnDimensionMismatch)
@@ -388,6 +415,7 @@ TEST(GpuReadbackJob, PropertyBindingFailsClosedOnDimensionMismatch)
 
 TEST(GpuReadbackJob, FollowUpStaysPendingUntilReadbackApplies)
 {
+    SchedulerScope scheduler{1};
     Harness harness;
     Geometry::PropertySet properties;
     properties.Resize(2u);
@@ -400,7 +428,7 @@ TEST(GpuReadbackJob, FollowUpStaysPendingUntilReadbackApplies)
     const RHI::BufferDesc* sourceDesc = harness.Queue.GetDesc(source);
     ASSERT_NE(sourceDesc, nullptr);
 
-    const Runtime::DerivedJobHandle readback =
+    const Runtime::JobToken readback =
         Runtime::SubmitGpuReadbackJob(
             harness.Jobs,
             MakeFloatReadback(
@@ -412,52 +440,63 @@ TEST(GpuReadbackJob, FollowUpStaysPendingUntilReadbackApplies)
     ASSERT_TRUE(readback.IsValid());
 
     std::vector<std::string> order{};
-    Runtime::DerivedJobDesc followUp{
-        .Key = MakeKey(10u, Runtime::ProgressiveSlotSemantic::Albedo),
-        .Name = "derive color from readback",
-        .Execute = [&order]() -> Runtime::DerivedJobWorkerResult
-        {
-            order.push_back("follow-worker");
-            return Runtime::DerivedJobOutput{.PayloadToken = 99u};
-        },
-        .ApplyOnMainThread = [&order](Runtime::DerivedJobApplyContext&) -> Core::Result
-        {
-            order.push_back("follow-apply");
-            return Core::Ok();
-        },
+    Runtime::JobDesc followUp{};
+    followUp.DebugName = "derive color from readback";
+    followUp.DependsOn.push_back(
+        Runtime::JobDependency{
+            .Job = readback,
+            .Reason = "readback property ready",
+        });
+    followUp.Work = [&order](const Runtime::JobCancellation&)
+    {
+        order.push_back("follow-worker");
+        return Runtime::JobResultEnvelope::Make<FollowUpRan>(FollowUpRan{});
     };
-    const Runtime::DerivedJobHandle follow =
-        harness.Jobs.SubmitFollowUp(readback, std::move(followUp), "readback property ready");
+    followUp.PublishCompletion =
+        [&order](Runtime::KernelEventBus&,
+                 const Runtime::JobResultEnvelope&) -> bool
+    {
+        order.push_back("follow-apply");
+        return true;
+    };
+    const Runtime::JobToken follow = harness.Jobs.Submit(std::move(followUp));
     ASSERT_TRUE(follow.IsValid());
 
-    harness.Jobs.Pump(1u);
-    harness.Jobs.DrainCompletions();
-    EXPECT_EQ(harness.Jobs.Snapshot(readback)->ExecutionState,
-              Runtime::StreamingTaskState::WaitingForReadback);
+    ASSERT_TRUE(WaitUntilReadbackIssued(harness.Jobs, readback));
+    EXPECT_EQ(harness.Jobs.GetState(follow),
+              Runtime::JobState::AwaitingDependencies);
 
-    harness.Jobs.Pump(1u);
-    harness.Jobs.DrainCompletions();
+    // The parked readback holds the whole chain: a dependency is released only
+    // once it reaches a terminal state, so the follow-up cannot start against a
+    // property that has not been written yet.
+    EXPECT_EQ(harness.Jobs.DrainCompletions(harness.Events), 0u);
     EXPECT_TRUE(order.empty());
-    EXPECT_EQ(harness.Jobs.Snapshot(follow)->Status, Runtime::DerivedJobStatus::Blocked);
+    EXPECT_EQ(harness.Jobs.GetState(readback), Runtime::JobState::AwaitingApply);
+    EXPECT_EQ(harness.Jobs.GetState(follow),
+              Runtime::JobState::AwaitingDependencies);
 
     harness.Queue.CollectCompleted();
     harness.Transfer.DrainCompleted(harness.CommandContext);
-    harness.Jobs.DrainReadbacks();
-    harness.Jobs.ApplyMainThreadResults();
 
-    harness.Jobs.Pump(1u);
-    harness.Jobs.DrainCompletions();
-    harness.Jobs.ApplyMainThreadResults();
+    EXPECT_EQ(harness.Jobs.DrainCompletions(harness.Events), 1u);
+    EXPECT_EQ(harness.Jobs.GetState(readback), Runtime::JobState::Published);
+
+    ASSERT_TRUE(WaitUntil(
+        [&]
+        {
+            (void)harness.Jobs.DrainCompletions(harness.Events);
+            return harness.Jobs.IsComplete(follow);
+        }));
 
     ASSERT_EQ(order.size(), 2u);
     EXPECT_EQ(order[0], "follow-worker");
     EXPECT_EQ(order[1], "follow-apply");
-    EXPECT_EQ(harness.Jobs.GetStatus(readback), Runtime::DerivedJobStatus::Complete);
-    EXPECT_EQ(harness.Jobs.GetStatus(follow), Runtime::DerivedJobStatus::Complete);
+    EXPECT_EQ(harness.Jobs.GetState(follow), Runtime::JobState::Published);
 }
 
 TEST(GpuReadbackJob, CancelledParkedReadbackDoesNotWriteProperty)
 {
+    SchedulerScope scheduler{1};
     Harness harness;
     Geometry::PropertySet properties;
     properties.Resize(1u);
@@ -471,26 +510,29 @@ TEST(GpuReadbackJob, CancelledParkedReadbackDoesNotWriteProperty)
     const RHI::BufferDesc* sourceDesc = harness.Queue.GetDesc(source);
     ASSERT_NE(sourceDesc, nullptr);
 
-    const Runtime::DerivedJobHandle handle =
+    const Runtime::JobToken handle =
         Runtime::SubmitGpuReadbackJob(
             harness.Jobs,
             MakeFloatReadback(harness, properties, source, *sourceDesc, sizeof(float)));
     ASSERT_TRUE(handle.IsValid());
 
-    harness.Jobs.Pump(1u);
-    harness.Jobs.DrainCompletions();
-    EXPECT_EQ(harness.Jobs.Snapshot(handle)->ExecutionState,
-              Runtime::StreamingTaskState::WaitingForReadback);
+    ASSERT_TRUE(WaitUntilReadbackIssued(harness.Jobs, handle));
+    EXPECT_EQ(harness.Jobs.DrainCompletions(harness.Events), 0u);
+    EXPECT_EQ(harness.Jobs.GetState(handle), Runtime::JobState::AwaitingApply);
 
-    harness.Jobs.Cancel(handle);
+    // Cancelling a parked readback must terminalize it even though its transfer
+    // then lands: the drain checks cancellation before the readiness gate.
+    EXPECT_TRUE(harness.Jobs.Cancel(handle));
     harness.Queue.CollectCompleted();
     harness.Transfer.DrainCompleted(harness.CommandContext);
-    harness.Jobs.DrainReadbacks();
-    harness.Jobs.ApplyMainThreadResults();
+
+    EXPECT_EQ(harness.Jobs.DrainCompletions(harness.Events), 0u);
 
     EXPECT_EQ(target.Vector()[0], 0.0f);
-    EXPECT_EQ(harness.Jobs.GetStatus(handle), Runtime::DerivedJobStatus::Cancelled);
-    const Runtime::DerivedJobQueueSnapshot snapshot = harness.Jobs.SnapshotAll();
-    EXPECT_EQ(snapshot.Readbacks.Issued, 1u);
-    EXPECT_EQ(snapshot.Readbacks.StaleOrCancelled, 1u);
+    EXPECT_EQ(harness.Jobs.GetState(handle), Runtime::JobState::Cancelled);
+
+    const std::vector<Runtime::JobSnapshot> snapshot = harness.Jobs.SnapshotAll();
+    ASSERT_EQ(snapshot.size(), 1u);
+    EXPECT_EQ(snapshot[0].Token, handle);
+    EXPECT_EQ(snapshot[0].State, Runtime::JobState::Cancelled);
 }

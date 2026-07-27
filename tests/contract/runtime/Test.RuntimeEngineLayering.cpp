@@ -969,8 +969,8 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     EXPECT_EQ(CountOccurrences(editorFacades, "desc.Scope = activeWorld"), 1u);
     EXPECT_NE(WithoutWhitespace(editorFacades).find(".World=activeWorld"),
               std::string::npos);
-    EXPECT_EQ(CountOccurrences(readback, "DerivedJobDesc derived"), 1u);
-    EXPECT_EQ(CountOccurrences(readback, ".Scope = desc.Scope"), 1u);
+    EXPECT_EQ(CountOccurrences(readback, "JobDesc job{}"), 1u);
+    EXPECT_EQ(CountOccurrences(readback, "job.Scope = desc.Scope"), 1u);
 
     EXPECT_EQ(CountOccurrences(assetWorkflow, ".World = BoundWorld"), 2u);
     EXPECT_EQ(CountOccurrences(assetWorkflow, ".Worlds = Worlds"), 1u);

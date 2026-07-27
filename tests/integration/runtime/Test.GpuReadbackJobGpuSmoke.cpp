@@ -27,10 +27,10 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
-import Extrinsic.Runtime.DerivedJobGraph;
+import Extrinsic.Core.Tasks;
 import Extrinsic.Runtime.GpuReadbackJob;
-import Extrinsic.Runtime.ProgressiveRenderData;
-import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Geometry.Properties;
 
 namespace
@@ -133,50 +133,53 @@ namespace
         std::vector<BufferBarrierEvent> Barriers{};
     };
 
-    [[nodiscard]] Runtime::DerivedJobKey MakeKey(
-        const std::uint32_t entityId,
-        const Runtime::ProgressiveSlotSemantic semantic)
+    class SchedulerScope final
     {
-        return Runtime::DerivedJobKey{
-            .EntityId = entityId,
-            .Domain = Runtime::DerivedJobScope::MeshVertex,
-            .OutputSemantic = semantic,
-            .EntityGeneration = 1u,
-            .GeometryGeneration = 1u,
-            .SourcePropertyGeneration = 1u,
-            .BindingGeneration = 1u,
-            .OutputName = std::string{Runtime::ToString(semantic)},
-        };
-    }
+    public:
+        explicit SchedulerScope(const unsigned workers = 1)
+        {
+            if (Extrinsic::Core::Tasks::Scheduler::IsInitialized())
+                Extrinsic::Core::Tasks::Scheduler::Shutdown();
+            Extrinsic::Core::Tasks::Scheduler::Initialize(workers);
+        }
 
-    [[nodiscard]] bool DrainRuntimeReadbackUntilReady(
+        ~SchedulerScope()
+        {
+            Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+            Extrinsic::Core::Tasks::Scheduler::Shutdown();
+        }
+
+        SchedulerScope(const SchedulerScope&) = delete;
+        SchedulerScope& operator=(const SchedulerScope&) = delete;
+    };
+
+    struct DerivedColorApplied
+    {
+        std::uint64_t PayloadToken{0u};
+    };
+
+    // Pumps the transfer queue and the JobService completion drain until the
+    // readback job publishes. The drain itself re-polls `IsReadyToApply`, so
+    // there is no separate readback drain to run.
+    [[nodiscard]] bool DrainRuntimeReadbackUntilApplied(
         RHI::ITransferQueue& queue,
         Graphics::GpuTransfer& transfer,
         RecordingCommandContext& commandContext,
-        Runtime::DerivedJobRegistry& jobs,
-        const Runtime::DerivedJobHandle readback)
+        Runtime::JobService& jobs,
+        Runtime::KernelEventBus& events,
+        const Runtime::JobToken readback)
     {
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{3};
         while (std::chrono::steady_clock::now() < deadline)
         {
             queue.CollectCompleted();
             transfer.DrainCompleted(commandContext);
-            jobs.DrainReadbacks();
-
-            const std::optional<Runtime::DerivedJobSnapshot> snapshot = jobs.Snapshot(readback);
-            if (snapshot.has_value() &&
-                snapshot->ExecutionState == Runtime::StreamingTaskState::WaitingForMainThreadApply)
-            {
+            (void)jobs.DrainCompletions(events);
+            if (jobs.IsComplete(readback))
                 return true;
-            }
             std::this_thread::sleep_for(std::chrono::milliseconds{1});
         }
-        queue.CollectCompleted();
-        transfer.DrainCompleted(commandContext);
-        jobs.DrainReadbacks();
-        const std::optional<Runtime::DerivedJobSnapshot> snapshot = jobs.Snapshot(readback);
-        return snapshot.has_value() &&
-               snapshot->ExecutionState == Runtime::StreamingTaskState::WaitingForMainThreadApply;
+        return false;
     }
 }
 
@@ -262,14 +265,14 @@ TEST(GpuReadbackJobGpuSmoke, VulkanTransferReadbackWritesPropertyAndFollowUpUplo
     ASSERT_TRUE(properties.Add<float>("v:height", 0.0f));
     ASSERT_TRUE(properties.Add<glm::vec4>("v:readback_color", glm::vec4{0.0f}));
 
-    Runtime::StreamingExecutor executor{};
-    Runtime::DerivedJobRegistry jobs{executor};
+    SchedulerScope scheduler{1};
+    Runtime::JobService jobs{};
+    Runtime::KernelEventBus events{};
 
-    const Runtime::DerivedJobHandle readback =
+    const Runtime::JobToken readback =
         Runtime::SubmitGpuReadbackJob(
             jobs,
             Runtime::GpuReadbackJobDesc{
-                .Key = MakeKey(42u, Runtime::ProgressiveSlotSemantic::ScalarField),
                 .Name = "vulkan readback to scalar property",
                 .Transfer = &transfer,
                 .CommandContext = &commandContext,
@@ -289,27 +292,29 @@ TEST(GpuReadbackJobGpuSmoke, VulkanTransferReadbackWritesPropertyAndFollowUpUplo
     ASSERT_TRUE(readback.IsValid());
 
     Graphics::GpuTransferUploadTicket colorUpload{};
-    Runtime::DerivedJobDesc followUp{
-        .Key = MakeKey(42u, Runtime::ProgressiveSlotSemantic::Albedo),
-        .Name = "derive color from readback property",
-        .Execute = []() -> Runtime::DerivedJobWorkerResult
-        {
-            return Runtime::DerivedJobOutput{.PayloadToken = 400u};
-        },
-        .ApplyOnMainThread =
-            [&properties, &transfer, colorBuffer, colorDesc, &colorUpload](
-                Runtime::DerivedJobApplyContext&) -> Core::Result
+    Runtime::JobDesc followUp{};
+    followUp.DebugName = "derive color from readback property";
+    followUp.DependsOn.push_back(
+        Runtime::JobDependency{
+            .Job = readback,
+            .Reason = "readback scalar property ready",
+        });
+    followUp.Work = [](const Runtime::JobCancellation&)
+    {
+        return Runtime::JobResultEnvelope::Make<DerivedColorApplied>(
+            DerivedColorApplied{.PayloadToken = 400u});
+    };
+    followUp.PublishCompletion =
+        [&properties, &transfer, colorBuffer, colorDesc, &colorUpload](
+            Runtime::KernelEventBus&,
+            const Runtime::JobResultEnvelope&) -> bool
         {
             auto heights = properties.Registry().Get<float>("v:height");
             auto colors = properties.Registry().Get<glm::vec4>("v:readback_color");
             if (!heights.has_value() || !colors.has_value())
-            {
-                return Core::Err(Core::ErrorCode::ResourceNotFound);
-            }
+                return false;
             if (heights->Span().size() != colors->Span().size())
-            {
-                return Core::Err(Core::ErrorCode::TypeMismatch);
-            }
+                return false;
 
             for (std::size_t index = 0; index < heights->Span().size(); ++index)
             {
@@ -328,28 +333,16 @@ TEST(GpuReadbackJobGpuSmoke, VulkanTransferReadbackWritesPropertyAndFollowUpUplo
                 .Source = BytesOf<glm::vec4>(colors->Span()),
                 .DestinationOffsetBytes = 0u,
             });
-            return colorUpload.IsValid()
-                ? Core::Ok()
-                : Core::Err(Core::ErrorCode::InvalidState);
-        },
-    };
+            return colorUpload.IsValid();
+        };
 
-    const Runtime::DerivedJobHandle colorJob =
-        jobs.SubmitFollowUp(readback, std::move(followUp), "readback scalar property ready");
+    const Runtime::JobToken colorJob = jobs.Submit(std::move(followUp));
     ASSERT_TRUE(colorJob.IsValid());
 
-    executor.PumpBackground(1);
-    executor.DrainCompletions();
-    {
-        const std::optional<Runtime::DerivedJobSnapshot> snapshot = jobs.Snapshot(readback);
-        ASSERT_TRUE(snapshot.has_value());
-        EXPECT_EQ(snapshot->ExecutionState, Runtime::StreamingTaskState::WaitingForReadback);
-    }
-
-    ASSERT_TRUE(DrainRuntimeReadbackUntilReady(queue, transfer, commandContext, jobs, readback))
+    ASSERT_TRUE(DrainRuntimeReadbackUntilApplied(
+        queue, transfer, commandContext, jobs, events, readback))
         << "timed out waiting for readback job delivery";
-    jobs.ApplyMainThreadResults();
-    EXPECT_EQ(jobs.GetStatus(readback), Runtime::DerivedJobStatus::Complete);
+    EXPECT_EQ(jobs.GetState(readback), Runtime::JobState::Published);
 
     auto heights = properties.Registry().Get<float>("v:height");
     ASSERT_TRUE(heights.has_value());
@@ -359,10 +352,15 @@ TEST(GpuReadbackJobGpuSmoke, VulkanTransferReadbackWritesPropertyAndFollowUpUplo
         EXPECT_FLOAT_EQ(heights->Span()[index], readbackValues[index]);
     }
 
-    executor.PumpBackground(1);
-    executor.DrainCompletions();
-    jobs.ApplyMainThreadResults();
-    EXPECT_EQ(jobs.GetStatus(colorJob), Runtime::DerivedJobStatus::Complete);
+    const auto colorDeadline =
+        std::chrono::steady_clock::now() + std::chrono::seconds{3};
+    while (!jobs.IsComplete(colorJob) &&
+           std::chrono::steady_clock::now() < colorDeadline)
+    {
+        (void)jobs.DrainCompletions(events);
+        std::this_thread::sleep_for(std::chrono::milliseconds{1});
+    }
+    EXPECT_EQ(jobs.GetState(colorJob), Runtime::JobState::Published);
     ASSERT_TRUE(colorUpload.IsValid());
     ASSERT_TRUE(DrainTransferTokenUntilComplete(queue, colorUpload.Token))
         << "timed out uploading derived color property";
@@ -389,11 +387,13 @@ TEST(GpuReadbackJobGpuSmoke, VulkanTransferReadbackWritesPropertyAndFollowUpUplo
         << "timed out reading back derived color upload";
     EXPECT_EQ(actualColorBytes, expectedColorBytes);
 
-    const Runtime::DerivedJobQueueSnapshot jobSnapshot = jobs.SnapshotAll();
-    EXPECT_EQ(jobSnapshot.Readbacks.Issued, 1u);
-    EXPECT_EQ(jobSnapshot.Readbacks.Completed, 1u);
-    EXPECT_EQ(jobSnapshot.Readbacks.Waiting, 0u);
-    EXPECT_EQ(jobSnapshot.Readbacks.Failed, 0u);
+    const std::vector<Runtime::JobSnapshot> jobSnapshot = jobs.SnapshotAll();
+    ASSERT_EQ(jobSnapshot.size(), 2u);
+    EXPECT_EQ(jobSnapshot[0].Token, readback);
+    EXPECT_EQ(jobSnapshot[0].State, Runtime::JobState::Published);
+    EXPECT_EQ(jobSnapshot[1].Token, colorJob);
+    EXPECT_EQ(jobSnapshot[1].State, Runtime::JobState::Published);
+    EXPECT_EQ(jobs.Stats().PublishedCompletions, 2u);
 
     device->DestroyBuffer(colorBuffer);
     device->DestroyBuffer(source);

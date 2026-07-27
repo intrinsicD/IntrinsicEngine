@@ -533,9 +533,53 @@ and commits independently.
 
                   Two contract tests: enumeration/ordering/reap lifecycle, and
                   progress + age propagation. CPU gate 4264/4264.
-            - [ ] **B5a** — `Runtime.GpuReadbackJob` (1 desc; readback parking
-                  and staleness map onto `IsReadyToApply` /
-                  `ValidateBeforeApply`).
+            - [x] **B5a — `Runtime.GpuReadbackJob`.** Taken first: the census
+                  showed it has **no production caller at all** — the helper is
+                  exercised only by its own CPU contract test and the opt-in
+                  `gpu;vulkan` smoke — so it migrates without touching a live
+                  workflow.
+
+                  `SubmitGpuReadbackJob(DerivedJobRegistry&, ...)` becomes
+                  `SubmitGpuReadbackJob(JobService&, ...)` returning a
+                  `JobToken`. Readback parking maps onto `IsReadyToApply` and
+                  staleness onto `ValidateBeforeApply`, and the property write
+                  moves into `PublishCompletion`.
+
+                  **The separate readback drain disappears.** The registry
+                  needed `DrainReadbacks()` to re-poll parked records;
+                  `JobService::DrainCompletions` re-polls the readiness gate
+                  itself, so the caller sequence collapses from
+                  `DrainCompletions` + `DrainReadbacks` + `ApplyMainThreadResults`
+                  to one drain.
+
+                  Dropped from `GpuReadbackJobDesc`: `DerivedJobKey Key` (no
+                  caller needed it; identity belongs to the consumer, per the
+                  B5 decision) and `HasPreviousOutput` (retention was a registry
+                  snapshot concern with no `JobService` counterpart and no
+                  caller). `ApplyAfterWrite` loses its `DerivedJobApplyContext`
+                  parameter — no caller read it — and becomes
+                  `move_only_function<Core::Result()>`, with a failure now
+                  failing the completion rather than being recorded as a job
+                  error, since `PublishCompletion` returning false is the
+                  service's equivalent.
+
+                  Test-side: the harness swaps `StreamingExecutor` +
+                  `DerivedJobRegistry` for `JobService` + `KernelEventBus` and
+                  gains a `SchedulerScope`, since `JobService` dispatches at
+                  submit. Assertions move from `DerivedJobStatus` /
+                  `StreamingTaskState` to `JobState` (`AwaitingApply` for a
+                  parked readback, `Published` on apply) and from
+                  `Readbacks.Issued/Waiting/Completed` to `Stats().LastDrainParked`
+                  / `AwaitingApplyJobs` plus the new `SnapshotAll()`. The
+                  follow-up test's `SubmitFollowUp` becomes a plain `JobDesc`
+                  with `DependsOn`. Because the readback body now runs on a
+                  worker, the tests wait for `AwaitingGate` before reading the
+                  command context it recorded into — that state transition is
+                  the synchronising edge.
+
+                  CPU gate 4264/4264; `GpuReadbackJob.*` 0/40 under stress. The
+                  `gpu;vulkan` smoke is migrated in the same commit but is
+                  opt-in and did not run on this host.
             - [ ] **B5b** — `Runtime.AssetModelSceneHandoff` (4 descs,
                   dependency chains).
             - [ ] **B5c** — `Runtime.SelectedMeshTextureBake` (1 desc).

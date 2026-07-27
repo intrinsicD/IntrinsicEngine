@@ -17,7 +17,8 @@ import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Types;
-import Extrinsic.Runtime.DerivedJobGraph;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.Properties;
 
@@ -45,14 +46,12 @@ export namespace Extrinsic::Runtime
 
     struct GpuReadbackJobDesc
     {
-        DerivedJobKey Key{};
         std::string Name{};
         Core::Dag::TaskPriority Priority{Core::Dag::TaskPriority::Normal};
         std::uint32_t EstimatedCost{1u};
         std::uint64_t CancellationGeneration{0u};
         WorldHandle Scope{DefaultWorldHandle};
-        bool HasPreviousOutput{false};
-        std::vector<DerivedJobDependency> DependsOn{};
+        std::vector<JobDependency> DependsOn{};
 
         Graphics::GpuTransfer* Transfer{nullptr};
         RHI::ICommandContext* CommandContext{nullptr};
@@ -61,8 +60,12 @@ export namespace Extrinsic::Runtime
         RHI::MemoryAccess SourceAccess{RHI::MemoryAccess::ShaderWrite};
         GpuReadbackPropertyBinding Binding{};
 
-        std::move_only_function<DerivedJobApplyValidation()> ValidateOnMainThread{};
-        std::move_only_function<Core::Result(DerivedJobApplyContext&)> ApplyAfterWrite{};
+        // Fail-closed revalidation on the main thread, immediately before the
+        // readback bytes are allowed to touch the target property.
+        std::move_only_function<JobApplyValidation()> ValidateBeforeApply{};
+        // Runs after the property write succeeds, on the main thread. A failure
+        // here fails the job's completion the same way a failed write does.
+        std::move_only_function<Core::Result()> ApplyAfterWrite{};
     };
 
     [[nodiscard]] Core::Result ValidateGpuReadbackPropertyBinding(
@@ -72,7 +75,13 @@ export namespace Extrinsic::Runtime
         const GpuReadbackPropertyBinding& binding,
         std::span<const std::byte> bytes) noexcept;
 
-    [[nodiscard]] DerivedJobHandle SubmitGpuReadbackJob(
-        DerivedJobRegistry& registry,
+    // Issues the readback on a worker, parks the job until the transfer is
+    // delivered, then writes the bytes into the bound property from the
+    // main-thread completion drain. RUNTIME-194 Slice B5a moved this from
+    // `DerivedJobRegistry` onto `JobService`: readback parking is
+    // `JobDesc::IsReadyToApply` and staleness is `JobDesc::ValidateBeforeApply`,
+    // so the helper composes the one execution service instead of a second one.
+    [[nodiscard]] JobToken SubmitGpuReadbackJob(
+        JobService& jobs,
         GpuReadbackJobDesc desc);
 }

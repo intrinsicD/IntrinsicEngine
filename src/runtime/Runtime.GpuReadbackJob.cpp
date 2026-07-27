@@ -23,7 +23,8 @@ import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
-import Extrinsic.Runtime.DerivedJobGraph;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Geometry.Properties;
 
 namespace Extrinsic::Runtime
@@ -155,6 +156,13 @@ namespace Extrinsic::Runtime
             }
             return Core::Err(Core::ErrorCode::InvalidArgument);
         }
+
+        // Receipt that the readback was issued and its ticket is valid; the
+        // bytes themselves live in the shared buffer the callbacks capture.
+        struct GpuReadbackIssued
+        {
+            std::uint64_t TicketId{0u};
+        };
     }
 
     Core::Result ValidateGpuReadbackPropertyBinding(
@@ -170,8 +178,8 @@ namespace Extrinsic::Runtime
         return WriteBindingByType(binding, bytes);
     }
 
-    DerivedJobHandle SubmitGpuReadbackJob(
-        DerivedJobRegistry& registry,
+    JobToken SubmitGpuReadbackJob(
+        JobService& jobs,
         GpuReadbackJobDesc desc)
     {
         auto bytes = std::make_shared<std::vector<std::byte>>(
@@ -185,22 +193,19 @@ namespace Extrinsic::Runtime
         const RHI::MemoryAccess sourceAccess = desc.SourceAccess;
         const GpuReadbackPropertyBinding binding = std::move(desc.Binding);
 
-        DerivedJobDesc derived{};
-        derived.Key = std::move(desc.Key);
-        derived.Name = std::move(desc.Name);
-        derived.Priority = desc.Priority;
-        derived.EstimatedCost = std::max<std::uint32_t>(1u, desc.EstimatedCost);
-        derived.CancellationGeneration = desc.CancellationGeneration;
-        derived.Scope = desc.Scope;
-        derived.HasPreviousOutput = desc.HasPreviousOutput;
-        derived.IsReadbackJob = true;
-        derived.ReadbackByteSize = binding.SourceRange.SizeBytes;
-        derived.DependsOn = std::move(desc.DependsOn);
-        derived.ValidateOnMainThread = std::move(desc.ValidateOnMainThread);
+        JobDesc job{};
+        job.DebugName = std::move(desc.Name);
+        job.Scope = desc.Scope;
+        job.Priority = desc.Priority;
+        job.Kind = RuntimeTaskKinds::GeometryProcess;
+        job.EstimatedCost = std::max<std::uint32_t>(1u, desc.EstimatedCost);
+        job.CancellationGeneration = desc.CancellationGeneration;
+        job.DependsOn = std::move(desc.DependsOn);
+        job.ValidateBeforeApply = std::move(desc.ValidateBeforeApply);
 
-        derived.Execute =
-            [transfer, commandContext, source, sourceDesc, sourceAccess, binding, bytes, ticket]()
-            mutable -> DerivedJobWorkerResult
+        job.Work =
+            [transfer, commandContext, source, sourceDesc, sourceAccess, binding, bytes, ticket](
+                const JobCancellation&) mutable
         {
             if (transfer == nullptr ||
                 commandContext == nullptr ||
@@ -208,7 +213,9 @@ namespace Extrinsic::Runtime
                 bytes == nullptr ||
                 ticket == nullptr)
             {
-                return std::unexpected(Core::ErrorCode::InvalidArgument);
+                // An empty envelope is how JobService reports a dropped job,
+                // which is the fail-closed outcome for an unusable request.
+                return JobResultEnvelope{};
             }
 
             bytes->assign(static_cast<std::size_t>(binding.SourceRange.SizeBytes), std::byte{0});
@@ -224,19 +231,15 @@ namespace Extrinsic::Runtime
                 });
 
             if (!ticket->IsValid())
-            {
-                return std::unexpected(Core::ErrorCode::InvalidState);
-            }
+                return JobResultEnvelope{};
 
-            return DerivedJobOutput{
-                .PayloadToken = ticket->Id,
-                .NormalizedProgress = 0.5f,
-                .ProgressDeterminate = true,
-                .Diagnostic = "readback issued",
-            };
+            return JobResultEnvelope::Make<GpuReadbackIssued>(
+                GpuReadbackIssued{.TicketId = ticket->Id});
         };
 
-        derived.IsReadbackReady = [transfer, ticket]() noexcept -> bool
+        // Parks the finished job across drains until the transfer lands, rather
+        // than blocking a drain waiting for the GPU.
+        job.IsReadyToApply = [transfer, ticket]() noexcept -> bool
         {
             return transfer != nullptr &&
                    ticket != nullptr &&
@@ -245,30 +248,25 @@ namespace Extrinsic::Runtime
         };
 
         auto afterWrite = std::move(desc.ApplyAfterWrite);
-        derived.ApplyOnMainThread =
-            [binding, bytes, afterWrite = std::move(afterWrite)](DerivedJobApplyContext& context)
-            mutable -> Core::Result
+        job.PublishCompletion =
+            [binding, bytes, afterWrite = std::move(afterWrite)](
+                KernelEventBus&,
+                const JobResultEnvelope& envelope) mutable -> bool
         {
-            if (bytes == nullptr)
-            {
-                return Core::Err(Core::ErrorCode::InvalidState);
-            }
+            if (envelope.TryGet<GpuReadbackIssued>() == nullptr || bytes == nullptr)
+                return false;
 
             auto write = WriteGpuReadbackProperty(
                 binding,
                 std::span<const std::byte>{bytes->data(), bytes->size()});
             if (!write.has_value())
-            {
-                return write;
-            }
+                return false;
 
             if (afterWrite)
-            {
-                return afterWrite(context);
-            }
-            return Core::Ok();
+                return afterWrite().has_value();
+            return true;
         };
 
-        return registry.Submit(std::move(derived));
+        return jobs.Submit(std::move(job));
     }
 }
