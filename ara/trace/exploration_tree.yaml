@@ -6646,12 +6646,12 @@ tree:
     timestamp: "2026-07-27T21:35+02:00"
     also_depends_on: [N279]
     evidence:
-      - "tasks/active/RUNTIME-195-unified-gpu-result-readback.md"
+      - "tasks/done/RUNTIME-195-unified-gpu-result-readback.md"
       - "src/graphics/renderer/Graphics.GpuTransfer.cppm"
       - "src/graphics/renderer/Graphics.GpuTransfer.cpp"
       - "tests/contract/graphics/Test.GpuTransferFacade.cpp"
-      - "tests/contract/runtime/Test.GpuReadbackJob.cpp"
-      - "ctest --test-dir build/ci --output-on-failure -R '^(GpuTransferFacade|GpuResultReadbackJob|GpuReadbackJob)\\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "tests/contract/runtime/Test.GpuResultReadbackJob.cpp"
+      - "ctest --test-dir build/ci --output-on-failure -R '^(GpuTransferFacade|GpuResultReadbackJob)\\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
       - "python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicCpuTests"
       - "strict layering, task-policy, test-layout, and documentation-link checks"
     result: >
@@ -6671,7 +6671,7 @@ tree:
     timestamp: "2026-07-27T21:52+02:00"
     also_depends_on: [N280]
     evidence:
-      - "tasks/active/RUNTIME-195-unified-gpu-result-readback.md"
+      - "tasks/done/RUNTIME-195-unified-gpu-result-readback.md"
       - "src/runtime/Runtime.KMeansGpuBackend.cppm"
       - "src/runtime/Runtime.KMeansGpuBackend.cpp"
       - "src/runtime/Runtime.KMeansGpuJobQueue.cpp"
@@ -6696,7 +6696,7 @@ tree:
     timestamp: "2026-07-27T22:19+02:00"
     also_depends_on: [N280, N281]
     evidence:
-      - "tasks/active/RUNTIME-195-unified-gpu-result-readback.md"
+      - "tasks/done/RUNTIME-195-unified-gpu-result-readback.md"
       - "src/runtime/Runtime.ProgressivePoissonGpuBackend.cppm"
       - "src/runtime/Runtime.ProgressivePoissonGpuBackend.cpp"
       - "tests/contract/runtime/Test.ProgressivePoissonGpuBackend.cpp"
@@ -6713,4 +6713,35 @@ tree:
       and one exactly-once consume. The smoke uses a CPU-reference-shaped
       seeded payload and therefore proves the actual transfer/parser path, not
       Progressive Poisson compute or public parity; METHOD-014 retains those.
+    status: resolved
+  - id: N283
+    type: experiment
+    title: "Retire the duplicate runtime GPU-result readback surfaces"
+    provenance: ai-executed
+    timestamp: "2026-07-27T22:42+02:00"
+    also_depends_on: [N280, N281, N282]
+    evidence:
+      - "tasks/done/RUNTIME-195-unified-gpu-result-readback.md"
+      - "src/graphics/renderer/Graphics.GpuTransfer.cppm"
+      - "src/graphics/renderer/Graphics.GpuTransfer.cpp"
+      - "src/runtime/Runtime.KMeansGpuBackend.cpp"
+      - "src/runtime/Runtime.ProgressivePoissonGpuBackend.cpp"
+      - "tests/contract/runtime/Test.GpuResultReadbackJob.cpp"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "tests/integration/runtime/Test.GpuResultReadbackGpuSmoke.cpp"
+      - "docs/api/generated/module_inventory.md"
+      - "focused CPU result-readback cohort: 40/40 plus retirement ratchet 1/1"
+      - "complete CPU-supported selector: 4230/4230 with one expected self-skip"
+      - "ASan+UBSan promoted-Vulkan RUNTIME-195 cohort: 3/3"
+      - "CPU routing: 4229 cases; Vulkan routing: 45 cases"
+      - "NVIDIA GeForce RTX 3050, driver 590.48.01"
+    result: >
+      The superseded Runtime.AsyncBufferReadback and Runtime.GpuReadbackJob
+      modules, sources, CMake entries, and wrapper-only tests are absent. The
+      censused K-Means and Progressive Poisson result paths use the existing
+      Graphics.GpuTransfer multi-range batch, feature-owned typed parsing, and
+      the existing JobService waiting lifecycle. CPU contracts and all three
+      actual-Vulkan fixtures passed. Renderer SelectionReadback remains outside
+      this result-transport lifecycle, and METHOD-014 still owns Progressive
+      Poisson compute and public parity.
     status: resolved

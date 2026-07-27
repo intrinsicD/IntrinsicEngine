@@ -129,11 +129,11 @@
   cancelled in-flight sink loses required storage or remains consumable, a
   batch consumes twice, a dependent releases before successful publication, or
   world cancellation permits later publication.
-- **Proof**: [tasks/active/RUNTIME-195-unified-gpu-result-readback.md,
+- **Proof**: [tasks/done/RUNTIME-195-unified-gpu-result-readback.md,
   src/graphics/renderer/Graphics.GpuTransfer.cppm,
   src/graphics/renderer/Graphics.GpuTransfer.cpp,
   tests/contract/graphics/Test.GpuTransferFacade.cpp,
-  tests/contract/runtime/Test.GpuReadbackJob.cpp]
+  tests/contract/runtime/Test.GpuResultReadbackJob.cpp]
 - **Dependencies**: [C06]
 - **Tags**: graphics, runtime, GPU readback, JobService, CPU-supported
 - **From staging**: O62
@@ -152,7 +152,7 @@
   wrapper, submits more than one logical result batch, emits more than one
   transfer-read barrier for its shared Work buffer, consumes the result more
   than once, or the operational parity fixture disagrees with the CPU reference.
-- **Proof**: [tasks/active/RUNTIME-195-unified-gpu-result-readback.md,
+- **Proof**: [tasks/done/RUNTIME-195-unified-gpu-result-readback.md,
   src/runtime/Runtime.KMeansGpuBackend.cppm,
   src/runtime/Runtime.KMeansGpuBackend.cpp,
   src/runtime/Runtime.KMeansGpuJobQueue.cpp,
@@ -179,7 +179,7 @@
   result, submits more than one logical batch, consumes the result more than
   once, or the actual-Vulkan transport fixture does not reproduce the seeded
   CPU-reference-shaped order, level offsets, and splat radii.
-- **Proof**: [tasks/active/RUNTIME-195-unified-gpu-result-readback.md,
+- **Proof**: [tasks/done/RUNTIME-195-unified-gpu-result-readback.md,
   src/runtime/Runtime.ProgressivePoissonGpuBackend.cppm,
   src/runtime/Runtime.ProgressivePoissonGpuBackend.cpp,
   tests/contract/runtime/Test.ProgressivePoissonGpuBackend.cpp,
@@ -188,3 +188,33 @@
 - **Tags**: Progressive Poisson, graphics, runtime, GPU readback, Vulkan,
   transport
 - **From staging**: O64
+
+## C10: Runtime compute-result readback has one shared lifecycle
+- **Statement**: Every censused runtime compute-result workflow uses one
+  copied, multi-range `Graphics.GpuTransfer` batch with feature-owned typed
+  parsing and canonical `JobService` waiting/publication. The superseded
+  `Runtime.AsyncBufferReadback` and `Runtime.GpuReadbackJob` modules, build
+  entries, and wrapper-only tests are absent. Renderer `SelectionReadback`
+  remains an explicitly separate frame-correlated lifecycle.
+- **Status**: supported — CPU/fake-queue contracts plus ASan+UBSan promoted
+  Vulkan on NVIDIA GeForce RTX 3050, driver 590.48.01; Progressive Poisson
+  compute/public parity remains excluded and owned by METHOD-014
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A runtime compute-result producer bypasses the
+  shared transfer batch, reintroduces either retired module or a feature-named
+  result queue/service, performs a blocking result `IDevice::ReadBuffer`, lets
+  the transport interpret feature semantics, or folds renderer selection into
+  this lifecycle.
+- **Proof**: [tasks/done/RUNTIME-195-unified-gpu-result-readback.md,
+  src/graphics/renderer/Graphics.GpuTransfer.cppm,
+  src/graphics/renderer/Graphics.GpuTransfer.cpp,
+  src/runtime/Runtime.KMeansGpuBackend.cpp,
+  src/runtime/Runtime.ProgressivePoissonGpuBackend.cpp,
+  tests/contract/runtime/Test.GpuResultReadbackJob.cpp,
+  tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
+  tests/integration/runtime/Test.GpuResultReadbackGpuSmoke.cpp,
+  docs/api/generated/module_inventory.md]
+- **Dependencies**: [C06, C08, C09]
+- **Tags**: graphics, runtime, GPU readback, JobService, Vulkan, retirement
+- **From staging**: O65

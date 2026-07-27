@@ -38,9 +38,10 @@ cleanup slice:
   and cancels shutdown survivors, and the duplicate streaming/derived-job
   systems are deleted. It supplies the execution prerequisite for the
   remaining consolidation tasks below.
-- [`RUNTIME-195` — Unified GPU-result readback](../../active/RUNTIME-195-unified-gpu-result-readback.md)
-  integrates one multi-range transfer wait with `JobService` and retires
-  `AsyncBufferReadback`, `GpuReadbackJob`, and blocking compute-result reads.
+- [`RUNTIME-195` — Unified GPU-result readback](../../done/RUNTIME-195-unified-gpu-result-readback.md)
+  is retired: one multi-range `Graphics.GpuTransfer` batch now composes with
+  `JobService`, and `AsyncBufferReadback`, `GpuReadbackJob`, duplicate result
+  buffers/copies, and blocking compute-result reads are gone.
 - [`RUNTIME-196` — Canonical clustering-service CPU/GPU path](RUNTIME-196-canonical-clustering-service-path.md)
   makes `ClusteringService::RunKMeans` the sole typed operation and deletes the
   parallel backend wrapper/private queue/facade DTOs after Vulkan parity.

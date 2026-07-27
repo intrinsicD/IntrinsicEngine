@@ -9,7 +9,6 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Runtime.AsyncWorkModule.cppm
-        Runtime.AsyncBufferReadback.cppm
         Runtime.AssetWorkflowModule.cppm
         Runtime.AssetImportPipeline.cppm
         Runtime.AssetGeometryIO.cppm
@@ -52,7 +51,6 @@ target_sources(${target_name}
         Runtime.WorldHandle.cppm
         Runtime.WorldRegistry.cppm
         Runtime.GeometryAvailability.cppm
-        Runtime.GpuReadbackJob.cppm
         Runtime.KMeansBackend.cppm
         Runtime.KMeansGpuBackend.cppm
         Runtime.RegistrationAlignment.cppm
@@ -91,7 +89,6 @@ target_sources(${target_name}
         Runtime.RenderExtraction.Internal.cpp
         PRIVATE
         Runtime.AsyncWorkModule.cpp
-        Runtime.AsyncBufferReadback.cpp
         Runtime.AssetWorkflowModule.cpp
         Runtime.AssetImportPipeline.cpp
         Runtime.AssetGeometryIO.cpp
@@ -133,7 +130,6 @@ target_sources(${target_name}
         Runtime.ServiceRegistry.cpp
         Runtime.WorldRegistry.cpp
         Runtime.GeometryAvailability.cpp
-        Runtime.GpuReadbackJob.cpp
         Runtime.KMeansBackend.cpp
         Runtime.KMeansGpuBackend.cpp
         Runtime.KMeansGpuJobQueue.cpp

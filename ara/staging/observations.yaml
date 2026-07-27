@@ -886,3 +886,23 @@ observations:
     promoted_to: "logic/claims.md:C09"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O65
+    timestamp: "2026-07-27T22:42+02:00"
+    provenance: ai-executed
+    content: >
+      Every censused runtime compute-result workflow now uses the existing
+      Graphics.GpuTransfer multi-range batch with feature-owned parsing and the
+      existing JobService waiting lifecycle; the two duplicate runtime
+      readback modules and their wrapper-only surfaces are retired.
+    context: >
+      RUNTIME-195 closure combines CPU/fake-queue contracts, a structural
+      absence ratchet, and three ASan+UBSan promoted-Vulkan fixtures on an
+      NVIDIA GeForce RTX 3050 with driver 590.48.01. Renderer selection remains
+      excluded, and the Progressive Poisson Vulkan fixture proves transport and
+      parsing rather than compute parity.
+    potential_type: claim
+    bound_to: [N283]
+    promoted: true
+    promoted_to: "logic/claims.md:C10"
+    crystallized_via: artifact-commitment
+    stale: false

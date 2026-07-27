@@ -118,8 +118,8 @@ RHI_MANAGER_SOURCES = frozenset(
         "Test.RHI.TextureManager.cpp",
     }
 )
-READBACK_SOURCE = "Test.GpuReadbackJobGpuSmoke.cpp"
-READBACK_TARGET = "IntrinsicRuntimeGpuReadbackSmokeTests"
+READBACK_SOURCE = "Test.GpuResultReadbackGpuSmoke.cpp"
+READBACK_TARGET = "IntrinsicRuntimeGpuResultReadbackSmokeTests"
 FRAME_LOOP_SOURCE = "Test.RuntimeFrameLoopContract.cpp"
 GROUPED_PURE_CTEST_TARGETS = frozenset(
     {
@@ -173,7 +173,7 @@ AFFECTED_DEDICATED_TARGETS = frozenset(
     {
         "IntrinsicGraphicsIntegrationCpuTests",
         "IntrinsicGraphicsUnitTests",
-        "IntrinsicRuntimeGpuReadbackSmokeTests",
+        "IntrinsicRuntimeGpuResultReadbackSmokeTests",
         "IntrinsicRuntimeIntegrationTests",
     }
 )
@@ -186,12 +186,12 @@ AFFECTED_SHARED_SUITES = {
 AFFECTED_TARGET_CASE_COUNTS = {
     "IntrinsicGraphicsIntegrationCpuTests": 74,
     "IntrinsicGraphicsUnitTests": 20,
-    "IntrinsicRuntimeContractTests": 34,
-    "IntrinsicRuntimeGpuReadbackSmokeTests": 1,
+    "IntrinsicRuntimeContractTests": 35,
+    "IntrinsicRuntimeGpuResultReadbackSmokeTests": 1,
     "IntrinsicRuntimeGraphicsCpuTests": 9,
     "IntrinsicRuntimeIntegrationTests": 83,
 }
-EXPECTED_AFFECTED_CASE_COUNT = 221
+EXPECTED_AFFECTED_CASE_COUNT = 222
 
 AggregatePredicate = Callable[[frozenset[str]], bool]
 
@@ -458,12 +458,12 @@ def _validate_affected_contract(
 
     readback = _require_affected_owner(owners, READBACK_SOURCE)
     if (
-        readback.object_library != "RuntimeGpuReadbackSmokeTestObjs"
+        readback.object_library != "RuntimeGpuResultReadbackSmokeTestObjs"
         or readback.target != READBACK_TARGET
     ):
         raise ReconciliationError(
             f"{READBACK_SOURCE} must be owned by "
-            f"RuntimeGpuReadbackSmokeTestObjs/{READBACK_TARGET}, "
+            f"RuntimeGpuResultReadbackSmokeTestObjs/{READBACK_TARGET}, "
             f"got {readback.object_library}/{readback.target}"
         )
     readback_labels = targets.get(readback.target)
@@ -1128,7 +1128,7 @@ def reconcile(build_dir: Path, aggregate: str) -> tuple[int, int, int]:
     expected_affected_targets = members & AFFECTED_TARGET_CASE_COUNTS.keys()
     if aggregate == "IntrinsicGpuVulkanTests":
         expected_affected_targets = expected_affected_targets | {
-            "IntrinsicRuntimeGpuReadbackSmokeTests"
+            "IntrinsicRuntimeGpuResultReadbackSmokeTests"
         }
     expected_discovered_cases = frozenset(
         identity
@@ -1565,7 +1565,7 @@ OrdinarySuite.
                 {"integration", "runtime", "graphics"}
             ),
             "IntrinsicGraphicsUnitTests": frozenset({"unit", "graphics"}),
-            "IntrinsicRuntimeGpuReadbackSmokeTests": frozenset(
+            "IntrinsicRuntimeGpuResultReadbackSmokeTests": frozenset(
                 {"gpu", "vulkan", "integration", "runtime", "graphics", "slow"}
             ),
         }
@@ -1582,8 +1582,8 @@ OrdinarySuite.
         readback_source = f"tests/integration/runtime/{READBACK_SOURCE}"
         sources[readback_source] = SourceOwner(
             readback_source,
-            "RuntimeGpuReadbackSmokeTestObjs",
-            "IntrinsicRuntimeGpuReadbackSmokeTests",
+            "RuntimeGpuResultReadbackSmokeTestObjs",
+            "IntrinsicRuntimeGpuResultReadbackSmokeTests",
         )
 
         _validate_affected_contract(targets, sources)

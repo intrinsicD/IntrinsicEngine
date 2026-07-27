@@ -28,7 +28,6 @@ import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
 import Extrinsic.Core.Tasks;
-import Extrinsic.Runtime.GpuReadbackJob;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Geometry.Properties;
@@ -158,9 +157,14 @@ namespace
         std::uint64_t PayloadToken{0u};
     };
 
+    struct ReadbackBatchIssued
+    {
+        std::uint64_t TicketId{0u};
+    };
+
     // Pumps the transfer queue and the JobService completion drain until the
-    // readback job publishes. The drain itself re-polls `IsReadyToApply`, so
-    // there is no separate readback drain to run.
+    // shared result job publishes. The drain itself re-polls `IsReadyToApply`,
+    // so there is no separate runtime readback wrapper to drain.
     [[nodiscard]] bool DrainRuntimeReadbackUntilApplied(
         RHI::ITransferQueue& queue,
         Graphics::GpuTransfer& transfer,
@@ -183,15 +187,16 @@ namespace
     }
 }
 
-TEST(GpuReadbackJobGpuSmoke, VulkanTransferReadbackWritesPropertyAndFollowUpUploadsDerivedColor)
+TEST(GpuResultReadbackGpuSmoke,
+     SharedBatchParksJobAndReleasesDerivedUpload)
 {
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
     {
-        GTEST_SKIP() << "GLFW could not initialize in this environment; gpu;vulkan readback-job smoke is opt-in.";
+        GTEST_SKIP() << "GLFW could not initialize in this environment; gpu;vulkan result-readback smoke is opt-in.";
     }
 
     Extrinsic::Core::Config::WindowConfig windowConfig{};
-    windowConfig.Title = "Intrinsic runtime GPU readback job smoke";
+    windowConfig.Title = "Intrinsic runtime GPU result-readback smoke";
     windowConfig.Width = 64;
     windowConfig.Height = 64;
     windowConfig.Resizable = false;
@@ -201,7 +206,7 @@ TEST(GpuReadbackJobGpuSmoke, VulkanTransferReadbackWritesPropertyAndFollowUpUplo
     ASSERT_NE(window, nullptr);
     if (window->GetNativeHandle() == nullptr)
     {
-        GTEST_SKIP() << "GLFW window creation failed; gpu;vulkan readback-job smoke requires a native surface.";
+        GTEST_SKIP() << "GLFW window creation failed; gpu;vulkan result-readback smoke requires a native surface.";
     }
 
     Extrinsic::Core::Config::RenderConfig renderConfig{};
@@ -234,7 +239,7 @@ TEST(GpuReadbackJobGpuSmoke, VulkanTransferReadbackWritesPropertyAndFollowUpUplo
                  RHI::BufferUsage::TransferDst |
                  RHI::BufferUsage::TransferSrc,
         .HostVisible = false,
-        .DebugName = "GpuReadbackJobGpuSmoke.Source",
+        .DebugName = "GpuResultReadbackGpuSmoke.Source",
     };
     const RHI::BufferHandle source = device->CreateBuffer(sourceDesc);
     ASSERT_TRUE(source.IsValid());
@@ -245,7 +250,7 @@ TEST(GpuReadbackJobGpuSmoke, VulkanTransferReadbackWritesPropertyAndFollowUpUplo
                  RHI::BufferUsage::TransferDst |
                  RHI::BufferUsage::TransferSrc,
         .HostVisible = false,
-        .DebugName = "GpuReadbackJobGpuSmoke.DerivedColor",
+        .DebugName = "GpuResultReadbackGpuSmoke.DerivedColor",
     };
     const RHI::BufferHandle colorBuffer = device->CreateBuffer(colorDesc);
     ASSERT_TRUE(colorBuffer.IsValid());
@@ -269,26 +274,72 @@ TEST(GpuReadbackJobGpuSmoke, VulkanTransferReadbackWritesPropertyAndFollowUpUplo
     Runtime::JobService jobs{};
     Runtime::KernelEventBus events{};
 
-    const Runtime::JobToken readback =
-        Runtime::SubmitGpuReadbackJob(
-            jobs,
-            Runtime::GpuReadbackJobDesc{
-                .Name = "vulkan readback to scalar property",
-                .Transfer = &transfer,
-                .CommandContext = &commandContext,
-                .Source = source,
-                .SourceDesc = sourceDesc,
-                .SourceAccess = RHI::MemoryAccess::ShaderRead,
-                .Binding = Runtime::GpuReadbackPropertyBinding{
-                    .TargetProperties = &properties.Registry(),
-                    .TargetProperty = "v:height",
-                    .TargetType = Runtime::GpuReadbackPropertyType::Float32,
-                    .SourceRange = RHI::BufferRange{
-                        .OffsetBytes = 0u,
-                        .SizeBytes = readbackValues.size() * sizeof(float),
-                    },
-                },
-            });
+    const std::array resultRanges{
+        Graphics::GpuTransferReadbackRangeDesc{
+            .Source = source,
+            .SourceDesc = sourceDesc,
+            .SourceRange = RHI::BufferRange{
+                .OffsetBytes = 0u,
+                .SizeBytes = readbackValues.size() * sizeof(float),
+            },
+            .SourceAccess = RHI::MemoryAccess::ShaderRead,
+        },
+    };
+    const Graphics::GpuTransferReadbackBatchTicket resultTicket =
+        transfer.ScheduleReadbackBatch(
+            commandContext,
+            Graphics::GpuTransferReadbackBatchDesc{.Ranges = resultRanges});
+    ASSERT_TRUE(resultTicket.IsValid());
+
+    Runtime::JobDesc readbackDesc{};
+    readbackDesc.DebugName = "vulkan shared result to scalar property";
+    readbackDesc.Work = [resultTicket](const Runtime::JobCancellation&)
+    {
+        return Runtime::JobResultEnvelope::Make<ReadbackBatchIssued>(
+            ReadbackBatchIssued{.TicketId = resultTicket.Id});
+    };
+    readbackDesc.IsReadyToApply = [&transfer, resultTicket]
+    {
+        return transfer.ReadbackBatchState(resultTicket) ==
+               Graphics::GpuTransferReadbackBatchState::Ready;
+    };
+    readbackDesc.PublishCompletion =
+        [&properties,
+         &transfer,
+         resultRanges,
+         resultTicket](Runtime::KernelEventBus&,
+                       const Runtime::JobResultEnvelope& envelope) -> bool
+    {
+        const ReadbackBatchIssued* issued =
+            envelope.TryGet<ReadbackBatchIssued>();
+        if (issued == nullptr || issued->TicketId != resultTicket.Id)
+            return false;
+
+        Graphics::GpuTransferReadbackBatchResult result{};
+        if (!transfer.ConsumeReadbackBatch(
+                resultTicket, resultRanges, result))
+        {
+            return false;
+        }
+
+        auto heights = properties.Registry().Get<float>("v:height");
+        const std::span<const std::byte> bytes = result.Bytes(0u);
+        if (!heights.has_value() ||
+            bytes.size_bytes() != heights->Span().size_bytes())
+        {
+            return false;
+        }
+        std::memcpy(heights->Span().data(),
+                    bytes.data(),
+                    bytes.size_bytes());
+        return true;
+    };
+    readbackDesc.FinalizeUnpublishedOnMainThread =
+        [&transfer, resultTicket]
+    {
+        (void)transfer.CancelReadbackBatch(resultTicket);
+    };
+    const Runtime::JobToken readback = jobs.Submit(std::move(readbackDesc));
     ASSERT_TRUE(readback.IsValid());
 
     Graphics::GpuTransferUploadTicket colorUpload{};
@@ -394,6 +445,12 @@ TEST(GpuReadbackJobGpuSmoke, VulkanTransferReadbackWritesPropertyAndFollowUpUplo
     EXPECT_EQ(jobSnapshot[1].Token, colorJob);
     EXPECT_EQ(jobSnapshot[1].State, Runtime::JobState::Published);
     EXPECT_EQ(jobs.Stats().PublishedCompletions, 2u);
+
+    const Graphics::GpuTransferDiagnostics diagnostics =
+        transfer.GetDiagnostics();
+    EXPECT_EQ(diagnostics.ReadbackBatchesIssued, 1u);
+    EXPECT_EQ(diagnostics.ReadbackBatchesDelivered, 1u);
+    EXPECT_EQ(diagnostics.ReadbackBatchesConsumed, 1u);
 
     device->DestroyBuffer(colorBuffer);
     device->DestroyBuffer(source);

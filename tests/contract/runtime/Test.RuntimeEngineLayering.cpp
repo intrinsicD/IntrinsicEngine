@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -682,6 +683,69 @@ TEST(RuntimeEngineLayering, SupersededWorkSurfacesAreRetiredFromBuild)
     EXPECT_EQ(testsCMake.find("Test.DerivedJobGraph.cpp"), std::string::npos);
 }
 
+TEST(RuntimeEngineLayering,
+     SupersededGpuResultReadbackSurfacesAreRetiredFromBuild)
+{
+    const auto root = RepoRoot();
+    const auto runtimeCMake = ReadFile(root / "src/runtime/CMakeLists.txt");
+    const auto testsCMake = ReadFile(root / "tests/CMakeLists.txt");
+
+    const std::array retiredPaths{
+        root / "src/runtime/Runtime.AsyncBufferReadback.cppm",
+        root / "src/runtime/Runtime.AsyncBufferReadback.cpp",
+        root / "src/runtime/Runtime.GpuReadbackJob.cppm",
+        root / "src/runtime/Runtime.GpuReadbackJob.cpp",
+        root / "tests/contract/runtime/Test.AsyncBufferReadback.cpp",
+        root / "tests/contract/runtime/Test.GpuReadbackJob.cpp",
+        root / "tests/integration/runtime/Test.GpuReadbackJobGpuSmoke.cpp",
+    };
+    for (const auto& path : retiredPaths)
+        EXPECT_FALSE(std::filesystem::exists(path)) << path;
+
+    EXPECT_EQ(runtimeCMake.find("Runtime.AsyncBufferReadback"),
+              std::string::npos);
+    EXPECT_EQ(runtimeCMake.find("Runtime.GpuReadbackJob"),
+              std::string::npos);
+    EXPECT_EQ(testsCMake.find("Test.AsyncBufferReadback.cpp"),
+              std::string::npos);
+    EXPECT_EQ(testsCMake.find("Test.GpuReadbackJob.cpp"),
+              std::string::npos);
+    EXPECT_NE(testsCMake.find("Test.GpuResultReadbackJob.cpp"),
+              std::string::npos);
+    EXPECT_NE(testsCMake.find("Test.GpuResultReadbackGpuSmoke.cpp"),
+              std::string::npos);
+
+    const std::array sourceRoots{
+        root / "src/runtime",
+        root / "methods",
+    };
+    for (const auto& sourceRoot : sourceRoots)
+    {
+        for (const auto& entry :
+             std::filesystem::recursive_directory_iterator(sourceRoot))
+        {
+            if (!entry.is_regular_file())
+                continue;
+            const auto extension = entry.path().extension().string();
+            if (extension != ".cpp" && extension != ".cppm")
+                continue;
+
+            const std::string content = ReadFile(entry.path());
+            EXPECT_EQ(content.find("ReadBuffer("), std::string::npos)
+                << entry.path();
+            EXPECT_EQ(
+                content.find(
+                    "import Extrinsic.Runtime.AsyncBufferReadback"),
+                std::string::npos)
+                << entry.path();
+            EXPECT_EQ(
+                content.find("import Extrinsic.Runtime.GpuReadbackJob"),
+                std::string::npos)
+                << entry.path();
+        }
+    }
+}
+
 TEST(RuntimeEngineLayering, AsyncWorkModulePublishesOnlyKernelJobService)
 {
     const auto engineInterface =
@@ -876,8 +940,6 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
         ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxMethodFacade.cpp");
     const auto editorFacades =
         ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxEditorFacades.cpp");
-    const auto readback =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.GpuReadbackJob.cpp");
     const auto assetWorkflow =
         ReadFile(RepoRoot() / "src/runtime/Runtime.AssetWorkflowModule.cpp");
 
@@ -914,9 +976,6 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
               1u);
     EXPECT_NE(WithoutWhitespace(editorFacades).find(".World=activeWorld"),
               std::string::npos);
-    EXPECT_EQ(CountOccurrences(readback, "JobDesc job{}"), 1u);
-    EXPECT_EQ(CountOccurrences(readback, "job.Scope = desc.Scope"), 1u);
-
     EXPECT_EQ(CountOccurrences(assetWorkflow, ".World = BoundWorld"), 2u);
     EXPECT_EQ(CountOccurrences(assetWorkflow, ".Worlds = Worlds"), 1u);
 }

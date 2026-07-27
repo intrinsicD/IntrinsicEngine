@@ -19,8 +19,8 @@ jobs:
       !github.event.pull_request.draft
     runs-on: ubuntu-24.04
     env:
-      VULKAN_READBACK_TEST: GpuReadbackJobGpuSmoke.VulkanTransferReadbackWritesPropertyAndFollowUpUploadsDerivedColor
-      VULKAN_OPERATIONAL_TEST_REGEX: '^(ExtrinsicSandbox\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)|GpuReadbackJobGpuSmoke\.VulkanTransferReadbackWritesPropertyAndFollowUpUploadsDerivedColor)$'
+      VULKAN_READBACK_TEST: GpuResultReadbackGpuSmoke.SharedBatchParksJobAndReleasesDerivedUpload
+      VULKAN_OPERATIONAL_TEST_REGEX: '^(ExtrinsicSandbox\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)|GpuResultReadbackGpuSmoke\.SharedBatchParksJobAndReleasesDerivedUpload)$'
 
     steps:
       - name: Checkout
@@ -80,7 +80,7 @@ jobs:
           python3 tools/ci/time_command.py \
             --label "Build promoted Vulkan targets" \
             --json-out build/ci-vulkan/ci-timing/phases/build.json \
-            -- cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicGpuVulkanTests IntrinsicRuntimeGpuReadbackSmokeTests IntrinsicGlfwLifecycleLsanProcess
+            -- cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicGpuVulkanTests IntrinsicRuntimeGpuResultReadbackSmokeTests IntrinsicGlfwLifecycleLsanProcess
 
       - name: Reconcile gpu;vulkan test routing
         run: |
@@ -100,7 +100,7 @@ jobs:
             --inventory build/ci-vulkan/test-inventories/IntrinsicGpuVulkanTests.txt
           python3 tools/ci/check_prerequisites.py test-binaries \
             --build-dir build/ci-vulkan \
-            --targets ExtrinsicSandbox IntrinsicRuntimeGpuReadbackSmokeTests IntrinsicGlfwLifecycleLsanProcess
+            --targets ExtrinsicSandbox IntrinsicRuntimeGpuResultReadbackSmokeTests IntrinsicGlfwLifecycleLsanProcess
           python3 tools/ci/time_command.py \
             --label "Run gpu;vulkan opt-in fixtures" \
             --json-out build/ci-vulkan/ci-timing/phases/test.json \
@@ -189,7 +189,7 @@ jobs:
              operational_tests="$(ctest --test-dir build/ci-vulkan --show-only=json-v1 -R "$VULKAN_OPERATIONAL_TEST_REGEX" -L "gpu" -L "vulkan" | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"; then
             context_args+=(--selected-test-count "$((gpu_tests + operational_tests))")
           fi
-          if ninja_edges="$(ninja -C build/ci-vulkan -t commands ExtrinsicSandbox IntrinsicGpuVulkanTests IntrinsicRuntimeGpuReadbackSmokeTests IntrinsicGlfwLifecycleLsanProcess | sed '/^[[:space:]]*$/d' | wc -l)"; then
+          if ninja_edges="$(ninja -C build/ci-vulkan -t commands ExtrinsicSandbox IntrinsicGpuVulkanTests IntrinsicRuntimeGpuResultReadbackSmokeTests IntrinsicGlfwLifecycleLsanProcess | sed '/^[[:space:]]*$/d' | wc -l)"; then
             context_args+=(--ninja-edge-count "$ninja_edges")
           fi
           python3 tools/ci/aggregate_gate_timing.py \

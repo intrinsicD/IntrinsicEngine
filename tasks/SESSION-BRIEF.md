@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-195` — Unified GPU-result readback (tasks/active/RUNTIME-195-unified-gpu-result-readback.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -79,7 +79,7 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-005` — Robust mesh boolean reference backend (tasks/backlog/methods/METHOD-005-robust-mesh-boolean-reference-backend.md)
 - blocked by `GEOM-024`: `METHOD-006` — Surface cross-field design CPU reference backend (tasks/backlog/methods/METHOD-006-cross-field-design-reference-backend.md)
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
-- blocked by `RUNTIME-195`: `METHOD-014` — Progressive Poisson GPU operational parity (tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md)
+- blocked by `RUNTIME-202`: `METHOD-014` — Progressive Poisson GPU operational parity (tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md)
 - blocked by `GEOM-058`: `METHOD-015` — Coherent Point Drift registration family reference backend (tasks/backlog/methods/METHOD-015-coherent-point-drift-family-reference-backend.md)
 - blocked by `GEOM-062`: `METHOD-016` — Locally Optimal Projection (LOP/WLOP) point-cloud consolidation reference backend (tasks/backlog/methods/METHOD-016-locally-optimal-projection-reference-backend.md)
 - blocked by `METHOD-016`: `METHOD-017` — Continuous LOP (CLOP) reference backend (tasks/backlog/methods/METHOD-017-continuous-lop-clop-reference-backend.md)
@@ -103,7 +103,7 @@ the authoritative open/unblocked view.
 - blocked by `METHOD-032`: `METHOD-036` — Normal-orientation method comparison evidence (publication protocol) (tasks/backlog/methods/METHOD-036-orientation-comparison-evidence.md)
 - blocked by `METHOD-016`: `RUNTIME-175` — Point-cloud consolidation runtime operation and config lane (tasks/backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md)
 - blocked by `METHOD-032`: `RUNTIME-189` — Sandbox debug-draw view for orientation parity diagnostics (tasks/backlog/runtime/RUNTIME-189-orientation-parity-debug-draw-view.md)
-- blocked by `RUNTIME-195`: `RUNTIME-196` — Canonical clustering-service CPU/GPU path (tasks/backlog/runtime/RUNTIME-196-canonical-clustering-service-path.md)
+- unblocked: `RUNTIME-196` — Canonical clustering-service CPU/GPU path (tasks/backlog/runtime/RUNTIME-196-canonical-clustering-service-path.md)
 - blocked by `RUNTIME-175`: `UI-035` — Sandbox point-cloud consolidation editor panel (tasks/backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md)
 
 ## Unthemed

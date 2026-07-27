@@ -15,7 +15,7 @@ depends_on: []
 
 ## Context
 - Status: backlog.
-- Owning subsystem/layer: `graphics`/`runtime` — the render-recipe/offscreen config and readback already exist (`Graphics.RenderRecipeConfig` `target: OffscreenTexture`/`mode: Headless`/`captureRequested`, `Runtime.RenderArtifactPublication` with `SavedToFile`, `Runtime.GpuReadbackJob`, `Graphics.RenderingContract` `RenderOutputKind::Color`/`ReadbackBuffer`). What is **missing** is the final step: a PNG encoder + save path wired to the capture request. Gate on `RHI::IDevice::IsOperational()`.
+- Owning subsystem/layer: `graphics`/`runtime` — the render-recipe/offscreen config and readback already exist (`Graphics.RenderRecipeConfig` `target: OffscreenTexture`/`mode: Headless`/`captureRequested`, `Runtime.RenderArtifactPublication` with `SavedToFile`, the shared `Graphics.GpuTransfer` batch plus caller-owned `Runtime.JobService` publication, and `Graphics.RenderingContract` `RenderOutputKind::Color`/`ReadbackBuffer`). What is **missing** is the final step: a PNG encoder + save path wired to the capture request. Gate on `RHI::IDevice::IsOperational()`.
 - Pairs with RUNTIME-131 (agent/CLI config facade) so captures can be driven without ImGui, and with RUNTIME-134 for an in-editor "export frame" action.
 
 ## Required changes

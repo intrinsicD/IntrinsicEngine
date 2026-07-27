@@ -8,6 +8,10 @@ maturity_target: Retired
 
 ## Status
 
+- Retired on 2026-07-27 at `Retired` after Slices A-C closed the shared
+  transfer contract, both production migrations, and duplicate-path deletion.
+- Commit reference: this retirement commit plus the Slice A/B commits recorded
+  in this status section.
 - Promoted to active on 2026-07-27 after retired `RUNTIME-194` supplied the
   single `JobService` lifecycle.
 - Slice A completed on 2026-07-27. The initial census found three production result
@@ -43,6 +47,21 @@ maturity_target: Retired
   seeds a CPU-reference-shaped payload into the production-shaped result
   buffers; it proves the actual Vulkan transfer/parser seam only. `METHOD-014`
   retains Progressive Poisson compute execution and public CPU/GPU parity.
+- Slice C completed on 2026-07-27. `Runtime.AsyncBufferReadback` and
+  `Runtime.GpuReadbackJob` are deleted from source, CMake, dedicated tests, and
+  the 384-module generated inventory. The two shared batch/`JobService`
+  readiness and world-cancellation contracts remain under the truthful
+  `GpuResultReadbackJob` suite, and the required operational CI fixture now
+  composes caller-owned parsing directly from `Graphics.GpuTransfer` and
+  `JobService`. Focused CPU evidence passed 40/40 plus the structural retirement
+  ratchet 1/1. All three sanitizer-enabled Vulkan fixtures passed 3/3 on the
+  same RTX 3050: K-Means compute parity, Progressive Poisson transport/parser,
+  and the generic parked-publication/dependent-upload workflow. CPU routing
+  reconciled 4,229 cases and Vulkan routing 45 cases. The Vulkan-specific
+  workflow ratchet passed; the unrelated whole-file concurrency failures remain
+  tracked by existing `BUG-120`. The canonical full `IntrinsicTests` build
+  completed and the CPU-supported selector passed 4,230/4,230 with the one
+  expected headless GLFW/LSan self-skip.
 
 ## Goal
 
@@ -98,9 +117,9 @@ maturity_target: Retired
 - [x] Migrate K-Means, Progressive Poisson, and every subsequent GPU method
       operation to one final-result readback; keep iteration/control reductions
       on device.
-- [ ] Replace `GpuReadbackJob`'s generic property-write behavior with
+- [x] Replace `GpuReadbackJob`'s generic property-write behavior with
       caller-owned typed result processing after delivery.
-- [ ] Delete `Runtime.AsyncBufferReadback`, `Runtime.GpuReadbackJob`, duplicate
+- [x] Delete `Runtime.AsyncBufferReadback`, `Runtime.GpuReadbackJob`, duplicate
       method-local readback queues, and blocking result `IDevice::ReadBuffer`
       calls only after CPU/fallback and actual-GPU tests use the new path.
 
@@ -109,30 +128,30 @@ maturity_target: Retired
 - [x] CPU/fake-device tests cover multi-range ordering, malformed ranges,
       incomplete delivery, cancellation, stale buffers, dependent work, and
       exactly-once resume/apply.
-- [ ] Port the valuable `GpuReadbackJob` contracts to the shared operation and
+- [x] Port the valuable `GpuReadbackJob` contracts to the shared operation and
       remove tests that only pin the obsolete wrapper.
 - [x] Opt-in `gpu;vulkan` tests prove K-Means compute results and a
       CPU-reference-shaped Progressive Poisson result use the shared transfer
       path without a device-wide result-read stall. The latter is deliberately
       transport/parser evidence, not `METHOD-014` compute parity.
-- [ ] Structural tests prove no production compute result calls
+- [x] Structural tests prove no production compute result calls
       `IDevice::ReadBuffer` and no old runtime readback module remains.
 
 ## Docs
 
 - [x] Document transfer ownership, JobService waiting, caller-owned parsing,
       and the explicit SelectionReadback exclusion.
-- [ ] Regenerate module inventory and test-routing documentation after module
+- [x] Regenerate module inventory and test-routing documentation after module
       and test target changes.
-- [ ] Refresh task indexes, session brief, and retirement records.
+- [x] Refresh task indexes, session brief, and retirement records.
 
 ## Acceptance criteria
 
-- [ ] One transfer/readback mechanism serves every runtime GPU-result
+- [x] One transfer/readback mechanism serves every runtime GPU-result
       operation and supports multiple result buffers/ranges.
-- [ ] Feature owners parse/process delivered bytes; the transport owns no
+- [x] Feature owners parse/process delivered bytes; the transport owns no
       K-Means, Poisson, geometry-property, or presentation semantics.
-- [ ] Both old runtime readback modules and all blocking compute-result reads
+- [x] Both old runtime readback modules and all blocking compute-result reads
       are deleted after K-Means compute parity and Progressive Poisson
       production-shaped transport/parser operation are proven. Progressive
       Poisson compute/public parity remains separately owned by `METHOD-014`.

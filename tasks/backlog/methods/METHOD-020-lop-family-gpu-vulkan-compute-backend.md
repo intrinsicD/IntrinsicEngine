@@ -146,8 +146,8 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 ## Forbidden changes
 - No divergence from the reference numerics beyond the documented parity tolerance.
 - No private scan/compaction primitives (reuse `ComputeParallelPrimitives`); no
-  `IDevice::ReadBuffer` or `AsyncBufferReadback` compatibility path for the
-  drain (use `RUNTIME-195`).
+  `IDevice::ReadBuffer` or retired `AsyncBufferReadback` compatibility path for
+  the drain (use the `RUNTIME-195` shared batch).
 - No speedup claim without the baseline; no `Vk*` types on the public seam.
 - No public consolidation backend module, feature queue, or parallel operation
   beside `RUNTIME-175`.

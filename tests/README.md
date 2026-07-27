@@ -299,19 +299,21 @@ that requires a live Vulkan backend. The corrected graphics/runtime topology is:
 | Executable | Canonical ownership |
 | --- | --- |
 | `IntrinsicRuntimeIntegrationTests` | Six runtime/core/assets CPU sources, 104 cases, labeled `integration;runtime` |
-| `IntrinsicRuntimeContractTests` | Sole CPU owner of the 25 `CoreGraphInterfaces` and `RuntimeEngineLayering` cases, labeled `contract;runtime` |
+| `IntrinsicRuntimeContractTests` | Sole CPU owner of the 35 `CoreGraphInterfaces` and `RuntimeEngineLayering` cases, labeled `contract;runtime` |
 | `IntrinsicRuntimeGraphicsCpuTests` | Sole owner of `RuntimeFrameLoopContract` and its nine cases, labeled `integration;runtime;graphics` |
 | `IntrinsicGraphicsIntegrationCpuTests` | Three MockDevice graphics integration sources, 74 cases, labeled `integration;graphics` |
 | `IntrinsicGraphicsUnitTests` | Three MockDevice unit sources, 20 cases, labeled `unit;graphics` |
-| `IntrinsicRuntimeGpuReadbackSmokeTests` | The one real readback case, labeled `gpu;vulkan;integration;runtime;graphics;slow` |
+| `IntrinsicRuntimeGpuResultReadbackSmokeTests` | The one real shared-result readback case, labeled `gpu;vulkan;integration;runtime;graphics;slow` |
 
-`IntrinsicRuntimeGpuReadbackSmokeTests` retains `slow`: current Linux-clang
+`IntrinsicRuntimeGpuResultReadbackSmokeTests` retains `slow`: current Linux-clang
 measurements exceed the documented one-second threshold. Its
-`GpuReadbackJobGpuSmoke.VulkanTransferReadbackWritesPropertyAndFollowUpUploadsDerivedColor`
-case remains outside the fast GPU aggregate, but `ci-vulkan` builds it
-explicitly and runs it under Xvfb with lavapipe alongside the two operational
-Sandbox contracts. The retained JUnit artifact is parsed in the job; an absent,
-skipped, or failed readback result fails the gate.
+`GpuResultReadbackGpuSmoke.SharedBatchParksJobAndReleasesDerivedUpload` case
+remains outside the fast GPU aggregate, but `ci-vulkan` builds it explicitly
+and runs it under Xvfb with lavapipe alongside the two operational Sandbox
+contracts. It schedules one shared `GpuTransfer` batch, parks canonical
+`JobService` publication until delivery, performs caller-owned property parsing,
+and releases a dependent upload. The retained JUnit artifact is parsed in the
+job; an absent, skipped, or failed result fails the gate.
 
 Common gates:
 
@@ -406,7 +408,7 @@ suppressions; the three entries are scoped to this runner.
 
 ```bash
 ctest --test-dir build/ci-vulkan --output-on-failure \
-  -R '^(ExtrinsicSandbox\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)|GpuReadbackJobGpuSmoke\.VulkanTransferReadbackWritesPropertyAndFollowUpUploadsDerivedColor)$' \
+  -R '^(ExtrinsicSandbox\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)|GpuResultReadbackGpuSmoke\.SharedBatchParksJobAndReleasesDerivedUpload)$' \
   -L 'gpu' -L 'vulkan' --no-tests=error --timeout 180
 ```
 

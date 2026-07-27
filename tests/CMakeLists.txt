@@ -247,9 +247,8 @@ if(TARGET ExtrinsicRuntime)
     set(_runtime_contract_test_files
         Test.CoreGraphInterfaces.cpp
         Test.GpuAssetCacheFallbackBootstrap.cpp
-        Test.AsyncBufferReadback.cpp
+        Test.GpuResultReadbackJob.cpp
         Test.KMeansGpuBackend.cpp
-        Test.GpuReadbackJob.cpp
         Test.AssetGeometryIO.cpp
         Test.AssetIngestStateMachine.cpp
         Test.AssetImportFormatCoverage.cpp
@@ -1023,17 +1022,18 @@ if(TARGET ExtrinsicGraphics)
     )
 endif()
 
-# The one operational readback case owns the Vulkan/GLFW capability boundary.
+# The one operational shared-result case owns the Vulkan/GLFW capability
+# boundary.
 if(TARGET ExtrinsicRuntime
    AND TARGET ExtrinsicBackendsVulkan
    AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
-    intrinsic_resolve_test_sources(_runtime_gpu_readback_smoke_test_sources
+    intrinsic_resolve_test_sources(_runtime_gpu_result_readback_smoke_test_sources
         SEARCH_DIRS integration/runtime
-        FILES Test.GpuReadbackJobGpuSmoke.cpp
+        FILES Test.GpuResultReadbackGpuSmoke.cpp
     )
-    intrinsic_test_object_lib(RuntimeGpuReadbackSmokeTestObjs
+    intrinsic_test_object_lib(RuntimeGpuResultReadbackSmokeTestObjs
         SOURCES
-            ${_runtime_gpu_readback_smoke_test_sources}
+            ${_runtime_gpu_result_readback_smoke_test_sources}
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore IntrinsicGeometry glm::glm
     )
 endif()
@@ -1335,9 +1335,9 @@ if(TARGET RuntimeProgressivePoissonResultGpuSmokeTestObjs)
     )
 endif()
 
-if(TARGET RuntimeGpuReadbackSmokeTestObjs)
-    intrinsic_test_executable(IntrinsicRuntimeGpuReadbackSmokeTests
-        OBJECTS RuntimeGpuReadbackSmokeTestObjs
+if(TARGET RuntimeGpuResultReadbackSmokeTestObjs)
+    intrinsic_test_executable(IntrinsicRuntimeGpuResultReadbackSmokeTests
+        OBJECTS RuntimeGpuResultReadbackSmokeTestObjs
         LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore IntrinsicGeometry
         LABELS gpu vulkan integration runtime graphics slow
     )

@@ -172,7 +172,7 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 ## Forbidden changes
 - No numeric change versus the reference beyond documented parity tolerance; no speedup claim without the baseline benchmark.
 - No live GPU work on the poll thread; readback drains through `RUNTIME-195`,
-  not `AsyncBufferReadback` or `IDevice::ReadBuffer`.
+  not retired `AsyncBufferReadback` or `IDevice::ReadBuffer`.
 - No RHI import into `src/geometry`; no private GPU primitive library.
 - No public parameterization backend adapter, feature job queue/DTO, or
   replacement Sandbox facade.

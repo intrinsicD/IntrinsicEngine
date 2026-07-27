@@ -603,7 +603,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         _, vulkan = _load_workflow("ci-vulkan.yml")
         self.assertIn(
             "--target ExtrinsicSandbox IntrinsicGpuVulkanTests "
-            "IntrinsicRuntimeGpuReadbackSmokeTests "
+            "IntrinsicRuntimeGpuResultReadbackSmokeTests "
             "IntrinsicGlfwLifecycleLsanProcess",
             vulkan,
         )
@@ -1085,14 +1085,14 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         self.assertIsInstance(env, dict)
         self.assertEqual(
             env.get("VULKAN_READBACK_TEST"),
-            "GpuReadbackJobGpuSmoke."
-            "VulkanTransferReadbackWritesPropertyAndFollowUpUploadsDerivedColor",
+            "GpuResultReadbackGpuSmoke."
+            "SharedBatchParksJobAndReleasesDerivedUpload",
         )
         operational_regex = env.get("VULKAN_OPERATIONAL_TEST_REGEX")
         self.assertIsInstance(operational_regex, str)
         self.assertIn(
-            r"GpuReadbackJobGpuSmoke\."
-            "VulkanTransferReadbackWritesPropertyAndFollowUpUploadsDerivedColor",
+            r"GpuResultReadbackGpuSmoke\."
+            "SharedBatchParksJobAndReleasesDerivedUpload",
             operational_regex,
         )
 
@@ -1123,7 +1123,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             vulkan,
         )
         self.assertIn(
-            "--targets ExtrinsicSandbox IntrinsicRuntimeGpuReadbackSmokeTests "
+            "--targets ExtrinsicSandbox IntrinsicRuntimeGpuResultReadbackSmokeTests "
             "IntrinsicGlfwLifecycleLsanProcess",
             vulkan,
         )

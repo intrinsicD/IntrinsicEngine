@@ -8,6 +8,25 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-195`](RUNTIME-195-unified-gpu-result-readback.md) — unified GPU-result
+readback retired on 2026-07-27 at `Retired`. The existing
+`Graphics.GpuTransfer` now carries one logical compute result as an ordered,
+copied multi-range batch, while the existing kernel `JobService` owns parked
+work, dependencies, cancellation, and bounded main-thread publication.
+K-Means and Progressive Poisson retain only feature-owned typed parsing;
+K-Means has operational compute parity and Progressive Poisson has operational
+production-shaped transfer/parser evidence, while `METHOD-014` still owns its
+compute/public parity. `Runtime.AsyncBufferReadback`, `Runtime.GpuReadbackJob`,
+their source/CMake and wrapper-only test surfaces, three Poisson duplicate
+readback buffers/copies, and the blocking compute-result read are deleted.
+Renderer `SelectionReadback` remains a deliberately separate frame-correlated
+lifecycle. Focused CPU evidence passed 40/40 plus the structural retirement
+ratchet 1/1; all three ASan+UBSan promoted-Vulkan fixtures passed 3/3 on an
+NVIDIA GeForce RTX 3050 with driver 590.48.01, and routing reconciled 4,229 CPU
+cases and 45 Vulkan cases. The canonical full `IntrinsicTests` build completed,
+and the CPU-supported selector passed 4,230/4,230 with one expected headless
+GLFW/LSan self-skip. The generated inventory now records 384 modules.
+
 [`RUNTIME-194`](RUNTIME-194-consolidate-runtime-work-execution.md) — duplicate
 runtime work execution retired on 2026-07-27 at `Retired`. The kernel-owned
 `JobService` is now the single submission, dependency, cancellation, progress,

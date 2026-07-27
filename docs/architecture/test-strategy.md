@@ -178,7 +178,7 @@ former mixed graphics/runtime set as follows:
 
 - `IntrinsicRuntimeIntegrationTests` owns six CPU sources and 104 cases under
   `integration;runtime`.
-- `IntrinsicRuntimeContractTests` owns the 25 `CoreGraphInterfaces` and
+- `IntrinsicRuntimeContractTests` owns the 35 `CoreGraphInterfaces` and
   `RuntimeEngineLayering` cases under `contract;runtime`.
 - `IntrinsicRuntimeGraphicsCpuTests` is the sole owner of
   `RuntimeFrameLoopContract` and its nine cases under
@@ -187,8 +187,8 @@ former mixed graphics/runtime set as follows:
   sources and 74 cases under `integration;graphics`.
 - `IntrinsicGraphicsUnitTests` owns three MockDevice unit sources and 20 cases
   under `unit;graphics`.
-- `IntrinsicRuntimeGpuReadbackSmokeTests` owns only
-  `GpuReadbackJobGpuSmoke.VulkanTransferReadbackWritesPropertyAndFollowUpUploadsDerivedColor`
+- `IntrinsicRuntimeGpuResultReadbackSmokeTests` owns only
+  `GpuResultReadbackGpuSmoke.SharedBatchParksJobAndReleasesDerivedUpload`
   under `gpu;vulkan;integration;runtime;graphics;slow`.
 
 The dedicated readback executable retains `slow` because current Linux-clang
