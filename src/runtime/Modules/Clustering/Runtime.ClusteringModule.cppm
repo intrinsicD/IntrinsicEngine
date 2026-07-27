@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -9,6 +10,7 @@ export module Extrinsic.Runtime.ClusteringModule;
 
 import Extrinsic.Core.Error;
 import Extrinsic.Runtime.CommandBus;
+export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
@@ -17,18 +19,53 @@ import Extrinsic.Runtime.WorldRegistry;
 
 namespace Extrinsic::Runtime
 {
-    export enum class ClusteringDomain : std::uint8_t
-    {
-        MeshVertices,
-        GraphVertices,
-        PointCloudPoints,
-    };
-
     export enum class ClusteringBackend : std::uint8_t
     {
+        None,
         CpuReference,
         VulkanCompute,
     };
+
+    export [[nodiscard]] std::string_view ToString(
+        ClusteringBackend backend) noexcept;
+
+    export enum class KMeansInitialization : std::uint8_t
+    {
+        Random,
+        Hierarchical,
+    };
+
+    export struct KMeansParameters
+    {
+        std::uint32_t ClusterCount{8u};
+        std::uint32_t MaxIterations{32u};
+        std::uint32_t Seed{42u};
+        KMeansInitialization Initialization{
+            KMeansInitialization::Hierarchical};
+    };
+
+    export struct KMeansPropertyRefs
+    {
+        GeometryPropertyRef InputPositions{
+            .Domain = GeometryElementDomain::PointCloudPoint,
+            .Name = "v:position",
+            .ValueKind = Geometry::PropertyValueKind::Vec3,
+        };
+        GeometryPropertyRef OutputLabels{
+            .Domain = GeometryElementDomain::PointCloudPoint,
+            .Name = "p:kmeans_label",
+            .ValueKind = Geometry::PropertyValueKind::UInt32,
+        };
+        GeometryPropertyRef OutputColors{
+            .Domain = GeometryElementDomain::PointCloudPoint,
+            .Name = "p:kmeans_color",
+            .ValueKind = Geometry::PropertyValueKind::Vec4,
+        };
+        std::optional<GeometryPropertyRef> OutputScalarLabels{};
+    };
+
+    export [[nodiscard]] KMeansPropertyRefs MakeKMeansPropertyRefs(
+        GeometryElementDomain domain);
 
     export enum class KMeansRunStatus : std::uint8_t
     {
@@ -39,6 +76,7 @@ namespace Extrinsic::Runtime
         StaleEntity,
         UnsupportedGeometryDomain,
         GeometryProcessingFailed,
+        Cancelled,
         StaleSource,
         StaleWorld,
         ModuleUnavailable,
@@ -47,11 +85,8 @@ namespace Extrinsic::Runtime
     export struct RunKMeans
     {
         std::uint32_t StableEntityId{0u};
-        ClusteringDomain Domain{ClusteringDomain::PointCloudPoints};
-        std::uint32_t ClusterCount{8u};
-        std::uint32_t MaxIterations{32u};
-        std::uint32_t Seed{42u};
-        bool UseHierarchicalInitialization{true};
+        KMeansPropertyRefs Properties{};
+        KMeansParameters Parameters{};
         ClusteringBackend Backend{ClusteringBackend::CpuReference};
     };
 
@@ -60,8 +95,9 @@ namespace Extrinsic::Runtime
         CommandCorrelationId Correlation{};
         WorldHandle World{};
         KMeansRunStatus Status{KMeansRunStatus::Queued};
-        ClusteringDomain Domain{ClusteringDomain::PointCloudPoints};
         std::uint32_t StableEntityId{0u};
+        KMeansPropertyRefs Properties{};
+        KMeansParameters Parameters{};
         std::uint32_t LabelCount{0u};
         std::uint32_t ClusterCount{0u};
         std::uint32_t Iterations{0u};
@@ -69,8 +105,9 @@ namespace Extrinsic::Runtime
         float Inertia{0.0f};
         std::uint32_t MaxDistanceIndex{0u};
         ClusteringBackend RequestedBackend{ClusteringBackend::CpuReference};
-        ClusteringBackend ActualBackend{ClusteringBackend::CpuReference};
+        ClusteringBackend ActualBackend{ClusteringBackend::None};
         bool FellBackToCpu{false};
+        std::string BackendDiagnostic{};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
@@ -84,7 +121,8 @@ namespace Extrinsic::Runtime
     {
         CommandCorrelationId Correlation{};
         WorldHandle World{};
-        ClusteringDomain Domain{ClusteringDomain::PointCloudPoints};
+        GeometryPropertyRef Labels{};
+        GeometryPropertyRef Colors{};
         std::uint32_t StableEntityId{0u};
         std::uint32_t LabelCount{0u};
     };

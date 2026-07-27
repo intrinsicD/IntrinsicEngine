@@ -71,6 +71,24 @@ namespace
         return entity;
     }
 
+    [[nodiscard]] Runtime::RunKMeans MakePointCloudRequest(
+        const std::uint32_t stableEntityId,
+        const Runtime::ClusteringBackend backend =
+            Runtime::ClusteringBackend::CpuReference)
+    {
+        return Runtime::RunKMeans{
+            .StableEntityId = stableEntityId,
+            .Properties = Runtime::MakeKMeansPropertyRefs(
+                Runtime::GeometryElementDomain::PointCloudPoint),
+            .Parameters = Runtime::KMeansParameters{
+                .ClusterCount = 2u,
+                .MaxIterations = 8u,
+                .Seed = 13u,
+            },
+            .Backend = backend,
+        };
+    }
+
     [[nodiscard]] bool HasPointLabels(ECS::Scene::Registry& scene,
                                       const ECS::EntityHandle entity)
     {
@@ -95,6 +113,13 @@ namespace
     class KMeansSuccessApp final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
+        explicit KMeansSuccessApp(
+            const Runtime::ClusteringBackend backend =
+                Runtime::ClusteringBackend::CpuReference)
+            : Backend(backend)
+        {
+        }
+
         void Resolve() override
         {
             auto& engine = Kernel();
@@ -132,13 +157,8 @@ namespace
                     LabelsChangedThread = std::this_thread::get_id();
                 });
 
-            Correlation = service->RunKMeans(Runtime::RunKMeans{
-                .StableEntityId = StableEntityId,
-                .Domain = Runtime::ClusteringDomain::PointCloudPoints,
-                .ClusterCount = 2u,
-                .MaxIterations = 8u,
-                .Seed = 13u,
-            });
+            Correlation = service->RunKMeans(
+                MakePointCloudRequest(StableEntityId, Backend));
         }
 
 
@@ -188,6 +208,8 @@ namespace
         std::uint32_t Ticks{0u};
         bool MissingService{false};
         bool TimedOut{false};
+        Runtime::ClusteringBackend Backend{
+            Runtime::ClusteringBackend::CpuReference};
     };
 
     class KMeansWorldSwitchApp final : public Intrinsic::Tests::RuntimeTestModule
@@ -232,13 +254,8 @@ namespace
                         std::this_thread::sleep_for(1ms);
                 });
 
-            Correlation = service->RunKMeans(Runtime::RunKMeans{
-                .StableEntityId = StableEntityId,
-                .Domain = Runtime::ClusteringDomain::PointCloudPoints,
-                .ClusterCount = 2u,
-                .MaxIterations = 8u,
-                .Seed = 13u,
-            });
+            Correlation = service->RunKMeans(
+                MakePointCloudRequest(StableEntityId));
             NextWorld = engine.Worlds().CreateWorld("Switched");
         }
 
@@ -311,13 +328,8 @@ namespace
                                                                           });
             StableEntityId =
                 Runtime::SelectionController::ToStableEntityId(Entity);
-            Correlation = engine.Commands().Enqueue(Runtime::RunKMeans{
-                .StableEntityId = StableEntityId,
-                .Domain = Runtime::ClusteringDomain::PointCloudPoints,
-                .ClusterCount = 2u,
-                .MaxIterations = 8u,
-                .Seed = 13u,
-            });
+            Correlation = engine.Commands().Enqueue(
+                MakePointCloudRequest(StableEntityId));
         }
 
 
@@ -364,6 +376,16 @@ TEST(ClusteringModule, EngineRunCommitsLabelsAndPublishesChangeEvent)
     EXPECT_EQ(appPtr->Completion->ClusterCount, 2u);
     EXPECT_EQ(appPtr->Completion->ActualBackend,
               Runtime::ClusteringBackend::CpuReference);
+    EXPECT_EQ(appPtr->Completion->Properties.InputPositions.Domain,
+              Runtime::GeometryElementDomain::PointCloudPoint);
+    EXPECT_EQ(appPtr->Completion->Properties.InputPositions.Name,
+              "v:position");
+    EXPECT_EQ(appPtr->Completion->Properties.OutputLabels.Name,
+              "p:kmeans_label");
+    EXPECT_EQ(appPtr->Completion->Properties.OutputColors.Name,
+              "p:kmeans_color");
+    EXPECT_FALSE(
+        appPtr->Completion->Properties.OutputScalarLabels.has_value());
     EXPECT_EQ(appPtr->CompletionThread, appPtr->MainThread);
 
     ASSERT_TRUE(appPtr->LabelsChanged.has_value());
@@ -376,6 +398,31 @@ TEST(ClusteringModule, EngineRunCommitsLabelsAndPublishesChangeEvent)
         appPtr->Entity));
     EXPECT_EQ(appPtr->Stats.LabelsCommitted, 1u);
     EXPECT_EQ(appPtr->Stats.VisualizationRefreshReactions, 1u);
+
+    engine.Shutdown();
+}
+
+TEST(ClusteringModule, NullDeviceVulkanRequestFallsBackHonestly)
+{
+    auto app = std::make_unique<KMeansSuccessApp>(
+        Runtime::ClusteringBackend::VulkanCompute);
+    KMeansSuccessApp* appPtr = app.get();
+
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        NullWindowHeadlessConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::ClusteringModule>();
+    engine.Initialize();
+    engine.Run();
+
+    ASSERT_TRUE(appPtr->Completion.has_value());
+    EXPECT_TRUE(appPtr->Completion->Succeeded())
+        << appPtr->Completion->Message;
+    EXPECT_EQ(appPtr->Completion->RequestedBackend,
+              Runtime::ClusteringBackend::VulkanCompute);
+    EXPECT_EQ(appPtr->Completion->ActualBackend,
+              Runtime::ClusteringBackend::CpuReference);
+    EXPECT_TRUE(appPtr->Completion->FellBackToCpu);
+    EXPECT_FALSE(appPtr->Completion->BackendDiagnostic.empty());
 
     engine.Shutdown();
 }

@@ -18,9 +18,13 @@ maturity_target: Retired
   and `SandboxEditorSession` owns a separate single-flight GPU queue plus
   duplicate command/result/backend records. The Vulkan smoke and benchmark
   also import the backend surface directly.
-- Slice A is in progress: make property identity, backend selection, fallback
-  diagnostics, and the completion record complete on the clustering service
-  before migrating execution or deleting any proven path.
+- Slice A completed on 2026-07-27. `RunKMeans` now carries canonical typed
+  input/output `GeometryPropertyRef` records plus one nested parameter record;
+  `KMeansRunCompleted` returns those identities, requested/actual backend,
+  and an explicit backend diagnostic. Invalid requests report
+  `ActualBackend::None`, while a Vulkan request on the Null device reports the
+  CPU reference fallback truthfully. The focused service target compiled and
+  `ClusteringModule.*` passed 4/4. No proven GPU path has been deleted yet.
 
 ## Goal
 
@@ -87,7 +91,7 @@ maturity_target: Retired
 
 ## Required changes
 
-- [ ] Define one `RunKMeans` request/result on `ClusteringService`, using
+- [x] Define one `RunKMeans` request/result on `ClusteringService`, using
       `GeometryPropertyRef` for input/output property identity and plain
       backend/parameter/result records.
 - [ ] Route CPU reference, operational Vulkan, and honest CPU fallback through

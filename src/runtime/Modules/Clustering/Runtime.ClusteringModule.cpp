@@ -7,6 +7,7 @@ module;
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -55,25 +56,18 @@ namespace Extrinsic::Runtime
             KMeansJobResult Result{};
         };
 
-        [[nodiscard]] const char* DomainName(const ClusteringDomain domain) noexcept
+        [[nodiscard]] const char* DomainName(
+            const GeometryElementDomain domain) noexcept
         {
             switch (domain)
             {
-            case ClusteringDomain::MeshVertices: return "mesh vertices";
-            case ClusteringDomain::GraphVertices: return "graph vertices";
-            case ClusteringDomain::PointCloudPoints: return "point-cloud points";
+            case GeometryElementDomain::MeshVertex: return "mesh vertices";
+            case GeometryElementDomain::GraphNode: return "graph nodes";
+            case GeometryElementDomain::PointCloudPoint:
+                return "point-cloud points";
+            default: break;
             }
             return "unknown";
-        }
-
-        [[nodiscard]] const char* BackendId(const ClusteringBackend backend) noexcept
-        {
-            switch (backend)
-            {
-            case ClusteringBackend::CpuReference: return "cpu_reference";
-            case ClusteringBackend::VulkanCompute: return "gpu_vulkan_compute";
-            }
-            return "cpu_reference";
         }
 
         [[nodiscard]] GK::Backend ToGeometryBackend(
@@ -83,20 +77,82 @@ namespace Extrinsic::Runtime
             {
             case ClusteringBackend::CpuReference: return GK::Backend::CPU;
             case ClusteringBackend::VulkanCompute: return GK::Backend::GPU;
+            case ClusteringBackend::None: break;
             }
             return GK::Backend::CPU;
         }
 
-        [[nodiscard]] bool IsExecutionDomain(const ClusteringDomain domain) noexcept
+        [[nodiscard]] bool IsExecutionDomain(
+            const GeometryElementDomain domain) noexcept
         {
             switch (domain)
             {
-            case ClusteringDomain::MeshVertices:
-            case ClusteringDomain::GraphVertices:
-            case ClusteringDomain::PointCloudPoints:
+            case GeometryElementDomain::MeshVertex:
+            case GeometryElementDomain::GraphNode:
+            case GeometryElementDomain::PointCloudPoint:
                 return true;
+            default: break;
             }
             return false;
+        }
+
+        [[nodiscard]] bool HasExpectedPropertyKinds(
+            const KMeansPropertyRefs& refs) noexcept
+        {
+            const GeometryElementDomain domain = refs.InputPositions.Domain;
+            return IsExecutionDomain(domain) &&
+                   refs.InputPositions.HasName() &&
+                   refs.InputPositions.ValueKind ==
+                       Geometry::PropertyValueKind::Vec3 &&
+                   refs.OutputLabels.Domain == domain &&
+                   refs.OutputLabels.HasName() &&
+                   refs.OutputLabels.ValueKind ==
+                       Geometry::PropertyValueKind::UInt32 &&
+                   refs.OutputColors.Domain == domain &&
+                   refs.OutputColors.HasName() &&
+                   refs.OutputColors.ValueKind ==
+                       Geometry::PropertyValueKind::Vec4 &&
+                   (!refs.OutputScalarLabels.has_value() ||
+                    (refs.OutputScalarLabels->Domain == domain &&
+                     refs.OutputScalarLabels->HasName() &&
+                     refs.OutputScalarLabels->ValueKind ==
+                         Geometry::PropertyValueKind::Float));
+        }
+
+        [[nodiscard]] bool HasDistinctPropertyNames(
+            const KMeansPropertyRefs& refs) noexcept
+        {
+            if (refs.InputPositions.Name == refs.OutputLabels.Name ||
+                refs.InputPositions.Name == refs.OutputColors.Name ||
+                refs.OutputLabels.Name == refs.OutputColors.Name)
+            {
+                return false;
+            }
+            if (!refs.OutputScalarLabels.has_value())
+                return true;
+            return refs.OutputScalarLabels->Name != refs.InputPositions.Name &&
+                   refs.OutputScalarLabels->Name != refs.OutputLabels.Name &&
+                   refs.OutputScalarLabels->Name != refs.OutputColors.Name;
+        }
+
+        [[nodiscard]] bool CanWriteProperty(
+            const Geometry::PropertySet& properties,
+            const GeometryPropertyRef& ref) noexcept
+        {
+            const Geometry::PropertyValueKind actual =
+                DetectGeometryPropertyValueKind(properties, ref.Name);
+            return actual == Geometry::PropertyValueKind::Unknown ||
+                   actual == ref.ValueKind;
+        }
+
+        [[nodiscard]] bool CanWriteOutputs(
+            const Geometry::PropertySet& properties,
+            const KMeansPropertyRefs& refs) noexcept
+        {
+            return CanWriteProperty(properties, refs.OutputLabels) &&
+                   CanWriteProperty(properties, refs.OutputColors) &&
+                   (!refs.OutputScalarLabels.has_value() ||
+                    CanWriteProperty(properties, *refs.OutputScalarLabels));
         }
 
         [[nodiscard]] KMeansRunCompleted MakeCompletion(
@@ -111,12 +167,11 @@ namespace Extrinsic::Runtime
                 .Correlation = correlation,
                 .World = world,
                 .Status = status,
-                .Domain = command.Domain,
                 .StableEntityId = command.StableEntityId,
+                .Properties = command.Properties,
+                .Parameters = command.Parameters,
                 .RequestedBackend = command.Backend,
-                .ActualBackend = ClusteringBackend::CpuReference,
-                .FellBackToCpu =
-                    command.Backend == ClusteringBackend::VulkanCompute,
+                .ActualBackend = ClusteringBackend::None,
                 .Error = error,
                 .Message = std::move(message),
             };
@@ -124,39 +179,41 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] bool SourceViewSupportsDomain(
             const GS::MutableSourceView& view,
-            const ClusteringDomain domain) noexcept
+            const GeometryElementDomain domain) noexcept
         {
             const GS::SourceAvailability sources =
                 GS::BuildSourceAvailability(view);
             switch (domain)
             {
-            case ClusteringDomain::MeshVertices:
+            case GeometryElementDomain::MeshVertex:
                 return sources.ProvenanceDomain == GS::Domain::Mesh &&
                        sources.Has(GS::SourceCapability::VertexPoints);
-            case ClusteringDomain::GraphVertices:
+            case GeometryElementDomain::GraphNode:
                 return sources.ProvenanceDomain == GS::Domain::Graph &&
                        sources.Has(GS::SourceCapability::NodePoints);
-            case ClusteringDomain::PointCloudPoints:
+            case GeometryElementDomain::PointCloudPoint:
                 return sources.ProvenanceDomain == GS::Domain::PointCloud &&
                        sources.Has(GS::SourceCapability::VertexPoints);
+            default: break;
             }
             return false;
         }
 
         [[nodiscard]] Geometry::PropertySet* TargetProperties(
             GS::MutableSourceView& view,
-            const ClusteringDomain domain) noexcept
+            const GeometryElementDomain domain) noexcept
         {
             switch (domain)
             {
-            case ClusteringDomain::MeshVertices:
-            case ClusteringDomain::PointCloudPoints:
+            case GeometryElementDomain::MeshVertex:
+            case GeometryElementDomain::PointCloudPoint:
                 return view.VertexSource != nullptr
                     ? &view.VertexSource->Properties
                     : nullptr;
-            case ClusteringDomain::GraphVertices:
+            case GeometryElementDomain::GraphNode:
                 return view.NodeSource != nullptr ? &view.NodeSource->Properties
                                                   : nullptr;
+            default: break;
             }
             return nullptr;
         }
@@ -169,10 +226,11 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::optional<std::vector<glm::vec3>> CollectPositions(
-            const Geometry::PropertySet& properties)
+            const Geometry::PropertySet& properties,
+            const std::string_view propertyName)
         {
             const auto positions =
-                properties.Get<glm::vec3>(GS::PropertyNames::kPosition);
+                properties.Get<glm::vec3>(propertyName);
             if (!positions || positions.Vector().empty())
                 return std::nullopt;
             if (positions.Vector().size() != properties.Size())
@@ -238,7 +296,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] bool PublishProperties(
             Geometry::PropertySet& properties,
-            const ClusteringDomain domain,
+            const KMeansPropertyRefs& refs,
             const GK::KMeansResult& result)
         {
             if (result.Labels.empty() ||
@@ -247,16 +305,11 @@ namespace Extrinsic::Runtime
                 return false;
             }
 
-            const bool pointCloud =
-                domain == ClusteringDomain::PointCloudPoints;
-            const std::string labelName =
-                pointCloud ? "p:kmeans_label" : "v:kmeans_label";
-            const std::string colorName =
-                pointCloud ? "p:kmeans_color" : "v:kmeans_color";
-
-            auto labels = properties.GetOrAdd<std::uint32_t>(labelName, 0u);
+            auto labels = properties.GetOrAdd<std::uint32_t>(
+                refs.OutputLabels.Name, 0u);
             auto colors =
-                properties.GetOrAdd<glm::vec4>(colorName, glm::vec4{1.0f});
+                properties.GetOrAdd<glm::vec4>(
+                    refs.OutputColors.Name, glm::vec4{1.0f});
             if (!labels || !colors)
                 return false;
             if (labels.Vector().size() != result.Labels.size() ||
@@ -271,10 +324,11 @@ namespace Extrinsic::Runtime
                 colors.Vector()[i] = LabelColor(result.Labels[i]);
             }
 
-            if (!pointCloud)
+            if (refs.OutputScalarLabels.has_value())
             {
                 auto labelFloats =
-                    properties.GetOrAdd<float>("v:kmeans_label_f", 0.0f);
+                    properties.GetOrAdd<float>(
+                        refs.OutputScalarLabels->Name, 0.0f);
                 if (!labelFloats ||
                     labelFloats.Vector().size() != result.Labels.size())
                 {
@@ -288,13 +342,13 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::string BuildSuccessMessage(
-            const ClusteringDomain domain,
+            const GeometryElementDomain domain,
             const KMeansRunCompleted& completion)
         {
             std::string message = "K-Means (requested ";
-            message += BackendId(completion.RequestedBackend);
+            message += ToString(completion.RequestedBackend);
             message += ", actual ";
-            message += BackendId(completion.ActualBackend);
+            message += ToString(completion.ActualBackend);
             message += ") completed for ";
             message += DomainName(domain);
             message += " (labels=";
@@ -314,9 +368,13 @@ namespace Extrinsic::Runtime
             const RunKMeans& command,
             KMeansRunCompleted& failure)
         {
-            if (!IsExecutionDomain(command.Domain) ||
-                command.ClusterCount == 0u ||
-                command.MaxIterations == 0u)
+            const GeometryElementDomain domain =
+                command.Properties.InputPositions.Domain;
+            if (!HasExpectedPropertyKinds(command.Properties) ||
+                !HasDistinctPropertyNames(command.Properties) ||
+                command.Parameters.ClusterCount == 0u ||
+                command.Parameters.MaxIterations == 0u ||
+                command.Backend == ClusteringBackend::None)
             {
                 failure = MakeCompletion(
                     command,
@@ -324,7 +382,7 @@ namespace Extrinsic::Runtime
                     correlation,
                     KMeansRunStatus::InvalidProcessingParameters,
                     Core::ErrorCode::InvalidArgument,
-                    "K-Means requires mesh vertices, graph nodes, or point-cloud points with positive cluster and iteration counts.");
+                    "K-Means requires one supported input/output property domain, the canonical vec3/uint32/vec4/float value kinds, distinct property names, a concrete backend, and positive cluster and iteration counts.");
                 return std::nullopt;
             }
 
@@ -343,8 +401,15 @@ namespace Extrinsic::Runtime
                 return std::nullopt;
             }
 
-            GS::MutableSourceView view = GS::BuildMutableView(raw, entity);
-            if (!view.Valid() || !SourceViewSupportsDomain(view, command.Domain))
+            const GeometryEntityAvailability availability =
+                BuildGeometryAvailability(raw, entity);
+            const GeometryPropertyResolution inputResolution =
+                ResolveGeometryProperty(
+                    availability,
+                    command.Properties.InputPositions,
+                    std::nullopt,
+                    true);
+            if (!inputResolution.Resolved() || inputResolution.ElementCount == 0u)
             {
                 failure = MakeCompletion(
                     command,
@@ -352,12 +417,25 @@ namespace Extrinsic::Runtime
                     correlation,
                     KMeansRunStatus::UnsupportedGeometryDomain,
                     Core::ErrorCode::InvalidArgument,
-                    "Selected entity does not expose the requested K-Means GeometrySources domain.");
+                    "Selected entity does not expose the requested non-empty, finite K-Means input position property.");
+                return std::nullopt;
+            }
+
+            GS::MutableSourceView view = GS::BuildMutableView(raw, entity);
+            if (!view.Valid() || !SourceViewSupportsDomain(view, domain))
+            {
+                failure = MakeCompletion(
+                    command,
+                    world,
+                    correlation,
+                    KMeansRunStatus::UnsupportedGeometryDomain,
+                    Core::ErrorCode::InvalidArgument,
+                    "Selected entity no longer exposes the requested writable K-Means GeometrySources domain.");
                 return std::nullopt;
             }
 
             Geometry::PropertySet* properties =
-                TargetProperties(view, command.Domain);
+                TargetProperties(view, domain);
             if (properties == nullptr)
             {
                 failure = MakeCompletion(
@@ -370,8 +448,22 @@ namespace Extrinsic::Runtime
                 return std::nullopt;
             }
 
+            if (!CanWriteOutputs(*properties, command.Properties))
+            {
+                failure = MakeCompletion(
+                    command,
+                    world,
+                    correlation,
+                    KMeansRunStatus::InvalidProcessingParameters,
+                    Core::ErrorCode::TypeMismatch,
+                    "One or more requested K-Means output properties already exist with incompatible value kinds.");
+                return std::nullopt;
+            }
+
             std::optional<std::vector<glm::vec3>> points =
-                CollectPositions(*properties);
+                CollectPositions(
+                    *properties,
+                    command.Properties.InputPositions.Name);
             if (!points.has_value())
             {
                 failure = MakeCompletion(
@@ -380,15 +472,16 @@ namespace Extrinsic::Runtime
                     correlation,
                     KMeansRunStatus::InvalidProcessingParameters,
                     Core::ErrorCode::InvalidArgument,
-                    "K-Means requires a non-empty finite v:position property on the requested domain.");
+                    "K-Means requires a non-empty finite vec3 input position property on the requested domain.");
                 return std::nullopt;
             }
 
             GK::KMeansParams params{};
-            params.ClusterCount = command.ClusterCount;
-            params.MaxIterations = command.MaxIterations;
-            params.Seed = command.Seed;
-            params.Init = command.UseHierarchicalInitialization
+            params.ClusterCount = command.Parameters.ClusterCount;
+            params.MaxIterations = command.Parameters.MaxIterations;
+            params.Seed = command.Parameters.Seed;
+            params.Init = command.Parameters.Initialization ==
+                    KMeansInitialization::Hierarchical
                 ? GK::Initialization::Hierarchical
                 : GK::Initialization::Random;
             params.Compute = GK::Backend::CPU;
@@ -417,7 +510,13 @@ namespace Extrinsic::Runtime
                 "Geometry.KMeans returned no result for the requested points.");
 
             if (cancellation.IsCancelled())
+            {
+                result.Completion.Status = KMeansRunStatus::Cancelled;
+                result.Completion.Error = Core::ErrorCode::InvalidState;
+                result.Completion.Message =
+                    "K-Means CPU work was cancelled before execution.";
                 return result;
+            }
 
             std::optional<GK::KMeansResult> clustered = GK::Cluster(
                 std::span<const glm::vec3>{
@@ -447,6 +546,11 @@ namespace Extrinsic::Runtime
             result.Completion.MaxDistanceIndex = clustered->MaxDistanceIndex;
             result.Completion.ActualBackend = ClusteringBackend::CpuReference;
             result.Completion.FellBackToCpu = clustered->FellBackToCPU;
+            if (result.Completion.FellBackToCpu)
+            {
+                result.Completion.BackendDiagnostic =
+                    "Vulkan compute execution was unavailable; the CPU reference completed the request.";
+            }
             result.Clustered = std::move(*clustered);
             return result;
         }
@@ -530,7 +634,9 @@ namespace Extrinsic::Runtime
 
             GS::MutableSourceView view = GS::BuildMutableView(raw, entity);
             if (!view.Valid() ||
-                !SourceViewSupportsDomain(view, job.Snapshot.Command.Domain))
+                !SourceViewSupportsDomain(
+                    view,
+                    job.Snapshot.Command.Properties.InputPositions.Domain))
             {
                 stats.CommitsDropped += 1u;
                 KMeansRunCompleted dropped = job.Completion;
@@ -543,7 +649,9 @@ namespace Extrinsic::Runtime
             }
 
             Geometry::PropertySet* properties =
-                TargetProperties(view, job.Snapshot.Command.Domain);
+                TargetProperties(
+                    view,
+                    job.Snapshot.Command.Properties.InputPositions.Domain);
             if (properties == nullptr)
             {
                 stats.CommitsDropped += 1u;
@@ -557,7 +665,9 @@ namespace Extrinsic::Runtime
             }
 
             std::optional<std::vector<glm::vec3>> current =
-                CollectPositions(*properties);
+                CollectPositions(
+                    *properties,
+                    job.Snapshot.Command.Properties.InputPositions.Name);
             if (!current.has_value() ||
                 !SamePositions(*current, job.Snapshot.Points))
             {
@@ -573,7 +683,7 @@ namespace Extrinsic::Runtime
 
             if (!PublishProperties(
                     *properties,
-                    job.Snapshot.Command.Domain,
+                    job.Snapshot.Command.Properties,
                     *job.Clustered))
             {
                 stats.CommitsDropped += 1u;
@@ -588,7 +698,9 @@ namespace Extrinsic::Runtime
 
             KMeansRunCompleted completed = job.Completion;
             completed.Message =
-                BuildSuccessMessage(job.Snapshot.Command.Domain, completed);
+                BuildSuccessMessage(
+                    job.Snapshot.Command.Properties.InputPositions.Domain,
+                    completed);
             stats.LabelsCommitted += 1u;
             PublishCompletion(events, completed);
 
@@ -597,7 +709,8 @@ namespace Extrinsic::Runtime
                 events->Publish(ClusterLabelsChanged{
                     .Correlation = completed.Correlation,
                     .World = completed.World,
-                    .Domain = completed.Domain,
+                    .Labels = completed.Properties.OutputLabels,
+                    .Colors = completed.Properties.OutputColors,
                     .StableEntityId = completed.StableEntityId,
                     .LabelCount = completed.LabelCount,
                 });
@@ -707,6 +820,50 @@ namespace Extrinsic::Runtime
             stats.JobsSubmitted += 1u;
             return CommandOutcome::Ok();
         }
+    }
+
+    std::string_view ToString(const ClusteringBackend backend) noexcept
+    {
+        switch (backend)
+        {
+        case ClusteringBackend::None: return "none";
+        case ClusteringBackend::CpuReference: return "cpu_reference";
+        case ClusteringBackend::VulkanCompute: return "vulkan_compute";
+        }
+        return "none";
+    }
+
+    KMeansPropertyRefs MakeKMeansPropertyRefs(
+        const GeometryElementDomain domain)
+    {
+        const bool pointCloud =
+            domain == GeometryElementDomain::PointCloudPoint;
+        KMeansPropertyRefs refs{
+            .InputPositions = GeometryPropertyRef{
+                .Domain = domain,
+                .Name = "v:position",
+                .ValueKind = Geometry::PropertyValueKind::Vec3,
+            },
+            .OutputLabels = GeometryPropertyRef{
+                .Domain = domain,
+                .Name = pointCloud ? "p:kmeans_label" : "v:kmeans_label",
+                .ValueKind = Geometry::PropertyValueKind::UInt32,
+            },
+            .OutputColors = GeometryPropertyRef{
+                .Domain = domain,
+                .Name = pointCloud ? "p:kmeans_color" : "v:kmeans_color",
+                .ValueKind = Geometry::PropertyValueKind::Vec4,
+            },
+        };
+        if (!pointCloud)
+        {
+            refs.OutputScalarLabels = GeometryPropertyRef{
+                .Domain = domain,
+                .Name = "v:kmeans_label_f",
+                .ValueKind = Geometry::PropertyValueKind::Float,
+            };
+        }
+        return refs;
     }
 
     bool ClusteringService::Available() const noexcept

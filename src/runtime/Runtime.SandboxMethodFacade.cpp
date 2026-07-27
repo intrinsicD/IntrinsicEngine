@@ -450,40 +450,41 @@ namespace Extrinsic::Runtime
             return SandboxEditorKMeansBackend::CpuReference;
         }
 
-        [[nodiscard]] ClusteringDomain ToRuntimeClusteringDomain(
+        [[nodiscard]] GeometryElementDomain ToRuntimeClusteringDomain(
             const SandboxEditorGeometryProcessingDomain domain) noexcept
         {
             switch (domain)
             {
             case SandboxEditorGeometryProcessingDomain::MeshVertices:
-                return ClusteringDomain::MeshVertices;
+                return GeometryElementDomain::MeshVertex;
             case SandboxEditorGeometryProcessingDomain::GraphVertices:
-                return ClusteringDomain::GraphVertices;
+                return GeometryElementDomain::GraphNode;
             case SandboxEditorGeometryProcessingDomain::PointCloudPoints:
-                return ClusteringDomain::PointCloudPoints;
+                return GeometryElementDomain::PointCloudPoint;
             case SandboxEditorGeometryProcessingDomain::None:
             case SandboxEditorGeometryProcessingDomain::MeshEdges:
             case SandboxEditorGeometryProcessingDomain::MeshHalfedges:
             case SandboxEditorGeometryProcessingDomain::MeshFaces:
             case SandboxEditorGeometryProcessingDomain::GraphEdges:
             case SandboxEditorGeometryProcessingDomain::GraphHalfedges:
-                return ClusteringDomain::PointCloudPoints;
+                return GeometryElementDomain::Unknown;
             }
-            return ClusteringDomain::PointCloudPoints;
+            return GeometryElementDomain::Unknown;
         }
 
         [[nodiscard]] SandboxEditorGeometryProcessingDomain
         ToSandboxEditorGeometryProcessingDomain(
-            const ClusteringDomain domain) noexcept
+            const GeometryElementDomain domain) noexcept
         {
             switch (domain)
             {
-            case ClusteringDomain::MeshVertices:
+            case GeometryElementDomain::MeshVertex:
                 return SandboxEditorGeometryProcessingDomain::MeshVertices;
-            case ClusteringDomain::GraphVertices:
+            case GeometryElementDomain::GraphNode:
                 return SandboxEditorGeometryProcessingDomain::GraphVertices;
-            case ClusteringDomain::PointCloudPoints:
+            case GeometryElementDomain::PointCloudPoint:
                 return SandboxEditorGeometryProcessingDomain::PointCloudPoints;
+            default: break;
             }
             return SandboxEditorGeometryProcessingDomain::None;
         }
@@ -506,6 +507,8 @@ namespace Extrinsic::Runtime
         {
             switch (backend)
             {
+            case ClusteringBackend::None:
+                return SandboxEditorKMeansBackend::CpuReference;
             case ClusteringBackend::CpuReference:
                 return SandboxEditorKMeansBackend::CpuReference;
             case ClusteringBackend::VulkanCompute:
@@ -532,6 +535,7 @@ namespace Extrinsic::Runtime
             case KMeansRunStatus::UnsupportedGeometryDomain:
                 return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
             case KMeansRunStatus::GeometryProcessingFailed:
+            case KMeansRunStatus::Cancelled:
             case KMeansRunStatus::StaleSource:
             case KMeansRunStatus::StaleWorld:
             case KMeansRunStatus::ModuleUnavailable:
@@ -545,7 +549,8 @@ namespace Extrinsic::Runtime
             const KMeansRunCompleted& completed)
         {
             const SandboxEditorGeometryProcessingDomain domain =
-                ToSandboxEditorGeometryProcessingDomain(completed.Domain);
+                ToSandboxEditorGeometryProcessingDomain(
+                    completed.Properties.InputPositions.Domain);
             const SandboxEditorKMeansBackend requested =
                 ToSandboxEditorKMeansBackend(completed.RequestedBackend);
             const SandboxEditorKMeansBackend actual =
@@ -567,10 +572,7 @@ namespace Extrinsic::Runtime
                 .BackendId = KMeansBackendId(actual),
                 .BackendDisplayName = KMeansBackendDisplayName(actual),
                 .FellBackToCpu = completed.FellBackToCpu,
-                .BackendFallbackReason =
-                    completed.FellBackToCpu
-                        ? "K-Means request ran on the runtime CPU reference job lane."
-                        : std::string{},
+                .BackendFallbackReason = completed.BackendDiagnostic,
                 .Error = completed.Error,
                 .Message = completed.Message,
             };
@@ -2470,12 +2472,17 @@ namespace Extrinsic::Runtime
             const CommandCorrelationId correlation =
                 context.KMeansCommands.Submit(RunKMeans{
                     .StableEntityId = command.StableEntityId,
-                    .Domain = ToRuntimeClusteringDomain(command.Domain),
-                    .ClusterCount = command.ClusterCount,
-                    .MaxIterations = command.MaxIterations,
-                    .Seed = command.Seed,
-                    .UseHierarchicalInitialization =
-                        command.UseHierarchicalInitialization,
+                    .Properties = MakeKMeansPropertyRefs(
+                        ToRuntimeClusteringDomain(command.Domain)),
+                    .Parameters = KMeansParameters{
+                        .ClusterCount = command.ClusterCount,
+                        .MaxIterations = command.MaxIterations,
+                        .Seed = command.Seed,
+                        .Initialization =
+                            command.UseHierarchicalInitialization
+                                ? KMeansInitialization::Hierarchical
+                                : KMeansInitialization::Random,
+                    },
                     .Backend = ToRuntimeClusteringBackend(command.Backend),
                 });
             if (!correlation.IsValid())
