@@ -885,13 +885,31 @@ and commits independently.
 
                     CPU gate 4264/4264; `SandboxEditorUi.*` (143 tests) 0/40
                     under stress.
-                  - [ ] **B5d-1c — `SandboxEditorFacades` vertex-normals,
-                    point-cloud outlier-removal, and registration descs**
-                    (`MakeVertexNormalsCpuJobDesc` ×3,
+                  - [x] **B5d-1c — vertex-normals, point-cloud
+                    outlier-removal, and registration descs.** Landed. Three
+                    factories (`MakeVertexNormalsCpuJobDesc` with 3 callers,
                     `MakePointCloudOutlierRemovalCpuJobDesc`,
-                    `MakeRegistrationCpuJobDesc`).
+                    `MakeRegistrationCpuJobDesc`) split into identity + `JobDesc`
+                    builders, six worker bodies converted, three validators
+                    mapped onto `JobApplyValidation`, five submit sites and five
+                    `Available()` gates flipped. Registration's key carried both
+                    the source *and* target geometry signatures; neither was in
+                    the dedup comparison and both are re-checked by
+                    `ValidateRegistrationCpuJobApply`, so both leave the
+                    identity. Same three test adjustments as the earlier
+                    batches. CPU gate 4264/4264; `SandboxEditorUi.*` 0/30 under
+                    stress.
                   - [ ] **B5d-1d — `MakeUvRegenerationCpuJobDesc`**, the last
-                    factory.
+                    factory. It is the only remaining `return DerivedJobDesc{`
+                    in `SandboxEditorFacades.cpp` and owns the one surviving
+                    `DerivedJobCommands.Available()` gate
+                    (`SubmitUvRegenerationCpuJob`), plus
+                    `RunUvRegenerationCpuWorker` /
+                    `ValidateUvRegenerationCpuJobApply` and the four
+                    `UvRegeneration*` contract tests. Note it also has a
+                    *synchronous* caller path that reads
+                    `const DerivedJobWorkerResult worker = ...` directly, which
+                    the earlier factories did not.
                   - [ ] **B5d-1z — close the window.** Delete `Submit`/`Cancel`,
                     `context.DerivedJobs`, `m_DerivedJobSnapshot`, the union in
                     the dedup guard and the queue view, and the registry-backed

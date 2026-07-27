@@ -968,8 +968,8 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     // invariant under test is unchanged — every production async submission
     // carries its owning world scope — so the total stays 5 while the split
     // between the retiring and surviving desc types shifts.
-    EXPECT_EQ(CountOccurrences(editorFacades, "return DerivedJobDesc{"), 4u);
-    EXPECT_EQ(CountOccurrences(editorFacades, "return JobDesc{"), 1u);
+    EXPECT_EQ(CountOccurrences(editorFacades, "return DerivedJobDesc{"), 1u);
+    EXPECT_EQ(CountOccurrences(editorFacades, "return JobDesc{"), 4u);
     EXPECT_EQ(CountOccurrences(editorFacades, ".Scope = context.World"), 5u);
     EXPECT_EQ(CountOccurrences(editorFacades, "desc.Scope = activeWorld"), 1u);
     EXPECT_NE(WithoutWhitespace(editorFacades).find(".World=activeWorld"),

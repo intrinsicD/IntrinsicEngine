@@ -6757,19 +6757,19 @@ namespace Extrinsic::Runtime
             SandboxEditorPointCloudOutlierRemovalResult Result{};
         };
 
-        [[nodiscard]] DerivedJobApplyValidation
+        [[nodiscard]] JobApplyValidation
         ValidatePointCloudOutlierRemovalCpuJobApply(
             const SandboxEditorContext& context,
             const SandboxEditorPointCloudOutlierRemovalCpuJobState& job)
         {
             if (context.Scene == nullptr)
-                return DerivedJobApplyValidation::MissingEntity;
+                return JobApplyValidation::MissingTarget;
 
             entt::registry& raw = context.Scene->Raw();
             const std::optional<ECS::EntityHandle> entity =
                 ResolveStableEntity(raw, job.StableEntityId);
             if (!entity.has_value())
-                return DerivedJobApplyValidation::MissingEntity;
+                return JobApplyValidation::MissingTarget;
 
             const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
             const GS::SourceAvailability availability =
@@ -6777,13 +6777,13 @@ namespace Extrinsic::Runtime
             if (availability.ProvenanceDomain != GS::Domain::PointCloud ||
                 view.VertexSource == nullptr)
             {
-                return DerivedJobApplyValidation::StaleGeometryGeneration;
+                return JobApplyValidation::StaleGeneration;
             }
 
             if (GeometryMetadataSignatureForEntity(raw, *entity) !=
                 job.GeometryMetadataSignature)
             {
-                return DerivedJobApplyValidation::StaleGeometryGeneration;
+                return JobApplyValidation::StaleGeneration;
             }
 
             std::optional<std::vector<glm::vec3>> current =
@@ -6791,10 +6791,10 @@ namespace Extrinsic::Runtime
             if (!current.has_value() ||
                 !SameGeometryPositions(*current, job.SnapshotPositions))
             {
-                return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+                return JobApplyValidation::StaleGeneration;
             }
 
-            return DerivedJobApplyValidation::Current;
+            return JobApplyValidation::Current;
         }
 
         void PublishPointCloudOutlierRemovalResultSink(
@@ -6808,7 +6808,7 @@ namespace Extrinsic::Runtime
             }
         }
 
-        [[nodiscard]] DerivedJobWorkerResult
+        [[nodiscard]] JobResultEnvelope
         RunPointCloudOutlierRemovalCpuWorker(
             const std::shared_ptr<
                 SandboxEditorPointCloudOutlierRemovalCpuJobState>& state)
@@ -6855,12 +6855,10 @@ namespace Extrinsic::Runtime
                 result.Message +=
                     DebugNameForOutlierRemovalStatus(removal.Status);
                 result.Message += ".";
-                return DerivedJobOutput{
-                    .PayloadToken = 0u,
-                    .NormalizedProgress = 1.0f,
-                    .ProgressDeterminate = true,
-                    .Diagnostic = result.Message,
-                };
+                return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                    SandboxEditorJobResult{
+                        .Diagnostic = result.Message,
+                    });
             }
 
             state->AfterCloud = state->WorkCloud;
@@ -6873,12 +6871,10 @@ namespace Extrinsic::Runtime
             state->AfterCloud.GarbageCollection();
             result.Status = SandboxEditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
-            return DerivedJobOutput{
-                .PayloadToken = 0u,
-                .NormalizedProgress = 1.0f,
-                .ProgressDeterminate = true,
-                .Diagnostic = "Point-cloud outlier-removal CPU result ready",
-            };
+            return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                SandboxEditorJobResult{
+                    .Diagnostic = "Point-cloud outlier-removal CPU result ready",
+                });
         }
 
         [[nodiscard]] Core::Result PublishPointCloudOutlierRemovalCpuJob(
@@ -6923,47 +6919,54 @@ namespace Extrinsic::Runtime
             return Core::Ok();
         }
 
-        [[nodiscard]] DerivedJobDesc MakePointCloudOutlierRemovalCpuJobDesc(
+        [[nodiscard]] SandboxEditorJobIdentity
+        MakePointCloudOutlierRemovalCpuJobIdentity(
+            const SandboxEditorPointCloudOutlierRemovalCpuJobState& state)
+        {
+            return SandboxEditorJobIdentity{
+                .EntityId = state.StableEntityId,
+                .Scope = SandboxEditorJobScope::PointCloudPoint,
+                .OutputSemantic = ProgressiveSlotSemantic::Displacement,
+                .OutputName = "point_cloud_outlier_removal",
+            };
+        }
+
+        [[nodiscard]] JobDesc MakePointCloudOutlierRemovalCpuJobDesc(
             const SandboxEditorContext& context,
             const std::shared_ptr<
                 SandboxEditorPointCloudOutlierRemovalCpuJobState>& state)
         {
-            return DerivedJobDesc{
-                .Key = DerivedJobKey{
-                    .EntityId = state->StableEntityId,
-                    .Domain = DerivedJobScope::PointCloudPoint,
-                    .OutputSemantic = ProgressiveSlotSemantic::Displacement,
-                    .SourcePropertyGeneration =
-                        state->GeometryMetadataSignature,
-                    .OutputName = "point_cloud_outlier_removal",
-                },
-                .Name = "Sandbox.PointCloudOutlierRemoval.CPU",
-                .RequestedJobDomain = ProgressiveJobDomain::Cpu,
-                .Kind = RuntimeTaskKinds::GeometryProcess,
+            return JobDesc{
+                .DebugName = "Sandbox.PointCloudOutlierRemoval.CPU",
+                .Scope = context.World,
                 .Priority = Core::Dag::TaskPriority::Normal,
+                .Kind = RuntimeTaskKinds::GeometryProcess,
                 .EstimatedCost = std::max<std::uint32_t>(
                     1u,
                     static_cast<std::uint32_t>(
                         (state->WorkCloud.VertexCount() + 1023u) / 1024u)),
-                .Scope = context.World,
-                .Execute =
-                    [state]() -> DerivedJobWorkerResult
+                .Work =
+                    [state](const JobCancellation&) -> JobResultEnvelope
                     {
                         return RunPointCloudOutlierRemovalCpuWorker(state);
                     },
-                .ValidateOnMainThread =
+                .ValidateBeforeApply =
                     [context, state]()
                     {
                         return ValidatePointCloudOutlierRemovalCpuJobApply(
                             context,
                             *state);
                     },
-                .ApplyOnMainThread =
-                    [context, state](DerivedJobApplyContext&) -> Core::Result
+                .PublishCompletion =
+                    [context, state](KernelEventBus&,
+                                     const JobResultEnvelope& result) -> bool
                     {
+                        if (result.TryGet<SandboxEditorJobResult>() == nullptr)
+                            return false;
                         return PublishPointCloudOutlierRemovalCpuJob(
-                            context,
-                            *state);
+                                   context,
+                                   *state)
+                            .has_value();
                     },
             };
         }
@@ -6989,10 +6992,12 @@ namespace Extrinsic::Runtime
             state->Result.OriginalCount = state->WorkCloud.VertexCount();
             state->Result.KeptCount = state->WorkCloud.VertexCount();
 
-            DerivedJobDesc desc =
+            const SandboxEditorJobIdentity identity =
+                MakePointCloudOutlierRemovalCpuJobIdentity(*state);
+            JobDesc desc =
                 MakePointCloudOutlierRemovalCpuJobDesc(context, state);
             if (const std::optional<SandboxEditorJobRecord> active =
-                    FindActiveEditorDerivedJob(context, desc.Key))
+                    FindActiveEditorJob(context, identity))
             {
                 SandboxEditorPointCloudOutlierRemovalResult pending =
                     MakePendingPointCloudOutlierRemovalResult(
@@ -7005,8 +7010,9 @@ namespace Extrinsic::Runtime
                 return pending;
             }
 
-            const JobToken handle = ToSandboxEditorJobToken(
-                context.DerivedJobCommands.Submit(std::move(desc)));
+            const JobToken handle = context.DerivedJobCommands.SubmitJob(
+                std::move(desc),
+                identity);
             if (!handle.IsValid())
             {
                 SandboxEditorPointCloudOutlierRemovalResult result =
@@ -7214,18 +7220,18 @@ namespace Extrinsic::Runtime
             return nullptr;
         }
 
-        [[nodiscard]] DerivedJobApplyValidation ValidateVertexNormalsCpuJobApply(
+        [[nodiscard]] JobApplyValidation ValidateVertexNormalsCpuJobApply(
             const SandboxEditorContext& context,
             const SandboxEditorVertexNormalsCpuJobState& job)
         {
             if (context.Scene == nullptr)
-                return DerivedJobApplyValidation::MissingEntity;
+                return JobApplyValidation::MissingTarget;
 
             entt::registry& raw = context.Scene->Raw();
             const std::optional<ECS::EntityHandle> entity =
                 ResolveStableEntity(raw, job.StableEntityId);
             if (!entity.has_value())
-                return DerivedJobApplyValidation::MissingEntity;
+                return JobApplyValidation::MissingTarget;
 
             const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
             const GS::SourceAvailability availability =
@@ -7233,29 +7239,29 @@ namespace Extrinsic::Runtime
             if (availability.ProvenanceDomain !=
                 VertexNormalsExpectedSourceDomain(job.Kind))
             {
-                return DerivedJobApplyValidation::StaleGeometryGeneration;
+                return JobApplyValidation::StaleGeneration;
             }
 
             if (GeometryMetadataSignatureForEntity(raw, *entity) !=
                 job.GeometryMetadataSignature)
             {
-                return DerivedJobApplyValidation::StaleGeometryGeneration;
+                return JobApplyValidation::StaleGeneration;
             }
 
             const Geometry::PropertySet* properties =
                 VertexNormalsSourceProperties(view, job.Kind);
             if (properties == nullptr)
-                return DerivedJobApplyValidation::StaleGeometryGeneration;
+                return JobApplyValidation::StaleGeneration;
 
             std::optional<std::vector<glm::vec3>> current =
                 CollectFiniteGeometryPositions(*properties);
             if (!current.has_value() ||
                 !SameGeometryPositions(*current, job.SnapshotPositions))
             {
-                return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+                return JobApplyValidation::StaleGeneration;
             }
 
-            return DerivedJobApplyValidation::Current;
+            return JobApplyValidation::Current;
         }
 
         void PublishMeshVertexNormalsResultSink(
@@ -7285,7 +7291,7 @@ namespace Extrinsic::Runtime
             }
         }
 
-        [[nodiscard]] DerivedJobWorkerResult RunMeshVertexNormalsCpuWorker(
+        [[nodiscard]] JobResultEnvelope RunMeshVertexNormalsCpuWorker(
             const std::shared_ptr<SandboxEditorVertexNormalsCpuJobState>& state)
         {
             GN::Params params{};
@@ -7312,12 +7318,10 @@ namespace Extrinsic::Runtime
                     "Geometry.HalfedgeMesh.Vertices.Normals failed with ";
                 result.Message += std::string(GN::DebugName(normalResult.Status));
                 result.Message += ".";
-                return DerivedJobOutput{
-                    .PayloadToken = 0u,
-                    .NormalizedProgress = 1.0f,
-                    .ProgressDeterminate = true,
-                    .Diagnostic = result.Message,
-                };
+                return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                    SandboxEditorJobResult{
+                        .Diagnostic = result.Message,
+                    });
             }
 
             if (!normalResult.Normals.IsValid() ||
@@ -7330,24 +7334,20 @@ namespace Extrinsic::Runtime
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message      = "Geometry.HalfedgeMesh.Vertices.Normals produced missing "
                                       "or count-mismatched normals.";
-                return DerivedJobOutput{
-                    .PayloadToken = 0u,
-                    .NormalizedProgress = 1.0f,
-                    .ProgressDeterminate = true,
-                    .Diagnostic = result.Message,
-                };
+                return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                    SandboxEditorJobResult{
+                        .Diagnostic = result.Message,
+                    });
             }
 
             state->Normals = normalResult.Normals.Vector();
-            return DerivedJobOutput{
-                .PayloadToken = 0u,
-                .NormalizedProgress = 1.0f,
-                .ProgressDeterminate = true,
-                .Diagnostic = "Mesh vertex-normal CPU result ready",
-            };
+            return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                SandboxEditorJobResult{
+                    .Diagnostic = "Mesh vertex-normal CPU result ready",
+                });
         }
 
-        [[nodiscard]] DerivedJobWorkerResult RunGraphVertexNormalsCpuWorker(
+        [[nodiscard]] JobResultEnvelope RunGraphVertexNormalsCpuWorker(
             const std::shared_ptr<SandboxEditorVertexNormalsCpuJobState>& state)
         {
             GraphNormals::Params params{};
@@ -7395,12 +7395,10 @@ namespace Extrinsic::Runtime
                 result.Message +=
                     std::string(GraphNormals::DebugName(normalResult.Status));
                 result.Message += ".";
-                return DerivedJobOutput{
-                    .PayloadToken = 0u,
-                    .NormalizedProgress = 1.0f,
-                    .ProgressDeterminate = true,
-                    .Diagnostic = result.Message,
-                };
+                return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                    SandboxEditorJobResult{
+                        .Diagnostic = result.Message,
+                    });
             }
 
             if (!normalResult.Normals.IsValid() ||
@@ -7414,24 +7412,20 @@ namespace Extrinsic::Runtime
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message = "Geometry.Graph.Vertex.Normals produced missing or "
                                  "count-mismatched normals.";
-                return DerivedJobOutput{
-                    .PayloadToken = 0u,
-                    .NormalizedProgress = 1.0f,
-                    .ProgressDeterminate = true,
-                    .Diagnostic = result.Message,
-                };
+                return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                    SandboxEditorJobResult{
+                        .Diagnostic = result.Message,
+                    });
             }
 
             state->Normals = normalResult.Normals.Vector();
-            return DerivedJobOutput{
-                .PayloadToken = 0u,
-                .NormalizedProgress = 1.0f,
-                .ProgressDeterminate = true,
-                .Diagnostic = "Graph vertex-normal CPU result ready",
-            };
+            return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                SandboxEditorJobResult{
+                    .Diagnostic = "Graph vertex-normal CPU result ready",
+                });
         }
 
-        [[nodiscard]] DerivedJobWorkerResult
+        [[nodiscard]] JobResultEnvelope
         RunPointCloudVertexNormalsCpuWorker(
             const std::shared_ptr<SandboxEditorVertexNormalsCpuJobState>& state)
         {
@@ -7477,12 +7471,10 @@ namespace Extrinsic::Runtime
                 result.Message +=
                     std::string(PointNormals::DebugName(normalResult.Status));
                 result.Message += ".";
-                return DerivedJobOutput{
-                    .PayloadToken = 0u,
-                    .NormalizedProgress = 1.0f,
-                    .ProgressDeterminate = true,
-                    .Diagnostic = result.Message,
-                };
+                return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                    SandboxEditorJobResult{
+                        .Diagnostic = result.Message,
+                    });
             }
 
             if (!normalResult.Normals.IsValid() ||
@@ -7496,24 +7488,20 @@ namespace Extrinsic::Runtime
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message = "Geometry.PointCloud.Normals produced missing or "
                                  "count-mismatched normals.";
-                return DerivedJobOutput{
-                    .PayloadToken = 0u,
-                    .NormalizedProgress = 1.0f,
-                    .ProgressDeterminate = true,
-                    .Diagnostic = result.Message,
-                };
+                return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                    SandboxEditorJobResult{
+                        .Diagnostic = result.Message,
+                    });
             }
 
             state->Normals = normalResult.Normals.Vector();
-            return DerivedJobOutput{
-                .PayloadToken = 0u,
-                .NormalizedProgress = 1.0f,
-                .ProgressDeterminate = true,
-                .Diagnostic = "Point-cloud vertex-normal CPU result ready",
-            };
+            return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                SandboxEditorJobResult{
+                    .Diagnostic = "Point-cloud vertex-normal CPU result ready",
+                });
         }
 
-        [[nodiscard]] DerivedJobWorkerResult RunVertexNormalsCpuWorker(
+        [[nodiscard]] JobResultEnvelope RunVertexNormalsCpuWorker(
             const std::shared_ptr<SandboxEditorVertexNormalsCpuJobState>& state)
         {
             switch (state->Kind)
@@ -7525,7 +7513,7 @@ namespace Extrinsic::Runtime
             case SandboxEditorVertexNormalsCpuJobKind::PointCloud:
                 return RunPointCloudVertexNormalsCpuWorker(state);
             }
-            return std::unexpected(Core::ErrorCode::InvalidArgument);
+            return JobResultEnvelope{};
         }
 
         [[nodiscard]] Core::Result PublishMeshVertexNormalsCpuJob(
@@ -7736,7 +7724,19 @@ namespace Extrinsic::Runtime
             return Core::Err(Core::ErrorCode::InvalidArgument);
         }
 
-        [[nodiscard]] DerivedJobDesc MakeVertexNormalsCpuJobDesc(
+        [[nodiscard]] SandboxEditorJobIdentity MakeVertexNormalsCpuJobIdentity(
+            const SandboxEditorVertexNormalsCpuJobState& state)
+        {
+            return SandboxEditorJobIdentity{
+                .EntityId = state.StableEntityId,
+                .Scope = ToSandboxEditorJobScope(
+                    VertexNormalsCpuJobDomain(state.Kind)),
+                .OutputSemantic = ProgressiveSlotSemantic::Normal,
+                .OutputName = VertexNormalsCpuJobOutputName(state.Kind),
+            };
+        }
+
+        [[nodiscard]] JobDesc MakeVertexNormalsCpuJobDesc(
             const SandboxEditorContext& context,
             const std::shared_ptr<SandboxEditorVertexNormalsCpuJobState>& state)
         {
@@ -7748,37 +7748,32 @@ namespace Extrinsic::Runtime
                                   state->GraphEdgeSlotCount) +
                          1023u) /
                         1024u));
-            return DerivedJobDesc{
-                .Key = DerivedJobKey{
-                    .EntityId = state->StableEntityId,
-                    .Domain = ToDerivedJobScope(VertexNormalsCpuJobDomain(state->Kind)),
-                    .OutputSemantic = ProgressiveSlotSemantic::Normal,
-                    .SourcePropertyGeneration =
-                        state->GeometryMetadataSignature,
-                    .OutputName = VertexNormalsCpuJobOutputName(state->Kind),
-                },
-                .Name = VertexNormalsCpuJobName(state->Kind),
-                .RequestedJobDomain = ProgressiveJobDomain::Cpu,
-                .Kind = RuntimeTaskKinds::GeometryProcess,
-                .Priority = Core::Dag::TaskPriority::Normal,
-                .EstimatedCost = estimatedCost,
+            return JobDesc{
+                .DebugName = VertexNormalsCpuJobName(state->Kind),
                 .Scope = context.World,
-                .Execute =
-                    [state]() -> DerivedJobWorkerResult
+                .Priority = Core::Dag::TaskPriority::Normal,
+                .Kind = RuntimeTaskKinds::GeometryProcess,
+                .EstimatedCost = estimatedCost,
+                .Work =
+                    [state](const JobCancellation&) -> JobResultEnvelope
                     {
                         return RunVertexNormalsCpuWorker(state);
                     },
-                .ValidateOnMainThread =
+                .ValidateBeforeApply =
                     [context, state]()
                     {
                         return ValidateVertexNormalsCpuJobApply(
                             context,
                             *state);
                     },
-                .ApplyOnMainThread =
-                    [context, state](DerivedJobApplyContext&) -> Core::Result
+                .PublishCompletion =
+                    [context, state](KernelEventBus&,
+                                     const JobResultEnvelope& result) -> bool
                     {
-                        return PublishVertexNormalsCpuJob(context, *state);
+                        if (result.TryGet<SandboxEditorJobResult>() == nullptr)
+                            return false;
+                        return PublishVertexNormalsCpuJob(context, *state)
+                            .has_value();
                     },
             };
         }
@@ -7807,9 +7802,11 @@ namespace Extrinsic::Runtime
             state->MeshResult.VertexSlotCount =
                 state->SnapshotPositions.size();
 
-            DerivedJobDesc desc = MakeVertexNormalsCpuJobDesc(context, state);
+            const SandboxEditorJobIdentity identity =
+                MakeVertexNormalsCpuJobIdentity(*state);
+            JobDesc desc = MakeVertexNormalsCpuJobDesc(context, state);
             if (const std::optional<SandboxEditorJobRecord> active =
-                    FindActiveEditorDerivedJob(context, desc.Key))
+                    FindActiveEditorJob(context, identity))
             {
                 SandboxEditorMeshVertexNormalsResult pending =
                     MakePendingMeshVertexNormalsResult(
@@ -7822,8 +7819,9 @@ namespace Extrinsic::Runtime
                 return pending;
             }
 
-            const JobToken handle = ToSandboxEditorJobToken(
-                context.DerivedJobCommands.Submit(std::move(desc)));
+            const JobToken handle = context.DerivedJobCommands.SubmitJob(
+                std::move(desc),
+                identity);
             if (!handle.IsValid())
             {
                 return MakeMeshNormalsResult(
@@ -7883,9 +7881,11 @@ namespace Extrinsic::Runtime
                 state->SnapshotPositions.size();
             state->GraphResult.EdgeSlotCount = edgeSlotCount;
 
-            DerivedJobDesc desc = MakeVertexNormalsCpuJobDesc(context, state);
+            const SandboxEditorJobIdentity identity =
+                MakeVertexNormalsCpuJobIdentity(*state);
+            JobDesc desc = MakeVertexNormalsCpuJobDesc(context, state);
             if (const std::optional<SandboxEditorJobRecord> active =
-                    FindActiveEditorDerivedJob(context, desc.Key))
+                    FindActiveEditorJob(context, identity))
             {
                 SandboxEditorGraphVertexNormalsResult pending =
                     MakePendingGraphVertexNormalsResult(
@@ -7899,8 +7899,9 @@ namespace Extrinsic::Runtime
                 return pending;
             }
 
-            const JobToken handle = ToSandboxEditorJobToken(
-                context.DerivedJobCommands.Submit(std::move(desc)));
+            const JobToken handle = context.DerivedJobCommands.SubmitJob(
+                std::move(desc),
+                identity);
             if (!handle.IsValid())
             {
                 return MakeGraphNormalsResult(
@@ -7954,9 +7955,11 @@ namespace Extrinsic::Runtime
             state->PointCloudResult.PointSlotCount =
                 state->SnapshotPositions.size();
 
-            DerivedJobDesc desc = MakeVertexNormalsCpuJobDesc(context, state);
+            const SandboxEditorJobIdentity identity =
+                MakeVertexNormalsCpuJobIdentity(*state);
+            JobDesc desc = MakeVertexNormalsCpuJobDesc(context, state);
             if (const std::optional<SandboxEditorJobRecord> active =
-                    FindActiveEditorDerivedJob(context, desc.Key))
+                    FindActiveEditorJob(context, identity))
             {
                 SandboxEditorPointCloudVertexNormalsResult pending =
                     MakePendingPointCloudVertexNormalsResult(
@@ -7969,8 +7972,9 @@ namespace Extrinsic::Runtime
                 return pending;
             }
 
-            const JobToken handle = ToSandboxEditorJobToken(
-                context.DerivedJobCommands.Submit(std::move(desc)));
+            const JobToken handle = context.DerivedJobCommands.SubmitJob(
+                std::move(desc),
+                identity);
             if (!handle.IsValid())
             {
                 return MakePointCloudNormalsResult(
@@ -9367,13 +9371,13 @@ namespace Extrinsic::Runtime
             return world;
         }
 
-        [[nodiscard]] DerivedJobApplyValidation
+        [[nodiscard]] JobApplyValidation
         ValidateRegistrationCpuJobApply(
             const SandboxEditorContext& context,
             const SandboxEditorRegistrationCpuJobState& job)
         {
             if (context.Scene == nullptr)
-                return DerivedJobApplyValidation::MissingEntity;
+                return JobApplyValidation::MissingTarget;
 
             entt::registry& raw = context.Scene->Raw();
             const std::optional<ECS::EntityHandle> sourceEntity =
@@ -9381,7 +9385,7 @@ namespace Extrinsic::Runtime
             const std::optional<ECS::EntityHandle> targetEntity =
                 ResolveStableEntity(raw, job.TargetStableEntityId);
             if (!sourceEntity.has_value() || !targetEntity.has_value())
-                return DerivedJobApplyValidation::MissingEntity;
+                return JobApplyValidation::MissingTarget;
 
             const GS::ConstSourceView sourceView =
                 GS::BuildConstView(raw, *sourceEntity);
@@ -9394,7 +9398,7 @@ namespace Extrinsic::Runtime
                 sourceView.VertexSource == nullptr ||
                 targetView.VertexSource == nullptr)
             {
-                return DerivedJobApplyValidation::StaleGeometryGeneration;
+                return JobApplyValidation::StaleGeneration;
             }
 
             if (GeometryMetadataSignatureForEntity(raw, *sourceEntity) !=
@@ -9402,7 +9406,7 @@ namespace Extrinsic::Runtime
                 GeometryMetadataSignatureForEntity(raw, *targetEntity) !=
                     job.TargetGeometryMetadataSignature)
             {
-                return DerivedJobApplyValidation::StaleGeometryGeneration;
+                return JobApplyValidation::StaleGeneration;
             }
 
             const std::optional<std::vector<glm::vec3>> sourcePoints =
@@ -9417,7 +9421,7 @@ namespace Extrinsic::Runtime
                 !SameGeometryPositions(*targetPoints,
                                           job.TargetLocalPoints))
             {
-                return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+                return JobApplyValidation::StaleGeneration;
             }
 
             const ECSC::Transform::Component* sourceTransform =
@@ -9426,23 +9430,23 @@ namespace Extrinsic::Runtime
                 !SameTransformComponent(*sourceTransform,
                                         job.SourceBeforeTransform))
             {
-                return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+                return JobApplyValidation::StaleGeneration;
             }
 
             const ECSC::Transform::Component* targetTransform =
                 raw.try_get<ECSC::Transform::Component>(*targetEntity);
             if (targetTransform == nullptr)
                 return job.TargetHadTransform
-                    ? DerivedJobApplyValidation::StaleSourcePropertyGeneration
-                    : DerivedJobApplyValidation::Current;
+                    ? JobApplyValidation::StaleGeneration
+                    : JobApplyValidation::Current;
             if (!job.TargetHadTransform ||
                 !SameTransformComponent(*targetTransform,
                                         job.TargetBeforeTransform))
             {
-                return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+                return JobApplyValidation::StaleGeneration;
             }
 
-            return DerivedJobApplyValidation::Current;
+            return JobApplyValidation::Current;
         }
 
         void PublishRegistrationResultSink(
@@ -9453,7 +9457,7 @@ namespace Extrinsic::Runtime
                 context.MethodResultSinks.Registration(std::move(result));
         }
 
-        [[nodiscard]] DerivedJobWorkerResult RunRegistrationCpuWorker(
+        [[nodiscard]] JobResultEnvelope RunRegistrationCpuWorker(
             const std::shared_ptr<SandboxEditorRegistrationCpuJobState>& state)
         {
             SandboxEditorRegistrationResult& result = state->Result;
@@ -9496,12 +9500,10 @@ namespace Extrinsic::Runtime
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message = "ICP rejected the selected point clouds (fewer than 3 "
                                  "points or invalid parameters).";
-                return DerivedJobOutput{
-                    .PayloadToken = 0u,
-                    .NormalizedProgress = 1.0f,
-                    .ProgressDeterminate = true,
-                    .Diagnostic = result.Message,
-                };
+                return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                    SandboxEditorJobResult{
+                        .Diagnostic = result.Message,
+                    });
             }
 
             result.HasResult = true;
@@ -9526,12 +9528,10 @@ namespace Extrinsic::Runtime
 
             result.Status = SandboxEditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
-            return DerivedJobOutput{
-                .PayloadToken = 0u,
-                .NormalizedProgress = 1.0f,
-                .ProgressDeterminate = true,
-                .Diagnostic = "ICP registration CPU result ready",
-            };
+            return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                SandboxEditorJobResult{
+                    .Diagnostic = "ICP registration CPU result ready",
+                });
         }
 
         [[nodiscard]] Core::Result PublishRegistrationCpuJob(
@@ -9616,7 +9616,21 @@ namespace Extrinsic::Runtime
             return Core::Ok();
         }
 
-        [[nodiscard]] DerivedJobDesc MakeRegistrationCpuJobDesc(
+        // The retired key carried the source *and* target geometry signatures;
+        // neither was part of the dedup comparison, and both are re-checked by
+        // `ValidateRegistrationCpuJobApply` before the apply.
+        [[nodiscard]] SandboxEditorJobIdentity MakeRegistrationCpuJobIdentity(
+            const SandboxEditorRegistrationCpuJobState& state)
+        {
+            return SandboxEditorJobIdentity{
+                .EntityId = state.SourceStableEntityId,
+                .Scope = SandboxEditorJobScope::PointCloudPoint,
+                .OutputSemantic = ProgressiveSlotSemantic::Displacement,
+                .OutputName = "registration_transform",
+            };
+        }
+
+        [[nodiscard]] JobDesc MakeRegistrationCpuJobDesc(
             const SandboxEditorContext& context,
             const std::shared_ptr<SandboxEditorRegistrationCpuJobState>& state)
         {
@@ -9628,37 +9642,30 @@ namespace Extrinsic::Runtime
                                   state->TargetLocalPoints.size()) +
                          1023u) /
                         1024u));
-            return DerivedJobDesc{
-                .Key = DerivedJobKey{
-                    .EntityId = state->SourceStableEntityId,
-                    .Domain = DerivedJobScope::PointCloudPoint,
-                    .OutputSemantic = ProgressiveSlotSemantic::Displacement,
-                    .SourcePropertyGeneration =
-                        state->SourceGeometryMetadataSignature,
-                    .BindingGeneration =
-                        state->TargetGeometryMetadataSignature,
-                    .OutputName = "registration_transform",
-                },
-                .Name = "Sandbox.RegistrationICP.CPU",
-                .RequestedJobDomain = ProgressiveJobDomain::Cpu,
-                .Kind = RuntimeTaskKinds::GeometryProcess,
-                .Priority = Core::Dag::TaskPriority::Normal,
-                .EstimatedCost = estimatedCost,
+            return JobDesc{
+                .DebugName = "Sandbox.RegistrationICP.CPU",
                 .Scope = context.World,
-                .Execute =
-                    [state]() -> DerivedJobWorkerResult
+                .Priority = Core::Dag::TaskPriority::Normal,
+                .Kind = RuntimeTaskKinds::GeometryProcess,
+                .EstimatedCost = estimatedCost,
+                .Work =
+                    [state](const JobCancellation&) -> JobResultEnvelope
                     {
                         return RunRegistrationCpuWorker(state);
                     },
-                .ValidateOnMainThread =
+                .ValidateBeforeApply =
                     [context, state]()
                     {
                         return ValidateRegistrationCpuJobApply(context, *state);
                     },
-                .ApplyOnMainThread =
-                    [context, state](DerivedJobApplyContext&) -> Core::Result
+                .PublishCompletion =
+                    [context, state](KernelEventBus&,
+                                     const JobResultEnvelope& result) -> bool
                     {
-                        return PublishRegistrationCpuJob(context, *state);
+                        if (result.TryGet<SandboxEditorJobResult>() == nullptr)
+                            return false;
+                        return PublishRegistrationCpuJob(context, *state)
+                            .has_value();
                     },
             };
         }
@@ -9695,9 +9702,11 @@ namespace Extrinsic::Runtime
             state->Result.SourcePointCount = state->SourceLocalPoints.size();
             state->Result.TargetPointCount = state->TargetLocalPoints.size();
 
-            DerivedJobDesc desc = MakeRegistrationCpuJobDesc(context, state);
+            const SandboxEditorJobIdentity identity =
+                MakeRegistrationCpuJobIdentity(*state);
+            JobDesc desc = MakeRegistrationCpuJobDesc(context, state);
             if (const std::optional<SandboxEditorJobRecord> active =
-                    FindActiveEditorDerivedJob(context, desc.Key))
+                    FindActiveEditorJob(context, identity))
             {
                 SandboxEditorRegistrationResult pending =
                     MakePendingRegistrationResult(
@@ -9710,8 +9719,9 @@ namespace Extrinsic::Runtime
                 return pending;
             }
 
-            const JobToken handle = ToSandboxEditorJobToken(
-                context.DerivedJobCommands.Submit(std::move(desc)));
+            const JobToken handle = context.DerivedJobCommands.SubmitJob(
+                std::move(desc),
+                identity);
             if (!handle.IsValid())
             {
                 SandboxEditorRegistrationResult result =
@@ -15581,7 +15591,7 @@ namespace Extrinsic::Runtime
                 source.Diagnostic);
         }
 
-        if (context.DerivedJobCommands.Available())
+        if (context.DerivedJobCommands.JobsAvailable())
         {
             return SubmitMeshVertexNormalsCpuJob(
                 context,
@@ -15688,7 +15698,7 @@ namespace Extrinsic::Runtime
                 source.Diagnostic);
         }
 
-        if (context.DerivedJobCommands.Available())
+        if (context.DerivedJobCommands.JobsAvailable())
         {
             return SubmitGraphVertexNormalsCpuJob(
                 context,
@@ -15824,7 +15834,7 @@ namespace Extrinsic::Runtime
                 "GeometrySources.");
         }
 
-        if (context.DerivedJobCommands.Available())
+        if (context.DerivedJobCommands.JobsAvailable())
         {
             return SubmitPointCloudVertexNormalsCpuJob(
                 context,
@@ -16029,7 +16039,7 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        if (context.DerivedJobCommands.Available())
+        if (context.DerivedJobCommands.JobsAvailable())
         {
             return SubmitPointCloudOutlierRemovalCpuJob(
                 context,
@@ -16231,7 +16241,7 @@ namespace Extrinsic::Runtime
         const ECSC::Transform::Component* targetTransform =
             raw.try_get<ECSC::Transform::Component>(*targetEntity);
 
-        if (context.DerivedJobCommands.Available())
+        if (context.DerivedJobCommands.JobsAvailable())
         {
             return SubmitRegistrationCpuJob(
                 context,

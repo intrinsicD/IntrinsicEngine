@@ -1911,13 +1911,8 @@ TEST(SandboxEditorUi, RegistrationRequestQueuesDerivedJobAndPublishesOnApply)
     Runtime::EditorCommandHistory history;
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
-    Runtime::StreamingExecutor executor{};
-    Runtime::DerivedJobRegistry jobs{executor};
-    context.DerivedJobCommands.Submit =
-        [&jobs](Runtime::DerivedJobDesc desc)
-        {
-            return jobs.Submit(std::move(desc));
-        };
+    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    jobs.Attach(context);
     std::optional<Runtime::SandboxEditorRegistrationResult> completedResult{};
     context.MethodResultSinks.Registration =
         [&completedResult](Runtime::SandboxEditorRegistrationResult result)
@@ -1967,7 +1962,7 @@ TEST(SandboxEditorUi, RegistrationRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_FALSE(registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(source));
 
     Runtime::SandboxEditorJobQueueSnapshot queued =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(queued.Entries.size(), 1u);
     EXPECT_EQ(queued.Entries[0].Name, "Sandbox.RegistrationICP.CPU");
     // `JobService` dispatches at submit, so the pre-drain state races
@@ -1981,11 +1976,9 @@ TEST(SandboxEditorUi, RegistrationRequestQueuesDerivedJobAndPublishesOnApply)
         before.Position.x,
         1.0e-6f);
 
-    jobs.Pump(1u);
-    jobs.DrainCompletions();
-    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
     Runtime::SandboxEditorJobQueueSnapshot done =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
     ASSERT_TRUE(completedResult.has_value());
@@ -2017,13 +2010,8 @@ TEST(SandboxEditorUi, RegistrationDerivedJobDiscardsStaleSourceBeforeApply)
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    Runtime::StreamingExecutor executor{};
-    Runtime::DerivedJobRegistry jobs{executor};
-    context.DerivedJobCommands.Submit =
-        [&jobs](Runtime::DerivedJobDesc desc)
-        {
-            return jobs.Submit(std::move(desc));
-        };
+    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    jobs.Attach(context);
     bool completedSinkCalled = false;
     context.MethodResultSinks.Registration =
         [&completedSinkCalled](Runtime::SandboxEditorRegistrationResult)
@@ -2065,12 +2053,10 @@ TEST(SandboxEditorUi, RegistrationDerivedJobDiscardsStaleSourceBeforeApply)
         point += glm::vec3{10.0f, 0.0f, 0.0f};
     SetPositions(registry.Raw().get<GS::Vertices>(source), staleSourcePoints);
 
-    jobs.Pump(1u);
-    jobs.DrainCompletions();
-    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
 
     Runtime::SandboxEditorJobQueueSnapshot done =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State,
               Runtime::JobState::StaleDiscarded);
