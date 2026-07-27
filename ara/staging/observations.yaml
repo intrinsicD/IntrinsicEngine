@@ -851,3 +851,20 @@ observations:
     promoted_to: "logic/claims.md:C07"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O63
+    timestamp: "2026-07-27T21:52+02:00"
+    provenance: ai-executed
+    content: >
+      K-Means production GPU results can use one shared copied multi-range
+      transfer batch with one source barrier and caller-owned typed parsing,
+      while preserving CPU-reference parity on an operational Vulkan device.
+    context: >
+      RUNTIME-195 Slice B1 CPU contracts plus the ASan+UBSan ci-vulkan K-Means
+      parity smoke on an NVIDIA GeForce RTX 3050 with driver 590.48.01. The
+      observation is K-Means-specific and does not include Progressive Poisson.
+    potential_type: claim
+    bound_to: [N281]
+    promoted: true
+    promoted_to: "logic/claims.md:C08"
+    crystallized_via: artifact-commitment
+    stale: false

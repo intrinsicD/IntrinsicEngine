@@ -280,7 +280,7 @@ namespace
 
     [[nodiscard]] bool SubmitReadbacksAfterProducerRetired(
         RHI::IDevice& device,
-        Runtime::KMeansGpuAsyncReadbacks& readbacks,
+        Runtime::KMeansGpuResultReadback& readbacks,
         const Runtime::KMeansGpuExecutionResources& resources)
     {
         const std::uint32_t framesInFlight = std::max(device.GetFramesInFlight(), 1u);
@@ -304,7 +304,7 @@ namespace
 
     [[nodiscard]] bool DrainReadbacks(RHI::ITransferQueue& queue,
                                       Graphics::GpuTransfer& transfer,
-                                      Runtime::KMeansGpuAsyncReadbacks& readbacks)
+                                      Runtime::KMeansGpuResultReadback& readbacks)
     {
         NoopCommandContext noop;
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{5};
@@ -358,7 +358,7 @@ namespace
         Runtime::KMeansGpuResourceCache cache{buffers};
         RHI::ITransferQueue& queue = device.GetTransferQueue();
         Graphics::GpuTransfer transfer{queue};
-        Runtime::KMeansGpuAsyncReadbacks readbacks{transfer};
+        Runtime::KMeansGpuResultReadback readbacks{transfer};
 
         GpuRunResult last{};
         double measuredMs = 0.0;

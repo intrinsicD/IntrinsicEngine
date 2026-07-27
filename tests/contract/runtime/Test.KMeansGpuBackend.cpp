@@ -576,7 +576,7 @@ TEST(KMeansGpuBackend, ExecutionAllocatesUploadsRecordsAndPublishesReadbackResou
     Runtime::KMeansGpuResourceCache cache{buffers};
     MockReadbackTransferQueue queue;
     Extrinsic::Graphics::GpuTransfer transfer{queue};
-    Runtime::KMeansGpuAsyncReadbacks readbacks{transfer};
+    Runtime::KMeansGpuResultReadback readbacks{transfer};
 
     const Runtime::KMeansGpuPlanDesc plan = MakePlanDesc(3u, 2u, 2u);
     const std::array<glm::vec3, 3> points{{
@@ -652,7 +652,8 @@ TEST(KMeansGpuBackend, ExecutionAllocatesUploadsRecordsAndPublishesReadbackResou
         if (barrier.Buffer == work && barrier.After == RHI::MemoryAccess::TransferRead)
             ++transferReadBarriers;
     }
-    EXPECT_EQ(transferReadBarriers, 3u);
+    EXPECT_EQ(transferReadBarriers, 1u);
+    EXPECT_EQ(transfer.GetDiagnostics().ReadbackBatchesIssued, 1u);
 
     queue.CollectCompleted();
     transfer.DrainCompleted(device.CommandContext);
@@ -674,7 +675,7 @@ TEST(KMeansGpuBackend, ExecutionAllocatesUploadsRecordsAndPublishesReadbackResou
     EXPECT_EQ(device.CreateBufferCount, 2);
 }
 
-TEST(KMeansGpuBackend, AsyncReadbacksCollectLabelsDistancesAndCentroids)
+TEST(KMeansGpuBackend, SharedResultBatchCollectsLabelsDistancesAndCentroids)
 {
     const Runtime::KMeansGpuDispatchPlan plan =
         Runtime::ComputeKMeansGpuDispatchPlan(MakePlanDesc(3u, 2u, 1u));
@@ -705,7 +706,7 @@ TEST(KMeansGpuBackend, AsyncReadbacksCollectLabelsDistancesAndCentroids)
     MockReadbackTransferQueue queue;
     queue.BufferContents[resources.Resources.Work.Index] = std::move(work);
     Extrinsic::Graphics::GpuTransfer transfer{queue};
-    Runtime::KMeansGpuAsyncReadbacks readbacks{transfer};
+    Runtime::KMeansGpuResultReadback readbacks{transfer};
     Tests::MockDevice device;
 
     ASSERT_TRUE(readbacks.Enqueue(device.CommandContext, resources));
@@ -726,4 +727,6 @@ TEST(KMeansGpuBackend, AsyncReadbacksCollectLabelsDistancesAndCentroids)
     EXPECT_EQ(result.Centroids[1], (glm::vec3{7.0f, 8.0f, 9.0f}));
     EXPECT_FLOAT_EQ(result.Inertia, 2.5f);
     EXPECT_EQ(result.MaxDistanceIndex, 1u);
+    EXPECT_EQ(transfer.GetDiagnostics().ReadbackBatchesIssued, 1u);
+    EXPECT_EQ(transfer.GetDiagnostics().ReadbackBatchesConsumed, 1u);
 }

@@ -6664,3 +6664,28 @@ tree:
       Progressive Poisson production migration and operational Vulkan parity
       remain open in RUNTIME-195.
     status: resolved
+  - id: N281
+    type: experiment
+    title: "Migrate K-Means to one operational GPU-result batch"
+    provenance: ai-executed
+    timestamp: "2026-07-27T21:52+02:00"
+    also_depends_on: [N280]
+    evidence:
+      - "tasks/active/RUNTIME-195-unified-gpu-result-readback.md"
+      - "src/runtime/Runtime.KMeansGpuBackend.cppm"
+      - "src/runtime/Runtime.KMeansGpuBackend.cpp"
+      - "src/runtime/Runtime.KMeansGpuJobQueue.cpp"
+      - "tests/contract/runtime/Test.KMeansGpuBackend.cpp"
+      - "tests/integration/runtime/Test.KMeansGpuBackendGpuSmoke.cpp"
+      - "cmake --build --preset ci-vulkan --target IntrinsicRuntimeKMeansGpuSmokeTests"
+      - "ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R KMeansGpuBackendGpuSmoke --timeout 180"
+      - "NVIDIA GeForce RTX 3050, driver 590.48.01"
+    result: >
+      K-Means now submits labels, squared distances, and centroids as one shared
+      copied result batch and retains only feature-owned typed parsing. Its 15
+      CPU/fake-queue contracts passed. The ASan+UBSan promoted-Vulkan parity
+      smoke passed 1/1 on the named GPU and asserted three underlying ranges,
+      one deduplicated transfer-read barrier, one delivered batch, and one
+      exactly-once consume. This evidence does not cover Progressive Poisson or
+      complete RUNTIME-195 retirement.
+    status: resolved

@@ -137,3 +137,27 @@
 - **Dependencies**: [C06]
 - **Tags**: graphics, runtime, GPU readback, JobService, CPU-supported
 - **From staging**: O62
+
+## C08: K-Means uses the shared result batch on operational Vulkan
+- **Statement**: The production K-Means GPU backend submits labels, squared
+  distances, and centroids through one copied `Graphics.GpuTransfer` batch,
+  deduplicates their common source to one transfer-read barrier, consumes the
+  batch exactly once in its typed adapter, and matches its CPU reference on the
+  deterministic separated-clusters Vulkan fixture.
+- **Status**: supported — ASan+UBSan promoted Vulkan on NVIDIA GeForce RTX 3050,
+  driver 590.48.01; no Progressive Poisson or whole-task claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: K-Means imports or constructs the retired async
+  wrapper, submits more than one logical result batch, emits more than one
+  transfer-read barrier for its shared Work buffer, consumes the result more
+  than once, or the operational parity fixture disagrees with the CPU reference.
+- **Proof**: [tasks/active/RUNTIME-195-unified-gpu-result-readback.md,
+  src/runtime/Runtime.KMeansGpuBackend.cppm,
+  src/runtime/Runtime.KMeansGpuBackend.cpp,
+  src/runtime/Runtime.KMeansGpuJobQueue.cpp,
+  tests/contract/runtime/Test.KMeansGpuBackend.cpp,
+  tests/integration/runtime/Test.KMeansGpuBackendGpuSmoke.cpp]
+- **Dependencies**: [C07]
+- **Tags**: K-Means, graphics, runtime, GPU readback, Vulkan, parity
+- **From staging**: O63

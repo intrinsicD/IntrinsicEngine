@@ -1,5 +1,6 @@
 module;
 
+#include <array>
 #include <cstdint>
 #include <span>
 #include <string>
@@ -16,7 +17,6 @@ import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.Graphics.GpuTransfer;
-import Extrinsic.Runtime.AsyncBufferReadback;
 
 // ============================================================
 // KMeansGpuBackend (GEOM-056 — Vulkan compute backend seam)
@@ -24,9 +24,9 @@ import Extrinsic.Runtime.AsyncBufferReadback;
 // Runtime-owned Vulkan-compute backend utilities for Geometry.KMeans. The
 // module owns CPU-testable planning, shader/BDA record contracts, fail-closed
 // pass recording, persistent `(n,k)` resource caching, one-time SoA/seed upload,
-// and RUNTIME-137 async result drains. `Extrinsic.Runtime.KMeansBackend` remains
+// and RUNTIME-195 shared result drains. `Extrinsic.Runtime.KMeansBackend` remains
 // the thin CPU-reference fallback overload unless a caller supplies the explicit
-// command context, pipelines, cache, and async readback set required here.
+// command context, pipelines, cache, and result-readback adapter required here.
 //
 // Design: docs/migration/kmeans-gpu-vulkan-compute-proposal.md
 // ============================================================
@@ -260,8 +260,8 @@ export namespace Extrinsic::Runtime
     // A single packed "Work" buffer holds every compute-touched role as a
     // sub-span (see ComputeKMeansGpuBufferLayout); State is the BDA pointer
     // table. The readback handles are retained for compatibility with the Slice
-    // B descriptor builders; Slice C drains directly from Work through
-    // KMeansGpuAsyncReadbacks.
+    // B descriptor builders; results drain directly from Work through one
+    // shared multi-range transfer batch.
     struct KMeansGpuResourceSet
     {
         RHI::BufferHandle State{};
@@ -374,7 +374,7 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] KMeansGpuRecordResult RecordKMeansGpuPasses(
         const KMeansGpuRecordDesc& desc);
 
-    class KMeansGpuAsyncReadbacks;
+    class KMeansGpuResultReadback;
 
     struct KMeansGpuExecutionDesc
     {
@@ -424,13 +424,18 @@ export namespace Extrinsic::Runtime
         }
     };
 
-    class KMeansGpuAsyncReadbacks
+    // Feature-owned typed adapter over one Graphics.GpuTransfer multi-range
+    // batch. Transport completion, cancellation, and byte ownership stay in the
+    // shared facade; this adapter owns only K-Means range selection and parsing.
+    class KMeansGpuResultReadback
     {
     public:
-        explicit KMeansGpuAsyncReadbacks(Extrinsic::Graphics::GpuTransfer& transfer) noexcept;
+        explicit KMeansGpuResultReadback(
+            Extrinsic::Graphics::GpuTransfer& transfer) noexcept;
+        ~KMeansGpuResultReadback();
 
-        KMeansGpuAsyncReadbacks(const KMeansGpuAsyncReadbacks&) = delete;
-        KMeansGpuAsyncReadbacks& operator=(const KMeansGpuAsyncReadbacks&) = delete;
+        KMeansGpuResultReadback(const KMeansGpuResultReadback&) = delete;
+        KMeansGpuResultReadback& operator=(const KMeansGpuResultReadback&) = delete;
 
         [[nodiscard]] bool Enqueue(RHI::ICommandContext& cmd,
                                    const KMeansGpuExecutionResources& resources);
@@ -439,18 +444,19 @@ export namespace Extrinsic::Runtime
 
         [[nodiscard]] bool IsReady() const noexcept;
         [[nodiscard]] KMeansGpuReadbackResult Collect(
-            const KMeansGpuDispatchPlan& plan) const;
+            const KMeansGpuDispatchPlan& plan);
 
     private:
-        AsyncBufferReadback m_Labels;
-        AsyncBufferReadback m_SquaredDistances;
-        AsyncBufferReadback m_Centroids;
+        Extrinsic::Graphics::GpuTransfer* m_Transfer{nullptr};
+        std::array<Extrinsic::Graphics::GpuTransferReadbackRangeDesc, 3u>
+            m_Ranges{};
+        Extrinsic::Graphics::GpuTransferReadbackBatchTicket m_Ticket{};
     };
 
     // Allocate/reuse persistent buffers, upload the SoA positions and supplied
     // seed centroids once, and call RecordKMeansGpuPasses. The returned
     // Resources pointer remains owned by the cache and is the source for
-    // KMeansGpuAsyncReadbacks::Enqueue after the producer command submission has
+    // KMeansGpuResultReadback::Enqueue after the producer command submission has
     // retired. Scheduling transfer-queue readback from inside this recording
     // call would race the compute work on real Vulkan queues.
     [[nodiscard]] KMeansGpuExecutionResult RecordKMeansGpuExecution(

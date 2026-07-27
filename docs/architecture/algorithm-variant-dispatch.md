@@ -251,12 +251,14 @@ Method adapters such as METHOD-013 should consume that seam instead of declaring
 private CUB-equivalent primitives; later tasks own method-specific GPU backends
 and runtime UI routing.
 
-GPU backends should also drain their results through the runtime-owned
-`Extrinsic.Runtime.AsyncBufferReadback` helper (RUNTIME-137) rather than
+GPU backends drain final CPU-visible results through
+`Graphics::GpuTransfer::ScheduleReadbackBatch(...)` (RUNTIME-195) rather than
 `RHI::IDevice::ReadBuffer`, which performs a device-wide `vkDeviceWaitIdle` on
-every call. The helper composes `Graphics::GpuTransfer` (record barrier →
-non-blocking download → `Poll()` for delivery) and pools the host destination
-across drains. `IDevice::ReadBuffer` remains the explicit-stall escape hatch. See
+every call. One logical batch owns copied storage for all result ranges,
+revalidates the exact handles and byte ranges before exactly-once consumption,
+and composes with the runtime `JobService` readiness/cancellation lifecycle.
+Feature adapters own typed parsing; the transport owns no method semantics.
+`IDevice::ReadBuffer` remains the explicit-stall escape hatch. See
 `docs/reviews/2026-07-01-gpu-geometry-backend-io-audit.md` Finding 1.
 
 ## Config And Agent Lane
@@ -316,15 +318,15 @@ adapter `Extrinsic.Runtime.KMeansBackend::ClusterKMeans(...)` accepts
 `Extrinsic::RHI::IDevice&`, evaluates `IDevice::IsOperational()` for GPU
 requests, and falls back to the CPU reference with honest telemetry because that
 synchronous convenience overload does not own the command context, pipeline set,
-persistent buffer cache, or async readback set required to execute GPU work.
+persistent buffer cache, or result-readback adapter required to execute GPU work.
 The explicit runtime GPU surface lives in
 `Extrinsic.Runtime.KMeansGpuBackend`: callers supply those dependencies to
 `RecordKMeansGpuExecution(...)`, which reuses persistent `(n,k)` buffers, uploads
 SoA positions plus seed centroids once, records the reset/assign/update pass
-loop, and returns cache-owned result resources. Callers enqueue
-`KMeansGpuAsyncReadbacks` after the producing command submission has retired;
-the helper then drains labels/distances/centroids through
-`AsyncBufferReadback` without a device-wide readback stall. The Sandbox editor
+loop, and returns cache-owned result resources. Callers enqueue one
+`KMeansGpuResultReadback` after the producing command submission has retired;
+the typed adapter selects labels/distances/centroids as one copied
+`Graphics.GpuTransfer` batch without a device-wide readback stall. The Sandbox editor
 uses a queue registered with the `JobService` `GpuQueue` participant registry so
 those command/readback dependencies record inside the normal renderer frame
 context and never create an extra swapchain present. That queue is private

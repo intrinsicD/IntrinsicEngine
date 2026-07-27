@@ -22,7 +22,6 @@ import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.Graphics.GpuTransfer;
-import Extrinsic.Runtime.AsyncBufferReadback;
 
 namespace Extrinsic::Runtime
 {
@@ -228,7 +227,8 @@ namespace Extrinsic::Runtime
             result.UploadedInputs = true;
         }
 
-        [[nodiscard]] AsyncBufferReadbackRequest MakeRoleReadbackRequest(
+        [[nodiscard]] Graphics::GpuTransferReadbackRangeDesc
+        MakeRoleReadbackRange(
             const KMeansGpuExecutionResources& resources,
             const KMeansGpuBufferRole role)
         {
@@ -236,7 +236,7 @@ namespace Extrinsic::Runtime
             if (span == nullptr)
                 return {};
 
-            return AsyncBufferReadbackRequest{
+            return Graphics::GpuTransferReadbackRangeDesc{
                 .Source = resources.Resources.Work,
                 .SourceDesc = BuildKMeansGpuWorkBufferDesc(resources.Layout),
                 .SourceRange = RHI::BufferRange{
@@ -247,16 +247,22 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] std::vector<std::uint32_t> CopyUint32Readback(
-            const std::span<const std::uint32_t> source)
+        template <class T>
+        [[nodiscard]] bool CopyTypedReadback(
+            const std::span<const std::byte> source,
+            const std::size_t expectedCount,
+            std::vector<T>& destination)
         {
-            return std::vector<std::uint32_t>{source.begin(), source.end()};
-        }
-
-        [[nodiscard]] std::vector<float> CopyFloatReadback(
-            const std::span<const float> source)
-        {
-            return std::vector<float>{source.begin(), source.end()};
+            if (source.size_bytes() != expectedCount * sizeof(T))
+                return false;
+            destination.resize(expectedCount);
+            if (!destination.empty())
+            {
+                std::memcpy(destination.data(),
+                            source.data(),
+                            source.size_bytes());
+            }
+            return true;
         }
     }
 
@@ -703,70 +709,66 @@ namespace Extrinsic::Runtime
         return m_AllocationCount;
     }
 
-    KMeansGpuAsyncReadbacks::KMeansGpuAsyncReadbacks(
+    KMeansGpuResultReadback::KMeansGpuResultReadback(
         Extrinsic::Graphics::GpuTransfer& transfer) noexcept
-        : m_Labels(transfer)
-        , m_SquaredDistances(transfer)
-        , m_Centroids(transfer)
+        : m_Transfer(&transfer)
     {
     }
 
-    bool KMeansGpuAsyncReadbacks::Enqueue(
+    KMeansGpuResultReadback::~KMeansGpuResultReadback()
+    {
+        Reset();
+    }
+
+    bool KMeansGpuResultReadback::Enqueue(
         RHI::ICommandContext& cmd,
         const KMeansGpuExecutionResources& resources)
     {
-        if (!resources.IsValid())
+        if (m_Transfer == nullptr || !resources.IsValid() || m_Ticket.IsValid())
             return false;
-        if (m_Labels.Status() == AsyncReadbackStatus::Pending ||
-            m_SquaredDistances.Status() == AsyncReadbackStatus::Pending ||
-            m_Centroids.Status() == AsyncReadbackStatus::Pending)
+
+        m_Ranges = {
+            MakeRoleReadbackRange(resources, KMeansGpuBufferRole::Labels),
+            MakeRoleReadbackRange(resources,
+                                  KMeansGpuBufferRole::SquaredDistances),
+            MakeRoleReadbackRange(resources, KMeansGpuBufferRole::Centroids),
+        };
+        if (std::any_of(m_Ranges.begin(),
+                        m_Ranges.end(),
+                        [](const Graphics::GpuTransferReadbackRangeDesc& range)
+                        { return !range.Source.IsValid(); }))
         {
             return false;
         }
 
-        const AsyncBufferReadbackRequest labels =
-            MakeRoleReadbackRequest(resources, KMeansGpuBufferRole::Labels);
-        const AsyncBufferReadbackRequest distances =
-            MakeRoleReadbackRequest(resources, KMeansGpuBufferRole::SquaredDistances);
-        const AsyncBufferReadbackRequest centroids =
-            MakeRoleReadbackRequest(resources, KMeansGpuBufferRole::Centroids);
-        if (!labels.Source.IsValid() ||
-            !distances.Source.IsValid() ||
-            !centroids.Source.IsValid())
-        {
-            return false;
-        }
-
-        const bool labelsQueued = m_Labels.Enqueue(cmd, labels);
-        const bool distancesQueued = m_SquaredDistances.Enqueue(cmd, distances);
-        const bool centroidsQueued = m_Centroids.Enqueue(cmd, centroids);
-        return labelsQueued && distancesQueued && centroidsQueued;
+        m_Ticket = m_Transfer->ScheduleReadbackBatch(
+            cmd,
+            Graphics::GpuTransferReadbackBatchDesc{.Ranges = m_Ranges});
+        return m_Ticket.IsValid();
     }
 
-    bool KMeansGpuAsyncReadbacks::Poll() noexcept
+    bool KMeansGpuResultReadback::Poll() noexcept
     {
-        const bool labels = m_Labels.Poll();
-        const bool distances = m_SquaredDistances.Poll();
-        const bool centroids = m_Centroids.Poll();
-        return labels && distances && centroids;
+        return IsReady();
     }
 
-    void KMeansGpuAsyncReadbacks::Reset() noexcept
+    void KMeansGpuResultReadback::Reset() noexcept
     {
-        m_Labels.Reset();
-        m_SquaredDistances.Reset();
-        m_Centroids.Reset();
+        if (m_Transfer != nullptr && m_Ticket.IsValid())
+            (void)m_Transfer->CancelReadbackBatch(m_Ticket);
+        m_Ranges = {};
+        m_Ticket = {};
     }
 
-    bool KMeansGpuAsyncReadbacks::IsReady() const noexcept
+    bool KMeansGpuResultReadback::IsReady() const noexcept
     {
-        return m_Labels.IsReady() &&
-               m_SquaredDistances.IsReady() &&
-               m_Centroids.IsReady();
+        return m_Transfer != nullptr &&
+               m_Transfer->ReadbackBatchState(m_Ticket) ==
+                   Graphics::GpuTransferReadbackBatchState::Ready;
     }
 
-    KMeansGpuReadbackResult KMeansGpuAsyncReadbacks::Collect(
-        const KMeansGpuDispatchPlan& plan) const
+    KMeansGpuReadbackResult KMeansGpuResultReadback::Collect(
+        const KMeansGpuDispatchPlan& plan)
     {
         if (!plan.IsValid())
         {
@@ -779,19 +781,12 @@ namespace Extrinsic::Runtime
                                   "k-means GPU readback is not ready yet");
         }
 
-        const std::span<const std::uint32_t> labelSpan =
-            m_Labels.BytesAs<std::uint32_t>();
-        const std::span<const float> distanceSpan =
-            m_SquaredDistances.BytesAs<float>();
-        const std::span<const float> centroidSpan =
-            m_Centroids.BytesAs<float>();
-
-        if (labelSpan.size() != plan.PointCount ||
-            distanceSpan.size() != plan.PointCount ||
-            centroidSpan.size() != static_cast<std::size_t>(plan.ClusterCount) * 3u)
+        Graphics::GpuTransferReadbackBatchResult batch{};
+        if (m_Transfer == nullptr ||
+            !m_Transfer->ConsumeReadbackBatch(m_Ticket, m_Ranges, batch))
         {
             return ReadbackStatus(KMeansGpuStatus::InvalidReadback,
-                                  "k-means GPU readback byte sizes do not match the dispatch plan");
+                                  "k-means GPU result batch failed exact transport validation");
         }
 
         KMeansGpuReadbackResult result{};
@@ -799,16 +794,30 @@ namespace Extrinsic::Runtime
         result.Read = true;
         result.StructurallyValid = true;
         result.CpuFallbackRecommended = false;
-        result.Labels = CopyUint32Readback(labelSpan);
-        result.SquaredDistances = CopyFloatReadback(distanceSpan);
+        std::vector<float> packedCentroids{};
+        if (!CopyTypedReadback<std::uint32_t>(batch.Bytes(0u),
+                                             plan.PointCount,
+                                             result.Labels) ||
+            !CopyTypedReadback<float>(batch.Bytes(1u),
+                                      plan.PointCount,
+                                      result.SquaredDistances) ||
+            !CopyTypedReadback<float>(
+                batch.Bytes(2u),
+                static_cast<std::size_t>(plan.ClusterCount) * 3u,
+                packedCentroids))
+        {
+            return ReadbackStatus(
+                KMeansGpuStatus::InvalidReadback,
+                "k-means GPU readback byte sizes do not match the dispatch plan");
+        }
         result.Centroids.resize(plan.ClusterCount);
 
         for (std::uint32_t cluster = 0u; cluster < plan.ClusterCount; ++cluster)
         {
             result.Centroids[cluster] = glm::vec3{
-                centroidSpan[static_cast<std::size_t>(cluster) * 3u + 0u],
-                centroidSpan[static_cast<std::size_t>(cluster) * 3u + 1u],
-                centroidSpan[static_cast<std::size_t>(cluster) * 3u + 2u],
+                packedCentroids[static_cast<std::size_t>(cluster) * 3u + 0u],
+                packedCentroids[static_cast<std::size_t>(cluster) * 3u + 1u],
+                packedCentroids[static_cast<std::size_t>(cluster) * 3u + 2u],
             };
         }
 

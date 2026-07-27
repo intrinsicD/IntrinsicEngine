@@ -21,6 +21,16 @@ maturity_target: Retired
   dependent release, bounded main-thread delivery, and world-cancellation
   cleanup without adding a second runtime service. Focused CPU evidence:
   `GpuTransferFacade.*` 8/8 and `GpuReadbackJob.*|GpuResultReadbackJob.*` 6/6.
+- Slice B1 completed on 2026-07-27. K-Means replaced its three
+  `AsyncBufferReadback` instances with one `Graphics.GpuTransfer` batch;
+  `KMeansGpuResultReadback` owns only range selection and typed validation/
+  parsing, while the private JobService GPU participant retains frame-command
+  and shutdown ownership. CPU contracts passed 15/15. The sanitizer-enabled
+  `ci-vulkan` parity smoke passed 1/1 on an NVIDIA GeForce RTX 3050 with driver
+  590.48.01 and explicitly observed three ranges, one transfer-read barrier,
+  one delivered batch, and one consumed batch. The Vulkan benchmark consumer
+  also compiled against the renamed adapter. Progressive Poisson remains the
+  open Slice B2 producer.
 
 ## Goal
 

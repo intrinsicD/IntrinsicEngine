@@ -141,7 +141,7 @@ Extrinsic.Runtime.KMeansGpuBackend (runtime)
     ├─ pipeline set (reset / assign / update / reduce)
     ├─ persistent resource cache keyed by `(n,k)`
     ├─ RecordKMeansGpuExecution(...)  → records the whole Lloyd loop
-    └─ KMeansGpuAsyncReadbacks        → post-submit async drain at the end
+    └─ KMeansGpuResultReadback        → one post-submit result batch at the end
 Extrinsic.Runtime.KMeansBackend::ClusterKMeans(...)  ← thin CPU fallback overload
 ```
 
@@ -166,7 +166,7 @@ descriptor-set storage bindings**).
    updated centroid in place. A `NextCentroids` slot remains reserved for a future
    double-buffered variant.
 4. Final diagnostics (`Inertia`, farthest point) are reconstructed from the
-   read-back labels/distances/centroids in `KMeansGpuAsyncReadbacks::Collect`.
+   read-back labels/distances/centroids in `KMeansGpuResultReadback::Collect`.
 
 ### 4.2 Buffers — persistent, allocated once, reused every iteration
 
@@ -185,7 +185,7 @@ TransferSrc | TransferDst`, reached by BDA:
 | `SquaredDistances` (f32) | `n` | output | resident, drained once |
 | `Reduction scratch` | few | `maxShiftBits` from update, plus legacy-compatible fields retained in the record | cleared per iter on GPU |
 | `State` (BDA table) | 1 | device-address pointer table to the other buffers | resident |
-| Async readback host pool | `n`+`n`+`k` | outputs | **drained exactly once at the end** through `AsyncBufferReadback` after the producing submission has retired |
+| Copied result batch | `n`+`n`+`k` | outputs | **drained exactly once at the end** through `Graphics.GpuTransfer` after the producing submission has retired |
 
 **I/O budget:** one bulk upload of positions + one batched readback of
 `Labels`/`SquaredDistances`/`Centroids`. Nothing is mapped, copied, or synced
@@ -214,12 +214,13 @@ and testable headless.
   (ref-counted leases + hot-reload).
 - **Buffers**: `RHI::BufferManager::Create({.SizeBytes, .Usage = Storage |
   TransferSrc | TransferDst})` → `BufferLease`; `IDevice::WriteBuffer` /
-  `AsyncBufferReadback`; `IDevice::GetBufferDeviceAddress` for the BDA push table
+  `Graphics.GpuTransfer`; `IDevice::GetBufferDeviceAddress` for the BDA push table
   (requires `BufferUsage::Storage`).
 - **Recording**: `ICommandContext::BindPipeline` → `PushConstants` → `Dispatch(⌈n/256⌉,1,1)`
   → `BufferBarrier(MemoryAccess::ShaderWrite, ShaderRead)` between passes →
-  `AsyncBufferReadback` records `ShaderWrite → TransferRead` for the final
-  non-blocking drains after the compute-producing command submission has
+  one multi-range `Graphics.GpuTransfer` batch records the deduplicated
+  `ShaderWrite → TransferRead` bracket for final non-blocking drains after the
+  compute-producing command submission has
   retired. `DispatchIndirect` remains available for a future device-driven
   early-out.
 - **Reductions**: reuse `Extrinsic.Graphics.ComputeParallelPrimitives` (prefix
@@ -304,8 +305,8 @@ ungated optional atomics.
 > per call (`RHI.Device.cppm:145-147`, `Backends.Vulkan.Device.cpp:3889-3937`),
 > and the ProgressivePoisson backend drifted onto that stalling default despite
 > otherwise-exemplary structure. k-means must route its final
-> labels/distances/centroids drain through `Runtime.AsyncBufferReadback` /
-> `Graphics.GpuTransfer` (ticket → poll → deferred apply) after the producing
+> labels/distances/centroids drain through one copied multi-range
+> `Graphics.GpuTransfer` batch (ticket → ready → exact consume) after the producing
 > compute submission has retired, so the drain does not race the producer and the
 > device never stalls — critical for interactive or repeated-solve use. See the audit
 > (`docs/reviews/2026-07-01-gpu-geometry-backend-io-audit.md`, Finding 1).
@@ -342,7 +343,7 @@ ungated optional atomics.
   dispatch planning; `check_shader_outputs` wiring. Execution still falls back.
 - **Slice C — record + persistent buffers.** Implemented by
   `KMeansGpuResourceCache`, `RecordKMeansGpuExecution(...)`, and
-  `KMeansGpuAsyncReadbacks`: persistent `(n,k)` buffer leasing, one-time SoA
+  `KMeansGpuResultReadback`: persistent `(n,k)` buffer leasing, one-time SoA
   position + seed-centroid upload, recorded Lloyd loop with barriers, and async
   labels/distances/centroids drains. The current shaders use portable assignment
   plus per-cluster scans and do not require optional float/int64 atomic features.

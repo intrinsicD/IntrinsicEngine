@@ -455,7 +455,7 @@ namespace Extrinsic::Runtime
         RHI::ITransferQueue* TransferQueue{nullptr};
         Graphics::GpuTransfer Transfer;
         KMeansGpuResourceCache Cache;
-        KMeansGpuAsyncReadbacks Readbacks;
+        KMeansGpuResultReadback Readbacks;
         KMeansGpuPipelineSet Pipelines{};
         std::optional<ActiveJob> Active{};
         std::optional<RuntimeKMeansGpuJobResult> Completed{};

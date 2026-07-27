@@ -198,7 +198,7 @@ namespace
 
     [[nodiscard]] bool SubmitReadbacksAfterProducerRetired(
         RHI::IDevice& device,
-        Runtime::KMeansGpuAsyncReadbacks& readbacks,
+        Runtime::KMeansGpuResultReadback& readbacks,
         const Runtime::KMeansGpuExecutionResources& resources)
     {
         const std::uint32_t framesInFlight = std::max(device.GetFramesInFlight(), 1u);
@@ -223,7 +223,7 @@ namespace
 
     [[nodiscard]] bool DrainReadbacksUntilReady(RHI::ITransferQueue& queue,
                                                 Graphics::GpuTransfer& transfer,
-                                                Runtime::KMeansGpuAsyncReadbacks& readbacks)
+                                                Runtime::KMeansGpuResultReadback& readbacks)
     {
         NoopCommandContext noopContext;
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{5};
@@ -325,7 +325,7 @@ TEST(KMeansGpuBackendGpuSmoke, VulkanExecutionMatchesCpuReferenceOnSeparatedClus
     Runtime::KMeansGpuResourceCache cache{buffers};
     RHI::ITransferQueue& queue = device.GetTransferQueue();
     Graphics::GpuTransfer transfer{queue};
-    Runtime::KMeansGpuAsyncReadbacks readbacks{transfer};
+    Runtime::KMeansGpuResultReadback readbacks{transfer};
 
     Runtime::KMeansGpuExecutionResult execution{};
     const Runtime::KMeansGpuPlanDesc plan{
@@ -356,10 +356,10 @@ TEST(KMeansGpuBackendGpuSmoke, VulkanExecutionMatchesCpuReferenceOnSeparatedClus
     ASSERT_TRUE(SubmitReadbacksAfterProducerRetired(device,
                                                     readbacks,
                                                     *execution.Resources))
-        << "failed to enqueue async KMeans GPU readbacks after producer retirement";
+        << "failed to enqueue the KMeans GPU result batch after producer retirement";
 
     ASSERT_TRUE(DrainReadbacksUntilReady(queue, transfer, readbacks))
-        << "timed out waiting for async KMeans GPU readback";
+        << "timed out waiting for the KMeans GPU result batch";
 
     const Runtime::KMeansGpuReadbackResult gpu = readbacks.Collect(execution.Plan);
     ASSERT_TRUE(gpu.Succeeded()) << gpu.Diagnostic;
@@ -375,6 +375,14 @@ TEST(KMeansGpuBackendGpuSmoke, VulkanExecutionMatchesCpuReferenceOnSeparatedClus
     EXPECT_LT(centroidDelta, 1.0e-4f);
     EXPECT_LT(inertiaDelta, 1.0e-4f);
     EXPECT_EQ(gpu.MaxDistanceIndex, cpu->MaxDistanceIndex);
+
+    const Graphics::GpuTransferDiagnostics transferDiagnostics =
+        transfer.GetDiagnostics();
+    EXPECT_EQ(transferDiagnostics.ReadbacksIssued, 3u);
+    EXPECT_EQ(transferDiagnostics.ReadbackBarriersEmitted, 1u);
+    EXPECT_EQ(transferDiagnostics.ReadbackBatchesIssued, 1u);
+    EXPECT_EQ(transferDiagnostics.ReadbackBatchesDelivered, 1u);
+    EXPECT_EQ(transferDiagnostics.ReadbackBatchesConsumed, 1u);
 
     device.DestroyPipeline(pipelines.Update);
     device.DestroyPipeline(pipelines.Assign);
