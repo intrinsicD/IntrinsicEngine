@@ -25,6 +25,15 @@ maturity_target: Retired
   `ActualBackend::None`, while a Vulkan request on the Null device reports the
   CPU reference fallback truthfully. The focused service target compiled and
   `ClusteringModule.*` passed 4/4. No proven GPU path has been deleted yet.
+- Slice B completed on 2026-07-27. `ClusteringModule` now owns one private
+  single-flight Vulkan state registered as a `JobService` GPU participant and
+  drains its typed result through `Graphics::GpuTransfer`; failures re-enter
+  the same CPU-reference completion path with an explicit diagnostic. The
+  opt-in smoke now submits through `ClusteringService`, writes the canonical
+  label/color properties, matches CPU labels/inertia, and passed 1/1 on the
+  promoted Vulkan device with one GPU completion and zero fallbacks. This is
+  the parity gate for Slice C deletion; the legacy surfaces remain only until
+  their callers are migrated.
 
 ## Goal
 
@@ -94,9 +103,9 @@ maturity_target: Retired
 - [x] Define one `RunKMeans` request/result on `ClusteringService`, using
       `GeometryPropertyRef` for input/output property identity and plain
       backend/parameter/result records.
-- [ ] Route CPU reference, operational Vulkan, and honest CPU fallback through
+- [x] Route CPU reference, operational Vulkan, and honest CPU fallback through
       that operation without exposing a backend interface or queue.
-- [ ] Record GPU work through the service/module's private JobService
+- [x] Record GPU work through the service/module's private JobService
       participant and drain results through the shared transfer operation.
 - [ ] Route config, UI, agent/CLI, selected-entity writeback, visualization
       result processing, cancellation, and stale completion through the same
@@ -112,7 +121,7 @@ maturity_target: Retired
       cancellation, stale source/property generation, writeback, and
       UI/config/agent request parity.
 - [ ] Null tests assert honest requested/actual backend and fallback reasons.
-- [ ] Existing opt-in `gpu;vulkan` parity/smoke evidence is rerouted through
+- [x] Existing opt-in `gpu;vulkan` parity/smoke evidence is rerouted through
       `ClusteringService` and shared readback.
 - [ ] Structural tests prove no production K-Means route bypasses the service
       and no deleted queue/wrapper name remains.

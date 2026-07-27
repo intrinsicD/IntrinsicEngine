@@ -4,6 +4,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -21,11 +22,18 @@ import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.Renderer;
+import Extrinsic.RHI.BufferManager;
+import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.Device;
+import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldRegistry;
 import Geometry.KMeans;
 import Geometry.Properties;
+
+#include "Runtime.ClusteringGpuState.Internal.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -34,15 +42,6 @@ namespace Extrinsic::Runtime
         namespace Dirty = ECS::Components::DirtyTags;
         namespace GS = ECS::Components::GeometrySources;
         namespace GK = Geometry::KMeans;
-
-        struct KMeansSnapshot
-        {
-            RunKMeans Command{};
-            WorldHandle World{};
-            CommandCorrelationId Correlation{};
-            std::vector<glm::vec3> Points{};
-            GK::KMeansParams Params{};
-        };
 
         struct KMeansJobResult
         {
@@ -495,9 +494,10 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] KMeansJobResult RunKMeansWorker(
+        [[nodiscard]] KMeansJobResult MakeCompletedResult(
             KMeansSnapshot snapshot,
-            const JobCancellation& cancellation)
+            GK::KMeansResult clustered,
+            const ClusteringBackend actualBackend)
         {
             KMeansJobResult result{};
             result.Snapshot = std::move(snapshot);
@@ -505,54 +505,81 @@ namespace Extrinsic::Runtime
                 result.Snapshot.Command,
                 result.Snapshot.World,
                 result.Snapshot.Correlation,
-                KMeansRunStatus::GeometryProcessingFailed,
-                Core::ErrorCode::Unknown,
-                "Geometry.KMeans returned no result for the requested points.");
+                KMeansRunStatus::Applied,
+                Core::ErrorCode::Success,
+                {});
 
+            clustered.RequestedBackend =
+                ToGeometryBackend(result.Snapshot.Command.Backend);
+            clustered.ActualBackend = actualBackend ==
+                    ClusteringBackend::VulkanCompute
+                ? GK::Backend::GPU
+                : GK::Backend::CPU;
+            clustered.FellBackToCPU =
+                result.Snapshot.Command.Backend ==
+                    ClusteringBackend::VulkanCompute &&
+                actualBackend == ClusteringBackend::CpuReference;
+
+            result.Completion.LabelCount =
+                static_cast<std::uint32_t>(clustered.Labels.size());
+            result.Completion.ClusterCount =
+                static_cast<std::uint32_t>(clustered.Centroids.size());
+            result.Completion.Iterations = clustered.Iterations;
+            result.Completion.Converged = clustered.Converged;
+            result.Completion.Inertia = clustered.Inertia;
+            result.Completion.MaxDistanceIndex = clustered.MaxDistanceIndex;
+            result.Completion.ActualBackend = actualBackend;
+            result.Completion.FellBackToCpu = clustered.FellBackToCPU;
+            if (result.Completion.FellBackToCpu)
+            {
+                result.Completion.BackendDiagnostic =
+                    result.Snapshot.BackendDiagnostic.empty()
+                    ? "Vulkan compute execution was unavailable; the CPU reference completed the request."
+                    : result.Snapshot.BackendDiagnostic;
+            }
+            result.Clustered = std::move(clustered);
+            return result;
+        }
+
+        [[nodiscard]] KMeansJobResult RunKMeansWorker(
+            KMeansSnapshot snapshot,
+            const JobCancellation& cancellation)
+        {
             if (cancellation.IsCancelled())
             {
-                result.Completion.Status = KMeansRunStatus::Cancelled;
-                result.Completion.Error = Core::ErrorCode::InvalidState;
-                result.Completion.Message =
-                    "K-Means CPU work was cancelled before execution.";
-                return result;
+                KMeansJobResult cancelled{};
+                cancelled.Snapshot = std::move(snapshot);
+                cancelled.Completion = MakeCompletion(
+                    cancelled.Snapshot.Command,
+                    cancelled.Snapshot.World,
+                    cancelled.Snapshot.Correlation,
+                    KMeansRunStatus::Cancelled,
+                    Core::ErrorCode::InvalidState,
+                    "K-Means CPU work was cancelled before execution.");
+                return cancelled;
             }
 
             std::optional<GK::KMeansResult> clustered = GK::Cluster(
                 std::span<const glm::vec3>{
-                    result.Snapshot.Points.data(),
-                    result.Snapshot.Points.size()},
-                result.Snapshot.Params);
+                    snapshot.Points.data(), snapshot.Points.size()},
+                snapshot.Params);
             if (!clustered.has_value())
-                return result;
-
-            clustered->RequestedBackend =
-                ToGeometryBackend(result.Snapshot.Command.Backend);
-            clustered->ActualBackend = GK::Backend::CPU;
-            clustered->FellBackToCPU =
-                result.Snapshot.Command.Backend ==
-                ClusteringBackend::VulkanCompute;
-
-            result.Completion.Status = KMeansRunStatus::Applied;
-            result.Completion.Error = Core::ErrorCode::Success;
-            result.Completion.Message.clear();
-            result.Completion.LabelCount =
-                static_cast<std::uint32_t>(clustered->Labels.size());
-            result.Completion.ClusterCount =
-                static_cast<std::uint32_t>(clustered->Centroids.size());
-            result.Completion.Iterations = clustered->Iterations;
-            result.Completion.Converged = clustered->Converged;
-            result.Completion.Inertia = clustered->Inertia;
-            result.Completion.MaxDistanceIndex = clustered->MaxDistanceIndex;
-            result.Completion.ActualBackend = ClusteringBackend::CpuReference;
-            result.Completion.FellBackToCpu = clustered->FellBackToCPU;
-            if (result.Completion.FellBackToCpu)
             {
-                result.Completion.BackendDiagnostic =
-                    "Vulkan compute execution was unavailable; the CPU reference completed the request.";
+                KMeansJobResult failed{};
+                failed.Snapshot = std::move(snapshot);
+                failed.Completion = MakeCompletion(
+                    failed.Snapshot.Command,
+                    failed.Snapshot.World,
+                    failed.Snapshot.Correlation,
+                    KMeansRunStatus::GeometryProcessingFailed,
+                    Core::ErrorCode::Unknown,
+                    "Geometry.KMeans returned no result for the requested points.");
+                return failed;
             }
-            result.Clustered = std::move(*clustered);
-            return result;
+            return MakeCompletedResult(
+                std::move(snapshot),
+                std::move(*clustered),
+                ClusteringBackend::CpuReference);
         }
 
         void PublishCompletion(KernelEventBus* events,
@@ -744,9 +771,94 @@ namespace Extrinsic::Runtime
             stats.VisualizationRefreshReactions += 1u;
         }
 
+        [[nodiscard]] CommandOutcome SubmitCpuSnapshot(
+            JobService& jobs,
+            KernelEventBus* events,
+            KMeansSnapshot snapshot,
+            ClusteringModuleStats& stats)
+        {
+            const RunKMeans command = snapshot.Command;
+            const WorldHandle world = snapshot.World;
+            const CommandCorrelationId correlation = snapshot.Correlation;
+            const JobToken token = jobs.Submit(
+                MakeCpuJobDesc<KMeansJobResult>(
+                    "Runtime.Clustering.KMeans.CPU",
+                    world,
+                    [snapshot = std::move(snapshot)](
+                        const JobCancellation& cancellation) mutable
+                    {
+                        return RunKMeansWorker(
+                            std::move(snapshot), cancellation);
+                    },
+                    [](const KMeansJobResult& result)
+                    {
+                        return KMeansJobCompleted{.Result = result};
+                    }));
+            if (!token.IsValid())
+            {
+                stats.JobSubmissionFailures += 1u;
+                KMeansRunCompleted rejected = MakeCompletion(
+                    command,
+                    world,
+                    correlation,
+                    KMeansRunStatus::GeometryProcessingFailed,
+                    Core::ErrorCode::InvalidState,
+                    "K-Means CPU job submission was rejected by JobService.");
+                PublishCompletion(events, std::move(rejected));
+                return CommandOutcome::Fail(
+                    "K-Means CPU job submission was rejected by JobService.");
+            }
+            stats.JobsSubmitted += 1u;
+            return CommandOutcome::Ok();
+        }
+
+        void HandleGpuResult(
+            ClusteringGpuResult result,
+            JobService* jobs,
+            WorldRegistry* worlds,
+            KernelEventBus* events,
+            ClusteringModuleStats& stats)
+        {
+            if (result.Succeeded())
+            {
+                stats.GpuCompletions += 1u;
+                KMeansJobResult completed = MakeCompletedResult(
+                    std::move(result.Snapshot),
+                    std::move(*result.Clustered),
+                    ClusteringBackend::VulkanCompute);
+                HandleJobCompletedEvent(
+                    KMeansJobCompleted{.Result = std::move(completed)},
+                    worlds,
+                    events,
+                    stats);
+                return;
+            }
+
+            stats.GpuFallbacks += 1u;
+            result.Snapshot.BackendDiagnostic = result.Diagnostic.empty()
+                ? "K-Means Vulkan execution failed; the CPU reference completed the request."
+                : result.Diagnostic +
+                      " The CPU reference completed the request.";
+            if (jobs == nullptr)
+            {
+                KMeansRunCompleted failed = MakeCompletion(
+                    result.Snapshot.Command,
+                    result.Snapshot.World,
+                    result.Snapshot.Correlation,
+                    KMeansRunStatus::GeometryProcessingFailed,
+                    Core::ErrorCode::InvalidState,
+                    "K-Means Vulkan execution failed and JobService is unavailable for CPU fallback.");
+                PublishCompletion(events, std::move(failed));
+                return;
+            }
+            (void)SubmitCpuSnapshot(
+                *jobs, events, std::move(result.Snapshot), stats);
+        }
+
         [[nodiscard]] CommandOutcome HandleRunKMeansCommand(
             CommandContext& context,
             const RunKMeans& command,
+            ClusteringGpuState* gpuState,
             ClusteringModuleStats& stats)
         {
             stats.CommandsHandled += 1u;
@@ -786,39 +898,31 @@ namespace Extrinsic::Runtime
                 return CommandOutcome::Fail(failure.Message);
             }
 
-            const JobToken token = context.Jobs->Submit(
-                MakeCpuJobDesc<KMeansJobResult>(
-                    "Runtime.Clustering.KMeans.CPU",
-                    world,
-                    [snapshot = std::move(*snapshot)](
-                        const JobCancellation& cancellation) mutable
-                    {
-                        return RunKMeansWorker(
-                            std::move(snapshot),
-                            cancellation);
-                    },
-                    [](const KMeansJobResult& result)
-                    {
-                        return KMeansJobCompleted{.Result = result};
-                    }));
-
-            if (!token.IsValid())
+            if (command.Backend == ClusteringBackend::VulkanCompute)
             {
-                stats.JobSubmissionFailures += 1u;
-                KMeansRunCompleted rejected = MakeCompletion(
-                    command,
-                    world,
-                    context.Correlation,
-                    KMeansRunStatus::GeometryProcessingFailed,
-                    Core::ErrorCode::InvalidState,
-                    "K-Means CPU job submission was rejected by JobService.");
-                PublishCompletion(context.Events, std::move(rejected));
-                return CommandOutcome::Fail(
-                    "K-Means CPU job submission was rejected by JobService.");
-            }
+                const ClusteringGpuSubmission submission = gpuState != nullptr
+                    ? gpuState->Start(*snapshot)
+                    : ClusteringGpuSubmission{
+                          .Diagnostic =
+                              "Clustering Vulkan state is unavailable.",
+                      };
+                if (submission.Accepted)
+                {
+                    stats.GpuRequestsAccepted += 1u;
+                    return CommandOutcome::Ok();
+                }
 
-            stats.JobsSubmitted += 1u;
-            return CommandOutcome::Ok();
+                stats.GpuFallbacks += 1u;
+                snapshot->BackendDiagnostic = submission.Diagnostic.empty()
+                    ? "K-Means Vulkan compute execution is unavailable; the CPU reference completed the request."
+                    : submission.Diagnostic +
+                          " The CPU reference completed the request.";
+            }
+            return SubmitCpuSnapshot(
+                *context.Jobs,
+                context.Events,
+                std::move(*snapshot),
+                stats);
         }
     }
 
@@ -915,6 +1019,9 @@ namespace Extrinsic::Runtime
         m_Stats = stats;
     }
 
+    ClusteringModule::ClusteringModule() = default;
+    ClusteringModule::~ClusteringModule() = default;
+
     std::string_view ClusteringModule::Name() const noexcept
     {
         return "Runtime.ClusteringModule";
@@ -935,6 +1042,56 @@ namespace Extrinsic::Runtime
             return provided;
         }
 
+        m_Device = setup.Services().Find<RHI::IDevice>();
+        Graphics::IRenderer* const renderer =
+            setup.Services().Find<Graphics::IRenderer>();
+        if (m_Device != nullptr && renderer != nullptr)
+        {
+            m_GpuState = std::make_unique<ClusteringGpuState>(
+                *m_Device,
+                renderer->GetBufferManager(),
+                m_Device->GetTransferQueue());
+            m_GpuParticipant = m_Jobs->RegisterGpuQueueParticipant(
+                GpuQueueParticipantDesc{
+                    .DebugName = "Runtime.Clustering.KMeans",
+                    .RecordFrameCommands =
+                        [this](RHI::ICommandContext& commandContext)
+                    {
+                        if (m_GpuState != nullptr)
+                            m_GpuState->RecordFrameCommands(commandContext);
+                    },
+                    .DrainCompletedTransfers =
+                        [this]()
+                    {
+                        if (m_GpuState == nullptr)
+                            return;
+                        m_GpuState->DrainCompletedTransfers();
+                        while (std::optional<ClusteringGpuResult> result =
+                                   m_GpuState->ConsumeCompleted())
+                        {
+                            HandleGpuResult(
+                                std::move(*result),
+                                m_Jobs,
+                                m_Worlds,
+                                m_Events,
+                                m_Stats);
+                        }
+                    },
+                    .HasInFlightWork = [this]() -> bool
+                    {
+                        return m_GpuState != nullptr &&
+                               m_GpuState->HasInFlightWork();
+                    },
+                    .ShutdownAfterDeviceIdle = [this]()
+                    {
+                        m_GpuState.reset();
+                        m_GpuParticipant = {};
+                    },
+                });
+            if (!m_GpuParticipant.IsValid())
+                m_GpuState.reset();
+        }
+
         setup.RegisterCommandHandler<RunKMeans>(
             [this](CommandContext& context,
                    const RunKMeans& command) -> CommandOutcome
@@ -942,6 +1099,7 @@ namespace Extrinsic::Runtime
                 return HandleRunKMeansCommand(
                     context,
                     command,
+                    m_GpuState.get(),
                     m_Stats);
             });
 
@@ -971,6 +1129,15 @@ namespace Extrinsic::Runtime
 
     void ClusteringModule::OnShutdown(RuntimeModuleShutdownContext& context)
     {
+        if (m_Jobs != nullptr && m_Device != nullptr &&
+            m_GpuParticipant.IsValid())
+        {
+            m_Jobs->UnregisterGpuQueueParticipant(
+                m_GpuParticipant,
+                [device = m_Device] { device->WaitIdle(); });
+        }
+        m_GpuParticipant = {};
+        m_GpuState.reset();
         if (m_JobCompletedSubscription.IsValid())
             context.Events.Unsubscribe(m_JobCompletedSubscription);
         if (m_ClusterLabelsChangedSubscription.IsValid())
@@ -981,5 +1148,6 @@ namespace Extrinsic::Runtime
         m_Events = nullptr;
         m_Jobs = nullptr;
         m_Worlds = nullptr;
+        m_Device = nullptr;
     }
 }

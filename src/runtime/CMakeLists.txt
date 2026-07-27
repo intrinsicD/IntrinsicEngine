@@ -102,6 +102,7 @@ target_sources(${target_name}
         Runtime.JobService.cpp
         Runtime.JobServiceGpuQueueBridge.cpp
         Modules/Clustering/Runtime.ClusteringModule.cpp
+        Modules/Clustering/Runtime.ClusteringGpuState.cpp
         Runtime.MeshAttributeTextureBake.cpp
         Runtime.ObjectSpaceNormalBakeBinding.cpp
         Runtime.ObjectSpaceNormalBakeQueue.cpp

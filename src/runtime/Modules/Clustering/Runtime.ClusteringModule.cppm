@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -9,6 +10,7 @@ module;
 export module Extrinsic.Runtime.ClusteringModule;
 
 import Extrinsic.Core.Error;
+import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.CommandBus;
 export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
@@ -19,6 +21,8 @@ import Extrinsic.Runtime.WorldRegistry;
 
 namespace Extrinsic::Runtime
 {
+    class ClusteringGpuState;
+
     export enum class ClusteringBackend : std::uint8_t
     {
         None,
@@ -132,6 +136,9 @@ namespace Extrinsic::Runtime
         std::uint64_t CommandsHandled{0};
         std::uint64_t JobsSubmitted{0};
         std::uint64_t JobSubmissionFailures{0};
+        std::uint64_t GpuRequestsAccepted{0};
+        std::uint64_t GpuFallbacks{0};
+        std::uint64_t GpuCompletions{0};
         std::uint64_t CompletionEvents{0};
         std::uint64_t LabelsCommitted{0};
         std::uint64_t CommitsDropped{0};
@@ -172,6 +179,9 @@ namespace Extrinsic::Runtime
     export class ClusteringModule final : public IRuntimeModule
     {
     public:
+        ClusteringModule();
+        ~ClusteringModule() override;
+
         [[nodiscard]] std::string_view Name() const noexcept override;
         [[nodiscard]] Core::Result OnRegister(EngineSetup& setup) override;
         void OnShutdown(RuntimeModuleShutdownContext& context) override;
@@ -188,6 +198,9 @@ namespace Extrinsic::Runtime
         KernelEventBus* m_Events{};
         JobService* m_Jobs{};
         WorldRegistry* m_Worlds{};
+        RHI::IDevice* m_Device{};
+        std::unique_ptr<ClusteringGpuState> m_GpuState{};
+        GpuQueueParticipantHandle m_GpuParticipant{};
         ClusteringModuleStats m_Stats{};
     };
 }
