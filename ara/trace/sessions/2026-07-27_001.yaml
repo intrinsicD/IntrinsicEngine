@@ -1,0 +1,122 @@
+session:
+  id: "2026-07-27_001"
+  date: "2026-07-27"
+  started: "2026-07-27T21:10+02:00"
+  last_turn: "2026-07-27T22:56+02:00"
+  turn_count: 1
+  summary: "Retired RUNTIME-194 and RUNTIME-195, converging runtime work on JobService and compute-result readback on Graphics.GpuTransfer with complete CPU and operational Vulkan evidence."
+
+events_logged:
+  - turn: 1
+    type: experiment
+    id: "N279"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired duplicate runtime work-execution systems after 56 focused passes, 4,231 complete CPU passes, and strict structural gates."
+  - turn: 1
+    type: claim
+    id: "O61"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the one-JobService runtime work lifecycle as C06 through artifact commitment."
+  - turn: 1
+    type: experiment
+    id: "N280"
+    routing: direct
+    provenance: ai-executed
+    summary: "Contracted ordered copied multi-range GPU-result batches with exact validation, cancellation, and JobService readiness."
+  - turn: 1
+    type: claim
+    id: "O62"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the CPU-supported shared result-transport contract as C07 through artifact commitment."
+  - turn: 1
+    type: experiment
+    id: "N281"
+    routing: direct
+    provenance: ai-executed
+    summary: "Migrated K-Means to one result batch and passed operational Vulkan CPU-reference parity."
+  - turn: 1
+    type: claim
+    id: "O63"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized K-Means operational shared-batch parity as C08 through artifact commitment."
+  - turn: 1
+    type: experiment
+    id: "N282"
+    routing: direct
+    provenance: ai-executed
+    summary: "Migrated Progressive Poisson to one result batch and passed operational Vulkan transport/parser coverage."
+  - turn: 1
+    type: claim
+    id: "O64"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized Progressive Poisson transport operation as C09 without claiming compute parity."
+  - turn: 1
+    type: experiment
+    id: "N283"
+    routing: direct
+    provenance: ai-executed
+    summary: "Deleted both duplicate runtime readback modules and passed 4,230 CPU cases plus three ASan+UBSan Vulkan fixtures."
+  - turn: 1
+    type: claim
+    id: "O65"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the one-lifecycle runtime compute-result endpoint as C10 through artifact commitment."
+
+ai_actions:
+  - turn: 1
+    action: "Completed, verified, documented, committed, and retired RUNTIME-194 so kernel JobService is the sole production runtime work lifecycle."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.AsyncWorkModule.cpp"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "tests/contract/runtime/Test.RuntimeJobService.cpp"
+      - "tests/contract/runtime/Test.AsyncWorkModule.cpp"
+      - "tasks/done/RUNTIME-194-consolidate-runtime-work-execution.md"
+  - turn: 1
+    action: "Implemented and retired all RUNTIME-195 slices, migrated K-Means and Progressive Poisson, deleted duplicate readback wrappers, synchronized CI/routing/docs/ARA, and committed c470a056 after complete CPU and operational Vulkan gates."
+    provenance: ai-executed
+    files_changed:
+      - "src/graphics/renderer/Graphics.GpuTransfer.cppm"
+      - "src/graphics/renderer/Graphics.GpuTransfer.cpp"
+      - "src/runtime/Runtime.KMeansGpuBackend.cpp"
+      - "src/runtime/Runtime.ProgressivePoissonGpuBackend.cpp"
+      - "tests/contract/runtime/Test.GpuResultReadbackJob.cpp"
+      - "tests/integration/runtime/Test.GpuResultReadbackGpuSmoke.cpp"
+      - "tasks/done/RUNTIME-195-unified-gpu-result-readback.md"
+
+claims_touched:
+  - id: C06
+    action: crystallized
+    turn: 1
+  - id: C07
+    action: crystallized
+    turn: 1
+  - id: C08
+    action: crystallized
+    turn: 1
+  - id: C09
+    action: crystallized
+    turn: 1
+  - id: C10
+    action: crystallized
+    turn: 1
+
+key_context:
+  - turn: 1
+    excerpt: "The user directed continuation of the active task and the runtime cleanup chain; the work closed RUNTIME-194 and RUNTIME-195 as separate reviewed tasks."
+  - turn: 1
+    excerpt: "The endpoint reuses Graphics.GpuTransfer and JobService, introduces no replacement scheduler or readback service, and keeps renderer selection plus Progressive Poisson compute parity outside the claim."
+
+open_threads:
+  - "RUNTIME-196 is now unblocked as the next separate runtime abstraction-consolidation task."
+  - "METHOD-014 remains separately blocked by RUNTIME-202 and still owns Progressive Poisson compute/public parity."
+  - "BUG-120 continues to own the unrelated full WorkflowConcurrency source-shape and PROCESSORS drift; the Vulkan-specific ratchet passed."
+  - "N273, O57, and O58 remain open for a separately selected mechanical runtime-directory reorganization."
+
+ai_suggestions_pending: []

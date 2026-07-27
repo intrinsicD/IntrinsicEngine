@@ -153,3 +153,10 @@ sessions:
     events_count: 11
     claims_touched: []
     open_threads: 2
+  - id: "2026-07-27_001"
+    date: "2026-07-27"
+    summary: "Retired RUNTIME-194 and RUNTIME-195, converging runtime work on JobService and compute-result readback on Graphics.GpuTransfer with complete CPU and operational Vulkan evidence."
+    turn_count: 1
+    events_count: 10
+    claims_touched: [C06, C07, C08, C09, C10]
+    open_threads: 4
