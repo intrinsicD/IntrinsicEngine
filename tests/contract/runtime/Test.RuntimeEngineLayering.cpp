@@ -970,7 +970,10 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     EXPECT_EQ(CountOccurrences(editorFacades, "return DerivedJobDesc{"), 0u);
     EXPECT_EQ(CountOccurrences(editorFacades, "return JobDesc{"), 5u);
     EXPECT_EQ(CountOccurrences(editorFacades, ".Scope = context.World"), 5u);
-    EXPECT_EQ(CountOccurrences(editorFacades, "desc.Scope = activeWorld"), 1u);
+    EXPECT_EQ(CountOccurrences(
+                  editorFacades,
+                  "desc.Scope = m_Worlds->ActiveWorld()"),
+              1u);
     EXPECT_NE(WithoutWhitespace(editorFacades).find(".World=activeWorld"),
               std::string::npos);
     EXPECT_EQ(CountOccurrences(readback, "JobDesc job{}"), 1u);
@@ -978,6 +981,47 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
 
     EXPECT_EQ(CountOccurrences(assetWorkflow, ".World = BoundWorld"), 2u);
     EXPECT_EQ(CountOccurrences(assetWorkflow, ".Worlds = Worlds"), 1u);
+}
+
+TEST(RuntimeEngineLayering, SandboxEditorJobsUseSingleJobServiceSurface)
+{
+    const auto editorInterface =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxEditorFacades.cppm");
+    const auto editorImplementation =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxEditorFacades.cpp");
+    const auto methodImplementation =
+        ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxMethodFacade.cpp");
+
+    EXPECT_EQ(editorInterface.find(
+                  "import Extrinsic.Runtime.DerivedJobGraph"),
+              std::string::npos);
+    EXPECT_EQ(editorImplementation.find(
+                  "import Extrinsic.Runtime.DerivedJobGraph"),
+              std::string::npos);
+    EXPECT_EQ(methodImplementation.find(
+                  "import Extrinsic.Runtime.DerivedJobGraph"),
+              std::string::npos);
+    EXPECT_EQ(methodImplementation.find(
+                  "import Extrinsic.Runtime.StreamingExecutor"),
+              std::string::npos);
+
+    EXPECT_NE(editorInterface.find("struct SandboxEditorJobCommandSurface"),
+              std::string::npos);
+    EXPECT_NE(editorInterface.find("SandboxEditorJobCommandSurface JobCommands"),
+              std::string::npos);
+    EXPECT_NE(editorInterface.find("FindActive{}"), std::string::npos);
+    EXPECT_NE(editorInterface.find("SnapshotEntity{}"), std::string::npos);
+    EXPECT_EQ(editorInterface.find("SandboxEditorDerivedJobCommandSurface"),
+              std::string::npos);
+    EXPECT_EQ(editorInterface.find("DerivedJobCommands"), std::string::npos);
+    EXPECT_EQ(editorInterface.find("ToSandboxEditorJobQueueSnapshot"),
+              std::string::npos);
+    EXPECT_EQ(editorImplementation.find("DerivedJobRegistry"),
+              std::string::npos);
+    EXPECT_EQ(editorImplementation.find("m_DerivedJobSnapshot"),
+              std::string::npos);
+    EXPECT_EQ(methodImplementation.find("FindActiveEditorDerivedJob"),
+              std::string::npos);
 }
 
 TEST(RuntimeEngineLayering, FrameLoopContractDoesNotBecomeCompositionRoot)

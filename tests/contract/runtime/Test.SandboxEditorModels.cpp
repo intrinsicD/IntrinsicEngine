@@ -66,12 +66,12 @@ import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
-import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressiveRenderData;
@@ -82,7 +82,6 @@ import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Graph.Vertex.Normals;
@@ -543,6 +542,39 @@ void AddGraphSource(ECS::Scene::Registry& registry,
             .AssetImportCommandsAvailable = false,
             .CameraRenderCommandsAvailable = false,
             .VisualizationCommandsAvailable = false,
+        };
+    }
+
+    void AttachJobSnapshot(
+        Runtime::SandboxEditorContext& context,
+        const Runtime::SandboxEditorJobQueueSnapshot& snapshot)
+    {
+        context.JobCommands.FindActive =
+            [&snapshot](const Runtime::SandboxEditorJobIdentity& requested)
+                -> std::optional<Runtime::SandboxEditorJobRecord>
+        {
+            for (const Runtime::SandboxEditorJobRecord& job : snapshot.Entries)
+            {
+                if (Runtime::IsActiveSandboxEditorJobState(job.State) &&
+                    Runtime::SameSandboxEditorJobOutput(
+                        job.Identity,
+                        requested))
+                {
+                    return job;
+                }
+            }
+            return std::nullopt;
+        };
+        context.JobCommands.SnapshotEntity =
+            [&snapshot](const std::uint32_t stableEntityId)
+        {
+            std::vector<Runtime::SandboxEditorJobRecord> rows{};
+            for (const Runtime::SandboxEditorJobRecord& job : snapshot.Entries)
+            {
+                if (job.Identity.EntityId == stableEntityId)
+                    rows.push_back(job);
+            }
+            return rows;
         };
     }
 
@@ -3184,7 +3216,7 @@ TEST(SandboxEditorUi, ProgressiveInspectorReportsSlotsPropertiesAndJobs)
     }
 
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    context.DerivedJobs = &jobs;
+    AttachJobSnapshot(context, jobs);
 
     const Runtime::SandboxEditorPanelFrame frame =
         Runtime::BuildSandboxEditorPanelFrame(context);
@@ -3326,7 +3358,7 @@ TEST(SandboxEditorUi, ProgressiveInspectorInfersGraphPointCloudAndComposition)
         .Name = "child normal bake",
         .State = Runtime::JobState::Running,
     });
-    context.DerivedJobs = &jobs;
+    AttachJobSnapshot(context, jobs);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, parent));
     frame = Runtime::BuildSandboxEditorPanelFrame(context);
 

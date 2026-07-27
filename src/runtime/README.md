@@ -183,11 +183,10 @@ primitive and focus once only after every renderable/selectable leaf exists.
 ### Sandbox Editor Async Method Jobs
 
 Editor buttons that run heavyweight geometry or method work must submit copied
-main-thread input snapshots through `SandboxEditorContext::DerivedJobCommands`,
-then return a pending result to the ImGui frame. New submissions use
-`SubmitJob` (`Runtime.JobService`); the `Submit` member is the retiring
-`DerivedJobRegistry` path and exists only until `RUNTIME-194` sub-slice
-`B5d-1z`, so do not add sites to it.
+main-thread input snapshots through `SandboxEditorContext::JobCommands`, then
+return a pending result to the ImGui frame. Its `Submit` callback queues a
+`JobDesc` on `Runtime.JobService` together with the editor-owned entity/output
+identity used by deduplication and queue-row queries.
 Workers never access live ECS or renderer state. The frame maintenance lane
 drains completed jobs with the same bounded apply budget as other streaming
 work, revalidates the selected target before mutation, and publishes results
@@ -195,7 +194,7 @@ only from the main-thread apply callback.
 
 `RUNTIME-141` Slice A first applied this model to the CPU K-Means path;
 `ARCH-012` supersedes Sandbox composition with `ClusteringModule` and
-`JobService`, while the standalone command helper keeps the derived-job/immediate
+`JobService`, while the standalone command helper keeps the async/immediate
 fallback for isolated tests and uncomposed callers. Slice B applies the model to
 Progressive Poisson point-cloud and mesh-surface CPU sampling,
 Slice C applies it to mesh denoise/remesh/simplify commands, and Slice D
@@ -1196,29 +1195,24 @@ queued scene document IO, deferred mesh post-processing, visualization/Htex
 baking, GPU result write-back, and the model-scene progressive enrichment chain
 now submit to the kernel-owned `Extrinsic.Runtime.JobService`;
 `Extrinsic.Runtime.StreamingExecutor` now has no production descriptor-factory
-consumer, but survives temporarily behind `AsyncWorkModule` and the registry
-side of the documented editor migration window until `RUNTIME-194` closes that
-window and its shutdown survivor sweep. Queue visibility that used to come from
+consumer and no editor-lane role, but survives temporarily behind
+`AsyncWorkModule` until `RUNTIME-194` completes its shutdown survivor sweep and
+Slice C retirement. Queue visibility that used to come from
 `DerivedJobRegistry::SnapshotAll()` is served by the generic, read-only
 `JobService::SnapshotAll()`; job identity (which entity, which output) stays
 with the submitting consumer rather than the execution service.
 
-The Sandbox editor lane is mid-migration and carries a **documented temporary
-exception** (`RUNTIME-194` Slice B5d, removal sub-slice `B5d-1z`):
-`SandboxEditorDerivedJobCommandSurface` exposes both
-`Submit`/`Cancel` (`DerivedJobRegistry`) and
-`SubmitJob`/`CancelJob` (`JobService`, taking a `SandboxEditorJobIdentity`
-alongside the desc), and `SandboxEditorSession` builds one
-`SandboxEditorJobQueueSnapshot` from both surfaces. The editor's presentation
-models and its duplicate-submission guard read only that unified queue, so a
-duplicate is refused regardless of which path queued the original. Editor job
-identity — entity id, `SandboxEditorJobScope`, output semantic, output name —
-lives in the session's `JobToken -> identity` table, never on `JobService`;
-`SandboxEditorJobScope` is the editor-local successor to `DerivedJobScope` and
-must not be promoted to a general vocabulary. `Runtime.SandboxMethodFacade` and
-all five `Runtime.SandboxEditorFacades` descriptor factories submit through the
-new path; the legacy command members and registry half of the unified snapshot
-remain only until `B5d-1z` closes the migration window.
+The Sandbox editor migration window is closed. `SandboxEditorJobCommandSurface`
+contains one `JobService` submit path plus active-output and per-entity row
+queries. `SandboxEditorSession` keeps editor job identity — entity id,
+`SandboxEditorJobScope`, output semantic, output name — in its
+`JobToken -> identity` table, prunes it against `JobService::SnapshotAll()` each
+frame, and joins it only when either query runs. The editor no longer owns a raw
+queue snapshot or a registry adapter. `SandboxEditorJobScope` is the
+editor-local successor to `DerivedJobScope` and must not be promoted to a
+general vocabulary. `Runtime.SandboxMethodFacade` and all five
+`Runtime.SandboxEditorFacades` descriptor factories submit through this single
+surface.
 `AssetImportPipeline::GetAssetImportQueueSnapshot()` computes import-row
 cancellation from per-token `JobService::GetState` queries; a decode is
 cancellable until its result reaches the main-thread apply gate

@@ -65,7 +65,6 @@ import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
-import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.EditorWindowRegistry;
@@ -74,6 +73,8 @@ import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
@@ -84,7 +85,6 @@ import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Graph.Vertex.Normals;
@@ -215,7 +215,9 @@ TEST(SandboxEditorSession, AttachPrepareDetachBoundsPreparedFrameLifetime)
         [&sawPreparedContext](Runtime::SandboxEditorPreparedFrameView frame)
         {
             sawPreparedContext = frame.Context.Scene != nullptr;
-            EXPECT_FALSE(frame.Context.DerivedJobCommands.Available());
+            EXPECT_TRUE(frame.Context.JobCommands.Available());
+            EXPECT_TRUE(frame.Context.JobCommands.FindActive);
+            EXPECT_TRUE(frame.Context.JobCommands.SnapshotEntity);
             EXPECT_FALSE(
                 frame.Context.RenderRecipeCommandsAvailable);
             EXPECT_FALSE(
@@ -293,8 +295,14 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
         staleImportCommand{};
     Runtime::SandboxEditorKMeansGpuCommandSurface staleGpuCommands{};
     Runtime::SandboxEditorParameterizationUvViewCommandSurface staleUvCommands{};
-    Runtime::SandboxEditorDerivedJobCommandSurface staleDerivedJobCommands{};
-    Runtime::DerivedJobHandle submittedDerivedJob{};
+    Runtime::SandboxEditorJobCommandSurface staleJobCommands{};
+    Runtime::JobToken submittedJob{};
+    const Runtime::SandboxEditorJobIdentity jobIdentity{
+        .EntityId = 17u,
+        .Scope = Runtime::SandboxEditorJobScope::MeshSurface,
+        .OutputSemantic = Runtime::ProgressiveSlotSemantic::Albedo,
+        .OutputName = "session_scope_probe",
+    };
     ASSERT_TRUE(session.VisitPreparedFrame(
         [&](Runtime::SandboxEditorPreparedFrameView frame)
         {
@@ -302,30 +310,41 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
             staleImportCommand = frame.Context.AssetImportCommands.Import;
             staleGpuCommands = frame.Context.KMeansGpuCommands;
             staleUvCommands = frame.Context.ParameterizationUvViewCommands;
-            staleDerivedJobCommands = frame.Context.DerivedJobCommands;
-            submittedDerivedJob = frame.Context.DerivedJobCommands.Submit(
-                Runtime::DerivedJobDesc{
-                    .Name = "session world-scoped derived job",
-                    .Execute = []() -> Runtime::DerivedJobWorkerResult
+            staleJobCommands = frame.Context.JobCommands;
+            submittedJob = frame.Context.JobCommands.Submit(
+                Runtime::JobDesc{
+                    .DebugName = "session world-scoped job",
+                    .Work = [](const Runtime::JobCancellation&)
+                        -> Runtime::JobResultEnvelope
                     {
-                        return Runtime::DerivedJobOutput{
-                            .PayloadToken = 17u,
-                        };
+                        return Runtime::JobResultEnvelope::Make<std::uint64_t>(
+                            17u);
                     },
-                });
+                    .PublishCompletion =
+                        [](Runtime::KernelEventBus&,
+                           const Runtime::JobResultEnvelope&) -> bool
+                    {
+                        return true;
+                    },
+                },
+                jobIdentity);
         }));
     ASSERT_TRUE(staleResultSink);
     ASSERT_TRUE(staleImportCommand);
     ASSERT_TRUE(staleGpuCommands.Available());
     ASSERT_TRUE(staleUvCommands.Available());
-    ASSERT_TRUE(staleDerivedJobCommands.Available());
-    ASSERT_TRUE(submittedDerivedJob.IsValid());
-    const Runtime::DerivedJobRegistry* derivedJobs =
-        engine.Services().Find<Runtime::DerivedJobRegistry>();
-    ASSERT_NE(derivedJobs, nullptr);
-    const std::optional<Runtime::DerivedJobSnapshot> submittedSnapshot =
-        derivedJobs->Snapshot(submittedDerivedJob);
-    ASSERT_TRUE(submittedSnapshot.has_value());
+    ASSERT_TRUE(staleJobCommands.Available());
+    ASSERT_TRUE(submittedJob.IsValid());
+    const std::vector<Runtime::JobSnapshot> submittedSnapshots =
+        engine.Jobs().SnapshotAll();
+    const auto submittedSnapshot = std::find_if(
+        submittedSnapshots.begin(),
+        submittedSnapshots.end(),
+        [submittedJob](const Runtime::JobSnapshot& snapshot)
+        {
+            return snapshot.Token == submittedJob;
+        });
+    ASSERT_NE(submittedSnapshot, submittedSnapshots.end());
     EXPECT_EQ(submittedSnapshot->Scope, engine.ActiveWorld());
     const Runtime::SandboxEditorFileImportResult activeImport =
         staleImportCommand(Runtime::SandboxEditorFileImportCommand{
@@ -353,15 +372,19 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
     ASSERT_TRUE(currentGpuCommands.Available());
 
     EXPECT_FALSE(
-        staleDerivedJobCommands
-            .Submit(Runtime::DerivedJobDesc{
-                .Name = "expired session derived job",
-                .Execute = []() -> Runtime::DerivedJobWorkerResult
+        staleJobCommands
+            .Submit(Runtime::JobDesc{
+                .DebugName = "expired session job",
+                .Work = [](const Runtime::JobCancellation&)
+                    -> Runtime::JobResultEnvelope
                 {
-                    return Runtime::DerivedJobOutput{};
+                    return Runtime::JobResultEnvelope::Make<std::uint64_t>(0u);
                 },
-            })
+            },
+            jobIdentity)
             .IsValid());
+    EXPECT_FALSE(staleJobCommands.FindActive(jobIdentity).has_value());
+    EXPECT_TRUE(staleJobCommands.SnapshotEntity(jobIdentity.EntityId).empty());
     currentResultSink(Runtime::SandboxEditorKMeansResult{
         .Message = "current attachment result",
     });

@@ -44,7 +44,6 @@ import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.CommandBus;
-import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.InputActions;
@@ -1350,10 +1349,8 @@ export namespace Extrinsic::Runtime
         std::string Reason{};
     };
 
-    // One row of the editor's job queue view. During the Slice B5d migration
-    // window it is populated from both the retiring `DerivedJobRegistry` and
-    // `JobService`, so the presentation layer sees a single vocabulary while
-    // the submit sites move batch by batch.
+    // One row of the editor's job queue view. `JobService` owns generic
+    // lifecycle state while the submitting editor session supplies identity.
     struct SandboxEditorJobRecord
     {
         JobToken Token{};
@@ -1375,13 +1372,6 @@ export namespace Extrinsic::Runtime
     {
         std::vector<SandboxEditorJobRecord> Entries{};
     };
-
-    // RUNTIME-194 Slice B5d migration window: projects a retiring
-    // `DerivedJobRegistry` snapshot into the editor's job vocabulary, so the
-    // queue view and the dedup guard see one list while the submit sites move
-    // batch by batch. Deleted with the registry path in sub-slice `B5d-1z`.
-    [[nodiscard]] SandboxEditorJobQueueSnapshot ToSandboxEditorJobQueueSnapshot(
-        const DerivedJobQueueSnapshot& snapshot);
 
     struct SandboxEditorProgressiveJobDependencyModel
     {
@@ -2174,27 +2164,22 @@ export namespace Extrinsic::Runtime
         }
     };
 
-    // RUNTIME-194 Slice B5d migration window: both submit paths are live while
-    // the desc sites move batch by batch. `Submit`/`Cancel` are the retiring
-    // `DerivedJobRegistry` path; `SubmitJob`/`CancelJob` are the `JobService`
-    // one, which takes the editor's own identity alongside the desc because
-    // `JobService` deliberately stores no domain identity. Sub-slice `B5d-1z`
-    // deletes the first pair; `RUNTIME-194` Slice C deletes the registry.
-    struct SandboxEditorDerivedJobCommandSurface
+    // `JobService` deliberately stores no editor domain identity. The session
+    // therefore records identity at submit and exposes the two queries the
+    // editor actually needs: active-output dedup and per-entity queue rows.
+    // This callback surface is also the test-double seam for facade contracts.
+    struct SandboxEditorJobCommandSurface
     {
-        std::function<DerivedJobHandle(DerivedJobDesc)> Submit{};
-        std::function<void(DerivedJobHandle)> Cancel{};
-        std::function<JobToken(JobDesc, SandboxEditorJobIdentity)> SubmitJob{};
-        std::function<void(JobToken)> CancelJob{};
+        std::function<JobToken(JobDesc, SandboxEditorJobIdentity)> Submit{};
+        std::function<std::optional<SandboxEditorJobRecord>(
+            const SandboxEditorJobIdentity&)>
+            FindActive{};
+        std::function<std::vector<SandboxEditorJobRecord>(std::uint32_t)>
+            SnapshotEntity{};
 
         [[nodiscard]] bool Available() const noexcept
         {
             return static_cast<bool>(Submit);
-        }
-
-        [[nodiscard]] bool JobsAvailable() const noexcept
-        {
-            return static_cast<bool>(SubmitJob);
         }
     };
 
@@ -2632,14 +2617,9 @@ export namespace Extrinsic::Runtime
         std::uint64_t VisualizationAdapterBindingRevision{0u};
         SandboxEditorKMeansCommandSurface KMeansCommands{};
         SandboxEditorKMeansGpuCommandSurface KMeansGpuCommands{};
-        SandboxEditorDerivedJobCommandSurface DerivedJobCommands{};
+        SandboxEditorJobCommandSurface JobCommands{};
         SandboxEditorMethodResultSinks MethodResultSinks{};
         RuntimeAssetImportQueueSnapshot AssetImportQueue{};
-        // Unified editor job queue. During the Slice B5d migration window the
-        // session builds it from the retiring registry *and* `JobService`, so a
-        // duplicate submission is refused no matter which path queued the
-        // original and the queue view shows one list.
-        const SandboxEditorJobQueueSnapshot* DerivedJobs{nullptr};
         std::string PendingAssetImportPath{};
         std::string PendingSceneFilePath{};
         Assets::AssetPayloadKind PendingAssetImportPayloadKind{
@@ -2900,9 +2880,7 @@ export namespace Extrinsic::Runtime
         SelectedMeshTextureBakeStatus BakeStatus{
             SelectedMeshTextureBakeStatus::Success};
         Assets::AssetId GeneratedTexture{};
-        // RUNTIME-194 Slice B5c: the selected-mesh bake runs on `JobService`.
-        // The rest of the editor's progressive-job models still speak
-        // `DerivedJobHandle` and move in Slice B5e.
+        // The selected-mesh bake runs on `JobService`.
         JobToken Job{};
         bool Scheduled{false};
         bool BoundGeneratedTexture{false};
@@ -3360,9 +3338,9 @@ export namespace Extrinsic::Runtime
             m_LastParameterizationResult{};
         std::optional<SandboxEditorRegistrationResult>
             m_LastRegistrationResult{};
-        SandboxEditorJobQueueSnapshot m_DerivedJobSnapshot{};
         // Submit-time identity for jobs this session put on `JobService`, which
-        // stores none itself. Pruned against `SnapshotAll()` each frame.
+        // stores none itself. The index is pruned against `SnapshotAll()` each
+        // frame and projected by `SandboxEditorJobCommandSurface` queries.
         std::unordered_map<JobToken,
                            SandboxEditorJobIdentity,
                            Core::StrongHandleHash<JobTokenTag>>

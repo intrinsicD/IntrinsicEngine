@@ -3581,7 +3581,6 @@ TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
     Runtime::SandboxEditorJobQueueSnapshot queued =
         jobs.Snapshot();
     ASSERT_EQ(queued.Entries.size(), 1u);
-    context.DerivedJobs = &queued;
 
     const Runtime::SandboxEditorUvRegenerationCommandResult duplicate =
         Runtime::ApplySandboxEditorUvRegenerationCommand(context, command);
@@ -3597,7 +3596,6 @@ TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
         jobs.Snapshot();
     ASSERT_EQ(complete.Entries.size(), 1u);
     EXPECT_EQ(complete.Entries[0].State, Runtime::JobState::Published);
-    context.DerivedJobs = &complete;
 
     const Runtime::SandboxEditorUvRegenerationCommandResult rerun =
         Runtime::ApplySandboxEditorUvRegenerationCommand(context, command);
@@ -3707,9 +3705,6 @@ TEST(SandboxEditorUi, UvRegenerationPanelModelTracksDerivedJobStateThroughCache)
             });
     ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
 
-    Runtime::SandboxEditorJobQueueSnapshot queued =
-        jobs.Snapshot();
-    context.DerivedJobs = &queued;
     frame = Runtime::BuildSandboxEditorPanelFrame(context);
     ASSERT_TRUE(frame.Inspector.TextureBake.Uv.UvRegenerationJob.has_value());
     EXPECT_TRUE(Runtime::IsActiveSandboxEditorJobState(
@@ -3718,18 +3713,12 @@ TEST(SandboxEditorUi, UvRegenerationPanelModelTracksDerivedJobStateThroughCache)
               "uv_regeneration");
 
     Core::Tasks::Scheduler::WaitForAll();
-    Runtime::SandboxEditorJobQueueSnapshot applying =
-        jobs.Snapshot();
-    context.DerivedJobs = &applying;
     frame = Runtime::BuildSandboxEditorPanelFrame(context);
     ASSERT_TRUE(frame.Inspector.TextureBake.Uv.UvRegenerationJob.has_value());
     EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->Status,
               Runtime::JobState::AwaitingGate);
 
     EXPECT_EQ(jobs.Jobs().DrainCompletions(jobs.Events(), 1u), 1u);
-    Runtime::SandboxEditorJobQueueSnapshot complete =
-        jobs.Snapshot();
-    context.DerivedJobs = &complete;
     frame = Runtime::BuildSandboxEditorPanelFrame(context);
     ASSERT_TRUE(frame.Inspector.TextureBake.Uv.UvRegenerationJob.has_value());
     EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->Status,

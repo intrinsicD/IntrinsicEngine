@@ -638,7 +638,6 @@ TEST(SandboxEditorUi, KMeansCpuRequestQueuesDerivedJobAndPublishesOnApply)
         {
             completedResult = std::move(result);
         };
-    context.DerivedJobs = nullptr;
 
     const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
     AddPointCloudSource(registry, cloud, 4u);
@@ -733,7 +732,6 @@ TEST(SandboxEditorUi, KMeansCpuDuplicateSubmitUsesExistingActiveJob)
     Runtime::SandboxEditorJobQueueSnapshot queued =
         jobs.Snapshot();
     ASSERT_EQ(queued.Entries.size(), 1u);
-    context.DerivedJobs = &queued;
 
     const Runtime::SandboxEditorKMeansResult duplicate =
         Runtime::ApplySandboxEditorKMeansCommand(context, command);
@@ -749,7 +747,6 @@ TEST(SandboxEditorUi, KMeansCpuDuplicateSubmitUsesExistingActiveJob)
         jobs.Snapshot();
     ASSERT_EQ(complete.Entries.size(), 1u);
     EXPECT_EQ(complete.Entries[0].State, Runtime::JobState::Published);
-    context.DerivedJobs = &complete;
 
     const Runtime::SandboxEditorKMeansResult rerun =
         Runtime::ApplySandboxEditorKMeansCommand(context, command);

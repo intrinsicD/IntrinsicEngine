@@ -34,18 +34,12 @@ namespace Extrinsic::Runtime::Detail
     void InvalidateSandboxMethodSelectedModelCache(
         const SandboxEditorContext& context);
 
-    // RUNTIME-194 Slice B5d: the editor's unified job queue. `SandboxMethodFacade`
-    // shares the dedup guard with `SandboxEditorFacades`, so both speak the
-    // editor-owned vocabulary regardless of which submit path queued the job.
+    // `SandboxMethodFacade` shares the editor session's JobService-backed dedup
+    // query with `SandboxEditorFacades`.
     [[nodiscard]] std::optional<SandboxEditorJobRecord>
     FindActiveSandboxMethodJob(
         const SandboxEditorContext& context,
         const SandboxEditorJobIdentity& identity);
-
-    [[nodiscard]] std::optional<SandboxEditorJobRecord>
-    FindActiveSandboxMethodDerivedJob(
-        const SandboxEditorContext& context,
-        const DerivedJobKey& key);
 
     [[nodiscard]] std::string BuildActiveSandboxMethodDerivedJobMessage(
         std::string_view label,

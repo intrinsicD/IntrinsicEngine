@@ -14,9 +14,9 @@ derivable from the tree.
 
 ### Where the work stands
 
-Updated 2026-07-27 (fourth session).
+Updated 2026-07-27 (fifth session).
 
-- Default CPU gate: **4264/4264**, one skip
+- Default CPU gate: **4265/4265**, one skip
   (`GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl`, expected on a
   headless host). Strict layering, docs-sync, test-layout, root-hygiene, and all
   task validators pass.
@@ -26,26 +26,21 @@ Updated 2026-07-27 (fourth session).
   `GpuReadbackJob`), `B5b` (`15beaef5`, `AssetModelSceneHandoff`), and `B5c`
   (`SelectedMeshTextureBake`) are landed. `B5d-1a` through `B5d-1d` are also
   landed: **all six production `StreamingExecutor::Submit` sites and every
-  production editor descriptor factory are migrated.** `B5d-1z` and `B5d-2`
-  remain before Slice C can retire the old modules.
+  production editor descriptor factory are migrated.** `B5d-1z` is complete;
+  only `B5d-2` remains before Slice C can retire the old modules.
 
 ### Next action
 
-Take **`B5d-1z — close the window`**, the next unchecked batch in `## Progress`
--> `B5d+e` -> "Batch plan and status". All production editor submit sites now
-use `JobService`; remove the legacy `Submit`/`Cancel` members, registry half of
-the unified snapshot, and registry-backed adapters without changing editor job
-identity or presentation behaviour. The dual-surface route was deliberately
-temporary and `B5d-1z` is its named removal checkpoint.
+Take **`B5d-2 — AsyncWorkModule's shutdown survivor sweep`**, the next unchecked
+batch in `## Progress` -> `B5d+e` -> "Batch plan and status". Replace the
+registry-backed shutdown enumeration/cancellation with
+`JobService::SnapshotAll()` plus `JobService::Cancel()`, preserving the
+shutdown wait/drain ordering and its survivor diagnostics. This is the last
+production dependency on the retiring registry/executor pair.
 
-Read that section before starting — the measured coupling, the temporary
-exception's terms, and the list of registry fields the consumer must now record
-itself are all there. Then read `FindActiveEditorDerivedJob`
-(`SandboxEditorFacades.cpp:4787`) with its call sites: it is the only part of
-the lane with real behaviour.
-
-After `B5d-2`, `StreamingExecutor` has no consumer left and Slice C can delete
-both modules.
+After `B5d-2`, rerun the source census. `StreamingExecutor` and
+`DerivedJobGraph` should have no production consumer left, and Slice C can
+quarantine/delete both modules, their dedicated tests, and their CMake entries.
 
 Note that `B5a`–`B5c` were all lanes with **no production caller**, which is why
 they moved cleanly and are weaker evidence than they look. `B5d` is the live
@@ -922,11 +917,44 @@ and commits independently.
                     already-migrated K-Means contract and removed its unused
                     legacy test adapters. CPU gate 4264/4264, one expected
                     headless skip; `SandboxEditorUi.*` 0/30 under stress.
-                  - [ ] **B5d-1z — close the window.** Delete `Submit`/`Cancel`,
+                  - [x] **B5d-1z — close the window.** Deleted `Submit`/`Cancel`,
                     `context.DerivedJobs`, `m_DerivedJobSnapshot`, the union in
                     the dedup guard and the queue view, and the registry-backed
                     adapters. After this `SandboxEditorFacades` and
                     `SandboxMethodFacade` no longer name `DerivedJobGraph`.
+
+                    The final `SandboxEditorJobCommandSurface` contains only
+                    `Submit`, `FindActive`, and `SnapshotEntity`. The session
+                    retains the existing `JobToken -> identity` index, prunes
+                    it against `JobService::SnapshotAll()` once per prepared
+                    frame, and joins identity with generic job snapshots only
+                    for the two editor queries. The active-output query keeps
+                    the exact entity + scope + semantic + output-name dedup
+                    rule. Attachment-epoch guards now cover submit and both
+                    queries, including stale copied surfaces after detach.
+
+                    The earlier lane notes assumed every field on the retired
+                    registry row needed a new sidecar. The completed descriptor
+                    census showed that all migrated editor jobs are CPU,
+                    dependency-free, use payload token zero, and do not retain
+                    previous output, so those record fields are their existing
+                    defaults. Only worker diagnostic text varied; `B5d-1a`
+                    already established `JobState` plus feature result sinks as
+                    the observable replacement because `JobService` has no
+                    per-job diagnostic channel. No second metadata service or
+                    per-frame queue owner was introduced. The unused editor
+                    cancel callback was also removed; cancellation remains a
+                    `JobService` capability for the runtime paths that call it.
+
+                    Added a structural contract for the single service surface
+                    and extended session lifecycle coverage for world scoping
+                    and stale query callbacks. Focused editor/session contracts
+                    pass 149/149; the 147 editor/session tests pass for all 30
+                    stress repetitions. Full CPU gate 4265/4265, one expected
+                    headless skip. Module inventory unchanged. Clean-workshop
+                    review: the public surface remains runtime-owned, adds no
+                    dependency edge or backend seam, and closes the documented
+                    temporary exception.
                   - [ ] **B5d-2 — `AsyncWorkModule`'s shutdown survivor sweep.**
                     Separable: it needs only `SnapshotAll()` plus `Cancel`, both
                     of which already exist.

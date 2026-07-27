@@ -58,7 +58,6 @@ import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.CommandBus;
-import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryAvailability;
@@ -80,7 +79,6 @@ import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Graph;
@@ -162,14 +160,6 @@ namespace Extrinsic::Runtime
             const SandboxEditorJobIdentity& identity)
         {
             return Detail::FindActiveSandboxMethodJob(context, identity);
-        }
-
-        [[nodiscard]] std::optional<SandboxEditorJobRecord>
-        FindActiveEditorDerivedJob(
-            const SandboxEditorContext& context,
-            const DerivedJobKey& key)
-        {
-            return Detail::FindActiveSandboxMethodDerivedJob(context, key);
         }
 
         [[nodiscard]] std::string BuildActiveDerivedJobMessage(
@@ -1060,7 +1050,7 @@ namespace Extrinsic::Runtime
                 return pending;
             }
 
-            const JobToken handle = context.DerivedJobCommands.SubmitJob(
+            const JobToken handle = context.JobCommands.Submit(
                 std::move(desc),
                 identity);
             if (!handle.IsValid())
@@ -2118,7 +2108,7 @@ namespace Extrinsic::Runtime
                 return pending;
             }
 
-            const JobToken handle = context.DerivedJobCommands.SubmitJob(
+            const JobToken handle = context.JobCommands.Submit(
                 std::move(desc),
                 identity);
             if (!handle.IsValid())
@@ -2507,7 +2497,7 @@ namespace Extrinsic::Runtime
             return pending;
         }
 
-        if (context.DerivedJobCommands.JobsAvailable())
+        if (context.JobCommands.Available())
         {
             return SubmitKMeansCpuDerivedJob(
                 context,
@@ -2624,7 +2614,7 @@ namespace Extrinsic::Runtime
                     "property.");
             }
 
-            if (context.DerivedJobCommands.JobsAvailable())
+            if (context.JobCommands.Available())
             {
                 const std::uint32_t pointCount =
                     static_cast<std::uint32_t>(positions->size());
@@ -2692,7 +2682,7 @@ namespace Extrinsic::Runtime
                                                     : source.Diagnostic);
         }
 
-        if (context.DerivedJobCommands.JobsAvailable())
+        if (context.JobCommands.Available())
         {
             const ProgressivePoissonBackendResolution backend =
                 ResolveProgressivePoissonBackend(

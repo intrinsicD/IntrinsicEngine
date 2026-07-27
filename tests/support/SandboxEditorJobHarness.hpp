@@ -5,16 +5,17 @@
 //
 // `JobService` deliberately stores no domain identity, so the editor records
 // which entity and output each token belongs to and joins that against
-// `JobService::SnapshotAll()` to build the queue view its dedup guard and
-// panels read. Contract tests that drive editor facades without a session need
-// the same join, and several of them need it, so it lives here rather than
-// being re-derived per file.
+// `JobService::SnapshotAll()` to answer the active-output and per-entity row
+// queries its dedup guard and panels read. Contract tests that drive editor
+// facades without a session need the same join, and several of them need it,
+// so it lives here rather than being re-derived per file.
 //
 // This mirrors the session; it does not replace it. Session-level behaviour
 // (attachment epochs, world scoping) stays covered by the session's own tests.
 
 #include <chrono>
 #include <cstdint>
+#include <optional>
 #include <thread>
 #include <unordered_map>
 #include <utility>
@@ -41,7 +42,7 @@ namespace Extrinsic::Tests
         // editor identity the service does not keep.
         void Attach(Runtime::SandboxEditorContext& context)
         {
-            context.DerivedJobCommands.SubmitJob =
+            context.JobCommands.Submit =
                 [this](Runtime::JobDesc desc,
                        Runtime::SandboxEditorJobIdentity identity)
                     -> Runtime::JobToken
@@ -51,10 +52,34 @@ namespace Extrinsic::Tests
                     m_Identities.insert_or_assign(token, std::move(identity));
                 return token;
             };
-            context.DerivedJobCommands.CancelJob =
-                [this](const Runtime::JobToken token)
+            context.JobCommands.FindActive =
+                [this](const Runtime::SandboxEditorJobIdentity& requested)
+                    -> std::optional<Runtime::SandboxEditorJobRecord>
             {
-                (void)m_Jobs.Cancel(token);
+                for (const Runtime::SandboxEditorJobRecord& job :
+                     Snapshot().Entries)
+                {
+                    if (Runtime::IsActiveSandboxEditorJobState(job.State) &&
+                        Runtime::SameSandboxEditorJobOutput(
+                            job.Identity,
+                            requested))
+                    {
+                        return job;
+                    }
+                }
+                return std::nullopt;
+            };
+            context.JobCommands.SnapshotEntity =
+                [this](const std::uint32_t stableEntityId)
+            {
+                std::vector<Runtime::SandboxEditorJobRecord> rows{};
+                for (const Runtime::SandboxEditorJobRecord& job :
+                     Snapshot().Entries)
+                {
+                    if (job.Identity.EntityId == stableEntityId)
+                        rows.push_back(job);
+                }
+                return rows;
             };
         }
 
