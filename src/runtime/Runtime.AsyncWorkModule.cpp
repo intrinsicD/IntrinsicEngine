@@ -9,6 +9,7 @@ module Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameLoop;
 import Extrinsic.Runtime.DerivedJobGraph;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ServiceRegistry;
@@ -21,6 +22,12 @@ namespace Extrinsic::Runtime
     namespace
     {
         constexpr std::uint32_t kApplyBudgetPerFrame = 8u;
+
+        void CancelJobServiceSurvivors(JobService& jobs)
+        {
+            for (const JobSnapshot& survivor : jobs.SnapshotAll())
+                (void)jobs.Cancel(survivor.Token);
+        }
     }
 
     AsyncWorkModule::AsyncWorkModule() = default;
@@ -99,6 +106,11 @@ namespace Extrinsic::Runtime
             context.Events.Unsubscribe(m_WorldRetirementSubscription);
         m_WorldRetirementSubscription = {};
         ShutdownAndReset(&context.Services);
+        // Registration rollback must not affect kernel jobs, so the survivor
+        // sweep belongs only to the real shutdown path. Snapshot after the
+        // retiring executor/registry is quiescent; Cancel ignores records that
+        // reached a terminal state while that teardown completed.
+        CancelJobServiceSurvivors(context.Jobs);
     }
 
     void AsyncWorkModule::ShutdownAndReset(ServiceRegistry* const services)

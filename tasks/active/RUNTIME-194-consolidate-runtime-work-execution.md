@@ -20,27 +20,25 @@ Updated 2026-07-27 (fifth session).
   (`GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl`, expected on a
   headless host). Strict layering, docs-sync, test-layout, root-hygiene, and all
   task validators pass.
-- Slice A landed in `2214ddf9`. **Slice B is in its last lane**: `B0`
+- Slice A landed in `2214ddf9`. **Slice B is complete**: `B0`
   (`73dedb2a`), `B1` (`6cb2152b`), `B3` (`b09cee58`), `B2`+`B4` (`6db202c6`),
   `B5-0` (`0eb46f32`, `JobService::SnapshotAll()`), `B5a` (`7f78963d`,
   `GpuReadbackJob`), `B5b` (`15beaef5`, `AssetModelSceneHandoff`), and `B5c`
   (`SelectedMeshTextureBake`) are landed. `B5d-1a` through `B5d-1d` are also
   landed: **all six production `StreamingExecutor::Submit` sites and every
-  production editor descriptor factory are migrated.** `B5d-1z` is complete;
-  only `B5d-2` remains before Slice C can retire the old modules.
+  production editor descriptor factory are migrated.** `B5d-1z` closed the
+  editor window and `B5d-2` moved the shutdown survivor sweep. Slice C can now
+  retire the old modules.
 
 ### Next action
 
-Take **`B5d-2 — AsyncWorkModule's shutdown survivor sweep`**, the next unchecked
-batch in `## Progress` -> `B5d+e` -> "Batch plan and status". Replace the
-registry-backed shutdown enumeration/cancellation with
-`JobService::SnapshotAll()` plus `JobService::Cancel()`, preserving the
-shutdown wait/drain ordering and its survivor diagnostics. This is the last
-production dependency on the retiring registry/executor pair.
-
-After `B5d-2`, rerun the source census. `StreamingExecutor` and
-`DerivedJobGraph` should have no production consumer left, and Slice C can
-quarantine/delete both modules, their dedicated tests, and their CMake entries.
+Take **Slice C — cleanup**, the next unchecked batch in `## Progress`. Rerun the
+source census, quarantine the four retired module source files under
+`experimental/to_delete/` with paths preserved, remove their CMake entries and
+dedicated tests, and reduce `AsyncWorkModule` to the single `JobService`
+lifecycle. Remove legacy-only test imports/assertions and regenerate the module
+inventory. Do not internalize `JobServiceGpuQueueBridge`; `RUNTIME-203` owns
+that separate cleanup.
 
 Note that `B5a`–`B5c` were all lanes with **no production caller**, which is why
 they moved cleanly and are weaker evidence than they look. `B5d` is the live
@@ -219,7 +217,7 @@ and commits independently.
       Implementation note found while testing: dependency release must run
       **after** publication within a drain, otherwise a dependency retired by
       that drain costs its dependents an extra frame.
-- [ ] **Slice B — production migration.** Move asset read/import processing,
+- [x] **Slice B — production migration.** Move asset read/import processing,
       selected-entity analysis, clustering/method jobs, and existing derived
       chains onto `JobService` lane by lane, with parity and shutdown tests.
       Consumer census: `StreamingExecutor` has 17 src/test files,
@@ -469,7 +467,7 @@ and commits independently.
             `RuntimeAssetImportFormatCoverage.*` + `AssetWorkflowModule.*` 0/30
             failures under stress. `src/runtime/README.md` updated in the same
             commit; module inventory unchanged.
-      - [ ] **B5** — `DerivedJobRegistry` consumers. Census re-run after
+      - [x] **B5** — `DerivedJobRegistry` consumers. Census re-run after
             `B2`/`B4` landed; this lane is a different shape from `B1`–`B4` and
             must be sub-sliced.
 
@@ -728,7 +726,7 @@ and commits independently.
                   0/60 for the bake suite alone after the ordering fix).
                   `src/runtime/README.md` updated in the same commit; module
                   inventory unchanged.
-            - [ ] **B5d+e — the editor lane. Re-planned 2026-07-27: `B5d` and
+            - [x] **B5d+e — the editor lane. Re-planned 2026-07-27: `B5d` and
                   `B5e` cannot land separately.** The original split assumed
                   `SandboxMethodFacade` was its own consumer. It is not: both
                   files submit through the *same* surface,
@@ -955,9 +953,21 @@ and commits independently.
                     review: the public surface remains runtime-owned, adds no
                     dependency edge or backend seam, and closes the documented
                     temporary exception.
-                  - [ ] **B5d-2 — `AsyncWorkModule`'s shutdown survivor sweep.**
-                    Separable: it needs only `SnapshotAll()` plus `Cancel`, both
-                    of which already exist.
+                  - [x] **B5d-2 — `AsyncWorkModule`'s shutdown survivor sweep.**
+                    `OnShutdown` now snapshots the kernel-owned `JobService`
+                    after the retiring executor/registry teardown and requests
+                    cancellation for each surviving token. The sweep is not
+                    shared with registration rollback, which must never cancel
+                    unrelated kernel work after an optional-provider conflict.
+
+                    The migrated contract parks a completed `JobService`
+                    result at its apply gate, shuts the module down, and proves
+                    a later drain terminalizes it as `Cancelled`, suppresses
+                    normal publication, and runs the unpublished finalizer
+                    exactly once. All 9 `RuntimeAsyncWorkModule.*` contracts
+                    pass for 50 stress repetitions; full CPU gate 4265/4265,
+                    one expected headless skip. Runtime shutdown documentation
+                    now records the kernel survivor sweep.
 
                   Each batch keeps the default CPU gate green and commits on its
                   own. **A batch that cannot go green is reverted, not
@@ -976,10 +986,11 @@ and commits independently.
                   in each job's own `ValidateBeforeApply`.
 
                   Fields the registry snapshot carried that `JobService` has no
-                  counterpart for, and which the consumer must therefore record
-                  at submit: `RequestedJobDomain` / `ResolvedJobDomain`,
-                  `Dependencies`, `Diagnostic`, `PayloadToken`,
-                  `PreviousOutputRetained`.
+                  counterpart for were audited at `B5d-1z` before adding any
+                  sidecar: the migrated jobs use constant CPU domains, no
+                  dependencies, payload token zero, and no retained previous
+                  output. Worker diagnostics remain on feature result sinks;
+                  lifecycle failure/staleness is represented by `JobState`.
 
                   Unlike `B5a`–`B5c`, this lane has live production callers, so
                   the existing `SandboxEditorUi.*` / `SandboxEditor*` contract

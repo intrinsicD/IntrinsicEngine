@@ -368,43 +368,51 @@ TEST(RuntimeAsyncWorkModule, ShutdownDrainsReadyDerivedReadbackBeforeReturn)
     EXPECT_EQ(applyCalls.load(std::memory_order_relaxed), 1u);
 }
 
-TEST(RuntimeAsyncWorkModule, ShutdownCancelsUnreadiedDerivedReadback)
+TEST(RuntimeAsyncWorkModule, ShutdownCancelsParkedJobServiceSurvivor)
 {
     AsyncWorkModuleHarness harness{};
+    SchedulerScope scheduler{};
     ASSERT_TRUE(harness.Initialize().has_value());
 
-    std::atomic<bool> readbackReady{false};
-    std::atomic<std::uint32_t> applyCalls{0u};
-    Runtime::DerivedJobDesc readbackJob{
-        .Name = "shutdown unreadied readback",
+    std::atomic<std::uint32_t> publishCalls{0u};
+    std::atomic<std::uint32_t> finalizerCalls{0u};
+    Runtime::JobDesc parkedJob{
+        .DebugName = "shutdown parked JobService survivor",
         .Scope = Runtime::DefaultWorldHandle,
-        .IsReadbackJob = true,
-        .ReadbackByteSize = 4u,
-        .Execute = []() -> Runtime::DerivedJobWorkerResult
+        .Work = [](const Runtime::JobCancellation&)
+            -> Runtime::JobResultEnvelope
         {
-            return Runtime::DerivedJobOutput{.PayloadToken = 77u};
+            return Runtime::JobResultEnvelope::Make<std::uint64_t>(77u);
         },
-        .IsReadbackReady = [&readbackReady]()
+        .IsReadyToApply = []()
         {
-            return readbackReady.load(std::memory_order_relaxed);
+            return false;
         },
-        .ApplyOnMainThread =
-            [&applyCalls](Runtime::DerivedJobApplyContext&) -> Core::Result
+        .PublishCompletion =
+            [&publishCalls](Runtime::KernelEventBus&,
+                            const Runtime::JobResultEnvelope&) -> bool
         {
-            applyCalls.fetch_add(1u, std::memory_order_relaxed);
-            return Core::Ok();
+            publishCalls.fetch_add(1u, std::memory_order_relaxed);
+            return true;
+        },
+        .FinalizeUnpublishedOnMainThread = [&finalizerCalls]()
+        {
+            finalizerCalls.fetch_add(1u, std::memory_order_relaxed);
         },
     };
 
-    const Runtime::DerivedJobHandle handle =
-        harness.DerivedJobs()->Submit(std::move(readbackJob));
-    ASSERT_TRUE(handle.IsValid());
+    const Runtime::JobToken token =
+        harness.Jobs.Submit(std::move(parkedJob));
+    ASSERT_TRUE(token.IsValid());
+    Core::Tasks::Scheduler::WaitForAll();
+    ASSERT_EQ(harness.Jobs.GetState(token), Runtime::JobState::AwaitingGate);
 
-    harness.FrameHooks()->PumpBackground(1u);
     harness.Shutdown();
 
-    readbackReady.store(true, std::memory_order_relaxed);
-    EXPECT_EQ(applyCalls.load(std::memory_order_relaxed), 0u);
+    EXPECT_EQ(harness.Jobs.DrainCompletions(harness.Events), 0u);
+    EXPECT_EQ(harness.Jobs.GetState(token), Runtime::JobState::Cancelled);
+    EXPECT_EQ(publishCalls.load(std::memory_order_relaxed), 0u);
+    EXPECT_EQ(finalizerCalls.load(std::memory_order_relaxed), 1u);
 }
 
 TEST(RuntimeAsyncWorkModule, WorldRetirementCancelsQueuedAndReadyWork)
