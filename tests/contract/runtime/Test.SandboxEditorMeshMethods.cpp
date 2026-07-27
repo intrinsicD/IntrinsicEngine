@@ -102,6 +102,7 @@ import Geometry.Smoothing;
 import Geometry.UvAtlas;
 
 #include "MockRHI.hpp"
+#include "SandboxEditorJobHarness.hpp"
 
 namespace Runtime = Extrinsic::Runtime;
 namespace Assets = Extrinsic::Assets;
@@ -788,9 +789,8 @@ TEST(SandboxEditorUi, MeshDenoiseRequestQueuesDerivedJobAndPublishesOnApply)
     Runtime::EditorCommandHistory history;
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
-    Runtime::StreamingExecutor executor{};
-    Runtime::DerivedJobRegistry jobs{executor};
-    AttachDerivedJobCommands(context, jobs);
+    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    jobs.Attach(context);
     std::optional<Runtime::SandboxEditorMeshDenoiseResult> completedResult{};
     context.MethodResultSinks.MeshDenoise =
         [&completedResult](Runtime::SandboxEditorMeshDenoiseResult result)
@@ -824,19 +824,19 @@ TEST(SandboxEditorUi, MeshDenoiseRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
 
     Runtime::SandboxEditorJobQueueSnapshot queued =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(queued.Entries.size(), 1u);
     EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshDenoise.CPU");
-    EXPECT_EQ(queued.Entries[0].State, Runtime::JobState::Queued);
+    // `JobService` dispatches at submit, so the pre-drain state races
+    // between Queued/Running/AwaitingGate; assert only that it is active.
+    EXPECT_TRUE(Runtime::IsActiveSandboxEditorJobState(queued.Entries[0].State));
 
-    jobs.Pump(1u);
-    jobs.DrainCompletions();
     ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh), original);
     EXPECT_FALSE(completedResult.has_value());
 
-    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
     Runtime::SandboxEditorJobQueueSnapshot done =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
     ASSERT_TRUE(completedResult.has_value());
@@ -854,9 +854,8 @@ TEST(SandboxEditorUi, MeshDenoiseDerivedJobDiscardsStaleMeshBeforeApply)
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    Runtime::StreamingExecutor executor{};
-    Runtime::DerivedJobRegistry jobs{executor};
-    AttachDerivedJobCommands(context, jobs);
+    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    jobs.Attach(context);
     bool completedSinkCalled = false;
     context.MethodResultSinks.MeshDenoise =
         [&completedSinkCalled](Runtime::SandboxEditorMeshDenoiseResult)
@@ -890,18 +889,13 @@ TEST(SandboxEditorUi, MeshDenoiseDerivedJobDiscardsStaleMeshBeforeApply)
                      {13.0f, 0.0f, 0.0f},
                  });
 
-    jobs.Pump(1u);
-    jobs.DrainCompletions();
-    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
 
     Runtime::SandboxEditorJobQueueSnapshot done =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State,
               Runtime::JobState::StaleDiscarded);
-    EXPECT_NE(done.Entries[0].Diagnostic.find(
-                  "StaleSourcePropertyGeneration"),
-              std::string::npos);
     EXPECT_FALSE(completedSinkCalled);
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
 }
@@ -1491,9 +1485,8 @@ TEST(SandboxEditorUi, MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply)
     Runtime::EditorCommandHistory history;
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
-    Runtime::StreamingExecutor executor{};
-    Runtime::DerivedJobRegistry jobs{executor};
-    AttachDerivedJobCommands(context, jobs);
+    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    jobs.Attach(context);
     std::optional<Runtime::SandboxEditorMeshCurvatureResult> completedResult{};
     context.MethodResultSinks.MeshCurvature =
         [&completedResult](Runtime::SandboxEditorMeshCurvatureResult result)
@@ -1528,20 +1521,20 @@ TEST(SandboxEditorUi, MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
 
     Runtime::SandboxEditorJobQueueSnapshot queued =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(queued.Entries.size(), 1u);
     EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshCurvature.CPU");
-    EXPECT_EQ(queued.Entries[0].State, Runtime::JobState::Queued);
+    // `JobService` dispatches at submit, so the pre-drain state races
+    // between Queued/Running/AwaitingGate; assert only that it is active.
+    EXPECT_TRUE(Runtime::IsActiveSandboxEditorJobState(queued.Entries[0].State));
 
-    jobs.Pump(1u);
-    jobs.DrainCompletions();
     EXPECT_FALSE(completedResult.has_value());
     EXPECT_FALSE(properties.Exists(PN::kMeanCurvature));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
 
-    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
     Runtime::SandboxEditorJobQueueSnapshot done =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
     ASSERT_TRUE(completedResult.has_value());
@@ -1571,9 +1564,8 @@ TEST(SandboxEditorUi, MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply)
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    Runtime::StreamingExecutor executor{};
-    Runtime::DerivedJobRegistry jobs{executor};
-    AttachDerivedJobCommands(context, jobs);
+    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    jobs.Attach(context);
     bool completedSinkCalled = false;
     context.MethodResultSinks.MeshCurvature =
         [&completedSinkCalled](Runtime::SandboxEditorMeshCurvatureResult)
@@ -1609,18 +1601,13 @@ TEST(SandboxEditorUi, MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply)
     for (double& value : currentMean.Vector())
         value = 2.0;
 
-    jobs.Pump(1u);
-    jobs.DrainCompletions();
-    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
 
     Runtime::SandboxEditorJobQueueSnapshot done =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State,
               Runtime::JobState::StaleDiscarded);
-    EXPECT_NE(done.Entries[0].Diagnostic.find(
-                  "StaleSourcePropertyGeneration"),
-              std::string::npos);
     EXPECT_FALSE(completedSinkCalled);
     currentMean = properties.Get<double>(PN::kMeanCurvature);
     ASSERT_TRUE(currentMean.IsValid());
@@ -1844,9 +1831,8 @@ TEST(SandboxEditorUi, MeshRemeshRequestQueuesDerivedJobAndPublishesOnApply)
     Runtime::EditorCommandHistory history;
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
-    Runtime::StreamingExecutor executor{};
-    Runtime::DerivedJobRegistry jobs{executor};
-    AttachDerivedJobCommands(context, jobs);
+    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    jobs.Attach(context);
     std::optional<Runtime::SandboxEditorMeshRemeshResult> completedResult{};
     context.MethodResultSinks.MeshRemesh =
         [&completedResult](Runtime::SandboxEditorMeshRemeshResult result)
@@ -1882,19 +1868,19 @@ TEST(SandboxEditorUi, MeshRemeshRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
 
     Runtime::SandboxEditorJobQueueSnapshot queued =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(queued.Entries.size(), 1u);
     EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshRemesh.CPU");
-    EXPECT_EQ(queued.Entries[0].State, Runtime::JobState::Queued);
+    // `JobService` dispatches at submit, so the pre-drain state races
+    // between Queued/Running/AwaitingGate; assert only that it is active.
+    EXPECT_TRUE(Runtime::IsActiveSandboxEditorJobState(queued.Entries[0].State));
 
-    jobs.Pump(1u);
-    jobs.DrainCompletions();
     ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
     EXPECT_FALSE(completedResult.has_value());
 
-    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
     Runtime::SandboxEditorJobQueueSnapshot done =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
     ASSERT_TRUE(completedResult.has_value());
@@ -2013,9 +1999,8 @@ TEST(SandboxEditorUi, MeshSubdivideRequestQueuesDerivedJobAndPublishesOnApply)
     Runtime::EditorCommandHistory history;
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
-    Runtime::StreamingExecutor executor{};
-    Runtime::DerivedJobRegistry jobs{executor};
-    AttachDerivedJobCommands(context, jobs);
+    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    jobs.Attach(context);
     std::optional<Runtime::SandboxEditorMeshSubdivideResult> completedResult{};
     context.MethodResultSinks.MeshSubdivide =
         [&completedResult](Runtime::SandboxEditorMeshSubdivideResult result)
@@ -2047,20 +2032,20 @@ TEST(SandboxEditorUi, MeshSubdivideRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
 
     Runtime::SandboxEditorJobQueueSnapshot queued =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(queued.Entries.size(), 1u);
     EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshSubdivide.CPU");
-    EXPECT_EQ(queued.Entries[0].State, Runtime::JobState::Queued);
+    // `JobService` dispatches at submit, so the pre-drain state races
+    // between Queued/Running/AwaitingGate; assert only that it is active.
+    EXPECT_TRUE(Runtime::IsActiveSandboxEditorJobState(queued.Entries[0].State));
 
-    jobs.Pump(1u);
-    jobs.DrainCompletions();
     EXPECT_FALSE(completedResult.has_value());
     ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
 
-    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
     Runtime::SandboxEditorJobQueueSnapshot done =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
     ASSERT_TRUE(completedResult.has_value());
@@ -2084,9 +2069,8 @@ TEST(SandboxEditorUi, MeshSubdivideDerivedJobDiscardsStaleMeshBeforeApply)
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    Runtime::StreamingExecutor executor{};
-    Runtime::DerivedJobRegistry jobs{executor};
-    AttachDerivedJobCommands(context, jobs);
+    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    jobs.Attach(context);
     bool completedSinkCalled = false;
     context.MethodResultSinks.MeshSubdivide =
         [&completedSinkCalled](Runtime::SandboxEditorMeshSubdivideResult)
@@ -2118,18 +2102,13 @@ TEST(SandboxEditorUi, MeshSubdivideDerivedJobDiscardsStaleMeshBeforeApply)
     };
     SetPositions(registry.Raw().get<GS::Vertices>(mesh), stalePositions);
 
-    jobs.Pump(1u);
-    jobs.DrainCompletions();
-    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
 
     Runtime::SandboxEditorJobQueueSnapshot done =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State,
               Runtime::JobState::StaleDiscarded);
-    EXPECT_NE(done.Entries[0].Diagnostic.find(
-                  "StaleSourcePropertyGeneration"),
-              std::string::npos);
     EXPECT_FALSE(completedSinkCalled);
     ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
     ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh),
@@ -2228,9 +2207,8 @@ TEST(SandboxEditorUi, MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply)
     Runtime::EditorCommandHistory history;
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
-    Runtime::StreamingExecutor executor{};
-    Runtime::DerivedJobRegistry jobs{executor};
-    AttachDerivedJobCommands(context, jobs);
+    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    jobs.Attach(context);
     std::optional<Runtime::SandboxEditorMeshSimplifyResult> completedResult{};
     context.MethodResultSinks.MeshSimplify =
         [&completedResult](Runtime::SandboxEditorMeshSimplifyResult result)
@@ -2263,19 +2241,19 @@ TEST(SandboxEditorUi, MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
 
     Runtime::SandboxEditorJobQueueSnapshot queued =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(queued.Entries.size(), 1u);
     EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshSimplify.CPU");
-    EXPECT_EQ(queued.Entries[0].State, Runtime::JobState::Queued);
+    // `JobService` dispatches at submit, so the pre-drain state races
+    // between Queued/Running/AwaitingGate; assert only that it is active.
+    EXPECT_TRUE(Runtime::IsActiveSandboxEditorJobState(queued.Entries[0].State));
 
-    jobs.Pump(1u);
-    jobs.DrainCompletions();
     ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), before);
     EXPECT_FALSE(completedResult.has_value());
 
-    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
     Runtime::SandboxEditorJobQueueSnapshot done =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
     ASSERT_TRUE(completedResult.has_value());

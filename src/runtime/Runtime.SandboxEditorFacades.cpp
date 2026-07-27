@@ -2571,6 +2571,16 @@ namespace Extrinsic::Runtime
                    status == DerivedJobStatus::StaleDiscarded;
         }
 
+        // RUNTIME-194 Slice B5d: result payload for this file's editor jobs.
+        // The computed result already reaches the main thread in the shared job
+        // state the worker fills, so the envelope carries only the diagnostic
+        // the retired `DerivedJobOutput` exposed — and exists at all because an
+        // empty envelope is how `JobService` reports a dropped job.
+        struct SandboxEditorJobResult
+        {
+            std::string Diagnostic{};
+        };
+
         // RUNTIME-194 Slice B5d adapters. Both sources land in the editor's own
         // `SandboxEditorJobRecord` vocabulary so the presentation layer and the
         // dedup guard see one list while the submit sites move batch by batch.
@@ -8091,40 +8101,40 @@ namespace Extrinsic::Runtime
             SandboxEditorMeshSimplifyResult SimplifyResult{};
         };
 
-        [[nodiscard]] DerivedJobApplyValidation ValidateMeshCpuJobApply(
+        [[nodiscard]] JobApplyValidation ValidateMeshCpuJobApply(
             const SandboxEditorContext& context,
             const SandboxEditorMeshCpuJobState& job)
         {
             if (context.Scene == nullptr)
-                return DerivedJobApplyValidation::MissingEntity;
+                return JobApplyValidation::MissingTarget;
 
             entt::registry& raw = context.Scene->Raw();
             const std::optional<ECS::EntityHandle> entity =
                 ResolveStableEntity(raw, job.StableEntityId);
             if (!entity.has_value())
-                return DerivedJobApplyValidation::MissingEntity;
+                return JobApplyValidation::MissingTarget;
 
             const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
             const GS::SourceAvailability availability =
                 GS::BuildSourceAvailability(view);
             if (availability.ProvenanceDomain != GS::Domain::Mesh)
-                return DerivedJobApplyValidation::StaleGeometryGeneration;
+                return JobApplyValidation::StaleGeneration;
 
             if (GeometryMetadataSignatureForEntity(raw, *entity) !=
                 job.GeometryMetadataSignature)
             {
-                return DerivedJobApplyValidation::StaleGeometryGeneration;
+                return JobApplyValidation::StaleGeneration;
             }
 
             if (view.VertexSource == nullptr)
-                return DerivedJobApplyValidation::StaleGeometryGeneration;
+                return JobApplyValidation::StaleGeneration;
 
             std::optional<std::vector<glm::vec3>> current =
                 CollectFiniteGeometryPositions(view.VertexSource->Properties);
             if (!current.has_value() ||
                 !SameGeometryPositions(*current, job.SnapshotPositions))
             {
-                return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+                return JobApplyValidation::StaleGeneration;
             }
 
             if (job.Kind == SandboxEditorMeshCpuJobKind::Curvature)
@@ -8134,7 +8144,7 @@ namespace Extrinsic::Runtime
                 if (!mutableView.Valid() ||
                     mutableView.VertexSource == nullptr)
                 {
-                    return DerivedJobApplyValidation::StaleGeometryGeneration;
+                    return JobApplyValidation::StaleGeneration;
                 }
 
                 MeshCurvaturePropertyState currentCurvature{};
@@ -8148,11 +8158,11 @@ namespace Extrinsic::Runtime
                         currentCurvature,
                         job.CurvatureBefore))
                 {
-                    return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+                    return JobApplyValidation::StaleGeneration;
                 }
             }
 
-            return DerivedJobApplyValidation::Current;
+            return JobApplyValidation::Current;
         }
 
         void PublishMeshCurvatureResultSink(
@@ -8195,7 +8205,7 @@ namespace Extrinsic::Runtime
                 context.MethodResultSinks.MeshSimplify(std::move(result));
         }
 
-        [[nodiscard]] DerivedJobWorkerResult RunMeshCurvatureCpuWorker(
+        [[nodiscard]] JobResultEnvelope RunMeshCurvatureCpuWorker(
             const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
         {
             SandboxEditorMeshCurvatureResult& result = state->CurvatureResult;
@@ -8215,12 +8225,10 @@ namespace Extrinsic::Runtime
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message = "Geometry.Curvature produced missing or count-mismatched "
                                  "scalar properties.";
-                return DerivedJobOutput{
-                    .PayloadToken = 0u,
-                    .NormalizedProgress = 1.0f,
-                    .ProgressDeterminate = true,
-                    .Diagnostic = result.Message,
-                };
+                return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                    SandboxEditorJobResult{
+                        .Diagnostic = result.Message,
+                    });
             }
 
             const std::vector<double>& mean =
@@ -8239,12 +8247,10 @@ namespace Extrinsic::Runtime
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message =
                     "Geometry.Curvature produced non-finite scalar curvature values.";
-                return DerivedJobOutput{
-                    .PayloadToken = 0u,
-                    .NormalizedProgress = 1.0f,
-                    .ProgressDeterminate = true,
-                    .Diagnostic = result.Message,
-                };
+                return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                    SandboxEditorJobResult{
+                        .Diagnostic = result.Message,
+                    });
             }
 
             state->CurvatureAfter = state->CurvatureBefore;
@@ -8270,12 +8276,10 @@ namespace Extrinsic::Runtime
                     result.Error = Core::ErrorCode::InvalidArgument;
                     result.Message = "Geometry.Curvature produced missing or "
                                      "count-mismatched principal-direction properties.";
-                    return DerivedJobOutput{
-                        .PayloadToken = 0u,
-                        .NormalizedProgress = 1.0f,
-                        .ProgressDeterminate = true,
-                        .Diagnostic = result.Message,
-                    };
+                    return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                        SandboxEditorJobResult{
+                            .Diagnostic = result.Message,
+                        });
                 }
 
                 const std::vector<glm::vec3>& dir1 =
@@ -8294,12 +8298,10 @@ namespace Extrinsic::Runtime
                     result.Error = Core::ErrorCode::InvalidArgument;
                     result.Message =
                         "Geometry.Curvature produced non-finite principal directions.";
-                    return DerivedJobOutput{
-                        .PayloadToken = 0u,
-                        .NormalizedProgress = 1.0f,
-                        .ProgressDeterminate = true,
-                        .Diagnostic = result.Message,
-                    };
+                    return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                        SandboxEditorJobResult{
+                            .Diagnostic = result.Message,
+                        });
                 }
 
                 state->CurvatureAfter.HadDir1 = true;
@@ -8315,15 +8317,13 @@ namespace Extrinsic::Runtime
                 result.DirectionPropertyCount == 2u &&
                 result.DirectionWrittenCount == result.VertexSlotCount * 2u;
             result.Error = Core::ErrorCode::Success;
-            return DerivedJobOutput{
-                .PayloadToken = 0u,
-                .NormalizedProgress = 1.0f,
-                .ProgressDeterminate = true,
-                .Diagnostic = "Mesh curvature CPU result ready",
-            };
+            return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                SandboxEditorJobResult{
+                    .Diagnostic = "Mesh curvature CPU result ready",
+                });
         }
 
-        [[nodiscard]] DerivedJobWorkerResult RunMeshDenoiseCpuWorker(
+        [[nodiscard]] JobResultEnvelope RunMeshDenoiseCpuWorker(
             const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
         {
             Smooth::BilateralDenoiseParams params{};
@@ -8357,12 +8357,10 @@ namespace Extrinsic::Runtime
                 result.Message = "Geometry.Smoothing denoise failed with ";
                 result.Message += std::string(Smooth::DebugName(denoise.Status));
                 result.Message += ".";
-                return DerivedJobOutput{
-                    .PayloadToken = 0u,
-                    .NormalizedProgress = 1.0f,
-                    .ProgressDeterminate = true,
-                    .Diagnostic = result.Message,
-                };
+                return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                    SandboxEditorJobResult{
+                        .Diagnostic = result.Message,
+                    });
             }
 
             std::vector<glm::vec3> afterPositions =
@@ -8378,12 +8376,10 @@ namespace Extrinsic::Runtime
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message       = "Geometry.Smoothing denoise produced invalid or "
                                        "count-mismatched positions.";
-                return DerivedJobOutput{
-                    .PayloadToken = 0u,
-                    .NormalizedProgress = 1.0f,
-                    .ProgressDeterminate = true,
-                    .Diagnostic = result.Message,
-                };
+                return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                    SandboxEditorJobResult{
+                        .Diagnostic = result.Message,
+                    });
             }
 
             std::size_t movedPublishedVertices = 0u;
@@ -8402,15 +8398,13 @@ namespace Extrinsic::Runtime
             result.Status = SandboxEditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             state->DenoiseAfterPositions = std::move(afterPositions);
-            return DerivedJobOutput{
-                .PayloadToken = 0u,
-                .NormalizedProgress = 1.0f,
-                .ProgressDeterminate = true,
-                .Diagnostic = "Mesh denoise CPU result ready",
-            };
+            return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                SandboxEditorJobResult{
+                    .Diagnostic = "Mesh denoise CPU result ready",
+                });
         }
 
-        [[nodiscard]] DerivedJobWorkerResult RunMeshRemeshCpuWorker(
+        [[nodiscard]] JobResultEnvelope RunMeshRemeshCpuWorker(
             const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
         {
             SandboxEditorMeshRemeshResult& result = state->RemeshResult;
@@ -8470,12 +8464,10 @@ namespace Extrinsic::Runtime
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message =
                     "Geometry remeshing failed for the selected mesh and parameters.";
-                return DerivedJobOutput{
-                    .PayloadToken = 0u,
-                    .NormalizedProgress = 1.0f,
-                    .ProgressDeterminate = true,
-                    .Diagnostic = result.Message,
-                };
+                return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                    SandboxEditorJobResult{
+                        .Diagnostic = result.Message,
+                    });
             }
 
             if (state->Mesh.HasGarbage())
@@ -8485,15 +8477,13 @@ namespace Extrinsic::Runtime
             result.OutputFaceCount = state->Mesh.FaceCount();
             result.Status = SandboxEditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
-            return DerivedJobOutput{
-                .PayloadToken = 0u,
-                .NormalizedProgress = 1.0f,
-                .ProgressDeterminate = true,
-                .Diagnostic = "Mesh remesh CPU result ready",
-            };
+            return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                SandboxEditorJobResult{
+                    .Diagnostic = "Mesh remesh CPU result ready",
+                });
         }
 
-        [[nodiscard]] DerivedJobWorkerResult RunMeshSubdivideCpuWorker(
+        [[nodiscard]] JobResultEnvelope RunMeshSubdivideCpuWorker(
             const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
         {
             SandboxEditorMeshSubdivideResult& result =
@@ -8523,12 +8513,10 @@ namespace Extrinsic::Runtime
                     result.Error = Core::ErrorCode::InvalidArgument;
                     result.Message = "Geometry.Subdivision Loop subdivision failed for the "
                                      "selected mesh and parameters.";
-                    return DerivedJobOutput{
-                        .PayloadToken = 0u,
-                        .NormalizedProgress = 1.0f,
-                        .ProgressDeterminate = true,
-                        .Diagnostic = result.Message,
-                    };
+                    return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                        SandboxEditorJobResult{
+                            .Diagnostic = result.Message,
+                        });
                 }
                 result.IterationsPerformed =
                     static_cast<std::uint32_t>(
@@ -8551,12 +8539,10 @@ namespace Extrinsic::Runtime
                     result.Error = Core::ErrorCode::InvalidArgument;
                     result.Message = "Geometry.CatmullClark subdivision failed for the "
                                      "selected mesh and parameters.";
-                    return DerivedJobOutput{
-                        .PayloadToken = 0u,
-                        .NormalizedProgress = 1.0f,
-                        .ProgressDeterminate = true,
-                        .Diagnostic = result.Message,
-                    };
+                    return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                        SandboxEditorJobResult{
+                            .Diagnostic = result.Message,
+                        });
                 }
                 result.IterationsPerformed =
                     static_cast<std::uint32_t>(
@@ -8580,12 +8566,10 @@ namespace Extrinsic::Runtime
                     result.Error = Core::ErrorCode::InvalidArgument;
                     result.Message = "Geometry.HalfedgeMesh.SubdivisionSqrt3 failed for the "
                                      "selected mesh and parameters.";
-                    return DerivedJobOutput{
-                        .PayloadToken = 0u,
-                        .NormalizedProgress = 1.0f,
-                        .ProgressDeterminate = true,
-                        .Diagnostic = result.Message,
-                    };
+                    return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                        SandboxEditorJobResult{
+                            .Diagnostic = result.Message,
+                        });
                 }
                 result.IterationsPerformed =
                     static_cast<std::uint32_t>(
@@ -8601,15 +8585,13 @@ namespace Extrinsic::Runtime
             result.Status = SandboxEditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             state->Mesh = std::move(output);
-            return DerivedJobOutput{
-                .PayloadToken = 0u,
-                .NormalizedProgress = 1.0f,
-                .ProgressDeterminate = true,
-                .Diagnostic = "Mesh subdivide CPU result ready",
-            };
+            return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                SandboxEditorJobResult{
+                    .Diagnostic = "Mesh subdivide CPU result ready",
+                });
         }
 
-        [[nodiscard]] DerivedJobWorkerResult RunMeshSimplifyCpuWorker(
+        [[nodiscard]] JobResultEnvelope RunMeshSimplifyCpuWorker(
             const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
         {
             SandboxEditorMeshSimplifyResult& result = state->SimplifyResult;
@@ -8647,12 +8629,10 @@ namespace Extrinsic::Runtime
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message =
                     "Geometry.Simplification failed for the selected mesh and parameters.";
-                return DerivedJobOutput{
-                    .PayloadToken = 0u,
-                    .NormalizedProgress = 1.0f,
-                    .ProgressDeterminate = true,
-                    .Diagnostic = result.Message,
-                };
+                return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                    SandboxEditorJobResult{
+                        .Diagnostic = result.Message,
+                    });
             }
 
             if (state->Mesh.HasGarbage())
@@ -8670,15 +8650,13 @@ namespace Extrinsic::Runtime
             result.SeamVerticesPinned = simplification->SeamVerticesPinned;
             result.Status = SandboxEditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
-            return DerivedJobOutput{
-                .PayloadToken = 0u,
-                .NormalizedProgress = 1.0f,
-                .ProgressDeterminate = true,
-                .Diagnostic = "Mesh simplify CPU result ready",
-            };
+            return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                SandboxEditorJobResult{
+                    .Diagnostic = "Mesh simplify CPU result ready",
+                });
         }
 
-        [[nodiscard]] DerivedJobWorkerResult RunMeshCpuWorker(
+        [[nodiscard]] JobResultEnvelope RunMeshCpuWorker(
             const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
         {
             switch (state->Kind)
@@ -8694,7 +8672,7 @@ namespace Extrinsic::Runtime
             case SandboxEditorMeshCpuJobKind::Simplify:
                 return RunMeshSimplifyCpuWorker(state);
             }
-            return std::unexpected(Core::ErrorCode::InvalidArgument);
+            return JobResultEnvelope{};
         }
 
         [[nodiscard]] Core::Result PublishMeshDenoiseCpuJob(
@@ -8898,7 +8876,21 @@ namespace Extrinsic::Runtime
             return Core::Err(Core::ErrorCode::InvalidArgument);
         }
 
-        [[nodiscard]] DerivedJobDesc MakeMeshCpuJobDesc(
+        // The retired key carried `SourcePropertyGeneration`; the dedup guard
+        // never compared it, and the staleness it stood for is re-checked by
+        // `ValidateMeshCpuJobApply` immediately before the apply.
+        [[nodiscard]] SandboxEditorJobIdentity MakeMeshCpuJobIdentity(
+            const SandboxEditorMeshCpuJobState& state)
+        {
+            return SandboxEditorJobIdentity{
+                .EntityId = state.StableEntityId,
+                .Scope = SandboxEditorJobScope::MeshSurface,
+                .OutputSemantic = MeshCpuJobOutputSemantic(state.Kind),
+                .OutputName = MeshCpuJobOutputName(state.Kind),
+            };
+        }
+
+        [[nodiscard]] JobDesc MakeMeshCpuJobDesc(
             const SandboxEditorContext& context,
             const std::shared_ptr<SandboxEditorMeshCpuJobState>& state)
         {
@@ -8910,36 +8902,30 @@ namespace Extrinsic::Runtime
                                   state->BeforeMesh.FaceCount()) +
                          1023u) /
                         1024u));
-            return DerivedJobDesc{
-                .Key = DerivedJobKey{
-                    .EntityId = state->StableEntityId,
-                    .Domain = DerivedJobScope::MeshSurface,
-                    .OutputSemantic = MeshCpuJobOutputSemantic(state->Kind),
-                    .SourcePropertyGeneration =
-                        state->GeometryMetadataSignature,
-                    .OutputName = MeshCpuJobOutputName(state->Kind),
-                },
-                .Name = MeshCpuJobName(state->Kind),
-                .RequestedJobDomain = ProgressiveJobDomain::Cpu,
-                .Kind = RuntimeTaskKinds::GeometryProcess,
-                .Priority = Core::Dag::TaskPriority::Normal,
-                .EstimatedCost = estimatedCost,
+            return JobDesc{
+                .DebugName = MeshCpuJobName(state->Kind),
                 .Scope = context.World,
-                .Execute =
-                    [state]() -> DerivedJobWorkerResult
+                .Priority = Core::Dag::TaskPriority::Normal,
+                .Kind = RuntimeTaskKinds::GeometryProcess,
+                .EstimatedCost = estimatedCost,
+                .Work =
+                    [state](const JobCancellation&) -> JobResultEnvelope
                     {
                         return RunMeshCpuWorker(state);
                     },
-                .ValidateOnMainThread =
+                .ValidateBeforeApply =
                     [context, state]()
                     {
                         return ValidateMeshCpuJobApply(context, *state);
                     },
-                .ApplyOnMainThread =
-                    [context, state](DerivedJobApplyContext&) -> Core::Result
+                .PublishCompletion =
+                    [context, state](KernelEventBus&,
+                                     const JobResultEnvelope& result) -> bool
                     {
-                        return PublishMeshCpuJob(context, *state);
-                },
+                        if (result.TryGet<SandboxEditorJobResult>() == nullptr)
+                            return false;
+                        return PublishMeshCpuJob(context, *state).has_value();
+                    },
             };
         }
 
@@ -8966,9 +8952,11 @@ namespace Extrinsic::Runtime
                 context.MeshCurvatureDirectionsAvailable);
             state->CurvatureResult.VertexSlotCount = source.VertexSlotCount;
 
-            DerivedJobDesc desc = MakeMeshCpuJobDesc(context, state);
+            const SandboxEditorJobIdentity identity =
+                MakeMeshCpuJobIdentity(*state);
+            JobDesc desc = MakeMeshCpuJobDesc(context, state);
             if (const std::optional<SandboxEditorJobRecord> active =
-                    FindActiveEditorDerivedJob(context, desc.Key))
+                    FindActiveEditorJob(context, identity))
             {
                 SandboxEditorMeshCurvatureResult pending =
                     MakePendingMeshCurvatureResult(
@@ -8981,8 +8969,9 @@ namespace Extrinsic::Runtime
                 return pending;
             }
 
-            const JobToken handle = ToSandboxEditorJobToken(
-                context.DerivedJobCommands.Submit(std::move(desc)));
+            const JobToken handle = context.DerivedJobCommands.SubmitJob(
+                std::move(desc),
+                identity);
             if (!handle.IsValid())
             {
                 SandboxEditorMeshCurvatureResult result =
@@ -9031,9 +9020,11 @@ namespace Extrinsic::Runtime
                 state->DenoiseResult.VertexSlotCount -
                 state->DenoiseResult.SkippedDeletedVertexCount;
 
-            DerivedJobDesc desc = MakeMeshCpuJobDesc(context, state);
+            const SandboxEditorJobIdentity identity =
+                MakeMeshCpuJobIdentity(*state);
+            JobDesc desc = MakeMeshCpuJobDesc(context, state);
             if (const std::optional<SandboxEditorJobRecord> active =
-                    FindActiveEditorDerivedJob(context, desc.Key))
+                    FindActiveEditorJob(context, identity))
             {
                 MeshDenoiseSourceResult pendingSource{};
                 pendingSource.BeforePositions = state->SnapshotPositions;
@@ -9048,8 +9039,9 @@ namespace Extrinsic::Runtime
                 return pending;
             }
 
-            const JobToken handle = ToSandboxEditorJobToken(
-                context.DerivedJobCommands.Submit(std::move(desc)));
+            const JobToken handle = context.DerivedJobCommands.SubmitJob(
+                std::move(desc),
+                identity);
             if (!handle.IsValid())
             {
                 SandboxEditorMeshDenoiseResult result =
@@ -9091,9 +9083,11 @@ namespace Extrinsic::Runtime
                 state->BeforeMesh.VertexCount();
             state->RemeshResult.InputFaceCount = state->BeforeMesh.FaceCount();
 
-            DerivedJobDesc desc = MakeMeshCpuJobDesc(context, state);
+            const SandboxEditorJobIdentity identity =
+                MakeMeshCpuJobIdentity(*state);
+            JobDesc desc = MakeMeshCpuJobDesc(context, state);
             if (const std::optional<SandboxEditorJobRecord> active =
-                    FindActiveEditorDerivedJob(context, desc.Key))
+                    FindActiveEditorJob(context, identity))
             {
                 SandboxEditorMeshRemeshResult pending =
                     MakePendingMeshRemeshResult(
@@ -9105,8 +9099,9 @@ namespace Extrinsic::Runtime
                 return pending;
             }
 
-            const JobToken handle = ToSandboxEditorJobToken(
-                context.DerivedJobCommands.Submit(std::move(desc)));
+            const JobToken handle = context.DerivedJobCommands.SubmitJob(
+                std::move(desc),
+                identity);
             if (!handle.IsValid())
             {
                 SandboxEditorMeshRemeshResult result =
@@ -9143,9 +9138,11 @@ namespace Extrinsic::Runtime
             state->SubdivideResult.InputFaceCount =
                 state->BeforeMesh.FaceCount();
 
-            DerivedJobDesc desc = MakeMeshCpuJobDesc(context, state);
+            const SandboxEditorJobIdentity identity =
+                MakeMeshCpuJobIdentity(*state);
+            JobDesc desc = MakeMeshCpuJobDesc(context, state);
             if (const std::optional<SandboxEditorJobRecord> active =
-                    FindActiveEditorDerivedJob(context, desc.Key))
+                    FindActiveEditorJob(context, identity))
             {
                 SandboxEditorMeshSubdivideResult pending =
                     MakePendingMeshSubdivideResult(
@@ -9157,8 +9154,9 @@ namespace Extrinsic::Runtime
                 return pending;
             }
 
-            const JobToken handle = ToSandboxEditorJobToken(
-                context.DerivedJobCommands.Submit(std::move(desc)));
+            const JobToken handle = context.DerivedJobCommands.SubmitJob(
+                std::move(desc),
+                identity);
             if (!handle.IsValid())
             {
                 SandboxEditorMeshSubdivideResult result =
@@ -9196,9 +9194,11 @@ namespace Extrinsic::Runtime
                 state->BeforeMesh.VertexCount();
             state->SimplifyResult.InputFaceCount = state->BeforeMesh.FaceCount();
 
-            DerivedJobDesc desc = MakeMeshCpuJobDesc(context, state);
+            const SandboxEditorJobIdentity identity =
+                MakeMeshCpuJobIdentity(*state);
+            JobDesc desc = MakeMeshCpuJobDesc(context, state);
             if (const std::optional<SandboxEditorJobRecord> active =
-                    FindActiveEditorDerivedJob(context, desc.Key))
+                    FindActiveEditorJob(context, identity))
             {
                 SandboxEditorMeshSimplifyResult pending =
                     MakePendingMeshSimplifyResult(
@@ -9210,8 +9210,9 @@ namespace Extrinsic::Runtime
                 return pending;
             }
 
-            const JobToken handle = ToSandboxEditorJobToken(
-                context.DerivedJobCommands.Submit(std::move(desc)));
+            const JobToken handle = context.DerivedJobCommands.SubmitJob(
+                std::move(desc),
+                identity);
             if (!handle.IsValid())
             {
                 SandboxEditorMeshSimplifyResult result =
@@ -14694,7 +14695,7 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        if (context.DerivedJobCommands.Available())
+        if (context.DerivedJobCommands.JobsAvailable())
         {
             return SubmitMeshDenoiseCpuJob(
                 context,
@@ -14866,7 +14867,7 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        if (context.DerivedJobCommands.Available())
+        if (context.DerivedJobCommands.JobsAvailable())
         {
             return SubmitMeshCurvatureCpuJob(
                 context,
@@ -15085,7 +15086,7 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        if (context.DerivedJobCommands.Available())
+        if (context.DerivedJobCommands.JobsAvailable())
         {
             return SubmitMeshRemeshCpuJob(
                 context,
@@ -15269,7 +15270,7 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        if (context.DerivedJobCommands.Available())
+        if (context.DerivedJobCommands.JobsAvailable())
         {
             return SubmitMeshSubdivideCpuJob(
                 context,
@@ -15451,7 +15452,7 @@ namespace Extrinsic::Runtime
         // instead of silently no-opping when the halfedge mesh lacks texcoords.
         CopyMeshSimplifyAuxiliaryProperties(view, source.Mesh);
 
-        if (context.DerivedJobCommands.Available())
+        if (context.DerivedJobCommands.JobsAvailable())
         {
             return SubmitMeshSimplifyCpuJob(
                 context,

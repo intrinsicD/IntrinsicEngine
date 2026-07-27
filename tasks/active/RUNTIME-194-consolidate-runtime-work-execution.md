@@ -855,11 +855,43 @@ and commits independently.
                     `SandboxEditorUi.*` 0/40 under stress.
                     `src/runtime/README.md` updated in the same commit; module
                     inventory unchanged.
-                  - [ ] **B5d-1b — `SandboxEditorFacades` mesh-method descs.**
-                  - [ ] **B5d-1c — `SandboxEditorFacades` point-cloud / graph /
-                    registration descs.**
-                  - [ ] **B5d-1d — `SandboxEditorFacades` remaining descs**
-                    (UV regeneration, parameterization, visualization).
+                  - [x] **B5d-1b — `SandboxEditorFacades` mesh-method descs.**
+                    Landed. **The "23 desc sites" are really 5 desc factories**,
+                    which is the useful batching unit:
+                    `MakeMeshCpuJobDesc` (5 callers: curvature, denoise, remesh,
+                    subdivide, simplify), `MakeVertexNormalsCpuJobDesc` (3),
+                    `MakePointCloudOutlierRemovalCpuJobDesc` (1),
+                    `MakeRegistrationCpuJobDesc` (1),
+                    `MakeUvRegenerationCpuJobDesc` (1).
+
+                    This batch took `MakeMeshCpuJobDesc`: split into
+                    `MakeMeshCpuJobIdentity` + a `JobDesc` builder, converted
+                    the five worker bodies and `RunMeshCpuWorker` to
+                    `JobResultEnvelope` over a local `SandboxEditorJobResult`,
+                    mapped `ValidateMeshCpuJobApply` onto `JobApplyValidation`,
+                    and flipped the five `Available()` gates.
+
+                    Same three test adjustments as `B5d-1a`, for the same
+                    reasons: harness instead of registry wiring, racy pre-drain
+                    `Queued`/`AwaitingGate` assertions relaxed to
+                    `IsActiveSandboxEditorJobState`, and three
+                    `"StaleSourcePropertyGeneration"` diagnostic assertions
+                    dropped in favour of `JobState::StaleDiscarded`.
+
+                    `ProductionAsyncSubmissionsCarryOwningWorldScope` now counts
+                    both desc types in `SandboxEditorFacades` (4 registry + 1
+                    service = the same 5); the `.Scope = context.World` total is
+                    unchanged, which is the invariant it actually guards.
+
+                    CPU gate 4264/4264; `SandboxEditorUi.*` (143 tests) 0/40
+                    under stress.
+                  - [ ] **B5d-1c — `SandboxEditorFacades` vertex-normals,
+                    point-cloud outlier-removal, and registration descs**
+                    (`MakeVertexNormalsCpuJobDesc` ×3,
+                    `MakePointCloudOutlierRemovalCpuJobDesc`,
+                    `MakeRegistrationCpuJobDesc`).
+                  - [ ] **B5d-1d — `MakeUvRegenerationCpuJobDesc`**, the last
+                    factory.
                   - [ ] **B5d-1z — close the window.** Delete `Submit`/`Cancel`,
                     `context.DerivedJobs`, `m_DerivedJobSnapshot`, the union in
                     the dedup guard and the queue view, and the registry-backed
