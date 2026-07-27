@@ -29,17 +29,22 @@ Updated 2026-07-27 (fourth session).
 
 ### Next action
 
-Take `B5d` — `Runtime.SandboxMethodFacade` (2 descs + `DerivedJobSnapshot` for
-editor messages). Then `B5e`, the big one: `SandboxEditorFacades` (~23 desc
-sites plus `DerivedJobCommands`, `DerivedJobHandleToMessage`,
-`DerivedJobStateSignature`, `SandboxEditorSession::m_DerivedJobSnapshot`), the
-two Sandbox app panels, and `AsyncWorkModule`'s shutdown survivor sweep. After
-`B5`, `StreamingExecutor` has no consumer left and Slice C can delete both
+Take `B5d-1`, the editor job lane. **`B5d` and `B5e` were re-planned into one
+lane on 2026-07-27** — they share `SandboxEditorDerivedJobCommandSurface`, and
+the dedup guard couples the submit path to the queue snapshot, so neither the
+two files nor the submit/presentation halves separate. The measured coupling and
+the sub-slice plan are in `## Progress` -> `B5d+e`; read that before starting,
+and read `FindActiveEditorDerivedJob` (`SandboxEditorFacades.cpp:4787`) with its
+call sites first — it is the only part of the lane with real behaviour.
+
+`B5d-2` (`AsyncWorkModule`'s shutdown survivor sweep) is separable and comes
+after. Then `StreamingExecutor` has no consumer left and Slice C can delete both
 modules.
 
 Note that `B5a`–`B5c` were all lanes with **no production caller**, which is why
-they moved cleanly. `B5d`/`B5e` are the live editor path, so expect real
-behaviour to be under test rather than only shape.
+they moved cleanly and are weaker evidence than they look. `B5d` is the live
+editor path, so its existing contract tests are behaviour tests, not shape
+tests.
 
 Two behaviours to preserve, both already expressible on `JobService`:
 `DerivedJobRegistry::ValidateOnMainThread`'s five-way staleness reason maps onto
@@ -718,10 +723,71 @@ and commits independently.
                   0/60 for the bake suite alone after the ordering fix).
                   `src/runtime/README.md` updated in the same commit; module
                   inventory unchanged.
-            - [ ] **B5d** — `Runtime.SandboxMethodFacade` (2 descs + editor
-                  messages).
-            - [ ] **B5e** — `Runtime.SandboxEditorFacades` + the two Sandbox app
-                  panels + `AsyncWorkModule`'s shutdown survivor sweep.
+            - [ ] **B5d+e — the editor lane. Re-planned 2026-07-27: `B5d` and
+                  `B5e` cannot land separately.** The original split assumed
+                  `SandboxMethodFacade` was its own consumer. It is not: both
+                  files submit through the *same* surface,
+                  `SandboxEditorDerivedJobCommandSurface`, whose members are
+                  `std::function<DerivedJobHandle(DerivedJobDesc)> Submit` and
+                  `std::function<void(DerivedJobHandle)> Cancel`
+                  (`Runtime.SandboxEditorFacades.cppm:2091`). Retyping it to
+                  `JobDesc`/`JobToken` breaks every desc site at once, and
+                  leaving it typed on the registry means `SandboxMethodFacade`
+                  cannot move at all.
+
+                  Measured coupling:
+                  - `DerivedJobDesc` construction sites: 23 in
+                    `SandboxEditorFacades.cpp`, 2 in `SandboxMethodFacade.cpp`
+                  - `DerivedJobCommands.Submit` calls: 14 + 2
+                  - `DerivedJobKey` uses: 9 + 3
+                  - `DerivedJob` references in the app panels: 2 in
+                    `Sandbox.DomainPanels.cpp`, 2 in `Sandbox.EditorShell.cpp`
+
+                  **The submit path and the presentation path are also
+                  inseparable**, because the dedup guard reads both.
+                  `FindActiveEditorDerivedJob(context, key)`
+                  (`SandboxEditorFacades.cpp:4787`) scans
+                  `context.DerivedJobs->Entries` — the editor's
+                  `DerivedJobQueueSnapshot` — for an active entry whose
+                  `DerivedJobKey` names the same entity+output, and refuses a
+                  duplicate submission. So the desc's `Key` (submit path) and
+                  the queue snapshot (presentation path) are one mechanism. The
+                  key disappears with `JobDesc`, so both move together or
+                  neither does.
+
+                  **Where the identity goes.** Per the Slice B5 decision, into
+                  the consumer that already holds per-request state:
+                  `SandboxEditorSession`, which owns `m_DerivedJobSnapshot`
+                  today. It grows a `key -> JobToken` index refreshed from
+                  `JobService::SnapshotAll()`; `SandboxEditorContext` exposes an
+                  "is this entity+output already busy?" query plus the queue-row
+                  projection instead of a raw registry snapshot. This is the
+                  first B5 lane where that decision has to be *implemented*
+                  rather than simply applied by deleting an unused key.
+
+                  Sub-slices (revised):
+                  - **B5d-1 — the editor job lane, one commit.** The command
+                    surface, all 25 desc sites, the session-owned key index and
+                    dedup query, the queue-row projection over `SnapshotAll()`,
+                    `SandboxEditorProgressiveJobModel` /
+                    `SandboxEditorProgressiveJobDependencyModel`,
+                    `DerivedJobStateSignatureForEntity`,
+                    `AppendDerivedJobHandleToMessage`, and the two Sandbox app
+                    panels. Large, but the analysis above shows it does not
+                    decompose further without leaving the tree non-building.
+                  - **B5d-2 — `AsyncWorkModule`'s shutdown survivor sweep.**
+                    Separable: it only needs `SnapshotAll()` plus `Cancel`, both
+                    of which already exist, and it is the last consumer once
+                    `B5d-1` lands.
+
+                  **Do not start `B5d-1` without re-reading
+                  `FindActiveEditorDerivedJob` and its ~10 call sites first** —
+                  the dedup guard is the part with real behaviour, and every
+                  other edit in the lane is mechanical.
+
+                  Unlike `B5a`–`B5c`, this lane has live production callers, so
+                  the existing `SandboxEditorUi.*` / `SandboxEditor*` contract
+                  tests are behaviour tests, not shape tests.
 - [ ] **Slice C — cleanup.** Delete `Runtime.StreamingExecutor`,
       `Runtime.DerivedJobGraph`, their bridges/DTOs and CMake/test entries, and
       reduce `AsyncWorkModule` to the single-service lifecycle. `RUNTIME-203`
