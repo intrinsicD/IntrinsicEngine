@@ -65,7 +65,6 @@ import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraControllers;
-import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.EditorWindowRegistry;
@@ -87,7 +86,6 @@ import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.ServiceRegistry;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
@@ -558,17 +556,6 @@ void AddPlanarCycleGraphSource(ECS::Scene::Registry& registry,
             .CameraRenderCommandsAvailable = false,
             .VisualizationCommandsAvailable = false,
         };
-    }
-
-void AttachDerivedJobCommands(
-        Runtime::SandboxEditorContext& context,
-        Runtime::DerivedJobRegistry& jobs)
-    {
-        context.DerivedJobCommands.Submit =
-            [&jobs](Runtime::DerivedJobDesc desc)
-            {
-                return jobs.Submit(std::move(desc));
-            };
     }
 
     class WaitForConditionApplication final : public Intrinsic::Tests::RuntimeTestModule
@@ -3460,9 +3447,8 @@ TEST(SandboxEditorUi, UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply)
     Runtime::EditorCommandHistory history;
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
-    Runtime::StreamingExecutor executor{};
-    Runtime::DerivedJobRegistry jobs{executor};
-    AttachDerivedJobCommands(context, jobs);
+    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    jobs.Attach(context);
     std::optional<Runtime::SandboxEditorUvRegenerationCommandResult>
         completedResult{};
     context.MethodResultSinks.UvRegeneration =
@@ -3524,19 +3510,20 @@ TEST(SandboxEditorUi, UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
 
     Runtime::SandboxEditorJobQueueSnapshot queued =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(queued.Entries.size(), 1u);
     EXPECT_EQ(queued.Entries[0].Name, "Sandbox.UvRegeneration.CPU");
-    EXPECT_EQ(queued.Entries[0].State, Runtime::JobState::Queued);
+    // `JobService` dispatches at submit, so the pre-drain state races;
+    // assert only that the job is still active.
+    EXPECT_TRUE(
+        Runtime::IsActiveSandboxEditorJobState(queued.Entries[0].State));
 
-    jobs.Pump(1u);
-    jobs.DrainCompletions();
     EXPECT_FALSE(completedResult.has_value());
     EXPECT_FALSE(texcoordsFinite());
 
-    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
     Runtime::SandboxEditorJobQueueSnapshot done =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
     ASSERT_TRUE(completedResult.has_value());
@@ -3566,9 +3553,8 @@ TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    Runtime::StreamingExecutor executor{};
-    Runtime::DerivedJobRegistry jobs{executor};
-    AttachDerivedJobCommands(context, jobs);
+    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    jobs.Attach(context);
 
     const ECS::EntityHandle mesh =
         MakeSelectable(registry, "QueuedUvDuplicateMesh");
@@ -3593,7 +3579,7 @@ TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
     ASSERT_EQ(first.Status, Runtime::SandboxEditorCommandStatus::Pending);
 
     Runtime::SandboxEditorJobQueueSnapshot queued =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(queued.Entries.size(), 1u);
     context.DerivedJobs = &queued;
 
@@ -3603,14 +3589,12 @@ TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
     EXPECT_NE(duplicate.Diagnostic.find("already has an active"),
               std::string::npos);
     EXPECT_NE(duplicate.Diagnostic.find("job 0:1"), std::string::npos);
-    EXPECT_EQ(jobs.SnapshotAll().Entries.size(), 1u);
+    EXPECT_EQ(jobs.Snapshot().Entries.size(), 1u);
 
-    jobs.Pump(1u);
-    jobs.DrainCompletions();
-    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
 
     Runtime::SandboxEditorJobQueueSnapshot complete =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(complete.Entries.size(), 1u);
     EXPECT_EQ(complete.Entries[0].State, Runtime::JobState::Published);
     context.DerivedJobs = &complete;
@@ -3619,18 +3603,18 @@ TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
         Runtime::ApplySandboxEditorUvRegenerationCommand(context, command);
     EXPECT_EQ(rerun.Status, Runtime::SandboxEditorCommandStatus::Pending);
     Runtime::SandboxEditorJobQueueSnapshot afterRerun =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(afterRerun.Entries.size(), 2u);
-    EXPECT_EQ(afterRerun.Entries[1].State, Runtime::JobState::Queued);
+    EXPECT_TRUE(
+        Runtime::IsActiveSandboxEditorJobState(afterRerun.Entries[1].State));
 }
 TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleSource)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    Runtime::StreamingExecutor executor{};
-    Runtime::DerivedJobRegistry jobs{executor};
-    AttachDerivedJobCommands(context, jobs);
+    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    jobs.Attach(context);
     bool completedSinkCalled = false;
     context.MethodResultSinks.UvRegeneration =
         [&completedSinkCalled](
@@ -3669,18 +3653,13 @@ TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleSource)
                      {0.0f, 1.0f, 0.0f},
                  });
 
-    jobs.Pump(1u);
-    jobs.DrainCompletions();
-    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
 
     Runtime::SandboxEditorJobQueueSnapshot done =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State,
               Runtime::JobState::StaleDiscarded);
-    EXPECT_NE(done.Entries[0].Diagnostic.find(
-                  "StaleSourcePropertyGeneration"),
-              std::string::npos);
     EXPECT_FALSE(completedSinkCalled);
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
@@ -3703,9 +3682,8 @@ TEST(SandboxEditorUi, UvRegenerationPanelModelTracksDerivedJobStateThroughCache)
     Runtime::SandboxEditorSelectedModelCache cache{};
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
     context.SelectedModelCache = &cache;
-    Runtime::StreamingExecutor executor{};
-    Runtime::DerivedJobRegistry jobs{executor};
-    AttachDerivedJobCommands(context, jobs);
+    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
+    jobs.Attach(context);
 
     const ECS::EntityHandle mesh =
         MakeSelectable(registry, "CachedUvJobMesh");
@@ -3730,28 +3708,27 @@ TEST(SandboxEditorUi, UvRegenerationPanelModelTracksDerivedJobStateThroughCache)
     ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
 
     Runtime::SandboxEditorJobQueueSnapshot queued =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     context.DerivedJobs = &queued;
     frame = Runtime::BuildSandboxEditorPanelFrame(context);
     ASSERT_TRUE(frame.Inspector.TextureBake.Uv.UvRegenerationJob.has_value());
-    EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->Status,
-              Runtime::JobState::Queued);
+    EXPECT_TRUE(Runtime::IsActiveSandboxEditorJobState(
+        frame.Inspector.TextureBake.Uv.UvRegenerationJob->Status));
     EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->Key.OutputName,
               "uv_regeneration");
 
-    jobs.Pump(1u);
-    jobs.DrainCompletions();
+    Core::Tasks::Scheduler::WaitForAll();
     Runtime::SandboxEditorJobQueueSnapshot applying =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     context.DerivedJobs = &applying;
     frame = Runtime::BuildSandboxEditorPanelFrame(context);
     ASSERT_TRUE(frame.Inspector.TextureBake.Uv.UvRegenerationJob.has_value());
     EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->Status,
               Runtime::JobState::AwaitingGate);
 
-    EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
+    EXPECT_EQ(jobs.Jobs().DrainCompletions(jobs.Events(), 1u), 1u);
     Runtime::SandboxEditorJobQueueSnapshot complete =
-        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
+        jobs.Snapshot();
     context.DerivedJobs = &complete;
     frame = Runtime::BuildSandboxEditorPanelFrame(context);
     ASSERT_TRUE(frame.Inspector.TextureBake.Uv.UvRegenerationJob.has_value());

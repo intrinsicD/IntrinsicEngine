@@ -64,7 +64,6 @@ import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
-import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.EditorWindowRegistry;
@@ -81,7 +80,6 @@ import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Graph.Vertex.Normals;
@@ -381,16 +379,6 @@ void AddGraphSource(ECS::Scene::Registry& registry,
         };
     }
 
-void AttachDerivedJobCommands(
-        Runtime::SandboxEditorContext& context,
-        Runtime::DerivedJobRegistry& jobs)
-    {
-        context.DerivedJobCommands.Submit =
-            [&jobs](Runtime::DerivedJobDesc desc)
-            {
-                return jobs.Submit(std::move(desc));
-            };
-    }
 }
 TEST(SandboxEditorUi, KMeansCommandPublishesMeshGraphAndPointCloudProperties)
 {
@@ -769,7 +757,8 @@ TEST(SandboxEditorUi, KMeansCpuDuplicateSubmitUsesExistingActiveJob)
     Runtime::SandboxEditorJobQueueSnapshot afterRerun =
         jobs.Snapshot();
     ASSERT_EQ(afterRerun.Entries.size(), 2u);
-    EXPECT_EQ(afterRerun.Entries[1].State, Runtime::JobState::Queued);
+    EXPECT_TRUE(
+        Runtime::IsActiveSandboxEditorJobState(afterRerun.Entries[1].State));
 }
 TEST(SandboxEditorUi, KMeansCpuDerivedJobDiscardsStaleTargetBeforeApply)
 {

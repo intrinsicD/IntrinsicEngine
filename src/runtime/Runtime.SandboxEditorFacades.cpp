@@ -14265,39 +14265,39 @@ namespace Extrinsic::Runtime
         SandboxEditorUvRegenerationCommandResult Result{};
     };
 
-    [[nodiscard]] DerivedJobApplyValidation
+    [[nodiscard]] JobApplyValidation
     ValidateUvRegenerationCpuJobApply(
         const SandboxEditorContext& context,
         const SandboxEditorUvRegenerationCpuJobState& job)
     {
         if (context.Scene == nullptr)
-            return DerivedJobApplyValidation::MissingEntity;
+            return JobApplyValidation::MissingTarget;
 
         entt::registry& raw = context.Scene->Raw();
         const std::optional<ECS::EntityHandle> entity =
             ResolveStableEntity(raw, job.StableEntityId);
         if (!entity.has_value())
-            return DerivedJobApplyValidation::MissingEntity;
+            return JobApplyValidation::MissingTarget;
 
         const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
         const GS::SourceAvailability availability =
             GS::BuildSourceAvailability(view);
         if (availability.ProvenanceDomain != GS::Domain::Mesh)
-            return DerivedJobApplyValidation::StaleGeometryGeneration;
+            return JobApplyValidation::StaleGeneration;
 
         if (GeometryMetadataSignatureForEntity(raw, *entity) !=
             job.GeometryMetadataSignature)
         {
-            return DerivedJobApplyValidation::StaleGeometryGeneration;
+            return JobApplyValidation::StaleGeneration;
         }
 
         SandboxEditorUvRegenerationSourceSnapshot current{};
         if (!CaptureUvRegenerationSourceSnapshot(view, current))
-            return DerivedJobApplyValidation::StaleGeometryGeneration;
+            return JobApplyValidation::StaleGeneration;
         if (!SameUvRegenerationSourceSnapshot(current, job.Snapshot))
-            return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+            return JobApplyValidation::StaleGeneration;
 
-        return DerivedJobApplyValidation::Current;
+        return JobApplyValidation::Current;
     }
 
     void PublishUvRegenerationResultSink(
@@ -14308,7 +14308,7 @@ namespace Extrinsic::Runtime
             context.MethodResultSinks.UvRegeneration(std::move(result));
     }
 
-    [[nodiscard]] DerivedJobWorkerResult RunUvRegenerationCpuWorker(
+    [[nodiscard]] JobResultEnvelope RunUvRegenerationCpuWorker(
         const std::shared_ptr<SandboxEditorUvRegenerationCpuJobState>& state)
     {
         Geometry::UvAtlas::UvAtlasOptions options{};
@@ -14349,12 +14349,10 @@ namespace Extrinsic::Runtime
                 atlas.Diagnostics.BackendDetail.empty()
                     ? std::string{Geometry::UvAtlas::ToString(atlas.Status)}
                     : atlas.Diagnostics.BackendDetail;
-            return DerivedJobOutput{
-                .PayloadToken = 0u,
-                .NormalizedProgress = 1.0f,
-                .ProgressDeterminate = true,
-                .Diagnostic = state->Result.Diagnostic,
-            };
+            return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                SandboxEditorJobResult{
+                    .Diagnostic = state->Result.Diagnostic,
+                });
         }
 
         auto converted =
@@ -14365,12 +14363,10 @@ namespace Extrinsic::Runtime
                 SandboxEditorCommandStatus::GeometryProcessingFailed;
             state->Result.Diagnostic =
                 "generated UV mesh could not be converted back to halfedge topology";
-            return DerivedJobOutput{
-                .PayloadToken = 0u,
-                .NormalizedProgress = 1.0f,
-                .ProgressDeterminate = true,
-                .Diagnostic = state->Result.Diagnostic,
-            };
+            return JobResultEnvelope::Make<SandboxEditorJobResult>(
+                SandboxEditorJobResult{
+                    .Diagnostic = state->Result.Diagnostic,
+                });
         }
 
         CopyUvOutputPropertiesToHalfedgeMesh(
@@ -14382,12 +14378,10 @@ namespace Extrinsic::Runtime
         state->AfterMesh = std::move(converted.Mesh);
         state->Result.Status = SandboxEditorCommandStatus::Applied;
         state->Result.Diagnostic = atlas.Diagnostics.BackendDetail;
-        return DerivedJobOutput{
-            .PayloadToken = 0u,
-            .NormalizedProgress = 1.0f,
-            .ProgressDeterminate = true,
-            .Diagnostic = "UV regeneration CPU result ready",
-        };
+        return JobResultEnvelope::Make<SandboxEditorJobResult>(
+            SandboxEditorJobResult{
+                .Diagnostic = "UV regeneration CPU result ready",
+            });
     }
 
     [[nodiscard]] SandboxEditorUvRegenerationCommandResult
@@ -14430,23 +14424,29 @@ namespace Extrinsic::Runtime
         return succeeded ? Core::Ok() : Core::Err(Core::ErrorCode::Unknown);
     }
 
-    [[nodiscard]] DerivedJobDesc MakeUvRegenerationCpuJobDesc(
+    // The retired key carried `SourcePropertyGeneration`; the dedup guard never
+    // compared it, and the source/metadata staleness it stood for is re-checked
+    // by `ValidateUvRegenerationCpuJobApply` immediately before the apply.
+    [[nodiscard]] SandboxEditorJobIdentity MakeUvRegenerationCpuJobIdentity(
+        const SandboxEditorUvRegenerationCpuJobState& state)
+    {
+        return SandboxEditorJobIdentity{
+            .EntityId = state.StableEntityId,
+            .Scope = SandboxEditorJobScope::MeshSurface,
+            .OutputSemantic = ProgressiveSlotSemantic::Albedo,
+            .OutputName = std::string{kUvRegenerationJobOutputName},
+        };
+    }
+
+    [[nodiscard]] JobDesc MakeUvRegenerationCpuJobDesc(
         const SandboxEditorContext& context,
         const std::shared_ptr<SandboxEditorUvRegenerationCpuJobState>& state)
     {
-        return DerivedJobDesc{
-            .Key = DerivedJobKey{
-                .EntityId = state->StableEntityId,
-                .Domain = DerivedJobScope::MeshSurface,
-                .OutputSemantic = ProgressiveSlotSemantic::Albedo,
-                .SourcePropertyGeneration =
-                    state->GeometryMetadataSignature,
-                .OutputName = std::string{kUvRegenerationJobOutputName},
-            },
-            .Name = "Sandbox.UvRegeneration.CPU",
-            .RequestedJobDomain = ProgressiveJobDomain::Cpu,
-            .Kind = RuntimeTaskKinds::GeometryProcess,
+        return JobDesc{
+            .DebugName = "Sandbox.UvRegeneration.CPU",
+            .Scope = context.World,
             .Priority = Core::Dag::TaskPriority::Normal,
+            .Kind = RuntimeTaskKinds::GeometryProcess,
             .EstimatedCost = std::max<std::uint32_t>(
                 1u,
                 static_cast<std::uint32_t>(
@@ -14454,23 +14454,26 @@ namespace Extrinsic::Runtime
                               state->Soup.Mesh.FaceCount()) +
                      1023u) /
                     1024u)),
-            .Scope = context.World,
-            .Execute =
-                [state]() -> DerivedJobWorkerResult
+            .Work =
+                [state](const JobCancellation&) -> JobResultEnvelope
                 {
                     return RunUvRegenerationCpuWorker(state);
                 },
-            .ValidateOnMainThread =
+            .ValidateBeforeApply =
                 [context, state]()
                 {
                     return ValidateUvRegenerationCpuJobApply(
                         context,
                         *state);
                 },
-            .ApplyOnMainThread =
-                [context, state](DerivedJobApplyContext&) -> Core::Result
+            .PublishCompletion =
+                [context, state](KernelEventBus&,
+                                 const JobResultEnvelope& result) -> bool
                 {
-                    return PublishUvRegenerationCpuJob(context, *state);
+                    if (result.TryGet<SandboxEditorJobResult>() == nullptr)
+                        return false;
+                    return PublishUvRegenerationCpuJob(context, *state)
+                        .has_value();
                 },
         };
     }
@@ -14480,9 +14483,11 @@ namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const std::shared_ptr<SandboxEditorUvRegenerationCpuJobState>& state)
     {
-        DerivedJobDesc desc = MakeUvRegenerationCpuJobDesc(context, state);
+        const SandboxEditorJobIdentity identity =
+            MakeUvRegenerationCpuJobIdentity(*state);
+        JobDesc desc = MakeUvRegenerationCpuJobDesc(context, state);
         if (const std::optional<SandboxEditorJobRecord> active =
-                FindActiveEditorDerivedJob(context, desc.Key))
+                FindActiveEditorJob(context, identity))
         {
             SandboxEditorUvRegenerationCommandResult pending =
                 MakePendingUvRegenerationResult(active->Token);
@@ -14491,8 +14496,9 @@ namespace Extrinsic::Runtime
             return pending;
         }
 
-        const JobToken handle = ToSandboxEditorJobToken(
-            context.DerivedJobCommands.Submit(std::move(desc)));
+        const JobToken handle = context.DerivedJobCommands.SubmitJob(
+            std::move(desc),
+            identity);
         if (!handle.IsValid())
         {
             return MakeUvRegenerationResult(
@@ -14604,12 +14610,12 @@ namespace Extrinsic::Runtime
             state->HasSourceFaceProperties = true;
         }
 
-        if (context.DerivedJobCommands.Available())
+        if (context.DerivedJobCommands.JobsAvailable())
             return SubmitUvRegenerationCpuJob(context, state);
 
-        const DerivedJobWorkerResult worker =
+        const JobResultEnvelope worker =
             RunUvRegenerationCpuWorker(state);
-        if (!worker.has_value())
+        if (worker.TryGet<SandboxEditorJobResult>() == nullptr)
         {
             return MakeUvRegenerationResult(
                 SandboxEditorCommandStatus::GeometryProcessingFailed,

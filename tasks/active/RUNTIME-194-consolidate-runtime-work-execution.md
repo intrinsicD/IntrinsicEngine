@@ -24,18 +24,19 @@ Updated 2026-07-27 (fourth session).
   (`73dedb2a`), `B1` (`6cb2152b`), `B3` (`b09cee58`), `B2`+`B4` (`6db202c6`),
   `B5-0` (`0eb46f32`, `JobService::SnapshotAll()`), `B5a` (`7f78963d`,
   `GpuReadbackJob`), `B5b` (`15beaef5`, `AssetModelSceneHandoff`), and `B5c`
-  (`SelectedMeshTextureBake`) are landed. **All six production
-  `StreamingExecutor::Submit` sites are migrated.** `B5d` and `B5e` remain.
+  (`SelectedMeshTextureBake`) are landed. `B5d-1a` through `B5d-1d` are also
+  landed: **all six production `StreamingExecutor::Submit` sites and every
+  production editor descriptor factory are migrated.** `B5d-1z` and `B5d-2`
+  remain before Slice C can retire the old modules.
 
 ### Next action
 
-Take the next unchecked batch in `## Progress` -> `B5d+e` -> "Batch plan and
-status". **`B5d` and `B5e` were re-planned into one lane on 2026-07-27** — they
-share `SandboxEditorDerivedJobCommandSurface`, and the dedup guard couples the
-submit path to the queue snapshot, so neither the two files nor the
-submit/presentation halves separate. The owner chose the **dual-surface, batched
-route**: both submit paths live side by side, one batch at a time, green gate
-per batch, closed by `B5d-1z`.
+Take **`B5d-1z — close the window`**, the next unchecked batch in `## Progress`
+-> `B5d+e` -> "Batch plan and status". All production editor submit sites now
+use `JobService`; remove the legacy `Submit`/`Cancel` members, registry half of
+the unified snapshot, and registry-backed adapters without changing editor job
+identity or presentation behaviour. The dual-surface route was deliberately
+temporary and `B5d-1z` is its named removal checkpoint.
 
 Read that section before starting — the measured coupling, the temporary
 exception's terms, and the list of registry fields the consumer must now record
@@ -92,6 +93,10 @@ lessons:
   to a worker decode, so a scheduler outliving its `AssetService` is a real
   use-after-free — it cost ~35% hung/aborted runs before the ordering was
   fixed.
+- **B5d-1d** — after submit, even a freshly queued rerun may already be
+  `Running`; assert the active-state contract unless the test owns an explicit
+  worker gate. The `SandboxEditorUi.*` stress run exposed and repaired one
+  exact-`Queued` assertion left behind by `B5d-1a`.
 
 ### Verify the checkpoint before changing anything
 
@@ -899,17 +904,24 @@ and commits independently.
                     identity. Same three test adjustments as the earlier
                     batches. CPU gate 4264/4264; `SandboxEditorUi.*` 0/30 under
                     stress.
-                  - [ ] **B5d-1d — `MakeUvRegenerationCpuJobDesc`**, the last
-                    factory. It is the only remaining `return DerivedJobDesc{`
-                    in `SandboxEditorFacades.cpp` and owns the one surviving
-                    `DerivedJobCommands.Available()` gate
-                    (`SubmitUvRegenerationCpuJob`), plus
-                    `RunUvRegenerationCpuWorker` /
-                    `ValidateUvRegenerationCpuJobApply` and the four
-                    `UvRegeneration*` contract tests. Note it also has a
-                    *synchronous* caller path that reads
-                    `const DerivedJobWorkerResult worker = ...` directly, which
-                    the earlier factories did not.
+                  - [x] **B5d-1d — `MakeUvRegenerationCpuJobDesc`.** Landed.
+                    The fifth and final editor factory split into
+                    `MakeUvRegenerationCpuJobIdentity` + `JobDesc`; its worker
+                    now returns a typed `JobResultEnvelope`, its apply guard
+                    maps onto `JobApplyValidation`, and its submit/availability
+                    path uses `JobService`. The synchronous fallback remains
+                    synchronous and now verifies the typed envelope before
+                    committing the result.
+
+                    All four async `UvRegeneration*` contracts now use
+                    `SandboxEditorJobHarness`; the separate synchronous
+                    contract is preserved. The source-text scope guard now
+                    counts 0 `DerivedJobDesc` and 5 `JobDesc` factories. A
+                    30-repeat `SandboxEditorUi.*` stress pass also exposed and
+                    repaired a racy exact-`Queued` rerun assertion left in the
+                    already-migrated K-Means contract and removed its unused
+                    legacy test adapters. CPU gate 4264/4264, one expected
+                    headless skip; `SandboxEditorUi.*` 0/30 under stress.
                   - [ ] **B5d-1z — close the window.** Delete `Submit`/`Cancel`,
                     `context.DerivedJobs`, `m_DerivedJobSnapshot`, the union in
                     the dedup guard and the queue view, and the registry-backed
