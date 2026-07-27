@@ -1,7 +1,10 @@
+#include <algorithm>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -10,18 +13,19 @@
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
+import Extrinsic.Core.Tasks;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
-import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.TextureBakeModule;
 
 #include "MockRHI.hpp"
@@ -334,6 +338,76 @@ namespace
             }
         }
         EXPECT_TRUE(sawAuthoredValue);
+    }
+
+    // `JobService` dispatches at submit onto the shared CPU pool and has no
+    // inline fallback, so the async bake needs a live scheduler.
+    //
+    // Declare it *last* in a test: its destructor quiesces the pool, and that
+    // has to happen while every object a worker task can still reach is alive.
+    // A live scheduler also makes `AssetService::Load` decode on a worker
+    // rather than inline, so the pipeline outliving its service is a real
+    // use-after-free, not a theoretical one.
+    class SchedulerScope final
+    {
+    public:
+        explicit SchedulerScope(const unsigned workers = 1)
+        {
+            if (Extrinsic::Core::Tasks::Scheduler::IsInitialized())
+            {
+                Extrinsic::Core::Tasks::Scheduler::Shutdown();
+            }
+            Extrinsic::Core::Tasks::Scheduler::Initialize(workers);
+        }
+
+        ~SchedulerScope()
+        {
+            Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+            Extrinsic::Core::Tasks::Scheduler::Shutdown();
+        }
+
+        SchedulerScope(const SchedulerScope&) = delete;
+        SchedulerScope& operator=(const SchedulerScope&) = delete;
+    };
+
+    [[nodiscard]] bool IsTerminalJobState(const Runtime::JobState state)
+    {
+        switch (state)
+        {
+        case Runtime::JobState::Published:
+        case Runtime::JobState::Dropped:
+        case Runtime::JobState::Cancelled:
+        case Runtime::JobState::Rejected:
+        case Runtime::JobState::StaleDiscarded:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    // Per RUNTIME-194 Slice B0, drain until the job is terminal rather than
+    // asserting on a fixed drain count.
+    [[nodiscard]] bool DrainUntilTerminal(
+        Runtime::JobService& jobs,
+        Runtime::KernelEventBus& events,
+        const Runtime::JobToken token,
+        const std::chrono::milliseconds timeout = std::chrono::seconds{5})
+    {
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        for (;;)
+        {
+            Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+            (void)jobs.DrainCompletions(events);
+            if (IsTerminalJobState(jobs.GetState(token)))
+            {
+                return true;
+            }
+            if (std::chrono::steady_clock::now() >= deadline)
+            {
+                return false;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
+        }
     }
 }
 
@@ -972,22 +1046,26 @@ TEST(RuntimeSelectedMeshTextureBake, InvalidRequestsFailBeforeScheduling)
               Runtime::SelectedMeshTextureBakeStatus::NonMeshSelection);
 }
 
-TEST(RuntimeSelectedMeshTextureBake, DerivedJobAppliesGeneratedTextureOnMainThread)
+TEST(RuntimeSelectedMeshTextureBake, AsyncJobAppliesGeneratedTextureOnMainThread)
 {
     ECS::Scene::Registry scene{};
     const ECS::EntityHandle entity = MakeMeshEntity(scene);
     Assets::AssetService assets{};
     Runtime::EditorCommandHistory history{};
-    Runtime::StreamingExecutor executor{};
-    Runtime::DerivedJobRegistry jobs{executor};
+    Runtime::JobService jobs{};
+    Runtime::KernelEventBus events{};
+    // Declared last so it is destroyed first: with a live scheduler
+    // `AssetService::Load` decodes on a worker instead of inline, so the pool
+    // must be quiesced while everything a worker can touch is still alive.
+    SchedulerScope scheduler{};
 
     Runtime::SelectedMeshTextureBakeRequest request = MakeNormalRequest(entity);
-    request.PreferDerivedJob = true;
+    request.PreferAsyncJob = true;
     Runtime::SelectedMeshTextureBakeContext context{
         .Scene = &scene,
         .AssetService = &assets,
         .CommandHistory = &history,
-        .DerivedJobs = &jobs,
+        .Jobs = &jobs,
     };
 
     const Runtime::SelectedMeshTextureBakeResult scheduled =
@@ -1005,13 +1083,8 @@ TEST(RuntimeSelectedMeshTextureBake, DerivedJobAppliesGeneratedTextureOnMainThre
     ASSERT_NE(pendingSlot, nullptr);
     EXPECT_EQ(pendingSlot->Readiness, Runtime::ProgressiveReadinessState::Pending);
 
-    jobs.Pump(1u);
-    jobs.DrainCompletions();
-    jobs.ApplyMainThreadResults();
-
-    const auto snapshot = jobs.Snapshot(scheduled.Job);
-    ASSERT_TRUE(snapshot.has_value());
-    EXPECT_EQ(snapshot->Status, Runtime::DerivedJobStatus::Complete);
+    ASSERT_TRUE(DrainUntilTerminal(jobs, events, scheduled.Job));
+    EXPECT_EQ(jobs.GetState(scheduled.Job), Runtime::JobState::Published);
 
     const auto& readyBindings =
         scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
@@ -1024,20 +1097,22 @@ TEST(RuntimeSelectedMeshTextureBake, DerivedJobAppliesGeneratedTextureOnMainThre
     EXPECT_TRUE(readySlot->GeneratedTexture.IsValid());
 }
 
-TEST(RuntimeSelectedMeshTextureBake, DerivedJobStaleBindingApplyIsDiscarded)
+TEST(RuntimeSelectedMeshTextureBake, AsyncJobStaleBindingApplyIsDiscarded)
 {
     ECS::Scene::Registry scene{};
     const ECS::EntityHandle entity = MakeMeshEntity(scene);
     Assets::AssetService assets{};
-    Runtime::StreamingExecutor executor{};
-    Runtime::DerivedJobRegistry jobs{executor};
+    Runtime::JobService jobs{};
+    Runtime::KernelEventBus events{};
+    // Destroyed first — see the note in the sibling apply test.
+    SchedulerScope scheduler{};
 
     Runtime::SelectedMeshTextureBakeRequest request = MakeNormalRequest(entity);
-    request.PreferDerivedJob = true;
+    request.PreferAsyncJob = true;
     Runtime::SelectedMeshTextureBakeContext context{
         .Scene = &scene,
         .AssetService = &assets,
-        .DerivedJobs = &jobs,
+        .Jobs = &jobs,
     };
 
     const Runtime::SelectedMeshTextureBakeResult scheduled =
@@ -1048,13 +1123,10 @@ TEST(RuntimeSelectedMeshTextureBake, DerivedJobStaleBindingApplyIsDiscarded)
         scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
     ++bindings.BindingGeneration;
 
-    jobs.Pump(1u);
-    jobs.DrainCompletions();
-    jobs.ApplyMainThreadResults();
-
-    const auto snapshot = jobs.Snapshot(scheduled.Job);
-    ASSERT_TRUE(snapshot.has_value());
-    EXPECT_EQ(snapshot->Status, Runtime::DerivedJobStatus::StaleDiscarded);
+    ASSERT_TRUE(DrainUntilTerminal(jobs, events, scheduled.Job));
+    EXPECT_EQ(jobs.GetState(scheduled.Job), Runtime::JobState::StaleDiscarded);
+    EXPECT_EQ(jobs.Stats().StaleDiscardedJobs, 1u);
+    EXPECT_EQ(jobs.Stats().PublishedCompletions, 0u);
     const Runtime::ProgressiveSlotBinding* slot =
         FindSlot(bindings, Runtime::ProgressiveSlotSemantic::Normal);
     ASSERT_NE(slot, nullptr);

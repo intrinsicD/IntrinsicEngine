@@ -23,17 +23,23 @@ Updated 2026-07-27 (fourth session).
 - Slice A landed in `2214ddf9`. **Slice B is in its last lane**: `B0`
   (`73dedb2a`), `B1` (`6cb2152b`), `B3` (`b09cee58`), `B2`+`B4` (`6db202c6`),
   `B5-0` (`0eb46f32`, `JobService::SnapshotAll()`), `B5a` (`7f78963d`,
-  `GpuReadbackJob`), and `B5b` (`AssetModelSceneHandoff`) are landed. **All six
-  production `StreamingExecutor::Submit` sites are migrated.** `B5c`–`B5e`
-  remain.
+  `GpuReadbackJob`), `B5b` (`15beaef5`, `AssetModelSceneHandoff`), and `B5c`
+  (`SelectedMeshTextureBake`) are landed. **All six production
+  `StreamingExecutor::Submit` sites are migrated.** `B5d` and `B5e` remain.
 
 ### Next action
 
-Take `B5c` — `Runtime.SelectedMeshTextureBake` (1 desc). Then `B5d`
-(`SandboxMethodFacade`, 2 descs + editor messages) and `B5e` (the big one:
-`SandboxEditorFacades` + the two Sandbox app panels + `AsyncWorkModule`'s
-shutdown survivor sweep). After `B5`, `StreamingExecutor` has no consumer left
-and Slice C can delete both modules.
+Take `B5d` — `Runtime.SandboxMethodFacade` (2 descs + `DerivedJobSnapshot` for
+editor messages). Then `B5e`, the big one: `SandboxEditorFacades` (~23 desc
+sites plus `DerivedJobCommands`, `DerivedJobHandleToMessage`,
+`DerivedJobStateSignature`, `SandboxEditorSession::m_DerivedJobSnapshot`), the
+two Sandbox app panels, and `AsyncWorkModule`'s shutdown survivor sweep. After
+`B5`, `StreamingExecutor` has no consumer left and Slice C can delete both
+modules.
+
+Note that `B5a`–`B5c` were all lanes with **no production caller**, which is why
+they moved cleanly. `B5d`/`B5e` are the live editor path, so expect real
+behaviour to be under test rather than only shape.
 
 Two behaviours to preserve, both already expressible on `JobService`:
 `DerivedJobRegistry::ValidateOnMainThread`'s five-way staleness reason maps onto
@@ -70,6 +76,12 @@ lessons:
 - **B5b** — `DerivedJobDesc` defaulted `Kind` to `GeometryProcess` while
   `JobDesc` defaults to `Generic`. Set `Kind` explicitly or the lane taxonomy
   silently changes.
+- **B5c** — **declare `SchedulerScope` last in a test.** Its destructor
+  quiesces the pool, so it must run while every object a worker can still
+  reach is alive. A live scheduler also flips `AssetService::Load` from inline
+  to a worker decode, so a scheduler outliving its `AssetService` is a real
+  use-after-free — it cost ~35% hung/aborted runs before the ordering was
+  fixed.
 
 ### Verify the checkpoint before changing anything
 
@@ -654,7 +666,58 @@ and commits independently.
                   `src/runtime/README.md` updated in the same commit (module row
                   plus the "Streaming integration" migration state); module
                   inventory unchanged.
-            - [ ] **B5c** — `Runtime.SelectedMeshTextureBake` (1 desc).
+            - [x] **B5c — `Runtime.SelectedMeshTextureBake`.** One desc, and the
+                  first B5 lane whose `ValidateOnMainThread` staleness check has
+                  real content. It maps onto `ValidateBeforeApply`: a vanished
+                  entity or missing `ProgressivePresentationBindings` becomes
+                  `MissingTarget`, a bumped `BindingGeneration` becomes
+                  `StaleGeneration`. This is the *silent-discard* case B4's
+                  lesson describes — the consumer publishes no diagnostic of its
+                  own for a stale result — so `ValidateBeforeApply` is the right
+                  home, unlike the import lane.
+
+                  Like `B5a`/`B5b` there is no production caller:
+                  `SelectedMeshTextureBakeContext::Jobs` is set only by this
+                  module's two contract tests, since `TextureBakeModule` binds
+                  the context with `.AssetService` alone.
+
+                  Renames that follow the surface change:
+                  `SelectedMeshTextureBakeContext::DerivedJobs` -> `Jobs`,
+                  `SelectedMeshTextureBakeRequest::PreferDerivedJob` ->
+                  `PreferAsyncJob`,
+                  `SelectedMeshTextureBakeExecutionMode::DerivedJob` ->
+                  `AsyncJob`, and `SelectedMeshTextureBakeResult::Job` /
+                  `SandboxEditorTextureBakeCommandResult::Job` from
+                  `DerivedJobHandle` to `JobToken`. That last one is the only
+                  reason `SandboxEditorFacades` is in this diff; nothing reads
+                  the field, and the editor's other progressive-job models still
+                  speak `DerivedJobHandle` until `B5e`.
+
+                  The bake payload itself already travelled to the main thread
+                  in the shared `bakeState` slot rather than in the job output,
+                  so the envelope only needs to be non-empty and typed: a local
+                  `SelectedMeshBakeJobResult` carries the retired
+                  `DerivedJobOutput`'s two observable fields.
+
+                  **A test-only defect this lane surfaced, worth its own note.**
+                  Making the tests real (a `SchedulerScope`, per B5b's lesson)
+                  turned `AssetService::Load` from an inline call into a worker
+                  decode, and the first version declared `SchedulerScope` first
+                  — so it was destroyed *last*, after the `AssetService` it
+                  feeds. A worker inside `AssetLoadPipeline::OnCpuDecoded` then
+                  ran against a destroyed pipeline: ~35% of runs hung in
+                  `Scheduler::WaitForAll` or aborted. Rule, now stated in both
+                  files: **declare `SchedulerScope` last**, so the pool is
+                  quiesced while everything a worker can reach is still alive.
+                  The B5b tests already satisfied it incidentally; they were
+                  reordered to satisfy it deliberately.
+
+                  CPU gate 4264/4264, one expected headless skip;
+                  `RuntimeSelectedMeshTextureBake.*` +
+                  `RuntimeAssetModelSceneHandoff.*` 0/40 under stress (and
+                  0/60 for the bake suite alone after the ordering fix).
+                  `src/runtime/README.md` updated in the same commit; module
+                  inventory unchanged.
             - [ ] **B5d** — `Runtime.SandboxMethodFacade` (2 descs + editor
                   messages).
             - [ ] **B5e** — `Runtime.SandboxEditorFacades` + the two Sandbox app

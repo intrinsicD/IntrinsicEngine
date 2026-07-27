@@ -25,7 +25,8 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 import Extrinsic.RHI.Device;
-import Extrinsic.Runtime.DerivedJobGraph;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
@@ -1214,30 +1215,46 @@ namespace Extrinsic::Runtime
             return snapshot;
         }
 
-        [[nodiscard]] DerivedJobApplyValidation ValidateAsyncApply(
+        // The bake payload itself travels to the main thread in the shared
+        // `bakeState` slot the worker fills, not in the envelope — it is large
+        // and the apply body already owns it. The envelope carries the retired
+        // `DerivedJobOutput`'s two observable fields so the completion is
+        // non-empty (an empty envelope is how `JobService` reports a dropped
+        // job) and stays typed to this lane.
+        struct SelectedMeshBakeJobResult
+        {
+            std::uint64_t PayloadByteCount{0u};
+            std::string Diagnostic{};
+        };
+
+        // The retired registry's five-way staleness reason collapses onto
+        // `JobApplyValidation`: a vanished entity or binding component is
+        // `MissingTarget`, a bumped binding generation is `StaleGeneration`.
+        // Either way the result is discarded before it can mutate anything.
+        [[nodiscard]] JobApplyValidation ValidateAsyncApply(
             const SelectedMeshTextureBakeContext& context,
             const SelectedMeshTextureBakeRequest& request,
             const std::uint64_t expectedBindingGeneration)
         {
             if (context.Scene == nullptr)
-                return DerivedJobApplyValidation::MissingEntity;
+                return JobApplyValidation::MissingTarget;
 
             const ECS::EntityHandle entity =
                 ResolveEntity(*context.Scene, request.StableEntityId);
             if (entity == ECS::InvalidEntityHandle)
-                return DerivedJobApplyValidation::MissingEntity;
+                return JobApplyValidation::MissingTarget;
 
             if (request.BindGeneratedTexture)
             {
                 const auto* bindings =
                     context.Scene->Raw().try_get<ProgressivePresentationBindings>(entity);
                 if (bindings == nullptr)
-                    return DerivedJobApplyValidation::MissingEntity;
+                    return JobApplyValidation::MissingTarget;
                 if (bindings->BindingGeneration != expectedBindingGeneration)
-                    return DerivedJobApplyValidation::StaleBindingGeneration;
+                    return JobApplyValidation::StaleGeneration;
             }
 
-            return DerivedJobApplyValidation::Current;
+            return JobApplyValidation::Current;
         }
     }
 
@@ -1657,9 +1674,9 @@ namespace Extrinsic::Runtime
         if (context.AssetService == nullptr)
             return FailureResult(SelectedMeshTextureBakeStatus::MissingAssetService);
 
-        const bool useDerived =
-            request.PreferDerivedJob && context.DerivedJobs != nullptr;
-        if (!useDerived)
+        const bool useAsyncJob =
+            request.PreferAsyncJob && context.Jobs != nullptr;
+        if (!useAsyncJob)
         {
             const MeshAttributeTextureBakeResult bake =
                 BakeMeshAttributeTexture(view, build.BakeRequest);
@@ -1690,25 +1707,17 @@ namespace Extrinsic::Runtime
         SelectedMeshTextureBakeRequest applyRequest = request;
         SelectedMeshTextureBakeBuildResult applyBuild = build;
         const std::uint64_t expectedBindingGeneration = bindingGeneration;
-        DerivedJobDesc desc{};
-        desc.Key = DerivedJobKey{
-            .EntityId = request.StableEntityId,
-            .Domain = ToDerivedJobScope(request.SourceDomain),
-            .OutputSemantic = request.TargetSemantic,
-            .BindingGeneration = expectedBindingGeneration,
-            .OutputName = request.SourcePropertyName,
-        };
-        desc.Name = "selected mesh texture bake";
-        desc.RequestedJobDomain = ProgressiveJobDomain::Cpu;
+        JobDesc desc{};
+        desc.DebugName = "selected mesh texture bake";
+        desc.Kind = RuntimeTaskKinds::GeometryProcess;
         desc.EstimatedCost = std::max<std::uint32_t>(
             1u,
             request.Width * request.Height / 1024u);
         desc.Scope = context.World;
-        desc.HasPreviousOutput = previousOutputRetained;
-        desc.Execute =
+        desc.Work =
             [snapshot = std::move(snapshot),
              bakeRequest = build.BakeRequest,
-             bakeState]() mutable -> DerivedJobWorkerResult
+             bakeState](const JobCancellation&) mutable -> JobResultEnvelope
             {
                 *bakeState = BakeMeshAttributeTexture(
                     snapshot.View(),
@@ -1716,21 +1725,19 @@ namespace Extrinsic::Runtime
                 const MeshAttributeTextureBakeResult& bake = **bakeState;
                 if (bake.Status != MeshAttributeTextureBakeStatus::Success)
                 {
-                    return DerivedJobOutput{
-                        .NormalizedProgress = 1.0f,
-                        .ProgressDeterminate = true,
-                        .Diagnostic = BuildBakeDiagnostic(bake.Status),
-                    };
+                    return JobResultEnvelope::Make<SelectedMeshBakeJobResult>(
+                        SelectedMeshBakeJobResult{
+                            .Diagnostic = BuildBakeDiagnostic(bake.Status),
+                        });
                 }
-                return DerivedJobOutput{
-                    .PayloadToken =
-                        static_cast<std::uint64_t>(bake.Payload.PixelBytes.size()),
-                    .NormalizedProgress = 1.0f,
-                    .ProgressDeterminate = true,
-                    .Diagnostic = "mesh texture bake ready",
-                };
+                return JobResultEnvelope::Make<SelectedMeshBakeJobResult>(
+                    SelectedMeshBakeJobResult{
+                        .PayloadByteCount =
+                            static_cast<std::uint64_t>(bake.Payload.PixelBytes.size()),
+                        .Diagnostic = "mesh texture bake ready",
+                    });
             };
-        desc.ValidateOnMainThread =
+        desc.ValidateBeforeApply =
             [applyContext, applyRequest, expectedBindingGeneration]()
             {
                 return ValidateAsyncApply(
@@ -1738,14 +1745,18 @@ namespace Extrinsic::Runtime
                     applyRequest,
                     expectedBindingGeneration);
             };
-        desc.ApplyOnMainThread =
+        desc.PublishCompletion =
             [applyContext,
              applyRequest = std::move(applyRequest),
              applyBuild = std::move(applyBuild),
-             bakeState](DerivedJobApplyContext&) mutable -> Core::Result
+             bakeState](KernelEventBus&,
+                        const JobResultEnvelope& result) mutable -> bool
             {
-                if (!bakeState->has_value())
-                    return Core::Err(Core::ErrorCode::InvalidState);
+                if (result.TryGet<SelectedMeshBakeJobResult>() == nullptr ||
+                    !bakeState->has_value())
+                {
+                    return false;
+                }
                 const MeshAttributeTextureBakeResult& bake = **bakeState;
                 if (bake.Status != MeshAttributeTextureBakeStatus::Success)
                 {
@@ -1777,7 +1788,7 @@ namespace Extrinsic::Runtime
                             }
                         }
                     }
-                    return Core::Err(Core::ErrorCode::InvalidArgument);
+                    return false;
                 }
 
                 SelectedMeshTextureBakeResult applied =
@@ -1787,12 +1798,10 @@ namespace Extrinsic::Runtime
                         applyBuild,
                         bake,
                         false);
-                return applied.Succeeded()
-                    ? Core::Ok()
-                    : Core::Err(Core::ErrorCode::InvalidState);
+                return applied.Succeeded();
             };
 
-        const DerivedJobHandle handle = context.DerivedJobs->Submit(std::move(desc));
+        const JobToken handle = context.Jobs->Submit(std::move(desc));
         if (!handle.IsValid())
             return FailureResult(SelectedMeshTextureBakeStatus::JobSubmitFailed);
 
@@ -1800,7 +1809,7 @@ namespace Extrinsic::Runtime
             .Status = SelectedMeshTextureBakeStatus::Scheduled,
             .GeneratedTexture = request.ExistingGeneratedTexture,
             .Job = handle,
-            .ExecutionMode = SelectedMeshTextureBakeExecutionMode::DerivedJob,
+            .ExecutionMode = SelectedMeshTextureBakeExecutionMode::AsyncJob,
             .BoundGeneratedTexture = false,
             .PreviousOutputRetained = previousOutputRetained,
             .BindingGeneration = bindingGeneration,

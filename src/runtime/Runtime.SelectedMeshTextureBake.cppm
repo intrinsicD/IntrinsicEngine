@@ -17,7 +17,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Colormap;
 import Geometry.Properties;
 import Extrinsic.RHI.Device;
-import Extrinsic.Runtime.DerivedJobGraph;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
@@ -62,7 +62,7 @@ export namespace Extrinsic::Runtime
     enum class SelectedMeshTextureBakeExecutionMode : std::uint8_t
     {
         Synchronous,
-        DerivedJob,
+        AsyncJob,
         ObjectSpaceNormalBakeQueue,
         PropertyRasterGpu,
     };
@@ -189,7 +189,7 @@ export namespace Extrinsic::Runtime
         std::vector<BakedPropertyTextureConsumer> Consumers{};
         Assets::AssetId ExistingGeneratedTexture{};
         bool BindGeneratedTexture{true};
-        bool PreferDerivedJob{false};
+        bool PreferAsyncJob{false};
         std::uint64_t SourceGeneration{0u};
         std::uint64_t DirtyStamp{0u};
     };
@@ -217,7 +217,7 @@ export namespace Extrinsic::Runtime
         std::uint64_t BindingEpoch{0u};
         Assets::AssetService* AssetService{nullptr};
         EditorCommandHistory* CommandHistory{nullptr};
-        DerivedJobRegistry* DerivedJobs{nullptr};
+        JobService* Jobs{nullptr};
         RuntimeObjectSpaceNormalBakeQueue* ObjectSpaceNormalBakeQueue{nullptr};
         const RHI::IDevice* ObjectSpaceNormalBakeDevice{nullptr};
     };
@@ -228,7 +228,7 @@ export namespace Extrinsic::Runtime
         MeshAttributeTextureBakeStatus BakeStatus{MeshAttributeTextureBakeStatus::Success};
         MeshAttributeTextureBakeDiagnostics BakeDiagnostics{};
         Assets::AssetId GeneratedTexture{};
-        DerivedJobHandle Job{};
+        JobToken Job{};
         SelectedMeshTextureBakeExecutionMode ExecutionMode{
             SelectedMeshTextureBakeExecutionMode::Synchronous};
         bool BoundGeneratedTexture{false};

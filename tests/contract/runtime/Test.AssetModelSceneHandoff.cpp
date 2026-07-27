@@ -280,7 +280,8 @@ namespace
 
     // `JobService` dispatches at submit onto the shared CPU pool and has no
     // inline fallback, so the progressive enrichment jobs need a live scheduler
-    // for the duration of the test.
+    // for the duration of the test. Declare it *last* in a test — see the
+    // per-test note.
     class SchedulerScope final
     {
     public:
@@ -769,9 +770,13 @@ TEST(RuntimeAssetModelSceneHandoff, MaterialLessPrimitiveBindsNeutralLitDefaultM
 TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstPublishesNormalsAndQueuesUvAndBakeJobs)
 {
     SceneHandoffFixture fx;
-    SchedulerScope scheduler{};
     Runtime::JobService jobs{};
     Runtime::KernelEventBus events{};
+    // Declared last so it is destroyed first: its destructor quiesces the pool,
+    // and that has to happen while every object a worker task can still reach
+    // is alive. A live scheduler also makes `AssetService::Load` decode on a
+    // worker rather than inline.
+    SchedulerScope scheduler{};
     TmpFile modelFile("asset_model_scene_handoff_progressive_triangle.gltf");
     auto payload = MakeModelScenePayload(
         /*includeTexcoords*/ false,
@@ -860,10 +865,11 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstPublishesNormalsA
 TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpaceNormalBakeWhenInputsReady)
 {
     SceneHandoffFixture fx;
-    SchedulerScope scheduler{};
     Runtime::JobService jobs{};
     Runtime::KernelEventBus events{};
     Runtime::RuntimeObjectSpaceNormalBakeQueue normalBakeQueue{};
+    // Destroyed first — see the note in the sibling uv/bake test.
+    SchedulerScope scheduler{};
     TmpFile modelFile("asset_model_scene_handoff_progressive_ready_normal_bake.gltf");
     auto payload = MakeModelScenePayload(
         /*includeTexcoords*/ true,
@@ -936,10 +942,11 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpace
 TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpaceNormalBakeAfterUvEnrichment)
 {
     SceneHandoffFixture fx;
-    SchedulerScope scheduler{};
     Runtime::JobService jobs{};
     Runtime::KernelEventBus events{};
     Runtime::RuntimeObjectSpaceNormalBakeQueue normalBakeQueue{};
+    // Destroyed first — see the note in the sibling uv/bake test.
+    SchedulerScope scheduler{};
     TmpFile modelFile("asset_model_scene_handoff_progressive_enriched_normal_bake.gltf");
     auto payload = MakeModelScenePayload(
         /*includeTexcoords*/ false,
@@ -1019,10 +1026,11 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpace
 TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstDoesNotCpuFallbackWhenNormalBakeBackendIsNonOperational)
 {
     SceneHandoffFixture fx;
-    SchedulerScope scheduler{};
     Runtime::JobService jobs{};
     Runtime::KernelEventBus events{};
     Runtime::RuntimeObjectSpaceNormalBakeQueue normalBakeQueue{};
+    // Destroyed first — see the note in the sibling uv/bake test.
+    SchedulerScope scheduler{};
     TmpFile modelFile("asset_model_scene_handoff_progressive_nonoperational_normal_bake.gltf");
     auto payload = MakeModelScenePayload(
         /*includeTexcoords*/ true,

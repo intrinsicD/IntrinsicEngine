@@ -2797,7 +2797,10 @@ export namespace Extrinsic::Runtime
         SelectedMeshTextureBakeStatus BakeStatus{
             SelectedMeshTextureBakeStatus::Success};
         Assets::AssetId GeneratedTexture{};
-        DerivedJobHandle Job{};
+        // RUNTIME-194 Slice B5c: the selected-mesh bake runs on `JobService`.
+        // The rest of the editor's progressive-job models still speak
+        // `DerivedJobHandle` and move in Slice B5e.
+        JobToken Job{};
         bool Scheduled{false};
         bool BoundGeneratedTexture{false};
         std::string GeneratedAssetPath{};
