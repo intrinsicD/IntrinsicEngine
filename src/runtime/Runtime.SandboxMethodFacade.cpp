@@ -124,6 +124,17 @@ namespace Extrinsic::Runtime
         namespace SurfaceSampling = Geometry::PointCloud::SurfaceSampling;
         namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
 
+        // RUNTIME-194 Slice B5d: the result payload for this file's method
+        // jobs. The computed result itself already reaches the main thread in
+        // the shared job state the worker fills, so the envelope carries only
+        // the diagnostic the retired `DerivedJobOutput` exposed — and exists at
+        // all because an empty envelope is how `JobService` reports a dropped
+        // job.
+        struct SandboxMethodJobResult
+        {
+            std::string Diagnostic{};
+        };
+
         [[nodiscard]] std::optional<ECS::EntityHandle> ResolveStableEntity(
             const entt::registry& raw,
             const std::uint32_t stableId)
@@ -145,7 +156,15 @@ namespace Extrinsic::Runtime
             Detail::InvalidateSandboxMethodSelectedModelCache(context);
         }
 
-        [[nodiscard]] std::optional<DerivedJobSnapshot>
+        [[nodiscard]] std::optional<SandboxEditorJobRecord>
+        FindActiveEditorJob(
+            const SandboxEditorContext& context,
+            const SandboxEditorJobIdentity& identity)
+        {
+            return Detail::FindActiveSandboxMethodJob(context, identity);
+        }
+
+        [[nodiscard]] std::optional<SandboxEditorJobRecord>
         FindActiveEditorDerivedJob(
             const SandboxEditorContext& context,
             const DerivedJobKey& key)
@@ -155,7 +174,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] std::string BuildActiveDerivedJobMessage(
             const std::string_view label,
-            const DerivedJobSnapshot& job)
+            const SandboxEditorJobRecord& job)
         {
             return Detail::BuildActiveSandboxMethodDerivedJobMessage(
                 label,
@@ -680,41 +699,41 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        [[nodiscard]] DerivedJobApplyValidation ValidateKMeansCpuJobApply(
+        [[nodiscard]] JobApplyValidation ValidateKMeansCpuJobApply(
             const SandboxEditorContext& context,
             const SandboxEditorKMeansCommand& command,
             const std::vector<glm::vec3>& points)
         {
             if (context.Scene == nullptr)
-                return DerivedJobApplyValidation::MissingEntity;
+                return JobApplyValidation::MissingTarget;
 
             entt::registry& raw = context.Scene->Raw();
             const std::optional<ECS::EntityHandle> entity =
                 ResolveStableEntity(raw, command.StableEntityId);
             if (!entity.has_value())
-                return DerivedJobApplyValidation::MissingEntity;
+                return JobApplyValidation::MissingTarget;
 
             GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
             if (!view.Valid() ||
                 !SourceViewSupportsKMeansDomain(view, command.Domain))
             {
-                return DerivedJobApplyValidation::StaleGeometryGeneration;
+                return JobApplyValidation::StaleGeneration;
             }
 
             Geometry::PropertySet* properties =
                 KMeansTargetProperties(view, command.Domain);
             if (properties == nullptr)
-                return DerivedJobApplyValidation::StaleGeometryGeneration;
+                return JobApplyValidation::StaleGeneration;
 
             std::optional<std::vector<glm::vec3>> current =
                 CollectKMeansPositions(*properties);
             if (!current.has_value() ||
                 !SameKMeansInputPositions(*current, points))
             {
-                return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+                return JobApplyValidation::StaleGeneration;
             }
 
-            return DerivedJobApplyValidation::Current;
+            return JobApplyValidation::Current;
         }
 
         struct SandboxEditorKMeansCpuJobState
@@ -839,7 +858,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] SandboxEditorKMeansResult MakePendingKMeansCpuJobResult(
             const SandboxEditorKMeansCommand& command,
-            const DerivedJobHandle handle,
+            const JobToken handle,
             const std::uint32_t pointCount)
         {
             const SandboxEditorKMeansBackend actual =
@@ -973,24 +992,24 @@ namespace Extrinsic::Runtime
 
             const std::uint32_t pointCount =
                 static_cast<std::uint32_t>(state->Points.size());
-            DerivedJobDesc desc{
-                .Key = DerivedJobKey{
-                    .EntityId = command.StableEntityId,
-                    .Domain = ToDerivedJobScope(ToKMeansDerivedJobDomain(command.Domain)),
-                    .OutputSemantic = ToKMeansDerivedJobSemantic(command.Domain),
-                    .OutputName = "kmeans_label",
-                },
-                .Name = "Sandbox.KMeans.CPU",
-                .RequestedJobDomain = ProgressiveJobDomain::Cpu,
-                .Kind = RuntimeTaskKinds::GeometryProcess,
+            const SandboxEditorJobIdentity identity{
+                .EntityId = command.StableEntityId,
+                .Scope = ToSandboxEditorJobScope(
+                    ToKMeansDerivedJobDomain(command.Domain)),
+                .OutputSemantic = ToKMeansDerivedJobSemantic(command.Domain),
+                .OutputName = "kmeans_label",
+            };
+            JobDesc desc{
+                .DebugName = "Sandbox.KMeans.CPU",
+                .Scope = context.World,
                 .Priority = Core::Dag::TaskPriority::Normal,
+                .Kind = RuntimeTaskKinds::GeometryProcess,
                 .EstimatedCost = std::max<std::uint32_t>(
                     1u,
                     static_cast<std::uint32_t>(
                         (state->Points.size() + 1023u) / 1024u)),
-                .Scope = context.World,
-                .Execute =
-                    [state]() -> DerivedJobWorkerResult
+                .Work =
+                    [state](const JobCancellation&) -> JobResultEnvelope
                     {
                         std::optional<GK::KMeansResult> clustered =
                             RunKMeansForSandbox(
@@ -1000,17 +1019,15 @@ namespace Extrinsic::Runtime
                                 state->Params,
                                 nullptr);
                         if (!clustered.has_value())
-                            return std::unexpected(Core::ErrorCode::Unknown);
+                            return JobResultEnvelope{};
 
                         state->Clustered = std::move(*clustered);
-                        return DerivedJobOutput{
-                            .PayloadToken = 0u,
-                            .NormalizedProgress = 1.0f,
-                            .ProgressDeterminate = true,
-                            .Diagnostic = "K-Means CPU result ready",
-                        };
+                        return JobResultEnvelope::Make<SandboxMethodJobResult>(
+                            SandboxMethodJobResult{
+                                .Diagnostic = "K-Means CPU result ready",
+                            });
                     },
-                .ValidateOnMainThread =
+                .ValidateBeforeApply =
                     [context, state]()
                     {
                         return ValidateKMeansCpuJobApply(
@@ -1018,20 +1035,24 @@ namespace Extrinsic::Runtime
                             state->Command,
                             state->Points);
                     },
-                .ApplyOnMainThread =
-                    [context, state](DerivedJobApplyContext&) -> Core::Result
+                .PublishCompletion =
+                    [context, state](KernelEventBus&,
+                                     const JobResultEnvelope& result) -> bool
                     {
-                        return PublishCompletedKMeansCpuJob(context, *state);
+                        if (result.TryGet<SandboxMethodJobResult>() == nullptr)
+                            return false;
+                        return PublishCompletedKMeansCpuJob(context, *state)
+                            .has_value();
                     },
             };
 
-            if (const std::optional<DerivedJobSnapshot> active =
-                    FindActiveEditorDerivedJob(context, desc.Key))
+            if (const std::optional<SandboxEditorJobRecord> active =
+                    FindActiveEditorJob(context, identity))
             {
                 SandboxEditorKMeansResult pending =
                     MakePendingKMeansCpuJobResult(
                         command,
-                        active->Handle,
+                        active->Token,
                         pointCount);
                 pending.Message =
                     BuildActiveDerivedJobMessage("K-Means CPU", *active);
@@ -1039,8 +1060,9 @@ namespace Extrinsic::Runtime
                 return pending;
             }
 
-            const DerivedJobHandle handle =
-                context.DerivedJobCommands.Submit(std::move(desc));
+            const JobToken handle = context.DerivedJobCommands.SubmitJob(
+                std::move(desc),
+                identity);
             if (!handle.IsValid())
             {
                 return MakeKMeansResult(
@@ -1598,13 +1620,14 @@ namespace Extrinsic::Runtime
             MeshSurface,
         };
 
-        [[nodiscard]] DerivedJobScope
-        ToProgressivePoissonDerivedJobDomain(
+        [[nodiscard]] SandboxEditorJobScope
+        ToProgressivePoissonJobScope(
             const SandboxEditorProgressivePoissonCpuJobSource source) noexcept
         {
-            return source == SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
-                ? DerivedJobScope::MeshSurface
-                : DerivedJobScope::PointCloudPoint;
+            return source ==
+                       SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
+                ? SandboxEditorJobScope::MeshSurface
+                : SandboxEditorJobScope::PointCloudPoint;
         }
 
         [[nodiscard]] const char* ProgressivePoissonOutputName(
@@ -1683,7 +1706,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] SandboxEditorProgressivePoissonResult
         MakePendingProgressivePoissonCpuJobResult(
             const SandboxEditorProgressivePoissonCommand& command,
-            const DerivedJobHandle handle,
+            const JobToken handle,
             const std::uint32_t inputCount,
             const ProgressivePoissonBackendResolution& backend,
             const SandboxEditorProgressivePoissonCpuJobSource source)
@@ -1750,20 +1773,20 @@ namespace Extrinsic::Runtime
             SandboxEditorProgressivePoissonResult Result{};
         };
 
-        [[nodiscard]] DerivedJobApplyValidation
+        [[nodiscard]] JobApplyValidation
         ValidateProgressivePoissonPointCloudApply(
             const SandboxEditorContext& context,
             const SandboxEditorProgressivePoissonCommand& command,
             const std::vector<glm::vec3>& positions)
         {
             if (context.Scene == nullptr)
-                return DerivedJobApplyValidation::MissingEntity;
+                return JobApplyValidation::MissingTarget;
 
             entt::registry& raw = context.Scene->Raw();
             const std::optional<ECS::EntityHandle> entity =
                 ResolveStableEntity(raw, command.StableEntityId);
             if (!entity.has_value())
-                return DerivedJobApplyValidation::MissingEntity;
+                return JobApplyValidation::MissingTarget;
 
             GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
             const GS::SourceAvailability availability =
@@ -1771,7 +1794,7 @@ namespace Extrinsic::Runtime
             if (availability.ProvenanceDomain != GS::Domain::PointCloud ||
                 view.VertexSource == nullptr)
             {
-                return DerivedJobApplyValidation::StaleGeometryGeneration;
+                return JobApplyValidation::StaleGeneration;
             }
 
             std::optional<std::vector<glm::vec3>> current =
@@ -1779,50 +1802,50 @@ namespace Extrinsic::Runtime
             if (!current.has_value() ||
                 !SameKMeansInputPositions(*current, positions))
             {
-                return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+                return JobApplyValidation::StaleGeneration;
             }
 
-            return DerivedJobApplyValidation::Current;
+            return JobApplyValidation::Current;
         }
 
-        [[nodiscard]] DerivedJobApplyValidation
+        [[nodiscard]] JobApplyValidation
         ValidateProgressivePoissonMeshSurfaceApply(
             const SandboxEditorContext& context,
             const SandboxEditorProgressivePoissonCpuJobState& job)
         {
             if (context.Scene == nullptr)
-                return DerivedJobApplyValidation::MissingEntity;
+                return JobApplyValidation::MissingTarget;
 
             entt::registry& raw = context.Scene->Raw();
             const std::optional<ECS::EntityHandle> entity =
                 ResolveStableEntity(raw, job.Command.StableEntityId);
             if (!entity.has_value())
-                return DerivedJobApplyValidation::MissingEntity;
+                return JobApplyValidation::MissingTarget;
 
             const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
             const GS::SourceAvailability availability =
                 GS::BuildSourceAvailability(view);
             if (availability.ProvenanceDomain != GS::Domain::Mesh)
-                return DerivedJobApplyValidation::StaleGeometryGeneration;
+                return JobApplyValidation::StaleGeneration;
 
             if (GeometryMetadataSignatureForEntity(raw, *entity) !=
                 job.GeometryMetadataSignature)
             {
-                return DerivedJobApplyValidation::StaleGeometryGeneration;
+                return JobApplyValidation::StaleGeneration;
             }
 
             if (view.VertexSource == nullptr)
-                return DerivedJobApplyValidation::StaleGeometryGeneration;
+                return JobApplyValidation::StaleGeneration;
 
             std::optional<std::vector<glm::vec3>> current =
                 CollectKMeansPositions(view.VertexSource->Properties);
             if (!current.has_value() ||
                 !SameKMeansInputPositions(*current, job.SnapshotPositions))
             {
-                return DerivedJobApplyValidation::StaleSourcePropertyGeneration;
+                return JobApplyValidation::StaleGeneration;
             }
 
-            return DerivedJobApplyValidation::Current;
+            return JobApplyValidation::Current;
         }
 
         [[nodiscard]] Core::Result PublishProgressivePoissonPointCloudCpuJob(
@@ -1929,7 +1952,7 @@ namespace Extrinsic::Runtime
             return Core::Ok();
         }
 
-        [[nodiscard]] DerivedJobWorkerResult
+        [[nodiscard]] JobResultEnvelope
         RunProgressivePoissonPointCloudCpuWorker(
             const std::shared_ptr<SandboxEditorProgressivePoissonCpuJobState>& state)
         {
@@ -1942,17 +1965,15 @@ namespace Extrinsic::Runtime
                     state->Backend);
             state->Method = std::move(computed.Method);
             state->Result = std::move(computed.Result);
-            return DerivedJobOutput{
-                .PayloadToken = 0u,
-                .NormalizedProgress = 1.0f,
-                .ProgressDeterminate = true,
-                .Diagnostic = state->Result.Succeeded()
-                    ? "Progressive Poisson CPU result ready"
-                    : state->Result.Message,
-            };
+            return JobResultEnvelope::Make<SandboxMethodJobResult>(
+                SandboxMethodJobResult{
+                    .Diagnostic = state->Result.Succeeded()
+                        ? "Progressive Poisson CPU result ready"
+                        : state->Result.Message,
+                });
         }
 
-        [[nodiscard]] DerivedJobWorkerResult
+        [[nodiscard]] JobResultEnvelope
         RunProgressivePoissonMeshSurfaceCpuWorker(
             const std::shared_ptr<SandboxEditorProgressivePoissonCpuJobState>& state)
         {
@@ -1967,12 +1988,10 @@ namespace Extrinsic::Runtime
             if (!sampled.Succeeded())
             {
                 state->Sampled = std::move(sampled);
-                return DerivedJobOutput{
-                    .PayloadToken = 0u,
-                    .NormalizedProgress = 1.0f,
-                    .ProgressDeterminate = true,
-                    .Diagnostic = state->Result.Message,
-                };
+                return JobResultEnvelope::Make<SandboxMethodJobResult>(
+                    SandboxMethodJobResult{
+                        .Diagnostic = state->Result.Message,
+                    });
             }
 
             const std::span<const glm::vec3> sampledPositions =
@@ -1993,14 +2012,12 @@ namespace Extrinsic::Runtime
                 std::move(result));
             state->Result = std::move(result);
             state->Sampled = std::move(sampled);
-            return DerivedJobOutput{
-                .PayloadToken = 0u,
-                .NormalizedProgress = 1.0f,
-                .ProgressDeterminate = true,
-                .Diagnostic = state->Result.Succeeded()
-                    ? "Progressive Poisson mesh CPU result ready"
-                    : state->Result.Message,
-            };
+            return JobResultEnvelope::Make<SandboxMethodJobResult>(
+                SandboxMethodJobResult{
+                    .Diagnostic = state->Result.Succeeded()
+                        ? "Progressive Poisson mesh CPU result ready"
+                        : state->Result.Message,
+                });
         }
 
         [[nodiscard]] SandboxEditorProgressivePoissonResult
@@ -2023,33 +2040,35 @@ namespace Extrinsic::Runtime
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->Mesh = std::move(mesh);
 
-            DerivedJobDesc desc{
-                .Key = DerivedJobKey{
-                    .EntityId = command.StableEntityId,
-                    .Domain = ToProgressivePoissonDerivedJobDomain(source),
-                    .OutputSemantic = ProgressiveSlotSemantic::PointScalarField,
-                    .SourcePropertyGeneration = geometryMetadataSignature,
-                    .OutputName = ProgressivePoissonOutputName(command.Config),
-                },
-                .Name = source == SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
+            // The retired key carried `SourcePropertyGeneration`; the dedup
+            // guard never compared it, and the staleness it stood for is
+            // re-checked by `ValidateBeforeApply` below.
+            (void)geometryMetadataSignature;
+            const SandboxEditorJobIdentity identity{
+                .EntityId = command.StableEntityId,
+                .Scope = ToProgressivePoissonJobScope(source),
+                .OutputSemantic = ProgressiveSlotSemantic::PointScalarField,
+                .OutputName = ProgressivePoissonOutputName(command.Config),
+            };
+            JobDesc desc{
+                .DebugName = source == SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
                     ? "Sandbox.ProgressivePoisson.MeshCPU"
                     : "Sandbox.ProgressivePoisson.CPU",
-                .RequestedJobDomain = ProgressiveJobDomain::Cpu,
-                .Kind = RuntimeTaskKinds::GeometryProcess,
+                .Scope = context.World,
                 .Priority = Core::Dag::TaskPriority::Normal,
+                .Kind = RuntimeTaskKinds::GeometryProcess,
                 .EstimatedCost = std::max<std::uint32_t>(
                     1u,
                     (inputCount + 1023u) / 1024u),
-                .Scope = context.World,
-                .Execute =
-                    [state]() -> DerivedJobWorkerResult
+                .Work =
+                    [state](const JobCancellation&) -> JobResultEnvelope
                     {
                         return state->Source ==
                                    SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
                             ? RunProgressivePoissonMeshSurfaceCpuWorker(state)
                             : RunProgressivePoissonPointCloudCpuWorker(state);
                     },
-                .ValidateOnMainThread =
+                .ValidateBeforeApply =
                     [context, state]()
                     {
                         return state->Source ==
@@ -2062,27 +2081,32 @@ namespace Extrinsic::Runtime
                                   state->Command,
                                   state->SnapshotPositions);
                     },
-                .ApplyOnMainThread =
-                    [context, state](DerivedJobApplyContext&) -> Core::Result
+                .PublishCompletion =
+                    [context, state](KernelEventBus&,
+                                     const JobResultEnvelope& result) -> bool
                     {
-                        return state->Source ==
-                                   SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
-                            ? PublishProgressivePoissonMeshSurfaceCpuJob(
-                                  context,
-                                  *state)
-                            : PublishProgressivePoissonPointCloudCpuJob(
-                                  context,
-                                  *state);
+                        if (result.TryGet<SandboxMethodJobResult>() == nullptr)
+                            return false;
+                        const Core::Result published =
+                            state->Source ==
+                                    SandboxEditorProgressivePoissonCpuJobSource::MeshSurface
+                                ? PublishProgressivePoissonMeshSurfaceCpuJob(
+                                      context,
+                                      *state)
+                                : PublishProgressivePoissonPointCloudCpuJob(
+                                      context,
+                                      *state);
+                        return published.has_value();
                     },
             };
 
-            if (const std::optional<DerivedJobSnapshot> active =
-                    FindActiveEditorDerivedJob(context, desc.Key))
+            if (const std::optional<SandboxEditorJobRecord> active =
+                    FindActiveEditorJob(context, identity))
             {
                 SandboxEditorProgressivePoissonResult pending =
                     MakePendingProgressivePoissonCpuJobResult(
                         command,
-                        active->Handle,
+                        active->Token,
                         inputCount,
                         state->Backend,
                         source);
@@ -2094,8 +2118,9 @@ namespace Extrinsic::Runtime
                 return pending;
             }
 
-            const DerivedJobHandle handle =
-                context.DerivedJobCommands.Submit(std::move(desc));
+            const JobToken handle = context.DerivedJobCommands.SubmitJob(
+                std::move(desc),
+                identity);
             if (!handle.IsValid())
             {
                 return MakeProgressivePoissonResult(
@@ -2482,7 +2507,7 @@ namespace Extrinsic::Runtime
             return pending;
         }
 
-        if (context.DerivedJobCommands.Available())
+        if (context.DerivedJobCommands.JobsAvailable())
         {
             return SubmitKMeansCpuDerivedJob(
                 context,
@@ -2599,7 +2624,7 @@ namespace Extrinsic::Runtime
                     "property.");
             }
 
-            if (context.DerivedJobCommands.Available())
+            if (context.DerivedJobCommands.JobsAvailable())
             {
                 const std::uint32_t pointCount =
                     static_cast<std::uint32_t>(positions->size());
@@ -2667,7 +2692,7 @@ namespace Extrinsic::Runtime
                                                     : source.Diagnostic);
         }
 
-        if (context.DerivedJobCommands.Available())
+        if (context.DerivedJobCommands.JobsAvailable())
         {
             const ProgressivePoissonBackendResolution backend =
                 ResolveProgressivePoissonBackend(

@@ -121,6 +121,36 @@ namespace Extrinsic::Runtime
         JobServiceTestHooks TestHooks{};
     };
 
+    std::string_view ToString(const JobState value) noexcept
+    {
+        switch (value)
+        {
+        case JobState::Invalid:
+            return "invalid";
+        case JobState::AwaitingDependencies:
+            return "awaiting-dependencies";
+        case JobState::Queued:
+            return "queued";
+        case JobState::Running:
+            return "running";
+        case JobState::AwaitingGate:
+            return "awaiting-gate";
+        case JobState::AwaitingApply:
+            return "awaiting-apply";
+        case JobState::Published:
+            return "published";
+        case JobState::Dropped:
+            return "dropped";
+        case JobState::Cancelled:
+            return "cancelled";
+        case JobState::Rejected:
+            return "rejected";
+        case JobState::StaleDiscarded:
+            return "stale-discarded";
+        }
+        return "invalid";
+    }
+
     JobService::JobService(JobServiceTestHooks testHooks)
         : m_State(std::make_shared<SharedState>())
     {

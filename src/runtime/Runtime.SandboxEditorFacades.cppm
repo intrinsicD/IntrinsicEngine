@@ -9,6 +9,7 @@ module;
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -23,6 +24,7 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
+import Extrinsic.Core.StrongHandle;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Component.StableId;
@@ -1297,20 +1299,104 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorProgressivePropertyOptionModel> PropertyOptions{};
     };
 
+    // RUNTIME-194 Slice B5d: editor-local job scope. This is the retired
+    // `DerivedJobScope`, `MeshSurface` included — a whole-surface job target
+    // that is deliberately not a `GeometryElementDomain`. RUNTIME-192 kept the
+    // two apart rather than smuggling `MeshSurface` into the canonical property
+    // vocabulary; keeping the enum local to the one consumer that needs it
+    // keeps them apart without promoting it to a general vocabulary.
+    enum class SandboxEditorJobScope : std::uint8_t
+    {
+        Unknown,
+        MeshVertex,
+        MeshEdge,
+        MeshHalfedge,
+        MeshFace,
+        MeshSurface,
+        GraphNode,
+        GraphEdge,
+        PointCloudPoint,
+    };
+
+    [[nodiscard]] SandboxEditorJobScope ToSandboxEditorJobScope(
+        GeometryElementDomain domain) noexcept;
+
+    // Which entity and output a job belongs to. `JobService` stores only
+    // generic per-job state; identity is the submitting consumer's business
+    // (RUNTIME-194 Slice B5 decision). This mirrors the retired `DerivedJobKey`'s
+    // *identity* fields only — the four generations on that key were staleness
+    // data, and staleness now lives in each job's `JobDesc::ValidateBeforeApply`.
+    struct SandboxEditorJobIdentity
+    {
+        std::uint32_t EntityId{0u};
+        SandboxEditorJobScope Scope{SandboxEditorJobScope::Unknown};
+        ProgressiveSlotSemantic OutputSemantic{ProgressiveSlotSemantic::Albedo};
+        std::string OutputName{};
+    };
+
+    // Two jobs address the same output when their identity matches on entity,
+    // scope, semantic, and output name. Generations are deliberately excluded:
+    // this answers "is that output already busy?", not "is this result stale?".
+    [[nodiscard]] bool SameSandboxEditorJobOutput(
+        const SandboxEditorJobIdentity& lhs,
+        const SandboxEditorJobIdentity& rhs) noexcept;
+
+    [[nodiscard]] bool IsActiveSandboxEditorJobState(JobState state) noexcept;
+    [[nodiscard]] bool IsFailedSandboxEditorJobState(JobState state) noexcept;
+
+    struct SandboxEditorJobDependency
+    {
+        JobToken Job{};
+        std::string Reason{};
+    };
+
+    // One row of the editor's job queue view. During the Slice B5d migration
+    // window it is populated from both the retiring `DerivedJobRegistry` and
+    // `JobService`, so the presentation layer sees a single vocabulary while
+    // the submit sites move batch by batch.
+    struct SandboxEditorJobRecord
+    {
+        JobToken Token{};
+        SandboxEditorJobIdentity Identity{};
+        std::string Name{};
+        JobState State{JobState::Invalid};
+        ProgressiveJobDomain RequestedJobDomain{ProgressiveJobDomain::Cpu};
+        ProgressiveJobDomain ResolvedJobDomain{ProgressiveJobDomain::Cpu};
+        std::vector<SandboxEditorJobDependency> Dependencies{};
+        float NormalizedProgress{0.0f};
+        bool ProgressDeterminate{true};
+        bool PreviousOutputRetained{false};
+        std::uint64_t PayloadToken{0u};
+        std::uint64_t ElapsedMilliseconds{0u};
+        std::string Diagnostic{};
+    };
+
+    struct SandboxEditorJobQueueSnapshot
+    {
+        std::vector<SandboxEditorJobRecord> Entries{};
+    };
+
+    // RUNTIME-194 Slice B5d migration window: projects a retiring
+    // `DerivedJobRegistry` snapshot into the editor's job vocabulary, so the
+    // queue view and the dedup guard see one list while the submit sites move
+    // batch by batch. Deleted with the registry path in sub-slice `B5d-1z`.
+    [[nodiscard]] SandboxEditorJobQueueSnapshot ToSandboxEditorJobQueueSnapshot(
+        const DerivedJobQueueSnapshot& snapshot);
+
     struct SandboxEditorProgressiveJobDependencyModel
     {
-        DerivedJobHandle Job{};
+        JobToken Job{};
         std::string Reason{};
     };
 
     struct SandboxEditorProgressiveJobModel
     {
-        DerivedJobHandle Handle{};
-        DerivedJobKey Key{};
+        JobToken Handle{};
+        SandboxEditorJobIdentity Key{};
         std::string Name{};
         ProgressiveJobDomain RequestedJobDomain{ProgressiveJobDomain::Cpu};
         ProgressiveJobDomain ResolvedJobDomain{ProgressiveJobDomain::Cpu};
-        DerivedJobStatus Status{DerivedJobStatus::Queued};
+        JobState Status{JobState::Queued};
         std::vector<SandboxEditorProgressiveJobDependencyModel> Dependencies{};
         float NormalizedProgress{0.0f};
         bool ProgressDeterminate{true};
@@ -1375,8 +1461,8 @@ export namespace Extrinsic::Runtime
         Assets::AssetId AuthoredTexture{};
         Assets::AssetId GeneratedTexture{};
         Assets::AssetId TextureAsset{};
-        DerivedJobHandle Job{};
-        DerivedJobStatus JobStatus{DerivedJobStatus::Queued};
+        JobToken Job{};
+        JobState JobStatus{JobState::Queued};
         float JobProgress{0.0f};
         bool JobProgressDeterminate{true};
         bool Enabled{false};
@@ -2088,14 +2174,27 @@ export namespace Extrinsic::Runtime
         }
     };
 
+    // RUNTIME-194 Slice B5d migration window: both submit paths are live while
+    // the desc sites move batch by batch. `Submit`/`Cancel` are the retiring
+    // `DerivedJobRegistry` path; `SubmitJob`/`CancelJob` are the `JobService`
+    // one, which takes the editor's own identity alongside the desc because
+    // `JobService` deliberately stores no domain identity. Sub-slice `B5d-1z`
+    // deletes the first pair; `RUNTIME-194` Slice C deletes the registry.
     struct SandboxEditorDerivedJobCommandSurface
     {
         std::function<DerivedJobHandle(DerivedJobDesc)> Submit{};
         std::function<void(DerivedJobHandle)> Cancel{};
+        std::function<JobToken(JobDesc, SandboxEditorJobIdentity)> SubmitJob{};
+        std::function<void(JobToken)> CancelJob{};
 
         [[nodiscard]] bool Available() const noexcept
         {
             return static_cast<bool>(Submit);
+        }
+
+        [[nodiscard]] bool JobsAvailable() const noexcept
+        {
+            return static_cast<bool>(SubmitJob);
         }
     };
 
@@ -2536,7 +2635,11 @@ export namespace Extrinsic::Runtime
         SandboxEditorDerivedJobCommandSurface DerivedJobCommands{};
         SandboxEditorMethodResultSinks MethodResultSinks{};
         RuntimeAssetImportQueueSnapshot AssetImportQueue{};
-        const DerivedJobQueueSnapshot* DerivedJobs{nullptr};
+        // Unified editor job queue. During the Slice B5d migration window the
+        // session builds it from the retiring registry *and* `JobService`, so a
+        // duplicate submission is refused no matter which path queued the
+        // original and the queue view shows one list.
+        const SandboxEditorJobQueueSnapshot* DerivedJobs{nullptr};
         std::string PendingAssetImportPath{};
         std::string PendingSceneFilePath{};
         Assets::AssetPayloadKind PendingAssetImportPayloadKind{
@@ -3257,7 +3360,13 @@ export namespace Extrinsic::Runtime
             m_LastParameterizationResult{};
         std::optional<SandboxEditorRegistrationResult>
             m_LastRegistrationResult{};
-        DerivedJobQueueSnapshot m_DerivedJobSnapshot{};
+        SandboxEditorJobQueueSnapshot m_DerivedJobSnapshot{};
+        // Submit-time identity for jobs this session put on `JobService`, which
+        // stores none itself. Pruned against `SnapshotAll()` each frame.
+        std::unordered_map<JobToken,
+                           SandboxEditorJobIdentity,
+                           Core::StrongHandleHash<JobTokenTag>>
+            m_JobIdentities{};
         std::shared_ptr<std::atomic_bool> m_AttachmentEpoch{};
         Graphics::RenderRecipeConfigContext m_RenderRecipeContext{};
         SandboxEditorRenderRecipeEditorState m_RenderRecipeState{};

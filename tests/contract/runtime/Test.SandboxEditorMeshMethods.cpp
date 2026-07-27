@@ -823,10 +823,11 @@ TEST(SandboxEditorUi, MeshDenoiseRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
 
-    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot queued =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(queued.Entries.size(), 1u);
     EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshDenoise.CPU");
-    EXPECT_EQ(queued.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+    EXPECT_EQ(queued.Entries[0].State, Runtime::JobState::Queued);
 
     jobs.Pump(1u);
     jobs.DrainCompletions();
@@ -834,9 +835,10 @@ TEST(SandboxEditorUi, MeshDenoiseRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_FALSE(completedResult.has_value());
 
     EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
-    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot done =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
     ASSERT_TRUE(completedResult.has_value());
     EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
     EXPECT_EQ(completedResult->DenoiseStatus, Smooth::DenoiseStatus::Success);
@@ -892,10 +894,11 @@ TEST(SandboxEditorUi, MeshDenoiseDerivedJobDiscardsStaleMeshBeforeApply)
     jobs.DrainCompletions();
     EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
 
-    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot done =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].Status,
-              Runtime::DerivedJobStatus::StaleDiscarded);
+    EXPECT_EQ(done.Entries[0].State,
+              Runtime::JobState::StaleDiscarded);
     EXPECT_NE(done.Entries[0].Diagnostic.find(
                   "StaleSourcePropertyGeneration"),
               std::string::npos);
@@ -1045,11 +1048,12 @@ TEST(SandboxEditorUi,
     EXPECT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
 
-    Runtime::DerivedJobQueueSnapshot pending = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot pending =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(pending.Entries.size(), 1u);
     EXPECT_EQ(pending.Entries[0].Name,
               "Sandbox.PointCloudOutlierRemoval.CPU");
-    EXPECT_EQ(pending.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+    EXPECT_EQ(pending.Entries[0].State, Runtime::JobState::Queued);
 
     jobs.Pump(1u);
     jobs.DrainCompletions();
@@ -1058,9 +1062,10 @@ TEST(SandboxEditorUi,
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
 
     EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
-    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot done =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
     ASSERT_TRUE(completedResult.has_value());
     EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
     EXPECT_EQ(completedResult->OriginalCount, originalCount);
@@ -1127,10 +1132,11 @@ TEST(SandboxEditorUi, PointCloudOutlierRemovalDerivedJobDiscardsStaleSource)
     jobs.Pump(1u);
     jobs.DrainCompletions();
     EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
-    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot done =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].Status,
-              Runtime::DerivedJobStatus::StaleDiscarded);
+    EXPECT_EQ(done.Entries[0].State,
+              Runtime::JobState::StaleDiscarded);
     EXPECT_NE(done.Entries[0].Diagnostic.find(
                   "StaleSourcePropertyGeneration"),
               std::string::npos);
@@ -1521,10 +1527,11 @@ TEST(SandboxEditorUi, MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_FALSE(properties.Exists(PN::kGaussianCurvature));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
 
-    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot queued =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(queued.Entries.size(), 1u);
     EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshCurvature.CPU");
-    EXPECT_EQ(queued.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+    EXPECT_EQ(queued.Entries[0].State, Runtime::JobState::Queued);
 
     jobs.Pump(1u);
     jobs.DrainCompletions();
@@ -1533,9 +1540,10 @@ TEST(SandboxEditorUi, MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
 
     EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
-    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot done =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
     ASSERT_TRUE(completedResult.has_value());
     EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
     EXPECT_EQ(completedResult->VertexSlotCount, 4u);
@@ -1605,10 +1613,11 @@ TEST(SandboxEditorUi, MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply)
     jobs.DrainCompletions();
     EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
 
-    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot done =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].Status,
-              Runtime::DerivedJobStatus::StaleDiscarded);
+    EXPECT_EQ(done.Entries[0].State,
+              Runtime::JobState::StaleDiscarded);
     EXPECT_NE(done.Entries[0].Diagnostic.find(
                   "StaleSourcePropertyGeneration"),
               std::string::npos);
@@ -1872,10 +1881,11 @@ TEST(SandboxEditorUi, MeshRemeshRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
 
-    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot queued =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(queued.Entries.size(), 1u);
     EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshRemesh.CPU");
-    EXPECT_EQ(queued.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+    EXPECT_EQ(queued.Entries[0].State, Runtime::JobState::Queued);
 
     jobs.Pump(1u);
     jobs.DrainCompletions();
@@ -1883,9 +1893,10 @@ TEST(SandboxEditorUi, MeshRemeshRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_FALSE(completedResult.has_value());
 
     EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
-    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot done =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
     ASSERT_TRUE(completedResult.has_value());
     EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
     EXPECT_EQ(completedResult->InputFaceCount, before.Faces);
@@ -2035,10 +2046,11 @@ TEST(SandboxEditorUi, MeshSubdivideRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
 
-    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot queued =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(queued.Entries.size(), 1u);
     EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshSubdivide.CPU");
-    EXPECT_EQ(queued.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+    EXPECT_EQ(queued.Entries[0].State, Runtime::JobState::Queued);
 
     jobs.Pump(1u);
     jobs.DrainCompletions();
@@ -2047,9 +2059,10 @@ TEST(SandboxEditorUi, MeshSubdivideRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
 
     EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
-    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot done =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
     ASSERT_TRUE(completedResult.has_value());
     EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
     EXPECT_EQ(completedResult->InputFaceCount, before.Faces);
@@ -2109,10 +2122,11 @@ TEST(SandboxEditorUi, MeshSubdivideDerivedJobDiscardsStaleMeshBeforeApply)
     jobs.DrainCompletions();
     EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
 
-    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot done =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].Status,
-              Runtime::DerivedJobStatus::StaleDiscarded);
+    EXPECT_EQ(done.Entries[0].State,
+              Runtime::JobState::StaleDiscarded);
     EXPECT_NE(done.Entries[0].Diagnostic.find(
                   "StaleSourcePropertyGeneration"),
               std::string::npos);
@@ -2248,10 +2262,11 @@ TEST(SandboxEditorUi, MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
 
-    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot queued =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(queued.Entries.size(), 1u);
     EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshSimplify.CPU");
-    EXPECT_EQ(queued.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+    EXPECT_EQ(queued.Entries[0].State, Runtime::JobState::Queued);
 
     jobs.Pump(1u);
     jobs.DrainCompletions();
@@ -2259,9 +2274,10 @@ TEST(SandboxEditorUi, MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_FALSE(completedResult.has_value());
 
     EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
-    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot done =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
     ASSERT_TRUE(completedResult.has_value());
     EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
     EXPECT_EQ(completedResult->InputFaceCount, before.Faces);
@@ -2625,10 +2641,11 @@ TEST(SandboxEditorUi, MeshVertexNormalsRequestQueuesDerivedJobAndPublishesOnAppl
     EXPECT_FALSE(properties.Exists(PN::kNormal));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
 
-    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot queued =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(queued.Entries.size(), 1u);
     EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshVertexNormals.CPU");
-    EXPECT_EQ(queued.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+    EXPECT_EQ(queued.Entries[0].State, Runtime::JobState::Queued);
 
     jobs.Pump(1u);
     jobs.DrainCompletions();
@@ -2637,9 +2654,10 @@ TEST(SandboxEditorUi, MeshVertexNormalsRequestQueuesDerivedJobAndPublishesOnAppl
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
 
     EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
-    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot done =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
     ASSERT_TRUE(completedResult.has_value());
     EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
     EXPECT_EQ(completedResult->NormalStatus, GN::RecomputeStatus::Success);
@@ -2708,10 +2726,11 @@ TEST(SandboxEditorUi,
     EXPECT_EQ(graphResult.EdgeSlotCount, 4u);
     EXPECT_FALSE(graphProperties.Exists(PN::kNormal));
 
-    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot queued =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(queued.Entries.size(), 1u);
     EXPECT_EQ(queued.Entries[0].Name, "Sandbox.GraphVertexNormals.CPU");
-    EXPECT_EQ(queued.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+    EXPECT_EQ(queued.Entries[0].State, Runtime::JobState::Queued);
 
     jobs.Pump(1u);
     jobs.DrainCompletions();
@@ -2766,10 +2785,10 @@ TEST(SandboxEditorUi,
     EXPECT_EQ(cloudResult.PointSlotCount, 9u);
     EXPECT_FALSE(cloudProperties.Exists(PN::kNormal));
 
-    queued = jobs.SnapshotAll();
+    queued = Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(queued.Entries.size(), 2u);
     EXPECT_EQ(queued.Entries[1].Name, "Sandbox.PointCloudVertexNormals.CPU");
-    EXPECT_EQ(queued.Entries[1].Status, Runtime::DerivedJobStatus::Queued);
+    EXPECT_EQ(queued.Entries[1].State, Runtime::JobState::Queued);
 
     jobs.Pump(1u);
     jobs.DrainCompletions();
@@ -2831,10 +2850,11 @@ TEST(SandboxEditorUi, VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply)
         jobs.Pump(1u);
         jobs.DrainCompletions();
         EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
-        Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+        Runtime::SandboxEditorJobQueueSnapshot done =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
         ASSERT_EQ(done.Entries.size(), 1u);
-        EXPECT_EQ(done.Entries[0].Status,
-                  Runtime::DerivedJobStatus::StaleDiscarded);
+        EXPECT_EQ(done.Entries[0].State,
+                  Runtime::JobState::StaleDiscarded);
         EXPECT_NE(done.Entries[0].Diagnostic.find(
                       "StaleSourcePropertyGeneration"),
                   std::string::npos);
@@ -2880,10 +2900,11 @@ TEST(SandboxEditorUi, VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply)
         jobs.Pump(1u);
         jobs.DrainCompletions();
         EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
-        Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+        Runtime::SandboxEditorJobQueueSnapshot done =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
         ASSERT_EQ(done.Entries.size(), 1u);
-        EXPECT_EQ(done.Entries[0].Status,
-                  Runtime::DerivedJobStatus::StaleDiscarded);
+        EXPECT_EQ(done.Entries[0].State,
+                  Runtime::JobState::StaleDiscarded);
         EXPECT_NE(done.Entries[0].Diagnostic.find(
                       "StaleSourcePropertyGeneration"),
                   std::string::npos);
@@ -2938,10 +2959,11 @@ TEST(SandboxEditorUi, VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply)
         jobs.Pump(1u);
         jobs.DrainCompletions();
         EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
-        Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+        Runtime::SandboxEditorJobQueueSnapshot done =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
         ASSERT_EQ(done.Entries.size(), 1u);
-        EXPECT_EQ(done.Entries[0].Status,
-                  Runtime::DerivedJobStatus::StaleDiscarded);
+        EXPECT_EQ(done.Entries[0].State,
+                  Runtime::JobState::StaleDiscarded);
         EXPECT_NE(done.Entries[0].Diagnostic.find(
                       "StaleSourcePropertyGeneration"),
                   std::string::npos);
@@ -3550,10 +3572,11 @@ TEST(SandboxEditorUi, UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
 
-    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot queued =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(queued.Entries.size(), 1u);
     EXPECT_EQ(queued.Entries[0].Name, "Sandbox.UvRegeneration.CPU");
-    EXPECT_EQ(queued.Entries[0].Status, Runtime::DerivedJobStatus::Queued);
+    EXPECT_EQ(queued.Entries[0].State, Runtime::JobState::Queued);
 
     jobs.Pump(1u);
     jobs.DrainCompletions();
@@ -3561,9 +3584,10 @@ TEST(SandboxEditorUi, UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_FALSE(texcoordsFinite());
 
     EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
-    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot done =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
     ASSERT_TRUE(completedResult.has_value());
     EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Diagnostic;
     EXPECT_EQ(completedResult->UvStatus,
@@ -3617,7 +3641,8 @@ TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
         Runtime::ApplySandboxEditorUvRegenerationCommand(context, command);
     ASSERT_EQ(first.Status, Runtime::SandboxEditorCommandStatus::Pending);
 
-    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot queued =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(queued.Entries.size(), 1u);
     context.DerivedJobs = &queued;
 
@@ -3633,17 +3658,19 @@ TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
     jobs.DrainCompletions();
     EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
 
-    Runtime::DerivedJobQueueSnapshot complete = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot complete =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(complete.Entries.size(), 1u);
-    EXPECT_EQ(complete.Entries[0].Status, Runtime::DerivedJobStatus::Complete);
+    EXPECT_EQ(complete.Entries[0].State, Runtime::JobState::Published);
     context.DerivedJobs = &complete;
 
     const Runtime::SandboxEditorUvRegenerationCommandResult rerun =
         Runtime::ApplySandboxEditorUvRegenerationCommand(context, command);
     EXPECT_EQ(rerun.Status, Runtime::SandboxEditorCommandStatus::Pending);
-    Runtime::DerivedJobQueueSnapshot afterRerun = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot afterRerun =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(afterRerun.Entries.size(), 2u);
-    EXPECT_EQ(afterRerun.Entries[1].Status, Runtime::DerivedJobStatus::Queued);
+    EXPECT_EQ(afterRerun.Entries[1].State, Runtime::JobState::Queued);
 }
 TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleSource)
 {
@@ -3695,10 +3722,11 @@ TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleSource)
     jobs.DrainCompletions();
     EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
 
-    Runtime::DerivedJobQueueSnapshot done = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot done =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].Status,
-              Runtime::DerivedJobStatus::StaleDiscarded);
+    EXPECT_EQ(done.Entries[0].State,
+              Runtime::JobState::StaleDiscarded);
     EXPECT_NE(done.Entries[0].Diagnostic.find(
                   "StaleSourcePropertyGeneration"),
               std::string::npos);
@@ -3750,31 +3778,34 @@ TEST(SandboxEditorUi, UvRegenerationPanelModelTracksDerivedJobStateThroughCache)
             });
     ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
 
-    Runtime::DerivedJobQueueSnapshot queued = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot queued =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     context.DerivedJobs = &queued;
     frame = Runtime::BuildSandboxEditorPanelFrame(context);
     ASSERT_TRUE(frame.Inspector.TextureBake.Uv.UvRegenerationJob.has_value());
     EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->Status,
-              Runtime::DerivedJobStatus::Queued);
+              Runtime::JobState::Queued);
     EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->Key.OutputName,
               "uv_regeneration");
 
     jobs.Pump(1u);
     jobs.DrainCompletions();
-    Runtime::DerivedJobQueueSnapshot applying = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot applying =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     context.DerivedJobs = &applying;
     frame = Runtime::BuildSandboxEditorPanelFrame(context);
     ASSERT_TRUE(frame.Inspector.TextureBake.Uv.UvRegenerationJob.has_value());
     EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->Status,
-              Runtime::DerivedJobStatus::Applying);
+              Runtime::JobState::AwaitingGate);
 
     EXPECT_EQ(jobs.ApplyMainThreadResults(1u), 1u);
-    Runtime::DerivedJobQueueSnapshot complete = jobs.SnapshotAll();
+    Runtime::SandboxEditorJobQueueSnapshot complete =
+        Runtime::ToSandboxEditorJobQueueSnapshot(jobs.SnapshotAll());
     context.DerivedJobs = &complete;
     frame = Runtime::BuildSandboxEditorPanelFrame(context);
     ASSERT_TRUE(frame.Inspector.TextureBake.Uv.UvRegenerationJob.has_value());
     EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->Status,
-              Runtime::DerivedJobStatus::Complete);
+              Runtime::JobState::Published);
     EXPECT_TRUE(frame.Inspector.TextureBake.Uv.TexcoordsFinite);
 
     const Runtime::SandboxEditorSelectedModelCacheStats stats = cache.Stats();

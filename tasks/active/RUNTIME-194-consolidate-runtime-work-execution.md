@@ -794,23 +794,67 @@ and commits independently.
 
                   #### Batch plan and status
 
-                  - [ ] **B5d-1a — editor-owned job vocabulary + first
-                    consumer.** Add `SandboxEditorJobScope` (the editor-local
-                    replacement for `DerivedJobScope`, `MeshSurface` included —
-                    it must not become general vocabulary),
-                    `SandboxEditorJobIdentity`, `SandboxEditorJobRecord`,
-                    `SandboxEditorJobQueueSnapshot`, and the second submit path.
-                    Retype the *presentation* models
-                    (`SandboxEditorProgressiveJobModel`,
-                    `SandboxEditorProgressiveJobDependencyModel`, the job fields
-                    on `SandboxEditorBoundRenderStateRow`) onto that vocabulary,
-                    with adapters from **both** sources, so later batches move
-                    desc sites without touching presentation again. Session
-                    grows `m_JobSnapshot` + a `JobToken -> identity/domain/
-                    diagnostic` index filled at submit. Migrate
-                    `Runtime.SandboxMethodFacade`'s 2 desc sites as the first
-                    real consumer of the new path. Update the two Sandbox app
-                    panels once, here.
+                  - [x] **B5d-1a — editor-owned job vocabulary + first
+                    consumer.** Landed. Added `SandboxEditorJobScope` (the
+                    editor-local successor to `DerivedJobScope`, `MeshSurface`
+                    included), `SandboxEditorJobIdentity`,
+                    `SandboxEditorJobDependency`, `SandboxEditorJobRecord`,
+                    `SandboxEditorJobQueueSnapshot`, and the `SubmitJob` /
+                    `CancelJob` pair. Retyped the presentation models
+                    (`SandboxEditorProgressiveJobModel`, its dependency model,
+                    and `SandboxEditorBoundRenderStateRow::Job`/`JobStatus`)
+                    onto that vocabulary so later batches move desc sites
+                    without touching presentation again. `JobState` became the
+                    editor's status vocabulary outright — `Runtime.JobService`
+                    gained `ToString(JobState)` for it — and the two Sandbox app
+                    panels only needed their `DerivedJobGraph` import swapped.
+
+                    `SandboxEditorSession` now builds one
+                    `SandboxEditorJobQueueSnapshot` from both surfaces and owns
+                    an `m_JobIdentities` (`JobToken -> identity`) table filled at
+                    submit and pruned against `SnapshotAll()` each frame, so a
+                    reaped job's identity cannot leak.
+                    `ToSandboxEditorJobQueueSnapshot(DerivedJobQueueSnapshot)` is
+                    exported for the window so registry-path tests can still
+                    inject a queue; it goes with `B5d-1z`.
+
+                    `Runtime.SandboxMethodFacade` is fully migrated (K-Means CPU,
+                    Progressive Poisson point-cloud and mesh-surface CPU): its
+                    two descs, both worker bodies, the five-way validation
+                    mapping onto `JobApplyValidation`, and its three
+                    `Available()` gates, which became `JobsAvailable()`.
+
+                    Findings worth keeping:
+                    - **The `Available()` gate is the trap in this lane.** It
+                      tests `Submit` only, so a migrated call site silently falls
+                      through to the *synchronous* path instead of failing —
+                      the K-Means test caught it because labels appeared
+                      immediately. Every batch must flip its own gates.
+                    - The retired `DerivedJobKey::SourcePropertyGeneration` was
+                      never part of the dedup comparison; the staleness it stood
+                      for is re-checked by `ValidateBeforeApply`. Dropping it
+                      from the identity is safe, and the same will hold for the
+                      remaining batches.
+                    - The registry wrote its validation reason into the job's
+                      diagnostic; `JobService` has no per-job diagnostic
+                      channel, so `JobState::StaleDiscarded` is the observable
+                      fact a stale-discard test can assert. One assertion on
+                      `"StaleSourcePropertyGeneration"` was dropped for this.
+                    - Pre-drain `Queued`/`AwaitingGate` assertions are racy
+                      under `JobService` (it dispatches at submit); they became
+                      `IsActiveSandboxEditorJobState(...)`, which is what the
+                      test actually meant.
+
+                    New shared test helper
+                    `tests/support/SandboxEditorJobHarness.hpp` mirrors the
+                    session's identity/join for contract tests that drive editor
+                    facades without a session. It owns its scheduler as its
+                    **last** member, per the B5c ordering rule.
+
+                    CPU gate 4264/4264, one expected headless skip;
+                    `SandboxEditorUi.*` 0/40 under stress.
+                    `src/runtime/README.md` updated in the same commit; module
+                    inventory unchanged.
                   - [ ] **B5d-1b — `SandboxEditorFacades` mesh-method descs.**
                   - [ ] **B5d-1c — `SandboxEditorFacades` point-cloud / graph /
                     registration descs.**

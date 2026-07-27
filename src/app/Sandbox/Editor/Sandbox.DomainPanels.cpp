@@ -19,7 +19,7 @@ module Extrinsic.Sandbox.Editor.DomainPanels;
 
 import Extrinsic.Sandbox.Editor.Shell;
 
-import Extrinsic.Runtime.DerivedJobGraph;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.EditorWindowRegistry;

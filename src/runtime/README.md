@@ -183,8 +183,11 @@ primitive and focus once only after every renderable/selectable leaf exists.
 ### Sandbox Editor Async Method Jobs
 
 Editor buttons that run heavyweight geometry or method work must submit copied
-main-thread input snapshots through the runtime-owned `DerivedJobRegistry`
-beside `StreamingExecutor`, then return a pending result to the ImGui frame.
+main-thread input snapshots through `SandboxEditorContext::DerivedJobCommands`,
+then return a pending result to the ImGui frame. New submissions use
+`SubmitJob` (`Runtime.JobService`); the `Submit` member is the retiring
+`DerivedJobRegistry` path and exists only until `RUNTIME-194` sub-slice
+`B5d-1z`, so do not add sites to it.
 Workers never access live ECS or renderer state. The frame maintenance lane
 drains completed jobs with the same bounded apply budget as other streaming
 work, revalidates the selected target before mutation, and publishes results
@@ -1199,6 +1202,22 @@ and its `DerivedJobRegistry` until then. Queue visibility that used to come from
 `DerivedJobRegistry::SnapshotAll()` is served by the generic, read-only
 `JobService::SnapshotAll()`; job identity (which entity, which output) stays
 with the submitting consumer rather than the execution service.
+
+The Sandbox editor lane is mid-migration and carries a **documented temporary
+exception** (`RUNTIME-194` Slice B5d, removal sub-slice `B5d-1z`):
+`SandboxEditorDerivedJobCommandSurface` exposes both
+`Submit`/`Cancel` (`DerivedJobRegistry`) and
+`SubmitJob`/`CancelJob` (`JobService`, taking a `SandboxEditorJobIdentity`
+alongside the desc), and `SandboxEditorSession` builds one
+`SandboxEditorJobQueueSnapshot` from both surfaces. The editor's presentation
+models and its duplicate-submission guard read only that unified queue, so a
+duplicate is refused regardless of which path queued the original. Editor job
+identity — entity id, `SandboxEditorJobScope`, output semantic, output name —
+lives in the session's `JobToken -> identity` table, never on `JobService`;
+`SandboxEditorJobScope` is the editor-local successor to `DerivedJobScope` and
+must not be promoted to a general vocabulary. `Runtime.SandboxMethodFacade`
+(K-Means CPU, Progressive Poisson CPU/mesh-CPU) is the first consumer on the new
+path; the remaining `SandboxEditorFacades` submit sites follow in `B5d-1b`/`c`/`d`.
 `AssetImportPipeline::GetAssetImportQueueSnapshot()` computes import-row
 cancellation from per-token `JobService::GetState` queries; a decode is
 cancellable until its result reaches the main-thread apply gate

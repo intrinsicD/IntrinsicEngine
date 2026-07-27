@@ -87,6 +87,11 @@ namespace Extrinsic::Runtime
         StaleDiscarded,
     };
 
+    // Stable lowercase name for a job state, for queue views and diagnostics.
+    // Added by RUNTIME-194 Slice B5d so the editor's presentation layer can
+    // speak `JobState` directly instead of the retired `DerivedJobStatus`.
+    export [[nodiscard]] std::string_view ToString(JobState value) noexcept;
+
     export struct JobDependency
     {
         JobToken    Job{};

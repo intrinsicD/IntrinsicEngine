@@ -2571,6 +2571,138 @@ namespace Extrinsic::Runtime
                    status == DerivedJobStatus::StaleDiscarded;
         }
 
+        // RUNTIME-194 Slice B5d adapters. Both sources land in the editor's own
+        // `SandboxEditorJobRecord` vocabulary so the presentation layer and the
+        // dedup guard see one list while the submit sites move batch by batch.
+        [[nodiscard]] JobState ToSandboxEditorJobState(
+            const DerivedJobStatus status) noexcept
+        {
+            switch (status)
+            {
+            case DerivedJobStatus::Blocked:
+                return JobState::AwaitingDependencies;
+            case DerivedJobStatus::Queued:
+                return JobState::Queued;
+            case DerivedJobStatus::Running:
+                return JobState::Running;
+            case DerivedJobStatus::Applying:
+                return JobState::AwaitingGate;
+            case DerivedJobStatus::Complete:
+                return JobState::Published;
+            case DerivedJobStatus::Failed:
+                return JobState::Rejected;
+            case DerivedJobStatus::Cancelled:
+                return JobState::Cancelled;
+            case DerivedJobStatus::StaleDiscarded:
+                return JobState::StaleDiscarded;
+            }
+            return JobState::Invalid;
+        }
+
+        // The registry and `JobService` hand out handles from independent index
+        // spaces, so a registry-backed row's token is *not* a `JobService`
+        // token. It exists only so the queue view and the "(job i:g)" message
+        // suffix keep working during the migration window, and it disappears
+        // with the registry path in `B5d-1z`.
+        [[nodiscard]] JobToken ToSandboxEditorJobToken(
+            const DerivedJobHandle handle) noexcept
+        {
+            return JobToken{handle.Index, handle.Generation};
+        }
+
+        [[nodiscard]] SandboxEditorJobScope ToSandboxEditorJobScopeFromDerived(
+            const DerivedJobScope scope) noexcept
+        {
+            switch (scope)
+            {
+            case DerivedJobScope::MeshVertex:
+                return SandboxEditorJobScope::MeshVertex;
+            case DerivedJobScope::MeshEdge:
+                return SandboxEditorJobScope::MeshEdge;
+            case DerivedJobScope::MeshHalfedge:
+                return SandboxEditorJobScope::MeshHalfedge;
+            case DerivedJobScope::MeshFace:
+                return SandboxEditorJobScope::MeshFace;
+            case DerivedJobScope::MeshSurface:
+                return SandboxEditorJobScope::MeshSurface;
+            case DerivedJobScope::GraphNode:
+                return SandboxEditorJobScope::GraphNode;
+            case DerivedJobScope::GraphEdge:
+                return SandboxEditorJobScope::GraphEdge;
+            case DerivedJobScope::PointCloudPoint:
+                return SandboxEditorJobScope::PointCloudPoint;
+            case DerivedJobScope::Unknown:
+                break;
+            }
+            return SandboxEditorJobScope::Unknown;
+        }
+
+        [[nodiscard]] DerivedJobScope ToDerivedJobScopeFromSandboxEditor(
+            const SandboxEditorJobScope scope) noexcept
+        {
+            switch (scope)
+            {
+            case SandboxEditorJobScope::MeshVertex:
+                return DerivedJobScope::MeshVertex;
+            case SandboxEditorJobScope::MeshEdge:
+                return DerivedJobScope::MeshEdge;
+            case SandboxEditorJobScope::MeshHalfedge:
+                return DerivedJobScope::MeshHalfedge;
+            case SandboxEditorJobScope::MeshFace:
+                return DerivedJobScope::MeshFace;
+            case SandboxEditorJobScope::MeshSurface:
+                return DerivedJobScope::MeshSurface;
+            case SandboxEditorJobScope::GraphNode:
+                return DerivedJobScope::GraphNode;
+            case SandboxEditorJobScope::GraphEdge:
+                return DerivedJobScope::GraphEdge;
+            case SandboxEditorJobScope::PointCloudPoint:
+                return DerivedJobScope::PointCloudPoint;
+            case SandboxEditorJobScope::Unknown:
+                break;
+            }
+            return DerivedJobScope::Unknown;
+        }
+
+        [[nodiscard]] SandboxEditorJobIdentity ToSandboxEditorJobIdentity(
+            const DerivedJobKey& key)
+        {
+            return SandboxEditorJobIdentity{
+                .EntityId = key.EntityId,
+                .Scope = ToSandboxEditorJobScopeFromDerived(key.Domain),
+                .OutputSemantic = key.OutputSemantic,
+                .OutputName = key.OutputName,
+            };
+        }
+
+        [[nodiscard]] SandboxEditorJobRecord ToSandboxEditorJobRecord(
+            const DerivedJobSnapshot& job)
+        {
+            SandboxEditorJobRecord record{
+                .Token = ToSandboxEditorJobToken(job.Handle),
+                .Identity = ToSandboxEditorJobIdentity(job.Key),
+                .Name = job.Name,
+                .State = ToSandboxEditorJobState(job.Status),
+                .RequestedJobDomain = job.RequestedJobDomain,
+                .ResolvedJobDomain = job.ResolvedJobDomain,
+                .NormalizedProgress = job.NormalizedProgress,
+                .ProgressDeterminate = job.ProgressDeterminate,
+                .PreviousOutputRetained = job.PreviousOutputRetained,
+                .PayloadToken = job.PayloadToken,
+                .ElapsedMilliseconds = job.ElapsedMilliseconds,
+                .Diagnostic = job.Diagnostic,
+            };
+            record.Dependencies.reserve(job.Dependencies.size());
+            for (const DerivedJobDependency& dependency : job.Dependencies)
+            {
+                record.Dependencies.push_back(SandboxEditorJobDependency{
+                    .Job = ToSandboxEditorJobToken(dependency.Job),
+                    .Reason = dependency.Reason,
+                });
+            }
+            return record;
+        }
+
         constexpr std::string_view kUvRegenerationJobOutputName{
             "uv_regeneration"};
 
@@ -2649,7 +2781,8 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] SandboxEditorProgressiveJobDependencyModel
-        ToProgressiveJobDependencyModel(const DerivedJobDependency& dependency)
+        ToProgressiveJobDependencyModel(
+            const SandboxEditorJobDependency& dependency)
         {
             return SandboxEditorProgressiveJobDependencyModel{
                 .Job = dependency.Job,
@@ -2658,15 +2791,15 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] SandboxEditorProgressiveJobModel ToProgressiveJobModel(
-            const DerivedJobSnapshot& job)
+            const SandboxEditorJobRecord& job)
         {
             SandboxEditorProgressiveJobModel model{
-                .Handle = job.Handle,
-                .Key = job.Key,
+                .Handle = job.Token,
+                .Key = job.Identity,
                 .Name = job.Name,
                 .RequestedJobDomain = job.RequestedJobDomain,
                 .ResolvedJobDomain = job.ResolvedJobDomain,
-                .Status = job.Status,
+                .Status = job.State,
                 .NormalizedProgress = job.NormalizedProgress,
                 .ProgressDeterminate = job.ProgressDeterminate,
                 .PreviousOutputRetained = job.PreviousOutputRetained,
@@ -2675,7 +2808,7 @@ namespace Extrinsic::Runtime
                 .Diagnostic = job.Diagnostic,
             };
             model.Dependencies.reserve(job.Dependencies.size());
-            for (const DerivedJobDependency& dependency : job.Dependencies)
+            for (const SandboxEditorJobDependency& dependency : job.Dependencies)
                 model.Dependencies.push_back(
                     ToProgressiveJobDependencyModel(dependency));
             return model;
@@ -2683,18 +2816,18 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] std::optional<SandboxEditorProgressiveJobModel>
         FindDerivedJobModelForOutput(
-            const DerivedJobQueueSnapshot* jobs,
+            const SandboxEditorJobQueueSnapshot* jobs,
             const std::uint32_t stableEntityId,
             const std::string_view outputName)
         {
             if (jobs == nullptr)
                 return std::nullopt;
 
-            const DerivedJobSnapshot* selected = nullptr;
-            for (const DerivedJobSnapshot& job : jobs->Entries)
+            const SandboxEditorJobRecord* selected = nullptr;
+            for (const SandboxEditorJobRecord& job : jobs->Entries)
             {
-                if (job.Key.EntityId != stableEntityId ||
-                    std::string_view{job.Key.OutputName} != outputName)
+                if (job.Identity.EntityId != stableEntityId ||
+                    std::string_view{job.Identity.OutputName} != outputName)
                 {
                     continue;
                 }
@@ -2705,9 +2838,9 @@ namespace Extrinsic::Runtime
                     continue;
                 }
 
-                const bool jobActive = IsActiveDerivedJobStatus(job.Status);
+                const bool jobActive = IsActiveSandboxEditorJobState(job.State);
                 const bool selectedActive =
-                    IsActiveDerivedJobStatus(selected->Status);
+                    IsActiveSandboxEditorJobState(selected->State);
                 if (jobActive || !selectedActive)
                     selected = &job;
             }
@@ -3139,36 +3272,36 @@ namespace Extrinsic::Runtime
 
         void AppendProgressiveJobRowsForEntity(
             SandboxEditorProgressiveRenderDataModel& model,
-            const DerivedJobQueueSnapshot* jobs,
+            const SandboxEditorJobQueueSnapshot* jobs,
             const std::uint32_t stableEntityId)
         {
             if (jobs == nullptr)
                 return;
 
-            for (const DerivedJobSnapshot& job : jobs->Entries)
+            for (const SandboxEditorJobRecord& job : jobs->Entries)
             {
-                if (job.Key.EntityId == stableEntityId)
+                if (job.Identity.EntityId == stableEntityId)
                     model.Jobs.push_back(ToProgressiveJobModel(job));
             }
         }
 
         void AccumulateProgressiveJobSummaryForEntity(
             SandboxEditorProgressiveCompositionSummary& summary,
-            const DerivedJobQueueSnapshot* jobs,
+            const SandboxEditorJobQueueSnapshot* jobs,
             const std::uint32_t stableEntityId)
         {
             if (jobs == nullptr)
                 return;
 
-            for (const DerivedJobSnapshot& job : jobs->Entries)
+            for (const SandboxEditorJobRecord& job : jobs->Entries)
             {
-                if (job.Key.EntityId != stableEntityId)
+                if (job.Identity.EntityId != stableEntityId)
                     continue;
 
                 ++summary.ChildJobCount;
-                if (IsActiveDerivedJobStatus(job.Status))
+                if (IsActiveSandboxEditorJobState(job.State))
                     ++summary.ChildActiveJobCount;
-                if (IsFailedDerivedJobStatus(job.Status))
+                if (IsFailedSandboxEditorJobState(job.State))
                     ++summary.ChildFailedJobCount;
             }
         }
@@ -3256,7 +3389,7 @@ namespace Extrinsic::Runtime
             const entt::registry& raw,
             SandboxEditorProgressiveCompositionSummary& summary,
             const ECS::EntityHandle child,
-            const DerivedJobQueueSnapshot* jobs)
+            const SandboxEditorJobQueueSnapshot* jobs)
         {
             if (!raw.valid(child))
                 return;
@@ -3286,7 +3419,7 @@ namespace Extrinsic::Runtime
             const entt::registry& raw,
             SandboxEditorProgressiveRenderDataModel& model,
             const ECS::EntityHandle entity,
-            const DerivedJobQueueSnapshot* jobs)
+            const SandboxEditorJobQueueSnapshot* jobs)
         {
             const ECS::Hierarchy::Structure::HierarchyQueryResult children =
                 ECS::Hierarchy::Structure::CollectChildren(raw, entity);
@@ -3507,9 +3640,9 @@ namespace Extrinsic::Runtime
                     .Label = job.Name,
                     .Lane = ProgressiveRenderLane::Surface,
                     .Semantic = job.Key.OutputSemantic,
-                    .Readiness = IsFailedDerivedJobStatus(job.Status)
+                    .Readiness = IsFailedSandboxEditorJobState(job.Status)
                         ? ProgressiveReadinessState::Failed
-                        : (IsActiveDerivedJobStatus(job.Status)
+                        : (IsActiveSandboxEditorJobState(job.Status)
                                ? ProgressiveReadinessState::Pending
                                : ProgressiveReadinessState::Ready),
                     .Job = job.Handle,
@@ -4463,7 +4596,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::uint64_t DerivedJobStateSignatureForEntity(
-            const DerivedJobQueueSnapshot* jobs,
+            const SandboxEditorJobQueueSnapshot* jobs,
             const std::uint32_t stableEntityId,
             const SandboxEditorSelectedModelCacheSection section)
         {
@@ -4475,15 +4608,15 @@ namespace Extrinsic::Runtime
 
             std::uint64_t signature = kSandboxEditorSignatureOffset;
             std::uint64_t order = 0u;
-            for (const DerivedJobSnapshot& job : jobs->Entries)
+            for (const SandboxEditorJobRecord& job : jobs->Entries)
             {
-                if (job.Key.EntityId != stableEntityId)
+                if (job.Identity.EntityId != stableEntityId)
                     continue;
 
                 MixSignature(signature, order++);
-                MixSignature(signature, job.Handle.Index);
-                MixSignature(signature, job.Handle.Generation);
-                MixSignature(signature, static_cast<std::uint64_t>(job.Status));
+                MixSignature(signature, job.Token.Index);
+                MixSignature(signature, job.Token.Generation);
+                MixSignature(signature, static_cast<std::uint64_t>(job.State));
                 MixSignatureFloat(signature, job.NormalizedProgress);
                 MixSignature(signature,
                              static_cast<std::uint64_t>(
@@ -4492,11 +4625,11 @@ namespace Extrinsic::Runtime
                              static_cast<std::uint64_t>(
                                  job.ResolvedJobDomain));
                 MixSignature(signature,
-                             static_cast<std::uint64_t>(job.Key.Domain));
+                             static_cast<std::uint64_t>(job.Identity.Scope));
                 MixSignature(signature,
                              static_cast<std::uint64_t>(
-                                 job.Key.OutputSemantic));
-                MixSignatureString(signature, job.Key.OutputName);
+                                 job.Identity.OutputSemantic));
+                MixSignatureString(signature, job.Identity.OutputName);
                 MixSignature(signature, job.PayloadToken);
                 MixSignature(signature, job.PreviousOutputRetained ? 1u : 0u);
                 MixSignatureString(signature, job.Diagnostic);
@@ -4764,37 +4897,24 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        [[nodiscard]] bool IsActiveEditorDerivedJobStatus(
-            const DerivedJobStatus status) noexcept
-        {
-            return status == DerivedJobStatus::Blocked ||
-                   status == DerivedJobStatus::Queued ||
-                   status == DerivedJobStatus::Running ||
-                   status == DerivedJobStatus::Applying;
-        }
-
-        [[nodiscard]] bool SameEditorDerivedJobOutput(
-            const DerivedJobKey& lhs,
-            const DerivedJobKey& rhs) noexcept
-        {
-            return lhs.EntityId == rhs.EntityId &&
-                   lhs.Domain == rhs.Domain &&
-                   lhs.OutputSemantic == rhs.OutputSemantic &&
-                   lhs.OutputName == rhs.OutputName;
-        }
-
-        [[nodiscard]] std::optional<DerivedJobSnapshot>
-        FindActiveEditorDerivedJob(
+        // The guard refuses a duplicate submission when the same entity+output
+        // already has a non-terminal job. It reads the *unified* queue, so
+        // during the Slice B5d migration window it sees both the retiring
+        // registry's jobs and `JobService`'s and cannot be defeated by the two
+        // paths being out of step.
+        [[nodiscard]] std::optional<SandboxEditorJobRecord>
+        FindActiveEditorJob(
             const SandboxEditorContext& context,
-            const DerivedJobKey& key)
+            const SandboxEditorJobIdentity& identity)
         {
             if (context.DerivedJobs == nullptr)
                 return std::nullopt;
 
-            for (const DerivedJobSnapshot& entry : context.DerivedJobs->Entries)
+            for (const SandboxEditorJobRecord& entry :
+                 context.DerivedJobs->Entries)
             {
-                if (IsActiveEditorDerivedJobStatus(entry.Status) &&
-                    SameEditorDerivedJobOutput(entry.Key, key))
+                if (IsActiveSandboxEditorJobState(entry.State) &&
+                    SameSandboxEditorJobOutput(entry.Identity, identity))
                 {
                     return entry;
                 }
@@ -4802,9 +4922,19 @@ namespace Extrinsic::Runtime
             return std::nullopt;
         }
 
+        [[nodiscard]] std::optional<SandboxEditorJobRecord>
+        FindActiveEditorDerivedJob(
+            const SandboxEditorContext& context,
+            const DerivedJobKey& key)
+        {
+            return FindActiveEditorJob(
+                context,
+                ToSandboxEditorJobIdentity(key));
+        }
+
         void AppendDerivedJobHandleToMessage(
             std::string& message,
-            const DerivedJobHandle handle)
+            const JobToken handle)
         {
             if (!handle.IsValid())
                 return;
@@ -4818,13 +4948,13 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] std::string BuildActiveDerivedJobMessage(
             const std::string_view label,
-            const DerivedJobSnapshot& job)
+            const SandboxEditorJobRecord& job)
         {
             std::string message{label};
             message += " already has an active ";
-            message += std::string{ToString(job.Status)};
+            message += std::string{ToString(job.State)};
             message += " job";
-            AppendDerivedJobHandleToMessage(message, job.Handle);
+            AppendDerivedJobHandleToMessage(message, job.Token);
             message += ".";
             return message;
         }
@@ -6451,7 +6581,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorMeshCurvatureCommand& command,
             const bool directionsAvailable,
             const std::size_t vertexSlotCount,
-            const DerivedJobHandle handle)
+            const JobToken handle)
         {
             SandboxEditorMeshCurvatureResult result =
                 MakeMeshCurvatureBaseResult(command, directionsAvailable);
@@ -6466,7 +6596,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] SandboxEditorMeshDenoiseResult MakePendingMeshDenoiseResult(
             const SandboxEditorMeshDenoiseCommand& command,
             const MeshDenoiseSourceResult& source,
-            const DerivedJobHandle handle)
+            const JobToken handle)
         {
             SandboxEditorMeshDenoiseResult result =
                 MakeMeshDenoiseBaseResult(command);
@@ -6488,7 +6618,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] SandboxEditorMeshRemeshResult MakePendingMeshRemeshResult(
             const SandboxEditorMeshRemeshCommand& command,
             const Geometry::HalfedgeMesh::Mesh& mesh,
-            const DerivedJobHandle handle)
+            const JobToken handle)
         {
             SandboxEditorMeshRemeshResult result =
                 MakeMeshRemeshBaseResult(command);
@@ -6505,7 +6635,7 @@ namespace Extrinsic::Runtime
         MakePendingMeshSubdivideResult(
             const SandboxEditorMeshSubdivideCommand& command,
             const Geometry::HalfedgeMesh::Mesh& mesh,
-            const DerivedJobHandle handle)
+            const JobToken handle)
         {
             SandboxEditorMeshSubdivideResult result =
                 MakeMeshSubdivideBaseResult(command);
@@ -6522,7 +6652,7 @@ namespace Extrinsic::Runtime
         MakePendingMeshSimplifyResult(
             const SandboxEditorMeshSimplifyCommand& command,
             const Geometry::HalfedgeMesh::Mesh& mesh,
-            const DerivedJobHandle handle)
+            const JobToken handle)
         {
             SandboxEditorMeshSimplifyResult result =
                 MakeMeshSimplifyBaseResult(command);
@@ -6592,7 +6722,7 @@ namespace Extrinsic::Runtime
         MakePendingPointCloudOutlierRemovalResult(
             const SandboxEditorPointCloudOutlierRemovalCommand& command,
             const std::size_t livePointCount,
-            const DerivedJobHandle handle)
+            const JobToken handle)
         {
             SandboxEditorPointCloudOutlierRemovalResult result =
                 MakePointCloudOutlierRemovalBaseResult(command);
@@ -6851,22 +6981,22 @@ namespace Extrinsic::Runtime
 
             DerivedJobDesc desc =
                 MakePointCloudOutlierRemovalCpuJobDesc(context, state);
-            if (const std::optional<DerivedJobSnapshot> active =
+            if (const std::optional<SandboxEditorJobRecord> active =
                     FindActiveEditorDerivedJob(context, desc.Key))
             {
                 SandboxEditorPointCloudOutlierRemovalResult pending =
                     MakePendingPointCloudOutlierRemovalResult(
                         command,
                         state->WorkCloud.VertexCount(),
-                        active->Handle);
+                        active->Token);
                 pending.Message = BuildActiveDerivedJobMessage(
                     "Point-cloud outlier-removal CPU",
                     *active);
                 return pending;
             }
 
-            const DerivedJobHandle handle =
-                context.DerivedJobCommands.Submit(std::move(desc));
+            const JobToken handle = ToSandboxEditorJobToken(
+                context.DerivedJobCommands.Submit(std::move(desc)));
             if (!handle.IsValid())
             {
                 SandboxEditorPointCloudOutlierRemovalResult result =
@@ -6958,7 +7088,7 @@ namespace Extrinsic::Runtime
         MakePendingMeshVertexNormalsResult(
             const SandboxEditorMeshVertexNormalsCommand& command,
             const std::size_t vertexSlotCount,
-            const DerivedJobHandle handle)
+            const JobToken handle)
         {
             SandboxEditorMeshVertexNormalsResult result =
                 MakeMeshNormalsResult(
@@ -6978,7 +7108,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorGraphVertexNormalsCommand& command,
             const std::size_t vertexSlotCount,
             const std::size_t edgeSlotCount,
-            const DerivedJobHandle handle)
+            const JobToken handle)
         {
             SandboxEditorGraphVertexNormalsResult result =
                 MakeGraphNormalsResult(
@@ -6998,7 +7128,7 @@ namespace Extrinsic::Runtime
         MakePendingPointCloudVertexNormalsResult(
             const SandboxEditorPointCloudVertexNormalsCommand& command,
             const std::size_t pointSlotCount,
-            const DerivedJobHandle handle)
+            const JobToken handle)
         {
             SandboxEditorPointCloudVertexNormalsResult result =
                 MakePointCloudNormalsResult(
@@ -7668,22 +7798,22 @@ namespace Extrinsic::Runtime
                 state->SnapshotPositions.size();
 
             DerivedJobDesc desc = MakeVertexNormalsCpuJobDesc(context, state);
-            if (const std::optional<DerivedJobSnapshot> active =
+            if (const std::optional<SandboxEditorJobRecord> active =
                     FindActiveEditorDerivedJob(context, desc.Key))
             {
                 SandboxEditorMeshVertexNormalsResult pending =
                     MakePendingMeshVertexNormalsResult(
                         command,
                         state->SnapshotPositions.size(),
-                        active->Handle);
+                        active->Token);
                 pending.Message = BuildActiveDerivedJobMessage(
                     "Mesh vertex-normal CPU",
                     *active);
                 return pending;
             }
 
-            const DerivedJobHandle handle =
-                context.DerivedJobCommands.Submit(std::move(desc));
+            const JobToken handle = ToSandboxEditorJobToken(
+                context.DerivedJobCommands.Submit(std::move(desc)));
             if (!handle.IsValid())
             {
                 return MakeMeshNormalsResult(
@@ -7744,7 +7874,7 @@ namespace Extrinsic::Runtime
             state->GraphResult.EdgeSlotCount = edgeSlotCount;
 
             DerivedJobDesc desc = MakeVertexNormalsCpuJobDesc(context, state);
-            if (const std::optional<DerivedJobSnapshot> active =
+            if (const std::optional<SandboxEditorJobRecord> active =
                     FindActiveEditorDerivedJob(context, desc.Key))
             {
                 SandboxEditorGraphVertexNormalsResult pending =
@@ -7752,15 +7882,15 @@ namespace Extrinsic::Runtime
                         command,
                         state->SnapshotPositions.size(),
                         edgeSlotCount,
-                        active->Handle);
+                        active->Token);
                 pending.Message = BuildActiveDerivedJobMessage(
                     "Graph vertex-normal CPU",
                     *active);
                 return pending;
             }
 
-            const DerivedJobHandle handle =
-                context.DerivedJobCommands.Submit(std::move(desc));
+            const JobToken handle = ToSandboxEditorJobToken(
+                context.DerivedJobCommands.Submit(std::move(desc)));
             if (!handle.IsValid())
             {
                 return MakeGraphNormalsResult(
@@ -7815,22 +7945,22 @@ namespace Extrinsic::Runtime
                 state->SnapshotPositions.size();
 
             DerivedJobDesc desc = MakeVertexNormalsCpuJobDesc(context, state);
-            if (const std::optional<DerivedJobSnapshot> active =
+            if (const std::optional<SandboxEditorJobRecord> active =
                     FindActiveEditorDerivedJob(context, desc.Key))
             {
                 SandboxEditorPointCloudVertexNormalsResult pending =
                     MakePendingPointCloudVertexNormalsResult(
                         command,
                         state->SnapshotPositions.size(),
-                        active->Handle);
+                        active->Token);
                 pending.Message = BuildActiveDerivedJobMessage(
                     "Point-cloud vertex-normal CPU",
                     *active);
                 return pending;
             }
 
-            const DerivedJobHandle handle =
-                context.DerivedJobCommands.Submit(std::move(desc));
+            const JobToken handle = ToSandboxEditorJobToken(
+                context.DerivedJobCommands.Submit(std::move(desc)));
             if (!handle.IsValid())
             {
                 return MakePointCloudNormalsResult(
@@ -8837,7 +8967,7 @@ namespace Extrinsic::Runtime
             state->CurvatureResult.VertexSlotCount = source.VertexSlotCount;
 
             DerivedJobDesc desc = MakeMeshCpuJobDesc(context, state);
-            if (const std::optional<DerivedJobSnapshot> active =
+            if (const std::optional<SandboxEditorJobRecord> active =
                     FindActiveEditorDerivedJob(context, desc.Key))
             {
                 SandboxEditorMeshCurvatureResult pending =
@@ -8845,14 +8975,14 @@ namespace Extrinsic::Runtime
                         command,
                         context.MeshCurvatureDirectionsAvailable,
                         source.VertexSlotCount,
-                        active->Handle);
+                        active->Token);
                 pending.Message =
                     BuildActiveDerivedJobMessage("Mesh curvature CPU", *active);
                 return pending;
             }
 
-            const DerivedJobHandle handle =
-                context.DerivedJobCommands.Submit(std::move(desc));
+            const JobToken handle = ToSandboxEditorJobToken(
+                context.DerivedJobCommands.Submit(std::move(desc)));
             if (!handle.IsValid())
             {
                 SandboxEditorMeshCurvatureResult result =
@@ -8902,7 +9032,7 @@ namespace Extrinsic::Runtime
                 state->DenoiseResult.SkippedDeletedVertexCount;
 
             DerivedJobDesc desc = MakeMeshCpuJobDesc(context, state);
-            if (const std::optional<DerivedJobSnapshot> active =
+            if (const std::optional<SandboxEditorJobRecord> active =
                     FindActiveEditorDerivedJob(context, desc.Key))
             {
                 MeshDenoiseSourceResult pendingSource{};
@@ -8912,14 +9042,14 @@ namespace Extrinsic::Runtime
                     MakePendingMeshDenoiseResult(
                         command,
                         pendingSource,
-                        active->Handle);
+                        active->Token);
                 pending.Message =
                     BuildActiveDerivedJobMessage("Mesh denoise CPU", *active);
                 return pending;
             }
 
-            const DerivedJobHandle handle =
-                context.DerivedJobCommands.Submit(std::move(desc));
+            const JobToken handle = ToSandboxEditorJobToken(
+                context.DerivedJobCommands.Submit(std::move(desc)));
             if (!handle.IsValid())
             {
                 SandboxEditorMeshDenoiseResult result =
@@ -8962,21 +9092,21 @@ namespace Extrinsic::Runtime
             state->RemeshResult.InputFaceCount = state->BeforeMesh.FaceCount();
 
             DerivedJobDesc desc = MakeMeshCpuJobDesc(context, state);
-            if (const std::optional<DerivedJobSnapshot> active =
+            if (const std::optional<SandboxEditorJobRecord> active =
                     FindActiveEditorDerivedJob(context, desc.Key))
             {
                 SandboxEditorMeshRemeshResult pending =
                     MakePendingMeshRemeshResult(
                         command,
                         state->BeforeMesh,
-                        active->Handle);
+                        active->Token);
                 pending.Message =
                     BuildActiveDerivedJobMessage("Mesh remesh CPU", *active);
                 return pending;
             }
 
-            const DerivedJobHandle handle =
-                context.DerivedJobCommands.Submit(std::move(desc));
+            const JobToken handle = ToSandboxEditorJobToken(
+                context.DerivedJobCommands.Submit(std::move(desc)));
             if (!handle.IsValid())
             {
                 SandboxEditorMeshRemeshResult result =
@@ -9014,21 +9144,21 @@ namespace Extrinsic::Runtime
                 state->BeforeMesh.FaceCount();
 
             DerivedJobDesc desc = MakeMeshCpuJobDesc(context, state);
-            if (const std::optional<DerivedJobSnapshot> active =
+            if (const std::optional<SandboxEditorJobRecord> active =
                     FindActiveEditorDerivedJob(context, desc.Key))
             {
                 SandboxEditorMeshSubdivideResult pending =
                     MakePendingMeshSubdivideResult(
                         command,
                         state->BeforeMesh,
-                        active->Handle);
+                        active->Token);
                 pending.Message =
                     BuildActiveDerivedJobMessage("Mesh subdivide CPU", *active);
                 return pending;
             }
 
-            const DerivedJobHandle handle =
-                context.DerivedJobCommands.Submit(std::move(desc));
+            const JobToken handle = ToSandboxEditorJobToken(
+                context.DerivedJobCommands.Submit(std::move(desc)));
             if (!handle.IsValid())
             {
                 SandboxEditorMeshSubdivideResult result =
@@ -9067,21 +9197,21 @@ namespace Extrinsic::Runtime
             state->SimplifyResult.InputFaceCount = state->BeforeMesh.FaceCount();
 
             DerivedJobDesc desc = MakeMeshCpuJobDesc(context, state);
-            if (const std::optional<DerivedJobSnapshot> active =
+            if (const std::optional<SandboxEditorJobRecord> active =
                     FindActiveEditorDerivedJob(context, desc.Key))
             {
                 SandboxEditorMeshSimplifyResult pending =
                     MakePendingMeshSimplifyResult(
                         command,
                         state->BeforeMesh,
-                        active->Handle);
+                        active->Token);
                 pending.Message =
                     BuildActiveDerivedJobMessage("Mesh simplify CPU", *active);
                 return pending;
             }
 
-            const DerivedJobHandle handle =
-                context.DerivedJobCommands.Submit(std::move(desc));
+            const JobToken handle = ToSandboxEditorJobToken(
+                context.DerivedJobCommands.Submit(std::move(desc)));
             if (!handle.IsValid())
             {
                 SandboxEditorMeshSimplifyResult result =
@@ -9179,7 +9309,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorRegistrationCommand& command,
             const std::size_t sourcePointCount,
             const std::size_t targetPointCount,
-            const DerivedJobHandle handle)
+            const JobToken handle)
         {
             SandboxEditorRegistrationResult result =
                 MakeRegistrationBaseResult(command);
@@ -9565,7 +9695,7 @@ namespace Extrinsic::Runtime
             state->Result.TargetPointCount = state->TargetLocalPoints.size();
 
             DerivedJobDesc desc = MakeRegistrationCpuJobDesc(context, state);
-            if (const std::optional<DerivedJobSnapshot> active =
+            if (const std::optional<SandboxEditorJobRecord> active =
                     FindActiveEditorDerivedJob(context, desc.Key))
             {
                 SandboxEditorRegistrationResult pending =
@@ -9573,14 +9703,14 @@ namespace Extrinsic::Runtime
                         command,
                         state->SourceLocalPoints.size(),
                         state->TargetLocalPoints.size(),
-                        active->Handle);
+                        active->Token);
                 pending.Message =
                     BuildActiveDerivedJobMessage("ICP registration CPU", *active);
                 return pending;
             }
 
-            const DerivedJobHandle handle =
-                context.DerivedJobCommands.Submit(std::move(desc));
+            const JobToken handle = ToSandboxEditorJobToken(
+                context.DerivedJobCommands.Submit(std::move(desc)));
             if (!handle.IsValid())
             {
                 SandboxEditorRegistrationResult result =
@@ -11499,6 +11629,25 @@ namespace Extrinsic::Runtime
                     {
                     });
             }
+            if (context.DerivedJobCommands.SubmitJob)
+            {
+                context.DerivedJobCommands.SubmitJob = GuardAttachmentCommand(
+                    std::move(context.DerivedJobCommands.SubmitJob),
+                    epoch,
+                    [](JobDesc, SandboxEditorJobIdentity)
+                    {
+                        return JobToken{};
+                    });
+            }
+            if (context.DerivedJobCommands.CancelJob)
+            {
+                context.DerivedJobCommands.CancelJob = GuardAttachmentCommand(
+                    std::move(context.DerivedJobCommands.CancelJob),
+                    epoch,
+                    [](const JobToken)
+                    {
+                    });
+            }
             if (context.PreviewRenderRecipeDocument)
             {
                 context.PreviewRenderRecipeDocument =
@@ -11572,7 +11721,14 @@ namespace Extrinsic::Runtime
             InvalidateSelectedModelCache(context);
         }
 
-        std::optional<DerivedJobSnapshot> FindActiveSandboxMethodDerivedJob(
+        std::optional<SandboxEditorJobRecord> FindActiveSandboxMethodJob(
+            const SandboxEditorContext& context,
+            const SandboxEditorJobIdentity& identity)
+        {
+            return FindActiveEditorJob(context, identity);
+        }
+
+        std::optional<SandboxEditorJobRecord> FindActiveSandboxMethodDerivedJob(
             const SandboxEditorContext& context,
             const DerivedJobKey& key)
         {
@@ -11581,7 +11737,7 @@ namespace Extrinsic::Runtime
 
         std::string BuildActiveSandboxMethodDerivedJobMessage(
             const std::string_view label,
-            const DerivedJobSnapshot& job)
+            const SandboxEditorJobRecord& job)
         {
             return BuildActiveDerivedJobMessage(label, job);
         }
@@ -12040,6 +12196,80 @@ namespace Extrinsic::Runtime
             return "PointCloudPoints";
         }
         return "Unknown";
+    }
+
+    SandboxEditorJobQueueSnapshot ToSandboxEditorJobQueueSnapshot(
+        const DerivedJobQueueSnapshot& snapshot)
+    {
+        SandboxEditorJobQueueSnapshot projected{};
+        projected.Entries.reserve(snapshot.Entries.size());
+        for (const DerivedJobSnapshot& job : snapshot.Entries)
+            projected.Entries.push_back(ToSandboxEditorJobRecord(job));
+        return projected;
+    }
+
+    SandboxEditorJobScope ToSandboxEditorJobScope(
+        const GeometryElementDomain domain) noexcept
+    {
+        switch (domain)
+        {
+        case GeometryElementDomain::MeshVertex:
+            return SandboxEditorJobScope::MeshVertex;
+        case GeometryElementDomain::MeshEdge:
+            return SandboxEditorJobScope::MeshEdge;
+        case GeometryElementDomain::MeshHalfedge:
+            return SandboxEditorJobScope::MeshHalfedge;
+        case GeometryElementDomain::MeshFace:
+            return SandboxEditorJobScope::MeshFace;
+        case GeometryElementDomain::GraphNode:
+            return SandboxEditorJobScope::GraphNode;
+        case GeometryElementDomain::GraphEdge:
+            return SandboxEditorJobScope::GraphEdge;
+        case GeometryElementDomain::PointCloudPoint:
+            return SandboxEditorJobScope::PointCloudPoint;
+        default:
+            break;
+        }
+        return SandboxEditorJobScope::Unknown;
+    }
+
+    bool SameSandboxEditorJobOutput(
+        const SandboxEditorJobIdentity& lhs,
+        const SandboxEditorJobIdentity& rhs) noexcept
+    {
+        return lhs.EntityId == rhs.EntityId &&
+               lhs.Scope == rhs.Scope &&
+               lhs.OutputSemantic == rhs.OutputSemantic &&
+               lhs.OutputName == rhs.OutputName;
+    }
+
+    bool IsActiveSandboxEditorJobState(const JobState state) noexcept
+    {
+        switch (state)
+        {
+        case JobState::AwaitingDependencies:
+        case JobState::Queued:
+        case JobState::Running:
+        case JobState::AwaitingGate:
+        case JobState::AwaitingApply:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    bool IsFailedSandboxEditorJobState(const JobState state) noexcept
+    {
+        switch (state)
+        {
+        case JobState::Rejected:
+        case JobState::Dropped:
+        case JobState::Cancelled:
+        case JobState::StaleDiscarded:
+            return true;
+        default:
+            return false;
+        }
     }
 
     const char* DebugNameForSandboxEditorBoundRenderStateRowKind(
@@ -13997,7 +14227,7 @@ namespace Extrinsic::Runtime
 
     [[nodiscard]] SandboxEditorUvRegenerationCommandResult
     MakePendingUvRegenerationResult(
-        const DerivedJobHandle handle)
+        const JobToken handle)
     {
         SandboxEditorUvRegenerationCommandResult result{};
         result.Status = SandboxEditorCommandStatus::Pending;
@@ -14240,18 +14470,18 @@ namespace Extrinsic::Runtime
         const std::shared_ptr<SandboxEditorUvRegenerationCpuJobState>& state)
     {
         DerivedJobDesc desc = MakeUvRegenerationCpuJobDesc(context, state);
-        if (const std::optional<DerivedJobSnapshot> active =
+        if (const std::optional<SandboxEditorJobRecord> active =
                 FindActiveEditorDerivedJob(context, desc.Key))
         {
             SandboxEditorUvRegenerationCommandResult pending =
-                MakePendingUvRegenerationResult(active->Handle);
+                MakePendingUvRegenerationResult(active->Token);
             pending.Diagnostic =
                 BuildActiveDerivedJobMessage("UV regeneration CPU", *active);
             return pending;
         }
 
-        const DerivedJobHandle handle =
-            context.DerivedJobCommands.Submit(std::move(desc));
+        const JobToken handle = ToSandboxEditorJobToken(
+            context.DerivedJobCommands.Submit(std::move(desc)));
         if (!handle.IsValid())
         {
             return MakeUvRegenerationResult(
@@ -16204,6 +16434,34 @@ namespace Extrinsic::Runtime
         SandboxEditorContext& context = m_Context;
         GuardAttachmentCommandSurfaces(context, m_AttachmentEpoch);
         context.SelectedModelCache = &m_SelectedModelCache;
+        // RUNTIME-194 Slice B5d: the `JobService` submit path. It records the
+        // editor's identity for the token because the service stores none, and
+        // carries its own epoch check for the same reason the guarded surfaces
+        // do — a submission from an expired attachment must not reach a
+        // service this session no longer owns.
+        if (m_Jobs != nullptr)
+        {
+            context.DerivedJobCommands.SubmitJob =
+                [epoch = m_AttachmentEpoch, this](
+                    JobDesc desc,
+                    SandboxEditorJobIdentity identity) -> JobToken
+                {
+                    if (!AttachmentEpochIsActive(epoch) || m_Jobs == nullptr)
+                        return JobToken{};
+                    desc.Scope = m_Worlds->ActiveWorld();
+                    const JobToken token = m_Jobs->Submit(std::move(desc));
+                    if (token.IsValid())
+                        m_JobIdentities.insert_or_assign(token, std::move(identity));
+                    return token;
+                };
+            context.DerivedJobCommands.CancelJob =
+                [epoch = m_AttachmentEpoch, this](const JobToken token)
+                {
+                    if (!AttachmentEpochIsActive(epoch) || m_Jobs == nullptr)
+                        return;
+                    (void)m_Jobs->Cancel(token);
+                };
+        }
         context.KMeansCommands.Required = true;
         if (m_ClusteringService != nullptr)
         {
@@ -16254,14 +16512,45 @@ namespace Extrinsic::Runtime
                         *completed);
             }
         }
+        // RUNTIME-194 Slice B5d: the queue view and the dedup guard read one
+        // list built from both execution surfaces, so a duplicate submission is
+        // refused no matter which path queued the original. The registry half
+        // and the `m_JobIdentities` join both disappear with sub-slice B5d-1z.
+        m_DerivedJobSnapshot = {};
         if (const DerivedJobRegistry* derivedJobs = m_Services->Find<DerivedJobRegistry>();
             derivedJobs != nullptr)
         {
-            m_DerivedJobSnapshot = derivedJobs->SnapshotAll();
+            m_DerivedJobSnapshot =
+                ToSandboxEditorJobQueueSnapshot(derivedJobs->SnapshotAll());
         }
-        else
+        if (m_Jobs != nullptr && !m_JobIdentities.empty())
         {
-            m_DerivedJobSnapshot = {};
+            const std::vector<JobSnapshot> serviceJobs = m_Jobs->SnapshotAll();
+            std::unordered_map<JobToken,
+                               SandboxEditorJobIdentity,
+                               Core::StrongHandleHash<JobTokenTag>>
+                retained{};
+            retained.reserve(m_JobIdentities.size());
+            for (const JobSnapshot& job : serviceJobs)
+            {
+                const auto identity = m_JobIdentities.find(job.Token);
+                if (identity == m_JobIdentities.end())
+                    continue;
+
+                m_DerivedJobSnapshot.Entries.push_back(SandboxEditorJobRecord{
+                    .Token = job.Token,
+                    .Identity = identity->second,
+                    .Name = job.DebugName,
+                    .State = job.State,
+                    .NormalizedProgress = job.Progress.Normalized,
+                    .ProgressDeterminate = job.Progress.Determinate,
+                    .ElapsedMilliseconds = job.ElapsedMilliseconds,
+                });
+                retained.insert(*identity);
+            }
+            // Jobs the service has reaped are gone from the queue view; drop
+            // their identity with them so the table cannot grow without bound.
+            m_JobIdentities = std::move(retained);
         }
         context.DerivedJobs = &m_DerivedJobSnapshot;
         context.MethodResultSinks.KMeans =
@@ -16560,6 +16849,7 @@ namespace Extrinsic::Runtime
         m_LastParameterizationResult.reset();
         m_LastRegistrationResult.reset();
         m_DerivedJobSnapshot = {};
+        m_JobIdentities.clear();
         m_RenderRecipeContext = {};
         m_RenderRecipeState = {};
         m_RenderArtifactRegistry = {};

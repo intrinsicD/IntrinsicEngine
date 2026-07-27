@@ -3145,35 +3145,34 @@ TEST(SandboxEditorUi, ProgressiveInspectorReportsSlotsPropertiesAndJobs)
     const std::uint32_t stableId =
         Runtime::SelectionController::ToStableEntityId(mesh);
 
-    const Runtime::DerivedJobHandle dependencyHandle{99u, 1u};
-    Runtime::DerivedJobQueueSnapshot jobs{};
-    const std::vector<Runtime::DerivedJobStatus> statuses{
-        Runtime::DerivedJobStatus::Blocked,
-        Runtime::DerivedJobStatus::Queued,
-        Runtime::DerivedJobStatus::Running,
-        Runtime::DerivedJobStatus::Applying,
-        Runtime::DerivedJobStatus::Complete,
-        Runtime::DerivedJobStatus::Failed,
-        Runtime::DerivedJobStatus::Cancelled,
-        Runtime::DerivedJobStatus::StaleDiscarded,
+    const Runtime::JobToken dependencyHandle{99u, 1u};
+    Runtime::SandboxEditorJobQueueSnapshot jobs{};
+    const std::vector<Runtime::JobState> statuses{
+        Runtime::JobState::AwaitingDependencies,
+        Runtime::JobState::Queued,
+        Runtime::JobState::Running,
+        Runtime::JobState::AwaitingGate,
+        Runtime::JobState::Published,
+        Runtime::JobState::Rejected,
+        Runtime::JobState::Cancelled,
+        Runtime::JobState::StaleDiscarded,
     };
     for (std::size_t i = 0u; i < statuses.size(); ++i)
     {
-        jobs.Entries.push_back(Runtime::DerivedJobSnapshot{
-            .Handle = Runtime::DerivedJobHandle{
+        jobs.Entries.push_back(Runtime::SandboxEditorJobRecord{
+            .Token = Runtime::JobToken{
                 static_cast<std::uint32_t>(10u + i),
                 1u},
-            .Key = Runtime::DerivedJobKey{
+            .Identity = Runtime::SandboxEditorJobIdentity{
                 .EntityId = stableId,
-                .Domain = Runtime::DerivedJobScope::MeshVertex,
+                .Scope = Runtime::SandboxEditorJobScope::MeshVertex,
                 .OutputSemantic = Runtime::ProgressiveSlotSemantic::Normal,
-                .BindingGeneration = 7u,
                 .OutputName = "normal",
             },
             .Name = "progressive job",
-            .Status = statuses[i],
+            .State = statuses[i],
             .Dependencies = {
-                Runtime::DerivedJobDependency{
+                Runtime::SandboxEditorJobDependency{
                     .Job = dependencyHandle,
                     .Reason = "normal requires uv",
                 },
@@ -3198,7 +3197,7 @@ TEST(SandboxEditorUi, ProgressiveInspectorReportsSlotsPropertiesAndJobs)
     EXPECT_EQ(progressive.BindingGeneration, 7u);
     EXPECT_EQ(progressive.Slots.size(), 2u);
     EXPECT_EQ(progressive.Jobs.size(), statuses.size());
-    EXPECT_EQ(progressive.Jobs[0].Status, Runtime::DerivedJobStatus::Blocked);
+    EXPECT_EQ(progressive.Jobs[0].Status, Runtime::JobState::AwaitingDependencies);
     ASSERT_EQ(progressive.Jobs[0].Dependencies.size(), 1u);
     EXPECT_EQ(progressive.Jobs[0].Dependencies[0].Reason, "normal requires uv");
     EXPECT_EQ(progressive.Jobs[5].Diagnostic, "failed bake");
@@ -3250,7 +3249,7 @@ TEST(SandboxEditorUi, ProgressiveInspectorReportsSlotsPropertiesAndJobs)
         {
             return row.Kind ==
                        Runtime::SandboxEditorBoundRenderStateRowKind::DerivedJob &&
-                   row.JobStatus == Runtime::DerivedJobStatus::Failed;
+                   row.JobStatus == Runtime::JobState::Rejected;
         });
     ASSERT_NE(failedJob, bound.Rows.end());
     EXPECT_EQ(failedJob->Diagnostic, "failed bake");
@@ -3315,18 +3314,17 @@ TEST(SandboxEditorUi, ProgressiveInspectorInfersGraphPointCloudAndComposition)
     ECS::Hierarchy::Attach(registry.Raw(), secondChild, parent);
     ECS::Hierarchy::Attach(registry.Raw(), grandchild, child);
 
-    Runtime::DerivedJobQueueSnapshot jobs{};
-    jobs.Entries.push_back(Runtime::DerivedJobSnapshot{
-        .Handle = Runtime::DerivedJobHandle{77u, 1u},
-        .Key = Runtime::DerivedJobKey{
+    Runtime::SandboxEditorJobQueueSnapshot jobs{};
+    jobs.Entries.push_back(Runtime::SandboxEditorJobRecord{
+        .Token = Runtime::JobToken{77u, 1u},
+        .Identity = Runtime::SandboxEditorJobIdentity{
             .EntityId = Runtime::SelectionController::ToStableEntityId(child),
-            .Domain = Runtime::DerivedJobScope::MeshVertex,
+            .Scope = Runtime::SandboxEditorJobScope::MeshVertex,
             .OutputSemantic = Runtime::ProgressiveSlotSemantic::Normal,
-            .BindingGeneration = 7u,
             .OutputName = "normal",
         },
         .Name = "child normal bake",
-        .Status = Runtime::DerivedJobStatus::Running,
+        .State = Runtime::JobState::Running,
     });
     context.DerivedJobs = &jobs;
     ASSERT_TRUE(selection.SetSelectedEntity(registry, parent));
