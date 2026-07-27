@@ -42,7 +42,7 @@ cleanup slice:
   is retired: one multi-range `Graphics.GpuTransfer` batch now composes with
   `JobService`, and `AsyncBufferReadback`, `GpuReadbackJob`, duplicate result
   buffers/copies, and blocking compute-result reads are gone.
-- [`RUNTIME-196` — Canonical clustering-service CPU/GPU path](RUNTIME-196-canonical-clustering-service-path.md)
+- [`RUNTIME-196` — Canonical clustering-service CPU/GPU path](../../active/RUNTIME-196-canonical-clustering-service-path.md)
   makes `ClusteringService::RunKMeans` the sole typed operation and deletes the
   parallel backend wrapper/private queue/facade DTOs after Vulkan parity.
 - [`RUNTIME-197` — Unified geometry upload and residency coordinator](RUNTIME-197-unified-geometry-upload-residency-coordinator.md)

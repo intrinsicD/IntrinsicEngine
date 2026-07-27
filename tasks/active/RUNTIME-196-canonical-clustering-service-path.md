@@ -6,6 +6,22 @@ maturity_target: Retired
 ---
 # RUNTIME-196 — Canonical clustering-service CPU/GPU path
 
+## Status
+
+- Promoted to active on 2026-07-27 after `RUNTIME-192`, `RUNTIME-194`, and
+  `RUNTIME-195` retired the property-vocabulary, work-lifecycle, and shared
+  GPU-result-readback prerequisites.
+- Intake census found four production routes or surfaces for one operation:
+  `ClusteringService::RunKMeans` owns the CPU lifecycle, the synchronous
+  `Runtime.KMeansBackend` wrapper advertises fallback only,
+  `Runtime.KMeansGpuBackend` exports the Vulkan recorder/readback machinery,
+  and `SandboxEditorSession` owns a separate single-flight GPU queue plus
+  duplicate command/result/backend records. The Vulkan smoke and benchmark
+  also import the backend surface directly.
+- Slice A is in progress: make property identity, backend selection, fallback
+  diagnostics, and the completion record complete on the clustering service
+  before migrating execution or deleting any proven path.
+
 ## Goal
 
 - Make `ClusteringService::RunKMeans` the sole typed clustering operation for
@@ -31,6 +47,32 @@ maturity_target: Retired
   Vulkan implementation remains private module state.
 - Geometry keeps the CPU reference and algorithm data; runtime owns backend
   selection, RHI access, ECS snapshot/writeback, and honest fallback.
+
+## Right-sizing decision
+
+- **Elements:** `Runtime.KMeansBackend`, public
+  `Runtime.KMeansGpuBackend`, `RuntimeKMeansGpuJobQueue`, and the Sandbox
+  K-Means request/result/backend family trigger the shallow-wrapper,
+  role-fragmentation, pure-forwarding, and parallel-pipeline heuristics. They
+  split one feature across two owners and retain an API primarily for direct
+  tests and one benchmark.
+- **Simpler alternative:** deepen the existing `ClusteringModule` and its
+  `ClusteringService::RunKMeans` operation. Export plain request/completion
+  records with canonical `GeometryPropertyRef` identities; keep one optional
+  in-flight Vulkan state, command recording, resource cache, and typed shared
+  readback private in the module implementation. Use the existing
+  `JobService` GPU participant and `Graphics.GpuTransfer`; add no backend
+  interface, factory, registry, service, or queue.
+- **Blast radius:** clustering module interface/implementation, runtime and
+  test CMake registration, Sandbox session/facade/panel models, clustering
+  contracts, the opt-in Vulkan smoke and benchmark, runtime/geometry/backend
+  dispatch docs, task indexes, and the generated module inventory. Strict
+  source-search and layering checks must close the census.
+- **Reintroduction trigger:** extract a reusable backend adapter only when a
+  second independent runtime feature needs the same K-Means recorder with a
+  different lifecycle owner. A second UI, test, benchmark, or parameter
+  variant remains a caller of `ClusteringService` and does not justify another
+  route.
 
 ## Slice plan
 
