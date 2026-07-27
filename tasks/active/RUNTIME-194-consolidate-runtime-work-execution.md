@@ -29,17 +29,22 @@ Updated 2026-07-27 (fourth session).
 
 ### Next action
 
-Take `B5d-1`, the editor job lane. **`B5d` and `B5e` were re-planned into one
-lane on 2026-07-27** — they share `SandboxEditorDerivedJobCommandSurface`, and
-the dedup guard couples the submit path to the queue snapshot, so neither the
-two files nor the submit/presentation halves separate. The measured coupling and
-the sub-slice plan are in `## Progress` -> `B5d+e`; read that before starting,
-and read `FindActiveEditorDerivedJob` (`SandboxEditorFacades.cpp:4787`) with its
-call sites first — it is the only part of the lane with real behaviour.
+Take the next unchecked batch in `## Progress` -> `B5d+e` -> "Batch plan and
+status". **`B5d` and `B5e` were re-planned into one lane on 2026-07-27** — they
+share `SandboxEditorDerivedJobCommandSurface`, and the dedup guard couples the
+submit path to the queue snapshot, so neither the two files nor the
+submit/presentation halves separate. The owner chose the **dual-surface, batched
+route**: both submit paths live side by side, one batch at a time, green gate
+per batch, closed by `B5d-1z`.
 
-`B5d-2` (`AsyncWorkModule`'s shutdown survivor sweep) is separable and comes
-after. Then `StreamingExecutor` has no consumer left and Slice C can delete both
-modules.
+Read that section before starting — the measured coupling, the temporary
+exception's terms, and the list of registry fields the consumer must now record
+itself are all there. Then read `FindActiveEditorDerivedJob`
+(`SandboxEditorFacades.cpp:4787`) with its call sites: it is the only part of
+the lane with real behaviour.
+
+After `B5d-2`, `StreamingExecutor` has no consumer left and Slice C can delete
+both modules.
 
 Note that `B5a`–`B5c` were all lanes with **no production caller**, which is why
 they moved cleanly and are weaker evidence than they look. `B5d` is the live
@@ -765,25 +770,82 @@ and commits independently.
                   first B5 lane where that decision has to be *implemented*
                   rather than simply applied by deleting an unused key.
 
-                  Sub-slices (revised):
-                  - **B5d-1 — the editor job lane, one commit.** The command
-                    surface, all 25 desc sites, the session-owned key index and
-                    dedup query, the queue-row projection over `SnapshotAll()`,
-                    `SandboxEditorProgressiveJobModel` /
-                    `SandboxEditorProgressiveJobDependencyModel`,
-                    `DerivedJobStateSignatureForEntity`,
-                    `AppendDerivedJobHandleToMessage`, and the two Sandbox app
-                    panels. Large, but the analysis above shows it does not
-                    decompose further without leaving the tree non-building.
-                  - **B5d-2 — `AsyncWorkModule`'s shutdown survivor sweep.**
-                    Separable: it only needs `SnapshotAll()` plus `Cancel`, both
-                    of which already exist, and it is the last consumer once
-                    `B5d-1` lands.
+                  #### Chosen route: dual surface, batched (owner, 2026-07-27)
 
-                  **Do not start `B5d-1` without re-reading
-                  `FindActiveEditorDerivedJob` and its ~10 call sites first** —
-                  the dedup guard is the part with real behaviour, and every
-                  other edit in the lane is mechanical.
+                  The one-commit route was rejected: the tree would not build
+                  until the whole lane was done, with no intermediate green
+                  gate. Instead `SandboxEditorDerivedJobCommandSurface` carries
+                  **both** submit paths for the duration of the lane:
+
+                  ```cpp
+                  std::function<DerivedJobHandle(DerivedJobDesc)> Submit{};        // retiring
+                  std::function<void(DerivedJobHandle)> Cancel{};                  // retiring
+                  std::function<JobToken(JobDesc, SandboxEditorJobIdentity)> SubmitJob{};
+                  std::function<void(JobToken)> CancelJob{};
+                  ```
+
+                  This is a **documented temporary migration exception** under
+                  `AGENTS.md`: it lives in this active task, its removal task ID
+                  is `RUNTIME-194` itself (sub-slice `B5d-1z` below), it is
+                  bounded to this lane, and it adds no violation to a promoted
+                  final layer. The dedup guard and the queue view **union** both
+                  sources while the window is open, so a duplicate submission is
+                  refused no matter which path queued the original.
+
+                  #### Batch plan and status
+
+                  - [ ] **B5d-1a — editor-owned job vocabulary + first
+                    consumer.** Add `SandboxEditorJobScope` (the editor-local
+                    replacement for `DerivedJobScope`, `MeshSurface` included —
+                    it must not become general vocabulary),
+                    `SandboxEditorJobIdentity`, `SandboxEditorJobRecord`,
+                    `SandboxEditorJobQueueSnapshot`, and the second submit path.
+                    Retype the *presentation* models
+                    (`SandboxEditorProgressiveJobModel`,
+                    `SandboxEditorProgressiveJobDependencyModel`, the job fields
+                    on `SandboxEditorBoundRenderStateRow`) onto that vocabulary,
+                    with adapters from **both** sources, so later batches move
+                    desc sites without touching presentation again. Session
+                    grows `m_JobSnapshot` + a `JobToken -> identity/domain/
+                    diagnostic` index filled at submit. Migrate
+                    `Runtime.SandboxMethodFacade`'s 2 desc sites as the first
+                    real consumer of the new path. Update the two Sandbox app
+                    panels once, here.
+                  - [ ] **B5d-1b — `SandboxEditorFacades` mesh-method descs.**
+                  - [ ] **B5d-1c — `SandboxEditorFacades` point-cloud / graph /
+                    registration descs.**
+                  - [ ] **B5d-1d — `SandboxEditorFacades` remaining descs**
+                    (UV regeneration, parameterization, visualization).
+                  - [ ] **B5d-1z — close the window.** Delete `Submit`/`Cancel`,
+                    `context.DerivedJobs`, `m_DerivedJobSnapshot`, the union in
+                    the dedup guard and the queue view, and the registry-backed
+                    adapters. After this `SandboxEditorFacades` and
+                    `SandboxMethodFacade` no longer name `DerivedJobGraph`.
+                  - [ ] **B5d-2 — `AsyncWorkModule`'s shutdown survivor sweep.**
+                    Separable: it needs only `SnapshotAll()` plus `Cancel`, both
+                    of which already exist.
+
+                  Each batch keeps the default CPU gate green and commits on its
+                  own. **A batch that cannot go green is reverted, not
+                  weakened.**
+
+                  #### What has real behaviour
+
+                  Everything except the dedup guard is mechanical. Re-read
+                  `FindActiveEditorDerivedJob` (`SandboxEditorFacades.cpp:4787`)
+                  and its ~11 call sites before touching it: it refuses a
+                  duplicate submission when an entry with a **non-terminal**
+                  status matches on `EntityId` + `Domain` + `OutputSemantic` +
+                  `OutputName` (`SameEditorDerivedJobOutput`, `:4776`) — the
+                  four generations on `DerivedJobKey` are *not* part of that
+                  comparison; they were staleness data, and staleness now lives
+                  in each job's own `ValidateBeforeApply`.
+
+                  Fields the registry snapshot carried that `JobService` has no
+                  counterpart for, and which the consumer must therefore record
+                  at submit: `RequestedJobDomain` / `ResolvedJobDomain`,
+                  `Dependencies`, `Diagnostic`, `PayloadToken`,
+                  `PreviousOutputRetained`.
 
                   Unlike `B5a`–`B5c`, this lane has live production callers, so
                   the existing `SandboxEditorUi.*` / `SandboxEditor*` contract
