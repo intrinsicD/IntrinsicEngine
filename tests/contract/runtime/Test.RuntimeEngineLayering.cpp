@@ -958,7 +958,7 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     EXPECT_EQ(CountOccurrences(visualization, "JobDesc{"), 1u);
     EXPECT_EQ(CountOccurrences(visualization, ".Scope = world"), 1u);
 
-    EXPECT_EQ(CountOccurrences(modelHandoff, "DerivedJobDesc "), 4u);
+    EXPECT_EQ(CountOccurrences(modelHandoff, "JobDesc "), 4u);
     EXPECT_EQ(CountOccurrences(modelHandoff, ".Scope = "), 4u);
     EXPECT_EQ(CountOccurrences(selectedBake, "DerivedJobDesc desc"), 1u);
     EXPECT_EQ(CountOccurrences(selectedBake, ".Scope = context.World"), 1u);

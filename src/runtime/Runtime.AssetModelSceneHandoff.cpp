@@ -45,7 +45,8 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetMeshNormals;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
-import Extrinsic.Runtime.DerivedJobGraph;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ProgressiveRenderData;
@@ -1604,37 +1605,45 @@ namespace Extrinsic::Runtime
             ++bindings->BindingGeneration;
         }
 
-        [[nodiscard]] DerivedJobHandle QueueProgressiveNoopJob(
-            DerivedJobRegistry& jobs,
+        // The retired `DerivedJobOutput` carried a payload token and a
+        // diagnostic on every derived job. `JobService` results are typed, so
+        // the enrichment chain declares the one record its apply bodies read.
+        // Jobs whose apply ignores the payload still return a populated
+        // envelope, because an empty envelope is how `JobService` reports a
+        // dropped job.
+        struct ProgressiveEnrichmentResult
+        {
+            std::uint64_t PayloadToken{0u};
+            std::string Diagnostic{};
+        };
+
+        // RUNTIME-194 Slice B5b: the enrichment jobs no longer carry a
+        // `DerivedJobKey`. Nothing here looked the jobs up by entity, semantic,
+        // or generation — the key existed only for the retired registry's
+        // dedup/enumeration — so identity stays with the consumer that has a
+        // reason to hold it, per the Slice B5 decision.
+        [[nodiscard]] JobToken QueueProgressiveNoopJob(
+            JobService& jobs,
             const WorldHandle world,
-            const ECS::EntityHandle entity,
-            const ProgressiveSlotSemantic semantic,
             std::string name,
             std::uint64_t payloadToken,
             std::move_only_function<Core::Result()> apply)
         {
-            const std::uint32_t stableId = StableEntityLookup::ToRenderId(entity);
-            DerivedJobDesc desc{};
-            desc.Key = DerivedJobKey{
-                .EntityId = stableId,
-                .Domain = DerivedJobScope::MeshVertex,
-                .OutputSemantic = semantic,
-                .EntityGeneration = static_cast<std::uint64_t>(entity),
-                .GeometryGeneration = 1u,
-                .SourcePropertyGeneration = 1u,
-                .BindingGeneration = 1u,
-                .OutputName = name,
-            };
-            desc.Name = std::move(name);
+            JobDesc desc{};
+            desc.DebugName = std::move(name);
             desc.Scope = world;
-            desc.Execute = [payloadToken]() -> DerivedJobWorkerResult
+            desc.Kind = RuntimeTaskKinds::GeometryProcess;
+            desc.Work = [payloadToken](const JobCancellation&) -> JobResultEnvelope
             {
-                return DerivedJobOutput{.PayloadToken = payloadToken};
+                return JobResultEnvelope::Make<ProgressiveEnrichmentResult>(
+                    ProgressiveEnrichmentResult{.PayloadToken = payloadToken});
             };
-            desc.ApplyOnMainThread =
-                [apply = std::move(apply)](DerivedJobApplyContext&) mutable -> Core::Result
+            desc.PublishCompletion =
+                [apply = std::move(apply)](
+                    KernelEventBus&,
+                    const JobResultEnvelope&) mutable -> bool
             {
-                return apply ? apply() : Core::Ok();
+                return !apply || apply().has_value();
             };
             return jobs.Submit(std::move(desc));
         }
@@ -1653,16 +1662,14 @@ namespace Extrinsic::Runtime
                 return;
             }
 
-            DerivedJobHandle uvJob{};
-            DerivedJobHandle normalJob{};
+            JobToken uvJob{};
+            JobToken normalJob{};
 
             if (hasProgressiveJobs && !MeshHasVertexTexcoords(primitive.Mesh))
             {
                 uvJob = QueueProgressiveNoopJob(
                     *options.ProgressiveJobs,
                     options.World,
-                    entity,
-                    ProgressiveSlotSemantic::Normal,
                     "generate mesh uv atlas",
                     1001u,
                     [&scene, entity]() -> Core::Result
@@ -1685,8 +1692,6 @@ namespace Extrinsic::Runtime
                 normalJob = QueueProgressiveNoopJob(
                     *options.ProgressiveJobs,
                     options.World,
-                    entity,
-                    ProgressiveSlotSemantic::Normal,
                     "compute mesh vertex normals",
                     1002u,
                     [&scene, entity, propertyName = options.GeneratedNormalPropertyName]() -> Core::Result
@@ -1719,50 +1724,43 @@ namespace Extrinsic::Runtime
             {
                 if (hasProgressiveJobs)
                 {
-                    DerivedJobDesc schedule{};
-                    schedule.Key = DerivedJobKey{
-                        .EntityId = StableEntityLookup::ToRenderId(entity),
-                        .Domain = DerivedJobScope::MeshVertex,
-                        .OutputSemantic = ProgressiveSlotSemantic::Normal,
-                        .EntityGeneration = static_cast<std::uint64_t>(entity),
-                        .GeometryGeneration = 1u,
-                        .SourcePropertyGeneration = 1u,
-                        .BindingGeneration = 1u,
-                        .OutputName = "schedule normal GPU bake request",
-                    };
-                    schedule.Name = "schedule normal GPU bake request";
+                    JobDesc schedule{};
+                    schedule.DebugName = "schedule normal GPU bake request";
                     schedule.Scope = options.World;
+                    schedule.Kind = RuntimeTaskKinds::GeometryProcess;
                     if (uvJob.IsValid())
                     {
-                        schedule.DependsOn.push_back(DerivedJobDependency{
+                        schedule.DependsOn.push_back(JobDependency{
                             .Job = uvJob,
                             .Reason = "uv atlas ready",
                         });
                     }
                     if (normalJob.IsValid())
                     {
-                        schedule.DependsOn.push_back(DerivedJobDependency{
+                        schedule.DependsOn.push_back(JobDependency{
                             .Job = normalJob,
                             .Reason = "vertex normals ready",
                         });
                     }
-                    schedule.Execute = []() -> DerivedJobWorkerResult
+                    schedule.Work = [](const JobCancellation&) -> JobResultEnvelope
                     {
-                        return DerivedJobOutput{
-                            .PayloadToken = 0u,
-                            .Diagnostic = "object-space normal GPU bake request dependencies ready",
-                        };
+                        return JobResultEnvelope::Make<ProgressiveEnrichmentResult>(
+                            ProgressiveEnrichmentResult{
+                                .PayloadToken = 0u,
+                                .Diagnostic = "object-space normal GPU bake request dependencies ready",
+                            });
                     };
-                    schedule.ApplyOnMainThread =
+                    schedule.PublishCompletion =
                         [&scene,
                          entity,
                          queue = options.ObjectSpaceNormalBakeQueue,
                          requestOptions = options](
-                            DerivedJobApplyContext&) mutable -> Core::Result
+                            KernelEventBus&,
+                            const JobResultEnvelope&) mutable -> bool
                     {
                         if (!scene.IsValid(entity))
                         {
-                            return Core::Err(Core::ErrorCode::InvalidState);
+                            return false;
                         }
 
                         RuntimeObjectSpaceNormalBakeRequestBuildResult build =
@@ -1776,7 +1774,7 @@ namespace Extrinsic::Runtime
                                 scene,
                                 entity,
                                 std::move(build.Diagnostic));
-                            return Core::Ok();
+                            return true;
                         }
 
                         RuntimeObjectSpaceNormalBakeResult result =
@@ -1790,7 +1788,7 @@ namespace Extrinsic::Runtime
                             scene,
                             entity,
                             std::move(result.Diagnostic));
-                        return Core::Ok();
+                        return true;
                     };
                     (void)options.ProgressiveJobs->Submit(std::move(schedule));
                     if (diagnostics != nullptr)
@@ -1840,54 +1838,49 @@ namespace Extrinsic::Runtime
             }
             else if (hasProgressiveJobs)
             {
-                DerivedJobDesc bake{};
-                bake.Key = DerivedJobKey{
-                    .EntityId = StableEntityLookup::ToRenderId(entity),
-                    .Domain = DerivedJobScope::MeshVertex,
-                    .OutputSemantic = ProgressiveSlotSemantic::Normal,
-                    .EntityGeneration = static_cast<std::uint64_t>(entity),
-                    .GeometryGeneration = 1u,
-                    .SourcePropertyGeneration = 1u,
-                    .BindingGeneration = 1u,
-                    .OutputName = "bake normal texture",
-                };
-                bake.Name = "bake normal texture";
+                JobDesc bake{};
+                bake.DebugName = "bake normal texture";
                 bake.Scope = options.World;
+                bake.Kind = RuntimeTaskKinds::GeometryProcess;
                 if (uvJob.IsValid())
                 {
-                    bake.DependsOn.push_back(DerivedJobDependency{
+                    bake.DependsOn.push_back(JobDependency{
                         .Job = uvJob,
                         .Reason = "uv atlas ready",
                     });
                 }
                 if (normalJob.IsValid())
                 {
-                    bake.DependsOn.push_back(DerivedJobDependency{
+                    bake.DependsOn.push_back(JobDependency{
                         .Job = normalJob,
                         .Reason = "vertex normals ready",
                     });
                 }
-                bake.Execute = []() -> DerivedJobWorkerResult
+                bake.Work = [](const JobCancellation&) -> JobResultEnvelope
                 {
-                    return DerivedJobOutput{
-                        .PayloadToken = 1003u,
-                        .Diagnostic = "normal texture bake completed without upload in CPU contract path",
-                    };
+                    return JobResultEnvelope::Make<ProgressiveEnrichmentResult>(
+                        ProgressiveEnrichmentResult{
+                            .PayloadToken = 1003u,
+                            .Diagnostic = "normal texture bake completed without upload in CPU contract path",
+                        });
                 };
-                bake.ApplyOnMainThread =
-                    [&scene, entity](DerivedJobApplyContext& context) -> Core::Result
+                bake.PublishCompletion =
+                    [&scene, entity](KernelEventBus&,
+                                     const JobResultEnvelope& result) -> bool
                 {
-                    if (!scene.IsValid(entity))
+                    const auto* output =
+                        result.TryGet<ProgressiveEnrichmentResult>();
+                    if (output == nullptr || !scene.IsValid(entity))
                     {
-                        return Core::Err(Core::ErrorCode::InvalidState);
+                        return false;
                     }
                     MarkProgressiveTextureBakeReady(
                         scene,
                         entity,
                         ProgressiveSlotSemantic::Normal,
-                        context.Output.PayloadToken,
-                        context.Output.Diagnostic);
-                    return Core::Ok();
+                        output->PayloadToken,
+                        output->Diagnostic);
+                    return true;
                 };
                 (void)options.ProgressiveJobs->Submit(std::move(bake));
                 if (diagnostics != nullptr)
@@ -1903,47 +1896,42 @@ namespace Extrinsic::Runtime
                 !materialHasAuthoredAlbedo &&
                 MeshHasVertexProperty(primitive.Mesh, options.GeneratedAlbedoPropertyName))
             {
-                DerivedJobDesc albedoBake{};
-                albedoBake.Key = DerivedJobKey{
-                    .EntityId = StableEntityLookup::ToRenderId(entity),
-                    .Domain = DerivedJobScope::MeshVertex,
-                    .OutputSemantic = ProgressiveSlotSemantic::Albedo,
-                    .EntityGeneration = static_cast<std::uint64_t>(entity),
-                    .GeometryGeneration = 1u,
-                    .SourcePropertyGeneration = 1u,
-                    .BindingGeneration = 1u,
-                    .OutputName = "bake albedo texture",
-                };
-                albedoBake.Name = "bake albedo texture";
+                JobDesc albedoBake{};
+                albedoBake.DebugName = "bake albedo texture";
                 albedoBake.Scope = options.World;
+                albedoBake.Kind = RuntimeTaskKinds::GeometryProcess;
                 if (uvJob.IsValid())
                 {
-                    albedoBake.DependsOn.push_back(DerivedJobDependency{
+                    albedoBake.DependsOn.push_back(JobDependency{
                         .Job = uvJob,
                         .Reason = "uv atlas ready",
                     });
                 }
-                albedoBake.Execute = []() -> DerivedJobWorkerResult
+                albedoBake.Work = [](const JobCancellation&) -> JobResultEnvelope
                 {
-                    return DerivedJobOutput{
-                        .PayloadToken = 1004u,
-                        .Diagnostic = "albedo texture bake completed without upload in CPU contract path",
-                    };
+                    return JobResultEnvelope::Make<ProgressiveEnrichmentResult>(
+                        ProgressiveEnrichmentResult{
+                            .PayloadToken = 1004u,
+                            .Diagnostic = "albedo texture bake completed without upload in CPU contract path",
+                        });
                 };
-                albedoBake.ApplyOnMainThread =
-                    [&scene, entity](DerivedJobApplyContext& context) -> Core::Result
+                albedoBake.PublishCompletion =
+                    [&scene, entity](KernelEventBus&,
+                                     const JobResultEnvelope& result) -> bool
                 {
-                    if (!scene.IsValid(entity))
+                    const auto* output =
+                        result.TryGet<ProgressiveEnrichmentResult>();
+                    if (output == nullptr || !scene.IsValid(entity))
                     {
-                        return Core::Err(Core::ErrorCode::InvalidState);
+                        return false;
                     }
                     MarkProgressiveTextureBakeReady(
                         scene,
                         entity,
                         ProgressiveSlotSemantic::Albedo,
-                        context.Output.PayloadToken,
-                        context.Output.Diagnostic);
-                    return Core::Ok();
+                        output->PayloadToken,
+                        output->Diagnostic);
+                    return true;
                 };
                 (void)options.ProgressiveJobs->Submit(std::move(albedoBake));
                 if (diagnostics != nullptr)

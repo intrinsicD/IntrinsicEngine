@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -9,6 +11,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -50,11 +53,10 @@ import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
-import Extrinsic.Runtime.DerivedJobGraph;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ProgressiveRenderData;
-import Extrinsic.Runtime.StableEntityLookup;
-import Extrinsic.Runtime.StreamingExecutor;
 import Geometry.HalfedgeMesh.IO;
 import Geometry.Properties;
 
@@ -276,15 +278,87 @@ namespace
         service.Tick();
     }
 
-    void PumpDerivedJobs(Runtime::DerivedJobRegistry& jobs, const std::uint32_t maxLaunches)
+    // `JobService` dispatches at submit onto the shared CPU pool and has no
+    // inline fallback, so the progressive enrichment jobs need a live scheduler
+    // for the duration of the test.
+    class SchedulerScope final
     {
-        jobs.Pump(maxLaunches);
-        if (Core::Tasks::Scheduler::IsInitialized())
+    public:
+        explicit SchedulerScope(const unsigned workers = 2)
+        {
+            if (Core::Tasks::Scheduler::IsInitialized())
+            {
+                Core::Tasks::Scheduler::Shutdown();
+            }
+            Core::Tasks::Scheduler::Initialize(workers);
+        }
+
+        ~SchedulerScope()
         {
             Core::Tasks::Scheduler::WaitForAll();
+            Core::Tasks::Scheduler::Shutdown();
         }
-        jobs.DrainCompletions();
-        jobs.ApplyMainThreadResults();
+
+        SchedulerScope(const SchedulerScope&) = delete;
+        SchedulerScope& operator=(const SchedulerScope&) = delete;
+    };
+
+    [[nodiscard]] bool IsTerminalJobState(const Runtime::JobState state)
+    {
+        switch (state)
+        {
+        case Runtime::JobState::Published:
+        case Runtime::JobState::Dropped:
+        case Runtime::JobState::Cancelled:
+        case Runtime::JobState::Rejected:
+        case Runtime::JobState::StaleDiscarded:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    [[nodiscard]] const Runtime::JobSnapshot* FindJob(
+        const std::vector<Runtime::JobSnapshot>& snapshot,
+        const std::string_view debugName)
+    {
+        const auto it = std::ranges::find(
+            snapshot, debugName, &Runtime::JobSnapshot::DebugName);
+        return it == snapshot.end() ? nullptr : &*it;
+    }
+
+    // A dependency edge releases from a completion drain, so an enrichment
+    // chain needs one drain per level. Per RUNTIME-194 Slice B0, drain until
+    // every retained job is terminal rather than asserting on a fixed count.
+    [[nodiscard]] bool DrainProgressiveJobsUntilTerminal(
+        Runtime::JobService& jobs,
+        Runtime::KernelEventBus& events,
+        const std::chrono::milliseconds timeout = std::chrono::seconds{5})
+    {
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        for (;;)
+        {
+            if (Core::Tasks::Scheduler::IsInitialized())
+            {
+                Core::Tasks::Scheduler::WaitForAll();
+            }
+            (void)jobs.DrainCompletions(events);
+            const auto snapshot = jobs.SnapshotAll();
+            if (std::ranges::all_of(
+                    snapshot,
+                    [](const Runtime::JobSnapshot& entry)
+                    {
+                        return IsTerminalJobState(entry.State);
+                    }))
+            {
+                return true;
+            }
+            if (std::chrono::steady_clock::now() >= deadline)
+            {
+                return false;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
+        }
     }
 }
 
@@ -695,8 +769,9 @@ TEST(RuntimeAssetModelSceneHandoff, MaterialLessPrimitiveBindsNeutralLitDefaultM
 TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstPublishesNormalsAndQueuesUvAndBakeJobs)
 {
     SceneHandoffFixture fx;
-    Runtime::StreamingExecutor streaming{};
-    Runtime::DerivedJobRegistry jobs{streaming};
+    SchedulerScope scheduler{};
+    Runtime::JobService jobs{};
+    Runtime::KernelEventBus events{};
     TmpFile modelFile("asset_model_scene_handoff_progressive_triangle.gltf");
     auto payload = MakeModelScenePayload(
         /*includeTexcoords*/ false,
@@ -733,13 +808,17 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstPublishesNormalsA
     const ECS::EntityHandle entity = state->Record.Primitives[0].Entity;
     ASSERT_TRUE(fx.Scene.IsValid(entity));
     ASSERT_TRUE(fx.Scene.Raw().all_of<Runtime::ProgressivePresentationBindings>(entity));
-    const auto jobSnapshot = jobs.SnapshotEntity(Runtime::StableEntityLookup::ToRenderId(entity));
-    ASSERT_EQ(jobSnapshot.Entries.size(), 3u);
-    EXPECT_EQ(jobSnapshot.Entries[0].Name, "generate mesh uv atlas");
-    EXPECT_EQ(jobSnapshot.Entries[1].Name, "bake normal texture");
-    EXPECT_EQ(jobSnapshot.Entries[2].Name, "bake albedo texture");
-    EXPECT_EQ(jobSnapshot.Entries[1].Dependencies.size(), 1u);
-    EXPECT_EQ(jobSnapshot.Entries[2].Dependencies.size(), 1u);
+    const auto jobSnapshot = jobs.SnapshotAll();
+    ASSERT_EQ(jobSnapshot.size(), 3u);
+    EXPECT_EQ(jobSnapshot[0].DebugName, "generate mesh uv atlas");
+    EXPECT_EQ(jobSnapshot[1].DebugName, "bake normal texture");
+    EXPECT_EQ(jobSnapshot[2].DebugName, "bake albedo texture");
+    // `JobSnapshot` carries no dependency list. The edge is observable as the
+    // state a dependent sits in until a completion drain releases it, which is
+    // the behaviour that actually matters.
+    EXPECT_EQ(jobSnapshot[1].State, Runtime::JobState::AwaitingDependencies);
+    EXPECT_EQ(jobSnapshot[2].State, Runtime::JobState::AwaitingDependencies);
+    EXPECT_EQ(jobs.Stats().AwaitingDependencyJobs, 2u);
 
     const auto* initialVertices =
         fx.Scene.Raw().try_get<ECS::Components::GeometrySources::Vertices>(entity);
@@ -747,15 +826,15 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstPublishesNormalsA
     EXPECT_TRUE(initialVertices->Properties.Exists("v:normal"));
     EXPECT_FALSE(initialVertices->Properties.Exists("v:texcoord"));
 
-    PumpDerivedJobs(jobs, 2u);
-    PumpDerivedJobs(jobs, 2u);
+    ASSERT_TRUE(DrainProgressiveJobsUntilTerminal(jobs, events));
 
     const auto* vertices = fx.Scene.Raw().try_get<ECS::Components::GeometrySources::Vertices>(entity);
     ASSERT_NE(vertices, nullptr);
     EXPECT_TRUE(vertices->Properties.Exists("v:texcoord"));
     EXPECT_TRUE(vertices->Properties.Exists("v:normal"));
-    EXPECT_EQ(jobs.SnapshotEntity(Runtime::StableEntityLookup::ToRenderId(entity)).Entries[1].Status,
-              Runtime::DerivedJobStatus::Complete);
+    const auto* normalBake = FindJob(jobs.SnapshotAll(), "bake normal texture");
+    ASSERT_NE(normalBake, nullptr);
+    EXPECT_EQ(normalBake->State, Runtime::JobState::Published);
 
     auto& bindings =
         fx.Scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
@@ -781,8 +860,9 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstPublishesNormalsA
 TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpaceNormalBakeWhenInputsReady)
 {
     SceneHandoffFixture fx;
-    Runtime::StreamingExecutor streaming{};
-    Runtime::DerivedJobRegistry jobs{streaming};
+    SchedulerScope scheduler{};
+    Runtime::JobService jobs{};
+    Runtime::KernelEventBus events{};
     Runtime::RuntimeObjectSpaceNormalBakeQueue normalBakeQueue{};
     TmpFile modelFile("asset_model_scene_handoff_progressive_ready_normal_bake.gltf");
     auto payload = MakeModelScenePayload(
@@ -820,31 +900,15 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpace
 
     const ECS::EntityHandle entity = state->Record.Primitives[0].Entity;
     ASSERT_TRUE(fx.Scene.IsValid(entity));
-    const auto initialJobs =
-        jobs.SnapshotEntity(Runtime::StableEntityLookup::ToRenderId(entity));
-    bool sawCpuNormalBake = false;
-    bool sawGpuSchedule = false;
-    for (const auto& entry : initialJobs.Entries)
-    {
-        sawCpuNormalBake = sawCpuNormalBake || entry.Name == "bake normal texture";
-        sawGpuSchedule =
-            sawGpuSchedule || entry.Name == "schedule normal GPU bake request";
-    }
-    EXPECT_FALSE(sawCpuNormalBake);
-    EXPECT_TRUE(sawGpuSchedule);
+    const auto initialJobs = jobs.SnapshotAll();
+    EXPECT_EQ(FindJob(initialJobs, "bake normal texture"), nullptr);
+    ASSERT_NE(FindJob(initialJobs, "schedule normal GPU bake request"), nullptr);
 
-    PumpDerivedJobs(jobs, 2u);
-    PumpDerivedJobs(jobs, 2u);
-    const auto afterJobs =
-        jobs.SnapshotEntity(Runtime::StableEntityLookup::ToRenderId(entity));
-    for (const auto& entry : afterJobs.Entries)
-    {
-        if (entry.Name == "schedule normal GPU bake request")
-        {
-            EXPECT_EQ(entry.Status, Runtime::DerivedJobStatus::Complete)
-                << entry.Diagnostic;
-        }
-    }
+    ASSERT_TRUE(DrainProgressiveJobsUntilTerminal(jobs, events));
+    const auto* schedule =
+        FindJob(jobs.SnapshotAll(), "schedule normal GPU bake request");
+    ASSERT_NE(schedule, nullptr);
+    EXPECT_EQ(schedule->State, Runtime::JobState::Published);
     EXPECT_EQ(normalBakeQueue.Diagnostics().QueuedRequests, 1u);
     EXPECT_EQ(normalBakeQueue.Diagnostics().NonOperationalNoOps, 0u);
     EXPECT_EQ(normalBakeQueue.PendingCount(), 1u);
@@ -872,8 +936,9 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpace
 TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpaceNormalBakeAfterUvEnrichment)
 {
     SceneHandoffFixture fx;
-    Runtime::StreamingExecutor streaming{};
-    Runtime::DerivedJobRegistry jobs{streaming};
+    SchedulerScope scheduler{};
+    Runtime::JobService jobs{};
+    Runtime::KernelEventBus events{};
     Runtime::RuntimeObjectSpaceNormalBakeQueue normalBakeQueue{};
     TmpFile modelFile("asset_model_scene_handoff_progressive_enriched_normal_bake.gltf");
     auto payload = MakeModelScenePayload(
@@ -911,31 +976,22 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpace
 
     const ECS::EntityHandle entity = state->Record.Primitives[0].Entity;
     ASSERT_TRUE(fx.Scene.IsValid(entity));
-    const auto initialJobs =
-        jobs.SnapshotEntity(Runtime::StableEntityLookup::ToRenderId(entity));
-    bool sawUvAtlas = false;
-    bool sawGpuSchedule = false;
-    std::size_t scheduleDependencies = 0u;
-    for (const auto& entry : initialJobs.Entries)
-    {
-        sawUvAtlas = sawUvAtlas || entry.Name == "generate mesh uv atlas";
-        if (entry.Name == "schedule normal GPU bake request")
-        {
-            sawGpuSchedule = true;
-            scheduleDependencies = entry.Dependencies.size();
-        }
-    }
-    EXPECT_TRUE(sawUvAtlas);
-    EXPECT_TRUE(sawGpuSchedule);
-    EXPECT_EQ(scheduleDependencies, 1u);
+    const auto initialJobs = jobs.SnapshotAll();
+    EXPECT_NE(FindJob(initialJobs, "generate mesh uv atlas"), nullptr);
+    const auto* initialSchedule =
+        FindJob(initialJobs, "schedule normal GPU bake request");
+    ASSERT_NE(initialSchedule, nullptr);
+    // The schedule job depends on the UV atlas job, so it stays blocked until a
+    // completion drain releases it — the observable form of the edge that the
+    // retired snapshot exposed as a dependency list.
+    EXPECT_EQ(initialSchedule->State, Runtime::JobState::AwaitingDependencies);
 
     const auto* initialVertices =
         fx.Scene.Raw().try_get<ECS::Components::GeometrySources::Vertices>(entity);
     ASSERT_NE(initialVertices, nullptr);
     EXPECT_FALSE(initialVertices->Properties.Exists("v:texcoord"));
 
-    PumpDerivedJobs(jobs, 2u);
-    PumpDerivedJobs(jobs, 2u);
+    ASSERT_TRUE(DrainProgressiveJobsUntilTerminal(jobs, events));
 
     const auto* vertices =
         fx.Scene.Raw().try_get<ECS::Components::GeometrySources::Vertices>(entity);
@@ -963,8 +1019,9 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpace
 TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstDoesNotCpuFallbackWhenNormalBakeBackendIsNonOperational)
 {
     SceneHandoffFixture fx;
-    Runtime::StreamingExecutor streaming{};
-    Runtime::DerivedJobRegistry jobs{streaming};
+    SchedulerScope scheduler{};
+    Runtime::JobService jobs{};
+    Runtime::KernelEventBus events{};
     Runtime::RuntimeObjectSpaceNormalBakeQueue normalBakeQueue{};
     TmpFile modelFile("asset_model_scene_handoff_progressive_nonoperational_normal_bake.gltf");
     auto payload = MakeModelScenePayload(
@@ -1001,31 +1058,15 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstDoesNotCpuFallbac
 
     const ECS::EntityHandle entity = state->Record.Primitives[0].Entity;
     ASSERT_TRUE(fx.Scene.IsValid(entity));
-    const auto initialJobs =
-        jobs.SnapshotEntity(Runtime::StableEntityLookup::ToRenderId(entity));
-    bool sawCpuNormalBake = false;
-    bool sawGpuSchedule = false;
-    for (const auto& entry : initialJobs.Entries)
-    {
-        sawCpuNormalBake = sawCpuNormalBake || entry.Name == "bake normal texture";
-        sawGpuSchedule =
-            sawGpuSchedule || entry.Name == "schedule normal GPU bake request";
-    }
-    EXPECT_FALSE(sawCpuNormalBake);
-    EXPECT_TRUE(sawGpuSchedule);
+    const auto initialJobs = jobs.SnapshotAll();
+    EXPECT_EQ(FindJob(initialJobs, "bake normal texture"), nullptr);
+    ASSERT_NE(FindJob(initialJobs, "schedule normal GPU bake request"), nullptr);
 
-    PumpDerivedJobs(jobs, 2u);
-    PumpDerivedJobs(jobs, 2u);
-    const auto afterJobs =
-        jobs.SnapshotEntity(Runtime::StableEntityLookup::ToRenderId(entity));
-    for (const auto& entry : afterJobs.Entries)
-    {
-        if (entry.Name == "schedule normal GPU bake request")
-        {
-            EXPECT_EQ(entry.Status, Runtime::DerivedJobStatus::Complete)
-                << entry.Diagnostic;
-        }
-    }
+    ASSERT_TRUE(DrainProgressiveJobsUntilTerminal(jobs, events));
+    const auto* schedule =
+        FindJob(jobs.SnapshotAll(), "schedule normal GPU bake request");
+    ASSERT_NE(schedule, nullptr);
+    EXPECT_EQ(schedule->State, Runtime::JobState::Published);
     EXPECT_EQ(normalBakeQueue.Diagnostics().QueuedRequests, 0u);
     EXPECT_EQ(normalBakeQueue.Diagnostics().NonOperationalNoOps, 1u);
     EXPECT_EQ(normalBakeQueue.PendingCount(), 0u);

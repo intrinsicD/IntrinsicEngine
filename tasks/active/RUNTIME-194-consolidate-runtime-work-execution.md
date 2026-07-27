@@ -6,7 +6,7 @@ maturity_target: Retired
 ---
 # RUNTIME-194 — Consolidate runtime work execution
 
-## Session handoff (written 2026-07-26)
+## Session handoff (written 2026-07-27)
 
 Everything a fresh session needs to resume this task. Read `AGENTS.md` and
 `tasks/SESSION-BRIEF.md` first as usual; this section only covers what is not
@@ -14,42 +14,40 @@ derivable from the tree.
 
 ### Where the work stands
 
-Updated 2026-07-26 (third session).
+Updated 2026-07-27 (fourth session).
 
-- Default CPU gate: **4262/4262**, one skip
+- Default CPU gate: **4264/4264**, one skip
   (`GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl`, expected on a
   headless host). Strict layering, docs-sync, test-layout, root-hygiene, and all
   task validators pass.
-- Slice A landed in `2214ddf9`. **Slice B is nearly done**: `B0` (`73dedb2a`,
-  the unpublished-finalizer contract gap), `B1` (`6cb2152b`,
-  `VisualizationAdapters`), `B3` (`b09cee58`, `SceneDocumentModule`), and
-  `B2`+`B4` (the import lane) are landed. **All six production
-  `StreamingExecutor::Submit` sites are migrated.** Only `B5`
-  (`DerivedJobRegistry` consumers) remains.
+- Slice A landed in `2214ddf9`. **Slice B is in its last lane**: `B0`
+  (`73dedb2a`), `B1` (`6cb2152b`), `B3` (`b09cee58`), `B2`+`B4` (`6db202c6`),
+  `B5-0` (`0eb46f32`, `JobService::SnapshotAll()`), `B5a` (`7f78963d`,
+  `GpuReadbackJob`), and `B5b` (`AssetModelSceneHandoff`) are landed. **All six
+  production `StreamingExecutor::Submit` sites are migrated.** `B5c`–`B5e`
+  remain.
 
 ### Next action
 
-Take `B5`, the last and largest lane: the `DerivedJobRegistry` consumers
-(30 src/test files at the last census). Re-run the census first, since the
-earlier counts predate B1–B4:
-
-```bash
-grep -rln "DerivedJobRegistry\|Runtime.DerivedJobGraph" src/ tests/ --include=*.cpp --include=*.cppm
-```
+Take `B5c` — `Runtime.SelectedMeshTextureBake` (1 desc). Then `B5d`
+(`SandboxMethodFacade`, 2 descs + editor messages) and `B5e` (the big one:
+`SandboxEditorFacades` + the two Sandbox app panels + `AsyncWorkModule`'s
+shutdown survivor sweep). After `B5`, `StreamingExecutor` has no consumer left
+and Slice C can delete both modules.
 
 Two behaviours to preserve, both already expressible on `JobService`:
 `DerivedJobRegistry::ValidateOnMainThread`'s five-way staleness reason maps onto
 `ValidateBeforeApply` returning `JobApplyValidation` (discard, never apply, when
 not `Current`), and `ApplyMainThreadResults(maxApplyCount)` maps onto
-`DrainCompletions(events, maxApplyCount)`. After `B5`, `StreamingExecutor` has
-no consumer left and Slice C can delete both modules.
+`DrainCompletions(events, maxApplyCount)`.
 
 Read `## Progress` -> Slice B for the lane list, the two standing obligations
 every lane owes (the `ProductionAsyncSubmissionsCarryOwningWorldScope`
 source-text assertions and `src/runtime/README.md`), and these accumulated
 lessons:
 
-- **B0** — never assert on a fixed drain count; drain until terminal.
+- **B0** — never assert on a fixed drain count; drain until terminal. This bites
+  hardest on dependency chains, which release one level per drain.
 - **B3** — only assert an exact terminal `JobState` when nothing else in the
   test can reach the consumer first. An observer that revalidates its own
   binding can cancel the job before the drain classifies it.
@@ -61,6 +59,17 @@ lessons:
   transition, not at the cancel request, so a consumer's visible state
   terminalizes only once the worker returns. Any test that cancels a *blocked*
   worker and then waits for terminal before releasing it will deadlock.
+- **B5b** — **`JobService` has no inline fallback.** `StreamingExecutor` ran its
+  work inline when `Core::Tasks::Scheduler` was uninitialized;
+  `JobService::DispatchJob` always calls `Scheduler::Dispatch`, and
+  `DispatchInternal` silently drops the task with no scheduler, so the job hangs
+  in `Queued`. Any migrated test in a binary without a global scheduler needs a
+  `SchedulerScope`.
+- **B5b** — a job whose apply body ignores its payload still needs a populated
+  result envelope; an empty envelope is how `JobService` reports a dropped job.
+- **B5b** — `DerivedJobDesc` defaulted `Kind` to `GeometryProcess` while
+  `JobDesc` defaults to `Generic`. Set `Kind` explicitly or the lane taxonomy
+  silently changes.
 
 ### Verify the checkpoint before changing anything
 
@@ -580,8 +589,71 @@ and commits independently.
                   CPU gate 4264/4264; `GpuReadbackJob.*` 0/40 under stress. The
                   `gpu;vulkan` smoke is migrated in the same commit but is
                   opt-in and did not run on this host.
-            - [ ] **B5b** — `Runtime.AssetModelSceneHandoff` (4 descs,
-                  dependency chains).
+            - [x] **B5b — `Runtime.AssetModelSceneHandoff`.** The progressive
+                  enrichment chain: two optional leaf jobs (`generate mesh uv
+                  atlas`, `compute mesh vertex normals`) and three dependents
+                  (`schedule normal GPU bake request`, `bake normal texture`,
+                  `bake albedo texture`). Like `B5a` it has **no production
+                  caller** — `AssetModelSceneHandoffOptions::ProgressiveJobs` is
+                  set only by this module's four contract tests — so the lane
+                  proves the dependency-chain shape without touching a live
+                  workflow.
+
+                  `DerivedJobRegistry* ProgressiveJobs` -> `JobService*`;
+                  `.Name` -> `.DebugName`, `.Execute` -> `.Work`,
+                  `.ApplyOnMainThread` -> `.PublishCompletion`,
+                  `DerivedJobDependency` -> `JobDependency`. `DerivedJobDesc`
+                  defaulted `Kind` to `GeometryProcess` and `JobDesc` defaults
+                  to `Generic`, so every desc sets `Kind` explicitly to keep the
+                  lane taxonomy.
+
+                  **All four `DerivedJobKey` constructions are gone**, per the
+                  B5 decision. Nothing looked these jobs up by entity, semantic,
+                  or generation — the key existed only for the registry's dedup
+                  and per-entity enumeration — so `QueueProgressiveNoopJob` also
+                  loses its now-unused `entity` and `semantic` parameters.
+
+                  Two apply bodies read `DerivedJobApplyContext::Output`
+                  (`PayloadToken`, `Diagnostic`), which `JobService` has no
+                  counterpart for because its results are typed. They get a
+                  local `ProgressiveEnrichmentResult` record carried in the
+                  envelope; the jobs whose apply ignores the payload still
+                  return a populated envelope, since an empty one is how
+                  `JobService` reports a dropped job. Apply failure maps from
+                  `Core::Err` onto `PublishCompletion` returning false.
+
+                  **Test-side, the lane hit a `JobService` property worth
+                  recording.** `StreamingExecutor` runs its work inline when
+                  `Core::Tasks::Scheduler` is not initialized;
+                  `JobService::DispatchJob` calls `Scheduler::Dispatch`
+                  unconditionally, and `DispatchInternal` silently drops the
+                  task when there is no scheduler. The runtime contract binary
+                  initializes no global scheduler, so all four migrated tests
+                  gained a `SchedulerScope` — without it the jobs would sit in
+                  `Queued` forever rather than failing loudly.
+
+                  `SnapshotEntity(renderId)` becomes `SnapshotAll()` plus a
+                  `FindJob(name)` helper — sound here because each test
+                  materializes exactly one entity. `JobSnapshot` carries no
+                  dependency list, so the two `Dependencies.size() == 1`
+                  assertions become the behaviour that list stood for: the
+                  dependent sits in `AwaitingDependencies` until a drain
+                  releases it (checked against `Stats().AwaitingDependencyJobs`
+                  too). That is deterministic because materialization never
+                  drains. `PumpDerivedJobs(jobs, 2)` called twice becomes
+                  `DrainProgressiveJobsUntilTerminal`, per B0's lesson — a
+                  dependency releases from a drain, so a chain needs one drain
+                  per level and a fixed count is a race.
+
+                  `Test.RuntimeEngineLayering`'s source-text assertion moves
+                  from `DerivedJobDesc ` to `JobDesc `; the `.Scope = ` count is
+                  unchanged at 4.
+
+                  CPU gate 4264/4264, one expected headless skip;
+                  `RuntimeAssetModelSceneHandoff.*` 0/40 failures under stress.
+                  `src/runtime/README.md` updated in the same commit (module row
+                  plus the "Streaming integration" migration state); module
+                  inventory unchanged.
             - [ ] **B5c** — `Runtime.SelectedMeshTextureBake` (1 desc).
             - [ ] **B5d** — `Runtime.SandboxMethodFacade` (2 descs + editor
                   messages).

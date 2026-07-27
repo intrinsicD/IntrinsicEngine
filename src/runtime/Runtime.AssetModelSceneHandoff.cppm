@@ -21,7 +21,7 @@ import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
-import Extrinsic.Runtime.DerivedJobGraph;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.WorldHandle;
 
@@ -36,7 +36,11 @@ export namespace Extrinsic::Runtime
         bool GenerateMissingNormalTextures{true};
         bool GenerateMissingAlbedoTextures{true};
         bool ProgressiveRawGeometryFirst{false};
-        DerivedJobRegistry* ProgressiveJobs{nullptr};
+        // Optional execution service for the progressive enrichment chain
+        // (UV atlas / vertex normals, then the dependent texture bakes).
+        // Null in every non-test composition today; when null the enrichment
+        // jobs are simply not queued.
+        JobService* ProgressiveJobs{nullptr};
         WorldHandle World{DefaultWorldHandle};
         std::uint64_t BindingEpoch{0u};
         std::function<bool()> BindingValid{};
