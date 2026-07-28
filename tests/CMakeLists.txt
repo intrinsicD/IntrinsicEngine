@@ -281,6 +281,7 @@ if(TARGET ExtrinsicRuntime)
         Test.GraphGeometryExtraction.cpp
         Test.GraphGeometryPacker.cpp
         Test.GeometryAvailability.cpp
+        Test.GeometryPresentation.cpp
         Test.PointCloudGeometryExtraction.cpp
         Test.PointCloudGeometryPacker.cpp
         Test.ParameterizationFacade.cpp

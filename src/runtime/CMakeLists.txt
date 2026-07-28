@@ -23,6 +23,7 @@ target_sources(${target_name}
         Runtime.JobServiceGpuQueueBridge.cppm
         Modules/Clustering/Runtime.ClusteringModule.cppm
         Modules/Clustering/Runtime.ClusteringGpuBackend.cppm
+        Runtime.GeometryPresentation.cppm
         Runtime.MeshAttributeTextureBake.cppm
         Runtime.ObjectSpaceNormalBakeBinding.cppm
         Runtime.ObjectSpaceNormalBakeQueue.cppm
@@ -103,6 +104,7 @@ target_sources(${target_name}
         Modules/Clustering/Runtime.ClusteringModule.cpp
         Modules/Clustering/Runtime.ClusteringGpuBackend.cpp
         Modules/Clustering/Runtime.ClusteringGpuState.cpp
+        Runtime.GeometryPresentation.cpp
         Runtime.MeshAttributeTextureBake.cpp
         Runtime.ObjectSpaceNormalBakeBinding.cpp
         Runtime.ObjectSpaceNormalBakeQueue.cpp

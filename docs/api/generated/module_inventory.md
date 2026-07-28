@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 74 |
+| `runtime` | 75 |
 
 ## Modules
 
@@ -363,6 +363,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.EngineConfigControl` | `src/runtime/Runtime.EngineConfigControl.cppm` | `runtime` |
 | `Extrinsic.Runtime.FramePacingDiagnostics` | `src/runtime/Runtime.FramePacingDiagnostics.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryAvailability` | `src/runtime/Runtime.GeometryAvailability.cppm` | `runtime` |
+| `Extrinsic.Runtime.GeometryPresentation` | `src/runtime/Runtime.GeometryPresentation.cppm` | `runtime` |
 | `Extrinsic.Runtime.GraphGeometryPacker` | `src/runtime/Runtime.GraphGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.InputActions` | `src/runtime/Runtime.InputActions.cppm` | `runtime` |
 | `Extrinsic.Runtime.JobService` | `src/runtime/Runtime.JobService.cppm` | `runtime` |
@@ -409,4 +410,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SceneInteractionModule` | `src/runtime/Scene/Runtime.SceneInteractionModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **382**
+Total modules: **383**

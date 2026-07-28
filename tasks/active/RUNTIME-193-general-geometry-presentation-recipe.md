@@ -17,9 +17,19 @@ maturity_target: Retired
   choices with readiness, diagnostics, generated outputs, expected counts,
   and source/binding generations; scene serialization persists several of
   those runtime observations.
-- Slice A is in progress: introduce the neutral authored recipe and copied,
-  generation-qualified operational snapshot in one cohesive runtime module
-  before migrating or deleting the proven path.
+- Slice A completed on 2026-07-28. `Runtime.GeometryPresentation` now exports
+  one authored `GeometryPresentationRecipe` using canonical
+  `GeometryPropertyRef`, one runtime-only status sidecar, and one fully copied
+  `GeometryPresentationSnapshot`. The pure projection preserves uniform and
+  previous-output fallback, reports readiness/diagnostics, and carries exact
+  recipe/source/output generations without an ECS entity, borrowed view, job,
+  GPU handle, or service pointer. The focused module target built and its
+  mesh/graph/point-cloud/procedural/property-option/legacy-spelling contracts
+  passed 5/5. The old
+  modules remain until Slice B migrates real workflows.
+- Slice B is next: migrate scene persistence and every runtime/app consumer to
+  the recipe plus status sidecar before any progressive-named surface is
+  removed.
 
 ## Goal
 
@@ -86,11 +96,11 @@ maturity_target: Retired
 
 ## Required changes
 
-- [ ] Add one serializable `GeometryPresentationRecipe` containing stable
+- [x] Add one serializable `GeometryPresentationRecipe` containing stable
       property/asset identities and explicit material/visualization choices,
       without borrowed pointers, ECS entities, job handles, GPU handles, or
       operational readiness.
-- [ ] Add one copied `GeometryPresentationSnapshot` for effective state,
+- [x] Add one copied `GeometryPresentationSnapshot` for effective state,
       readiness, fallback, diagnostics, and exact generations.
 - [ ] Project the recipe into renderer snapshots through pure/runtime-owned
       extraction functions and the existing render-world submission boundary.
