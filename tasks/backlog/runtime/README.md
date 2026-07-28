@@ -9,7 +9,7 @@ another backlog directory.
 
 ### Unified property-to-texture pipeline
 
-- [`RUNTIME-191` — Unify property-to-texture baking and retire specialized paths](RUNTIME-191-unified-property-texture-bake-pipeline.md)
+- [`RUNTIME-191` — Unify property-to-texture baking and retire specialized paths](../../active/RUNTIME-191-unified-property-texture-bake-pipeline.md)
   follows `RUNTIME-192`'s canonical property reference and completes the
   narrower `RUNTIME-190` migration. It makes
   `TextureBakeModule`/`TextureBakeService` the one production surface for

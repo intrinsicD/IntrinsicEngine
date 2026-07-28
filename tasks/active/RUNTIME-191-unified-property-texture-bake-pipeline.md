@@ -6,6 +6,25 @@ maturity_target: Retired
 ---
 # RUNTIME-191 — Unify property-to-texture baking and retire specialized paths
 
+## Status
+
+- Promoted to active on 2026-07-28 after `RUNTIME-190` and `RUNTIME-192`
+  retired the generalized GPU texture-bake owner and canonical geometry-
+  property vocabulary prerequisites.
+- Owner: Codex. Branch: `main`. Next verification: land Slice A's canonical
+  property request/result vocabulary and run the focused headless
+  `TextureBake` contract selector before changing either GPU participant.
+- Intake census found 12,662 lines across the generalized runtime/graphics
+  bake modules and the selected-mesh, CPU mesh-attribute, and object-space-
+  normal families. Production currently registers two JobService GPU
+  participants, exposes the object-normal queue through
+  `TextureBakeProducerContext`, and retains live CPU bake calls in model-scene
+  handoff plus the older selected-mesh direct command.
+- Slice A will move the execution vocabulary onto
+  `Runtime.TextureBakeModule` without changing GPU recording or deleting
+  compatibility modules. Slices B/C own semantic adoption and parity; Slice D
+  remains a separate mechanical deletion.
+
 ## Goal
 
 - Make `TextureBakeModule` the single runtime owner and
