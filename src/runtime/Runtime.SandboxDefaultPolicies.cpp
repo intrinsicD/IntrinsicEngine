@@ -147,6 +147,85 @@ namespace Extrinsic::Runtime
             };
         }
 
+        void ConfigureDirectMeshNormalPresentationTarget(
+            ECS::Scene::Registry& scene,
+            const ECS::EntityHandle entity,
+            const std::string_view outputName)
+        {
+            auto& raw = scene.Raw();
+            auto& recipe =
+                raw.get_or_emplace<GeometryPresentationRecipe>(entity);
+            recipe.Shape = GeometryPresentationShape::Mesh;
+
+            GeometryPresentationLaneRecipe* lane = FindGeometryPresentationLane(
+                recipe, GeometryRenderLane::Surface);
+            if (lane == nullptr)
+            {
+                recipe.Lanes.push_back(GeometryPresentationLaneRecipe{
+                    .Lane = GeometryRenderLane::Surface,
+                    .PresentationKey = "mesh.surface",
+                });
+            }
+            else if (lane->PresentationKey.empty())
+            {
+                lane->PresentationKey = "mesh.surface";
+            }
+
+            GeometryPresentationBindingRecipe* presentation =
+                FindGeometryPresentationBinding(recipe, "mesh.surface");
+            if (presentation == nullptr)
+            {
+                recipe.Presentations.push_back(
+                    GeometryPresentationBindingRecipe{
+                        .Key = "mesh.surface",
+                        .Kind = GeometryPresentationKind::SurfaceMaterial,
+                    });
+                presentation = &recipe.Presentations.back();
+            }
+            GeometryPresentationSlotRecipe* slot = FindGeometryPresentationSlot(
+                *presentation, GeometryPresentationSlotSemantic::Normal);
+            if (slot == nullptr)
+            {
+                presentation->Slots.push_back(GeometryPresentationSlotRecipe{
+                    .Semantic = GeometryPresentationSlotSemantic::Normal,
+                });
+                slot = &presentation->Slots.back();
+            }
+            slot->SourceKind = GeometryPresentationSourceKind::PropertyBake;
+            slot->Property = GeometryPropertyRef{
+                .Domain = GeometryElementDomain::MeshVertex,
+                .Name = std::string{ECS::Components::GeometrySources::
+                                        PropertyNames::kNormal},
+                .ValueKind = Geometry::PropertyValueKind::Vec3,
+            };
+            slot->GeneratedOutputName = std::string{outputName};
+            slot->NormalSpace = GeometryPresentationNormalSpace::Object;
+            slot->GeneratedPolicy =
+                GeometryGeneratedOutputPolicy::DeterministicChildAsset;
+            slot->Enabled = true;
+
+            auto& state =
+                raw.get_or_emplace<GeometryPresentationRuntimeState>(entity);
+            GeometryPresentationSlotStatus* status =
+                FindGeometryPresentationSlotStatus(
+                    state,
+                    presentation->Key,
+                    GeometryPresentationSlotSemantic::Normal);
+            if (status == nullptr)
+            {
+                state.Slots.push_back(GeometryPresentationSlotStatus{
+                    .PresentationKey = presentation->Key,
+                    .Semantic = GeometryPresentationSlotSemantic::Normal,
+                });
+                status = &state.Slots.back();
+            }
+            status->Readiness = GeometryPresentationReadiness::Pending;
+            status->Provenance =
+                GeometryPresentationProvenance::PropertyBinding;
+            status->Diagnostic = "GPU property texture bake pending";
+            ++state.RecipeGeneration;
+        }
+
         void MarkMeshGeometryDirty(entt::registry& raw,
                                    const ECS::EntityHandle entity)
         {
@@ -218,6 +297,97 @@ namespace Extrinsic::Runtime
             ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
         };
 
+        struct DirectMeshNormalBakeRetryDone
+        {
+            ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
+        };
+
+        constexpr std::uint32_t kDirectMeshNormalBakeRetryDrainLimit = 256u;
+
+        void DeferDirectMeshNormalBakeUntilOperational(
+            JobService& jobs,
+            const WorldHandle world,
+            ECS::Scene::Registry& scene,
+            TextureBakeService& textureBake,
+            const ECS::EntityHandle entity,
+            std::string sourcePath)
+        {
+            auto readinessChecks = std::make_shared<std::uint32_t>(0u);
+            const JobToken handle = jobs.Submit(
+                JobDesc{
+                    .DebugName = "Runtime.DirectMeshNormalBakeRetry." +
+                        FileNameFromPath(sourcePath),
+                    .Scope = world,
+                    .Priority = Core::Dag::TaskPriority::Low,
+                    .Kind = RuntimeTaskKinds::AssetDecode,
+                    .EstimatedCost = 1u,
+                    .Work =
+                        [entity](const JobCancellation&)
+                        {
+                            return JobResultEnvelope::Make<
+                                DirectMeshNormalBakeRetryDone>(
+                                DirectMeshNormalBakeRetryDone{
+                                    .Entity = entity,
+                                });
+                        },
+                    .IsReadyToApply =
+                        [&textureBake, readinessChecks]
+                        {
+                            if (textureBake.Available())
+                                return true;
+                            ++*readinessChecks;
+                            return *readinessChecks >=
+                                kDirectMeshNormalBakeRetryDrainLimit;
+                        },
+                    .ValidateBeforeApply =
+                        [&scene, entity]
+                        {
+                            return scene.IsValid(entity)
+                                ? JobApplyValidation::Current
+                                : JobApplyValidation::MissingTarget;
+                        },
+                    .PublishCompletion =
+                        [
+                            &textureBake,
+                            entity,
+                            world,
+                            sourcePath
+                        ](
+                            KernelEventBus&,
+                            const JobResultEnvelope& envelope) -> bool
+                        {
+                            const auto* const done =
+                                envelope.TryGet<
+                                    DirectMeshNormalBakeRetryDone>();
+                            if (done == nullptr || done->Entity != entity)
+                                return false;
+
+                            const PropertyTextureBakeResult result =
+                                textureBake.Bake(
+                                    BuildDirectMeshNormalBakeRequest(
+                                        entity,
+                                        world));
+                            if (!result.Succeeded())
+                            {
+                                Core::Log::Warn(
+                                    "[Runtime] Deferred direct mesh normal texture bake failed: path='{}' status={} diagnostic='{}'",
+                                    sourcePath,
+                                    DebugNameForPropertyTextureBakeStatus(
+                                        result.Status),
+                                    result.Diagnostic);
+                            }
+                            return true;
+                        },
+                });
+
+            if (!handle.IsValid())
+            {
+                Core::Log::Warn(
+                    "[Runtime] Direct mesh normal texture bake retry submission failed: path='{}'",
+                    sourcePath);
+            }
+        }
+
         void QueueDirectMeshPostProcess(
             JobService* jobs,
             const WorldHandle world,
@@ -276,9 +446,10 @@ namespace Extrinsic::Runtime
                         [
                             state,
                             &scene,
+                            jobs,
                             textureBake,
                             world
-                            ](
+                        ](
                                 KernelEventBus&,
                                 const JobResultEnvelope& envelope) -> bool
                         {
@@ -324,44 +495,28 @@ namespace Extrinsic::Runtime
 
                             if (textureBake != nullptr)
                             {
-                                PropertyTextureBakeResult result =
+                                ConfigureDirectMeshNormalPresentationTarget(
+                                    scene,
+                                    state->Entity,
+                                    "generated-normal");
+                                const PropertyTextureBakeResult result =
                                     textureBake->Bake(
                                         BuildDirectMeshNormalBakeRequest(
                                             state->Entity,
                                             world));
-                                if (result.Succeeded())
+                                if (result.Status ==
+                                    PropertyTextureBakeStatus::
+                                        NonOperationalBackend)
                                 {
-                                    const TextureBakeMutationResult consumers =
-                                        textureBake->SetConsumers(
-                                            TextureBakeConsumerUpdateRequest{
-                                                .StableEntityId =
-                                                    StableEntityLookup::
-                                                        ToRenderId(
-                                                            state->Entity),
-                                                .OutputName =
-                                                    result.OutputName,
-                                                .Consumers = {
-                                                    TextureBakeConsumerBinding{
-                                                        .Semantic =
-                                                            GeometryPresentationSlotSemantic::
-                                                                Normal,
-                                                        .NormalSpace =
-                                                            PropertyTextureNormalSpace::
-                                                                Object,
-                                                    },
-                                                },
-                                            });
-                                    if (!consumers.Succeeded())
-                                    {
-                                        Core::Log::Warn(
-                                            "[Runtime] Direct mesh normal texture consumer binding failed: path='{}' diagnostic='{}'",
-                                            state->Path,
-                                            consumers.Diagnostic);
-                                    }
+                                    DeferDirectMeshNormalBakeUntilOperational(
+                                        *jobs,
+                                        world,
+                                        scene,
+                                        *textureBake,
+                                        state->Entity,
+                                        state->Path);
                                 }
-                                else if (result.Status !=
-                                         PropertyTextureBakeStatus::
-                                             NonOperationalBackend)
+                                else if (!result.Succeeded())
                                 {
                                     Core::Log::Warn(
                                         "[Runtime] Direct mesh normal texture bake request failed: path='{}' status={} diagnostic='{}'",

@@ -137,18 +137,18 @@ namespace Extrinsic::Sandbox::Editor
             bool* UvPreserveAuthored{nullptr};
         };
 
-        [[nodiscard]] std::span<const TextureBakeConsumerBinding>
-            TextureBakeConsumersFor(
+        [[nodiscard]] std::span<const SandboxEditorTextureBakeTarget>
+        TextureBakeTargetsFor(
                 const SandboxEditorTextureBakeControlsModel& model,
                 const std::string_view outputName)
         {
             const auto found = std::ranges::find(
-                model.TextureBakeConsumerBindings,
+                model.TextureBakeTargets,
                 outputName,
-                &TextureBakeConsumerSnapshot::OutputName);
-            if (found == model.TextureBakeConsumerBindings.end())
+                &SandboxEditorTextureBakeTargetSnapshot::OutputName);
+            if (found == model.TextureBakeTargets.end())
                 return {};
-            return found->Consumers;
+            return found->Targets;
         }
 
         struct BuiltinWindowSpec
@@ -920,23 +920,23 @@ namespace Extrinsic::Sandbox::Editor
                 {
                     if (selectedSource == nullptr)
                         return false;
-                    const std::array<TextureBakeConsumerBinding, 1> consumer{{
-                        TextureBakeConsumerBinding{
+                    const std::array<SandboxEditorTextureBakeTarget, 1> target{{
+                    SandboxEditorTextureBakeTarget{
                             .PresentationKey = "mesh.surface",
                             .Semantic = semantic,
                             .Colormap = static_cast<ColormapType>(colormapIndex),
                         },
                     }};
                     const PropertyTextureBakeRepresentation representation =
-                        ResolvePropertyTextureBakeRepresentation(
+                    ResolveSandboxEditorTextureBakeTargetRepresentation(
                             selectedSource->ResolvedExpectedValueKind(),
                             kTextureBakeStorageModes[
                                 static_cast<std::size_t>(storageIndex)],
                             kTextureBakeEncoders[
                                 static_cast<std::size_t>(encoderIndex)],
-                            consumer);
-                    return IsPropertyTextureBakeConsumerCompatible(
-                        consumer.front(),
+                        target);
+                    return IsSandboxEditorTextureBakeTargetCompatible(
+                    target.front(),
                         selectedSource->ResolvedExpectedValueKind(),
                         representation.Storage,
                         representation.Encoding);
@@ -996,23 +996,23 @@ namespace Extrinsic::Sandbox::Editor
                 kColormapNames.data(),
                 static_cast<int>(kColormapNames.size()));
 
-            const auto makeConsumer =
+            const auto makeTarget =
                 [colormapIndex](const GeometryPresentationSlotSemantic semantic)
                 {
-                    return TextureBakeConsumerBinding{
+                    return SandboxEditorTextureBakeTarget{
                         .PresentationKey = "mesh.surface",
                         .Semantic = semantic,
                         .Colormap = static_cast<ColormapType>(colormapIndex),
                     };
                 };
-            const auto consumersCompatible =
+            const auto targetsCompatible =
                 [selectedSource, storageIndex, encoderIndex](
-                    const std::vector<TextureBakeConsumerBinding>& values)
+                    const std::vector<SandboxEditorTextureBakeTarget>& values)
                 {
                     if (selectedSource == nullptr)
                         return false;
                     const PropertyTextureBakeRepresentation representation =
-                        ResolvePropertyTextureBakeRepresentation(
+                    ResolveSandboxEditorTextureBakeTargetRepresentation(
                             selectedSource->ResolvedExpectedValueKind(),
                             kTextureBakeStorageModes[
                                 static_cast<std::size_t>(storageIndex)],
@@ -1021,18 +1021,18 @@ namespace Extrinsic::Sandbox::Editor
                             values);
                     return std::ranges::all_of(
                         values,
-                        [&](const TextureBakeConsumerBinding& consumer)
+                        [&](const SandboxEditorTextureBakeTarget& target)
                         {
-                            return IsPropertyTextureBakeConsumerCompatible(
-                                consumer,
+                            return IsSandboxEditorTextureBakeTargetCompatible(
+                            target,
                                 selectedSource->ResolvedExpectedValueKind(),
                                 representation.Storage,
                                 representation.Encoding);
                         });
                 };
 
-            std::vector<TextureBakeConsumerBinding> consumers{
-                makeConsumer(kTextureBakeTargetSemantics[
+            std::vector<SandboxEditorTextureBakeTarget> consumers{
+                makeTarget(kTextureBakeTargetSemantics[
                     static_cast<std::size_t>(semanticIndex)])};
             for (std::size_t i = 0u;
                  i < kTextureBakeTargetSemantics.size();
@@ -1044,7 +1044,7 @@ namespace Extrinsic::Sandbox::Editor
                     1u << static_cast<std::uint32_t>(i);
                 if ((additionalConsumerMask & bit) != 0u)
                     consumers.push_back(
-                        makeConsumer(kTextureBakeTargetSemantics[i]));
+                        makeTarget(kTextureBakeTargetSemantics[i]));
             }
 
             ImGui::TextUnformatted("Additional consumers");
@@ -1059,16 +1059,16 @@ namespace Extrinsic::Sandbox::Editor
                 const std::uint32_t bit =
                     1u << static_cast<std::uint32_t>(i);
                 bool selected = (additionalConsumerMask & bit) != 0u;
-                std::vector<TextureBakeConsumerBinding> candidate = consumers;
+                std::vector<SandboxEditorTextureBakeTarget> candidate = consumers;
                 if (!selected)
-                    candidate.push_back(makeConsumer(semantic));
-                const bool compatible = consumersCompatible(candidate);
+                    candidate.push_back(makeTarget(semantic));
+                const bool compatible = targetsCompatible(candidate);
                 if (selected && !compatible)
                 {
                     additionalConsumerMask &= ~bit;
                     std::erase_if(
                         consumers,
-                        [semantic](const TextureBakeConsumerBinding& consumer)
+                        [semantic](const SandboxEditorTextureBakeTarget& consumer)
                         {
                             return consumer.Semantic == semantic;
                         });
@@ -1083,7 +1083,7 @@ namespace Extrinsic::Sandbox::Editor
                     if (selected)
                     {
                         additionalConsumerMask |= bit;
-                        consumers.push_back(makeConsumer(semantic));
+                        consumers.push_back(makeTarget(semantic));
                     }
                     else
                     {
@@ -1091,7 +1091,7 @@ namespace Extrinsic::Sandbox::Editor
                         std::erase_if(
                             consumers,
                             [semantic](
-                                const TextureBakeConsumerBinding& consumer)
+                                const SandboxEditorTextureBakeTarget& consumer)
                             {
                                 return consumer.Semantic == semantic;
                             });
@@ -1103,7 +1103,7 @@ namespace Extrinsic::Sandbox::Editor
 
             const bool hasNormalConsumer = std::ranges::any_of(
                 consumers,
-                [](const TextureBakeConsumerBinding& consumer)
+                [](const SandboxEditorTextureBakeTarget& consumer)
                 {
                     return consumer.Semantic == GeometryPresentationSlotSemantic::Normal;
                 });
@@ -1124,7 +1124,7 @@ namespace Extrinsic::Sandbox::Editor
                 model.CanBake &&
                 context != nullptr &&
                 selectedSource != nullptr &&
-                consumersCompatible(consumers);
+                targetsCompatible(consumers);
             if (!canBake)
                 ImGui::BeginDisabled();
             if (ImGui::Button("Bake") && canBake)
@@ -1150,9 +1150,9 @@ namespace Extrinsic::Sandbox::Editor
                         .EncodingColormap =
                             static_cast<ColormapType>(colormapIndex),
                         .NormalSpace = normalSpaceIndex == 1
-                            ? PropertyTextureNormalSpace::World
-                            : PropertyTextureNormalSpace::Object,
-                        .Consumers = consumers,
+                            ? GeometryPresentationNormalSpace::World
+                            : GeometryPresentationNormalSpace::Object,
+                        .Targets = consumers,
                         .BindGeneratedTexture = true,
                     });
             }
@@ -1213,9 +1213,9 @@ namespace Extrinsic::Sandbox::Editor
                         ImGui::Text("Baked colormap: %s",
                                     kColormapNames[mapIndex]);
                     }
-                    const std::span<const TextureBakeConsumerBinding>
+                    const std::span<const SandboxEditorTextureBakeTarget>
                         existingConsumers =
-                            TextureBakeConsumersFor(
+                            TextureBakeTargetsFor(
                                 model,
                                 record.OutputName);
                     if (record.Encoding ==
@@ -1224,12 +1224,12 @@ namespace Extrinsic::Sandbox::Editor
                         const auto normalConsumer = std::ranges::find(
                             existingConsumers,
                             GeometryPresentationSlotSemantic::Normal,
-                            &TextureBakeConsumerBinding::Semantic);
+                            &SandboxEditorTextureBakeTarget::Semantic);
                         ImGui::Text(
                             "Normal space: %s",
                             normalConsumer != existingConsumers.end() &&
                                     normalConsumer->NormalSpace ==
-                                        PropertyTextureNormalSpace::World
+                                        GeometryPresentationNormalSpace::World
                                 ? "world"
                                 : "object");
                     }
@@ -1277,7 +1277,7 @@ namespace Extrinsic::Sandbox::Editor
                         mutationDiagnostic = result.Diagnostic;
                     }
 
-                    std::vector<TextureBakeConsumerBinding> nextConsumers{
+                    std::vector<SandboxEditorTextureBakeTarget> nextConsumers{
                         existingConsumers.begin(),
                         existingConsumers.end()};
                     bool consumersChanged = false;
@@ -1291,14 +1291,14 @@ namespace Extrinsic::Sandbox::Editor
                             nextConsumers.begin(),
                             nextConsumers.end(),
                             [semantic](
-                                const TextureBakeConsumerBinding& consumer)
+                                const SandboxEditorTextureBakeTarget& consumer)
                             {
                                 return consumer.Semantic == semantic;
                             });
                         bool enabled = found != nextConsumers.end();
                         const bool compatible =
-                            IsPropertyTextureBakeConsumerCompatible(
-                                TextureBakeConsumerBinding{
+                            IsSandboxEditorTextureBakeTargetCompatible(
+                                SandboxEditorTextureBakeTarget{
                                     .PresentationKey = "mesh.surface",
                                     .Semantic = semantic,
                                 },
@@ -1316,7 +1316,7 @@ namespace Extrinsic::Sandbox::Editor
                             if (enabled)
                             {
                                 nextConsumers.push_back(
-                                    TextureBakeConsumerBinding{
+                                    SandboxEditorTextureBakeTarget{
                                         .PresentationKey = "mesh.surface",
                                         .Semantic = semantic,
                                         .Colormap = static_cast<ColormapType>(
@@ -1328,7 +1328,7 @@ namespace Extrinsic::Sandbox::Editor
                                 std::erase_if(
                                     nextConsumers,
                                     [semantic](
-                                        const TextureBakeConsumerBinding&
+                                        const SandboxEditorTextureBakeTarget&
                                             consumer)
                                     {
                                         return consumer.Semantic == semantic;
@@ -1349,7 +1349,7 @@ namespace Extrinsic::Sandbox::Editor
                     if (rawScalar)
                     {
                         int recordColormap = 0;
-                        for (const TextureBakeConsumerBinding& consumer :
+                        for (const SandboxEditorTextureBakeTarget& consumer :
                              nextConsumers)
                         {
                             if (consumer.Semantic ==
@@ -1373,7 +1373,7 @@ namespace Extrinsic::Sandbox::Editor
                                 static_cast<int>(kColormapNames.size())))
                         {
                             consumersChanged = true;
-                            for (TextureBakeConsumerBinding& consumer :
+                            for (SandboxEditorTextureBakeTarget& consumer :
                                  nextConsumers)
                             {
                                 if (consumer.Semantic ==
@@ -1391,12 +1391,12 @@ namespace Extrinsic::Sandbox::Editor
                     if (context != nullptr && consumersChanged)
                     {
                         const TextureBakeMutationResult result =
-                            SetSandboxEditorBakedTextureConsumers(
+                            SetSandboxEditorBakedTextureTargets(
                                 *context,
-                                TextureBakeConsumerUpdateRequest{
+                                SandboxEditorTextureBakeTargetUpdateRequest{
                                     .StableEntityId = model.SelectedStableId,
                                     .OutputName = record.OutputName,
-                                    .Consumers = std::move(nextConsumers),
+                                    .Targets = std::move(nextConsumers),
                                 });
                         mutationDiagnostic = result.Diagnostic;
                     }
@@ -2711,23 +2711,11 @@ namespace Extrinsic::Sandbox::Editor
                                     static_cast<unsigned long long>(
                                         result->EmbeddedTextureAssetsCreated));
                     }
-                    if (result->GeneratedTextureAssetsCreated > 0u)
-                    {
-                        ImGui::Text("Generated textures: %llu",
-                                    static_cast<unsigned long long>(
-                                        result->GeneratedTextureAssetsCreated));
-                    }
                     if (result->TextureUploadRequests > 0u)
                     {
                         ImGui::Text("Texture upload requests: %llu",
                                     static_cast<unsigned long long>(
                                         result->TextureUploadRequests));
-                    }
-                    if (result->GeneratedTextureUploadRequests > 0u)
-                    {
-                        ImGui::Text("Generated texture upload requests: %llu",
-                                    static_cast<unsigned long long>(
-                                        result->GeneratedTextureUploadRequests));
                     }
                 }
                 DrawAssetImportQueue(frame.AssetImportQueue, context);
@@ -2753,48 +2741,42 @@ namespace Extrinsic::Sandbox::Editor
                 {
                     gpuProfilingConfigResult =
                         ApplySandboxEditorGpuProfilingConfigCommand(
-                            *context,
-                            gpuProfilingEnabled);
+                            *context, gpuProfilingEnabled);
                 }
                 if (!gpuProfilingToggleAvailable)
                 {
                     ImGui::EndDisabled();
                     DrawDisabledReasonTooltip(
-                        frame.RenderGraph
-                            .GpuProfilingToggleDisabledReason);
+                        frame.RenderGraph.GpuProfilingToggleDisabledReason);
                 }
                 if (gpuProfilingConfigResult.has_value() &&
                     !gpuProfilingConfigResult->Message.empty())
                 {
                     ImGui::TextWrapped(
-                        "%s",
-                        gpuProfilingConfigResult->Message.c_str());
+                        "%s", gpuProfilingConfigResult->Message.c_str());
                     for (const auto& diagnostic :
                          gpuProfilingConfigResult->Preview.Diagnostics)
                     {
-                        const std::string text =
-                            diagnostic.Subject.empty()
-                                ? diagnostic.Message
-                                : diagnostic.Subject + ": " +
-                                    diagnostic.Message;
+                        const std::string text = diagnostic.Subject.empty()
+                                                     ? diagnostic.Message
+                                                     : diagnostic.Subject +
+                                                           ": " +
+                                                           diagnostic.Message;
                         ImGui::BulletText("%s", text.c_str());
                     }
                     for (const std::string& field :
-                         gpuProfilingConfigResult->Apply
-                             .RejectedBootOnlyFields)
+                         gpuProfilingConfigResult->Apply.RejectedBootOnlyFields)
                     {
-                        ImGui::BulletText(
-                            "Boot-only field rejected: %s",
-                            field.c_str());
+                        ImGui::BulletText("Boot-only field rejected: %s",
+                                          field.c_str());
                     }
                 }
-                if (!frame.RenderGraph
-                         .GpuProfilingControlStatusText.empty())
+                if (!frame.RenderGraph.GpuProfilingControlStatusText.empty())
                 {
                     ImGui::TextWrapped(
                         "%s",
-                        frame.RenderGraph
-                            .GpuProfilingControlStatusText.c_str());
+                        frame.RenderGraph.GpuProfilingControlStatusText
+                            .c_str());
                 }
                 for (const std::string& diagnostic :
                      frame.RenderGraph.GpuProfilingControlDiagnostics)
@@ -2805,7 +2787,8 @@ namespace Extrinsic::Sandbox::Editor
 
                 if (!frame.RenderGraph.Enabled)
                 {
-                    ImGui::TextDisabled("Renderer frame graph diagnostics are unavailable.");
+                    ImGui::TextDisabled(
+                        "Renderer frame graph diagnostics are unavailable.");
                     DrawDiagnostics(frame.RenderGraph.Diagnostics);
                 }
                 else
@@ -2813,53 +2796,63 @@ namespace Extrinsic::Sandbox::Editor
                     ImGui::TextWrapped("%s",
                                        frame.RenderGraph.StatusText.c_str());
                     ImGui::Text("Compile: %s (%llu us)",
-                                frame.RenderGraph.CompileSucceeded ? "yes" : "no",
-                                static_cast<unsigned long long>(
+                                frame.RenderGraph.CompileSucceeded ? "yes"
+                                                                   : "no",
+                                    static_cast<unsigned long long>(
                                     frame.RenderGraph.CompileTimeMicros));
                     ImGui::Text("Execute: %s (%llu us), device=%s",
-                                frame.RenderGraph.ExecuteSucceeded ? "yes" : "no",
-                                static_cast<unsigned long long>(
+                                frame.RenderGraph.ExecuteSucceeded ? "yes"
+                                                                   : "no",
+                                    static_cast<unsigned long long>(
                                     frame.RenderGraph.ExecuteTimeMicros),
-                                frame.RenderGraph.DeviceOperational ? "operational" : "not operational");
+                                frame.RenderGraph.DeviceOperational
+                                    ? "operational"
+                                    : "not operational");
                     ImGui::Text("Passes: %u live, %u culled",
                                 frame.RenderGraph.PassCount,
                                 frame.RenderGraph.CulledPassCount);
-                    ImGui::Text("Resources: %u, barriers=%u, transient=%llu bytes",
-                                frame.RenderGraph.ResourceCount,
-                                frame.RenderGraph.BarrierCount,
+                    ImGui::Text(
+                        "Resources: %u, barriers=%u, transient=%llu bytes",
+                        frame.RenderGraph
+                            .ResourceCount,
+                        frame.RenderGraph
+                         .BarrierCount,
                                 static_cast<unsigned long long>(
                                     frame.RenderGraph.TransientMemoryEstimateBytes));
-                    ImGui::Text("Queue handoffs: %u, timeline edges=%u signals=%u waits=%u "
-                                "ownership=%u",
+                    ImGui::Text(
+                        "Queue handoffs: %u, timeline edges=%u signals=%u "
+                        "waits=%u "
+                        "ownership=%u",
                                 frame.RenderGraph.QueueHandoffEdgeCount,
-                                frame.RenderGraph.CrossQueueTimelineEdgeCount,
-                                frame.RenderGraph.CrossQueueTimelineSignalCount,
-                                frame.RenderGraph.CrossQueueTimelineWaitCount,
-                                frame.RenderGraph.CrossQueueOwnershipTransferCount);
-                    ImGui::Text("Command passes: recorded=%u skipped=%u nonOperational=%u "
-                                "unavailable=%u",
-                                frame.RenderGraph.CommandPassesRecorded,
-                                frame.RenderGraph.CommandPassesSkipped,
-                                frame.RenderGraph.CommandPassesSkippedNonOperational,
-                                frame.RenderGraph.CommandPassesSkippedUnavailable);
+                        frame.RenderGraph.CrossQueueTimelineEdgeCount,
+                        frame.RenderGraph.CrossQueueTimelineSignalCount,
+                        frame.RenderGraph.CrossQueueTimelineWaitCount,
+                        frame.RenderGraph.CrossQueueOwnershipTransferCount);
+                    ImGui::Text(
+                        "Command passes: recorded=%u skipped=%u "
+                        "nonOperational=%u "
+                        "unavailable=%u",
+                        frame.RenderGraph.CommandPassesRecorded,
+                        frame.RenderGraph.CommandPassesSkipped,
+                        frame.RenderGraph.CommandPassesSkippedNonOperational,
+                        frame.RenderGraph.CommandPassesSkippedUnavailable);
                     ImGui::Text("Async compute frames: %u",
                                 frame.RenderGraph.AsyncComputeUtilizedFrames);
-                    if (ImGui::CollapsingHeader(
-                            "GPU Profile",
-                            ImGuiTreeNodeFlags_DefaultOpen))
+                    if (ImGui::CollapsingHeader("GPU Profile",
+                                                ImGuiTreeNodeFlags_DefaultOpen))
                     {
                         const SandboxEditorGpuProfileModel& profile =
                             frame.RenderGraph.GpuProfile;
-                        ImGui::Text(
-                            "Status: %s, source=%s, fresh=%s, stale=%s",
-                            profile.Status.c_str(),
-                            profile.Source.c_str(),
-                            profile.Fresh ? "yes" : "no",
-                            profile.Stale ? "yes" : "no");
+                        ImGui::Text("Status: %s, source=%s, fresh=%s, stale=%s",
+                                    profile.Status.c_str(),
+                                    profile.Source.c_str(),
+                                    profile.Fresh ? "yes" : "no",
+                                    profile.Stale ? "yes" : "no");
                         if (profile.HasResolvedFrame)
                         {
                             ImGui::Text(
-                                "Resolved submission: frame=%llu slot=%u age=%llu frame(s)",
+                                "Resolved submission: frame=%llu slot=%u "
+                                "age=%llu frame(s)",
                                 static_cast<unsigned long long>(
                                     profile.ResolvedSubmittedFrameNumber),
                                 profile.ResolvedFrameSlot,
@@ -2868,21 +2861,18 @@ namespace Extrinsic::Sandbox::Editor
                         }
                         else
                         {
-                            ImGui::TextDisabled(
-                                "No resolved submission key.");
+                            ImGui::TextDisabled("No resolved submission key.");
                         }
                         if (!profile.Diagnostic.empty())
                         {
-                            ImGui::TextWrapped(
-                                "Profile diagnostic: %s",
-                                profile.Diagnostic.c_str());
+                            ImGui::TextWrapped("Profile diagnostic: %s",
+                                               profile.Diagnostic.c_str());
                         }
 
                         ImGui::Text("Queue envelopes:");
                         if (profile.QueueEnvelopes.empty())
                         {
-                            ImGui::TextDisabled(
-                                "No queue envelope samples.");
+                            ImGui::TextDisabled("No queue envelope samples.");
                         }
                         for (const SandboxEditorGpuProfileQueueModel& queue :
                              profile.QueueEnvelopes)
@@ -2892,16 +2882,15 @@ namespace Extrinsic::Sandbox::Editor
                                 ImGui::BulletText(
                                     "%s - %llu ns (%s)",
                                     queue.Queue.c_str(),
-                                    static_cast<unsigned long long>(
+                                static_cast<unsigned long long>(
                                         *queue.DurationNs),
                                     queue.Source.c_str());
                             }
                             else
                             {
-                                ImGui::BulletText(
-                                    "%s - unavailable (%s)",
-                                    queue.Queue.c_str(),
-                                    queue.Source.c_str());
+                                ImGui::BulletText("%s - unavailable (%s)",
+                                                  queue.Queue.c_str(),
+                                                  queue.Source.c_str());
                             }
                         }
 
@@ -2913,16 +2902,18 @@ namespace Extrinsic::Sandbox::Editor
                         for (const SandboxEditorGpuProfilePassModel& pass :
                              profile.Passes)
                         {
-                            const std::string typedId = pass.HasTypedId
-                                ? " [" + std::to_string(pass.TypedId) + "]"
-                                : std::string{};
+                            const std::string typedId =
+                                pass.HasTypedId
+                                    ? " [" + std::to_string(pass.TypedId) + "]"
+                                    : std::string{};
                             if (pass.DurationNs.has_value())
                             {
                                 ImGui::BulletText(
-                                    "%s%s - %llu ns, queue=%s, command=%s, source=%s",
+                                    "%s%s - %llu ns, queue=%s, command=%s, "
+                                    "source=%s",
                                     pass.Name.c_str(),
                                     typedId.c_str(),
-                                    static_cast<unsigned long long>(
+                                static_cast<unsigned long long>(
                                         *pass.DurationNs),
                                     pass.Queue.c_str(),
                                     pass.CommandStatus.c_str(),

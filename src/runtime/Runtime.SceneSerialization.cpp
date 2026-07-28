@@ -1249,6 +1249,9 @@ namespace Extrinsic::Runtime
                 {"uniformDefault", GeometryPresentationDefaultValueToJson(slot.UniformDefault)},
                 {"property", GeometryPropertyRefToJson(slot.Property)},
                 {"textureAsset", AssetIdToJson(slot.TextureAsset)},
+                {"generatedOutputName", slot.GeneratedOutputName},
+                {"textureColormap", ColormapToString(slot.TextureColormap)},
+                {"normalSpace", std::string(ToString(slot.NormalSpace))},
                 {"generatedPolicy", std::string(ToString(slot.GeneratedPolicy))},
             };
         }
@@ -1306,6 +1309,33 @@ namespace Extrinsic::Runtime
                      !TryReadAssetId(value["generatedTexture"], out.TextureAsset))
             {
                 return false;
+            }
+            if (value.contains("generatedOutputName"))
+            {
+                if (!value["generatedOutputName"].is_string())
+                    return false;
+                out.GeneratedOutputName =
+                    value["generatedOutputName"].get<std::string>();
+            }
+            if (value.contains("textureColormap"))
+            {
+                if (!value["textureColormap"].is_string() ||
+                    !TryColormapFromString(
+                        value["textureColormap"].get<std::string>(),
+                        out.TextureColormap))
+                {
+                    return false;
+                }
+            }
+            if (value.contains("normalSpace"))
+            {
+                if (!value["normalSpace"].is_string() ||
+                    !TryParseGeometryPresentationNormalSpace(
+                        value["normalSpace"].get<std::string>(),
+                        out.NormalSpace))
+                {
+                    return false;
+                }
             }
             if (value.contains("generatedPolicy"))
             {

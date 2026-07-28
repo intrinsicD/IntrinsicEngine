@@ -5895,6 +5895,11 @@ public:
                 engine.RequestExit();
                 return;
             }
+            m_Stage = Stage::WaitingForRemovalReconciliation;
+            break;
+        case Stage::WaitingForRemovalReconciliation:
+            if (!ObserveRemovalReconciliation())
+                break;
             m_Stage = Stage::Finished;
             engine.RequestExit();
             break;
@@ -5979,6 +5984,7 @@ private:
         InfernoSettle,
         WaitingForRebakeReadback,
         RetireReadback,
+        WaitingForRemovalReconciliation,
         Finished,
     };
 
@@ -6000,17 +6006,17 @@ private:
         };
     }
 
-    [[nodiscard]] std::vector<RT::TextureBakeConsumerBinding>
-    Consumers(const Extrinsic::Graphics::Colormap::Type colormap) const
+    [[nodiscard]] std::vector<RT::SandboxEditorTextureBakeTarget> Targets(
+        const Extrinsic::Graphics::Colormap::Type colormap) const
     {
         return {
-            RT::TextureBakeConsumerBinding{
+            RT::SandboxEditorTextureBakeTarget{
                 .PresentationKey =
                     std::string{kRuntime190Presentation},
                 .Semantic = RT::GeometryPresentationSlotSemantic::Albedo,
                 .Colormap = colormap,
             },
-            RT::TextureBakeConsumerBinding{
+            RT::SandboxEditorTextureBakeTarget{
                 .PresentationKey =
                     std::string{kRuntime190Presentation},
                 .Semantic =
@@ -6043,7 +6049,7 @@ private:
         command.OutputName = std::string{kRuntime190VertexOutput};
         command.Storage =
             RT::PropertyTextureBakeStorage::RawFloat;
-        command.Consumers = Consumers(colormap);
+        command.Targets = Targets(colormap);
         command.BindGeneratedTexture = true;
         return command;
     }
@@ -6137,7 +6143,8 @@ private:
     [[nodiscard]] bool RenameEdgeAndSelectInferno()
     {
         const RT::TextureBakeMutationResult renamed =
-            m_TextureBake->Rename(
+            RT::RenameSandboxEditorBakedTexture(
+                CommandContext(),
                 m_StableEntityId,
                 kRuntime190EdgeOutput,
                 kRuntime190SavedEdgeOutput);
@@ -6173,14 +6180,15 @@ private:
             return false;
         }
 
-        const std::vector<RT::TextureBakeConsumerBinding> inferno =
-            Consumers(Extrinsic::Graphics::Colormap::Type::Inferno);
+        const std::vector<RT::SandboxEditorTextureBakeTarget> inferno =
+            Targets(Extrinsic::Graphics::Colormap::Type::Inferno);
         const RT::TextureBakeMutationResult changed =
-            m_TextureBake->SetConsumers(
-                RT::TextureBakeConsumerUpdateRequest{
+            RT::SetSandboxEditorBakedTextureTargets(
+                CommandContext(),
+                RT::SandboxEditorTextureBakeTargetUpdateRequest{
                     .StableEntityId = m_StableEntityId,
                     .OutputName = std::string{kRuntime190VertexOutput},
-                    .Consumers = inferno,
+                    .Targets = inferno,
                 });
         if (!changed.Succeeded())
         {
@@ -6188,7 +6196,7 @@ private:
                  changed.Diagnostic);
             return false;
         }
-        m_VertexCommand.Consumers = inferno;
+        m_VertexCommand.Targets = inferno;
         return true;
     }
 
@@ -6271,7 +6279,10 @@ private:
         for (const std::string_view name : names)
         {
             const RT::TextureBakeMutationResult removed =
-                m_TextureBake->Remove(m_StableEntityId, name);
+                RT::RemoveSandboxEditorBakedTexture(
+                    CommandContext(),
+                    m_StableEntityId,
+                    name);
             if (!removed.Succeeded())
             {
                 Fail("Generated texture removal failed: " +
@@ -6308,25 +6319,33 @@ private:
                       *presentation,
                       RT::GeometryPresentationSlotSemantic::ScalarField)
                 : nullptr;
-        const auto material =
-            m_Extraction->GetMaterialTextureAssetBindings(
-                m_StableEntityId);
-        PropertyBufferFallbackObserved =
+        const bool recipeFallbackObserved =
             snapshot.Textures.empty() &&
             albedo != nullptr &&
             scalar != nullptr &&
             albedo->SourceKind ==
                 RT::GeometryPresentationSourceKind::PropertyBuffer &&
             scalar->SourceKind ==
-                RT::GeometryPresentationSourceKind::PropertyBuffer &&
-            (!material.has_value() || !material->Albedo.IsValid());
+                RT::GeometryPresentationSourceKind::PropertyBuffer;
         if (!AssetsDestroyedObserved ||
-            !PropertyBufferFallbackObserved)
+            !recipeFallbackObserved)
         {
             Fail("Removing generated textures did not destroy assets and restore "
-                 "property-buffer consumers.");
+                 "property-buffer presentation targets.");
             return false;
         }
+        return true;
+    }
+
+    [[nodiscard]] bool ObserveRemovalReconciliation()
+    {
+        const auto material =
+            m_Extraction->GetMaterialTextureAssetBindings(
+                m_StableEntityId);
+        if (material.has_value() && material->Albedo.IsValid())
+            return false;
+
+        PropertyBufferFallbackObserved = true;
         return true;
     }
 

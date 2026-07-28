@@ -621,9 +621,7 @@ namespace Extrinsic::Runtime
                 .Error = Core::ErrorCode::Success,
                 .PrimitiveEntitiesCreated = imported.PrimitiveEntitiesCreated,
                 .EmbeddedTextureAssetsCreated = imported.EmbeddedTextureAssetsCreated,
-                .GeneratedTextureAssetsCreated = imported.GeneratedTextureAssetsCreated,
                 .TextureUploadRequests = imported.TextureUploadRequests,
-                .GeneratedTextureUploadRequests = imported.GeneratedTextureUploadRequests,
                 .MaterializedModelScene = imported.MaterializedModelScene,
                 .RequestedTextureUpload = imported.RequestedTextureUpload,
             };
@@ -4132,8 +4130,52 @@ namespace Extrinsic::Runtime
                 TextureBakeSnapshot snapshot =
                     context.TextureBake->Snapshot(stableEntityId);
                 model.BakedTextures = std::move(snapshot.Textures);
-                model.TextureBakeConsumerBindings =
-                    std::move(snapshot.ConsumerBindings);
+            }
+            const ECS::EntityHandle entity =
+                SelectionController::ToEntityHandle(stableEntityId);
+            if (context.Scene != nullptr &&
+                entity != ECS::InvalidEntityHandle &&
+                context.Scene->Raw().valid(entity))
+            {
+                if (const auto* recipe =
+                        context.Scene->Raw()
+                            .try_get<GeometryPresentationRecipe>(entity))
+                {
+                    for (const auto& presentation : recipe->Presentations)
+                    {
+                        for (const auto& slot : presentation.Slots)
+                        {
+                            if (slot.SourceKind !=
+                                    GeometryPresentationSourceKind::
+                                        PropertyBake ||
+                                slot.GeneratedOutputName.empty())
+                            {
+                                continue;
+                            }
+                            auto found = std::ranges::find(
+                                model.TextureBakeTargets,
+                                slot.GeneratedOutputName,
+                                &SandboxEditorTextureBakeTargetSnapshot::
+                                    OutputName);
+                            if (found == model.TextureBakeTargets.end())
+                            {
+                                model.TextureBakeTargets.push_back(
+                                    SandboxEditorTextureBakeTargetSnapshot{
+                                        .OutputName = slot.GeneratedOutputName,
+                                    });
+                                found =
+                                    std::prev(model.TextureBakeTargets.end());
+                            }
+                            found->Targets.push_back(
+                                SandboxEditorTextureBakeTarget{
+                                    .PresentationKey = presentation.Key,
+                                    .Semantic = slot.Semantic,
+                                    .Colormap = slot.TextureColormap,
+                                    .NormalSpace = slot.NormalSpace,
+                                });
+                        }
+                    }
+                }
             }
 
             model.Sources.reserve(catalog.Rows.size());
@@ -11098,12 +11140,8 @@ namespace Extrinsic::Runtime
                                     imported->PrimitiveEntitiesCreated,
                                 .EmbeddedTextureAssetsCreated =
                                     imported->EmbeddedTextureAssetsCreated,
-                                .GeneratedTextureAssetsCreated =
-                                    imported->GeneratedTextureAssetsCreated,
                                 .TextureUploadRequests =
                                     imported->TextureUploadRequests,
-                                .GeneratedTextureUploadRequests =
-                                    imported->GeneratedTextureUploadRequests,
                                 .MaterializedModelScene =
                                     imported->MaterializedModelScene,
                                 .RequestedTextureUpload =
@@ -13807,6 +13845,170 @@ namespace Extrinsic::Runtime
                 std::move(after)));
     }
 
+    bool IsSandboxEditorTextureBakeTargetCompatible(
+        const SandboxEditorTextureBakeTarget& target,
+        const Geometry::PropertyValueKind valueKind,
+        const PropertyTextureBakeStorage storage,
+        const PropertyTextureBakeEncoding encoding) noexcept
+    {
+        if (!IsPropertyTextureBakeRepresentationCompatible(
+                valueKind, storage, encoding))
+        {
+            return false;
+        }
+        const bool raw = storage == PropertyTextureBakeStorage::RawFloat;
+        const bool scalar = valueKind == Geometry::PropertyValueKind::Float ||
+                            valueKind == Geometry::PropertyValueKind::Double;
+        switch (target.Semantic)
+        {
+        case GeometryPresentationSlotSemantic::Normal:
+            return valueKind == Geometry::PropertyValueKind::Vec3 &&
+                   storage == PropertyTextureBakeStorage::EncodedRgba &&
+                   encoding == PropertyTextureBakeEncoding::Normal;
+        case GeometryPresentationSlotSemantic::Roughness:
+        case GeometryPresentationSlotSemantic::Metallic:
+            return scalar &&
+                   (raw ||
+                    encoding == PropertyTextureBakeEncoding::LinearScalar);
+        case GeometryPresentationSlotSemantic::ScalarField:
+            return (scalar &&
+                    (raw ||
+                     encoding == PropertyTextureBakeEncoding::LinearScalar ||
+                     encoding ==
+                         PropertyTextureBakeEncoding::ScalarColormap)) ||
+                   (valueKind == Geometry::PropertyValueKind::UInt32 && !raw &&
+                    encoding == PropertyTextureBakeEncoding::LabelPalette);
+        case GeometryPresentationSlotSemantic::Albedo:
+            if (scalar)
+            {
+                return raw ||
+                       encoding == PropertyTextureBakeEncoding::LinearScalar ||
+                       encoding == PropertyTextureBakeEncoding::ScalarColormap;
+            }
+            if (valueKind == Geometry::PropertyValueKind::UInt32)
+            {
+                return !raw &&
+                       encoding == PropertyTextureBakeEncoding::LabelPalette;
+            }
+            if (valueKind == Geometry::PropertyValueKind::Vec2)
+            {
+                return raw ||
+                       encoding == PropertyTextureBakeEncoding::Vector2 ||
+                       encoding == PropertyTextureBakeEncoding::RgbaColor;
+            }
+            if (valueKind == Geometry::PropertyValueKind::Vec3)
+            {
+                return raw ||
+                       encoding == PropertyTextureBakeEncoding::Vector3 ||
+                       encoding == PropertyTextureBakeEncoding::RgbaColor ||
+                       encoding == PropertyTextureBakeEncoding::Normal;
+            }
+            return valueKind == Geometry::PropertyValueKind::Vec4 &&
+                   (raw || encoding == PropertyTextureBakeEncoding::RgbaColor);
+        case GeometryPresentationSlotSemantic::Displacement:
+        case GeometryPresentationSlotSemantic::PointColor:
+        case GeometryPresentationSlotSemantic::PointScalarField:
+        case GeometryPresentationSlotSemantic::PointSize:
+        case GeometryPresentationSlotSemantic::PointNormalOrientation:
+        case GeometryPresentationSlotSemantic::LineColor:
+        case GeometryPresentationSlotSemantic::LineScalarField:
+        case GeometryPresentationSlotSemantic::LineWidth:
+            return false;
+        }
+        return false;
+    }
+
+    [[nodiscard]] bool ValidateSandboxEditorTextureBakeTargetSet(
+        const PropertyTextureBakeRecord& output,
+        const std::span<const SandboxEditorTextureBakeTarget> targets,
+        std::string& diagnostic)
+    {
+        std::optional<Graphics::Colormap::Type> scalarColormap{};
+        for (const SandboxEditorTextureBakeTarget& target : targets)
+        {
+            if (target.Colormap >= Graphics::Colormap::Type::Count)
+            {
+                diagnostic = "generated texture target colormap is invalid";
+                return false;
+            }
+            if (!IsSandboxEditorTextureBakeTargetCompatible(
+                    target,
+                    output.Source.ValueKind,
+                    output.Storage,
+                    output.Encoding))
+            {
+                diagnostic =
+                    "generated texture target is incompatible with the baked "
+                    "representation";
+                return false;
+            }
+            if (target.Semantic != GeometryPresentationSlotSemantic::Albedo &&
+                target.Semantic !=
+                    GeometryPresentationSlotSemantic::ScalarField)
+            {
+                continue;
+            }
+            if (scalarColormap.has_value() &&
+                *scalarColormap != target.Colormap)
+            {
+                diagnostic =
+                    "one scalar texture cannot use different colormaps in the "
+                    "same surface material";
+                return false;
+            }
+            scalarColormap = target.Colormap;
+        }
+        return true;
+    }
+
+    PropertyTextureBakeRepresentation
+    ResolveSandboxEditorTextureBakeTargetRepresentation(
+        const Geometry::PropertyValueKind valueKind,
+        const PropertyTextureBakeStorage requestedStorage,
+        const PropertyTextureBakeEncoding requestedEncoding,
+        const std::span<const SandboxEditorTextureBakeTarget> targets) noexcept
+    {
+        PropertyTextureBakeStorage storage = requestedStorage;
+        PropertyTextureBakeEncoding encoding = requestedEncoding;
+        const bool hasNormalTarget = std::ranges::any_of(
+            targets,
+            [](const SandboxEditorTextureBakeTarget& target)
+            {
+                return target.Semantic ==
+                       GeometryPresentationSlotSemantic::Normal;
+            });
+        const bool hasLinearPbrTarget = std::ranges::any_of(
+            targets,
+            [](const SandboxEditorTextureBakeTarget& target)
+            {
+                return target.Semantic ==
+                           GeometryPresentationSlotSemantic::Roughness ||
+                       target.Semantic ==
+                           GeometryPresentationSlotSemantic::Metallic;
+            });
+        if (storage == PropertyTextureBakeStorage::Auto &&
+            (hasNormalTarget ||
+             valueKind == Geometry::PropertyValueKind::UInt32))
+        {
+            storage = PropertyTextureBakeStorage::EncodedRgba;
+        }
+        if (encoding == PropertyTextureBakeEncoding::Auto)
+        {
+            if (hasNormalTarget)
+            {
+                encoding = PropertyTextureBakeEncoding::Normal;
+            }
+            else if (hasLinearPbrTarget &&
+                     (valueKind == Geometry::PropertyValueKind::Float ||
+                      valueKind == Geometry::PropertyValueKind::Double))
+            {
+                encoding = PropertyTextureBakeEncoding::LinearScalar;
+            }
+        }
+        return ResolvePropertyTextureBakeRepresentation(
+            valueKind, storage, encoding);
+    }
+
     SandboxEditorTextureBakeCommandResult ApplySandboxEditorTextureBakeCommand(
         const SandboxEditorContext& context,
         const SandboxEditorTextureBakeCommand& command)
@@ -13851,36 +14053,36 @@ namespace Extrinsic::Runtime
             };
         }
 
-        std::vector<TextureBakeConsumerBinding> consumers =
-            command.Consumers;
-        if (consumers.empty() && command.BindGeneratedTexture)
+        std::vector<SandboxEditorTextureBakeTarget> targets =
+            command.Targets;
+        if (targets.empty() && command.BindGeneratedTexture)
         {
-            consumers.push_back(TextureBakeConsumerBinding{
+            targets.push_back(SandboxEditorTextureBakeTarget{
                 .PresentationKey = command.PresentationKey,
                 .Semantic = command.TargetSemantic,
                 .Colormap = command.EncodingColormap,
                 .NormalSpace = command.NormalSpace,
             });
         }
-        for (TextureBakeConsumerBinding& consumer : consumers)
+        for (SandboxEditorTextureBakeTarget& target : targets)
         {
-            if (consumer.Semantic ==
+            if (target.Semantic ==
                 GeometryPresentationSlotSemantic::Normal)
             {
-                consumer.NormalSpace = command.NormalSpace;
+                target.NormalSpace = command.NormalSpace;
             }
         }
 
         PropertyTextureBakeStorage storage = command.Storage;
         PropertyTextureBakeEncoding encoding = command.Encoder;
-        const bool normalConsumer = std::ranges::any_of(
-            consumers,
-            [](const TextureBakeConsumerBinding& consumer)
+        const bool normalTarget = std::ranges::any_of(
+            targets,
+            [](const SandboxEditorTextureBakeTarget& target)
             {
-                return consumer.Semantic ==
+                return target.Semantic ==
                     GeometryPresentationSlotSemantic::Normal;
             });
-        if (normalConsumer)
+        if (normalTarget)
         {
             if (storage == PropertyTextureBakeStorage::Auto)
                 storage = PropertyTextureBakeStorage::EncodedRgba;
@@ -13922,6 +14124,18 @@ namespace Extrinsic::Runtime
 
         const PropertyTextureBakeResult bake =
             context.TextureBake->Bake(request);
+        std::optional<PropertyTextureBakeRecord> scheduledOutput{};
+        if (bake.Succeeded())
+        {
+            const TextureBakeSnapshot snapshot =
+                context.TextureBake->Snapshot(command.StableEntityId);
+            const auto output =
+                std::ranges::find(snapshot.Textures,
+                                  bake.OutputName,
+                                  &PropertyTextureBakeRecord::OutputName);
+            if (output != snapshot.Textures.end())
+                scheduledOutput = *output;
+        }
 
         SandboxEditorCommandStatus status =
             SandboxEditorCommandStatus::Applied;
@@ -13969,27 +14183,169 @@ namespace Extrinsic::Runtime
             }
         }
         if (status == SandboxEditorCommandStatus::Applied &&
-            !consumers.empty())
+            !targets.empty())
         {
-            const TextureBakeMutationResult bound =
-                context.TextureBake->SetConsumers(
-                    TextureBakeConsumerUpdateRequest{
-                        .StableEntityId = command.StableEntityId,
-                        .OutputName = bake.OutputName,
-                        .Consumers = std::move(consumers),
-                    });
+            TextureBakeMutationResult bound{};
+            const ECS::EntityHandle entity =
+                SelectionController::ToEntityHandle(command.StableEntityId);
+            auto& raw = context.Scene->Raw();
+            const auto* current =
+                raw.try_get<GeometryPresentationRecipe>(entity);
+            if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+            {
+                bound = TextureBakeMutationResult{
+                    .Status = TextureBakeMutationStatus::StaleEntity,
+                    .Diagnostic = "entity is stale",
+                };
+            }
+            else if (!scheduledOutput.has_value())
+            {
+                bound = TextureBakeMutationResult{
+                    .Status = TextureBakeMutationStatus::MissingTexture,
+                    .Diagnostic =
+                        "scheduled generated texture output is unavailable",
+                };
+            }
+            else if (current == nullptr)
+            {
+                bound = TextureBakeMutationResult{
+                    .Status = TextureBakeMutationStatus::IncompatibleTarget,
+                    .Diagnostic =
+                        "generated texture targets require a geometry "
+                        "presentation recipe",
+                };
+            }
+            else
+            {
+                GeometryPresentationRecipe next = *current;
+                GeometryPresentationRuntimeState nextRuntime =
+                    raw.try_get<GeometryPresentationRuntimeState>(entity) !=
+                            nullptr
+                        ? *raw.try_get<GeometryPresentationRuntimeState>(entity)
+                        : GeometryPresentationRuntimeState{};
+                std::string targetDiagnostic{};
+                bool compatible = ValidateSandboxEditorTextureBakeTargetSet(
+                    *scheduledOutput, targets, targetDiagnostic);
+                std::vector<SandboxEditorTextureBakeTarget> resolvedTargets{};
+                for (SandboxEditorTextureBakeTarget& target : targets)
+                {
+                    if (!compatible)
+                        break;
+                    GeometryPresentationBindingRecipe* presentation = nullptr;
+                    if (!target.PresentationKey.empty())
+                    {
+                        presentation = FindGeometryPresentationBinding(
+                            next, target.PresentationKey);
+                    }
+                    else
+                    {
+                        for (auto& candidate : next.Presentations)
+                        {
+                            if (FindGeometryPresentationSlot(
+                                    candidate, target.Semantic) != nullptr)
+                            {
+                                presentation = &candidate;
+                                target.PresentationKey = candidate.Key;
+                                break;
+                            }
+                        }
+                    }
+                    GeometryPresentationSlotRecipe* slot =
+                        presentation != nullptr
+                            ? FindGeometryPresentationSlot(*presentation,
+                                                           target.Semantic)
+                            : nullptr;
+                    if (presentation == nullptr ||
+                        presentation->Kind !=
+                            GeometryPresentationKind::SurfaceMaterial ||
+                        slot == nullptr)
+                    {
+                        compatible = false;
+                        break;
+                    }
+                    if (std::ranges::any_of(
+                            resolvedTargets,
+                            [&](const SandboxEditorTextureBakeTarget& existing)
+                            {
+                                return existing.PresentationKey ==
+                                           presentation->Key &&
+                                       existing.Semantic == target.Semantic;
+                            }))
+                    {
+                        compatible = false;
+                        targetDiagnostic = "generated texture target list "
+                                           "contains a duplicate slot";
+                        break;
+                    }
+                    target.PresentationKey = presentation->Key;
+                    resolvedTargets.push_back(target);
+
+                    slot->SourceKind =
+                        GeometryPresentationSourceKind::PropertyBake;
+                    slot->Property = scheduledOutput->Source;
+                    slot->GeneratedOutputName = bake.OutputName;
+                    slot->TextureColormap = target.Colormap;
+                    slot->NormalSpace = target.NormalSpace;
+                    slot->GeneratedPolicy =
+                        GeometryGeneratedOutputPolicy::DeterministicChildAsset;
+                    slot->Enabled = true;
+
+                    GeometryPresentationSlotStatus* slotStatus =
+                        FindGeometryPresentationSlotStatus(
+                            nextRuntime, presentation->Key, target.Semantic);
+                    if (slotStatus == nullptr)
+                    {
+                        nextRuntime.Slots.push_back(
+                            GeometryPresentationSlotStatus{
+                                .PresentationKey = presentation->Key,
+                                .Semantic = target.Semantic,
+                            });
+                        slotStatus = &nextRuntime.Slots.back();
+                    }
+                    if (slotStatus->GeneratedOutputName != bake.OutputName)
+                    {
+                        slotStatus->GeneratedTexture = {};
+                    }
+                    slotStatus->GeneratedOutputName = bake.OutputName;
+                    slotStatus->Readiness =
+                        GeometryPresentationReadiness::Pending;
+                    slotStatus->Provenance =
+                        GeometryPresentationProvenance::PropertyBinding;
+                    slotStatus->Diagnostic = bake.Diagnostic;
+                }
+                if (compatible)
+                {
+                    ++nextRuntime.RecipeGeneration;
+                    raw.emplace_or_replace<GeometryPresentationRecipe>(
+                        entity, std::move(next));
+                    raw.emplace_or_replace<GeometryPresentationRuntimeState>(
+                        entity, std::move(nextRuntime));
+                    bound = TextureBakeMutationResult{
+                        .Status = TextureBakeMutationStatus::Success,
+                        .Diagnostic = "generated texture targets updated",
+                    };
+                }
+                else
+                {
+                    bound = TextureBakeMutationResult{
+                        .Status = TextureBakeMutationStatus::IncompatibleTarget,
+                        .Diagnostic = targetDiagnostic.empty()
+                                          ? "generated texture target has no "
+                                            "compatible surface slot"
+                                          : std::move(targetDiagnostic),
+                    };
+                }
+            }
             if (!bound.Succeeded())
             {
-                (void)context.TextureBake->Remove(
-                    command.StableEntityId,
-                    bake.OutputName);
+                (void)context.TextureBake->Remove(command.StableEntityId,
+                                                  bake.OutputName);
                 return SandboxEditorTextureBakeCommandResult{
                     .Status = SandboxEditorCommandStatus::
                         InvalidVisualizationProperty,
-                    .BakeStatus =
-                        PropertyTextureBakeStatus::CommandFailed,
+                    .BakeStatus = PropertyTextureBakeStatus::CommandFailed,
                     .OutputName = bake.OutputName,
-                    .Diagnostic = bound.Diagnostic,
+                        .Diagnostic = bound.Diagnostic,
                 };
             }
         }
@@ -14023,12 +14379,49 @@ namespace Extrinsic::Runtime
                 .Diagnostic = "Texture-bake runtime module is unavailable.",
             };
         }
-        const TextureBakeMutationResult result = context.TextureBake->Rename(
-            stableEntityId,
-            currentName,
-            newName);
+        const TextureBakeMutationResult result =
+            context.TextureBake->Rename(stableEntityId, currentName, newName);
         if (result.Succeeded())
+        {
+            if (context.Scene != nullptr)
+            {
+                const ECS::EntityHandle entity =
+                    SelectionController::ToEntityHandle(stableEntityId);
+                auto& raw = context.Scene->Raw();
+                if (entity != ECS::InvalidEntityHandle && raw.valid(entity))
+                {
+                    if (auto* recipe =
+                            raw.try_get<GeometryPresentationRecipe>(entity))
+                    {
+                        for (auto& presentation : recipe->Presentations)
+                        {
+                            for (auto& slot : presentation.Slots)
+                            {
+                                if (slot.GeneratedOutputName == currentName)
+                                {
+                                    slot.GeneratedOutputName =
+                                        std::string{newName};
+                                }
+                            }
+                        }
+                    }
+                    if (auto* runtimeState =
+                            raw.try_get<GeometryPresentationRuntimeState>(
+                                entity))
+                    {
+                        for (auto& status : runtimeState->Slots)
+                        {
+                            if (status.GeneratedOutputName == currentName)
+                            {
+                                status.GeneratedOutputName =
+                                    std::string{newName};
+                            }
+                        }
+                    }
+                }
+            }
             InvalidateSelectedModelCache(context);
+        }
         return result;
     }
 
@@ -14045,29 +14438,251 @@ namespace Extrinsic::Runtime
             };
         }
         const TextureBakeMutationResult result = context.TextureBake->Remove(
-            stableEntityId,
-            outputName);
+            stableEntityId, outputName);
         if (result.Succeeded())
+        {
+            if (context.Scene != nullptr)
+            {
+                const ECS::EntityHandle entity =
+                    SelectionController::ToEntityHandle(stableEntityId);
+                auto& raw = context.Scene->Raw();
+                if (entity != ECS::InvalidEntityHandle && raw.valid(entity))
+                {
+                    if (auto* recipe =
+                            raw.try_get<GeometryPresentationRecipe>(entity))
+                    {
+                        for (auto& presentation : recipe->Presentations)
+                        {
+                            for (auto& slot : presentation.Slots)
+                            {
+                                if (slot.GeneratedOutputName != outputName)
+                                {
+                                    continue;
+                                }
+                                slot.SourceKind =
+                                    GeometryPresentationSourceKind::
+                                        PropertyBuffer;
+                                slot.GeneratedOutputName.clear();
+                            }
+                        }
+                    }
+                    if (auto* runtimeState =
+                            raw.try_get<GeometryPresentationRuntimeState>(
+                                entity))
+                    {
+                        for (auto& status : runtimeState->Slots)
+                        {
+                            if (status.GeneratedOutputName != outputName)
+                            {
+                                continue;
+                            }
+                            status.Readiness =
+                                GeometryPresentationReadiness::Ready;
+                            status.Provenance =
+                                GeometryPresentationProvenance::PropertyBuffer;
+                            status.Diagnostic =
+                                "generated texture removed; property-buffer "
+                                "source restored";
+                        }
+                    }
+                }
+            }
             InvalidateSelectedModelCache(context);
+        }
         return result;
     }
 
-    TextureBakeMutationResult SetSandboxEditorBakedTextureConsumers(
+    TextureBakeMutationResult SetSandboxEditorBakedTextureTargets(
         const SandboxEditorContext& context,
-        const TextureBakeConsumerUpdateRequest& request)
+        const SandboxEditorTextureBakeTargetUpdateRequest& request)
     {
-        if (context.TextureBake == nullptr)
+        if (context.TextureBake == nullptr || context.Scene == nullptr)
         {
             return TextureBakeMutationResult{
                 .Status = TextureBakeMutationStatus::MissingScene,
-                .Diagnostic = "Texture-bake runtime module is unavailable.",
+                .Diagnostic =
+                    "Texture-bake runtime module or scene is unavailable.",
             };
         }
-        const TextureBakeMutationResult result =
-            context.TextureBake->SetConsumers(request);
-        if (result.Succeeded())
-            InvalidateSelectedModelCache(context);
-        return result;
+
+        const ECS::EntityHandle entity =
+            SelectionController::ToEntityHandle(request.StableEntityId);
+        auto& raw = context.Scene->Raw();
+        if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+        {
+            return TextureBakeMutationResult{
+                .Status = TextureBakeMutationStatus::StaleEntity,
+                .Diagnostic = "entity is stale",
+            };
+        }
+
+        const TextureBakeSnapshot bakeSnapshot = context.TextureBake->Snapshot(request.StableEntityId);
+        const auto output =
+            std::ranges::find(bakeSnapshot.Textures,
+                              request.OutputName,
+                              &PropertyTextureBakeRecord::OutputName);
+        if (output == bakeSnapshot.Textures.end())
+        {
+            return TextureBakeMutationResult{
+                .Status = TextureBakeMutationStatus::MissingTexture,
+                .Diagnostic = "baked texture was not found",
+            };
+        }
+        std::string targetDiagnostic{};
+        if (!ValidateSandboxEditorTextureBakeTargetSet(
+                *output, request.Targets, targetDiagnostic))
+        {
+            return TextureBakeMutationResult{
+                .Status = TextureBakeMutationStatus::IncompatibleTarget,
+                .Diagnostic = std::move(targetDiagnostic),
+            };
+        }
+
+        const auto* current = raw.try_get<GeometryPresentationRecipe>(entity);
+        if (current == nullptr)
+        {
+            return TextureBakeMutationResult{
+                .Status = TextureBakeMutationStatus::IncompatibleTarget,
+                .Diagnostic = "generated texture targets require a geometry "
+                              "presentation recipe",
+            };
+        }
+
+        GeometryPresentationRecipe next = *current;
+        GeometryPresentationRuntimeState nextRuntime =
+            raw.try_get<GeometryPresentationRuntimeState>(entity) != nullptr
+                ? *raw.try_get<GeometryPresentationRuntimeState>(entity)
+                : GeometryPresentationRuntimeState{};
+        std::vector<SandboxEditorTextureBakeTarget> resolvedTargets{};
+
+        for (GeometryPresentationBindingRecipe& presentation :
+             next.Presentations)
+        {
+            for (GeometryPresentationSlotRecipe& slot : presentation.Slots)
+            {
+                if (slot.GeneratedOutputName != request.OutputName)
+                {
+                    continue;
+                }
+                slot.SourceKind =
+                    GeometryPresentationSourceKind::PropertyBuffer;
+                slot.GeneratedOutputName.clear();
+                if (GeometryPresentationSlotStatus* status =
+                        FindGeometryPresentationSlotStatus(
+                            nextRuntime, presentation.Key, slot.Semantic))
+                {
+                    status->Readiness = GeometryPresentationReadiness::Ready;
+                    status->Provenance =
+                        GeometryPresentationProvenance::PropertyBuffer;
+                    status->Diagnostic = "generated texture target removed; "
+                                         "property-buffer source restored";
+                }
+            }
+        }
+
+        for (const SandboxEditorTextureBakeTarget& target : request.Targets)
+        {
+            GeometryPresentationBindingRecipe* presentation =
+                target.PresentationKey.empty()
+                    ? nullptr
+                    : FindGeometryPresentationBinding(next,
+                                                      target.PresentationKey);
+            if (presentation == nullptr && target.PresentationKey.empty())
+            {
+                for (auto& candidate : next.Presentations)
+                {
+                    if (FindGeometryPresentationSlot(
+                            candidate, target.Semantic) != nullptr)
+                    {
+                        presentation = &candidate;
+                        break;
+                    }
+                }
+            }
+            GeometryPresentationSlotRecipe* slot =
+                presentation != nullptr ? FindGeometryPresentationSlot(
+                                              *presentation, target.Semantic)
+                                        : nullptr;
+            if (presentation == nullptr ||
+                presentation->Kind !=
+                    GeometryPresentationKind::SurfaceMaterial ||
+                slot == nullptr)
+            {
+                return TextureBakeMutationResult{
+                    .Status = TextureBakeMutationStatus::IncompatibleTarget,
+                    .Diagnostic = "generated texture target has no compatible "
+                                  "surface slot",
+                };
+            }
+            if (std::ranges::any_of(
+                    resolvedTargets,
+                    [&](const SandboxEditorTextureBakeTarget& existing)
+                    {
+                        return existing.PresentationKey == presentation->Key &&
+                               existing.Semantic == target.Semantic;
+                    }))
+            {
+                return TextureBakeMutationResult{
+                    .Status = TextureBakeMutationStatus::IncompatibleTarget,
+                    .Diagnostic = "generated texture target list contains a "
+                                  "duplicate slot",
+                };
+            }
+            resolvedTargets.push_back(SandboxEditorTextureBakeTarget{
+                .PresentationKey = presentation->Key,
+                .Semantic = target.Semantic,
+                .Colormap = target.Colormap,
+                .NormalSpace = target.NormalSpace,
+            });
+
+            slot->SourceKind = GeometryPresentationSourceKind::PropertyBake;
+            slot->Property = output->Source;
+            slot->GeneratedOutputName = request.OutputName;
+            slot->TextureColormap = target.Colormap;
+            slot->NormalSpace = target.NormalSpace;
+            slot->GeneratedPolicy =
+                GeometryGeneratedOutputPolicy::DeterministicChildAsset;
+            slot->Enabled = true;
+
+            GeometryPresentationSlotStatus* status =
+                FindGeometryPresentationSlotStatus(
+                    nextRuntime, presentation->Key, target.Semantic);
+            if (status == nullptr)
+            {
+                nextRuntime.Slots.push_back(GeometryPresentationSlotStatus{
+                    .PresentationKey = presentation->Key,
+                    .Semantic = target.Semantic,
+                });
+                status = &nextRuntime.Slots.back();
+            }
+            status->GeneratedOutputName = request.OutputName;
+            status->Readiness =
+                output->State == PropertyTextureBakeOutputState::Ready
+                    ? GeometryPresentationReadiness::Ready
+                    : GeometryPresentationReadiness::Pending;
+            status->Provenance =
+                output->State == PropertyTextureBakeOutputState::Ready
+                    ? GeometryPresentationProvenance::GeneratedTextureAsset
+                    : GeometryPresentationProvenance::PropertyBinding;
+            status->GeneratedTexture =
+                output->State == PropertyTextureBakeOutputState::Ready
+                    ? output->Texture
+                    : Assets::AssetId{};
+            status->SourceGeneration = output->SourceGeneration;
+            status->OutputGeneration = output->Generation;
+            status->Diagnostic = output->Diagnostic;
+        }
+
+        ++nextRuntime.RecipeGeneration;
+        raw.emplace_or_replace<GeometryPresentationRecipe>(entity,
+                                                           std::move(next));
+        raw.emplace_or_replace<GeometryPresentationRuntimeState>(
+            entity, std::move(nextRuntime));
+        InvalidateSelectedModelCache(context);
+        return TextureBakeMutationResult{
+                .Status = TextureBakeMutationStatus::Success,
+                .Diagnostic = "generated texture targets updated",
+        };
     }
 
     struct SandboxEditorUvRegenerationSourceSnapshot

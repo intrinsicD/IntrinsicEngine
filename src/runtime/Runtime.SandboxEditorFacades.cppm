@@ -1435,6 +1435,41 @@ export namespace Extrinsic::Runtime
         std::optional<SandboxEditorJobModel> UvRegenerationJob{};
     };
 
+    struct SandboxEditorTextureBakeTarget
+    {
+        std::string PresentationKey{};
+        GeometryPresentationSlotSemantic Semantic{
+            GeometryPresentationSlotSemantic::Albedo};
+        Graphics::Colormap::Type Colormap{Graphics::Colormap::Type::Viridis};
+        GeometryPresentationNormalSpace NormalSpace{
+            GeometryPresentationNormalSpace::Object};
+    };
+
+    [[nodiscard]] bool IsSandboxEditorTextureBakeTargetCompatible(
+        const SandboxEditorTextureBakeTarget& target,
+        Geometry::PropertyValueKind valueKind,
+        PropertyTextureBakeStorage storage,
+        PropertyTextureBakeEncoding encoding) noexcept;
+    [[nodiscard]] PropertyTextureBakeRepresentation
+    ResolveSandboxEditorTextureBakeTargetRepresentation(
+        Geometry::PropertyValueKind valueKind,
+        PropertyTextureBakeStorage requestedStorage,
+        PropertyTextureBakeEncoding requestedEncoding,
+        std::span<const SandboxEditorTextureBakeTarget> targets) noexcept;
+
+    struct SandboxEditorTextureBakeTargetSnapshot
+    {
+        std::string OutputName{};
+        std::vector<SandboxEditorTextureBakeTarget> Targets{};
+    };
+
+    struct SandboxEditorTextureBakeTargetUpdateRequest
+    {
+        std::uint32_t StableEntityId{0u};
+        std::string OutputName{};
+        std::vector<SandboxEditorTextureBakeTarget> Targets{};
+    };
+
     struct SandboxEditorTextureBakeControlsModel
     {
         bool HasSelectedEntity{false};
@@ -1452,7 +1487,8 @@ export namespace Extrinsic::Runtime
         SandboxEditorUvDiagnosticsModel Uv{};
         std::vector<SandboxEditorTextureBakeSourceRow> Sources{};
         std::vector<PropertyTextureBakeRecord> BakedTextures{};
-        std::vector<TextureBakeConsumerSnapshot> TextureBakeConsumerBindings{};
+        std::vector<SandboxEditorTextureBakeTargetSnapshot>
+            TextureBakeTargets{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
@@ -1590,9 +1626,7 @@ export namespace Extrinsic::Runtime
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::uint64_t PrimitiveEntitiesCreated{0};
         std::uint64_t EmbeddedTextureAssetsCreated{0};
-        std::uint64_t GeneratedTextureAssetsCreated{0};
         std::uint64_t TextureUploadRequests{0};
-        std::uint64_t GeneratedTextureUploadRequests{0};
         bool MaterializedModelScene{false};
         bool RequestedTextureUpload{false};
         std::string Message{};
@@ -2730,9 +2764,9 @@ export namespace Extrinsic::Runtime
             PropertyTextureBakeStorage::Auto};
         Graphics::Colormap::Type EncodingColormap{
             Graphics::Colormap::Type::Viridis};
-        PropertyTextureNormalSpace NormalSpace{
-            PropertyTextureNormalSpace::Object};
-        std::vector<TextureBakeConsumerBinding> Consumers{};
+        GeometryPresentationNormalSpace NormalSpace{
+            GeometryPresentationNormalSpace::Object};
+        std::vector<SandboxEditorTextureBakeTarget> Targets{};
         bool BindGeneratedTexture{true};
     };
 
@@ -2987,9 +3021,9 @@ export namespace Extrinsic::Runtime
         std::uint32_t stableEntityId,
         std::string_view outputName);
 
-    TextureBakeMutationResult SetSandboxEditorBakedTextureConsumers(
+    TextureBakeMutationResult SetSandboxEditorBakedTextureTargets(
         const SandboxEditorContext& context,
-        const TextureBakeConsumerUpdateRequest& request);
+        const SandboxEditorTextureBakeTargetUpdateRequest& request);
 
     SandboxEditorUvRegenerationCommandResult ApplySandboxEditorUvRegenerationCommand(
         const SandboxEditorContext& context,

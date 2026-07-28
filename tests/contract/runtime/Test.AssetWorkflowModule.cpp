@@ -13,11 +13,11 @@
 #include <thread>
 #include <vector>
 
+#include "RuntimeTestModule.hpp"
 #include <entt/entity/entity.hpp>
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
-#include "RuntimeTestModule.hpp"
 
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
@@ -33,9 +33,11 @@ import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
@@ -866,7 +868,217 @@ TEST(AssetWorkflowModule,
 }
 
 TEST(AssetWorkflowModule,
-     RegistrationConflictsLeaveOnlyTheExactExistingProvider)
+    CallerOwnedBakeReconciliationIsAtomicAndPreservesUnrelatedChannels)
+{
+    DirectHarness harness;
+    ASSERT_TRUE(harness.Start().has_value());
+
+    Assets::AssetService* const assets =
+        harness.Services.Find<Assets::AssetService>();
+    Core::IAssetFrameHooks* const hooks =
+        harness.Services.Find<Core::IAssetFrameHooks>();
+    ECS::Scene::Registry* const scene =
+        harness.Worlds.Get(harness.InitialWorld);
+    ASSERT_NE(assets, nullptr);
+    ASSERT_NE(hooks, nullptr);
+    ASSERT_NE(scene, nullptr);
+
+    const auto loadTexture =
+        [assets](const std::string_view path) -> Core::Expected<Assets::AssetId>
+    {
+        return assets->Load<Assets::AssetTexture2DPayload>(
+            path,
+            [](std::string_view,
+               Assets::AssetId) -> Core::Expected<Assets::AssetTexture2DPayload>
+            { return Assets::AssetTexture2DPayload{}; });
+    };
+    auto albedoTexture = loadTexture("generated://runtime191/albedo");
+    auto normalTexture = loadTexture("generated://runtime191/normal");
+    ASSERT_TRUE(albedoTexture.has_value());
+    ASSERT_TRUE(normalTexture.has_value());
+
+    const ECS::EntityHandle entity = scene->Create();
+    const std::uint32_t stableId =
+        Runtime::StableEntityLookup::ToRenderId(entity);
+    scene->Raw().emplace<Runtime::GeometryPresentationRecipe>(
+        entity,
+        Runtime::GeometryPresentationRecipe{
+            .Shape = Runtime::GeometryPresentationShape::Mesh,
+            .Lanes =
+                {
+                    Runtime::GeometryPresentationLaneRecipe{
+                        .Lane = Runtime::GeometryRenderLane::Surface,
+                        .PresentationKey = "mesh.surface",
+                    },
+                },
+            .Presentations =
+                {
+                    Runtime::GeometryPresentationBindingRecipe{
+                        .Key = "mesh.surface",
+                        .Kind =
+                            Runtime::GeometryPresentationKind::SurfaceMaterial,
+                        .Slots =
+                            {
+                                Runtime::GeometryPresentationSlotRecipe{
+                                    .Semantic = Runtime::
+                                        GeometryPresentationSlotSemantic::
+                                            Albedo,
+                                    .SourceKind = Runtime::
+                                        GeometryPresentationSourceKind::
+                                            PropertyBake,
+                                    .Property =
+                                        Runtime::GeometryPropertyRef{
+                                            .Domain =
+                                                Runtime::GeometryElementDomain::
+                                                    MeshVertex,
+                                            .Name = "v:heat",
+                                            .ValueKind = Geometry::
+                                                PropertyValueKind::Float,
+                                        },
+                                    .GeneratedOutputName = "generated-albedo",
+                                    .TextureColormap =
+                                        Graphics::Colormap::Type::Inferno,
+                                },
+                                Runtime::GeometryPresentationSlotRecipe{
+                                    .Semantic = Runtime::
+                                        GeometryPresentationSlotSemantic::
+                                            Normal,
+                                    .SourceKind = Runtime::
+                                        GeometryPresentationSourceKind::
+                                            PropertyBake,
+                                    .Property =
+                                        Runtime::GeometryPropertyRef{
+                                            .Domain =
+                                                Runtime::GeometryElementDomain::
+                                                    MeshVertex,
+                                            .Name = "v:normal",
+                                            .ValueKind = Geometry::
+                                                PropertyValueKind::Vec3,
+                                        },
+                                    .GeneratedOutputName = "generated-normal",
+                                    .NormalSpace = Runtime::
+                                        GeometryPresentationNormalSpace::World,
+                                },
+                            },
+                    },
+                },
+        });
+    auto& outputs = scene->Raw().emplace<Runtime::PropertyTextureBakeOutputs>(
+        entity,
+        Runtime::PropertyTextureBakeOutputs{
+            .Records =
+                {
+                    Runtime::PropertyTextureBakeRecord{
+                        .OutputName = "generated-albedo",
+                        .Source =
+                            Runtime::GeometryPropertyRef{
+                                .Domain =
+                                    Runtime::GeometryElementDomain::MeshVertex,
+                                .Name = "v:heat",
+                                .ValueKind = Geometry::PropertyValueKind::Float,
+                            },
+                        .Storage =
+                            Runtime::PropertyTextureBakeStorage::RawFloat,
+                        .Encoding =
+                            Runtime::PropertyTextureBakeEncoding::LinearScalar,
+                        .Texture = *albedoTexture,
+                        .RangeMin = -2.0f,
+                        .RangeMax = 3.0f,
+                        .Generation = 4u,
+                        .State = Runtime::PropertyTextureBakeOutputState::Ready,
+                        .Diagnostic = "albedo ready",
+                    },
+                    Runtime::PropertyTextureBakeRecord{
+                        .OutputName = "generated-normal",
+                        .Source =
+                            Runtime::GeometryPropertyRef{
+                                .Domain =
+                                    Runtime::GeometryElementDomain::MeshVertex,
+                                .Name = "v:normal",
+                                .ValueKind = Geometry::PropertyValueKind::Vec3,
+                            },
+                        .Storage =
+                            Runtime::PropertyTextureBakeStorage::EncodedRgba,
+                        .Encoding =
+                            Runtime::PropertyTextureBakeEncoding::Normal,
+                        .Texture = *normalTexture,
+                        .Generation = 7u,
+                        .State = Runtime::PropertyTextureBakeOutputState::Ready,
+                        .Diagnostic = "normal ready",
+                    },
+                },
+        });
+
+    const Assets::AssetId unrelatedMetallicRoughness{700u, 3u};
+    const Assets::AssetId unrelatedEmissive{701u, 5u};
+    harness.Extraction.SetMaterialTextureAssetBindings(
+        stableId,
+        Graphics::MaterialTextureAssetBindings{
+            .MetallicRoughness = unrelatedMetallicRoughness,
+            .Emissive = unrelatedEmissive,
+            .RoughnessFromRed = true,
+        });
+
+    hooks->TickAssets();
+
+    const auto ready =
+        harness.Extraction.GetMaterialTextureAssetBindings(stableId);
+    ASSERT_TRUE(ready.has_value());
+    EXPECT_EQ(ready->Albedo, *albedoTexture);
+    EXPECT_EQ(ready->AlbedoInterpretation,
+              Graphics::MaterialAlbedoTextureInterpretation::Scalar);
+    EXPECT_EQ(ready->AlbedoScalarColormap, Graphics::Colormap::Type::Inferno);
+    EXPECT_FLOAT_EQ(ready->AlbedoScalarRangeMin, -2.0f);
+    EXPECT_FLOAT_EQ(ready->AlbedoScalarRangeMax, 3.0f);
+    EXPECT_EQ(ready->Normal, *normalTexture);
+    EXPECT_EQ(ready->NormalSpace,
+              Graphics::MaterialNormalTextureSpace::WorldSpaceNormal);
+    EXPECT_EQ(ready->MetallicRoughness, unrelatedMetallicRoughness);
+    EXPECT_EQ(ready->Emissive, unrelatedEmissive);
+    EXPECT_TRUE(ready->RoughnessFromRed);
+
+    outputs.Records[0].State = Runtime::PropertyTextureBakeOutputState::Pending;
+    outputs.Records[0].Diagnostic = "rebake pending";
+    hooks->TickAssets();
+    const auto pending =
+        harness.Extraction.GetMaterialTextureAssetBindings(stableId);
+    ASSERT_TRUE(pending.has_value());
+    EXPECT_EQ(pending->Albedo, *albedoTexture)
+        << "the last ready output remains visible while its rebake is pending";
+
+    outputs.Records[0].State = Runtime::PropertyTextureBakeOutputState::Failed;
+    outputs.Records[0].Diagnostic = "rebake failed";
+    hooks->TickAssets();
+    const auto failed =
+        harness.Extraction.GetMaterialTextureAssetBindings(stableId);
+    ASSERT_TRUE(failed.has_value());
+    EXPECT_FALSE(failed->Albedo.IsValid());
+    EXPECT_EQ(failed->Normal, *normalTexture);
+    EXPECT_EQ(failed->MetallicRoughness, unrelatedMetallicRoughness);
+    EXPECT_EQ(failed->Emissive, unrelatedEmissive);
+
+    const auto& runtimeState =
+        scene->Raw().get<Runtime::GeometryPresentationRuntimeState>(entity);
+    const auto* albedoStatus = Runtime::FindGeometryPresentationSlotStatus(
+        runtimeState,
+        "mesh.surface",
+        Runtime::GeometryPresentationSlotSemantic::Albedo);
+    const auto* normalStatus = Runtime::FindGeometryPresentationSlotStatus(
+        runtimeState,
+        "mesh.surface",
+        Runtime::GeometryPresentationSlotSemantic::Normal);
+    ASSERT_NE(albedoStatus, nullptr);
+    ASSERT_NE(normalStatus, nullptr);
+    EXPECT_EQ(albedoStatus->Readiness,
+              Runtime::GeometryPresentationReadiness::Failed);
+    EXPECT_EQ(normalStatus->Readiness,
+              Runtime::GeometryPresentationReadiness::Ready);
+    EXPECT_EQ(normalStatus->GeneratedTexture, *normalTexture);
+}
+
+TEST(
+    AssetWorkflowModule,
+    RegistrationConflictsLeaveOnlyTheExactExistingProvider)
 {
     enum class Conflict
     {

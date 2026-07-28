@@ -1,8 +1,8 @@
 module;
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <chrono>
 #include <optional>
 #include <string>
 #include <vector>
@@ -99,7 +99,6 @@ export namespace Extrinsic::Runtime
         Assets::AssetId Asset{};
         std::uint32_t PrimitiveEntitiesCreated{0u};
         std::uint32_t EmbeddedTextureAssetsCreated{0u};
-        std::uint32_t GeneratedTextureAssetsCreated{0u};
         std::uint32_t TextureUploadRequests{0u};
         bool MaterializedModelScene{false};
         bool RequestedTextureUpload{false};

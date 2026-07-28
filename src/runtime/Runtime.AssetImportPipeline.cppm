@@ -179,9 +179,7 @@ namespace Extrinsic::Runtime
         Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
         std::uint64_t PrimitiveEntitiesCreated{0};
         std::uint64_t EmbeddedTextureAssetsCreated{0};
-        std::uint64_t GeneratedTextureAssetsCreated{0};
         std::uint64_t TextureUploadRequests{0};
-        std::uint64_t GeneratedTextureUploadRequests{0};
         bool MaterializedModelScene{false};
         bool RequestedTextureUpload{false};
     };

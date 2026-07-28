@@ -13,6 +13,7 @@ export module Extrinsic.Runtime.GeometryPresentation;
 
 export import Extrinsic.Asset.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.Graphics.Colormap;
 export import Extrinsic.Runtime.GeometryAvailability;
 
 export namespace Extrinsic::Runtime
@@ -85,6 +86,12 @@ export namespace Extrinsic::Runtime
         PersistOnSave,
     };
 
+    enum class GeometryPresentationNormalSpace : std::uint8_t
+    {
+        Object,
+        World,
+    };
+
     enum class GeometryPresentationProvenance : std::uint8_t
     {
         None,
@@ -114,6 +121,11 @@ export namespace Extrinsic::Runtime
         GeometryPresentationDefaultValue UniformDefault{};
         GeometryPropertyRef Property{};
         Assets::AssetId TextureAsset{};
+        std::string GeneratedOutputName{};
+        Graphics::Colormap::Type TextureColormap{
+            Graphics::Colormap::Type::Viridis};
+        GeometryPresentationNormalSpace NormalSpace{
+            GeometryPresentationNormalSpace::Object};
         GeometryGeneratedOutputPolicy GeneratedPolicy{
             GeometryGeneratedOutputPolicy::DeterministicChildAsset};
         bool Enabled{true};
@@ -149,6 +161,7 @@ export namespace Extrinsic::Runtime
             GeometryPresentationSlotSemantic::Albedo};
         GeometryPresentationReadiness Readiness{
             GeometryPresentationReadiness::Unset};
+        std::string GeneratedOutputName{};
         Assets::AssetId GeneratedTexture{};
         GeometryPresentationProvenance Provenance{
             GeometryPresentationProvenance::None};
@@ -190,6 +203,11 @@ export namespace Extrinsic::Runtime
         GeometryPropertyRef Property{};
         GeometryPropertyResolution PropertyResolution{};
         Assets::AssetId TextureAsset{};
+        std::string GeneratedOutputName{};
+        Graphics::Colormap::Type TextureColormap{
+            Graphics::Colormap::Type::Viridis};
+        GeometryPresentationNormalSpace NormalSpace{
+            GeometryPresentationNormalSpace::Object};
         GeometryPresentationProvenance Provenance{
             GeometryPresentationProvenance::None};
         std::uint64_t SourceGeneration{0u};
@@ -243,6 +261,8 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::string_view ToString(
         GeometryGeneratedOutputPolicy value) noexcept;
     [[nodiscard]] std::string_view ToString(
+        GeometryPresentationNormalSpace value) noexcept;
+    [[nodiscard]] std::string_view ToString(
         GeometryPresentationProvenance value) noexcept;
 
     [[nodiscard]] bool TryParseGeometryPresentationShape(
@@ -263,6 +283,9 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] bool TryParseGeometryGeneratedOutputPolicy(
         std::string_view value,
         GeometryGeneratedOutputPolicy& out) noexcept;
+    [[nodiscard]] bool TryParseGeometryPresentationNormalSpace(
+        std::string_view value,
+        GeometryPresentationNormalSpace& out) noexcept;
 
     [[nodiscard]] GeometryGeneratedOutputPolicy
     DefaultGeometryGeneratedOutputPolicyFor(

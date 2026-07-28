@@ -11,9 +11,9 @@ maturity_target: Retired
 - Promoted to active on 2026-07-28 after `RUNTIME-190` and `RUNTIME-192`
   retired the generalized GPU texture-bake owner and canonical geometry-
   property vocabulary prerequisites.
-- Owner: Codex. Branch: `main`. Next implementation: Slice B's one-participant
-  migration, beginning with canonical padding/dilation and specialized
-  object-normal producer adoption.
+- Owner: Codex. Branch: `main`. Next implementation: Slice D's separate
+  mechanical deletion of the isolated compatibility modules, shaders, tests,
+  and CMake entries.
 - Intake census found 12,662 lines across the generalized runtime/graphics
   bake modules and the selected-mesh, CPU mesh-attribute, and object-space-
   normal families. Production currently registers two JobService GPU
@@ -63,10 +63,24 @@ maturity_target: Retired
   scheduling after backend promotion but remains a Slice C parity gate because
   its direct material binding still encounters the transitional bake-owned
   consumer API.
-- Next implementation: Slice C moves generated-output interpretation and
-  presentation/material mutation to callers, removes every production CPU
-  fallback and the transitional consumer surface, then closes the canonical
-  import smoke before legacy deletion.
+- Slice C completed on 2026-07-28: generated-output interpretation and atomic
+  material/presentation reconciliation now live in `AssetWorkflowModule` and
+  the Sandbox caller facades. The bake service no longer accepts consumers or
+  mutates presentation/material state. Model-scene and direct-mesh import
+  paths retain authored/property-buffer fallback, submit only canonical GPU
+  requests, and contain no live CPU texture fallback. Direct imports use the
+  existing bounded `JobService::IsReadyToApply` seam to retain one caller-owned
+  retry across promoted-Vulkan cold start without blocking mesh publication or
+  changing the service's fail-closed Null behavior.
+- Slice C verification: the focused import/workflow/model-handoff/canonical
+  texture-bake selector passed 63/63 on `ci`. The promoted-Vulkan
+  `ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice` and
+  `PropertyTextureModuleBakesRebindsRebakesAndRemovesOnVulkan` smokes both
+  passed, proving exact import binding plus caller-owned rebake, rename,
+  removal, and post-removal reconciliation.
+- Next implementation: Slice D deletes the now-isolated legacy production and
+  test surfaces, refreshes docs/inventories, runs the full gates, and retires
+  this task.
 
 ## Goal
 

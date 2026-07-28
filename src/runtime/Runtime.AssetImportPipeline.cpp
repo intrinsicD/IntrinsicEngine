@@ -214,8 +214,6 @@ namespace Extrinsic::Runtime
                     static_cast<std::uint32_t>(result.PrimitiveEntitiesCreated),
                 .EmbeddedTextureAssetsCreated =
                     static_cast<std::uint32_t>(result.EmbeddedTextureAssetsCreated),
-                .GeneratedTextureAssetsCreated =
-                    static_cast<std::uint32_t>(result.GeneratedTextureAssetsCreated),
                 .TextureUploadRequests =
                     static_cast<std::uint32_t>(result.TextureUploadRequests),
                 .MaterializedModelScene = result.MaterializedModelScene,
@@ -354,8 +352,7 @@ namespace Extrinsic::Runtime
             const RuntimeAssetImportResult& result) noexcept
         {
             return result.RequestedTextureUpload ||
-                   result.TextureUploadRequests > 0u ||
-                   result.GeneratedTextureUploadRequests > 0u;
+                   result.TextureUploadRequests > 0u;
         }
 
         void RunPostImportProcessors(
@@ -590,17 +587,9 @@ namespace Extrinsic::Runtime
                     .EmbeddedTextureAssetsCreated =
                         Delta(after.EmbeddedTextureAssetsCreated,
                               before.EmbeddedTextureAssetsCreated),
-                    .GeneratedTextureAssetsCreated =
-                        Delta(after.GeneratedTextureAssetsCreated,
-                              before.GeneratedTextureAssetsCreated),
                     .TextureUploadRequests =
                         Delta(after.EmbeddedTextureUploadRequests,
-                              before.EmbeddedTextureUploadRequests) +
-                        Delta(after.GeneratedTextureUploadRequests,
-                              before.GeneratedTextureUploadRequests),
-                    .GeneratedTextureUploadRequests =
-                        Delta(after.GeneratedTextureUploadRequests,
-                              before.GeneratedTextureUploadRequests),
+                              before.EmbeddedTextureUploadRequests),
                     .MaterializedModelScene =
                         after.ModelSceneMaterializeSuccesses >
                             before.ModelSceneMaterializeSuccesses,
@@ -665,17 +654,9 @@ namespace Extrinsic::Runtime
                 .EmbeddedTextureAssetsCreated =
                     Delta(after.EmbeddedTextureAssetsCreated,
                           before.EmbeddedTextureAssetsCreated),
-                .GeneratedTextureAssetsCreated =
-                    Delta(after.GeneratedTextureAssetsCreated,
-                          before.GeneratedTextureAssetsCreated),
                 .TextureUploadRequests =
                     Delta(after.EmbeddedTextureUploadRequests,
-                          before.EmbeddedTextureUploadRequests) +
-                    Delta(after.GeneratedTextureUploadRequests,
-                          before.GeneratedTextureUploadRequests),
-                .GeneratedTextureUploadRequests =
-                    Delta(after.GeneratedTextureUploadRequests,
-                          before.GeneratedTextureUploadRequests),
+                          before.EmbeddedTextureUploadRequests),
                 .MaterializedModelScene =
                     after.ModelSceneMaterializeSuccesses >
                         before.ModelSceneMaterializeSuccesses,
@@ -3038,16 +3019,18 @@ namespace Extrinsic::Runtime
         {
             event.Result = *result;
             Core::Log::Info(
-                "[Runtime] Asset import succeeded: path='{}' requested_payload={} result_payload={} ingest_diagnostic={} primitive_entities={} embedded_textures={} generated_textures={} texture_upload_requests={} generated_texture_upload_requests={} materialized_model_scene={} requested_texture_upload={}",
+                "[Runtime] Asset import succeeded: path='{}' "
+                "requested_payload={} "
+                "result_payload={} ingest_diagnostic={} primitive_entities={} "
+                "embedded_textures={} texture_upload_requests={} "
+                "materialized_model_scene={} requested_texture_upload={}",
                 event.Path,
                 Assets::DebugNameForAssetPayloadKind(event.RequestedPayloadKind),
                 Assets::DebugNameForAssetPayloadKind(result->PayloadKind),
                 DebugNameForRuntimeAssetIngestDiagnostic(event.IngestDiagnostic),
                 result->PrimitiveEntitiesCreated,
                 result->EmbeddedTextureAssetsCreated,
-                result->GeneratedTextureAssetsCreated,
                 result->TextureUploadRequests,
-                result->GeneratedTextureUploadRequests,
                 result->MaterializedModelScene,
                 result->RequestedTextureUpload);
         }

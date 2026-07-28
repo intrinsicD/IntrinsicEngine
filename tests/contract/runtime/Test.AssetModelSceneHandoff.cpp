@@ -397,19 +397,8 @@ TEST(RuntimeAssetModelSceneHandoff, MaterializeModelSceneCreatesMeshEntityAndUpl
     const Assets::AssetId childTexture = state->Record.EmbeddedTextureAssets[0];
     EXPECT_TRUE(childTexture.IsValid());
     EXPECT_EQ(fx.Cache.GetState(childTexture), Graphics::GpuAssetState::GpuUploading);
-    ASSERT_EQ(fx.Transfer.TextureUploads.size(), 2u);
+    ASSERT_EQ(fx.Transfer.TextureUploads.size(), 1u);
     EXPECT_EQ(fx.Transfer.TextureUploads[0].SizeBytes, 4u);
-
-    ASSERT_EQ(state->Record.GeneratedTextureAssets.size(), 1u);
-    const Assets::AssetId generatedNormal = state->Record.GeneratedTextureAssets[0];
-    EXPECT_TRUE(generatedNormal.IsValid());
-    EXPECT_EQ(fx.Cache.GetState(generatedNormal), Graphics::GpuAssetState::GpuUploading);
-    EXPECT_EQ(fx.Transfer.TextureUploads[1].SizeBytes, 64u * 64u * 4u);
-    auto generatedPayload = fx.Service.Read<Assets::AssetTexture2DPayload>(generatedNormal);
-    ASSERT_TRUE(generatedPayload.has_value()) << static_cast<int>(generatedPayload.error());
-    ASSERT_EQ(generatedPayload->size(), 1u);
-    EXPECT_EQ((*generatedPayload)[0].Metadata.SourceKind, Assets::AssetTextureSourceKind::Generated);
-    EXPECT_EQ((*generatedPayload)[0].Metadata.ColorSpace, Assets::AssetTextureColorSpace::Linear);
 
     ASSERT_EQ(state->Record.Primitives.size(), 1u);
     const auto entity = state->Record.Primitives[0].Entity;
@@ -442,7 +431,9 @@ TEST(RuntimeAssetModelSceneHandoff, MaterializeModelSceneCreatesMeshEntityAndUpl
 
     ASSERT_EQ(state->Record.Materials.size(), 1u);
     EXPECT_EQ(state->Record.Materials[0].TextureBindings.Albedo, childTexture);
-    EXPECT_EQ(state->Record.Materials[0].TextureBindings.Normal, generatedNormal);
+    EXPECT_FALSE(state->Record.Materials[0].TextureBindings.Normal.IsValid());
+    EXPECT_EQ(state->Record.Materials[0].TextureBindings.NormalSpace,
+              Graphics::MaterialNormalTextureSpace::TangentSpaceNormal);
     EXPECT_TRUE(state->Record.Materials[0].HasMaterialSlot);
     EXPECT_FALSE(state->Record.Materials[0].TextureBindingsResolved)
         << "The texture is pending and this fixture has no fallback texture; "
@@ -453,8 +444,6 @@ TEST(RuntimeAssetModelSceneHandoff, MaterializeModelSceneCreatesMeshEntityAndUpl
     EXPECT_EQ(diagnostics.PrimitiveEntitiesCreated, 1u);
     EXPECT_EQ(diagnostics.EmbeddedTextureAssetsCreated, 1u);
     EXPECT_EQ(diagnostics.EmbeddedTextureUploadRequests, 1u);
-    EXPECT_EQ(diagnostics.GeneratedTextureAssetsCreated, 1u);
-    EXPECT_EQ(diagnostics.GeneratedTextureUploadRequests, 1u);
     EXPECT_EQ(diagnostics.GeneratedTextureBakeFailures, 0u);
     EXPECT_EQ(diagnostics.MaterialInstancesCreated, 1u);
     EXPECT_EQ(diagnostics.MaterialTextureBindingUploadDeferrals, 1u);
@@ -767,7 +756,8 @@ TEST(RuntimeAssetModelSceneHandoff, MaterialLessPrimitiveBindsNeutralLitDefaultM
     EXPECT_GT(params.BaseColorFactor.b, 0.0f);
 }
 
-TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstPublishesNormalsAndQueuesUvAndBakeJobs)
+TEST(RuntimeAssetModelSceneHandoff,
+    ProgressiveRawGeometryFirstQueuesUvWithoutCpuBakeFallback)
 {
     SceneHandoffFixture fx;
     Runtime::JobService jobs{};
@@ -803,27 +793,19 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstPublishesNormalsA
         &diagnostics);
     ASSERT_TRUE(state.has_value()) << static_cast<int>(state.error());
     ASSERT_EQ(state->Record.Primitives.size(), 1u);
-    EXPECT_TRUE(state->Record.GeneratedTextureAssets.empty());
     EXPECT_EQ(diagnostics.ProgressiveRawPrimitiveEntitiesPublished, 1u);
     EXPECT_EQ(diagnostics.GeometryPresentationRecipesCreated, 1u);
     EXPECT_EQ(diagnostics.ProgressiveUvAtlasJobsQueued, 1u);
     EXPECT_EQ(diagnostics.ProgressiveNormalJobsQueued, 0u);
-    EXPECT_EQ(diagnostics.ProgressiveTextureBakeJobsQueued, 2u);
+    EXPECT_EQ(diagnostics.ProgressiveTextureBakeJobsQueued, 0u);
 
     const ECS::EntityHandle entity = state->Record.Primitives[0].Entity;
     ASSERT_TRUE(fx.Scene.IsValid(entity));
     ASSERT_TRUE(fx.Scene.Raw().all_of<Runtime::GeometryPresentationRecipe>(entity));
     const auto jobSnapshot = jobs.SnapshotAll();
-    ASSERT_EQ(jobSnapshot.size(), 3u);
+    ASSERT_EQ(jobSnapshot.size(), 1u);
     EXPECT_EQ(jobSnapshot[0].DebugName, "generate mesh uv atlas");
-    EXPECT_EQ(jobSnapshot[1].DebugName, "bake normal texture");
-    EXPECT_EQ(jobSnapshot[2].DebugName, "bake albedo texture");
-    // `JobSnapshot` carries no dependency list. The edge is observable as the
-    // state a dependent sits in until a completion drain releases it, which is
-    // the behaviour that actually matters.
-    EXPECT_EQ(jobSnapshot[1].State, Runtime::JobState::AwaitingDependencies);
-    EXPECT_EQ(jobSnapshot[2].State, Runtime::JobState::AwaitingDependencies);
-    EXPECT_EQ(jobs.Stats().AwaitingDependencyJobs, 2u);
+    EXPECT_EQ(jobs.Stats().AwaitingDependencyJobs, 0u);
 
     const auto* initialVertices =
         fx.Scene.Raw().try_get<ECS::Components::GeometrySources::Vertices>(entity);
@@ -837,10 +819,6 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstPublishesNormalsA
     ASSERT_NE(vertices, nullptr);
     EXPECT_TRUE(vertices->Properties.Exists("v:texcoord"));
     EXPECT_TRUE(vertices->Properties.Exists("v:normal"));
-    const auto* normalBake = FindJob(jobs.SnapshotAll(), "bake normal texture");
-    ASSERT_NE(normalBake, nullptr);
-    EXPECT_EQ(normalBake->State, Runtime::JobState::Published);
-
     auto& bindings =
         fx.Scene.Raw().get<Runtime::GeometryPresentationRecipe>(entity);
     const Runtime::GeometryPresentationBindingRecipe* presentation =
@@ -851,13 +829,13 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstPublishesNormalsA
                                  Runtime::GeometryPresentationSlotSemantic::Normal);
     ASSERT_NE(normal, nullptr);
     EXPECT_EQ(normal->SourceKind,
-              Runtime::GeometryPresentationSourceKind::PropertyBake);
+              Runtime::GeometryPresentationSourceKind::PropertyBuffer);
     const Runtime::GeometryPresentationSlotRecipe* albedo =
         Runtime::FindGeometryPresentationSlot(*presentation,
                                  Runtime::GeometryPresentationSlotSemantic::Albedo);
     ASSERT_NE(albedo, nullptr);
     EXPECT_EQ(albedo->SourceKind,
-              Runtime::GeometryPresentationSourceKind::PropertyBake);
+              Runtime::GeometryPresentationSourceKind::PropertyBuffer);
 
     const auto& runtimeState =
         fx.Scene.Raw().get<Runtime::GeometryPresentationRuntimeState>(entity);
@@ -869,8 +847,8 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstPublishesNormalsA
     ASSERT_NE(normalStatus, nullptr);
     EXPECT_EQ(normalStatus->Readiness,
               Runtime::GeometryPresentationReadiness::Ready);
-    EXPECT_TRUE(normalStatus->GeneratedTexture.IsValid());
-    EXPECT_NE(normalStatus->Diagnostic.find("without upload"),
+    EXPECT_FALSE(normalStatus->GeneratedTexture.IsValid());
+    EXPECT_NE(normalStatus->Diagnostic.find("property-buffer fallback"),
               std::string::npos);
     const Runtime::GeometryPresentationSlotStatus* albedoStatus =
         Runtime::FindGeometryPresentationSlotStatus(
@@ -880,8 +858,8 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstPublishesNormalsA
     ASSERT_NE(albedoStatus, nullptr);
     EXPECT_EQ(albedoStatus->Readiness,
               Runtime::GeometryPresentationReadiness::Ready);
-    EXPECT_TRUE(albedoStatus->GeneratedTexture.IsValid());
-    EXPECT_NE(albedoStatus->Diagnostic.find("without upload"),
+    EXPECT_FALSE(albedoStatus->GeneratedTexture.IsValid());
+    EXPECT_NE(albedoStatus->Diagnostic.find("property-buffer fallback"),
               std::string::npos);
 }
 
@@ -921,7 +899,6 @@ TEST(RuntimeAssetModelSceneHandoff,
         &diagnostics);
     ASSERT_TRUE(state.has_value()) << static_cast<int>(state.error());
     ASSERT_EQ(state->Record.Primitives.size(), 1u);
-    EXPECT_TRUE(state->Record.GeneratedTextureAssets.empty());
     EXPECT_EQ(diagnostics.ProgressiveNormalJobsQueued, 0u);
     EXPECT_EQ(diagnostics.ProgressiveTextureBakeJobsQueued, 1u);
 
@@ -1097,7 +1074,6 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstDoesNotCpuFallbac
         &diagnostics);
     ASSERT_TRUE(state.has_value()) << static_cast<int>(state.error());
     ASSERT_EQ(state->Record.Primitives.size(), 1u);
-    EXPECT_TRUE(state->Record.GeneratedTextureAssets.empty());
     EXPECT_EQ(diagnostics.ProgressiveTextureBakeJobsQueued, 1u);
 
     const ECS::EntityHandle entity = state->Record.Primitives[0].Entity;
@@ -1166,10 +1142,7 @@ TEST(RuntimeAssetModelSceneHandoff, ReadyModelSceneEventMaterializesRecordAndOwn
         const Runtime::AssetModelSceneHandoffRecord* record = handoff.FindRecord(modelAsset);
         ASSERT_NE(record, nullptr);
         ASSERT_EQ(record->EmbeddedTextureAssets.size(), 1u);
-        ASSERT_EQ(record->GeneratedTextureAssets.size(), 1u);
         EXPECT_EQ(fx.Cache.GetState(record->EmbeddedTextureAssets[0]),
-                  Graphics::GpuAssetState::GpuUploading);
-        EXPECT_EQ(fx.Cache.GetState(record->GeneratedTextureAssets[0]),
                   Graphics::GpuAssetState::GpuUploading);
         ASSERT_EQ(record->Nodes.size(), 1u);
         ASSERT_EQ(record->Primitives.size(), 1u);
@@ -1198,12 +1171,11 @@ TEST(RuntimeAssetModelSceneHandoff, ReadyModelSceneEventMaterializesRecordAndOwn
         EXPECT_EQ(externalHierarchy.Parent, record->Nodes[0].Entity);
 
         const auto diagnostics = handoff.GetDiagnostics();
-        EXPECT_EQ(diagnostics.ReadyEventsObserved, 3u);
+        EXPECT_EQ(diagnostics.ReadyEventsObserved, 2u);
         EXPECT_EQ(diagnostics.ModelSceneReadyEvents, 1u);
-        EXPECT_EQ(diagnostics.NonModelSceneReadyEvents, 2u);
+        EXPECT_EQ(diagnostics.NonModelSceneReadyEvents, 1u);
         EXPECT_EQ(diagnostics.ModelSceneMaterializeSuccesses, 1u);
         EXPECT_EQ(diagnostics.EmbeddedTextureUploadRequests, 1u);
-        EXPECT_EQ(diagnostics.GeneratedTextureUploadRequests, 1u);
     }
 
     EXPECT_TRUE(modelAsset.IsValid());
@@ -1343,7 +1315,8 @@ TEST(RuntimeAssetModelSceneHandoff, MaterialBindingsResolveWhenChildTextureAlrea
     EXPECT_EQ(diagnostics.MaterialTextureBindingFailures, 0u);
 }
 
-TEST(RuntimeAssetModelSceneHandoff, GeneratesMissingAlbedoTextureFromVertexColorProperty)
+TEST(RuntimeAssetModelSceneHandoff,
+    MissingAlbedoDoesNotUseCpuFallbackWithoutCanonicalService)
 {
     SceneHandoffFixture fx;
     TmpFile modelFile("asset_model_scene_handoff_generated_albedo.gltf");
@@ -1369,20 +1342,11 @@ TEST(RuntimeAssetModelSceneHandoff, GeneratesMissingAlbedoTextureFromVertexColor
     ASSERT_TRUE(state.has_value()) << static_cast<int>(state.error());
 
     ASSERT_EQ(state->Record.EmbeddedTextureAssets.size(), 0u);
-    ASSERT_EQ(state->Record.GeneratedTextureAssets.size(), 1u);
-    const Assets::AssetId generatedAlbedo = state->Record.GeneratedTextureAssets[0];
-    EXPECT_TRUE(generatedAlbedo.IsValid());
-    auto generatedPayload = fx.Service.Read<Assets::AssetTexture2DPayload>(generatedAlbedo);
-    ASSERT_TRUE(generatedPayload.has_value()) << static_cast<int>(generatedPayload.error());
-    ASSERT_EQ(generatedPayload->size(), 1u);
-    EXPECT_EQ((*generatedPayload)[0].Metadata.SourceKind, Assets::AssetTextureSourceKind::Generated);
-    EXPECT_EQ((*generatedPayload)[0].Metadata.ColorSpace, Assets::AssetTextureColorSpace::SRGB);
+    EXPECT_TRUE(fx.Transfer.TextureUploads.empty());
 
     ASSERT_EQ(state->Record.Materials.size(), 1u);
-    EXPECT_EQ(state->Record.Materials[0].TextureBindings.Albedo, generatedAlbedo);
+    EXPECT_FALSE(state->Record.Materials[0].TextureBindings.Albedo.IsValid());
     EXPECT_FALSE(state->Record.Materials[0].TextureBindings.Normal.IsValid());
-    EXPECT_EQ(diagnostics.GeneratedTextureAssetsCreated, 1u);
-    EXPECT_EQ(diagnostics.GeneratedTextureUploadRequests, 1u);
     EXPECT_EQ(diagnostics.GeneratedTextureBakeFailures, 0u);
 }
 
@@ -1421,21 +1385,19 @@ TEST(RuntimeAssetModelSceneHandoff,
         &diagnostics);
     ASSERT_TRUE(state.has_value()) << static_cast<int>(state.error());
 
-    EXPECT_TRUE(state->Record.GeneratedTextureAssets.empty());
     ASSERT_EQ(state->Record.Materials.size(), 1u);
-    EXPECT_FALSE(
-        state->Record.Materials[0].TextureBindings.Albedo.IsValid());
+    EXPECT_FALSE(state->Record.Materials[0].TextureBindings.Albedo.IsValid());
     EXPECT_FALSE(
         state->Record.Materials[0].TextureBindings.Normal.IsValid());
     EXPECT_EQ(
         state->Record.Materials[0].TextureBindings.NormalSpace,
-        Graphics::MaterialNormalTextureSpace::TangentSpaceNormal);
-    EXPECT_EQ(diagnostics.GeneratedTextureAssetsCreated, 0u);
+              Graphics::MaterialNormalTextureSpace::TangentSpaceNormal);
     EXPECT_EQ(diagnostics.GeneratedNormalTextureBakeFailures, 0u);
     EXPECT_EQ(diagnostics.GeneratedAlbedoTextureBakeFailures, 0u);
 }
 
-TEST(RuntimeAssetModelSceneHandoff, MissingTexcoordsReceiveGeneratedAtlasBeforeGeneratedMaterialTextures)
+TEST(RuntimeAssetModelSceneHandoff,
+    MissingTexcoordsReceiveGeneratedAtlasWithoutCpuTextureFallback)
 {
     SceneHandoffFixture fx;
     TmpFile modelFile("asset_model_scene_handoff_missing_texcoords.gltf");
@@ -1482,15 +1444,12 @@ TEST(RuntimeAssetModelSceneHandoff, MissingTexcoordsReceiveGeneratedAtlasBeforeG
     }
     EXPECT_TRUE(sawNonZeroTexcoord);
 
-    EXPECT_EQ(state->Record.GeneratedTextureAssets.size(), 2u);
-    EXPECT_EQ(fx.Transfer.TextureUploads.size(), 2u);
+    EXPECT_TRUE(fx.Transfer.TextureUploads.empty());
     ASSERT_EQ(state->Record.Materials.size(), 1u);
-    EXPECT_TRUE(state->Record.Materials[0].TextureBindings.Albedo.IsValid());
-    EXPECT_TRUE(state->Record.Materials[0].TextureBindings.Normal.IsValid());
+    EXPECT_FALSE(state->Record.Materials[0].TextureBindings.Albedo.IsValid());
+    EXPECT_FALSE(state->Record.Materials[0].TextureBindings.Normal.IsValid());
     EXPECT_EQ(state->Record.Materials[0].TextureBindings.NormalSpace,
-              Graphics::MaterialNormalTextureSpace::ObjectSpaceNormal);
-    EXPECT_EQ(diagnostics.GeneratedTextureAssetsCreated, 2u);
-    EXPECT_EQ(diagnostics.GeneratedTextureUploadRequests, 2u);
+              Graphics::MaterialNormalTextureSpace::TangentSpaceNormal);
     EXPECT_EQ(diagnostics.GeneratedTextureBakeFailures, 0u);
     EXPECT_EQ(diagnostics.GeneratedNormalTextureBakeFailures, 0u);
     EXPECT_EQ(diagnostics.GeneratedAlbedoTextureBakeFailures, 0u);
@@ -1524,9 +1483,6 @@ TEST(RuntimeAssetModelSceneHandoff, PendingMaterialBindingsResolveAfterTextureUp
     ASSERT_EQ(record->EmbeddedTextureAssets.size(), 1u);
     EXPECT_EQ(fx.Cache.GetState(record->EmbeddedTextureAssets[0]),
               Graphics::GpuAssetState::GpuUploading);
-    ASSERT_EQ(record->GeneratedTextureAssets.size(), 1u);
-    EXPECT_EQ(fx.Cache.GetState(record->GeneratedTextureAssets[0]),
-              Graphics::GpuAssetState::GpuUploading);
 
     fx.Cache.Tick(0u, 2u);
     auto resolved = handoff.ResolvePendingMaterialTextureBindings();
@@ -1540,7 +1496,7 @@ TEST(RuntimeAssetModelSceneHandoff, PendingMaterialBindingsResolveAfterTextureUp
 
     const auto diagnostics = handoff.GetDiagnostics();
     EXPECT_EQ(diagnostics.MaterialTextureBindingsResolved, 1u);
-    EXPECT_EQ(diagnostics.MaterialTextureBindingReresolveRequests, 3u);
+    EXPECT_EQ(diagnostics.MaterialTextureBindingReresolveRequests, 2u);
     EXPECT_EQ(diagnostics.MaterialTextureBindingReresolveSuccesses, 1u);
     EXPECT_EQ(diagnostics.MaterialTextureBindingReresolveFailures, 0u);
     EXPECT_GE(diagnostics.MaterialTextureBindingUploadDeferrals, 1u);

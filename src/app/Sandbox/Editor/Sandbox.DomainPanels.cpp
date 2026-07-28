@@ -149,16 +149,16 @@ struct TextureBakeUiState {
   bool *UvPreserveAuthored{nullptr};
 };
 
-[[nodiscard]] std::span<const TextureBakeConsumerBinding>
-TextureBakeConsumersFor(
+[[nodiscard]] std::span<const SandboxEditorTextureBakeTarget>
+TextureBakeTargetsFor(
     const SandboxEditorTextureBakeControlsModel &model,
     const std::string_view outputName) {
   const auto found = std::ranges::find(
-      model.TextureBakeConsumerBindings, outputName,
-      &TextureBakeConsumerSnapshot::OutputName);
-  if (found == model.TextureBakeConsumerBindings.end())
+      model.TextureBakeTargets, outputName,
+      &SandboxEditorTextureBakeTargetSnapshot::OutputName);
+  if (found == model.TextureBakeTargets.end())
     return {};
-  return found->Consumers;
+  return found->Targets;
 }
 
 void DrawDiagnostics(const std::vector<SandboxEditorDiagnostic> &diagnostics) {
@@ -689,21 +689,21 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
           const GeometryPresentationSlotSemantic semantic) {
         if (selectedSource == nullptr)
           return false;
-        const std::array<TextureBakeConsumerBinding, 1> consumer{{
-            TextureBakeConsumerBinding{
+        const std::array<SandboxEditorTextureBakeTarget, 1> target{{
+        SandboxEditorTextureBakeTarget{
                 .PresentationKey = "mesh.surface",
                 .Semantic = semantic,
                 .Colormap = static_cast<ColormapType>(colormapIndex),
             },
         }};
         const PropertyTextureBakeRepresentation representation =
-            ResolvePropertyTextureBakeRepresentation(
+        ResolveSandboxEditorTextureBakeTargetRepresentation(
                 selectedSource->ResolvedExpectedValueKind(),
                 kTextureBakeStorageModes[static_cast<std::size_t>(storageIndex)],
                 kTextureBakeEncoders[static_cast<std::size_t>(encoderIndex)],
-                consumer);
-        return IsPropertyTextureBakeConsumerCompatible(
-            consumer.front(), selectedSource->ResolvedExpectedValueKind(),
+            target);
+        return IsSandboxEditorTextureBakeTargetCompatible(
+        target.front(), selectedSource->ResolvedExpectedValueKind(),
             representation.Storage, representation.Encoding);
       };
 
@@ -752,42 +752,41 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
                      kColormapNames.data(),
                      static_cast<int>(kColormapNames.size()));
 
-  const auto makeConsumer =
+  const auto makeTarget =
       [colormapIndex](const GeometryPresentationSlotSemantic semantic) {
-        return TextureBakeConsumerBinding{
+        return SandboxEditorTextureBakeTarget{
             .PresentationKey = "mesh.surface",
             .Semantic = semantic,
             .Colormap = static_cast<ColormapType>(colormapIndex),
         };
       };
-  const auto consumersCompatible =
+  const auto targetsCompatible =
       [selectedSource, storageIndex, encoderIndex](
-          const std::vector<TextureBakeConsumerBinding> &values) {
+          const std::vector<SandboxEditorTextureBakeTarget> &values) {
         if (selectedSource == nullptr)
           return false;
         const PropertyTextureBakeRepresentation representation =
-            ResolvePropertyTextureBakeRepresentation(
+            ResolveSandboxEditorTextureBakeTargetRepresentation(
                 selectedSource->ResolvedExpectedValueKind(),
                 kTextureBakeStorageModes[static_cast<std::size_t>(storageIndex)],
                 kTextureBakeEncoders[static_cast<std::size_t>(encoderIndex)],
                 values);
         return std::ranges::all_of(
-            values, [&](const TextureBakeConsumerBinding &consumer) {
-              return IsPropertyTextureBakeConsumerCompatible(
-                  consumer, selectedSource->ResolvedExpectedValueKind(),
+            values, [&](const SandboxEditorTextureBakeTarget &target) {
+              return IsSandboxEditorTextureBakeTargetCompatible(
+                  target, selectedSource->ResolvedExpectedValueKind(),
                   representation.Storage, representation.Encoding);
             });
       };
 
-  std::vector<TextureBakeConsumerBinding> consumers{
-      makeConsumer(kTextureBakeTargetSemantics[
+  std::vector<SandboxEditorTextureBakeTarget> consumers{makeTarget(kTextureBakeTargetSemantics[
           static_cast<std::size_t>(semanticIndex)])};
   for (std::size_t i = 0u; i < kTextureBakeTargetSemantics.size(); ++i) {
     if (i == static_cast<std::size_t>(semanticIndex))
       continue;
     const std::uint32_t bit = 1u << static_cast<std::uint32_t>(i);
     if ((additionalConsumerMask & bit) != 0u)
-      consumers.push_back(makeConsumer(kTextureBakeTargetSemantics[i]));
+      consumers.push_back(makeTarget(kTextureBakeTargetSemantics[i]));
   }
 
   ImGui::TextUnformatted("Additional consumers");
@@ -797,14 +796,14 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
     const GeometryPresentationSlotSemantic semantic = kTextureBakeTargetSemantics[i];
     const std::uint32_t bit = 1u << static_cast<std::uint32_t>(i);
     bool selected = (additionalConsumerMask & bit) != 0u;
-    std::vector<TextureBakeConsumerBinding> candidate = consumers;
+    std::vector<SandboxEditorTextureBakeTarget> candidate = consumers;
     if (!selected)
-      candidate.push_back(makeConsumer(semantic));
-    const bool compatible = consumersCompatible(candidate);
+      candidate.push_back(makeTarget(semantic));
+    const bool compatible = targetsCompatible(candidate);
     if (selected && !compatible) {
       additionalConsumerMask &= ~bit;
       std::erase_if(consumers,
-                    [semantic](const TextureBakeConsumerBinding &consumer) {
+                    [semantic](const SandboxEditorTextureBakeTarget &consumer) {
                       return consumer.Semantic == semantic;
                     });
       selected = false;
@@ -815,12 +814,12 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
     if (ImGui::Checkbox(label.c_str(), &selected)) {
       if (selected) {
         additionalConsumerMask |= bit;
-        consumers.push_back(makeConsumer(semantic));
+        consumers.push_back(makeTarget(semantic));
       } else {
         additionalConsumerMask &= ~bit;
         std::erase_if(
             consumers,
-            [semantic](const TextureBakeConsumerBinding &consumer) {
+            [semantic](const SandboxEditorTextureBakeTarget &consumer) {
               return consumer.Semantic == semantic;
             });
       }
@@ -830,7 +829,7 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
   }
 
   const bool hasNormalConsumer = std::ranges::any_of(
-      consumers, [](const TextureBakeConsumerBinding &consumer) {
+      consumers, [](const SandboxEditorTextureBakeTarget &consumer) {
         return consumer.Semantic == GeometryPresentationSlotSemantic::Normal;
       });
   if (hasNormalConsumer) {
@@ -845,7 +844,7 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
 
   const bool canBake =
       model.CanBake && context != nullptr && selectedSource != nullptr &&
-      consumersCompatible(consumers);
+      targetsCompatible(consumers);
   if (!canBake)
     ImGui::BeginDisabled();
   if (ImGui::Button("Bake") && canBake) {
@@ -868,9 +867,9 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
                 static_cast<std::size_t>(storageIndex)],
             .EncodingColormap = static_cast<ColormapType>(colormapIndex),
             .NormalSpace = normalSpaceIndex == 1
-                               ? PropertyTextureNormalSpace::World
-                               : PropertyTextureNormalSpace::Object,
-            .Consumers = consumers,
+                               ? GeometryPresentationNormalSpace::World
+                               : GeometryPresentationNormalSpace::Object,
+            .Targets = consumers,
             .BindGeneratedTexture = true,
         });
   }
@@ -912,16 +911,16 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
             kColormapNames.size() - 1u);
         ImGui::Text("Baked colormap: %s", kColormapNames[mapIndex]);
       }
-      const std::span<const TextureBakeConsumerBinding> existingConsumers =
-          TextureBakeConsumersFor(model, record.OutputName);
+      const std::span<const SandboxEditorTextureBakeTarget> existingConsumers =
+          TextureBakeTargetsFor(model, record.OutputName);
       if (record.Encoding == PropertyTextureBakeEncoding::Normal) {
         const auto normalConsumer = std::ranges::find(
             existingConsumers, GeometryPresentationSlotSemantic::Normal,
-            &TextureBakeConsumerBinding::Semantic);
+            &SandboxEditorTextureBakeTarget::Semantic);
         ImGui::Text("Normal space: %s",
                     normalConsumer != existingConsumers.end() &&
                             normalConsumer->NormalSpace ==
-                                PropertyTextureNormalSpace::World
+                                GeometryPresentationNormalSpace::World
                         ? "world"
                         : "object");
       }
@@ -958,7 +957,7 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
         mutationDiagnostic = result.Diagnostic;
       }
 
-      std::vector<TextureBakeConsumerBinding> nextConsumers{
+      std::vector<SandboxEditorTextureBakeTarget> nextConsumers{
           existingConsumers.begin(), existingConsumers.end()};
       bool consumersChanged = false;
       for (std::size_t i = 0u; i < kTextureBakeTargetSemantics.size(); ++i) {
@@ -966,12 +965,12 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
             kTextureBakeTargetSemantics[i];
         const auto found = std::find_if(
             nextConsumers.begin(), nextConsumers.end(),
-            [semantic](const TextureBakeConsumerBinding &consumer) {
+            [semantic](const SandboxEditorTextureBakeTarget &consumer) {
               return consumer.Semantic == semantic;
             });
         bool enabled = found != nextConsumers.end();
-        const bool compatible = IsPropertyTextureBakeConsumerCompatible(
-            TextureBakeConsumerBinding{
+        const bool compatible = IsSandboxEditorTextureBakeTargetCompatible(
+            SandboxEditorTextureBakeTarget{
                 .PresentationKey = "mesh.surface",
                 .Semantic = semantic,
             },
@@ -984,7 +983,7 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
         if (ImGui::Checkbox(label.c_str(), &enabled)) {
           consumersChanged = true;
           if (enabled) {
-            nextConsumers.push_back(TextureBakeConsumerBinding{
+            nextConsumers.push_back(SandboxEditorTextureBakeTarget{
                 .PresentationKey = "mesh.surface",
                 .Semantic = semantic,
                 .Colormap = static_cast<ColormapType>(colormapIndex),
@@ -992,7 +991,7 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
           } else {
             std::erase_if(
                 nextConsumers,
-                [semantic](const TextureBakeConsumerBinding &consumer) {
+                [semantic](const SandboxEditorTextureBakeTarget &consumer) {
                   return consumer.Semantic == semantic;
                 });
           }
@@ -1007,7 +1006,7 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
            record.Source.ValueKind == Geometry::PropertyValueKind::Double);
       if (rawScalar) {
         int recordColormap = 0;
-        for (const TextureBakeConsumerBinding &consumer : nextConsumers) {
+        for (const SandboxEditorTextureBakeTarget &consumer : nextConsumers) {
           if (consumer.Semantic == GeometryPresentationSlotSemantic::Albedo ||
               consumer.Semantic == GeometryPresentationSlotSemantic::ScalarField) {
             recordColormap = static_cast<int>(consumer.Colormap);
@@ -1021,7 +1020,7 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
                          kColormapNames.data(),
                          static_cast<int>(kColormapNames.size()))) {
           consumersChanged = true;
-          for (TextureBakeConsumerBinding &consumer : nextConsumers) {
+          for (SandboxEditorTextureBakeTarget &consumer : nextConsumers) {
             if (consumer.Semantic == GeometryPresentationSlotSemantic::Albedo ||
                 consumer.Semantic == GeometryPresentationSlotSemantic::ScalarField) {
               consumer.Colormap =
@@ -1032,11 +1031,11 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
       }
       if (context != nullptr && consumersChanged) {
         const TextureBakeMutationResult result =
-            SetSandboxEditorBakedTextureConsumers(
-                *context, TextureBakeConsumerUpdateRequest{
+            SetSandboxEditorBakedTextureTargets(
+                *context, SandboxEditorTextureBakeTargetUpdateRequest{
                               .StableEntityId = model.SelectedStableId,
                               .OutputName = record.OutputName,
-                              .Consumers = std::move(nextConsumers),
+                              .Targets = std::move(nextConsumers),
                           });
         mutationDiagnostic = result.Diagnostic;
       }

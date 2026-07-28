@@ -1312,9 +1312,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
     ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
     EXPECT_EQ(imported->PayloadKind, Assets::AssetPayloadKind::Mesh);
     EXPECT_EQ(imported->PrimitiveEntitiesCreated, 1u);
-    EXPECT_EQ(imported->GeneratedTextureAssetsCreated, 0u);
     EXPECT_EQ(imported->TextureUploadRequests, 0u);
-    EXPECT_EQ(imported->GeneratedTextureUploadRequests, 0u);
 
     meshEntity = FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
@@ -2254,41 +2252,40 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportQueuesGeneratedNormalBakeF
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
     ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
-    EXPECT_EQ(imported->GeneratedTextureAssetsCreated, 0u);
     EXPECT_EQ(imported->TextureUploadRequests, 0u);
-    EXPECT_EQ(imported->GeneratedTextureUploadRequests, 0u);
 
-    meshEntity = FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
+    meshEntity = FindFirstEntityWithDomain(
+        *engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
-    ExpectMeshVertexNormals(
-        *engine.Worlds().Get(engine.ActiveWorld()),
-        *meshEntity,
-        {
-            {1.0f, 0.0f, 0.0f},
-            {0.0f, 1.0f, 0.0f},
-            {0.0f, 0.0f, -1.0f},
-        });
+    ExpectMeshVertexNormals(*engine.Worlds().Get(engine.ActiveWorld()),
+                            *meshEntity,
+                            {
+                                {1.0f, 0.0f, 0.0f},
+                                {0.0f, 1.0f, 0.0f},
+                                {0.0f, 0.0f, -1.0f},
+                            });
     EXPECT_FALSE(HasGeneratedNormalTextureBinding(engine, *meshEntity));
 
     engine.Run();
 
-    EXPECT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(*meshEntity));
-    ASSERT_TRUE(DirectMeshPostProcessReady(
-        engine, *meshEntity, bakeProbe));
+    EXPECT_TRUE(
+        engine.Worlds().Get(engine.ActiveWorld())->IsValid(*meshEntity));
+    ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity, bakeProbe));
     ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(
         engine, *meshEntity, bakeProbe);
 
     engine.Shutdown();
 }
 
-TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenMissing)
+TEST(
+    RuntimeAssetImportFormatCoverage,
+    DirectObjImportComputesVertexNormalsWhenMissing)
 {
-    TempAssetFile meshFile(
-        "assetio041_no_normals.obj",
-        "v 0 0 0\n"
-        "v 1 0 0\n"
-        "v 0 1 0\n"
-        "f 1 2 3\n");
+    TempAssetFile meshFile("assetio041_no_normals.obj",
+                           "v 0 0 0\n"
+                           "v 1 0 0\n"
+                           "v 0 1 0\n"
+                           "f 1 2 3\n");
 
     std::optional<ECS::EntityHandle> meshEntity{};
     ComposedNormalBakeProbe bakeProbe{};
@@ -2298,24 +2295,22 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenM
             [&meshEntity, &bakeProbe](Runtime::Engine& runningEngine)
             {
                 return meshEntity.has_value() &&
-                    DirectMeshPostProcessReady(
-                        runningEngine,
-                        *meshEntity,
-                        bakeProbe);
+                       DirectMeshPostProcessReady(
+                           runningEngine, *meshEntity, bakeProbe);
             }));
     InitializeAssetImportEngine(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
     InstallComposedNormalBakeProbe(engine, bakeProbe);
 
-    auto imported = RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine).ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
-        .Path = meshFile.Path.string(),
-        .PayloadKind = Assets::AssetPayloadKind::Mesh,
-    });
+    auto imported =
+        RequiredEngineService<Extrinsic::Runtime::AssetImportPipeline>(engine)
+            .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+                .Path = meshFile.Path.string(),
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+            });
     ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
     EXPECT_EQ(imported->PrimitiveEntitiesCreated, 1u);
-    EXPECT_EQ(imported->GeneratedTextureAssetsCreated, 0u);
     EXPECT_EQ(imported->TextureUploadRequests, 0u);
-    EXPECT_EQ(imported->GeneratedTextureUploadRequests, 0u);
 
     meshEntity = FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
@@ -2324,43 +2319,44 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenM
         *meshEntity,
         {
             {0.0f, 0.0f, 1.0f},
+                                {0.0f, 0.0f, 1.0f},
             {0.0f, 0.0f, 1.0f},
-            {0.0f, 0.0f, 1.0f},
-        });
-    ExpectMeshLacksVertexProperty(*engine.Worlds().Get(engine.ActiveWorld()), *meshEntity, "v:texcoord");
+                            });
+    ExpectMeshLacksVertexProperty(
+        *engine.Worlds().Get(engine.ActiveWorld()), *meshEntity, "v:texcoord");
     EXPECT_FALSE(HasGeneratedNormalTextureBinding(engine, *meshEntity));
 
     engine.Run();
 
-    EXPECT_TRUE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(*meshEntity));
-    ASSERT_TRUE(DirectMeshPostProcessReady(
-        engine, *meshEntity, bakeProbe));
-    ExpectMeshVertexTexcoordsFinite(*engine.Worlds().Get(engine.ActiveWorld()), *meshEntity);
-    ExpectMeshVertexNormals(
-        *engine.Worlds().Get(engine.ActiveWorld()),
-        *meshEntity,
-        {
-            {0.0f, 0.0f, 1.0f},
-            {0.0f, 0.0f, 1.0f},
-            {0.0f, 0.0f, 1.0f},
-        });
-    ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(
-        engine, *meshEntity, bakeProbe);
+    EXPECT_TRUE(
+        engine.Worlds().Get(engine.ActiveWorld())->IsValid(*meshEntity));
+    ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity, bakeProbe));
+    ExpectMeshVertexTexcoordsFinite(*engine.Worlds().Get(engine.ActiveWorld()),
+                                    *meshEntity);
+    ExpectMeshVertexNormals(*engine.Worlds().Get(engine.ActiveWorld()),
+                            *meshEntity,
+                            {
+                                {0.0f, 0.0f, 1.0f},
+                                {0.0f, 0.0f, 1.0f},
+                                {0.0f, 0.0f, 1.0f},
+                            });
+    ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(engine, *meshEntity, bakeProbe);
 
     engine.Shutdown();
 }
 
-TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesNormalsAndQueuesGeneratedNormalBake)
+TEST(
+    RuntimeAssetImportFormatCoverage,
+    DirectObjImportComputesNormalsAndQueuesGeneratedNormalBake)
 {
-    TempAssetFile meshFile(
-        "assetio007_no_normals_texcoords.obj",
-        "v 0 0 0\n"
-        "v 1 0 0\n"
-        "v 0 1 0\n"
-        "vt 0 0\n"
-        "vt 1 0\n"
-        "vt 0 1\n"
-        "f 1/1 2/2 3/3\n");
+    TempAssetFile meshFile("assetio007_no_normals_texcoords.obj",
+                           "v 0 0 0\n"
+                           "v 1 0 0\n"
+                           "v 0 1 0\n"
+                           "vt 0 0\n"
+                           "vt 1 0\n"
+                           "vt 0 1\n"
+                           "f 1/1 2/2 3/3\n");
 
     std::optional<ECS::EntityHandle> meshEntity{};
     ComposedNormalBakeProbe bakeProbe{};
@@ -2370,9 +2366,8 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesNormalsAndQueuesGe
             [&meshEntity, &bakeProbe](Runtime::Engine& runningEngine)
             {
                 return meshEntity.has_value() &&
-                    DirectMeshPostProcessReady(
-                        runningEngine,
-                        *meshEntity,
+                       DirectMeshPostProcessReady(
+                           runningEngine, *meshEntity,
                         bakeProbe);
             }));
     InitializeAssetImportEngine(engine);
@@ -2384,9 +2379,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesNormalsAndQueuesGe
         .PayloadKind = Assets::AssetPayloadKind::Mesh,
     });
     ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
-    EXPECT_EQ(imported->GeneratedTextureAssetsCreated, 0u);
     EXPECT_EQ(imported->TextureUploadRequests, 0u);
-    EXPECT_EQ(imported->GeneratedTextureUploadRequests, 0u);
 
     meshEntity = FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());

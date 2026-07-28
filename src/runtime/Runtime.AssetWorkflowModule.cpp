@@ -1,9 +1,12 @@
 module;
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <string_view>
 #include <utility>
+
+#include <entt/entity/registry.hpp>
 
 module Extrinsic.Runtime.AssetWorkflowModule;
 
@@ -15,7 +18,10 @@ import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameLoop;
 import Extrinsic.Core.Logging;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Graphics.Colormap;
+import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetImportPipeline;
@@ -23,6 +29,7 @@ import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.DeviceBootstrap;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
@@ -87,6 +94,332 @@ namespace Extrinsic::Runtime
                        BoundRegistry != nullptr &&
                        Worlds->ActiveWorld() == BoundWorld &&
                        Worlds->Get(BoundWorld) == BoundRegistry;
+            }
+
+            [[nodiscard]] static const PropertyTextureBakeRecord*
+            FindTextureBakeOutput(
+                const PropertyTextureBakeOutputs* const outputs,
+                const std::string_view outputName) noexcept
+            {
+                if (outputs == nullptr)
+                    return nullptr;
+                const auto found =
+                    std::ranges::find(outputs->Records,
+                                      outputName,
+                                      &PropertyTextureBakeRecord::OutputName);
+                return found == outputs->Records.end() ? nullptr : &*found;
+            }
+
+            [[nodiscard]] static bool IsScalarProperty(
+                const Geometry::PropertyValueKind kind) noexcept
+            {
+                return kind == Geometry::PropertyValueKind::Float ||
+                       kind == Geometry::PropertyValueKind::Double;
+            }
+
+            static void ClearGeneratedMaterialTarget(
+                Graphics::MaterialTextureAssetBindings& bindings,
+                const GeometryPresentationSlotSemantic semantic,
+                const Assets::AssetId texture) noexcept
+            {
+                if (!texture.IsValid())
+                    return;
+                switch (semantic)
+                {
+                case GeometryPresentationSlotSemantic::Albedo:
+                case GeometryPresentationSlotSemantic::ScalarField:
+                    if (bindings.Albedo == texture)
+                    {
+                        bindings.Albedo = {};
+                        bindings.AlbedoInterpretation = Graphics::
+                            MaterialAlbedoTextureInterpretation::Color;
+                        bindings.AlbedoScalarColormap =
+                            Graphics::Colormap::Type::Viridis;
+                        bindings.AlbedoScalarRangeMin = 0.0f;
+                        bindings.AlbedoScalarRangeMax = 1.0f;
+                    }
+                    break;
+                case GeometryPresentationSlotSemantic::Normal:
+                    if (bindings.Normal == texture)
+                    {
+                        bindings.Normal = {};
+                        bindings.NormalSpace = Graphics::
+                            MaterialNormalTextureSpace::TangentSpaceNormal;
+                    }
+                    break;
+                case GeometryPresentationSlotSemantic::Roughness:
+                case GeometryPresentationSlotSemantic::Metallic:
+                    if (bindings.MetallicRoughness == texture)
+                    {
+                        bindings.MetallicRoughness = {};
+                        bindings.RoughnessFromRed = false;
+                        bindings.MetallicFromRed = false;
+                    }
+                    break;
+                case GeometryPresentationSlotSemantic::Displacement:
+                case GeometryPresentationSlotSemantic::PointColor:
+                case GeometryPresentationSlotSemantic::PointScalarField:
+                case GeometryPresentationSlotSemantic::PointSize:
+                case GeometryPresentationSlotSemantic::PointNormalOrientation:
+                case GeometryPresentationSlotSemantic::LineColor:
+                case GeometryPresentationSlotSemantic::LineScalarField:
+                case GeometryPresentationSlotSemantic::LineWidth:
+                    break;
+                }
+            }
+
+            static void ApplyGeneratedMaterialTarget(
+                Graphics::MaterialTextureAssetBindings& bindings,
+                const GeometryPresentationSlotRecipe& slot,
+                const PropertyTextureBakeRecord& output) noexcept
+            {
+                switch (slot.Semantic)
+                {
+                case GeometryPresentationSlotSemantic::Albedo:
+                case GeometryPresentationSlotSemantic::ScalarField:
+                    bindings.Albedo = output.Texture;
+                    bindings.AlbedoInterpretation =
+                        IsScalarProperty(output.Source.ValueKind) &&
+                                output.Storage ==
+                                    PropertyTextureBakeStorage::RawFloat
+                            ? Graphics::MaterialAlbedoTextureInterpretation::
+                                  Scalar
+                            : Graphics::MaterialAlbedoTextureInterpretation::
+                                  Color;
+                    bindings.AlbedoScalarColormap = slot.TextureColormap;
+                    bindings.AlbedoScalarRangeMin = output.RangeMin;
+                    bindings.AlbedoScalarRangeMax = output.RangeMax;
+                    break;
+                case GeometryPresentationSlotSemantic::Normal:
+                    bindings.Normal = output.Texture;
+                    bindings.NormalSpace =
+                        slot.NormalSpace ==
+                                GeometryPresentationNormalSpace::World
+                            ? Graphics::MaterialNormalTextureSpace::
+                                  WorldSpaceNormal
+                            : Graphics::MaterialNormalTextureSpace::
+                                  ObjectSpaceNormal;
+                    break;
+                case GeometryPresentationSlotSemantic::Roughness:
+                    if (bindings.MetallicRoughness != output.Texture)
+                    {
+                        bindings.MetallicRoughness = output.Texture;
+                        bindings.RoughnessFromRed = false;
+                        bindings.MetallicFromRed = false;
+                    }
+                    bindings.RoughnessFromRed = true;
+                    break;
+                case GeometryPresentationSlotSemantic::Metallic:
+                    if (bindings.MetallicRoughness != output.Texture)
+                    {
+                        bindings.MetallicRoughness = output.Texture;
+                        bindings.RoughnessFromRed = false;
+                        bindings.MetallicFromRed = false;
+                    }
+                    bindings.MetallicFromRed = true;
+                    break;
+                case GeometryPresentationSlotSemantic::Displacement:
+                case GeometryPresentationSlotSemantic::PointColor:
+                case GeometryPresentationSlotSemantic::PointScalarField:
+                case GeometryPresentationSlotSemantic::PointSize:
+                case GeometryPresentationSlotSemantic::PointNormalOrientation:
+                case GeometryPresentationSlotSemantic::LineColor:
+                case GeometryPresentationSlotSemantic::LineScalarField:
+                case GeometryPresentationSlotSemantic::LineWidth:
+                    break;
+                }
+            }
+
+            void ReconcileTextureBakeOutputs()
+            {
+                if (!IsBindingCurrent(BindingEpoch) || Extraction == nullptr)
+                {
+                    return;
+                }
+
+                auto& raw = BoundRegistry->Raw();
+                auto view = raw.view<GeometryPresentationRecipe>();
+                for (const ECS::EntityHandle entity : view)
+                {
+                    GeometryPresentationRecipe& recipe =
+                        view.get<GeometryPresentationRecipe>(entity);
+                    const auto* outputs =
+                        raw.try_get<PropertyTextureBakeOutputs>(entity);
+                    auto& runtimeState =
+                        raw.get_or_emplace<GeometryPresentationRuntimeState>(
+                            entity);
+                    const std::uint32_t stableId =
+                        SelectionController::ToStableEntityId(entity);
+                    Graphics::MaterialTextureAssetBindings bindings =
+                        Extraction->GetMaterialTextureAssetBindings(stableId)
+                            .value_or(Graphics::MaterialTextureAssetBindings{});
+                    bool materialChanged = false;
+
+                    for (GeometryPresentationSlotStatus& status :
+                         runtimeState.Slots)
+                    {
+                        if (status.GeneratedOutputName.empty())
+                            continue;
+                        const auto* presentation =
+                            FindGeometryPresentationBinding(
+                                recipe, status.PresentationKey);
+                        const auto* slot =
+                            presentation != nullptr
+                                ? FindGeometryPresentationSlot(*presentation,
+                                                               status.Semantic)
+                                : nullptr;
+                        if (slot != nullptr &&
+                            slot->SourceKind ==
+                                GeometryPresentationSourceKind::PropertyBake &&
+                            slot->GeneratedOutputName ==
+                                status.GeneratedOutputName)
+                        {
+                            continue;
+                        }
+                        ClearGeneratedMaterialTarget(
+                            bindings, status.Semantic, status.GeneratedTexture);
+                        materialChanged = status.GeneratedTexture.IsValid() ||
+                                          materialChanged;
+                        status.GeneratedOutputName.clear();
+                        status.GeneratedTexture = {};
+                    }
+
+                    for (const GeometryPresentationBindingRecipe& presentation :
+                         recipe.Presentations)
+                    {
+                        for (const GeometryPresentationSlotRecipe& slot :
+                             presentation.Slots)
+                        {
+                            if (slot.SourceKind !=
+                                    GeometryPresentationSourceKind::
+                                        PropertyBake ||
+                                slot.GeneratedOutputName.empty())
+                            {
+                                continue;
+                            }
+
+                            GeometryPresentationSlotStatus* status =
+                                FindGeometryPresentationSlotStatus(
+                                    runtimeState,
+                                    presentation.Key,
+                                    slot.Semantic);
+                            if (status == nullptr)
+                            {
+                                runtimeState.Slots.push_back(
+                                    GeometryPresentationSlotStatus{
+                                        .PresentationKey = presentation.Key,
+                                        .Semantic = slot.Semantic,
+                                    });
+                                status = &runtimeState.Slots.back();
+                            }
+                            if (status->GeneratedOutputName !=
+                                slot.GeneratedOutputName)
+                            {
+                                ClearGeneratedMaterialTarget(
+                                    bindings,
+                                    slot.Semantic,
+                                    status->GeneratedTexture);
+                                materialChanged =
+                                    status->GeneratedTexture.IsValid() ||
+                                    materialChanged;
+                                status->GeneratedTexture = {};
+                                status->GeneratedOutputName =
+                                    slot.GeneratedOutputName;
+                            }
+
+                            const PropertyTextureBakeRecord* const output =
+                                FindTextureBakeOutput(outputs,
+                                                      slot.GeneratedOutputName);
+                            if (output == nullptr)
+                            {
+                                ClearGeneratedMaterialTarget(
+                                    bindings,
+                                    slot.Semantic,
+                                    status->GeneratedTexture);
+                                materialChanged =
+                                    status->GeneratedTexture.IsValid() ||
+                                    materialChanged;
+                                status->GeneratedTexture = {};
+                                status->Readiness =
+                                    GeometryPresentationReadiness::Pending;
+                                status->Provenance =
+                                    GeometryPresentationProvenance::
+                                        PropertyBinding;
+                                status->Diagnostic =
+                                    "generated texture output is not scheduled";
+                                continue;
+                            }
+
+                            status->SourceGeneration = output->SourceGeneration;
+                            status->OutputGeneration = output->Generation;
+                            status->Diagnostic = output->Diagnostic;
+                            switch (output->State)
+                            {
+                            case PropertyTextureBakeOutputState::Pending:
+                                status->Readiness =
+                                    GeometryPresentationReadiness::Pending;
+                                status->Provenance =
+                                    GeometryPresentationProvenance::
+                                        PropertyBinding;
+                                break;
+                            case PropertyTextureBakeOutputState::Ready:
+                                if (Assets == nullptr ||
+                                    !output->Texture.IsValid() ||
+                                    !Assets->IsAlive(output->Texture))
+                                {
+                                    ClearGeneratedMaterialTarget(
+                                        bindings,
+                                        slot.Semantic,
+                                        status->GeneratedTexture);
+                                    materialChanged =
+                                        status->GeneratedTexture.IsValid() ||
+                                        materialChanged;
+                                    status->GeneratedTexture = {};
+                                    status->Readiness =
+                                        GeometryPresentationReadiness::Failed;
+                                    status->Provenance =
+                                        GeometryPresentationProvenance::
+                                            PropertyBinding;
+                                    status->Diagnostic =
+                                        "generated texture asset is no longer "
+                                        "alive";
+                                    break;
+                                }
+                                status->GeneratedTexture = output->Texture;
+                                status->Readiness =
+                                    GeometryPresentationReadiness::Ready;
+                                status->Provenance =
+                                    GeometryPresentationProvenance::
+                                        GeneratedTextureAsset;
+                                ApplyGeneratedMaterialTarget(
+                                    bindings, slot, *output);
+                                materialChanged = true;
+                                break;
+                            case PropertyTextureBakeOutputState::Failed:
+                                ClearGeneratedMaterialTarget(
+                                    bindings,
+                                    slot.Semantic,
+                                    status->GeneratedTexture);
+                                materialChanged =
+                                    status->GeneratedTexture.IsValid() ||
+                                    materialChanged;
+                                status->GeneratedTexture = {};
+                                status->Readiness =
+                                    GeometryPresentationReadiness::Failed;
+                                status->Provenance =
+                                    GeometryPresentationProvenance::
+                                        PropertyBinding;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (materialChanged)
+                    {
+                        Extraction->SetMaterialTextureAssetBindings(stableId,
+                                                                    bindings);
+                    }
+                }
             }
 
             void DetachPipeline() noexcept
@@ -794,6 +1127,7 @@ namespace Extrinsic::Runtime
                 state.Device->GetGlobalFrameNumber(),
                 state.Device->GetFramesInFlight());
         }
+        state.ReconcileTextureBakeOutputs();
         if (state.SceneHandoff != nullptr &&
             state.IsBindingCurrent(state.BindingEpoch))
         {

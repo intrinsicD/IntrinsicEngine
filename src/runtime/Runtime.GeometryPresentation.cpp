@@ -140,6 +140,12 @@ namespace Extrinsic::Runtime
                  "PersistOnSave"},
             };
 
+        constexpr std::pair<GeometryPresentationNormalSpace, std::string_view>
+            kNormalSpaces[]{
+                {GeometryPresentationNormalSpace::Object, "Object"},
+                {GeometryPresentationNormalSpace::World, "World"},
+            };
+
         constexpr std::pair<GeometryPresentationProvenance, std::string_view>
             kProvenance[]{
                 {GeometryPresentationProvenance::None, "None"},
@@ -292,6 +298,12 @@ namespace Extrinsic::Runtime
     }
 
     std::string_view ToString(
+        const GeometryPresentationNormalSpace value) noexcept
+    {
+        return EnumToString(value, kNormalSpaces, "Object");
+    }
+
+    std::string_view ToString(
         const GeometryPresentationProvenance value) noexcept
     {
         return EnumToString(value, kProvenance, "None");
@@ -372,6 +384,13 @@ namespace Extrinsic::Runtime
         GeometryGeneratedOutputPolicy& out) noexcept
     {
         return TryEnumFromString(value, kGeneratedPolicies, out);
+    }
+
+    bool TryParseGeometryPresentationNormalSpace(
+        const std::string_view value,
+        GeometryPresentationNormalSpace& out) noexcept
+    {
+        return TryEnumFromString(value, kNormalSpaces, out);
     }
 
     GeometryGeneratedOutputPolicy DefaultGeometryGeneratedOutputPolicyFor(
@@ -613,6 +632,9 @@ namespace Extrinsic::Runtime
                     .SourceKind = sourceSlot.SourceKind,
                     .UniformDefault = sourceSlot.UniformDefault,
                     .Property = sourceSlot.Property,
+                    .GeneratedOutputName = sourceSlot.GeneratedOutputName,
+                    .TextureColormap = sourceSlot.TextureColormap,
+                    .NormalSpace = sourceSlot.NormalSpace,
                     .Provenance = DefaultProvenance(sourceSlot.SourceKind),
                     .SourceGeneration = observedSourceGeneration,
                     .Enabled = sourceSlot.Enabled,

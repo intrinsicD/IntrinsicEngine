@@ -24,6 +24,7 @@ import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.TextureBakeModule;
@@ -434,22 +435,22 @@ namespace
 
 TEST(RuntimeTextureBakeModule, RepresentationDefaultsPreserveRawScalarData)
 {
-    const std::vector<Runtime::TextureBakeConsumerBinding> consumers{
-        Runtime::TextureBakeConsumerBinding{
+    const std::vector<Runtime::SandboxEditorTextureBakeTarget> targets{
+        Runtime::SandboxEditorTextureBakeTarget{
             .PresentationKey = "mesh.surface",
             .Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo,
         },
-        Runtime::TextureBakeConsumerBinding{
+        Runtime::SandboxEditorTextureBakeTarget{
             .PresentationKey = "mesh.surface",
             .Semantic = Runtime::GeometryPresentationSlotSemantic::ScalarField,
         },
     };
     const Runtime::PropertyTextureBakeRepresentation representation =
-        Runtime::ResolvePropertyTextureBakeRepresentation(
+        Runtime::ResolveSandboxEditorTextureBakeTargetRepresentation(
             Geometry::PropertyValueKind::Float,
             Runtime::PropertyTextureBakeStorage::Auto,
             Runtime::PropertyTextureBakeEncoding::Auto,
-            consumers);
+            targets);
 
     EXPECT_EQ(
         representation.Storage,
@@ -457,13 +458,13 @@ TEST(RuntimeTextureBakeModule, RepresentationDefaultsPreserveRawScalarData)
     EXPECT_EQ(
         representation.Encoding,
         Runtime::PropertyTextureBakeEncoding::LinearScalar);
-    EXPECT_TRUE(Runtime::IsPropertyTextureBakeConsumerCompatible(
-        consumers[0],
+    EXPECT_TRUE(Runtime::IsSandboxEditorTextureBakeTargetCompatible(
+        targets[0],
         Geometry::PropertyValueKind::Float,
         representation.Storage,
         representation.Encoding));
-    EXPECT_TRUE(Runtime::IsPropertyTextureBakeConsumerCompatible(
-        consumers[1],
+    EXPECT_TRUE(Runtime::IsSandboxEditorTextureBakeTargetCompatible(
+        targets[1],
         Geometry::PropertyValueKind::Float,
         representation.Storage,
         representation.Encoding));
@@ -471,40 +472,40 @@ TEST(RuntimeTextureBakeModule, RepresentationDefaultsPreserveRawScalarData)
 
 TEST(RuntimeTextureBakeModule, NormalAndLabelDefaultsChooseEncodedStorage)
 {
-    const std::vector<Runtime::TextureBakeConsumerBinding> normalConsumer{
-        Runtime::TextureBakeConsumerBinding{
+    const std::vector<Runtime::SandboxEditorTextureBakeTarget> normalTargets{
+        Runtime::SandboxEditorTextureBakeTarget{
             .PresentationKey = "mesh.surface",
             .Semantic = Runtime::GeometryPresentationSlotSemantic::Normal,
         },
     };
-    const auto normal = Runtime::ResolvePropertyTextureBakeRepresentation(
+    const auto normal = Runtime::ResolveSandboxEditorTextureBakeTargetRepresentation(
         Geometry::PropertyValueKind::Vec3,
         Runtime::PropertyTextureBakeStorage::Auto,
         Runtime::PropertyTextureBakeEncoding::Auto,
-        normalConsumer);
+            normalTargets);
     EXPECT_EQ(
         normal.Storage,
         Runtime::PropertyTextureBakeStorage::EncodedRgba);
     EXPECT_EQ(
         normal.Encoding,
         Runtime::PropertyTextureBakeEncoding::Normal);
-    EXPECT_TRUE(Runtime::IsPropertyTextureBakeConsumerCompatible(
-        normalConsumer.front(),
+    EXPECT_TRUE(Runtime::IsSandboxEditorTextureBakeTargetCompatible(
+        normalTargets.front(),
         Geometry::PropertyValueKind::Vec3,
         normal.Storage,
         normal.Encoding));
 
-    const std::vector<Runtime::TextureBakeConsumerBinding> albedoConsumer{
-        Runtime::TextureBakeConsumerBinding{
+    const std::vector<Runtime::SandboxEditorTextureBakeTarget> albedoTargets{
+        Runtime::SandboxEditorTextureBakeTarget{
             .PresentationKey = "mesh.surface",
             .Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo,
         },
     };
-    const auto label = Runtime::ResolvePropertyTextureBakeRepresentation(
+    const auto label = Runtime::ResolveSandboxEditorTextureBakeTargetRepresentation(
         Geometry::PropertyValueKind::UInt32,
         Runtime::PropertyTextureBakeStorage::Auto,
         Runtime::PropertyTextureBakeEncoding::Auto,
-        albedoConsumer);
+            albedoTargets);
     EXPECT_EQ(
         label.Storage,
         Runtime::PropertyTextureBakeStorage::EncodedRgba);

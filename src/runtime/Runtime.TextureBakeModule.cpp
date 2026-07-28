@@ -144,40 +144,6 @@ namespace Extrinsic::Runtime
                 generation = 1u;
         }
 
-        [[nodiscard]] GeometryPresentationBindingRecipe* FindPresentation(
-            GeometryPresentationRecipe& bindings,
-            const TextureBakeConsumerBinding& consumer) noexcept
-        {
-            if (!consumer.PresentationKey.empty())
-                return FindGeometryPresentationBinding(
-                    bindings,
-                    consumer.PresentationKey);
-            for (GeometryPresentationBindingRecipe& presentation :
-                 bindings.Presentations)
-            {
-                if (FindGeometryPresentationSlot(presentation, consumer.Semantic) != nullptr)
-                    return &presentation;
-            }
-            return nullptr;
-        }
-
-        [[nodiscard]] const GeometryPresentationBindingRecipe* FindPresentation(
-            const GeometryPresentationRecipe& bindings,
-            const TextureBakeConsumerBinding& consumer) noexcept
-        {
-            if (!consumer.PresentationKey.empty())
-                return FindGeometryPresentationBinding(
-                    bindings,
-                    consumer.PresentationKey);
-            for (const GeometryPresentationBindingRecipe& presentation :
-                 bindings.Presentations)
-            {
-                if (FindGeometryPresentationSlot(presentation, consumer.Semantic) != nullptr)
-                    return &presentation;
-            }
-            return nullptr;
-        }
-
         [[nodiscard]] bool IsScalar(
             const Geometry::PropertyValueKind kind) noexcept
         {
@@ -205,19 +171,6 @@ namespace Extrinsic::Runtime
                 return PropertyTextureBakeStatus::NonFinitePropertyValue;
             }
             return PropertyTextureBakeStatus::UnsupportedPropertyType;
-        }
-
-        [[nodiscard]] bool ConsumerCompatible(
-            const TextureBakeConsumerBinding& consumer,
-            const Geometry::PropertyValueKind valueKind,
-            const PropertyTextureBakeStorage storage,
-            const PropertyTextureBakeEncoding encoder) noexcept
-        {
-            return IsPropertyTextureBakeConsumerCompatible(
-                consumer,
-                valueKind,
-                storage,
-                encoder);
         }
 
         struct GeneratedPropertyTextureMetadata
@@ -279,17 +232,6 @@ namespace Extrinsic::Runtime
             {
                 return Status == PropertyTextureBakeStatus::Success;
             }
-        };
-
-        struct PropertyTextureConsumerRecord
-        {
-            std::string OutputName{};
-            std::vector<TextureBakeConsumerBinding> Consumers{};
-        };
-
-        struct PropertyTextureConsumerBindings
-        {
-            std::vector<PropertyTextureConsumerRecord> Records{};
         };
 
         [[nodiscard]] PreparedPropertyBake PrepareFailure(
@@ -501,140 +443,6 @@ namespace Extrinsic::Runtime
         case Geometry::PropertyValueKind::Bool:
         case Geometry::PropertyValueKind::Int32:
         case Geometry::PropertyValueKind::UInt64:
-            return false;
-        }
-        return false;
-    }
-
-    PropertyTextureBakeRepresentation ResolvePropertyTextureBakeRepresentation(
-        const Geometry::PropertyValueKind valueKind,
-        const PropertyTextureBakeStorage requestedStorage,
-        const PropertyTextureBakeEncoding requestedEncoding,
-        const std::span<const TextureBakeConsumerBinding> consumers) noexcept
-    {
-        PropertyTextureBakeStorage storage = requestedStorage;
-        PropertyTextureBakeEncoding encoding = requestedEncoding;
-        const bool hasNormalConsumer = std::ranges::any_of(
-            consumers,
-            [](const TextureBakeConsumerBinding& consumer)
-            {
-                return consumer.Semantic ==
-                    GeometryPresentationSlotSemantic::Normal;
-            });
-        const bool hasLinearPbrConsumer = std::ranges::any_of(
-            consumers,
-            [](const TextureBakeConsumerBinding& consumer)
-            {
-                return consumer.Semantic ==
-                           GeometryPresentationSlotSemantic::Roughness ||
-                       consumer.Semantic ==
-                           GeometryPresentationSlotSemantic::Metallic;
-            });
-
-        if (storage == PropertyTextureBakeStorage::Auto)
-        {
-            storage = hasNormalConsumer ||
-                              valueKind ==
-                                  Geometry::PropertyValueKind::UInt32
-                ? PropertyTextureBakeStorage::EncodedRgba
-                : PropertyTextureBakeStorage::RawFloat;
-        }
-        if (encoding == PropertyTextureBakeEncoding::Auto)
-        {
-            if (hasNormalConsumer)
-            {
-                encoding = PropertyTextureBakeEncoding::Normal;
-            }
-            else if (hasLinearPbrConsumer &&
-                     IsScalar(valueKind))
-            {
-                encoding =
-                    PropertyTextureBakeEncoding::LinearScalar;
-            }
-        }
-        return ResolvePropertyTextureBakeRepresentation(
-            valueKind,
-            storage,
-            encoding);
-    }
-
-    bool IsPropertyTextureBakeConsumerCompatible(
-        const TextureBakeConsumerBinding& consumer,
-        const Geometry::PropertyValueKind valueKind,
-        const PropertyTextureBakeStorage storage,
-        const PropertyTextureBakeEncoding encoding) noexcept
-    {
-        if (!IsPropertyTextureBakeRepresentationCompatible(
-                valueKind,
-                storage,
-                encoding))
-        {
-            return false;
-        }
-        const bool raw = storage == PropertyTextureBakeStorage::RawFloat;
-        const bool scalar = IsScalar(valueKind);
-        switch (consumer.Semantic)
-        {
-        case GeometryPresentationSlotSemantic::Normal:
-            return valueKind == Geometry::PropertyValueKind::Vec3 &&
-                   storage == PropertyTextureBakeStorage::EncodedRgba &&
-                   encoding == PropertyTextureBakeEncoding::Normal;
-        case GeometryPresentationSlotSemantic::Roughness:
-        case GeometryPresentationSlotSemantic::Metallic:
-            return scalar &&
-                   (raw ||
-                    encoding ==
-                        PropertyTextureBakeEncoding::LinearScalar);
-        case GeometryPresentationSlotSemantic::ScalarField:
-            return (scalar &&
-                    (raw ||
-                     encoding ==
-                         PropertyTextureBakeEncoding::LinearScalar ||
-                     encoding ==
-                         PropertyTextureBakeEncoding::ScalarColormap)) ||
-                   (valueKind == Geometry::PropertyValueKind::UInt32 &&
-                    !raw &&
-                    encoding ==
-                        PropertyTextureBakeEncoding::LabelPalette);
-        case GeometryPresentationSlotSemantic::Albedo:
-            if (scalar)
-            {
-                return raw ||
-                       encoding ==
-                           PropertyTextureBakeEncoding::LinearScalar ||
-                       encoding ==
-                           PropertyTextureBakeEncoding::ScalarColormap;
-            }
-            if (valueKind == Geometry::PropertyValueKind::UInt32)
-            {
-                return !raw &&
-                       encoding ==
-                           PropertyTextureBakeEncoding::LabelPalette;
-            }
-            if (valueKind == Geometry::PropertyValueKind::Vec2)
-            {
-                return raw ||
-                       encoding == PropertyTextureBakeEncoding::Vector2 ||
-                       encoding == PropertyTextureBakeEncoding::RgbaColor;
-            }
-            if (valueKind == Geometry::PropertyValueKind::Vec3)
-            {
-                return raw ||
-                       encoding == PropertyTextureBakeEncoding::Vector3 ||
-                       encoding == PropertyTextureBakeEncoding::RgbaColor ||
-                       encoding == PropertyTextureBakeEncoding::Normal;
-            }
-            return valueKind == Geometry::PropertyValueKind::Vec4 &&
-                   (raw ||
-                    encoding == PropertyTextureBakeEncoding::RgbaColor);
-        case GeometryPresentationSlotSemantic::Displacement:
-        case GeometryPresentationSlotSemantic::PointColor:
-        case GeometryPresentationSlotSemantic::PointScalarField:
-        case GeometryPresentationSlotSemantic::PointSize:
-        case GeometryPresentationSlotSemantic::PointNormalOrientation:
-        case GeometryPresentationSlotSemantic::LineColor:
-        case GeometryPresentationSlotSemantic::LineScalarField:
-        case GeometryPresentationSlotSemantic::LineWidth:
             return false;
         }
         return false;
@@ -898,50 +706,6 @@ namespace Extrinsic::Runtime
             const std::string_view outputName) const noexcept
         {
             return const_cast<Impl*>(this)->FindRecord(entity, outputName);
-        }
-
-        [[nodiscard]] PropertyTextureConsumerRecord* FindConsumerRecord(
-            const ECS::EntityHandle entity,
-            const std::string_view outputName) noexcept
-        {
-            if (Context.Scene == nullptr ||
-                entity == ECS::InvalidEntityHandle)
-            {
-                return nullptr;
-            }
-            auto* bindings = Context.Scene->Raw()
-                .try_get<PropertyTextureConsumerBindings>(entity);
-            if (bindings == nullptr)
-                return nullptr;
-            const auto found = std::ranges::find(
-                bindings->Records,
-                outputName,
-                &PropertyTextureConsumerRecord::OutputName);
-            return found != bindings->Records.end()
-                ? &*found
-                : nullptr;
-        }
-
-        [[nodiscard]] const PropertyTextureConsumerRecord* FindConsumerRecord(
-            const ECS::EntityHandle entity,
-            const std::string_view outputName) const noexcept
-        {
-            return const_cast<Impl*>(this)->FindConsumerRecord(
-                entity,
-                outputName);
-        }
-
-        [[nodiscard]] std::span<const TextureBakeConsumerBinding>
-        ConsumersFor(
-            const ECS::EntityHandle entity,
-            const std::string_view outputName) const noexcept
-        {
-            const PropertyTextureConsumerRecord* record =
-                FindConsumerRecord(entity, outputName);
-            return record != nullptr
-                ? std::span<const TextureBakeConsumerBinding>{
-                      record->Consumers}
-                : std::span<const TextureBakeConsumerBinding>{};
         }
 
         [[nodiscard]] bool AssetOwnedByAnotherRecord(
@@ -1487,392 +1251,6 @@ namespace Extrinsic::Runtime
             return prepared;
         }
 
-        [[nodiscard]] bool ValidateConsumerSlots(
-            const ECS::EntityHandle entity,
-            std::vector<TextureBakeConsumerBinding>& consumers,
-            std::string& diagnostic) const
-        {
-            if (consumers.empty())
-                return true;
-            if (Context.Scene == nullptr)
-            {
-                diagnostic = "texture bake has no active scene";
-                return false;
-            }
-            const auto* bindings = Context.Scene->Raw()
-                .try_get<GeometryPresentationRecipe>(entity);
-            if (bindings == nullptr)
-            {
-                diagnostic = "texture bake consumers require progressive presentation bindings";
-                return false;
-            }
-            for (TextureBakeConsumerBinding& consumer : consumers)
-            {
-                if (consumer.Colormap >= Graphics::Colormap::Type::Count)
-                {
-                    diagnostic = "texture bake consumer colormap is invalid";
-                    return false;
-                }
-                const GeometryPresentationBindingRecipe* presentation =
-                    FindPresentation(*bindings, consumer);
-                if (presentation == nullptr ||
-                    presentation->Kind !=
-                        GeometryPresentationKind::SurfaceMaterial ||
-                    FindGeometryPresentationSlot(*presentation, consumer.Semantic) == nullptr)
-                {
-                    diagnostic =
-                        "texture bake consumer has no compatible surface slot";
-                    return false;
-                }
-                consumer.PresentationKey = presentation->Key;
-            }
-            for (std::size_t index = 0u; index < consumers.size(); ++index)
-            {
-                for (std::size_t other = index + 1u;
-                     other < consumers.size();
-                     ++other)
-                {
-                    if (consumers[index].PresentationKey ==
-                            consumers[other].PresentationKey &&
-                        consumers[index].Semantic == consumers[other].Semantic)
-                    {
-                        diagnostic =
-                            "texture bake consumer list contains a duplicate slot";
-                        return false;
-                    }
-                }
-            }
-            return true;
-        }
-
-        [[nodiscard]] static std::uint32_t ConsumerChannel(
-            const GeometryPresentationSlotSemantic semantic) noexcept
-        {
-            switch (semantic)
-            {
-            case GeometryPresentationSlotSemantic::Albedo:
-            case GeometryPresentationSlotSemantic::ScalarField:
-                return 0u;
-            case GeometryPresentationSlotSemantic::Normal:
-                return 1u;
-            case GeometryPresentationSlotSemantic::Roughness:
-            case GeometryPresentationSlotSemantic::Metallic:
-                return 2u;
-            case GeometryPresentationSlotSemantic::Displacement:
-                return 3u;
-            case GeometryPresentationSlotSemantic::PointColor:
-            case GeometryPresentationSlotSemantic::PointScalarField:
-            case GeometryPresentationSlotSemantic::PointSize:
-            case GeometryPresentationSlotSemantic::PointNormalOrientation:
-            case GeometryPresentationSlotSemantic::LineColor:
-            case GeometryPresentationSlotSemantic::LineScalarField:
-            case GeometryPresentationSlotSemantic::LineWidth:
-                return 4u + static_cast<std::uint32_t>(semantic);
-            }
-            return std::numeric_limits<std::uint32_t>::max();
-        }
-
-        [[nodiscard]] static bool SameConsumerSlot(
-            const TextureBakeConsumerBinding& lhs,
-            const TextureBakeConsumerBinding& rhs) noexcept
-        {
-            return lhs.PresentationKey == rhs.PresentationKey &&
-                   lhs.Semantic == rhs.Semantic;
-        }
-
-        [[nodiscard]] static bool SameConsumerChannel(
-            const TextureBakeConsumerBinding& lhs,
-            const TextureBakeConsumerBinding& rhs) noexcept
-        {
-            // MaterialTextureAssetBindings is currently one effective
-            // per-renderable snapshot, not one snapshot per progressive
-            // presentation. Treat its physical material channels as entity-
-            // wide ownership even if two logical slots use different keys.
-            return ConsumerChannel(lhs.Semantic) ==
-                   ConsumerChannel(rhs.Semantic);
-        }
-
-        [[nodiscard]] bool ValidateConsumerOwnership(
-            const ECS::EntityHandle entity,
-            const std::string_view outputName,
-            const std::span<const TextureBakeConsumerBinding> consumers,
-            std::string& diagnostic) const
-        {
-            if (Context.Scene == nullptr)
-                return false;
-            const auto* bindings = Context.Scene->Raw()
-                .try_get<PropertyTextureConsumerBindings>(entity);
-            if (bindings == nullptr)
-                return true;
-            for (const PropertyTextureConsumerRecord& record :
-                 bindings->Records)
-            {
-                if (record.OutputName == outputName)
-                    continue;
-                for (const TextureBakeConsumerBinding& existing :
-                    record.Consumers)
-                {
-                    for (const TextureBakeConsumerBinding& candidate :
-                         consumers)
-                    {
-                        if (ConsumerChannel(existing.Semantic) ==
-                                ConsumerChannel(candidate.Semantic))
-                        {
-                            diagnostic =
-                                "renderer texture channel is already owned by another baked texture";
-                            return false;
-                        }
-                    }
-                }
-            }
-            return true;
-        }
-
-        enum class SlotUpdate : std::uint8_t
-        {
-            Pending,
-            Ready,
-            PropertyBuffer,
-            Failed,
-        };
-
-        void UpdateSlots(
-            const ECS::EntityHandle entity,
-            const PropertyTextureBakeRecord& record,
-            const std::span<const TextureBakeConsumerBinding> consumers,
-            const SlotUpdate update)
-        {
-            if (Context.Scene == nullptr)
-                return;
-            auto& raw = Context.Scene->Raw();
-            auto* recipe = raw
-                .try_get<GeometryPresentationRecipe>(entity);
-            if (recipe == nullptr)
-                return;
-            auto* runtimeState =
-                raw.try_get<GeometryPresentationRuntimeState>(entity);
-            if (runtimeState == nullptr)
-            {
-                runtimeState = &raw.emplace<GeometryPresentationRuntimeState>(
-                    entity);
-            }
-
-            bool recipeChanged = false;
-            for (const TextureBakeConsumerBinding& consumer :
-                 consumers)
-            {
-                GeometryPresentationBindingRecipe* presentation =
-                    FindPresentation(*recipe, consumer);
-                if (presentation == nullptr)
-                    continue;
-                GeometryPresentationSlotRecipe* slot =
-                    FindGeometryPresentationSlot(*presentation, consumer.Semantic);
-                if (slot == nullptr)
-                    continue;
-
-                const GeometryPropertyRef property{
-                    .Domain = record.Source.Domain,
-                    .Name = record.Source.Name,
-                    .ValueKind = record.Source.ValueKind,
-                };
-                const GeometryPresentationSourceKind sourceKind =
-                    update == SlotUpdate::Pending ||
-                            update == SlotUpdate::Ready
-                        ? GeometryPresentationSourceKind::PropertyBake
-                        : GeometryPresentationSourceKind::PropertyBuffer;
-                recipeChanged = recipeChanged ||
-                    slot->Property != property ||
-                    slot->SourceKind != sourceKind ||
-                    !slot->Enabled;
-                slot->Property = property;
-                slot->SourceKind = sourceKind;
-                slot->Enabled = true;
-
-                GeometryPresentationSlotStatus* status =
-                    FindGeometryPresentationSlotStatus(
-                        *runtimeState,
-                        presentation->Key,
-                        consumer.Semantic);
-                if (status == nullptr)
-                {
-                    runtimeState->Slots.push_back(
-                        GeometryPresentationSlotStatus{
-                            .PresentationKey = presentation->Key,
-                            .Semantic = consumer.Semantic,
-                        });
-                    status = &runtimeState->Slots.back();
-                }
-                status->SourceGeneration = record.SourceGeneration;
-                switch (update)
-                {
-                case SlotUpdate::Pending:
-                    status->Provenance =
-                        GeometryPresentationProvenance::PropertyBinding;
-                    status->Readiness = GeometryPresentationReadiness::Pending;
-                    status->Diagnostic =
-                        "GPU property texture bake pending";
-                    break;
-                case SlotUpdate::Ready:
-                    status->GeneratedTexture = record.Texture;
-                    status->Provenance = GeometryPresentationProvenance::
-                        GeneratedTextureAsset;
-                    status->Readiness = GeometryPresentationReadiness::Ready;
-                    status->OutputGeneration = record.Generation;
-                    status->Diagnostic =
-                        "GPU property texture bake ready";
-                    break;
-                case SlotUpdate::PropertyBuffer:
-                    status->GeneratedTexture = {};
-                    status->Provenance =
-                        GeometryPresentationProvenance::PropertyBuffer;
-                    status->Readiness = GeometryPresentationReadiness::Ready;
-                    status->Diagnostic =
-                        "property texture removed; property-buffer source restored";
-                    break;
-                case SlotUpdate::Failed:
-                    status->GeneratedTexture = {};
-                    status->Provenance =
-                        GeometryPresentationProvenance::PropertyBuffer;
-                    status->Readiness = GeometryPresentationReadiness::Failed;
-                    status->Diagnostic = record.Diagnostic;
-                    break;
-                }
-            }
-            if (recipeChanged)
-                AdvanceGeneration(runtimeState->RecipeGeneration);
-        }
-
-        void UpdateSlots(
-            const ECS::EntityHandle entity,
-            const PropertyTextureBakeRecord& record,
-            const SlotUpdate update)
-        {
-            UpdateSlots(
-                entity,
-                record,
-                ConsumersFor(entity, record.OutputName),
-                update);
-        }
-
-        void ApplyMaterialConsumers(
-            const ECS::EntityHandle entity,
-            const PropertyTextureBakeRecord& record,
-            const std::span<const TextureBakeConsumerBinding> consumers,
-            const bool bind)
-        {
-            if (Extraction == nullptr)
-                return;
-            Graphics::MaterialTextureAssetBindings material =
-                Extraction->GetMaterialTextureAssetBindings(
-                    SelectionController::ToStableEntityId(entity))
-                    .value_or(Graphics::MaterialTextureAssetBindings{});
-            const bool hasRoughnessConsumer = std::ranges::any_of(
-                consumers,
-                [](const TextureBakeConsumerBinding& consumer)
-                {
-                    return consumer.Semantic ==
-                        GeometryPresentationSlotSemantic::Roughness;
-                });
-            const bool hasMetallicConsumer = std::ranges::any_of(
-                consumers,
-                [](const TextureBakeConsumerBinding& consumer)
-                {
-                    return consumer.Semantic ==
-                        GeometryPresentationSlotSemantic::Metallic;
-                });
-            if (hasRoughnessConsumer || hasMetallicConsumer)
-            {
-                if (bind)
-                {
-                    material.MetallicRoughness = record.Texture;
-                    material.RoughnessFromRed = hasRoughnessConsumer;
-                    material.MetallicFromRed = hasMetallicConsumer;
-                }
-                else if (material.MetallicRoughness == record.Texture)
-                {
-                    material.MetallicRoughness = {};
-                    material.RoughnessFromRed = false;
-                    material.MetallicFromRed = false;
-                }
-            }
-            for (const TextureBakeConsumerBinding& consumer :
-                 consumers)
-            {
-                switch (consumer.Semantic)
-                {
-                case GeometryPresentationSlotSemantic::Albedo:
-                case GeometryPresentationSlotSemantic::ScalarField:
-                    if (bind)
-                    {
-                        material.Albedo = record.Texture;
-                        const bool rawScalar =
-                            IsScalar(record.Source.ValueKind) &&
-                            record.Storage ==
-                                PropertyTextureBakeStorage::RawFloat;
-                        material.AlbedoInterpretation = rawScalar
-                            ? Graphics::MaterialAlbedoTextureInterpretation::Scalar
-                            : Graphics::MaterialAlbedoTextureInterpretation::Color;
-                        material.AlbedoScalarColormap = consumer.Colormap;
-                        material.AlbedoScalarRangeMin = record.RangeMin;
-                        material.AlbedoScalarRangeMax = record.RangeMax;
-                    }
-                    else if (material.Albedo == record.Texture)
-                    {
-                        material.Albedo = {};
-                        material.AlbedoInterpretation =
-                            Graphics::MaterialAlbedoTextureInterpretation::Color;
-                    }
-                    break;
-                case GeometryPresentationSlotSemantic::Normal:
-                    if (bind)
-                    {
-                        material.Normal = record.Texture;
-                        material.NormalSpace =
-                            consumer.NormalSpace ==
-                                PropertyTextureNormalSpace::World
-                            ? Graphics::MaterialNormalTextureSpace::
-                                  WorldSpaceNormal
-                            : Graphics::MaterialNormalTextureSpace::
-                                  ObjectSpaceNormal;
-                    }
-                    else if (material.Normal == record.Texture)
-                    {
-                        material.Normal = {};
-                        material.NormalSpace = Graphics::
-                            MaterialNormalTextureSpace::TangentSpaceNormal;
-                    }
-                    break;
-                case GeometryPresentationSlotSemantic::Roughness:
-                case GeometryPresentationSlotSemantic::Metallic:
-                    break;
-                case GeometryPresentationSlotSemantic::Displacement:
-                case GeometryPresentationSlotSemantic::PointColor:
-                case GeometryPresentationSlotSemantic::PointScalarField:
-                case GeometryPresentationSlotSemantic::PointSize:
-                case GeometryPresentationSlotSemantic::PointNormalOrientation:
-                case GeometryPresentationSlotSemantic::LineColor:
-                case GeometryPresentationSlotSemantic::LineScalarField:
-                case GeometryPresentationSlotSemantic::LineWidth:
-                    break;
-                }
-            }
-            Extraction->SetMaterialTextureAssetBindings(
-                SelectionController::ToStableEntityId(entity),
-                material);
-        }
-
-        void ApplyMaterialConsumers(
-            const ECS::EntityHandle entity,
-            const PropertyTextureBakeRecord& record,
-            const bool bind)
-        {
-            ApplyMaterialConsumers(
-                entity,
-                record,
-                ConsumersFor(entity, record.OutputName),
-                bind);
-        }
-
         void CancelWork(
             const ECS::EntityHandle entity,
             const std::string_view outputName)
@@ -2082,21 +1460,6 @@ namespace Extrinsic::Runtime
                 catalog.Records.push_back(record);
             }
             AdvanceGeneration(catalog.Generation);
-            const std::span<const TextureBakeConsumerBinding> consumers =
-                ConsumersFor(entity, record.OutputName);
-            if (!consumers.empty())
-            {
-                UpdateSlots(
-                    entity,
-                    record,
-                    consumers,
-                    SlotUpdate::Pending);
-                ApplyMaterialConsumers(
-                    entity,
-                    record,
-                    consumers,
-                    false);
-            }
 
             WorkItems.push_back(Work{
                 .World = Context.World,
@@ -2196,7 +1559,6 @@ namespace Extrinsic::Runtime
             {
                 record->State = PropertyTextureBakeOutputState::Failed;
                 record->Diagnostic = std::move(diagnostic);
-                UpdateSlots(work.Entity, *record, SlotUpdate::Failed);
             }
             RetireWorkResources(
                 work,
@@ -2600,8 +1962,6 @@ namespace Extrinsic::Runtime
                 {
                     record->State = PropertyTextureBakeOutputState::Ready;
                     record->Diagnostic = "GPU property texture bake ready";
-                    UpdateSlots(work.Entity, *record, SlotUpdate::Ready);
-                    ApplyMaterialConsumers(work.Entity, *record, true);
                 }
                 else if (current)
                 {
@@ -2609,7 +1969,6 @@ namespace Extrinsic::Runtime
                     record->Diagnostic = sourceCurrent
                         ? "GPU property texture bake completion became stale"
                         : std::move(sourceDiagnostic);
-                    UpdateSlots(work.Entity, *record, SlotUpdate::Failed);
                 }
                 WorkItems.erase(
                     WorkItems.begin() + static_cast<std::ptrdiff_t>(index));
@@ -2669,8 +2028,6 @@ namespace Extrinsic::Runtime
                     record->State = PropertyTextureBakeOutputState::Failed;
                     record->Diagnostic =
                         "GPU property texture bake cancelled because its scene binding was detached";
-                    UpdateSlots(work.Entity, *record, SlotUpdate::Failed);
-                    ApplyMaterialConsumers(work.Entity, *record, false);
                 }
                 RetireWorkResources(
                     work,
@@ -2688,40 +2045,13 @@ namespace Extrinsic::Runtime
                 auto view = Context.Scene->Raw().view<PropertyTextureBakeOutputs>();
                 for (auto&& [entity, catalog] : view.each())
                 {
+                    (void)entity;
                     for (const PropertyTextureBakeRecord& record :
                          catalog.Records)
                     {
-                        ApplyMaterialConsumers(entity, record, false);
                         if (destroyGeneratedAssets)
                             (void)DestroyAsset(record.Texture);
                     }
-                }
-            }
-        }
-
-        void RestoreReadyBindings()
-        {
-            if (Context.Scene == nullptr || Context.AssetService == nullptr)
-                return;
-
-            auto view = Context.Scene->Raw().view<PropertyTextureBakeOutputs>();
-            for (auto&& [entity, catalog] : view.each())
-            {
-                for (PropertyTextureBakeRecord& record : catalog.Records)
-                {
-                    if (record.State != PropertyTextureBakeOutputState::Ready)
-                        continue;
-                    if (!record.Texture.IsValid() ||
-                        !Context.AssetService->IsAlive(record.Texture))
-                    {
-                        record.State = PropertyTextureBakeOutputState::Failed;
-                        record.Diagnostic =
-                            "baked property texture asset is no longer alive";
-                        UpdateSlots(entity, record, SlotUpdate::Failed);
-                        continue;
-                    }
-                    UpdateSlots(entity, record, SlotUpdate::Ready);
-                    ApplyMaterialConsumers(entity, record, true);
                 }
             }
         }
@@ -2826,11 +2156,6 @@ namespace Extrinsic::Runtime
                     work.RecordGeneration = found->Generation;
                 }
             }
-            if (PropertyTextureConsumerRecord* bindings =
-                    FindConsumerRecord(entity, oldName))
-            {
-                bindings->OutputName = found->OutputName;
-            }
             return {TextureBakeMutationStatus::Success, "baked texture renamed"};
         }
 
@@ -2865,138 +2190,9 @@ namespace Extrinsic::Runtime
                 };
             }
             CancelWork(entity, removed.OutputName);
-            const std::span<const TextureBakeConsumerBinding> consumers =
-                ConsumersFor(entity, removed.OutputName);
-            ApplyMaterialConsumers(entity, removed, consumers, false);
-            UpdateSlots(
-                entity,
-                removed,
-                consumers,
-                SlotUpdate::PropertyBuffer);
-            if (auto* bindings = Context.Scene->Raw()
-                    .try_get<PropertyTextureConsumerBindings>(entity))
-            {
-                std::erase_if(
-                    bindings->Records,
-                    [outputName](
-                        const PropertyTextureConsumerRecord& binding)
-                    {
-                        return binding.OutputName == outputName;
-                    });
-            }
             catalog->Records.erase(found);
             AdvanceGeneration(catalog->Generation);
             return {TextureBakeMutationStatus::Success, "baked texture removed"};
-        }
-
-        [[nodiscard]] TextureBakeMutationResult SetConsumers(
-            const TextureBakeConsumerUpdateRequest& request)
-        {
-            if (Context.Scene == nullptr)
-                return {TextureBakeMutationStatus::MissingScene, "no active scene"};
-            const ECS::EntityHandle entity = ResolveEntity(
-                *Context.Scene,
-                request.StableEntityId);
-            if (entity == ECS::InvalidEntityHandle)
-                return {TextureBakeMutationStatus::StaleEntity, "entity is stale"};
-            PropertyTextureBakeRecord* record =
-                FindRecord(entity, request.OutputName);
-            if (record == nullptr)
-                return {TextureBakeMutationStatus::MissingTexture, "baked texture was not found"};
-            std::vector<TextureBakeConsumerBinding> nextConsumers =
-                request.Consumers;
-            for (const TextureBakeConsumerBinding& consumer : nextConsumers)
-            {
-                if (!ConsumerCompatible(
-                        consumer,
-                        record->Source.ValueKind,
-                        record->Storage,
-                        record->Encoding))
-                {
-                    return {
-                        TextureBakeMutationStatus::IncompatibleConsumer,
-                        "consumer is incompatible with the baked representation",
-                    };
-                }
-            }
-            std::optional<Graphics::Colormap::Type> scalarColormap{};
-            for (const TextureBakeConsumerBinding& consumer :
-                 nextConsumers)
-            {
-                if (consumer.Semantic != GeometryPresentationSlotSemantic::Albedo &&
-                    consumer.Semantic != GeometryPresentationSlotSemantic::ScalarField)
-                {
-                    continue;
-                }
-                if (scalarColormap.has_value() &&
-                    *scalarColormap != consumer.Colormap)
-                {
-                    return {
-                        TextureBakeMutationStatus::IncompatibleConsumer,
-                        "one scalar texture cannot use different colormaps in the same surface material",
-                    };
-                }
-                scalarColormap = consumer.Colormap;
-            }
-            std::string diagnostic{};
-            if (!ValidateConsumerSlots(entity, nextConsumers, diagnostic) ||
-                !ValidateConsumerOwnership(
-                    entity,
-                    record->OutputName,
-                    nextConsumers,
-                    diagnostic))
-            {
-                return {
-                    TextureBakeMutationStatus::IncompatibleConsumer,
-                    std::move(diagnostic),
-                };
-            }
-
-            const std::vector<TextureBakeConsumerBinding> beforeConsumers =
-                [&]()
-                {
-                    const auto current =
-                        ConsumersFor(entity, record->OutputName);
-                    return std::vector<TextureBakeConsumerBinding>{
-                        current.begin(),
-                        current.end()};
-                }();
-            ApplyMaterialConsumers(
-                entity,
-                *record,
-                beforeConsumers,
-                false);
-            UpdateSlots(
-                entity,
-                *record,
-                beforeConsumers,
-                SlotUpdate::PropertyBuffer);
-            auto& bindings = Context.Scene->Raw()
-                .get_or_emplace<PropertyTextureConsumerBindings>(entity);
-            PropertyTextureConsumerRecord* binding =
-                FindConsumerRecord(entity, record->OutputName);
-            if (binding == nullptr)
-            {
-                bindings.Records.push_back(PropertyTextureConsumerRecord{
-                    .OutputName = record->OutputName,
-                });
-                binding = &bindings.Records.back();
-            }
-            binding->Consumers = std::move(nextConsumers);
-            if (record->State == PropertyTextureBakeOutputState::Ready)
-            {
-                UpdateSlots(entity, *record, SlotUpdate::Ready);
-                ApplyMaterialConsumers(entity, *record, true);
-            }
-            else if (record->State == PropertyTextureBakeOutputState::Pending)
-            {
-                UpdateSlots(entity, *record, SlotUpdate::Pending);
-            }
-            else
-            {
-                UpdateSlots(entity, *record, SlotUpdate::Failed);
-            }
-            return {TextureBakeMutationStatus::Success, "texture consumers updated"};
         }
     };
 
@@ -3066,20 +2262,6 @@ namespace Extrinsic::Runtime
         {
             snapshot.Textures = catalog->Records;
         }
-        if (const auto* bindings = m_Impl->Context.Scene->Raw()
-                .try_get<PropertyTextureConsumerBindings>(entity))
-        {
-            snapshot.ConsumerBindings.reserve(bindings->Records.size());
-            for (const PropertyTextureConsumerRecord& binding :
-                 bindings->Records)
-            {
-                snapshot.ConsumerBindings.push_back(
-                    TextureBakeConsumerSnapshot{
-                        .OutputName = binding.OutputName,
-                        .Consumers = binding.Consumers,
-                    });
-            }
-        }
         return snapshot;
     }
 
@@ -3101,16 +2283,6 @@ namespace Extrinsic::Runtime
     {
         return m_Impl
             ? m_Impl->Remove(stableEntityId, outputName)
-            : TextureBakeMutationResult{
-                  TextureBakeMutationStatus::MissingScene,
-                  "texture-bake module is unavailable"};
-    }
-
-    TextureBakeMutationResult TextureBakeService::SetConsumers(
-        const TextureBakeConsumerUpdateRequest& request)
-    {
-        return m_Impl
-            ? m_Impl->SetConsumers(request)
             : TextureBakeMutationResult{
                   TextureBakeMutationStatus::MissingScene,
                   "texture-bake module is unavailable"};
@@ -3177,12 +2349,6 @@ namespace Extrinsic::Runtime
                 bindingEpoch,
                 destroyGeneratedAssets);
         }
-    }
-
-    void TextureBakeService::RestoreReadyBindings() noexcept
-    {
-        if (m_Impl)
-            m_Impl->RestoreReadyBindings();
     }
 
     void TextureBakeService::DestroySceneAssets(
@@ -3325,7 +2491,6 @@ namespace Extrinsic::Runtime
                     BoundWorld,
                     BindingEpoch,
                     BoundRegistry);
-                Service.RestoreReadyBindings();
                 PublishBindingChanged();
             }
 
@@ -3338,8 +2503,8 @@ namespace Extrinsic::Runtime
                 if (active != BoundWorld || registry != BoundRegistry)
                 {
                     // Inactive worlds retain completed generated assets and
-                    // their catalogs.  Rebinding restores their material
-                    // consumers when the world becomes active again.
+                    // their catalogs. The asset workflow reconciles
+                    // presentation targets after the world becomes active.
                     ClearTarget(false);
                     BindTo(active, registry);
                 }

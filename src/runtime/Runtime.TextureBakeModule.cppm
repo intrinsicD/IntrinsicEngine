@@ -200,39 +200,6 @@ namespace Extrinsic::Runtime
     export [[nodiscard]] const char* DebugNameForPropertyTextureBakeStatus(
         PropertyTextureBakeStatus status) noexcept;
 
-    // Transitional caller-owned binding vocabulary. It is deliberately
-    // separate from PropertyTextureBakeRequest/Result and is removed in
-    // RUNTIME-191 Slice C once every caller processes generic output records.
-    export enum class PropertyTextureNormalSpace : std::uint8_t
-    {
-        Object,
-        World,
-    };
-
-    export struct TextureBakeConsumerBinding
-    {
-        std::string PresentationKey{};
-        GeometryPresentationSlotSemantic Semantic{
-            GeometryPresentationSlotSemantic::Albedo};
-        Graphics::Colormap::Type Colormap{
-            Graphics::Colormap::Type::Viridis};
-        PropertyTextureNormalSpace NormalSpace{
-            PropertyTextureNormalSpace::Object};
-    };
-
-    export [[nodiscard]] PropertyTextureBakeRepresentation
-        ResolvePropertyTextureBakeRepresentation(
-            Geometry::PropertyValueKind valueKind,
-            PropertyTextureBakeStorage requestedStorage,
-            PropertyTextureBakeEncoding requestedEncoding,
-            std::span<const TextureBakeConsumerBinding> consumers) noexcept;
-
-    export [[nodiscard]] bool IsPropertyTextureBakeConsumerCompatible(
-        const TextureBakeConsumerBinding& consumer,
-        Geometry::PropertyValueKind valueKind,
-        PropertyTextureBakeStorage storage,
-        PropertyTextureBakeEncoding encoding) noexcept;
-
     export struct TextureBakeBindingChanged
     {
         WorldHandle World{};
@@ -255,7 +222,7 @@ namespace Extrinsic::Runtime
         MissingTexture,
         DuplicateName,
         InvalidName,
-        IncompatibleConsumer,
+        IncompatibleTarget,
         AssetDestroyFailed,
         CommandFailed,
     };
@@ -272,23 +239,9 @@ namespace Extrinsic::Runtime
         }
     };
 
-    export struct TextureBakeConsumerUpdateRequest
-    {
-        std::uint32_t StableEntityId{0u};
-        std::string OutputName{};
-        std::vector<TextureBakeConsumerBinding> Consumers{};
-    };
-
-    export struct TextureBakeConsumerSnapshot
-    {
-        std::string OutputName{};
-        std::vector<TextureBakeConsumerBinding> Consumers{};
-    };
-
     export struct TextureBakeSnapshot
     {
         std::vector<PropertyTextureBakeRecord> Textures{};
-        std::vector<TextureBakeConsumerSnapshot> ConsumerBindings{};
         bool GpuOperational{false};
         std::string Diagnostic{};
     };
@@ -315,10 +268,8 @@ namespace Extrinsic::Runtime
         [[nodiscard]] TextureBakeMutationResult Remove(
             std::uint32_t stableEntityId,
             std::string_view outputName);
-        [[nodiscard]] TextureBakeMutationResult SetConsumers(
-            const TextureBakeConsumerUpdateRequest& request);
 
-    private:
+      private:
         friend class TextureBakeModule;
 
         void Bind(
@@ -341,7 +292,6 @@ namespace Extrinsic::Runtime
                            std::uint64_t bindingEpoch,
                            bool destroyGeneratedAssets) noexcept;
         void DestroySceneAssets(ECS::Scene::Registry& scene) noexcept;
-        void RestoreReadyBindings() noexcept;
         [[nodiscard]] GpuQueueParticipantHandle
             RegisterGpuQueueParticipant(JobService& jobs);
         void Unbind() noexcept;
