@@ -42,165 +42,130 @@ import Extrinsic.Runtime.WorldHandle;
 
 namespace Extrinsic::Runtime
 {
-    void RenderExtractionCache::State::AppendVisualizationAdapters(
-        const std::uint32_t stableId,
-        const RenderableSidecar& sidecar,
+    void RenderExtractionCache::State::AppendVisualizationRecipe(
+        const GeometryEntityAvailability& availability,
+        const VisualizationRecipe& recipe,
         RuntimeRenderExtractionStats& stats)
     {
-        const auto* visualization =
-            sidecar.HasVisualization
-                ? &sidecar.Visualization
-                : nullptr;
-        const bool scalarConfigRequested =
-            IsRenderExtractionScalarVisualizationSource(visualization);
-        const bool colorConfigRequested =
-            IsRenderExtractionColorBufferVisualizationSource(visualization);
-        const auto bindingIt =
-            m_VisualizationState->Bindings.find(stableId);
-        const bool bindingRequested =
-            bindingIt != m_VisualizationState->Bindings.end();
-
-        if (!scalarConfigRequested
-            && !colorConfigRequested
-            && !bindingRequested)
-        {
-            return;
-        }
-
-        if (scalarConfigRequested)
-        {
-            ++stats.VisualizationAdapterScalarConfigsObserved;
-        }
-
-        if (!bindingRequested)
-        {
-            ++stats.VisualizationAdapterBindingsMissing;
-            return;
-        }
-
-        const IVisualizationAdapter* adapter =
-            m_VisualizationState->Registry.Find(
-                bindingIt->second.AdapterKey);
-        if (adapter == nullptr)
-        {
-            ++stats.VisualizationAdapterMissingAdapterCount;
-            return;
-        }
-
-        VisualizationAdapterStats perAdapter{};
-        const VisualizationAdapterOptions options =
-            BuildRenderExtractionVisualizationAdapterOptions(
-                stableId,
-                bindingIt->second,
-                visualization);
-        adapter->Append(
-            m_VisualizationState->Batch,
-            options,
-            perAdapter);
+        VisualizationEncodingResult encoded =
+            EncodeVisualizationRecipe(availability, recipe);
+        const VisualizationAdapterStats& diagnostics = encoded.Diagnostics;
 
         ++stats.VisualizationAdapterInvokedCount;
         stats.VisualizationAdapterPacketAppendCount +=
-            perAdapter.PacketAppendCount;
+            diagnostics.PacketAppendCount;
         stats.VisualizationAdapterMissingSourceCount +=
-            perAdapter.MissingSourceCount
-            + perAdapter.MissingTexcoordCount;
+            diagnostics.MissingSourceCount
+            + diagnostics.MissingTexcoordCount;
         stats.VisualizationAdapterUnsupportedSourceTypeCount +=
-            perAdapter.UnsupportedSourceTypeCount;
+            diagnostics.UnsupportedSourceTypeCount;
         stats.VisualizationAdapterEmptySourceCount +=
-            perAdapter.EmptySourceCount;
+            diagnostics.EmptySourceCount;
         stats.VisualizationAdapterInvalidBufferCount +=
-            perAdapter.InvalidBufferCount
-            + perAdapter.InvalidResourceCount;
+            diagnostics.InvalidBufferCount
+            + diagnostics.InvalidResourceCount;
         stats.VisualizationAdapterInvalidRangeCount +=
-            perAdapter.InvalidRangeCount;
+            diagnostics.InvalidRangeCount;
         stats.VisualizationAdapterNonFiniteValueCount +=
-            perAdapter.NonFiniteValueCount;
+            diagnostics.NonFiniteValueCount;
         stats.VisualizationAdapterElementCountOverflowCount +=
-            perAdapter.ElementCountOverflowCount;
+            diagnostics.ElementCountOverflowCount;
         stats.VisualizationAdapterManualRangeCount +=
-            perAdapter.ManualRangeCount;
+            diagnostics.ManualRangeCount;
         stats.VisualizationAdapterFlatAutoRangeExpandedCount +=
-            perAdapter.FlatAutoRangeExpandedCount;
+            diagnostics.FlatAutoRangeExpandedCount;
         stats.VisualizationAdapterRobustAutoRangeClampedCount +=
-            perAdapter.RobustAutoRangeClampedCount;
+            diagnostics.RobustAutoRangeClampedCount;
         stats.VisualizationAdapterScalarValueScanCount +=
-            perAdapter.ScalarValueScanCount;
-    }
+            diagnostics.ScalarValueScanCount;
 
-    void RenderExtractionCache::State::RegisterVisualizationAdapter(
-        const std::uint64_t key,
-        std::unique_ptr<IVisualizationAdapter> adapter)
-    {
-        if (adapter == nullptr)
+        switch (encoded.Status)
         {
-            (void)UnregisterVisualizationAdapter(key);
-            return;
+        case VisualizationRecipeStatus::EmptyRecipe:
+            ++stats.VisualizationRecipeEmptyCount;
+            break;
+        case VisualizationRecipeStatus::UnsupportedDomain:
+            ++stats.VisualizationRecipeUnsupportedDomainCount;
+            break;
+        case VisualizationRecipeStatus::ElementCountMismatch:
+            ++stats.VisualizationRecipeElementCountMismatchCount;
+            break;
+        case VisualizationRecipeStatus::MissingSource:
+            if (diagnostics.MissingSourceCount == 0u)
+                ++stats.VisualizationAdapterMissingSourceCount;
+            break;
+        case VisualizationRecipeStatus::UnsupportedSourceType:
+            if (diagnostics.UnsupportedSourceTypeCount == 0u)
+                ++stats.VisualizationAdapterUnsupportedSourceTypeCount;
+            break;
+        case VisualizationRecipeStatus::EmptySource:
+            if (diagnostics.EmptySourceCount == 0u)
+                ++stats.VisualizationAdapterEmptySourceCount;
+            break;
+        case VisualizationRecipeStatus::InvalidBuffer:
+            if (diagnostics.InvalidBufferCount == 0u)
+                ++stats.VisualizationAdapterInvalidBufferCount;
+            break;
+        case VisualizationRecipeStatus::InvalidResource:
+            if (diagnostics.InvalidResourceCount == 0u)
+                ++stats.VisualizationAdapterInvalidBufferCount;
+            break;
+        case VisualizationRecipeStatus::MissingTexcoord:
+            if (diagnostics.MissingTexcoordCount == 0u)
+                ++stats.VisualizationAdapterMissingSourceCount;
+            break;
+        case VisualizationRecipeStatus::InvalidRange:
+            if (diagnostics.InvalidRangeCount == 0u)
+                ++stats.VisualizationAdapterInvalidRangeCount;
+            break;
+        case VisualizationRecipeStatus::NonFiniteValue:
+            if (diagnostics.NonFiniteValueCount == 0u)
+                ++stats.VisualizationAdapterNonFiniteValueCount;
+            break;
+        case VisualizationRecipeStatus::ElementCountOverflow:
+            if (diagnostics.ElementCountOverflowCount == 0u)
+                ++stats.VisualizationAdapterElementCountOverflowCount;
+            break;
+        case VisualizationRecipeStatus::Encoded:
+            break;
         }
-        m_VisualizationState->Registry.Register(key, *adapter);
-        m_VisualizationState->Adapters.insert_or_assign(
-            key,
-            std::move(adapter));
+
+        m_VisualizationState->Batch.Append(std::move(encoded.Batch));
     }
 
-    bool RenderExtractionCache::State::UnregisterVisualizationAdapter(
-        const std::uint64_t key) noexcept
-    {
-        m_VisualizationState->Registry.Unregister(key);
-        return m_VisualizationState->Adapters.erase(key) != 0u;
-    }
-
-    std::size_t
-    RenderExtractionCache::State::GetVisualizationAdapterCount()
-        const noexcept
-    {
-        return m_VisualizationState->Adapters.size();
-    }
-
-    const VisualizationAdapterRegistry&
-    RenderExtractionCache::State::
-        GetVisualizationAdapterRegistryForTest() const noexcept
-    {
-        return m_VisualizationState->Registry;
-    }
-
-    void RenderExtractionCache::State::SetVisualizationAdapterBinding(
+    void RenderExtractionCache::State::SetVisualizationRecipe(
         const std::uint32_t stableEntityId,
-        VisualizationAdapterBinding binding)
+        VisualizationRecipe recipe)
     {
-        m_VisualizationState->Bindings.insert_or_assign(
+        m_VisualizationState->Recipes.insert_or_assign(
             stableEntityId,
-            std::move(binding));
-        ++m_VisualizationState->BindingRevision;
+            std::move(recipe));
+        ++m_VisualizationState->RecipeRevision;
     }
 
-    void RenderExtractionCache::State::ClearVisualizationAdapterBinding(
+    void RenderExtractionCache::State::ClearVisualizationRecipe(
         const std::uint32_t stableEntityId) noexcept
     {
-        if (m_VisualizationState->Bindings.erase(stableEntityId) != 0u)
-        {
-            ++m_VisualizationState->BindingRevision;
-        }
+        if (m_VisualizationState->Recipes.erase(stableEntityId) != 0u)
+            ++m_VisualizationState->RecipeRevision;
     }
 
-    std::optional<
-        RenderExtractionCache::State::VisualizationAdapterBinding>
-    RenderExtractionCache::State::GetVisualizationAdapterBinding(
+    std::optional<VisualizationRecipe>
+    RenderExtractionCache::State::GetVisualizationRecipe(
         const std::uint32_t stableEntityId) const noexcept
     {
         const auto it =
-            m_VisualizationState->Bindings.find(stableEntityId);
-        if (it == m_VisualizationState->Bindings.end())
-        {
+            m_VisualizationState->Recipes.find(stableEntityId);
+        if (it == m_VisualizationState->Recipes.end())
             return std::nullopt;
-        }
         return it->second;
     }
 
     std::uint64_t
     RenderExtractionCache::State::
-        GetVisualizationAdapterBindingRevision() const noexcept
+        GetVisualizationRecipeRevision() const noexcept
     {
-        return m_VisualizationState->BindingRevision;
+        return m_VisualizationState->RecipeRevision;
     }
 
 }

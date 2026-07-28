@@ -220,12 +220,10 @@ export namespace Extrinsic::Runtime
         std::uint32_t MeshVertexViewMissingPositions{0};
         std::uint32_t MeshPrimitiveViewFreeRetires{0};
 
-        // RUNTIME-083 Slices B/E — runtime visualization adapter pump counters.
-        // `VisualizationAdapterScalarConfigsObserved` preserves the original
-        // scalar-field config count. Slice E extends the same binding surface to
-        // non-scalar adapter packets; the missing/invalid counters are folded
-        // from `VisualizationAdapterStats`, and packet lane counts mirror the
-        // spans attached to `RuntimeRenderSnapshotBatch::Visualization*`.
+        // RUNTIME-198 Slice B — typed visualization recipe encoding counters.
+        // The compatibility names are retained until Slice C performs the
+        // mechanical stats rename; every value now comes from pure recipe
+        // encoding, never adapter lookup or object dispatch.
         std::uint32_t VisualizationAdapterScalarConfigsObserved{0};
         std::uint32_t VisualizationAdapterBindingsMissing{0};
         std::uint32_t VisualizationAdapterMissingAdapterCount{0};
@@ -242,6 +240,9 @@ export namespace Extrinsic::Runtime
         std::uint32_t VisualizationAdapterFlatAutoRangeExpandedCount{0};
         std::uint32_t VisualizationAdapterRobustAutoRangeClampedCount{0};
         std::uint64_t VisualizationAdapterScalarValueScanCount{0};
+        std::uint32_t VisualizationRecipeEmptyCount{0};
+        std::uint32_t VisualizationRecipeUnsupportedDomainCount{0};
+        std::uint32_t VisualizationRecipeElementCountMismatchCount{0};
         std::uint32_t VisualizationAttributeBufferPacketCount{0};
         std::uint32_t VisualizationScalarPacketCount{0};
         std::uint32_t VisualizationColorPacketCount{0};
@@ -351,9 +352,7 @@ export namespace Extrinsic::Runtime
             const RuntimeSceneInteractionRenderSnapshot& snapshot);
         // Scene replacement boundary: free scene-owned renderable sidecars,
         // hard-shutdown unified geometry residency, clear per-entity extraction
-        // settings and bindings, and submit an empty snapshot. Adapter
-        // registrations stay live because they are runtime/editor resources,
-        // not scene contents.
+        // settings and visualization recipes, and submit an empty snapshot.
         void ClearSceneState(Graphics::IRenderer& renderer);
         void Shutdown(Graphics::IRenderer& renderer);
 
@@ -461,42 +460,16 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] std::optional<GpuRenderableAvailabilityView>
             FindGpuRenderableAvailability(std::uint32_t stableEntityId) const noexcept;
 
-        enum class VisualizationAdapterBindingKind : std::uint8_t
-        {
-            Scalar,
-            Color,
-            VectorField,
-            Isoline,
-            HtexMetadata,
-        };
-
-        struct VisualizationAdapterBinding
-        {
-            std::uint64_t AdapterKey{0u};
-            std::uint64_t BufferBDA{0u};
-            VisualizationAdapterBindingKind Kind{
-                VisualizationAdapterBindingKind::Scalar};
-            VisualizationAdapterOptions Options{};
-        };
-
-        // RUNTIME-083 Slices B/E — runtime-owned visualization adapter binding
-        // surface. Scalar/color/isolines may derive source metadata from
-        // `VisualizationConfig`; vector fields and Htex metadata are supplied
-        // through `Options`. Bindings provide the active adapter key and any
-        // externally owned GPU buffer addresses the adapter must reference.
-        // They are keyed by the same stable renderable id that extraction
-        // sidecars and selection use.
-        void RegisterVisualizationAdapter(std::uint64_t key,
-                                          std::unique_ptr<IVisualizationAdapter> adapter);
-        bool UnregisterVisualizationAdapter(std::uint64_t key) noexcept;
-        [[nodiscard]] std::size_t GetVisualizationAdapterCount() const noexcept;
-        [[nodiscard]] const VisualizationAdapterRegistry& GetVisualizationAdapterRegistryForTest() const noexcept;
-        void SetVisualizationAdapterBinding(std::uint32_t stableEntityId,
-                                            VisualizationAdapterBinding binding);
-        void ClearVisualizationAdapterBinding(std::uint32_t stableEntityId) noexcept;
-        [[nodiscard]] std::optional<VisualizationAdapterBinding> GetVisualizationAdapterBinding(
+        // RUNTIME-198 Slice B — optional copied per-entity visualization intent.
+        // Recipes are keyed by the same stable render id as extraction sidecars.
+        // They contain no adapter identity, borrowed property pointer, ECS
+        // handle, registry entry, or service lifetime.
+        void SetVisualizationRecipe(std::uint32_t stableEntityId,
+                                    VisualizationRecipe recipe);
+        void ClearVisualizationRecipe(std::uint32_t stableEntityId) noexcept;
+        [[nodiscard]] std::optional<VisualizationRecipe> GetVisualizationRecipe(
             std::uint32_t stableEntityId) const noexcept;
-        [[nodiscard]] std::uint64_t GetVisualizationAdapterBindingRevision() const noexcept;
+        [[nodiscard]] std::uint64_t GetVisualizationRecipeRevision() const noexcept;
 
     private:
         struct State;

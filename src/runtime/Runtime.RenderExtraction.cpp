@@ -162,63 +162,34 @@ namespace Extrinsic::Runtime
         return m_State->FindGpuRenderableAvailability(stableEntityId);
     }
 
-    void RenderExtractionCache::RegisterVisualizationAdapter(
-        const std::uint64_t key,
-        std::unique_ptr<IVisualizationAdapter> adapter)
-    {
-        m_State->RegisterVisualizationAdapter(key, std::move(adapter));
-    }
-
-    bool RenderExtractionCache::UnregisterVisualizationAdapter(
-        const std::uint64_t key) noexcept
-    {
-        return m_State->UnregisterVisualizationAdapter(key);
-    }
-
-    std::size_t
-    RenderExtractionCache::GetVisualizationAdapterCount() const noexcept
-    {
-        return m_State->GetVisualizationAdapterCount();
-    }
-
-    const VisualizationAdapterRegistry&
-    RenderExtractionCache::GetVisualizationAdapterRegistryForTest()
-        const noexcept
-    {
-        return m_State->GetVisualizationAdapterRegistryForTest();
-    }
-
-    void RenderExtractionCache::SetVisualizationAdapterBinding(
+    void RenderExtractionCache::SetVisualizationRecipe(
         const std::uint32_t stableEntityId,
-        VisualizationAdapterBinding binding)
+        VisualizationRecipe recipe)
     {
-        m_State->SetVisualizationAdapterBinding(
-            stableEntityId,
-            std::move(binding));
+        m_State->SetVisualizationRecipe(stableEntityId, std::move(recipe));
     }
 
-    void RenderExtractionCache::ClearVisualizationAdapterBinding(
+    void RenderExtractionCache::ClearVisualizationRecipe(
         const std::uint32_t stableEntityId) noexcept
     {
-        m_State->ClearVisualizationAdapterBinding(stableEntityId);
+        m_State->ClearVisualizationRecipe(stableEntityId);
     }
 
-    std::optional<RenderExtractionCache::VisualizationAdapterBinding>
-    RenderExtractionCache::GetVisualizationAdapterBinding(
+    std::optional<VisualizationRecipe>
+    RenderExtractionCache::GetVisualizationRecipe(
         const std::uint32_t stableEntityId) const noexcept
     {
-        return m_State->GetVisualizationAdapterBinding(stableEntityId);
+        return m_State->GetVisualizationRecipe(stableEntityId);
     }
 
     std::uint64_t
-    RenderExtractionCache::GetVisualizationAdapterBindingRevision()
-        const noexcept
+    RenderExtractionCache::GetVisualizationRecipeRevision() const noexcept
     {
-        return m_State->GetVisualizationAdapterBindingRevision();
+        return m_State->GetVisualizationRecipeRevision();
     }
 
     RenderExtractionCache::State::State()
-        : m_VisualizationState(std::make_unique<VisualizationAdapterState>())
+        : m_VisualizationState(std::make_unique<VisualizationRecipeState>())
     {
     }
 
@@ -259,22 +230,6 @@ namespace Extrinsic::Runtime
             return registry.any_of<G::RenderSurface, G::RenderEdges, G::RenderPoints>(entity);
         }
 
-        [[nodiscard]] Graphics::VisualizationAttributeDomain ToVisualizationAttributeDomain(
-            const Graphics::Components::VisualizationConfig::Domain domain) noexcept
-        {
-            using Domain = Graphics::Components::VisualizationConfig::Domain;
-            switch (domain)
-            {
-            case Domain::Vertex:
-                return Graphics::VisualizationAttributeDomain::Vertex;
-            case Domain::Edge:
-                return Graphics::VisualizationAttributeDomain::Edge;
-            case Domain::Face:
-                return Graphics::VisualizationAttributeDomain::Face;
-            }
-            return Graphics::VisualizationAttributeDomain::Vertex;
-        }
-
         [[nodiscard]] bool IsScalarVisualizationSource(
             const Graphics::Components::VisualizationConfig* visualization) noexcept
         {
@@ -293,97 +248,62 @@ namespace Extrinsic::Runtime
                     visualization->Source == ColorSource::PerFaceBuffer);
         }
 
-        [[nodiscard]] Graphics::VisualizationAttributeDomain ToColorBufferDomain(
-            const Graphics::Components::VisualizationConfig::ColorSource source) noexcept
-        {
-            using ColorSource = Graphics::Components::VisualizationConfig::ColorSource;
-            switch (source)
-            {
-            case ColorSource::PerVertexBuffer:
-                return Graphics::VisualizationAttributeDomain::Vertex;
-            case ColorSource::PerEdgeBuffer:
-                return Graphics::VisualizationAttributeDomain::Edge;
-            case ColorSource::PerFaceBuffer:
-                return Graphics::VisualizationAttributeDomain::Face;
-            default:
-                return Graphics::VisualizationAttributeDomain::Vertex;
-            }
-        }
-
-        [[nodiscard]] Graphics::Components::VisualizationConfig::Domain ToColorBufferConfigDomain(
-            const Graphics::Components::VisualizationConfig::ColorSource source) noexcept
-        {
-            using ColorSource = Graphics::Components::VisualizationConfig::ColorSource;
-            using Domain = Graphics::Components::VisualizationConfig::Domain;
-            switch (source)
-            {
-            case ColorSource::PerEdgeBuffer:
-                return Domain::Edge;
-            case ColorSource::PerFaceBuffer:
-                return Domain::Face;
-            case ColorSource::PerVertexBuffer:
-            case ColorSource::Material:
-            case ColorSource::UniformColor:
-            case ColorSource::ScalarField:
-                return Domain::Vertex;
-            }
-            return Domain::Vertex;
-        }
-
-        [[nodiscard]] const Geometry::PropertySet* PropertySetForVisualizationDomain(
-            const ECS::Components::GeometrySources::ConstSourceView& view,
+        [[nodiscard]] GeometryElementDomain ToGeometryElementDomain(
+            const GeometryEntityAvailability& availability,
             const Graphics::Components::VisualizationConfig::Domain domain) noexcept
         {
             namespace GS = ECS::Components::GeometrySources;
             using Domain = Graphics::Components::VisualizationConfig::Domain;
-            const GS::SourceAvailability sources =
-                GS::BuildSourceAvailability(view);
 
-            if (sources.ProvenanceDomain == GS::Domain::Mesh)
+            switch (availability.Sources.ProvenanceDomain)
             {
+            case GS::Domain::Unknown:
+                break;
+            case GS::Domain::Mesh:
                 switch (domain)
                 {
-                case Domain::Vertex:
-                    return view.VertexSource != nullptr
-                        ? &view.VertexSource->Properties
-                        : nullptr;
-                case Domain::Edge:
-                    return view.EdgeSource != nullptr
-                        ? &view.EdgeSource->Properties
-                        : nullptr;
-                case Domain::Face:
-                    return view.FaceSource != nullptr
-                        ? &view.FaceSource->Properties
-                        : nullptr;
+                case Domain::Vertex: return GeometryElementDomain::MeshVertex;
+                case Domain::Edge: return GeometryElementDomain::MeshEdge;
+                case Domain::Face: return GeometryElementDomain::MeshFace;
                 }
-            }
-
-            if (sources.ProvenanceDomain == GS::Domain::Graph)
-            {
+                break;
+            case GS::Domain::Graph:
                 switch (domain)
                 {
-                case Domain::Vertex:
-                    return view.NodeSource != nullptr
-                        ? &view.NodeSource->Properties
-                        : nullptr;
-                case Domain::Edge:
-                    return view.EdgeSource != nullptr
-                        ? &view.EdgeSource->Properties
-                        : nullptr;
-                case Domain::Face:
-                    return nullptr;
+                case Domain::Vertex: return GeometryElementDomain::GraphNode;
+                case Domain::Edge: return GeometryElementDomain::GraphEdge;
+                case Domain::Face: return GeometryElementDomain::Unknown;
                 }
+                break;
+            case GS::Domain::PointCloud:
+                return domain == Domain::Vertex
+                    ? GeometryElementDomain::PointCloudPoint
+                    : GeometryElementDomain::Unknown;
+            case GS::Domain::None:
+                break;
             }
+            return GeometryElementDomain::Unknown;
+        }
 
-            if (sources.ProvenanceDomain == GS::Domain::PointCloud &&
-                domain == Domain::Vertex)
+        [[nodiscard]] GeometryElementDomain ToColorGeometryElementDomain(
+            const GeometryEntityAvailability& availability,
+            const Graphics::Components::VisualizationConfig::ColorSource source) noexcept
+        {
+            using ColorSource = Graphics::Components::VisualizationConfig::ColorSource;
+            using Domain = Graphics::Components::VisualizationConfig::Domain;
+            switch (source)
             {
-                return view.VertexSource != nullptr
-                    ? &view.VertexSource->Properties
-                    : nullptr;
+            case ColorSource::PerEdgeBuffer:
+                return ToGeometryElementDomain(availability, Domain::Edge);
+            case ColorSource::PerFaceBuffer:
+                return ToGeometryElementDomain(availability, Domain::Face);
+            case ColorSource::PerVertexBuffer:
+            case ColorSource::Material:
+            case ColorSource::UniformColor:
+            case ColorSource::ScalarField:
+                return ToGeometryElementDomain(availability, Domain::Vertex);
             }
-
-            return nullptr;
+            return GeometryElementDomain::Unknown;
         }
 
         [[nodiscard]] std::string BuildVisualizationPropertySourceKey(
@@ -399,222 +319,54 @@ namespace Extrinsic::Runtime
             return key;
         }
 
-        [[nodiscard]] VisualizationAdapterOptions BuildVisualizationAdapterOptions(
+        [[nodiscard]] std::optional<VisualizationRecipe>
+        BuildScalarVisualizationRecipe(
             const std::uint32_t stableId,
-            const RenderExtractionCache::VisualizationAdapterBinding& binding,
+            const GeometryEntityAvailability& availability,
             const Graphics::Components::VisualizationConfig* visualization)
-        {
-            using BindingKind = RenderExtractionCache::VisualizationAdapterBindingKind;
-
-            VisualizationAdapterOptions options = binding.Options;
-            switch (binding.Kind)
-            {
-            case BindingKind::Scalar:
-                if (IsScalarVisualizationSource(visualization))
-                {
-                    options.SourceName = visualization->ScalarFieldName;
-                    options.OutputName = visualization->ScalarFieldName;
-                    options.Domain = ToVisualizationAttributeDomain(
-                        visualization->ScalarDomain);
-                    options.AutoRange = visualization->Scalar.AutoRange;
-                    options.RangeMin = visualization->Scalar.RangeMin;
-                    options.RangeMax = visualization->Scalar.RangeMax;
-                    options.Colormap = visualization->Scalar.Map;
-                }
-                if (options.PropertyBufferSourceKey.empty())
-                {
-                    const std::string_view scalarName =
-                        options.OutputName.empty()
-                            ? std::string_view{options.SourceName}
-                            : std::string_view{options.OutputName};
-                    if (!scalarName.empty())
-                    {
-                        options.PropertyBufferSourceKey =
-                            BuildVisualizationPropertySourceKey(
-                                stableId, "scalar", scalarName);
-                    }
-                }
-                if (options.BufferBDA == 0u)
-                {
-                    options.BufferBDA = binding.BufferBDA;
-                }
-                break;
-            case BindingKind::Color:
-                if (IsColorBufferVisualizationSource(visualization))
-                {
-                    options.SourceName = visualization->ColorBufferName;
-                    options.OutputName = visualization->ColorBufferName;
-                    options.Domain = ToColorBufferDomain(visualization->Source);
-                }
-                if (options.PropertyBufferSourceKey.empty())
-                {
-                    const std::string_view colorName =
-                        options.OutputName.empty()
-                            ? std::string_view{options.SourceName}
-                            : std::string_view{options.OutputName};
-                    if (!colorName.empty())
-                    {
-                        options.PropertyBufferSourceKey =
-                            BuildVisualizationPropertySourceKey(
-                                stableId, "color", colorName);
-                    }
-                }
-                if (options.ColorBufferBDA == 0u)
-                {
-                    options.ColorBufferBDA = binding.BufferBDA;
-                }
-                break;
-            case BindingKind::VectorField:
-                if (options.PropertyBufferSourceKey.empty())
-                {
-                    const std::string_view vectorName =
-                        options.OutputName.empty()
-                            ? std::string_view{options.SourceName}
-                            : std::string_view{options.OutputName};
-                    if (!vectorName.empty())
-                    {
-                        options.PropertyBufferSourceKey =
-                            BuildVisualizationPropertySourceKey(
-                                stableId, "vector", vectorName);
-                    }
-                }
-                if (options.VectorBufferBDA == 0u)
-                {
-                    options.VectorBufferBDA = binding.BufferBDA;
-                }
-                break;
-            case BindingKind::Isoline:
-                if (IsScalarVisualizationSource(visualization))
-                {
-                    options.SourceName = visualization->ScalarFieldName;
-                    options.OutputName = visualization->ScalarFieldName;
-                    options.Domain = ToVisualizationAttributeDomain(
-                        visualization->ScalarDomain);
-                    options.AutoRange = visualization->Scalar.AutoRange;
-                    options.RangeMin = visualization->Scalar.RangeMin;
-                    options.RangeMax = visualization->Scalar.RangeMax;
-                    options.IsoValueCount = visualization->Scalar.Isolines.Num;
-                    options.LineWidth = visualization->Scalar.Isolines.Width;
-                    options.OverlayColor = visualization->Scalar.Isolines.Color;
-                }
-                if (options.PropertyBufferSourceKey.empty())
-                {
-                    const std::string_view scalarName =
-                        options.OutputName.empty()
-                            ? std::string_view{options.SourceName}
-                            : std::string_view{options.OutputName};
-                    if (!scalarName.empty())
-                    {
-                        options.PropertyBufferSourceKey =
-                            BuildVisualizationPropertySourceKey(
-                                stableId, "isoline", scalarName);
-                    }
-                }
-                break;
-            case BindingKind::HtexMetadata:
-                if (options.TexcoordBufferBDA == 0u)
-                {
-                    options.TexcoordBufferBDA = binding.BufferBDA;
-                }
-                break;
-            }
-            return options;
-        }
-
-        void AppendScalarVisualizationPropertyBuffer(
-            const std::uint32_t stableId,
-            const ECS::Components::GeometrySources::ConstSourceView& view,
-            const Graphics::Components::VisualizationConfig* visualization,
-            VisualizationAdapterBatch& batch,
-            RuntimeRenderExtractionStats& stats)
         {
             if (!IsScalarVisualizationSource(visualization) ||
                 visualization->ScalarFieldName.empty())
-            {
-                return;
-            }
+                return std::nullopt;
 
-            const Geometry::PropertySet* properties =
-                PropertySetForVisualizationDomain(
-                    view, visualization->ScalarDomain);
-            if (properties == nullptr)
-            {
-                return;
-            }
-
-            PropertyScalarAdapter adapter{Geometry::ConstPropertySet{*properties}};
-            VisualizationAdapterStats perAdapter{};
-            VisualizationAdapterOptions options{};
-            options.SourceName = visualization->ScalarFieldName;
-            options.OutputName = visualization->ScalarFieldName;
-            options.Domain = ToVisualizationAttributeDomain(
-                visualization->ScalarDomain);
-            options.AutoRange = visualization->Scalar.AutoRange;
-            options.RangeMin = visualization->Scalar.RangeMin;
-            options.RangeMax = visualization->Scalar.RangeMax;
-            options.Colormap = visualization->Scalar.Map;
-            options.PropertyBufferSourceKey =
-                BuildVisualizationPropertySourceKey(
-                    stableId, "scalar", visualization->ScalarFieldName);
-            adapter.Append(batch, options, perAdapter);
-
-            stats.VisualizationAdapterPacketAppendCount += perAdapter.PacketAppendCount;
-            stats.VisualizationAdapterMissingSourceCount += perAdapter.MissingSourceCount;
-            stats.VisualizationAdapterUnsupportedSourceTypeCount += perAdapter.UnsupportedSourceTypeCount;
-            stats.VisualizationAdapterEmptySourceCount += perAdapter.EmptySourceCount;
-            stats.VisualizationAdapterInvalidBufferCount +=
-                perAdapter.InvalidBufferCount + perAdapter.InvalidResourceCount;
-            stats.VisualizationAdapterInvalidRangeCount += perAdapter.InvalidRangeCount;
-            stats.VisualizationAdapterNonFiniteValueCount += perAdapter.NonFiniteValueCount;
-            stats.VisualizationAdapterElementCountOverflowCount += perAdapter.ElementCountOverflowCount;
-            stats.VisualizationAdapterManualRangeCount += perAdapter.ManualRangeCount;
-            stats.VisualizationAdapterFlatAutoRangeExpandedCount += perAdapter.FlatAutoRangeExpandedCount;
-            stats.VisualizationAdapterRobustAutoRangeClampedCount += perAdapter.RobustAutoRangeClampedCount;
-            stats.VisualizationAdapterScalarValueScanCount += perAdapter.ScalarValueScanCount;
+            return VisualizationRecipe{.Data = ScalarVisualizationRecipe{
+                .Source = GeometryPropertyRef{
+                    .Domain = ToGeometryElementDomain(
+                        availability, visualization->ScalarDomain),
+                    .Name = visualization->ScalarFieldName,
+                    .ValueKind = Geometry::PropertyValueKind::Unknown,
+                },
+                .OutputName = visualization->ScalarFieldName,
+                .BufferSourceKey = BuildVisualizationPropertySourceKey(
+                    stableId, "scalar", visualization->ScalarFieldName),
+                .AutoRange = visualization->Scalar.AutoRange,
+                .RangeMin = visualization->Scalar.RangeMin,
+                .RangeMax = visualization->Scalar.RangeMax,
+                .Colormap = visualization->Scalar.Map,
+            }};
         }
 
-        void AppendColorVisualizationPropertyBuffer(
+        [[nodiscard]] std::optional<VisualizationRecipe>
+        BuildColorVisualizationRecipe(
             const std::uint32_t stableId,
-            const ECS::Components::GeometrySources::ConstSourceView& view,
-            const Graphics::Components::VisualizationConfig* visualization,
-            VisualizationAdapterBatch& batch,
-            RuntimeRenderExtractionStats& stats)
+            const GeometryEntityAvailability& availability,
+            const Graphics::Components::VisualizationConfig* visualization)
         {
             if (!IsColorBufferVisualizationSource(visualization) ||
                 visualization->ColorBufferName.empty())
-            {
-                return;
-            }
+                return std::nullopt;
 
-            const Geometry::PropertySet* properties =
-                PropertySetForVisualizationDomain(
-                    view,
-                    ToColorBufferConfigDomain(visualization->Source));
-            if (properties == nullptr)
-            {
-                return;
-            }
-
-            KMeansLabelAdapter adapter{Geometry::ConstPropertySet{*properties}};
-            VisualizationAdapterStats perAdapter{};
-            VisualizationAdapterOptions options{};
-            options.SourceName = visualization->ColorBufferName;
-            options.OutputName = visualization->ColorBufferName;
-            options.Domain = ToColorBufferDomain(visualization->Source);
-            options.PropertyBufferSourceKey =
-                BuildVisualizationPropertySourceKey(
-                    stableId, "color", visualization->ColorBufferName);
-            adapter.Append(batch, options, perAdapter);
-
-            stats.VisualizationAdapterPacketAppendCount += perAdapter.PacketAppendCount;
-            stats.VisualizationAdapterMissingSourceCount += perAdapter.MissingSourceCount;
-            stats.VisualizationAdapterUnsupportedSourceTypeCount += perAdapter.UnsupportedSourceTypeCount;
-            stats.VisualizationAdapterEmptySourceCount += perAdapter.EmptySourceCount;
-            stats.VisualizationAdapterInvalidBufferCount +=
-                perAdapter.InvalidBufferCount + perAdapter.InvalidResourceCount;
-            stats.VisualizationAdapterInvalidRangeCount += perAdapter.InvalidRangeCount;
-            stats.VisualizationAdapterNonFiniteValueCount += perAdapter.NonFiniteValueCount;
-            stats.VisualizationAdapterElementCountOverflowCount += perAdapter.ElementCountOverflowCount;
+            return VisualizationRecipe{.Data = ColorVisualizationRecipe{
+                .Source = GeometryPropertyRef{
+                    .Domain = ToColorGeometryElementDomain(
+                        availability, visualization->Source),
+                    .Name = visualization->ColorBufferName,
+                    .ValueKind = Geometry::PropertyValueKind::Vec4,
+                },
+                .OutputName = visualization->ColorBufferName,
+                .BufferSourceKey = BuildVisualizationPropertySourceKey(
+                    stableId, "color", visualization->ColorBufferName),
+            }};
         }
 
         [[nodiscard]] std::uint32_t BuildRenderFlags(const entt::registry& registry, entt::entity entity)
@@ -1047,18 +799,6 @@ namespace Extrinsic::Runtime
         return IsColorBufferVisualizationSource(visualization);
     }
 
-    VisualizationAdapterOptions
-    BuildRenderExtractionVisualizationAdapterOptions(
-        const std::uint32_t stableId,
-        const RenderExtractionCache::VisualizationAdapterBinding& binding,
-        const Graphics::Components::VisualizationConfig* visualization)
-    {
-        return BuildVisualizationAdapterOptions(
-            stableId,
-            binding,
-            visualization);
-    }
-
     RuntimeRenderableAssetGenerationObservation ObserveRenderableAssetGeneration(
         Graphics::Components::GpuSceneSlot& slot,
         const Assets::AssetId sourceAsset,
@@ -1273,13 +1013,94 @@ namespace Extrinsic::Runtime
             }
             return false;
         }
+
+        [[nodiscard]] const Graphics::Components::VisualizationConfig*
+        VisualizationConfigForPresentationLane(
+            const Graphics::Components::VisualizationConfig* fallback,
+            const Graphics::Components::VisualizationLaneOverrides* overrides,
+            const GeometryRenderLane lane) noexcept
+        {
+            switch (lane)
+            {
+            case GeometryRenderLane::Surface:
+                return ResolveVisualizationForLane(
+                    fallback, overrides, VisualizationLane::Surface);
+            case GeometryRenderLane::Edges:
+                return ResolveVisualizationForLane(
+                    fallback, overrides, VisualizationLane::Edges);
+            case GeometryRenderLane::Points:
+                return ResolveVisualizationForLane(
+                    fallback, overrides, VisualizationLane::Points);
+            }
+            return fallback;
+        }
+
+        [[nodiscard]] std::optional<VisualizationRecipe>
+        BuildPresentationVisualizationRecipe(
+            const std::uint32_t stableId,
+            const GeometryPresentationSlotSnapshot& slot,
+            const Graphics::Components::VisualizationConfig* config)
+        {
+            if (!slot.Enabled || !slot.PropertyBufferReady || slot.Unsupported ||
+                slot.SourceKind != GeometryPresentationSourceKind::PropertyBuffer)
+            {
+                return std::nullopt;
+            }
+
+            std::string keyLane{"presentation."};
+            keyLane += ToString(slot.Lane);
+            const std::string sourceKey = BuildVisualizationPropertySourceKey(
+                stableId, keyLane, slot.Property.Name);
+
+            switch (slot.Semantic)
+            {
+            case GeometryPresentationSlotSemantic::ScalarField:
+            case GeometryPresentationSlotSemantic::PointScalarField:
+            case GeometryPresentationSlotSemantic::LineScalarField:
+            {
+                ScalarVisualizationRecipe scalar{
+                    .Source = slot.Property,
+                    .OutputName = slot.Property.Name,
+                    .BufferSourceKey = sourceKey,
+                    .DirtyStamp = slot.SourceGeneration,
+                };
+                if (IsScalarVisualizationSource(config) &&
+                    config->ScalarFieldName == slot.Property.Name)
+                {
+                    scalar.AutoRange = config->Scalar.AutoRange;
+                    scalar.RangeMin = config->Scalar.RangeMin;
+                    scalar.RangeMax = config->Scalar.RangeMax;
+                    scalar.Colormap = config->Scalar.Map;
+                }
+                return VisualizationRecipe{.Data = std::move(scalar)};
+            }
+            case GeometryPresentationSlotSemantic::PointColor:
+            case GeometryPresentationSlotSemantic::LineColor:
+                return VisualizationRecipe{.Data = ColorVisualizationRecipe{
+                    .Source = slot.Property,
+                    .OutputName = slot.Property.Name,
+                    .BufferSourceKey = sourceKey,
+                    .DirtyStamp = slot.SourceGeneration,
+                }};
+            case GeometryPresentationSlotSemantic::Albedo:
+            case GeometryPresentationSlotSemantic::Normal:
+            case GeometryPresentationSlotSemantic::Roughness:
+            case GeometryPresentationSlotSemantic::Metallic:
+            case GeometryPresentationSlotSemantic::Displacement:
+            case GeometryPresentationSlotSemantic::PointSize:
+            case GeometryPresentationSlotSemantic::PointNormalOrientation:
+            case GeometryPresentationSlotSemantic::LineWidth:
+                return std::nullopt;
+            }
+            return std::nullopt;
+        }
     }
 
-    void RenderExtractionCache::State::ApplyGeometryPresentation(
+    bool RenderExtractionCache::State::ApplyGeometryPresentation(
         entt::registry& registry,
         const entt::entity entity,
         const std::uint32_t stableId,
-        const ECS::Components::GeometrySources::ConstSourceView& view,
+        const GeometryEntityAvailability& availability,
         RenderableSidecar& sidecar,
         Graphics::IRenderer& renderer,
         Graphics::GpuAssetCache* gpuAssets,
@@ -1287,15 +1108,13 @@ namespace Extrinsic::Runtime
     {
         const auto* recipe = registry.try_get<GeometryPresentationRecipe>(entity);
         if (recipe == nullptr)
-        {
-            return;
-        }
+            return false;
 
         const auto* runtimeState =
             registry.try_get<GeometryPresentationRuntimeState>(entity);
         const GeometryPresentationSnapshot snapshot =
             BuildGeometryPresentationSnapshot(
-                view,
+                availability.SourceView,
                 *recipe,
                 runtimeState != nullptr
                     ? *runtimeState
@@ -1310,6 +1129,30 @@ namespace Extrinsic::Runtime
         stats.GeometryPresentationUnsupportedSlotCount += snapshot.Stats.UnsupportedSlotCount;
         stats.GeometryPresentationPreviousOutputRetainedCount += snapshot.Stats.PreviousOutputRetainedCount;
         stats.GeometryPresentationDiagnosticCount += snapshot.Stats.DiagnosticCount;
+
+        bool projectedVisualizationRecipes = false;
+        if (!m_VisualizationState->Recipes.contains(stableId))
+        {
+            for (const GeometryPresentationSlotSnapshot& slot : snapshot.Slots)
+            {
+                const auto projected = BuildPresentationVisualizationRecipe(
+                    stableId,
+                    slot,
+                    VisualizationConfigForPresentationLane(
+                        sidecar.HasVisualization
+                            ? &sidecar.Visualization
+                            : nullptr,
+                        sidecar.HasVisualizationOverrides
+                            ? &sidecar.VisualizationOverrides
+                            : nullptr,
+                        slot.Lane));
+                if (!projected.has_value())
+                    continue;
+
+                AppendVisualizationRecipe(availability, *projected, stats);
+                projectedVisualizationRecipes = true;
+            }
+        }
 
         Graphics::MaterialTextureAssetBindings textureBindings{};
         if (const auto direct = m_MaterialTextureBindings.find(stableId);
@@ -1332,14 +1175,12 @@ namespace Extrinsic::Runtime
         }
 
         if (!hasTextureBinding)
-        {
-            return;
-        }
+            return projectedVisualizationRecipes;
 
         if (gpuAssets == nullptr || !sidecar.Material.Lease.IsValid())
         {
             ++stats.GeometryPresentationMaterialTextureBindingResolveFailureCount;
-            return;
+            return projectedVisualizationRecipes;
         }
 
         auto resolved = renderer.GetMaterialSystem().ResolveTextureAssetBindings(
@@ -1358,6 +1199,7 @@ namespace Extrinsic::Runtime
         {
             ++stats.GeometryPresentationMaterialTextureBindingResolveFailureCount;
         }
+        return projectedVisualizationRecipes;
     }
 
     RuntimeRenderExtractionStats RenderExtractionCache::State::ExtractAndSubmit(
@@ -1549,8 +1391,8 @@ namespace Extrinsic::Runtime
         bool meshViewsResident = false;
         bool meshSurfaceLaneReadyThisFrame = false;
         bool graphLaneReadyThisFrame = false;
-        std::optional<ECS::Components::GeometrySources::ConstSourceView>
-            sourceViewThisFrame{};
+        bool presentationRecipesProjected = false;
+        std::optional<GeometryEntityAvailability> availabilityThisFrame{};
         if (sourceEligible)
         {
             namespace GS = ECS::Components::GeometrySources;
@@ -1569,15 +1411,16 @@ namespace Extrinsic::Runtime
             graphLaneReadyThisFrame =
                 availability.Sources.ProvenanceDomain == GS::Domain::Graph &&
                 (edgeLane.Ready() || pointLane.Ready());
-            sourceViewThisFrame = view;
-            ApplyGeometryPresentation(registry,
-                                                 entity,
-                                                 stableId,
-                                                 view,
-                                                 *sidecar,
-                                                 renderer,
-                                                 gpuAssets,
-                                                 stats);
+            availabilityThisFrame = availability;
+            presentationRecipesProjected = ApplyGeometryPresentation(
+                registry,
+                entity,
+                stableId,
+                availability,
+                *sidecar,
+                renderer,
+                gpuAssets,
+                stats);
             if (availability.Sources.ProvenanceDomain == GS::Domain::Mesh)
             {
                 namespace D = ECS::Components::DirtyTags;
@@ -2014,35 +1857,54 @@ namespace Extrinsic::Runtime
                 .ColorPropertyBufferSourceKey = colorKeyFor(pointVisualization),
             });
         }
-        if (sourceViewThisFrame.has_value() &&
-            !m_VisualizationState->Bindings.contains(stableId))
+        if (availabilityThisFrame.has_value())
         {
-            const std::array<const Graphics::Components::VisualizationConfig*, 3u>
-                configs{surfaceVisualization, edgeVisualization, pointVisualization};
-            for (std::size_t i = 0u; i < configs.size(); ++i)
+            const auto explicitRecipe =
+                m_VisualizationState->Recipes.find(stableId);
+            if (explicitRecipe != m_VisualizationState->Recipes.end())
             {
-                bool alreadyAppended = false;
-                for (std::size_t j = 0u; j < i; ++j)
-                {
-                    alreadyAppended = alreadyAppended || configs[j] == configs[i];
-                }
-                if (alreadyAppended)
-                    continue;
-                AppendScalarVisualizationPropertyBuffer(
-                    stableId,
-                    *sourceViewThisFrame,
-                    configs[i],
-                    m_VisualizationState->Batch,
-                    stats);
-                AppendColorVisualizationPropertyBuffer(
-                    stableId,
-                    *sourceViewThisFrame,
-                    configs[i],
-                    m_VisualizationState->Batch,
+                AppendVisualizationRecipe(
+                    *availabilityThisFrame,
+                    explicitRecipe->second,
                     stats);
             }
+            else if (!presentationRecipesProjected)
+            {
+                const std::array<
+                    const Graphics::Components::VisualizationConfig*, 3u>
+                    configs{surfaceVisualization,
+                            edgeVisualization,
+                            pointVisualization};
+                for (std::size_t i = 0u; i < configs.size(); ++i)
+                {
+                    bool alreadyAppended = false;
+                    for (std::size_t j = 0u; j < i; ++j)
+                        alreadyAppended = alreadyAppended || configs[j] == configs[i];
+                    if (alreadyAppended)
+                        continue;
+
+                    if (const auto scalar = BuildScalarVisualizationRecipe(
+                            stableId,
+                            *availabilityThisFrame,
+                            configs[i]);
+                        scalar.has_value())
+                    {
+                        ++stats.VisualizationAdapterScalarConfigsObserved;
+                        AppendVisualizationRecipe(
+                            *availabilityThisFrame, *scalar, stats);
+                    }
+                    if (const auto color = BuildColorVisualizationRecipe(
+                            stableId,
+                            *availabilityThisFrame,
+                            configs[i]);
+                        color.has_value())
+                    {
+                        AppendVisualizationRecipe(
+                            *availabilityThisFrame, *color, stats);
+                    }
+                }
+            }
         }
-        AppendVisualizationAdapters(stableId, *sidecar, stats);
 
         const bool primaryRenderableSubmitted =
             proceduralBound ||
@@ -2275,11 +2137,9 @@ namespace Extrinsic::Runtime
         m_Visualizations.clear();
         m_Lights.clear();
 
-        if (!m_VisualizationState->Bindings.empty())
-        {
-            ++m_VisualizationState->BindingRevision;
-        }
-        m_VisualizationState->Bindings.clear();
+        if (!m_VisualizationState->Recipes.empty())
+            ++m_VisualizationState->RecipeRevision;
+        m_VisualizationState->Recipes.clear();
         m_VisualizationState->Batch.Clear();
         m_SceneInteraction = {};
 
@@ -2290,8 +2150,5 @@ namespace Extrinsic::Runtime
     void RenderExtractionCache::State::Shutdown(Graphics::IRenderer& renderer)
     {
         ClearSceneState(renderer);
-
-        m_VisualizationState->Registry.Clear();
-        m_VisualizationState->Adapters.clear();
     }
 }

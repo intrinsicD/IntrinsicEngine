@@ -5,6 +5,7 @@ module;
 #include <cstddef>
 #include <cstring>
 #include <cstdint>
+#include <iterator>
 #include <limits>
 #include <optional>
 #include <span>
@@ -668,6 +669,158 @@ namespace Extrinsic::Runtime
         return "InvalidResource";
     }
 
+    VisualizationRecipeKind GetVisualizationRecipeKind(
+        const VisualizationRecipe& recipe) noexcept
+    {
+        return std::visit(
+            [](const auto& authored) noexcept
+            {
+                using Recipe = std::decay_t<decltype(authored)>;
+                if constexpr (std::is_same_v<Recipe, std::monostate>)
+                    return VisualizationRecipeKind::Empty;
+                else if constexpr (std::is_same_v<Recipe, ScalarVisualizationRecipe>)
+                    return VisualizationRecipeKind::Scalar;
+                else if constexpr (std::is_same_v<Recipe, ColorVisualizationRecipe>)
+                    return VisualizationRecipeKind::Color;
+                else if constexpr (std::is_same_v<Recipe, LabelVisualizationRecipe>)
+                    return VisualizationRecipeKind::Label;
+                else if constexpr (std::is_same_v<Recipe, VectorFieldVisualizationRecipe>)
+                    return VisualizationRecipeKind::VectorField;
+                else if constexpr (std::is_same_v<Recipe, IsolineVisualizationRecipe>)
+                    return VisualizationRecipeKind::Isoline;
+                else if constexpr (std::is_same_v<Recipe, HtexPreviewVisualizationRecipe>)
+                    return VisualizationRecipeKind::HtexPreview;
+                else
+                    return VisualizationRecipeKind::FragmentBake;
+            },
+            recipe.Data);
+    }
+
+    std::string_view ToString(const VisualizationRecipeKind kind) noexcept
+    {
+        switch (kind)
+        {
+        case VisualizationRecipeKind::Empty: return "Empty";
+        case VisualizationRecipeKind::Scalar: return "Scalar";
+        case VisualizationRecipeKind::Color: return "Color";
+        case VisualizationRecipeKind::Label: return "Label";
+        case VisualizationRecipeKind::VectorField: return "VectorField";
+        case VisualizationRecipeKind::Isoline: return "Isoline";
+        case VisualizationRecipeKind::HtexPreview: return "HtexPreview";
+        case VisualizationRecipeKind::FragmentBake: return "FragmentBake";
+        }
+        return "Empty";
+    }
+
+    bool SameVisualizationRecipe(const VisualizationRecipe& lhs,
+                                 const VisualizationRecipe& rhs) noexcept
+    {
+        if (lhs.Data.index() != rhs.Data.index())
+            return false;
+
+        const auto sameRef = [](const GeometryPropertyRef& a,
+                                const GeometryPropertyRef& b) noexcept
+        {
+            return a == b;
+        };
+        const auto sameVec4 = [](const glm::vec4& a,
+                                 const glm::vec4& b) noexcept
+        {
+            return a.x == b.x && a.y == b.y &&
+                   a.z == b.z && a.w == b.w;
+        };
+
+        return std::visit(
+            [&](const auto& a, const auto& b) noexcept
+            {
+                using Lhs = std::decay_t<decltype(a)>;
+                using Rhs = std::decay_t<decltype(b)>;
+                if constexpr (!std::is_same_v<Lhs, Rhs>)
+                {
+                    return false;
+                }
+                else if constexpr (std::is_same_v<Lhs, std::monostate>)
+                {
+                    return true;
+                }
+                else if constexpr (std::is_same_v<Lhs, ScalarVisualizationRecipe>)
+                {
+                    return sameRef(a.Source, b.Source) &&
+                           a.OutputName == b.OutputName &&
+                           a.BufferBDA == b.BufferBDA &&
+                           a.BufferSourceKey == b.BufferSourceKey &&
+                           a.DirtyStamp == b.DirtyStamp &&
+                           a.AutoRange == b.AutoRange &&
+                           a.RangeMin == b.RangeMin &&
+                           a.RangeMax == b.RangeMax &&
+                           a.Colormap == b.Colormap;
+                }
+                else if constexpr (std::is_same_v<Lhs, ColorVisualizationRecipe> ||
+                                   std::is_same_v<Lhs, LabelVisualizationRecipe>)
+                {
+                    return sameRef(a.Source, b.Source) &&
+                           a.OutputName == b.OutputName &&
+                           a.BufferBDA == b.BufferBDA &&
+                           a.BufferSourceKey == b.BufferSourceKey &&
+                           a.DirtyStamp == b.DirtyStamp;
+                }
+                else if constexpr (std::is_same_v<Lhs, VectorFieldVisualizationRecipe>)
+                {
+                    return sameRef(a.Source, b.Source) &&
+                           sameRef(a.PositionSource, b.PositionSource) &&
+                           a.OutputName == b.OutputName &&
+                           a.PositionBufferBDA == b.PositionBufferBDA &&
+                           a.VectorBufferBDA == b.VectorBufferBDA &&
+                           a.PositionBufferSourceKey == b.PositionBufferSourceKey &&
+                           a.VectorBufferSourceKey == b.VectorBufferSourceKey &&
+                           a.DirtyStamp == b.DirtyStamp &&
+                           a.Scale == b.Scale &&
+                           sameVec4(a.Color, b.Color) &&
+                           a.DepthTested == b.DepthTested;
+                }
+                else if constexpr (std::is_same_v<Lhs, IsolineVisualizationRecipe>)
+                {
+                    return sameRef(a.Source, b.Source) &&
+                           a.OutputName == b.OutputName &&
+                           a.BufferBDA == b.BufferBDA &&
+                           a.BufferSourceKey == b.BufferSourceKey &&
+                           a.DirtyStamp == b.DirtyStamp &&
+                           a.AutoRange == b.AutoRange &&
+                           a.RangeMin == b.RangeMin &&
+                           a.RangeMax == b.RangeMax &&
+                           a.IsoValueCount == b.IsoValueCount &&
+                           a.LineWidth == b.LineWidth &&
+                           sameVec4(a.Color, b.Color) &&
+                           a.DepthTested == b.DepthTested;
+                }
+                else if constexpr (std::is_same_v<Lhs, HtexPreviewVisualizationRecipe>)
+                {
+                    return a.Name == b.Name &&
+                           a.PatchCount == b.PatchCount &&
+                           a.AtlasWidth == b.AtlasWidth &&
+                           a.AtlasHeight == b.AtlasHeight;
+                }
+                else
+                {
+                    return a.Name == b.Name &&
+                           sameRef(a.Source, b.Source) &&
+                           a.Mapping == b.Mapping &&
+                           a.MeshHasTexcoords == b.MeshHasTexcoords &&
+                           a.FaceCount == b.FaceCount &&
+                           a.AtlasWidth == b.AtlasWidth &&
+                           a.AtlasHeight == b.AtlasHeight &&
+                           a.TexcoordBufferSourceKey == b.TexcoordBufferSourceKey &&
+                           a.TexcoordBufferBDA == b.TexcoordBufferBDA &&
+                           a.AtlasTextureAsset == b.AtlasTextureAsset &&
+                           a.GeneratedTextureSemantic == b.GeneratedTextureSemantic &&
+                           a.TexcoordDirtyStamp == b.TexcoordDirtyStamp &&
+                           a.SourceAttributeDirtyStamp == b.SourceAttributeDirtyStamp;
+                }
+            },
+            lhs.Data,
+            rhs.Data);
+    }
+
     VisualizationEncodingResult EncodeVisualizationRecipe(
         const GeometryEntityAvailability& availability,
         const VisualizationRecipe& recipe)
@@ -1002,6 +1155,43 @@ namespace Extrinsic::Runtime
         Isolines.clear();
         HtexAtlases.clear();
         FragmentBakeAtlases.clear();
+    }
+
+    void VisualizationAdapterBatch::Append(VisualizationAdapterBatch&& other)
+    {
+        PropertyBufferPayloads.insert(
+            PropertyBufferPayloads.end(),
+            std::make_move_iterator(other.PropertyBufferPayloads.begin()),
+            std::make_move_iterator(other.PropertyBufferPayloads.end()));
+        PropertyBuffers.insert(
+            PropertyBuffers.end(),
+            std::make_move_iterator(other.PropertyBuffers.begin()),
+            std::make_move_iterator(other.PropertyBuffers.end()));
+        AttributeBuffers.insert(
+            AttributeBuffers.end(),
+            std::make_move_iterator(other.AttributeBuffers.begin()),
+            std::make_move_iterator(other.AttributeBuffers.end()));
+        Scalars.insert(Scalars.end(),
+                       std::make_move_iterator(other.Scalars.begin()),
+                       std::make_move_iterator(other.Scalars.end()));
+        Colors.insert(Colors.end(),
+                      std::make_move_iterator(other.Colors.begin()),
+                      std::make_move_iterator(other.Colors.end()));
+        VectorFields.insert(
+            VectorFields.end(),
+            std::make_move_iterator(other.VectorFields.begin()),
+            std::make_move_iterator(other.VectorFields.end()));
+        Isolines.insert(Isolines.end(),
+                        std::make_move_iterator(other.Isolines.begin()),
+                        std::make_move_iterator(other.Isolines.end()));
+        HtexAtlases.insert(
+            HtexAtlases.end(),
+            std::make_move_iterator(other.HtexAtlases.begin()),
+            std::make_move_iterator(other.HtexAtlases.end()));
+        FragmentBakeAtlases.insert(
+            FragmentBakeAtlases.end(),
+            std::make_move_iterator(other.FragmentBakeAtlases.begin()),
+            std::make_move_iterator(other.FragmentBakeAtlases.end()));
     }
 
     Graphics::VisualizationPacketBatch VisualizationAdapterBatch::AsPacketBatch(

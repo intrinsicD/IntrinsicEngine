@@ -3069,22 +3069,18 @@ namespace Extrinsic::Sandbox::Editor
                         {
                             ImGui::TextDisabled("Visualization: material/default");
                         }
-                        if (frame.Visualization.AdapterBindingControlsAvailable)
+                        if (frame.Visualization.RecipeControlsAvailable)
                         {
-                            if (frame.Visualization.AdapterBinding.HasBinding)
+                            if (frame.Visualization.Recipe.HasRecipe)
                             {
                                 ImGui::Text(
-                                    "Adapter: %s key=%llu buffer=%llu",
-                                    DebugNameForSandboxEditorVisualizationAdapterBindingKind(
-                                        frame.Visualization.AdapterBinding.Kind),
-                                    static_cast<unsigned long long>(
-                                        frame.Visualization.AdapterBinding.AdapterKey),
-                                    static_cast<unsigned long long>(
-                                        frame.Visualization.AdapterBinding.BufferBDA));
+                                    "Recipe: %s",
+                                    DebugNameForSandboxEditorVisualizationRecipeKind(
+                                        frame.Visualization.Recipe.Kind));
                             }
                             else
                             {
-                                ImGui::TextDisabled("Adapter: no runtime binding");
+                                ImGui::TextDisabled("Recipe: config/presentation-derived");
                             }
                         }
 

@@ -744,7 +744,9 @@ namespace Extrinsic::Runtime
                 if (sourceSlot.SourceKind ==
                         GeometryPresentationSourceKind::PropertyBuffer &&
                     presentation->Kind ==
-                        GeometryPresentationKind::SurfaceMaterial)
+                        GeometryPresentationKind::SurfaceMaterial &&
+                    sourceSlot.Semantic !=
+                        GeometryPresentationSlotSemantic::ScalarField)
                 {
                     slot.Unsupported = true;
                     AppendDiagnostic(

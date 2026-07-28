@@ -101,23 +101,12 @@ namespace Extrinsic::Runtime
         const Graphics::Components::VisualizationConfig* visualization) noexcept;
     [[nodiscard]] bool IsRenderExtractionColorBufferVisualizationSource(
         const Graphics::Components::VisualizationConfig* visualization) noexcept;
-    [[nodiscard]] VisualizationAdapterOptions
-        BuildRenderExtractionVisualizationAdapterOptions(
-            std::uint32_t stableId,
-            const RenderExtractionCache::VisualizationAdapterBinding& binding,
-            const Graphics::Components::VisualizationConfig* visualization);
-
     struct RenderExtractionCache::State
     {
         using RenderableSidecarView =
             RenderExtractionCache::RenderableSidecarView;
         using GpuRenderableAvailabilityView =
             RenderExtractionCache::GpuRenderableAvailabilityView;
-        using VisualizationAdapterBindingKind =
-            RenderExtractionCache::VisualizationAdapterBindingKind;
-        using VisualizationAdapterBinding =
-            RenderExtractionCache::VisualizationAdapterBinding;
-
         State();
         ~State();
 
@@ -158,23 +147,13 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::optional<GpuRenderableAvailabilityView>
             FindGpuRenderableAvailability(
                 std::uint32_t stableEntityId) const noexcept;
-        void RegisterVisualizationAdapter(
-            std::uint64_t key,
-            std::unique_ptr<IVisualizationAdapter> adapter);
-        bool UnregisterVisualizationAdapter(std::uint64_t key) noexcept;
-        [[nodiscard]] std::size_t GetVisualizationAdapterCount() const noexcept;
-        [[nodiscard]] const VisualizationAdapterRegistry&
-            GetVisualizationAdapterRegistryForTest() const noexcept;
-        void SetVisualizationAdapterBinding(
+        void SetVisualizationRecipe(
             std::uint32_t stableEntityId,
-            VisualizationAdapterBinding binding);
-        void ClearVisualizationAdapterBinding(
-            std::uint32_t stableEntityId) noexcept;
-        [[nodiscard]] std::optional<VisualizationAdapterBinding>
-            GetVisualizationAdapterBinding(
-                std::uint32_t stableEntityId) const noexcept;
-        [[nodiscard]] std::uint64_t
-            GetVisualizationAdapterBindingRevision() const noexcept;
+            VisualizationRecipe recipe);
+        void ClearVisualizationRecipe(std::uint32_t stableEntityId) noexcept;
+        [[nodiscard]] std::optional<VisualizationRecipe>
+            GetVisualizationRecipe(std::uint32_t stableEntityId) const noexcept;
+        [[nodiscard]] std::uint64_t GetVisualizationRecipeRevision() const noexcept;
 
         struct RenderableSidecar
         {
@@ -216,11 +195,11 @@ namespace Extrinsic::Runtime
             Graphics::IRenderer& renderer,
             Graphics::GpuAssetCache* gpuAssets,
             RuntimeRenderExtractionStats& stats);
-        void ApplyGeometryPresentation(
+        [[nodiscard]] bool ApplyGeometryPresentation(
             entt::registry& registry,
             entt::entity entity,
             std::uint32_t stableId,
-            const ECS::Components::GeometrySources::ConstSourceView& view,
+            const GeometryEntityAvailability& availability,
             RenderableSidecar& sidecar,
             Graphics::IRenderer& renderer,
             Graphics::GpuAssetCache* gpuAssets,
@@ -290,9 +269,9 @@ namespace Extrinsic::Runtime
             Graphics::IRenderer& renderer,
             RuntimeRenderExtractionStats& stats);
 
-        void AppendVisualizationAdapters(
-            std::uint32_t stableId,
-            const RenderableSidecar& sidecar,
+        void AppendVisualizationRecipe(
+            const GeometryEntityAvailability& availability,
+            const VisualizationRecipe& recipe,
             RuntimeRenderExtractionStats& stats);
         void ExtractLightsForEntity(
             entt::registry& registry,
@@ -349,21 +328,13 @@ namespace Extrinsic::Runtime
             Graphics::MaterialTextureAssetBindings>
             m_MaterialTextureBindings{};
 
-        struct VisualizationAdapterState
+        struct VisualizationRecipeState
         {
-            std::unordered_map<
-                std::uint64_t,
-                std::unique_ptr<IVisualizationAdapter>>
-                Adapters{};
-            VisualizationAdapterRegistry Registry{};
-            std::unordered_map<
-                std::uint32_t,
-                VisualizationAdapterBinding>
-                Bindings{};
-            std::uint64_t BindingRevision{0u};
+            std::unordered_map<std::uint32_t, VisualizationRecipe> Recipes{};
+            std::uint64_t RecipeRevision{0u};
             VisualizationAdapterBatch Batch{};
         };
-        std::unique_ptr<VisualizationAdapterState> m_VisualizationState{};
+        std::unique_ptr<VisualizationRecipeState> m_VisualizationState{};
 
         RuntimeSceneInteractionRenderSnapshot m_SceneInteraction{};
         RuntimeRenderExtractionStats m_LastStats{};

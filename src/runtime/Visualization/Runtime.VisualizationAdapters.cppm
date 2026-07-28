@@ -36,6 +36,7 @@ export namespace Extrinsic::Runtime
         std::vector<Graphics::FragmentBakeAtlasPacket> FragmentBakeAtlases{};
 
         void Clear() noexcept;
+        void Append(VisualizationAdapterBatch&& other);
 
         [[nodiscard]] Graphics::VisualizationPacketBatch AsPacketBatch(
             bool enforceDomain = false,
@@ -217,6 +218,28 @@ export namespace Extrinsic::Runtime
     {
         VisualizationRecipeData Data{};
     };
+
+    enum class VisualizationRecipeKind : std::uint8_t
+    {
+        Empty,
+        Scalar,
+        Color,
+        Label,
+        VectorField,
+        Isoline,
+        HtexPreview,
+        FragmentBake,
+    };
+
+    [[nodiscard]] VisualizationRecipeKind GetVisualizationRecipeKind(
+        const VisualizationRecipe& recipe) noexcept;
+
+    [[nodiscard]] std::string_view ToString(
+        VisualizationRecipeKind kind) noexcept;
+
+    [[nodiscard]] bool SameVisualizationRecipe(
+        const VisualizationRecipe& lhs,
+        const VisualizationRecipe& rhs) noexcept;
 
     enum class VisualizationRecipeStatus : std::uint8_t
     {

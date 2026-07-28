@@ -2198,28 +2198,13 @@ namespace Extrinsic::Runtime
             return false;
         }
 
-        [[nodiscard]] SandboxEditorVisualizationAdapterBindingModel
-        FromVisualizationAdapterBinding(
-            const RenderExtractionCache::VisualizationAdapterBinding& binding)
+        [[nodiscard]] SandboxEditorVisualizationRecipeModel
+        FromVisualizationRecipe(const VisualizationRecipe& recipe)
         {
-            return SandboxEditorVisualizationAdapterBindingModel{
-                .HasBinding = true,
-                .AdapterKey = binding.AdapterKey,
-                .BufferBDA = binding.BufferBDA,
-                .Kind = binding.Kind,
-                .Options = binding.Options,
-            };
-        }
-
-        [[nodiscard]] RenderExtractionCache::VisualizationAdapterBinding
-        ToVisualizationAdapterBinding(
-            const SandboxEditorVisualizationAdapterBindingCommand& command)
-        {
-            return RenderExtractionCache::VisualizationAdapterBinding{
-                .AdapterKey = command.AdapterKey,
-                .BufferBDA = command.BufferBDA,
-                .Kind = command.Kind,
-                .Options = command.Options,
+            return SandboxEditorVisualizationRecipeModel{
+                .HasRecipe = true,
+                .Kind = GetVisualizationRecipeKind(recipe),
+                .Recipe = recipe,
             };
         }
 
@@ -2496,50 +2481,6 @@ namespace Extrinsic::Runtime
                    lhs.y == rhs.y &&
                    lhs.z == rhs.z &&
                    lhs.w == rhs.w;
-        }
-
-        [[nodiscard]] bool SameVisualizationAdapterOptions(
-            const VisualizationAdapterOptions& lhs,
-            const VisualizationAdapterOptions& rhs) noexcept
-        {
-            return lhs.SourceName == rhs.SourceName &&
-                   lhs.OutputName == rhs.OutputName &&
-                   lhs.Domain == rhs.Domain &&
-                   lhs.BufferBDA == rhs.BufferBDA &&
-                   lhs.ColorBufferBDA == rhs.ColorBufferBDA &&
-                   lhs.PositionBufferBDA == rhs.PositionBufferBDA &&
-                   lhs.VectorBufferBDA == rhs.VectorBufferBDA &&
-                   lhs.AutoRange == rhs.AutoRange &&
-                   lhs.RangeMin == rhs.RangeMin &&
-                   lhs.RangeMax == rhs.RangeMax &&
-                   lhs.Colormap == rhs.Colormap &&
-                   lhs.IsoValueCount == rhs.IsoValueCount &&
-                   lhs.LineWidth == rhs.LineWidth &&
-                   SameVec4(lhs.OverlayColor, rhs.OverlayColor) &&
-                   lhs.VectorScale == rhs.VectorScale &&
-                   SameVec4(lhs.VectorColor, rhs.VectorColor) &&
-                   lhs.DepthTested == rhs.DepthTested &&
-                   lhs.EmitHtexPreview == rhs.EmitHtexPreview &&
-                   lhs.EmitFragmentBake == rhs.EmitFragmentBake &&
-                   lhs.SourceAttributeName == rhs.SourceAttributeName &&
-                   lhs.FragmentBakeMapping == rhs.FragmentBakeMapping &&
-                   lhs.MeshHasTexcoords == rhs.MeshHasTexcoords &&
-                   lhs.PatchCount == rhs.PatchCount &&
-                   lhs.FaceCount == rhs.FaceCount &&
-                   lhs.AtlasWidth == rhs.AtlasWidth &&
-                   lhs.AtlasHeight == rhs.AtlasHeight &&
-                   lhs.TexcoordBufferBDA == rhs.TexcoordBufferBDA &&
-                   lhs.HtexRecreatePayloadToken == rhs.HtexRecreatePayloadToken;
-        }
-
-        [[nodiscard]] bool SameVisualizationAdapterBinding(
-            const RenderExtractionCache::VisualizationAdapterBinding& lhs,
-            const RenderExtractionCache::VisualizationAdapterBinding& rhs) noexcept
-        {
-            return lhs.AdapterKey == rhs.AdapterKey &&
-                   lhs.BufferBDA == rhs.BufferBDA &&
-                   lhs.Kind == rhs.Kind &&
-                   SameVisualizationAdapterOptions(lhs.Options, rhs.Options);
         }
 
         [[nodiscard]] bool SameGeometryPresentationDefaultValue(
@@ -4339,16 +4280,16 @@ namespace Extrinsic::Runtime
             return context.LastRefinedPrimitiveGeneration;
         }
 
-        [[nodiscard]] std::uint64_t CurrentVisualizationAdapterBindingRevision(
+        [[nodiscard]] std::uint64_t CurrentVisualizationRecipeRevision(
             const SandboxEditorContext& context,
             const SandboxEditorSelectedModelCacheSection section)
         {
             if (section != SandboxEditorSelectedModelCacheSection::Visualization ||
-                !context.VisualizationAdapterBindings.Available())
+                !context.VisualizationRecipes.Available())
             {
                 return 0u;
             }
-            return context.VisualizationAdapterBindingRevision;
+            return context.VisualizationRecipeRevision;
         }
 
         [[nodiscard]] std::uint64_t VertexBindingGenerationForEntity(
@@ -4713,16 +4654,16 @@ namespace Extrinsic::Runtime
                     stableId,
                     section),
                 .CommandHistoryRevision = CurrentCommandHistoryRevision(context),
-                .VisualizationAdapterBindingRevision =
-                    CurrentVisualizationAdapterBindingRevision(context, section),
+                .VisualizationRecipeRevision =
+                    CurrentVisualizationRecipeRevision(context, section),
                 .ViewportWidth =
                     static_cast<std::uint32_t>(context.CameraViewport.Width),
                 .ViewportHeight =
                     static_cast<std::uint32_t>(context.CameraViewport.Height),
                 .VisualizationCommandsAvailable =
                     context.VisualizationCommandsAvailable,
-                .VisualizationAdapterBindingsAvailable =
-                    context.VisualizationAdapterBindings.Available(),
+                .VisualizationRecipesAvailable =
+                    context.VisualizationRecipes.Available(),
             };
         }
 
@@ -10664,9 +10605,9 @@ namespace Extrinsic::Runtime
             }
             SandboxEditorVisualizationModel model{};
             model.GeometryDomainControlsAvailable = context.VisualizationCommandsAvailable;
-            model.AdapterBindingControlsAvailable =
+            model.RecipeControlsAvailable =
                 context.VisualizationCommandsAvailable &&
-                context.VisualizationAdapterBindings.Available();
+                context.VisualizationRecipes.Available();
             model.Target = target;
             if (!context.VisualizationCommandsAvailable)
             {
@@ -10719,16 +10660,12 @@ namespace Extrinsic::Runtime
 
             model.Visualization =
                 BuildVisualizationConfigModelForTarget(raw, *selected, target);
-            if (model.AdapterBindingControlsAvailable)
+            if (model.RecipeControlsAvailable)
             {
-                const std::optional<RenderExtractionCache::VisualizationAdapterBinding>
-                    binding =
-                    context.VisualizationAdapterBindings.GetBinding(model.SelectedStableId);
-                if (binding.has_value())
-                {
-                    model.AdapterBinding =
-                        FromVisualizationAdapterBinding(*binding);
-                }
+                const std::optional<VisualizationRecipe> recipe =
+                    context.VisualizationRecipes.GetRecipe(model.SelectedStableId);
+                if (recipe.has_value())
+                    model.Recipe = FromVisualizationRecipe(*recipe);
             }
             return model;
         }
@@ -11360,36 +11297,35 @@ namespace Extrinsic::Runtime
                                 *renderer, *device, services, renderExtraction, std::move(request));
                         },
                     },
-                .VisualizationAdapterBindings =
-                    SandboxEditorVisualizationAdapterBindingCommandSurface{
-                        .GetBinding =
+                .VisualizationRecipes =
+                    SandboxEditorVisualizationRecipeCommandSurface{
+                        .GetRecipe =
                             [renderExtraction](const std::uint32_t stableEntityId)
                         {
                             return renderExtraction != nullptr
-                                       ? renderExtraction->GetVisualizationAdapterBinding(
+                                       ? renderExtraction->GetVisualizationRecipe(
                                              stableEntityId)
-                                       : std::optional<
-                                             RenderExtractionCache::VisualizationAdapterBinding>{};
+                                       : std::optional<VisualizationRecipe>{};
                         },
-                        .SetBinding =
+                        .SetRecipe =
                             [renderExtraction](
                                 const std::uint32_t stableEntityId,
-                                RenderExtractionCache::VisualizationAdapterBinding binding)
+                                VisualizationRecipe recipe)
                         {
                             if (renderExtraction != nullptr)
-                                renderExtraction->SetVisualizationAdapterBinding(
-                                    stableEntityId, std::move(binding));
+                                renderExtraction->SetVisualizationRecipe(
+                                    stableEntityId, std::move(recipe));
                         },
-                        .ClearBinding =
+                        .ClearRecipe =
                             [renderExtraction](const std::uint32_t stableEntityId)
                         {
                             if (renderExtraction != nullptr)
-                                renderExtraction->ClearVisualizationAdapterBinding(stableEntityId);
+                                renderExtraction->ClearVisualizationRecipe(stableEntityId);
                         },
                     },
-                .VisualizationAdapterBindingRevision =
+                .VisualizationRecipeRevision =
                     renderExtraction != nullptr
-                        ? renderExtraction->GetVisualizationAdapterBindingRevision()
+                        ? renderExtraction->GetVisualizationRecipeRevision()
                         : 0u,
                 .AssetImportQueue   = assetImportPipeline != nullptr
                                           ? assetImportPipeline->GetAssetImportQueueSnapshot()
@@ -11570,30 +11506,24 @@ namespace Extrinsic::Runtime
                                         "attachment expired.",
                     };
                 });
-            context.VisualizationAdapterBindings.GetBinding =
+            context.VisualizationRecipes.GetRecipe =
                 GuardAttachmentCommand(
-                    std::move(
-                        context.VisualizationAdapterBindings.GetBinding),
+                    std::move(context.VisualizationRecipes.GetRecipe),
                     epoch,
                     [](const std::uint32_t)
                     {
-                        return std::optional<
-                            RenderExtractionCache::
-                                VisualizationAdapterBinding>{};
+                        return std::optional<VisualizationRecipe>{};
                     });
-            context.VisualizationAdapterBindings.SetBinding =
+            context.VisualizationRecipes.SetRecipe =
                 GuardAttachmentCommand(
-                    std::move(
-                        context.VisualizationAdapterBindings.SetBinding),
+                    std::move(context.VisualizationRecipes.SetRecipe),
                     epoch,
-                    [](const std::uint32_t,
-                       RenderExtractionCache::VisualizationAdapterBinding)
+                    [](const std::uint32_t, VisualizationRecipe)
                     {
                     });
-            context.VisualizationAdapterBindings.ClearBinding =
+            context.VisualizationRecipes.ClearRecipe =
                 GuardAttachmentCommand(
-                    std::move(
-                        context.VisualizationAdapterBindings.ClearBinding),
+                    std::move(context.VisualizationRecipes.ClearRecipe),
                     epoch,
                     [](const std::uint32_t)
                     {
@@ -12041,22 +11971,19 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
-    const char* DebugNameForSandboxEditorVisualizationAdapterBindingKind(
-        const RenderExtractionCache::VisualizationAdapterBindingKind kind) noexcept
+    const char* DebugNameForSandboxEditorVisualizationRecipeKind(
+        const VisualizationRecipeKind kind) noexcept
     {
-        using Kind = RenderExtractionCache::VisualizationAdapterBindingKind;
         switch (kind)
         {
-        case Kind::Scalar:
-            return "Scalar";
-        case Kind::Color:
-            return "Color";
-        case Kind::VectorField:
-            return "VectorField";
-        case Kind::Isoline:
-            return "Isoline";
-        case Kind::HtexMetadata:
-            return "HtexMetadata";
+        case VisualizationRecipeKind::Empty: return "Empty";
+        case VisualizationRecipeKind::Scalar: return "Scalar";
+        case VisualizationRecipeKind::Color: return "Color";
+        case VisualizationRecipeKind::Label: return "Label";
+        case VisualizationRecipeKind::VectorField: return "VectorField";
+        case VisualizationRecipeKind::Isoline: return "Isoline";
+        case VisualizationRecipeKind::HtexPreview: return "HtexPreview";
+        case VisualizationRecipeKind::FragmentBake: return "FragmentBake";
         }
         return "Unknown";
     }
@@ -13567,12 +13494,12 @@ namespace Extrinsic::Runtime
             configCommand);
     }
 
-    SandboxEditorCommandStatus ApplySandboxEditorVisualizationAdapterBindingCommand(
+    SandboxEditorCommandStatus ApplySandboxEditorVisualizationRecipeCommand(
         const SandboxEditorContext& context,
-        const SandboxEditorVisualizationAdapterBindingCommand& command)
+        const SandboxEditorVisualizationRecipeCommand& command)
     {
         if (!context.VisualizationCommandsAvailable ||
-            !context.VisualizationAdapterBindings.Available())
+            !context.VisualizationRecipes.Available())
             return SandboxEditorCommandStatus::MissingVisualizationCommands;
         if (context.Scene == nullptr)
             return SandboxEditorCommandStatus::MissingScene;
@@ -13588,27 +13515,24 @@ namespace Extrinsic::Runtime
         if (!availability.HasGeometry())
             return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
 
-        const std::optional<RenderExtractionCache::VisualizationAdapterBinding>
-            current =
-            context.VisualizationAdapterBindings.GetBinding(command.StableEntityId);
-        if (!command.EnableBinding)
+        const std::optional<VisualizationRecipe> current =
+            context.VisualizationRecipes.GetRecipe(command.StableEntityId);
+        if (!command.EnableRecipe)
         {
             if (!current.has_value())
                 return SandboxEditorCommandStatus::NoChange;
-            context.VisualizationAdapterBindings.ClearBinding(command.StableEntityId);
+            context.VisualizationRecipes.ClearRecipe(command.StableEntityId);
             InvalidateSelectedModelCache(context);
             return SandboxEditorCommandStatus::Applied;
         }
 
-        const RenderExtractionCache::VisualizationAdapterBinding next =
-            ToVisualizationAdapterBinding(command);
         if (current.has_value() &&
-            SameVisualizationAdapterBinding(*current, next))
+            SameVisualizationRecipe(*current, command.Recipe))
             return SandboxEditorCommandStatus::NoChange;
 
-        context.VisualizationAdapterBindings.SetBinding(
+        context.VisualizationRecipes.SetRecipe(
             command.StableEntityId,
-            next);
+            command.Recipe);
         InvalidateSelectedModelCache(context);
         return SandboxEditorCommandStatus::Applied;
     }

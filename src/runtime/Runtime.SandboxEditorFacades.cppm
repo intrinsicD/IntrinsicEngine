@@ -194,8 +194,8 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationDomain(
         Graphics::Components::VisualizationConfig::Domain domain) noexcept;
 
-    [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationAdapterBindingKind(
-        RenderExtractionCache::VisualizationAdapterBindingKind kind) noexcept;
+    [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationRecipeKind(
+        VisualizationRecipeKind kind) noexcept;
 
     enum class SandboxEditorVisualizationPropertyDomain : std::uint8_t
     {
@@ -2019,19 +2019,19 @@ export namespace Extrinsic::Runtime
         }
     };
 
-    struct SandboxEditorVisualizationAdapterBindingCommandSurface
+    struct SandboxEditorVisualizationRecipeCommandSurface
     {
-        std::function<std::optional<RenderExtractionCache::VisualizationAdapterBinding>(std::uint32_t)>
-            GetBinding{};
-        std::function<void(std::uint32_t, RenderExtractionCache::VisualizationAdapterBinding)>
-            SetBinding{};
-        std::function<void(std::uint32_t)> ClearBinding{};
+        std::function<std::optional<VisualizationRecipe>(std::uint32_t)>
+            GetRecipe{};
+        std::function<void(std::uint32_t, VisualizationRecipe)>
+            SetRecipe{};
+        std::function<void(std::uint32_t)> ClearRecipe{};
 
         [[nodiscard]] bool Available() const noexcept
         {
-            return static_cast<bool>(GetBinding) &&
-                   static_cast<bool>(SetBinding) &&
-                   static_cast<bool>(ClearBinding);
+            return static_cast<bool>(GetRecipe) &&
+                   static_cast<bool>(SetRecipe) &&
+                   static_cast<bool>(ClearRecipe);
         }
     };
 
@@ -2135,20 +2135,17 @@ export namespace Extrinsic::Runtime
         bool VectorFieldCandidate{false};
     };
 
-    struct SandboxEditorVisualizationAdapterBindingModel
+    struct SandboxEditorVisualizationRecipeModel
     {
-        bool HasBinding{false};
-        std::uint64_t AdapterKey{0u};
-        std::uint64_t BufferBDA{0u};
-        RenderExtractionCache::VisualizationAdapterBindingKind Kind{
-            RenderExtractionCache::VisualizationAdapterBindingKind::Scalar};
-        VisualizationAdapterOptions Options{};
+        bool HasRecipe{false};
+        VisualizationRecipeKind Kind{VisualizationRecipeKind::Empty};
+        VisualizationRecipe Recipe{};
     };
 
     struct SandboxEditorVisualizationModel
     {
         bool GeometryDomainControlsAvailable{false};
-        bool AdapterBindingControlsAvailable{false};
+        bool RecipeControlsAvailable{false};
         bool TargetAvailable{false};
         SandboxEditorVisualizationTarget Target{
             SandboxEditorVisualizationTarget::Entity};
@@ -2158,7 +2155,7 @@ export namespace Extrinsic::Runtime
             ECS::Components::GeometrySources::Domain::None};
         SandboxEditorVisualizationConfigModel Visualization{};
         std::vector<SandboxEditorVisualizationPropertyInfo> Properties{};
-        SandboxEditorVisualizationAdapterBindingModel AdapterBinding{};
+        SandboxEditorVisualizationRecipeModel Recipe{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
@@ -2280,11 +2277,11 @@ export namespace Extrinsic::Runtime
         std::uint64_t GeometryPresentationRecipeGeneration{0u};
         std::uint64_t DerivedJobStateSignature{0u};
         std::uint64_t CommandHistoryRevision{0u};
-        std::uint64_t VisualizationAdapterBindingRevision{0u};
+        std::uint64_t VisualizationRecipeRevision{0u};
         std::uint32_t ViewportWidth{0u};
         std::uint32_t ViewportHeight{0u};
         bool VisualizationCommandsAvailable{false};
-        bool VisualizationAdapterBindingsAvailable{false};
+        bool VisualizationRecipesAvailable{false};
 
         friend bool operator==(
             const SandboxEditorSelectedModelCacheKey&,
@@ -2484,8 +2481,8 @@ export namespace Extrinsic::Runtime
         SandboxEditorPrimitiveViewCommandSurface PrimitiveViewCommands{};
         SandboxEditorParameterizationUvViewCommandSurface
             ParameterizationUvViewCommands{};
-        SandboxEditorVisualizationAdapterBindingCommandSurface VisualizationAdapterBindings{};
-        std::uint64_t VisualizationAdapterBindingRevision{0u};
+        SandboxEditorVisualizationRecipeCommandSurface VisualizationRecipes{};
+        std::uint64_t VisualizationRecipeRevision{0u};
         SandboxEditorJobCommandSurface JobCommands{};
         SandboxEditorMethodResultSinks MethodResultSinks{};
         RuntimeAssetImportQueueSnapshot AssetImportQueue{};
@@ -2676,15 +2673,11 @@ export namespace Extrinsic::Runtime
         std::uint32_t IsolineCount{12u};
     };
 
-    struct SandboxEditorVisualizationAdapterBindingCommand
+    struct SandboxEditorVisualizationRecipeCommand
     {
         std::uint32_t StableEntityId{0u};
-        bool EnableBinding{true};
-        std::uint64_t AdapterKey{0u};
-        std::uint64_t BufferBDA{0u};
-        RenderExtractionCache::VisualizationAdapterBindingKind Kind{
-            RenderExtractionCache::VisualizationAdapterBindingKind::Scalar};
-        VisualizationAdapterOptions Options{};
+        bool EnableRecipe{true};
+        VisualizationRecipe Recipe{};
     };
 
     struct SandboxEditorVertexChannelBindingCommand
@@ -2963,9 +2956,9 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorVisualizationPropertyCommand& command);
 
-    SandboxEditorCommandStatus ApplySandboxEditorVisualizationAdapterBindingCommand(
+    SandboxEditorCommandStatus ApplySandboxEditorVisualizationRecipeCommand(
         const SandboxEditorContext& context,
-        const SandboxEditorVisualizationAdapterBindingCommand& command);
+        const SandboxEditorVisualizationRecipeCommand& command);
 
     SandboxEditorCommandStatus ApplySandboxEditorVertexChannelBindingCommand(
         const SandboxEditorContext& context,

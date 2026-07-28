@@ -288,36 +288,36 @@ TEST(RuntimeJobServiceEngineWiring, RunFrameAppliesSubmittedJob)
     engine.Shutdown();
 }
 
-TEST(RuntimeRenderExtraction, VisualizationAdapterBindingRevisionTracksMutations)
+TEST(RuntimeRenderExtraction, VisualizationRecipeRevisionTracksMutations)
 {
     Runtime::RenderExtractionCache cache{};
 
-    EXPECT_EQ(cache.GetVisualizationAdapterBindingRevision(), 0u);
+    EXPECT_EQ(cache.GetVisualizationRecipeRevision(), 0u);
 
-    cache.ClearVisualizationAdapterBinding(7u);
-    EXPECT_EQ(cache.GetVisualizationAdapterBindingRevision(), 0u);
+    cache.ClearVisualizationRecipe(7u);
+    EXPECT_EQ(cache.GetVisualizationRecipeRevision(), 0u);
 
-    cache.SetVisualizationAdapterBinding(
+    cache.SetVisualizationRecipe(
         7u,
-        Runtime::RenderExtractionCache::VisualizationAdapterBinding{
-            .AdapterKey = 0xA11CEu,
+        Runtime::VisualizationRecipe{.Data = Runtime::ScalarVisualizationRecipe{
+            .OutputName = "curvature",
             .BufferBDA = 0xCAFE1000u,
-        });
-    EXPECT_EQ(cache.GetVisualizationAdapterBindingRevision(), 1u);
+        }});
+    EXPECT_EQ(cache.GetVisualizationRecipeRevision(), 1u);
 
-    cache.SetVisualizationAdapterBinding(
+    cache.SetVisualizationRecipe(
         7u,
-        Runtime::RenderExtractionCache::VisualizationAdapterBinding{
-            .AdapterKey = 0xB0Bu,
+        Runtime::VisualizationRecipe{.Data = Runtime::ColorVisualizationRecipe{
+            .OutputName = "color",
             .BufferBDA = 0xCAFE2000u,
-        });
-    EXPECT_EQ(cache.GetVisualizationAdapterBindingRevision(), 2u);
+        }});
+    EXPECT_EQ(cache.GetVisualizationRecipeRevision(), 2u);
 
-    cache.ClearVisualizationAdapterBinding(9u);
-    EXPECT_EQ(cache.GetVisualizationAdapterBindingRevision(), 2u);
+    cache.ClearVisualizationRecipe(9u);
+    EXPECT_EQ(cache.GetVisualizationRecipeRevision(), 2u);
 
-    cache.ClearVisualizationAdapterBinding(7u);
-    EXPECT_EQ(cache.GetVisualizationAdapterBindingRevision(), 3u);
+    cache.ClearVisualizationRecipe(7u);
+    EXPECT_EQ(cache.GetVisualizationRecipeRevision(), 3u);
 }
 
 TEST(RuntimeSceneLifecycle, AsyncWaitAllowsCompletionBeyondLegacyFrameBudget)
@@ -412,15 +412,15 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
             .Type = G::RenderPoints::RenderType::Surfel,
             .SizeSource = 4.0f,
         });
-    extraction.SetVisualizationAdapterBinding(
+    extraction.SetVisualizationRecipe(
         stableId,
-        Runtime::RenderExtractionCache::VisualizationAdapterBinding{
-            .AdapterKey = 0x5CE11u,
+        Runtime::VisualizationRecipe{.Data = Runtime::ScalarVisualizationRecipe{
+            .OutputName = "curvature",
             .BufferBDA = 0xCAFE1000u,
-        });
-    const std::uint64_t bindingRevisionBeforeReset =
-        extraction.GetVisualizationAdapterBindingRevision();
-    EXPECT_EQ(bindingRevisionBeforeReset, 1u);
+        }});
+    const std::uint64_t recipeRevisionBeforeReset =
+        extraction.GetVisualizationRecipeRevision();
+    EXPECT_EQ(recipeRevisionBeforeReset, 1u);
     ASSERT_TRUE(scene.Raw().all_of<G::RenderEdges>(entity));
     ASSERT_TRUE(scene.Raw().all_of<G::RenderPoints>(entity));
     const G::RenderPoints& translatedPoints =
@@ -428,7 +428,7 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
     EXPECT_EQ(translatedPoints.Type, G::RenderPoints::RenderType::Surfel);
     ASSERT_TRUE(std::holds_alternative<float>(translatedPoints.SizeSource));
     EXPECT_FLOAT_EQ(std::get<float>(translatedPoints.SizeSource), 4.0f);
-    ASSERT_TRUE(extraction.GetVisualizationAdapterBinding(stableId).has_value());
+    ASSERT_TRUE(extraction.GetVisualizationRecipe(stableId).has_value());
 
     const auto reset = engine.Services().Find<Runtime::SceneDocumentModule>()->NewSceneDocument();
     ASSERT_TRUE(reset.has_value()) << static_cast<int>(reset.error());
@@ -438,9 +438,9 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
     EXPECT_FALSE(selection.HasHovered());
     EXPECT_FALSE(selection.HasPendingPick());
     EXPECT_EQ(selection.InFlightPickCount(), 0u);
-    EXPECT_FALSE(extraction.GetVisualizationAdapterBinding(stableId).has_value());
-    EXPECT_GT(extraction.GetVisualizationAdapterBindingRevision(),
-              bindingRevisionBeforeReset);
+    EXPECT_FALSE(extraction.GetVisualizationRecipe(stableId).has_value());
+    EXPECT_GT(extraction.GetVisualizationRecipeRevision(),
+              recipeRevisionBeforeReset);
 
     engine.Shutdown();
 }

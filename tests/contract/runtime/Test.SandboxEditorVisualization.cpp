@@ -1455,148 +1455,158 @@ TEST(SandboxEditorUi, VisualizationConfigCommandTargetsPointLaneOverride)
     EXPECT_FALSE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
     EXPECT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
 }
-TEST(SandboxEditorUi, VisualizationAdapterBindingCommandRoutesThroughRuntimeSurface)
+TEST(SandboxEditorUi, VisualizationRecipeCommandRoutesThroughRuntimeSurface)
 {
-    using Binding = Runtime::RenderExtractionCache::VisualizationAdapterBinding;
-    using Kind = Runtime::RenderExtractionCache::VisualizationAdapterBindingKind;
-
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "AdapterMesh");
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "RecipeMesh");
     AddTriangleMeshSource(registry, mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
     const std::uint32_t stableId =
         Runtime::SelectionController::ToStableEntityId(mesh);
 
-    std::optional<Binding> storedBinding{};
+    std::optional<Runtime::VisualizationRecipe> storedRecipe{};
     std::uint32_t storedStableId{0u};
     std::uint32_t setCount{0u};
     std::uint32_t clearCount{0u};
 
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
     context.VisualizationCommandsAvailable = true;
-    context.VisualizationAdapterBindings =
-        Runtime::SandboxEditorVisualizationAdapterBindingCommandSurface{
-            .GetBinding =
-                [&](const std::uint32_t queriedStableId) -> std::optional<Binding>
+    context.VisualizationRecipes =
+        Runtime::SandboxEditorVisualizationRecipeCommandSurface{
+            .GetRecipe =
+                [&](const std::uint32_t queriedStableId)
+                    -> std::optional<Runtime::VisualizationRecipe>
                 {
-                    if (storedBinding.has_value() &&
+                    if (storedRecipe.has_value() &&
                         storedStableId == queriedStableId)
                     {
-                        return storedBinding;
+                        return storedRecipe;
                     }
                     return std::nullopt;
                 },
-            .SetBinding =
-                [&](const std::uint32_t targetStableId, Binding binding)
+            .SetRecipe =
+                [&](const std::uint32_t targetStableId,
+                    Runtime::VisualizationRecipe recipe)
                 {
                     storedStableId = targetStableId;
-                    storedBinding = std::move(binding);
+                    storedRecipe = std::move(recipe);
                     ++setCount;
                 },
-            .ClearBinding =
+            .ClearRecipe =
                 [&](const std::uint32_t targetStableId)
                 {
                     if (storedStableId == targetStableId)
                     {
-                        storedBinding.reset();
+                        storedRecipe.reset();
                     }
                     ++clearCount;
                 },
         };
 
-    Runtime::VisualizationAdapterOptions options{};
-    options.SourceName = "velocity";
-    options.OutputName = "velocity_glyphs";
-    options.PositionBufferBDA = 0xAABB'1000u;
-    options.VectorBufferBDA = 0xAABB'2000u;
-    options.VectorScale = 2.0f;
-    options.DepthTested = false;
-
-    const Runtime::SandboxEditorVisualizationAdapterBindingCommand bindVector{
-        .StableEntityId = stableId,
-        .EnableBinding = true,
-        .AdapterKey = 0xF00Du,
-        .BufferBDA = 0xAABB'2000u,
-        .Kind = Kind::VectorField,
-        .Options = options,
+    const Runtime::VisualizationRecipe vectorRecipe{
+        .Data = Runtime::VectorFieldVisualizationRecipe{
+            .Source = Runtime::GeometryPropertyRef{
+                .Domain = Runtime::GeometryElementDomain::MeshVertex,
+                .Name = "velocity",
+                .ValueKind = Geometry::PropertyValueKind::Vec3,
+            },
+            .PositionSource = Runtime::GeometryPropertyRef{
+                .Domain = Runtime::GeometryElementDomain::MeshVertex,
+                .Name = std::string{PN::kPosition},
+                .ValueKind = Geometry::PropertyValueKind::Vec3,
+            },
+            .OutputName = "velocity_glyphs",
+            .PositionBufferBDA = 0xAABB'1000u,
+            .VectorBufferBDA = 0xAABB'2000u,
+            .Scale = 2.0f,
+            .DepthTested = false,
+        },
     };
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationAdapterBindingCommand(
+    const Runtime::SandboxEditorVisualizationRecipeCommand setVector{
+        .StableEntityId = stableId,
+        .EnableRecipe = true,
+        .Recipe = vectorRecipe,
+    };
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationRecipeCommand(
                   context,
-                  bindVector),
+                  setVector),
               Runtime::SandboxEditorCommandStatus::Applied);
-    ASSERT_TRUE(storedBinding.has_value());
+    ASSERT_TRUE(storedRecipe.has_value());
     EXPECT_EQ(storedStableId, stableId);
-    EXPECT_EQ(storedBinding->AdapterKey, 0xF00Du);
-    EXPECT_EQ(storedBinding->Kind, Kind::VectorField);
-    EXPECT_EQ(storedBinding->Options.SourceName, "velocity");
-    EXPECT_EQ(storedBinding->Options.VectorBufferBDA, 0xAABB'2000u);
-    EXPECT_FALSE(storedBinding->Options.DepthTested);
+    EXPECT_EQ(Runtime::GetVisualizationRecipeKind(*storedRecipe),
+              Runtime::VisualizationRecipeKind::VectorField);
+    const auto& storedVector =
+        std::get<Runtime::VectorFieldVisualizationRecipe>(storedRecipe->Data);
+    EXPECT_EQ(storedVector.Source.Name, "velocity");
+    EXPECT_EQ(storedVector.VectorBufferBDA, 0xAABB'2000u);
+    EXPECT_FALSE(storedVector.DepthTested);
     EXPECT_EQ(setCount, 1u);
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorVisualizationAdapterBindingKind(
-                     storedBinding->Kind),
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorVisualizationRecipeKind(
+                     Runtime::GetVisualizationRecipeKind(*storedRecipe)),
                  "VectorField");
 
     Runtime::SandboxEditorPanelFrame frame =
         Runtime::BuildSandboxEditorPanelFrame(context);
-    ASSERT_TRUE(frame.Visualization.AdapterBindingControlsAvailable);
-    ASSERT_TRUE(frame.Visualization.AdapterBinding.HasBinding);
-    EXPECT_EQ(frame.Visualization.AdapterBinding.AdapterKey, 0xF00Du);
-    EXPECT_EQ(frame.Visualization.AdapterBinding.Kind, Kind::VectorField);
-    EXPECT_EQ(frame.Visualization.AdapterBinding.Options.OutputName,
+    ASSERT_TRUE(frame.Visualization.RecipeControlsAvailable);
+    ASSERT_TRUE(frame.Visualization.Recipe.HasRecipe);
+    EXPECT_EQ(frame.Visualization.Recipe.Kind,
+              Runtime::VisualizationRecipeKind::VectorField);
+    EXPECT_EQ(std::get<Runtime::VectorFieldVisualizationRecipe>(
+                  frame.Visualization.Recipe.Recipe.Data).OutputName,
               "velocity_glyphs");
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationAdapterBindingCommand(
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationRecipeCommand(
                   context,
-                  bindVector),
+                  setVector),
               Runtime::SandboxEditorCommandStatus::NoChange);
     EXPECT_EQ(setCount, 1u);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationAdapterBindingCommand(
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationRecipeCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationAdapterBindingCommand{
+                  Runtime::SandboxEditorVisualizationRecipeCommand{
                       .StableEntityId = stableId,
-                      .EnableBinding = false,
+                      .EnableRecipe = false,
                   }),
               Runtime::SandboxEditorCommandStatus::Applied);
-    EXPECT_FALSE(storedBinding.has_value());
+    EXPECT_FALSE(storedRecipe.has_value());
     EXPECT_EQ(clearCount, 1u);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationAdapterBindingCommand(
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationRecipeCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationAdapterBindingCommand{
+                  Runtime::SandboxEditorVisualizationRecipeCommand{
                       .StableEntityId = stableId,
-                      .EnableBinding = false,
+                      .EnableRecipe = false,
                   }),
               Runtime::SandboxEditorCommandStatus::NoChange);
     EXPECT_EQ(clearCount, 1u);
 
     Runtime::SandboxEditorContext missingSurface = context;
-    missingSurface.VisualizationAdapterBindings = {};
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationAdapterBindingCommand(
+    missingSurface.VisualizationRecipes = {};
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationRecipeCommand(
                   missingSurface,
-                  bindVector),
+                  setVector),
               Runtime::SandboxEditorCommandStatus::MissingVisualizationCommands);
 
     const ECS::EntityHandle empty = MakeSelectable(registry, "NoGeometry");
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationAdapterBindingCommand(
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationRecipeCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationAdapterBindingCommand{
+                  Runtime::SandboxEditorVisualizationRecipeCommand{
                       .StableEntityId =
                           Runtime::SelectionController::ToStableEntityId(empty),
-                      .EnableBinding = true,
-                      .AdapterKey = 0xF00Du,
-                      .Kind = Kind::Scalar,
+                      .EnableRecipe = true,
+                      .Recipe = vectorRecipe,
                   }),
               Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationAdapterBindingCommand(
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationRecipeCommand(
                   context,
-                  Runtime::SandboxEditorVisualizationAdapterBindingCommand{
+                  Runtime::SandboxEditorVisualizationRecipeCommand{
                       .StableEntityId = std::numeric_limits<std::uint32_t>::max(),
-                      .EnableBinding = true,
-                      .AdapterKey = 0xF00Du,
+                      .EnableRecipe = true,
+                      .Recipe = vectorRecipe,
                   }),
               Runtime::SandboxEditorCommandStatus::StaleEntity);
 }

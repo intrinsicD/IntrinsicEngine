@@ -28,6 +28,14 @@ maturity_target: Retired
   results, and a separate typed `ScheduleVisualizationHtexRecreate` operation.
   The encoder never schedules background work. Five new recipe contracts and
   the 22 existing adapter parity contracts pass in the Clang 23 `ci` tree.
+- Slice B migrated render extraction, scene reset/revision state, and the
+  Sandbox editor facade to copied per-entity recipes. Scalar/color config is
+  translated into typed recipes, ready `GeometryPresentationRecipe` property-
+  buffer slots project directly into the same encoder, presentation state
+  suppresses duplicate config packets, and an explicit recipe takes
+  precedence over both. Focused Clang 23 coverage passes 12 extraction/
+  presentation cases plus four lifecycle/editor contracts; production source
+  scans find no adapter registration or binding call site.
 
 ## Goal
 
@@ -106,9 +114,9 @@ maturity_target: Retired
       each supported visualization and `GeometryPropertyRef` for source fields.
 - [x] Implement pure encoders returning packet batches and deterministic
       diagnostics; keep allocation/residency in the existing common owners.
-- [ ] Project recipes directly from `GeometryPresentationRecipe` during copied
+- [x] Project recipes directly from `GeometryPresentationRecipe` during copied
       runtime extraction without borrowed adapter/source pointers.
-- [ ] Migrate scalar/color/K-Means/vector/isoline/Htex/fragment-preview
+- [x] Migrate scalar/color/K-Means/vector/isoline/Htex/fragment-preview
       production paths and preserve their ranges, colormaps, budgets, stamps,
       and rejection diagnostics.
 - [x] Move Htex/atlas regeneration out of adapter encoding and onto the
@@ -124,7 +132,7 @@ maturity_target: Retired
 - [x] Pure encoder tests cover every recipe alternative, valid packets,
       malformed/missing/stale properties, deterministic diagnostics, and empty
       output.
-- [ ] Render-extraction parity tests preserve packet bytes/counts, property
+- [x] Render-extraction parity tests preserve packet bytes/counts, property
       residency requests, cache invalidation, and visualization statistics.
 - [ ] Existing Vulkan visualization smokes run through recipes.
 - [ ] Source scans prove no production registry/adapter interface or opaque
@@ -140,9 +148,9 @@ maturity_target: Retired
 
 ## Acceptance criteria
 
-- [ ] All production visualization packets originate from typed recipes and
+- [x] All production visualization packets originate from typed recipes and
       pure encoders using canonical property references.
-- [ ] No production lifetime depends on an adapter object or opaque registry
+- [x] No production lifetime depends on an adapter object or opaque registry
       key.
 - [ ] The old adapter interface, registry, wrappers, and extraction
       registration surface are deleted after parity.
