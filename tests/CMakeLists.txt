@@ -915,6 +915,7 @@ set(_graphics_contract_cpu_test_files
     Test.DebugViewContract.cpp
     Test.DebugViewPass.cpp
     Test.FrameRecipeContract.cpp
+    Test.GeometryResidency.cpp
     Test.GpuWorldCompactionContract.cpp
     Test.GpuWorldLifetimeContract.cpp
     Test.GpuWorldStoragePlanContract.cpp

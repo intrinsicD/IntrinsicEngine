@@ -22,6 +22,16 @@ maturity_target: Retired
   legitimate production consumers outside extraction. Slice B will move them
   into truthful value/function modules before deleting the packer modules;
   only topology-to-byte-plan builders become private extraction details.
+- Slice A completed on 2026-07-28. The new graphics-owned
+  `GeometryUploadPlan` is an owning copy with stable graphics-only identity,
+  generation, fixed stream formats, update class/channels, storage hint, and
+  deterministic validation diagnostics. One concrete
+  `GeometryResidencyCoordinator` composes with `GpuWorld` for unique
+  reconciliation, shared acquisition, partial update/full replacement,
+  stale rejection, reference counting, retire cancellation, frame-safe free,
+  and hard shutdown. It introduces no device, allocator, interface, factory,
+  registry, or app service. The focused target builds and all 5 coordinator
+  contracts pass; the old runtime packer/lifecycle paths remain until Slice B.
 
 ## Goal
 

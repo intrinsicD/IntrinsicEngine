@@ -20,6 +20,7 @@ target_sources(${target_name}
         Graphics.RenderFrameInput.cppm
         Graphics.RenderWorld.cppm
         Graphics.GpuTransfer.cppm
+        Graphics.GeometryResidency.cppm
         Graphics.GpuWorld.cppm
         Graphics.Material.cppm
         Graphics.MaterialSystem.cppm
@@ -63,6 +64,7 @@ target_sources(${target_name}
         Graphics.TransientDebugUploadHelper.cpp
         Graphics.VisualizationOverlayUploadHelper.cpp
         Graphics.GpuTransfer.cpp
+        Graphics.GeometryResidency.cpp
         Graphics.GpuWorld.cpp
         Graphics.MaterialSystem.cpp
         Graphics.ObjectSpaceNormalTextureBake.cpp
