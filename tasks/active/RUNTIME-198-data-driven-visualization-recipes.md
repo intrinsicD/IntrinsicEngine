@@ -6,6 +6,24 @@ maturity_target: Retired
 ---
 # RUNTIME-198 — Data-driven visualization recipes
 
+## Status
+
+- Promoted to active on 2026-07-28 after `RUNTIME-192`, `RUNTIME-193`,
+  `RUNTIME-194`, and `RUNTIME-197` retired the property, presentation, work,
+  and residency prerequisites.
+- Intake census found a 219-line exported adapter interface plus a 1,060-line
+  implementation and 1,136-line wrapper/registry contract. Production has
+  zero adapter registrations and the app submits zero opaque adapter-binding
+  commands. Render extraction only stack-constructs scalar and color adapters
+  as disguised free functions; vector, isoline, curvature-direction, and Htex
+  adapter registration are exercised by tests, while the app merely displays
+  a binding that cannot resolve without a production registration.
+- `VisualizationConfig` and `GeometryPresentationRecipe` already carry the
+  authored scalar/color/property intent. The replacement must project those
+  existing values plus an optional closed per-entity recipe directly into the
+  existing graphics packet/residency seam, not introduce another persisted
+  visualization schema or service.
+
 ## Goal
 
 - Replace the runtime visualization adapter interface/registry/opaque-key
@@ -35,6 +53,36 @@ maturity_target: Retired
 - `RUNTIME-192` supplies property identity, `RUNTIME-193` supplies desired
   presentation state, and `RUNTIME-197` supplies common property-buffer
   residency.
+
+## Right-sizing decision
+
+- **Elements:** `IVisualizationAdapter`, six concrete wrappers, the registry,
+  owned adapter map, opaque numeric keys, per-entity binding map, public
+  registration forwarding, and Sandbox facade records trigger the shallow-
+  wrapper, role-fragmentation, registry-without-extension-consumer, and
+  parallel-authoring heuristics. The numeric/range/packet algorithms and
+  graphics packet types are real and must remain.
+- **Simpler alternative:** replace object dispatch with one closed
+  `VisualizationRecipe` variant and deterministic free encoders. Each typed
+  alternative carries canonical `GeometryPropertyRef` values plus only its
+  own scalar/color/vector/isoline/atlas metadata. Extraction builds recipes
+  from existing `VisualizationConfig`/presentation state or accepts one copied
+  optional recipe value; no adapter object, key, factory, registry, or service
+  is introduced.
+- **Htex boundary:** encoding never schedules work. Preserve the existing
+  request-token behavior, if still required by a caller, as a separate typed
+  free operation composed directly with `JobService`; do not create an Htex
+  service for a single operation or claim that the current token-only job is a
+  regeneration algorithm.
+- **Blast radius:** the visualization runtime module and tests, render-
+  extraction public/private state and stats, Sandbox facade/model display,
+  runtime/graphics visualization docs and ADR, CMake/test registration, task
+  indexes, and generated module inventory. Graphics packet validation,
+  residency, renderer passes, and shader behavior are unchanged.
+- **Reintroduction trigger:** add an extension registry only when a live
+  independently deployed visualization implementation cannot be represented
+  by the closed variant. A new built-in visualization kind, editor, config,
+  test, or backend remains variant data plus a pure encoder.
 
 ## Slice plan
 
