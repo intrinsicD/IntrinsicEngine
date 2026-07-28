@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 
 import Extrinsic.Core.Error;
@@ -30,6 +31,42 @@ TEST(PropertyTextureBake, PipelineContractIsUvRasterWithoutDepthOrCulling)
     EXPECT_EQ(
         desc.PushConstantSize,
         sizeof(Graphics::PropertyTextureBakePushConstants));
+}
+
+TEST(PropertyTextureBake, DilationPipelineAndScratchMatchEncodedOutput)
+{
+    const RHI::PipelineDesc pipeline =
+        Graphics::MakePropertyTextureBakeDilationPipelineDesc(
+            "fullscreen.vert.spv",
+            "property-dilate.frag.spv",
+            RHI::Format::RGBA8_UNORM);
+    EXPECT_EQ(pipeline.VertexShaderPath, "fullscreen.vert.spv");
+    EXPECT_EQ(
+        pipeline.FragmentShaderPath,
+        "property-dilate.frag.spv");
+    EXPECT_EQ(pipeline.Rasterizer.Culling, RHI::CullMode::None);
+    EXPECT_FALSE(pipeline.DepthStencil.DepthTestEnable);
+    EXPECT_FALSE(pipeline.DepthStencil.DepthWriteEnable);
+    EXPECT_EQ(
+        pipeline.PushConstantSize,
+        sizeof(Graphics::PropertyTextureBakeDilationPushConstants));
+
+    const RHI::TextureDesc scratch =
+        Graphics::MakePropertyTextureBakeDilationScratchTextureDesc(
+            32u,
+            16u,
+            RHI::Format::RGBA8_UNORM);
+    EXPECT_EQ(scratch.Width, 32u);
+    EXPECT_EQ(scratch.Height, 16u);
+    EXPECT_EQ(scratch.Fmt, RHI::Format::RGBA8_UNORM);
+    EXPECT_NE(
+        static_cast<std::uint32_t>(scratch.Usage) &
+            static_cast<std::uint32_t>(RHI::TextureUsage::Sampled),
+        0u);
+    EXPECT_NE(
+        static_cast<std::uint32_t>(scratch.Usage) &
+            static_cast<std::uint32_t>(RHI::TextureUsage::ColorTarget),
+        0u);
 }
 
 TEST(PropertyTextureBake, InvalidResourcesFailBeforeRecordingCommands)
@@ -64,6 +101,14 @@ TEST(PropertyTextureBake, InvalidResourcesFailBeforeRecordingCommands)
     EXPECT_EQ(
         nonTriangleIndexCount.error(),
         Core::ErrorCode::InvalidArgument);
+    EXPECT_TRUE(commands.Events.empty());
+
+    desc.IndexCount = 3u;
+    desc.PaddingTexels = 1u;
+    const Core::Result rawPadding =
+        Graphics::RecordPropertyTextureBake(commands, desc);
+    ASSERT_FALSE(rawPadding.has_value());
+    EXPECT_EQ(rawPadding.error(), Core::ErrorCode::InvalidArgument);
     EXPECT_TRUE(commands.Events.empty());
 }
 
@@ -131,4 +176,65 @@ TEST(PropertyTextureBake, RecordsIndexedRasterWithExactRepresentationMetadata)
     EXPECT_EQ(push.ColormapID, desc.ColormapID);
     EXPECT_FLOAT_EQ(push.RangeMin, desc.RangeMin);
     EXPECT_FLOAT_EQ(push.RangeMax, desc.RangeMax);
+}
+
+TEST(PropertyTextureBake, RecordsEncodedPaddingThroughGenericDilation)
+{
+    Tests::MockCommandContext commands{};
+    const Graphics::PropertyTextureBakeRecordDesc desc{
+        .Pipeline = RHI::PipelineHandle{4u, 1u},
+        .OutputTexture = RHI::TextureHandle{5u, 1u},
+        .Dilation = Graphics::PropertyTextureBakeDilationResources{
+            .Pipeline = RHI::PipelineHandle{7u, 1u},
+            .ScratchTexture = RHI::TextureHandle{8u, 1u},
+        },
+        .IndexBuffer = RHI::BufferHandle{6u, 1u},
+        .TexcoordBDA = 0x1100u,
+        .PropertyBDA = 0x2200u,
+        .IndexBDA = 0x3300u,
+        .IndexCount = 3u,
+        .Width = 32u,
+        .Height = 16u,
+        .PaddingTexels = 2u,
+        .ValueKind = Graphics::PropertyTextureBakeValueKind::Vector3,
+        .Encoding = Graphics::PropertyTextureBakeEncoding::Normal,
+        .RangeMin = 0.0f,
+        .RangeMax = 1.0f,
+        .FinalLayout = RHI::TextureLayout::TransferSrc,
+    };
+
+    ASSERT_TRUE(
+        Graphics::RecordPropertyTextureBake(commands, desc).has_value());
+    ASSERT_EQ(commands.SampledTextureBindings.size(), 2u);
+    EXPECT_EQ(
+        commands.SampledTextureBindings[0].Texture,
+        desc.OutputTexture);
+    EXPECT_EQ(
+        commands.SampledTextureBindings[0].DescriptorIndex,
+        Graphics::kPropertyTextureBakeDilationOutputDescriptorSlot);
+    EXPECT_EQ(
+        commands.SampledTextureBindings[1].Texture,
+        desc.Dilation.ScratchTexture);
+    EXPECT_EQ(
+        commands.SampledTextureBindings[1].DescriptorIndex,
+        Graphics::kPropertyTextureBakeDilationScratchDescriptorSlot);
+    EXPECT_EQ(commands.DrawIndexedCalls, 1);
+    EXPECT_EQ(commands.DrawCalls, 2);
+    ASSERT_EQ(commands.PushConstantPayloads.size(), 3u);
+    EXPECT_EQ(
+        commands.PushConstantPayloads[0].size(),
+        sizeof(Graphics::PropertyTextureBakePushConstants));
+    EXPECT_EQ(
+        commands.PushConstantPayloads[1].size(),
+        sizeof(Graphics::PropertyTextureBakeDilationPushConstants));
+    EXPECT_EQ(
+        commands.PushConstantPayloads[2].size(),
+        sizeof(Graphics::PropertyTextureBakeDilationPushConstants));
+    ASSERT_FALSE(commands.TextureBarrierCalls.empty());
+    EXPECT_EQ(
+        commands.TextureBarrierCalls.back().Texture,
+        desc.OutputTexture);
+    EXPECT_EQ(
+        commands.TextureBarrierCalls.back().After,
+        RHI::TextureLayout::TransferSrc);
 }

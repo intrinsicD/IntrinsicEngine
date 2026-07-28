@@ -22,7 +22,6 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.Module;
-import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.Properties;
@@ -240,24 +239,6 @@ namespace Extrinsic::Runtime
         std::uint64_t BindingEpoch{0u};
     };
 
-    export struct TextureBakeProducerContext
-    {
-        RuntimeObjectSpaceNormalBakeQueue* Queue{};
-        WorldHandle World{};
-        std::uint64_t BindingEpoch{0u};
-        const RHI::IDevice* Device{};
-        std::weak_ptr<void> Lifetime{};
-
-        [[nodiscard]] bool IsValid() const noexcept
-        {
-            return Queue != nullptr &&
-                   World.IsValid() &&
-                   BindingEpoch != 0u &&
-                   Device != nullptr &&
-                   !Lifetime.expired();
-        }
-    };
-
     export struct TextureBakeModuleStats
     {
         std::uint64_t BakeRequests{0u};
@@ -324,8 +305,6 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool Available() const noexcept;
         [[nodiscard]] PropertyTextureBakeResult Bake(
             const PropertyTextureBakeRequest& request);
-        [[nodiscard]] TextureBakeProducerContext
-            ProducerContext() const noexcept;
         [[nodiscard]] TextureBakeModuleStats Stats() const noexcept;
         [[nodiscard]] TextureBakeSnapshot Snapshot(
             std::uint32_t stableEntityId) const;
@@ -349,7 +328,6 @@ namespace Extrinsic::Runtime
             Assets::AssetService* assets,
             EditorCommandHistory* history,
             JobService* jobs,
-            RuntimeObjectSpaceNormalBakeQueue* queue,
             RHI::IDevice* device,
             Graphics::GpuAssetCache* gpuAssets,
             Graphics::IRenderer* renderer,

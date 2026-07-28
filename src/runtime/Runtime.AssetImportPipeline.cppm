@@ -22,16 +22,15 @@ import Extrinsic.Core.IOBackend;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.GpuAssetCache;
-import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.JobService;
-import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 import Geometry.HalfedgeMesh.IO;
@@ -79,10 +78,7 @@ namespace Extrinsic::Runtime
         Graphics::GpuAssetCache* GpuAssetCache{};
         RenderExtractionCache* RenderExtraction{};
         ECS::Scene::Registry* Scene{};
-        RuntimeObjectSpaceNormalBakeQueue* ObjectSpaceNormalBakeQueue{};
-        std::uint64_t ObjectSpaceNormalBakeBindingEpoch{0u};
-        const RHI::IDevice* ObjectSpaceNormalBakeDevice{};
-        std::weak_ptr<void> ObjectSpaceNormalBakeLifetime{};
+        TextureBakeService* TextureBake{};
     };
 
     export struct RuntimePostImportProcessorDesc
@@ -226,18 +222,7 @@ namespace Extrinsic::Runtime
         ECS::Scene::Registry* Scene{};
         SelectionController* Selection{};
         EditorCommandHistory* CommandHistory{};
-        RuntimeObjectSpaceNormalBakeQueue* ObjectSpaceNormalBakeQueue{};
-        std::uint64_t ObjectSpaceNormalBakeBindingEpoch{0u};
-        std::weak_ptr<void> ObjectSpaceNormalBakeLifetime{};
-        const RHI::IDevice* Device{};
-    };
-
-    export struct RuntimeObjectSpaceNormalBakeProducerContext
-    {
-        RuntimeObjectSpaceNormalBakeQueue* Queue{};
-        std::uint64_t BindingEpoch{0u};
-        const RHI::IDevice* Device{};
-        std::weak_ptr<void> Lifetime{};
+        TextureBakeService* TextureBake{};
     };
 
     struct BorrowedBool
@@ -315,15 +300,10 @@ namespace Extrinsic::Runtime
             std::function<void(const RuntimeAssetImportRequest&)> hook);
         [[nodiscard]] RuntimeAssetImportQueueSnapshot
             GetAssetImportQueueSnapshot() const;
-        [[nodiscard]] RuntimeObjectSpaceNormalBakeProducerContext
-            GetObjectSpaceNormalBakeProducerContext() const noexcept
+        [[nodiscard]] TextureBakeService*
+            GetTextureBakeServiceForTest() const noexcept
         {
-            return RuntimeObjectSpaceNormalBakeProducerContext{
-                .Queue = m_ObjectSpaceNormalBakeQueue.get(),
-                .BindingEpoch = m_ObjectSpaceNormalBakeBindingEpoch,
-                .Device = m_Device.get(),
-                .Lifetime = m_ObjectSpaceNormalBakeLifetime,
-            };
+            return m_TextureBake.get();
         }
         [[nodiscard]] std::size_t ClearCompletedAssetImports();
         [[nodiscard]] Core::Result CancelAssetImport(
@@ -381,10 +361,7 @@ namespace Extrinsic::Runtime
         BorrowedSubsystem<ECS::Scene::Registry> m_Scene{};
         BorrowedSubsystem<SelectionController> m_SelectionController{};
         BorrowedSubsystem<EditorCommandHistory> m_EditorCommandHistory{};
-        BorrowedSubsystem<RuntimeObjectSpaceNormalBakeQueue> m_ObjectSpaceNormalBakeQueue{};
-        std::uint64_t m_ObjectSpaceNormalBakeBindingEpoch{0u};
-        std::weak_ptr<void> m_ObjectSpaceNormalBakeLifetime{};
-        BorrowedSubsystem<const RHI::IDevice> m_Device{};
+        BorrowedSubsystem<TextureBakeService> m_TextureBake{};
         RuntimeIOBackendFactory m_ModelTextureImportIOBackendFactoryForTest{};
         std::function<void(const RuntimeAssetImportRequest&)>
             m_QueuedGeometryImportBeforeDecodeHookForTest{};

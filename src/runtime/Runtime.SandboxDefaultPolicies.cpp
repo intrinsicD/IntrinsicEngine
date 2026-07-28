@@ -27,9 +27,7 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
-import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 import Extrinsic.Graphics.RenderFrameInput;
-import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Input;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetMeshNormals;
@@ -40,10 +38,10 @@ import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
+import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.IO;
@@ -125,34 +123,28 @@ namespace Extrinsic::Runtime
             cameraControllers.MarkCameraTransition(CameraControllerSlot::Main);
         }
 
-        [[nodiscard]] RuntimeObjectSpaceNormalBakeRequestBuildResult
-        BuildDirectMeshObjectSpaceNormalBakeRequest(
-            const ECS::Scene::Registry& scene,
+        [[nodiscard]] PropertyTextureBakeRequest
+        BuildDirectMeshNormalBakeRequest(
             const ECS::EntityHandle entity,
-            const WorldHandle world,
-            const std::uint64_t bindingEpoch)
+            const WorldHandle world)
         {
             namespace GS = ECS::Components::GeometrySources;
-
-            const GS::ConstSourceView view = GS::BuildConstView(scene.Raw(), entity);
-            const std::uint32_t stableId = StableEntityLookup::ToRenderId(entity);
-            Graphics::ObjectSpaceNormalTextureBakeOptions bakeOptions{};
-            bakeOptions.Width = 64u;
-            bakeOptions.Height = 64u;
-            bakeOptions.Space = Graphics::NormalTextureSpace::ObjectSpaceNormal;
-
-            return BuildRuntimeObjectSpaceNormalBakeRequest(
-                view,
-                RuntimeObjectSpaceNormalBakeTarget{
-                    .World = world,
-                    .BindingEpoch = bindingEpoch,
-                    .Entity = entity,
-                    .StableEntityId = stableId,
-                    .PresentationKey = {},
-                    .Semantic = GeometryPresentationSlotSemantic::Normal,
-                    .ExpectedRecipeGeneration = 0u,
+            return PropertyTextureBakeRequest{
+                .World = world,
+                .StableEntityId =
+                    StableEntityLookup::ToRenderId(entity),
+                .Source = GeometryPropertyRef{
+                    .Domain = GeometryElementDomain::MeshVertex,
+                    .Name = std::string{GS::PropertyNames::kNormal},
+                    .ValueKind = Geometry::PropertyValueKind::Vec3,
                 },
-                bakeOptions);
+                .Storage = PropertyTextureBakeStorage::EncodedRgba,
+                .Encoding = PropertyTextureBakeEncoding::Normal,
+                .Width = 64u,
+                .Height = 64u,
+                .PaddingTexels = 4u,
+                .OutputName = "generated-normal",
+            };
         }
 
         void MarkMeshGeometryDirty(entt::registry& raw,
@@ -230,10 +222,7 @@ namespace Extrinsic::Runtime
             JobService* jobs,
             const WorldHandle world,
             ECS::Scene::Registry& scene,
-            RuntimeObjectSpaceNormalBakeQueue* objectSpaceNormalBakeQueue,
-            const std::uint64_t objectSpaceNormalBakeBindingEpoch,
-            const RHI::IDevice* objectSpaceNormalBakeDevice,
-            std::weak_ptr<void> objectSpaceNormalBakeLifetime,
+            TextureBakeService* textureBake,
             std::string meshPath,
             const Geometry::MeshIO::MeshIOResult& meshPayload,
             const ECS::EntityHandle entity)
@@ -248,8 +237,6 @@ namespace Extrinsic::Runtime
             state->Path = std::move(meshPath);
             state->Payload = meshPayload;
             state->Entity = entity;
-            const bool guardObjectSpaceNormalBakeLifetime =
-                objectSpaceNormalBakeLifetime.use_count() != 0u;
 
             const JobToken handle = jobs->Submit(
                 JobDesc{
@@ -289,12 +276,9 @@ namespace Extrinsic::Runtime
                         [
                             state,
                             &scene,
-                            objectSpaceNormalBakeQueue,
-                            world,
-                            objectSpaceNormalBakeBindingEpoch,
-                            objectSpaceNormalBakeDevice,
-                            objectSpaceNormalBakeLifetime,
-                            guardObjectSpaceNormalBakeLifetime](
+                            textureBake,
+                            world
+                            ](
                                 KernelEventBus&,
                                 const JobResultEnvelope& envelope) -> bool
                         {
@@ -338,51 +322,53 @@ namespace Extrinsic::Runtime
                                 currentNormals);
                             MarkMeshGeometryDirty(raw, state->Entity);
 
-                            if (objectSpaceNormalBakeQueue != nullptr)
+                            if (textureBake != nullptr)
                             {
-                                const std::shared_ptr<void> producerLifetime =
-                                    guardObjectSpaceNormalBakeLifetime
-                                        ? objectSpaceNormalBakeLifetime.lock()
-                                        : std::shared_ptr<void>{};
-                                if (guardObjectSpaceNormalBakeLifetime &&
-                                    producerLifetime == nullptr)
+                                PropertyTextureBakeResult result =
+                                    textureBake->Bake(
+                                        BuildDirectMeshNormalBakeRequest(
+                                            state->Entity,
+                                            world));
+                                if (result.Succeeded())
                                 {
-                                    return true;
+                                    const TextureBakeMutationResult consumers =
+                                        textureBake->SetConsumers(
+                                            TextureBakeConsumerUpdateRequest{
+                                                .StableEntityId =
+                                                    StableEntityLookup::
+                                                        ToRenderId(
+                                                            state->Entity),
+                                                .OutputName =
+                                                    result.OutputName,
+                                                .Consumers = {
+                                                    TextureBakeConsumerBinding{
+                                                        .Semantic =
+                                                            GeometryPresentationSlotSemantic::
+                                                                Normal,
+                                                        .NormalSpace =
+                                                            PropertyTextureNormalSpace::
+                                                                Object,
+                                                    },
+                                                },
+                                            });
+                                    if (!consumers.Succeeded())
+                                    {
+                                        Core::Log::Warn(
+                                            "[Runtime] Direct mesh normal texture consumer binding failed: path='{}' diagnostic='{}'",
+                                            state->Path,
+                                            consumers.Diagnostic);
+                                    }
                                 }
-                                RuntimeObjectSpaceNormalBakeRequestBuildResult
-                                    request =
-                                    BuildDirectMeshObjectSpaceNormalBakeRequest(
-                                        scene,
-                                        state->Entity,
-                                        world,
-                                        objectSpaceNormalBakeBindingEpoch);
-                                if (!request.Succeeded())
+                                else if (result.Status !=
+                                         PropertyTextureBakeStatus::
+                                             NonOperationalBackend)
                                 {
                                     Core::Log::Warn(
-                                        "[Runtime] Direct mesh object-space normal bake request is invalid: path='{}' diagnostic='{}'",
+                                        "[Runtime] Direct mesh normal texture bake request failed: path='{}' status={} diagnostic='{}'",
                                         state->Path,
-                                        request.Diagnostic);
-                                    return true;
-                                }
-
-                                const RuntimeObjectSpaceNormalBakeResult queued =
-                                    objectSpaceNormalBakeQueue->Schedule(
-                                        *request.Request,
-                                        objectSpaceNormalBakeDevice != nullptr &&
-                                            objectSpaceNormalBakeDevice->
-                                                IsOperational());
-                                if (queued.Status !=
-                                        RuntimeObjectSpaceNormalBakeStatus::Queued &&
-                                    queued.Status !=
-                                        RuntimeObjectSpaceNormalBakeStatus::
-                                            NonOperationalBackend)
-                                {
-                                    Core::Log::Warn(
-                                        "[Runtime] Direct mesh object-space normal bake request failed: path='{}' status={} diagnostic='{}'",
-                                        state->Path,
-                                        DebugNameForRuntimeObjectSpaceNormalBakeStatus(
-                                            queued.Status),
-                                        queued.Diagnostic);
+                                        DebugNameForPropertyTextureBakeStatus(
+                                            result.Status),
+                                        result.Diagnostic);
                                 }
                             }
                             return true;
@@ -579,10 +565,7 @@ namespace Extrinsic::Runtime
                         services.Jobs,
                         services.World,
                         *services.Scene,
-                        services.ObjectSpaceNormalBakeQueue,
-                        services.ObjectSpaceNormalBakeBindingEpoch,
-                        services.ObjectSpaceNormalBakeDevice,
-                        services.ObjectSpaceNormalBakeLifetime,
+                        services.TextureBake,
                         std::string{context.Path},
                         *context.MeshPayload,
                         context.Entity);

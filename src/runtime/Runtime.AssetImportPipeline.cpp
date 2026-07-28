@@ -47,9 +47,9 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldRegistry;
 import Geometry.Graph;
 import Geometry.Graph.IO;
@@ -1042,10 +1042,7 @@ namespace Extrinsic::Runtime
             const std::span<const RuntimeImportEntityAuthoringPolicyRecord>
                 importEntityPolicies,
             const std::span<const RuntimePostImportProcessorRecord> postImportProcessors,
-            RuntimeObjectSpaceNormalBakeQueue* objectSpaceNormalBakeQueue,
-            const std::uint64_t objectSpaceNormalBakeBindingEpoch,
-            const RHI::IDevice* objectSpaceNormalBakeDevice,
-            const std::weak_ptr<void>& objectSpaceNormalBakeLifetime,
+            TextureBakeService* textureBake,
             const DecodedGeometryImport& decoded)
         {
             RuntimeImportEntityAuthoringPolicyServices authoringServices{
@@ -1058,12 +1055,7 @@ namespace Extrinsic::Runtime
                 .GpuAssetCache = &gpuAssetCache,
                 .RenderExtraction = &extraction,
                 .Scene = &scene,
-                .ObjectSpaceNormalBakeQueue = objectSpaceNormalBakeQueue,
-                .ObjectSpaceNormalBakeBindingEpoch =
-                    objectSpaceNormalBakeBindingEpoch,
-                .ObjectSpaceNormalBakeDevice = objectSpaceNormalBakeDevice,
-                .ObjectSpaceNormalBakeLifetime =
-                    objectSpaceNormalBakeLifetime,
+                .TextureBake = textureBake,
             };
 
             return std::visit(
@@ -1498,14 +1490,9 @@ namespace Extrinsic::Runtime
             BorrowedSubsystem<SelectionController>{dependencies.Selection};
         m_EditorCommandHistory =
             BorrowedSubsystem<EditorCommandHistory>{dependencies.CommandHistory};
-        m_ObjectSpaceNormalBakeQueue =
-            BorrowedSubsystem<RuntimeObjectSpaceNormalBakeQueue>{
-                dependencies.ObjectSpaceNormalBakeQueue};
-        m_ObjectSpaceNormalBakeBindingEpoch =
-            dependencies.ObjectSpaceNormalBakeBindingEpoch;
-        m_ObjectSpaceNormalBakeLifetime =
-            std::move(dependencies.ObjectSpaceNormalBakeLifetime);
-        m_Device = BorrowedSubsystem<const RHI::IDevice>{dependencies.Device};
+        m_TextureBake =
+            BorrowedSubsystem<TextureBakeService>{
+                dependencies.TextureBake};
     }
 
     bool AssetImportPipeline::IsCurrentSubmissionTarget(
@@ -2240,10 +2227,7 @@ namespace Extrinsic::Runtime
                         submissionWorld,
                         m_ImportEntityAuthoringPolicies,
                         m_PostImportProcessors,
-                        m_ObjectSpaceNormalBakeQueue.get(),
-                        m_ObjectSpaceNormalBakeBindingEpoch,
-                        m_Device.get(),
-                        m_ObjectSpaceNormalBakeLifetime,
+                        m_TextureBake.get(),
                         *state->Decoded);
                     if (materialized.has_value())
                     {
@@ -3138,10 +3122,7 @@ namespace Extrinsic::Runtime
                 m_World,
                 m_ImportEntityAuthoringPolicies,
                 m_PostImportProcessors,
-                m_ObjectSpaceNormalBakeQueue.get(),
-                m_ObjectSpaceNormalBakeBindingEpoch,
-                m_Device.get(),
-                m_ObjectSpaceNormalBakeLifetime,
+                m_TextureBake.get(),
                 *decoded);
             if (!materialized.has_value())
             {

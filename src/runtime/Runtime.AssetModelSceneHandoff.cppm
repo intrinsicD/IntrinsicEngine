@@ -19,10 +19,9 @@ import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.Renderer;
-import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.JobService;
-import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
+import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
 
 export namespace Extrinsic::Runtime
@@ -44,12 +43,12 @@ export namespace Extrinsic::Runtime
         WorldHandle World{DefaultWorldHandle};
         std::uint64_t BindingEpoch{0u};
         std::function<bool()> BindingValid{};
-        RuntimeObjectSpaceNormalBakeQueue* ObjectSpaceNormalBakeQueue{nullptr};
-        const RHI::IDevice* ObjectSpaceNormalBakeDevice{nullptr};
+        TextureBakeService* TextureBake{nullptr};
         std::string GeneratedNormalPropertyName{"v:normal"};
         std::string GeneratedAlbedoPropertyName{"v:color"};
         std::uint32_t GeneratedTextureWidth{64u};
         std::uint32_t GeneratedTextureHeight{64u};
+        std::uint32_t GeneratedTexturePaddingTexels{4u};
     };
 
     struct AssetModelSceneHandoffDiagnostics

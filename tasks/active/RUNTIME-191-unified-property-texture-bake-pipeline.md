@@ -47,6 +47,26 @@ maturity_target: Retired
   producer surfaces name this active task and their Slice C/D removal points.
   No dependency edge, CMake link, module-composition order, or allowlist entry
   changed.
+- Slice B completed on 2026-07-28: the canonical graphics recorder now owns
+  encoded-RGBA padding/dilation, including signed-vector/normal storage, and
+  the runtime registers one bounded property-texture GPU participant with
+  frame-safe scratch retirement. Asset workflow, model-scene handoff, and the
+  direct-mesh default policy submit through `TextureBakeService`; the
+  specialized queue is no longer composed or exposed through a producer
+  context. The retained specialized modules are isolated compatibility code
+  awaiting Slice D deletion.
+- Slice B verification: the focused canonical/property/import/runtime selector
+  passed 101/101. The `ci-vulkan` ASan+UBSan
+  `PropertyTextureModuleBakesRebindsRebakesAndRemovesOnVulkan` smoke passed and
+  reads one texel beyond the source triangle to prove the generic dilation
+  shader produced the padded value. The import smoke reaches canonical
+  scheduling after backend promotion but remains a Slice C parity gate because
+  its direct material binding still encounters the transitional bake-owned
+  consumer API.
+- Next implementation: Slice C moves generated-output interpretation and
+  presentation/material mutation to callers, removes every production CPU
+  fallback and the transitional consumer surface, then closes the canonical
+  import smoke before legacy deletion.
 
 ## Goal
 
@@ -213,12 +233,12 @@ maturity_target: Retired
       succeed. Transform-derived producers must advance source
       generation/dirty identity so an old world-space result cannot survive a
       transform change.
-- [ ] Extend the general graphics property-raster plan/recorder with the
+- [x] Extend the general graphics property-raster plan/recorder with the
       currently load-bearing padding/dilation and signed-vector storage
       encoding behavior,
       without normal-specific public plans, shaders, descriptor contracts, or
       Vulkan types crossing the graphics/runtime interface.
-- [ ] Consolidate scheduling, canonical content identity, GPU residency
+- [x] Consolidate scheduling, canonical content identity, GPU residency
       validation, cache generations, ready-frame publication, stale rejection,
       frame-safe retirement, generated-asset ownership, and output catalog
       lifecycle into the one `TextureBakeModule` implementation and one
@@ -229,7 +249,7 @@ maturity_target: Retired
       output is pending and preserve exact world/epoch/entity lifetime checks.
       Once a result is ready, the asset/material/presentation owner binds or
       postprocesses it through its own typed operation.
-- [ ] Remove `TextureBakeProducerContext`'s specialized queue exposure; no
+- [x] Remove `TextureBakeProducerContext`'s specialized queue exposure; no
       production interface may publish or accept
       `RuntimeObjectSpaceNormalBakeQueue*`.
 - [ ] Remove live calls to `BakeMeshAttributeTexture(...)`,

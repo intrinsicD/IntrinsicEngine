@@ -2723,6 +2723,7 @@ export namespace Extrinsic::Runtime
         float RangeMax{1.0f};
         std::uint32_t Width{64u};
         std::uint32_t Height{64u};
+        std::uint32_t PaddingTexels{0u};
         std::string GeneratedKey{};
         std::string OutputName{};
         PropertyTextureBakeStorage Storage{

@@ -776,12 +776,15 @@ TEST(RuntimeEnginePrivateGlue,
     EXPECT_NE(workflowImpl.find(
                   "import Extrinsic.Runtime.TextureBakeModule;"),
               std::string::npos);
-    EXPECT_NE(workflowImpl.find("TextureBake->ProducerContext()"),
+    EXPECT_EQ(workflowImpl.find("TextureBake->ProducerContext()"),
+              std::string::npos);
+    EXPECT_NE(workflowImpl.find(
+                  "Require<TextureBakeService>("),
               std::string::npos);
     EXPECT_NE(textureBakeInterface.find(
                   "export module Extrinsic.Runtime.TextureBakeModule;"),
               std::string::npos);
-    EXPECT_NE(textureBakeImpl.find(
+    EXPECT_EQ(textureBakeImpl.find(
                   "ObjectSpaceNormalBakeService Bake{}"),
               std::string::npos);
     EXPECT_NE(textureBakeImpl.find("Provide<TextureBakeService>"),

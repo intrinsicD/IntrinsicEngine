@@ -6064,6 +6064,8 @@ private:
             RT::PropertyTextureBakeEncoding::RgbaColor;
         command.Width = kRuntime190BakeExtent;
         command.Height = kRuntime190BakeExtent;
+        command.PaddingTexels =
+            domain == RT::GeometryElementDomain::MeshFace ? 2u : 0u;
         command.OutputName = std::move(output);
         command.Storage =
             RT::PropertyTextureBakeStorage::EncodedRgba;
@@ -6767,6 +6769,21 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
     EXPECT_GE(facePixel.G, 251u) << PixelText(facePixel);
     EXPECT_LE(facePixel.B, 4u) << PixelText(facePixel);
     EXPECT_GE(facePixel.A, 251u) << PixelText(facePixel);
+    // The reference UV triangle covers texel centers where x + y <= 31.
+    // (16, 16) is one texel beyond that rasterized diagonal and therefore
+    // proves the generic padding pass copied the neighboring face value into
+    // an otherwise alpha-zero gutter texel.
+    const RgbaPixel dilatedFacePixel = ReadPixel(
+        bakeBytes[2],
+        Extrinsic::RHI::Format::RGBA8_UNORM,
+        kRuntime190BakePixelBytes,
+        bakeExtent,
+        16u,
+        16u);
+    EXPECT_LE(dilatedFacePixel.R, 4u) << PixelText(dilatedFacePixel);
+    EXPECT_GE(dilatedFacePixel.G, 251u) << PixelText(dilatedFacePixel);
+    EXPECT_LE(dilatedFacePixel.B, 4u) << PixelText(dilatedFacePixel);
+    EXPECT_GE(dilatedFacePixel.A, 251u) << PixelText(dilatedFacePixel);
 
     std::array<std::uint32_t, 3u> edgeColorCounts{};
     for (std::uint32_t y = 0u; y < kRuntime190BakeExtent; ++y)

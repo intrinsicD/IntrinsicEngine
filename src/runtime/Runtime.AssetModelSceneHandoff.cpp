@@ -40,18 +40,15 @@ import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.MaterialSystem;
-import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 import Extrinsic.Graphics.Renderer;
-import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetMeshNormals;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
-import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.StableEntityLookup;
-import Extrinsic.Runtime.VertexChannelBindings;
+import Extrinsic.Runtime.TextureBakeModule;
 import Geometry.HalfedgeMesh.IO;
 import Geometry.Properties;
 
@@ -862,10 +859,11 @@ namespace Extrinsic::Runtime
                 const bool needsNormal =
                     options.GenerateMissingNormalTextures &&
                     !material.NormalTexture.IsValid() &&
-                    options.ObjectSpaceNormalBakeQueue == nullptr;
+                    options.TextureBake == nullptr;
                 const bool needsAlbedo =
                     options.GenerateMissingAlbedoTextures &&
                     !material.BaseColorTexture.IsValid() &&
+                    options.TextureBake == nullptr &&
                     !options.GeneratedAlbedoPropertyName.empty();
                 if (!needsNormal && !needsAlbedo)
                 {
@@ -1445,75 +1443,84 @@ namespace Extrinsic::Runtime
                 : std::string_view{options.GeneratedNormalPropertyName};
         }
 
-        [[nodiscard]] std::uint64_t
-        NextGeometryPresentationRecipeGeneration(
-            const ECS::Scene::Registry& scene,
-            const ECS::EntityHandle entity) noexcept
-        {
-            const auto* state =
-                scene.Raw().try_get<GeometryPresentationRuntimeState>(entity);
-            if (state == nullptr)
-            {
-                return 0u;
-            }
-            return state->RecipeGeneration;
-        }
-
-        [[nodiscard]] RuntimeObjectSpaceNormalBakeRequestBuildResult
-        BuildObjectSpaceNormalBakeRequest(
-            const ECS::Scene::Registry& scene,
+        [[nodiscard]] PropertyTextureBakeRequest
+        BuildGeneratedPropertyTextureBakeRequest(
             const ECS::EntityHandle entity,
-            const AssetModelSceneHandoffOptions& options)
+            const AssetModelSceneHandoffOptions& options,
+            const std::string_view propertyName,
+            const Geometry::PropertyValueKind valueKind,
+            const PropertyTextureBakeEncoding encoding,
+            std::string outputName)
         {
-            namespace GS = ECS::Components::GeometrySources;
-
-            Graphics::ObjectSpaceNormalTextureBakeOptions bakeOptions{};
-            bakeOptions.Width = options.GeneratedTextureWidth;
-            bakeOptions.Height = options.GeneratedTextureHeight;
-            bakeOptions.Space = Graphics::NormalTextureSpace::ObjectSpaceNormal;
-
-            const std::uint32_t stableId = StableEntityLookup::ToRenderId(entity);
-            const std::uint64_t expectedRecipeGeneration =
-                NextGeometryPresentationRecipeGeneration(scene, entity);
-            RuntimeObjectSpaceNormalBakeTarget target{
+            return PropertyTextureBakeRequest{
                 .World = options.World,
-                .BindingEpoch = options.BindingEpoch,
-                .Entity = entity,
-                .StableEntityId = stableId,
-                .PresentationKey =
-                    expectedRecipeGeneration != 0u
-                        ? std::string{"mesh.surface"}
-                        : std::string{},
-                .Semantic = GeometryPresentationSlotSemantic::Normal,
-                .ExpectedRecipeGeneration =
-                    expectedRecipeGeneration,
-            };
-
-            VertexChannelBindingSet channelBindings{};
-            const std::string_view normalProperty =
-                NormalBakePropertyName(options);
-            const VertexChannelBindingSet* channelBindingsPtr = nullptr;
-            if (normalProperty != GS::PropertyNames::kNormal)
-            {
-                channelBindings.Normal.Enabled = true;
-                channelBindings.Normal.Property = GeometryPropertyRef{
+                .StableEntityId =
+                    StableEntityLookup::ToRenderId(entity),
+                .Source = GeometryPropertyRef{
                     .Domain = GeometryElementDomain::MeshVertex,
-                    .Name = std::string{normalProperty},
-                    .ValueKind = Geometry::PropertyValueKind::Vec3,
-                };
-                channelBindingsPtr = &channelBindings;
-            }
-
-            return BuildRuntimeObjectSpaceNormalBakeRequest(
-                GS::BuildConstView(scene.Raw(), entity),
-                std::move(target),
-                bakeOptions,
-                channelBindingsPtr);
+                    .Name = std::string{propertyName},
+                    .ValueKind = valueKind,
+                },
+                .Storage = PropertyTextureBakeStorage::EncodedRgba,
+                .Encoding = encoding,
+                .Width = options.GeneratedTextureWidth,
+                .Height = options.GeneratedTextureHeight,
+                .PaddingTexels =
+                    options.GeneratedTexturePaddingTexels,
+                .OutputName = std::move(outputName),
+            };
         }
 
-        void RecordProgressiveNormalBakeDiagnostic(
+        [[nodiscard]] PropertyTextureBakeResult
+        ScheduleGeneratedPropertyTextureBake(
+            TextureBakeService& textureBake,
+            const ECS::EntityHandle entity,
+            const AssetModelSceneHandoffOptions& options,
+            const std::string_view propertyName,
+            const Geometry::PropertyValueKind valueKind,
+            const PropertyTextureBakeEncoding encoding,
+            const GeometryPresentationSlotSemantic semantic,
+            std::string outputName)
+        {
+            PropertyTextureBakeResult result = textureBake.Bake(
+                BuildGeneratedPropertyTextureBakeRequest(
+                    entity,
+                    options,
+                    propertyName,
+                    valueKind,
+                    encoding,
+                    std::move(outputName)));
+            if (!result.Succeeded())
+                return result;
+
+            const TextureBakeMutationResult consumers =
+                textureBake.SetConsumers(
+                    TextureBakeConsumerUpdateRequest{
+                        .StableEntityId =
+                            StableEntityLookup::ToRenderId(entity),
+                        .OutputName = result.OutputName,
+                        .Consumers = {
+                            TextureBakeConsumerBinding{
+                                .PresentationKey = "mesh.surface",
+                                .Semantic = semantic,
+                                .NormalSpace =
+                                    PropertyTextureNormalSpace::Object,
+                            },
+                        },
+                    });
+            if (!consumers.Succeeded())
+            {
+                result.Diagnostic +=
+                    "; consumer binding failed: " +
+                    consumers.Diagnostic;
+            }
+            return result;
+        }
+
+        void RecordProgressiveTextureBakeDiagnostic(
             ECS::Scene::Registry& scene,
             const ECS::EntityHandle entity,
+            const GeometryPresentationSlotSemantic semantic,
             std::string diagnostic)
         {
             auto* bindings =
@@ -1531,7 +1538,7 @@ namespace Extrinsic::Runtime
             }
 
             GeometryPresentationSlotRecipe* slot =
-                FindGeometryPresentationSlot(*presentation, GeometryPresentationSlotSemantic::Normal);
+                FindGeometryPresentationSlot(*presentation, semantic);
             if (slot == nullptr ||
                 slot->SourceKind != GeometryPresentationSourceKind::PropertyBake)
             {
@@ -1546,12 +1553,12 @@ namespace Extrinsic::Runtime
                 FindGeometryPresentationSlotStatus(
                     *state,
                     "mesh.surface",
-                    GeometryPresentationSlotSemantic::Normal);
+                    semantic);
             if (status == nullptr)
             {
                 state->Slots.push_back(GeometryPresentationSlotStatus{
                     .PresentationKey = "mesh.surface",
-                    .Semantic = GeometryPresentationSlotSemantic::Normal,
+                    .Semantic = semantic,
                 });
                 status = &state->Slots.back();
             }
@@ -1698,7 +1705,7 @@ namespace Extrinsic::Runtime
             AssetModelSceneHandoffDiagnostics* diagnostics)
         {
             const bool hasProgressiveJobs = options.ProgressiveJobs != nullptr;
-            if (!hasProgressiveJobs && options.ObjectSpaceNormalBakeQueue == nullptr)
+            if (!hasProgressiveJobs && options.TextureBake == nullptr)
             {
                 return;
             }
@@ -1756,12 +1763,12 @@ namespace Extrinsic::Runtime
 
             const bool materialHasAuthoredNormal =
                 material != nullptr && material->NormalTexture.IsValid();
-            const bool useRuntimeObjectSpaceNormalBakeQueue =
+            const bool useTextureBake =
                 material != nullptr &&
                 !materialHasAuthoredNormal &&
                 options.GenerateMissingNormalTextures &&
-                options.ObjectSpaceNormalBakeQueue != nullptr;
-            if (useRuntimeObjectSpaceNormalBakeQueue)
+                options.TextureBake != nullptr;
+            if (useTextureBake)
             {
                 if (hasProgressiveJobs)
                 {
@@ -1788,13 +1795,13 @@ namespace Extrinsic::Runtime
                         return JobResultEnvelope::Make<ProgressiveEnrichmentResult>(
                             ProgressiveEnrichmentResult{
                                 .PayloadToken = 0u,
-                                .Diagnostic = "object-space normal GPU bake request dependencies ready",
+                                .Diagnostic = "property texture bake request dependencies ready",
                             });
                     };
                     schedule.PublishCompletion =
                         [&scene,
                          entity,
-                         queue = options.ObjectSpaceNormalBakeQueue,
+                         textureBake = options.TextureBake,
                          requestOptions = options](
                             KernelEventBus&,
                             const JobResultEnvelope&) mutable -> bool
@@ -1804,30 +1811,20 @@ namespace Extrinsic::Runtime
                             return false;
                         }
 
-                        RuntimeObjectSpaceNormalBakeRequestBuildResult build =
-                            BuildObjectSpaceNormalBakeRequest(
-                                scene,
+                        PropertyTextureBakeResult result =
+                            ScheduleGeneratedPropertyTextureBake(
+                                *textureBake,
                                 entity,
-                                requestOptions);
-                        if (!build.Succeeded())
-                        {
-                            RecordProgressiveNormalBakeDiagnostic(
-                                scene,
-                                entity,
-                                std::move(build.Diagnostic));
-                            return true;
-                        }
-
-                        RuntimeObjectSpaceNormalBakeResult result =
-                            queue->Schedule(
-                                *build.Request,
-                                requestOptions.ObjectSpaceNormalBakeDevice !=
-                                        nullptr &&
-                                    requestOptions.ObjectSpaceNormalBakeDevice->
-                                        IsOperational());
-                        RecordProgressiveNormalBakeDiagnostic(
+                                requestOptions,
+                                NormalBakePropertyName(requestOptions),
+                                Geometry::PropertyValueKind::Vec3,
+                                PropertyTextureBakeEncoding::Normal,
+                                GeometryPresentationSlotSemantic::Normal,
+                                "generated-normal");
+                        RecordProgressiveTextureBakeDiagnostic(
                             scene,
                             entity,
+                            GeometryPresentationSlotSemantic::Normal,
                             std::move(result.Diagnostic));
                         return true;
                     };
@@ -1840,41 +1837,34 @@ namespace Extrinsic::Runtime
                 else if (MeshHasVertexTexcoords(primitive.Mesh) &&
                          MeshHasVertexProperty(primitive.Mesh, NormalBakePropertyName(options)))
                 {
-                    RuntimeObjectSpaceNormalBakeRequestBuildResult build =
-                        BuildObjectSpaceNormalBakeRequest(
-                            scene,
+                    PropertyTextureBakeResult result =
+                        ScheduleGeneratedPropertyTextureBake(
+                            *options.TextureBake,
                             entity,
-                            options);
-                    if (!build.Succeeded())
-                    {
-                        RecordProgressiveNormalBakeDiagnostic(
-                            scene,
-                            entity,
-                            std::move(build.Diagnostic));
-                        return;
-                    }
-                    RuntimeObjectSpaceNormalBakeResult result =
-                        options.ObjectSpaceNormalBakeQueue->Schedule(
-                            *build.Request,
-                            options.ObjectSpaceNormalBakeDevice != nullptr &&
-                                options.ObjectSpaceNormalBakeDevice->
-                                    IsOperational());
-                    RecordProgressiveNormalBakeDiagnostic(
+                            options,
+                            NormalBakePropertyName(options),
+                            Geometry::PropertyValueKind::Vec3,
+                            PropertyTextureBakeEncoding::Normal,
+                            GeometryPresentationSlotSemantic::Normal,
+                            "generated-normal");
+                    RecordProgressiveTextureBakeDiagnostic(
                         scene,
                         entity,
+                        GeometryPresentationSlotSemantic::Normal,
                         std::move(result.Diagnostic));
                     if (diagnostics != nullptr &&
-                        result.Status == RuntimeObjectSpaceNormalBakeStatus::Queued)
+                        result.Succeeded())
                     {
                         ++diagnostics->ProgressiveTextureBakeJobsQueued;
                     }
                 }
                 else
                 {
-                    RecordProgressiveNormalBakeDiagnostic(
+                    RecordProgressiveTextureBakeDiagnostic(
                         scene,
                         entity,
-                        "waiting for resolved UVs and vertex normals before object-space normal GPU bake request");
+                        GeometryPresentationSlotSemantic::Normal,
+                        "waiting for resolved UVs and vertex normals before property texture bake request");
                 }
             }
             else if (hasProgressiveJobs)
@@ -1932,10 +1922,97 @@ namespace Extrinsic::Runtime
 
             const bool materialHasAuthoredAlbedo =
                 material != nullptr && material->BaseColorTexture.IsValid();
-            if (hasProgressiveJobs &&
+            const bool wantsGeneratedAlbedo =
                 options.GenerateMissingAlbedoTextures &&
                 !materialHasAuthoredAlbedo &&
-                MeshHasVertexProperty(primitive.Mesh, options.GeneratedAlbedoPropertyName))
+                MeshHasVertexProperty(
+                    primitive.Mesh,
+                    options.GeneratedAlbedoPropertyName);
+            if (options.TextureBake != nullptr &&
+                wantsGeneratedAlbedo &&
+                hasProgressiveJobs)
+            {
+                JobDesc albedoBake{};
+                albedoBake.DebugName =
+                    "schedule albedo GPU bake request";
+                albedoBake.Scope = options.World;
+                albedoBake.Kind = RuntimeTaskKinds::GeometryProcess;
+                if (uvJob.IsValid())
+                {
+                    albedoBake.DependsOn.push_back(JobDependency{
+                        .Job = uvJob,
+                        .Reason = "uv atlas ready",
+                    });
+                }
+                albedoBake.Work = [](const JobCancellation&) -> JobResultEnvelope
+                {
+                    return JobResultEnvelope::Make<ProgressiveEnrichmentResult>(
+                        ProgressiveEnrichmentResult{
+                            .Diagnostic =
+                                "property texture bake request dependencies ready",
+                        });
+                };
+                albedoBake.PublishCompletion =
+                    [&scene,
+                     entity,
+                     textureBake = options.TextureBake,
+                     requestOptions = options](
+                        KernelEventBus&,
+                        const JobResultEnvelope&) mutable -> bool
+                {
+                    if (!scene.IsValid(entity))
+                    {
+                        return false;
+                    }
+
+                    PropertyTextureBakeResult result =
+                        ScheduleGeneratedPropertyTextureBake(
+                            *textureBake,
+                            entity,
+                            requestOptions,
+                            requestOptions.GeneratedAlbedoPropertyName,
+                            Geometry::PropertyValueKind::Unknown,
+                            PropertyTextureBakeEncoding::RgbaColor,
+                            GeometryPresentationSlotSemantic::Albedo,
+                            "generated-albedo");
+                    RecordProgressiveTextureBakeDiagnostic(
+                        scene,
+                        entity,
+                        GeometryPresentationSlotSemantic::Albedo,
+                        std::move(result.Diagnostic));
+                    return true;
+                };
+                (void)options.ProgressiveJobs->Submit(std::move(albedoBake));
+                if (diagnostics != nullptr)
+                {
+                    ++diagnostics->ProgressiveTextureBakeJobsQueued;
+                }
+            }
+            else if (options.TextureBake != nullptr &&
+                     wantsGeneratedAlbedo &&
+                     MeshHasVertexTexcoords(primitive.Mesh))
+            {
+                PropertyTextureBakeResult result =
+                    ScheduleGeneratedPropertyTextureBake(
+                        *options.TextureBake,
+                        entity,
+                        options,
+                        options.GeneratedAlbedoPropertyName,
+                        Geometry::PropertyValueKind::Unknown,
+                        PropertyTextureBakeEncoding::RgbaColor,
+                        GeometryPresentationSlotSemantic::Albedo,
+                        "generated-albedo");
+                RecordProgressiveTextureBakeDiagnostic(
+                    scene,
+                    entity,
+                    GeometryPresentationSlotSemantic::Albedo,
+                    std::move(result.Diagnostic));
+                if (diagnostics != nullptr && result.Succeeded())
+                {
+                    ++diagnostics->ProgressiveTextureBakeJobsQueued;
+                }
+            }
+            else if (hasProgressiveJobs && wantsGeneratedAlbedo)
             {
                 JobDesc albedoBake{};
                 albedoBake.DebugName = "bake albedo texture";
@@ -2238,7 +2315,7 @@ namespace Extrinsic::Runtime
                                                 options,
                                                 diagnostics);
             }
-            else if (options.ObjectSpaceNormalBakeQueue != nullptr)
+            else if (options.TextureBake != nullptr)
             {
                 QueueProgressiveEnrichmentJobs(scene,
                                                 entity,

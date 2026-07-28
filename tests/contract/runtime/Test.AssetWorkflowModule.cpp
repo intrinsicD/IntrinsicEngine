@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <memory>
 #include <span>
 #include <string>
@@ -29,12 +30,12 @@ import Extrinsic.Core.FrameLoop;
 import Extrinsic.Core.Tasks;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
+import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.GpuWorld;
-import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
@@ -48,7 +49,6 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
-import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneDocumentModule;
@@ -58,6 +58,7 @@ import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
+import Geometry.Properties;
 
 #include "MockRHI.hpp"
 
@@ -665,62 +666,115 @@ namespace
         return entity;
     }
 
-    [[nodiscard]] Runtime::RuntimeObjectSpaceNormalBakeRequest
+    [[nodiscard]] ECS::EntityHandle MakeTextureBakeMesh(
+        ECS::Scene::Registry& scene)
+    {
+        namespace GS = ECS::Components::GeometrySources;
+        constexpr std::uint32_t invalidIndex =
+            std::numeric_limits<std::uint32_t>::max();
+
+        const ECS::EntityHandle entity = scene.Create();
+        auto& raw = scene.Raw();
+        auto& vertices = raw.emplace<GS::Vertices>(entity);
+        vertices.Properties.Resize(3u);
+        vertices.Properties
+            .GetOrAdd<glm::vec3>(
+                std::string{GS::PropertyNames::kPosition},
+                glm::vec3{0.0f})
+            .Vector() = {
+                {0.0f, 0.0f, 0.0f},
+                {1.0f, 0.0f, 0.0f},
+                {0.0f, 1.0f, 0.0f},
+            };
+        vertices.Properties
+            .GetOrAdd<glm::vec2>("v:texcoord", glm::vec2{0.0f})
+            .Vector() = {
+                {0.0f, 0.0f},
+                {1.0f, 0.0f},
+                {0.0f, 1.0f},
+            };
+        vertices.Properties
+            .GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f})
+            .Vector() = {
+                {0.0f, 0.0f, 1.0f},
+                {0.0f, 0.0f, 1.0f},
+                {0.0f, 0.0f, 1.0f},
+            };
+
+        auto& edges = raw.emplace<GS::Edges>(entity);
+        edges.Properties.Resize(3u);
+        edges.Properties
+            .GetOrAdd<std::uint32_t>(
+                std::string{GS::PropertyNames::kEdgeV0},
+                invalidIndex)
+            .Vector() = {0u, 1u, 2u};
+        edges.Properties
+            .GetOrAdd<std::uint32_t>(
+                std::string{GS::PropertyNames::kEdgeV1},
+                invalidIndex)
+            .Vector() = {1u, 2u, 0u};
+
+        auto& halfedges = raw.emplace<GS::Halfedges>(entity);
+        halfedges.Properties.Resize(6u);
+        halfedges.Properties
+            .GetOrAdd<std::uint32_t>(
+                std::string{GS::PropertyNames::kHalfedgeToVertex},
+                invalidIndex)
+            .Vector() = {1u, 2u, 0u, 0u, 2u, 1u};
+        halfedges.Properties
+            .GetOrAdd<std::uint32_t>(
+                std::string{GS::PropertyNames::kHalfedgeNext},
+                invalidIndex)
+            .Vector() = {1u, 2u, 0u, 5u, 3u, 4u};
+        halfedges.Properties
+            .GetOrAdd<std::uint32_t>(
+                std::string{GS::PropertyNames::kHalfedgeFace},
+                invalidIndex)
+            .Vector() = {
+                0u,
+                0u,
+                0u,
+                invalidIndex,
+                invalidIndex,
+                invalidIndex,
+            };
+
+        auto& faces = raw.emplace<GS::Faces>(entity);
+        faces.Properties.Resize(1u);
+        faces.Properties
+            .GetOrAdd<std::uint32_t>(
+                std::string{GS::PropertyNames::kFaceHalfedge},
+                invalidIndex)
+            .Vector() = {0u};
+        return entity;
+    }
+
+    [[nodiscard]] Runtime::PropertyTextureBakeRequest
     MakeBakeRequest(
         const std::uint64_t key,
         const Runtime::WorldHandle world,
-        const std::uint64_t bindingEpoch,
         const ECS::EntityHandle entity)
     {
-        const std::array<float, 9u> positions{
-            0.0f, 0.0f, 0.0f,
-            1.0f, 0.0f, 0.0f,
-            0.0f, static_cast<float>(key), 0.0f,
-        };
-        const std::array<std::uint32_t, 3u> indices{0u, 1u, 2u};
-        const std::array<float, 6u> texcoords{
-            0.0f, 0.0f,
-            1.0f, 0.0f,
-            0.0f, 1.0f,
-        };
-        const std::array<float, 9u> normals{
-            0.0f, 0.0f, 1.0f,
-            0.0f, 0.0f, 1.0f,
-            0.0f, 0.0f, 1.0f,
-        };
-        const auto identity =
-            Runtime::BuildRuntimeObjectSpaceNormalBakeIdentity(
-                Runtime::RuntimeObjectSpaceNormalBakeIdentityInput{
-                    .PackedPositionBytes =
-                        std::as_bytes(std::span{positions}),
-                    .SurfaceIndexBytes =
-                        std::as_bytes(std::span{indices}),
-                    .ResolvedTexcoordBytes =
-                        std::as_bytes(std::span{texcoords}),
-                    .ResolvedNormalBytes =
-                        std::as_bytes(std::span{normals}),
-                    .VertexCount = 3u,
-                    .SurfaceIndexCount = 3u,
-                    .Options =
-                        Graphics::ObjectSpaceNormalTextureBakeOptions{
-                            .Width = 64u,
-                            .Height = 64u,
-                            .PaddingTexels = 2u,
-                        },
-                });
-        EXPECT_TRUE(identity.Succeeded());
-        return Runtime::RuntimeObjectSpaceNormalBakeRequest{
-            .Identity = identity.Identity,
-            .Target =
-                Runtime::RuntimeObjectSpaceNormalBakeTarget{
-                    .World = world,
-                    .BindingEpoch = bindingEpoch,
-                    .Entity = entity,
-                    .StableEntityId =
-                        Runtime::StableEntityLookup::ToRenderId(entity),
-                    .Semantic =
-                        Runtime::GeometryPresentationSlotSemantic::Normal,
-                },
+        return Runtime::PropertyTextureBakeRequest{
+            .World = world,
+            .StableEntityId =
+                Runtime::StableEntityLookup::ToRenderId(entity),
+            .Source = Runtime::GeometryPropertyRef{
+                .Domain =
+                    Runtime::GeometryElementDomain::MeshVertex,
+                .Name = "v:normal",
+                .ValueKind =
+                    Geometry::PropertyValueKind::Vec3,
+            },
+            .Storage =
+                Runtime::PropertyTextureBakeStorage::EncodedRgba,
+            .Encoding =
+                Runtime::PropertyTextureBakeEncoding::Normal,
+            .Width = 64u,
+            .Height = 64u,
+            .PaddingTexels = 2u,
+            .OutputName =
+                "runtime-test-normal-" + std::to_string(key),
         };
     }
 }
@@ -1026,6 +1080,9 @@ TEST(AssetWorkflowModule,
     ASSERT_TRUE(
         harness.Asset.OnRegister(setup).has_value());
     harness.AssetRegistered = true;
+    ASSERT_TRUE(
+        harness.TextureBake.OnRegister(setup).has_value());
+    harness.TextureBakeRegistered = true;
 
     auto conflict =
         harness.Document.RegisterReplacementParticipant(
@@ -1107,12 +1164,9 @@ TEST(AssetWorkflowModule,
     TempSceneFile invalidScene{
         "runtime183-binding-invalid.scene.json", "not json"};
 
-    Runtime::RuntimeObjectSpaceNormalBakeQueue* bakeQueue =
-        nullptr;
+    Runtime::TextureBakeService* postImportTextureBake = nullptr;
     Runtime::WorldHandle bakeWorld{};
-    std::uint64_t bakeBindingEpoch = 0u;
-    const RHI::IDevice* bakeDevice = nullptr;
-    const auto queueProbe =
+    const auto serviceProbe =
         pipeline->RegisterPostImportProcessor(
             Runtime::RuntimePostImportProcessorDesc{
                 .DebugName =
@@ -1120,10 +1174,8 @@ TEST(AssetWorkflowModule,
                 .PayloadKind =
                     Assets::AssetPayloadKind::Mesh,
                 .Process =
-                    [&bakeQueue,
-                     &bakeWorld,
-                     &bakeBindingEpoch,
-                     &bakeDevice](
+                    [&postImportTextureBake,
+                     &bakeWorld](
                         const Runtime::
                             RuntimePostImportProcessorContext&,
                         Runtime::
@@ -1131,26 +1183,24 @@ TEST(AssetWorkflowModule,
                                 services)
                         -> Core::Result
                     {
-                        bakeQueue =
-                            services.ObjectSpaceNormalBakeQueue;
+                        postImportTextureBake =
+                            services.TextureBake;
                         bakeWorld = services.World;
-                        bakeBindingEpoch =
-                            services.ObjectSpaceNormalBakeBindingEpoch;
-                        bakeDevice =
-                            services.ObjectSpaceNormalBakeDevice;
-                        return bakeQueue != nullptr
+                        return postImportTextureBake != nullptr
                             ? Core::Ok()
                             : Core::Err(
                                   Core::ErrorCode::
                                       InvalidState);
                     },
             });
-    ASSERT_TRUE(queueProbe.IsValid());
+    ASSERT_TRUE(serviceProbe.IsValid());
 
     auto* const initialScene =
         harness.Worlds.Get(harness.InitialWorld);
     ASSERT_NE(initialScene, nullptr);
     ECS::EntityHandle expectedOutgoing =
+        ECS::InvalidEntityHandle;
+    ECS::EntityHandle expectedBakeEntity =
         ECS::InvalidEntityHandle;
     std::string afterReplacementPath{};
     std::vector<Runtime::SceneReplacementKind> beforeKinds;
@@ -1179,8 +1229,12 @@ TEST(AssetWorkflowModule,
                                 .GetTrackedRenderableCount() ==
                             0u);
                         beforeSawBakeCleared.push_back(
-                            bakeQueue != nullptr &&
-                            bakeQueue->PendingCount() == 0u);
+                            textureBake
+                                ->Snapshot(
+                                    Runtime::StableEntityLookup::
+                                        ToRenderId(
+                                            expectedBakeEntity))
+                                .Textures.empty());
                     },
                 .AfterReplace =
                     [&](const Runtime::
@@ -1224,18 +1278,22 @@ TEST(AssetWorkflowModule,
                 harness.Extraction
                     .GetTrackedRenderableCount(),
                 0u);
-            ASSERT_NE(bakeQueue, nullptr);
+            expectedBakeEntity =
+                MakeTextureBakeMesh(*initialScene);
             const auto scheduled =
-                bakeQueue->Schedule(
+                textureBake->Bake(
                     MakeBakeRequest(
                         ++bakeKey,
                         bakeWorld,
-                        bakeBindingEpoch,
-                        expectedOutgoing),
-                    bakeDevice != nullptr &&
-                        bakeDevice->IsOperational());
+                        expectedBakeEntity));
             ASSERT_TRUE(scheduled.Succeeded());
-            ASSERT_EQ(bakeQueue->PendingCount(), 1u);
+            ASSERT_EQ(
+                textureBake
+                    ->Snapshot(
+                        Runtime::StableEntityLookup::
+                            ToRenderId(expectedBakeEntity))
+                    .Textures.size(),
+                1u);
             ASSERT_TRUE(
                 initialScene->IsValid(expectedOutgoing));
         };
@@ -1248,6 +1306,7 @@ TEST(AssetWorkflowModule,
     ASSERT_TRUE(first.has_value())
         << static_cast<int>(first.error());
     ASSERT_GT(EntityCount(*initialScene), 0u);
+    ASSERT_EQ(postImportTextureBake, textureBake);
 
     prepareReplacement();
     afterReplacementPath = afterNewMesh.Path.string();
@@ -1294,6 +1353,8 @@ TEST(AssetWorkflowModule,
 
     expectedOutgoing =
         MakeProceduralRenderable(*initialScene);
+    expectedBakeEntity =
+        MakeTextureBakeMesh(*initialScene);
     const auto trackedBeforeInvalid =
         harness.Extraction.ExtractAndSubmit(
             *initialScene, *harness.Renderer, cache);
@@ -1304,16 +1365,19 @@ TEST(AssetWorkflowModule,
         harness.Extraction.GetTrackedRenderableCount(),
         0u);
     const auto pendingBeforeInvalid =
-        bakeQueue->Schedule(
+        textureBake->Bake(
             MakeBakeRequest(
                 ++bakeKey,
                 bakeWorld,
-                bakeBindingEpoch,
-                expectedOutgoing),
-            bakeDevice != nullptr &&
-                bakeDevice->IsOperational());
+                expectedBakeEntity));
     ASSERT_TRUE(pendingBeforeInvalid.Succeeded());
-    ASSERT_EQ(bakeQueue->PendingCount(), 1u);
+    ASSERT_EQ(
+        textureBake
+            ->Snapshot(
+                Runtime::StableEntityLookup::
+                    ToRenderId(expectedBakeEntity))
+            .Textures.size(),
+        1u);
     ASSERT_TRUE(initialScene->IsValid(expectedOutgoing));
     const std::size_t callbackCountBeforeInvalid =
         beforeKinds.size();
@@ -1331,7 +1395,13 @@ TEST(AssetWorkflowModule,
     EXPECT_GT(
         harness.Extraction.GetTrackedRenderableCount(),
         0u);
-    EXPECT_EQ(bakeQueue->PendingCount(), 1u);
+    EXPECT_EQ(
+        textureBake
+            ->Snapshot(
+                Runtime::StableEntityLookup::
+                    ToRenderId(expectedBakeEntity))
+            .Textures.size(),
+        1u);
 
     auto afterInvalidLoad = pipeline->ImportAssetFromPath(
         Runtime::RuntimeAssetImportRequest{
@@ -1404,10 +1474,12 @@ TEST(AssetWorkflowModule,
                 },
             },
         });
-    const Runtime::TextureBakeProducerContext initialProducer =
-        textureBake->ProducerContext();
-    ASSERT_EQ(initialProducer.World, harness.InitialWorld);
-    ASSERT_FALSE(initialProducer.Lifetime.expired());
+    ASSERT_EQ(
+        pipeline->GetTextureBakeServiceForTest(),
+        textureBake);
+    ASSERT_TRUE(textureBake->Available());
+    const std::uint64_t initialBindingChanges =
+        textureBake->Stats().BindingChanges;
 
     const Runtime::WorldHandle away =
         harness.Worlds.CreateWorld("Away");
@@ -1444,12 +1516,13 @@ TEST(AssetWorkflowModule,
     EXPECT_GT(EntityCount(*awayScene), 0u);
 
     (void)harness.Events.Pump();
-    const Runtime::TextureBakeProducerContext awayProducer =
-        textureBake->ProducerContext();
-    EXPECT_EQ(awayProducer.World, away);
-    EXPECT_NE(awayProducer.BindingEpoch, initialProducer.BindingEpoch);
-    EXPECT_TRUE(initialProducer.Lifetime.expired());
-    EXPECT_FALSE(awayProducer.Lifetime.expired());
+    EXPECT_EQ(
+        pipeline->GetTextureBakeServiceForTest(),
+        textureBake);
+    EXPECT_TRUE(textureBake->Available());
+    const std::uint64_t awayBindingChanges =
+        textureBake->Stats().BindingChanges;
+    EXPECT_GT(awayBindingChanges, initialBindingChanges);
     EXPECT_TRUE(assets->IsAlive(*retainedTexture));
 
     ASSERT_TRUE(
@@ -1460,12 +1533,13 @@ TEST(AssetWorkflowModule,
             .AppliedActiveWorldChanges,
         1u);
     (void)harness.Events.Pump();
-    const Runtime::TextureBakeProducerContext restoredProducer =
-        textureBake->ProducerContext();
-    EXPECT_EQ(restoredProducer.World, harness.InitialWorld);
-    EXPECT_NE(restoredProducer.BindingEpoch, awayProducer.BindingEpoch);
-    EXPECT_TRUE(awayProducer.Lifetime.expired());
-    EXPECT_FALSE(restoredProducer.Lifetime.expired());
+    EXPECT_EQ(
+        pipeline->GetTextureBakeServiceForTest(),
+        textureBake);
+    EXPECT_TRUE(textureBake->Available());
+    EXPECT_GT(
+        textureBake->Stats().BindingChanges,
+        awayBindingChanges);
     const Runtime::TextureBakeSnapshot restored = textureBake->Snapshot(
         Runtime::StableEntityLookup::ToRenderId(retainedEntity));
     ASSERT_EQ(restored.Textures.size(), 1u);
@@ -1495,7 +1569,7 @@ TEST(AssetWorkflowModule,
         harness.Worlds.Contains(harness.InitialWorld));
     EXPECT_FALSE(assets->IsAlive(*retainedTexture));
 
-    pipeline->UnregisterPostImportProcessor(queueProbe);
+    pipeline->UnregisterPostImportProcessor(serviceProbe);
     EXPECT_TRUE(
         harness.Document
             .UnregisterReplacementParticipant(*observer)
@@ -1599,7 +1673,7 @@ TEST(AssetWorkflowModule,
     EXPECT_TRUE(recycledHandleReleased);
     harness.Events.Unsubscribe(releaseProbe);
 
-    EXPECT_EQ(harness.QuiesceGpuParticipants(), 2u);
+    EXPECT_EQ(harness.QuiesceGpuParticipants(), 1u);
     EXPECT_EQ(harness.QuiesceGpuParticipants(), 0u);
 
     Runtime::RuntimeModuleShutdownContext context{
@@ -1777,15 +1851,16 @@ TEST(AssetWorkflowModule,
             persistentPipeline = pipeline;
         EXPECT_EQ(pipeline, persistentPipeline);
 
-        // The texture-bake module registers one legacy normal-bake
-        // participant plus one generalized property-raster participant.
+        // The texture-bake module registers exactly one generalized
+        // property-raster participant.
         EXPECT_EQ(
             harness.Jobs
                 .DrainGpuQueueCompletedTransfers(),
-            2u);
+            1u);
 
-        Runtime::RuntimeObjectSpaceNormalBakeQueue* queue =
-            nullptr;
+        Runtime::TextureBakeService* textureBake = nullptr;
+        ECS::EntityHandle bakeEntity =
+            ECS::InvalidEntityHandle;
         bool processorCalled = false;
         bool operational = false;
         const std::uint64_t bakeKey =
@@ -1797,39 +1872,35 @@ TEST(AssetWorkflowModule,
                         "RUNTIME-183 composed bake probe",
                     .PayloadKind =
                         Assets::AssetPayloadKind::Mesh,
-                        .Process =
+                    .Process =
                         [&](const Runtime::
-                                RuntimePostImportProcessorContext&
-                                    context,
+                                RuntimePostImportProcessorContext&,
                             Runtime::
                                 RuntimePostImportProcessorServices&
                                     services)
                             -> Core::Result
                         {
                             processorCalled = true;
-                            queue =
-                                services
-                                    .ObjectSpaceNormalBakeQueue;
+                            textureBake = services.TextureBake;
                             operational =
-                                services.ObjectSpaceNormalBakeDevice !=
-                                    nullptr &&
-                                services.ObjectSpaceNormalBakeDevice->
-                                    IsOperational();
-                            if (queue == nullptr)
+                                textureBake != nullptr &&
+                                textureBake->Available();
+                            if (textureBake == nullptr ||
+                                services.Scene == nullptr)
                             {
                                 return Core::Err(
                                     Core::ErrorCode::
                                         InvalidState);
                             }
+                            bakeEntity =
+                                MakeTextureBakeMesh(
+                                    *services.Scene);
                             const auto scheduled =
-                                queue->Schedule(
+                                textureBake->Bake(
                                     MakeBakeRequest(
                                         bakeKey,
                                         services.World,
-                                        services
-                                            .ObjectSpaceNormalBakeBindingEpoch,
-                                        context.Entity),
-                                    operational);
+                                        bakeEntity));
                             return scheduled.Succeeded()
                                 ? Core::Ok()
                                 : Core::Err(
@@ -1854,16 +1925,21 @@ TEST(AssetWorkflowModule,
             << static_cast<int>(imported.error());
         ASSERT_TRUE(processorCalled);
         ASSERT_TRUE(operational);
-        ASSERT_NE(queue, nullptr);
-        EXPECT_EQ(queue->PendingCount(), 1u);
+        ASSERT_NE(textureBake, nullptr);
+        EXPECT_EQ(
+            textureBake
+                ->Snapshot(
+                    Runtime::StableEntityLookup::
+                        ToRenderId(bakeEntity))
+                .Textures.size(),
+            1u);
         EXPECT_TRUE(harness.Jobs.HasGpuQueueWork());
 
         const std::uint64_t idleBefore =
             harness.GpuIdleWaits;
-        EXPECT_EQ(harness.QuiesceGpuParticipants(), 2u);
+        EXPECT_EQ(harness.QuiesceGpuParticipants(), 1u);
         EXPECT_EQ(
             harness.GpuIdleWaits, idleBefore + 1u);
-        EXPECT_EQ(queue->PendingCount(), 0u);
         EXPECT_FALSE(harness.Jobs.HasGpuQueueWork());
         EXPECT_EQ(harness.QuiesceGpuParticipants(), 0u);
         EXPECT_EQ(
@@ -1871,8 +1947,8 @@ TEST(AssetWorkflowModule,
 
         pipeline->UnregisterPostImportProcessor(processor);
         harness.Stop();
-        // The queue is module-state owned and no longer addressable after
-        // shutdown; quiescence above proves it was cleared before teardown.
+        // Quiescence above proves the sole participant released its work
+        // before the asset/cache owners were torn down.
         EXPECT_EQ(
             harness.Services.Find<
                 Runtime::AssetImportPipeline>(),
@@ -1992,7 +2068,7 @@ TEST(AssetWorkflowModule,
                 RuntimeAssetImportQueueTerminalStatus::
                     Cancelled);
         EXPECT_EQ(
-            harness.QuiesceGpuParticipants(), 2u);
+            harness.QuiesceGpuParticipants(), 1u);
 
         Runtime::RuntimeModuleShutdownContext context{
             .Commands = harness.Commands,
@@ -2095,6 +2171,8 @@ TEST(AssetWorkflowModule,
                 Runtime::AssetWorkflowModule>();
             engine.EmplaceModule<
                 Runtime::SceneDocumentModule>();
+            engine.EmplaceModule<
+                Runtime::TextureBakeModule>();
         }
         engine.Initialize();
 
@@ -2152,6 +2230,7 @@ TEST(AssetWorkflowModule,
     ShutdownOrderObservation observation{};
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::TextureBakeModule>();
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
     engine.EmplaceModule<ShutdownOrderProbeModule>(
         observation);
@@ -2248,6 +2327,7 @@ TEST(AssetWorkflowModule,
     Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
     engine.EmplaceModule<Runtime::AssetWorkflowModule>();
     engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.EmplaceModule<Runtime::TextureBakeModule>();
 
     engine.Initialize();
     Runtime::AssetImportPipeline* const firstPipeline =

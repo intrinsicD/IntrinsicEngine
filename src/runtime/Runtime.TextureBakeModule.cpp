@@ -7,6 +7,7 @@ module;
 #include <cstdint>
 #include <cstring>
 #include <functional>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -41,12 +42,12 @@ import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.PipelineManager;
+import Extrinsic.RHI.TextureManager;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.Module;
-import Extrinsic.Runtime.ObjectSpaceNormalBakeService;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneDocumentModule;
@@ -65,6 +66,9 @@ namespace Extrinsic::Runtime
         constexpr float kUvAreaEpsilon = 1.0e-10f;
         constexpr std::uint64_t kFnv1aOffset64 = 14695981039346656037ull;
         constexpr std::uint64_t kFnv1aPrime64 = 1099511628211ull;
+        constexpr std::size_t kMaxActivePropertyTextureBakes = 256u;
+        constexpr std::size_t kMaxRetainedPropertyBakeSourceBytes =
+            64u * 1024u * 1024u;
 
         [[nodiscard]] std::uint64_t FingerprintIndices(
             const std::span<const std::uint32_t> values) noexcept
@@ -86,7 +90,8 @@ namespace Extrinsic::Runtime
         {
             return PropertyTextureBakeResult{
                 .Status = PropertyTextureBakeStatus::NonOperationalBackend,
-                .Diagnostic = "texture-bake module is unavailable",
+                .Diagnostic =
+                    "texture-bake GPU service is non-operational; no CPU fallback is available",
             };
         }
 
@@ -729,6 +734,8 @@ namespace Extrinsic::Runtime
             std::uint32_t Height{0u};
             std::optional<RHI::BufferManager::BufferLease> PropertyBuffer{};
             std::optional<RHI::BufferManager::BufferLease> TexcoordBuffer{};
+            std::optional<RHI::TextureManager::TextureLease>
+                DilationScratch{};
             std::uint64_t CacheGeneration{0u};
             std::uint64_t GeometryRevision{0u};
             std::uint64_t ReadyFrame{0u};
@@ -737,21 +744,30 @@ namespace Extrinsic::Runtime
         struct PipelineEntry
         {
             RHI::Format Format{RHI::Format::Undefined};
-            std::optional<RHI::PipelineManager::PipelineLease> Lease{};
+            std::optional<RHI::PipelineManager::PipelineLease> Raster{};
+            std::optional<RHI::PipelineManager::PipelineLease> Dilation{};
+        };
+
+        struct RetiredWorkResources
+        {
+            std::optional<RHI::BufferManager::BufferLease> PropertyBuffer{};
+            std::optional<RHI::BufferManager::BufferLease> TexcoordBuffer{};
+            std::optional<RHI::TextureManager::TextureLease>
+                DilationScratch{};
+            std::uint64_t SafeFrame{0u};
         };
 
         BoundContext Context{};
-        RuntimeObjectSpaceNormalBakeQueue* LegacyQueue{};
         RHI::IDevice* Device{};
         Graphics::GpuAssetCache* GpuAssets{};
         Graphics::IRenderer* Renderer{};
         RenderExtractionCache* Extraction{};
         TextureBakeModuleStats* Stats{};
         std::vector<Work> WorkItems{};
+        std::vector<RetiredWorkResources> RetiredResources{};
         std::vector<PipelineEntry> Pipelines{};
         std::uint64_t NextAssetSerial{1u};
         GpuQueueParticipantHandle Participant{};
-        std::shared_ptr<void> ProducerLifetime{};
 
         [[nodiscard]] bool Available() const noexcept
         {
@@ -763,6 +779,96 @@ namespace Extrinsic::Runtime
                    Extraction != nullptr &&
                    Participant.IsValid() &&
                    Device->IsOperational();
+        }
+
+        [[nodiscard]] std::uint64_t CurrentFrame() const noexcept
+        {
+            return Device != nullptr
+                ? Device->GetGlobalFrameNumber()
+                : 0u;
+        }
+
+        [[nodiscard]] std::uint64_t SafeReleaseFrame() const noexcept
+        {
+            if (Device == nullptr)
+                return 0u;
+            return CurrentFrame() +
+                   std::max<std::uint32_t>(
+                       Device->GetFramesInFlight(),
+                       1u);
+        }
+
+        [[nodiscard]] static std::size_t SourceByteCount(
+            const PreparedPropertyBake& prepared) noexcept
+        {
+            return prepared.Texcoords.size() * sizeof(glm::vec2) +
+                   prepared.Values.size() * sizeof(glm::vec4) +
+                   prepared.SurfaceIndices.size() *
+                       sizeof(std::uint32_t);
+        }
+
+        [[nodiscard]] bool HasScheduleCapacity(
+            const ECS::EntityHandle entity,
+            const std::string_view outputName,
+            const PreparedPropertyBake& prepared) const noexcept
+        {
+            const std::size_t candidateBytes =
+                SourceByteCount(prepared);
+            if (candidateBytes >
+                kMaxRetainedPropertyBakeSourceBytes)
+            {
+                return false;
+            }
+
+            std::size_t retainedBytes = 0u;
+            std::size_t retainedCount = 0u;
+            for (const Work& work : WorkItems)
+            {
+                if (work.Entity == entity &&
+                    work.OutputName == outputName)
+                {
+                    continue;
+                }
+                ++retainedCount;
+                retainedBytes += SourceByteCount(work.Prepared);
+            }
+            return retainedCount <
+                       kMaxActivePropertyTextureBakes &&
+                   retainedBytes <=
+                       kMaxRetainedPropertyBakeSourceBytes -
+                           candidateBytes;
+        }
+
+        void RetireWorkResources(
+            Work& work,
+            const std::uint64_t safeFrame)
+        {
+            if (!work.PropertyBuffer.has_value() &&
+                !work.TexcoordBuffer.has_value() &&
+                !work.DilationScratch.has_value())
+            {
+                return;
+            }
+            RetiredResources.push_back(RetiredWorkResources{
+                .PropertyBuffer =
+                    std::exchange(work.PropertyBuffer, std::nullopt),
+                .TexcoordBuffer =
+                    std::exchange(work.TexcoordBuffer, std::nullopt),
+                .DilationScratch =
+                    std::exchange(work.DilationScratch, std::nullopt),
+                .SafeFrame = safeFrame,
+            });
+        }
+
+        void DrainRetiredResources()
+        {
+            const std::uint64_t frame = CurrentFrame();
+            std::erase_if(
+                RetiredResources,
+                [frame](const RetiredWorkResources& resources)
+                {
+                    return frame >= resources.SafeFrame;
+                });
         }
 
         [[nodiscard]] PropertyTextureBakeRecord* FindRecord(
@@ -934,12 +1040,6 @@ namespace Extrinsic::Runtime
                 return PrepareFailure(
                     PropertyTextureBakeStatus::InvalidPadding,
                     "texture bake padding must be within [0, 32]");
-            }
-            if (request.PaddingTexels != 0u)
-            {
-                return PrepareFailure(
-                    PropertyTextureBakeStatus::InvalidPadding,
-                    "texture bake padding requires the unified dilation producer from RUNTIME-191 Slice B");
             }
             if (!request.Source.HasName())
             {
@@ -1278,6 +1378,14 @@ namespace Extrinsic::Runtime
                 return PrepareFailure(
                     PropertyTextureBakeStatus::UnsupportedPropertyType,
                     "texture bake encoder is incompatible with the selected property type and storage");
+            }
+            if (request.PaddingTexels != 0u &&
+                prepared.Storage !=
+                    PropertyTextureBakeStorage::EncodedRgba)
+            {
+                return PrepareFailure(
+                    PropertyTextureBakeStatus::InvalidPadding,
+                    "texture bake padding requires encoded RGBA storage with alpha coverage");
             }
             if (prepared.Storage == PropertyTextureBakeStorage::RawFloat)
             {
@@ -1783,6 +1891,11 @@ namespace Extrinsic::Runtime
                         work.Asset,
                         work.CacheGeneration);
                 }
+                RetireWorkResources(
+                    work,
+                    work.ReadyFrame != 0u
+                        ? work.ReadyFrame
+                        : SafeReleaseFrame());
                 WorkItems.erase(
                     WorkItems.begin() + static_cast<std::ptrdiff_t>(index));
             }
@@ -1848,6 +1961,19 @@ namespace Extrinsic::Runtime
                 return PropertyTextureBakeResult{
                     .Status = PropertyTextureBakeStatus::StaleEntity,
                     .Diagnostic = "texture bake entity is stale",
+                };
+            }
+            if (!HasScheduleCapacity(
+                    entity,
+                    prepared.OutputName,
+                    prepared))
+            {
+                return PropertyTextureBakeResult{
+                    .Status =
+                        PropertyTextureBakeStatus::JobSubmitFailed,
+                    .OutputName = prepared.OutputName,
+                    .Diagnostic =
+                        "property texture bake queue reached its bounded source-snapshot capacity",
                 };
             }
 
@@ -2000,36 +2126,59 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] RHI::PipelineHandle PipelineFor(
-            const RHI::Format format)
+            const RHI::Format format,
+            const bool dilation)
         {
             if (Renderer == nullptr || Device == nullptr)
                 return {};
             for (PipelineEntry& entry : Pipelines)
             {
-                if (entry.Format == format &&
-                    entry.Lease.has_value() &&
-                    entry.Lease->IsValid())
+                if (entry.Format != format)
+                    continue;
+                auto& lease = dilation
+                    ? entry.Dilation
+                    : entry.Raster;
+                if (lease.has_value() && lease->IsValid())
                 {
                     return Renderer->GetPipelineManager().GetDeviceHandle(
-                        entry.Lease->GetHandle());
+                        lease->GetHandle());
                 }
             }
 
-            auto lease = Renderer->GetPipelineManager().Create(
-                Graphics::MakePropertyTextureBakePipelineDesc(
+            RHI::PipelineDesc desc = dilation
+                ? Graphics::MakePropertyTextureBakeDilationPipelineDesc(
+                    Core::Filesystem::GetShaderPath(
+                        "shaders/post_fullscreen.vert.spv"),
+                    Core::Filesystem::GetShaderPath(
+                        "shaders/property_texture_bake_dilate.frag.spv"),
+                    format)
+                : Graphics::MakePropertyTextureBakePipelineDesc(
                     Core::Filesystem::GetShaderPath(
                         "shaders/property_texture_bake.vert.spv"),
                     Core::Filesystem::GetShaderPath(
                         "shaders/property_texture_bake.frag.spv"),
-                    format));
+                    format);
+            auto lease =
+                Renderer->GetPipelineManager().Create(desc);
             if (!lease.has_value())
                 return {};
-            Pipelines.push_back(PipelineEntry{
-                .Format = format,
-                .Lease = std::move(*lease),
-            });
+            auto found = std::ranges::find(
+                Pipelines,
+                format,
+                &PipelineEntry::Format);
+            if (found == Pipelines.end())
+            {
+                Pipelines.push_back(PipelineEntry{
+                    .Format = format,
+                });
+                found = std::prev(Pipelines.end());
+            }
+            auto& stored = dilation
+                ? found->Dilation
+                : found->Raster;
+            stored.emplace(std::move(*lease));
             return Renderer->GetPipelineManager().GetDeviceHandle(
-                Pipelines.back().Lease->GetHandle());
+                stored->GetHandle());
         }
 
         void MarkFailed(Work& work, std::string diagnostic)
@@ -2049,6 +2198,11 @@ namespace Extrinsic::Runtime
                 record->Diagnostic = std::move(diagnostic);
                 UpdateSlots(work.Entity, *record, SlotUpdate::Failed);
             }
+            RetireWorkResources(
+                work,
+                work.ReadyFrame != 0u
+                    ? work.ReadyFrame
+                    : SafeReleaseFrame());
             work.Phase = WorkPhase::Failed;
         }
 
@@ -2057,11 +2211,18 @@ namespace Extrinsic::Runtime
             if (!Available())
                 return;
 
+            DrainRetiredResources();
             std::size_t recorded = 0u;
+            bool paddedRecorded = false;
             for (Work& work : WorkItems)
             {
                 if (work.Phase != WorkPhase::Queued || recorded >= 4u)
                     continue;
+                if (work.Request.PaddingTexels != 0u &&
+                    paddedRecorded)
+                {
+                    continue;
+                }
                 if (work.World != Context.World ||
                     work.BindingEpoch != Context.BindingEpoch ||
                     !Context.Scene->IsValid(work.Entity))
@@ -2211,13 +2372,45 @@ namespace Extrinsic::Runtime
                 }
 
                 const RHI::PipelineHandle pipeline =
-                    PipelineFor(work.Prepared.Format);
+                    PipelineFor(work.Prepared.Format, false);
                 if (!pipeline.IsValid())
                 {
                     MarkFailed(
                         work,
                         "property texture bake raster pipeline is unavailable");
                     continue;
+                }
+
+                RHI::PipelineHandle dilationPipeline{};
+                std::optional<RHI::TextureManager::TextureLease>
+                    dilationScratch{};
+                if (work.Request.PaddingTexels != 0u)
+                {
+                    dilationPipeline =
+                        PipelineFor(work.Prepared.Format, true);
+                    if (!dilationPipeline.IsValid())
+                    {
+                        MarkFailed(
+                            work,
+                            "property texture bake dilation pipeline is unavailable");
+                        continue;
+                    }
+                    auto scratch =
+                        Renderer->GetTextureManager().Create(
+                            Graphics::
+                                MakePropertyTextureBakeDilationScratchTextureDesc(
+                                    work.Width,
+                                    work.Height,
+                                    work.Prepared.Format,
+                                    "Runtime.PropertyTextureBake.DilationScratch"));
+                    if (!scratch.has_value())
+                    {
+                        MarkFailed(
+                            work,
+                            "property texture bake dilation scratch allocation failed");
+                        continue;
+                    }
+                    dilationScratch.emplace(std::move(*scratch));
                 }
 
                 Graphics::GpuProducedTextureRequest textureRequest{};
@@ -2254,12 +2447,24 @@ namespace Extrinsic::Runtime
                     continue;
                 }
 
+                Graphics::PropertyTextureBakeDilationResources
+                    dilationResources{};
+                if (dilationScratch.has_value())
+                {
+                    dilationResources =
+                        Graphics::PropertyTextureBakeDilationResources{
+                            .Pipeline = dilationPipeline,
+                            .ScratchTexture =
+                                dilationScratch->GetHandle(),
+                        };
+                }
                 const Core::Result recordedResult =
                     Graphics::RecordPropertyTextureBake(
                         commandContext,
                         Graphics::PropertyTextureBakeRecordDesc{
                             .Pipeline = pipeline,
                             .OutputTexture = pending->Texture,
+                            .Dilation = dilationResources,
                             .IndexBuffer = residency.IndexBuffer,
                             .TexcoordBDA = texcoordBda,
                             .PropertyBDA = propertyBda,
@@ -2274,6 +2479,8 @@ namespace Extrinsic::Runtime
                                 residency.Record.SurfaceIndexCount,
                             .Width = work.Width,
                             .Height = work.Height,
+                            .PaddingTexels =
+                                work.Request.PaddingTexels,
                             .Domain = work.Prepared.Domain,
                             .ValueKind = work.Prepared.GpuValueKind,
                             .Encoding = work.Prepared.GpuEncoding,
@@ -2291,10 +2498,19 @@ namespace Extrinsic::Runtime
                 }
 
                 const std::uint64_t readyFrame =
-                    Device->GetGlobalFrameNumber() +
+                    CurrentFrame() +
                     std::max<std::uint32_t>(
                         Device->GetFramesInFlight(),
                         1u);
+                work.PropertyBuffer.emplace(std::move(*propertyBuffer));
+                work.TexcoordBuffer.emplace(std::move(*texcoordBuffer));
+                if (dilationScratch.has_value())
+                {
+                    work.DilationScratch.emplace(
+                        std::move(*dilationScratch));
+                }
+                work.CacheGeneration = pending->Generation;
+                work.ReadyFrame = readyFrame;
                 if (Core::Result ready =
                         GpuAssets->SetGpuProducedTextureReadyFrame(
                             work.Asset,
@@ -2302,19 +2518,17 @@ namespace Extrinsic::Runtime
                             readyFrame);
                     !ready.has_value())
                 {
-                    work.CacheGeneration = pending->Generation;
                     MarkFailed(
                         work,
                         "property texture bake ready-frame publication failed");
                     continue;
                 }
 
-                work.PropertyBuffer.emplace(std::move(*propertyBuffer));
-                work.TexcoordBuffer.emplace(std::move(*texcoordBuffer));
-                work.CacheGeneration = pending->Generation;
                 work.GeometryRevision = residency.ContentRevision;
-                work.ReadyFrame = readyFrame;
                 work.Phase = WorkPhase::WaitingForReadyFrame;
+                paddedRecorded =
+                    paddedRecorded ||
+                    work.Request.PaddingTexels != 0u;
                 ++recorded;
             }
 
@@ -2330,6 +2544,7 @@ namespace Extrinsic::Runtime
         {
             if (Device == nullptr || GpuAssets == nullptr)
                 return;
+            DrainRetiredResources();
             for (std::size_t index = 0u; index < WorkItems.size();)
             {
                 Work& work = WorkItems[index];
@@ -2403,7 +2618,8 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] bool HasInFlightWork() const noexcept
         {
-            return !WorkItems.empty();
+            return !WorkItems.empty() ||
+                   !RetiredResources.empty();
         }
 
         [[nodiscard]] bool DestroyAsset(const Assets::AssetId asset)
@@ -2456,6 +2672,11 @@ namespace Extrinsic::Runtime
                     UpdateSlots(work.Entity, *record, SlotUpdate::Failed);
                     ApplyMaterialConsumers(work.Entity, *record, false);
                 }
+                RetireWorkResources(
+                    work,
+                    work.ReadyFrame != 0u
+                        ? work.ReadyFrame
+                        : SafeReleaseFrame());
                 WorkItems.erase(
                     WorkItems.begin() + static_cast<std::ptrdiff_t>(index));
             }
@@ -2528,6 +2749,7 @@ namespace Extrinsic::Runtime
                 }
             }
             WorkItems.clear();
+            RetiredResources.clear();
             Pipelines.clear();
         }
 
@@ -2814,20 +3036,6 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    TextureBakeProducerContext
-    TextureBakeService::ProducerContext() const noexcept
-    {
-        if (!m_Impl)
-            return {};
-        return TextureBakeProducerContext{
-            .Queue = m_Impl->LegacyQueue,
-            .World = m_Impl->Context.World,
-            .BindingEpoch = m_Impl->Context.BindingEpoch,
-            .Device = m_Impl->Device,
-            .Lifetime = m_Impl->ProducerLifetime,
-        };
-    }
-
     TextureBakeModuleStats TextureBakeService::Stats() const noexcept
     {
         return m_Impl && m_Impl->Stats != nullptr
@@ -2915,7 +3123,6 @@ namespace Extrinsic::Runtime
         Assets::AssetService* const assets,
         EditorCommandHistory* const history,
         JobService* const jobs,
-        RuntimeObjectSpaceNormalBakeQueue* const queue,
         RHI::IDevice* const device,
         Graphics::GpuAssetCache* const gpuAssets,
         Graphics::IRenderer* const renderer,
@@ -2932,7 +3139,6 @@ namespace Extrinsic::Runtime
             .CommandHistory = history,
             .Jobs = jobs,
         };
-        m_Impl->LegacyQueue = queue;
         m_Impl->Device = device;
         m_Impl->GpuAssets = gpuAssets;
         m_Impl->Renderer = renderer;
@@ -2947,19 +3153,9 @@ namespace Extrinsic::Runtime
     {
         if (!m_Impl)
             return;
-        m_Impl->ProducerLifetime.reset();
         m_Impl->Context.World = world;
         m_Impl->Context.BindingEpoch = bindingEpoch;
         m_Impl->Context.Scene = scene;
-        if (world.IsValid() &&
-            bindingEpoch != 0u &&
-            scene != nullptr &&
-            m_Impl->LegacyQueue != nullptr &&
-            m_Impl->Device != nullptr)
-        {
-            m_Impl->ProducerLifetime =
-                std::make_shared<std::uint8_t>(0u);
-        }
     }
 
     void TextureBakeService::SetCommandHistory(
@@ -3012,8 +3208,6 @@ namespace Extrinsic::Runtime
             return;
         m_Impl->ShutdownAfterDeviceIdle();
         m_Impl->Context = {};
-        m_Impl->ProducerLifetime.reset();
-        m_Impl->LegacyQueue = nullptr;
         m_Impl->Device = nullptr;
         m_Impl->GpuAssets = nullptr;
         m_Impl->Renderer = nullptr;
@@ -3026,7 +3220,6 @@ namespace Extrinsic::Runtime
     {
         struct State
         {
-            ObjectSpaceNormalBakeService Bake{};
             TextureBakeService Service{};
             TextureBakeModuleStats Stats{};
 
@@ -3046,7 +3239,6 @@ namespace Extrinsic::Runtime
             std::uint64_t BindingEpoch{1u};
             SceneReplacementParticipantHandle DocumentParticipant{};
             GpuQueueParticipantHandle GpuParticipant{};
-            GpuQueueParticipantHandle PropertyGpuParticipant{};
             bool AcceptingCallbacks{false};
             bool ShutdownAnnounced{false};
             std::weak_ptr<State> Self{};
@@ -3087,13 +3279,11 @@ namespace Extrinsic::Runtime
                 if (outgoingWorld.IsValid() &&
                     outgoingEpoch != 0u)
                 {
-                    Bake.DetachTargets(outgoingWorld, outgoingEpoch);
                     Service.DetachTargets(
                         outgoingWorld,
                         outgoingEpoch,
                         destroyGeneratedAssets);
                 }
-                Bake.SetTargetScene({}, 0u, nullptr);
                 BoundWorld = {};
                 BoundRegistry = nullptr;
                 AdvanceBindingEpoch();
@@ -3126,16 +3316,11 @@ namespace Extrinsic::Runtime
                     !BoundWorld.IsValid() ||
                     BoundRegistry == nullptr)
                 {
-                    Bake.SetTargetScene({}, 0u, nullptr);
                     Service.SetTarget({}, BindingEpoch, nullptr);
                     PublishBindingChanged();
                     return;
                 }
 
-                Bake.SetTargetScene(
-                    BoundWorld,
-                    BindingEpoch,
-                    BoundRegistry);
                 Service.SetTarget(
                     BoundWorld,
                     BindingEpoch,
@@ -3236,20 +3421,6 @@ namespace Extrinsic::Runtime
                 auto& state = *Shared;
                 state.AcceptingCallbacks = false;
                 state.ReleaseDocumentParticipant();
-                if (jobs != nullptr &&
-                    state.PropertyGpuParticipant.IsValid())
-                {
-                    RHI::IDevice* const device = state.Device;
-                    jobs->UnregisterGpuQueueParticipant(
-                        state.PropertyGpuParticipant,
-                        waitForGpuIdle && device != nullptr
-                            ? std::function<void()>{[device]
-                              {
-                                  device->WaitIdle();
-                              }}
-                            : std::function<void()>{});
-                }
-                state.PropertyGpuParticipant = {};
                 if (jobs != nullptr && state.GpuParticipant.IsValid())
                 {
                     RHI::IDevice* const device = state.Device;
@@ -3263,8 +3434,6 @@ namespace Extrinsic::Runtime
                             : std::function<void()>{});
                 }
                 state.GpuParticipant = {};
-                state.Bake.ClearDependencies();
-                state.Bake.Queue().Clear();
                 state.Service.Unbind();
             }
             Unsubscribe(events);
@@ -3330,13 +3499,6 @@ namespace Extrinsic::Runtime
         state.Renderer = &renderer->get();
         state.Extraction = &extraction->get();
         state.Device = &device->get();
-        state.Bake.SetDependencies(ObjectSpaceNormalBakeServiceDependencies{
-            .Assets = state.Assets,
-            .GpuAssets = state.GpuAssets,
-            .Renderer = state.Renderer,
-            .RenderExtraction = state.Extraction,
-            .Device = state.Device,
-        });
         state.Service.Bind(
             nullptr,
             {},
@@ -3344,7 +3506,6 @@ namespace Extrinsic::Runtime
             state.Assets,
             nullptr,
             state.Jobs,
-            &state.Bake.Queue(),
             state.Device,
             state.GpuAssets,
             state.Renderer,
@@ -3420,7 +3581,6 @@ namespace Extrinsic::Runtime
                     if (const auto state = weakState.lock())
                     {
                         (void)state->ValidateBinding();
-                        state->Bake.PrepareScheduledRequests();
                     }
                 });
             !hook.has_value())
@@ -3433,10 +3593,10 @@ namespace Extrinsic::Runtime
             return hook;
         }
 
-        // AssetWorkflowModule resolves before this module, but its import
-        // producers need the bake queue and the current scene epoch while
-        // wiring their dependencies. Publish that producer target during the
-        // registration pass; command history is added during OnResolve.
+        // AssetWorkflowModule resolves before this module and retains the
+        // published service pointer. Publish the active target during the
+        // registration pass; command history and the GPU participant are
+        // added during OnResolve before imports can run.
         state.AcceptingCallbacks = true;
         state.BindTo(
             state.Worlds->ActiveWorld(),
@@ -3479,10 +3639,9 @@ namespace Extrinsic::Runtime
         const std::weak_ptr<Impl::State> weakState = m_Impl->Shared;
         auto participant = state.Documents->RegisterReplacementParticipant(
             SceneReplacementParticipantDesc{
-                // Scene-document participants are ordered by name.  The bake
-                // target must bind before AssetWorkflow's AfterReplace reads
-                // ProducerContext, while both still detach synchronously in
-                // BeforeReplace.
+                // Scene-document participants are ordered by name. The bake
+                // target binds before AssetWorkflow recreates its handoffs,
+                // while both still detach synchronously in BeforeReplace.
                 .Name = "Runtime.AssetTextureBakeModule",
                 .BeforeReplace =
                     [weakState](const SceneReplacementContext& context)
@@ -3521,19 +3680,8 @@ namespace Extrinsic::Runtime
         }
 
         state.GpuParticipant =
-            state.Bake.RegisterGpuQueueParticipant(setup.Jobs());
-        if (!state.GpuParticipant.IsValid())
-        {
-            m_Impl->RollBack(
-                &setup.Events(),
-                &setup.Jobs(),
-                &setup.Services(),
-                true);
-            return Core::Err(Core::ErrorCode::InvalidState);
-        }
-        state.PropertyGpuParticipant =
             state.Service.RegisterGpuQueueParticipant(setup.Jobs());
-        if (!state.PropertyGpuParticipant.IsValid())
+        if (!state.GpuParticipant.IsValid())
         {
             m_Impl->RollBack(
                 &setup.Events(),

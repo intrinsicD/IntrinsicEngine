@@ -262,7 +262,7 @@ TEST(RuntimeEngineLayering, EngineDelegatesGpuQueueLifecycleToJobService)
 }
 
 TEST(RuntimeEngineLayering,
-     TextureBakeModuleOwnsGpuBakeCompositionOutsideAssetWorkflow)
+     TextureBakeModuleOwnsSingleCanonicalGpuBakeComposition)
 {
     const auto engineInterface =
         ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cppm");
@@ -302,33 +302,43 @@ TEST(RuntimeEngineLayering,
     EXPECT_NE(workflowImpl.find(
                   "import Extrinsic.Runtime.TextureBakeModule;"),
               std::string::npos);
-    EXPECT_NE(workflowImpl.find("TextureBake->ProducerContext()"),
+    EXPECT_EQ(workflowImpl.find("TextureBake->ProducerContext()"),
               std::string::npos);
-    EXPECT_NE(textureBakeImpl.find(
+    EXPECT_EQ(textureBakeImpl.find(
                   "import Extrinsic.Runtime.ObjectSpaceNormalBakeService;"),
               std::string::npos);
-    EXPECT_NE(textureBakeImpl.find("ObjectSpaceNormalBakeService Bake{}"),
+    EXPECT_EQ(textureBakeImpl.find("ObjectSpaceNormalBakeService Bake{}"),
               std::string::npos);
-    EXPECT_NE(textureBakeImpl.find("state.Bake.SetDependencies("),
+    EXPECT_EQ(textureBakeImpl.find("state.Bake.SetDependencies("),
               std::string::npos);
-    EXPECT_NE(textureBakeImpl.find(
+    EXPECT_EQ(textureBakeImpl.find(
                   "state.Bake.RegisterGpuQueueParticipant("),
               std::string::npos);
     EXPECT_EQ(CountOccurrences(
                   workflowImpl,
                   ".ObjectSpaceNormalBakeQueue ="),
-              2u);
+              0u);
+    EXPECT_EQ(
+        CountOccurrences(
+            workflowImpl,
+            ".TextureBake = TextureBake"),
+        2u);
     EXPECT_EQ(workflowImpl.find("&Bake->Queue()"),
               std::string::npos);
-    EXPECT_NE(textureBakeImpl.find("Bake.ClearDependencies()"),
+    EXPECT_EQ(textureBakeImpl.find("Bake.ClearDependencies()"),
               std::string::npos);
-    EXPECT_NE(textureBakeImpl.find("Bake.Queue().Clear()"),
+    EXPECT_EQ(textureBakeImpl.find("Bake.Queue().Clear()"),
               std::string::npos);
     EXPECT_EQ(textureBakeImpl.find(
                   "Provide<ObjectSpaceNormalBakeService>"),
               std::string::npos);
     EXPECT_NE(textureBakeImpl.find("Provide<TextureBakeService>"),
               std::string::npos);
+    EXPECT_EQ(
+        CountOccurrences(
+            textureBakeImpl,
+            "RegisterGpuQueueParticipant(setup.Jobs())"),
+        1u);
     EXPECT_EQ(textureBakeImpl.find("QueueDiagnostics()"),
               std::string::npos);
 
@@ -365,6 +375,14 @@ TEST(RuntimeEngineLayering,
               std::string::npos);
     EXPECT_NE(textureBakeInterface.find("class TextureBakeModule final"),
               std::string::npos);
+    EXPECT_EQ(
+        textureBakeInterface.find(
+            "RuntimeObjectSpaceNormalBakeQueue"),
+        std::string::npos);
+    EXPECT_EQ(
+        textureBakeInterface.find(
+            "TextureBakeProducerContext"),
+        std::string::npos);
     EXPECT_NE(serviceInterface.find("export module Extrinsic.Runtime.ObjectSpaceNormalBakeService"),
               std::string::npos);
     EXPECT_NE(serviceInterface.find("export import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue"),
@@ -961,8 +979,8 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     EXPECT_EQ(CountOccurrences(visualization, "JobDesc{"), 1u);
     EXPECT_EQ(CountOccurrences(visualization, ".Scope = request.World"), 1u);
 
-    EXPECT_EQ(CountOccurrences(modelHandoff, "JobDesc "), 4u);
-    EXPECT_EQ(CountOccurrences(modelHandoff, ".Scope = "), 4u);
+    EXPECT_EQ(CountOccurrences(modelHandoff, "JobDesc "), 5u);
+    EXPECT_EQ(CountOccurrences(modelHandoff, ".Scope = "), 5u);
     EXPECT_EQ(CountOccurrences(selectedBake, "JobDesc desc"), 1u);
     EXPECT_EQ(CountOccurrences(selectedBake, ".Scope = context.World"), 1u);
     EXPECT_EQ(CountOccurrences(methodFacade, "JobDesc desc{"), 1u);

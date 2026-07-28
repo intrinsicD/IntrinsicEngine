@@ -55,8 +55,8 @@ import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.TextureBakeModule;
 import Geometry.HalfedgeMesh.IO;
 import Geometry.Properties;
 
@@ -885,12 +885,13 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstPublishesNormalsA
               std::string::npos);
 }
 
-TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpaceNormalBakeWhenInputsReady)
+TEST(RuntimeAssetModelSceneHandoff,
+     ProgressiveRawGeometryFirstRoutesNormalBakeThroughCanonicalService)
 {
     SceneHandoffFixture fx;
     Runtime::JobService jobs{};
     Runtime::KernelEventBus events{};
-    Runtime::RuntimeObjectSpaceNormalBakeQueue normalBakeQueue{};
+    Runtime::TextureBakeService textureBake{};
     // Destroyed first — see the note in the sibling uv/bake test.
     SchedulerScope scheduler{};
     TmpFile modelFile("asset_model_scene_handoff_progressive_ready_normal_bake.gltf");
@@ -909,9 +910,7 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpace
     Runtime::AssetModelSceneHandoffOptions options{};
     options.ProgressiveRawGeometryFirst = true;
     options.ProgressiveJobs = &jobs;
-    options.ObjectSpaceNormalBakeQueue = &normalBakeQueue;
-    options.BindingEpoch = 1u;
-    options.ObjectSpaceNormalBakeDevice = &fx.Device;
+    options.TextureBake = &textureBake;
     auto state = Runtime::MaterializeModelSceneAsset(
         fx.Service,
         fx.Cache,
@@ -925,7 +924,6 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpace
     EXPECT_TRUE(state->Record.GeneratedTextureAssets.empty());
     EXPECT_EQ(diagnostics.ProgressiveNormalJobsQueued, 0u);
     EXPECT_EQ(diagnostics.ProgressiveTextureBakeJobsQueued, 1u);
-    EXPECT_EQ(normalBakeQueue.Diagnostics().QueuedRequests, 0u);
 
     const ECS::EntityHandle entity = state->Record.Primitives[0].Entity;
     ASSERT_TRUE(fx.Scene.IsValid(entity));
@@ -938,9 +936,6 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpace
         FindJob(jobs.SnapshotAll(), "schedule normal GPU bake request");
     ASSERT_NE(schedule, nullptr);
     EXPECT_EQ(schedule->State, Runtime::JobState::Published);
-    EXPECT_EQ(normalBakeQueue.Diagnostics().QueuedRequests, 1u);
-    EXPECT_EQ(normalBakeQueue.Diagnostics().NonOperationalNoOps, 0u);
-    EXPECT_EQ(normalBakeQueue.PendingCount(), 1u);
 
     ASSERT_EQ(state->Record.Materials.size(), 1u);
     EXPECT_FALSE(state->Record.Materials[0].TextureBindings.Normal.IsValid());
@@ -970,16 +965,19 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpace
               Runtime::GeometryPresentationReadiness::Pending);
     EXPECT_FALSE(normalStatus->GeneratedTexture.IsValid());
     EXPECT_NE(normalStatus->Diagnostic.find(
-                  "queued object-space normal GPU bake request"),
+                  "non-operational"),
+              std::string::npos);
+    EXPECT_NE(normalStatus->Diagnostic.find("no CPU fallback"),
               std::string::npos);
 }
 
-TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpaceNormalBakeAfterUvEnrichment)
+TEST(RuntimeAssetModelSceneHandoff,
+     ProgressiveRawGeometryFirstDefersCanonicalBakeUntilUvEnrichment)
 {
     SceneHandoffFixture fx;
     Runtime::JobService jobs{};
     Runtime::KernelEventBus events{};
-    Runtime::RuntimeObjectSpaceNormalBakeQueue normalBakeQueue{};
+    Runtime::TextureBakeService textureBake{};
     // Destroyed first — see the note in the sibling uv/bake test.
     SchedulerScope scheduler{};
     TmpFile modelFile("asset_model_scene_handoff_progressive_enriched_normal_bake.gltf");
@@ -998,9 +996,7 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpace
     Runtime::AssetModelSceneHandoffOptions options{};
     options.ProgressiveRawGeometryFirst = true;
     options.ProgressiveJobs = &jobs;
-    options.ObjectSpaceNormalBakeQueue = &normalBakeQueue;
-    options.BindingEpoch = 1u;
-    options.ObjectSpaceNormalBakeDevice = &fx.Device;
+    options.TextureBake = &textureBake;
     auto state = Runtime::MaterializeModelSceneAsset(
         fx.Service,
         fx.Cache,
@@ -1014,7 +1010,6 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpace
     EXPECT_EQ(diagnostics.ProgressiveUvAtlasJobsQueued, 1u);
     EXPECT_EQ(diagnostics.ProgressiveNormalJobsQueued, 0u);
     EXPECT_EQ(diagnostics.ProgressiveTextureBakeJobsQueued, 1u);
-    EXPECT_EQ(normalBakeQueue.Diagnostics().QueuedRequests, 0u);
 
     const ECS::EntityHandle entity = state->Record.Primitives[0].Entity;
     ASSERT_TRUE(fx.Scene.IsValid(entity));
@@ -1039,9 +1034,6 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpace
         fx.Scene.Raw().try_get<ECS::Components::GeometrySources::Vertices>(entity);
     ASSERT_NE(vertices, nullptr);
     EXPECT_TRUE(vertices->Properties.Exists("v:texcoord"));
-    EXPECT_EQ(normalBakeQueue.Diagnostics().QueuedRequests, 1u);
-    EXPECT_GT(normalBakeQueue.PendingIdentityByteCount(), 0u);
-    EXPECT_EQ(normalBakeQueue.PendingCount(), 1u);
 
     auto& bindings =
         fx.Scene.Raw().get<Runtime::GeometryPresentationRecipe>(entity);
@@ -1066,7 +1058,7 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpace
               Runtime::GeometryPresentationReadiness::Pending);
     EXPECT_FALSE(normalStatus->GeneratedTexture.IsValid());
     EXPECT_NE(normalStatus->Diagnostic.find(
-                  "queued object-space normal GPU bake request"),
+                  "non-operational"),
               std::string::npos);
 }
 
@@ -1075,7 +1067,7 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstDoesNotCpuFallbac
     SceneHandoffFixture fx;
     Runtime::JobService jobs{};
     Runtime::KernelEventBus events{};
-    Runtime::RuntimeObjectSpaceNormalBakeQueue normalBakeQueue{};
+    Runtime::TextureBakeService textureBake{};
     // Destroyed first — see the note in the sibling uv/bake test.
     SchedulerScope scheduler{};
     TmpFile modelFile("asset_model_scene_handoff_progressive_nonoperational_normal_bake.gltf");
@@ -1094,9 +1086,7 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstDoesNotCpuFallbac
     Runtime::AssetModelSceneHandoffOptions options{};
     options.ProgressiveRawGeometryFirst = true;
     options.ProgressiveJobs = &jobs;
-    options.ObjectSpaceNormalBakeQueue = &normalBakeQueue;
-    options.BindingEpoch = 1u;
-    options.ObjectSpaceNormalBakeDevice = nullptr;
+    options.TextureBake = &textureBake;
     auto state = Runtime::MaterializeModelSceneAsset(
         fx.Service,
         fx.Cache,
@@ -1109,7 +1099,6 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstDoesNotCpuFallbac
     ASSERT_EQ(state->Record.Primitives.size(), 1u);
     EXPECT_TRUE(state->Record.GeneratedTextureAssets.empty());
     EXPECT_EQ(diagnostics.ProgressiveTextureBakeJobsQueued, 1u);
-    EXPECT_EQ(normalBakeQueue.Diagnostics().QueuedRequests, 0u);
 
     const ECS::EntityHandle entity = state->Record.Primitives[0].Entity;
     ASSERT_TRUE(fx.Scene.IsValid(entity));
@@ -1122,9 +1111,6 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstDoesNotCpuFallbac
         FindJob(jobs.SnapshotAll(), "schedule normal GPU bake request");
     ASSERT_NE(schedule, nullptr);
     EXPECT_EQ(schedule->State, Runtime::JobState::Published);
-    EXPECT_EQ(normalBakeQueue.Diagnostics().QueuedRequests, 0u);
-    EXPECT_EQ(normalBakeQueue.Diagnostics().NonOperationalNoOps, 1u);
-    EXPECT_EQ(normalBakeQueue.PendingCount(), 0u);
 
     ASSERT_EQ(state->Record.Materials.size(), 1u);
     EXPECT_FALSE(state->Record.Materials[0].TextureBindings.Normal.IsValid());
@@ -1401,10 +1387,10 @@ TEST(RuntimeAssetModelSceneHandoff, GeneratesMissingAlbedoTextureFromVertexColor
 }
 
 TEST(RuntimeAssetModelSceneHandoff,
-     NonProgressiveComposedNormalBakeQueuesGpuWorkAndPreservesCpuAlbedo)
+     NonProgressiveCanonicalBakeDoesNotUseCpuNormalOrAlbedoFallback)
 {
     SceneHandoffFixture fx;
-    Runtime::RuntimeObjectSpaceNormalBakeQueue normalBakeQueue{};
+    Runtime::TextureBakeService textureBake{};
     TmpFile modelFile(
         "asset_model_scene_handoff_nonprogressive_composed_normal_bake.gltf");
     Assets::AssetModelScenePayload payload = MakeModelScenePayload(
@@ -1423,9 +1409,7 @@ TEST(RuntimeAssetModelSceneHandoff,
 
     Runtime::AssetModelSceneHandoffDiagnostics diagnostics{};
     Runtime::AssetModelSceneHandoffOptions options{};
-    options.BindingEpoch = 17u;
-    options.ObjectSpaceNormalBakeQueue = &normalBakeQueue;
-    options.ObjectSpaceNormalBakeDevice = &fx.Device;
+    options.TextureBake = &textureBake;
 
     auto state = Runtime::MaterializeModelSceneAsset(
         fx.Service,
@@ -1437,36 +1421,18 @@ TEST(RuntimeAssetModelSceneHandoff,
         &diagnostics);
     ASSERT_TRUE(state.has_value()) << static_cast<int>(state.error());
 
-    ASSERT_EQ(state->Record.GeneratedTextureAssets.size(), 1u);
-    const Assets::AssetId generatedAlbedo =
-        state->Record.GeneratedTextureAssets.front();
-    ASSERT_TRUE(generatedAlbedo.IsValid());
+    EXPECT_TRUE(state->Record.GeneratedTextureAssets.empty());
     ASSERT_EQ(state->Record.Materials.size(), 1u);
-    EXPECT_EQ(
-        state->Record.Materials[0].TextureBindings.Albedo,
-        generatedAlbedo);
+    EXPECT_FALSE(
+        state->Record.Materials[0].TextureBindings.Albedo.IsValid());
     EXPECT_FALSE(
         state->Record.Materials[0].TextureBindings.Normal.IsValid());
     EXPECT_EQ(
         state->Record.Materials[0].TextureBindings.NormalSpace,
         Graphics::MaterialNormalTextureSpace::TangentSpaceNormal);
-    EXPECT_EQ(diagnostics.GeneratedTextureAssetsCreated, 1u);
+    EXPECT_EQ(diagnostics.GeneratedTextureAssetsCreated, 0u);
     EXPECT_EQ(diagnostics.GeneratedNormalTextureBakeFailures, 0u);
-
-    auto pending = normalBakeQueue.TakePendingSubmissions();
-    ASSERT_EQ(pending.size(), 1u);
-    ASSERT_TRUE(pending.front().Identity.has_value());
-    ASSERT_EQ(state->Record.Primitives.size(), 1u);
-    EXPECT_EQ(
-        pending.front().Target.Entity,
-        state->Record.Primitives.front().Entity);
-    EXPECT_EQ(pending.front().Target.BindingEpoch, 17u);
-    EXPECT_TRUE(pending.front().Target.PresentationKey.empty());
-    EXPECT_EQ(
-        pending.front().Target.ExpectedRecipeGeneration,
-        0u);
-    EXPECT_EQ(pending.front().Identity->Width, options.GeneratedTextureWidth);
-    EXPECT_EQ(pending.front().Identity->Height, options.GeneratedTextureHeight);
+    EXPECT_EQ(diagnostics.GeneratedAlbedoTextureBakeFailures, 0u);
 }
 
 TEST(RuntimeAssetModelSceneHandoff, MissingTexcoordsReceiveGeneratedAtlasBeforeGeneratedMaterialTextures)

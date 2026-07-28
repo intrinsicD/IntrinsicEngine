@@ -3849,19 +3849,12 @@ TEST(SandboxEditorUi, AttachedEngineContextWiresTextureBakeModule)
 
     Runtime::AssetImportPipeline& pipeline =
         RequiredEngineService<Runtime::AssetImportPipeline>(engine);
-    const Runtime::RuntimeObjectSpaceNormalBakeProducerContext producer =
-        pipeline.GetObjectSpaceNormalBakeProducerContext();
     Runtime::TextureBakeService& textureBake =
         RequiredEngineService<Runtime::TextureBakeService>(engine);
-    const Runtime::TextureBakeProducerContext moduleProducer =
-        textureBake.ProducerContext();
-    ASSERT_NE(producer.Queue, nullptr);
-    ASSERT_NE(producer.Device, nullptr);
-    EXPECT_EQ(producer.Device, &engine.GetDevice());
-    EXPECT_NE(producer.BindingEpoch, 0u);
-    EXPECT_EQ(producer.Queue, moduleProducer.Queue);
-    EXPECT_EQ(producer.BindingEpoch, moduleProducer.BindingEpoch);
-    EXPECT_EQ(producer.Device, moduleProducer.Device);
+    EXPECT_EQ(
+        pipeline.GetTextureBakeServiceForTest(),
+        &textureBake);
+    EXPECT_TRUE(textureBake.Available());
 
     Runtime::SandboxEditorSession session{};
     session.Attach(engine.Worlds(), engine.Services());

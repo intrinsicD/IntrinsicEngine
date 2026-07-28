@@ -62,7 +62,6 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobService;
-import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneDocumentModule;
@@ -804,9 +803,7 @@ namespace
 
     struct ComposedNormalBakeProbe
     {
-        Runtime::RuntimeObjectSpaceNormalBakeQueue* Queue{
-            nullptr};
-        bool BackendOperational{true};
+        Runtime::TextureBakeService* Service{nullptr};
         Runtime::RuntimePostImportProcessorHandle Handle{};
     };
 
@@ -832,15 +829,9 @@ namespace
                                         services)
                                 -> Core::Result
                             {
-                                probe.Queue =
-                                    services
-                                        .ObjectSpaceNormalBakeQueue;
-                                probe.BackendOperational =
-                                    services.ObjectSpaceNormalBakeDevice !=
-                                        nullptr &&
-                                    services.ObjectSpaceNormalBakeDevice->
-                                        IsOperational();
-                                return probe.Queue != nullptr
+                                probe.Service =
+                                    services.TextureBake;
+                                return probe.Service != nullptr
                                     ? Core::Ok()
                                     : Core::Err(
                                           Core::ErrorCode::
@@ -857,9 +848,8 @@ namespace
     {
         return MeshHasVertexProperty(engine, entity, "v:texcoord") &&
             MeshHasVertexProperty(engine, entity, "v:normal") &&
-            probe.Queue != nullptr &&
-            probe.Queue->Diagnostics().NonOperationalNoOps >
-                0u;
+            probe.Service != nullptr &&
+            probe.Service->Stats().BakeRequestsRejected > 0u;
     }
 
     void ExpectDirectMeshObjectSpaceNormalBakeNoCpuFallback(
@@ -868,13 +858,12 @@ namespace
         const ComposedNormalBakeProbe& probe)
     {
         EXPECT_FALSE(HasGeneratedNormalTextureBinding(engine, entity));
-        ASSERT_NE(probe.Queue, nullptr);
-        EXPECT_FALSE(probe.BackendOperational);
-        const auto& diagnostics =
-            probe.Queue->Diagnostics();
-        EXPECT_EQ(diagnostics.QueuedRequests, 0u);
-        EXPECT_EQ(diagnostics.NonOperationalNoOps, 1u);
-        EXPECT_EQ(probe.Queue->PendingCount(), 0u);
+        ASSERT_NE(probe.Service, nullptr);
+        EXPECT_FALSE(probe.Service->Available());
+        const Runtime::TextureBakeModuleStats stats =
+            probe.Service->Stats();
+        EXPECT_EQ(stats.BakeRequestsAccepted, 0u);
+        EXPECT_EQ(stats.BakeRequestsRejected, 1u);
     }
 
     void ExpectMaterialDrivenImportedSurface(

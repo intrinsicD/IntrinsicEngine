@@ -13913,6 +13913,7 @@ namespace Extrinsic::Runtime
         request.RangeMax = command.RangeMax;
         request.Width = command.Width;
         request.Height = command.Height;
+        request.PaddingTexels = command.PaddingTexels;
         request.OutputName = command.OutputName.empty()
             ? command.PropertyName
             : command.OutputName;

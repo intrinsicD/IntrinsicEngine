@@ -141,12 +141,6 @@ namespace Extrinsic::Runtime
 
                 const std::uint64_t expectedEpoch =
                     BindingEpoch;
-                const TextureBakeProducerContext bake =
-                    TextureBake != nullptr
-                        ? TextureBake->ProducerContext()
-                        : TextureBakeProducerContext{};
-                const bool bakeMatchesScene =
-                    bake.IsValid() && bake.World == BoundWorld;
                 const std::weak_ptr<State> weakState = Self;
                 SceneHandoff =
                     std::make_unique<AssetModelSceneHandoff>(
@@ -169,10 +163,7 @@ namespace Extrinsic::Runtime
                                     }
                                     return false;
                             },
-                            .ObjectSpaceNormalBakeQueue =
-                                bakeMatchesScene ? bake.Queue : nullptr,
-                            .ObjectSpaceNormalBakeDevice =
-                                bakeMatchesScene ? bake.Device : nullptr,
+                            .TextureBake = TextureBake,
                         });
 
                 Pipeline->SetDependencies(
@@ -192,43 +183,8 @@ namespace Extrinsic::Runtime
                         .Scene = BoundRegistry,
                         .Selection = Selection,
                         .CommandHistory = History,
-                        .ObjectSpaceNormalBakeQueue =
-                            bakeMatchesScene ? bake.Queue : nullptr,
-                        .ObjectSpaceNormalBakeBindingEpoch =
-                            bakeMatchesScene ? bake.BindingEpoch : 0u,
-                        .ObjectSpaceNormalBakeLifetime =
-                            bakeMatchesScene
-                                ? bake.Lifetime
-                                : std::weak_ptr<void>{},
-                        .Device = Device,
+                        .TextureBake = TextureBake,
                     });
-            }
-
-            void RefreshTextureBakeBinding()
-            {
-                if (!AcceptingCallbacks ||
-                    !BoundWorld.IsValid() ||
-                    BoundRegistry == nullptr)
-                {
-                    return;
-                }
-                const TextureBakeProducerContext bake =
-                    TextureBake != nullptr
-                        ? TextureBake->ProducerContext()
-                        : TextureBakeProducerContext{};
-                const RuntimeObjectSpaceNormalBakeProducerContext current =
-                    Pipeline->GetObjectSpaceNormalBakeProducerContext();
-                const bool bakeMatchesScene =
-                    bake.IsValid() && bake.World == BoundWorld;
-                if (current.Queue ==
-                        (bakeMatchesScene ? bake.Queue : nullptr) &&
-                    current.BindingEpoch ==
-                        (bakeMatchesScene ? bake.BindingEpoch : 0u) &&
-                    current.Device == Device)
-                {
-                    return;
-                }
-                BindTo(BoundWorld, BoundRegistry);
             }
 
             void ResetAndBindTo(
@@ -331,7 +287,6 @@ namespace Extrinsic::Runtime
         std::shared_ptr<State> Shared{};
         KernelEventSubscription ActiveWorldChangedSubscription{};
         KernelEventSubscription WorldDestroyedSubscription{};
-        KernelEventSubscription TextureBakeBindingChangedSubscription{};
         KernelEventSubscription ShutdownSubscription{};
         bool AssetServicePublished{false};
         bool PipelinePublished{false};
@@ -353,17 +308,11 @@ namespace Extrinsic::Runtime
                     events->Unsubscribe(
                         WorldDestroyedSubscription);
                 }
-                if (TextureBakeBindingChangedSubscription.IsValid())
-                {
-                    events->Unsubscribe(
-                        TextureBakeBindingChangedSubscription);
-                }
                 if (ShutdownSubscription.IsValid())
                     events->Unsubscribe(ShutdownSubscription);
             }
             ActiveWorldChangedSubscription = {};
             WorldDestroyedSubscription = {};
-            TextureBakeBindingChangedSubscription = {};
             ShutdownSubscription = {};
         }
 
@@ -474,7 +423,6 @@ namespace Extrinsic::Runtime
             m_Impl->AssetHooksPublished ||
             m_Impl->ActiveWorldChangedSubscription.IsValid() ||
             m_Impl->WorldDestroyedSubscription.IsValid() ||
-            m_Impl->TextureBakeBindingChangedSubscription.IsValid() ||
             m_Impl->ShutdownSubscription.IsValid() ||
             setup.Services().Phase() !=
                 ServiceRegistryPhase::Registration ||
@@ -649,13 +597,6 @@ namespace Extrinsic::Runtime
                         state->DestroySceneBinding(true);
                     }
                 });
-        m_Impl->TextureBakeBindingChangedSubscription =
-            setup.Subscribe<TextureBakeBindingChanged>(
-                [weakState](const TextureBakeBindingChanged&)
-                {
-                    if (const auto state = weakState.lock())
-                        state->RefreshTextureBakeBinding();
-                });
         m_Impl->ShutdownSubscription =
             setup.Subscribe<RuntimeShutdownAnnounced>(
                 [weakState](const RuntimeShutdownAnnounced&)
@@ -666,7 +607,6 @@ namespace Extrinsic::Runtime
 
         if (!m_Impl->ActiveWorldChangedSubscription.IsValid() ||
             !m_Impl->WorldDestroyedSubscription.IsValid() ||
-            !m_Impl->TextureBakeBindingChangedSubscription.IsValid() ||
             !m_Impl->ShutdownSubscription.IsValid())
         {
             m_Impl->RollBack(
@@ -730,9 +670,14 @@ namespace Extrinsic::Runtime
         auto history =
             setup.Services().Require<EditorCommandHistory>(
                 Name());
-        if (!history.has_value())
+        auto textureBake =
+            setup.Services().Require<TextureBakeService>(
+                Name());
+        if (!history.has_value() || !textureBake.has_value())
         {
-            const Core::ErrorCode error = history.error();
+            const Core::ErrorCode error = !history.has_value()
+                ? history.error()
+                : textureBake.error();
             m_Impl->RollBack(
                 *this,
                 &setup.Events(),
@@ -747,8 +692,7 @@ namespace Extrinsic::Runtime
         state.History = &history->get();
         state.Selection =
             setup.Services().Find<SelectionController>();
-        state.TextureBake =
-            setup.Services().Find<TextureBakeService>();
+        state.TextureBake = &textureBake->get();
         state.AcceptingCallbacks = true;
 
         const std::weak_ptr<Impl::State> weakState =
