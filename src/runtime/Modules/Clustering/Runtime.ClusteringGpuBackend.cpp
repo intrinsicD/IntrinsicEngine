@@ -13,7 +13,9 @@ module;
 
 #include <glm/glm.hpp>
 
-module Extrinsic.Runtime.KMeansGpuBackend;
+module Extrinsic.Runtime.ClusteringModule;
+
+import :GpuBackend;
 
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.BufferTransfer;

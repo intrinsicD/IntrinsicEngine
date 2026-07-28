@@ -3,16 +3,19 @@
 Status: implemented design note; GEOM-056 Slices A-D implemented the planning,
 recording, persistent-buffer upload, post-submit async readback, portable
 assignment/update shaders, opt-in `gpu;vulkan` parity smoke, and benchmark
-manifest/result path. BUG-053 wires the Sandbox editor to the queued runtime
-GPU path. The current promoted shader path avoids optional Vulkan float-atomic
-and int64-atomic feature requirements; the faster segmented-reduction path
-remains a follow-up.
+manifest/result path. RUNTIME-196 subsequently converged the public architecture:
+`ClusteringService::RunKMeans` is now the sole CPU/GPU operation, while the
+recorder, resource cache, shared readback adapter, and one GPU participant are
+private `ClusteringModule` state. Sandbox UI/config/agent callers, the Vulkan
+smoke, and the benchmark all use that operation. The current promoted shader
+path avoids optional Vulkan float-atomic and int64-atomic feature requirements;
+the faster segmented-reduction path remains a follow-up.
 Scope: analyze the Framework24 CUDA k-means and propose a parity-gated GPU
 backend for `Geometry.KMeans` in IntrinsicEngine.
 
 Related existing work:
-- `docs/architecture/algorithm-variant-dispatch.md` — the CPU-reference + RHI
-  overload seam that `Geometry.KMeans` already exemplifies.
+- `docs/architecture/algorithm-variant-dispatch.md` — the CPU-reference plus
+  sole typed runtime-operation pattern that `Geometry.KMeans` exemplifies.
 - `docs/architecture/compute-parallel-primitives.md` — GRAPHICS-108 scan/compaction.
 - `tasks/archive/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md` — installed
   the `{CPU, GPU}` seam and telemetry; explicitly deferred the real GPU kernel.
@@ -41,11 +44,10 @@ Related existing work:
 - **Precedent is unambiguous.** METHOD-013 states its GPU backend is "Vulkan
   compute only; no CUDA path," and the dispatch doc maps `Backend::GPU →
   gpu_vulkan_compute` for compute-style families.
-- **The seam is already wired.** `Extrinsic.Runtime.KMeansBackend::ClusterKMeans`
-  preserves honest CPU fallback telemetry, while
-  `Extrinsic.Runtime.KMeansGpuBackend` owns the explicit GPU execution surface
-  for callers that can supply command recording, pipelines, persistent buffer
-  cache, and async readbacks.
+- **The operation is already wired.**
+  `Extrinsic.Runtime.ClusteringService::RunKMeans` preserves honest backend and
+  fallback telemetry while private `ClusteringModule` state owns command
+  recording, pipelines, persistent buffers, and async readback.
 
 A straight port of the Framework24 CUDA kernels is therefore the wrong shape for
 this repo. We migrate the **algorithm**, not the CUDA mechanics.
@@ -127,22 +129,23 @@ FellBackToCPU` telemetry are already defined and must be filled honestly.
 
 ---
 
-## 4. Proposed architecture
+## 4. Implemented architecture
 
-Mirror METHOD-013 exactly. New runtime module
-**`Extrinsic.Runtime.KMeansGpuBackend`** (`src/runtime/`), consumed by the
-existing `Extrinsic.Runtime.KMeansBackend` GPU branch. Geometry stays RHI-free;
-only the runtime adapter sees `RHI::IDevice`.
+Geometry stays RHI-free. Runtime exports one feature service operation; only a
+non-exported `ClusteringModule` partition and its owned GPU state see
+`RHI::IDevice`, command recording, pipelines, buffers, and readback.
 
 ```
 Geometry.KMeans (geometry, RHI-free)      ← canonical CPU reference (unchanged)
-Extrinsic.Runtime.KMeansGpuBackend (runtime)
-    ├─ buffer layout + BDA state record + push-constant structs
-    ├─ pipeline set (reset / assign / update / reduce)
-    ├─ persistent resource cache keyed by `(n,k)`
-    ├─ RecordKMeansGpuExecution(...)  → records the whole Lloyd loop
-    └─ KMeansGpuResultReadback        → one post-submit result batch at the end
-Extrinsic.Runtime.KMeansBackend::ClusterKMeans(...)  ← thin CPU fallback overload
+Extrinsic.Runtime.ClusteringModule (runtime)
+    ├─ ClusteringService::RunKMeans(...)  → sole typed CPU/GPU operation
+    ├─ CPU snapshot job + common stale/cancellation/writeback gate
+    └─ private :GpuBackend partition + GPU state
+        ├─ buffer layout + BDA state record + push-constant structs
+        ├─ pipeline set (reset / assign / update / reduce)
+        ├─ persistent resource cache keyed by `(n,k)`
+        ├─ private recorder             → records the whole Lloyd loop
+        └─ typed shared readback        → one post-submit result batch at the end
 ```
 
 ### 4.1 Shaders (`assets/shaders/`, `local_size_x = 256`, scalar BDA push)
@@ -323,36 +326,38 @@ ungated optional atomics.
   shared fixtures; assert the explicit GPU execution surface reaches the GPU path
   when operational and matches labels, centroids, inertia, and max-distance
   index within tolerance.
-- **Default-gate fallback test**: on the Null device, a `Backend::GPU` request
-  returns the CPU result with `ActualBackend == CPU`, `FellBackToCPU == true`
-  (extends the existing `tests/contract/runtime/Test.KMeansBackend.cpp`).
-- **Benchmark**: `IntrinsicKMeansGpuBenchmarkSmoke` emits `gpu_time_ms`, a
-  CPU-reference baseline timing, parity diagnostics, and `speedup_claimed=false`
-  until a separate baseline comparison task makes a supported performance claim.
+- **Default-gate fallback test**: on the Null device, a Vulkan-compute
+  `RunKMeans` request completes through the CPU reference with requested/actual
+  backend and fallback diagnostics asserted by `Test.ClusteringModule.cpp`.
+- **Benchmark**: `IntrinsicKMeansGpuBenchmarkSmoke` invokes
+  `ClusteringService`, reports end-to-end service command-to-applied-event time,
+  CPU-reference baseline timing, committed-property/service counters, parity
+  diagnostics, and `speedup_claimed=false`.
 
 ---
 
-## 8. Slice plan (mirrors METHOD-013)
+## 8. Implemented slice history
 
-- **Slice A — seam + telemetry (`CPUContracted`).** Add
-  `Extrinsic.Runtime.KMeansGpuBackend` skeleton; route the existing
-  `ClusterKMeans` GPU branch through it; honest fallback on non-operational
-  device; default-gate fallback test. No kernel yet.
+- **Slice A — seam + telemetry (`CPUContracted`).** GEOM-056 introduced the
+  initial GPU planning seam and honest fallback on a non-operational device.
 - **Slice B — layout + shaders (`CPUContracted`).** BDA state record,
   push-constant structs, `kmeans_reset/assign/update` shader assets, fail-closed
   dispatch planning; `check_shader_outputs` wiring. Execution still falls back.
-- **Slice C — record + persistent buffers.** Implemented by
-  `KMeansGpuResourceCache`, `RecordKMeansGpuExecution(...)`, and
-  `KMeansGpuResultReadback`: persistent `(n,k)` buffer leasing, one-time SoA
-  position + seed-centroid upload, recorded Lloyd loop with barriers, and async
-  labels/distances/centroids drains. The current shaders use portable assignment
-  plus per-cluster scans and do not require optional float/int64 atomic features.
+- **Slice C — record + persistent buffers.** Implemented persistent `(n,k)`
+  buffer leasing, one-time SoA position + seed-centroid upload, the recorded
+  Lloyd loop with barriers, and async labels/distances/centroids drains. Those
+  details now live in the private clustering backend partition. The current
+  shaders use portable assignment plus per-cluster scans and do not require
+  optional float/int64 atomic features.
 - **Slice D — parity + benchmark (`Operational` → `ParityProven`).** Implemented
-  by `IntrinsicRuntimeKMeansGpuSmokeTests` and
-  `IntrinsicKMeansGpuBenchmarkSmoke`: the opt-in `gpu;vulkan` smoke validates the
-  deterministic fixture against the CPU reference, and the benchmark manifest /
-  emitted result JSON report GPU wall time, CPU-reference baseline timing, and
-  parity diagnostics without claiming a speedup.
+  by `ClusteringServiceGpuSmoke` and `IntrinsicKMeansGpuBenchmarkSmoke`: the
+  opt-in `gpu;vulkan` smoke validates the deterministic fixture against the CPU
+  reference, and the benchmark manifest/result report service latency,
+  CPU-reference baseline timing, and parity diagnostics without claiming a
+  speedup.
+- **RUNTIME-196 convergence.** Moved the implementation behind
+  `ClusteringService`, migrated UI/config/agent/smoke/benchmark callers, and
+  deleted the public wrapper, Sandbox queue, and duplicate facade DTO family.
 
 Each slice is independently bisectable and keeps the default CPU gate green.
 

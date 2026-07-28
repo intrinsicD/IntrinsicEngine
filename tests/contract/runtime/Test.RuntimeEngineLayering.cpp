@@ -938,6 +938,9 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
                  "src/runtime/Runtime.SelectedMeshTextureBake.cpp");
     const auto methodFacade =
         ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxMethodFacade.cpp");
+    const auto clusteringModule = ReadFile(
+        RepoRoot() /
+        "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp");
     const auto editorFacades =
         ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxEditorFacades.cpp");
     const auto assetWorkflow =
@@ -962,8 +965,22 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     EXPECT_EQ(CountOccurrences(modelHandoff, ".Scope = "), 4u);
     EXPECT_EQ(CountOccurrences(selectedBake, "JobDesc desc"), 1u);
     EXPECT_EQ(CountOccurrences(selectedBake, ".Scope = context.World"), 1u);
-    EXPECT_EQ(CountOccurrences(methodFacade, "JobDesc desc{"), 2u);
-    EXPECT_EQ(CountOccurrences(methodFacade, ".Scope = context.World"), 2u);
+    EXPECT_EQ(CountOccurrences(methodFacade, "JobDesc desc{"), 1u);
+    EXPECT_EQ(CountOccurrences(methodFacade, ".Scope = context.World"), 1u);
+    EXPECT_EQ(
+        CountOccurrences(
+            clusteringModule,
+            "MakeCpuJobDesc<KMeansJobResult>("),
+        1u);
+    EXPECT_EQ(
+        CountOccurrences(
+            clusteringModule,
+            "const WorldHandle world = snapshot.World"),
+        1u);
+    EXPECT_NE(
+        WithoutWhitespace(clusteringModule).find(
+            "returnKMeansSnapshot{.Command=command,.World=world"),
+        std::string::npos);
     // RUNTIME-194 Slice B5d moved all five desc factories to JobService. The
     // invariant under test is unchanged — every production async submission
     // carries its owning world scope.

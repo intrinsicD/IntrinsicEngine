@@ -8,6 +8,7 @@ export namespace Extrinsic::Sandbox
 {
     struct SandboxConfigSectionCallbacks
     {
+        Runtime::EngineConfigSectionChangedCallback Clustering{};
         Runtime::EngineConfigSectionChangedCallback ProgressivePoisson{};
         Runtime::EngineConfigSectionChangedCallback Parameterization{};
     };

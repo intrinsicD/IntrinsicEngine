@@ -86,6 +86,9 @@ namespace Extrinsic::Runtime
         ModuleUnavailable,
     };
 
+    export [[nodiscard]] std::string_view ToString(
+        KMeansRunStatus status) noexcept;
+
     export struct RunKMeans
     {
         std::uint32_t StableEntityId{0u};

@@ -22,12 +22,15 @@ It links `IntrinsicGeometry` so workloads may use the public Geometry C++23
 module surface directly; benchmarks must not import `assets`, `ecs`,
 `runtime`, `graphics`, or `platform`.
 
-The GEOM-056 KMeans Vulkan smoke is the explicit exception: it lives in
+The GEOM-056/RUNTIME-196 KMeans Vulkan smoke is the explicit exception: it lives in
 [`Bench_KMeansGpuVulkanSmoke.cpp`](Bench_KMeansGpuVulkanSmoke.cpp), imports the
-runtime/Vulkan stack, and is registered as `IntrinsicKMeansGpuBenchmarkSmoke`
-with `benchmark;geometry;runtime;gpu;vulkan` labels. It emits GPU timing,
-CPU-reference baseline timing, and parity diagnostics for the same deterministic
-fixture without claiming a speedup.
+runtime/Vulkan stack, composes the production `ClusteringService`, and is
+registered as `IntrinsicKMeansGpuBenchmarkSmoke` with
+`benchmark;geometry;runtime;gpu;vulkan` labels. It reports end-to-end service
+command-to-applied-event timing, CPU-reference baseline timing, committed
+property/service-operation diagnostics, and parity for the same deterministic
+fixture without claiming a speedup. The timing is intentionally not described
+as raw shader or device time.
 
 ## Manifest schema
 

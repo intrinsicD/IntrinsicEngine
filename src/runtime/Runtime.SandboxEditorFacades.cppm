@@ -35,20 +35,16 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.Renderer;
-import Extrinsic.RHI.BufferManager;
-import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
-import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Runtime.AssetImportPipeline;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
-import Extrinsic.Runtime.ClusteringModule;
+export import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobService;
-import Extrinsic.Runtime.KMeansGpuBackend;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
@@ -67,7 +63,6 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
-import Geometry.KMeans;
 import Geometry.Graph.Vertex.Normals;
 import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.PointCloud.Normals;
@@ -96,61 +91,7 @@ export namespace Extrinsic::Runtime
             CameraControllerRegistry& cameraControllers,
             SelectionController& selection);
 
-    enum class RuntimeKMeansGpuJobStatus : std::uint8_t
-    {
-        Idle,
-        Accepted,
-        Busy,
-        InvalidInput,
-        GpuUnavailable,
-        PipelineUnavailable,
-        RecordFailed,
-        ReadbackPending,
-        ReadbackFailed,
-        Completed,
-    };
-
-    struct RuntimeKMeansGpuJobRequest
-    {
-        std::uint64_t Sequence{0u}; // 0 means "assign a sequence on submit".
-        std::uint32_t StableEntityId{0u};
-        std::uint32_t DomainTag{0u};
-        std::vector<glm::vec3> Points{};
-        std::vector<glm::vec3> InitialCentroids{};
-        Geometry::KMeans::KMeansParams Params{};
-    };
-
-    struct RuntimeKMeansGpuJobSubmission
-    {
-        RuntimeKMeansGpuJobStatus Status{RuntimeKMeansGpuJobStatus::Idle};
-        std::uint64_t Sequence{0u};
-        KMeansGpuStatus GpuStatus{KMeansGpuStatus::Success};
-        std::string Diagnostic{};
-
-        [[nodiscard]] bool Accepted() const noexcept
-        {
-            return Status == RuntimeKMeansGpuJobStatus::Accepted;
-        }
-    };
-
-    struct RuntimeKMeansGpuJobResult
-    {
-        RuntimeKMeansGpuJobStatus Status{RuntimeKMeansGpuJobStatus::Idle};
-        std::uint64_t Sequence{0u};
-        std::uint32_t StableEntityId{0u};
-        std::uint32_t DomainTag{0u};
-        KMeansGpuStatus GpuStatus{KMeansGpuStatus::Success};
-        Geometry::KMeans::KMeansResult Result{};
-        std::string Diagnostic{};
-
-        [[nodiscard]] bool Succeeded() const noexcept
-        {
-            return Status == RuntimeKMeansGpuJobStatus::Completed;
-        }
-    };
 }
-
-#include "Runtime.KMeansGpuJobQueue.Internal.hpp"
 
 export namespace Extrinsic::Runtime
 {
@@ -426,63 +367,11 @@ export namespace Extrinsic::Runtime
         const ECS::Scene::Registry& registry,
         ECS::EntityHandle entity);
 
-    enum class SandboxEditorKMeansBackend : std::uint8_t
-    {
-        CpuReference,
-        VulkanCompute,
-    };
-
-    [[nodiscard]] const char* DebugNameForSandboxEditorKMeansBackend(
-        SandboxEditorKMeansBackend backend) noexcept;
-
     [[nodiscard]] const char* DebugNameForSandboxEditorGeometryProcessingDomain(
         SandboxEditorGeometryProcessingDomain domain) noexcept;
 
     [[nodiscard]] const char* DebugNameForSandboxEditorGeometryProcessingAlgorithm(
         SandboxEditorGeometryProcessingAlgorithm algorithm) noexcept;
-
-    struct SandboxEditorKMeansCommand
-    {
-        std::uint32_t StableEntityId{0u};
-        SandboxEditorGeometryProcessingDomain Domain{
-            SandboxEditorGeometryProcessingDomain::PointCloudPoints};
-        std::uint32_t ClusterCount{8u};
-        std::uint32_t MaxIterations{32u};
-        std::uint32_t Seed{42u};
-        bool UseHierarchicalInitialization{true};
-        SandboxEditorKMeansBackend Backend{
-            SandboxEditorKMeansBackend::CpuReference};
-    };
-
-    struct SandboxEditorKMeansResult
-    {
-        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
-        SandboxEditorGeometryProcessingDomain Domain{
-            SandboxEditorGeometryProcessingDomain::None};
-        std::uint32_t LabelCount{0u};
-        std::uint32_t ClusterCount{0u};
-        std::uint32_t Iterations{0u};
-        bool Converged{false};
-        float Inertia{0.0f};
-        std::uint32_t MaxDistanceIndex{0u};
-        SandboxEditorKMeansBackend RequestedBackend{
-            SandboxEditorKMeansBackend::CpuReference};
-        SandboxEditorKMeansBackend ActualBackend{
-            SandboxEditorKMeansBackend::CpuReference};
-        std::string RequestedBackendId{};
-        std::string RequestedBackendDisplayName{};
-        std::string BackendId{};
-        std::string BackendDisplayName{};
-        bool FellBackToCpu{false};
-        std::string BackendFallbackReason{};
-        Core::ErrorCode Error{Core::ErrorCode::Success};
-        std::string Message{};
-
-        [[nodiscard]] bool Succeeded() const noexcept
-        {
-            return Status == SandboxEditorCommandStatus::Applied;
-        }
-    };
 
     enum class SandboxEditorProgressivePoissonChannel : std::uint8_t
     {
@@ -2139,31 +2028,6 @@ export namespace Extrinsic::Runtime
         }
     };
 
-    struct SandboxEditorKMeansCommandSurface
-    {
-        std::function<CommandCorrelationId(RunKMeans)> Submit{};
-        bool Required{false};
-
-        [[nodiscard]] bool Available() const noexcept
-        {
-            return static_cast<bool>(Submit);
-        }
-    };
-
-    struct SandboxEditorKMeansGpuCommandSurface
-    {
-        std::function<RuntimeKMeansGpuJobSubmission(RuntimeKMeansGpuJobRequest)>
-            Submit{};
-        std::function<std::optional<RuntimeKMeansGpuJobResult>()>
-            ConsumeCompleted{};
-
-        [[nodiscard]] bool Available() const noexcept
-        {
-            return static_cast<bool>(Submit) &&
-                   static_cast<bool>(ConsumeCompleted);
-        }
-    };
-
     // `JobService` deliberately stores no editor domain identity. The session
     // therefore records identity at submit and exposes the two queries the
     // editor actually needs: active-output dedup and per-entity queue rows.
@@ -2188,7 +2052,6 @@ export namespace Extrinsic::Runtime
 
     struct SandboxEditorMethodResultSinks
     {
-        std::function<void(SandboxEditorKMeansResult)> KMeans{};
         std::function<void(SandboxEditorProgressivePoissonResult)>
             ProgressivePoisson{};
         std::function<void(SandboxEditorUvRegenerationCommandResult)>
@@ -2318,7 +2181,7 @@ export namespace Extrinsic::Runtime
         bool PointCloudOutlierRemovalAvailable{false};
         bool PointCloudProgressivePoissonAvailable{false};
         bool MeshProgressivePoissonAvailable{false};
-        std::optional<SandboxEditorKMeansResult> LastKMeansResult{};
+        std::optional<KMeansRunCompleted> LastKMeansResult{};
         std::optional<SandboxEditorMeshDenoiseResult>
             LastMeshDenoiseResult{};
         std::optional<SandboxEditorMeshCurvatureResult>
@@ -2607,6 +2470,7 @@ export namespace Extrinsic::Runtime
         Core::Extent2D CameraViewport{};
         RHI::IDevice* Device{nullptr};
         TextureBakeService* TextureBake{nullptr};
+        ClusteringService* Clustering{nullptr};
         SandboxEditorAssetImportCommandSurface AssetImportCommands{};
         SandboxEditorAssetImportQueueCommandSurface AssetImportQueueCommands{};
         SandboxEditorSceneFileCommandSurface SceneFileCommands{};
@@ -2615,8 +2479,6 @@ export namespace Extrinsic::Runtime
             ParameterizationUvViewCommands{};
         SandboxEditorVisualizationAdapterBindingCommandSurface VisualizationAdapterBindings{};
         std::uint64_t VisualizationAdapterBindingRevision{0u};
-        SandboxEditorKMeansCommandSurface KMeansCommands{};
-        SandboxEditorKMeansGpuCommandSurface KMeansGpuCommands{};
         SandboxEditorJobCommandSurface JobCommands{};
         SandboxEditorMethodResultSinks MethodResultSinks{};
         RuntimeAssetImportQueueSnapshot AssetImportQueue{};
@@ -2626,7 +2488,7 @@ export namespace Extrinsic::Runtime
             Assets::AssetPayloadKind::Unknown};
         const SandboxEditorFileImportResult* LastAssetImportResult{nullptr};
         const SandboxEditorSceneFileResult* LastSceneFileResult{nullptr};
-        const SandboxEditorKMeansResult* LastKMeansResult{nullptr};
+        const KMeansRunCompleted* LastKMeansResult{nullptr};
         const SandboxEditorMeshDenoiseResult*
             LastMeshDenoiseResult{nullptr};
         const SandboxEditorMeshCurvatureResult*
@@ -3170,10 +3032,6 @@ export namespace Extrinsic::Runtime
     DebugNameForSandboxEditorParameterizationUvViewStatus(
         SandboxEditorParameterizationUvViewStatus status) noexcept;
 
-    SandboxEditorKMeansResult ApplySandboxEditorKMeansCommand(
-        const SandboxEditorContext& context,
-        const SandboxEditorKMeansCommand& command);
-
     SandboxEditorMeshDenoiseResult ApplySandboxEditorMeshDenoiseCommand(
         const SandboxEditorContext& context,
         const SandboxEditorMeshDenoiseCommand& command);
@@ -3227,6 +3085,16 @@ export namespace Extrinsic::Runtime
     ApplySandboxEditorProgressivePoissonConfigCommand(
         const SandboxEditorContext& context,
         const SandboxEditorProgressivePoissonConfigCommand& command);
+
+    [[nodiscard]] RuntimeEngineConfigApplyResult
+    ApplySandboxEditorClusteringConfig(
+        const SandboxEditorContext& context,
+        const ClusteringConfig& config,
+        std::string sourceId = "sandbox.clustering");
+
+    [[nodiscard]] std::optional<ClusteringConfig>
+    GetSandboxEditorClusteringConfig(
+        const SandboxEditorContext& context) noexcept;
 
     [[nodiscard]] std::optional<SandboxEditorProgressivePoissonConfig>
     GetSandboxEditorProgressivePoissonConfig(
@@ -3291,14 +3159,11 @@ export namespace Extrinsic::Runtime
         }
 
     private:
-        void AttachKMeansGpuQueue(ServiceRegistry& services);
-        void DetachKMeansGpuQueue();
         void ResetAttachmentState();
 
         WorldRegistry* m_Worlds{nullptr};
         ServiceRegistry* m_Services{nullptr};
         JobService* m_Jobs{nullptr};
-        RHI::IDevice* m_Device{nullptr};
         bool m_FramePrepared{false};
         SandboxEditorContext m_Context{};
         SandboxEditorPanelFrame m_LastFrame{};
@@ -3307,11 +3172,9 @@ export namespace Extrinsic::Runtime
         std::uint64_t m_LastObservedRuntimeSceneFileSequence{0};
         std::optional<SandboxEditorFileImportResult> m_LastImportResult{};
         std::optional<SandboxEditorSceneFileResult> m_LastSceneFileResult{};
-        std::optional<SandboxEditorKMeansResult> m_LastKMeansResult{};
+        std::optional<KMeansRunCompleted> m_LastKMeansResult{};
         ClusteringService* m_ClusteringService{};
         KernelEventSubscription m_KMeansCompletionSubscription{};
-        std::unique_ptr<RuntimeKMeansGpuJobQueue> m_KMeansGpuJobs{};
-        GpuQueueParticipantHandle m_KMeansGpuParticipant{};
         std::optional<SandboxEditorMeshDenoiseResult>
             m_LastMeshDenoiseResult{};
         std::optional<SandboxEditorMeshCurvatureResult>

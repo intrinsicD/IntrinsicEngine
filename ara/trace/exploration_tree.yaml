@@ -6745,3 +6745,36 @@ tree:
       this result-transport lifecycle, and METHOD-014 still owns Progressive
       Poisson compute and public parity.
     status: resolved
+  - id: N284
+    type: experiment
+    title: "Converge runtime K-Means on one typed clustering service"
+    provenance: ai-executed
+    timestamp: "2026-07-28T02:23+02:00"
+    also_depends_on: [N281, N283]
+    evidence:
+      - "tasks/done/RUNTIME-196-canonical-clustering-service-path.md"
+      - "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm"
+      - "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp"
+      - "src/runtime/Modules/Clustering/Runtime.ClusteringGpuBackend.cppm"
+      - "src/runtime/Runtime.SandboxConfigSections.cpp"
+      - "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp"
+      - "tests/contract/runtime/Test.ClusteringModule.cpp"
+      - "tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp"
+      - "tests/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp"
+      - "benchmarks/geometry/manifests/geometry_kmeans_gpu_vulkan_smoke.yaml"
+      - "focused CPU clustering/config/structural cohort: 48/48"
+      - "complete CPU-supported selector: 4210 passed plus one expected GLFW/LSan self-skip"
+      - "ASan+UBSan promoted-Vulkan clustering/benchmark selector: 3/3"
+      - "NVIDIA GeForce RTX 3050, driver 590.48.01"
+    result: >
+      Every production CPU and Vulkan K-Means caller now enters
+      ClusteringService::RunKMeans and terminates through the same typed
+      completion/change events. Config and UI map the same canonical request,
+      selected-entity label/color writeback and visualization invalidation are
+      service-owned, and the recorder/cache/readback implementation is a
+      non-exported clustering partition. The parallel public wrapper modules,
+      Sandbox-private GPU queue, duplicate facade records/command, and their
+      wrapper-only tests are absent. CPU contracts and actual Vulkan parity
+      passed; the service-routed benchmark passed strict validation and makes
+      no performance-improvement claim.
+    status: resolved

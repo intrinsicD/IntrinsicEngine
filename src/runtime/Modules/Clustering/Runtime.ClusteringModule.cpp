@@ -780,20 +780,32 @@ namespace Extrinsic::Runtime
             const RunKMeans command = snapshot.Command;
             const WorldHandle world = snapshot.World;
             const CommandCorrelationId correlation = snapshot.Correlation;
-            const JobToken token = jobs.Submit(
-                MakeCpuJobDesc<KMeansJobResult>(
-                    "Runtime.Clustering.KMeans.CPU",
-                    world,
-                    [snapshot = std::move(snapshot)](
-                        const JobCancellation& cancellation) mutable
-                    {
-                        return RunKMeansWorker(
-                            std::move(snapshot), cancellation);
-                    },
-                    [](const KMeansJobResult& result)
-                    {
-                        return KMeansJobCompleted{.Result = result};
-                    }));
+            JobDesc job = MakeCpuJobDesc<KMeansJobResult>(
+                "Runtime.Clustering.KMeans.CPU",
+                world,
+                [snapshot = std::move(snapshot)](
+                    const JobCancellation& cancellation) mutable
+                {
+                    return RunKMeansWorker(
+                        std::move(snapshot), cancellation);
+                },
+                [](const KMeansJobResult& result)
+                {
+                    return KMeansJobCompleted{.Result = result};
+                });
+            job.FinalizeUnpublishedOnMainThread =
+                [events, command, world, correlation]() mutable
+                {
+                    KMeansRunCompleted cancelled = MakeCompletion(
+                        command,
+                        world,
+                        correlation,
+                        KMeansRunStatus::Cancelled,
+                        Core::ErrorCode::InvalidState,
+                        "K-Means work was cancelled before its result could be committed.");
+                    PublishCompletion(events, std::move(cancelled));
+                };
+            const JobToken token = jobs.Submit(std::move(job));
             if (!token.IsValid())
             {
                 stats.JobSubmissionFailures += 1u;
@@ -935,6 +947,29 @@ namespace Extrinsic::Runtime
         case ClusteringBackend::VulkanCompute: return "vulkan_compute";
         }
         return "none";
+    }
+
+    std::string_view ToString(const KMeansRunStatus status) noexcept
+    {
+        switch (status)
+        {
+        case KMeansRunStatus::Queued: return "Queued";
+        case KMeansRunStatus::Applied: return "Applied";
+        case KMeansRunStatus::MissingScene: return "MissingScene";
+        case KMeansRunStatus::InvalidProcessingParameters:
+            return "InvalidProcessingParameters";
+        case KMeansRunStatus::StaleEntity: return "StaleEntity";
+        case KMeansRunStatus::UnsupportedGeometryDomain:
+            return "UnsupportedGeometryDomain";
+        case KMeansRunStatus::GeometryProcessingFailed:
+            return "GeometryProcessingFailed";
+        case KMeansRunStatus::Cancelled: return "Cancelled";
+        case KMeansRunStatus::StaleSource: return "StaleSource";
+        case KMeansRunStatus::StaleWorld: return "StaleWorld";
+        case KMeansRunStatus::ModuleUnavailable:
+            return "ModuleUnavailable";
+        }
+        return "Unknown";
     }
 
     KMeansPropertyRefs MakeKMeansPropertyRefs(

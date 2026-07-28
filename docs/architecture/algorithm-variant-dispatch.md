@@ -1,20 +1,21 @@
 # Algorithm Variant Dispatch Pattern
 
 Status: canonical template. `Geometry.KMeans` is the first implemented exemplar
-for the CPU-reference plus RHI-visible seam; GEOM-056 adds the opt-in
-Vulkan-compute execution surface behind that seam.
+for a lower-layer CPU reference plus one runtime-owned typed operation;
+GEOM-056 supplies Vulkan compute and RUNTIME-196 keeps its recorder, cache, and
+readback lifecycle private behind `ClusteringService`.
 
 This document describes typed strategy dispatch and the optional backend seam
 for geometry and method algorithms. A backend selector is justified only when a
 second implementation exists or an active task owns it; future possibility
 alone does not justify a CPU/GPU token or fallback branch. The first full
 Strategy × Backend exemplar is
-`Geometry.KMeans`: its CPU reference path is implemented in `src/geometry`,
-`Extrinsic.Runtime.KMeansBackend` provides the `RHI::IDevice`-visible
-convenience overload that falls back honestly, and
-`Extrinsic.Runtime.KMeansGpuBackend` exposes the explicit command-recording
-Vulkan-compute path for callers that own pipelines, cache, and async readback
-lifetime.
+`Geometry.KMeans`: its CPU reference path is implemented in `src/geometry`, and
+`Extrinsic.Runtime.ClusteringService::RunKMeans` is the sole operation that
+selects CPU reference or Vulkan compute, owns ECS snapshot/writeback, and
+reports fallback honestly. Its Vulkan recorder, persistent resources, and
+typed readback are implementation-only module state rather than another caller
+surface.
 
 The seam keeps the CPU reference path testable without RHI while giving runtime
 or method-integration code a clear place to request a GPU backend and fall back
@@ -51,10 +52,12 @@ only when the result telemetry says so.
 The CPU reference entry point lives with the algorithm's owning lower layer. For
 geometry algorithms, that means `src/geometry` and no RHI import.
 
-The GPU-capable overload lives in the integration layer that can see RHI, usually
-runtime or a declared method backend adapter. It takes `Extrinsic::RHI::IDevice&`
-and must gate on `IDevice::IsOperational()`. It must not expose Vulkan backend
-types or `Vk*` handles through the public seam.
+The GPU-capable implementation lives in the integration layer that can see RHI,
+usually runtime or a declared method backend adapter. The public integration
+surface is one typed feature operation; it carries backend selection as request
+data and must not expose `RHI::IDevice`, command contexts, Vulkan backend types,
+resource caches, readback adapters, or `Vk*` handles. The private implementation
+gates on `IDevice::IsOperational()` and rejoins the canonical result path.
 
 ```
 Geometry or method CPU layer
@@ -62,7 +65,8 @@ Geometry or method CPU layer
   Algorithm.cpp   -> deterministic CPU reference implementation
 
 Runtime or backend adapter layer
-  AlgorithmGpu.cpp -> RHI::IDevice-backed overload and GPU fallback policy
+  FeatureService.cppm -> one typed request/completion operation
+  FeatureGpu.cpp      -> private RHI recording/readback and fallback policy
 ```
 
 ## Module Interface Shape
@@ -195,49 +199,35 @@ in its params so callers can use one config struct everywhere.
 request. A CPU-only family without that seam should expose neither the request
 nor synthetic `ActualBackend` telemetry.
 
-## GPU-Capable Overload
+## Runtime Operation And Private GPU Backend
 
-The GPU-capable overload is declared and built only where RHI is an allowed
-dependency. It accepts `Extrinsic::RHI::IDevice&`, checks operational readiness,
-tries the requested GPU path only when supported, and falls back to the CPU
-reference otherwise.
+Once a GPU implementation exists, expose one typed feature operation in the
+RHI-owning integration layer. The request carries the selected source/output
+identities, algorithm parameters, and requested backend; the completion carries
+the same identities plus actual backend and fallback diagnostics. The operation
+captures an immutable CPU snapshot before either backend runs and owns the sole
+main-thread validation/writeback boundary.
+
+The GPU implementation is private module state. It checks operational readiness,
+records through the runtime's existing frame command context, retains only the
+resources needed across frames, drains one shared result batch, and publishes
+into the same completion path as the CPU reference. Callers—including UI,
+config/agent control, tests, and benchmarks—never receive the recorder or cache.
 
 ```cpp
-import Extrinsic.RHI.Device;
-import Geometry.KMeans;
-
-namespace Extrinsic::Runtime
-{
-    [[nodiscard]] std::optional<Geometry::KMeans::KMeansResult> ClusterKMeans(
-        std::span<const glm::vec3> points,
-        const Geometry::KMeans::KMeansParams& params,
-        Extrinsic::RHI::IDevice& device)
-    {
-        namespace KMeans = Geometry::KMeans;
-
-        if (params.Compute == KMeans::Backend::GPU &&
-            device.IsOperational())
-        {
-            // Future parity-gated GPU kernel hook. GEOM-052 intentionally
-            // installs only the seam, so the current exemplar falls through.
-        }
-
-        auto cpuParams = params;
-        cpuParams.Compute = KMeans::Backend::CPU;
-        auto cpuResult = KMeans::Cluster(points, cpuParams);
-        if (cpuResult)
-        {
-            cpuResult->ActualBackend = KMeans::Backend::CPU;
-            cpuResult->RequestedBackend = params.Compute;
-            cpuResult->FellBackToCPU = params.Compute == KMeans::Backend::GPU;
-        }
-        return cpuResult;
-    }
-}
+const RunKMeans request{
+    .StableEntityId = selected,
+    .Properties = MakeKMeansPropertyRefs(domain),
+    .Parameters = configuredParameters,
+    .Backend = ClusteringBackend::VulkanCompute,
+};
+const CommandCorrelationId correlation = service.RunKMeans(request);
 ```
 
-Fallback is not silent. Tests must assert requested-vs-actual backend telemetry,
-especially when `Backend::GPU` is requested on a null or non-operational device.
+Fallback is not silent. Contracts assert requested-vs-actual backend telemetry,
+especially when Vulkan compute is requested on a null or non-operational device.
+Cancellation, stale world/entity/property state, GPU failure, CPU fallback, and
+successful writeback all terminate through the same typed completion event.
 
 Reusable GPU building blocks should stay in graphics-owned modules rather than
 inside individual method adapters. For scan/compaction-style compute workloads,
@@ -279,9 +269,10 @@ Recommended flow:
 
 1. Config or command selects `Backend::CPU` or `Backend::GPU` for one dispatch
    family.
-2. Runtime translates that value into the algorithm params.
-3. The GPU-capable overload checks `RHI::IDevice::IsOperational()`.
-4. The result reports `ActualBackend` and fallback state.
+2. Runtime translates that value into the sole typed feature request.
+3. Private module state checks `RHI::IDevice::IsOperational()` and either
+   accepts GPU work or invokes the CPU reference with a fallback diagnostic.
+4. The typed completion reports `ActualBackend` and fallback state.
 5. UI/agent diagnostics display requested and actual backends separately.
 
 This keeps early CPU-only algorithms honest while preserving a stable control
@@ -300,10 +291,10 @@ Use this checklist when adding a new dispatchable family:
 - Put output payload and convergence/diagnostics in the result struct; add
   requested/actual/fallback telemetry only for a real backend seam.
 - Export a CPU-only free function from the owning layer with no RHI dependency.
-- When GPU execution is owned, add its overload only in a layer that may import
-  RHI, using `Extrinsic::RHI::IDevice&`.
-- Gate an owned GPU path on `IDevice::IsOperational()` and explicit strategy
-  support, and fall back to the CPU reference with honest telemetry.
+- When GPU execution is owned, expose one typed feature operation in a layer
+  that may import RHI; keep device, recorder, resources, and readback private.
+- Gate private GPU work on `IDevice::IsOperational()` and explicit strategy
+  support, and rejoin the CPU reference completion path with honest telemetry.
 - Add CPU unit tests for each strategy and fallback/telemetry tests for any
   RHI-backed overload.
 
@@ -314,33 +305,23 @@ Use this checklist when adding a new dispatchable family:
 `KMeansParams::Compute`, and reports `RequestedBackend`, `ActualBackend`, and
 `FellBackToCPU` in `KMeansResult`.
 
-The Sandbox K-Means panel exposes that backend request to users as CPU reference
-vs Vulkan compute. `SandboxEditorKMeansResult` reports stable requested and
-actual backend ids (`cpu_reference` / `gpu_vulkan_compute`), display names, and
-CPU fallback reason when applicable, so the UI and agent callers can choose a
-backend for one run without scraping diagnostics text.
+The Sandbox K-Means panel exposes CPU reference vs Vulkan compute through the
+validated `sandbox.clustering` config section. UI and agent/CLI hot apply both
+map `ClusteringConfig` to the same `RunKMeans` request, and
+`KMeansRunCompleted` reports stable requested/actual backend identity plus an
+explicit fallback diagnostic without requiring callers to scrape text.
 
-The CPU entry point always runs the CPU reference implementation. The runtime
-adapter `Extrinsic.Runtime.KMeansBackend::ClusterKMeans(...)` accepts
-`Extrinsic::RHI::IDevice&`, evaluates `IDevice::IsOperational()` for GPU
-requests, and falls back to the CPU reference with honest telemetry because that
-synchronous convenience overload does not own the command context, pipeline set,
-persistent buffer cache, or result-readback adapter required to execute GPU work.
-The explicit runtime GPU surface lives in
-`Extrinsic.Runtime.KMeansGpuBackend`: callers supply those dependencies to
-`RecordKMeansGpuExecution(...)`, which reuses persistent `(n,k)` buffers, uploads
-SoA positions plus seed centroids once, records the reset/assign/update pass
-loop, and returns cache-owned result resources. Callers enqueue one
-`KMeansGpuResultReadback` after the producing command submission has retired;
-the typed adapter selects labels/distances/centroids as one copied
-`Graphics.GpuTransfer` batch without a device-wide readback stall. The Sandbox editor
-uses a queue registered with the `JobService` `GpuQueue` participant registry so
-those command/readback dependencies record inside the normal renderer frame
-context and never create an extra swapchain present. That queue is private
-implementation glue attached to `Extrinsic.Runtime.SandboxEditorFacades`; the
-request, submission, result, and status DTOs remain on the public facade. The
-queue publishes completed GPU labels and colors back through the same ECS
-property path as CPU K-Means. GEOM-056 proves
-the explicit GPU path with an opt-in `gpu;vulkan` parity smoke and
-`IntrinsicKMeansGpuBenchmarkSmoke`, which emits GPU timing, CPU-reference
-baseline timing, and parity diagnostics without making a speedup claim.
+The geometry entry point always runs the deterministic CPU reference.
+`Extrinsic.Runtime.ClusteringService::RunKMeans` is the sole integration
+operation: it snapshots typed geometry properties, routes CPU work through
+world-scoped `JobService`, or accepts Vulkan work into one private clustering
+GPU participant. The non-exported backend partition reuses persistent `(n,k)`
+buffers, records the reset/assign/update loop, and drains labels, distances,
+and centroids as one copied `Graphics.GpuTransfer` batch after producer
+retirement. Both paths rejoin one stale/cancellation/writeback gate, publish the
+same typed completion, and commit label/color properties before visualization
+refresh. No Sandbox facade DTO, backend module, direct benchmark import, or
+second queue bypasses the service. GEOM-056/RUNTIME-196 prove this operation
+with an opt-in `gpu;vulkan` service parity smoke and the stable
+`IntrinsicKMeansGpuBenchmarkSmoke`, which reports end-to-end
+command-to-applied-event timing, CPU-reference parity, and no speedup claim.

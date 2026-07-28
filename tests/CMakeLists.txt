@@ -248,7 +248,6 @@ if(TARGET ExtrinsicRuntime)
         Test.CoreGraphInterfaces.cpp
         Test.GpuAssetCacheFallbackBootstrap.cpp
         Test.GpuResultReadbackJob.cpp
-        Test.KMeansGpuBackend.cpp
         Test.AssetGeometryIO.cpp
         Test.AssetIngestStateMachine.cpp
         Test.AssetImportFormatCoverage.cpp
@@ -264,7 +263,6 @@ if(TARGET ExtrinsicRuntime)
         Test.EditorWindowRegistry.cpp
         Test.ImGuiAdapter.cpp
         Test.ImGuiAdapterEngineWiring.cpp
-        Test.KMeansBackend.cpp
         Test.MeshGeometryExtraction.cpp
         Test.MeshAttributeTextureBake.cpp
         Test.MeshGeometryPacker.cpp
@@ -756,16 +754,16 @@ endif()
 # Kept in its own target so clustering service parity can be selected without
 # running broader runtime integration suites.
 if(TARGET ExtrinsicRuntime AND TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
-    set(_runtime_kmeans_gpu_smoke_test_files
+    set(_runtime_clustering_service_gpu_smoke_test_files
         Test.ClusteringServiceGpuSmoke.cpp
     )
-    intrinsic_resolve_test_sources(_runtime_kmeans_gpu_smoke_test_sources
+    intrinsic_resolve_test_sources(_runtime_clustering_service_gpu_smoke_test_sources
         SEARCH_DIRS integration/runtime
-        FILES ${_runtime_kmeans_gpu_smoke_test_files}
+        FILES ${_runtime_clustering_service_gpu_smoke_test_files}
     )
-    intrinsic_test_object_lib(RuntimeKMeansGpuSmokeTestObjs
+    intrinsic_test_object_lib(RuntimeClusteringServiceGpuSmokeTestObjs
         SOURCES
-            ${_runtime_kmeans_gpu_smoke_test_sources}
+            ${_runtime_clustering_service_gpu_smoke_test_sources}
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore IntrinsicGeometry glm::glm
     )
 endif()
@@ -1318,13 +1316,13 @@ if(TARGET RuntimeSandboxAcceptanceGpuSmokeTestObjs)
     intrinsic_add_glsl_shaders(IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests)
 endif()
 
-if(TARGET RuntimeKMeansGpuSmokeTestObjs)
-    intrinsic_test_executable(IntrinsicRuntimeKMeansGpuSmokeTests
-        OBJECTS RuntimeKMeansGpuSmokeTestObjs
+if(TARGET RuntimeClusteringServiceGpuSmokeTestObjs)
+    intrinsic_test_executable(IntrinsicRuntimeClusteringServiceGpuSmokeTests
+        OBJECTS RuntimeClusteringServiceGpuSmokeTestObjs
         LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore IntrinsicGeometry
         LABELS gpu vulkan integration runtime geometry
     )
-    intrinsic_add_glsl_shaders(IntrinsicRuntimeKMeansGpuSmokeTests)
+    intrinsic_add_glsl_shaders(IntrinsicRuntimeClusteringServiceGpuSmokeTests)
 endif()
 
 if(TARGET RuntimeProgressivePoissonResultGpuSmokeTestObjs)

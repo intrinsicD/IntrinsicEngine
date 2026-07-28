@@ -174,16 +174,18 @@ the resulting live surface.
 
 `Extrinsic.Runtime.ClusteringModule` is the first extracted domain module on
 this contract. Sandbox composes it from app startup, not from the kernel engine:
-the module provides `ClusteringService`, registers the `RunKMeans` command,
-copies active-world geometry into a `JobService` CPU snapshot, publishes a
-completion event at the main-thread job gate, commits labels during event pump B,
-and emits `ClusterLabelsChanged` as the standing visualization refresh reaction.
+the module provides the sole typed `ClusteringService::RunKMeans` operation,
+copies active-world geometry/property identities into a world-scoped snapshot,
+and routes CPU-reference or Vulkan-compute work from one request. CPU work uses
+`JobService`; Vulkan work uses one private GPU participant, a non-exported
+recorder/cache partition, and shared transfer readback. Both paths rejoin the
+same cancellation/stale validation gate, publish `KMeansRunCompleted`, commit
+labels/colors during the main-thread event pump, and emit
+`ClusterLabelsChanged` as the standing visualization refresh reaction.
 `Runtime.Engine.cppm` and `Runtime.Engine.cpp` do not import or name the K-Means
-modules. The public `Extrinsic.Runtime.SandboxEditorFacades` surface retains the
-K-Means GPU request, submission, result, and status DTOs used for command
-injection, while the queue class is private implementation glue attached to that
-module. Its Sandbox-owned `JobService` `GpuQueue` participant still records and
-drains Vulkan K-Means work inside the normal renderer frame context.
+module. Sandbox facades borrow the service and last typed completion; they own
+no backend-specific DTO or queue. Config files, UI, and agent/CLI hot apply use
+the registered `sandbox.clustering` section and the same request mapper.
 
 `Extrinsic.Runtime.AsyncWorkModule` is the app-composed lifecycle owner for the
 kernel's single persistent `JobService`. Sandbox explicitly composes it; Engine
@@ -323,7 +325,7 @@ widget; app presentation does not retain that view or import geometry directly.
 the K-Means windows for PointCloud, Graph, and Mesh plus the PointCloud and Mesh
 Progressive Poisson windows from the application layer. Their ImGui state and
 result presentation are app-owned, while model construction, command execution,
-job queues, config validation, and result publication remain runtime-owned.
+job scheduling, config validation, and result publication remain runtime-owned.
 `Extrinsic.Sandbox.Editor.MeshProcessingPanels` applies the same boundary to ICP
 registration, mesh denoise/curvature/remesh/subdivide/simplify, and the
 mesh/graph/point-cloud vertex-normal windows. Runtime retains their exported
@@ -338,13 +340,13 @@ paths, titles, closed defaults, controls, per-frame lazy model cache, and
 immediate/asynchronous result publication. Runtime retains the exported domain
 models, callback-scoped borrowed property view, command/job execution,
 UV/outlier result state, and result sinks; the app module imports runtime only.
-K-Means and Progressive Poisson facade bodies compile in the private
-`Runtime.SandboxMethodFacade.cpp` implementation unit. The K-Means GPU queue
-declaration is likewise private implementation glue, with its implementation
-unit attached to `Extrinsic.Runtime.SandboxEditorFacades`; only its command DTOs
-remain on that public facade. Render-recipe and artifact facades compile in
-their own private implementation unit. The app-to-runtime dependency direction
-is unchanged.
+Progressive Poisson facade bodies and clustering config-control helpers compile
+in the private `Runtime.SandboxMethodFacade.cpp` implementation unit. K-Means
+execution goes directly from the app panel to the borrowed `ClusteringService`;
+the Vulkan recorder/cache/readback partition is private to
+`Extrinsic.Runtime.ClusteringModule`. Render-recipe and artifact facades compile
+in their own private implementation unit. The app-to-runtime dependency
+direction is unchanged.
 
 The internal `RuntimeFrameContext` record carries the data that must survive
 between those phases: frame delta, fixed-step interpolation alpha, render frame

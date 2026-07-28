@@ -5885,3 +5885,19 @@ and the clean-workshop review found no architectural drift or follow-up.
 `REVIEW-003` is now ready as the separate commit-anchored whole-tree admission
 audit. Review:
 [`2026-07-23-arch-014-clean-workshop-review.md`](../../docs/reviews/2026-07-23-arch-014-clean-workshop-review.md).
+
+[`RUNTIME-196`](RUNTIME-196-canonical-clustering-service-path.md) — canonical
+clustering-service convergence retired on 2026-07-28 at `Retired`.
+`ClusteringService::RunKMeans` is the sole typed CPU/GPU operation for runtime,
+Sandbox config/UI, selected-entity property writeback, visualization refresh,
+and the stable Vulkan benchmark. The Vulkan recorder, cache, single-flight
+state, and shared readback parser are a non-exported clustering partition; the
+public backend wrappers, Sandbox-private GPU queue, duplicate facade records
+and command, and their wrapper-only tests are deleted. Focused CPU coverage
+passed 48/48, the complete CPU-supported selector passed 4,210 cases with zero
+failures plus the expected GLFW/LSan self-skip, and the ASan+UBSan promoted-
+Vulkan service/benchmark selector passed 3/3 on an NVIDIA GeForce RTX 3050
+with driver 590.48.01. The benchmark records service-command-to-applied-event
+latency, exact CPU-reference parity, zero fallback, and no performance claim.
+Strict layering, test-layout, task-policy, docs-link, root-hygiene, benchmark-
+manifest, ARA, generated-inventory, and whitespace checks close the evidence.

@@ -119,18 +119,6 @@ namespace
 constexpr std::uint32_t kInvalidIndex =
         std::numeric_limits<std::uint32_t>::max();
 
-[[nodiscard]] bool HasDiagnostic(
-        const std::vector<Runtime::SandboxEditorDiagnostic>& diagnostics,
-        const Runtime::SandboxEditorDiagnosticCode code)
-    {
-        for (const Runtime::SandboxEditorDiagnostic& diagnostic : diagnostics)
-        {
-            if (diagnostic.Code == code)
-                return true;
-        }
-        return false;
-    }
-
 [[nodiscard]] std::uint32_t SumCounts(
         const std::vector<std::uint32_t>& counts)
     {
@@ -160,16 +148,6 @@ void AddPointCloudSource(ECS::Scene::Registry& registry,
         auto& vertices = registry.Raw().emplace<GS::Vertices>(entity);
         vertices.Properties.Resize(pointCount);
         registry.Raw().emplace<G::RenderPoints>(entity);
-    }
-
-void SetNodePositions(GS::Nodes& nodes,
-                          const std::vector<glm::vec3>& positions)
-    {
-        nodes.Properties.Resize(positions.size());
-        auto pos = nodes.Properties.GetOrAdd<glm::vec3>(
-            std::string{PN::kPosition},
-            glm::vec3{0.0f});
-        pos.Vector() = positions;
     }
 
 void SetPositions(GS::Vertices& vertices,
@@ -221,44 +199,6 @@ void SetTexcoords(GS::Vertices& vertices,
 
     // An open grid-plane triangle mesh; its outer ring is an open boundary, so
     // texcoord-bearing boundary vertices are UV-seam vertices (UI-028).
-
-void ExpectKMeansVertexProperties(Geometry::PropertySet& properties,
-                                      const std::size_t expectedCount,
-                                      const bool pointCloudNames)
-    {
-        const std::string labelName =
-            pointCloudNames ? "p:kmeans_label" : "v:kmeans_label";
-        const std::string colorName =
-            pointCloudNames ? "p:kmeans_color" : "v:kmeans_color";
-
-        auto labels = properties.Get<std::uint32_t>(labelName);
-        auto colors = properties.Get<glm::vec4>(colorName);
-        ASSERT_TRUE(labels);
-        ASSERT_TRUE(colors);
-        ASSERT_EQ(labels.Vector().size(), expectedCount);
-        ASSERT_EQ(colors.Vector().size(), expectedCount);
-        for (std::size_t i = 0u; i < expectedCount; ++i)
-        {
-            EXPECT_LT(labels.Vector()[i], expectedCount);
-            EXPECT_FLOAT_EQ(colors.Vector()[i].w, 1.0f);
-        }
-
-        if (pointCloudNames)
-        {
-            EXPECT_FALSE(properties.Get<float>("v:kmeans_label_f"));
-        }
-        else
-        {
-            auto labelFloats = properties.Get<float>("v:kmeans_label_f");
-            ASSERT_TRUE(labelFloats);
-            ASSERT_EQ(labelFloats.Vector().size(), expectedCount);
-            for (std::size_t i = 0u; i < expectedCount; ++i)
-            {
-                EXPECT_FLOAT_EQ(labelFloats.Vector()[i],
-                                static_cast<float>(labels.Vector()[i]));
-            }
-        }
-    }
 
 void SetEdges(GS::Edges& edges,
                   const std::vector<std::uint32_t>& v0,
@@ -342,24 +282,6 @@ void AddIcosahedronMeshSource(ECS::Scene::Registry& registry,
         registry.Raw().emplace_or_replace<G::RenderSurface>(entity);
     }
 
-void AddGraphSource(ECS::Scene::Registry& registry,
-                        const ECS::EntityHandle entity)
-    {
-        auto& raw = registry.Raw();
-        auto& nodes = raw.emplace<GS::Nodes>(entity);
-        SetNodePositions(nodes,
-                         {
-                             {0.0f, 0.0f, 0.0f},
-                             {1.0f, 0.0f, 0.0f},
-                             {2.0f, 0.0f, 0.0f},
-                         });
-        auto& edges = raw.emplace<GS::Edges>(entity);
-        SetEdges(edges, {0u, 1u}, {1u, 2u});
-        raw.emplace<GS::HasGraphTopology>(entity);
-        raw.emplace<G::RenderEdges>(entity);
-        raw.emplace<G::RenderPoints>(entity);
-    }
-
 [[nodiscard]] Runtime::SandboxEditorContext MakeContext(
         ECS::Scene::Registry& registry,
         Runtime::SelectionController& selection,
@@ -379,444 +301,6 @@ void AddGraphSource(ECS::Scene::Registry& registry,
         };
     }
 
-}
-TEST(SandboxEditorUi, KMeansCommandPublishesMeshGraphAndPointCloudProperties)
-{
-    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
-
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
-    AddTriangleMeshSource(registry, mesh);
-    const Runtime::SandboxEditorKMeansResult meshResult =
-        Runtime::ApplySandboxEditorKMeansCommand(
-            context,
-            Runtime::SandboxEditorKMeansCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(mesh),
-                .Domain = Domain::MeshVertices,
-                .ClusterCount = 2u,
-                .MaxIterations = 8u,
-                .Seed = 7u,
-            });
-    ASSERT_TRUE(meshResult.Succeeded());
-    EXPECT_EQ(meshResult.Domain, Domain::MeshVertices);
-    EXPECT_EQ(meshResult.LabelCount, 3u);
-    EXPECT_EQ(meshResult.ClusterCount, 2u);
-    EXPECT_EQ(meshResult.RequestedBackend,
-              Runtime::SandboxEditorKMeansBackend::CpuReference);
-    EXPECT_EQ(meshResult.ActualBackend,
-              Runtime::SandboxEditorKMeansBackend::CpuReference);
-    EXPECT_EQ(meshResult.RequestedBackendId, "cpu_reference");
-    EXPECT_EQ(meshResult.BackendId, "cpu_reference");
-    EXPECT_FALSE(meshResult.FellBackToCpu);
-    EXPECT_TRUE(meshResult.BackendFallbackReason.empty());
-    EXPECT_NE(meshResult.Message.find("requested cpu_reference"),
-              std::string::npos);
-    EXPECT_EQ(meshResult.Error, Core::ErrorCode::Success);
-    ExpectKMeansVertexProperties(
-        registry.Raw().get<GS::Vertices>(mesh).Properties,
-        3u,
-        false);
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
-
-    const ECS::EntityHandle graph = MakeSelectable(registry, "Graph");
-    AddGraphSource(registry, graph);
-    const Runtime::SandboxEditorKMeansResult graphResult =
-        Runtime::ApplySandboxEditorKMeansCommand(
-            context,
-            Runtime::SandboxEditorKMeansCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(graph),
-                .Domain = Domain::GraphVertices,
-                .ClusterCount = 2u,
-                .MaxIterations = 8u,
-                .Seed = 11u,
-                .UseHierarchicalInitialization = false,
-            });
-    ASSERT_TRUE(graphResult.Succeeded());
-    EXPECT_EQ(graphResult.Domain, Domain::GraphVertices);
-    EXPECT_EQ(graphResult.LabelCount, 3u);
-    ExpectKMeansVertexProperties(
-        registry.Raw().get<GS::Nodes>(graph).Properties,
-        3u,
-        false);
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(graph));
-
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
-    AddPointCloudSource(registry, cloud, 4u);
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
-                 {
-                     {0.0f, 0.0f, 0.0f},
-                     {0.1f, 0.0f, 0.0f},
-                     {2.0f, 0.0f, 0.0f},
-                     {2.1f, 0.0f, 0.0f},
-                 });
-    const Runtime::SandboxEditorKMeansResult cloudResult =
-        Runtime::ApplySandboxEditorKMeansCommand(
-            context,
-            Runtime::SandboxEditorKMeansCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(cloud),
-                .Domain = Domain::PointCloudPoints,
-                .ClusterCount = 2u,
-                .MaxIterations = 8u,
-                .Seed = 13u,
-            });
-    ASSERT_TRUE(cloudResult.Succeeded());
-    EXPECT_EQ(cloudResult.Domain, Domain::PointCloudPoints);
-    EXPECT_EQ(cloudResult.LabelCount, 4u);
-    ExpectKMeansVertexProperties(
-        registry.Raw().get<GS::Vertices>(cloud).Properties,
-        4u,
-        true);
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(cloud));
-
-    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
-    context.LastKMeansResult = &cloudResult;
-    const Runtime::SandboxEditorDomainWindowModel model =
-        Runtime::BuildSandboxEditorDomainWindowModel(
-            context,
-            Runtime::SandboxEditorDomainWindowKind::PointCloud);
-    ASSERT_TRUE(model.Processing.LastKMeansResult.has_value());
-    EXPECT_TRUE(model.Processing.LastKMeansResult->Succeeded());
-    EXPECT_EQ(model.Processing.LastKMeansResult->LabelCount, 4u);
-}
-TEST(SandboxEditorUi, KMeansVulkanRequestFallsBackToCpuReference)
-{
-    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
-
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Tests::MockDevice device;
-    device.Operational = false;
-    Runtime::SandboxEditorContext context =
-        MakeContext(registry, selection, true, nullptr, &device);
-
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
-    AddPointCloudSource(registry, cloud, 4u);
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
-                 {
-                     {0.0f, 0.0f, 0.0f},
-                     {0.1f, 0.0f, 0.0f},
-                     {2.0f, 0.0f, 0.0f},
-                     {2.1f, 0.0f, 0.0f},
-                 });
-
-    const Runtime::SandboxEditorKMeansResult result =
-        Runtime::ApplySandboxEditorKMeansCommand(
-            context,
-            Runtime::SandboxEditorKMeansCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(cloud),
-                .Domain = Domain::PointCloudPoints,
-                .ClusterCount = 2u,
-                .MaxIterations = 8u,
-                .Seed = 13u,
-                .Backend =
-                    Runtime::SandboxEditorKMeansBackend::VulkanCompute,
-            });
-
-    ASSERT_TRUE(result.Succeeded()) << result.Message;
-    EXPECT_EQ(result.RequestedBackend,
-              Runtime::SandboxEditorKMeansBackend::VulkanCompute);
-    EXPECT_EQ(result.ActualBackend,
-              Runtime::SandboxEditorKMeansBackend::CpuReference);
-    EXPECT_EQ(result.RequestedBackendId, "gpu_vulkan_compute");
-    EXPECT_EQ(result.BackendId, "cpu_reference");
-    EXPECT_TRUE(result.FellBackToCpu);
-    EXPECT_NE(result.BackendFallbackReason.find("not operational"),
-              std::string::npos);
-    EXPECT_NE(result.Message.find("requested gpu_vulkan_compute"),
-              std::string::npos);
-    EXPECT_NE(result.Message.find("actual cpu_reference"), std::string::npos);
-    ExpectKMeansVertexProperties(
-        registry.Raw().get<GS::Vertices>(cloud).Properties,
-        4u,
-        true);
-}
-TEST(SandboxEditorUi, KMeansVulkanRequestQueuesGpuJobWhenSurfaceAccepts)
-{
-    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
-
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
-    AddPointCloudSource(registry, cloud, 4u);
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
-                 {
-                     {0.0f, 0.0f, 0.0f},
-                     {0.1f, 0.0f, 0.0f},
-                     {2.0f, 0.0f, 0.0f},
-                     {2.1f, 0.0f, 0.0f},
-                 });
-
-    std::optional<Runtime::RuntimeKMeansGpuJobRequest> submitted{};
-    context.KMeansGpuCommands.Submit =
-        [&submitted](Runtime::RuntimeKMeansGpuJobRequest request)
-        {
-            request.Sequence = 77u;
-            submitted = request;
-            return Runtime::RuntimeKMeansGpuJobSubmission{
-                .Status = Runtime::RuntimeKMeansGpuJobStatus::Accepted,
-                .Sequence = request.Sequence,
-            };
-        };
-    context.KMeansGpuCommands.ConsumeCompleted =
-        []() -> std::optional<Runtime::RuntimeKMeansGpuJobResult>
-        {
-            return std::nullopt;
-        };
-
-    const Runtime::SandboxEditorKMeansResult result =
-        Runtime::ApplySandboxEditorKMeansCommand(
-            context,
-            Runtime::SandboxEditorKMeansCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(cloud),
-                .Domain = Domain::PointCloudPoints,
-                .ClusterCount = 2u,
-                .MaxIterations = 8u,
-                .Seed = 13u,
-                .Backend =
-                    Runtime::SandboxEditorKMeansBackend::VulkanCompute,
-            });
-
-    ASSERT_TRUE(submitted.has_value());
-    EXPECT_EQ(submitted->StableEntityId,
-              Runtime::SelectionController::ToStableEntityId(cloud));
-    EXPECT_EQ(submitted->DomainTag,
-              static_cast<std::uint32_t>(Domain::PointCloudPoints));
-    EXPECT_EQ(submitted->Points.size(), 4u);
-    EXPECT_EQ(submitted->Params.Compute, Geometry::KMeans::Backend::GPU);
-    EXPECT_EQ(submitted->Params.ClusterCount, 2u);
-    EXPECT_EQ(submitted->Params.MaxIterations, 8u);
-
-    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
-    EXPECT_EQ(result.RequestedBackend,
-              Runtime::SandboxEditorKMeansBackend::VulkanCompute);
-    EXPECT_EQ(result.ActualBackend,
-              Runtime::SandboxEditorKMeansBackend::VulkanCompute);
-    EXPECT_EQ(result.RequestedBackendId, "gpu_vulkan_compute");
-    EXPECT_EQ(result.BackendId, "gpu_vulkan_compute");
-    EXPECT_FALSE(result.FellBackToCpu);
-    EXPECT_TRUE(result.BackendFallbackReason.empty());
-    EXPECT_NE(result.Message.find("queued"), std::string::npos);
-    EXPECT_FALSE(registry.Raw()
-                     .get<GS::Vertices>(cloud)
-                     .Properties.Get<std::uint32_t>("p:kmeans_label"));
-
-    context.LastKMeansResult = &result;
-    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
-    const Runtime::SandboxEditorDomainWindowModel model =
-        Runtime::BuildSandboxEditorDomainWindowModel(
-            context,
-            Runtime::SandboxEditorDomainWindowKind::PointCloud);
-    ASSERT_TRUE(model.Processing.LastKMeansResult.has_value());
-    EXPECT_EQ(model.Processing.LastKMeansResult->Status,
-              Runtime::SandboxEditorCommandStatus::Pending);
-    EXPECT_FALSE(HasDiagnostic(
-        model.Processing.Diagnostics,
-        Runtime::SandboxEditorDiagnosticCode::GeometryProcessingFailed));
-}
-TEST(SandboxEditorUi, KMeansCpuRequestQueuesDerivedJobAndPublishesOnApply)
-{
-    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
-
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::optional<Runtime::SandboxEditorKMeansResult> completedResult{};
-    context.MethodResultSinks.KMeans =
-        [&completedResult](Runtime::SandboxEditorKMeansResult result)
-        {
-            completedResult = std::move(result);
-        };
-
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
-    AddPointCloudSource(registry, cloud, 4u);
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
-                 {
-                     {0.0f, 0.0f, 0.0f},
-                     {0.1f, 0.0f, 0.0f},
-                     {2.0f, 0.0f, 0.0f},
-                     {2.1f, 0.0f, 0.0f},
-                 });
-
-    const Runtime::SandboxEditorKMeansResult result =
-        Runtime::ApplySandboxEditorKMeansCommand(
-            context,
-            Runtime::SandboxEditorKMeansCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(cloud),
-                .Domain = Domain::PointCloudPoints,
-                .ClusterCount = 2u,
-                .MaxIterations = 8u,
-                .Seed = 13u,
-                .Backend =
-                    Runtime::SandboxEditorKMeansBackend::CpuReference,
-            });
-
-    EXPECT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
-    EXPECT_NE(result.Message.find("queued"), std::string::npos);
-    EXPECT_FALSE(registry.Raw()
-                     .get<GS::Vertices>(cloud)
-                     .Properties.Get<std::uint32_t>("p:kmeans_label"));
-
-    Runtime::SandboxEditorJobQueueSnapshot queued =
-        jobs.Snapshot();
-    ASSERT_EQ(queued.Entries.size(), 1u);
-    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.KMeans.CPU");
-    // `JobService` dispatches at submit, so the exact pre-drain state races
-    // between Queued/Running/AwaitingGate. What is deterministic is that the
-    // job has not been applied yet — no drain has run.
-    EXPECT_TRUE(
-        Runtime::IsActiveSandboxEditorJobState(queued.Entries[0].State));
-    EXPECT_FALSE(registry.Raw()
-                     .get<GS::Vertices>(cloud)
-                     .Properties.Get<std::uint32_t>("p:kmeans_label"));
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    Runtime::SandboxEditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
-    EXPECT_EQ(completedResult->LabelCount, 4u);
-    ExpectKMeansVertexProperties(
-        registry.Raw().get<GS::Vertices>(cloud).Properties,
-        4u,
-        true);
-}
-TEST(SandboxEditorUi, KMeansCpuDuplicateSubmitUsesExistingActiveJob)
-{
-    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
-
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
-    jobs.Attach(context);
-
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
-    AddPointCloudSource(registry, cloud, 4u);
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
-                 {
-                     {0.0f, 0.0f, 0.0f},
-                     {0.1f, 0.0f, 0.0f},
-                     {2.0f, 0.0f, 0.0f},
-                     {2.1f, 0.0f, 0.0f},
-                 });
-
-    const Runtime::SandboxEditorKMeansCommand command{
-        .StableEntityId =
-            Runtime::SelectionController::ToStableEntityId(cloud),
-        .Domain = Domain::PointCloudPoints,
-        .ClusterCount = 2u,
-        .MaxIterations = 8u,
-        .Seed = 13u,
-        .Backend = Runtime::SandboxEditorKMeansBackend::CpuReference,
-    };
-
-    const Runtime::SandboxEditorKMeansResult first =
-        Runtime::ApplySandboxEditorKMeansCommand(context, command);
-    ASSERT_EQ(first.Status, Runtime::SandboxEditorCommandStatus::Pending);
-
-    Runtime::SandboxEditorJobQueueSnapshot queued =
-        jobs.Snapshot();
-    ASSERT_EQ(queued.Entries.size(), 1u);
-
-    const Runtime::SandboxEditorKMeansResult duplicate =
-        Runtime::ApplySandboxEditorKMeansCommand(context, command);
-    EXPECT_EQ(duplicate.Status, Runtime::SandboxEditorCommandStatus::Pending);
-    EXPECT_NE(duplicate.Message.find("already has an active"),
-              std::string::npos);
-    EXPECT_NE(duplicate.Message.find("job 0:1"), std::string::npos);
-    EXPECT_EQ(jobs.Snapshot().Entries.size(), 1u);
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-
-    Runtime::SandboxEditorJobQueueSnapshot complete =
-        jobs.Snapshot();
-    ASSERT_EQ(complete.Entries.size(), 1u);
-    EXPECT_EQ(complete.Entries[0].State, Runtime::JobState::Published);
-
-    const Runtime::SandboxEditorKMeansResult rerun =
-        Runtime::ApplySandboxEditorKMeansCommand(context, command);
-    EXPECT_EQ(rerun.Status, Runtime::SandboxEditorCommandStatus::Pending);
-    Runtime::SandboxEditorJobQueueSnapshot afterRerun =
-        jobs.Snapshot();
-    ASSERT_EQ(afterRerun.Entries.size(), 2u);
-    EXPECT_TRUE(
-        Runtime::IsActiveSandboxEditorJobState(afterRerun.Entries[1].State));
-}
-TEST(SandboxEditorUi, KMeansCpuDerivedJobDiscardsStaleTargetBeforeApply)
-{
-    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
-
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::SandboxEditorJobHarness jobs{};
-    jobs.Attach(context);
-    bool completedSinkCalled = false;
-    context.MethodResultSinks.KMeans =
-        [&completedSinkCalled](Runtime::SandboxEditorKMeansResult)
-        {
-            completedSinkCalled = true;
-        };
-
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
-    AddPointCloudSource(registry, cloud, 4u);
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
-                 {
-                     {0.0f, 0.0f, 0.0f},
-                     {0.1f, 0.0f, 0.0f},
-                     {2.0f, 0.0f, 0.0f},
-                     {2.1f, 0.0f, 0.0f},
-                 });
-
-    const Runtime::SandboxEditorKMeansResult result =
-        Runtime::ApplySandboxEditorKMeansCommand(
-            context,
-            Runtime::SandboxEditorKMeansCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(cloud),
-                .Domain = Domain::PointCloudPoints,
-                .ClusterCount = 2u,
-                .MaxIterations = 8u,
-                .Seed = 13u,
-                .Backend =
-                    Runtime::SandboxEditorKMeansBackend::CpuReference,
-            });
-    ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Pending);
-
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
-                 {
-                     {10.0f, 0.0f, 0.0f},
-                     {11.0f, 0.0f, 0.0f},
-                     {12.0f, 0.0f, 0.0f},
-                     {13.0f, 0.0f, 0.0f},
-                 });
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-
-    Runtime::SandboxEditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State,
-              Runtime::JobState::StaleDiscarded);
-    EXPECT_FALSE(completedSinkCalled);
-    EXPECT_FALSE(registry.Raw()
-                     .get<GS::Vertices>(cloud)
-                     .Properties.Get<std::uint32_t>("p:kmeans_label"));
 }
 TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisualization)
 {
@@ -1515,6 +999,56 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigFacade)
 }
 
 TEST(SandboxEditorUi,
+     ClusteringSectionValidationKeepsPerFieldReferenceFallback)
+{
+    Runtime::ClusteringConfig reference{};
+    reference.Parameters.ClusterCount = 11u;
+
+    const Core::Config::EngineConfigSectionValidationResult validation =
+        Runtime::ValidateClusteringConfigSection(
+            R"({"cluster_count":0,"max_iterations":91,"seed":4294967295,"initialization":"Random","backend":"VulkanCompute","unknown_field":true})",
+            Runtime::SerializeClusteringConfig(reference),
+            "app.sections.sandbox.clustering.payload");
+
+    EXPECT_EQ(validation.State,
+              Core::Config::EngineConfigState::FallbackApplied);
+    EXPECT_EQ(validation.ParsedFieldCount, 4u);
+    EXPECT_TRUE(std::ranges::any_of(
+        validation.Diagnostics,
+        [](const Core::Config::EngineConfigDiagnostic& diagnostic)
+        {
+            return diagnostic.Code ==
+                Core::Config::EngineConfigDiagnosticCode::InvalidValue;
+        }));
+    EXPECT_TRUE(std::ranges::any_of(
+        validation.Diagnostics,
+        [](const Core::Config::EngineConfigDiagnostic& diagnostic)
+        {
+            return diagnostic.Code ==
+                Core::Config::EngineConfigDiagnosticCode::UnknownField;
+        }));
+
+    Core::Config::EngineConfig canonical{};
+    Core::Config::UpsertEngineConfigSection(
+        canonical.AppSections,
+        Core::Config::EngineConfigSection{
+            .Name = std::string{Runtime::kClusteringConfigSectionName},
+            .SchemaId =
+                std::string{Runtime::kClusteringConfigSectionSchemaId},
+            .SchemaVersion = Runtime::kClusteringConfigSectionSchemaVersion,
+            .PayloadJson = validation.CanonicalPayloadJson,
+        });
+    const auto decoded = Runtime::GetClusteringConfig(canonical);
+    ASSERT_TRUE(decoded.has_value());
+    EXPECT_EQ(decoded->Parameters.ClusterCount, 11u);
+    EXPECT_EQ(decoded->Parameters.MaxIterations, 91u);
+    EXPECT_EQ(decoded->Parameters.Seed, 0xffffffffu);
+    EXPECT_EQ(decoded->Parameters.Initialization,
+              Runtime::KMeansInitialization::Random);
+    EXPECT_EQ(decoded->Backend, Runtime::ClusteringBackend::VulkanCompute);
+}
+
+TEST(SandboxEditorUi,
      ProgressivePoissonSectionValidationKeepsPerFieldReferenceFallback)
 {
     Runtime::ProgressivePoissonPlaygroundConfig reference{};
@@ -1709,116 +1243,6 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandSamplesMeshSurfaceToPointCloud)
     EXPECT_EQ(vis.Source, G::VisualizationConfig::ColorSource::ScalarField);
     EXPECT_EQ(vis.ScalarDomain, G::VisualizationConfig::Domain::Vertex);
     EXPECT_EQ(vis.ScalarFieldName, "p:poisson_level");
-}
-TEST(SandboxEditorUi, KMeansCommandFailsClosedForInvalidTargetsAndInputs)
-{
-    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
-
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-
-    const Runtime::SandboxEditorKMeansCommand validShape{
-        .StableEntityId = 1u,
-        .Domain = Domain::PointCloudPoints,
-        .ClusterCount = 2u,
-        .MaxIterations = 8u,
-    };
-
-    const Runtime::SandboxEditorKMeansResult missingScene =
-        Runtime::ApplySandboxEditorKMeansCommand(
-            Runtime::SandboxEditorContext{},
-            validShape);
-    EXPECT_EQ(missingScene.Status,
-              Runtime::SandboxEditorCommandStatus::MissingScene);
-    EXPECT_EQ(missingScene.Error, Core::ErrorCode::InvalidState);
-
-    const Runtime::SandboxEditorKMeansResult invalidParameters =
-        Runtime::ApplySandboxEditorKMeansCommand(
-            context,
-            Runtime::SandboxEditorKMeansCommand{
-                .StableEntityId = 1u,
-                .Domain = Domain::MeshEdges,
-                .ClusterCount = 0u,
-                .MaxIterations = 0u,
-            });
-    EXPECT_EQ(invalidParameters.Status,
-              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
-    EXPECT_EQ(invalidParameters.Error, Core::ErrorCode::InvalidArgument);
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(
-                     invalidParameters.Status),
-                 "InvalidProcessingParameters");
-
-    const Runtime::SandboxEditorKMeansResult stale =
-        Runtime::ApplySandboxEditorKMeansCommand(
-            context,
-            Runtime::SandboxEditorKMeansCommand{
-                .StableEntityId = std::numeric_limits<std::uint32_t>::max(),
-                .Domain = Domain::PointCloudPoints,
-                .ClusterCount = 2u,
-                .MaxIterations = 8u,
-            });
-    EXPECT_EQ(stale.Status, Runtime::SandboxEditorCommandStatus::StaleEntity);
-    EXPECT_EQ(stale.Error, Core::ErrorCode::ResourceNotFound);
-
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
-    AddPointCloudSource(registry, cloud, 3u);
-    const std::uint32_t cloudStableId =
-        Runtime::SelectionController::ToStableEntityId(cloud);
-    const Runtime::SandboxEditorKMeansResult wrongDomain =
-        Runtime::ApplySandboxEditorKMeansCommand(
-            context,
-            Runtime::SandboxEditorKMeansCommand{
-                .StableEntityId = cloudStableId,
-                .Domain = Domain::MeshVertices,
-                .ClusterCount = 2u,
-                .MaxIterations = 8u,
-            });
-    EXPECT_EQ(wrongDomain.Status,
-              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
-
-    const Runtime::SandboxEditorKMeansResult missingPositions =
-        Runtime::ApplySandboxEditorKMeansCommand(
-            context,
-            Runtime::SandboxEditorKMeansCommand{
-                .StableEntityId = cloudStableId,
-                .Domain = Domain::PointCloudPoints,
-                .ClusterCount = 2u,
-                .MaxIterations = 8u,
-            });
-    EXPECT_EQ(missingPositions.Status,
-              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
-
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
-                 {
-                     {0.0f, 0.0f, 0.0f},
-                     {std::numeric_limits<float>::infinity(), 0.0f, 0.0f},
-                     {1.0f, 0.0f, 0.0f},
-                 });
-    const Runtime::SandboxEditorKMeansResult nonFinite =
-        Runtime::ApplySandboxEditorKMeansCommand(
-            context,
-            Runtime::SandboxEditorKMeansCommand{
-                .StableEntityId = cloudStableId,
-                .Domain = Domain::PointCloudPoints,
-                .ClusterCount = 2u,
-                .MaxIterations = 8u,
-            });
-    EXPECT_EQ(nonFinite.Status,
-              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
-
-    context.LastKMeansResult = &nonFinite;
-    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
-    const Runtime::SandboxEditorDomainWindowModel model =
-        Runtime::BuildSandboxEditorDomainWindowModel(
-            context,
-            Runtime::SandboxEditorDomainWindowKind::PointCloud);
-    EXPECT_TRUE(HasDiagnostic(
-        model.Processing.Diagnostics,
-        Runtime::SandboxEditorDiagnosticCode::GeometryProcessingFailed));
-    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorDiagnosticCode(
-                     Runtime::SandboxEditorDiagnosticCode::GeometryProcessingFailed),
-                 "GeometryProcessingFailed");
 }
 TEST(SandboxEditorUi, RegistrationCommandAlignsSourceOntoTargetAndSupportsUndoRedo)
 {

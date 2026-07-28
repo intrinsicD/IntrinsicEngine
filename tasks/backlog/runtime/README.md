@@ -29,22 +29,11 @@ lands and tests the general path, migrates real production workflows, proves
 parity, and only then deletes the specialized/forwarding path in a separate
 cleanup slice:
 
+#### Open tasks
+
 - [`RUNTIME-193` — General geometry-presentation recipe](RUNTIME-193-general-geometry-presentation-recipe.md)
   replaces the generally used progressive-named presentation modules with one
   desired-state recipe plus copied operational snapshot.
-- [`RUNTIME-194` — Consolidate runtime work execution](../../done/RUNTIME-194-consolidate-runtime-work-execution.md)
-  is retired: the kernel-owned `JobService` is the single runtime work
-  lifecycle, `AsyncWorkModule` only publishes/withdraws that borrowed service
-  and cancels shutdown survivors, and the duplicate streaming/derived-job
-  systems are deleted. It supplies the execution prerequisite for the
-  remaining consolidation tasks below.
-- [`RUNTIME-195` — Unified GPU-result readback](../../done/RUNTIME-195-unified-gpu-result-readback.md)
-  is retired: one multi-range `Graphics.GpuTransfer` batch now composes with
-  `JobService`, and `AsyncBufferReadback`, `GpuReadbackJob`, duplicate result
-  buffers/copies, and blocking compute-result reads are gone.
-- [`RUNTIME-196` — Canonical clustering-service CPU/GPU path](../../active/RUNTIME-196-canonical-clustering-service-path.md)
-  makes `ClusteringService::RunKMeans` the sole typed operation and deletes the
-  parallel backend wrapper/private queue/facade DTOs after Vulkan parity.
 - [`RUNTIME-197` — Unified geometry upload and residency coordinator](RUNTIME-197-unified-geometry-upload-residency-coordinator.md)
   centralizes upload/reupload/generation/retirement while retaining only small
   private typed topology plan builders.
@@ -64,6 +53,21 @@ cleanup slice:
 - [`RUNTIME-203` — Internalize one-consumer runtime composition helpers](RUNTIME-203-internalize-one-consumer-runtime-helpers.md)
   removes public BMIs for Engine/SceneInteraction/config/device helpers after
   their owner-level behavior tests are in place.
+
+#### Retired prerequisites and completed paths
+
+- [`RUNTIME-194` — Consolidate runtime work execution](../../done/RUNTIME-194-consolidate-runtime-work-execution.md)
+  retired the duplicate streaming/derived-job systems; the kernel-owned
+  `JobService` is the single runtime work lifecycle and supplies the execution
+  prerequisite for the remaining consolidation tasks.
+- [`RUNTIME-195` — Unified GPU-result readback](../../done/RUNTIME-195-unified-gpu-result-readback.md)
+  retired `AsyncBufferReadback`, `GpuReadbackJob`, duplicate result buffers/
+  copies, and blocking compute-result reads in favor of one multi-range
+  `Graphics.GpuTransfer` batch composed with `JobService`.
+- [`RUNTIME-196` — Canonical clustering-service CPU/GPU path](../../done/RUNTIME-196-canonical-clustering-service-path.md)
+  retired the parallel backend wrapper, private queue, facade DTOs/command,
+  and wrapper-only tests; `ClusteringService::RunKMeans` is the sole typed
+  CPU/GPU operation and Vulkan state is private to the module.
 
 ### Canonical geometry-property vocabulary (retired 2026-07-26)
 

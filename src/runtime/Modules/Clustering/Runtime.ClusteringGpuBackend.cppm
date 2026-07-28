@@ -8,7 +8,7 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Extrinsic.Runtime.KMeansGpuBackend;
+module Extrinsic.Runtime.ClusteringModule:GpuBackend;
 
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.BufferTransfer;
@@ -19,19 +19,18 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.Graphics.GpuTransfer;
 
 // ============================================================
-// KMeansGpuBackend (GEOM-056 — Vulkan compute backend seam)
+// ClusteringModule private K-Means Vulkan implementation partition.
 // ============================================================
-// Runtime-owned Vulkan-compute backend utilities for Geometry.KMeans. The
-// module owns CPU-testable planning, shader/BDA record contracts, fail-closed
+// Runtime-owned Vulkan-compute utilities for Geometry.KMeans. This private
+// partition owns planning, shader/BDA record contracts, fail-closed
 // pass recording, persistent `(n,k)` resource caching, one-time SoA/seed upload,
-// and RUNTIME-195 shared result drains. `Extrinsic.Runtime.KMeansBackend` remains
-// the thin CPU-reference fallback overload unless a caller supplies the explicit
-// command context, pipelines, cache, and result-readback adapter required here.
+// and RUNTIME-195 shared result drains. Only ClusteringModule imports it;
+// callers select the backend through ClusteringService request data.
 //
 // Design: docs/migration/kmeans-gpu-vulkan-compute-proposal.md
 // ============================================================
 
-export namespace Extrinsic::Runtime
+namespace Extrinsic::Runtime
 {
     inline constexpr std::uint32_t kKMeansGpuGroupSize = 256u;
 

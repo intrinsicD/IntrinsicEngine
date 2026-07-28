@@ -73,8 +73,6 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.KMeansBackend;
-import Extrinsic.Runtime.KMeansGpuBackend;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressivePoissonGpuBackend;
@@ -103,7 +101,6 @@ import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.AdaptiveRemeshing;
 import Geometry.HalfedgeMesh.SubdivisionSqrt3;
 import Geometry.HalfedgeMesh.Vertices.Normals;
-import Geometry.KMeans;
 import Geometry.Mesh.Conversion;
 import Geometry.MeshOperator;
 import Geometry.MeshSoup;
@@ -159,7 +156,6 @@ namespace Extrinsic::Runtime
         namespace Sel = Extrinsic::ECS::Components::Selection;
         namespace G = Extrinsic::Graphics::Components;
         namespace A = Extrinsic::Assets;
-        namespace GK = Geometry::KMeans;
         namespace GN = Geometry::HalfedgeMesh::VertexNormals;
         namespace GraphNormals = Geometry::Graph::VertexNormals;
         namespace PointNormals = Geometry::PointCloud::Normals;
@@ -9769,7 +9765,7 @@ namespace Extrinsic::Runtime
                 model.LastKMeansResult = *context.LastKMeansResult;
                 if (!context.LastKMeansResult->Succeeded() &&
                     context.LastKMeansResult->Status !=
-                        SandboxEditorCommandStatus::Pending)
+                        KMeansRunStatus::Queued)
                 {
                     AddDiagnostic(
                         model.Diagnostics,
@@ -16210,7 +16206,7 @@ namespace Extrinsic::Runtime
         m_Worlds          = &worlds;
         m_Services        = &services;
         m_AttachmentEpoch = std::make_shared<std::atomic_bool>(true);
-        AttachKMeansGpuQueue(services);
+        m_Jobs = services.Find<JobService>();
         m_ClusteringService = services.Find<ClusteringService>();
         if (m_ClusteringService != nullptr &&
             m_ClusteringService->Available())
@@ -16222,9 +16218,7 @@ namespace Extrinsic::Runtime
                     {
                         if (!AttachmentEpochIsActive(epoch))
                             return;
-                        m_LastKMeansResult =
-                            Detail::MakeSandboxEditorKMeansCompletionResult(
-                                completed);
+                        m_LastKMeansResult = completed;
                         m_SelectedModelCache.Clear();
                     });
         }
@@ -16331,63 +16325,7 @@ namespace Extrinsic::Runtime
                         stableEntityId);
                 };
         }
-        context.KMeansCommands.Required = true;
-        if (m_ClusteringService != nullptr)
-        {
-            context.KMeansCommands.Submit =
-                [epoch = m_AttachmentEpoch,
-                 service = m_ClusteringService](RunKMeans request)
-                {
-                    if (!AttachmentEpochIsActive(epoch))
-                        return CommandCorrelationId{};
-                    return service->RunKMeans(std::move(request));
-                };
-        }
-        context.KMeansGpuCommands = SandboxEditorKMeansGpuCommandSurface{
-            .Submit =
-                [epoch = m_AttachmentEpoch,
-                 this](RuntimeKMeansGpuJobRequest request)
-                {
-                    if (!AttachmentEpochIsActive(epoch) ||
-                        !m_KMeansGpuJobs)
-                    {
-                        return RuntimeKMeansGpuJobSubmission{
-                            .Status     = RuntimeKMeansGpuJobStatus::GpuUnavailable,
-                            .GpuStatus  = KMeansGpuStatus::DeviceUnavailable,
-                            .Diagnostic = "Sandbox editor K-Means GPU job queue is "
-                                          "unavailable or its attachment expired.",
-                        };
-                    }
-                    return m_KMeansGpuJobs->Submit(std::move(request));
-                },
-            .ConsumeCompleted =
-                [epoch = m_AttachmentEpoch,
-                 this]() -> std::optional<RuntimeKMeansGpuJobResult>
-                {
-                    if (!AttachmentEpochIsActive(epoch) ||
-                        !m_KMeansGpuJobs)
-                        return std::nullopt;
-                    return m_KMeansGpuJobs->ConsumeCompleted();
-                },
-        };
-        if (context.KMeansGpuCommands.Available())
-        {
-            while (std::optional<RuntimeKMeansGpuJobResult> completed =
-                       context.KMeansGpuCommands.ConsumeCompleted())
-            {
-                m_LastKMeansResult =
-                    Detail::PublishSandboxEditorKMeansGpuCompletion(
-                        context,
-                        *completed);
-            }
-        }
-        context.MethodResultSinks.KMeans =
-            [epoch = m_AttachmentEpoch, this](
-                SandboxEditorKMeansResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastKMeansResult = std::move(result);
-            };
+        context.Clustering = m_ClusteringService;
         context.MethodResultSinks.ProgressivePoisson =
             [epoch = m_AttachmentEpoch, this](
                 SandboxEditorProgressivePoissonResult result)
@@ -16635,7 +16573,7 @@ namespace Extrinsic::Runtime
             }
             m_KMeansCompletionSubscription = {};
             m_ClusteringService = nullptr;
-            DetachKMeansGpuQueue();
+            m_Jobs = nullptr;
             m_Worlds   = nullptr;
             m_Services = nullptr;
         }
@@ -16643,10 +16581,7 @@ namespace Extrinsic::Runtime
         {
             m_KMeansCompletionSubscription = {};
             m_ClusteringService = nullptr;
-            m_KMeansGpuParticipant = {};
-            m_KMeansGpuJobs.reset();
-            m_Jobs   = nullptr;
-            m_Device = nullptr;
+            m_Jobs = nullptr;
         }
         m_AttachmentEpoch.reset();
         ResetAttachmentState();

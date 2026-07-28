@@ -8,6 +8,11 @@ maturity_target: Retired
 
 ## Status
 
+- Retired on 2026-07-28 at `Retired` after Slices A-C converged every
+  production CPU/GPU caller on `ClusteringService::RunKMeans` and deleted the
+  parallel wrapper, queue, facade DTO, command, and dedicated-test surfaces.
+- Retirement commit reference: this commit plus the Slice A/B commits recorded
+  below.
 - Promoted to active on 2026-07-27 after `RUNTIME-192`, `RUNTIME-194`, and
   `RUNTIME-195` retired the property-vocabulary, work-lifecycle, and shared
   GPU-result-readback prerequisites.
@@ -34,6 +39,21 @@ maturity_target: Retired
   promoted Vulkan device with one GPU completion and zero fallbacks. This is
   the parity gate for Slice C deletion; the legacy surfaces remain only until
   their callers are migrated.
+- Slice C completed on 2026-07-28. `sandbox.clustering` now round-trips the
+  full request through the app-owned config registry and the editor invokes
+  the same service operation directly. The Vulkan backend is a non-exported
+  clustering partition; the two public wrapper modules, Sandbox-private GPU
+  queue, duplicate facade records/command, and wrapper-only tests are deleted.
+  The Vulkan benchmark preserves its stable ID but now measures the
+  service-command-to-applied-event route and explicitly makes no speedup
+  claim. Focused CPU coverage passed 48/48. The complete CPU-supported selector
+  passed 4,210 cases with zero failures plus the expected GLFW/LSan self-skip.
+  The ASan+UBSan promoted-Vulkan selector passed 3/3 on an NVIDIA GeForce RTX
+  3050 with driver 590.48.01: service compute parity, benchmark execution, and
+  strict result validation. Layering, test layout, task policy, docs links,
+  root hygiene, benchmark manifests, whitespace, and the 382-module generated
+  inventory are clean; the ARA C11 record binds the capability scope and its
+  no-performance-claim boundary.
 
 ## Goal
 
@@ -107,40 +127,40 @@ maturity_target: Retired
       that operation without exposing a backend interface or queue.
 - [x] Record GPU work through the service/module's private JobService
       participant and drain results through the shared transfer operation.
-- [ ] Route config, UI, agent/CLI, selected-entity writeback, visualization
+- [x] Route config, UI, agent/CLI, selected-entity writeback, visualization
       result processing, cancellation, and stale completion through the same
       operation.
-- [ ] Delete `Runtime.KMeansBackend`, the public
+- [x] Delete `Runtime.KMeansBackend`, the public
       `Runtime.KMeansGpuBackend` wrapper if it has no independent caller, the
       Sandbox-private GPU job queue, duplicated Sandbox backend/result enums,
       and direct K-Means commands after parity.
 
 ## Tests
 
-- [ ] Service contracts cover validation, deterministic CPU results,
+- [x] Service contracts cover validation, deterministic CPU results,
       cancellation, stale source/property generation, writeback, and
       UI/config/agent request parity.
-- [ ] Null tests assert honest requested/actual backend and fallback reasons.
+- [x] Null tests assert honest requested/actual backend and fallback reasons.
 - [x] Existing opt-in `gpu;vulkan` parity/smoke evidence is rerouted through
       `ClusteringService` and shared readback.
-- [ ] Structural tests prove no production K-Means route bypasses the service
+- [x] Structural tests prove no production K-Means route bypasses the service
       and no deleted queue/wrapper name remains.
 
 ## Docs
 
-- [ ] Update clustering/runtime/backend-dispatch docs with the sole typed
+- [x] Update clustering/runtime/backend-dispatch docs with the sole typed
       operation and private backend ownership.
-- [ ] Regenerate module inventory and remove documentation for the old queue
+- [x] Regenerate module inventory and remove documentation for the old queue
       and facade records.
-- [ ] Refresh task indexes, session brief, and retirement records.
+- [x] Refresh task indexes, session brief, and retirement records.
 
 ## Acceptance criteria
 
-- [ ] Every K-Means caller invokes one `ClusteringService::RunKMeans`
+- [x] Every K-Means caller invokes one `ClusteringService::RunKMeans`
       operation and observes the same typed result.
-- [ ] CPU/GPU selection is request data; GPU implementation/work/readback
+- [x] CPU/GPU selection is request data; GPU implementation/work/readback
       details are private and fallback reporting is truthful.
-- [ ] The parallel backend wrapper, private job queue, duplicate DTOs, and old
+- [x] The parallel backend wrapper, private job queue, duplicate DTOs, and old
       facade command are deleted after parity.
 
 ## Verification
@@ -168,3 +188,16 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 - Target: `Retired`; CPU contracts and operational Vulkan parity must precede
   deletion of every parallel production route.
+
+## Clean-workshop review
+
+- Rows 1-2: **pass** — strict module/CMake layering is clean; the private
+  partition and smoke-target rename add no cross-layer target link.
+- Row 3: **pass** — the public runtime service exposes only runtime/geometry
+  value records; Vulkan/RHI implementation types remain non-exported.
+- Rows 4-6: **n/a** — no renderer member, frame-graph pass, or recipe edge was
+  added.
+- Row 7: **pass** — the task retires only after actual Vulkan service parity,
+  so no scaffold/parity maturity follow-up is owed.
+- Row 8: **pass** — no allowlist entry, temporary exception, or compatibility
+  shim remains.

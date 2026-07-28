@@ -54,12 +54,4 @@ namespace Extrinsic::Runtime::Detail
     [[nodiscard]] SandboxEditorCommandStatus
     ToSandboxMethodCommandStatus(EditorCommandHistoryStatus status) noexcept;
 
-    [[nodiscard]] SandboxEditorKMeansResult
-    MakeSandboxEditorKMeansCompletionResult(
-        const KMeansRunCompleted& completed);
-
-    [[nodiscard]] SandboxEditorKMeansResult
-    PublishSandboxEditorKMeansGpuCompletion(
-        const SandboxEditorContext& context,
-        const RuntimeKMeansGpuJobResult& completed);
 }

@@ -23,7 +23,7 @@ import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
-import Extrinsic.Runtime.KMeansGpuBackend;
+import :GpuBackend;
 import Geometry.KMeans;
 
 #include "Runtime.ClusteringGpuState.Internal.hpp"

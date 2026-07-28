@@ -227,11 +227,11 @@ owned by `METHOD-014`.
 explicit target Strategy x Backend template using `RHI::IDevice`, method-policy
 backend tokens, and honest requested-vs-actual fallback telemetry.
 
-`GEOM-052` is retired to `tasks/done`: `Geometry.KMeans` is now the canonical
-backend-seam exemplar with `{CPU, GPU}` backend tokens and requested-vs-actual
-fallback telemetry, while `Extrinsic.Runtime.KMeansBackend` owns the
-`RHI::IDevice`-visible fallback hook. This satisfies the backend-seam dependency
-for `PROC-011`.
+`GEOM-052` is retired to `tasks/done`: it introduced the `{CPU, GPU}` backend
+tokens and requested-vs-actual fallback telemetry that satisfied `PROC-011`'s
+backend-seam dependency. `RUNTIME-196` subsequently converged that historical
+wrapper into `ClusteringService::RunKMeans`; the service is now the sole typed
+CPU/GPU operation and keeps its RHI-visible Vulkan state private.
 
 The 2026-07-03 main-loop/task-graph/render-graph review
 ([`docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md`](../../docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md))

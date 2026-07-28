@@ -538,6 +538,8 @@ TEST(SandboxEditorPresentation, RuntimeFacadesCompileSeparatelyFromEditorShell)
     ASSERT_FALSE(renderRecipeFacade.empty());
 
     constexpr std::string_view kMeansDefinition = "ApplySandboxEditorKMeansCommand(";
+    constexpr std::string_view clusteringConfigDefinition =
+        "ApplySandboxEditorClusteringConfig(";
     constexpr std::string_view poissonDefinition =
         "ApplySandboxEditorProgressivePoissonCommand(";
     constexpr std::string_view renderRecipeDefinition =
@@ -553,18 +555,24 @@ TEST(SandboxEditorPresentation, RuntimeFacadesCompileSeparatelyFromEditorShell)
     EXPECT_EQ(runtimeFacade.find(kMeansDefinition), std::string::npos);
     EXPECT_EQ(runtimeFacade.find(renderRecipeDefinition), std::string::npos);
     EXPECT_EQ(runtimeFacade.find(renderRecipeCommand), std::string::npos);
-    EXPECT_NE(methodFacade.find(kMeansDefinition), std::string::npos);
+    EXPECT_EQ(methodFacade.find(kMeansDefinition), std::string::npos);
+    EXPECT_NE(methodFacade.find(clusteringConfigDefinition), std::string::npos);
     EXPECT_NE(methodFacade.find(poissonDefinition), std::string::npos);
     EXPECT_NE(renderRecipeFacade.find(renderRecipeDefinition), std::string::npos);
     EXPECT_NE(renderRecipeFacade.find(renderRecipeCommand), std::string::npos);
     EXPECT_NE(runtimeCMake.find("Runtime.SandboxMethodFacade.cpp"),
               std::string::npos);
+    EXPECT_NE(runtimeCMake.find("Runtime.ClusteringModule.cpp"),
+              std::string::npos);
     EXPECT_NE(runtimeCMake.find("Runtime.SandboxEditorRenderRecipeFacade.cpp"),
               std::string::npos);
-    EXPECT_NE(methodFacade.find("epoch->load"), std::string::npos);
-    EXPECT_NE(methodFacade.find("HasInFlightJob()"), std::string::npos);
-    EXPECT_NE(methodFacade.find("m_KMeansGpuJobs.reset()"),
+    EXPECT_NE(runtimeFacade.find("SubscribeRunCompleted("), std::string::npos);
+    EXPECT_NE(runtimeFacade.find("AttachmentEpochIsActive(epoch)"),
               std::string::npos);
+    EXPECT_NE(runtimeFacade.find("m_LastKMeansResult.reset()"),
+              std::string::npos);
+    EXPECT_EQ(methodFacade.find("HasInFlightJob()"), std::string::npos);
+    EXPECT_EQ(methodFacade.find("m_KMeansGpuJobs"), std::string::npos);
 }
 
 TEST(SandboxEditorPresentation, GeometryProcessingMenusExposeDomainElementSubmenus)
@@ -938,7 +946,7 @@ TEST(SandboxEditorPresentation, ControllerReattachPinsPanelAttachmentResetPolicy
         "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp");
     const std::string domainPanels = ReadRepositoryTextFile(
         "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp");
-    EXPECT_NE(methodPanels.find("KMeans.LastResult.reset();"),
+    EXPECT_NE(methodPanels.find("KMeans = KMeansState{};"),
               std::string::npos);
     EXPECT_NE(methodPanels.find("ProgressivePoisson.LastResult.reset();"),
               std::string::npos);

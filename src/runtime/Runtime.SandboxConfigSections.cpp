@@ -505,6 +505,25 @@ namespace Extrinsic::Runtime
             return std::nullopt;
         }
 
+        [[nodiscard]] std::optional<ClusteringBackend>
+        ParseClusteringBackend(const std::string_view value) noexcept
+        {
+            if (value == "CpuReference")
+                return ClusteringBackend::CpuReference;
+            if (value == "VulkanCompute")
+                return ClusteringBackend::VulkanCompute;
+            return std::nullopt;
+        }
+
+        [[nodiscard]] std::optional<KMeansInitialization>
+        ParseKMeansInitialization(const std::string_view value) noexcept
+        {
+            if (value == "Random") return KMeansInitialization::Random;
+            if (value == "Hierarchical")
+                return KMeansInitialization::Hierarchical;
+            return std::nullopt;
+        }
+
         [[nodiscard]] std::optional<ParameterizationStrategyKind>
         ParseParameterizationStrategy(const std::string_view value) noexcept
         {
@@ -588,6 +607,29 @@ namespace Extrinsic::Runtime
                 return "VulkanCompute";
             }
             return "CpuReference";
+        }
+
+        [[nodiscard]] std::string_view ToConfigString(
+            const ClusteringBackend value) noexcept
+        {
+            switch (value)
+            {
+            case ClusteringBackend::VulkanCompute: return "VulkanCompute";
+            case ClusteringBackend::None:
+            case ClusteringBackend::CpuReference: return "CpuReference";
+            }
+            return "CpuReference";
+        }
+
+        [[nodiscard]] std::string_view ToConfigString(
+            const KMeansInitialization value) noexcept
+        {
+            switch (value)
+            {
+            case KMeansInitialization::Random: return "Random";
+            case KMeansInitialization::Hierarchical: return "Hierarchical";
+            }
+            return "Hierarchical";
         }
 
         [[nodiscard]] std::string_view ToConfigString(
@@ -683,6 +725,69 @@ namespace Extrinsic::Runtime
             }
             outValue = *parsed;
             return true;
+        }
+
+        [[nodiscard]] ClusteringConfig ParseClustering(
+            const std::string_view payload,
+            ClusteringConfig config,
+            ValidationContext context)
+        {
+            const std::optional<json> object = ParseObject(context, payload);
+            if (!object.has_value())
+                return config;
+
+            AddUnknownFieldDiagnostics(
+                context,
+                *object,
+                {"cluster_count",
+                 "max_iterations",
+                 "seed",
+                 "initialization",
+                 "backend"});
+            if (const auto value = ReadInteger(
+                    context, *object, "cluster_count", 1, 1024))
+            {
+                config.Parameters.ClusterCount =
+                    static_cast<std::uint32_t>(*value);
+                CountParsed(context);
+            }
+            if (const auto value = ReadInteger(
+                    context, *object, "max_iterations", 1, 4096))
+            {
+                config.Parameters.MaxIterations =
+                    static_cast<std::uint32_t>(*value);
+                CountParsed(context);
+            }
+            if (const auto value = ReadInteger(
+                    context,
+                    *object,
+                    "seed",
+                    0,
+                    std::numeric_limits<std::uint32_t>::max()))
+            {
+                config.Parameters.Seed =
+                    static_cast<std::uint32_t>(*value);
+                CountParsed(context);
+            }
+            if (ReadEnum(
+                    context,
+                    *object,
+                    "initialization",
+                    ParseKMeansInitialization,
+                    config.Parameters.Initialization))
+            {
+                CountParsed(context);
+            }
+            if (ReadEnum(
+                    context,
+                    *object,
+                    "backend",
+                    ParseClusteringBackend,
+                    config.Backend))
+            {
+                CountParsed(context);
+            }
+            return config;
         }
 
         [[nodiscard]] ProgressivePoissonPlaygroundConfig ParseProgressivePoisson(
@@ -1264,6 +1369,15 @@ namespace Extrinsic::Runtime
                 ValidationContext{});
         }
 
+        [[nodiscard]] ClusteringConfig DecodeClusteringCanonical(
+            const std::string_view payload)
+        {
+            return ParseClustering(
+                payload,
+                ClusteringConfig{},
+                ValidationContext{});
+        }
+
         [[nodiscard]] ParameterizationConfig DecodeParameterizationCanonical(
             const std::string_view payload)
         {
@@ -1272,6 +1386,32 @@ namespace Extrinsic::Runtime
                 ParameterizationConfig{},
                 ValidationContext{});
         }
+    }
+
+    RunKMeans MakeConfiguredKMeansRequest(
+        const std::uint32_t stableEntityId,
+        KMeansPropertyRefs properties,
+        const ClusteringConfig& config)
+    {
+        return RunKMeans{
+            .StableEntityId = stableEntityId,
+            .Properties = std::move(properties),
+            .Parameters = config.Parameters,
+            .Backend = config.Backend,
+        };
+    }
+
+    std::string SerializeClusteringConfig(
+        const ClusteringConfig& config)
+    {
+        return json::object({
+            {"cluster_count", config.Parameters.ClusterCount},
+            {"max_iterations", config.Parameters.MaxIterations},
+            {"seed", config.Parameters.Seed},
+            {"initialization",
+             std::string{ToConfigString(config.Parameters.Initialization)}},
+            {"backend", std::string{ToConfigString(config.Backend)}},
+        }).dump();
     }
 
     std::string SerializeProgressivePoissonPlaygroundConfig(
@@ -1346,6 +1486,30 @@ namespace Extrinsic::Runtime
     }
 
     Core::Config::EngineConfigSectionValidationResult
+    ValidateClusteringConfigSection(
+        const std::string_view documentPayloadJson,
+        const std::string_view referencePayloadJson,
+        const std::string_view diagnosticSubject)
+    {
+        const ClusteringConfig reference = ParseClustering(
+            referencePayloadJson,
+            ClusteringConfig{},
+            ValidationContext{});
+        Core::Config::EngineConfigSectionValidationResult result{
+            .State = Core::Config::EngineConfigState::Valid,
+        };
+        const ClusteringConfig config = ParseClustering(
+            documentPayloadJson,
+            reference,
+            ValidationContext{
+                .Result = &result,
+                .Path = std::string{diagnosticSubject},
+            });
+        result.CanonicalPayloadJson = SerializeClusteringConfig(config);
+        return result;
+    }
+
+    Core::Config::EngineConfigSectionValidationResult
     ValidateProgressivePoissonConfigSection(
         const std::string_view documentPayloadJson,
         const std::string_view referencePayloadJson,
@@ -1394,6 +1558,43 @@ namespace Extrinsic::Runtime
             });
         result.CanonicalPayloadJson = SerializeParameterizationConfig(config);
         return result;
+    }
+
+    std::optional<ClusteringConfig> GetClusteringConfig(
+        const Core::Config::EngineConfig& config)
+    {
+        const Core::Config::EngineConfigSection* section =
+            Core::Config::FindEngineConfigSection(
+                config.AppSections,
+                kClusteringConfigSectionName);
+        if (section == nullptr ||
+            section->SchemaId != kClusteringConfigSectionSchemaId ||
+            section->SchemaVersion !=
+                kClusteringConfigSectionSchemaVersion)
+        {
+            return std::nullopt;
+        }
+        const auto validated = ValidateClusteringConfigSection(
+            section->PayloadJson,
+            SerializeClusteringConfig(ClusteringConfig{}),
+            kClusteringConfigSectionName);
+        if (validated.State != Core::Config::EngineConfigState::Valid)
+            return std::nullopt;
+        return DecodeClusteringCanonical(validated.CanonicalPayloadJson);
+    }
+
+    void SetClusteringConfig(
+        Core::Config::EngineConfig& config,
+        const ClusteringConfig& value)
+    {
+        Core::Config::UpsertEngineConfigSection(
+            config.AppSections,
+            Core::Config::EngineConfigSection{
+                .Name = std::string{kClusteringConfigSectionName},
+                .SchemaId = std::string{kClusteringConfigSectionSchemaId},
+                .SchemaVersion = kClusteringConfigSectionSchemaVersion,
+                .PayloadJson = SerializeClusteringConfig(value),
+            });
     }
 
     std::optional<ProgressivePoissonPlaygroundConfig>
@@ -1478,6 +1679,26 @@ namespace Extrinsic::Runtime
                 .SchemaVersion = kParameterizationConfigSectionSchemaVersion,
                 .PayloadJson = SerializeParameterizationConfig(value),
             });
+    }
+
+    Core::Config::EngineConfigSectionRegistration
+    MakeClusteringConfigSectionRegistration(
+        Core::Config::EngineConfigSectionChangedCallback onChanged)
+    {
+        return Core::Config::EngineConfigSectionRegistration{
+            .DefaultSection =
+                Core::Config::EngineConfigSection{
+                    .Name = std::string{kClusteringConfigSectionName},
+                    .SchemaId =
+                        std::string{kClusteringConfigSectionSchemaId},
+                    .SchemaVersion =
+                        kClusteringConfigSectionSchemaVersion,
+                    .PayloadJson =
+                        SerializeClusteringConfig(ClusteringConfig{}),
+                },
+            .Validate = ValidateClusteringConfigSection,
+            .OnChanged = std::move(onChanged),
+        };
     }
 
     Core::Config::EngineConfigSectionRegistration

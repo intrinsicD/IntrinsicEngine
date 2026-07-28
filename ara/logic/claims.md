@@ -139,8 +139,9 @@
 - **From staging**: O62
 
 ## C08: K-Means uses the shared result batch on operational Vulkan
-- **Statement**: The production K-Means GPU backend submits labels, squared
-  distances, and centroids through one copied `Graphics.GpuTransfer` batch,
+- **Statement**: The production K-Means service's private GPU backend submits
+  labels, squared distances, and centroids through one copied
+  `Graphics.GpuTransfer` batch,
   deduplicates their common source to one transfer-read barrier, consumes the
   batch exactly once in its typed adapter, and matches its CPU reference on the
   deterministic separated-clusters Vulkan fixture.
@@ -148,16 +149,18 @@
   driver 590.48.01; no Progressive Poisson or whole-task claim
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
-- **Falsification criteria**: K-Means imports or constructs the retired async
-  wrapper, submits more than one logical result batch, emits more than one
-  transfer-read barrier for its shared Work buffer, consumes the result more
-  than once, or the operational parity fixture disagrees with the CPU reference.
+- **Falsification criteria**: K-Means bypasses `ClusteringService`, imports or
+  constructs the retired async wrapper, submits more than one logical result
+  batch, emits more than one transfer-read barrier for its shared Work buffer,
+  consumes the result more than once, or the operational parity fixture
+  disagrees with the CPU reference.
 - **Proof**: [tasks/done/RUNTIME-195-unified-gpu-result-readback.md,
-  src/runtime/Runtime.KMeansGpuBackend.cppm,
-  src/runtime/Runtime.KMeansGpuBackend.cpp,
-  src/runtime/Runtime.KMeansGpuJobQueue.cpp,
-  tests/contract/runtime/Test.KMeansGpuBackend.cpp,
-  tests/integration/runtime/Test.KMeansGpuBackendGpuSmoke.cpp]
+  src/runtime/Modules/Clustering/Runtime.ClusteringGpuBackend.cppm,
+  src/runtime/Modules/Clustering/Runtime.ClusteringGpuBackend.cpp,
+  src/runtime/Modules/Clustering/Runtime.ClusteringGpuState.cpp,
+  src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp,
+  tests/contract/runtime/Test.GpuResultReadbackJob.cpp,
+  tests/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp]
 - **Dependencies**: [C07]
 - **Tags**: K-Means, graphics, runtime, GPU readback, Vulkan, parity
 - **From staging**: O63
@@ -209,7 +212,7 @@
 - **Proof**: [tasks/done/RUNTIME-195-unified-gpu-result-readback.md,
   src/graphics/renderer/Graphics.GpuTransfer.cppm,
   src/graphics/renderer/Graphics.GpuTransfer.cpp,
-  src/runtime/Runtime.KMeansGpuBackend.cpp,
+  src/runtime/Modules/Clustering/Runtime.ClusteringGpuBackend.cpp,
   src/runtime/Runtime.ProgressivePoissonGpuBackend.cpp,
   tests/contract/runtime/Test.GpuResultReadbackJob.cpp,
   tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
@@ -218,3 +221,35 @@
 - **Dependencies**: [C06, C08, C09]
 - **Tags**: graphics, runtime, GPU readback, JobService, Vulkan, retirement
 - **From staging**: O65
+
+## C11: Runtime K-Means has one typed CPU/GPU operation
+- **Statement**: Every production K-Means caller uses
+  `ClusteringService::RunKMeans`; CPU reference, operational Vulkan compute,
+  honest CPU fallback, cancellation, stale validation, selected-entity
+  label/color writeback, and visualization refresh terminate through the same
+  typed completion/change events. Vulkan recorder/cache/readback details are a
+  non-exported clustering module partition, and Sandbox/config/benchmark code
+  exposes no parallel backend, queue, or result family.
+- **Status**: supported — CPU/Null contracts plus ASan+UBSan promoted Vulkan on
+  NVIDIA GeForce RTX 3050, driver 590.48.01; no performance improvement claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A production caller bypasses `ClusteringService`,
+  a public K-Means backend/queue/duplicate facade DTO is reintroduced, config
+  and UI map different requests, fallback telemetry is false, stale/cancelled
+  work publishes success, label/color writeback omits the change event, or the
+  actual-Vulkan service fixture disagrees with the CPU reference.
+- **Proof**: [src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm,
+  tasks/done/RUNTIME-196-canonical-clustering-service-path.md,
+  src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp,
+  src/runtime/Modules/Clustering/Runtime.ClusteringGpuState.cpp,
+  src/runtime/Runtime.SandboxConfigSections.cpp,
+  src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp,
+  tests/contract/runtime/Test.ClusteringModule.cpp,
+  tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp,
+  tests/integration/runtime/Test.SandboxConfigSections.cpp,
+  tests/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp,
+  benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp]
+- **Dependencies**: [C06, C08]
+- **Tags**: K-Means, clustering, runtime, config, Vulkan, parity, retirement
+- **From staging**: O66

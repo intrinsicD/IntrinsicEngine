@@ -153,7 +153,7 @@ family*, not a universal DAG engine.
 | Stage/param/result types, kernels, CPU-reference driver | **geometry** | `Geometry.Registration` (+ new `Geometry.Registration.*` sub-modules) |
 | Reused kernels (no new math) | **geometry** | `Geometry.Robust`, `Geometry.KDTree`, `Geometry.RotationAveraging`, `Geometry.PointCloud.Features`, `Geometry.MeshClosestFace`, `Geometry.Rotation`, `Geometry.Sparse`/`Geometry.Linalg` |
 | Data-driven **param schema** (key/type/default/label/range) | **geometry-local** initially; promote to `core` on a second consumer | new `Geometry.Registration` descriptor types |
-| GPU-capable overloads + `IDevice::IsOperational()` fallback | **runtime** | `Runtime.RegistrationBackend` (mirrors `Runtime.KMeansBackend`) |
+| GPU-capable overloads + `IDevice::IsOperational()` fallback | **runtime** | `Runtime.RegistrationBackend`; a feature-owned typed service with private backend state should follow the `ClusteringModule` pattern when registration gains a durable runtime owner |
 | Heavy/async execution (large clouds, coarse RANSAC, BVH builds) | **runtime** | `Runtime.JobService` (do not invent another graph system) |
 | Runtime panel model + typed command facade | **runtime** | `Extrinsic.Runtime.SandboxEditorFacades`; split focused private implementation units as families grow |
 | UI (thin schema-reflecting adapter) | **app** | `Extrinsic.Sandbox.Editor.MeshProcessingPanels`, registered through `Extrinsic.Sandbox.Editor.Shell` |

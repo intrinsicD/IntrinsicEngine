@@ -906,3 +906,24 @@ observations:
     promoted_to: "logic/claims.md:C10"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O66
+    timestamp: "2026-07-28T02:23+02:00"
+    provenance: ai-executed
+    content: >
+      Runtime K-Means can use one typed ClusteringService operation for CPU,
+      operational Vulkan, honest fallback, cancellation, stale validation,
+      selected-entity property writeback, visualization refresh, config, UI,
+      and benchmark callers without a parallel public backend or queue.
+    context: >
+      RUNTIME-196 closure combines 48 focused CPU clustering/config/structural
+      contracts, the complete CPU-supported selector with 4,210 passes and one
+      expected GLFW/LSan self-skip, and three ASan+UBSan promoted-Vulkan
+      service/benchmark cases on an NVIDIA GeForce RTX 3050 with driver
+      590.48.01. The benchmark reports service-command-to-applied-event latency
+      and explicitly makes no performance-improvement claim.
+    potential_type: claim
+    bound_to: [N284]
+    promoted: true
+    promoted_to: "logic/claims.md:C11"
+    crystallized_via: artifact-commitment
+    stale: false

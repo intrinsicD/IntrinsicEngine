@@ -23,6 +23,7 @@ import Extrinsic.Sandbox.Editor.Shell;
 
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorWindowRegistry;
+import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.SandboxEditorFacades;
 
 namespace Extrinsic::Sandbox::Editor
@@ -51,10 +52,10 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::SandboxEditorParameterizationResult{}
                 .ParameterizationStatus);
 
-        constexpr std::array<Runtime::SandboxEditorKMeansBackend, 2>
+        constexpr std::array<Runtime::ClusteringBackend, 2>
             kKMeansBackends{
-                Runtime::SandboxEditorKMeansBackend::CpuReference,
-                Runtime::SandboxEditorKMeansBackend::VulkanCompute,
+                Runtime::ClusteringBackend::CpuReference,
+                Runtime::ClusteringBackend::VulkanCompute,
             };
         constexpr std::array<Runtime::SandboxEditorProgressivePoissonChannel, 4>
             kProgressivePoissonChannels{
@@ -122,7 +123,7 @@ namespace Extrinsic::Sandbox::Editor
                    domains.end();
         }
 
-        [[nodiscard]] Runtime::SandboxEditorKMeansBackend KMeansBackendFromIndex(
+        [[nodiscard]] Runtime::ClusteringBackend KMeansBackendFromIndex(
             const std::int32_t index) noexcept
         {
             const std::int32_t clamped = std::clamp(
@@ -130,6 +131,34 @@ namespace Extrinsic::Sandbox::Editor
                 0,
                 static_cast<std::int32_t>(kKMeansBackends.size() - 1u));
             return kKMeansBackends[static_cast<std::size_t>(clamped)];
+        }
+
+        [[nodiscard]] std::int32_t KMeansBackendIndex(
+            const Runtime::ClusteringBackend backend) noexcept
+        {
+            const auto found = std::find(
+                kKMeansBackends.begin(), kKMeansBackends.end(), backend);
+            return found == kKMeansBackends.end()
+                ? 0
+                : static_cast<std::int32_t>(
+                      std::distance(kKMeansBackends.begin(), found));
+        }
+
+        [[nodiscard]] Runtime::GeometryElementDomain KMeansDomain(
+            const Runtime::SandboxEditorGeometryProcessingDomain domain) noexcept
+        {
+            using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
+            switch (domain)
+            {
+            case Domain::MeshVertices:
+                return Runtime::GeometryElementDomain::MeshVertex;
+            case Domain::GraphVertices:
+                return Runtime::GeometryElementDomain::GraphNode;
+            case Domain::PointCloudPoints:
+                return Runtime::GeometryElementDomain::PointCloudPoint;
+            default: break;
+            }
+            return Runtime::GeometryElementDomain::Unknown;
         }
 
         [[nodiscard]] Runtime::SandboxEditorProgressivePoissonChannel
@@ -490,14 +519,18 @@ namespace Extrinsic::Sandbox::Editor
     {
         struct KMeansState
         {
-            std::optional<Runtime::SandboxEditorKMeansResult> LastResult{};
+            std::optional<Runtime::KMeansRunCompleted> LastResult{};
+            std::optional<Runtime::RuntimeEngineConfigApplyResult>
+                LastConfigApply{};
             Runtime::SandboxEditorGeometryProcessingDomain Domain{
                 Runtime::SandboxEditorGeometryProcessingDomain::None};
             std::int32_t Backend{0};
             std::int32_t ClusterCount{8};
             std::int32_t MaxIterations{32};
-            std::int32_t Seed{42};
+            std::uint32_t Seed{42u};
             bool UseHierarchicalInitialization{true};
+            bool Initialized{false};
+            bool Dirty{false};
         };
 
         struct ProgressivePoissonState
@@ -602,7 +635,7 @@ namespace Extrinsic::Sandbox::Editor
             CachedModelFrame = -1;
             for (auto& model : CachedDomainModels)
                 model.reset();
-            KMeans.LastResult.reset();
+            KMeans = KMeansState{};
             ProgressivePoisson.LastResult.reset();
             ProgressivePoisson.LastConfigResult.reset();
             ProgressivePoisson.AutoRunPending = false;
@@ -751,6 +784,24 @@ namespace Extrinsic::Sandbox::Editor
 
             if (context.LastKMeansResult != nullptr)
                 KMeans.LastResult = *context.LastKMeansResult;
+            if (!KMeans.Initialized || !KMeans.Dirty)
+            {
+                const std::optional<Runtime::ClusteringConfig> active =
+                    Runtime::GetSandboxEditorClusteringConfig(context);
+                if (active.has_value())
+                {
+                    KMeans.Backend = KMeansBackendIndex(active->Backend);
+                    KMeans.ClusterCount = static_cast<std::int32_t>(
+                        active->Parameters.ClusterCount);
+                    KMeans.MaxIterations = static_cast<std::int32_t>(
+                        active->Parameters.MaxIterations);
+                    KMeans.Seed = active->Parameters.Seed;
+                    KMeans.UseHierarchicalInitialization =
+                        active->Parameters.Initialization ==
+                        Runtime::KMeansInitialization::Hierarchical;
+                    KMeans.Initialized = true;
+                }
+            }
             if (!ContainsKMeansDomain(processing.KMeansDomains, KMeans.Domain))
                 KMeans.Domain = processing.KMeansDomains.front();
 
@@ -780,11 +831,11 @@ namespace Extrinsic::Sandbox::Editor
                 KMeans.Backend,
                 0,
                 static_cast<std::int32_t>(kKMeansBackends.size() - 1u));
-            const Runtime::SandboxEditorKMeansBackend backend =
+            const Runtime::ClusteringBackend previewBackend =
                 KMeansBackendFromIndex(KMeans.Backend);
             if (ImGui::BeginCombo(
                     "Backend##KMeans",
-                    Runtime::DebugNameForSandboxEditorKMeansBackend(backend)))
+                    Runtime::ToString(previewBackend).data()))
             {
                 for (std::size_t index = 0u;
                      index < kKMeansBackends.size();
@@ -793,11 +844,11 @@ namespace Extrinsic::Sandbox::Editor
                     const bool selected =
                         KMeans.Backend == static_cast<std::int32_t>(index);
                     if (ImGui::Selectable(
-                            Runtime::DebugNameForSandboxEditorKMeansBackend(
-                                kKMeansBackends[index]),
+                            Runtime::ToString(kKMeansBackends[index]).data(),
                             selected))
                     {
                         KMeans.Backend = static_cast<std::int32_t>(index);
+                        KMeans.Dirty = true;
                     }
                     if (selected)
                         ImGui::SetItemDefaultFocus();
@@ -805,56 +856,123 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::EndCombo();
             }
 
-            ImGui::DragInt(
+            bool configChanged = ImGui::DragInt(
                 "Clusters##KMeans",
                 &KMeans.ClusterCount,
                 1.0f,
                 1,
                 1024);
-            ImGui::DragInt(
+            configChanged |= ImGui::DragInt(
                 "Max iterations##KMeans",
                 &KMeans.MaxIterations,
                 1.0f,
                 1,
                 4096);
-            ImGui::DragInt(
+            configChanged |= ImGui::InputScalar(
                 "Seed##KMeans",
-                &KMeans.Seed,
-                1.0f,
-                0,
-                1'000'000);
+                ImGuiDataType_U32,
+                &KMeans.Seed);
             KMeans.ClusterCount = std::clamp(KMeans.ClusterCount, 1, 1024);
             KMeans.MaxIterations =
                 std::clamp(KMeans.MaxIterations, 1, 4096);
-            KMeans.Seed = std::clamp(KMeans.Seed, 0, 1'000'000);
-            ImGui::Checkbox(
+            configChanged |= ImGui::Checkbox(
                 "Hierarchical initialization##KMeans",
                 &KMeans.UseHierarchicalInitialization);
+            KMeans.Dirty |= configChanged;
 
+            const Runtime::ClusteringBackend backend =
+                KMeansBackendFromIndex(KMeans.Backend);
+            const Runtime::ClusteringConfig clusteringConfig{
+                .Parameters = Runtime::KMeansParameters{
+                    .ClusterCount = static_cast<std::uint32_t>(
+                        KMeans.ClusterCount),
+                    .MaxIterations = static_cast<std::uint32_t>(
+                        KMeans.MaxIterations),
+                    .Seed = KMeans.Seed,
+                    .Initialization = KMeans.UseHierarchicalInitialization
+                        ? Runtime::KMeansInitialization::Hierarchical
+                        : Runtime::KMeansInitialization::Random,
+                },
+                .Backend = backend,
+            };
+
+            const bool configAvailable =
+                context.EngineConfigControlState != nullptr &&
+                context.EngineConfigCommandsAvailable &&
+                context.PreviewEngineConfigDocument &&
+                context.ApplyEngineConfigHotSubset;
+            ImGui::BeginDisabled(!configAvailable || !KMeans.Dirty);
+            if (ImGui::Button("Apply configuration##KMeans"))
+            {
+                KMeans.LastConfigApply =
+                    Runtime::ApplySandboxEditorClusteringConfig(
+                        context,
+                        clusteringConfig,
+                        "sandbox.clustering.panel");
+                if (KMeans.LastConfigApply->Succeeded())
+                    KMeans.Dirty = false;
+            }
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            ImGui::BeginDisabled(!configAvailable);
+            if (ImGui::Button("Reload active##KMeans"))
+            {
+                KMeans.Dirty = false;
+                KMeans.Initialized = false;
+            }
+            ImGui::EndDisabled();
+
+            const bool clusteringAvailable = context.Clustering != nullptr &&
+                context.Clustering->Available();
+            ImGui::BeginDisabled(!clusteringAvailable || !configAvailable);
             if (ImGui::Button("Run K-Means##KMeans"))
             {
-                Runtime::SandboxEditorKMeansResult result =
-                    Runtime::ApplySandboxEditorKMeansCommand(
+                const Runtime::GeometryElementDomain domain =
+                    KMeansDomain(KMeans.Domain);
+                const Runtime::KMeansPropertyRefs properties =
+                    Runtime::MakeKMeansPropertyRefs(domain);
+                KMeans.LastConfigApply =
+                    Runtime::ApplySandboxEditorClusteringConfig(
                         context,
-                        Runtime::SandboxEditorKMeansCommand{
-                            .StableEntityId = model.SelectedStableId,
-                            .Domain = KMeans.Domain,
-                            .ClusterCount = static_cast<std::uint32_t>(
-                                KMeans.ClusterCount),
-                            .MaxIterations = static_cast<std::uint32_t>(
-                                KMeans.MaxIterations),
-                            .Seed = static_cast<std::uint32_t>(KMeans.Seed),
-                            .UseHierarchicalInitialization =
-                                KMeans.UseHierarchicalInitialization,
-                            .Backend =
-                                KMeansBackendFromIndex(KMeans.Backend),
-                        });
-                KMeans.LastResult = result;
-                if (context.MethodResultSinks.KMeans)
-                    context.MethodResultSinks.KMeans(std::move(result));
+                        clusteringConfig,
+                        "sandbox.clustering.panel.run");
+                if (KMeans.LastConfigApply->Succeeded())
+                {
+                    KMeans.Dirty = false;
+                    const Runtime::RunKMeans request =
+                        Runtime::MakeConfiguredKMeansRequest(
+                            model.SelectedStableId,
+                            properties,
+                            clusteringConfig);
+                    const auto correlation =
+                        context.Clustering->RunKMeans(request);
+                    KMeans.LastResult = Runtime::KMeansRunCompleted{
+                        .Correlation = correlation,
+                        .World = context.World,
+                        .Status = Runtime::KMeansRunStatus::Queued,
+                        .StableEntityId = model.SelectedStableId,
+                        .Properties = request.Properties,
+                        .Parameters = request.Parameters,
+                        .RequestedBackend = request.Backend,
+                        .ActualBackend = Runtime::ClusteringBackend::None,
+                        .Message = "K-Means runtime job queued.",
+                    };
+                }
+            }
+            ImGui::EndDisabled();
+            if (!clusteringAvailable)
+                ImGui::TextDisabled("ClusteringService is unavailable.");
+            if (!configAvailable)
+                ImGui::TextDisabled(
+                    "Clustering config control is unavailable.");
+            if (KMeans.LastConfigApply.has_value() &&
+                !KMeans.LastConfigApply->Succeeded())
+            {
+                ImGui::TextDisabled(
+                    "Clustering config preview/apply was rejected.");
             }
 
-            const std::optional<Runtime::SandboxEditorKMeansResult>& result =
+            const std::optional<Runtime::KMeansRunCompleted>& result =
                 KMeans.LastResult.has_value()
                     ? KMeans.LastResult
                     : processing.LastKMeansResult;
@@ -862,7 +980,7 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         static void DrawKMeansResultStatus(
-            const std::optional<Runtime::SandboxEditorKMeansResult>& lastResult)
+            const std::optional<Runtime::KMeansRunCompleted>& lastResult)
         {
             if (!lastResult.has_value())
             {
@@ -870,45 +988,18 @@ namespace Extrinsic::Sandbox::Editor
                 return;
             }
 
-            const Runtime::SandboxEditorKMeansResult& result = *lastResult;
+            const Runtime::KMeansRunCompleted& result = *lastResult;
             ImGui::Text(
                 "Last K-Means run: %s",
-                Runtime::DebugNameForSandboxEditorCommandStatus(result.Status));
+                Runtime::ToString(result.Status).data());
             ImGui::Text(
                 "Domain: %s",
-                Runtime::DebugNameForSandboxEditorGeometryProcessingDomain(
-                    result.Domain));
-            if (!result.BackendId.empty())
-            {
-                if (!result.BackendDisplayName.empty())
-                {
-                    ImGui::Text(
-                        "Backend: %s (%s)",
-                        result.BackendDisplayName.c_str(),
-                        result.BackendId.c_str());
-                }
-                else
-                {
-                    ImGui::Text("Backend: %s", result.BackendId.c_str());
-                }
-            }
-            if (!result.RequestedBackendId.empty() &&
-                result.RequestedBackendId != result.BackendId)
-            {
-                if (!result.RequestedBackendDisplayName.empty())
-                {
-                    ImGui::Text(
-                        "Requested backend: %s (%s)",
-                        result.RequestedBackendDisplayName.c_str(),
-                        result.RequestedBackendId.c_str());
-                }
-                else
-                {
-                    ImGui::Text(
-                        "Requested backend: %s",
-                        result.RequestedBackendId.c_str());
-                }
-            }
+                Runtime::ToString(
+                    result.Properties.InputPositions.Domain).data());
+            ImGui::Text(
+                "Backend: requested %s, actual %s",
+                Runtime::ToString(result.RequestedBackend).data(),
+                Runtime::ToString(result.ActualBackend).data());
             if (result.Succeeded())
             {
                 ImGui::Text(
@@ -921,11 +1012,11 @@ namespace Extrinsic::Sandbox::Editor
                     result.Converged ? "yes" : "no",
                     static_cast<double>(result.Inertia));
             }
-            if (!result.BackendFallbackReason.empty())
+            if (!result.BackendDiagnostic.empty())
             {
                 ImGui::TextWrapped(
                     "Backend fallback: %s",
-                    result.BackendFallbackReason.c_str());
+                    result.BackendDiagnostic.c_str());
             }
             if (!result.Message.empty())
                 ImGui::TextWrapped("%s", result.Message.c_str());

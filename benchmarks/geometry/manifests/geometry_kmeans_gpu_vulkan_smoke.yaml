@@ -1,4 +1,4 @@
-# GEOM-056 — KMeans Vulkan GPU smoke manifest.
+# GEOM-056 / RUNTIME-196 — KMeans Vulkan GPU smoke manifest.
 #
 # Stable benchmark contract for the opt-in runner implemented by
 # benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp. This is not part of the
@@ -14,7 +14,11 @@ params:
   point_count: 6
   cluster_count: 2
   max_iterations: 6
+  seed: 13
+  initialization: hierarchical
   convergence_tolerance: 0.00001
+  execution_route: clustering_service
+  measurement_scope: service_command_to_applied_event
   baseline_comparison: cpu_reference_same_fixture
 metrics:
   - runtime_ms

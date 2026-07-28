@@ -169,17 +169,18 @@ module owns the deterministic CPU reference path and does not import RHI. Its
 `ActualBackend`, and `FellBackToCPU` so a GPU request that runs on CPU is never
 silent.
 
-The RHI-visible integration hooks live in runtime:
-`Extrinsic.Runtime.KMeansBackend::ClusterKMeans(...)` accepts
-`Extrinsic::RHI::IDevice&`, evaluates `IDevice::IsOperational()` for GPU
-requests, and remains a nonblocking synchronous fallback seam. Real Vulkan
-KMeans execution is owned by `Extrinsic.Runtime.KMeansGpuBackend` and the
-Sandbox editor's `JobService` `GpuQueue` participant, which together provide
-command recording, persistent GPU resources, and asynchronous readback
-ownership without importing RHI into geometry or creating an extra swapchain
-present. The queue class is private implementation glue attached to the public
-`Extrinsic.Runtime.SandboxEditorFacades` module; its request, submission,
-result, and status DTOs remain on that facade for command injection.
+The RHI-visible integration owner is
+`Extrinsic.Runtime.ClusteringService::RunKMeans`. Its plain request carries
+typed input/output `GeometryPropertyRef` identities, algorithm parameters, and
+CPU-reference or Vulkan-compute selection; its typed completion reports the
+actual backend and fallback diagnostic. `ClusteringModule` owns the selected
+geometry snapshot, world/property-generation validation, label/color
+writeback, and visualization event. Real Vulkan execution is a non-exported
+module partition plus one private `JobService` GPU participant, providing
+command recording, persistent GPU resources, and shared asynchronous readback
+without importing RHI into geometry or creating an extra swapchain present.
+Sandbox UI/config/agent callers and the opt-in smoke/benchmark all invoke the
+service rather than importing backend machinery.
 
 ### Geometry IO coverage
 

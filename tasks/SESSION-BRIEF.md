@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-196` — Canonical clustering-service CPU/GPU path (tasks/active/RUNTIME-196-canonical-clustering-service-path.md)
+- none
 
 ## Theme B — Rendering modernization
 

@@ -10,6 +10,7 @@ export module Extrinsic.Runtime.SandboxConfigSections;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
+export import Extrinsic.Runtime.ClusteringModule;
 
 export namespace Extrinsic::Runtime
 {
@@ -33,6 +34,23 @@ export namespace Extrinsic::Runtime
         "intrinsic.runtime.sandbox.parameterization";
     inline constexpr std::uint32_t kParameterizationConfigSectionSchemaVersion =
         1u;
+
+    inline constexpr std::string_view kClusteringConfigSectionName =
+        "sandbox.clustering";
+    inline constexpr std::string_view kClusteringConfigSectionSchemaId =
+        "intrinsic.runtime.sandbox.clustering";
+    inline constexpr std::uint32_t kClusteringConfigSectionSchemaVersion = 1u;
+
+    struct ClusteringConfig
+    {
+        KMeansParameters Parameters{};
+        ClusteringBackend Backend{ClusteringBackend::CpuReference};
+    };
+
+    [[nodiscard]] RunKMeans MakeConfiguredKMeansRequest(
+        std::uint32_t stableEntityId,
+        KMeansPropertyRefs properties,
+        const ClusteringConfig& config);
 
     enum class ProgressivePoissonPlaygroundChannel : std::uint32_t
     {
@@ -166,6 +184,8 @@ export namespace Extrinsic::Runtime
         const ProgressivePoissonPlaygroundConfig& config);
     [[nodiscard]] std::string SerializeParameterizationConfig(
         const ParameterizationConfig& config);
+    [[nodiscard]] std::string SerializeClusteringConfig(
+        const ClusteringConfig& config);
 
     [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
     ValidateProgressivePoissonConfigSection(
@@ -174,6 +194,11 @@ export namespace Extrinsic::Runtime
         std::string_view diagnosticSubject);
     [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
     ValidateParameterizationConfigSection(
+        std::string_view documentPayloadJson,
+        std::string_view referencePayloadJson,
+        std::string_view diagnosticSubject);
+    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
+    ValidateClusteringConfigSection(
         std::string_view documentPayloadJson,
         std::string_view referencePayloadJson,
         std::string_view diagnosticSubject);
@@ -191,10 +216,19 @@ export namespace Extrinsic::Runtime
         Core::Config::EngineConfig& config,
         const ParameterizationConfig& value);
 
+    [[nodiscard]] std::optional<ClusteringConfig>
+    GetClusteringConfig(const Core::Config::EngineConfig& config);
+    void SetClusteringConfig(
+        Core::Config::EngineConfig& config,
+        const ClusteringConfig& value);
+
     [[nodiscard]] Core::Config::EngineConfigSectionRegistration
     MakeProgressivePoissonConfigSectionRegistration(
         EngineConfigSectionChangedCallback onChanged = {});
     [[nodiscard]] Core::Config::EngineConfigSectionRegistration
     MakeParameterizationConfigSectionRegistration(
+        EngineConfigSectionChangedCallback onChanged = {});
+    [[nodiscard]] Core::Config::EngineConfigSectionRegistration
+    MakeClusteringConfigSectionRegistration(
         EngineConfigSectionChangedCallback onChanged = {});
 }

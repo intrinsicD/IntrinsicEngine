@@ -7,13 +7,19 @@ same rubric proposed for the k-means GPU backend — **minimal CPU↔GPU I/O**,
 synchronization**. Companion to
 `docs/migration/kmeans-gpu-vulkan-compute-proposal.md`.
 
+Supersession note (2026-07-27): RUNTIME-195 unified compute-result transport
+on `Graphics.GpuTransfer`, and RUNTIME-196 moved operational K-Means Vulkan
+execution behind the sole typed `ClusteringService` operation with private
+backend state. The landscape below remains a point-in-time record of the July 1
+audit rather than current module inventory.
+
 ## Landscape
 
 Across `src/geometry`, `src/runtime`, and `methods/`, only two geometry
 algorithms have a GPU seam:
 
-1. `Geometry.KMeans` + `Extrinsic.Runtime.KMeansBackend` — seam + telemetry only;
-   the kernel is the pending proposal. Nothing to audit yet.
+1. `Geometry.KMeans` plus its then-public runtime fallback seam — seam and
+   telemetry only; the kernel was still the pending proposal.
 2. `progressive_poisson` + `Extrinsic.Runtime.ProgressivePoissonGpuBackend`
    (METHOD-013) — the only extant GPU geometry-processing backend.
 

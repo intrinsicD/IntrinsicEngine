@@ -14,6 +14,9 @@ namespace Extrinsic::Sandbox
     {
         Runtime::EngineConfigSectionRegistry registry{};
         if (!registry.Register(
+                Runtime::MakeClusteringConfigSectionRegistration(
+                    std::move(callbacks.Clustering))) ||
+            !registry.Register(
                 Runtime::MakeProgressivePoissonConfigSectionRegistration(
                     std::move(callbacks.ProgressivePoisson))) ||
             !registry.Register(

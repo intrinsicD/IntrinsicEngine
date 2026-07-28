@@ -22,6 +22,7 @@ target_sources(${target_name}
         Runtime.JobService.cppm
         Runtime.JobServiceGpuQueueBridge.cppm
         Modules/Clustering/Runtime.ClusteringModule.cppm
+        Modules/Clustering/Runtime.ClusteringGpuBackend.cppm
         Runtime.MeshAttributeTextureBake.cppm
         Runtime.ObjectSpaceNormalBakeBinding.cppm
         Runtime.ObjectSpaceNormalBakeQueue.cppm
@@ -51,8 +52,6 @@ target_sources(${target_name}
         Runtime.WorldHandle.cppm
         Runtime.WorldRegistry.cppm
         Runtime.GeometryAvailability.cppm
-        Runtime.KMeansBackend.cppm
-        Runtime.KMeansGpuBackend.cppm
         Runtime.RegistrationAlignment.cppm
         Runtime.PhysicsBridge.cppm
         Scene/Runtime.SceneDocumentModule.cppm
@@ -102,6 +101,7 @@ target_sources(${target_name}
         Runtime.JobService.cpp
         Runtime.JobServiceGpuQueueBridge.cpp
         Modules/Clustering/Runtime.ClusteringModule.cpp
+        Modules/Clustering/Runtime.ClusteringGpuBackend.cpp
         Modules/Clustering/Runtime.ClusteringGpuState.cpp
         Runtime.MeshAttributeTextureBake.cpp
         Runtime.ObjectSpaceNormalBakeBinding.cpp
@@ -131,9 +131,6 @@ target_sources(${target_name}
         Runtime.ServiceRegistry.cpp
         Runtime.WorldRegistry.cpp
         Runtime.GeometryAvailability.cpp
-        Runtime.KMeansBackend.cpp
-        Runtime.KMeansGpuBackend.cpp
-        Runtime.KMeansGpuJobQueue.cpp
         Runtime.RegistrationAlignment.cpp
         Runtime.PhysicsBridge.cpp
         Scene/Runtime.SceneDocumentModule.cpp

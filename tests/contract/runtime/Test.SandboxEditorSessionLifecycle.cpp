@@ -277,7 +277,7 @@ TEST(SandboxEditorSession, AttachPrepareDetachBoundsPreparedFrameLifetime)
     session.Detach();
     engine.Shutdown();
 }
-TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
+TEST(SandboxEditorSession, StaleCopiedCommandSurfacesFailAfterDetachAndReattach)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig());
     engine.EmplaceModule<Runtime::AsyncWorkModule>();
@@ -289,11 +289,9 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
     session.Attach(engine.Worlds(), engine.Services());
     ASSERT_TRUE(session.PrepareFrame(MakeNoSandboxEditorModelBuildRequest()));
 
-    std::function<void(Runtime::SandboxEditorKMeansResult)> staleResultSink{};
     std::function<Runtime::SandboxEditorFileImportResult(
         const Runtime::SandboxEditorFileImportCommand&)>
         staleImportCommand{};
-    Runtime::SandboxEditorKMeansGpuCommandSurface staleGpuCommands{};
     Runtime::SandboxEditorParameterizationUvViewCommandSurface staleUvCommands{};
     Runtime::SandboxEditorJobCommandSurface staleJobCommands{};
     Runtime::JobToken submittedJob{};
@@ -306,9 +304,7 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
     ASSERT_TRUE(session.VisitPreparedFrame(
         [&](Runtime::SandboxEditorPreparedFrameView frame)
         {
-            staleResultSink = frame.Context.MethodResultSinks.KMeans;
             staleImportCommand = frame.Context.AssetImportCommands.Import;
-            staleGpuCommands = frame.Context.KMeansGpuCommands;
             staleUvCommands = frame.Context.ParameterizationUvViewCommands;
             staleJobCommands = frame.Context.JobCommands;
             submittedJob = frame.Context.JobCommands.Submit(
@@ -329,9 +325,7 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
                 },
                 jobIdentity);
         }));
-    ASSERT_TRUE(staleResultSink);
     ASSERT_TRUE(staleImportCommand);
-    ASSERT_TRUE(staleGpuCommands.Available());
     ASSERT_TRUE(staleUvCommands.Available());
     ASSERT_TRUE(staleJobCommands.Available());
     ASSERT_TRUE(submittedJob.IsValid());
@@ -360,17 +354,6 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
     session.Attach(engine.Worlds(), engine.Services());
     ASSERT_TRUE(session.PrepareFrame(MakeNoSandboxEditorModelBuildRequest()));
 
-    std::function<void(Runtime::SandboxEditorKMeansResult)> currentResultSink{};
-    Runtime::SandboxEditorKMeansGpuCommandSurface currentGpuCommands{};
-    ASSERT_TRUE(session.VisitPreparedFrame(
-        [&](Runtime::SandboxEditorPreparedFrameView frame)
-        {
-            currentResultSink = frame.Context.MethodResultSinks.KMeans;
-            currentGpuCommands = frame.Context.KMeansGpuCommands;
-        }));
-    ASSERT_TRUE(currentResultSink);
-    ASSERT_TRUE(currentGpuCommands.Available());
-
     EXPECT_FALSE(
         staleJobCommands
             .Submit(Runtime::JobDesc{
@@ -385,12 +368,6 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
             .IsValid());
     EXPECT_FALSE(staleJobCommands.FindActive(jobIdentity).has_value());
     EXPECT_TRUE(staleJobCommands.SnapshotEntity(jobIdentity.EntityId).empty());
-    currentResultSink(Runtime::SandboxEditorKMeansResult{
-        .Message = "current attachment result",
-    });
-    staleResultSink(Runtime::SandboxEditorKMeansResult{
-        .Message = "stale attachment result",
-    });
     const Runtime::SandboxEditorFileImportResult staleImport =
         staleImportCommand(Runtime::SandboxEditorFileImportCommand{
             .Path = "/tmp/intrinsic-session-stale-command.obj",
@@ -399,11 +376,6 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
     EXPECT_EQ(staleImport.Status,
               Runtime::SandboxEditorCommandStatus::AssetImportFailed);
     EXPECT_EQ(staleImport.Error, Core::ErrorCode::InvalidState);
-    const Runtime::RuntimeKMeansGpuJobSubmission staleGpuSubmission =
-        staleGpuCommands.Submit({});
-    EXPECT_EQ(staleGpuSubmission.Status,
-              Runtime::RuntimeKMeansGpuJobStatus::GpuUnavailable);
-    EXPECT_FALSE(staleGpuCommands.ConsumeCompleted().has_value());
     const Runtime::SandboxEditorParameterizationUvViewState staleUvState =
         staleUvCommands.Submit(
             Runtime::SandboxEditorParameterizationUvViewRequest{
@@ -430,15 +402,6 @@ TEST(SandboxEditorSession, StaleCopiedSurfacesFailAfterDetachAndReattach)
     EXPECT_FALSE(staleUvState.GpuReady);
     EXPECT_NE(staleUvState.Message.find("attachment expired"),
               std::string::npos);
-
-    ASSERT_TRUE(session.PrepareFrame(MakeNoSandboxEditorModelBuildRequest()));
-    ASSERT_TRUE(session.VisitPreparedFrame(
-        [](Runtime::SandboxEditorPreparedFrameView frame)
-        {
-            ASSERT_NE(frame.Context.LastKMeansResult, nullptr);
-            EXPECT_EQ(frame.Context.LastKMeansResult->Message,
-                      "current attachment result");
-        }));
 
     session.Detach();
     engine.Shutdown();

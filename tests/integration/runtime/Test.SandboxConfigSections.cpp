@@ -70,11 +70,17 @@ namespace
 
 TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun)
 {
+    std::uint32_t clusteringChanges = 0u;
     std::uint32_t progressivePoissonChanges = 0u;
     std::uint32_t parameterizationChanges = 0u;
     auto configControl = std::make_unique<Runtime::EngineConfigControl>(
         Sandbox::CreateSandboxConfigSectionRegistry(
             Sandbox::SandboxConfigSectionCallbacks{
+                .Clustering =
+                    [&](const auto&, const auto&)
+                    {
+                        ++clusteringChanges;
+                    },
                 .ProgressivePoisson =
                     [&](const auto&, const auto&)
                     {
@@ -96,6 +102,15 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     fileConfig.Render.DefaultRecipeConfigPath.clear();
     fileConfig.ReferenceScene.Enabled = false;
     fileConfig.Camera.Enabled = false;
+
+    Runtime::ClusteringConfig clustering{};
+    clustering.Parameters.ClusterCount = 13u;
+    clustering.Parameters.MaxIterations = 77u;
+    clustering.Parameters.Seed = 0xf1234567u;
+    clustering.Parameters.Initialization =
+        Runtime::KMeansInitialization::Random;
+    clustering.Backend = Runtime::ClusteringBackend::VulkanCompute;
+    Runtime::SetClusteringConfig(fileConfig, clustering);
 
     Runtime::ProgressivePoissonPlaygroundConfig progressivePoisson{};
     progressivePoisson.Dimension = 2u;
@@ -123,6 +138,18 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     ASSERT_TRUE(boot.LoadedFile);
     ASSERT_FALSE(boot.UsedReferenceFallback);
 
+    const auto bootClustering =
+        Runtime::GetClusteringConfig(boot.Config);
+    ASSERT_TRUE(bootClustering.has_value());
+    EXPECT_EQ(bootClustering->Parameters.ClusterCount, 13u);
+    EXPECT_EQ(bootClustering->Parameters.MaxIterations, 77u);
+    EXPECT_EQ(bootClustering->Parameters.Seed, 0xf1234567u);
+    EXPECT_EQ(
+        bootClustering->Parameters.Initialization,
+        Runtime::KMeansInitialization::Random);
+    EXPECT_EQ(
+        bootClustering->Backend,
+        Runtime::ClusteringBackend::VulkanCompute);
     const auto bootProgressivePoisson =
         Runtime::GetProgressivePoissonPlaygroundConfig(boot.Config);
     ASSERT_TRUE(bootProgressivePoisson.has_value());
@@ -134,6 +161,7 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     EXPECT_EQ(
         bootParameterization->View.BackgroundMode,
         Runtime::ParameterizationUvBackgroundMode::Checker);
+    EXPECT_EQ(clusteringChanges, 0u);
     EXPECT_EQ(progressivePoissonChanges, 0u);
     EXPECT_EQ(parameterizationChanges, 0u);
 
@@ -148,6 +176,16 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     ASSERT_EQ(control, expectedConfigControl);
 
     CoreConfig::EngineConfig candidate = engine.GetEngineConfig();
+    auto liveClustering = Runtime::GetClusteringConfig(candidate);
+    ASSERT_TRUE(liveClustering.has_value());
+    liveClustering->Parameters.ClusterCount = 5u;
+    liveClustering->Parameters.MaxIterations = 19u;
+    liveClustering->Parameters.Seed = 0xffffffffu;
+    liveClustering->Parameters.Initialization =
+        Runtime::KMeansInitialization::Hierarchical;
+    liveClustering->Backend = Runtime::ClusteringBackend::CpuReference;
+    Runtime::SetClusteringConfig(candidate, *liveClustering);
+
     auto liveParameterization =
         Runtime::GetParameterizationConfig(candidate);
     ASSERT_TRUE(liveParameterization.has_value());
@@ -165,9 +203,12 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
             Runtime::RuntimeConfigControlSource::AgentCli);
     ASSERT_TRUE(apply.Succeeded());
     EXPECT_TRUE(apply.SectionChanged(
+        Runtime::kClusteringConfigSectionName));
+    EXPECT_TRUE(apply.SectionChanged(
         Runtime::kParameterizationConfigSectionName));
     EXPECT_FALSE(apply.SectionChanged(
         Runtime::kProgressivePoissonConfigSectionName));
+    EXPECT_EQ(clusteringChanges, 1u);
     EXPECT_EQ(progressivePoissonChanges, 0u);
     EXPECT_EQ(parameterizationChanges, 1u);
 
@@ -175,6 +216,27 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
         Runtime::GetParameterizationConfig(engine.GetEngineConfig());
     ASSERT_TRUE(activeParameterization.has_value());
     EXPECT_TRUE(activeParameterization->View.ShowDistortionHeatmap);
+
+    const auto activeClustering =
+        Runtime::GetClusteringConfig(engine.GetEngineConfig());
+    ASSERT_TRUE(activeClustering.has_value());
+    Runtime::KMeansPropertyRefs properties = Runtime::MakeKMeansPropertyRefs(
+        Runtime::GeometryElementDomain::MeshVertex);
+    properties.OutputLabels.Name = "v:configured_cluster";
+    const Runtime::RunKMeans command = Runtime::MakeConfiguredKMeansRequest(
+        41u,
+        properties,
+        *activeClustering);
+    EXPECT_EQ(command.StableEntityId, 41u);
+    EXPECT_EQ(command.Properties.InputPositions.Domain,
+              Runtime::GeometryElementDomain::MeshVertex);
+    EXPECT_EQ(command.Properties.OutputLabels.Name, "v:configured_cluster");
+    EXPECT_EQ(command.Parameters.ClusterCount, 5u);
+    EXPECT_EQ(command.Parameters.MaxIterations, 19u);
+    EXPECT_EQ(command.Parameters.Seed, 0xffffffffu);
+    EXPECT_EQ(command.Parameters.Initialization,
+              Runtime::KMeansInitialization::Hierarchical);
+    EXPECT_EQ(command.Backend, Runtime::ClusteringBackend::CpuReference);
 
     engine.Run();
     engine.Shutdown();
