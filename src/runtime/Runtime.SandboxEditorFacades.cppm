@@ -48,8 +48,7 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
-import Extrinsic.Runtime.ProgressivePresentationExtraction;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderArtifactPublication;
@@ -1057,9 +1056,9 @@ export namespace Extrinsic::Runtime
         std::size_t NodeCount{0u};
     };
 
-    struct SandboxEditorProgressivePropertyOptionModel
+    struct SandboxEditorGeometryPresentationPropertyOptionModel
     {
-        ProgressivePropertyBindingDescriptor Descriptor{};
+        GeometryPropertyRef Descriptor{};
         Geometry::PropertyValueKind ActualValueKind{
             Geometry::PropertyValueKind::Unknown};
         std::size_t ElementCount{0u};
@@ -1105,24 +1104,24 @@ export namespace Extrinsic::Runtime
         bool Connectivity{false};
         bool Generated{false};
         std::string UnsupportedReason{};
-        ProgressivePropertyBindingDescriptor Descriptor{};
+        GeometryPropertyRef Descriptor{};
         SandboxEditorPropertyValuePreview Preview{};
     };
 
     struct SandboxEditorPropertyBindingTargetModel
     {
-        ProgressiveRenderLane Lane{ProgressiveRenderLane::Surface};
+        GeometryRenderLane Lane{GeometryRenderLane::Surface};
         std::string PresentationKey{};
-        ProgressivePresentationKind PresentationKind{
-            ProgressivePresentationKind::SurfaceMaterial};
-        ProgressiveSlotSemantic Semantic{ProgressiveSlotSemantic::Albedo};
-        ProgressiveSlotSourceKind SourceKind{
-            ProgressiveSlotSourceKind::UniformDefault};
+        GeometryPresentationKind PresentationKind{
+            GeometryPresentationKind::SurfaceMaterial};
+        GeometryPresentationSlotSemantic Semantic{GeometryPresentationSlotSemantic::Albedo};
+        GeometryPresentationSourceKind SourceKind{
+            GeometryPresentationSourceKind::UniformDefault};
         GeometryElementDomain RequiredDomain{
             GeometryElementDomain::Unknown};
         GeometryPropertyValueKindFilter ExpectedValueKind{};
         std::size_t ExpectedElementCount{0u};
-        std::vector<SandboxEditorProgressivePropertyOptionModel> Options{};
+        std::vector<SandboxEditorGeometryPresentationPropertyOptionModel> Options{};
     };
 
     struct SandboxEditorVertexChannelBindingOptionModel
@@ -1161,19 +1160,19 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
-    struct SandboxEditorProgressiveSlotModel
+    struct SandboxEditorGeometryPresentationSlotModel
     {
-        ProgressiveRenderLane Lane{ProgressiveRenderLane::Surface};
+        GeometryRenderLane Lane{GeometryRenderLane::Surface};
         std::string PresentationKey{};
-        ProgressivePresentationKind PresentationKind{
-            ProgressivePresentationKind::SurfaceMaterial};
-        ProgressiveSlotSemantic Semantic{ProgressiveSlotSemantic::Albedo};
-        ProgressiveSlotSourceKind SourceKind{
-            ProgressiveSlotSourceKind::UniformDefault};
-        ProgressiveReadinessState Readiness{ProgressiveReadinessState::Unset};
-        ProgressiveDefaultValue UniformDefault{};
-        ProgressivePropertyBindingDescriptor Property{};
-        ProgressivePropertyResolution PropertyResolution{};
+        GeometryPresentationKind PresentationKind{
+            GeometryPresentationKind::SurfaceMaterial};
+        GeometryPresentationSlotSemantic Semantic{GeometryPresentationSlotSemantic::Albedo};
+        GeometryPresentationSourceKind SourceKind{
+            GeometryPresentationSourceKind::UniformDefault};
+        GeometryPresentationReadiness Readiness{GeometryPresentationReadiness::Unset};
+        GeometryPresentationDefaultValue UniformDefault{};
+        GeometryPropertyRef Property{};
+        GeometryPropertyResolution PropertyResolution{};
         Assets::AssetId AuthoredTexture{};
         Assets::AssetId GeneratedTexture{};
         Assets::AssetId TextureAsset{};
@@ -1184,7 +1183,7 @@ export namespace Extrinsic::Runtime
         bool PreviousOutputRetained{false};
         bool Unsupported{false};
         std::string Diagnostic{};
-        std::vector<SandboxEditorProgressivePropertyOptionModel> PropertyOptions{};
+        std::vector<SandboxEditorGeometryPresentationPropertyOptionModel> PropertyOptions{};
     };
 
     // RUNTIME-194 Slice B5d: editor-local job scope. This is the retired
@@ -1218,7 +1217,7 @@ export namespace Extrinsic::Runtime
     {
         std::uint32_t EntityId{0u};
         SandboxEditorJobScope Scope{SandboxEditorJobScope::Unknown};
-        ProgressiveSlotSemantic OutputSemantic{ProgressiveSlotSemantic::Albedo};
+        GeometryPresentationSlotSemantic OutputSemantic{GeometryPresentationSlotSemantic::Albedo};
         std::string OutputName{};
     };
 
@@ -1238,6 +1237,14 @@ export namespace Extrinsic::Runtime
         std::string Reason{};
     };
 
+    enum class SandboxEditorJobDomain : std::uint8_t
+    {
+        Cpu,
+        GpuCompute,
+        GpuGraphics,
+        Auto,
+    };
+
     // One row of the editor's job queue view. `JobService` owns generic
     // lifecycle state while the submitting editor session supplies identity.
     struct SandboxEditorJobRecord
@@ -1246,8 +1253,8 @@ export namespace Extrinsic::Runtime
         SandboxEditorJobIdentity Identity{};
         std::string Name{};
         JobState State{JobState::Invalid};
-        ProgressiveJobDomain RequestedJobDomain{ProgressiveJobDomain::Cpu};
-        ProgressiveJobDomain ResolvedJobDomain{ProgressiveJobDomain::Cpu};
+        SandboxEditorJobDomain RequestedJobDomain{SandboxEditorJobDomain::Cpu};
+        SandboxEditorJobDomain ResolvedJobDomain{SandboxEditorJobDomain::Cpu};
         std::vector<SandboxEditorJobDependency> Dependencies{};
         float NormalizedProgress{0.0f};
         bool ProgressDeterminate{true};
@@ -1262,21 +1269,21 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorJobRecord> Entries{};
     };
 
-    struct SandboxEditorProgressiveJobDependencyModel
+    struct SandboxEditorJobDependencyModel
     {
         JobToken Job{};
         std::string Reason{};
     };
 
-    struct SandboxEditorProgressiveJobModel
+    struct SandboxEditorJobModel
     {
         JobToken Handle{};
         SandboxEditorJobIdentity Key{};
         std::string Name{};
-        ProgressiveJobDomain RequestedJobDomain{ProgressiveJobDomain::Cpu};
-        ProgressiveJobDomain ResolvedJobDomain{ProgressiveJobDomain::Cpu};
+        SandboxEditorJobDomain RequestedJobDomain{SandboxEditorJobDomain::Cpu};
+        SandboxEditorJobDomain ResolvedJobDomain{SandboxEditorJobDomain::Cpu};
         JobState Status{JobState::Queued};
-        std::vector<SandboxEditorProgressiveJobDependencyModel> Dependencies{};
+        std::vector<SandboxEditorJobDependencyModel> Dependencies{};
         float NormalizedProgress{0.0f};
         bool ProgressDeterminate{true};
         bool PreviousOutputRetained{false};
@@ -1285,11 +1292,11 @@ export namespace Extrinsic::Runtime
         std::string Diagnostic{};
     };
 
-    struct SandboxEditorProgressiveCompositionSummary
+    struct SandboxEditorGeometryCompositionSummary
     {
         bool HasChildren{false};
         std::uint32_t ChildCount{0u};
-        std::uint32_t ChildBindingsCount{0u};
+        std::uint32_t ChildRecipeCount{0u};
         std::uint32_t ChildSlotCount{0u};
         std::uint32_t ChildPendingSlotCount{0u};
         std::uint32_t ChildFailedSlotCount{0u};
@@ -1298,22 +1305,22 @@ export namespace Extrinsic::Runtime
         std::uint32_t ChildFailedJobCount{0u};
     };
 
-    struct SandboxEditorProgressiveRenderDataModel
+    struct SandboxEditorGeometryPresentationModel
     {
-        bool HasBindings{false};
-        ProgressiveEntityShape Shape{ProgressiveEntityShape::Unknown};
-        std::uint64_t BindingGeneration{0u};
-        ProgressivePresentationExtractionStats Stats{};
-        std::vector<SandboxEditorProgressiveSlotModel> Slots{};
-        std::vector<SandboxEditorProgressiveJobModel> Jobs{};
-        SandboxEditorProgressiveCompositionSummary Composition{};
+        bool HasRecipe{false};
+        GeometryPresentationShape Shape{GeometryPresentationShape::Unknown};
+        std::uint64_t RecipeGeneration{0u};
+        GeometryPresentationSnapshotStats Stats{};
+        std::vector<SandboxEditorGeometryPresentationSlotModel> Slots{};
+        std::vector<SandboxEditorJobModel> Jobs{};
+        SandboxEditorGeometryCompositionSummary Composition{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
     enum class SandboxEditorBoundRenderStateRowKind : std::uint8_t
     {
         RenderHint,
-        ProgressiveSlot,
+        GeometryPresentationSlot,
         DerivedJob,
         CompositionSummary,
         DisabledCommand,
@@ -1325,18 +1332,18 @@ export namespace Extrinsic::Runtime
     struct SandboxEditorBoundRenderStateRow
     {
         SandboxEditorBoundRenderStateRowKind Kind{
-            SandboxEditorBoundRenderStateRowKind::ProgressiveSlot};
+            SandboxEditorBoundRenderStateRowKind::GeometryPresentationSlot};
         std::string Label{};
-        ProgressiveRenderLane Lane{ProgressiveRenderLane::Surface};
+        GeometryRenderLane Lane{GeometryRenderLane::Surface};
         std::string PresentationKey{};
-        ProgressivePresentationKind PresentationKind{
-            ProgressivePresentationKind::SurfaceMaterial};
-        ProgressiveSlotSemantic Semantic{ProgressiveSlotSemantic::Albedo};
-        ProgressiveSlotSourceKind SourceKind{
-            ProgressiveSlotSourceKind::UniformDefault};
-        ProgressiveReadinessState Readiness{ProgressiveReadinessState::Unset};
-        ProgressivePropertyBindingDescriptor Property{};
-        ProgressivePropertyResolution PropertyResolution{};
+        GeometryPresentationKind PresentationKind{
+            GeometryPresentationKind::SurfaceMaterial};
+        GeometryPresentationSlotSemantic Semantic{GeometryPresentationSlotSemantic::Albedo};
+        GeometryPresentationSourceKind SourceKind{
+            GeometryPresentationSourceKind::UniformDefault};
+        GeometryPresentationReadiness Readiness{GeometryPresentationReadiness::Unset};
+        GeometryPropertyRef Property{};
+        GeometryPropertyResolution PropertyResolution{};
         Assets::AssetId AuthoredTexture{};
         Assets::AssetId GeneratedTexture{};
         Assets::AssetId TextureAsset{};
@@ -1361,10 +1368,10 @@ export namespace Extrinsic::Runtime
     {
         bool HasSelectedEntity{false};
         std::uint32_t SelectedStableId{0u};
-        ProgressiveEntityShape Shape{ProgressiveEntityShape::Unknown};
-        std::uint64_t BindingGeneration{0u};
+        GeometryPresentationShape Shape{GeometryPresentationShape::Unknown};
+        std::uint64_t RecipeGeneration{0u};
         std::vector<SandboxEditorBoundRenderStateRow> Rows{};
-        SandboxEditorProgressiveCompositionSummary Composition{};
+        SandboxEditorGeometryCompositionSummary Composition{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
@@ -1403,7 +1410,7 @@ export namespace Extrinsic::Runtime
             SandboxEditorTextureBakeSourceCategory::Unsupported};
         bool Bakeable{false};
         std::string DisabledReason{};
-        ProgressivePropertyBindingDescriptor Descriptor{};
+        GeometryPropertyRef Descriptor{};
     };
 
     struct SandboxEditorUvDiagnosticsModel
@@ -1427,7 +1434,7 @@ export namespace Extrinsic::Runtime
         bool CheckerPreviewAvailable{false};
         bool UvRegenerationAvailable{false};
         std::string UvRegenerationDisabledReason{};
-        std::optional<SandboxEditorProgressiveJobModel> UvRegenerationJob{};
+        std::optional<SandboxEditorJobModel> UvRegenerationJob{};
     };
 
     struct SandboxEditorTextureBakeControlsModel
@@ -1438,8 +1445,8 @@ export namespace Extrinsic::Runtime
         bool HasRuntimeBakeCommand{false};
         bool CanBake{false};
         std::string DisabledReason{};
-        ProgressiveSlotSemantic DefaultTargetSemantic{
-            ProgressiveSlotSemantic::Albedo};
+        GeometryPresentationSlotSemantic DefaultTargetSemantic{
+            GeometryPresentationSlotSemantic::Albedo};
         MeshAttributeTextureBakeEncoder DefaultEncoder{
             MeshAttributeTextureBakeEncoder::Auto};
         std::uint32_t DefaultWidth{64u};
@@ -1458,7 +1465,7 @@ export namespace Extrinsic::Runtime
         SandboxEditorRenderHintModel    RenderHints{};
         SandboxEditorGeometryDomainModel Geometry{};
         SandboxEditorPropertyCatalogModel PropertyCatalog{};
-        SandboxEditorProgressiveRenderDataModel Progressive{};
+        SandboxEditorGeometryPresentationModel GeometryPresentation{};
         SandboxEditorBoundRenderStateModel BoundState{};
         SandboxEditorTextureBakeControlsModel TextureBake{};
         SandboxEditorGeometryProcessingCapabilities Processing{};
@@ -2270,7 +2277,7 @@ export namespace Extrinsic::Runtime
         std::uint64_t RenderHintSignature{0u};
         std::uint64_t VisualizationStateSignature{0u};
         std::uint64_t BindingGeneration{0u};
-        std::uint64_t ProgressiveBindingGeneration{0u};
+        std::uint64_t GeometryPresentationRecipeGeneration{0u};
         std::uint64_t DerivedJobStateSignature{0u};
         std::uint64_t CommandHistoryRevision{0u};
         std::uint64_t VisualizationAdapterBindingRevision{0u};
@@ -2287,7 +2294,7 @@ export namespace Extrinsic::Runtime
     struct SandboxEditorSelectedAnalysisModel
     {
         SandboxEditorPropertyCatalogModel PropertyCatalog{};
-        SandboxEditorProgressiveRenderDataModel Progressive{};
+        SandboxEditorGeometryPresentationModel GeometryPresentation{};
         SandboxEditorBoundRenderStateModel BoundState{};
         SandboxEditorTextureBakeControlsModel TextureBake{};
     };
@@ -2353,7 +2360,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t VertexChannelResolverScans{0u};
         std::uint32_t VertexChannelScratchAllocations{0u};
         std::uint64_t VertexChannelScratchBytes{0u};
-        std::uint32_t ProgressiveModelBuilds{0u};
+        std::uint32_t GeometryPresentationModelBuilds{0u};
         std::uint32_t BoundStateModelBuilds{0u};
         std::uint32_t UvDiagnosticsModelBuilds{0u};
         std::uint64_t UvDiagnosticsTexcoordElementsScanned{0u};
@@ -2688,21 +2695,21 @@ export namespace Extrinsic::Runtime
         std::string PropertyName{};
     };
 
-    struct SandboxEditorProgressiveSlotDefaultCommand
+    struct SandboxEditorGeometryPresentationSlotDefaultCommand
     {
         std::uint32_t StableEntityId{0u};
         std::string PresentationKey{};
-        ProgressiveSlotSemantic Semantic{ProgressiveSlotSemantic::Albedo};
-        ProgressiveDefaultValue Value{};
+        GeometryPresentationSlotSemantic Semantic{GeometryPresentationSlotSemantic::Albedo};
+        GeometryPresentationDefaultValue Value{};
         bool Enabled{true};
     };
 
-    struct SandboxEditorProgressiveSlotPropertyCommand
+    struct SandboxEditorGeometryPresentationSlotPropertyCommand
     {
         std::uint32_t StableEntityId{0u};
         std::string PresentationKey{};
-        ProgressiveSlotSemantic Semantic{ProgressiveSlotSemantic::Albedo};
-        ProgressiveSlotSourceKind SourceKind{ProgressiveSlotSourceKind::PropertyBake};
+        GeometryPresentationSlotSemantic Semantic{GeometryPresentationSlotSemantic::Albedo};
+        GeometryPresentationSourceKind SourceKind{GeometryPresentationSourceKind::PropertyBake};
         GeometryElementDomain Domain{GeometryElementDomain::Unknown};
         GeometryPropertyValueKindFilter ExpectedValueKind{};
         std::string PropertyName{};
@@ -2712,7 +2719,7 @@ export namespace Extrinsic::Runtime
     {
         std::uint32_t StableEntityId{0u};
         std::string PresentationKey{"mesh.surface"};
-        ProgressiveSlotSemantic TargetSemantic{ProgressiveSlotSemantic::Albedo};
+        GeometryPresentationSlotSemantic TargetSemantic{GeometryPresentationSlotSemantic::Albedo};
         GeometryElementDomain SourceDomain{GeometryElementDomain::MeshVertex};
         GeometryPropertyValueKindFilter ExpectedValueKind{};
         std::string PropertyName{};
@@ -2964,13 +2971,13 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorVertexChannelBindingCommand& command);
 
-    SandboxEditorCommandStatus ApplySandboxEditorProgressiveSlotDefaultCommand(
+    SandboxEditorCommandStatus ApplySandboxEditorGeometryPresentationSlotDefaultCommand(
         const SandboxEditorContext& context,
-        const SandboxEditorProgressiveSlotDefaultCommand& command);
+        const SandboxEditorGeometryPresentationSlotDefaultCommand& command);
 
-    SandboxEditorCommandStatus ApplySandboxEditorProgressiveSlotPropertyCommand(
+    SandboxEditorCommandStatus ApplySandboxEditorGeometryPresentationSlotPropertyCommand(
         const SandboxEditorContext& context,
-        const SandboxEditorProgressiveSlotPropertyCommand& command);
+        const SandboxEditorGeometryPresentationSlotPropertyCommand& command);
 
     SandboxEditorTextureBakeCommandResult ApplySandboxEditorTextureBakeCommand(
         const SandboxEditorContext& context,

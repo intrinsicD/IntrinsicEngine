@@ -33,7 +33,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.SceneSerialization;
 import Geometry.Properties;
 
@@ -481,61 +481,59 @@ TEST(RuntimeSceneSerialization, InvalidDocumentsFailClosed)
 // ============================================================================
 // RUNTIME-192 Slice B2 — property value-kind wire-format compatibility.
 //
-// The in-memory vocabulary moved to Geometry::PropertyValueKind, whose debug
-// names are "Float"/"Double". The persisted scene format predates that and
-// says "ScalarFloat"/"ScalarDouble", with "Any" for an unconstrained
-// expectation. These pin the wire strings so the migration cannot silently
-// invalidate existing scene documents.
+// The in-memory vocabulary uses Geometry::PropertyValueKind, whose debug names
+// are "Float"/"Double". The persisted scene format predates that and says
+// "ScalarFloat"/"ScalarDouble". Canonical references represent an
+// unconstrained kind as Unknown; the reader still accepts the legacy
+// expectedValueKind:"Any" spelling.
 // ============================================================================
 
 namespace
 {
-    ECS::EntityHandle AddProgressiveBindingEntity(ECS::Scene::Registry& scene)
+    ECS::EntityHandle AddGeometryPresentationEntity(ECS::Scene::Registry& scene)
     {
         const ECS::EntityHandle entity = AddMeshEntity(scene);
 
-        Runtime::ProgressiveSlotBinding constrained{};
-        constrained.Semantic = Runtime::ProgressiveSlotSemantic::ScalarField;
-        constrained.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBuffer;
+        Runtime::GeometryPresentationSlotRecipe constrained{};
+        constrained.Semantic = Runtime::GeometryPresentationSlotSemantic::ScalarField;
+        constrained.SourceKind = Runtime::GeometryPresentationSourceKind::PropertyBuffer;
         constrained.UniformDefault.Kind = Geometry::PropertyValueKind::Float;
-        constrained.Property = Runtime::ProgressivePropertyBindingDescriptor{
+        constrained.Property = Runtime::GeometryPropertyRef{
             .Domain = Runtime::GeometryElementDomain::MeshVertex,
-            .PropertyName = "v:quality",
-            .ExpectedValueKind = Geometry::PropertyValueKind::Float,
-            .ExpectedElementCount = 3u,
+            .Name = "v:quality",
+            .ValueKind = Geometry::PropertyValueKind::Float,
         };
 
-        Runtime::ProgressiveSlotBinding unconstrained{};
-        unconstrained.Semantic = Runtime::ProgressiveSlotSemantic::Albedo;
-        unconstrained.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBuffer;
+        Runtime::GeometryPresentationSlotRecipe unconstrained{};
+        unconstrained.Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo;
+        unconstrained.SourceKind = Runtime::GeometryPresentationSourceKind::PropertyBuffer;
         unconstrained.UniformDefault.Kind = Geometry::PropertyValueKind::Double;
-        unconstrained.Property = Runtime::ProgressivePropertyBindingDescriptor{
+        unconstrained.Property = Runtime::GeometryPropertyRef{
             .Domain = Runtime::GeometryElementDomain::MeshVertex,
-            .PropertyName = "v:color",
-            .ExpectedValueKind = std::nullopt,
-            .ExpectedElementCount = 3u,
+            .Name = "v:color",
+            .ValueKind = Geometry::PropertyValueKind::Unknown,
         };
 
-        Runtime::ProgressivePresentationBindings bindings{};
-        bindings.Shape = Runtime::ProgressiveEntityShape::MeshLeaf;
-        bindings.Presentations.push_back(Runtime::ProgressivePresentationBinding{
+        Runtime::GeometryPresentationRecipe bindings{};
+        bindings.Shape = Runtime::GeometryPresentationShape::Mesh;
+        bindings.Presentations.push_back(Runtime::GeometryPresentationBindingRecipe{
             .Key = "mesh.surface",
-            .Kind = Runtime::ProgressivePresentationKind::SurfaceMaterial,
+            .Kind = Runtime::GeometryPresentationKind::SurfaceMaterial,
             .Slots = {constrained, unconstrained},
         });
-        bindings.Lanes.push_back(Runtime::ProgressiveRenderLaneBinding{
-            .Lane = Runtime::ProgressiveRenderLane::Surface,
+        bindings.Lanes.push_back(Runtime::GeometryPresentationLaneRecipe{
+            .Lane = Runtime::GeometryRenderLane::Surface,
             .PresentationKey = "mesh.surface",
         });
 
-        scene.Raw().emplace<Runtime::ProgressivePresentationBindings>(
+        scene.Raw().emplace<Runtime::GeometryPresentationRecipe>(
             entity, std::move(bindings));
         return entity;
     }
 
-    [[nodiscard]] const Runtime::ProgressiveSlotBinding* FindSlot(
-        const Runtime::ProgressivePresentationBindings& bindings,
-        const Runtime::ProgressiveSlotSemantic semantic) noexcept
+    [[nodiscard]] const Runtime::GeometryPresentationSlotRecipe* FindSlot(
+        const Runtime::GeometryPresentationRecipe& bindings,
+        const Runtime::GeometryPresentationSlotSemantic semantic) noexcept
     {
         for (const auto& presentation : bindings.Presentations)
         {
@@ -552,13 +550,13 @@ namespace
 TEST(RuntimeSceneSerialization, PropertyValueKindKeepsLegacyWireStrings)
 {
     ECS::Scene::Registry source;
-    (void)AddProgressiveBindingEntity(source);
+    (void)AddGeometryPresentationEntity(source);
 
     MemoryIOBackend backend;
-    const auto saved = Runtime::SaveSceneDocument(source, "progressive.json", backend);
+    const auto saved = Runtime::SaveSceneDocument(source, "presentation.json", backend);
     ASSERT_TRUE(saved.has_value()) << static_cast<int>(saved.error());
 
-    const std::string text = backend.Text("progressive.json");
+    const std::string text = backend.Text("presentation.json");
 
     // The canonical debug names are "Float"/"Double"; the wire must NOT use
     // them, or documents written by older builds stop loading.
@@ -566,8 +564,8 @@ TEST(RuntimeSceneSerialization, PropertyValueKindKeepsLegacyWireStrings)
         << "float expectation must persist as ScalarFloat";
     EXPECT_NE(text.find("\"ScalarDouble\""), std::string::npos)
         << "double default must persist as ScalarDouble";
-    EXPECT_NE(text.find("\"Any\""), std::string::npos)
-        << "unconstrained expectation must persist as Any";
+    EXPECT_NE(text.find("\"Unknown\""), std::string::npos)
+        << "unconstrained references must persist as Unknown";
     EXPECT_EQ(text.find("\"expectedValueKind\":\"Float\""), std::string::npos);
     EXPECT_EQ(text.find("\"kind\":\"Double\""), std::string::npos);
 }
@@ -575,38 +573,135 @@ TEST(RuntimeSceneSerialization, PropertyValueKindKeepsLegacyWireStrings)
 TEST(RuntimeSceneSerialization, PropertyValueKindRoundTripsThroughLegacyWire)
 {
     ECS::Scene::Registry source;
-    (void)AddProgressiveBindingEntity(source);
+    (void)AddGeometryPresentationEntity(source);
 
     MemoryIOBackend backend;
     ASSERT_TRUE(
-        Runtime::SaveSceneDocument(source, "progressive.json", backend).has_value());
+        Runtime::SaveSceneDocument(source, "presentation.json", backend).has_value());
 
     ECS::Scene::Registry loaded;
     const auto result =
-        Runtime::LoadSceneDocument(loaded, "progressive.json", backend);
+        Runtime::LoadSceneDocument(loaded, "presentation.json", backend);
     ASSERT_TRUE(result.has_value()) << static_cast<int>(result.error());
 
     const ECS::EntityHandle entity = FindEntityByName(loaded, "Mesh Entity");
     ASSERT_NE(entity, ECS::InvalidEntityHandle);
     const auto* bindings =
-        loaded.Raw().try_get<Runtime::ProgressivePresentationBindings>(entity);
+        loaded.Raw().try_get<Runtime::GeometryPresentationRecipe>(entity);
     ASSERT_NE(bindings, nullptr);
 
     const auto* constrained =
-        FindSlot(*bindings, Runtime::ProgressiveSlotSemantic::ScalarField);
+        FindSlot(*bindings, Runtime::GeometryPresentationSlotSemantic::ScalarField);
     ASSERT_NE(constrained, nullptr);
-    ASSERT_TRUE(constrained->Property.ExpectedValueKind.has_value());
-    EXPECT_EQ(*constrained->Property.ExpectedValueKind,
+    EXPECT_EQ(constrained->Property.ValueKind,
               Geometry::PropertyValueKind::Float);
     EXPECT_EQ(constrained->UniformDefault.Kind, Geometry::PropertyValueKind::Float);
 
-    // "Any" must come back as an unconstrained filter, not as a concrete kind.
+    // Unknown must come back as an unconstrained reference kind.
     const auto* unconstrained =
-        FindSlot(*bindings, Runtime::ProgressiveSlotSemantic::Albedo);
+        FindSlot(*bindings, Runtime::GeometryPresentationSlotSemantic::Albedo);
     ASSERT_NE(unconstrained, nullptr);
-    EXPECT_FALSE(unconstrained->Property.ExpectedValueKind.has_value());
+    EXPECT_EQ(unconstrained->Property.ValueKind,
+              Geometry::PropertyValueKind::Unknown);
     EXPECT_EQ(unconstrained->UniformDefault.Kind,
               Geometry::PropertyValueKind::Double);
+}
+
+TEST(RuntimeSceneSerialization,
+     GeometryPresentationRuntimeStateIsNotSerialized)
+{
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle sourceEntity =
+        AddGeometryPresentationEntity(source);
+    source.Raw().emplace<Runtime::GeometryPresentationRuntimeState>(
+        sourceEntity,
+        Runtime::GeometryPresentationRuntimeState{
+            .RecipeGeneration = 91u,
+            .Slots = {
+                Runtime::GeometryPresentationSlotStatus{
+                    .PresentationKey = "mesh.surface",
+                    .Semantic = Runtime::GeometryPresentationSlotSemantic::ScalarField,
+                    .Readiness = Runtime::GeometryPresentationReadiness::Ready,
+                    .GeneratedTexture = Extrinsic::Assets::AssetId{77u, 3u},
+                    .Provenance = Runtime::GeometryPresentationProvenance::GeneratedTextureAsset,
+                    .SourceGeneration = 41u,
+                    .OutputGeneration = 42u,
+                    .Diagnostic = "runtime-only-presentation-diagnostic",
+                },
+            },
+        });
+
+    MemoryIOBackend backend;
+    ASSERT_TRUE(
+        Runtime::SaveSceneDocument(source, "presentation.json", backend)
+            .has_value());
+    const std::string document = backend.Text("presentation.json");
+
+    EXPECT_NE(document.find("\"geometryPresentation\""),
+              std::string::npos);
+    EXPECT_EQ(document.find("runtime-only-presentation-diagnostic"),
+              std::string::npos);
+    EXPECT_EQ(document.find("\"recipeGeneration\""),
+              std::string::npos);
+    EXPECT_EQ(document.find("\"sourceGeneration\""),
+              std::string::npos);
+    EXPECT_EQ(document.find("\"outputGeneration\""),
+              std::string::npos);
+    EXPECT_EQ(document.find("\"generatedTexture\""),
+              std::string::npos);
+
+    ECS::Scene::Registry loaded;
+    const auto loadedResult = Runtime::LoadSceneDocument(
+        loaded,
+        "presentation.json",
+        backend);
+    ASSERT_TRUE(loadedResult.has_value())
+        << static_cast<int>(loadedResult.error());
+    const ECS::EntityHandle loadedEntity =
+        FindEntityByName(loaded, "Mesh Entity");
+    ASSERT_NE(loadedEntity, ECS::InvalidEntityHandle);
+    const auto* loadedState = loaded.Raw().try_get<
+        Runtime::GeometryPresentationRuntimeState>(loadedEntity);
+    ASSERT_NE(loadedState, nullptr);
+    EXPECT_EQ(loadedState->RecipeGeneration, 1u);
+    EXPECT_TRUE(loadedState->Slots.empty());
+}
+
+TEST(RuntimeSceneSerialization,
+     LegacyProgressiveRenderDataKeyLoadsAsGeometryPresentationRecipe)
+{
+    ECS::Scene::Registry source;
+    (void)AddGeometryPresentationEntity(source);
+
+    MemoryIOBackend backend;
+    ASSERT_TRUE(
+        Runtime::SaveSceneDocument(source, "presentation.json", backend)
+            .has_value());
+    std::string document = backend.Text("presentation.json");
+    const std::string canonicalKey = "\"geometryPresentation\"";
+    const std::string legacyKey = "\"progressiveRenderData\"";
+    const std::size_t keyOffset = document.find(canonicalKey);
+    ASSERT_NE(keyOffset, std::string::npos);
+    document.replace(keyOffset, canonicalKey.size(), legacyKey);
+
+    ECS::Scene::Registry loaded;
+    const auto result = Runtime::DeserializeSceneDocument(loaded, document);
+    ASSERT_TRUE(result.has_value()) << static_cast<int>(result.error());
+    const ECS::EntityHandle entity =
+        FindEntityByName(loaded, "Mesh Entity");
+    ASSERT_NE(entity, ECS::InvalidEntityHandle);
+    const auto* recipe =
+        loaded.Raw().try_get<Runtime::GeometryPresentationRecipe>(entity);
+    ASSERT_NE(recipe, nullptr);
+    EXPECT_EQ(recipe->Shape, Runtime::GeometryPresentationShape::Mesh);
+    ASSERT_EQ(recipe->Presentations.size(), 1u);
+    EXPECT_EQ(recipe->Presentations.front().Key, "mesh.surface");
+
+    const auto* state = loaded.Raw().try_get<
+        Runtime::GeometryPresentationRuntimeState>(entity);
+    ASSERT_NE(state, nullptr);
+    EXPECT_EQ(state->RecipeGeneration, 1u);
+    EXPECT_TRUE(state->Slots.empty());
 }
 
 TEST(RuntimeSceneSerialization, ReaderStaysPinnedToLegacyValueKindWireStrings)
@@ -617,13 +712,13 @@ TEST(RuntimeSceneSerialization, ReaderStaysPinnedToLegacyValueKindWireStrings)
     // pins the reader to the legacy vocabulary: a document using the canonical
     // names must be rejected, not quietly accepted.
     ECS::Scene::Registry source;
-    (void)AddProgressiveBindingEntity(source);
+    (void)AddGeometryPresentationEntity(source);
 
     MemoryIOBackend backend;
     ASSERT_TRUE(
-        Runtime::SaveSceneDocument(source, "progressive.json", backend).has_value());
+        Runtime::SaveSceneDocument(source, "presentation.json", backend).has_value());
 
-    std::string document = backend.Text("progressive.json");
+    std::string document = backend.Text("presentation.json");
     ASSERT_NE(document.find("\"ScalarFloat\""), std::string::npos);
 
     const auto replaceAll = [](std::string& text,
@@ -658,34 +753,33 @@ TEST(RuntimeSceneSerialization, PropertyDomainKeepsLegacyWireStrings)
     const ECS::EntityHandle entity = AddMeshEntity(source);
 
     const auto slotWithDomain =
-        [](const Runtime::ProgressiveSlotSemantic semantic,
+        [](const Runtime::GeometryPresentationSlotSemantic semantic,
            const Runtime::GeometryElementDomain domain)
     {
-        Runtime::ProgressiveSlotBinding slot{};
+        Runtime::GeometryPresentationSlotRecipe slot{};
         slot.Semantic = semantic;
-        slot.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBuffer;
-        slot.Property = Runtime::ProgressivePropertyBindingDescriptor{
+        slot.SourceKind = Runtime::GeometryPresentationSourceKind::PropertyBuffer;
+        slot.Property = Runtime::GeometryPropertyRef{
             .Domain = domain,
-            .PropertyName = "v:field",
-            .ExpectedValueKind = Geometry::PropertyValueKind::Float,
-            .ExpectedElementCount = 3u,
+            .Name = "v:field",
+            .ValueKind = Geometry::PropertyValueKind::Float,
         };
         return slot;
     };
 
-    Runtime::ProgressivePresentationBindings bindings{};
-    bindings.Shape = Runtime::ProgressiveEntityShape::MeshLeaf;
-    bindings.Presentations.push_back(Runtime::ProgressivePresentationBinding{
+    Runtime::GeometryPresentationRecipe bindings{};
+    bindings.Shape = Runtime::GeometryPresentationShape::Mesh;
+    bindings.Presentations.push_back(Runtime::GeometryPresentationBindingRecipe{
         .Key = "mesh.surface",
-        .Kind = Runtime::ProgressivePresentationKind::SurfaceMaterial,
+        .Kind = Runtime::GeometryPresentationKind::SurfaceMaterial,
         .Slots = {
-            slotWithDomain(Runtime::ProgressiveSlotSemantic::ScalarField,
+            slotWithDomain(Runtime::GeometryPresentationSlotSemantic::ScalarField,
                            Runtime::GeometryElementDomain::GraphNode),
-            slotWithDomain(Runtime::ProgressiveSlotSemantic::Albedo,
+            slotWithDomain(Runtime::GeometryPresentationSlotSemantic::Albedo,
                            Runtime::GeometryElementDomain::PointCloudPoint),
         },
     });
-    source.Raw().emplace<Runtime::ProgressivePresentationBindings>(
+    source.Raw().emplace<Runtime::GeometryPresentationRecipe>(
         entity, std::move(bindings));
 
     MemoryIOBackend backend;
@@ -706,7 +800,7 @@ TEST(RuntimeSceneSerialization, PropertyDomainKeepsLegacyWireStrings)
     const ECS::EntityHandle loadedEntity = FindEntityByName(loaded, "Mesh Entity");
     ASSERT_NE(loadedEntity, ECS::InvalidEntityHandle);
     const auto* roundTripped =
-        loaded.Raw().try_get<Runtime::ProgressivePresentationBindings>(loadedEntity);
+        loaded.Raw().try_get<Runtime::GeometryPresentationRecipe>(loadedEntity);
     ASSERT_NE(roundTripped, nullptr);
     ASSERT_FALSE(roundTripped->Presentations.empty());
     ASSERT_EQ(roundTripped->Presentations.front().Slots.size(), 2u);
@@ -725,23 +819,22 @@ TEST(RuntimeSceneSerialization, LegacyMeshSurfaceDomainLoadsAsUnknown)
     ECS::Scene::Registry source;
     const ECS::EntityHandle entity = AddMeshEntity(source);
 
-    Runtime::ProgressiveSlotBinding slot{};
-    slot.Semantic = Runtime::ProgressiveSlotSemantic::Albedo;
-    slot.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBuffer;
-    slot.Property = Runtime::ProgressivePropertyBindingDescriptor{
+    Runtime::GeometryPresentationSlotRecipe slot{};
+    slot.Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo;
+    slot.SourceKind = Runtime::GeometryPresentationSourceKind::PropertyBuffer;
+    slot.Property = Runtime::GeometryPropertyRef{
         .Domain = Runtime::GeometryElementDomain::MeshVertex,
-        .PropertyName = "v:color",
-        .ExpectedElementCount = 3u,
+        .Name = "v:color",
     };
 
-    Runtime::ProgressivePresentationBindings bindings{};
-    bindings.Shape = Runtime::ProgressiveEntityShape::MeshLeaf;
-    bindings.Presentations.push_back(Runtime::ProgressivePresentationBinding{
+    Runtime::GeometryPresentationRecipe bindings{};
+    bindings.Shape = Runtime::GeometryPresentationShape::Mesh;
+    bindings.Presentations.push_back(Runtime::GeometryPresentationBindingRecipe{
         .Key = "mesh.surface",
-        .Kind = Runtime::ProgressivePresentationKind::SurfaceMaterial,
+        .Kind = Runtime::GeometryPresentationKind::SurfaceMaterial,
         .Slots = {slot},
     });
-    source.Raw().emplace<Runtime::ProgressivePresentationBindings>(
+    source.Raw().emplace<Runtime::GeometryPresentationRecipe>(
         entity, std::move(bindings));
 
     MemoryIOBackend backend;
@@ -762,7 +855,7 @@ TEST(RuntimeSceneSerialization, LegacyMeshSurfaceDomainLoadsAsUnknown)
     const ECS::EntityHandle loadedEntity = FindEntityByName(loaded, "Mesh Entity");
     ASSERT_NE(loadedEntity, ECS::InvalidEntityHandle);
     const auto* roundTripped =
-        loaded.Raw().try_get<Runtime::ProgressivePresentationBindings>(loadedEntity);
+        loaded.Raw().try_get<Runtime::GeometryPresentationRecipe>(loadedEntity);
     ASSERT_NE(roundTripped, nullptr);
     ASSERT_FALSE(roundTripped->Presentations.empty());
     ASSERT_FALSE(roundTripped->Presentations.front().Slots.empty());

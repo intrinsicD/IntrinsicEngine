@@ -42,7 +42,7 @@ import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Geometry.Properties;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 
 namespace Extrinsic::Runtime
 {
@@ -160,13 +160,6 @@ namespace Extrinsic::Runtime
                 }
             }
             return false;
-        }
-
-        [[nodiscard]] std::string_view PropertyValueKindFilterToWire(
-            const GeometryPropertyValueKindFilter value) noexcept
-        {
-            return value.has_value() ? PropertyValueKindToWire(*value)
-                                     : kPropertyValueKindAnyWire;
         }
 
         [[nodiscard]] bool TryPropertyValueKindFilterFromWire(
@@ -300,8 +293,8 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        [[nodiscard]] json ProgressiveDefaultValueToJson(
-            const ProgressiveDefaultValue& value)
+        [[nodiscard]] json GeometryPresentationDefaultValueToJson(
+            const GeometryPresentationDefaultValue& value)
         {
             return json{
                 {"kind", std::string(PropertyValueKindToWire(value.Kind))},
@@ -311,9 +304,9 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] bool TryReadProgressiveDefaultValue(
+        [[nodiscard]] bool TryReadGeometryPresentationDefaultValue(
             const json& value,
-            ProgressiveDefaultValue& out)
+            GeometryPresentationDefaultValue& out)
         {
             if (!value.is_object())
                 return false;
@@ -1185,78 +1178,84 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        [[nodiscard]] json ProgressivePropertyDescriptorToJson(
-            const ProgressivePropertyBindingDescriptor& descriptor)
+        [[nodiscard]] json GeometryPropertyRefToJson(
+            const GeometryPropertyRef& property)
         {
             return json{
-                {"domain", std::string(PropertyDomainToWire(descriptor.Domain))},
-                {"propertyName", descriptor.PropertyName},
-                {"expectedValueKind", std::string(PropertyValueKindFilterToWire(descriptor.ExpectedValueKind))},
-                {"expectedElementCount", descriptor.ExpectedElementCount},
-                {"sourceGeneration", descriptor.SourceGeneration},
+                {"domain", std::string(PropertyDomainToWire(property.Domain))},
+                {"name", property.Name},
+                {"valueKind", std::string(PropertyValueKindToWire(property.ValueKind))},
             };
         }
 
-        [[nodiscard]] bool TryReadProgressivePropertyDescriptor(
+        [[nodiscard]] bool TryReadGeometryPropertyRef(
             const json& value,
-            ProgressivePropertyBindingDescriptor& out)
+            GeometryPropertyRef& out)
         {
             if (!value.is_object() ||
-                !value.contains("domain") || !value["domain"].is_string() ||
-                !value.contains("propertyName") || !value["propertyName"].is_string())
+                !value.contains("domain") || !value["domain"].is_string())
             {
                 return false;
             }
             if (!TryPropertyDomainFromWire(value["domain"].get<std::string>(),
-                                                   out.Domain))
+                                           out.Domain))
             {
                 return false;
             }
-            out.PropertyName = value["propertyName"].get<std::string>();
-            if (value.contains("expectedValueKind"))
+
+            const json* name = nullptr;
+            if (value.contains("name"))
+                name = &value["name"];
+            else if (value.contains("propertyName"))
+                name = &value["propertyName"];
+            if (name == nullptr || !name->is_string())
+                return false;
+            out.Name = name->get<std::string>();
+
+            out.ValueKind = Geometry::PropertyValueKind::Unknown;
+            if (value.contains("valueKind"))
             {
-                if (!value["expectedValueKind"].is_string() ||
-                    !TryPropertyValueKindFilterFromWire(
-                        value["expectedValueKind"].get<std::string>(),
-                        out.ExpectedValueKind))
+                if (!value["valueKind"].is_string() ||
+                    !TryPropertyValueKindFromWire(
+                        value["valueKind"].get<std::string>(),
+                        out.ValueKind))
                 {
                     return false;
                 }
             }
-            if (value.contains("expectedElementCount"))
+            else if (value.contains("expectedValueKind"))
             {
-                if (!value["expectedElementCount"].is_number_unsigned())
+                GeometryPropertyValueKindFilter legacyKind{};
+                if (!value["expectedValueKind"].is_string() ||
+                    !TryPropertyValueKindFilterFromWire(
+                        value["expectedValueKind"].get<std::string>(),
+                        legacyKind))
+                {
                     return false;
-                out.ExpectedElementCount = value["expectedElementCount"].get<std::size_t>();
-            }
-            if (value.contains("sourceGeneration"))
-            {
-                if (!value["sourceGeneration"].is_number_unsigned())
-                    return false;
-                out.SourceGeneration = value["sourceGeneration"].get<std::uint64_t>();
+                }
+                out.ValueKind = legacyKind.value_or(
+                    Geometry::PropertyValueKind::Unknown);
             }
             return true;
         }
 
-        [[nodiscard]] json ProgressiveSlotBindingToJson(
-            const ProgressiveSlotBinding& slot)
+        [[nodiscard]] json GeometryPresentationSlotToJson(
+            const GeometryPresentationSlotRecipe& slot)
         {
             return json{
                 {"semantic", std::string(ToString(slot.Semantic))},
                 {"sourceKind", std::string(ToString(slot.SourceKind))},
                 {"enabled", slot.Enabled},
-                {"uniformDefault", ProgressiveDefaultValueToJson(slot.UniformDefault)},
-                {"property", ProgressivePropertyDescriptorToJson(slot.Property)},
-                {"authoredTexture", AssetIdToJson(slot.AuthoredTexture)},
-                {"generatedTexture", AssetIdToJson(slot.GeneratedTexture)},
+                {"uniformDefault", GeometryPresentationDefaultValueToJson(slot.UniformDefault)},
+                {"property", GeometryPropertyRefToJson(slot.Property)},
+                {"textureAsset", AssetIdToJson(slot.TextureAsset)},
                 {"generatedPolicy", std::string(ToString(slot.GeneratedPolicy))},
-                {"provenance", std::string(ToString(slot.Provenance))},
             };
         }
 
-        [[nodiscard]] bool TryReadProgressiveSlotBinding(
+        [[nodiscard]] bool TryReadGeometryPresentationSlot(
             const json& value,
-            ProgressiveSlotBinding& out)
+            GeometryPresentationSlotRecipe& out)
         {
             if (!value.is_object() ||
                 !value.contains("semantic") || !value["semantic"].is_string() ||
@@ -1264,19 +1263,14 @@ namespace Extrinsic::Runtime
             {
                 return false;
             }
-            if (!TryParseProgressiveSlotSemantic(value["semantic"].get<std::string>(),
-                                                 out.Semantic) ||
-                !TryParseProgressiveSlotSourceKind(value["sourceKind"].get<std::string>(),
-                                                   out.SourceKind))
+            if (!TryParseGeometryPresentationSlotSemantic(
+                    value["semantic"].get<std::string>(), out.Semantic) ||
+                !TryParseGeometryPresentationSourceKind(
+                    value["sourceKind"].get<std::string>(), out.SourceKind))
             {
                 return false;
             }
-            out.GeneratedPolicy = DefaultGeneratedOutputPolicyFor(out.SourceKind);
-            out.Provenance = ProgressiveGeneratedOutputProvenance::None;
-            out.Readiness = out.SourceKind == ProgressiveSlotSourceKind::UniformDefault
-                ? ProgressiveReadinessState::DefaultValue
-                : ProgressiveReadinessState::Pending;
-            out.LastDiagnostic.clear();
+            out.GeneratedPolicy = DefaultGeometryGeneratedOutputPolicyFor(out.SourceKind);
 
             if (value.contains("enabled"))
             {
@@ -1285,39 +1279,40 @@ namespace Extrinsic::Runtime
                 out.Enabled = value["enabled"].get<bool>();
             }
             if (value.contains("uniformDefault") &&
-                !TryReadProgressiveDefaultValue(value["uniformDefault"], out.UniformDefault))
+                !TryReadGeometryPresentationDefaultValue(value["uniformDefault"], out.UniformDefault))
             {
                 return false;
             }
             if (value.contains("property") &&
-                !TryReadProgressivePropertyDescriptor(value["property"], out.Property))
+                !TryReadGeometryPropertyRef(value["property"], out.Property))
             {
                 return false;
             }
-            if (value.contains("authoredTexture") &&
-                !TryReadAssetId(value["authoredTexture"], out.AuthoredTexture))
+            if (value.contains("textureAsset") &&
+                !TryReadAssetId(value["textureAsset"], out.TextureAsset))
             {
                 return false;
             }
-            if (value.contains("generatedTexture") &&
-                !TryReadAssetId(value["generatedTexture"], out.GeneratedTexture))
+            else if (out.SourceKind ==
+                         GeometryPresentationSourceKind::AuthoredTextureAsset &&
+                     value.contains("authoredTexture") &&
+                     !TryReadAssetId(value["authoredTexture"], out.TextureAsset))
+            {
+                return false;
+            }
+            else if (out.SourceKind ==
+                         GeometryPresentationSourceKind::GeneratedTextureAsset &&
+                     value.contains("generatedTexture") &&
+                     !TryReadAssetId(value["generatedTexture"], out.TextureAsset))
             {
                 return false;
             }
             if (value.contains("generatedPolicy"))
             {
                 if (!value["generatedPolicy"].is_string() ||
-                    !TryParseProgressiveGeneratedOutputPolicy(value["generatedPolicy"].get<std::string>(),
-                                                              out.GeneratedPolicy))
-                {
-                    return false;
-                }
-            }
-            if (value.contains("provenance"))
-            {
-                if (!value["provenance"].is_string() ||
-                    !TryParseProgressiveGeneratedOutputProvenance(value["provenance"].get<std::string>(),
-                                                                  out.Provenance))
+                    !TryParseGeometryGeneratedOutputPolicy(
+                        value["generatedPolicy"].get<std::string>(),
+                        out.GeneratedPolicy))
                 {
                     return false;
                 }
@@ -1325,12 +1320,12 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        [[nodiscard]] json ProgressivePresentationToJson(
-            const ProgressivePresentationBinding& presentation)
+        [[nodiscard]] json GeometryPresentationBindingToJson(
+            const GeometryPresentationBindingRecipe& presentation)
         {
             json slots = json::array();
-            for (const ProgressiveSlotBinding& slot : presentation.Slots)
-                slots.push_back(ProgressiveSlotBindingToJson(slot));
+            for (const GeometryPresentationSlotRecipe& slot : presentation.Slots)
+                slots.push_back(GeometryPresentationSlotToJson(slot));
             return json{
                 {"key", presentation.Key},
                 {"kind", std::string(ToString(presentation.Kind))},
@@ -1338,9 +1333,9 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] bool TryReadProgressivePresentation(
+        [[nodiscard]] bool TryReadGeometryPresentationBinding(
             const json& value,
-            ProgressivePresentationBinding& out)
+            GeometryPresentationBindingRecipe& out)
         {
             if (!value.is_object() ||
                 !value.contains("key") || !value["key"].is_string() ||
@@ -1350,8 +1345,8 @@ namespace Extrinsic::Runtime
                 return false;
             }
             out.Key = value["key"].get<std::string>();
-            if (!TryParseProgressivePresentationKind(value["kind"].get<std::string>(),
-                                                     out.Kind))
+            if (!TryParseGeometryPresentationKind(
+                    value["kind"].get<std::string>(), out.Kind))
             {
                 return false;
             }
@@ -1359,19 +1354,19 @@ namespace Extrinsic::Runtime
             out.Slots.reserve(value["slots"].size());
             for (const json& slotJson : value["slots"])
             {
-                ProgressiveSlotBinding slot{};
-                if (!TryReadProgressiveSlotBinding(slotJson, slot))
+                GeometryPresentationSlotRecipe slot{};
+                if (!TryReadGeometryPresentationSlot(slotJson, slot))
                     return false;
                 out.Slots.push_back(std::move(slot));
             }
             return true;
         }
 
-        [[nodiscard]] json ProgressiveBindingsToJson(
-            const ProgressivePresentationBindings& bindings)
+        [[nodiscard]] json GeometryPresentationRecipeToJson(
+            const GeometryPresentationRecipe& recipe)
         {
             json lanes = json::array();
-            for (const ProgressiveRenderLaneBinding& lane : bindings.Lanes)
+            for (const GeometryPresentationLaneRecipe& lane : recipe.Lanes)
             {
                 lanes.push_back(json{
                     {"lane", std::string(ToString(lane.Lane))},
@@ -1380,18 +1375,17 @@ namespace Extrinsic::Runtime
             }
 
             json presentations = json::array();
-            for (const ProgressivePresentationBinding& presentation : bindings.Presentations)
-                presentations.push_back(ProgressivePresentationToJson(presentation));
+            for (const GeometryPresentationBindingRecipe& presentation : recipe.Presentations)
+                presentations.push_back(GeometryPresentationBindingToJson(presentation));
 
             return json{
-                {"shape", std::string(ToString(bindings.Shape))},
-                {"bindingGeneration", bindings.BindingGeneration},
+                {"shape", std::string(ToString(recipe.Shape))},
                 {"lanes", std::move(lanes)},
                 {"presentations", std::move(presentations)},
             };
         }
 
-        [[nodiscard]] bool TryApplyProgressiveBindingsFromJson(
+        [[nodiscard]] bool TryApplyGeometryPresentationFromJson(
             entt::registry& raw,
             const ECS::EntityHandle entity,
             const json& value,
@@ -1405,20 +1399,14 @@ namespace Extrinsic::Runtime
                 return false;
             }
 
-            ProgressivePresentationBindings bindings{};
-            if (!TryParseProgressiveEntityShape(value["shape"].get<std::string>(),
-                                                bindings.Shape))
+            GeometryPresentationRecipe recipe{};
+            if (!TryParseGeometryPresentationShape(
+                    value["shape"].get<std::string>(), recipe.Shape))
             {
                 return false;
             }
-            if (value.contains("bindingGeneration"))
-            {
-                if (!value["bindingGeneration"].is_number_unsigned())
-                    return false;
-                bindings.BindingGeneration = value["bindingGeneration"].get<std::uint64_t>();
-            }
 
-            bindings.Lanes.reserve(value["lanes"].size());
+            recipe.Lanes.reserve(value["lanes"].size());
             for (const json& laneJson : value["lanes"])
             {
                 if (!laneJson.is_object() ||
@@ -1427,27 +1415,30 @@ namespace Extrinsic::Runtime
                 {
                     return false;
                 }
-                ProgressiveRenderLaneBinding lane{};
-                if (!TryParseProgressiveRenderLane(laneJson["lane"].get<std::string>(),
-                                                   lane.Lane))
+                GeometryPresentationLaneRecipe lane{};
+                if (!TryParseGeometryRenderLane(
+                        laneJson["lane"].get<std::string>(), lane.Lane))
                 {
                     return false;
                 }
                 lane.PresentationKey = laneJson["presentationKey"].get<std::string>();
-                bindings.Lanes.push_back(std::move(lane));
+                recipe.Lanes.push_back(std::move(lane));
             }
 
-            bindings.Presentations.reserve(value["presentations"].size());
+            recipe.Presentations.reserve(value["presentations"].size());
             for (const json& presentationJson : value["presentations"])
             {
-                ProgressivePresentationBinding presentation{};
-                if (!TryReadProgressivePresentation(presentationJson, presentation))
+                GeometryPresentationBindingRecipe presentation{};
+                if (!TryReadGeometryPresentationBinding(
+                        presentationJson, presentation))
                     return false;
-                bindings.Presentations.push_back(std::move(presentation));
+                recipe.Presentations.push_back(std::move(presentation));
             }
 
-            raw.emplace_or_replace<ProgressivePresentationBindings>(entity, std::move(bindings));
-            ++stats.ProgressiveRenderDataEntities;
+            raw.emplace_or_replace<GeometryPresentationRecipe>(
+                entity, std::move(recipe));
+            raw.emplace_or_replace<GeometryPresentationRuntimeState>(entity);
+            ++stats.GeometryPresentationEntities;
             return true;
         }
 
@@ -2028,11 +2019,20 @@ namespace Extrinsic::Runtime
                     return Core::Err<SceneDeserializationResult>(Core::ErrorCode::InvalidFormat);
                 }
 
-                if (entityJson.contains("progressiveRenderData") &&
-                    !TryApplyProgressiveBindingsFromJson(raw,
-                                                         entity,
-                                                         entityJson["progressiveRenderData"],
-                                                         result.Stats))
+                const json* geometryPresentation = nullptr;
+                if (entityJson.contains("geometryPresentation"))
+                {
+                    geometryPresentation = &entityJson["geometryPresentation"];
+                }
+                else if (entityJson.contains("progressiveRenderData"))
+                {
+                    // Read-only compatibility for scene documents emitted by
+                    // the retired combined desired/runtime component.
+                    geometryPresentation = &entityJson["progressiveRenderData"];
+                }
+                if (geometryPresentation != nullptr &&
+                    !TryApplyGeometryPresentationFromJson(
+                        raw, entity, *geometryPresentation, result.Stats))
                 {
                     return Core::Err<SceneDeserializationResult>(Core::ErrorCode::InvalidFormat);
                 }
@@ -2136,10 +2136,12 @@ namespace Extrinsic::Runtime
             if (!AddGeometry(entityJson, raw, entity, stats))
                 return Core::Err<std::string>(Core::ErrorCode::InvalidFormat);
 
-            if (const auto* progressive = raw.try_get<ProgressivePresentationBindings>(entity))
+            if (const auto* presentation =
+                    raw.try_get<GeometryPresentationRecipe>(entity))
             {
-                entityJson["progressiveRenderData"] = ProgressiveBindingsToJson(*progressive);
-                ++stats.ProgressiveRenderDataEntities;
+                entityJson["geometryPresentation"] =
+                    GeometryPresentationRecipeToJson(*presentation);
+                ++stats.GeometryPresentationEntities;
             }
 
             root["entities"].push_back(std::move(entityJson));
@@ -2155,7 +2157,7 @@ namespace Extrinsic::Runtime
             {"graphEntities", stats.GraphEntities},
             {"pointCloudEntities", stats.PointCloudEntities},
             {"renderHintEntities", stats.RenderHintEntities},
-            {"progressiveRenderDataEntities", stats.ProgressiveRenderDataEntities},
+            {"geometryPresentationEntities", stats.GeometryPresentationEntities},
             {"unsupportedPersistenceEntities", stats.UnsupportedPersistenceEntities},
             {"unsupportedLightEntities", stats.UnsupportedLightEntities},
             {"unsupportedShadowEntities", stats.UnsupportedShadowEntities},
@@ -2198,8 +2200,9 @@ namespace Extrinsic::Runtime
             stats.GraphEntities = statsJson.value("graphEntities", 0u);
             stats.PointCloudEntities = statsJson.value("pointCloudEntities", 0u);
             stats.RenderHintEntities = statsJson.value("renderHintEntities", 0u);
-            stats.ProgressiveRenderDataEntities =
-                statsJson.value("progressiveRenderDataEntities", 0u);
+            stats.GeometryPresentationEntities = statsJson.value(
+                "geometryPresentationEntities",
+                statsJson.value("progressiveRenderDataEntities", 0u));
             stats.UnsupportedPersistenceEntities =
                 statsJson.value("unsupportedPersistenceEntities", 0u);
             stats.UnsupportedLightEntities =

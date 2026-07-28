@@ -22,7 +22,7 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 import Extrinsic.Runtime.MeshGeometryPacker;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.WorldHandle;
 
@@ -557,7 +557,7 @@ namespace Extrinsic::Runtime
                target.BindingEpoch != 0u &&
                target.Entity != ECS::InvalidEntityHandle &&
                target.StableEntityId != 0u &&
-               target.Semantic == ProgressiveSlotSemantic::Normal;
+               target.Semantic == GeometryPresentationSlotSemantic::Normal;
     }
 
     RuntimeObjectSpaceNormalBakeRequestBuildResult

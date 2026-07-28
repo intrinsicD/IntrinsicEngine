@@ -73,7 +73,7 @@ export namespace Extrinsic::Runtime
         std::uint64_t GeneratedNormalTextureBakeFailures{0};
         std::uint64_t GeneratedAlbedoTextureBakeFailures{0};
         std::uint64_t ProgressiveRawPrimitiveEntitiesPublished{0};
-        std::uint64_t ProgressivePresentationBindingsCreated{0};
+        std::uint64_t GeometryPresentationRecipesCreated{0};
         std::uint64_t ProgressiveUvAtlasJobsQueued{0};
         std::uint64_t ProgressiveNormalJobsQueued{0};
         std::uint64_t ProgressiveTextureBakeJobsQueued{0};

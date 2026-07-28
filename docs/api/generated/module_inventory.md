@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 75 |
+| `runtime` | 73 |
 
 ## Modules
 
@@ -384,8 +384,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.ProceduralGeometry` | `src/runtime/Runtime.ProceduralGeometry.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProceduralGeometryPacker` | `src/runtime/Runtime.ProceduralGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonGpuBackend` | `src/runtime/Runtime.ProgressivePoissonGpuBackend.cppm` | `runtime` |
-| `Extrinsic.Runtime.ProgressivePresentationExtraction` | `src/runtime/Runtime.ProgressivePresentationExtraction.cppm` | `runtime` |
-| `Extrinsic.Runtime.ProgressiveRenderData` | `src/runtime/Runtime.ProgressiveRenderData.cppm` | `runtime` |
 | `Extrinsic.Runtime.ReferenceScene` | `src/runtime/Runtime.ReferenceScene.cppm` | `runtime` |
 | `Extrinsic.Runtime.RegistrationAlignment` | `src/runtime/Runtime.RegistrationAlignment.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderArtifactPublication` | `src/runtime/Runtime.RenderArtifactPublication.cppm` | `runtime` |
@@ -410,4 +408,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SceneInteractionModule` | `src/runtime/Scene/Runtime.SceneInteractionModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **383**
+Total modules: **381**

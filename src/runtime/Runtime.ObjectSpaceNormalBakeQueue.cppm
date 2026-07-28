@@ -16,7 +16,7 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 import Extrinsic.Runtime.MeshGeometryPacker;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.WorldHandle;
 
@@ -125,8 +125,8 @@ export namespace Extrinsic::Runtime
         ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
         std::uint32_t StableEntityId = 0u;
         std::string PresentationKey{};
-        ProgressiveSlotSemantic Semantic{ProgressiveSlotSemantic::Normal};
-        std::uint64_t ExpectedProgressiveBindingGeneration = 0u;
+        GeometryPresentationSlotSemantic Semantic{GeometryPresentationSlotSemantic::Normal};
+        std::uint64_t ExpectedRecipeGeneration = 0u;
 
         friend bool operator==(
             const RuntimeObjectSpaceNormalBakeTarget& lhs,

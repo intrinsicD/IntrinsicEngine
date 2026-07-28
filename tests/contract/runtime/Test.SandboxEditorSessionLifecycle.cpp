@@ -75,7 +75,7 @@ import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderExtraction;
@@ -298,7 +298,7 @@ TEST(SandboxEditorSession, StaleCopiedCommandSurfacesFailAfterDetachAndReattach)
     const Runtime::SandboxEditorJobIdentity jobIdentity{
         .EntityId = 17u,
         .Scope = Runtime::SandboxEditorJobScope::MeshSurface,
-        .OutputSemantic = Runtime::ProgressiveSlotSemantic::Albedo,
+        .OutputSemantic = Runtime::GeometryPresentationSlotSemantic::Albedo,
         .OutputName = "session_scope_probe",
     };
     ASSERT_TRUE(session.VisitPreparedFrame(

@@ -13,7 +13,7 @@ import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeSubmission;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
 
@@ -33,12 +33,12 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] ProgressiveSlotBinding* FindUniqueTargetSlot(
-            ProgressivePresentationBindings& bindings,
+        [[nodiscard]] GeometryPresentationSlotRecipe* FindUniqueTargetSlot(
+            GeometryPresentationRecipe& bindings,
             const RuntimeObjectSpaceNormalBakeTarget& target) noexcept
         {
-            ProgressivePresentationBinding* matchingPresentation = nullptr;
-            for (ProgressivePresentationBinding& presentation :
+            GeometryPresentationBindingRecipe* matchingPresentation = nullptr;
+            for (GeometryPresentationBindingRecipe& presentation :
                  bindings.Presentations)
             {
                 if (presentation.Key != target.PresentationKey)
@@ -50,11 +50,11 @@ namespace Extrinsic::Runtime
 
             if (matchingPresentation == nullptr ||
                 matchingPresentation->Kind !=
-                    ProgressivePresentationKind::SurfaceMaterial)
+                    GeometryPresentationKind::SurfaceMaterial)
                 return nullptr;
 
-            ProgressiveSlotBinding* match = nullptr;
-            for (ProgressiveSlotBinding& slot :
+            GeometryPresentationSlotRecipe* match = nullptr;
+            for (GeometryPresentationSlotRecipe& slot :
                  matchingPresentation->Slots)
             {
                 if (slot.Semantic != target.Semantic)
@@ -88,8 +88,8 @@ namespace Extrinsic::Runtime
             return "StaleScene";
         case RuntimeObjectSpaceNormalBakeBindingStatus::StaleGeometry:
             return "StaleGeometry";
-        case RuntimeObjectSpaceNormalBakeBindingStatus::StaleProgressiveState:
-            return "StaleProgressiveState";
+        case RuntimeObjectSpaceNormalBakeBindingStatus::StalePresentationState:
+            return "StalePresentationState";
         }
         return "Unknown";
     }
@@ -121,7 +121,7 @@ namespace Extrinsic::Runtime
             completion.GeometryContentRevision == 0u ||
             completion.AssetSelection ==
                 RuntimeObjectSpaceNormalBakeAssetSelection::None ||
-            ((target.ExpectedProgressiveBindingGeneration == 0u) !=
+            ((target.ExpectedRecipeGeneration == 0u) !=
              target.PresentationKey.empty()))
         {
             return BindingFail(
@@ -215,62 +215,72 @@ namespace Extrinsic::Runtime
                 residencyValidation.Diagnostic);
         }
 
-        auto* currentProgressive =
-            context.Scene->Raw().try_get<ProgressivePresentationBindings>(
+        auto* currentRecipe =
+            context.Scene->Raw().try_get<GeometryPresentationRecipe>(
                 target.Entity);
-        ProgressivePresentationBindings stagedProgressive{};
-        bool updateProgressive = false;
-        if (target.ExpectedProgressiveBindingGeneration == 0u)
+        auto* currentState =
+            context.Scene->Raw().try_get<GeometryPresentationRuntimeState>(
+                target.Entity);
+        GeometryPresentationRuntimeState stagedState{};
+        bool updatePresentation = false;
+        if (target.ExpectedRecipeGeneration == 0u)
         {
-            if (currentProgressive != nullptr)
+            if (currentRecipe != nullptr || currentState != nullptr)
             {
                 return BindingFail(
                     RuntimeObjectSpaceNormalBakeBindingStatus::
-                        StaleProgressiveState,
-                    "object-space normal bake target gained progressive presentation state after scheduling");
+                        StalePresentationState,
+                    "object-space normal bake target gained geometry-presentation state after scheduling");
             }
         }
         else
         {
-            if (currentProgressive == nullptr ||
-                currentProgressive->BindingGeneration !=
-                    target.ExpectedProgressiveBindingGeneration ||
+            if (currentRecipe == nullptr || currentState == nullptr ||
+                currentState->RecipeGeneration !=
+                    target.ExpectedRecipeGeneration ||
                 target.PresentationKey.empty())
             {
                 return BindingFail(
                     RuntimeObjectSpaceNormalBakeBindingStatus::
-                        StaleProgressiveState,
-                    "object-space normal bake progressive presentation generation changed");
+                        StalePresentationState,
+                    "object-space normal bake geometry-presentation generation changed");
             }
 
-            stagedProgressive = *currentProgressive;
-            ProgressiveSlotBinding* slot =
-                FindUniqueTargetSlot(stagedProgressive, target);
-            if (slot == nullptr)
+            GeometryPresentationRecipe recipe = *currentRecipe;
+            const GeometryPresentationSlotRecipe* slot =
+                FindUniqueTargetSlot(recipe, target);
+            if (slot == nullptr ||
+                slot->SourceKind !=
+                    GeometryPresentationSourceKind::PropertyBake)
             {
                 return BindingFail(
                     RuntimeObjectSpaceNormalBakeBindingStatus::
-                        StaleProgressiveState,
-                    "object-space normal bake progressive presentation has no unique target normal slot");
+                        StalePresentationState,
+                    "object-space normal bake geometry-presentation has no unique target normal slot");
             }
-            if (slot->Readiness != ProgressiveReadinessState::Pending)
+            stagedState = *currentState;
+            GeometryPresentationSlotStatus* status =
+                FindGeometryPresentationSlotStatus(
+                    stagedState,
+                    target.PresentationKey,
+                    target.Semantic);
+            if (status == nullptr ||
+                status->Readiness != GeometryPresentationReadiness::Pending)
             {
                 return BindingFail(
                     RuntimeObjectSpaceNormalBakeBindingStatus::
-                        StaleProgressiveState,
-                    "object-space normal bake progressive target slot is no longer pending");
+                        StalePresentationState,
+                    "object-space normal bake geometry-presentation target slot is no longer pending");
             }
-            slot->SourceKind =
-                ProgressiveSlotSourceKind::GeneratedTextureAsset;
-            slot->GeneratedTexture = completion.GeneratedTextureAsset;
-            slot->Provenance =
-                ProgressiveGeneratedOutputProvenance::
+            status->GeneratedTexture = completion.GeneratedTextureAsset;
+            status->Provenance =
+                GeometryPresentationProvenance::
                     GeneratedTextureAsset;
-            slot->Readiness = ProgressiveReadinessState::Ready;
-            slot->LastDiagnostic =
+            status->Readiness = GeometryPresentationReadiness::Ready;
+            status->Diagnostic =
                 "exact GPU object-space normal bake generation is ready";
-            ++stagedProgressive.BindingGeneration;
-            updateProgressive = true;
+            ++status->OutputGeneration;
+            updatePresentation = true;
         }
 
         Graphics::MaterialTextureAssetBindings stagedMaterial =
@@ -302,15 +312,15 @@ namespace Extrinsic::Runtime
         context.Extraction->SetMaterialTextureAssetBindings(
             target.StableEntityId,
             stagedMaterial);
-        if (updateProgressive)
-            *currentProgressive = std::move(stagedProgressive);
+        if (updatePresentation)
+            *currentState = std::move(stagedState);
 
         return RuntimeObjectSpaceNormalBakeBindingResult{
             .Status = RuntimeObjectSpaceNormalBakeBindingStatus::Bound,
             .Completion = std::move(ready),
             .BoundNormalTexture = completion.GeneratedTextureAsset,
             .Diagnostic =
-                "exact object-space normal bake generation merged into material and progressive binding",
+                "exact object-space normal bake generation merged into material and geometry presentation status",
         };
     }
 }

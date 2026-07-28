@@ -37,7 +37,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldHandle;
@@ -217,7 +217,7 @@ namespace Extrinsic::Runtime
                     sourceEntity, destinationEntity);
 
                 CopySerializableComponent<
-                    ProgressivePresentationBindings>(
+                    GeometryPresentationRecipe>(
                     sourceRaw, destinationRaw,
                     sourceEntity, destinationEntity);
 

@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-193` — General geometry-presentation recipe (tasks/active/RUNTIME-193-general-geometry-presentation-recipe.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -22,7 +22,7 @@ the authoritative open/unblocked view.
 - blocked by `REVIEW-003`: `GRAPHICS-126` — Bandwidth-priced frame-recipe trace model (tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
 - blocked by `RUNTIME-197`: `RUNTIME-139` — Static AoS storage and shader operational path (tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md)
 - unblocked: `RUNTIME-197` — Unified geometry upload and residency coordinator (tasks/backlog/runtime/RUNTIME-197-unified-geometry-upload-residency-coordinator.md)
-- blocked by `RUNTIME-193`: `RUNTIME-198` — Data-driven visualization recipes (tasks/backlog/runtime/RUNTIME-198-data-driven-visualization-recipes.md)
+- blocked by `RUNTIME-197`: `RUNTIME-198` — Data-driven visualization recipes (tasks/backlog/runtime/RUNTIME-198-data-driven-visualization-recipes.md)
 
 ## Theme C — Physics readiness
 
@@ -39,7 +39,7 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
 - unblocked: `RUNTIME-191` — Unify property-to-texture baking and retire specialized paths (tasks/backlog/runtime/RUNTIME-191-unified-property-texture-bake-pipeline.md)
 - blocked by `BUG-095`: `RUNTIME-200` — Staged asset-import and materialization recipe (tasks/backlog/runtime/RUNTIME-200-staged-asset-import-materialization-recipe.md)
-- blocked by `RUNTIME-193`: `RUNTIME-201` — Unified editor mutation and history transaction (tasks/backlog/runtime/RUNTIME-201-unified-editor-mutation-history-transaction.md)
+- unblocked: `RUNTIME-201` — Unified editor mutation and history transaction (tasks/backlog/runtime/RUNTIME-201-unified-editor-mutation-history-transaction.md)
 - blocked by `RUNTIME-138`: `RUNTIME-202` — Retire the Sandbox runtime facade and localize feature models (tasks/backlog/runtime/RUNTIME-202-retire-sandbox-runtime-facade.md)
 - blocked by `RUNTIME-200`: `RUNTIME-203` — Internalize one-consumer runtime composition helpers (tasks/backlog/runtime/RUNTIME-203-internalize-one-consumer-runtime-helpers.md)
 - blocked by `BUG-096`: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)

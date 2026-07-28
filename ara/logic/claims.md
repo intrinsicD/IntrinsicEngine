@@ -253,3 +253,37 @@
 - **Dependencies**: [C06, C08]
 - **Tags**: K-Means, clustering, runtime, config, Vulkan, parity, retirement
 - **From staging**: O66
+
+## C12: General geometry presentation has one authored/runtime/extraction path
+- **Statement**: Mesh, graph, point-cloud, composition, and procedural geometry
+  use one authored `GeometryPresentationRecipe`, a separate runtime-only
+  `GeometryPresentationRuntimeState`, and a copied generation-qualified
+  `GeometryPresentationSnapshot`. Scene documents write only authored recipe
+  state, retain legacy wire-key read compatibility, and graphics receives no
+  live ECS, property, job, asset-service, RHI, or Vulkan ownership. The former
+  progressive-named general modules and their dedicated tests are absent.
+- **Status**: supported — CPU/Null contracts plus ASan+UBSan promoted Vulkan on
+  NVIDIA GeForce RTX 3050, driver 590.48.01; no performance claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Runtime readiness, generated outputs,
+  diagnostics, or generations are serialized; graphics receives a live
+  recipe/state/ECS/service reference; stale generations commit; a supported
+  geometry domain bypasses the shared projection; either retired module or
+  symbol returns; or the operational Vulkan fixture fails to reach a frame
+  through the recipe/state path.
+- **Proof**: [tasks/done/RUNTIME-193-general-geometry-presentation-recipe.md,
+  src/runtime/Runtime.GeometryPresentation.cppm,
+  src/runtime/Runtime.GeometryPresentation.cpp,
+  src/runtime/Runtime.SceneSerialization.cpp,
+  src/runtime/Runtime.RenderExtraction.cpp,
+  src/runtime/Runtime.ObjectSpaceNormalBakeBinding.cpp,
+  tests/contract/runtime/Test.GeometryPresentation.cpp,
+  tests/contract/runtime/Test.RuntimeSceneSerialization.cpp,
+  tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
+  tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp,
+  docs/api/generated/module_inventory.md]
+- **Dependencies**: []
+- **Tags**: runtime, geometry presentation, serialization, extraction, Vulkan,
+  retirement
+- **From staging**: O67

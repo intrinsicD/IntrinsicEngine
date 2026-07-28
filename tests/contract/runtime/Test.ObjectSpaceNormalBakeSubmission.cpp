@@ -28,7 +28,7 @@ import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeSubmission;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.WorldHandle;
 
 #include "MockRHI.hpp"
@@ -117,8 +117,8 @@ namespace
                     .Entity = static_cast<ECS::EntityHandle>(117u),
                     .StableEntityId = 17u,
                     .PresentationKey = "submission-normal",
-                    .Semantic = Runtime::ProgressiveSlotSemantic::Normal,
-                    .ExpectedProgressiveBindingGeneration = 4u,
+                    .Semantic = Runtime::GeometryPresentationSlotSemantic::Normal,
+                    .ExpectedRecipeGeneration = 4u,
                 },
         };
     }

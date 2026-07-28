@@ -272,8 +272,6 @@ if(TARGET ExtrinsicRuntime)
         Test.ObjectSpaceNormalBakeQueue.cpp
         Test.ObjectSpaceNormalBakeSubmission.cpp
         Test.ProgressivePoissonGpuBackend.cpp
-        Test.ProgressivePresentationExtraction.cpp
-        Test.ProgressiveRenderData.cpp
         Test.RenderArtifactPublication.cpp
         Test.RenderExtractionContract.cpp
         Test.GizmoInteraction.cpp

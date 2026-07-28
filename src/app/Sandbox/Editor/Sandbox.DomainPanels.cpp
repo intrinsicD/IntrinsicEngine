@@ -25,7 +25,7 @@ import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.TextureBakeModule;
@@ -58,13 +58,13 @@ inline constexpr VisualizationColorSource kUniformColorSource =
 inline constexpr VisualizationColorSource kScalarFieldSource =
     static_cast<VisualizationColorSource>(2);
 
-inline constexpr std::array<ProgressiveSlotSemantic, 5>
+inline constexpr std::array<GeometryPresentationSlotSemantic, 5>
     kTextureBakeTargetSemantics{{
-        ProgressiveSlotSemantic::Albedo,
-        ProgressiveSlotSemantic::Normal,
-        ProgressiveSlotSemantic::Roughness,
-        ProgressiveSlotSemantic::Metallic,
-        ProgressiveSlotSemantic::ScalarField,
+        GeometryPresentationSlotSemantic::Albedo,
+        GeometryPresentationSlotSemantic::Normal,
+        GeometryPresentationSlotSemantic::Roughness,
+        GeometryPresentationSlotSemantic::Metallic,
+        GeometryPresentationSlotSemantic::ScalarField,
     }};
 
 inline constexpr std::array<MeshAttributeTextureBakeEncoder, 8>
@@ -318,12 +318,12 @@ void DrawPropertyBindingTargets(
                 DebugNameForGeometryPropertyValueKindFilter(
                     target.ExpectedValueKind),
                 target.ExpectedElementCount);
-    for (const SandboxEditorProgressivePropertyOptionModel &option :
+    for (const SandboxEditorGeometryPresentationPropertyOptionModel &option :
          target.Options) {
       if (option.Compatible) {
-        ImGui::BulletText("%s", option.Descriptor.PropertyName.c_str());
+        ImGui::BulletText("%s", option.Descriptor.Name.c_str());
       } else {
-        ImGui::BulletText("%s", option.Descriptor.PropertyName.c_str());
+        ImGui::BulletText("%s", option.Descriptor.Name.c_str());
         ImGui::SameLine();
         ImGui::TextDisabled("%s", option.DisabledReason.c_str());
       }
@@ -408,7 +408,7 @@ void DrawVertexChannelBindingTargets(
 void DrawBoundRenderStateRows(const SandboxEditorBoundRenderStateModel &bound) {
   ImGui::SeparatorText("Bound render state");
   ImGui::Text("Rows: %zu generation=%llu", bound.Rows.size(),
-              static_cast<unsigned long long>(bound.BindingGeneration));
+              static_cast<unsigned long long>(bound.RecipeGeneration));
   if (bound.Rows.empty()) {
     ImGui::TextDisabled("No bound render state rows.");
     DrawDiagnostics(bound.Diagnostics);
@@ -448,8 +448,8 @@ void DrawBoundRenderStateRows(const SandboxEditorBoundRenderStateModel &bound) {
       ImGui::TableSetColumnIndex(4);
       ImGui::TextUnformatted(readinessText.c_str());
       ImGui::TableSetColumnIndex(5);
-      if (!row.Property.PropertyName.empty()) {
-        ImGui::Text("%s%s", row.Property.PropertyName.c_str(),
+      if (!row.Property.Name.empty()) {
+        ImGui::Text("%s%s", row.Property.Name.c_str(),
                     row.HasCatalogMatch ? " catalog" : "");
       } else {
         ImGui::TextDisabled("-");
@@ -481,7 +481,7 @@ void DrawUvRegenerationStatus(
     const SandboxEditorUvDiagnosticsModel &uv,
     const std::optional<SandboxEditorUvRegenerationCommandResult> &lastResult) {
   if (uv.UvRegenerationJob.has_value()) {
-    const SandboxEditorProgressiveJobModel &job = *uv.UvRegenerationJob;
+    const SandboxEditorJobModel &job = *uv.UvRegenerationJob;
     ImGui::Text("UV job: %s %.0f%%", std::string(ToString(job.Status)).c_str(),
                 job.NormalizedProgress * 100.0f);
     if (!job.Diagnostic.empty())
@@ -675,7 +675,7 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
 
   const auto targetCompatible =
       [selectedSource, storageIndex, encoderIndex, colormapIndex](
-          const ProgressiveSlotSemantic semantic) {
+          const GeometryPresentationSlotSemantic semantic) {
         if (selectedSource == nullptr)
           return false;
         const std::array<BakedPropertyTextureConsumer, 1> consumer{{
@@ -742,7 +742,7 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
                      static_cast<int>(kColormapNames.size()));
 
   const auto makeConsumer =
-      [colormapIndex](const ProgressiveSlotSemantic semantic) {
+      [colormapIndex](const GeometryPresentationSlotSemantic semantic) {
         return BakedPropertyTextureConsumer{
             .PresentationKey = "mesh.surface",
             .Semantic = semantic,
@@ -783,7 +783,7 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
   for (std::size_t i = 0u; i < kTextureBakeTargetSemantics.size(); ++i) {
     if (i == static_cast<std::size_t>(semanticIndex))
       continue;
-    const ProgressiveSlotSemantic semantic = kTextureBakeTargetSemantics[i];
+    const GeometryPresentationSlotSemantic semantic = kTextureBakeTargetSemantics[i];
     const std::uint32_t bit = 1u << static_cast<std::uint32_t>(i);
     bool selected = (additionalConsumerMask & bit) != 0u;
     std::vector<BakedPropertyTextureConsumer> candidate = consumers;
@@ -820,7 +820,7 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
 
   const bool hasNormalConsumer = std::ranges::any_of(
       consumers, [](const BakedPropertyTextureConsumer &consumer) {
-        return consumer.Semantic == ProgressiveSlotSemantic::Normal;
+        return consumer.Semantic == GeometryPresentationSlotSemantic::Normal;
       });
   if (hasNormalConsumer) {
     (void)ImGui::Combo("Normal texture space", &normalSpaceIndex,
@@ -944,7 +944,7 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
           record.Consumers;
       bool consumersChanged = false;
       for (std::size_t i = 0u; i < kTextureBakeTargetSemantics.size(); ++i) {
-        const ProgressiveSlotSemantic semantic =
+        const GeometryPresentationSlotSemantic semantic =
             kTextureBakeTargetSemantics[i];
         const auto found = std::find_if(
             nextConsumers.begin(), nextConsumers.end(),
@@ -990,8 +990,8 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
       if (rawScalar) {
         int recordColormap = 0;
         for (const BakedPropertyTextureConsumer &consumer : nextConsumers) {
-          if (consumer.Semantic == ProgressiveSlotSemantic::Albedo ||
-              consumer.Semantic == ProgressiveSlotSemantic::ScalarField) {
+          if (consumer.Semantic == GeometryPresentationSlotSemantic::Albedo ||
+              consumer.Semantic == GeometryPresentationSlotSemantic::ScalarField) {
             recordColormap = static_cast<int>(consumer.Colormap);
             break;
           }
@@ -1004,8 +1004,8 @@ void DrawTextureBakeControls(const SandboxEditorTextureBakeControlsModel &model,
                          static_cast<int>(kColormapNames.size()))) {
           consumersChanged = true;
           for (BakedPropertyTextureConsumer &consumer : nextConsumers) {
-            if (consumer.Semantic == ProgressiveSlotSemantic::Albedo ||
-                consumer.Semantic == ProgressiveSlotSemantic::ScalarField) {
+            if (consumer.Semantic == GeometryPresentationSlotSemantic::Albedo ||
+                consumer.Semantic == GeometryPresentationSlotSemantic::ScalarField) {
               consumer.Colormap =
                   static_cast<ColormapType>(recordColormap);
             }

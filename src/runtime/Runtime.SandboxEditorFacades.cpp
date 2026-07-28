@@ -76,8 +76,7 @@ import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressivePoissonGpuBackend;
-import Extrinsic.Runtime.ProgressivePresentationExtraction;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RegistrationAlignment;
 import Extrinsic.Runtime.RenderExtraction;
@@ -1313,12 +1312,12 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] GeometryPropertyValueKindFilter DefaultExpectedValueKindForSlot(
-            ProgressiveSlotSemantic semantic) noexcept;
+            GeometryPresentationSlotSemantic semantic) noexcept;
 
-        [[nodiscard]] GeometryElementDomain DefaultDomainForProgressiveSlot(
+        [[nodiscard]] GeometryElementDomain DefaultDomainForGeometryPresentationSlot(
             GS::Domain sourceDomain,
-            ProgressiveRenderLane lane,
-            ProgressiveSlotSemantic semantic) noexcept;
+            GeometryRenderLane lane,
+            GeometryPresentationSlotSemantic semantic) noexcept;
         void AddDiagnostic(
             std::vector<SandboxEditorDiagnostic>& diagnostics,
             SandboxEditorDiagnosticCode code,
@@ -1429,6 +1428,9 @@ namespace Extrinsic::Runtime
             case Kind::Vec4:
                 return 4u;
             case Kind::Unknown:
+            case Kind::Bool:
+            case Kind::Int32:
+            case Kind::UInt64:
                 break;
             }
             return 0u;
@@ -1505,6 +1507,9 @@ namespace Extrinsic::Runtime
                     preview.Text = FormatVec4(prop.Vector()[*index]);
                 break;
             case Kind::Unknown:
+            case Kind::Bool:
+            case Kind::Int32:
+            case Kind::UInt64:
                 preview.HasValue = false;
                 break;
             }
@@ -1589,11 +1594,10 @@ namespace Extrinsic::Runtime
                     .Internal = IsInternalVisualizationProperty(name),
                     .Connectivity = IsConnectivityVisualizationProperty(name),
                     .Generated = IsGeneratedCatalogProperty(name),
-                    .Descriptor = ProgressivePropertyBindingDescriptor{
+                    .Descriptor = GeometryPropertyRef{
                         .Domain = ToGeometryElementDomain(domain),
-                        .PropertyName = name,
-                        .ExpectedValueKind = kind,
-                        .ExpectedElementCount = properties.Size(),
+                        .Name = name,
+                        .ValueKind = kind,
                     },
                     .Preview = BuildPropertyValuePreview(
                         properties,
@@ -1644,26 +1648,29 @@ namespace Extrinsic::Runtime
         [[nodiscard]] SandboxEditorPropertyBindingTargetModel
         BuildPropertyBindingTargetModel(
             const GS::ConstSourceView& view,
-            const ProgressiveSlotExtraction& slot)
+            const GeometryPresentationSlotSnapshot& slot)
         {
             GeometryElementDomain domain = slot.Property.Domain;
             if (domain == GeometryElementDomain::Unknown)
             {
                 const GS::SourceAvailability availability =
                     GS::BuildSourceAvailability(view);
-                domain = DefaultDomainForProgressiveSlot(
+                domain = DefaultDomainForGeometryPresentationSlot(
                     availability.ProvenanceDomain,
                     slot.Lane,
                     slot.Semantic);
             }
 
-            GeometryPropertyValueKindFilter expected =
-                slot.Property.ExpectedValueKind;
-            if (!expected.has_value() ||
-                *expected == Geometry::PropertyValueKind::Unknown)
+            GeometryPropertyValueKindFilter expected{};
+            if (slot.Property.ValueKind != Geometry::PropertyValueKind::Unknown)
+                expected = slot.Property.ValueKind;
+            else
             {
                 expected = DefaultExpectedValueKindForSlot(slot.Semantic);
             }
+
+            const GeometryEntityAvailability geometryAvailability =
+                BuildGeometryAvailability(view);
 
             SandboxEditorPropertyBindingTargetModel model{
                 .Lane = slot.Lane,
@@ -1673,26 +1680,25 @@ namespace Extrinsic::Runtime
                 .SourceKind = slot.SourceKind,
                 .RequiredDomain = domain,
                 .ExpectedValueKind = expected,
-                .ExpectedElementCount = ResolvePropertyElementCount(
-                    view,
+                .ExpectedElementCount = ResolveGeometryElementCount(
+                    geometryAvailability,
                     domain),
             };
 
             if (domain != GeometryElementDomain::Unknown)
             {
-                std::vector<ProgressivePropertyOption> options =
-                    EnumeratePropertyOptions(
+                std::vector<GeometryPresentationPropertyOption> options =
+                    EnumerateGeometryPresentationPropertyOptions(
                         view,
                         domain,
-                        expected,
-                        model.ExpectedElementCount);
+                        expected);
                 model.Options.reserve(options.size());
-                for (const ProgressivePropertyOption& option : options)
+                for (const GeometryPresentationPropertyOption& option : options)
                 {
                     model.Options.push_back(
-                        SandboxEditorProgressivePropertyOptionModel{
-                            .Descriptor = option.Descriptor,
-                            .ActualValueKind = option.ActualValueKind,
+                        SandboxEditorGeometryPresentationPropertyOptionModel{
+                            .Descriptor = option.Property,
+                            .ActualValueKind = option.Property.ValueKind,
                             .ElementCount = option.ElementCount,
                             .Compatible = option.Compatible,
                             .DisabledReason = option.DisabledReason,
@@ -1752,6 +1758,9 @@ namespace Extrinsic::Runtime
             case Kind::Double:
             case Kind::UInt32:
             case Kind::Unknown:
+            case Kind::Bool:
+            case Kind::Int32:
+            case Kind::UInt64:
                 break;
             }
             return std::nullopt;
@@ -2135,13 +2144,18 @@ namespace Extrinsic::Runtime
                 model.SelectedStableId);
 
             if (const auto* bindings =
-                    raw.try_get<ProgressivePresentationBindings>(entity);
+                    raw.try_get<GeometryPresentationRecipe>(entity);
                 bindings != nullptr)
             {
-                const ProgressivePresentationExtractionSnapshot snapshot =
-                    BuildProgressivePresentationSnapshot(view, *bindings);
+                const GeometryPresentationSnapshot snapshot =
+                    BuildGeometryPresentationSnapshot(
+                        view,
+                        *bindings,
+                        raw.try_get<GeometryPresentationRuntimeState>(entity)
+                            ? *raw.try_get<GeometryPresentationRuntimeState>(entity)
+                            : GeometryPresentationRuntimeState{});
                 model.BindingTargets.reserve(snapshot.Slots.size());
-                for (const ProgressiveSlotExtraction& slot : snapshot.Slots)
+                for (const GeometryPresentationSlotSnapshot& slot : snapshot.Slots)
                     model.BindingTargets.push_back(
                         BuildPropertyBindingTargetModel(view, slot));
             }
@@ -2518,9 +2532,9 @@ namespace Extrinsic::Runtime
                    SameVisualizationAdapterOptions(lhs.Options, rhs.Options);
         }
 
-        [[nodiscard]] bool SameProgressiveDefaultValue(
-            const ProgressiveDefaultValue& lhs,
-            const ProgressiveDefaultValue& rhs) noexcept
+        [[nodiscard]] bool SameGeometryPresentationDefaultValue(
+            const GeometryPresentationDefaultValue& lhs,
+            const GeometryPresentationDefaultValue& rhs) noexcept
         {
             return lhs.Kind == rhs.Kind &&
                    SameVec4(lhs.Vector, rhs.Vector) &&
@@ -2529,7 +2543,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool IsFiniteDefaultValue(
-            const ProgressiveDefaultValue& value) noexcept
+            const GeometryPresentationDefaultValue& value) noexcept
         {
             return std::isfinite(value.Vector.x) &&
                    std::isfinite(value.Vector.y) &&
@@ -2538,15 +2552,11 @@ namespace Extrinsic::Runtime
                    std::isfinite(value.Scalar);
         }
 
-        [[nodiscard]] bool SameProgressivePropertyDescriptor(
-            const ProgressivePropertyBindingDescriptor& lhs,
-            const ProgressivePropertyBindingDescriptor& rhs) noexcept
+        [[nodiscard]] bool SameGeometryPresentationPropertyDescriptor(
+            const GeometryPropertyRef& lhs,
+            const GeometryPropertyRef& rhs) noexcept
         {
-            return lhs.Domain == rhs.Domain &&
-                   lhs.PropertyName == rhs.PropertyName &&
-                   lhs.ExpectedValueKind == rhs.ExpectedValueKind &&
-                   lhs.ExpectedElementCount == rhs.ExpectedElementCount &&
-                   lhs.SourceGeneration == rhs.SourceGeneration;
+            return lhs == rhs;
         }
 
         // RUNTIME-194 Slice B5d: result payload for this file's editor jobs.
@@ -2637,54 +2647,54 @@ namespace Extrinsic::Runtime
             "uv_regeneration"};
 
         [[nodiscard]] GeometryPropertyValueKindFilter DefaultExpectedValueKindForSlot(
-            const ProgressiveSlotSemantic semantic) noexcept
+            const GeometryPresentationSlotSemantic semantic) noexcept
         {
             switch (semantic)
             {
-            case ProgressiveSlotSemantic::Normal:
-            case ProgressiveSlotSemantic::PointNormalOrientation:
+            case GeometryPresentationSlotSemantic::Normal:
+            case GeometryPresentationSlotSemantic::PointNormalOrientation:
                 return Geometry::PropertyValueKind::Vec3;
-            case ProgressiveSlotSemantic::Albedo:
-            case ProgressiveSlotSemantic::PointColor:
-            case ProgressiveSlotSemantic::LineColor:
+            case GeometryPresentationSlotSemantic::Albedo:
+            case GeometryPresentationSlotSemantic::PointColor:
+            case GeometryPresentationSlotSemantic::LineColor:
                 return Geometry::PropertyValueKind::Vec4;
-            case ProgressiveSlotSemantic::Roughness:
-            case ProgressiveSlotSemantic::Metallic:
-            case ProgressiveSlotSemantic::ScalarField:
-            case ProgressiveSlotSemantic::Displacement:
-            case ProgressiveSlotSemantic::PointScalarField:
-            case ProgressiveSlotSemantic::PointSize:
-            case ProgressiveSlotSemantic::LineScalarField:
-            case ProgressiveSlotSemantic::LineWidth:
+            case GeometryPresentationSlotSemantic::Roughness:
+            case GeometryPresentationSlotSemantic::Metallic:
+            case GeometryPresentationSlotSemantic::ScalarField:
+            case GeometryPresentationSlotSemantic::Displacement:
+            case GeometryPresentationSlotSemantic::PointScalarField:
+            case GeometryPresentationSlotSemantic::PointSize:
+            case GeometryPresentationSlotSemantic::LineScalarField:
+            case GeometryPresentationSlotSemantic::LineWidth:
                 return Geometry::PropertyValueKind::Float;
             }
             return std::nullopt;
         }
 
-        [[nodiscard]] GeometryElementDomain DefaultDomainForProgressiveSlot(
+        [[nodiscard]] GeometryElementDomain DefaultDomainForGeometryPresentationSlot(
             const GS::Domain sourceDomain,
-            const ProgressiveRenderLane lane,
-            const ProgressiveSlotSemantic semantic) noexcept
+            const GeometryRenderLane lane,
+            const GeometryPresentationSlotSemantic semantic) noexcept
         {
             switch (sourceDomain)
             {
             case GS::Domain::Mesh:
-                if (semantic == ProgressiveSlotSemantic::LineColor ||
-                    semantic == ProgressiveSlotSemantic::LineScalarField ||
-                    semantic == ProgressiveSlotSemantic::LineWidth)
+                if (semantic == GeometryPresentationSlotSemantic::LineColor ||
+                    semantic == GeometryPresentationSlotSemantic::LineScalarField ||
+                    semantic == GeometryPresentationSlotSemantic::LineWidth)
                 {
                     return GeometryElementDomain::MeshEdge;
                 }
-                if (semantic == ProgressiveSlotSemantic::ScalarField)
+                if (semantic == GeometryPresentationSlotSemantic::ScalarField)
                     return GeometryElementDomain::MeshFace;
-                if (lane == ProgressiveRenderLane::Edges)
+                if (lane == GeometryRenderLane::Edges)
                     return GeometryElementDomain::MeshEdge;
                 return GeometryElementDomain::MeshVertex;
             case GS::Domain::Graph:
-                if (lane == ProgressiveRenderLane::Edges ||
-                    semantic == ProgressiveSlotSemantic::LineColor ||
-                    semantic == ProgressiveSlotSemantic::LineScalarField ||
-                    semantic == ProgressiveSlotSemantic::LineWidth)
+                if (lane == GeometryRenderLane::Edges ||
+                    semantic == GeometryPresentationSlotSemantic::LineColor ||
+                    semantic == GeometryPresentationSlotSemantic::LineScalarField ||
+                    semantic == GeometryPresentationSlotSemantic::LineWidth)
                 {
                     return GeometryElementDomain::GraphEdge;
                 }
@@ -2698,32 +2708,32 @@ namespace Extrinsic::Runtime
             return GeometryElementDomain::Unknown;
         }
 
-        [[nodiscard]] SandboxEditorProgressivePropertyOptionModel
-        ToProgressivePropertyOptionModel(const ProgressivePropertyOption& option)
+        [[nodiscard]] SandboxEditorGeometryPresentationPropertyOptionModel
+        ToGeometryPresentationPropertyOptionModel(const GeometryPresentationPropertyOption& option)
         {
-            return SandboxEditorProgressivePropertyOptionModel{
-                .Descriptor = option.Descriptor,
-                .ActualValueKind = option.ActualValueKind,
+            return SandboxEditorGeometryPresentationPropertyOptionModel{
+                .Descriptor = option.Property,
+                .ActualValueKind = option.Property.ValueKind,
                 .ElementCount = option.ElementCount,
                 .Compatible = option.Compatible,
                 .DisabledReason = option.DisabledReason,
             };
         }
 
-        [[nodiscard]] SandboxEditorProgressiveJobDependencyModel
-        ToProgressiveJobDependencyModel(
+        [[nodiscard]] SandboxEditorJobDependencyModel
+        ToSandboxEditorJobDependencyModel(
             const SandboxEditorJobDependency& dependency)
         {
-            return SandboxEditorProgressiveJobDependencyModel{
+            return SandboxEditorJobDependencyModel{
                 .Job = dependency.Job,
                 .Reason = dependency.Reason,
             };
         }
 
-        [[nodiscard]] SandboxEditorProgressiveJobModel ToProgressiveJobModel(
+        [[nodiscard]] SandboxEditorJobModel ToSandboxEditorJobModel(
             const SandboxEditorJobRecord& job)
         {
-            SandboxEditorProgressiveJobModel model{
+            SandboxEditorJobModel model{
                 .Handle = job.Token,
                 .Key = job.Identity,
                 .Name = job.Name,
@@ -2740,11 +2750,11 @@ namespace Extrinsic::Runtime
             model.Dependencies.reserve(job.Dependencies.size());
             for (const SandboxEditorJobDependency& dependency : job.Dependencies)
                 model.Dependencies.push_back(
-                    ToProgressiveJobDependencyModel(dependency));
+                    ToSandboxEditorJobDependencyModel(dependency));
             return model;
         }
 
-        [[nodiscard]] std::optional<SandboxEditorProgressiveJobModel>
+        [[nodiscard]] std::optional<SandboxEditorJobModel>
         FindDerivedJobModelForOutput(
             const SandboxEditorContext& context,
             const std::uint32_t stableEntityId,
@@ -2779,13 +2789,19 @@ namespace Extrinsic::Runtime
 
             if (selected == nullptr)
                 return std::nullopt;
-            return ToProgressiveJobModel(*selected);
+            return ToSandboxEditorJobModel(*selected);
         }
 
-        [[nodiscard]] EditorCommandHistoryStatus ApplyProgressiveBindingsState(
+        struct GeometryPresentationEditorState
+        {
+            GeometryPresentationRecipe Recipe{};
+            GeometryPresentationRuntimeState Runtime{};
+        };
+
+        [[nodiscard]] EditorCommandHistoryStatus ApplyGeometryPresentationState(
             ECS::Scene::Registry* scene,
             const std::uint32_t stableEntityId,
-            const ProgressivePresentationBindings& state)
+            const GeometryPresentationEditorState& state)
         {
             if (scene == nullptr)
                 return EditorCommandHistoryStatus::MissingScene;
@@ -2796,40 +2812,45 @@ namespace Extrinsic::Runtime
             if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
                 return EditorCommandHistoryStatus::StaleEntity;
 
-            raw.emplace_or_replace<ProgressivePresentationBindings>(entity, state);
+            raw.emplace_or_replace<GeometryPresentationRecipe>(
+                entity,
+                state.Recipe);
+            raw.emplace_or_replace<GeometryPresentationRuntimeState>(
+                entity,
+                state.Runtime);
             return EditorCommandHistoryStatus::Applied;
         }
 
-        struct ProgressiveSlotLookup
+        struct GeometryPresentationSlotLookup
         {
-            ProgressivePresentationBinding* Presentation{nullptr};
-            ProgressiveSlotBinding* Slot{nullptr};
+            GeometryPresentationBindingRecipe* Presentation{nullptr};
+            GeometryPresentationSlotRecipe* Slot{nullptr};
         };
 
-        [[nodiscard]] ProgressiveSlotLookup FindMutableProgressiveSlot(
-            ProgressivePresentationBindings& bindings,
+        [[nodiscard]] GeometryPresentationSlotLookup FindMutableGeometryPresentationSlot(
+            GeometryPresentationRecipe& bindings,
             const std::string& presentationKey,
-            const ProgressiveSlotSemantic semantic)
+            const GeometryPresentationSlotSemantic semantic)
         {
             if (!presentationKey.empty())
             {
-                ProgressivePresentationBinding* presentation =
-                    FindPresentationBinding(bindings, presentationKey);
+                GeometryPresentationBindingRecipe* presentation =
+                    FindGeometryPresentationBinding(bindings, presentationKey);
                 if (presentation == nullptr)
                     return {};
-                return ProgressiveSlotLookup{
+                return GeometryPresentationSlotLookup{
                     .Presentation = presentation,
-                    .Slot = FindSlotBinding(*presentation, semantic),
+                    .Slot = FindGeometryPresentationSlot(*presentation, semantic),
                 };
             }
 
-            for (ProgressivePresentationBinding& presentation :
+            for (GeometryPresentationBindingRecipe& presentation :
                  bindings.Presentations)
             {
-                if (ProgressiveSlotBinding* slot =
-                        FindSlotBinding(presentation, semantic))
+                if (GeometryPresentationSlotRecipe* slot =
+                        FindGeometryPresentationSlot(presentation, semantic))
                 {
-                    return ProgressiveSlotLookup{
+                    return GeometryPresentationSlotLookup{
                         .Presentation = &presentation,
                         .Slot = slot,
                     };
@@ -2838,14 +2859,43 @@ namespace Extrinsic::Runtime
             return {};
         }
 
+        GeometryPresentationSlotStatus& ResetGeometryPresentationSlotStatus(
+            GeometryPresentationRuntimeState& state,
+            const std::string& presentationKey,
+            const GeometryPresentationSlotSemantic semantic,
+            const GeometryPresentationReadiness readiness,
+            const GeometryPresentationProvenance provenance)
+        {
+            GeometryPresentationSlotStatus* status =
+                FindGeometryPresentationSlotStatus(
+                    state,
+                    presentationKey,
+                    semantic);
+            if (status == nullptr)
+            {
+                state.Slots.push_back(GeometryPresentationSlotStatus{
+                    .PresentationKey = presentationKey,
+                    .Semantic = semantic,
+                });
+                status = &state.Slots.back();
+            }
+            *status = GeometryPresentationSlotStatus{
+                .PresentationKey = presentationKey,
+                .Semantic = semantic,
+                .Readiness = readiness,
+                .Provenance = provenance,
+            };
+            return *status;
+        }
+
         [[nodiscard]] SandboxEditorCommandStatus ToSandboxEditorCommandStatus(
             EditorCommandHistoryStatus status) noexcept;
 
-        [[nodiscard]] SandboxEditorCommandStatus CommitProgressiveBindingsChange(
+        [[nodiscard]] SandboxEditorCommandStatus CommitGeometryPresentationChange(
             const SandboxEditorContext& context,
             const std::uint32_t stableEntityId,
-            ProgressivePresentationBindings before,
-            ProgressivePresentationBindings after)
+            GeometryPresentationEditorState before,
+            GeometryPresentationEditorState after)
         {
             if (context.CommandHistory != nullptr)
             {
@@ -2853,11 +2903,11 @@ namespace Extrinsic::Runtime
                 const EditorCommandHistoryResult result =
                     context.CommandHistory->Execute(
                         EditorCommandRecord{
-                            .Label = "Change Progressive Presentation",
+                            .Label = "Change Geometry Presentation",
                             .Redo =
                                 [scene, stableEntityId, after]()
                                 {
-                                    return ApplyProgressiveBindingsState(
+                                    return ApplyGeometryPresentationState(
                                         scene,
                                         stableEntityId,
                                         after);
@@ -2865,7 +2915,7 @@ namespace Extrinsic::Runtime
                             .Undo =
                                 [scene, stableEntityId, before]()
                                 {
-                                    return ApplyProgressiveBindingsState(
+                                    return ApplyGeometryPresentationState(
                                         scene,
                                         stableEntityId,
                                         before);
@@ -2876,17 +2926,17 @@ namespace Extrinsic::Runtime
             }
 
             return ToSandboxEditorCommandStatus(
-                ApplyProgressiveBindingsState(
+                ApplyGeometryPresentationState(
                     context.Scene,
                     stableEntityId,
                     after));
         }
 
-        [[nodiscard]] bool PropertySourceKindAllowedForProgressiveSlotCommand(
-            const ProgressiveSlotSourceKind sourceKind) noexcept
+        [[nodiscard]] bool PropertySourceKindAllowedForGeometryPresentationSlotCommand(
+            const GeometryPresentationSourceKind sourceKind) noexcept
         {
-            return sourceKind == ProgressiveSlotSourceKind::PropertyBake ||
-                   sourceKind == ProgressiveSlotSourceKind::PropertyBuffer;
+            return sourceKind == GeometryPresentationSourceKind::PropertyBake ||
+                   sourceKind == GeometryPresentationSourceKind::PropertyBuffer;
         }
 
         [[nodiscard]] G::RenderPoints::RenderType ToRenderPointType(
@@ -3182,7 +3232,7 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] ProgressiveEntityShape InferProgressiveEntityShape(
+        [[nodiscard]] GeometryPresentationShape InferGeometryPresentationShape(
             const GS::ConstSourceView& view)
         {
             const GS::SourceAvailability availability =
@@ -3190,20 +3240,20 @@ namespace Extrinsic::Runtime
             switch (availability.ProvenanceDomain)
             {
             case GS::Domain::Mesh:
-                return ProgressiveEntityShape::MeshLeaf;
+                return GeometryPresentationShape::Mesh;
             case GS::Domain::Graph:
-                return ProgressiveEntityShape::GraphLeaf;
+                return GeometryPresentationShape::Graph;
             case GS::Domain::PointCloud:
-                return ProgressiveEntityShape::PointCloudLeaf;
+                return GeometryPresentationShape::PointCloud;
             case GS::Domain::None:
             case GS::Domain::Unknown:
                 break;
             }
-            return ProgressiveEntityShape::Unknown;
+            return GeometryPresentationShape::Unknown;
         }
 
-        void AppendProgressiveJobRowsForEntity(
-            SandboxEditorProgressiveRenderDataModel& model,
+        void AppendGeometryPresentationJobRowsForEntity(
+            SandboxEditorGeometryPresentationModel& model,
             const SandboxEditorContext& context,
             const std::uint32_t stableEntityId)
         {
@@ -3212,11 +3262,11 @@ namespace Extrinsic::Runtime
 
             for (const SandboxEditorJobRecord& job :
                  context.JobCommands.SnapshotEntity(stableEntityId))
-                model.Jobs.push_back(ToProgressiveJobModel(job));
+                model.Jobs.push_back(ToSandboxEditorJobModel(job));
         }
 
-        void AccumulateProgressiveJobSummaryForEntity(
-            SandboxEditorProgressiveCompositionSummary& summary,
+        void AccumulateGeometryPresentationJobSummaryForEntity(
+            SandboxEditorGeometryCompositionSummary& summary,
             const SandboxEditorContext& context,
             const std::uint32_t stableEntityId)
         {
@@ -3234,17 +3284,17 @@ namespace Extrinsic::Runtime
             }
         }
 
-        [[nodiscard]] std::vector<SandboxEditorProgressivePropertyOptionModel>
-        BuildProgressiveSlotPropertyOptions(
+        [[nodiscard]] std::vector<SandboxEditorGeometryPresentationPropertyOptionModel>
+        BuildGeometryPresentationSlotPropertyOptions(
             const GS::ConstSourceView& view,
-            const ProgressiveSlotExtraction& extractedSlot)
+            const GeometryPresentationSlotSnapshot& extractedSlot)
         {
             GeometryElementDomain domain = extractedSlot.Property.Domain;
             if (domain == GeometryElementDomain::Unknown)
             {
                 const GS::SourceAvailability availability =
                     GS::BuildSourceAvailability(view);
-                domain = DefaultDomainForProgressiveSlot(
+                domain = DefaultDomainForGeometryPresentationSlot(
                     availability.ProvenanceDomain,
                     extractedSlot.Lane,
                     extractedSlot.Semantic);
@@ -3252,32 +3302,37 @@ namespace Extrinsic::Runtime
             if (domain == GeometryElementDomain::Unknown)
                 return {};
 
-            GeometryPropertyValueKindFilter expected =
-                extractedSlot.Property.ExpectedValueKind;
-            if (!expected.has_value() ||
-                *expected == Geometry::PropertyValueKind::Unknown)
+            GeometryPropertyValueKindFilter expected{};
+            if (extractedSlot.Property.ValueKind !=
+                Geometry::PropertyValueKind::Unknown)
+            {
+                expected = extractedSlot.Property.ValueKind;
+            }
+            else
             {
                 expected = DefaultExpectedValueKindForSlot(extractedSlot.Semantic);
             }
 
-            const std::size_t expectedCount =
-                ResolvePropertyElementCount(view, domain);
-            std::vector<ProgressivePropertyOption> options =
-                EnumeratePropertyOptions(view, domain, expected, expectedCount);
+            std::vector<GeometryPresentationPropertyOption> options =
+                EnumerateGeometryPresentationPropertyOptions(
+                    view,
+                    domain,
+                    expected);
 
-            std::vector<SandboxEditorProgressivePropertyOptionModel> out{};
+            std::vector<SandboxEditorGeometryPresentationPropertyOptionModel> out{};
             out.reserve(options.size());
-            for (const ProgressivePropertyOption& option : options)
-                out.push_back(ToProgressivePropertyOptionModel(option));
+            for (const GeometryPresentationPropertyOption& option : options)
+                out.push_back(ToGeometryPresentationPropertyOptionModel(option));
             return out;
         }
 
-        [[nodiscard]] SandboxEditorProgressiveSlotModel ToProgressiveSlotModel(
+        [[nodiscard]] SandboxEditorGeometryPresentationSlotModel ToGeometryPresentationSlotModel(
             const GS::ConstSourceView& view,
-            const ProgressivePresentationBindings& bindings,
-            const ProgressiveSlotExtraction& extractedSlot)
+            const GeometryPresentationRecipe& bindings,
+            const GeometryPresentationRuntimeState& runtimeState,
+            const GeometryPresentationSlotSnapshot& extractedSlot)
         {
-            SandboxEditorProgressiveSlotModel model{
+            SandboxEditorGeometryPresentationSlotModel model{
                 .Lane = extractedSlot.Lane,
                 .PresentationKey = extractedSlot.PresentationKey,
                 .PresentationKind = extractedSlot.PresentationKind,
@@ -3297,26 +3352,33 @@ namespace Extrinsic::Runtime
                 .Diagnostic = extractedSlot.Diagnostic,
             };
 
-            if (const ProgressivePresentationBinding* presentation =
-                    FindPresentationBinding(bindings, extractedSlot.PresentationKey))
+            if (const GeometryPresentationBindingRecipe* presentation =
+                    FindGeometryPresentationBinding(bindings, extractedSlot.PresentationKey))
             {
-                if (const ProgressiveSlotBinding* slot =
-                        FindSlotBinding(*presentation, extractedSlot.Semantic))
+                if (const GeometryPresentationSlotRecipe* slot =
+                        FindGeometryPresentationSlot(*presentation, extractedSlot.Semantic))
                 {
-                    model.AuthoredTexture = slot->AuthoredTexture;
-                    model.GeneratedTexture = slot->GeneratedTexture;
+                    model.AuthoredTexture = slot->TextureAsset;
                 }
+            }
+            if (const GeometryPresentationSlotStatus* status =
+                    FindGeometryPresentationSlotStatus(
+                        runtimeState,
+                        extractedSlot.PresentationKey,
+                        extractedSlot.Semantic))
+            {
+                model.GeneratedTexture = status->GeneratedTexture;
             }
 
             model.PropertyOptions =
-                BuildProgressiveSlotPropertyOptions(view, extractedSlot);
+                BuildGeometryPresentationSlotPropertyOptions(view, extractedSlot);
             return model;
         }
 
-        void AccumulateProgressiveChildSummary(
+        void AccumulateGeometryPresentationChildSummary(
             const SandboxEditorContext& context,
             const entt::registry& raw,
-            SandboxEditorProgressiveCompositionSummary& summary,
+            SandboxEditorGeometryCompositionSummary& summary,
             const ECS::EntityHandle child)
         {
             if (!raw.valid(child))
@@ -3325,20 +3387,27 @@ namespace Extrinsic::Runtime
             ++summary.ChildCount;
             const std::uint32_t childStableId =
                 SelectionController::ToStableEntityId(child);
-            AccumulateProgressiveJobSummaryForEntity(
+            AccumulateGeometryPresentationJobSummaryForEntity(
                 summary,
                 context,
                 childStableId);
 
             const auto* bindings =
-                raw.try_get<ProgressivePresentationBindings>(child);
+                raw.try_get<GeometryPresentationRecipe>(child);
             if (bindings == nullptr)
                 return;
 
-            ++summary.ChildBindingsCount;
+            ++summary.ChildRecipeCount;
             const GS::ConstSourceView childView = GS::BuildConstView(raw, child);
-            const ProgressivePresentationExtractionSnapshot snapshot =
-                BuildProgressivePresentationSnapshot(childView, *bindings);
+            const GeometryPresentationRuntimeState runtimeState =
+                raw.try_get<GeometryPresentationRuntimeState>(child)
+                    ? *raw.try_get<GeometryPresentationRuntimeState>(child)
+                    : GeometryPresentationRuntimeState{};
+            const GeometryPresentationSnapshot snapshot =
+                BuildGeometryPresentationSnapshot(
+                    childView,
+                    *bindings,
+                    runtimeState);
 
             summary.ChildSlotCount += snapshot.Stats.SlotCount;
             summary.ChildPendingSlotCount += snapshot.Stats.PendingSlotCount;
@@ -3346,10 +3415,10 @@ namespace Extrinsic::Runtime
             summary.ChildFailedSlotCount += snapshot.Stats.UnsupportedSlotCount;
         }
 
-        void AccumulateProgressiveCompositionSummary(
+        void AccumulateGeometryPresentationCompositionSummary(
             const SandboxEditorContext& context,
             const entt::registry& raw,
-            SandboxEditorProgressiveRenderDataModel& model,
+            SandboxEditorGeometryPresentationModel& model,
             const ECS::EntityHandle entity)
         {
             const ECS::Hierarchy::Structure::HierarchyQueryResult children =
@@ -3359,7 +3428,7 @@ namespace Extrinsic::Runtime
                 AddDiagnostic(
                     model.Diagnostics,
                     SandboxEditorDiagnosticCode::CorruptHierarchy,
-                    std::string{"Progressive composition hierarchy query failed: "} +
+                    std::string{"Geometry-presentation composition hierarchy query failed: "} +
                         ECS::Hierarchy::Structure::
                             DebugNameForHierarchyQueryStatus(children.Status) +
                         ".");
@@ -3368,77 +3437,91 @@ namespace Extrinsic::Runtime
             if (children.Entities.empty())
                 return;
 
-            SandboxEditorProgressiveCompositionSummary& summary =
+            SandboxEditorGeometryCompositionSummary& summary =
                 model.Composition;
             summary.HasChildren = true;
             for (const ECS::EntityHandle child : children.Entities)
-                AccumulateProgressiveChildSummary(
+                AccumulateGeometryPresentationChildSummary(
                     context,
                     raw,
                     summary,
                     child);
         }
 
-        [[nodiscard]] SandboxEditorProgressiveRenderDataModel
-        BuildProgressiveRenderDataModel(
+        [[nodiscard]] SandboxEditorGeometryPresentationModel
+        BuildGeometryPresentationModel(
             const SandboxEditorContext& context,
             const entt::registry& raw,
             const ECS::EntityHandle entity)
         {
             if (context.ModelBuildStats != nullptr)
             {
-                ++context.ModelBuildStats->ProgressiveModelBuilds;
+                ++context.ModelBuildStats->GeometryPresentationModelBuilds;
             }
-            SandboxEditorProgressiveRenderDataModel model{};
+            SandboxEditorGeometryPresentationModel model{};
             const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
-            model.Shape = InferProgressiveEntityShape(view);
+            model.Shape = InferGeometryPresentationShape(view);
 
             const std::uint32_t stableEntityId =
                 SelectionController::ToStableEntityId(entity);
-            AppendProgressiveJobRowsForEntity(
+            AppendGeometryPresentationJobRowsForEntity(
                 model,
                 context,
                 stableEntityId);
-            AccumulateProgressiveCompositionSummary(
+            AccumulateGeometryPresentationCompositionSummary(
                 context,
                 raw,
                 model,
                 entity);
             if (model.Composition.HasChildren)
-                model.Shape = ProgressiveEntityShape::Composition;
+                model.Shape = GeometryPresentationShape::Composition;
 
-            const auto* bindings =
-                raw.try_get<ProgressivePresentationBindings>(entity);
-            if (bindings == nullptr)
+            const auto* recipe =
+                raw.try_get<GeometryPresentationRecipe>(entity);
+            if (recipe == nullptr)
                 return model;
 
-            model.HasBindings = true;
-            model.Shape = bindings->Shape;
-            model.BindingGeneration = bindings->BindingGeneration;
+            model.HasRecipe = true;
+            model.Shape = recipe->Shape;
+            const GeometryPresentationRuntimeState runtimeState =
+                raw.try_get<GeometryPresentationRuntimeState>(entity)
+                    ? *raw.try_get<GeometryPresentationRuntimeState>(entity)
+                    : GeometryPresentationRuntimeState{};
 
-            const ProgressivePresentationExtractionSnapshot snapshot =
-                BuildProgressivePresentationSnapshot(view, *bindings);
+            const GeometryPresentationSnapshot snapshot =
+                BuildGeometryPresentationSnapshot(
+                    view,
+                    *recipe,
+                    runtimeState);
+            model.RecipeGeneration = snapshot.RecipeGeneration;
             model.Stats = snapshot.Stats;
             model.Slots.reserve(snapshot.Slots.size());
-            for (const ProgressiveSlotExtraction& slot : snapshot.Slots)
-                model.Slots.push_back(ToProgressiveSlotModel(view, *bindings, slot));
+            for (const GeometryPresentationSlotSnapshot& slot : snapshot.Slots)
+            {
+                model.Slots.push_back(
+                    ToGeometryPresentationSlotModel(
+                        view,
+                        *recipe,
+                        runtimeState,
+                        slot));
+            }
 
             if (snapshot.Stats.DiagnosticCount > 0u)
             {
                 AddDiagnostic(
                     model.Diagnostics,
                     SandboxEditorDiagnosticCode::InvalidVisualizationProperty,
-                    "Progressive render-data has slot diagnostics.");
+                    "Geometry presentation has slot diagnostics.");
             }
             return model;
         }
 
         [[nodiscard]] std::optional<std::size_t> FindCatalogMatchIndex(
             const SandboxEditorPropertyCatalogModel& catalog,
-            const ProgressivePropertyBindingDescriptor& descriptor)
+            const GeometryPropertyRef& descriptor)
         {
             if (descriptor.Domain == GeometryElementDomain::Unknown ||
-                descriptor.PropertyName.empty())
+                descriptor.Name.empty())
             {
                 return std::nullopt;
             }
@@ -3447,7 +3530,7 @@ namespace Extrinsic::Runtime
             {
                 const SandboxEditorPropertyCatalogRow& row = catalog.Rows[i];
                 if (row.Descriptor.Domain == descriptor.Domain &&
-                    row.Name == descriptor.PropertyName)
+                    row.Name == descriptor.Name)
                 {
                     return i;
                 }
@@ -3457,7 +3540,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] SandboxEditorBoundRenderStateRow MakeRenderHintRow(
             std::string label,
-            const ProgressiveRenderLane lane,
+            const GeometryRenderLane lane,
             const bool enabled,
             std::string sourceDescription,
             std::string disabledReason = {})
@@ -3467,8 +3550,8 @@ namespace Extrinsic::Runtime
                 .Label = std::move(label),
                 .Lane = lane,
                 .Readiness = enabled
-                    ? ProgressiveReadinessState::Ready
-                    : ProgressiveReadinessState::Unset,
+                    ? GeometryPresentationReadiness::Ready
+                    : GeometryPresentationReadiness::Unset,
                 .Enabled = enabled,
                 .SourceDescription = std::move(sourceDescription),
                 .DisabledReason = std::move(disabledReason),
@@ -3482,7 +3565,7 @@ namespace Extrinsic::Runtime
             rows.push_back(
                 MakeRenderHintRow(
                     "Surface render hint",
-                    ProgressiveRenderLane::Surface,
+                    GeometryRenderLane::Surface,
                     hints.HasRenderSurface,
                     hints.HasRenderSurface ? hints.SurfaceDomain : "not enabled",
                     hints.HasRenderSurface ? std::string{} : "surface rendering is not enabled"));
@@ -3500,7 +3583,7 @@ namespace Extrinsic::Runtime
             rows.push_back(
                 MakeRenderHintRow(
                     "Edge render hint",
-                    ProgressiveRenderLane::Edges,
+                    GeometryRenderLane::Edges,
                     hints.HasRenderEdges,
                     std::move(edgeSource),
                     hints.HasRenderEdges ? std::string{} : "edge rendering is not enabled"));
@@ -3518,7 +3601,7 @@ namespace Extrinsic::Runtime
             rows.push_back(
                 MakeRenderHintRow(
                     "Point render hint",
-                    ProgressiveRenderLane::Points,
+                    GeometryRenderLane::Points,
                     hints.HasRenderPoints,
                     std::move(pointSource),
                     hints.HasRenderPoints ? std::string{} : "point rendering is not enabled"));
@@ -3527,15 +3610,15 @@ namespace Extrinsic::Runtime
         void AppendBoundSlotRows(
             std::vector<SandboxEditorBoundRenderStateRow>& rows,
             const SandboxEditorPropertyCatalogModel& catalog,
-            const SandboxEditorProgressiveRenderDataModel& progressive)
+            const SandboxEditorGeometryPresentationModel& presentation)
         {
-            for (const SandboxEditorProgressiveSlotModel& slot :
-                 progressive.Slots)
+            for (const SandboxEditorGeometryPresentationSlotModel& slot :
+                 presentation.Slots)
             {
                 const std::optional<std::size_t> match =
                     FindCatalogMatchIndex(catalog, slot.Property);
                 rows.push_back(SandboxEditorBoundRenderStateRow{
-                    .Kind = SandboxEditorBoundRenderStateRowKind::ProgressiveSlot,
+                    .Kind = SandboxEditorBoundRenderStateRowKind::GeometryPresentationSlot,
                     .Label = std::string{ToString(slot.Semantic)},
                     .Lane = slot.Lane,
                     .PresentationKey = slot.PresentationKey,
@@ -3565,21 +3648,21 @@ namespace Extrinsic::Runtime
 
         void AppendBoundJobRows(
             std::vector<SandboxEditorBoundRenderStateRow>& rows,
-            const SandboxEditorProgressiveRenderDataModel& progressive)
+            const SandboxEditorGeometryPresentationModel& presentation)
         {
-            for (const SandboxEditorProgressiveJobModel& job :
-                 progressive.Jobs)
+            for (const SandboxEditorJobModel& job :
+                 presentation.Jobs)
             {
                 rows.push_back(SandboxEditorBoundRenderStateRow{
                     .Kind = SandboxEditorBoundRenderStateRowKind::DerivedJob,
                     .Label = job.Name,
-                    .Lane = ProgressiveRenderLane::Surface,
+                    .Lane = GeometryRenderLane::Surface,
                     .Semantic = job.Key.OutputSemantic,
                     .Readiness = IsFailedSandboxEditorJobState(job.Status)
-                        ? ProgressiveReadinessState::Failed
+                        ? GeometryPresentationReadiness::Failed
                         : (IsActiveSandboxEditorJobState(job.Status)
-                               ? ProgressiveReadinessState::Pending
-                               : ProgressiveReadinessState::Ready),
+                               ? GeometryPresentationReadiness::Pending
+                               : GeometryPresentationReadiness::Ready),
                     .Job = job.Handle,
                     .JobStatus = job.Status,
                     .JobProgress = job.NormalizedProgress,
@@ -3595,7 +3678,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] SandboxEditorBoundRenderStateModel BuildBoundRenderStateModel(
             const SandboxEditorContext& context,
             const SandboxEditorPropertyCatalogModel& catalog,
-            const SandboxEditorProgressiveRenderDataModel& progressive,
+            const SandboxEditorGeometryPresentationModel& presentation,
             const SandboxEditorRenderHintModel& renderHints,
             const SandboxEditorGeometryDomainModel& geometry,
             const std::uint32_t stableEntityId)
@@ -3607,41 +3690,41 @@ namespace Extrinsic::Runtime
             SandboxEditorBoundRenderStateModel model{};
             model.HasSelectedEntity = true;
             model.SelectedStableId = stableEntityId;
-            model.Shape = progressive.Shape;
-            model.BindingGeneration = progressive.BindingGeneration;
-            model.Composition = progressive.Composition;
+            model.Shape = presentation.Shape;
+            model.RecipeGeneration = presentation.RecipeGeneration;
+            model.Composition = presentation.Composition;
 
             AppendRenderHintRows(model.Rows, renderHints);
-            AppendBoundSlotRows(model.Rows, catalog, progressive);
-            AppendBoundJobRows(model.Rows, progressive);
+            AppendBoundSlotRows(model.Rows, catalog, presentation);
+            AppendBoundJobRows(model.Rows, presentation);
 
-            if (progressive.Composition.HasChildren)
+            if (presentation.Composition.HasChildren)
             {
                 model.Rows.push_back(SandboxEditorBoundRenderStateRow{
                     .Kind = SandboxEditorBoundRenderStateRowKind::CompositionSummary,
                     .Label = "Composition summary",
-                    .Readiness = progressive.Composition.ChildFailedSlotCount > 0u ||
-                                         progressive.Composition.ChildFailedJobCount > 0u
-                                     ? ProgressiveReadinessState::Failed
-                                     : (progressive.Composition.ChildPendingSlotCount > 0u ||
-                                                progressive.Composition.ChildActiveJobCount > 0u
-                                            ? ProgressiveReadinessState::Pending
-                                            : ProgressiveReadinessState::Ready),
+                    .Readiness = presentation.Composition.ChildFailedSlotCount > 0u ||
+                                         presentation.Composition.ChildFailedJobCount > 0u
+                                     ? GeometryPresentationReadiness::Failed
+                                     : (presentation.Composition.ChildPendingSlotCount > 0u ||
+                                                presentation.Composition.ChildActiveJobCount > 0u
+                                            ? GeometryPresentationReadiness::Pending
+                                            : GeometryPresentationReadiness::Ready),
                     .Enabled = true,
                     .SourceDescription =
-                        "children:" + std::to_string(progressive.Composition.ChildCount),
+                        "children:" + std::to_string(presentation.Composition.ChildCount),
                 });
             }
 
-            if (!progressive.HasBindings)
+            if (!presentation.HasRecipe)
             {
                 model.Rows.push_back(SandboxEditorBoundRenderStateRow{
                     .Kind = SandboxEditorBoundRenderStateRowKind::DisabledCommand,
-                    .Label = "Progressive bindings",
-                    .Readiness = ProgressiveReadinessState::Unsupported,
+                    .Label = "Geometry presentation",
+                    .Readiness = GeometryPresentationReadiness::Unsupported,
                     .Enabled = false,
                     .DisabledReason =
-                        "selected entity has no progressive presentation bindings",
+                        "selected entity has no geometry-presentation recipe",
                 });
             }
 
@@ -3651,7 +3734,7 @@ namespace Extrinsic::Runtime
                 model.Rows.push_back(SandboxEditorBoundRenderStateRow{
                     .Kind = SandboxEditorBoundRenderStateRowKind::DisabledCommand,
                     .Label = "Texture bake",
-                    .Readiness = ProgressiveReadinessState::Unsupported,
+                    .Readiness = GeometryPresentationReadiness::Unsupported,
                     .Enabled = false,
                     .DisabledReason =
                         "texture baking is available for mesh surface slots only",
@@ -4267,7 +4350,7 @@ namespace Extrinsic::Runtime
             return bindings != nullptr ? bindings->BindingGeneration : 0u;
         }
 
-        [[nodiscard]] std::uint64_t ProgressiveBindingGenerationForEntity(
+        [[nodiscard]] std::uint64_t GeometryPresentationRecipeGenerationForEntity(
             const entt::registry& raw,
             const ECS::EntityHandle entity,
             const SandboxEditorSelectedModelCacheSection section)
@@ -4277,9 +4360,9 @@ namespace Extrinsic::Runtime
             {
                 return 0u;
             }
-            const auto* bindings =
-                raw.try_get<ProgressivePresentationBindings>(entity);
-            return bindings != nullptr ? bindings->BindingGeneration : 0u;
+            const auto* state =
+                raw.try_get<GeometryPresentationRuntimeState>(entity);
+            return state != nullptr ? state->RecipeGeneration : 0u;
         }
 
         constexpr std::uint64_t kSandboxEditorSignatureOffset =
@@ -4613,8 +4696,8 @@ namespace Extrinsic::Runtime
                         section,
                         visualizationTarget),
                 .BindingGeneration = VertexBindingGenerationForEntity(raw, entity),
-                .ProgressiveBindingGeneration =
-                    ProgressiveBindingGenerationForEntity(raw, entity, section),
+                .GeometryPresentationRecipeGeneration =
+                    GeometryPresentationRecipeGenerationForEntity(raw, entity, section),
                 .DerivedJobStateSignature = DerivedJobStateSignatureForEntity(
                     context,
                     stableId,
@@ -4693,13 +4776,13 @@ namespace Extrinsic::Runtime
             SandboxEditorSelectedAnalysisModel model{};
             model.PropertyCatalog =
                 BuildPropertyCatalogModel(context, raw, entity);
-            model.Progressive =
-                BuildProgressiveRenderDataModel(context, raw, entity);
+            model.GeometryPresentation =
+                BuildGeometryPresentationModel(context, raw, entity);
             model.BoundState =
                 BuildBoundRenderStateModel(
                     context,
                     model.PropertyCatalog,
-                    model.Progressive,
+                    model.GeometryPresentation,
                     renderHints,
                     geometry,
                     stableId);
@@ -6827,7 +6910,7 @@ namespace Extrinsic::Runtime
             return SandboxEditorJobIdentity{
                 .EntityId = state.StableEntityId,
                 .Scope = SandboxEditorJobScope::PointCloudPoint,
-                .OutputSemantic = ProgressiveSlotSemantic::Displacement,
+                .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
                 .OutputName = "point_cloud_outlier_removal",
             };
         }
@@ -7632,7 +7715,7 @@ namespace Extrinsic::Runtime
                 .EntityId = state.StableEntityId,
                 .Scope = ToSandboxEditorJobScope(
                     VertexNormalsCpuJobDomain(state.Kind)),
-                .OutputSemantic = ProgressiveSlotSemantic::Normal,
+                .OutputSemantic = GeometryPresentationSlotSemantic::Normal,
                 .OutputName = VertexNormalsCpuJobOutputName(state.Kind),
             };
         }
@@ -7939,20 +8022,20 @@ namespace Extrinsic::Runtime
             return "mesh_processing";
         }
 
-        [[nodiscard]] ProgressiveSlotSemantic MeshCpuJobOutputSemantic(
+        [[nodiscard]] GeometryPresentationSlotSemantic MeshCpuJobOutputSemantic(
             const SandboxEditorMeshCpuJobKind kind) noexcept
         {
             switch (kind)
             {
             case SandboxEditorMeshCpuJobKind::Curvature:
-                return ProgressiveSlotSemantic::ScalarField;
+                return GeometryPresentationSlotSemantic::ScalarField;
             case SandboxEditorMeshCpuJobKind::Denoise:
             case SandboxEditorMeshCpuJobKind::Remesh:
             case SandboxEditorMeshCpuJobKind::Subdivide:
             case SandboxEditorMeshCpuJobKind::Simplify:
-                return ProgressiveSlotSemantic::Displacement;
+                return GeometryPresentationSlotSemantic::Displacement;
             }
-            return ProgressiveSlotSemantic::Displacement;
+            return GeometryPresentationSlotSemantic::Displacement;
         }
 
         void CopyMeshSimplifyAuxiliaryProperties(
@@ -9526,7 +9609,7 @@ namespace Extrinsic::Runtime
             return SandboxEditorJobIdentity{
                 .EntityId = state.SourceStableEntityId,
                 .Scope = SandboxEditorJobScope::PointCloudPoint,
-                .OutputSemantic = ProgressiveSlotSemantic::Displacement,
+                .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
                 .OutputName = "registration_transform",
             };
         }
@@ -9983,7 +10066,7 @@ namespace Extrinsic::Runtime
                     model.Geometry,
                     model.Entity.StableEntityId);
             model.PropertyCatalog = std::move(selectedAnalysis.PropertyCatalog);
-            model.Progressive = std::move(selectedAnalysis.Progressive);
+            model.GeometryPresentation = std::move(selectedAnalysis.GeometryPresentation);
             model.BoundState = std::move(selectedAnalysis.BoundState);
             model.TextureBake = std::move(selectedAnalysis.TextureBake);
             model.Processing =
@@ -12120,8 +12203,8 @@ namespace Extrinsic::Runtime
         {
         case Kind::RenderHint:
             return "RenderHint";
-        case Kind::ProgressiveSlot:
-            return "ProgressiveSlot";
+        case Kind::GeometryPresentationSlot:
+            return "GeometryPresentationSlot";
         case Kind::DerivedJob:
             return "DerivedJob";
         case Kind::CompositionSummary:
@@ -13621,9 +13704,9 @@ namespace Extrinsic::Runtime
         return SandboxEditorCommandStatus::Applied;
     }
 
-    SandboxEditorCommandStatus ApplySandboxEditorProgressiveSlotDefaultCommand(
+    SandboxEditorCommandStatus ApplySandboxEditorGeometryPresentationSlotDefaultCommand(
         const SandboxEditorContext& context,
-        const SandboxEditorProgressiveSlotDefaultCommand& command)
+        const SandboxEditorGeometryPresentationSlotDefaultCommand& command)
     {
         if (context.Scene == nullptr)
             return SandboxEditorCommandStatus::MissingScene;
@@ -13637,56 +13720,65 @@ namespace Extrinsic::Runtime
             return SandboxEditorCommandStatus::StaleEntity;
 
         const auto* current =
-            raw.try_get<ProgressivePresentationBindings>(entity);
+            raw.try_get<GeometryPresentationRecipe>(entity);
         if (current == nullptr)
             return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
 
-        ProgressivePresentationBindings before = *current;
-        ProgressivePresentationBindings after = before;
-        const ProgressiveSlotLookup lookup = FindMutableProgressiveSlot(
-            after,
+        const auto* currentRuntime =
+            raw.try_get<GeometryPresentationRuntimeState>(entity);
+        GeometryPresentationEditorState before{
+            .Recipe = *current,
+            .Runtime = currentRuntime != nullptr
+                ? *currentRuntime
+                : GeometryPresentationRuntimeState{},
+        };
+        GeometryPresentationEditorState after = before;
+        const GeometryPresentationSlotLookup lookup = FindMutableGeometryPresentationSlot(
+            after.Recipe,
             command.PresentationKey,
             command.Semantic);
-        if (lookup.Slot == nullptr)
+        if (lookup.Presentation == nullptr || lookup.Slot == nullptr)
             return SandboxEditorCommandStatus::InvalidVisualizationProperty;
 
-        ProgressiveSlotBinding& slot = *lookup.Slot;
-        if (slot.SourceKind == ProgressiveSlotSourceKind::UniformDefault &&
+        GeometryPresentationSlotRecipe& slot = *lookup.Slot;
+        if (slot.SourceKind == GeometryPresentationSourceKind::UniformDefault &&
             slot.Enabled == command.Enabled &&
-            SameProgressiveDefaultValue(slot.UniformDefault, command.Value))
+            SameGeometryPresentationDefaultValue(slot.UniformDefault, command.Value))
         {
             return SandboxEditorCommandStatus::NoChange;
         }
 
-        slot.SourceKind = ProgressiveSlotSourceKind::UniformDefault;
+        slot.SourceKind = GeometryPresentationSourceKind::UniformDefault;
         slot.UniformDefault = command.Value;
         slot.Property = {};
-        slot.AuthoredTexture = {};
-        slot.GeneratedTexture = {};
+        slot.TextureAsset = {};
         slot.GeneratedPolicy =
-            DefaultGeneratedOutputPolicyFor(slot.SourceKind);
-        slot.Provenance = ProgressiveGeneratedOutputProvenance::UniformDefault;
-        slot.Readiness = ProgressiveReadinessState::DefaultValue;
-        slot.LastDiagnostic.clear();
+            DefaultGeometryGeneratedOutputPolicyFor(slot.SourceKind);
         slot.Enabled = command.Enabled;
-        ++after.BindingGeneration;
+        ResetGeometryPresentationSlotStatus(
+            after.Runtime,
+            lookup.Presentation->Key,
+            slot.Semantic,
+            GeometryPresentationReadiness::DefaultValue,
+            GeometryPresentationProvenance::UniformDefault);
+        ++after.Runtime.RecipeGeneration;
 
         return InvalidateSelectedModelCacheIfApplied(
             context,
-            CommitProgressiveBindingsChange(
+            CommitGeometryPresentationChange(
                 context,
                 command.StableEntityId,
                 std::move(before),
                 std::move(after)));
     }
 
-    SandboxEditorCommandStatus ApplySandboxEditorProgressiveSlotPropertyCommand(
+    SandboxEditorCommandStatus ApplySandboxEditorGeometryPresentationSlotPropertyCommand(
         const SandboxEditorContext& context,
-        const SandboxEditorProgressiveSlotPropertyCommand& command)
+        const SandboxEditorGeometryPresentationSlotPropertyCommand& command)
     {
         if (context.Scene == nullptr)
             return SandboxEditorCommandStatus::MissingScene;
-        if (!PropertySourceKindAllowedForProgressiveSlotCommand(command.SourceKind) ||
+        if (!PropertySourceKindAllowedForGeometryPresentationSlotCommand(command.SourceKind) ||
             command.PropertyName.empty())
         {
             return SandboxEditorCommandStatus::InvalidVisualizationProperty;
@@ -13699,66 +13791,79 @@ namespace Extrinsic::Runtime
             return SandboxEditorCommandStatus::StaleEntity;
 
         const auto* current =
-            raw.try_get<ProgressivePresentationBindings>(entity);
+            raw.try_get<GeometryPresentationRecipe>(entity);
         if (current == nullptr)
             return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
 
         const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        const GeometryEntityAvailability availability =
+            BuildGeometryAvailability(view);
         const std::size_t expectedCount =
-            ResolvePropertyElementCount(view, command.Domain);
-        ProgressivePropertyBindingDescriptor descriptor{
+            ResolveGeometryElementCount(availability, command.Domain);
+        GeometryPropertyRef descriptor{
             .Domain = command.Domain,
-            .PropertyName = command.PropertyName,
-            .ExpectedValueKind = command.ExpectedValueKind,
-            .ExpectedElementCount = expectedCount,
+            .Name = command.PropertyName,
+            .ValueKind = command.ExpectedValueKind.value_or(
+                Geometry::PropertyValueKind::Unknown),
         };
-        ProgressivePropertyResolution resolution =
-            ResolvePropertyBinding(view, descriptor);
-        if (!resolution.Compatible())
+        GeometryPropertyResolution resolution =
+            ResolveGeometryProperty(
+                availability,
+                descriptor,
+                expectedCount);
+        if (!resolution.Resolved())
             return SandboxEditorCommandStatus::InvalidVisualizationProperty;
+        descriptor.ValueKind = resolution.ResolvedValueKind;
 
-        ProgressivePresentationBindings before = *current;
-        ProgressivePresentationBindings after = before;
-        const ProgressiveSlotLookup lookup = FindMutableProgressiveSlot(
-            after,
+        const auto* currentRuntime =
+            raw.try_get<GeometryPresentationRuntimeState>(entity);
+        GeometryPresentationEditorState before{
+            .Recipe = *current,
+            .Runtime = currentRuntime != nullptr
+                ? *currentRuntime
+                : GeometryPresentationRuntimeState{},
+        };
+        GeometryPresentationEditorState after = before;
+        const GeometryPresentationSlotLookup lookup = FindMutableGeometryPresentationSlot(
+            after.Recipe,
             command.PresentationKey,
             command.Semantic);
-        if (lookup.Slot == nullptr)
+        if (lookup.Presentation == nullptr || lookup.Slot == nullptr)
             return SandboxEditorCommandStatus::InvalidVisualizationProperty;
 
-        ProgressiveSlotBinding& slot = *lookup.Slot;
-        const ProgressiveReadinessState nextReadiness =
-            command.SourceKind == ProgressiveSlotSourceKind::PropertyBuffer
-                ? ProgressiveReadinessState::Ready
-                : ProgressiveReadinessState::Pending;
-        const ProgressiveGeneratedOutputProvenance nextProvenance =
-            command.SourceKind == ProgressiveSlotSourceKind::PropertyBuffer
-                ? ProgressiveGeneratedOutputProvenance::PropertyBuffer
-                : ProgressiveGeneratedOutputProvenance::PropertyBinding;
+        GeometryPresentationSlotRecipe& slot = *lookup.Slot;
+        const GeometryPresentationReadiness nextReadiness =
+            command.SourceKind == GeometryPresentationSourceKind::PropertyBuffer
+                ? GeometryPresentationReadiness::Ready
+                : GeometryPresentationReadiness::Pending;
+        const GeometryPresentationProvenance nextProvenance =
+            command.SourceKind == GeometryPresentationSourceKind::PropertyBuffer
+                ? GeometryPresentationProvenance::PropertyBuffer
+                : GeometryPresentationProvenance::PropertyBinding;
 
-        if (slot.SourceKind == command.SourceKind &&
-            slot.Enabled &&
-            slot.Readiness == nextReadiness &&
-            SameProgressivePropertyDescriptor(slot.Property, descriptor))
+        if (slot.SourceKind == command.SourceKind && slot.Enabled &&
+            SameGeometryPresentationPropertyDescriptor(slot.Property, descriptor))
         {
             return SandboxEditorCommandStatus::NoChange;
         }
 
         slot.SourceKind = command.SourceKind;
         slot.Property = std::move(descriptor);
-        slot.AuthoredTexture = {};
-        slot.GeneratedTexture = {};
+        slot.TextureAsset = {};
         slot.GeneratedPolicy =
-            DefaultGeneratedOutputPolicyFor(slot.SourceKind);
-        slot.Provenance = nextProvenance;
-        slot.Readiness = nextReadiness;
-        slot.LastDiagnostic.clear();
+            DefaultGeometryGeneratedOutputPolicyFor(slot.SourceKind);
         slot.Enabled = true;
-        ++after.BindingGeneration;
+        ResetGeometryPresentationSlotStatus(
+            after.Runtime,
+            lookup.Presentation->Key,
+            slot.Semantic,
+            nextReadiness,
+            nextProvenance);
+        ++after.Runtime.RecipeGeneration;
 
         return InvalidateSelectedModelCacheIfApplied(
             context,
-            CommitProgressiveBindingsChange(
+            CommitGeometryPresentationChange(
                 context,
                 command.StableEntityId,
                 std::move(before),
@@ -13863,7 +13968,7 @@ namespace Extrinsic::Runtime
             case SelectedMeshTextureBakeStatus::Success:
             case SelectedMeshTextureBakeStatus::Scheduled:
             case SelectedMeshTextureBakeStatus::NonOperationalBackend:
-            case SelectedMeshTextureBakeStatus::MissingProgressiveBindings:
+            case SelectedMeshTextureBakeStatus::MissingGeometryPresentationRecipe:
             case SelectedMeshTextureBakeStatus::MissingPresentation:
             case SelectedMeshTextureBakeStatus::MissingSlot:
             case SelectedMeshTextureBakeStatus::UnsupportedTargetSemantic:
@@ -14262,7 +14367,7 @@ namespace Extrinsic::Runtime
         return SandboxEditorJobIdentity{
             .EntityId = state.StableEntityId,
             .Scope = SandboxEditorJobScope::MeshSurface,
-            .OutputSemantic = ProgressiveSlotSemantic::Albedo,
+            .OutputSemantic = GeometryPresentationSlotSemantic::Albedo,
             .OutputName = std::string{kUvRegenerationJobOutputName},
         };
     }

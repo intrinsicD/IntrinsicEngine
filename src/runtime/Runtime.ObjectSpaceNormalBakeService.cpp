@@ -1621,7 +1621,7 @@ namespace Extrinsic::Runtime
                     case RuntimeObjectSpaceNormalBakeBindingStatus::
                         StaleGeometry:
                     case RuntimeObjectSpaceNormalBakeBindingStatus::
-                        StaleProgressiveState:
+                        StalePresentationState:
                         (void)Queue.Discard(
                             waiter.StaleKey);
                         work.Waiters.erase(

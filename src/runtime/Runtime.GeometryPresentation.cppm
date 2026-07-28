@@ -248,6 +248,9 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] bool TryParseGeometryPresentationShape(
         std::string_view value,
         GeometryPresentationShape& out) noexcept;
+    [[nodiscard]] bool TryParseGeometryRenderLane(
+        std::string_view value,
+        GeometryRenderLane& out) noexcept;
     [[nodiscard]] bool TryParseGeometryPresentationKind(
         std::string_view value,
         GeometryPresentationKind& out) noexcept;

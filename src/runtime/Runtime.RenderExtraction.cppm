@@ -277,18 +277,18 @@ export namespace Extrinsic::Runtime
         // fallback/default use, property-buffer availability, and material
         // texture binding attempts without exposing ECS/property pointers or GPU
         // handles to graphics snapshots.
-        std::uint32_t ProgressivePresentationEntityCount{0};
-        std::uint32_t ProgressivePresentationLaneCount{0};
-        std::uint32_t ProgressivePresentationSlotCount{0};
-        std::uint32_t ProgressiveDefaultSlotCount{0};
-        std::uint32_t ProgressiveReadyTextureSlotCount{0};
-        std::uint32_t ProgressivePropertyBufferReadyCount{0};
-        std::uint32_t ProgressivePendingSlotCount{0};
-        std::uint32_t ProgressiveUnsupportedSlotCount{0};
-        std::uint32_t ProgressivePreviousOutputRetainedCount{0};
-        std::uint32_t ProgressiveDiagnosticCount{0};
-        std::uint32_t ProgressiveMaterialTextureBindingResolveCount{0};
-        std::uint32_t ProgressiveMaterialTextureBindingResolveFailureCount{0};
+        std::uint32_t GeometryPresentationEntityCount{0};
+        std::uint32_t GeometryPresentationLaneCount{0};
+        std::uint32_t GeometryPresentationSlotCount{0};
+        std::uint32_t GeometryPresentationDefaultSlotCount{0};
+        std::uint32_t GeometryPresentationReadyTextureSlotCount{0};
+        std::uint32_t GeometryPresentationPropertyBufferReadyCount{0};
+        std::uint32_t GeometryPresentationPendingSlotCount{0};
+        std::uint32_t GeometryPresentationUnsupportedSlotCount{0};
+        std::uint32_t GeometryPresentationPreviousOutputRetainedCount{0};
+        std::uint32_t GeometryPresentationDiagnosticCount{0};
+        std::uint32_t GeometryPresentationMaterialTextureBindingResolveCount{0};
+        std::uint32_t GeometryPresentationMaterialTextureBindingResolveFailureCount{0};
     };
 
     // RUNTIME-188 — copied, world-tagged interaction data consumed by render

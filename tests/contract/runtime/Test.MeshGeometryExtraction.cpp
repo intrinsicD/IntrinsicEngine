@@ -33,7 +33,7 @@ import Extrinsic.RHI.TextureManager;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.SceneDocumentModule;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.Properties;
@@ -286,7 +286,7 @@ TEST(MeshGeometryExtraction, MaterialTextureBindingsResolveOntoExtractionMateria
     renderer->Shutdown();
 }
 
-TEST(MeshGeometryExtraction, ProgressivePresentationBindingsAreConsumedDuringExtraction)
+TEST(MeshGeometryExtraction, GeometryPresentationRecipeIsConsumedDuringExtraction)
 {
     Extrinsic::Tests::MockDevice device{};
     Extrinsic::RHI::BufferManager buffers{device};
@@ -317,28 +317,27 @@ TEST(MeshGeometryExtraction, ProgressivePresentationBindingsAreConsumedDuringExt
     const EntityHandle entity = MakeMeshRenderable(scene);
 
     namespace R = Extrinsic::Runtime;
-    R::ProgressiveSlotBinding albedo{};
-    albedo.Semantic = R::ProgressiveSlotSemantic::Albedo;
-    albedo.SourceKind = R::ProgressiveSlotSourceKind::UniformDefault;
+    R::GeometryPresentationSlotRecipe albedo{};
+    albedo.Semantic = R::GeometryPresentationSlotSemantic::Albedo;
+    albedo.SourceKind = R::GeometryPresentationSourceKind::UniformDefault;
     albedo.UniformDefault.Vector = {0.15f, 0.25f, 0.35f, 1.0f};
 
-    R::ProgressiveSlotBinding normal{};
-    normal.Semantic = R::ProgressiveSlotSemantic::Normal;
-    normal.SourceKind = R::ProgressiveSlotSourceKind::GeneratedTextureAsset;
-    normal.GeneratedTexture = generatedNormalAsset;
-    normal.Readiness = R::ProgressiveReadinessState::Ready;
+    R::GeometryPresentationSlotRecipe normal{};
+    normal.Semantic = R::GeometryPresentationSlotSemantic::Normal;
+    normal.SourceKind = R::GeometryPresentationSourceKind::GeneratedTextureAsset;
+    normal.TextureAsset = generatedNormalAsset;
 
-    scene.Raw().emplace_or_replace<R::ProgressivePresentationBindings>(
+    scene.Raw().emplace_or_replace<R::GeometryPresentationRecipe>(
         entity,
-        R::ProgressivePresentationBindings{
-            .Shape = R::ProgressiveEntityShape::MeshLeaf,
-            .Lanes = {R::ProgressiveRenderLaneBinding{
-                .Lane = R::ProgressiveRenderLane::Surface,
+        R::GeometryPresentationRecipe{
+            .Shape = R::GeometryPresentationShape::Mesh,
+            .Lanes = {R::GeometryPresentationLaneRecipe{
+                .Lane = R::GeometryRenderLane::Surface,
                 .PresentationKey = "mesh.surface",
             }},
-            .Presentations = {R::ProgressivePresentationBinding{
+            .Presentations = {R::GeometryPresentationBindingRecipe{
                 .Key = "mesh.surface",
-                .Kind = R::ProgressivePresentationKind::SurfaceMaterial,
+                .Kind = R::GeometryPresentationKind::SurfaceMaterial,
                 .Slots = {albedo, normal},
             }},
         });
@@ -346,13 +345,13 @@ TEST(MeshGeometryExtraction, ProgressivePresentationBindingsAreConsumedDuringExt
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene, *renderer, &cache);
 
-    EXPECT_EQ(stats.ProgressivePresentationEntityCount, 1u);
-    EXPECT_EQ(stats.ProgressivePresentationLaneCount, 1u);
-    EXPECT_EQ(stats.ProgressivePresentationSlotCount, 2u);
-    EXPECT_EQ(stats.ProgressiveDefaultSlotCount, 1u);
-    EXPECT_EQ(stats.ProgressiveReadyTextureSlotCount, 1u);
-    EXPECT_EQ(stats.ProgressiveMaterialTextureBindingResolveCount, 1u);
-    EXPECT_EQ(stats.ProgressiveMaterialTextureBindingResolveFailureCount, 0u);
+    EXPECT_EQ(stats.GeometryPresentationEntityCount, 1u);
+    EXPECT_EQ(stats.GeometryPresentationLaneCount, 1u);
+    EXPECT_EQ(stats.GeometryPresentationSlotCount, 2u);
+    EXPECT_EQ(stats.GeometryPresentationDefaultSlotCount, 1u);
+    EXPECT_EQ(stats.GeometryPresentationReadyTextureSlotCount, 1u);
+    EXPECT_EQ(stats.GeometryPresentationMaterialTextureBindingResolveCount, 1u);
+    EXPECT_EQ(stats.GeometryPresentationMaterialTextureBindingResolveFailureCount, 0u);
 
     const auto sidecar = extraction.FindRenderableSidecarForTest(
         Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
@@ -369,7 +368,7 @@ TEST(MeshGeometryExtraction, ProgressivePresentationBindingsAreConsumedDuringExt
     renderer->Shutdown();
 }
 
-TEST(MeshGeometryExtraction, ProgressiveGeneratedPropertyTexturesBindUniqueMaterialSlots)
+TEST(MeshGeometryExtraction, GeneratedGeometryPresentationTexturesBindUniqueMaterialSlots)
 {
     Extrinsic::Tests::MockDevice device{};
     Extrinsic::RHI::BufferManager buffers{device};
@@ -410,35 +409,32 @@ TEST(MeshGeometryExtraction, ProgressiveGeneratedPropertyTexturesBindUniqueMater
     const EntityHandle entity = MakeMeshRenderable(scene);
 
     namespace R = Extrinsic::Runtime;
-    R::ProgressiveSlotBinding albedo{};
-    albedo.Semantic = R::ProgressiveSlotSemantic::Albedo;
-    albedo.SourceKind = R::ProgressiveSlotSourceKind::GeneratedTextureAsset;
-    albedo.GeneratedTexture = albedoAsset;
-    albedo.Readiness = R::ProgressiveReadinessState::Ready;
+    R::GeometryPresentationSlotRecipe albedo{};
+    albedo.Semantic = R::GeometryPresentationSlotSemantic::Albedo;
+    albedo.SourceKind = R::GeometryPresentationSourceKind::GeneratedTextureAsset;
+    albedo.TextureAsset = albedoAsset;
 
-    R::ProgressiveSlotBinding normal{};
-    normal.Semantic = R::ProgressiveSlotSemantic::Normal;
-    normal.SourceKind = R::ProgressiveSlotSourceKind::GeneratedTextureAsset;
-    normal.GeneratedTexture = normalAsset;
-    normal.Readiness = R::ProgressiveReadinessState::Ready;
+    R::GeometryPresentationSlotRecipe normal{};
+    normal.Semantic = R::GeometryPresentationSlotSemantic::Normal;
+    normal.SourceKind = R::GeometryPresentationSourceKind::GeneratedTextureAsset;
+    normal.TextureAsset = normalAsset;
 
-    R::ProgressiveSlotBinding roughness{};
-    roughness.Semantic = R::ProgressiveSlotSemantic::Roughness;
-    roughness.SourceKind = R::ProgressiveSlotSourceKind::GeneratedTextureAsset;
-    roughness.GeneratedTexture = roughnessAsset;
-    roughness.Readiness = R::ProgressiveReadinessState::Ready;
+    R::GeometryPresentationSlotRecipe roughness{};
+    roughness.Semantic = R::GeometryPresentationSlotSemantic::Roughness;
+    roughness.SourceKind = R::GeometryPresentationSourceKind::GeneratedTextureAsset;
+    roughness.TextureAsset = roughnessAsset;
 
-    scene.Raw().emplace_or_replace<R::ProgressivePresentationBindings>(
+    scene.Raw().emplace_or_replace<R::GeometryPresentationRecipe>(
         entity,
-        R::ProgressivePresentationBindings{
-            .Shape = R::ProgressiveEntityShape::MeshLeaf,
-            .Lanes = {R::ProgressiveRenderLaneBinding{
-                .Lane = R::ProgressiveRenderLane::Surface,
+        R::GeometryPresentationRecipe{
+            .Shape = R::GeometryPresentationShape::Mesh,
+            .Lanes = {R::GeometryPresentationLaneRecipe{
+                .Lane = R::GeometryRenderLane::Surface,
                 .PresentationKey = "mesh.surface",
             }},
-            .Presentations = {R::ProgressivePresentationBinding{
+            .Presentations = {R::GeometryPresentationBindingRecipe{
                 .Key = "mesh.surface",
-                .Kind = R::ProgressivePresentationKind::SurfaceMaterial,
+                .Kind = R::GeometryPresentationKind::SurfaceMaterial,
                 .Slots = {albedo, normal, roughness},
             }},
         });
@@ -446,12 +442,12 @@ TEST(MeshGeometryExtraction, ProgressiveGeneratedPropertyTexturesBindUniqueMater
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene, *renderer, &cache);
 
-    EXPECT_EQ(stats.ProgressivePresentationEntityCount, 1u);
-    EXPECT_EQ(stats.ProgressivePresentationLaneCount, 1u);
-    EXPECT_EQ(stats.ProgressivePresentationSlotCount, 3u);
-    EXPECT_EQ(stats.ProgressiveReadyTextureSlotCount, 3u);
-    EXPECT_EQ(stats.ProgressiveMaterialTextureBindingResolveCount, 1u);
-    EXPECT_EQ(stats.ProgressiveMaterialTextureBindingResolveFailureCount, 0u);
+    EXPECT_EQ(stats.GeometryPresentationEntityCount, 1u);
+    EXPECT_EQ(stats.GeometryPresentationLaneCount, 1u);
+    EXPECT_EQ(stats.GeometryPresentationSlotCount, 3u);
+    EXPECT_EQ(stats.GeometryPresentationReadyTextureSlotCount, 3u);
+    EXPECT_EQ(stats.GeometryPresentationMaterialTextureBindingResolveCount, 1u);
+    EXPECT_EQ(stats.GeometryPresentationMaterialTextureBindingResolveFailureCount, 0u);
 
     const auto sidecar = extraction.FindRenderableSidecarForTest(
         Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));

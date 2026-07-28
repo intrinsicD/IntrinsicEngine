@@ -8,6 +8,11 @@ maturity_target: Retired
 
 ## Status
 
+- Retired on 2026-07-28 at `Retired` after Slices A-C replaced the two
+  progressive-named general modules with one authored recipe, one runtime-only
+  state sidecar, and one copied extraction snapshot across every production
+  consumer.
+- Retirement commit reference: this commit plus Slice A commit `3bff6369`.
 - Promoted to active on 2026-07-28 after `RUNTIME-192` retired the duplicate
   property vocabularies and left `GeometryPropertyRef` as the canonical stable
   property identity.
@@ -27,9 +32,20 @@ maturity_target: Retired
   mesh/graph/point-cloud/procedural/property-option/legacy-spelling contracts
   passed 5/5. The old
   modules remain until Slice B migrates real workflows.
-- Slice B is next: migrate scene persistence and every runtime/app consumer to
-  the recipe plus status sidecar before any progressive-named surface is
-  removed.
+- Slices B/C completed on 2026-07-28. Scene documents now write only authored
+  `GeometryPresentationRecipe` values under `geometryPresentation`, accept the
+  legacy `progressiveRenderData` key on read, and initialize a fresh runtime
+  sidecar. Render extraction, asset/model handoff, selected texture baking,
+  object-space normal completion, Sandbox models/commands, and the promoted
+  Vulkan acceptance fixture all use the recipe/state/snapshot path. The old
+  modules, component/snapshot symbols, CMake entries, and dedicated tests are
+  deleted. Focused CPU coverage passed 118/118 plus the structural absence
+  ratchet 1/1; the complete CPU-supported selector passed 4,214 cases with one
+  expected GLFW/LSan self-skip; and the ASan+UBSan promoted-Vulkan presentation
+  smoke passed 1/1 on an NVIDIA GeForce RTX 3050 with driver 590.48.01. Strict
+  layering, test-layout, task-policy, docs-link, root-hygiene, ARA, whitespace,
+  and the 381-module generated inventory checks are clean. ARA C12 binds the
+  CPU/Vulkan capability scope and makes no performance claim.
 
 ## Goal
 
@@ -102,43 +118,43 @@ maturity_target: Retired
       operational readiness.
 - [x] Add one copied `GeometryPresentationSnapshot` for effective state,
       readiness, fallback, diagnostics, and exact generations.
-- [ ] Project the recipe into renderer snapshots through pure/runtime-owned
+- [x] Project the recipe into renderer snapshots through pure/runtime-owned
       extraction functions and the existing render-world submission boundary.
-- [ ] Migrate scene save/load, selected-entity models, generated-texture result
+- [x] Migrate scene save/load, selected-entity models, generated-texture result
       processing, material source selection, and mesh/graph/point-cloud/
       procedural extraction to the new vocabulary.
-- [ ] Preserve stale-generation rejection, fallback behavior, per-renderable
+- [x] Preserve stale-generation rejection, fallback behavior, per-renderable
       material isolation, and scene round-trip compatibility.
-- [ ] Delete `Runtime.ProgressiveRenderData`,
+- [x] Delete `Runtime.ProgressiveRenderData`,
       `Runtime.ProgressivePresentationExtraction`, old component/binding names,
       compatibility aliases, and duplicate production branches only after
       parity and round-trip coverage passes.
 
 ## Tests
 
-- [ ] Round-trip tests prove only desired authoring state is serialized and
+- [x] Round-trip tests prove only desired authoring state is serialized and
       runtime-only readiness/handles never persist.
-- [ ] Domain matrix tests prove mesh, graph, point-cloud, and procedural
+- [x] Domain matrix tests prove mesh, graph, point-cloud, and procedural
       presentation projects through the same recipe path.
-- [ ] Generation/fallback tests cover stale properties, generated assets,
+- [x] Generation/fallback tests cover stale properties, generated assets,
       per-renderable material isolation, and scene reload.
-- [ ] Structural tests prove no production import or old progressive
+- [x] Structural tests prove no production import or old progressive
       presentation symbol remains after cleanup.
 
 ## Docs
 
-- [ ] Update runtime, scene-serialization, and renderer extraction docs with
+- [x] Update runtime, scene-serialization, and renderer extraction docs with
       the recipe/snapshot ownership split.
-- [ ] Update migration references and regenerate the module inventory.
-- [ ] Refresh task indexes, session brief, and retirement records.
+- [x] Update migration references and regenerate the module inventory.
+- [x] Refresh task indexes, session brief, and retirement records.
 
 ## Acceptance criteria
 
-- [ ] One geometry-presentation recipe expresses desired source/material/
+- [x] One geometry-presentation recipe expresses desired source/material/
       visualization state for every supported geometry domain.
-- [ ] Runtime status remains copied and generation-qualified; graphics consumes
+- [x] Runtime status remains copied and generation-qualified; graphics consumes
       snapshots only.
-- [ ] The progressive-named general modules and compatibility path are deleted
+- [x] The progressive-named general modules and compatibility path are deleted
       after every workflow uses the new recipe.
 
 ## Verification
@@ -164,3 +180,18 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 - Target: `Retired`; closure requires production migration, round-trip and
   extraction parity, and removal of the old public modules.
+
+## Clean-workshop review
+
+- Rows 1-2: **pass** — strict module/CMake layering is clean and the migration
+  removes two public modules without introducing another dependency edge.
+- Row 3: **pass** — graphics receives only the copied
+  `GeometryPresentationSnapshot`; recipe, runtime status, ECS, job, and live
+  asset-service ownership remain in runtime.
+- Rows 4-6: **n/a** — no renderer member, frame-graph pass, or recipe pass-order
+  edge changed.
+- Row 7: **pass** — CPU contracts and an operational ASan+UBSan Vulkan frame
+  prove the promoted path before the old modules are deleted.
+- Row 8: **pass** — only the legacy scene wire key remains read-compatible;
+  there is no source/API forwarding shim, allowlist entry, or temporary
+  exception.

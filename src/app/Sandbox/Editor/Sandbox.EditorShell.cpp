@@ -25,8 +25,7 @@ import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
-import Extrinsic.Runtime.ProgressivePresentationExtraction;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
@@ -62,13 +61,13 @@ namespace Extrinsic::Sandbox::Editor
         inline constexpr VisualizationColorSource kScalarFieldSource =
             static_cast<VisualizationColorSource>(2);
 
-        inline constexpr std::array<ProgressiveSlotSemantic, 5>
+        inline constexpr std::array<GeometryPresentationSlotSemantic, 5>
             kTextureBakeTargetSemantics{{
-                ProgressiveSlotSemantic::Albedo,
-                ProgressiveSlotSemantic::Normal,
-                ProgressiveSlotSemantic::Roughness,
-                ProgressiveSlotSemantic::Metallic,
-                ProgressiveSlotSemantic::ScalarField,
+                GeometryPresentationSlotSemantic::Albedo,
+                GeometryPresentationSlotSemantic::Normal,
+                GeometryPresentationSlotSemantic::Roughness,
+                GeometryPresentationSlotSemantic::Metallic,
+                GeometryPresentationSlotSemantic::ScalarField,
             }};
 
         inline constexpr std::array<MeshAttributeTextureBakeEncoder, 8>
@@ -580,7 +579,7 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("Rows: %zu generation=%llu",
                         bound.Rows.size(),
                         static_cast<unsigned long long>(
-                            bound.BindingGeneration));
+                            bound.RecipeGeneration));
             if (bound.Rows.empty())
             {
                 ImGui::TextDisabled("No bound render state rows.");
@@ -627,10 +626,10 @@ namespace Extrinsic::Sandbox::Editor
                     ImGui::TableSetColumnIndex(4);
                     ImGui::TextUnformatted(readinessText.c_str());
                     ImGui::TableSetColumnIndex(5);
-                    if (!row.Property.PropertyName.empty())
+                    if (!row.Property.Name.empty())
                     {
                         ImGui::Text("%s%s",
-                                    row.Property.PropertyName.c_str(),
+                                    row.Property.Name.c_str(),
                                     row.HasCatalogMatch ? " catalog" : "");
                     }
                     else
@@ -674,7 +673,7 @@ namespace Extrinsic::Sandbox::Editor
         {
             if (uv.UvRegenerationJob.has_value())
             {
-                const SandboxEditorProgressiveJobModel& job =
+                const SandboxEditorJobModel& job =
                     *uv.UvRegenerationJob;
                 ImGui::Text("UV job: %s %.0f%%",
                             std::string(ToString(job.Status)).c_str(),
@@ -905,7 +904,7 @@ namespace Extrinsic::Sandbox::Editor
 
             const auto targetCompatible =
                 [selectedSource, storageIndex, encoderIndex, colormapIndex](
-                    const ProgressiveSlotSemantic semantic)
+                    const GeometryPresentationSlotSemantic semantic)
                 {
                     if (selectedSource == nullptr)
                         return false;
@@ -986,7 +985,7 @@ namespace Extrinsic::Sandbox::Editor
                 static_cast<int>(kColormapNames.size()));
 
             const auto makeConsumer =
-                [colormapIndex](const ProgressiveSlotSemantic semantic)
+                [colormapIndex](const GeometryPresentationSlotSemantic semantic)
                 {
                     return BakedPropertyTextureConsumer{
                         .PresentationKey = "mesh.surface",
@@ -1043,7 +1042,7 @@ namespace Extrinsic::Sandbox::Editor
             {
                 if (i == static_cast<std::size_t>(semanticIndex))
                     continue;
-                const ProgressiveSlotSemantic semantic =
+                const GeometryPresentationSlotSemantic semantic =
                     kTextureBakeTargetSemantics[i];
                 const std::uint32_t bit =
                     1u << static_cast<std::uint32_t>(i);
@@ -1094,7 +1093,7 @@ namespace Extrinsic::Sandbox::Editor
                 consumers,
                 [](const BakedPropertyTextureConsumer& consumer)
                 {
-                    return consumer.Semantic == ProgressiveSlotSemantic::Normal;
+                    return consumer.Semantic == GeometryPresentationSlotSemantic::Normal;
                 });
             if (hasNormalConsumer)
             {
@@ -1262,7 +1261,7 @@ namespace Extrinsic::Sandbox::Editor
                          i < kTextureBakeTargetSemantics.size();
                          ++i)
                     {
-                        const ProgressiveSlotSemantic semantic =
+                        const GeometryPresentationSlotSemantic semantic =
                             kTextureBakeTargetSemantics[i];
                         const auto found = std::find_if(
                             nextConsumers.begin(),
@@ -1330,9 +1329,9 @@ namespace Extrinsic::Sandbox::Editor
                              nextConsumers)
                         {
                             if (consumer.Semantic ==
-                                    ProgressiveSlotSemantic::Albedo ||
+                                    GeometryPresentationSlotSemantic::Albedo ||
                                 consumer.Semantic ==
-                                    ProgressiveSlotSemantic::ScalarField)
+                                    GeometryPresentationSlotSemantic::ScalarField)
                             {
                                 recordColormap =
                                     static_cast<int>(consumer.Colormap);
@@ -1354,9 +1353,9 @@ namespace Extrinsic::Sandbox::Editor
                                  nextConsumers)
                             {
                                 if (consumer.Semantic ==
-                                        ProgressiveSlotSemantic::Albedo ||
+                                        GeometryPresentationSlotSemantic::Albedo ||
                                     consumer.Semantic ==
-                                        ProgressiveSlotSemantic::ScalarField)
+                                        GeometryPresentationSlotSemantic::ScalarField)
                                 {
                                     consumer.Colormap =
                                         static_cast<ColormapType>(
@@ -2257,39 +2256,39 @@ namespace Extrinsic::Sandbox::Editor
                                           DebugNameForGeometryPropertyValueKind(
                                               row.ValueKind));
                     }
-                    const SandboxEditorProgressiveRenderDataModel& progressive =
-                        inspector.Progressive;
+                    const SandboxEditorGeometryPresentationModel& presentation =
+                        inspector.GeometryPresentation;
                     DrawBoundRenderStateRows(inspector.BoundState);
                     DrawTextureBakeControls(inspector.TextureBake, context, textureBakeState);
-                    ImGui::SeparatorText("Progressive render data");
+                    ImGui::SeparatorText("Geometry presentation");
                     ImGui::Text("Shape: %s",
-                                std::string(ToString(progressive.Shape)).c_str());
-                    ImGui::Text("Bindings: %s generation=%llu",
-                                progressive.HasBindings ? "yes" : "no",
+                                std::string(ToString(presentation.Shape)).c_str());
+                    ImGui::Text("Recipe: %s generation=%llu",
+                                presentation.HasRecipe ? "yes" : "no",
                                 static_cast<unsigned long long>(
-                                    progressive.BindingGeneration));
-                    if (progressive.Composition.HasChildren)
+                                    presentation.RecipeGeneration));
+                    if (presentation.Composition.HasChildren)
                     {
                         ImGui::Text("Composition: children=%u bindings=%u slots=%u pending=%u "
                                     "failed=%u jobs=%u active=%u job failures=%u",
-                                    progressive.Composition.ChildCount,
-                                    progressive.Composition.ChildBindingsCount,
-                                    progressive.Composition.ChildSlotCount,
-                                    progressive.Composition.ChildPendingSlotCount,
-                                    progressive.Composition.ChildFailedSlotCount,
-                                    progressive.Composition.ChildJobCount,
-                                    progressive.Composition.ChildActiveJobCount,
-                                    progressive.Composition.ChildFailedJobCount);
+                                    presentation.Composition.ChildCount,
+                                    presentation.Composition.ChildRecipeCount,
+                                    presentation.Composition.ChildSlotCount,
+                                    presentation.Composition.ChildPendingSlotCount,
+                                    presentation.Composition.ChildFailedSlotCount,
+                                    presentation.Composition.ChildJobCount,
+                                    presentation.Composition.ChildActiveJobCount,
+                                    presentation.Composition.ChildFailedJobCount);
                     }
-                    if (!progressive.Slots.empty())
+                    if (!presentation.Slots.empty())
                     {
-                        ImGui::Text("Slots: %zu", progressive.Slots.size());
+                        ImGui::Text("Slots: %zu", presentation.Slots.size());
                         for (std::size_t slotIndex = 0u;
-                             slotIndex < progressive.Slots.size();
+                             slotIndex < presentation.Slots.size();
                              ++slotIndex)
                         {
-                            const SandboxEditorProgressiveSlotModel& slot =
-                                progressive.Slots[slotIndex];
+                            const SandboxEditorGeometryPresentationSlotModel& slot =
+                                presentation.Slots[slotIndex];
                             ImGui::PushID(static_cast<int>(slotIndex));
                             ImGui::Text("%s / %s / %s / %s",
                                         std::string(ToString(slot.Lane)).c_str(),
@@ -2298,27 +2297,27 @@ namespace Extrinsic::Sandbox::Editor
                                         std::string(ToString(slot.Readiness)).c_str());
                             ImGui::Text("Source: %s property=%s",
                                         std::string(ToString(slot.SourceKind)).c_str(),
-                                        slot.Property.PropertyName.empty()
+                                        slot.Property.Name.empty()
                                             ? "(none)"
-                                            : slot.Property.PropertyName.c_str());
+                                            : slot.Property.Name.c_str());
                             if (!slot.Diagnostic.empty())
                                 ImGui::TextWrapped("%s", slot.Diagnostic.c_str());
 
                             if (context != nullptr &&
-                                (slot.Semantic == ProgressiveSlotSemantic::Albedo ||
-                                 slot.Semantic == ProgressiveSlotSemantic::PointColor ||
-                                 slot.Semantic == ProgressiveSlotSemantic::LineColor))
+                                (slot.Semantic == GeometryPresentationSlotSemantic::Albedo ||
+                                 slot.Semantic == GeometryPresentationSlotSemantic::PointColor ||
+                                 slot.Semantic == GeometryPresentationSlotSemantic::LineColor))
                             {
                                 glm::vec4 color = slot.UniformDefault.Vector;
                                 if (ImGui::ColorEdit4("Default color", &color.x))
                                 {
-                                    ProgressiveDefaultValue value =
+                                    GeometryPresentationDefaultValue value =
                                         slot.UniformDefault;
                                     value.Kind = Geometry::PropertyValueKind::Vec4;
                                     value.Vector = color;
-                                    (void)ApplySandboxEditorProgressiveSlotDefaultCommand(
+                                    (void)ApplySandboxEditorGeometryPresentationSlotDefaultCommand(
                                         *context,
-                                        SandboxEditorProgressiveSlotDefaultCommand{
+                                        SandboxEditorGeometryPresentationSlotDefaultCommand{
                                             .StableEntityId =
                                                 inspector.Entity.StableEntityId,
                                             .PresentationKey =
@@ -2334,28 +2333,28 @@ namespace Extrinsic::Sandbox::Editor
                                 !slot.PropertyOptions.empty())
                             {
                                 const char* currentProperty =
-                                    slot.Property.PropertyName.empty()
+                                    slot.Property.Name.empty()
                                         ? "(uniform/default)"
-                                        : slot.Property.PropertyName.c_str();
+                                        : slot.Property.Name.c_str();
                                 if (ImGui::BeginCombo("Source property",
                                                       currentProperty))
                                 {
-                                    for (const SandboxEditorProgressivePropertyOptionModel&
+                                    for (const SandboxEditorGeometryPresentationPropertyOptionModel&
                                              option : slot.PropertyOptions)
                                     {
                                         if (!option.Compatible)
                                             ImGui::BeginDisabled();
                                         const bool selected =
-                                            option.Descriptor.PropertyName ==
-                                            slot.Property.PropertyName;
+                                            option.Descriptor.Name ==
+                                            slot.Property.Name;
                                         if (ImGui::Selectable(
-                                                option.Descriptor.PropertyName.c_str(),
+                                                option.Descriptor.Name.c_str(),
                                                 selected) &&
                                             option.Compatible)
                                         {
-                                            (void)ApplySandboxEditorProgressiveSlotPropertyCommand(
+                                            (void)ApplySandboxEditorGeometryPresentationSlotPropertyCommand(
                                                 *context,
-                                                SandboxEditorProgressiveSlotPropertyCommand{
+                                                SandboxEditorGeometryPresentationSlotPropertyCommand{
                                                     .StableEntityId =
                                                         inspector.Entity.StableEntityId,
                                                     .PresentationKey =
@@ -2364,14 +2363,14 @@ namespace Extrinsic::Sandbox::Editor
                                                     .SourceKind =
                                                         IsSurfaceTextureSemantic(
                                                             slot.Semantic)
-                                                            ? ProgressiveSlotSourceKind::PropertyBake
-                                                            : ProgressiveSlotSourceKind::PropertyBuffer,
+                                                            ? GeometryPresentationSourceKind::PropertyBake
+                                                            : GeometryPresentationSourceKind::PropertyBuffer,
                                                     .Domain =
                                                         option.Descriptor.Domain,
                                                     .ExpectedValueKind =
-                                                        option.Descriptor.ExpectedValueKind,
+                                                        option.Descriptor.ValueKind,
                                                     .PropertyName =
-                                                        option.Descriptor.PropertyName,
+                                                        option.Descriptor.Name,
                                                 });
                                         }
                                         if (!option.Compatible)
@@ -2388,11 +2387,11 @@ namespace Extrinsic::Sandbox::Editor
                             ImGui::PopID();
                         }
                     }
-                    if (!progressive.Jobs.empty())
+                    if (!presentation.Jobs.empty())
                     {
-                        ImGui::Text("Derived jobs: %zu", progressive.Jobs.size());
-                        for (const SandboxEditorProgressiveJobModel& job :
-                             progressive.Jobs)
+                        ImGui::Text("Derived jobs: %zu", presentation.Jobs.size());
+                        for (const SandboxEditorJobModel& job :
+                             presentation.Jobs)
                         {
                             ImGui::BulletText("%s %s %.0f%% deps=%zu %s",
                                               job.Name.c_str(),
@@ -2402,7 +2401,7 @@ namespace Extrinsic::Sandbox::Editor
                                               job.Diagnostic.c_str());
                         }
                     }
-                    DrawDiagnostics(progressive.Diagnostics);
+                    DrawDiagnostics(presentation.Diagnostics);
                     DrawDiagnostics(inspector.Diagnostics);
                 }
                 ImGui::End();

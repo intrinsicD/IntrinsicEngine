@@ -51,7 +51,7 @@ import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
 

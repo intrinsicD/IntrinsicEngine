@@ -21,7 +21,7 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.WorldHandle;
 
 export namespace Extrinsic::Runtime
@@ -35,7 +35,7 @@ export namespace Extrinsic::Runtime
         MissingAssetService,
         StaleEntity,
         NonMeshSelection,
-        MissingProgressiveBindings,
+        MissingGeometryPresentationRecipe,
         MissingPresentation,
         MissingSlot,
         UnsupportedSourceDomain,
@@ -90,7 +90,7 @@ export namespace Extrinsic::Runtime
     struct BakedPropertyTextureConsumer
     {
         std::string PresentationKey{};
-        ProgressiveSlotSemantic Semantic{ProgressiveSlotSemantic::Albedo};
+        GeometryPresentationSlotSemantic Semantic{GeometryPresentationSlotSemantic::Albedo};
         Graphics::Colormap::Type Colormap{
             Graphics::Colormap::Type::Viridis};
     };
@@ -173,11 +173,11 @@ export namespace Extrinsic::Runtime
         std::uint32_t Height{64u};
         Assets::AssetTextureColorSpace ColorSpace{Assets::AssetTextureColorSpace::Unknown};
         Assets::AssetTexturePixelFormat PixelFormat{Assets::AssetTexturePixelFormat::Unknown};
-        ProgressiveRenderLane TargetLane{ProgressiveRenderLane::Surface};
+        GeometryRenderLane TargetLane{GeometryRenderLane::Surface};
         std::string TargetPresentationKey{};
-        ProgressiveSlotSemantic TargetSemantic{ProgressiveSlotSemantic::Albedo};
-        ProgressiveGeneratedOutputPolicy GeneratedPolicy{
-            ProgressiveGeneratedOutputPolicy::DeterministicChildAsset};
+        GeometryPresentationSlotSemantic TargetSemantic{GeometryPresentationSlotSemantic::Albedo};
+        GeometryGeneratedOutputPolicy GeneratedPolicy{
+            GeometryGeneratedOutputPolicy::DeterministicChildAsset};
         std::string GeneratedKey{};
         std::string OutputName{};
         SelectedMeshTextureBakeStorage Storage{
@@ -198,7 +198,7 @@ export namespace Extrinsic::Runtime
     {
         SelectedMeshTextureBakeStatus Status{SelectedMeshTextureBakeStatus::Success};
         MeshAttributeTextureBakeRequest BakeRequest{};
-        ProgressivePropertyResolution PropertyResolution{};
+        GeometryPropertyResolution PropertyResolution{};
         std::size_t ExpectedElementCount{0u};
         std::string GeneratedAssetPath{};
         std::string OutputName{};
@@ -233,7 +233,7 @@ export namespace Extrinsic::Runtime
             SelectedMeshTextureBakeExecutionMode::Synchronous};
         bool BoundGeneratedTexture{false};
         bool PreviousOutputRetained{false};
-        std::uint64_t BindingGeneration{0u};
+        std::uint64_t RecipeGeneration{0u};
         std::string GeneratedAssetPath{};
         std::string OutputName{};
         std::string Diagnostic{};

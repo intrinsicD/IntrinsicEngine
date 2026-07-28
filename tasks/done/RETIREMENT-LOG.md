@@ -5901,3 +5901,21 @@ with driver 590.48.01. The benchmark records service-command-to-applied-event
 latency, exact CPU-reference parity, zero fallback, and no performance claim.
 Strict layering, test-layout, task-policy, docs-link, root-hygiene, benchmark-
 manifest, ARA, generated-inventory, and whitespace checks close the evidence.
+
+[`RUNTIME-193`](RUNTIME-193-general-geometry-presentation-recipe.md) — general
+geometry-presentation convergence retired on 2026-07-28 at `Retired`. Mesh,
+graph, point-cloud, composition, and procedural geometry now share one authored
+`GeometryPresentationRecipe`, one runtime-only status sidecar, and one copied
+generation-qualified snapshot. Scene JSON writes only authored intent under
+`geometryPresentation`, accepts the retired `progressiveRenderData` key on
+read, and initializes fresh operational state. Render extraction, asset/model
+handoff, selected texture baking, object-space normal completion, and Sandbox
+models/commands all use the shared path; the two progressive-named general
+modules, their symbols, CMake entries, and dedicated tests are deleted. Focused
+CPU coverage passed 118/118 plus the structural absence ratchet 1/1; the full
+CPU-supported selector passed 4,214 cases with one expected GLFW/LSan self-
+skip; and the ASan+UBSan promoted-Vulkan presentation smoke passed 1/1 on an
+NVIDIA GeForce RTX 3050 with driver 590.48.01. Strict layering, test-layout,
+task-policy, docs-link, root-hygiene, ARA, generated-inventory, and whitespace
+checks close the evidence; C12 records the capability scope without a
+performance claim.

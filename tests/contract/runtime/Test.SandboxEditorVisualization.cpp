@@ -74,7 +74,7 @@ import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderExtraction;
@@ -295,52 +295,62 @@ void AddTriangleMeshSource(ECS::Scene::Registry& registry,
         SetFaces(faces, {0u});
     }
 
-[[nodiscard]] Runtime::ProgressivePresentationBindings
-    MakeProgressiveMeshPresentationBindings()
+[[nodiscard]] Runtime::GeometryPresentationRecipe
+    MakeGeometryPresentationRecipe()
     {
-        Runtime::ProgressiveSlotBinding albedo{};
-        albedo.Semantic = Runtime::ProgressiveSlotSemantic::Albedo;
-        albedo.SourceKind = Runtime::ProgressiveSlotSourceKind::UniformDefault;
-        albedo.UniformDefault = Runtime::ProgressiveDefaultValue{
+        Runtime::GeometryPresentationSlotRecipe albedo{};
+        albedo.Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo;
+        albedo.SourceKind = Runtime::GeometryPresentationSourceKind::UniformDefault;
+        albedo.UniformDefault = Runtime::GeometryPresentationDefaultValue{
             .Kind = Geometry::PropertyValueKind::Vec4,
             .Vector = glm::vec4{0.2f, 0.4f, 0.8f, 1.0f},
         };
-        albedo.Readiness = Runtime::ProgressiveReadinessState::DefaultValue;
-        albedo.Provenance =
-            Runtime::ProgressiveGeneratedOutputProvenance::UniformDefault;
-
-        Runtime::ProgressiveSlotBinding normal{};
-        normal.Semantic = Runtime::ProgressiveSlotSemantic::Normal;
-        normal.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBake;
-        normal.Property = Runtime::ProgressivePropertyBindingDescriptor{
+        Runtime::GeometryPresentationSlotRecipe normal{};
+        normal.Semantic = Runtime::GeometryPresentationSlotSemantic::Normal;
+        normal.SourceKind = Runtime::GeometryPresentationSourceKind::PropertyBake;
+        normal.Property = Runtime::GeometryPropertyRef{
             .Domain = Runtime::GeometryElementDomain::MeshVertex,
-            .PropertyName = "v:normal",
-            .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
-            .ExpectedElementCount = 3u,
+            .Name = "v:normal",
+            .ValueKind = Geometry::PropertyValueKind::Vec3,
         };
-        normal.Readiness = Runtime::ProgressiveReadinessState::Pending;
         normal.GeneratedPolicy =
-            Runtime::ProgressiveGeneratedOutputPolicy::DeterministicChildAsset;
-        normal.Provenance =
-            Runtime::ProgressiveGeneratedOutputProvenance::PropertyBinding;
-        normal.LastDiagnostic = "waiting for normal bake";
+            Runtime::GeometryGeneratedOutputPolicy::DeterministicChildAsset;
 
-        return Runtime::ProgressivePresentationBindings{
-            .Shape = Runtime::ProgressiveEntityShape::MeshLeaf,
+        return Runtime::GeometryPresentationRecipe{
+            .Shape = Runtime::GeometryPresentationShape::Mesh,
             .Lanes = {
-                Runtime::ProgressiveRenderLaneBinding{
-                    .Lane = Runtime::ProgressiveRenderLane::Surface,
+                Runtime::GeometryPresentationLaneRecipe{
+                    .Lane = Runtime::GeometryRenderLane::Surface,
                     .PresentationKey = "mesh.surface",
                 },
             },
             .Presentations = {
-                Runtime::ProgressivePresentationBinding{
+                Runtime::GeometryPresentationBindingRecipe{
                     .Key = "mesh.surface",
-                    .Kind = Runtime::ProgressivePresentationKind::SurfaceMaterial,
+                    .Kind = Runtime::GeometryPresentationKind::SurfaceMaterial,
                     .Slots = {albedo, normal},
                 },
             },
-            .BindingGeneration = 7u,
+        };
+    }
+
+    [[nodiscard]] Runtime::GeometryPresentationRuntimeState
+    MakeGeometryPresentationRuntimeState()
+    {
+        return Runtime::GeometryPresentationRuntimeState{
+            .RecipeGeneration = 7u,
+            .Slots = {
+                Runtime::GeometryPresentationSlotStatus{
+                    .PresentationKey = "mesh.surface",
+                    .Semantic =
+                        Runtime::GeometryPresentationSlotSemantic::Normal,
+                    .Readiness =
+                        Runtime::GeometryPresentationReadiness::Pending,
+                    .Provenance =
+                        Runtime::GeometryPresentationProvenance::PropertyBinding,
+                    .Diagnostic = "waiting for normal bake",
+                },
+            },
         };
     }
 
@@ -1581,12 +1591,12 @@ TEST(SandboxEditorUi, VisualizationAdapterBindingCommandRoutesThroughRuntimeSurf
                   }),
               Runtime::SandboxEditorCommandStatus::StaleEntity);
 }
-TEST(SandboxEditorUi, ProgressiveSlotCommandsUseCommandHistory)
+TEST(SandboxEditorUi, GeometryPresentationSlotCommandsUseCommandHistory)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
     Runtime::EditorCommandHistory history;
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "ProgressiveCommands");
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "GeometryPresentationCommands");
     AddTriangleMeshSource(registry, mesh);
     auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
     vertices.Properties.GetOrAdd<glm::vec4>("v:paint", glm::vec4{1.0f})
@@ -1597,9 +1607,12 @@ TEST(SandboxEditorUi, ProgressiveSlotCommandsUseCommandHistory)
         };
     vertices.Properties.GetOrAdd<float>("v:temperature", 0.0f)
         .Vector() = {0.0f, 0.5f, 1.0f};
-    registry.Raw().emplace<Runtime::ProgressivePresentationBindings>(
+    registry.Raw().emplace<Runtime::GeometryPresentationRecipe>(
         mesh,
-        MakeProgressiveMeshPresentationBindings());
+        MakeGeometryPresentationRecipe());
+    registry.Raw().emplace<Runtime::GeometryPresentationRuntimeState>(
+        mesh,
+        MakeGeometryPresentationRuntimeState());
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
     const std::uint32_t stableId =
@@ -1607,48 +1620,54 @@ TEST(SandboxEditorUi, ProgressiveSlotCommandsUseCommandHistory)
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
     context.CommandHistory = &history;
 
-    const Runtime::ProgressiveDefaultValue newColor{
+    const Runtime::GeometryPresentationDefaultValue newColor{
         .Kind = Geometry::PropertyValueKind::Vec4,
         .Vector = glm::vec4{0.9f, 0.1f, 0.2f, 1.0f},
     };
-    EXPECT_EQ(Runtime::ApplySandboxEditorProgressiveSlotDefaultCommand(
+    EXPECT_EQ(Runtime::ApplySandboxEditorGeometryPresentationSlotDefaultCommand(
                   context,
-                  Runtime::SandboxEditorProgressiveSlotDefaultCommand{
+                  Runtime::SandboxEditorGeometryPresentationSlotDefaultCommand{
                       .StableEntityId = stableId,
                       .PresentationKey = "mesh.surface",
-                      .Semantic = Runtime::ProgressiveSlotSemantic::Albedo,
+                      .Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo,
                       .Value = newColor,
                   }),
               Runtime::SandboxEditorCommandStatus::Applied);
     EXPECT_TRUE(history.IsDirty());
     auto& bindings =
-        registry.Raw().get<Runtime::ProgressivePresentationBindings>(mesh);
-    EXPECT_EQ(bindings.BindingGeneration, 8u);
+        registry.Raw().get<Runtime::GeometryPresentationRecipe>(mesh);
+    EXPECT_EQ(
+        registry.Raw()
+            .get<Runtime::GeometryPresentationRuntimeState>(mesh)
+            .RecipeGeneration,
+        8u);
     auto* presentation =
-        Runtime::FindPresentationBinding(bindings, "mesh.surface");
+        Runtime::FindGeometryPresentationBinding(bindings, "mesh.surface");
     ASSERT_NE(presentation, nullptr);
     auto* albedo =
-        Runtime::FindSlotBinding(*presentation,
-                                 Runtime::ProgressiveSlotSemantic::Albedo);
+        Runtime::FindGeometryPresentationSlot(*presentation,
+                                 Runtime::GeometryPresentationSlotSemantic::Albedo);
     ASSERT_NE(albedo, nullptr);
     EXPECT_EQ(albedo->SourceKind,
-              Runtime::ProgressiveSlotSourceKind::UniformDefault);
+              Runtime::GeometryPresentationSourceKind::UniformDefault);
     EXPECT_EQ(albedo->UniformDefault.Vector, newColor.Vector);
 
     EXPECT_EQ(history.Undo().Status,
               Runtime::EditorCommandHistoryStatus::Undone);
-    const auto& restored =
-        registry.Raw().get<Runtime::ProgressivePresentationBindings>(mesh);
-    EXPECT_EQ(restored.BindingGeneration, 7u);
+    EXPECT_EQ(
+        registry.Raw()
+            .get<Runtime::GeometryPresentationRuntimeState>(mesh)
+            .RecipeGeneration,
+        7u);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorProgressiveSlotPropertyCommand(
+    EXPECT_EQ(Runtime::ApplySandboxEditorGeometryPresentationSlotPropertyCommand(
                   context,
-                  Runtime::SandboxEditorProgressiveSlotPropertyCommand{
+                  Runtime::SandboxEditorGeometryPresentationSlotPropertyCommand{
                       .StableEntityId = stableId,
                       .PresentationKey = "mesh.surface",
-                      .Semantic = Runtime::ProgressiveSlotSemantic::Albedo,
+                      .Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo,
                       .SourceKind =
-                          Runtime::ProgressiveSlotSourceKind::PropertyBake,
+                          Runtime::GeometryPresentationSourceKind::PropertyBake,
                       .Domain = Runtime::GeometryElementDomain::MeshVertex,
                       .ExpectedValueKind =
                           Geometry::PropertyValueKind::Vec4,
@@ -1656,27 +1675,36 @@ TEST(SandboxEditorUi, ProgressiveSlotCommandsUseCommandHistory)
                   }),
               Runtime::SandboxEditorCommandStatus::Applied);
     auto& propertyBindings =
-        registry.Raw().get<Runtime::ProgressivePresentationBindings>(mesh);
-    EXPECT_EQ(propertyBindings.BindingGeneration, 8u);
-    presentation = Runtime::FindPresentationBinding(propertyBindings, "mesh.surface");
+        registry.Raw().get<Runtime::GeometryPresentationRecipe>(mesh);
+    const auto& propertyRuntimeState =
+        registry.Raw().get<Runtime::GeometryPresentationRuntimeState>(mesh);
+    EXPECT_EQ(propertyRuntimeState.RecipeGeneration, 8u);
+    presentation = Runtime::FindGeometryPresentationBinding(propertyBindings, "mesh.surface");
     ASSERT_NE(presentation, nullptr);
     albedo =
-        Runtime::FindSlotBinding(*presentation,
-                                 Runtime::ProgressiveSlotSemantic::Albedo);
+        Runtime::FindGeometryPresentationSlot(*presentation,
+                                 Runtime::GeometryPresentationSlotSemantic::Albedo);
     ASSERT_NE(albedo, nullptr);
     EXPECT_EQ(albedo->SourceKind,
-              Runtime::ProgressiveSlotSourceKind::PropertyBake);
-    EXPECT_EQ(albedo->Property.PropertyName, "v:paint");
-    EXPECT_EQ(albedo->Readiness, Runtime::ProgressiveReadinessState::Pending);
+              Runtime::GeometryPresentationSourceKind::PropertyBake);
+    EXPECT_EQ(albedo->Property.Name, "v:paint");
+    const auto* albedoStatus =
+        Runtime::FindGeometryPresentationSlotStatus(
+            propertyRuntimeState,
+            "mesh.surface",
+            Runtime::GeometryPresentationSlotSemantic::Albedo);
+    ASSERT_NE(albedoStatus, nullptr);
+    EXPECT_EQ(albedoStatus->Readiness,
+              Runtime::GeometryPresentationReadiness::Pending);
 
-    EXPECT_EQ(Runtime::ApplySandboxEditorProgressiveSlotPropertyCommand(
+    EXPECT_EQ(Runtime::ApplySandboxEditorGeometryPresentationSlotPropertyCommand(
                   context,
-                  Runtime::SandboxEditorProgressiveSlotPropertyCommand{
+                  Runtime::SandboxEditorGeometryPresentationSlotPropertyCommand{
                       .StableEntityId = stableId,
                       .PresentationKey = "mesh.surface",
-                      .Semantic = Runtime::ProgressiveSlotSemantic::Albedo,
+                      .Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo,
                       .SourceKind =
-                          Runtime::ProgressiveSlotSourceKind::PropertyBake,
+                          Runtime::GeometryPresentationSourceKind::PropertyBake,
                       .Domain = Runtime::GeometryElementDomain::MeshVertex,
                       .ExpectedValueKind =
                           Geometry::PropertyValueKind::Vec4,

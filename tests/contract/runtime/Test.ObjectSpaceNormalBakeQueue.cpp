@@ -27,7 +27,7 @@ import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.WorldHandle;
 
 #include "MockRHI.hpp"
@@ -149,7 +149,7 @@ namespace
     [[nodiscard]] Runtime::RuntimeObjectSpaceNormalBakeTarget MakeTarget(
         const std::uint32_t stableEntityId = 17u,
         const std::uint64_t bindingEpoch = 3u,
-        const std::uint64_t expectedBindingGeneration = 1u,
+        const std::uint64_t expectedRecipeGeneration = 1u,
         const Runtime::WorldHandle world = Runtime::DefaultWorldHandle)
     {
         return Runtime::RuntimeObjectSpaceNormalBakeTarget{
@@ -159,9 +159,9 @@ namespace
             .StableEntityId = stableEntityId,
             .PresentationKey =
                 "normal-presentation-" + std::to_string(stableEntityId),
-            .Semantic = Runtime::ProgressiveSlotSemantic::Normal,
-            .ExpectedProgressiveBindingGeneration =
-                expectedBindingGeneration,
+            .Semantic = Runtime::GeometryPresentationSlotSemantic::Normal,
+            .ExpectedRecipeGeneration =
+                expectedRecipeGeneration,
         };
     }
 
@@ -169,14 +169,14 @@ namespace
         const IdentityInputFixture& fixture,
         const std::uint32_t stableEntityId = 17u,
         const std::uint64_t bindingEpoch = 3u,
-        const std::uint64_t expectedBindingGeneration = 1u)
+        const std::uint64_t expectedRecipeGeneration = 1u)
     {
         return Runtime::RuntimeObjectSpaceNormalBakeRequest{
             .Identity = BuildIdentity(fixture),
             .Target = MakeTarget(
                 stableEntityId,
                 bindingEpoch,
-                expectedBindingGeneration),
+                expectedRecipeGeneration),
         };
     }
 
@@ -833,7 +833,7 @@ TEST(RuntimeObjectSpaceNormalBakeQueue,
     EXPECT_TRUE(queue.IsLatest(scheduled.Submission.StaleKey));
 
     auto mismatched = scheduled.Submission.StaleKey;
-    ++mismatched.Target.ExpectedProgressiveBindingGeneration;
+    ++mismatched.Target.ExpectedRecipeGeneration;
     EXPECT_FALSE(Runtime::RuntimeObjectSpaceNormalBakeStaleKeyMatches(
         scheduled.Submission.StaleKey,
         mismatched));

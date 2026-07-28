@@ -75,7 +75,7 @@ import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderExtraction;
@@ -471,53 +471,75 @@ void ExpectPositionsExactlyEqual(
         return false;
     }
 
-[[nodiscard]] Runtime::ProgressivePresentationBindings
-    MakeProgressiveMeshPresentationBindings()
+[[nodiscard]] Runtime::GeometryPresentationRecipe
+    MakeGeometryPresentationRecipe()
     {
-        Runtime::ProgressiveSlotBinding albedo{};
-        albedo.Semantic = Runtime::ProgressiveSlotSemantic::Albedo;
-        albedo.SourceKind = Runtime::ProgressiveSlotSourceKind::UniformDefault;
-        albedo.UniformDefault = Runtime::ProgressiveDefaultValue{
+        Runtime::GeometryPresentationSlotRecipe albedo{};
+        albedo.Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo;
+        albedo.SourceKind = Runtime::GeometryPresentationSourceKind::UniformDefault;
+        albedo.UniformDefault = Runtime::GeometryPresentationDefaultValue{
             .Kind = Geometry::PropertyValueKind::Vec4,
             .Vector = glm::vec4{0.2f, 0.4f, 0.8f, 1.0f},
         };
-        albedo.Readiness = Runtime::ProgressiveReadinessState::DefaultValue;
-        albedo.Provenance =
-            Runtime::ProgressiveGeneratedOutputProvenance::UniformDefault;
-
-        Runtime::ProgressiveSlotBinding normal{};
-        normal.Semantic = Runtime::ProgressiveSlotSemantic::Normal;
-        normal.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBake;
-        normal.Property = Runtime::ProgressivePropertyBindingDescriptor{
+        Runtime::GeometryPresentationSlotRecipe normal{};
+        normal.Semantic = Runtime::GeometryPresentationSlotSemantic::Normal;
+        normal.SourceKind = Runtime::GeometryPresentationSourceKind::PropertyBake;
+        normal.Property = Runtime::GeometryPropertyRef{
             .Domain = Runtime::GeometryElementDomain::MeshVertex,
-            .PropertyName = "v:normal",
-            .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
-            .ExpectedElementCount = 3u,
+            .Name = "v:normal",
+            .ValueKind = Geometry::PropertyValueKind::Vec3,
         };
-        normal.Readiness = Runtime::ProgressiveReadinessState::Pending;
         normal.GeneratedPolicy =
-            Runtime::ProgressiveGeneratedOutputPolicy::DeterministicChildAsset;
-        normal.Provenance =
-            Runtime::ProgressiveGeneratedOutputProvenance::PropertyBinding;
-        normal.LastDiagnostic = "waiting for normal bake";
+            Runtime::GeometryGeneratedOutputPolicy::DeterministicChildAsset;
 
-        return Runtime::ProgressivePresentationBindings{
-            .Shape = Runtime::ProgressiveEntityShape::MeshLeaf,
+        return Runtime::GeometryPresentationRecipe{
+            .Shape = Runtime::GeometryPresentationShape::Mesh,
             .Lanes = {
-                Runtime::ProgressiveRenderLaneBinding{
-                    .Lane = Runtime::ProgressiveRenderLane::Surface,
+                Runtime::GeometryPresentationLaneRecipe{
+                    .Lane = Runtime::GeometryRenderLane::Surface,
                     .PresentationKey = "mesh.surface",
                 },
             },
             .Presentations = {
-                Runtime::ProgressivePresentationBinding{
+                Runtime::GeometryPresentationBindingRecipe{
                     .Key = "mesh.surface",
-                    .Kind = Runtime::ProgressivePresentationKind::SurfaceMaterial,
+                    .Kind = Runtime::GeometryPresentationKind::SurfaceMaterial,
                     .Slots = {albedo, normal},
                 },
             },
-            .BindingGeneration = 7u,
         };
+    }
+
+    [[nodiscard]] Runtime::GeometryPresentationRuntimeState
+    MakeGeometryPresentationRuntimeState()
+    {
+        return Runtime::GeometryPresentationRuntimeState{
+            .RecipeGeneration = 7u,
+            .Slots = {
+                Runtime::GeometryPresentationSlotStatus{
+                    .PresentationKey = "mesh.surface",
+                    .Semantic =
+                        Runtime::GeometryPresentationSlotSemantic::Normal,
+                    .Readiness =
+                        Runtime::GeometryPresentationReadiness::Pending,
+                    .Provenance =
+                        Runtime::GeometryPresentationProvenance::PropertyBinding,
+                    .Diagnostic = "waiting for normal bake",
+                },
+            },
+        };
+    }
+
+    void AttachGeometryPresentation(
+        ECS::Scene::Registry& registry,
+        const ECS::EntityHandle entity)
+    {
+        registry.Raw().emplace<Runtime::GeometryPresentationRecipe>(
+            entity,
+            MakeGeometryPresentationRecipe());
+        registry.Raw().emplace<Runtime::GeometryPresentationRuntimeState>(
+            entity,
+            MakeGeometryPresentationRuntimeState());
     }
 
 void AddPlanarCycleGraphSource(ECS::Scene::Registry& registry,
@@ -3746,9 +3768,7 @@ TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRequireRuntimeModule)
             glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
             glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
         };
-    registry.Raw().emplace<Runtime::ProgressivePresentationBindings>(
-        mesh,
-        MakeProgressiveMeshPresentationBindings());
+    AttachGeometryPresentation(registry, mesh);
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
     Runtime::SandboxEditorContext context =
@@ -3795,7 +3815,7 @@ TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRequireRuntimeModule)
             Runtime::SandboxEditorTextureBakeCommand{
                 .StableEntityId = stableId,
                 .PresentationKey = "mesh.surface",
-                .TargetSemantic = Runtime::ProgressiveSlotSemantic::Albedo,
+                .TargetSemantic = Runtime::GeometryPresentationSlotSemantic::Albedo,
                 .SourceDomain = Runtime::GeometryElementDomain::MeshVertex,
                 .ExpectedValueKind = Geometry::PropertyValueKind::Vec4,
                 .PropertyName = "v:paint",
@@ -3869,9 +3889,7 @@ TEST(SandboxEditorUi, TextureBakeFacadeDoesNotBypassUnavailableRuntimeModule)
         MakeSelectable(registry, "QueuedNormalBakeMesh");
     AddTriangleMeshSource(registry, mesh);
     SetNormals(registry.Raw().get<GS::Vertices>(mesh));
-    registry.Raw().emplace<Runtime::ProgressivePresentationBindings>(
-        mesh,
-        MakeProgressiveMeshPresentationBindings());
+    AttachGeometryPresentation(registry, mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
     Runtime::SandboxEditorContext context =
@@ -3886,7 +3904,7 @@ TEST(SandboxEditorUi, TextureBakeFacadeDoesNotBypassUnavailableRuntimeModule)
             Runtime::SandboxEditorTextureBakeCommand{
                 .StableEntityId = stableId,
                 .PresentationKey = "mesh.surface",
-                .TargetSemantic = Runtime::ProgressiveSlotSemantic::Normal,
+                .TargetSemantic = Runtime::GeometryPresentationSlotSemantic::Normal,
                 .SourceDomain =
                     Runtime::GeometryElementDomain::MeshVertex,
                 .ExpectedValueKind =
@@ -3909,9 +3927,11 @@ TEST(SandboxEditorUi, TextureBakeFacadeDoesNotBypassUnavailableRuntimeModule)
     EXPECT_FALSE(result.GeneratedTexture.IsValid());
     EXPECT_FALSE(result.BoundGeneratedTexture);
 
-    const auto& bindings =
-        registry.Raw().get<Runtime::ProgressivePresentationBindings>(mesh);
-    EXPECT_EQ(bindings.BindingGeneration, 7u);
+    EXPECT_EQ(
+        registry.Raw()
+            .get<Runtime::GeometryPresentationRuntimeState>(mesh)
+            .RecipeGeneration,
+        7u);
 }
 TEST(SandboxEditorUi, UnavailableTextureBakeModuleHasNoCpuFallback)
 {
@@ -3924,9 +3944,7 @@ TEST(SandboxEditorUi, UnavailableTextureBakeModuleHasNoCpuFallback)
         MakeSelectable(registry, "UnavailableNormalBakeMesh");
     AddTriangleMeshSource(registry, mesh);
     SetNormals(registry.Raw().get<GS::Vertices>(mesh));
-    registry.Raw().emplace<Runtime::ProgressivePresentationBindings>(
-        mesh,
-        MakeProgressiveMeshPresentationBindings());
+    AttachGeometryPresentation(registry, mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
     Runtime::SandboxEditorContext context =
@@ -3940,7 +3958,7 @@ TEST(SandboxEditorUi, UnavailableTextureBakeModuleHasNoCpuFallback)
                 .StableEntityId =
                     Runtime::SelectionController::ToStableEntityId(mesh),
                 .PresentationKey = "mesh.surface",
-                .TargetSemantic = Runtime::ProgressiveSlotSemantic::Normal,
+                .TargetSemantic = Runtime::GeometryPresentationSlotSemantic::Normal,
                 .SourceDomain =
                     Runtime::GeometryElementDomain::MeshVertex,
                 .ExpectedValueKind =
@@ -3963,9 +3981,11 @@ TEST(SandboxEditorUi, UnavailableTextureBakeModuleHasNoCpuFallback)
     EXPECT_FALSE(result.BoundGeneratedTexture);
     EXPECT_NE(result.Diagnostic.find("operational GPU"), std::string::npos);
 
-    const auto& bindings =
-        registry.Raw().get<Runtime::ProgressivePresentationBindings>(mesh);
-    EXPECT_EQ(bindings.BindingGeneration, 7u);
+    EXPECT_EQ(
+        registry.Raw()
+            .get<Runtime::GeometryPresentationRuntimeState>(mesh)
+            .RecipeGeneration,
+        7u);
 }
 TEST(SandboxEditorUi, QueueBackedNormalBakeRejectsNoncanonicalOrMissingChannels)
 {
@@ -3984,9 +4004,7 @@ TEST(SandboxEditorUi, QueueBackedNormalBakeRejectsNoncanonicalOrMissingChannels)
             glm::vec2{1.0f, 0.0f},
             glm::vec2{0.0f, 1.0f},
         };
-    registry.Raw().emplace<Runtime::ProgressivePresentationBindings>(
-        mesh,
-        MakeProgressiveMeshPresentationBindings());
+    AttachGeometryPresentation(registry, mesh);
 
     Runtime::SelectedMeshTextureBakeRequest request{};
     request.StableEntityId =
@@ -4001,7 +4019,7 @@ TEST(SandboxEditorUi, QueueBackedNormalBakeRejectsNoncanonicalOrMissingChannels)
     request.Width = 64u;
     request.Height = 64u;
     request.TargetPresentationKey = "mesh.surface";
-    request.TargetSemantic = Runtime::ProgressiveSlotSemantic::Normal;
+    request.TargetSemantic = Runtime::GeometryPresentationSlotSemantic::Normal;
     request.GeneratedKey = "normal";
 
     const Runtime::SelectedMeshTextureBakeContext context{
@@ -4043,9 +4061,7 @@ TEST(SandboxEditorUi, TextureBakeModuleAvailabilityPrecedesAssetCreation)
     (void)vertices.Properties.GetOrAdd<glm::vec4>(
         "v:paint",
         glm::vec4{1.0f});
-    registry.Raw().emplace<Runtime::ProgressivePresentationBindings>(
-        mesh,
-        MakeProgressiveMeshPresentationBindings());
+    AttachGeometryPresentation(registry, mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
     Runtime::SandboxEditorContext context =
@@ -4059,7 +4075,7 @@ TEST(SandboxEditorUi, TextureBakeModuleAvailabilityPrecedesAssetCreation)
                 .StableEntityId =
                     Runtime::SelectionController::ToStableEntityId(mesh),
                 .PresentationKey = "mesh.surface",
-                .TargetSemantic = Runtime::ProgressiveSlotSemantic::Albedo,
+                .TargetSemantic = Runtime::GeometryPresentationSlotSemantic::Albedo,
                 .SourceDomain =
                     Runtime::GeometryElementDomain::MeshVertex,
                 .ExpectedValueKind =
@@ -4097,9 +4113,7 @@ TEST(SandboxEditorUi, TextureBakeRequiresOperationalGpuBackend)
             glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
             glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
         };
-    registry.Raw().emplace<Runtime::ProgressivePresentationBindings>(
-        mesh,
-        MakeProgressiveMeshPresentationBindings());
+    AttachGeometryPresentation(registry, mesh);
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
     Runtime::SandboxEditorContext context =
@@ -4129,7 +4143,7 @@ TEST(SandboxEditorUi, TextureBakeRequiresOperationalGpuBackend)
             Runtime::SandboxEditorTextureBakeCommand{
                 .StableEntityId = stableId,
                 .PresentationKey = "mesh.surface",
-                .TargetSemantic = Runtime::ProgressiveSlotSemantic::Albedo,
+                .TargetSemantic = Runtime::GeometryPresentationSlotSemantic::Albedo,
                 .SourceDomain = Runtime::GeometryElementDomain::MeshVertex,
                 .ExpectedValueKind = Geometry::PropertyValueKind::Vec4,
                 .PropertyName = "v:paint",

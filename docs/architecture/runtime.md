@@ -408,6 +408,35 @@ world-space bounds. With the sandbox defaults installed, this makes every leaf
 renderable and mouse-pick eligible, selects the first leaf, and focuses the
 camera once after the complete hierarchy is ready.
 
+### Geometry presentation recipe and extraction
+
+`Extrinsic.Runtime.GeometryPresentation` is the sole general presentation
+contract for mesh, graph, point-cloud, composition, and procedural geometry.
+Its `GeometryPresentationRecipe` is authored scene intent: shape, lane,
+presentation, slot semantics and sources, stable asset ids, canonical
+`GeometryPropertyRef` identities, uniform defaults, and generated-output
+policy. It contains no readiness, generated result, diagnostic, job, borrowed
+property view, ECS identity, graphics handle, or live service pointer.
+
+`GeometryPresentationRuntimeState` is a separate ECS sidecar for operational
+slot status, generated assets, diagnostics, and exact recipe/source/output
+generations. A scene load always starts this sidecar at its default state.
+Scene serialization writes only `GeometryPresentationRecipe` under the
+`geometryPresentation` key; it accepts the retired `progressiveRenderData` key
+on read for document compatibility without retaining the retired component or
+module surface.
+
+Runtime extraction calls the pure
+`BuildGeometryPresentationSnapshot(recipe, state, sourceView)` projection and
+submits only the resulting copied `GeometryPresentationSnapshot` through the
+existing render-world boundary. Uniform defaults and retained previous outputs
+are resolved there, while stale source or recipe generations fail closed.
+Graphics consumes the copied slot/material/property requests and never sees
+the recipe, runtime sidecar, ECS registry, or bake/job ownership. Asset/model
+handoff, selected texture baking, object-space normal completion, and Sandbox
+models and commands all mutate or observe this same recipe/state pair; no
+second feature-specific presentation pipeline remains.
+
 ### GPU object-space normal bake lifecycle
 
 `AssetWorkflowModule` owns the object-space normal bake as private runtime
@@ -418,8 +447,8 @@ content identity from the exact packed position bytes, fan-triangulated surface
 index order, resolved UV and normal bytes, element counts, and resolved
 extent/padding/normal-space/epsilon options. Float `-0` is canonicalized to
 `+0`. World and binding epoch, the raw generation-qualified entity handle,
-stable render id, presentation/semantic, and expected progressive binding
-generation form a separate target record so reusable content never hides a
+stable render id, presentation/semantic, and expected geometry-presentation
+recipe generation form a separate target record so reusable content never hides a
 destroyed/recycled entity or scene replacement.
 
 Queue scheduling does not fabricate or expose an output `AssetId`. During the
@@ -456,10 +485,11 @@ dilation scratch records its actual post-use layout for safe reuse.
 Completion is a transactional runtime merge. Before mutation it rechecks the
 current world/epoch, raw entity lifetime and render id, latest request, exact
 cache generation, live geometry content revision/identity, presentation key,
-and expected progressive binding generation. It changes only the material
+and expected recipe generation. It changes only the material
 normal `AssetId` and `ObjectSpaceNormal` metadata, preserving albedo,
-metallic-roughness, and emissive, then marks the matching progressive normal
-slot generated/ready and increments its binding generation. Any mismatch
+metallic-roughness, and emissive, then marks the matching normal-slot runtime
+status ready with the generated asset and increments its output generation
+without changing authored recipe generation. Any mismatch
 rejects the whole completion, leaving vertex-normal shading active; there is no
 CPU fallback for a non-operational device, record failure, stale completion, or
 capacity rejection. The CPU normal-texture path is compatibility behavior only
@@ -647,13 +677,17 @@ separate validated binding.
 
 Scene JSON remains backend-neutral. Supported persistence is limited to current
 sandbox-authoring CPU state: metadata names, stable ids, transforms, hierarchy,
-selection eligibility, render hints, visualization configs, and
-mesh/graph/point-cloud `GeometrySources`. Unsupported families such as lights,
+selection eligibility, render hints, visualization configs, authored
+`GeometryPresentationRecipe` values, and mesh/graph/point-cloud
+`GeometrySources`. The writer emits only `geometryPresentation`; the reader
+also accepts the retired `progressiveRenderData` key and creates a fresh default
+`GeometryPresentationRuntimeState`. Unsupported families such as lights,
 shadow-caster tags, collider/rigid-body descriptors, spatial-debug bindings, and
 asset-instance source references are counted in `SceneSerializationStats` but
-not materialized on load. Renderer/RHI resources, GPU handles, adapter bindings,
-camera controller state, and editor document history are runtime/graphics/editor
-state and are not scene-file contents.
+not materialized on load. Presentation readiness, generated outputs,
+diagnostics, and generations are likewise runtime-only. Renderer/RHI resources,
+GPU handles, adapter bindings, camera controller state, and editor document
+history are runtime/graphics/editor state and are not scene-file contents.
 
 ## Physics Bridge
 

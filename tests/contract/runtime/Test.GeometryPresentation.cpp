@@ -230,6 +230,60 @@ TEST(GeometryPresentation,
 }
 
 TEST(GeometryPresentation,
+     GeneratedTextureAssetUsesRuntimeSidecarOutput)
+{
+    ECS::Scene::Registry scene{};
+    const ECS::EntityHandle mesh = AddMesh(scene);
+
+    Runtime::GeometryPresentationSlotRecipe albedo{};
+    albedo.Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo;
+    albedo.SourceKind =
+        Runtime::GeometryPresentationSourceKind::GeneratedTextureAsset;
+    const Runtime::GeometryPresentationRecipe recipe{
+        .Shape = Runtime::GeometryPresentationShape::Mesh,
+        .Lanes = {Runtime::GeometryPresentationLaneRecipe{
+            .Lane = Runtime::GeometryRenderLane::Surface,
+            .PresentationKey = "mesh.surface",
+        }},
+        .Presentations = {Runtime::GeometryPresentationBindingRecipe{
+            .Key = "mesh.surface",
+            .Kind = Runtime::GeometryPresentationKind::SurfaceMaterial,
+            .Slots = {albedo},
+        }},
+    };
+    const Extrinsic::Assets::AssetId generatedTexture{55u, 2u};
+    const Runtime::GeometryPresentationRuntimeState state{
+        .RecipeGeneration = 6u,
+        .Slots = {Runtime::GeometryPresentationSlotStatus{
+            .PresentationKey = "mesh.surface",
+            .Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo,
+            .Readiness = Runtime::GeometryPresentationReadiness::Ready,
+            .GeneratedTexture = generatedTexture,
+            .Provenance =
+                Runtime::GeometryPresentationProvenance::GeneratedTextureAsset,
+            .OutputGeneration = 4u,
+        }},
+    };
+
+    const Runtime::GeometryPresentationSnapshot snapshot =
+        Runtime::BuildGeometryPresentationSnapshot(
+            GS::BuildConstView(scene.Raw(), mesh),
+            recipe,
+            state);
+
+    ASSERT_EQ(snapshot.Slots.size(), 1u);
+    const Runtime::GeometryPresentationSlotSnapshot& projected =
+        snapshot.Slots.front();
+    EXPECT_EQ(snapshot.RecipeGeneration, 6u);
+    EXPECT_EQ(projected.TextureAsset, generatedTexture);
+    EXPECT_EQ(projected.Readiness,
+              Runtime::GeometryPresentationReadiness::Ready);
+    EXPECT_TRUE(projected.TextureReady);
+    EXPECT_FALSE(projected.PreviousOutputRetained);
+    EXPECT_EQ(projected.OutputGeneration, 4u);
+}
+
+TEST(GeometryPresentation,
      GraphPointAndLineSlotsUseCanonicalPropertyReferences)
 {
     ECS::Scene::Registry scene{};

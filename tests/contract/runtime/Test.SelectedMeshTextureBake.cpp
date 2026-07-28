@@ -23,7 +23,7 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.TextureBakeModule;
@@ -123,68 +123,71 @@ namespace
             .Vector() = {{0.25f, 0.5f, 1.0f, 1.0f}};
     }
 
-    [[nodiscard]] Runtime::ProgressivePresentationBindings MakeBindings()
+    [[nodiscard]] Runtime::GeometryPresentationRecipe MakeBindings()
     {
-        Runtime::ProgressiveSlotBinding albedo{};
-        albedo.Semantic = Runtime::ProgressiveSlotSemantic::Albedo;
-        albedo.SourceKind = Runtime::ProgressiveSlotSourceKind::UniformDefault;
+        Runtime::GeometryPresentationSlotRecipe albedo{};
+        albedo.Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo;
+        albedo.SourceKind = Runtime::GeometryPresentationSourceKind::UniformDefault;
         albedo.UniformDefault.Kind = Geometry::PropertyValueKind::Vec4;
         albedo.UniformDefault.Vector = glm::vec4{1.0f};
-        albedo.Readiness = Runtime::ProgressiveReadinessState::DefaultValue;
-        albedo.Provenance =
-            Runtime::ProgressiveGeneratedOutputProvenance::UniformDefault;
-
-        Runtime::ProgressiveSlotBinding normal{};
-        normal.Semantic = Runtime::ProgressiveSlotSemantic::Normal;
-        normal.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBake;
-        normal.Property = Runtime::ProgressivePropertyBindingDescriptor{
+        Runtime::GeometryPresentationSlotRecipe normal{};
+        normal.Semantic = Runtime::GeometryPresentationSlotSemantic::Normal;
+        normal.SourceKind = Runtime::GeometryPresentationSourceKind::PropertyBake;
+        normal.Property = Runtime::GeometryPropertyRef{
             .Domain = Runtime::GeometryElementDomain::MeshVertex,
-            .PropertyName = "v:normal",
-            .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
-            .ExpectedElementCount = 3u,
+            .Name = "v:normal",
+            .ValueKind = Geometry::PropertyValueKind::Vec3,
         };
-        normal.Readiness = Runtime::ProgressiveReadinessState::Pending;
         normal.GeneratedPolicy =
-            Runtime::ProgressiveGeneratedOutputPolicy::DeterministicChildAsset;
-        normal.Provenance =
-            Runtime::ProgressiveGeneratedOutputProvenance::PropertyBinding;
+            Runtime::GeometryGeneratedOutputPolicy::DeterministicChildAsset;
 
-        Runtime::ProgressiveSlotBinding roughness{};
-        roughness.Semantic = Runtime::ProgressiveSlotSemantic::Roughness;
-        roughness.SourceKind = Runtime::ProgressiveSlotSourceKind::UniformDefault;
+        Runtime::GeometryPresentationSlotRecipe roughness{};
+        roughness.Semantic = Runtime::GeometryPresentationSlotSemantic::Roughness;
+        roughness.SourceKind = Runtime::GeometryPresentationSourceKind::UniformDefault;
         roughness.UniformDefault.Kind =
             Geometry::PropertyValueKind::Float;
         roughness.UniformDefault.Scalar = 0.5;
-        roughness.Readiness = Runtime::ProgressiveReadinessState::DefaultValue;
-        roughness.Provenance =
-            Runtime::ProgressiveGeneratedOutputProvenance::UniformDefault;
 
-        Runtime::ProgressiveSlotBinding metallic{};
-        metallic.Semantic = Runtime::ProgressiveSlotSemantic::Metallic;
-        metallic.SourceKind = Runtime::ProgressiveSlotSourceKind::UniformDefault;
+        Runtime::GeometryPresentationSlotRecipe metallic{};
+        metallic.Semantic = Runtime::GeometryPresentationSlotSemantic::Metallic;
+        metallic.SourceKind = Runtime::GeometryPresentationSourceKind::UniformDefault;
         metallic.UniformDefault.Kind =
             Geometry::PropertyValueKind::Float;
         metallic.UniformDefault.Scalar = 0.0;
-        metallic.Readiness = Runtime::ProgressiveReadinessState::DefaultValue;
-        metallic.Provenance =
-            Runtime::ProgressiveGeneratedOutputProvenance::UniformDefault;
 
-        return Runtime::ProgressivePresentationBindings{
-            .Shape = Runtime::ProgressiveEntityShape::MeshLeaf,
+        return Runtime::GeometryPresentationRecipe{
+            .Shape = Runtime::GeometryPresentationShape::Mesh,
             .Lanes = {
-                Runtime::ProgressiveRenderLaneBinding{
-                    .Lane = Runtime::ProgressiveRenderLane::Surface,
+                Runtime::GeometryPresentationLaneRecipe{
+                    .Lane = Runtime::GeometryRenderLane::Surface,
                     .PresentationKey = "mesh.surface",
                 },
             },
             .Presentations = {
-                Runtime::ProgressivePresentationBinding{
+                Runtime::GeometryPresentationBindingRecipe{
                     .Key = "mesh.surface",
-                    .Kind = Runtime::ProgressivePresentationKind::SurfaceMaterial,
+                    .Kind = Runtime::GeometryPresentationKind::SurfaceMaterial,
                     .Slots = {albedo, normal, roughness, metallic},
                 },
             },
-            .BindingGeneration = 7u,
+        };
+    }
+
+    [[nodiscard]] Runtime::GeometryPresentationRuntimeState MakeRuntimeState()
+    {
+        return Runtime::GeometryPresentationRuntimeState{
+            .RecipeGeneration = 7u,
+            .Slots = {
+                Runtime::GeometryPresentationSlotStatus{
+                    .PresentationKey = "mesh.surface",
+                    .Semantic =
+                        Runtime::GeometryPresentationSlotSemantic::Normal,
+                    .Readiness =
+                        Runtime::GeometryPresentationReadiness::Pending,
+                    .Provenance =
+                        Runtime::GeometryPresentationProvenance::PropertyBinding,
+                },
+            },
         };
     }
 
@@ -193,9 +196,12 @@ namespace
     {
         const ECS::EntityHandle entity = scene.Create();
         SetMeshTopology(scene, entity);
-        scene.Raw().emplace<Runtime::ProgressivePresentationBindings>(
+        scene.Raw().emplace<Runtime::GeometryPresentationRecipe>(
             entity,
             MakeBindings());
+        scene.Raw().emplace<Runtime::GeometryPresentationRuntimeState>(
+            entity,
+            MakeRuntimeState());
         return entity;
     }
 
@@ -212,7 +218,7 @@ namespace
         request.Width = 4u;
         request.Height = 4u;
         request.TargetPresentationKey = "mesh.surface";
-        request.TargetSemantic = Runtime::ProgressiveSlotSemantic::Normal;
+        request.TargetSemantic = Runtime::GeometryPresentationSlotSemantic::Normal;
         request.GeneratedKey = "normal";
         return request;
     }
@@ -230,7 +236,7 @@ namespace
         request.Width = 4u;
         request.Height = 4u;
         request.TargetPresentationKey = "mesh.surface";
-        request.TargetSemantic = Runtime::ProgressiveSlotSemantic::Albedo;
+        request.TargetSemantic = Runtime::GeometryPresentationSlotSemantic::Albedo;
         request.GeneratedKey = "heat";
         return request;
     }
@@ -247,7 +253,7 @@ namespace
         request.Width = 4u;
         request.Height = 4u;
         request.TargetPresentationKey = "mesh.surface";
-        request.TargetSemantic = Runtime::ProgressiveSlotSemantic::Albedo;
+        request.TargetSemantic = Runtime::GeometryPresentationSlotSemantic::Albedo;
         request.GeneratedKey = "albedo";
         return request;
     }
@@ -275,7 +281,7 @@ namespace
         request.Width = 4u;
         request.Height = 4u;
         request.TargetPresentationKey = "mesh.surface";
-        request.TargetSemantic = Runtime::ProgressiveSlotSemantic::Roughness;
+        request.TargetSemantic = Runtime::GeometryPresentationSlotSemantic::Roughness;
         request.GeneratedKey = "roughness";
         return request;
     }
@@ -285,25 +291,40 @@ namespace
     {
         Runtime::SelectedMeshTextureBakeRequest request = MakeRoughnessRequest(entity);
         request.SourcePropertyName = "v:metallic";
-        request.TargetSemantic = Runtime::ProgressiveSlotSemantic::Metallic;
+        request.TargetSemantic = Runtime::GeometryPresentationSlotSemantic::Metallic;
         request.GeneratedKey = "metallic";
         return request;
     }
 
-    [[nodiscard]] const Runtime::ProgressiveSlotBinding* FindSlot(
-        const Runtime::ProgressivePresentationBindings& bindings,
-        const Runtime::ProgressiveSlotSemantic semantic)
+    [[nodiscard]] const Runtime::GeometryPresentationSlotRecipe* FindSlot(
+        const Runtime::GeometryPresentationRecipe& bindings,
+        const Runtime::GeometryPresentationSlotSemantic semantic)
     {
         const auto* presentation =
-            Runtime::FindPresentationBinding(bindings, "mesh.surface");
+            Runtime::FindGeometryPresentationBinding(bindings, "mesh.surface");
         if (presentation == nullptr)
             return nullptr;
-        return Runtime::FindSlotBinding(*presentation, semantic);
+        return Runtime::FindGeometryPresentationSlot(*presentation, semantic);
+    }
+
+    [[nodiscard]] const Runtime::GeometryPresentationSlotStatus* FindStatus(
+        const ECS::Scene::Registry& scene,
+        const ECS::EntityHandle entity,
+        const Runtime::GeometryPresentationSlotSemantic semantic)
+    {
+        const auto* state =
+            scene.Raw().try_get<Runtime::GeometryPresentationRuntimeState>(entity);
+        if (state == nullptr)
+            return nullptr;
+        return Runtime::FindGeometryPresentationSlotStatus(
+            *state,
+            "mesh.surface",
+            semantic);
     }
 
     void ExpectPackedMetallicRoughnessPayload(
         const Assets::AssetTexture2DPayload& texture,
-        const Runtime::ProgressiveSlotSemantic semantic)
+        const Runtime::GeometryPresentationSlotSemantic semantic)
     {
         ASSERT_EQ(texture.Metadata.PixelFormat,
                   Assets::AssetTexturePixelFormat::Rgba8Unorm);
@@ -322,7 +343,7 @@ namespace
             const std::size_t offset = pixel * 4u;
             EXPECT_EQ(texture.PixelBytes[offset + 0u], std::byte{0xFF});
             EXPECT_EQ(texture.PixelBytes[offset + 3u], std::byte{0xFF});
-            if (semantic == Runtime::ProgressiveSlotSemantic::Roughness)
+            if (semantic == Runtime::GeometryPresentationSlotSemantic::Roughness)
             {
                 EXPECT_EQ(texture.PixelBytes[offset + 2u], std::byte{0x00});
                 sawAuthoredValue =
@@ -416,11 +437,11 @@ TEST(RuntimeSelectedMeshTextureBake, RepresentationDefaultsPreserveRawScalarData
     const std::vector<Runtime::BakedPropertyTextureConsumer> consumers{
         Runtime::BakedPropertyTextureConsumer{
             .PresentationKey = "mesh.surface",
-            .Semantic = Runtime::ProgressiveSlotSemantic::Albedo,
+            .Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo,
         },
         Runtime::BakedPropertyTextureConsumer{
             .PresentationKey = "mesh.surface",
-            .Semantic = Runtime::ProgressiveSlotSemantic::ScalarField,
+            .Semantic = Runtime::GeometryPresentationSlotSemantic::ScalarField,
         },
     };
     const Runtime::BakedPropertyTextureRepresentation representation =
@@ -453,7 +474,7 @@ TEST(RuntimeSelectedMeshTextureBake, NormalAndLabelDefaultsChooseEncodedStorage)
     const std::vector<Runtime::BakedPropertyTextureConsumer> normalConsumer{
         Runtime::BakedPropertyTextureConsumer{
             .PresentationKey = "mesh.surface",
-            .Semantic = Runtime::ProgressiveSlotSemantic::Normal,
+            .Semantic = Runtime::GeometryPresentationSlotSemantic::Normal,
         },
     };
     const auto normal = Runtime::ResolveBakedPropertyTextureRepresentation(
@@ -476,7 +497,7 @@ TEST(RuntimeSelectedMeshTextureBake, NormalAndLabelDefaultsChooseEncodedStorage)
     const std::vector<Runtime::BakedPropertyTextureConsumer> albedoConsumer{
         Runtime::BakedPropertyTextureConsumer{
             .PresentationKey = "mesh.surface",
-            .Semantic = Runtime::ProgressiveSlotSemantic::Albedo,
+            .Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo,
         },
     };
     const auto label = Runtime::ResolveBakedPropertyTextureRepresentation(
@@ -643,7 +664,7 @@ TEST(RuntimeSelectedMeshTextureBake, IncompatibleMaterialSlotEncodersFailClosed)
         Runtime::SelectedMeshTextureBakeStatus::IncompatibleTargetSlot);
 
     Runtime::SelectedMeshTextureBakeRequest displacement = MakeHeatRequest(entity);
-    displacement.TargetSemantic = Runtime::ProgressiveSlotSemantic::Displacement;
+    displacement.TargetSemantic = Runtime::GeometryPresentationSlotSemantic::Displacement;
     EXPECT_EQ(
         Runtime::BuildSelectedMeshTextureBakeRequest(scene, displacement).Status,
         Runtime::SelectedMeshTextureBakeStatus::UnsupportedTargetSemantic);
@@ -681,14 +702,21 @@ TEST(RuntimeSelectedMeshTextureBake, SynchronousCommandBakesBindsAndUsesHistory)
               Assets::AssetTextureSourceKind::Generated);
 
     const auto& bindings =
-        scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
-    const Runtime::ProgressiveSlotBinding* slot =
-        FindSlot(bindings, Runtime::ProgressiveSlotSemantic::Normal);
+        scene.Raw().get<Runtime::GeometryPresentationRecipe>(entity);
+    const Runtime::GeometryPresentationSlotRecipe* slot =
+        FindSlot(bindings, Runtime::GeometryPresentationSlotSemantic::Normal);
     ASSERT_NE(slot, nullptr);
     EXPECT_EQ(slot->SourceKind,
-              Runtime::ProgressiveSlotSourceKind::GeneratedTextureAsset);
-    EXPECT_EQ(slot->Readiness, Runtime::ProgressiveReadinessState::Ready);
-    EXPECT_EQ(slot->GeneratedTexture, result.GeneratedTexture);
+              Runtime::GeometryPresentationSourceKind::PropertyBake);
+    const Runtime::GeometryPresentationSlotStatus* status =
+        FindStatus(
+            scene,
+            entity,
+            Runtime::GeometryPresentationSlotSemantic::Normal);
+    ASSERT_NE(status, nullptr);
+    EXPECT_EQ(status->Readiness,
+              Runtime::GeometryPresentationReadiness::Ready);
+    EXPECT_EQ(status->GeneratedTexture, result.GeneratedTexture);
 }
 
 TEST(RuntimeSelectedMeshTextureBake, ObjectSpaceNormalQueueSchedulesSelectedMeshNormalBakeWithoutAssetService)
@@ -718,19 +746,26 @@ TEST(RuntimeSelectedMeshTextureBake, ObjectSpaceNormalQueueSchedulesSelectedMesh
               Runtime::SelectedMeshTextureBakeExecutionMode::ObjectSpaceNormalBakeQueue);
     EXPECT_FALSE(result.GeneratedTexture.IsValid());
     EXPECT_FALSE(result.BoundGeneratedTexture);
-    EXPECT_EQ(result.BindingGeneration, 8u);
+    EXPECT_EQ(result.RecipeGeneration, 8u);
     EXPECT_EQ(normalBakeQueue.PendingCount(), 1u);
     EXPECT_GT(normalBakeQueue.PendingIdentityByteCount(), 0u);
     EXPECT_EQ(normalBakeQueue.Diagnostics().QueuedRequests, 1u);
 
     const auto& bindings =
-        scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
-    const Runtime::ProgressiveSlotBinding* slot =
-        FindSlot(bindings, Runtime::ProgressiveSlotSemantic::Normal);
+        scene.Raw().get<Runtime::GeometryPresentationRecipe>(entity);
+    const Runtime::GeometryPresentationSlotRecipe* slot =
+        FindSlot(bindings, Runtime::GeometryPresentationSlotSemantic::Normal);
     ASSERT_NE(slot, nullptr);
-    EXPECT_EQ(slot->SourceKind, Runtime::ProgressiveSlotSourceKind::PropertyBake);
-    EXPECT_EQ(slot->Readiness, Runtime::ProgressiveReadinessState::Pending);
-    EXPECT_FALSE(slot->GeneratedTexture.IsValid());
+    EXPECT_EQ(slot->SourceKind, Runtime::GeometryPresentationSourceKind::PropertyBake);
+    const Runtime::GeometryPresentationSlotStatus* status =
+        FindStatus(
+            scene,
+            entity,
+            Runtime::GeometryPresentationSlotSemantic::Normal);
+    ASSERT_NE(status, nullptr);
+    EXPECT_EQ(status->Readiness,
+              Runtime::GeometryPresentationReadiness::Pending);
+    EXPECT_FALSE(status->GeneratedTexture.IsValid());
 
     auto pending = normalBakeQueue.TakePendingSubmissions();
     ASSERT_EQ(pending.size(), 1u);
@@ -739,7 +774,7 @@ TEST(RuntimeSelectedMeshTextureBake, ObjectSpaceNormalQueueSchedulesSelectedMesh
     EXPECT_EQ(pending.front().Target.StableEntityId, request.StableEntityId);
     EXPECT_EQ(pending.front().Target.BindingEpoch, 1u);
     EXPECT_EQ(pending.front().Target.PresentationKey, "mesh.surface");
-    EXPECT_EQ(pending.front().Target.ExpectedProgressiveBindingGeneration, 8u);
+    EXPECT_EQ(pending.front().Target.ExpectedRecipeGeneration, 8u);
     EXPECT_EQ(pending.front().Identity->Width, 64u);
     EXPECT_EQ(pending.front().Identity->Height, 128u);
     const auto completion = normalBakeQueue.Complete(
@@ -775,20 +810,31 @@ TEST(RuntimeSelectedMeshTextureBake, ObjectSpaceNormalQueueNoOpsOnNonOperational
     EXPECT_EQ(result.ExecutionMode,
               Runtime::SelectedMeshTextureBakeExecutionMode::ObjectSpaceNormalBakeQueue);
     EXPECT_NE(result.Diagnostic.find("no CPU fallback"), std::string::npos);
-    EXPECT_EQ(result.BindingGeneration, 0u);
+    EXPECT_EQ(result.RecipeGeneration, 0u);
     EXPECT_EQ(normalBakeQueue.PendingCount(), 0u);
     EXPECT_EQ(normalBakeQueue.PendingIdentityByteCount(), 0u);
     EXPECT_EQ(normalBakeQueue.Diagnostics().NonOperationalNoOps, 1u);
 
     const auto& bindings =
-        scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
-    EXPECT_EQ(bindings.BindingGeneration, 7u);
-    const Runtime::ProgressiveSlotBinding* slot =
-        FindSlot(bindings, Runtime::ProgressiveSlotSemantic::Normal);
+        scene.Raw().get<Runtime::GeometryPresentationRecipe>(entity);
+    EXPECT_EQ(
+        scene.Raw()
+            .get<Runtime::GeometryPresentationRuntimeState>(entity)
+            .RecipeGeneration,
+        7u);
+    const Runtime::GeometryPresentationSlotRecipe* slot =
+        FindSlot(bindings, Runtime::GeometryPresentationSlotSemantic::Normal);
     ASSERT_NE(slot, nullptr);
-    EXPECT_EQ(slot->SourceKind, Runtime::ProgressiveSlotSourceKind::PropertyBake);
-    EXPECT_EQ(slot->Readiness, Runtime::ProgressiveReadinessState::Pending);
-    EXPECT_FALSE(slot->GeneratedTexture.IsValid());
+    EXPECT_EQ(slot->SourceKind, Runtime::GeometryPresentationSourceKind::PropertyBake);
+    const Runtime::GeometryPresentationSlotStatus* status =
+        FindStatus(
+            scene,
+            entity,
+            Runtime::GeometryPresentationSlotSemantic::Normal);
+    ASSERT_NE(status, nullptr);
+    EXPECT_EQ(status->Readiness,
+              Runtime::GeometryPresentationReadiness::Pending);
+    EXPECT_FALSE(status->GeneratedTexture.IsValid());
 }
 
 TEST(RuntimeSelectedMeshTextureBake, SynchronousCommandBakesFaceColorToAlbedoSlot)
@@ -825,14 +871,21 @@ TEST(RuntimeSelectedMeshTextureBake, SynchronousCommandBakesFaceColorToAlbedoSlo
               Assets::AssetTextureColorSpace::SRGB);
 
     const auto& bindings =
-        scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
-    const Runtime::ProgressiveSlotBinding* albedo =
-        FindSlot(bindings, Runtime::ProgressiveSlotSemantic::Albedo);
+        scene.Raw().get<Runtime::GeometryPresentationRecipe>(entity);
+    const Runtime::GeometryPresentationSlotRecipe* albedo =
+        FindSlot(bindings, Runtime::GeometryPresentationSlotSemantic::Albedo);
     ASSERT_NE(albedo, nullptr);
     EXPECT_EQ(albedo->SourceKind,
-              Runtime::ProgressiveSlotSourceKind::GeneratedTextureAsset);
-    EXPECT_EQ(albedo->Readiness, Runtime::ProgressiveReadinessState::Ready);
-    EXPECT_EQ(albedo->GeneratedTexture, result.GeneratedTexture);
+              Runtime::GeometryPresentationSourceKind::PropertyBake);
+    const Runtime::GeometryPresentationSlotStatus* albedoStatus =
+        FindStatus(
+            scene,
+            entity,
+            Runtime::GeometryPresentationSlotSemantic::Albedo);
+    ASSERT_NE(albedoStatus, nullptr);
+    EXPECT_EQ(albedoStatus->Readiness,
+              Runtime::GeometryPresentationReadiness::Ready);
+    EXPECT_EQ(albedoStatus->GeneratedTexture, result.GeneratedTexture);
 }
 
 TEST(RuntimeSelectedMeshTextureBake, SynchronousCommandBakesScalarToRoughnessSlot)
@@ -863,17 +916,24 @@ TEST(RuntimeSelectedMeshTextureBake, SynchronousCommandBakesScalarToRoughnessSlo
     ASSERT_EQ(texture->size(), 1u);
     ExpectPackedMetallicRoughnessPayload(
         (*texture)[0],
-        Runtime::ProgressiveSlotSemantic::Roughness);
+        Runtime::GeometryPresentationSlotSemantic::Roughness);
 
     const auto& bindings =
-        scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
-    const Runtime::ProgressiveSlotBinding* roughness =
-        FindSlot(bindings, Runtime::ProgressiveSlotSemantic::Roughness);
+        scene.Raw().get<Runtime::GeometryPresentationRecipe>(entity);
+    const Runtime::GeometryPresentationSlotRecipe* roughness =
+        FindSlot(bindings, Runtime::GeometryPresentationSlotSemantic::Roughness);
     ASSERT_NE(roughness, nullptr);
     EXPECT_EQ(roughness->SourceKind,
-              Runtime::ProgressiveSlotSourceKind::GeneratedTextureAsset);
-    EXPECT_EQ(roughness->Readiness, Runtime::ProgressiveReadinessState::Ready);
-    EXPECT_EQ(roughness->GeneratedTexture, result.GeneratedTexture);
+              Runtime::GeometryPresentationSourceKind::PropertyBake);
+    const Runtime::GeometryPresentationSlotStatus* roughnessStatus =
+        FindStatus(
+            scene,
+            entity,
+            Runtime::GeometryPresentationSlotSemantic::Roughness);
+    ASSERT_NE(roughnessStatus, nullptr);
+    EXPECT_EQ(roughnessStatus->Readiness,
+              Runtime::GeometryPresentationReadiness::Ready);
+    EXPECT_EQ(roughnessStatus->GeneratedTexture, result.GeneratedTexture);
 }
 
 TEST(RuntimeSelectedMeshTextureBake, SynchronousCommandBakesScalarToMetallicSlot)
@@ -904,17 +964,24 @@ TEST(RuntimeSelectedMeshTextureBake, SynchronousCommandBakesScalarToMetallicSlot
     ASSERT_EQ(texture->size(), 1u);
     ExpectPackedMetallicRoughnessPayload(
         (*texture)[0],
-        Runtime::ProgressiveSlotSemantic::Metallic);
+        Runtime::GeometryPresentationSlotSemantic::Metallic);
 
     const auto& bindings =
-        scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
-    const Runtime::ProgressiveSlotBinding* metallic =
-        FindSlot(bindings, Runtime::ProgressiveSlotSemantic::Metallic);
+        scene.Raw().get<Runtime::GeometryPresentationRecipe>(entity);
+    const Runtime::GeometryPresentationSlotRecipe* metallic =
+        FindSlot(bindings, Runtime::GeometryPresentationSlotSemantic::Metallic);
     ASSERT_NE(metallic, nullptr);
     EXPECT_EQ(metallic->SourceKind,
-              Runtime::ProgressiveSlotSourceKind::GeneratedTextureAsset);
-    EXPECT_EQ(metallic->Readiness, Runtime::ProgressiveReadinessState::Ready);
-    EXPECT_EQ(metallic->GeneratedTexture, result.GeneratedTexture);
+              Runtime::GeometryPresentationSourceKind::PropertyBake);
+    const Runtime::GeometryPresentationSlotStatus* metallicStatus =
+        FindStatus(
+            scene,
+            entity,
+            Runtime::GeometryPresentationSlotSemantic::Metallic);
+    ASSERT_NE(metallicStatus, nullptr);
+    EXPECT_EQ(metallicStatus->Readiness,
+              Runtime::GeometryPresentationReadiness::Ready);
+    EXPECT_EQ(metallicStatus->GeneratedTexture, result.GeneratedTexture);
 }
 
 TEST(RuntimeSelectedMeshTextureBake, DistinctPropertiesCreateDistinctGeneratedTexturesAndBindings)
@@ -957,21 +1024,35 @@ TEST(RuntimeSelectedMeshTextureBake, DistinctPropertiesCreateDistinctGeneratedTe
               Assets::AssetTextureSourceKind::Generated);
 
     const auto& bindings =
-        scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
-    const Runtime::ProgressiveSlotBinding* normalSlot =
-        FindSlot(bindings, Runtime::ProgressiveSlotSemantic::Normal);
-    const Runtime::ProgressiveSlotBinding* albedoSlot =
-        FindSlot(bindings, Runtime::ProgressiveSlotSemantic::Albedo);
+        scene.Raw().get<Runtime::GeometryPresentationRecipe>(entity);
+    const Runtime::GeometryPresentationSlotRecipe* normalSlot =
+        FindSlot(bindings, Runtime::GeometryPresentationSlotSemantic::Normal);
+    const Runtime::GeometryPresentationSlotRecipe* albedoSlot =
+        FindSlot(bindings, Runtime::GeometryPresentationSlotSemantic::Albedo);
     ASSERT_NE(normalSlot, nullptr);
     ASSERT_NE(albedoSlot, nullptr);
     EXPECT_EQ(normalSlot->SourceKind,
-              Runtime::ProgressiveSlotSourceKind::GeneratedTextureAsset);
+              Runtime::GeometryPresentationSourceKind::PropertyBake);
     EXPECT_EQ(albedoSlot->SourceKind,
-              Runtime::ProgressiveSlotSourceKind::GeneratedTextureAsset);
-    EXPECT_EQ(normalSlot->Readiness, Runtime::ProgressiveReadinessState::Ready);
-    EXPECT_EQ(albedoSlot->Readiness, Runtime::ProgressiveReadinessState::Ready);
-    EXPECT_EQ(normalSlot->GeneratedTexture, normal.GeneratedTexture);
-    EXPECT_EQ(albedoSlot->GeneratedTexture, heat.GeneratedTexture);
+              Runtime::GeometryPresentationSourceKind::PropertyBake);
+    const Runtime::GeometryPresentationSlotStatus* normalStatus =
+        FindStatus(
+            scene,
+            entity,
+            Runtime::GeometryPresentationSlotSemantic::Normal);
+    const Runtime::GeometryPresentationSlotStatus* albedoStatus =
+        FindStatus(
+            scene,
+            entity,
+            Runtime::GeometryPresentationSlotSemantic::Albedo);
+    ASSERT_NE(normalStatus, nullptr);
+    ASSERT_NE(albedoStatus, nullptr);
+    EXPECT_EQ(normalStatus->Readiness,
+              Runtime::GeometryPresentationReadiness::Ready);
+    EXPECT_EQ(albedoStatus->Readiness,
+              Runtime::GeometryPresentationReadiness::Ready);
+    EXPECT_EQ(normalStatus->GeneratedTexture, normal.GeneratedTexture);
+    EXPECT_EQ(albedoStatus->GeneratedTexture, heat.GeneratedTexture);
 }
 
 TEST(RuntimeSelectedMeshTextureBake, ExplicitExistingGeneratedTextureReloadsPayload)
@@ -1077,24 +1158,40 @@ TEST(RuntimeSelectedMeshTextureBake, AsyncJobAppliesGeneratedTextureOnMainThread
     EXPECT_TRUE(history.IsDirty());
 
     const auto& pendingBindings =
-        scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
-    const Runtime::ProgressiveSlotBinding* pendingSlot =
-        FindSlot(pendingBindings, Runtime::ProgressiveSlotSemantic::Normal);
+        scene.Raw().get<Runtime::GeometryPresentationRecipe>(entity);
+    const Runtime::GeometryPresentationSlotRecipe* pendingSlot =
+        FindSlot(pendingBindings, Runtime::GeometryPresentationSlotSemantic::Normal);
     ASSERT_NE(pendingSlot, nullptr);
-    EXPECT_EQ(pendingSlot->Readiness, Runtime::ProgressiveReadinessState::Pending);
+    EXPECT_EQ(pendingSlot->SourceKind,
+              Runtime::GeometryPresentationSourceKind::PropertyBake);
+    const Runtime::GeometryPresentationSlotStatus* pendingStatus =
+        FindStatus(
+            scene,
+            entity,
+            Runtime::GeometryPresentationSlotSemantic::Normal);
+    ASSERT_NE(pendingStatus, nullptr);
+    EXPECT_EQ(pendingStatus->Readiness,
+              Runtime::GeometryPresentationReadiness::Pending);
 
     ASSERT_TRUE(DrainUntilTerminal(jobs, events, scheduled.Job));
     EXPECT_EQ(jobs.GetState(scheduled.Job), Runtime::JobState::Published);
 
     const auto& readyBindings =
-        scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
-    const Runtime::ProgressiveSlotBinding* readySlot =
-        FindSlot(readyBindings, Runtime::ProgressiveSlotSemantic::Normal);
+        scene.Raw().get<Runtime::GeometryPresentationRecipe>(entity);
+    const Runtime::GeometryPresentationSlotRecipe* readySlot =
+        FindSlot(readyBindings, Runtime::GeometryPresentationSlotSemantic::Normal);
     ASSERT_NE(readySlot, nullptr);
     EXPECT_EQ(readySlot->SourceKind,
-              Runtime::ProgressiveSlotSourceKind::GeneratedTextureAsset);
-    EXPECT_EQ(readySlot->Readiness, Runtime::ProgressiveReadinessState::Ready);
-    EXPECT_TRUE(readySlot->GeneratedTexture.IsValid());
+              Runtime::GeometryPresentationSourceKind::PropertyBake);
+    const Runtime::GeometryPresentationSlotStatus* readyStatus =
+        FindStatus(
+            scene,
+            entity,
+            Runtime::GeometryPresentationSlotSemantic::Normal);
+    ASSERT_NE(readyStatus, nullptr);
+    EXPECT_EQ(readyStatus->Readiness,
+              Runtime::GeometryPresentationReadiness::Ready);
+    EXPECT_TRUE(readyStatus->GeneratedTexture.IsValid());
 }
 
 TEST(RuntimeSelectedMeshTextureBake, AsyncJobStaleBindingApplyIsDiscarded)
@@ -1119,16 +1216,19 @@ TEST(RuntimeSelectedMeshTextureBake, AsyncJobStaleBindingApplyIsDiscarded)
         Runtime::ApplySelectedMeshTextureBakeCommand(context, request);
     ASSERT_EQ(scheduled.Status, Runtime::SelectedMeshTextureBakeStatus::Scheduled);
 
-    auto& bindings =
-        scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
-    ++bindings.BindingGeneration;
+    auto& runtimeState =
+        scene.Raw().get<Runtime::GeometryPresentationRuntimeState>(entity);
+    ++runtimeState.RecipeGeneration;
 
     ASSERT_TRUE(DrainUntilTerminal(jobs, events, scheduled.Job));
     EXPECT_EQ(jobs.GetState(scheduled.Job), Runtime::JobState::StaleDiscarded);
     EXPECT_EQ(jobs.Stats().StaleDiscardedJobs, 1u);
     EXPECT_EQ(jobs.Stats().PublishedCompletions, 0u);
-    const Runtime::ProgressiveSlotBinding* slot =
-        FindSlot(bindings, Runtime::ProgressiveSlotSemantic::Normal);
-    ASSERT_NE(slot, nullptr);
-    EXPECT_FALSE(slot->GeneratedTexture.IsValid());
+    const Runtime::GeometryPresentationSlotStatus* status =
+        FindStatus(
+            scene,
+            entity,
+            Runtime::GeometryPresentationSlotSemantic::Normal);
+    ASSERT_NE(status, nullptr);
+    EXPECT_FALSE(status->GeneratedTexture.IsValid());
 }

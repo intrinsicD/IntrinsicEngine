@@ -74,7 +74,7 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderExtraction;
@@ -347,7 +347,7 @@ void SetTexcoords(GS::Vertices& vertices,
 [[nodiscard]] const Runtime::SandboxEditorBoundRenderStateRow* FindBoundRow(
         const Runtime::SandboxEditorBoundRenderStateModel& bound,
         const Runtime::SandboxEditorBoundRenderStateRowKind kind,
-        const Runtime::ProgressiveSlotSemantic semantic)
+        const Runtime::GeometryPresentationSlotSemantic semantic)
     {
         for (const Runtime::SandboxEditorBoundRenderStateRow& row :
              bound.Rows)
@@ -445,61 +445,83 @@ void AddTriangleMeshSource(ECS::Scene::Registry& registry,
         SetFaces(faces, {0u});
     }
 
-[[nodiscard]] Runtime::ProgressivePresentationBindings
-    MakeProgressiveMeshPresentationBindings()
+[[nodiscard]] Runtime::GeometryPresentationRecipe
+    MakeGeometryPresentationRecipe()
     {
-        Runtime::ProgressiveSlotBinding albedo{};
-        albedo.Semantic = Runtime::ProgressiveSlotSemantic::Albedo;
-        albedo.SourceKind = Runtime::ProgressiveSlotSourceKind::UniformDefault;
-        albedo.UniformDefault = Runtime::ProgressiveDefaultValue{
+        Runtime::GeometryPresentationSlotRecipe albedo{};
+        albedo.Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo;
+        albedo.SourceKind = Runtime::GeometryPresentationSourceKind::UniformDefault;
+        albedo.UniformDefault = Runtime::GeometryPresentationDefaultValue{
             .Kind = Geometry::PropertyValueKind::Vec4,
             .Vector = glm::vec4{0.2f, 0.4f, 0.8f, 1.0f},
         };
-        albedo.Readiness = Runtime::ProgressiveReadinessState::DefaultValue;
-        albedo.Provenance =
-            Runtime::ProgressiveGeneratedOutputProvenance::UniformDefault;
-
-        Runtime::ProgressiveSlotBinding normal{};
-        normal.Semantic = Runtime::ProgressiveSlotSemantic::Normal;
-        normal.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBake;
-        normal.Property = Runtime::ProgressivePropertyBindingDescriptor{
+        Runtime::GeometryPresentationSlotRecipe normal{};
+        normal.Semantic = Runtime::GeometryPresentationSlotSemantic::Normal;
+        normal.SourceKind = Runtime::GeometryPresentationSourceKind::PropertyBake;
+        normal.Property = Runtime::GeometryPropertyRef{
             .Domain = Runtime::GeometryElementDomain::MeshVertex,
-            .PropertyName = "v:normal",
-            .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
-            .ExpectedElementCount = 3u,
+            .Name = "v:normal",
+            .ValueKind = Geometry::PropertyValueKind::Vec3,
         };
-        normal.Readiness = Runtime::ProgressiveReadinessState::Pending;
         normal.GeneratedPolicy =
-            Runtime::ProgressiveGeneratedOutputPolicy::DeterministicChildAsset;
-        normal.Provenance =
-            Runtime::ProgressiveGeneratedOutputProvenance::PropertyBinding;
-        normal.LastDiagnostic = "waiting for normal bake";
+            Runtime::GeometryGeneratedOutputPolicy::DeterministicChildAsset;
 
-        return Runtime::ProgressivePresentationBindings{
-            .Shape = Runtime::ProgressiveEntityShape::MeshLeaf,
+        return Runtime::GeometryPresentationRecipe{
+            .Shape = Runtime::GeometryPresentationShape::Mesh,
             .Lanes = {
-                Runtime::ProgressiveRenderLaneBinding{
-                    .Lane = Runtime::ProgressiveRenderLane::Surface,
+                Runtime::GeometryPresentationLaneRecipe{
+                    .Lane = Runtime::GeometryRenderLane::Surface,
                     .PresentationKey = "mesh.surface",
                 },
             },
             .Presentations = {
-                Runtime::ProgressivePresentationBinding{
+                Runtime::GeometryPresentationBindingRecipe{
                     .Key = "mesh.surface",
-                    .Kind = Runtime::ProgressivePresentationKind::SurfaceMaterial,
+                    .Kind = Runtime::GeometryPresentationKind::SurfaceMaterial,
                     .Slots = {albedo, normal},
                 },
             },
-            .BindingGeneration = 7u,
         };
     }
 
-[[nodiscard]] const Runtime::SandboxEditorProgressiveSlotModel*
-    FindProgressiveSlot(
-        const Runtime::SandboxEditorProgressiveRenderDataModel& model,
-        const Runtime::ProgressiveSlotSemantic semantic)
+    [[nodiscard]] Runtime::GeometryPresentationRuntimeState
+    MakeGeometryPresentationRuntimeState()
     {
-        for (const Runtime::SandboxEditorProgressiveSlotModel& slot :
+        return Runtime::GeometryPresentationRuntimeState{
+            .RecipeGeneration = 7u,
+            .Slots = {
+                Runtime::GeometryPresentationSlotStatus{
+                    .PresentationKey = "mesh.surface",
+                    .Semantic =
+                        Runtime::GeometryPresentationSlotSemantic::Normal,
+                    .Readiness =
+                        Runtime::GeometryPresentationReadiness::Pending,
+                    .Provenance =
+                        Runtime::GeometryPresentationProvenance::PropertyBinding,
+                    .Diagnostic = "waiting for normal bake",
+                },
+            },
+        };
+    }
+
+    void AttachGeometryPresentation(
+        ECS::Scene::Registry& registry,
+        const ECS::EntityHandle entity)
+    {
+        registry.Raw().emplace<Runtime::GeometryPresentationRecipe>(
+            entity,
+            MakeGeometryPresentationRecipe());
+        registry.Raw().emplace<Runtime::GeometryPresentationRuntimeState>(
+            entity,
+            MakeGeometryPresentationRuntimeState());
+    }
+
+[[nodiscard]] const Runtime::SandboxEditorGeometryPresentationSlotModel*
+    FindGeometryPresentationSlot(
+        const Runtime::SandboxEditorGeometryPresentationModel& model,
+        const Runtime::GeometryPresentationSlotSemantic semantic)
+    {
+        for (const Runtime::SandboxEditorGeometryPresentationSlotModel& slot :
              model.Slots)
         {
             if (slot.Semantic == semantic)
@@ -1232,7 +1254,7 @@ TEST(SandboxEditorUi, HiddenPanelBuildRequestSkipsSelectedEntityModels)
     EXPECT_EQ(stats.VertexChannelResolverScans, 0u);
     EXPECT_EQ(stats.VertexChannelScratchAllocations, 0u);
     EXPECT_EQ(stats.VertexChannelScratchBytes, 0u);
-    EXPECT_EQ(stats.ProgressiveModelBuilds, 0u);
+    EXPECT_EQ(stats.GeometryPresentationModelBuilds, 0u);
     EXPECT_EQ(stats.BoundStateModelBuilds, 0u);
     EXPECT_EQ(stats.UvDiagnosticsModelBuilds, 0u);
     EXPECT_EQ(stats.UvDiagnosticsTexcoordElementsScanned, 0u);
@@ -1278,7 +1300,7 @@ TEST(SandboxEditorUi, InspectorOnlyBuildRequestAvoidsSiblingPanelWork)
     EXPECT_GT(stats.VertexChannelResolverScans, 0u);
     EXPECT_GT(stats.VertexChannelScratchAllocations, 0u);
     EXPECT_GT(stats.VertexChannelScratchBytes, 0u);
-    EXPECT_EQ(stats.ProgressiveModelBuilds, 1u);
+    EXPECT_EQ(stats.GeometryPresentationModelBuilds, 1u);
     EXPECT_EQ(stats.BoundStateModelBuilds, 1u);
     EXPECT_EQ(stats.UvDiagnosticsModelBuilds, 1u);
     EXPECT_GT(stats.UvDiagnosticsTexcoordElementsScanned, 0u);
@@ -1350,7 +1372,7 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
     EXPECT_GT(first.ModelBuildStats.VertexChannelResolverScans, 0u);
     EXPECT_GT(first.ModelBuildStats.VertexChannelScratchAllocations, 0u);
     EXPECT_GT(first.ModelBuildStats.VertexChannelScratchBytes, 0u);
-    EXPECT_EQ(first.ModelBuildStats.ProgressiveModelBuilds, 1u);
+    EXPECT_EQ(first.ModelBuildStats.GeometryPresentationModelBuilds, 1u);
     EXPECT_EQ(first.ModelBuildStats.BoundStateModelBuilds, 1u);
     EXPECT_EQ(first.ModelBuildStats.UvDiagnosticsModelBuilds, 1u);
     EXPECT_GT(first.ModelBuildStats.UvDiagnosticsTexcoordElementsScanned, 0u);
@@ -1377,7 +1399,7 @@ TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
     EXPECT_EQ(second.ModelBuildStats.VertexChannelResolverScans, 0u);
     EXPECT_EQ(second.ModelBuildStats.VertexChannelScratchAllocations, 0u);
     EXPECT_EQ(second.ModelBuildStats.VertexChannelScratchBytes, 0u);
-    EXPECT_EQ(second.ModelBuildStats.ProgressiveModelBuilds, 0u);
+    EXPECT_EQ(second.ModelBuildStats.GeometryPresentationModelBuilds, 0u);
     EXPECT_EQ(second.ModelBuildStats.BoundStateModelBuilds, 0u);
     EXPECT_EQ(second.ModelBuildStats.UvDiagnosticsModelBuilds, 0u);
     EXPECT_EQ(second.ModelBuildStats.UvDiagnosticsTexcoordElementsScanned, 0u);
@@ -1607,16 +1629,14 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnPrimitiveGeneration)
     EXPECT_EQ(cacheStats.SelectedAnalysisCacheHits, 1u);
     EXPECT_EQ(cacheStats.Entries, 1u);
 }
-TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnProgressiveBindingGeneration)
+TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnGeometryPresentationRecipeGeneration)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
 
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "ProgressiveMesh");
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "GeometryPresentationMesh");
     AddTriangleMeshSource(registry, mesh);
-    registry.Raw().emplace<Runtime::ProgressivePresentationBindings>(
-        mesh,
-        MakeProgressiveMeshPresentationBindings());
+    AttachGeometryPresentation(registry, mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
     Runtime::SandboxEditorSelectedModelCache cache{};
@@ -1628,10 +1648,10 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnProgressiveBindingGeneratio
             context,
             MakeOnlyInspectorModelBuildRequest());
     ASSERT_TRUE(first.Inspector.HasEntity);
-    ASSERT_TRUE(first.Inspector.Progressive.HasBindings);
-    EXPECT_EQ(first.Inspector.Progressive.BindingGeneration, 7u);
+    ASSERT_TRUE(first.Inspector.GeometryPresentation.HasRecipe);
+    EXPECT_EQ(first.Inspector.GeometryPresentation.RecipeGeneration, 7u);
     EXPECT_EQ(first.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
-    EXPECT_EQ(first.ModelBuildStats.ProgressiveModelBuilds, 1u);
+    EXPECT_EQ(first.ModelBuildStats.GeometryPresentationModelBuilds, 1u);
 
     const Runtime::SandboxEditorPanelFrame cached =
         Runtime::BuildSandboxEditorPanelFrame(
@@ -1639,35 +1659,33 @@ TEST(SandboxEditorUi, SelectedModelCacheInvalidatesOnProgressiveBindingGeneratio
             MakeOnlyInspectorModelBuildRequest());
     ASSERT_TRUE(cached.Inspector.HasEntity);
     EXPECT_EQ(cached.ModelBuildStats.SelectedAnalysisCacheHits, 1u);
-    EXPECT_EQ(cached.ModelBuildStats.ProgressiveModelBuilds, 0u);
-    EXPECT_EQ(cached.Inspector.Progressive.BindingGeneration, 7u);
+    EXPECT_EQ(cached.ModelBuildStats.GeometryPresentationModelBuilds, 0u);
+    EXPECT_EQ(cached.Inspector.GeometryPresentation.RecipeGeneration, 7u);
 
-    auto& bindings =
-        registry.Raw().get<Runtime::ProgressivePresentationBindings>(mesh);
-    bindings.BindingGeneration = 8u;
-    ASSERT_FALSE(bindings.Presentations.empty());
-    ASSERT_GE(bindings.Presentations.front().Slots.size(), 2u);
-    bindings.Presentations.front().Slots[1].Readiness =
-        Runtime::ProgressiveReadinessState::Failed;
-    bindings.Presentations.front().Slots[1].LastDiagnostic =
-        "binding generation changed";
+    auto& runtimeState =
+        registry.Raw().get<Runtime::GeometryPresentationRuntimeState>(mesh);
+    runtimeState.RecipeGeneration = 8u;
+    ASSERT_FALSE(runtimeState.Slots.empty());
+    runtimeState.Slots.front().Readiness =
+        Runtime::GeometryPresentationReadiness::Failed;
+    runtimeState.Slots.front().Diagnostic = "binding generation changed";
 
     const Runtime::SandboxEditorPanelFrame changed =
         Runtime::BuildSandboxEditorPanelFrame(
             context,
             MakeOnlyInspectorModelBuildRequest());
     ASSERT_TRUE(changed.Inspector.HasEntity);
-    ASSERT_TRUE(changed.Inspector.Progressive.HasBindings);
+    ASSERT_TRUE(changed.Inspector.GeometryPresentation.HasRecipe);
     EXPECT_EQ(changed.ModelBuildStats.SelectedAnalysisCacheMisses, 1u);
     EXPECT_EQ(changed.ModelBuildStats.SelectedAnalysisCacheHits, 0u);
-    EXPECT_EQ(changed.ModelBuildStats.ProgressiveModelBuilds, 1u);
-    EXPECT_EQ(changed.Inspector.Progressive.BindingGeneration, 8u);
+    EXPECT_EQ(changed.ModelBuildStats.GeometryPresentationModelBuilds, 1u);
+    EXPECT_EQ(changed.Inspector.GeometryPresentation.RecipeGeneration, 8u);
 
-    const Runtime::SandboxEditorProgressiveSlotModel* normal =
-        FindProgressiveSlot(changed.Inspector.Progressive,
-                            Runtime::ProgressiveSlotSemantic::Normal);
+    const Runtime::SandboxEditorGeometryPresentationSlotModel* normal =
+        FindGeometryPresentationSlot(changed.Inspector.GeometryPresentation,
+                            Runtime::GeometryPresentationSlotSemantic::Normal);
     ASSERT_NE(normal, nullptr);
-    EXPECT_EQ(normal->Readiness, Runtime::ProgressiveReadinessState::Failed);
+    EXPECT_EQ(normal->Readiness, Runtime::GeometryPresentationReadiness::Failed);
     EXPECT_NE(normal->Diagnostic.find("binding generation changed"),
               std::string::npos);
 
@@ -2549,9 +2567,7 @@ TEST(SandboxEditorUi, PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection)
     faces.Properties.GetOrAdd<glm::vec4>("f:debug_color", glm::vec4{1.0f})
         .Vector() = {glm::vec4{0.1f, 0.2f, 0.3f, 1.0f}};
 
-    registry.Raw().emplace<Runtime::ProgressivePresentationBindings>(
-        mesh,
-        MakeProgressiveMeshPresentationBindings());
+    AttachGeometryPresentation(registry, mesh);
 
     Runtime::PrimitiveSelectionResult primitive{};
     primitive.Status = Runtime::PrimitiveRefineStatus::Success;
@@ -2633,7 +2649,7 @@ TEST(SandboxEditorUi, PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection)
         catalog.BindingTargets.end(),
         [](const Runtime::SandboxEditorPropertyBindingTargetModel& target)
         {
-            return target.Semantic == Runtime::ProgressiveSlotSemantic::Normal;
+            return target.Semantic == Runtime::GeometryPresentationSlotSemantic::Normal;
         });
     ASSERT_NE(normalTarget, catalog.BindingTargets.end());
     EXPECT_EQ(normalTarget->RequiredDomain,
@@ -2650,8 +2666,8 @@ TEST(SandboxEditorUi, PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection)
     EXPECT_EQ(meshWindow.PropertyCatalog.Rows.size(), catalog.Rows.size());
     EXPECT_FALSE(meshWindow.BoundState.Rows.empty());
     EXPECT_NE(FindBoundRow(meshWindow.BoundState,
-                           Runtime::SandboxEditorBoundRenderStateRowKind::ProgressiveSlot,
-                           Runtime::ProgressiveSlotSemantic::Normal),
+                           Runtime::SandboxEditorBoundRenderStateRowKind::GeometryPresentationSlot,
+                           Runtime::GeometryPresentationSlotSemantic::Normal),
               nullptr);
 
     EXPECT_STREQ(Runtime::DebugNameForSandboxEditorPropertyCatalogDomain(
@@ -3148,11 +3164,11 @@ TEST(SandboxEditorUi, SelectionDetailsModelReportsHoveredEntityAndPrimitiveIds)
                      frame.Selection.Primitive.Primitive.Kind),
                  "Face");
 }
-TEST(SandboxEditorUi, ProgressiveInspectorReportsSlotsPropertiesAndJobs)
+TEST(SandboxEditorUi, GeometryPresentationInspectorReportsSlotsPropertiesAndJobs)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "ProgressiveMesh");
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "GeometryPresentationMesh");
     AddTriangleMeshSource(registry, mesh);
     auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
     vertices.Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f})
@@ -3169,9 +3185,7 @@ TEST(SandboxEditorUi, ProgressiveInspectorReportsSlotsPropertiesAndJobs)
         };
     vertices.Properties.GetOrAdd<float>("v:temperature", 0.0f)
         .Vector() = {0.0f, 0.5f, 1.0f};
-    registry.Raw().emplace<Runtime::ProgressivePresentationBindings>(
-        mesh,
-        MakeProgressiveMeshPresentationBindings());
+    AttachGeometryPresentation(registry, mesh);
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
     const std::uint32_t stableId =
@@ -3198,10 +3212,10 @@ TEST(SandboxEditorUi, ProgressiveInspectorReportsSlotsPropertiesAndJobs)
             .Identity = Runtime::SandboxEditorJobIdentity{
                 .EntityId = stableId,
                 .Scope = Runtime::SandboxEditorJobScope::MeshVertex,
-                .OutputSemantic = Runtime::ProgressiveSlotSemantic::Normal,
+                .OutputSemantic = Runtime::GeometryPresentationSlotSemantic::Normal,
                 .OutputName = "normal",
             },
-            .Name = "progressive job",
+            .Name = "presentation job",
             .State = statuses[i],
             .Dependencies = {
                 Runtime::SandboxEditorJobDependency{
@@ -3222,32 +3236,32 @@ TEST(SandboxEditorUi, ProgressiveInspectorReportsSlotsPropertiesAndJobs)
         Runtime::BuildSandboxEditorPanelFrame(context);
 
     ASSERT_TRUE(frame.Inspector.HasEntity);
-    const Runtime::SandboxEditorProgressiveRenderDataModel& progressive =
-        frame.Inspector.Progressive;
-    ASSERT_TRUE(progressive.HasBindings);
-    EXPECT_EQ(progressive.Shape, Runtime::ProgressiveEntityShape::MeshLeaf);
-    EXPECT_EQ(progressive.BindingGeneration, 7u);
-    EXPECT_EQ(progressive.Slots.size(), 2u);
-    EXPECT_EQ(progressive.Jobs.size(), statuses.size());
-    EXPECT_EQ(progressive.Jobs[0].Status, Runtime::JobState::AwaitingDependencies);
-    ASSERT_EQ(progressive.Jobs[0].Dependencies.size(), 1u);
-    EXPECT_EQ(progressive.Jobs[0].Dependencies[0].Reason, "normal requires uv");
-    EXPECT_EQ(progressive.Jobs[5].Diagnostic, "failed bake");
+    const Runtime::SandboxEditorGeometryPresentationModel& presentation =
+        frame.Inspector.GeometryPresentation;
+    ASSERT_TRUE(presentation.HasRecipe);
+    EXPECT_EQ(presentation.Shape, Runtime::GeometryPresentationShape::Mesh);
+    EXPECT_EQ(presentation.RecipeGeneration, 7u);
+    EXPECT_EQ(presentation.Slots.size(), 2u);
+    EXPECT_EQ(presentation.Jobs.size(), statuses.size());
+    EXPECT_EQ(presentation.Jobs[0].Status, Runtime::JobState::AwaitingDependencies);
+    ASSERT_EQ(presentation.Jobs[0].Dependencies.size(), 1u);
+    EXPECT_EQ(presentation.Jobs[0].Dependencies[0].Reason, "normal requires uv");
+    EXPECT_EQ(presentation.Jobs[5].Diagnostic, "failed bake");
 
-    const Runtime::SandboxEditorProgressiveSlotModel* normal =
-        FindProgressiveSlot(progressive, Runtime::ProgressiveSlotSemantic::Normal);
+    const Runtime::SandboxEditorGeometryPresentationSlotModel* normal =
+        FindGeometryPresentationSlot(presentation, Runtime::GeometryPresentationSlotSemantic::Normal);
     ASSERT_NE(normal, nullptr);
-    EXPECT_EQ(normal->Readiness, Runtime::ProgressiveReadinessState::Pending);
-    EXPECT_EQ(normal->Property.PropertyName, "v:normal");
+    EXPECT_EQ(normal->Readiness, Runtime::GeometryPresentationReadiness::Pending);
+    EXPECT_EQ(normal->Property.Name, "v:normal");
     ASSERT_FALSE(normal->PropertyOptions.empty());
     EXPECT_TRUE(normal->PropertyOptions.front().Compatible);
 
     const auto disabled = std::find_if(
         normal->PropertyOptions.begin(),
         normal->PropertyOptions.end(),
-        [](const Runtime::SandboxEditorProgressivePropertyOptionModel& option)
+        [](const Runtime::SandboxEditorGeometryPresentationPropertyOptionModel& option)
         {
-            return option.Descriptor.PropertyName == "v:temperature";
+            return option.Descriptor.Name == "v:temperature";
         });
     ASSERT_NE(disabled, normal->PropertyOptions.end());
     EXPECT_FALSE(disabled->Compatible);
@@ -3257,18 +3271,18 @@ TEST(SandboxEditorUi, ProgressiveInspectorReportsSlotsPropertiesAndJobs)
         frame.Inspector.BoundState;
     EXPECT_TRUE(bound.HasSelectedEntity);
     EXPECT_EQ(bound.SelectedStableId, stableId);
-    EXPECT_EQ(bound.BindingGeneration, progressive.BindingGeneration);
-    EXPECT_GE(bound.Rows.size(), progressive.Slots.size() + progressive.Jobs.size());
+    EXPECT_EQ(bound.RecipeGeneration, presentation.RecipeGeneration);
+    EXPECT_GE(bound.Rows.size(), presentation.Slots.size() + presentation.Jobs.size());
 
     const Runtime::SandboxEditorBoundRenderStateRow* normalBound =
         FindBoundRow(bound,
-                     Runtime::SandboxEditorBoundRenderStateRowKind::ProgressiveSlot,
-                     Runtime::ProgressiveSlotSemantic::Normal);
+                     Runtime::SandboxEditorBoundRenderStateRowKind::GeometryPresentationSlot,
+                     Runtime::GeometryPresentationSlotSemantic::Normal);
     ASSERT_NE(normalBound, nullptr);
     EXPECT_EQ(normalBound->SourceKind,
-              Runtime::ProgressiveSlotSourceKind::PropertyBake);
-    EXPECT_EQ(normalBound->Readiness, Runtime::ProgressiveReadinessState::Pending);
-    EXPECT_EQ(normalBound->Property.PropertyName, "v:normal");
+              Runtime::GeometryPresentationSourceKind::PropertyBake);
+    EXPECT_EQ(normalBound->Readiness, Runtime::GeometryPresentationReadiness::Pending);
+    EXPECT_EQ(normalBound->Property.Name, "v:normal");
     EXPECT_TRUE(normalBound->HasCatalogMatch);
     ASSERT_TRUE(normalBound->CatalogRowIndex.has_value());
     EXPECT_EQ(frame.Inspector.PropertyCatalog.Rows[*normalBound->CatalogRowIndex].Name,
@@ -3289,19 +3303,19 @@ TEST(SandboxEditorUi, ProgressiveInspectorReportsSlotsPropertiesAndJobs)
                      Runtime::SandboxEditorBoundRenderStateRowKind::DerivedJob),
                  "DerivedJob");
 }
-TEST(SandboxEditorUi, ProgressiveInspectorInfersGraphPointCloudAndComposition)
+TEST(SandboxEditorUi, GeometryPresentationInspectorInfersGraphPointCloudAndComposition)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
 
-    const ECS::EntityHandle graph = MakeSelectable(registry, "ProgressiveGraph");
+    const ECS::EntityHandle graph = MakeSelectable(registry, "GeometryPresentationGraph");
     AddGraphSource(registry, graph);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
     Runtime::SandboxEditorPanelFrame frame =
         Runtime::BuildSandboxEditorPanelFrame(context);
-    EXPECT_EQ(frame.Inspector.Progressive.Shape,
-              Runtime::ProgressiveEntityShape::GraphLeaf);
+    EXPECT_EQ(frame.Inspector.GeometryPresentation.Shape,
+              Runtime::GeometryPresentationShape::Graph);
     const Runtime::SandboxEditorBoundRenderStateRow* graphBake =
         FindBoundRowLabel(
             frame.Inspector.BoundState,
@@ -3311,12 +3325,12 @@ TEST(SandboxEditorUi, ProgressiveInspectorInfersGraphPointCloudAndComposition)
     EXPECT_FALSE(graphBake->Enabled);
     EXPECT_FALSE(graphBake->DisabledReason.empty());
 
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "ProgressiveCloud");
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "GeometryPresentationCloud");
     AddPointCloudSource(registry, cloud, 3u);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
     frame = Runtime::BuildSandboxEditorPanelFrame(context);
-    EXPECT_EQ(frame.Inspector.Progressive.Shape,
-              Runtime::ProgressiveEntityShape::PointCloudLeaf);
+    EXPECT_EQ(frame.Inspector.GeometryPresentation.Shape,
+              Runtime::GeometryPresentationShape::PointCloud);
     const Runtime::SandboxEditorBoundRenderStateRow* cloudBake =
         FindBoundRowLabel(
             frame.Inspector.BoundState,
@@ -3325,12 +3339,12 @@ TEST(SandboxEditorUi, ProgressiveInspectorInfersGraphPointCloudAndComposition)
     ASSERT_NE(cloudBake, nullptr);
     EXPECT_FALSE(cloudBake->Enabled);
 
-    const ECS::EntityHandle parent = MakeSelectable(registry, "ProgressiveModel");
-    const ECS::EntityHandle child = MakeSelectable(registry, "ProgressiveChild");
+    const ECS::EntityHandle parent = MakeSelectable(registry, "GeometryPresentationModel");
+    const ECS::EntityHandle child = MakeSelectable(registry, "GeometryPresentationChild");
     const ECS::EntityHandle secondChild =
-        MakeSelectable(registry, "ProgressiveSecondChild");
+        MakeSelectable(registry, "GeometryPresentationSecondChild");
     const ECS::EntityHandle grandchild =
-        MakeSelectable(registry, "ProgressiveGrandchild");
+        MakeSelectable(registry, "GeometryPresentationGrandchild");
     AddTriangleMeshSource(registry, child);
     auto& childVertices = registry.Raw().get<GS::Vertices>(child);
     childVertices.Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f})
@@ -3339,9 +3353,7 @@ TEST(SandboxEditorUi, ProgressiveInspectorInfersGraphPointCloudAndComposition)
             glm::vec3{0.0f, 0.0f, 1.0f},
             glm::vec3{0.0f, 0.0f, 1.0f},
         };
-    registry.Raw().emplace<Runtime::ProgressivePresentationBindings>(
-        child,
-        MakeProgressiveMeshPresentationBindings());
+    AttachGeometryPresentation(registry, child);
     ECS::Hierarchy::Attach(registry.Raw(), child, parent);
     ECS::Hierarchy::Attach(registry.Raw(), secondChild, parent);
     ECS::Hierarchy::Attach(registry.Raw(), grandchild, child);
@@ -3352,7 +3364,7 @@ TEST(SandboxEditorUi, ProgressiveInspectorInfersGraphPointCloudAndComposition)
         .Identity = Runtime::SandboxEditorJobIdentity{
             .EntityId = Runtime::SelectionController::ToStableEntityId(child),
             .Scope = Runtime::SandboxEditorJobScope::MeshVertex,
-            .OutputSemantic = Runtime::ProgressiveSlotSemantic::Normal,
+            .OutputSemantic = Runtime::GeometryPresentationSlotSemantic::Normal,
             .OutputName = "normal",
         },
         .Name = "child normal bake",
@@ -3362,14 +3374,14 @@ TEST(SandboxEditorUi, ProgressiveInspectorInfersGraphPointCloudAndComposition)
     ASSERT_TRUE(selection.SetSelectedEntity(registry, parent));
     frame = Runtime::BuildSandboxEditorPanelFrame(context);
 
-    EXPECT_EQ(frame.Inspector.Progressive.Shape,
-              Runtime::ProgressiveEntityShape::Composition);
-    EXPECT_TRUE(frame.Inspector.Progressive.Composition.HasChildren);
-    EXPECT_EQ(frame.Inspector.Progressive.Composition.ChildCount, 2u);
-    EXPECT_EQ(frame.Inspector.Progressive.Composition.ChildBindingsCount, 1u);
-    EXPECT_EQ(frame.Inspector.Progressive.Composition.ChildPendingSlotCount, 1u);
-    EXPECT_EQ(frame.Inspector.Progressive.Composition.ChildJobCount, 1u);
-    EXPECT_EQ(frame.Inspector.Progressive.Composition.ChildActiveJobCount, 1u);
+    EXPECT_EQ(frame.Inspector.GeometryPresentation.Shape,
+              Runtime::GeometryPresentationShape::Composition);
+    EXPECT_TRUE(frame.Inspector.GeometryPresentation.Composition.HasChildren);
+    EXPECT_EQ(frame.Inspector.GeometryPresentation.Composition.ChildCount, 2u);
+    EXPECT_EQ(frame.Inspector.GeometryPresentation.Composition.ChildRecipeCount, 1u);
+    EXPECT_EQ(frame.Inspector.GeometryPresentation.Composition.ChildPendingSlotCount, 1u);
+    EXPECT_EQ(frame.Inspector.GeometryPresentation.Composition.ChildJobCount, 1u);
+    EXPECT_EQ(frame.Inspector.GeometryPresentation.Composition.ChildActiveJobCount, 1u);
     const Runtime::SandboxEditorBoundRenderStateRow* composition =
         FindBoundRowLabel(
             frame.Inspector.BoundState,
@@ -3377,21 +3389,21 @@ TEST(SandboxEditorUi, ProgressiveInspectorInfersGraphPointCloudAndComposition)
             "Composition summary");
     ASSERT_NE(composition, nullptr);
     EXPECT_EQ(composition->Readiness,
-              Runtime::ProgressiveReadinessState::Pending);
+              Runtime::GeometryPresentationReadiness::Pending);
     EXPECT_EQ(frame.Inspector.BoundState.Composition.ChildCount, 2u);
 }
 
-TEST(SandboxEditorUi, ProgressiveCompositionReportsCorruptHierarchyWithoutPartialSummary)
+TEST(SandboxEditorUi, GeometryPresentationCompositionReportsCorruptHierarchyWithoutPartialSummary)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
 
     const ECS::EntityHandle parent =
-        MakeSelectable(registry, "CorruptProgressiveModel");
+        MakeSelectable(registry, "CorruptGeometryPresentationModel");
     const ECS::EntityHandle child =
-        MakeSelectable(registry, "CorruptProgressiveChild");
+        MakeSelectable(registry, "CorruptGeometryPresentationChild");
     const ECS::EntityHandle danglingSibling =
-        MakeSelectable(registry, "DestroyedProgressiveSibling");
+        MakeSelectable(registry, "DestroyedGeometryPresentationSibling");
     ECS::Hierarchy::Attach(registry.Raw(), child, parent);
     registry.Destroy(danglingSibling);
 
@@ -3406,19 +3418,19 @@ TEST(SandboxEditorUi, ProgressiveCompositionReportsCorruptHierarchyWithoutPartia
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
     const Runtime::SandboxEditorPanelFrame frame =
         Runtime::BuildSandboxEditorPanelFrame(context);
-    const Runtime::SandboxEditorProgressiveRenderDataModel& progressive =
-        frame.Inspector.Progressive;
+    const Runtime::SandboxEditorGeometryPresentationModel& presentation =
+        frame.Inspector.GeometryPresentation;
 
-    EXPECT_FALSE(progressive.Composition.HasChildren);
-    EXPECT_EQ(progressive.Composition.ChildCount, 0u);
-    EXPECT_EQ(progressive.Composition.ChildBindingsCount, 0u);
-    EXPECT_EQ(progressive.Composition.ChildSlotCount, 0u);
+    EXPECT_FALSE(presentation.Composition.HasChildren);
+    EXPECT_EQ(presentation.Composition.ChildCount, 0u);
+    EXPECT_EQ(presentation.Composition.ChildRecipeCount, 0u);
+    EXPECT_EQ(presentation.Composition.ChildSlotCount, 0u);
     EXPECT_TRUE(HasDiagnostic(
-        progressive.Diagnostics,
+        presentation.Diagnostics,
         Runtime::SandboxEditorDiagnosticCode::CorruptHierarchy));
-    ASSERT_EQ(progressive.Diagnostics.size(), 1u);
+    ASSERT_EQ(presentation.Diagnostics.size(), 1u);
     EXPECT_NE(
-        progressive.Diagnostics.front().Message.find("DanglingLink"),
+        presentation.Diagnostics.front().Message.find("DanglingLink"),
         std::string::npos);
     EXPECT_STREQ(
         Runtime::DebugNameForSandboxEditorDiagnosticCode(

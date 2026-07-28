@@ -34,7 +34,7 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeBinding;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeService;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.WorldHandle;
@@ -109,7 +109,7 @@ namespace
             .Entity = entity,
             .StableEntityId =
                 Runtime::StableEntityLookup::ToRenderId(entity),
-            .Semantic = Runtime::ProgressiveSlotSemantic::Normal,
+            .Semantic = Runtime::GeometryPresentationSlotSemantic::Normal,
         };
     }
 
@@ -307,50 +307,61 @@ namespace
         return entity;
     }
 
-    [[nodiscard]] Runtime::ProgressivePresentationBindings
+    [[nodiscard]] Runtime::GeometryPresentationRecipe
     MakePendingNormalBindings()
     {
-        Runtime::ProgressiveSlotBinding normal{};
-        normal.Semantic = Runtime::ProgressiveSlotSemantic::Normal;
+        Runtime::GeometryPresentationSlotRecipe normal{};
+        normal.Semantic = Runtime::GeometryPresentationSlotSemantic::Normal;
         normal.SourceKind =
-            Runtime::ProgressiveSlotSourceKind::PropertyBake;
+            Runtime::GeometryPresentationSourceKind::PropertyBake;
         normal.Property =
-            Runtime::ProgressivePropertyBindingDescriptor{
+            Runtime::GeometryPropertyRef{
                 .Domain =
                     Runtime::GeometryElementDomain::MeshVertex,
-                .PropertyName = "v:normal",
-                .ExpectedValueKind =
-                    Geometry::PropertyValueKind::Vec3,
-                .ExpectedElementCount = 3u,
+                .Name = "v:normal",
+                .ValueKind = Geometry::PropertyValueKind::Vec3,
             };
         normal.GeneratedPolicy =
-            Runtime::ProgressiveGeneratedOutputPolicy::
+            Runtime::GeometryGeneratedOutputPolicy::
                 DeterministicChildAsset;
-        normal.Provenance =
-            Runtime::ProgressiveGeneratedOutputProvenance::
-                PropertyBinding;
-        normal.Readiness =
-            Runtime::ProgressiveReadinessState::Pending;
-        normal.LastDiagnostic = "original pending normal bake";
-
-        return Runtime::ProgressivePresentationBindings{
-            .Shape = Runtime::ProgressiveEntityShape::MeshLeaf,
+        return Runtime::GeometryPresentationRecipe{
+            .Shape = Runtime::GeometryPresentationShape::Mesh,
             .Lanes = {
-                Runtime::ProgressiveRenderLaneBinding{
-                    .Lane = Runtime::ProgressiveRenderLane::Surface,
+                Runtime::GeometryPresentationLaneRecipe{
+                    .Lane = Runtime::GeometryRenderLane::Surface,
                     .PresentationKey = "mesh.surface",
                 },
             },
             .Presentations = {
-                Runtime::ProgressivePresentationBinding{
+                Runtime::GeometryPresentationBindingRecipe{
                     .Key = "mesh.surface",
                     .Kind =
-                        Runtime::ProgressivePresentationKind::
+                        Runtime::GeometryPresentationKind::
                             SurfaceMaterial,
                     .Slots = {std::move(normal)},
                 },
             },
-            .BindingGeneration = 7u,
+        };
+    }
+
+    [[nodiscard]] Runtime::GeometryPresentationRuntimeState
+    MakePendingNormalRuntimeState()
+    {
+        return Runtime::GeometryPresentationRuntimeState{
+            .RecipeGeneration = 7u,
+            .Slots = {
+                Runtime::GeometryPresentationSlotStatus{
+                    .PresentationKey = "mesh.surface",
+                    .Semantic =
+                        Runtime::GeometryPresentationSlotSemantic::Normal,
+                    .Readiness =
+                        Runtime::GeometryPresentationReadiness::Pending,
+                    .Provenance =
+                        Runtime::GeometryPresentationProvenance::
+                            PropertyBinding,
+                    .Diagnostic = "original pending normal bake",
+                },
+            },
         };
     }
 
@@ -381,7 +392,7 @@ namespace
                 Graphics::MaterialNormalTextureSpace::
                     TangentSpaceNormal,
         };
-        bool HasProgressiveBinding{false};
+        bool HasPresentationRecipe{false};
 
         BindingFixture()
         {
@@ -406,22 +417,27 @@ namespace
         }
 
         [[nodiscard]] bool Initialize(
-            const bool withProgressiveBinding)
+            const bool withPresentationRecipe)
         {
             if (Renderer == nullptr || GpuAssets == nullptr)
                 return false;
 
-            HasProgressiveBinding = withProgressiveBinding;
+            HasPresentationRecipe = withPresentationRecipe;
             Entity = MakeRenderableTriangle(Scene, 0.0f);
             StableEntityId =
                 Runtime::StableEntityLookup::ToRenderId(Entity);
-            if (withProgressiveBinding)
+            if (withPresentationRecipe)
             {
                 Scene.Raw()
                     .emplace<
-                        Runtime::ProgressivePresentationBindings>(
+                        Runtime::GeometryPresentationRecipe>(
                         Entity,
                         MakePendingNormalBindings());
+                Scene.Raw()
+                    .emplace<
+                        Runtime::GeometryPresentationRuntimeState>(
+                        Entity,
+                        MakePendingNormalRuntimeState());
             }
 
             const auto extracted =
@@ -442,12 +458,12 @@ namespace
                 .Entity = Entity,
                 .StableEntityId = StableEntityId,
                 .Semantic =
-                    Runtime::ProgressiveSlotSemantic::Normal,
+                    Runtime::GeometryPresentationSlotSemantic::Normal,
             };
-            if (withProgressiveBinding)
+            if (withPresentationRecipe)
             {
                 target.PresentationKey = "mesh.surface";
-                target.ExpectedProgressiveBindingGeneration = 7u;
+                target.ExpectedRecipeGeneration = 7u;
             }
 
             const auto request =
@@ -580,7 +596,7 @@ namespace
 
     void ExpectBindingStateUnchanged(
         const BindingFixture& fixture,
-        const std::uint64_t expectedProgressiveGeneration = 7u)
+        const std::uint64_t expectedRecipeGeneration = 7u)
     {
         EXPECT_TRUE(fixture.Queue.IsLatest(fixture.StaleKey));
         EXPECT_EQ(fixture.Queue.PendingCount(), 1u);
@@ -608,7 +624,7 @@ namespace
                 fixture.OriginalMaterial.NormalSpace);
         }
 
-        if (!fixture.HasProgressiveBinding ||
+        if (!fixture.HasPresentationRecipe ||
             !fixture.Scene.IsValid(fixture.Entity))
         {
             return;
@@ -616,51 +632,57 @@ namespace
         const auto* bindings =
             fixture.Scene.Raw()
                 .try_get<
-                    Runtime::ProgressivePresentationBindings>(
+                    Runtime::GeometryPresentationRecipe>(
                     fixture.Entity);
         EXPECT_NE(bindings, nullptr);
         if (bindings == nullptr)
             return;
-        EXPECT_EQ(
-            bindings->BindingGeneration,
-            expectedProgressiveGeneration);
+        const auto* runtimeState =
+            fixture.Scene.Raw()
+                .try_get<Runtime::GeometryPresentationRuntimeState>(
+                    fixture.Entity);
+        ASSERT_NE(runtimeState, nullptr);
+        EXPECT_EQ(runtimeState->RecipeGeneration,
+                  expectedRecipeGeneration);
         const auto* presentation =
-            Runtime::FindPresentationBinding(
+            Runtime::FindGeometryPresentationBinding(
                 *bindings,
                 "mesh.surface");
         EXPECT_NE(presentation, nullptr);
         if (presentation == nullptr)
             return;
         const auto* normal =
-            Runtime::FindSlotBinding(
+            Runtime::FindGeometryPresentationSlot(
                 *presentation,
-                Runtime::ProgressiveSlotSemantic::Normal);
+                Runtime::GeometryPresentationSlotSemantic::Normal);
         EXPECT_NE(normal, nullptr);
         if (normal == nullptr)
             return;
         EXPECT_EQ(
             normal->SourceKind,
-            Runtime::ProgressiveSlotSourceKind::PropertyBake);
-        EXPECT_EQ(
-            normal->Provenance,
-            Runtime::ProgressiveGeneratedOutputProvenance::
-                PropertyBinding);
-        EXPECT_EQ(
-            normal->Readiness,
-            Runtime::ProgressiveReadinessState::Pending);
-        EXPECT_FALSE(normal->GeneratedTexture.IsValid());
-        EXPECT_EQ(
-            normal->LastDiagnostic,
-            "original pending normal bake");
+            Runtime::GeometryPresentationSourceKind::PropertyBake);
+        const auto* normalStatus =
+            Runtime::FindGeometryPresentationSlotStatus(
+                *runtimeState,
+                "mesh.surface",
+                Runtime::GeometryPresentationSlotSemantic::Normal);
+        ASSERT_NE(normalStatus, nullptr);
+        EXPECT_EQ(normalStatus->Provenance,
+                  Runtime::GeometryPresentationProvenance::PropertyBinding);
+        EXPECT_EQ(normalStatus->Readiness,
+                  Runtime::GeometryPresentationReadiness::Pending);
+        EXPECT_FALSE(normalStatus->GeneratedTexture.IsValid());
+        EXPECT_EQ(normalStatus->Diagnostic,
+                  "original pending normal bake");
     }
 }
 
 TEST(ObjectSpaceNormalBakeService,
-     PendingExactTextureLeavesQueueMaterialAndProgressiveStateUntouched)
+     PendingExactTextureLeavesQueueMaterialAndPresentationStateUntouched)
 {
     BindingFixture fixture;
     ASSERT_TRUE(fixture.Initialize(
-        /*withProgressiveBinding=*/true));
+        /*withPresentationRecipe=*/true));
     const auto cacheGeneration =
         fixture.BeginGeneratedTexture(/*ready=*/false);
     ASSERT_TRUE(cacheGeneration.has_value());
@@ -682,11 +704,11 @@ TEST(ObjectSpaceNormalBakeService,
 }
 
 TEST(ObjectSpaceNormalBakeService,
-     ExactReadyProgressiveCompletionCommitsMaterialAndSlotTogether)
+     ExactReadyPresentationCompletionCommitsMaterialAndSlotTogether)
 {
     BindingFixture fixture;
     ASSERT_TRUE(fixture.Initialize(
-        /*withProgressiveBinding=*/true));
+        /*withPresentationRecipe=*/true));
     const auto cacheGeneration =
         fixture.BeginGeneratedTexture(/*ready=*/true);
     ASSERT_TRUE(cacheGeneration.has_value());
@@ -726,34 +748,41 @@ TEST(ObjectSpaceNormalBakeService,
 
     const auto* progressive =
         fixture.Scene.Raw()
-            .try_get<Runtime::ProgressivePresentationBindings>(
+            .try_get<Runtime::GeometryPresentationRecipe>(
                 fixture.Entity);
     ASSERT_NE(progressive, nullptr);
-    EXPECT_EQ(progressive->BindingGeneration, 8u);
+    const auto* runtimeState =
+        fixture.Scene.Raw()
+            .try_get<Runtime::GeometryPresentationRuntimeState>(
+                fixture.Entity);
+    ASSERT_NE(runtimeState, nullptr);
+    EXPECT_EQ(runtimeState->RecipeGeneration, 7u);
     const auto* presentation =
-        Runtime::FindPresentationBinding(
+        Runtime::FindGeometryPresentationBinding(
             *progressive,
             "mesh.surface");
     ASSERT_NE(presentation, nullptr);
     const auto* normal =
-        Runtime::FindSlotBinding(
+        Runtime::FindGeometryPresentationSlot(
             *presentation,
-            Runtime::ProgressiveSlotSemantic::Normal);
+            Runtime::GeometryPresentationSlotSemantic::Normal);
     ASSERT_NE(normal, nullptr);
     EXPECT_EQ(
         normal->SourceKind,
-        Runtime::ProgressiveSlotSourceKind::
-            GeneratedTextureAsset);
-    EXPECT_EQ(
-        normal->GeneratedTexture,
-        fixture.GeneratedTexture);
-    EXPECT_EQ(
-        normal->Provenance,
-        Runtime::ProgressiveGeneratedOutputProvenance::
-            GeneratedTextureAsset);
-    EXPECT_EQ(
-        normal->Readiness,
-        Runtime::ProgressiveReadinessState::Ready);
+        Runtime::GeometryPresentationSourceKind::PropertyBake);
+    const auto* normalStatus =
+        Runtime::FindGeometryPresentationSlotStatus(
+            *runtimeState,
+            "mesh.surface",
+            Runtime::GeometryPresentationSlotSemantic::Normal);
+    ASSERT_NE(normalStatus, nullptr);
+    EXPECT_EQ(normalStatus->GeneratedTexture,
+              fixture.GeneratedTexture);
+    EXPECT_EQ(normalStatus->Provenance,
+              Runtime::GeometryPresentationProvenance::GeneratedTextureAsset);
+    EXPECT_EQ(normalStatus->Readiness,
+              Runtime::GeometryPresentationReadiness::Ready);
+    EXPECT_EQ(normalStatus->OutputGeneration, 1u);
 }
 
 TEST(ObjectSpaceNormalBakeService,
@@ -762,7 +791,7 @@ TEST(ObjectSpaceNormalBakeService,
     {
         BindingFixture fixture;
         ASSERT_TRUE(fixture.Initialize(
-            /*withProgressiveBinding=*/true));
+            /*withPresentationRecipe=*/true));
         const auto cacheGeneration =
             fixture.BeginGeneratedTexture(/*ready=*/true);
         ASSERT_TRUE(cacheGeneration.has_value());
@@ -785,7 +814,7 @@ TEST(ObjectSpaceNormalBakeService,
     {
         BindingFixture fixture;
         ASSERT_TRUE(fixture.Initialize(
-            /*withProgressiveBinding=*/false));
+            /*withPresentationRecipe=*/false));
         const auto cacheGeneration =
             fixture.BeginGeneratedTexture(/*ready=*/true);
         ASSERT_TRUE(cacheGeneration.has_value());
@@ -806,20 +835,20 @@ TEST(ObjectSpaceNormalBakeService,
 }
 
 TEST(ObjectSpaceNormalBakeService,
-     ChangedProgressiveGenerationRejectsWithoutPartialMaterialOrSlotMutation)
+     ChangedPresentationRecipeGenerationRejectsWithoutPartialMaterialOrSlotMutation)
 {
     BindingFixture fixture;
     ASSERT_TRUE(fixture.Initialize(
-        /*withProgressiveBinding=*/true));
+        /*withPresentationRecipe=*/true));
     const auto cacheGeneration =
         fixture.BeginGeneratedTexture(/*ready=*/true);
     ASSERT_TRUE(cacheGeneration.has_value());
     auto* progressive =
         fixture.Scene.Raw()
-            .try_get<Runtime::ProgressivePresentationBindings>(
+            .try_get<Runtime::GeometryPresentationRuntimeState>(
                 fixture.Entity);
     ASSERT_NE(progressive, nullptr);
-    progressive->BindingGeneration = 8u;
+    progressive->RecipeGeneration = 8u;
 
     const auto bound =
         Runtime::TryBindReadyObjectSpaceNormalBake(
@@ -829,11 +858,11 @@ TEST(ObjectSpaceNormalBakeService,
     EXPECT_EQ(
         bound.Status,
         Runtime::RuntimeObjectSpaceNormalBakeBindingStatus::
-            StaleProgressiveState);
+            StalePresentationState);
     EXPECT_FALSE(bound.Succeeded());
     ExpectBindingStateUnchanged(
         fixture,
-        /*expectedProgressiveGeneration=*/8u);
+        /*expectedRecipeGeneration=*/8u);
 }
 
 TEST(ObjectSpaceNormalBakeService,
@@ -841,7 +870,7 @@ TEST(ObjectSpaceNormalBakeService,
 {
     BindingFixture fixture;
     ASSERT_TRUE(fixture.Initialize(
-        /*withProgressiveBinding=*/true));
+        /*withPresentationRecipe=*/true));
     const auto cacheGeneration =
         fixture.BeginGeneratedTexture(/*ready=*/true);
     ASSERT_TRUE(cacheGeneration.has_value());
@@ -1125,7 +1154,7 @@ TEST(ObjectSpaceNormalBakeService,
                 .Entity = target,
                 .StableEntityId = stableId,
                 .Semantic =
-                    Runtime::ProgressiveSlotSemantic::Normal,
+                    Runtime::GeometryPresentationSlotSemantic::Normal,
             },
             Graphics::ObjectSpaceNormalTextureBakeOptions{
                 .Width = 64u,

@@ -30,7 +30,7 @@ import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Properties;
@@ -60,14 +60,14 @@ namespace Extrinsic::Runtime
 
         struct SlotLookup
         {
-            ProgressivePresentationBinding* Presentation{nullptr};
-            ProgressiveSlotBinding* Slot{nullptr};
+            GeometryPresentationBindingRecipe* Presentation{nullptr};
+            GeometryPresentationSlotRecipe* Slot{nullptr};
         };
 
         struct ConstSlotLookup
         {
-            const ProgressivePresentationBinding* Presentation{nullptr};
-            const ProgressiveSlotBinding* Slot{nullptr};
+            const GeometryPresentationBindingRecipe* Presentation{nullptr};
+            const GeometryPresentationSlotRecipe* Slot{nullptr};
         };
 
         struct LoadedTexture
@@ -99,51 +99,27 @@ namespace Extrinsic::Runtime
             return entity;
         }
 
-        [[nodiscard]] bool IsSurfaceTextureSemantic(
-            const ProgressiveSlotSemantic semantic) noexcept
-        {
-            switch (semantic)
-            {
-            case ProgressiveSlotSemantic::Albedo:
-            case ProgressiveSlotSemantic::Normal:
-            case ProgressiveSlotSemantic::Roughness:
-            case ProgressiveSlotSemantic::Metallic:
-            case ProgressiveSlotSemantic::ScalarField:
-            case ProgressiveSlotSemantic::Displacement:
-                return true;
-            case ProgressiveSlotSemantic::PointColor:
-            case ProgressiveSlotSemantic::PointScalarField:
-            case ProgressiveSlotSemantic::PointSize:
-            case ProgressiveSlotSemantic::PointNormalOrientation:
-            case ProgressiveSlotSemantic::LineColor:
-            case ProgressiveSlotSemantic::LineScalarField:
-            case ProgressiveSlotSemantic::LineWidth:
-                return false;
-            }
-            return false;
-        }
-
         [[nodiscard]] GeometryPropertyValueKindFilter DefaultExpectedKindForSemantic(
-            const ProgressiveSlotSemantic semantic) noexcept
+            const GeometryPresentationSlotSemantic semantic) noexcept
         {
             switch (semantic)
             {
-            case ProgressiveSlotSemantic::Normal:
+            case GeometryPresentationSlotSemantic::Normal:
                 return Geometry::PropertyValueKind::Vec3;
-            case ProgressiveSlotSemantic::Roughness:
-            case ProgressiveSlotSemantic::Metallic:
-            case ProgressiveSlotSemantic::ScalarField:
-            case ProgressiveSlotSemantic::Displacement:
+            case GeometryPresentationSlotSemantic::Roughness:
+            case GeometryPresentationSlotSemantic::Metallic:
+            case GeometryPresentationSlotSemantic::ScalarField:
+            case GeometryPresentationSlotSemantic::Displacement:
                 return Geometry::PropertyValueKind::Float;
-            case ProgressiveSlotSemantic::Albedo:
+            case GeometryPresentationSlotSemantic::Albedo:
                 return std::nullopt;
-            case ProgressiveSlotSemantic::PointColor:
-            case ProgressiveSlotSemantic::PointScalarField:
-            case ProgressiveSlotSemantic::PointSize:
-            case ProgressiveSlotSemantic::PointNormalOrientation:
-            case ProgressiveSlotSemantic::LineColor:
-            case ProgressiveSlotSemantic::LineScalarField:
-            case ProgressiveSlotSemantic::LineWidth:
+            case GeometryPresentationSlotSemantic::PointColor:
+            case GeometryPresentationSlotSemantic::PointScalarField:
+            case GeometryPresentationSlotSemantic::PointSize:
+            case GeometryPresentationSlotSemantic::PointNormalOrientation:
+            case GeometryPresentationSlotSemantic::LineColor:
+            case GeometryPresentationSlotSemantic::LineScalarField:
+            case GeometryPresentationSlotSemantic::LineWidth:
                 return std::nullopt;
             }
             return std::nullopt;
@@ -192,6 +168,9 @@ namespace Extrinsic::Runtime
             case Geometry::PropertyValueKind::Vec4:
                 return MeshAttributeTextureBakeValueKind::Vector4;
             case Geometry::PropertyValueKind::Unknown:
+            case Geometry::PropertyValueKind::Bool:
+            case Geometry::PropertyValueKind::Int32:
+            case Geometry::PropertyValueKind::UInt64:
                 break;
             }
             return MeshAttributeTextureBakeValueKind::Auto;
@@ -241,17 +220,17 @@ namespace Extrinsic::Runtime
 
             switch (request.TargetSemantic)
             {
-            case ProgressiveSlotSemantic::Normal:
+            case GeometryPresentationSlotSemantic::Normal:
                 return MeshAttributeTextureBakeEncoder::Normal;
-            case ProgressiveSlotSemantic::Roughness:
-            case ProgressiveSlotSemantic::Metallic:
-            case ProgressiveSlotSemantic::Displacement:
+            case GeometryPresentationSlotSemantic::Roughness:
+            case GeometryPresentationSlotSemantic::Metallic:
+            case GeometryPresentationSlotSemantic::Displacement:
                 return MeshAttributeTextureBakeEncoder::LinearScalar;
-            case ProgressiveSlotSemantic::ScalarField:
+            case GeometryPresentationSlotSemantic::ScalarField:
                 return kind == Geometry::PropertyValueKind::UInt32
                     ? MeshAttributeTextureBakeEncoder::LabelPalette
                     : MeshAttributeTextureBakeEncoder::LinearScalar;
-            case ProgressiveSlotSemantic::Albedo:
+            case GeometryPresentationSlotSemantic::Albedo:
                 switch (kind)
                 {
                 case Geometry::PropertyValueKind::Float:
@@ -264,17 +243,20 @@ namespace Extrinsic::Runtime
                     return MeshAttributeTextureBakeEncoder::RgbaColor;
                 case Geometry::PropertyValueKind::Vec2:
                     return MeshAttributeTextureBakeEncoder::Vector2;
-                    case Geometry::PropertyValueKind::Unknown:
+                case Geometry::PropertyValueKind::Unknown:
+                case Geometry::PropertyValueKind::Bool:
+                case Geometry::PropertyValueKind::Int32:
+                case Geometry::PropertyValueKind::UInt64:
                     break;
                 }
                 break;
-            case ProgressiveSlotSemantic::PointColor:
-            case ProgressiveSlotSemantic::PointScalarField:
-            case ProgressiveSlotSemantic::PointSize:
-            case ProgressiveSlotSemantic::PointNormalOrientation:
-            case ProgressiveSlotSemantic::LineColor:
-            case ProgressiveSlotSemantic::LineScalarField:
-            case ProgressiveSlotSemantic::LineWidth:
+            case GeometryPresentationSlotSemantic::PointColor:
+            case GeometryPresentationSlotSemantic::PointScalarField:
+            case GeometryPresentationSlotSemantic::PointSize:
+            case GeometryPresentationSlotSemantic::PointNormalOrientation:
+            case GeometryPresentationSlotSemantic::LineColor:
+            case GeometryPresentationSlotSemantic::LineScalarField:
+            case GeometryPresentationSlotSemantic::LineWidth:
                 break;
             }
 
@@ -282,7 +264,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] SelectedMeshTextureBakeStatus ValidateTargetSlotCompatibility(
-            const ProgressiveSlotSemantic semantic,
+            const GeometryPresentationSlotSemantic semantic,
             const Geometry::PropertyValueKind kind,
             const MeshAttributeTextureBakeEncoder encoder,
             std::string& diagnostic)
@@ -296,22 +278,22 @@ namespace Extrinsic::Runtime
 
             switch (semantic)
             {
-            case ProgressiveSlotSemantic::Normal:
+            case GeometryPresentationSlotSemantic::Normal:
                 if (kind == Geometry::PropertyValueKind::Vec3 &&
                     encoder == MeshAttributeTextureBakeEncoder::Normal)
                 {
                     return SelectedMeshTextureBakeStatus::Success;
                 }
                 return incompatible("normal material slot requires a vec3 property encoded as a normal texture");
-            case ProgressiveSlotSemantic::Roughness:
-            case ProgressiveSlotSemantic::Metallic:
+            case GeometryPresentationSlotSemantic::Roughness:
+            case GeometryPresentationSlotSemantic::Metallic:
                 if (IsScalarKind(kind) &&
                     encoder == MeshAttributeTextureBakeEncoder::LinearScalar)
                 {
                     return SelectedMeshTextureBakeStatus::Success;
                 }
                 return incompatible("roughness and metallic material slots require scalar properties encoded as linear scalar textures");
-            case ProgressiveSlotSemantic::Albedo:
+            case GeometryPresentationSlotSemantic::Albedo:
                 if ((IsScalarKind(kind) &&
                      (encoder == MeshAttributeTextureBakeEncoder::LinearScalar ||
                       encoder == MeshAttributeTextureBakeEncoder::ScalarColormap)) ||
@@ -324,7 +306,7 @@ namespace Extrinsic::Runtime
                     return SelectedMeshTextureBakeStatus::Success;
                 }
                 return incompatible("albedo material slot requires a color, scalar colormap, scalar grayscale, or label-palette texture");
-            case ProgressiveSlotSemantic::ScalarField:
+            case GeometryPresentationSlotSemantic::ScalarField:
                 if ((IsScalarKind(kind) &&
                      (encoder == MeshAttributeTextureBakeEncoder::LinearScalar ||
                       encoder == MeshAttributeTextureBakeEncoder::ScalarColormap)) ||
@@ -334,16 +316,16 @@ namespace Extrinsic::Runtime
                     return SelectedMeshTextureBakeStatus::Success;
                 }
                 return incompatible("scalar-field material slot requires scalar or label properties");
-            case ProgressiveSlotSemantic::Displacement:
+            case GeometryPresentationSlotSemantic::Displacement:
                 diagnostic = "displacement bake output has no backend-resident material texture slot yet";
                 return SelectedMeshTextureBakeStatus::UnsupportedTargetSemantic;
-            case ProgressiveSlotSemantic::PointColor:
-            case ProgressiveSlotSemantic::PointScalarField:
-            case ProgressiveSlotSemantic::PointSize:
-            case ProgressiveSlotSemantic::PointNormalOrientation:
-            case ProgressiveSlotSemantic::LineColor:
-            case ProgressiveSlotSemantic::LineScalarField:
-            case ProgressiveSlotSemantic::LineWidth:
+            case GeometryPresentationSlotSemantic::PointColor:
+            case GeometryPresentationSlotSemantic::PointScalarField:
+            case GeometryPresentationSlotSemantic::PointSize:
+            case GeometryPresentationSlotSemantic::PointNormalOrientation:
+            case GeometryPresentationSlotSemantic::LineColor:
+            case GeometryPresentationSlotSemantic::LineScalarField:
+            case GeometryPresentationSlotSemantic::LineWidth:
                 diagnostic = "target semantic is not a mesh surface material texture slot";
                 return SelectedMeshTextureBakeStatus::UnsupportedTargetSemantic;
             }
@@ -352,10 +334,10 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool IsPackedMetallicRoughnessTarget(
-            const ProgressiveSlotSemantic semantic) noexcept
+            const GeometryPresentationSlotSemantic semantic) noexcept
         {
-            return semantic == ProgressiveSlotSemantic::Roughness ||
-                   semantic == ProgressiveSlotSemantic::Metallic;
+            return semantic == GeometryPresentationSlotSemantic::Roughness ||
+                   semantic == GeometryPresentationSlotSemantic::Metallic;
         }
 
         [[nodiscard]] Assets::AssetTexture2DPayload AdaptPayloadForMaterialSlot(
@@ -383,10 +365,10 @@ namespace Extrinsic::Runtime
                 const std::byte scalar = payload.PixelBytes[pixel];
                 const std::size_t offset = pixel * 4u;
                 packed[offset + 0u] = std::byte{0xFF};
-                packed[offset + 1u] = request.TargetSemantic == ProgressiveSlotSemantic::Roughness
+                packed[offset + 1u] = request.TargetSemantic == GeometryPresentationSlotSemantic::Roughness
                     ? scalar
                     : std::byte{0xFF};
-                packed[offset + 2u] = request.TargetSemantic == ProgressiveSlotSemantic::Metallic
+                packed[offset + 2u] = request.TargetSemantic == GeometryPresentationSlotSemantic::Metallic
                     ? scalar
                     : std::byte{0x00};
                 packed[offset + 3u] = std::byte{0xFF};
@@ -400,24 +382,23 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] SelectedMeshTextureBakeStatus StatusForResolution(
-            const ProgressivePropertyResolutionStatus status) noexcept
+            const GeometryPropertyResolutionStatus status) noexcept
         {
             switch (status)
             {
-            case ProgressivePropertyResolutionStatus::Compatible:
+            case GeometryPropertyResolutionStatus::Resolved:
                 return SelectedMeshTextureBakeStatus::Success;
-            case ProgressivePropertyResolutionStatus::MissingProperty:
+            case GeometryPropertyResolutionStatus::MissingName:
+            case GeometryPropertyResolutionStatus::MissingProperty:
                 return SelectedMeshTextureBakeStatus::MissingProperty;
-            case ProgressivePropertyResolutionStatus::TypeMismatch:
-            case ProgressivePropertyResolutionStatus::UnsupportedType:
+            case GeometryPropertyResolutionStatus::ValueKindMismatch:
                 return SelectedMeshTextureBakeStatus::UnsupportedPropertyType;
-            case ProgressivePropertyResolutionStatus::CountMismatch:
+            case GeometryPropertyResolutionStatus::ElementCountMismatch:
                 return SelectedMeshTextureBakeStatus::MismatchedPropertyCount;
-            case ProgressivePropertyResolutionStatus::DomainUnavailable:
-            case ProgressivePropertyResolutionStatus::UnsupportedDomain:
+            case GeometryPropertyResolutionStatus::UnsupportedDomain:
                 return SelectedMeshTextureBakeStatus::UnsupportedSourceDomain;
-            case ProgressivePropertyResolutionStatus::StaleGeneration:
-                return SelectedMeshTextureBakeStatus::StaleCompletion;
+            case GeometryPropertyResolutionStatus::NonFiniteValues:
+                return SelectedMeshTextureBakeStatus::NonFinitePropertyValue;
             }
             return SelectedMeshTextureBakeStatus::UnsupportedPropertyType;
         }
@@ -581,8 +562,8 @@ namespace Extrinsic::Runtime
         {
             return context.ObjectSpaceNormalBakeQueue != nullptr &&
                    request.BindGeneratedTexture &&
-                   request.TargetLane == ProgressiveRenderLane::Surface &&
-                   request.TargetSemantic == ProgressiveSlotSemantic::Normal &&
+                   request.TargetLane == GeometryRenderLane::Surface &&
+                   request.TargetSemantic == GeometryPresentationSlotSemantic::Normal &&
                    request.SourceDomain == GeometryElementDomain::MeshVertex;
         }
 
@@ -632,83 +613,127 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] const ProgressivePresentationBinding* ResolvePresentation(
-            const ProgressivePresentationBindings& bindings,
+        [[nodiscard]] const GeometryPresentationBindingRecipe* ResolvePresentation(
+            const GeometryPresentationRecipe& bindings,
             const SelectedMeshTextureBakeRequest& request) noexcept
         {
             if (!request.TargetPresentationKey.empty())
-                return FindPresentationBinding(bindings, request.TargetPresentationKey);
+                return FindGeometryPresentationBinding(bindings, request.TargetPresentationKey);
 
-            if (const ProgressiveRenderLaneBinding* lane =
-                    FindLaneBinding(bindings, request.TargetLane);
+            if (const GeometryPresentationLaneRecipe* lane =
+                    FindGeometryPresentationLane(bindings, request.TargetLane);
                 lane != nullptr && !lane->PresentationKey.empty())
             {
-                return FindPresentationBinding(bindings, lane->PresentationKey);
+                return FindGeometryPresentationBinding(bindings, lane->PresentationKey);
             }
 
-            for (const ProgressivePresentationBinding& presentation :
+            for (const GeometryPresentationBindingRecipe& presentation :
                  bindings.Presentations)
             {
-                if (FindSlotBinding(presentation, request.TargetSemantic) != nullptr)
+                if (FindGeometryPresentationSlot(presentation, request.TargetSemantic) != nullptr)
                     return &presentation;
             }
             return nullptr;
         }
 
-        [[nodiscard]] ProgressivePresentationBinding* ResolvePresentation(
-            ProgressivePresentationBindings& bindings,
+        [[nodiscard]] GeometryPresentationBindingRecipe* ResolvePresentation(
+            GeometryPresentationRecipe& bindings,
             const SelectedMeshTextureBakeRequest& request) noexcept
         {
             if (!request.TargetPresentationKey.empty())
-                return FindPresentationBinding(bindings, request.TargetPresentationKey);
+                return FindGeometryPresentationBinding(bindings, request.TargetPresentationKey);
 
-            if (const ProgressiveRenderLaneBinding* lane =
-                    FindLaneBinding(bindings, request.TargetLane);
+            if (const GeometryPresentationLaneRecipe* lane =
+                    FindGeometryPresentationLane(bindings, request.TargetLane);
                 lane != nullptr && !lane->PresentationKey.empty())
             {
-                return FindPresentationBinding(bindings, lane->PresentationKey);
+                return FindGeometryPresentationBinding(bindings, lane->PresentationKey);
             }
 
-            for (ProgressivePresentationBinding& presentation : bindings.Presentations)
+            for (GeometryPresentationBindingRecipe& presentation : bindings.Presentations)
             {
-                if (FindSlotBinding(presentation, request.TargetSemantic) != nullptr)
+                if (FindGeometryPresentationSlot(presentation, request.TargetSemantic) != nullptr)
                     return &presentation;
             }
             return nullptr;
         }
 
         [[nodiscard]] ConstSlotLookup FindConstSlot(
-            const ProgressivePresentationBindings& bindings,
+            const GeometryPresentationRecipe& bindings,
             const SelectedMeshTextureBakeRequest& request) noexcept
         {
-            const ProgressivePresentationBinding* presentation =
+            const GeometryPresentationBindingRecipe* presentation =
                 ResolvePresentation(bindings, request);
             if (presentation == nullptr)
                 return {};
             return ConstSlotLookup{
                 .Presentation = presentation,
-                .Slot = FindSlotBinding(*presentation, request.TargetSemantic),
+                .Slot = FindGeometryPresentationSlot(*presentation, request.TargetSemantic),
             };
         }
 
         [[nodiscard]] SlotLookup FindMutableSlot(
-            ProgressivePresentationBindings& bindings,
+            GeometryPresentationRecipe& bindings,
             const SelectedMeshTextureBakeRequest& request) noexcept
         {
-            ProgressivePresentationBinding* presentation =
+            GeometryPresentationBindingRecipe* presentation =
                 ResolvePresentation(bindings, request);
             if (presentation == nullptr)
                 return {};
             return SlotLookup{
                 .Presentation = presentation,
-                .Slot = FindSlotBinding(*presentation, request.TargetSemantic),
+                .Slot = FindGeometryPresentationSlot(*presentation, request.TargetSemantic),
             };
         }
 
-        [[nodiscard]] EditorCommandHistoryStatus ApplyProgressiveBindingsState(
+        void AdvancePresentationGeneration(
+            std::uint64_t& generation) noexcept
+        {
+            ++generation;
+            if (generation == 0u)
+                generation = 1u;
+        }
+
+        [[nodiscard]] GeometryPresentationSlotStatus&
+        EnsurePresentationSlotStatus(
+            GeometryPresentationRuntimeState& state,
+            const std::string_view presentationKey,
+            const GeometryPresentationSlotSemantic semantic)
+        {
+            if (GeometryPresentationSlotStatus* status =
+                    FindGeometryPresentationSlotStatus(
+                        state, presentationKey, semantic))
+            {
+                return *status;
+            }
+            state.Slots.push_back(GeometryPresentationSlotStatus{
+                .PresentationKey = std::string{presentationKey},
+                .Semantic = semantic,
+            });
+            return state.Slots.back();
+        }
+
+        void ConfigurePropertyBakeRecipeSlot(
+            GeometryPresentationSlotRecipe& slot,
+            const SelectedMeshTextureBakeRequest& request,
+            const SelectedMeshTextureBakeBuildResult& build)
+        {
+            slot.SourceKind = GeometryPresentationSourceKind::PropertyBake;
+            slot.Property = GeometryPropertyRef{
+                .Domain = request.SourceDomain,
+                .Name = request.SourcePropertyName,
+                .ValueKind = build.PropertyResolution.ResolvedValueKind,
+            };
+            slot.TextureAsset = {};
+            slot.GeneratedPolicy = request.GeneratedPolicy;
+            slot.Enabled = true;
+        }
+
+        [[nodiscard]] EditorCommandHistoryStatus ApplyGeometryPresentationState(
             ECS::Scene::Registry* scene,
             const std::uint32_t stableEntityId,
-            const ProgressivePresentationBindings& state)
+            const GeometryPresentationRecipe& recipe,
+            const GeometryPresentationRuntimeState& runtimeState)
         {
             if (scene == nullptr)
                 return EditorCommandHistoryStatus::MissingScene;
@@ -717,9 +742,12 @@ namespace Extrinsic::Runtime
             if (entity == ECS::InvalidEntityHandle)
                 return EditorCommandHistoryStatus::StaleEntity;
 
-            scene->Raw().emplace_or_replace<ProgressivePresentationBindings>(
+            scene->Raw().emplace_or_replace<GeometryPresentationRecipe>(
                 entity,
-                state);
+                recipe);
+            scene->Raw().emplace_or_replace<GeometryPresentationRuntimeState>(
+                entity,
+                runtimeState);
             return EditorCommandHistoryStatus::Applied;
         }
 
@@ -750,11 +778,13 @@ namespace Extrinsic::Runtime
             return false;
         }
 
-        [[nodiscard]] SelectedMeshTextureBakeStatus CommitProgressiveChange(
+        [[nodiscard]] SelectedMeshTextureBakeStatus CommitGeometryPresentationChange(
             const SelectedMeshTextureBakeContext& context,
             const std::uint32_t stableEntityId,
-            ProgressivePresentationBindings before,
-            ProgressivePresentationBindings after)
+            GeometryPresentationRecipe beforeRecipe,
+            GeometryPresentationRecipe afterRecipe,
+            GeometryPresentationRuntimeState beforeState,
+            GeometryPresentationRuntimeState afterState)
         {
             if (context.CommandHistory != nullptr)
             {
@@ -764,20 +794,22 @@ namespace Extrinsic::Runtime
                         EditorCommandRecord{
                             .Label = "Bake Mesh Texture",
                             .Redo =
-                                [scene, stableEntityId, after]()
+                                [scene, stableEntityId, afterRecipe, afterState]()
                                 {
-                                    return ApplyProgressiveBindingsState(
+                                    return ApplyGeometryPresentationState(
                                         scene,
                                         stableEntityId,
-                                        after);
+                                        afterRecipe,
+                                        afterState);
                                 },
                             .Undo =
-                                [scene, stableEntityId, before]()
+                                [scene, stableEntityId, beforeRecipe, beforeState]()
                                 {
-                                    return ApplyProgressiveBindingsState(
+                                    return ApplyGeometryPresentationState(
                                         scene,
                                         stableEntityId,
-                                        before);
+                                        beforeRecipe,
+                                        beforeState);
                                 },
                             .Dirtying = true,
                         });
@@ -787,10 +819,11 @@ namespace Extrinsic::Runtime
             }
 
             const EditorCommandHistoryStatus status =
-                ApplyProgressiveBindingsState(
+                ApplyGeometryPresentationState(
                     context.Scene,
                     stableEntityId,
-                    after);
+                    afterRecipe,
+                    afterState);
             return HistorySucceeded(status)
                 ? SelectedMeshTextureBakeStatus::Success
                 : SelectedMeshTextureBakeStatus::CommandFailed;
@@ -800,7 +833,7 @@ namespace Extrinsic::Runtime
             const SelectedMeshTextureBakeContext& context,
             const SelectedMeshTextureBakeRequest& request,
             const SelectedMeshTextureBakeBuildResult& build,
-            std::uint64_t& outBindingGeneration,
+            std::uint64_t& outRecipeGeneration,
             bool& outPreviousOutputRetained)
         {
             if (!request.BindGeneratedTexture)
@@ -813,45 +846,52 @@ namespace Extrinsic::Runtime
             if (entity == ECS::InvalidEntityHandle)
                 return SelectedMeshTextureBakeStatus::StaleEntity;
 
-            auto* current =
-                context.Scene->Raw().try_get<ProgressivePresentationBindings>(entity);
-            if (current == nullptr)
-                return SelectedMeshTextureBakeStatus::MissingProgressiveBindings;
+            auto& raw = context.Scene->Raw();
+            auto* currentRecipe =
+                raw.try_get<GeometryPresentationRecipe>(entity);
+            if (currentRecipe == nullptr)
+                return SelectedMeshTextureBakeStatus::MissingGeometryPresentationRecipe;
+            auto* currentState =
+                raw.try_get<GeometryPresentationRuntimeState>(entity);
 
-            ProgressivePresentationBindings before = *current;
-            ProgressivePresentationBindings after = before;
-            SlotLookup lookup = FindMutableSlot(after, request);
+            GeometryPresentationRecipe beforeRecipe = *currentRecipe;
+            GeometryPresentationRecipe afterRecipe = beforeRecipe;
+            GeometryPresentationRuntimeState beforeState =
+                currentState != nullptr
+                    ? *currentState
+                    : GeometryPresentationRuntimeState{};
+            GeometryPresentationRuntimeState afterState = beforeState;
+            SlotLookup lookup = FindMutableSlot(afterRecipe, request);
             if (lookup.Presentation == nullptr)
                 return SelectedMeshTextureBakeStatus::MissingPresentation;
             if (lookup.Slot == nullptr)
                 return SelectedMeshTextureBakeStatus::MissingSlot;
 
-            ProgressiveSlotBinding& slot = *lookup.Slot;
-            outPreviousOutputRetained = slot.GeneratedTexture.IsValid() ||
-                                        slot.AuthoredTexture.IsValid();
-            slot.SourceKind = ProgressiveSlotSourceKind::PropertyBake;
-            slot.Property = ProgressivePropertyBindingDescriptor{
-                .Domain = request.SourceDomain,
-                .PropertyName = request.SourcePropertyName,
-                .ExpectedValueKind = build.PropertyResolution.ActualValueKind,
-                .ExpectedElementCount = build.ExpectedElementCount,
-                .SourceGeneration = request.SourceGeneration,
-            };
-            slot.AuthoredTexture = {};
-            slot.GeneratedPolicy = request.GeneratedPolicy;
-            slot.Provenance =
-                ProgressiveGeneratedOutputProvenance::PropertyBinding;
-            slot.Readiness = ProgressiveReadinessState::Pending;
-            slot.LastDiagnostic = "mesh texture bake pending";
-            slot.Enabled = true;
-            ++after.BindingGeneration;
-            outBindingGeneration = after.BindingGeneration;
+            GeometryPresentationSlotRecipe& slot = *lookup.Slot;
+            GeometryPresentationSlotStatus& status =
+                EnsurePresentationSlotStatus(
+                    afterState,
+                    lookup.Presentation->Key,
+                    request.TargetSemantic);
+            outPreviousOutputRetained =
+                status.GeneratedTexture.IsValid() ||
+                slot.TextureAsset.IsValid();
+            ConfigurePropertyBakeRecipeSlot(slot, request, build);
+            status.SourceGeneration = request.SourceGeneration;
+            status.Provenance =
+                GeometryPresentationProvenance::PropertyBinding;
+            status.Readiness = GeometryPresentationReadiness::Pending;
+            status.Diagnostic = "mesh texture bake pending";
+            AdvancePresentationGeneration(afterState.RecipeGeneration);
+            outRecipeGeneration = afterState.RecipeGeneration;
 
-            return CommitProgressiveChange(
+            return CommitGeometryPresentationChange(
                 context,
                 request.StableEntityId,
-                std::move(before),
-                std::move(after));
+                std::move(beforeRecipe),
+                std::move(afterRecipe),
+                std::move(beforeState),
+                std::move(afterState));
         }
 
         [[nodiscard]] SelectedMeshTextureBakeResult
@@ -871,24 +911,27 @@ namespace Extrinsic::Runtime
             if (entity == ECS::InvalidEntityHandle)
                 return FailureResult(SelectedMeshTextureBakeStatus::StaleEntity);
             const auto* bindings =
-                context.Scene->Raw().try_get<ProgressivePresentationBindings>(
+                context.Scene->Raw().try_get<GeometryPresentationRecipe>(
                     entity);
-            if (bindings == nullptr)
+            const auto* runtimeState =
+                context.Scene->Raw()
+                    .try_get<GeometryPresentationRuntimeState>(entity);
+            if (bindings == nullptr || runtimeState == nullptr)
             {
                 return FailureResult(
-                    SelectedMeshTextureBakeStatus::MissingProgressiveBindings);
+                    SelectedMeshTextureBakeStatus::MissingGeometryPresentationRecipe);
             }
-            const ProgressivePresentationBinding* presentation =
+            const GeometryPresentationBindingRecipe* presentation =
                 ResolvePresentation(*bindings, request);
             if (presentation == nullptr || presentation->Key.empty())
             {
                 return FailureResult(
                     SelectedMeshTextureBakeStatus::MissingPresentation);
             }
-            std::uint64_t expectedBindingGeneration =
-                bindings->BindingGeneration + 1u;
-            if (expectedBindingGeneration == 0u)
-                expectedBindingGeneration = 1u;
+            std::uint64_t expectedRecipeGeneration =
+                runtimeState->RecipeGeneration + 1u;
+            if (expectedRecipeGeneration == 0u)
+                expectedRecipeGeneration = 1u;
 
             SelectedObjectSpaceNormalBakeRequestBuild queueBuild =
                 BuildSelectedMeshObjectSpaceNormalBakeRequest(
@@ -900,9 +943,9 @@ namespace Extrinsic::Runtime
                         .Entity = entity,
                         .StableEntityId = request.StableEntityId,
                         .PresentationKey = presentation->Key,
-                        .Semantic = ProgressiveSlotSemantic::Normal,
-                        .ExpectedProgressiveBindingGeneration =
-                            expectedBindingGeneration,
+                        .Semantic = GeometryPresentationSlotSemantic::Normal,
+                        .ExpectedRecipeGeneration =
+                            expectedRecipeGeneration,
                     });
             if (!queueBuild.Succeeded())
             {
@@ -929,22 +972,22 @@ namespace Extrinsic::Runtime
                 return result;
             }
 
-            std::uint64_t bindingGeneration = 0u;
+            std::uint64_t recipeGeneration = 0u;
             bool previousOutputRetained = false;
             const SelectedMeshTextureBakeStatus pendingStatus =
                 SetPendingBinding(
                     context,
                     request,
                     build,
-                    bindingGeneration,
+                    recipeGeneration,
                     previousOutputRetained);
             if (pendingStatus != SelectedMeshTextureBakeStatus::Success)
                 return FailureResult(pendingStatus);
-            if (bindingGeneration != expectedBindingGeneration)
+            if (recipeGeneration != expectedRecipeGeneration)
             {
                 return FailureResult(
                     SelectedMeshTextureBakeStatus::StaleCompletion,
-                    "selected mesh progressive binding generation changed while scheduling object-space normal bake");
+                    "selected mesh presentation recipe generation changed while scheduling object-space normal bake");
             }
 
             RuntimeObjectSpaceNormalBakeResult queued =
@@ -960,7 +1003,7 @@ namespace Extrinsic::Runtime
                 result.ExecutionMode =
                     SelectedMeshTextureBakeExecutionMode::ObjectSpaceNormalBakeQueue;
                 result.GeneratedAssetPath = build.GeneratedAssetPath;
-                result.BindingGeneration = bindingGeneration;
+                result.RecipeGeneration = recipeGeneration;
                 result.PreviousOutputRetained = previousOutputRetained;
                 return result;
             }
@@ -972,7 +1015,7 @@ namespace Extrinsic::Runtime
                     SelectedMeshTextureBakeExecutionMode::ObjectSpaceNormalBakeQueue,
                 .BoundGeneratedTexture = false,
                 .PreviousOutputRetained = previousOutputRetained,
-                .BindingGeneration = bindingGeneration,
+                .RecipeGeneration = recipeGeneration,
                 .GeneratedAssetPath = build.GeneratedAssetPath,
                 .Diagnostic = queued.Diagnostic,
             };
@@ -984,43 +1027,47 @@ namespace Extrinsic::Runtime
             const Assets::AssetId generatedTexture,
             const SelectedMeshTextureBakeBuildResult& build,
             const std::string& diagnostic,
-            std::uint64_t& outBindingGeneration)
+            std::uint64_t& outRecipeGeneration)
         {
             const ECS::EntityHandle entity =
                 ResolveEntity(scene, request.StableEntityId);
             if (entity == ECS::InvalidEntityHandle)
                 return SelectedMeshTextureBakeStatus::StaleEntity;
 
-            auto* bindings =
-                scene.Raw().try_get<ProgressivePresentationBindings>(entity);
-            if (bindings == nullptr)
-                return SelectedMeshTextureBakeStatus::MissingProgressiveBindings;
+            auto& raw = scene.Raw();
+            auto* recipe =
+                raw.try_get<GeometryPresentationRecipe>(entity);
+            if (recipe == nullptr)
+                return SelectedMeshTextureBakeStatus::MissingGeometryPresentationRecipe;
 
-            SlotLookup lookup = FindMutableSlot(*bindings, request);
+            SlotLookup lookup = FindMutableSlot(*recipe, request);
             if (lookup.Presentation == nullptr)
                 return SelectedMeshTextureBakeStatus::MissingPresentation;
             if (lookup.Slot == nullptr)
                 return SelectedMeshTextureBakeStatus::MissingSlot;
 
-            ProgressiveSlotBinding& slot = *lookup.Slot;
-            slot.SourceKind = ProgressiveSlotSourceKind::GeneratedTextureAsset;
-            slot.Property = ProgressivePropertyBindingDescriptor{
-                .Domain = request.SourceDomain,
-                .PropertyName = request.SourcePropertyName,
-                .ExpectedValueKind = build.PropertyResolution.ActualValueKind,
-                .ExpectedElementCount = build.ExpectedElementCount,
-                .SourceGeneration = request.SourceGeneration,
-            };
-            slot.AuthoredTexture = {};
-            slot.GeneratedTexture = generatedTexture;
-            slot.GeneratedPolicy = request.GeneratedPolicy;
-            slot.Provenance =
-                ProgressiveGeneratedOutputProvenance::GeneratedTextureAsset;
-            slot.Readiness = ProgressiveReadinessState::Ready;
-            slot.LastDiagnostic = diagnostic;
-            slot.Enabled = true;
-            ++bindings->BindingGeneration;
-            outBindingGeneration = bindings->BindingGeneration;
+            GeometryPresentationSlotRecipe& slot = *lookup.Slot;
+            ConfigurePropertyBakeRecipeSlot(slot, request, build);
+            auto* runtimeState =
+                raw.try_get<GeometryPresentationRuntimeState>(entity);
+            if (runtimeState == nullptr)
+            {
+                runtimeState = &raw.emplace<GeometryPresentationRuntimeState>(
+                    entity);
+            }
+            GeometryPresentationSlotStatus& status =
+                EnsurePresentationSlotStatus(
+                    *runtimeState,
+                    lookup.Presentation->Key,
+                    request.TargetSemantic);
+            status.GeneratedTexture = generatedTexture;
+            status.SourceGeneration = request.SourceGeneration;
+            status.Provenance =
+                GeometryPresentationProvenance::GeneratedTextureAsset;
+            status.Readiness = GeometryPresentationReadiness::Ready;
+            status.Diagnostic = diagnostic;
+            AdvancePresentationGeneration(status.OutputGeneration);
+            outRecipeGeneration = runtimeState->RecipeGeneration;
             return SelectedMeshTextureBakeStatus::Success;
         }
 
@@ -1030,7 +1077,7 @@ namespace Extrinsic::Runtime
             const Assets::AssetId generatedTexture,
             const SelectedMeshTextureBakeBuildResult& build,
             const std::string& diagnostic,
-            std::uint64_t& outBindingGeneration)
+            std::uint64_t& outRecipeGeneration)
         {
             if (!request.BindGeneratedTexture)
                 return SelectedMeshTextureBakeStatus::Success;
@@ -1042,44 +1089,51 @@ namespace Extrinsic::Runtime
             if (entity == ECS::InvalidEntityHandle)
                 return SelectedMeshTextureBakeStatus::StaleEntity;
 
-            auto* current =
-                context.Scene->Raw().try_get<ProgressivePresentationBindings>(entity);
-            if (current == nullptr)
-                return SelectedMeshTextureBakeStatus::MissingProgressiveBindings;
+            auto& raw = context.Scene->Raw();
+            auto* currentRecipe =
+                raw.try_get<GeometryPresentationRecipe>(entity);
+            if (currentRecipe == nullptr)
+                return SelectedMeshTextureBakeStatus::MissingGeometryPresentationRecipe;
+            auto* currentState =
+                raw.try_get<GeometryPresentationRuntimeState>(entity);
 
-            ProgressivePresentationBindings before = *current;
-            ProgressivePresentationBindings after = before;
-            SlotLookup lookup = FindMutableSlot(after, request);
+            GeometryPresentationRecipe beforeRecipe = *currentRecipe;
+            GeometryPresentationRecipe afterRecipe = beforeRecipe;
+            GeometryPresentationRuntimeState beforeState =
+                currentState != nullptr
+                    ? *currentState
+                    : GeometryPresentationRuntimeState{};
+            GeometryPresentationRuntimeState afterState = beforeState;
+            SlotLookup lookup = FindMutableSlot(afterRecipe, request);
             if (lookup.Presentation == nullptr)
                 return SelectedMeshTextureBakeStatus::MissingPresentation;
             if (lookup.Slot == nullptr)
                 return SelectedMeshTextureBakeStatus::MissingSlot;
 
-            ProgressiveSlotBinding& slot = *lookup.Slot;
-            slot.SourceKind = ProgressiveSlotSourceKind::GeneratedTextureAsset;
-            slot.Property = ProgressivePropertyBindingDescriptor{
-                .Domain = request.SourceDomain,
-                .PropertyName = request.SourcePropertyName,
-                .ExpectedValueKind = build.PropertyResolution.ActualValueKind,
-                .ExpectedElementCount = build.ExpectedElementCount,
-                .SourceGeneration = request.SourceGeneration,
-            };
-            slot.AuthoredTexture = {};
-            slot.GeneratedTexture = generatedTexture;
-            slot.GeneratedPolicy = request.GeneratedPolicy;
-            slot.Provenance =
-                ProgressiveGeneratedOutputProvenance::GeneratedTextureAsset;
-            slot.Readiness = ProgressiveReadinessState::Ready;
-            slot.LastDiagnostic = diagnostic;
-            slot.Enabled = true;
-            ++after.BindingGeneration;
-            outBindingGeneration = after.BindingGeneration;
+            GeometryPresentationSlotRecipe& slot = *lookup.Slot;
+            ConfigurePropertyBakeRecipeSlot(slot, request, build);
+            GeometryPresentationSlotStatus& status =
+                EnsurePresentationSlotStatus(
+                    afterState,
+                    lookup.Presentation->Key,
+                    request.TargetSemantic);
+            status.GeneratedTexture = generatedTexture;
+            status.SourceGeneration = request.SourceGeneration;
+            status.Provenance =
+                GeometryPresentationProvenance::GeneratedTextureAsset;
+            status.Readiness = GeometryPresentationReadiness::Ready;
+            status.Diagnostic = diagnostic;
+            AdvancePresentationGeneration(status.OutputGeneration);
+            AdvancePresentationGeneration(afterState.RecipeGeneration);
+            outRecipeGeneration = afterState.RecipeGeneration;
 
-            return CommitProgressiveChange(
+            return CommitGeometryPresentationChange(
                 context,
                 request.StableEntityId,
-                std::move(before),
-                std::move(after));
+                std::move(beforeRecipe),
+                std::move(afterRecipe),
+                std::move(beforeState),
+                std::move(afterState));
         }
 
         [[nodiscard]] LoadedTexture LoadOrReloadGeneratedTexture(
@@ -1163,7 +1217,7 @@ namespace Extrinsic::Runtime
                     "failed to load or reload generated texture payload");
             }
 
-            std::uint64_t bindingGeneration = 0u;
+            std::uint64_t recipeGeneration = 0u;
             SelectedMeshTextureBakeStatus bindStatus =
                 SelectedMeshTextureBakeStatus::Success;
             if (request.BindGeneratedTexture)
@@ -1175,14 +1229,14 @@ namespace Extrinsic::Runtime
                           loaded.Asset,
                           build,
                           "mesh texture bake ready",
-                          bindingGeneration)
+                          recipeGeneration)
                     : SetReadyBindingDirect(
                           *context.Scene,
                           request,
                           loaded.Asset,
                           build,
                           "mesh texture bake ready",
-                          bindingGeneration);
+                          recipeGeneration);
             }
             if (bindStatus != SelectedMeshTextureBakeStatus::Success)
             {
@@ -1196,7 +1250,7 @@ namespace Extrinsic::Runtime
                 .GeneratedTexture = loaded.Asset,
                 .ExecutionMode = SelectedMeshTextureBakeExecutionMode::Synchronous,
                 .BoundGeneratedTexture = request.BindGeneratedTexture,
-                .BindingGeneration = bindingGeneration,
+                .RecipeGeneration = recipeGeneration,
                 .GeneratedAssetPath = build.GeneratedAssetPath,
                 .Diagnostic = "mesh texture bake ready",
             };
@@ -1234,7 +1288,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] JobApplyValidation ValidateAsyncApply(
             const SelectedMeshTextureBakeContext& context,
             const SelectedMeshTextureBakeRequest& request,
-            const std::uint64_t expectedBindingGeneration)
+            const std::uint64_t expectedRecipeGeneration)
         {
             if (context.Scene == nullptr)
                 return JobApplyValidation::MissingTarget;
@@ -1246,11 +1300,12 @@ namespace Extrinsic::Runtime
 
             if (request.BindGeneratedTexture)
             {
-                const auto* bindings =
-                    context.Scene->Raw().try_get<ProgressivePresentationBindings>(entity);
-                if (bindings == nullptr)
+                const auto* state =
+                    context.Scene->Raw()
+                        .try_get<GeometryPresentationRuntimeState>(entity);
+                if (state == nullptr)
                     return JobApplyValidation::MissingTarget;
-                if (bindings->BindingGeneration != expectedBindingGeneration)
+                if (state->RecipeGeneration != expectedRecipeGeneration)
                     return JobApplyValidation::StaleGeneration;
             }
 
@@ -1274,16 +1329,16 @@ namespace Extrinsic::Runtime
             consumers,
             [](const BakedPropertyTextureConsumer& consumer)
             {
-                return consumer.Semantic == ProgressiveSlotSemantic::Normal;
+                return consumer.Semantic == GeometryPresentationSlotSemantic::Normal;
             });
         const bool hasLinearPbrConsumer = std::ranges::any_of(
             consumers,
             [](const BakedPropertyTextureConsumer& consumer)
             {
                 return consumer.Semantic ==
-                           ProgressiveSlotSemantic::Roughness ||
+                           GeometryPresentationSlotSemantic::Roughness ||
                        consumer.Semantic ==
-                           ProgressiveSlotSemantic::Metallic;
+                           GeometryPresentationSlotSemantic::Metallic;
             });
 
         if (representation.Storage == SelectedMeshTextureBakeStorage::Auto)
@@ -1349,16 +1404,16 @@ namespace Extrinsic::Runtime
         const bool scalar = IsScalarKind(valueKind);
         switch (consumer.Semantic)
         {
-        case ProgressiveSlotSemantic::Normal:
+        case GeometryPresentationSlotSemantic::Normal:
             return valueKind == Geometry::PropertyValueKind::Vec3 &&
                    storage == SelectedMeshTextureBakeStorage::EncodedRgba &&
                    encoder == MeshAttributeTextureBakeEncoder::Normal;
-        case ProgressiveSlotSemantic::Roughness:
-        case ProgressiveSlotSemantic::Metallic:
+        case GeometryPresentationSlotSemantic::Roughness:
+        case GeometryPresentationSlotSemantic::Metallic:
             return scalar &&
                    (raw ||
                     encoder == MeshAttributeTextureBakeEncoder::LinearScalar);
-        case ProgressiveSlotSemantic::ScalarField:
+        case GeometryPresentationSlotSemantic::ScalarField:
             return (scalar &&
                     (raw ||
                      encoder == MeshAttributeTextureBakeEncoder::LinearScalar ||
@@ -1366,7 +1421,7 @@ namespace Extrinsic::Runtime
                    (valueKind == Geometry::PropertyValueKind::UInt32 &&
                     !raw &&
                     encoder == MeshAttributeTextureBakeEncoder::LabelPalette);
-        case ProgressiveSlotSemantic::Albedo:
+        case GeometryPresentationSlotSemantic::Albedo:
             if (scalar)
             {
                 return raw ||
@@ -1394,14 +1449,14 @@ namespace Extrinsic::Runtime
             return valueKind == Geometry::PropertyValueKind::Vec4 &&
                    (raw ||
                     encoder == MeshAttributeTextureBakeEncoder::RgbaColor);
-        case ProgressiveSlotSemantic::Displacement:
-        case ProgressiveSlotSemantic::PointColor:
-        case ProgressiveSlotSemantic::PointScalarField:
-        case ProgressiveSlotSemantic::PointSize:
-        case ProgressiveSlotSemantic::PointNormalOrientation:
-        case ProgressiveSlotSemantic::LineColor:
-        case ProgressiveSlotSemantic::LineScalarField:
-        case ProgressiveSlotSemantic::LineWidth:
+        case GeometryPresentationSlotSemantic::Displacement:
+        case GeometryPresentationSlotSemantic::PointColor:
+        case GeometryPresentationSlotSemantic::PointScalarField:
+        case GeometryPresentationSlotSemantic::PointSize:
+        case GeometryPresentationSlotSemantic::PointNormalOrientation:
+        case GeometryPresentationSlotSemantic::LineColor:
+        case GeometryPresentationSlotSemantic::LineScalarField:
+        case GeometryPresentationSlotSemantic::LineWidth:
             return false;
         }
         return false;
@@ -1434,6 +1489,9 @@ namespace Extrinsic::Runtime
                 return encoder == MeshAttributeTextureBakeEncoder::RgbaColor;
             case Geometry::PropertyValueKind::UInt32:
             case Geometry::PropertyValueKind::Unknown:
+            case Geometry::PropertyValueKind::Bool:
+            case Geometry::PropertyValueKind::Int32:
+            case Geometry::PropertyValueKind::UInt64:
                 return false;
             }
             return false;
@@ -1463,6 +1521,9 @@ namespace Extrinsic::Runtime
         case Geometry::PropertyValueKind::Vec4:
             return encoder == MeshAttributeTextureBakeEncoder::RgbaColor;
         case Geometry::PropertyValueKind::Unknown:
+        case Geometry::PropertyValueKind::Bool:
+        case Geometry::PropertyValueKind::Int32:
+        case Geometry::PropertyValueKind::UInt64:
             return false;
         }
         return false;
@@ -1480,7 +1541,7 @@ namespace Extrinsic::Runtime
         case SelectedMeshTextureBakeStatus::MissingAssetService: return "SelectedMeshTextureBake.MissingAssetService";
         case SelectedMeshTextureBakeStatus::StaleEntity: return "SelectedMeshTextureBake.StaleEntity";
         case SelectedMeshTextureBakeStatus::NonMeshSelection: return "SelectedMeshTextureBake.NonMeshSelection";
-        case SelectedMeshTextureBakeStatus::MissingProgressiveBindings: return "SelectedMeshTextureBake.MissingProgressiveBindings";
+        case SelectedMeshTextureBakeStatus::MissingGeometryPresentationRecipe: return "SelectedMeshTextureBake.MissingGeometryPresentationRecipe";
         case SelectedMeshTextureBakeStatus::MissingPresentation: return "SelectedMeshTextureBake.MissingPresentation";
         case SelectedMeshTextureBakeStatus::MissingSlot: return "SelectedMeshTextureBake.MissingSlot";
         case SelectedMeshTextureBakeStatus::UnsupportedSourceDomain: return "SelectedMeshTextureBake.UnsupportedSourceDomain";
@@ -1520,7 +1581,7 @@ namespace Extrinsic::Runtime
         if (request.SourcePropertyName.empty())
             return FailureBuild(SelectedMeshTextureBakeStatus::MissingProperty);
         if (!IsSurfaceTextureSemantic(request.TargetSemantic) ||
-            request.TargetLane != ProgressiveRenderLane::Surface)
+            request.TargetLane != GeometryRenderLane::Surface)
         {
             return FailureBuild(
                 SelectedMeshTextureBakeStatus::UnsupportedTargetSemantic);
@@ -1544,30 +1605,37 @@ namespace Extrinsic::Runtime
         if (domainStatus != SelectedMeshTextureBakeStatus::Success)
             return FailureBuild(domainStatus);
 
+        const GeometryEntityAvailability geometryAvailability =
+            BuildGeometryAvailability(view);
         const std::size_t expectedCount =
-            ResolvePropertyElementCount(view, request.SourceDomain);
+            ResolveGeometryElementCount(
+                geometryAvailability, request.SourceDomain);
         GeometryPropertyValueKindFilter expectedKind = request.ExpectedValueKind;
         if (!expectedKind.has_value())
             expectedKind = DefaultExpectedKindForSemantic(request.TargetSemantic);
 
-        ProgressivePropertyBindingDescriptor descriptor{
+        GeometryPropertyRef descriptor{
             .Domain = request.SourceDomain,
-            .PropertyName = request.SourcePropertyName,
-            .ExpectedValueKind = expectedKind,
-            .ExpectedElementCount = expectedCount,
-            .SourceGeneration = request.SourceGeneration,
+            .Name = request.SourcePropertyName,
+            .ValueKind = expectedKind.value_or(
+                Geometry::PropertyValueKind::Unknown),
         };
-        ProgressivePropertyResolution resolution =
-            ResolvePropertyBinding(view, descriptor, request.SourceGeneration);
-        if (!resolution.Compatible())
+        GeometryPropertyResolution resolution =
+            ResolveGeometryProperty(
+                geometryAvailability,
+                descriptor,
+                expectedCount,
+                true,
+                request.SourceGeneration);
+        if (!resolution.Resolved())
         {
             return FailureBuild(
                 StatusForResolution(resolution.Status),
-                resolution.Diagnostic);
+                std::string{ToString(resolution.Status)});
         }
         const MeshAttributeTextureBakeEncoder resolvedEncoder =
-            ResolveMaterialSlotEncoder(request, resolution.ActualValueKind);
-        if (!EncoderCanHandle(resolvedEncoder, resolution.ActualValueKind))
+            ResolveMaterialSlotEncoder(request, resolution.ResolvedValueKind);
+        if (!EncoderCanHandle(resolvedEncoder, resolution.ResolvedValueKind))
         {
             return FailureBuild(
                 SelectedMeshTextureBakeStatus::IncompatibleTargetSlot,
@@ -1578,7 +1646,7 @@ namespace Extrinsic::Runtime
         const SelectedMeshTextureBakeStatus compatibility =
             ValidateTargetSlotCompatibility(
                 request.TargetSemantic,
-                resolution.ActualValueKind,
+                resolution.ResolvedValueKind,
                 resolvedEncoder,
                 compatibilityDiagnostic);
         if (compatibility != SelectedMeshTextureBakeStatus::Success)
@@ -1591,10 +1659,10 @@ namespace Extrinsic::Runtime
         if (request.BindGeneratedTexture)
         {
             const auto* bindings =
-                scene.Raw().try_get<ProgressivePresentationBindings>(entity);
+                scene.Raw().try_get<GeometryPresentationRecipe>(entity);
             if (bindings == nullptr)
                 return FailureBuild(
-                    SelectedMeshTextureBakeStatus::MissingProgressiveBindings);
+                    SelectedMeshTextureBakeStatus::MissingGeometryPresentationRecipe);
 
             const ConstSlotLookup lookup = FindConstSlot(*bindings, request);
             if (lookup.Presentation == nullptr)
@@ -1610,7 +1678,7 @@ namespace Extrinsic::Runtime
         bake.SourcePropertyName = request.SourcePropertyName;
         bake.SourceDomain = bakeDomain;
         bake.ValueKind = request.ValueKind == MeshAttributeTextureBakeValueKind::Auto
-            ? ToBakeValueKind(resolution.ActualValueKind)
+            ? ToBakeValueKind(resolution.ResolvedValueKind)
             : request.ValueKind;
         bake.TargetSemantic = std::string{ToString(request.TargetSemantic)};
         bake.Encoder = resolvedEncoder;
@@ -1688,14 +1756,14 @@ namespace Extrinsic::Runtime
                 true);
         }
 
-        std::uint64_t bindingGeneration = 0u;
+        std::uint64_t recipeGeneration = 0u;
         bool previousOutputRetained = false;
         const SelectedMeshTextureBakeStatus pendingStatus =
             SetPendingBinding(
                 context,
                 request,
                 build,
-                bindingGeneration,
+                recipeGeneration,
                 previousOutputRetained);
         if (pendingStatus != SelectedMeshTextureBakeStatus::Success)
             return FailureResult(pendingStatus);
@@ -1706,7 +1774,7 @@ namespace Extrinsic::Runtime
         SelectedMeshTextureBakeContext applyContext = context;
         SelectedMeshTextureBakeRequest applyRequest = request;
         SelectedMeshTextureBakeBuildResult applyBuild = build;
-        const std::uint64_t expectedBindingGeneration = bindingGeneration;
+        const std::uint64_t expectedRecipeGeneration = recipeGeneration;
         JobDesc desc{};
         desc.DebugName = "selected mesh texture bake";
         desc.Kind = RuntimeTaskKinds::GeometryProcess;
@@ -1738,12 +1806,12 @@ namespace Extrinsic::Runtime
                     });
             };
         desc.ValidateBeforeApply =
-            [applyContext, applyRequest, expectedBindingGeneration]()
+            [applyContext, applyRequest, expectedRecipeGeneration]()
             {
                 return ValidateAsyncApply(
                     applyContext,
                     applyRequest,
-                    expectedBindingGeneration);
+                    expectedRecipeGeneration);
             };
         desc.PublishCompletion =
             [applyContext,
@@ -1769,21 +1837,29 @@ namespace Extrinsic::Runtime
                                     applyRequest.StableEntityId);
                             entity != ECS::InvalidEntityHandle)
                         {
-                            if (auto* bindings =
-                                    applyContext.Scene->Raw()
-                                        .try_get<ProgressivePresentationBindings>(
-                                            entity);
-                                bindings != nullptr)
+                            auto& raw = applyContext.Scene->Raw();
+                            auto* recipe =
+                                raw.try_get<GeometryPresentationRecipe>(
+                                    entity);
+                            auto* runtimeState =
+                                raw.try_get<GeometryPresentationRuntimeState>(
+                                    entity);
+                            if (recipe != nullptr && runtimeState != nullptr)
                             {
                                 if (SlotLookup lookup =
-                                        FindMutableSlot(*bindings, applyRequest);
+                                        FindMutableSlot(*recipe, applyRequest);
+                                    lookup.Presentation != nullptr &&
                                     lookup.Slot != nullptr)
                                 {
-                                    lookup.Slot->Readiness =
-                                        ProgressiveReadinessState::Failed;
-                                    lookup.Slot->LastDiagnostic =
+                                    GeometryPresentationSlotStatus& status =
+                                        EnsurePresentationSlotStatus(
+                                            *runtimeState,
+                                            lookup.Presentation->Key,
+                                            applyRequest.TargetSemantic);
+                                    status.Readiness =
+                                        GeometryPresentationReadiness::Failed;
+                                    status.Diagnostic =
                                         BuildBakeDiagnostic(bake.Status);
-                                    ++bindings->BindingGeneration;
                                 }
                             }
                         }
@@ -1812,7 +1888,7 @@ namespace Extrinsic::Runtime
             .ExecutionMode = SelectedMeshTextureBakeExecutionMode::AsyncJob,
             .BoundGeneratedTexture = false,
             .PreviousOutputRetained = previousOutputRetained,
-            .BindingGeneration = bindingGeneration,
+            .RecipeGeneration = recipeGeneration,
             .GeneratedAssetPath = build.GeneratedAssetPath,
             .Diagnostic = "mesh texture bake scheduled",
         };

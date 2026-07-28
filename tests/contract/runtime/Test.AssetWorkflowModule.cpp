@@ -49,7 +49,7 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SelectionController;
@@ -720,7 +720,7 @@ namespace
                     .StableEntityId =
                         Runtime::StableEntityLookup::ToRenderId(entity),
                     .Semantic =
-                        Runtime::ProgressiveSlotSemantic::Normal,
+                        Runtime::GeometryPresentationSlotSemantic::Normal,
                 },
         };
     }

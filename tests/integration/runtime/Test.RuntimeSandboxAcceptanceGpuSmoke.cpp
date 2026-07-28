@@ -102,8 +102,8 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshGeometryPacker;
-import Extrinsic.Runtime.ProgressivePresentationExtraction;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxConfigSections;
@@ -340,35 +340,51 @@ void SetTexcoords(Geometry::PropertySet& props, const std::vector<glm::vec2>& te
     return payload;
 }
 
-[[nodiscard]] RT::ProgressivePresentationBindings MakeGeneratedAlbedoPresentationBindings(
+struct GeometryPresentationFixture
+{
+    RT::GeometryPresentationRecipe Recipe{};
+    RT::GeometryPresentationRuntimeState RuntimeState{};
+};
+
+[[nodiscard]] GeometryPresentationFixture MakeGeneratedAlbedoPresentation(
     const Assets::AssetId generatedAlbedo)
 {
-    RT::ProgressiveSlotBinding albedo{};
-    albedo.Semantic = RT::ProgressiveSlotSemantic::Albedo;
-    albedo.SourceKind = RT::ProgressiveSlotSourceKind::GeneratedTextureAsset;
-    albedo.GeneratedTexture = generatedAlbedo;
+    RT::GeometryPresentationSlotRecipe albedo{};
+    albedo.Semantic = RT::GeometryPresentationSlotSemantic::Albedo;
+    albedo.SourceKind = RT::GeometryPresentationSourceKind::GeneratedTextureAsset;
     albedo.GeneratedPolicy =
-        RT::ProgressiveGeneratedOutputPolicy::DeterministicChildAsset;
-    albedo.Provenance =
-        RT::ProgressiveGeneratedOutputProvenance::GeneratedTextureAsset;
-    albedo.Readiness = RT::ProgressiveReadinessState::Ready;
+        RT::GeometryGeneratedOutputPolicy::DeterministicChildAsset;
 
-    return RT::ProgressivePresentationBindings{
-        .Shape = RT::ProgressiveEntityShape::MeshLeaf,
-        .Lanes = {
-            RT::ProgressiveRenderLaneBinding{
-                .Lane = RT::ProgressiveRenderLane::Surface,
-                .PresentationKey = "graphics089.generated.surface",
+    return GeometryPresentationFixture{
+        .Recipe = RT::GeometryPresentationRecipe{
+            .Shape = RT::GeometryPresentationShape::Mesh,
+            .Lanes = {
+                RT::GeometryPresentationLaneRecipe{
+                    .Lane = RT::GeometryRenderLane::Surface,
+                    .PresentationKey = "graphics089.generated.surface",
+                },
+            },
+            .Presentations = {
+                RT::GeometryPresentationBindingRecipe{
+                    .Key = "graphics089.generated.surface",
+                    .Kind = RT::GeometryPresentationKind::SurfaceMaterial,
+                    .Slots = {albedo},
+                },
             },
         },
-        .Presentations = {
-            RT::ProgressivePresentationBinding{
-                .Key = "graphics089.generated.surface",
-                .Kind = RT::ProgressivePresentationKind::SurfaceMaterial,
-                .Slots = {albedo},
+        .RuntimeState = RT::GeometryPresentationRuntimeState{
+            .RecipeGeneration = 1u,
+            .Slots = {
+                RT::GeometryPresentationSlotStatus{
+                    .PresentationKey = "graphics089.generated.surface",
+                    .Semantic = RT::GeometryPresentationSlotSemantic::Albedo,
+                    .Readiness = RT::GeometryPresentationReadiness::Ready,
+                    .GeneratedTexture = generatedAlbedo,
+                    .Provenance = RT::GeometryPresentationProvenance::GeneratedTextureAsset,
+                    .OutputGeneration = 1u,
+                },
             },
         },
-        .BindingGeneration = 1u,
     };
 }
 
@@ -523,130 +539,135 @@ void SeedAcceptanceScene(Registry& scene)
     (void)MakePointCloud(scene);
 }
 
-[[nodiscard]] RT::ProgressivePresentationBindings MakeProgressiveMeshBindings(
+[[nodiscard]] GeometryPresentationFixture MakeMeshGeometryPresentation(
     const bool normalReady)
 {
-    RT::ProgressiveSlotBinding albedo{};
-    albedo.Semantic = RT::ProgressiveSlotSemantic::Albedo;
-    albedo.SourceKind = RT::ProgressiveSlotSourceKind::UniformDefault;
-    albedo.UniformDefault = RT::ProgressiveDefaultValue{
+    RT::GeometryPresentationSlotRecipe albedo{};
+    albedo.Semantic = RT::GeometryPresentationSlotSemantic::Albedo;
+    albedo.SourceKind = RT::GeometryPresentationSourceKind::UniformDefault;
+    albedo.UniformDefault = RT::GeometryPresentationDefaultValue{
         .Kind = Geometry::PropertyValueKind::Vec4,
         .Vector = glm::vec4{0.25f, 0.45f, 0.85f, 1.0f},
     };
-    albedo.Readiness = RT::ProgressiveReadinessState::DefaultValue;
 
-    RT::ProgressiveSlotBinding normal{};
-    normal.Semantic = RT::ProgressiveSlotSemantic::Normal;
-    normal.SourceKind = RT::ProgressiveSlotSourceKind::PropertyBake;
-    normal.Property = RT::ProgressivePropertyBindingDescriptor{
+    RT::GeometryPresentationSlotRecipe normal{};
+    normal.Semantic = RT::GeometryPresentationSlotSemantic::Normal;
+    normal.SourceKind = RT::GeometryPresentationSourceKind::PropertyBake;
+    normal.Property = RT::GeometryPropertyRef{
         .Domain = RT::GeometryElementDomain::MeshVertex,
-        .PropertyName = "v:normal",
-        .ExpectedValueKind = Geometry::PropertyValueKind::Vec3,
-        .ExpectedElementCount = 3u,
+        .Name = "v:normal",
+        .ValueKind = Geometry::PropertyValueKind::Vec3,
     };
     normal.GeneratedPolicy =
-        RT::ProgressiveGeneratedOutputPolicy::DeterministicChildAsset;
-    normal.Provenance =
-        RT::ProgressiveGeneratedOutputProvenance::PropertyBinding;
-    normal.Readiness = normalReady
-        ? RT::ProgressiveReadinessState::Ready
-        : RT::ProgressiveReadinessState::Pending;
-    if (normalReady)
-        normal.GeneratedTexture = Assets::AssetId{501u, 1u};
+        RT::GeometryGeneratedOutputPolicy::DeterministicChildAsset;
 
-    RT::ProgressiveSlotBinding roughness{};
-    roughness.Semantic = RT::ProgressiveSlotSemantic::Roughness;
-    roughness.SourceKind = RT::ProgressiveSlotSourceKind::AuthoredTextureAsset;
-    roughness.Readiness = RT::ProgressiveReadinessState::Unset;
-    roughness.Provenance =
-        RT::ProgressiveGeneratedOutputProvenance::AuthoredAsset;
+    RT::GeometryPresentationSlotRecipe roughness{};
+    roughness.Semantic = RT::GeometryPresentationSlotSemantic::Roughness;
+    roughness.SourceKind = RT::GeometryPresentationSourceKind::AuthoredTextureAsset;
 
-    RT::ProgressiveSlotBinding metallic{};
-    metallic.Semantic = RT::ProgressiveSlotSemantic::Metallic;
-    metallic.SourceKind = RT::ProgressiveSlotSourceKind::PropertyBake;
-    metallic.Property = RT::ProgressivePropertyBindingDescriptor{
+    RT::GeometryPresentationSlotRecipe metallic{};
+    metallic.Semantic = RT::GeometryPresentationSlotSemantic::Metallic;
+    metallic.SourceKind = RT::GeometryPresentationSourceKind::PropertyBake;
+    metallic.Property = RT::GeometryPropertyRef{
         .Domain = RT::GeometryElementDomain::MeshVertex,
-        .PropertyName = "v:metallic",
-        .ExpectedValueKind = Geometry::PropertyValueKind::Float,
-        .ExpectedElementCount = 3u,
+        .Name = "v:metallic",
+        .ValueKind = Geometry::PropertyValueKind::Float,
     };
-    metallic.GeneratedTexture = Assets::AssetId{502u, 1u};
     metallic.GeneratedPolicy =
-        RT::ProgressiveGeneratedOutputPolicy::DeterministicChildAsset;
-    metallic.Provenance =
-        RT::ProgressiveGeneratedOutputProvenance::PropertyBinding;
-    metallic.Readiness = RT::ProgressiveReadinessState::Failed;
-    metallic.LastDiagnostic = "previous metallic texture retained after failed bake";
+        RT::GeometryGeneratedOutputPolicy::DeterministicChildAsset;
 
-    RT::ProgressiveSlotBinding faceScalar{};
-    faceScalar.Semantic = RT::ProgressiveSlotSemantic::ScalarField;
-    faceScalar.SourceKind = RT::ProgressiveSlotSourceKind::PropertyBuffer;
-    faceScalar.Property = RT::ProgressivePropertyBindingDescriptor{
+    RT::GeometryPresentationSlotRecipe faceScalar{};
+    faceScalar.Semantic = RT::GeometryPresentationSlotSemantic::ScalarField;
+    faceScalar.SourceKind = RT::GeometryPresentationSourceKind::PropertyBuffer;
+    faceScalar.Property = RT::GeometryPropertyRef{
         .Domain = RT::GeometryElementDomain::MeshFace,
-        .PropertyName = "f:heat",
-        .ExpectedValueKind = Geometry::PropertyValueKind::Float,
-        .ExpectedElementCount = 1u,
+        .Name = "f:heat",
+        .ValueKind = Geometry::PropertyValueKind::Float,
     };
-    faceScalar.Readiness = RT::ProgressiveReadinessState::Ready;
-    faceScalar.Provenance =
-        RT::ProgressiveGeneratedOutputProvenance::PropertyBuffer;
 
-    return RT::ProgressivePresentationBindings{
-        .Shape = RT::ProgressiveEntityShape::MeshLeaf,
-        .Lanes = {
-            RT::ProgressiveRenderLaneBinding{
-                .Lane = RT::ProgressiveRenderLane::Surface,
-                .PresentationKey = "progressive.mesh.surface",
+    return GeometryPresentationFixture{
+        .Recipe = RT::GeometryPresentationRecipe{
+            .Shape = RT::GeometryPresentationShape::Mesh,
+            .Lanes = {
+                RT::GeometryPresentationLaneRecipe{
+                    .Lane = RT::GeometryRenderLane::Surface,
+                    .PresentationKey = "mesh.surface",
+                },
+            },
+            .Presentations = {
+                RT::GeometryPresentationBindingRecipe{
+                    .Key = "mesh.surface",
+                    .Kind = RT::GeometryPresentationKind::SurfaceMaterial,
+                    .Slots = {albedo, normal, roughness, metallic, faceScalar},
+                },
             },
         },
-        .Presentations = {
-            RT::ProgressivePresentationBinding{
-                .Key = "progressive.mesh.surface",
-                .Kind = RT::ProgressivePresentationKind::SurfaceMaterial,
-                .Slots = {albedo, normal, roughness, metallic, faceScalar},
+        .RuntimeState = RT::GeometryPresentationRuntimeState{
+            .RecipeGeneration = 1u,
+            .Slots = {
+                RT::GeometryPresentationSlotStatus{
+                    .PresentationKey = "mesh.surface",
+                    .Semantic = RT::GeometryPresentationSlotSemantic::Normal,
+                    .Readiness = normalReady
+                        ? RT::GeometryPresentationReadiness::Ready
+                        : RT::GeometryPresentationReadiness::Pending,
+                    .GeneratedTexture = normalReady
+                        ? Assets::AssetId{501u, 1u}
+                        : Assets::AssetId{},
+                    .Provenance = RT::GeometryPresentationProvenance::PropertyBinding,
+                    .OutputGeneration = normalReady ? 1u : 0u,
+                },
+                RT::GeometryPresentationSlotStatus{
+                    .PresentationKey = "mesh.surface",
+                    .Semantic = RT::GeometryPresentationSlotSemantic::Metallic,
+                    .Readiness = RT::GeometryPresentationReadiness::Failed,
+                    .GeneratedTexture = Assets::AssetId{502u, 1u},
+                    .Provenance = RT::GeometryPresentationProvenance::PropertyBinding,
+                    .OutputGeneration = 1u,
+                    .Diagnostic = "previous metallic texture retained after failed bake",
+                },
             },
         },
-        .BindingGeneration = normalReady ? 2u : 1u,
     };
 }
 
-[[nodiscard]] RT::ProgressivePresentationBindings MakeProgressiveGraphBindings()
+[[nodiscard]] GeometryPresentationFixture MakeGraphGeometryPresentation()
 {
-    RT::ProgressiveSlotBinding edgeColor{};
-    edgeColor.Semantic = RT::ProgressiveSlotSemantic::LineColor;
-    edgeColor.SourceKind = RT::ProgressiveSlotSourceKind::PropertyBuffer;
-    edgeColor.Property = RT::ProgressivePropertyBindingDescriptor{
+    RT::GeometryPresentationSlotRecipe edgeColor{};
+    edgeColor.Semantic = RT::GeometryPresentationSlotSemantic::LineColor;
+    edgeColor.SourceKind = RT::GeometryPresentationSourceKind::PropertyBuffer;
+    edgeColor.Property = RT::GeometryPropertyRef{
         .Domain = RT::GeometryElementDomain::GraphEdge,
-        .PropertyName = "e:debug_color",
-        .ExpectedValueKind = Geometry::PropertyValueKind::Vec4,
-        .ExpectedElementCount = 2u,
+        .Name = "e:debug_color",
+        .ValueKind = Geometry::PropertyValueKind::Vec4,
     };
-    edgeColor.Readiness = RT::ProgressiveReadinessState::Ready;
-    edgeColor.Provenance =
-        RT::ProgressiveGeneratedOutputProvenance::PropertyBuffer;
 
-    return RT::ProgressivePresentationBindings{
-        .Shape = RT::ProgressiveEntityShape::GraphLeaf,
-        .Lanes = {
-            RT::ProgressiveRenderLaneBinding{
-                .Lane = RT::ProgressiveRenderLane::Edges,
-                .PresentationKey = "progressive.graph.lines",
+    return GeometryPresentationFixture{
+        .Recipe = RT::GeometryPresentationRecipe{
+            .Shape = RT::GeometryPresentationShape::Graph,
+            .Lanes = {
+                RT::GeometryPresentationLaneRecipe{
+                    .Lane = RT::GeometryRenderLane::Edges,
+                    .PresentationKey = "graph.lines",
+                },
+            },
+            .Presentations = {
+                RT::GeometryPresentationBindingRecipe{
+                    .Key = "graph.lines",
+                    .Kind = RT::GeometryPresentationKind::LinePresentation,
+                    .Slots = {edgeColor},
+                },
             },
         },
-        .Presentations = {
-            RT::ProgressivePresentationBinding{
-                .Key = "progressive.graph.lines",
-                .Kind = RT::ProgressivePresentationKind::LinePresentation,
-                .Slots = {edgeColor},
-            },
+        .RuntimeState = RT::GeometryPresentationRuntimeState{
+            .RecipeGeneration = 1u,
         },
-        .BindingGeneration = 1u,
     };
 }
 
-[[nodiscard]] EntityHandle SeedProgressiveMeshScene(Registry& scene)
+[[nodiscard]] EntityHandle SeedGeometryPresentationMeshScene(Registry& scene)
 {
-    const EntityHandle mesh = MakeMesh(scene, "ProgressiveGpuMesh", 201u);
+    const EntityHandle mesh = MakeMesh(scene, "GeometryPresentationGpuMesh", 201u);
     auto& raw = scene.Raw();
     auto& vertices = raw.get<gs::Vertices>(mesh);
     vertices.Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f}).Vector() =
@@ -657,38 +678,46 @@ void SeedAcceptanceScene(Registry& scene)
         {0.0f, 0.0f, 0.0f};
     auto& faces = raw.get<gs::Faces>(mesh);
     faces.Properties.GetOrAdd<float>("f:heat", 0.0f).Vector() = {0.5f};
-    raw.emplace<RT::ProgressivePresentationBindings>(
+    const GeometryPresentationFixture presentation =
+        MakeMeshGeometryPresentation(false);
+    raw.emplace<RT::GeometryPresentationRecipe>(mesh, presentation.Recipe);
+    raw.emplace<RT::GeometryPresentationRuntimeState>(
         mesh,
-        MakeProgressiveMeshBindings(false));
+        presentation.RuntimeState);
     return mesh;
 }
 
-[[nodiscard]] EntityHandle SeedProgressiveGraphScene(Registry& scene)
+[[nodiscard]] EntityHandle SeedGeometryPresentationGraphScene(Registry& scene)
 {
-    const EntityHandle graph = MakeGraph(scene, "ProgressiveGpuGraph", 202u);
+    const EntityHandle graph = MakeGraph(scene, "GeometryPresentationGpuGraph", 202u);
     auto& edges = scene.Raw().get<gs::Edges>(graph);
     edges.Properties.GetOrAdd<glm::vec4>("e:debug_color", glm::vec4{1.0f}).Vector() =
         {glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
          glm::vec4{0.0f, 1.0f, 0.0f, 1.0f}};
-    scene.Raw().emplace<RT::ProgressivePresentationBindings>(
+    const GeometryPresentationFixture presentation =
+        MakeGraphGeometryPresentation();
+    scene.Raw().emplace<RT::GeometryPresentationRecipe>(graph, presentation.Recipe);
+    scene.Raw().emplace<RT::GeometryPresentationRuntimeState>(
         graph,
-        MakeProgressiveGraphBindings());
+        presentation.RuntimeState);
     return graph;
 }
 
-void MarkProgressiveMeshNormalReady(Registry& scene, const EntityHandle mesh)
+void MarkGeometryPresentationMeshNormalReady(
+    Registry& scene,
+    const EntityHandle mesh)
 {
-    auto& bindings =
-        scene.Raw().get<RT::ProgressivePresentationBindings>(mesh);
-    RT::ProgressivePresentationBinding* presentation =
-        RT::FindPresentationBinding(bindings, "progressive.mesh.surface");
-    ASSERT_NE(presentation, nullptr);
-    RT::ProgressiveSlotBinding* normal =
-        RT::FindSlotBinding(*presentation, RT::ProgressiveSlotSemantic::Normal);
+    auto& state =
+        scene.Raw().get<RT::GeometryPresentationRuntimeState>(mesh);
+    RT::GeometryPresentationSlotStatus* normal =
+        RT::FindGeometryPresentationSlotStatus(
+            state,
+            "mesh.surface",
+            RT::GeometryPresentationSlotSemantic::Normal);
     ASSERT_NE(normal, nullptr);
-    normal->Readiness = RT::ProgressiveReadinessState::Ready;
+    normal->Readiness = RT::GeometryPresentationReadiness::Ready;
     normal->GeneratedTexture = Assets::AssetId{501u, 1u};
-    ++bindings.BindingGeneration;
+    ++normal->OutputGeneration;
 }
 
 // --- Pass-status helpers (local to this fixture) ---
@@ -1612,7 +1641,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, AcceptanceSceneReachesOperationalDefaultR
     engine.Shutdown();
 }
 
-TEST(RuntimeSandboxAcceptanceGpuSmoke, ProgressiveRenderDataReachesOperationalFrame)
+TEST(RuntimeSandboxAcceptanceGpuSmoke, GeometryPresentationReachesOperationalFrame)
 {
     auto bootstrap = BootstrapAcceptanceEngine();
     if (bootstrap.Skipped)
@@ -1622,31 +1651,37 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ProgressiveRenderDataReachesOperationalFr
     Engine& engine = *bootstrap.EnginePtr;
 
     Registry& scene = *engine.Worlds().Get(engine.ActiveWorld());
-    const EntityHandle mesh = SeedProgressiveMeshScene(scene);
-    const EntityHandle graph = SeedProgressiveGraphScene(scene);
+    const EntityHandle mesh = SeedGeometryPresentationMeshScene(scene);
+    const EntityHandle graph = SeedGeometryPresentationGraphScene(scene);
 
     const gs::ConstSourceView initialMeshView =
         gs::BuildConstView(scene.Raw(), mesh);
     const auto& initialMeshBindings =
-        scene.Raw().get<RT::ProgressivePresentationBindings>(mesh);
-    const RT::ProgressivePresentationExtractionSnapshot initialMesh =
-        RT::BuildProgressivePresentationSnapshot(initialMeshView,
-                                                initialMeshBindings);
+        scene.Raw().get<RT::GeometryPresentationRecipe>(mesh);
+    const auto& initialMeshState =
+        scene.Raw().get<RT::GeometryPresentationRuntimeState>(mesh);
+    const RT::GeometryPresentationSnapshot initialMesh =
+        RT::BuildGeometryPresentationSnapshot(initialMeshView,
+                                                initialMeshBindings,
+                                                initialMeshState);
     EXPECT_GE(initialMesh.Stats.DefaultSlotCount, 1u);
     EXPECT_GE(initialMesh.Stats.PendingSlotCount, 1u);
     EXPECT_GE(initialMesh.Stats.FailedSlotCount, 1u);
     EXPECT_GE(initialMesh.Stats.UnsupportedSlotCount, 1u);
     EXPECT_GE(initialMesh.Stats.PreviousOutputRetainedCount, 1u);
 
-    MarkProgressiveMeshNormalReady(scene, mesh);
+    MarkGeometryPresentationMeshNormalReady(scene, mesh);
 
     const gs::ConstSourceView readyMeshView =
         gs::BuildConstView(scene.Raw(), mesh);
     const auto& readyMeshBindings =
-        scene.Raw().get<RT::ProgressivePresentationBindings>(mesh);
-    const RT::ProgressivePresentationExtractionSnapshot readyMesh =
-        RT::BuildProgressivePresentationSnapshot(readyMeshView,
-                                                readyMeshBindings);
+        scene.Raw().get<RT::GeometryPresentationRecipe>(mesh);
+    const auto& readyMeshState =
+        scene.Raw().get<RT::GeometryPresentationRuntimeState>(mesh);
+    const RT::GeometryPresentationSnapshot readyMesh =
+        RT::BuildGeometryPresentationSnapshot(readyMeshView,
+                                                readyMeshBindings,
+                                                readyMeshState);
     EXPECT_GE(readyMesh.Stats.ReadyTextureSlotCount, 2u);
     EXPECT_EQ(readyMesh.Stats.PendingSlotCount, 0u);
     EXPECT_GE(readyMesh.Stats.UnsupportedSlotCount, 1u);
@@ -1654,16 +1689,21 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ProgressiveRenderDataReachesOperationalFr
 
     const gs::ConstSourceView graphView = gs::BuildConstView(scene.Raw(), graph);
     const auto& graphBindings =
-        scene.Raw().get<RT::ProgressivePresentationBindings>(graph);
-    const RT::ProgressivePresentationExtractionSnapshot graphSnapshot =
-        RT::BuildProgressivePresentationSnapshot(graphView, graphBindings);
+        scene.Raw().get<RT::GeometryPresentationRecipe>(graph);
+    const auto& graphState =
+        scene.Raw().get<RT::GeometryPresentationRuntimeState>(graph);
+    const RT::GeometryPresentationSnapshot graphSnapshot =
+        RT::BuildGeometryPresentationSnapshot(
+            graphView,
+            graphBindings,
+            graphState);
     EXPECT_GE(graphSnapshot.Stats.PropertyBufferReadyCount, 1u);
 
     const auto run = DriveAcceptanceAndCapture(engine);
     if (!run.DeviceOperational)
     {
         engine.Shutdown();
-        ADD_FAILURE() << "Progressive render-data smoke did not reach operational "
+        ADD_FAILURE() << "Geometry-presentation smoke did not reach operational "
                          "Vulkan: status="
                       << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
                       << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
@@ -1677,27 +1717,27 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ProgressiveRenderDataReachesOperationalFr
         << BuildPassStatusSummary(run.Stats);
 
     const auto& ex = RequiredEngineService<RT::RenderExtractionCache>(engine).GetLastStats();
-    EXPECT_GE(ex.ProgressivePresentationEntityCount, 2u);
-    EXPECT_GE(ex.ProgressivePresentationSlotCount,
+    EXPECT_GE(ex.GeometryPresentationEntityCount, 2u);
+    EXPECT_GE(ex.GeometryPresentationSlotCount,
               readyMesh.Stats.SlotCount + graphSnapshot.Stats.SlotCount);
-    EXPECT_GE(ex.ProgressiveDefaultSlotCount, readyMesh.Stats.DefaultSlotCount);
-    EXPECT_GE(ex.ProgressiveReadyTextureSlotCount,
+    EXPECT_GE(ex.GeometryPresentationDefaultSlotCount, readyMesh.Stats.DefaultSlotCount);
+    EXPECT_GE(ex.GeometryPresentationReadyTextureSlotCount,
               readyMesh.Stats.ReadyTextureSlotCount);
-    EXPECT_GE(ex.ProgressivePropertyBufferReadyCount,
+    EXPECT_GE(ex.GeometryPresentationPropertyBufferReadyCount,
               readyMesh.Stats.PropertyBufferReadyCount +
                   graphSnapshot.Stats.PropertyBufferReadyCount);
-    EXPECT_GE(ex.ProgressiveUnsupportedSlotCount,
+    EXPECT_GE(ex.GeometryPresentationUnsupportedSlotCount,
               readyMesh.Stats.UnsupportedSlotCount);
-    EXPECT_GE(ex.ProgressivePreviousOutputRetainedCount,
+    EXPECT_GE(ex.GeometryPresentationPreviousOutputRetainedCount,
               readyMesh.Stats.PreviousOutputRetainedCount);
-    EXPECT_GE(ex.ProgressiveDiagnosticCount,
+    EXPECT_GE(ex.GeometryPresentationDiagnosticCount,
               readyMesh.Stats.DiagnosticCount);
-    EXPECT_GE(ex.ProgressiveMaterialTextureBindingResolveFailureCount, 1u)
-        << "Generated progressive texture slots should attempt material binding "
+    EXPECT_GE(ex.GeometryPresentationMaterialTextureBindingResolveFailureCount, 1u)
+        << "Generated geometry-presentation texture slots should attempt material binding "
            "resolution and fail closed when the smoke uses synthetic AssetIds.";
 
     EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
-        << "Vulkan fallback counters incremented across operational progressive "
+        << "Vulkan fallback counters incremented across operational geometry-presentation "
            "frames: "
         << "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
         << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
@@ -3802,9 +3842,14 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
         << static_cast<int>(generatedTexture.error());
     appPtr->SetGeneratedTexture(*generatedTexture);
 
-    raw.emplace_or_replace<RT::ProgressivePresentationBindings>(
+    const GeometryPresentationFixture presentation =
+        MakeGeneratedAlbedoPresentation(*generatedTexture);
+    raw.emplace_or_replace<RT::GeometryPresentationRecipe>(
         importedEntity,
-        MakeGeneratedAlbedoPresentationBindings(*generatedTexture));
+        presentation.Recipe);
+    raw.emplace_or_replace<RT::GeometryPresentationRuntimeState>(
+        importedEntity,
+        presentation.RuntimeState);
     auto& visualization = raw.get<G::VisualizationConfig>(importedEntity);
     visualization.Source = G::VisualizationConfig::ColorSource::Material;
 
@@ -3895,12 +3940,12 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGener
         << "Mesh extraction fell back to default zero UVs instead of ASSETIO-008 "
            "generated UVs.";
     EXPECT_EQ(ex.MeshGeometryNonFiniteTexcoords, 0u);
-    EXPECT_GE(ex.ProgressivePresentationEntityCount, 1u);
-    EXPECT_GE(ex.ProgressiveReadyTextureSlotCount, 1u);
-    EXPECT_GE(ex.ProgressiveMaterialTextureBindingResolveCount, 1u)
+    EXPECT_GE(ex.GeometryPresentationEntityCount, 1u);
+    EXPECT_GE(ex.GeometryPresentationReadyTextureSlotCount, 1u);
+    EXPECT_GE(ex.GeometryPresentationMaterialTextureBindingResolveCount, 1u)
         << "Generated texture slot did not resolve through the material texture "
            "binding path.";
-    EXPECT_EQ(ex.ProgressiveMaterialTextureBindingResolveFailureCount, 0u);
+    EXPECT_EQ(ex.GeometryPresentationMaterialTextureBindingResolveFailureCount, 0u);
 
     const auto materialDiagnostics =
         renderer.GetMaterialSystem().GetDiagnostics();
@@ -5631,43 +5676,38 @@ constexpr std::string_view kRuntime190EdgeOutput =
 constexpr std::string_view kRuntime190SavedEdgeOutput =
     "runtime190.edge.color.saved";
 
-[[nodiscard]] RT::ProgressivePresentationBindings
+[[nodiscard]] RT::GeometryPresentationRecipe
 MakeRuntime190PresentationBindings()
 {
-    RT::ProgressiveSlotBinding albedo{};
-    albedo.Semantic = RT::ProgressiveSlotSemantic::Albedo;
-    albedo.SourceKind = RT::ProgressiveSlotSourceKind::PropertyBuffer;
-    albedo.Property = RT::ProgressivePropertyBindingDescriptor{
+    RT::GeometryPresentationSlotRecipe albedo{};
+    albedo.Semantic = RT::GeometryPresentationSlotSemantic::Albedo;
+    albedo.SourceKind = RT::GeometryPresentationSourceKind::PropertyBuffer;
+    albedo.Property = RT::GeometryPropertyRef{
         .Domain = RT::GeometryElementDomain::MeshVertex,
-        .PropertyName = "v:runtime190_scalar",
-        .ExpectedValueKind =
+        .Name = "v:runtime190_scalar",
+        .ValueKind =
             Geometry::PropertyValueKind::Float,
-        .ExpectedElementCount = 3u,
     };
-    albedo.Readiness = RT::ProgressiveReadinessState::Ready;
-    albedo.Provenance =
-        RT::ProgressiveGeneratedOutputProvenance::PropertyBuffer;
 
-    RT::ProgressiveSlotBinding scalar = albedo;
-    scalar.Semantic = RT::ProgressiveSlotSemantic::ScalarField;
+    RT::GeometryPresentationSlotRecipe scalar = albedo;
+    scalar.Semantic = RT::GeometryPresentationSlotSemantic::ScalarField;
 
-    return RT::ProgressivePresentationBindings{
-        .Shape = RT::ProgressiveEntityShape::MeshLeaf,
+    return RT::GeometryPresentationRecipe{
+        .Shape = RT::GeometryPresentationShape::Mesh,
         .Lanes = {
-            RT::ProgressiveRenderLaneBinding{
-                .Lane = RT::ProgressiveRenderLane::Surface,
+            RT::GeometryPresentationLaneRecipe{
+                .Lane = RT::GeometryRenderLane::Surface,
                 .PresentationKey = std::string{kRuntime190Presentation},
             },
         },
         .Presentations = {
-            RT::ProgressivePresentationBinding{
+            RT::GeometryPresentationBindingRecipe{
                 .Key = std::string{kRuntime190Presentation},
                 .Kind =
-                    RT::ProgressivePresentationKind::SurfaceMaterial,
+                    RT::GeometryPresentationKind::SurfaceMaterial,
                 .Slots = {albedo, scalar},
             },
         },
-        .BindingGeneration = 1u,
     };
 }
 
@@ -5956,14 +5996,14 @@ private:
             RT::BakedPropertyTextureConsumer{
                 .PresentationKey =
                     std::string{kRuntime190Presentation},
-                .Semantic = RT::ProgressiveSlotSemantic::Albedo,
+                .Semantic = RT::GeometryPresentationSlotSemantic::Albedo,
                 .Colormap = colormap,
             },
             RT::BakedPropertyTextureConsumer{
                 .PresentationKey =
                     std::string{kRuntime190Presentation},
                 .Semantic =
-                    RT::ProgressiveSlotSemantic::ScalarField,
+                    RT::GeometryPresentationSlotSemantic::ScalarField,
                 .Colormap = colormap,
             },
         };
@@ -5977,7 +6017,7 @@ private:
         command.PresentationKey =
             std::string{kRuntime190Presentation};
         command.TargetSemantic =
-            RT::ProgressiveSlotSemantic::Albedo;
+            RT::GeometryPresentationSlotSemantic::Albedo;
         command.SourceDomain =
             RT::GeometryElementDomain::MeshVertex;
         command.ExpectedValueKind =
@@ -6235,25 +6275,25 @@ private:
             });
         const RT::TextureBakeSnapshot snapshot =
             m_TextureBake->Snapshot(m_StableEntityId);
-        const auto* progressive = m_Scene->Raw()
-            .try_get<RT::ProgressivePresentationBindings>(m_Target);
-        const RT::ProgressivePresentationBinding* presentation =
-            progressive != nullptr
-                ? RT::FindPresentationBinding(
-                      *progressive,
+        const auto* recipe = m_Scene->Raw()
+            .try_get<RT::GeometryPresentationRecipe>(m_Target);
+        const RT::GeometryPresentationBindingRecipe* presentation =
+            recipe != nullptr
+                ? RT::FindGeometryPresentationBinding(
+                      *recipe,
                       kRuntime190Presentation)
                 : nullptr;
-        const RT::ProgressiveSlotBinding* albedo =
+        const RT::GeometryPresentationSlotRecipe* albedo =
             presentation != nullptr
-                ? RT::FindSlotBinding(
+                ? RT::FindGeometryPresentationSlot(
                       *presentation,
-                      RT::ProgressiveSlotSemantic::Albedo)
+                      RT::GeometryPresentationSlotSemantic::Albedo)
                 : nullptr;
-        const RT::ProgressiveSlotBinding* scalar =
+        const RT::GeometryPresentationSlotRecipe* scalar =
             presentation != nullptr
-                ? RT::FindSlotBinding(
+                ? RT::FindGeometryPresentationSlot(
                       *presentation,
-                      RT::ProgressiveSlotSemantic::ScalarField)
+                      RT::GeometryPresentationSlotSemantic::ScalarField)
                 : nullptr;
         const auto material =
             m_Extraction->GetMaterialTextureAssetBindings(
@@ -6263,9 +6303,9 @@ private:
             albedo != nullptr &&
             scalar != nullptr &&
             albedo->SourceKind ==
-                RT::ProgressiveSlotSourceKind::PropertyBuffer &&
+                RT::GeometryPresentationSourceKind::PropertyBuffer &&
             scalar->SourceKind ==
-                RT::ProgressiveSlotSourceKind::PropertyBuffer &&
+                RT::GeometryPresentationSourceKind::PropertyBuffer &&
             (!material.has_value() || !material->Albedo.IsValid());
         if (!AssetsDestroyedObserved ||
             !PropertyBufferFallbackObserved)
@@ -6511,9 +6551,12 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
             glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
             glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
         };
-    raw.emplace_or_replace<RT::ProgressivePresentationBindings>(
+    raw.emplace_or_replace<RT::GeometryPresentationRecipe>(
         triangle,
         MakeRuntime190PresentationBindings());
+    raw.emplace_or_replace<RT::GeometryPresentationRuntimeState>(
+        triangle,
+        RT::GeometryPresentationRuntimeState{});
     auto& visualization =
         raw.get_or_emplace<G::VisualizationConfig>(triangle);
     visualization.Source =

@@ -227,7 +227,7 @@ namespace Extrinsic::Runtime
             Graphics::IRenderer& renderer,
             Graphics::GpuAssetCache* gpuAssets,
             RuntimeRenderExtractionStats& stats);
-        void ApplyProgressivePresentationBindings(
+        void ApplyGeometryPresentation(
             entt::registry& registry,
             entt::entity entity,
             std::uint32_t stableId,

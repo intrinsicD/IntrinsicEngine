@@ -30,8 +30,6 @@ target_sources(${target_name}
         Runtime.ObjectSpaceNormalBakeService.cppm
         Runtime.ObjectSpaceNormalBakeSubmission.cppm
         Runtime.ProgressivePoissonGpuBackend.cppm
-        Runtime.ProgressivePresentationExtraction.cppm
-        Runtime.ProgressiveRenderData.cppm
         Runtime.RenderArtifactPublication.cppm
         Runtime.SandboxConfigSections.cppm
         Runtime.SelectedMeshTextureBake.cppm
@@ -111,8 +109,6 @@ target_sources(${target_name}
         Runtime.ObjectSpaceNormalBakeService.cpp
         Runtime.ObjectSpaceNormalBakeSubmission.cpp
         Runtime.ProgressivePoissonGpuBackend.cpp
-        Runtime.ProgressivePresentationExtraction.cpp
-        Runtime.ProgressiveRenderData.cpp
         Runtime.RenderArtifactPublication.cpp
         Runtime.SandboxDefaultPolicies.cpp
         Runtime.SandboxConfigSections.cpp

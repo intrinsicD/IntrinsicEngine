@@ -49,7 +49,7 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.HalfedgeMesh.IO;
@@ -1277,27 +1277,23 @@ namespace Extrinsic::Runtime
             }
         }
 
-        [[nodiscard]] ProgressiveSlotBinding AuthoredTextureSlot(
-            const ProgressiveSlotSemantic semantic,
+        [[nodiscard]] GeometryPresentationSlotRecipe AuthoredTextureSlot(
+            const GeometryPresentationSlotSemantic semantic,
             const Assets::AssetId asset)
         {
-            ProgressiveSlotBinding slot{};
+            GeometryPresentationSlotRecipe slot{};
             slot.Semantic = semantic;
-            slot.SourceKind = ProgressiveSlotSourceKind::AuthoredTextureAsset;
-            slot.AuthoredTexture = asset;
-            slot.Readiness = asset.IsValid()
-                ? ProgressiveReadinessState::Ready
-                : ProgressiveReadinessState::Failed;
-            slot.Provenance = ProgressiveGeneratedOutputProvenance::AuthoredAsset;
+            slot.SourceKind = GeometryPresentationSourceKind::AuthoredTextureAsset;
+            slot.TextureAsset = asset;
             return slot;
         }
 
-        [[nodiscard]] ProgressiveSlotBinding UniformColorSlot(
+        [[nodiscard]] GeometryPresentationSlotRecipe UniformColorSlot(
             const Assets::AssetModelMaterialPayload& material)
         {
-            ProgressiveSlotBinding slot{};
-            slot.Semantic = ProgressiveSlotSemantic::Albedo;
-            slot.SourceKind = ProgressiveSlotSourceKind::UniformDefault;
+            GeometryPresentationSlotRecipe slot{};
+            slot.Semantic = GeometryPresentationSlotSemantic::Albedo;
+            slot.SourceKind = GeometryPresentationSourceKind::UniformDefault;
             slot.UniformDefault.Kind = Geometry::PropertyValueKind::Vec4;
             slot.UniformDefault.Vector = glm::vec4{
                 material.BaseColorFactor[0],
@@ -1305,45 +1301,49 @@ namespace Extrinsic::Runtime
                 material.BaseColorFactor[2],
                 material.BaseColorFactor[3],
             };
-            slot.Readiness = ProgressiveReadinessState::DefaultValue;
             return slot;
         }
 
-        [[nodiscard]] ProgressiveSlotBinding UniformScalarSlot(
-            const ProgressiveSlotSemantic semantic,
+        [[nodiscard]] GeometryPresentationSlotRecipe UniformScalarSlot(
+            const GeometryPresentationSlotSemantic semantic,
             const float value)
         {
-            ProgressiveSlotBinding slot{};
+            GeometryPresentationSlotRecipe slot{};
             slot.Semantic = semantic;
-            slot.SourceKind = ProgressiveSlotSourceKind::UniformDefault;
+            slot.SourceKind = GeometryPresentationSourceKind::UniformDefault;
             slot.UniformDefault.Kind = Geometry::PropertyValueKind::Float;
             slot.UniformDefault.Scalar = value;
-            slot.Readiness = ProgressiveReadinessState::DefaultValue;
             return slot;
         }
 
-        [[nodiscard]] ProgressiveSlotBinding PendingPropertyBakeSlot(
-            const ProgressiveSlotSemantic semantic,
+        [[nodiscard]] GeometryPresentationSlotRecipe PendingPropertyBakeSlot(
+            const GeometryPresentationSlotSemantic semantic,
             const std::string& propertyName,
             const GeometryPropertyValueKindFilter expectedValueKind,
-            const std::string_view diagnostic)
+            const std::string_view diagnostic,
+            GeometryPresentationRuntimeState& runtimeState)
         {
-            ProgressiveSlotBinding slot{};
+            GeometryPresentationSlotRecipe slot{};
             slot.Semantic = semantic;
-            slot.SourceKind = ProgressiveSlotSourceKind::PropertyBake;
-            slot.Property = ProgressivePropertyBindingDescriptor{
+            slot.SourceKind = GeometryPresentationSourceKind::PropertyBake;
+            slot.Property = GeometryPropertyRef{
                 .Domain = GeometryElementDomain::MeshVertex,
-                .PropertyName = propertyName,
-                .ExpectedValueKind = expectedValueKind,
+                .Name = propertyName,
+                .ValueKind = expectedValueKind.value_or(
+                    Geometry::PropertyValueKind::Unknown),
             };
-            slot.GeneratedPolicy = ProgressiveGeneratedOutputPolicy::DeterministicChildAsset;
-            slot.Provenance = ProgressiveGeneratedOutputProvenance::PropertyBinding;
-            slot.Readiness = ProgressiveReadinessState::Pending;
-            slot.LastDiagnostic = std::string{diagnostic};
+            slot.GeneratedPolicy = GeometryGeneratedOutputPolicy::DeterministicChildAsset;
+            runtimeState.Slots.push_back(GeometryPresentationSlotStatus{
+                .PresentationKey = "mesh.surface",
+                .Semantic = semantic,
+                .Readiness = GeometryPresentationReadiness::Pending,
+                .Provenance = GeometryPresentationProvenance::PropertyBinding,
+                .Diagnostic = std::string{diagnostic},
+            });
             return slot;
         }
 
-        void AttachProgressivePresentationBindings(
+        void AttachGeometryPresentationRecipe(
             ECS::Scene::Registry& scene,
             const ECS::EntityHandle entity,
             const Assets::AssetModelMaterialPayload* material,
@@ -1357,7 +1357,8 @@ namespace Extrinsic::Runtime
                 return;
             }
 
-            std::vector<ProgressiveSlotBinding> slots{};
+            std::vector<GeometryPresentationSlotRecipe> slots{};
+            GeometryPresentationRuntimeState runtimeState{};
             const Assets::AssetId authoredAlbedo =
                 ResolveTextureReference(material->BaseColorTexture, embeddedTextureAssets);
             const Assets::AssetId authoredNormal =
@@ -1366,58 +1367,63 @@ namespace Extrinsic::Runtime
             if (authoredAlbedo.IsValid())
             {
                 slots.push_back(AuthoredTextureSlot(
-                    ProgressiveSlotSemantic::Albedo,
+                    GeometryPresentationSlotSemantic::Albedo,
                     authoredAlbedo));
             }
             else if (options.GenerateMissingAlbedoTextures &&
                      MeshHasVertexProperty(primitive.Mesh, options.GeneratedAlbedoPropertyName))
             {
                 slots.push_back(PendingPropertyBakeSlot(
-                    ProgressiveSlotSemantic::Albedo,
+                    GeometryPresentationSlotSemantic::Albedo,
                     options.GeneratedAlbedoPropertyName,
                     std::nullopt,
                     primitive.HasResolvedTexcoords
                         ? "waiting for vertex color albedo bake"
-                        : "waiting for generated UV atlas before vertex color albedo bake"));
+                        : "waiting for generated UV atlas before vertex color albedo bake",
+                    runtimeState));
             }
             else
             {
                 slots.push_back(UniformColorSlot(*material));
             }
             slots.push_back(authoredNormal.IsValid()
-                ? AuthoredTextureSlot(ProgressiveSlotSemantic::Normal, authoredNormal)
+                ? AuthoredTextureSlot(GeometryPresentationSlotSemantic::Normal, authoredNormal)
                 : PendingPropertyBakeSlot(
-                    ProgressiveSlotSemantic::Normal,
+                    GeometryPresentationSlotSemantic::Normal,
                     options.GeneratedNormalPropertyName,
                     Geometry::PropertyValueKind::Vec3,
                     primitive.HasResolvedTexcoords
                         ? "waiting for vertex normals before normal-map bake"
-                        : "waiting for generated UV atlas and vertex normals before normal-map bake"));
+                        : "waiting for generated UV atlas and vertex normals before normal-map bake",
+                    runtimeState));
             slots.push_back(UniformScalarSlot(
-                ProgressiveSlotSemantic::Roughness,
+                GeometryPresentationSlotSemantic::Roughness,
                 material->RoughnessFactor));
             slots.push_back(UniformScalarSlot(
-                ProgressiveSlotSemantic::Metallic,
+                GeometryPresentationSlotSemantic::Metallic,
                 material->MetallicFactor));
 
-            scene.Raw().emplace_or_replace<ProgressivePresentationBindings>(
+            scene.Raw().emplace_or_replace<GeometryPresentationRecipe>(
                 entity,
-                ProgressivePresentationBindings{
-                    .Shape = ProgressiveEntityShape::MeshLeaf,
-                    .Lanes = {ProgressiveRenderLaneBinding{
-                        .Lane = ProgressiveRenderLane::Surface,
+                GeometryPresentationRecipe{
+                    .Shape = GeometryPresentationShape::Mesh,
+                    .Lanes = {GeometryPresentationLaneRecipe{
+                        .Lane = GeometryRenderLane::Surface,
                         .PresentationKey = "mesh.surface",
                     }},
-                    .Presentations = {ProgressivePresentationBinding{
+                    .Presentations = {GeometryPresentationBindingRecipe{
                         .Key = "mesh.surface",
-                        .Kind = ProgressivePresentationKind::SurfaceMaterial,
+                        .Kind = GeometryPresentationKind::SurfaceMaterial,
                         .Slots = std::move(slots),
                     }},
                 });
+            scene.Raw().emplace_or_replace<GeometryPresentationRuntimeState>(
+                entity,
+                std::move(runtimeState));
 
             if (diagnostics != nullptr)
             {
-                ++diagnostics->ProgressivePresentationBindingsCreated;
+                ++diagnostics->GeometryPresentationRecipesCreated;
             }
         }
 
@@ -1440,18 +1446,17 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::uint64_t
-        NextProgressiveBindingGeneration(
+        NextGeometryPresentationRecipeGeneration(
             const ECS::Scene::Registry& scene,
             const ECS::EntityHandle entity) noexcept
         {
-            const auto* bindings =
-                scene.Raw().try_get<ProgressivePresentationBindings>(entity);
-            if (bindings == nullptr)
+            const auto* state =
+                scene.Raw().try_get<GeometryPresentationRuntimeState>(entity);
+            if (state == nullptr)
             {
                 return 0u;
             }
-            const std::uint64_t next = bindings->BindingGeneration + 1u;
-            return next == 0u ? 1u : next;
+            return state->RecipeGeneration;
         }
 
         [[nodiscard]] RuntimeObjectSpaceNormalBakeRequestBuildResult
@@ -1468,20 +1473,20 @@ namespace Extrinsic::Runtime
             bakeOptions.Space = Graphics::NormalTextureSpace::ObjectSpaceNormal;
 
             const std::uint32_t stableId = StableEntityLookup::ToRenderId(entity);
-            const std::uint64_t expectedBindingGeneration =
-                NextProgressiveBindingGeneration(scene, entity);
+            const std::uint64_t expectedRecipeGeneration =
+                NextGeometryPresentationRecipeGeneration(scene, entity);
             RuntimeObjectSpaceNormalBakeTarget target{
                 .World = options.World,
                 .BindingEpoch = options.BindingEpoch,
                 .Entity = entity,
                 .StableEntityId = stableId,
                 .PresentationKey =
-                    expectedBindingGeneration != 0u
+                    expectedRecipeGeneration != 0u
                         ? std::string{"mesh.surface"}
                         : std::string{},
-                .Semantic = ProgressiveSlotSemantic::Normal,
-                .ExpectedProgressiveBindingGeneration =
-                    expectedBindingGeneration,
+                .Semantic = GeometryPresentationSlotSemantic::Normal,
+                .ExpectedRecipeGeneration =
+                    expectedRecipeGeneration,
             };
 
             VertexChannelBindingSet channelBindings{};
@@ -1509,30 +1514,48 @@ namespace Extrinsic::Runtime
             std::string diagnostic)
         {
             auto* bindings =
-                scene.Raw().try_get<ProgressivePresentationBindings>(entity);
+                scene.Raw().try_get<GeometryPresentationRecipe>(entity);
             if (bindings == nullptr)
             {
                 return;
             }
 
-            ProgressivePresentationBinding* presentation =
-                FindPresentationBinding(*bindings, "mesh.surface");
+            GeometryPresentationBindingRecipe* presentation =
+                FindGeometryPresentationBinding(*bindings, "mesh.surface");
             if (presentation == nullptr)
             {
                 return;
             }
 
-            ProgressiveSlotBinding* slot =
-                FindSlotBinding(*presentation, ProgressiveSlotSemantic::Normal);
+            GeometryPresentationSlotRecipe* slot =
+                FindGeometryPresentationSlot(*presentation, GeometryPresentationSlotSemantic::Normal);
             if (slot == nullptr ||
-                slot->SourceKind != ProgressiveSlotSourceKind::PropertyBake)
+                slot->SourceKind != GeometryPresentationSourceKind::PropertyBake)
             {
                 return;
             }
 
-            slot->LastDiagnostic = std::move(diagnostic);
-            slot->Readiness = ProgressiveReadinessState::Pending;
-            ++bindings->BindingGeneration;
+            auto* state = scene.Raw().try_get<GeometryPresentationRuntimeState>(
+                entity);
+            if (state == nullptr)
+                return;
+            GeometryPresentationSlotStatus* status =
+                FindGeometryPresentationSlotStatus(
+                    *state,
+                    "mesh.surface",
+                    GeometryPresentationSlotSemantic::Normal);
+            if (status == nullptr)
+            {
+                state->Slots.push_back(GeometryPresentationSlotStatus{
+                    .PresentationKey = "mesh.surface",
+                    .Semantic = GeometryPresentationSlotSemantic::Normal,
+                });
+                status = &state->Slots.back();
+            }
+            status->Diagnostic = std::move(diagnostic);
+            status->Readiness = GeometryPresentationReadiness::Pending;
+            status->Provenance =
+                GeometryPresentationProvenance::PropertyBinding;
         }
 
         void WriteDefaultVectorProperty(
@@ -1570,39 +1593,54 @@ namespace Extrinsic::Runtime
         void MarkProgressiveTextureBakeReady(
             ECS::Scene::Registry& scene,
             const ECS::EntityHandle entity,
-            const ProgressiveSlotSemantic semantic,
+            const GeometryPresentationSlotSemantic semantic,
             const std::uint64_t payloadToken,
             std::string diagnostic)
         {
             auto* bindings =
-                scene.Raw().try_get<ProgressivePresentationBindings>(entity);
+                scene.Raw().try_get<GeometryPresentationRecipe>(entity);
             if (bindings == nullptr)
             {
                 return;
             }
 
-            ProgressivePresentationBinding* presentation =
-                FindPresentationBinding(*bindings, "mesh.surface");
+            GeometryPresentationBindingRecipe* presentation =
+                FindGeometryPresentationBinding(*bindings, "mesh.surface");
             if (presentation == nullptr)
             {
                 return;
             }
 
-            ProgressiveSlotBinding* slot = FindSlotBinding(*presentation, semantic);
+            GeometryPresentationSlotRecipe* slot = FindGeometryPresentationSlot(*presentation, semantic);
             if (slot == nullptr ||
-                slot->SourceKind != ProgressiveSlotSourceKind::PropertyBake)
+                slot->SourceKind != GeometryPresentationSourceKind::PropertyBake)
             {
                 return;
             }
 
-            slot->GeneratedTexture = Assets::AssetId{
+            auto* state = scene.Raw().try_get<GeometryPresentationRuntimeState>(
+                entity);
+            if (state == nullptr)
+                return;
+            GeometryPresentationSlotStatus* status =
+                FindGeometryPresentationSlotStatus(
+                    *state, "mesh.surface", semantic);
+            if (status == nullptr)
+            {
+                state->Slots.push_back(GeometryPresentationSlotStatus{
+                    .PresentationKey = "mesh.surface",
+                    .Semantic = semantic,
+                });
+                status = &state->Slots.back();
+            }
+            status->GeneratedTexture = Assets::AssetId{
                 static_cast<std::uint32_t>(payloadToken),
                 1u};
-            slot->Readiness = ProgressiveReadinessState::Ready;
-            slot->Provenance =
-                ProgressiveGeneratedOutputProvenance::GeneratedTextureAsset;
-            slot->LastDiagnostic = std::move(diagnostic);
-            ++bindings->BindingGeneration;
+            status->Readiness = GeometryPresentationReadiness::Ready;
+            status->Provenance =
+                GeometryPresentationProvenance::GeneratedTextureAsset;
+            status->Diagnostic = std::move(diagnostic);
+            ++status->OutputGeneration;
         }
 
         // The retired `DerivedJobOutput` carried a payload token and a
@@ -1877,7 +1915,7 @@ namespace Extrinsic::Runtime
                     MarkProgressiveTextureBakeReady(
                         scene,
                         entity,
-                        ProgressiveSlotSemantic::Normal,
+                        GeometryPresentationSlotSemantic::Normal,
                         output->PayloadToken,
                         output->Diagnostic);
                     return true;
@@ -1928,7 +1966,7 @@ namespace Extrinsic::Runtime
                     MarkProgressiveTextureBakeReady(
                         scene,
                         entity,
-                        ProgressiveSlotSemantic::Albedo,
+                        GeometryPresentationSlotSemantic::Albedo,
                         output->PayloadToken,
                         output->Diagnostic);
                     return true;
@@ -2183,7 +2221,7 @@ namespace Extrinsic::Runtime
                     : nullptr;
             if (options.ProgressiveRawGeometryFirst)
             {
-                AttachProgressivePresentationBindings(scene,
+                AttachGeometryPresentationRecipe(scene,
                                                        entity,
                                                        material,
                                                        state.Record.EmbeddedTextureAssets,

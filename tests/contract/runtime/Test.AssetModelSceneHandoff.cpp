@@ -56,7 +56,7 @@ import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Geometry.HalfedgeMesh.IO;
 import Geometry.Properties;
 
@@ -805,14 +805,14 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstPublishesNormalsA
     ASSERT_EQ(state->Record.Primitives.size(), 1u);
     EXPECT_TRUE(state->Record.GeneratedTextureAssets.empty());
     EXPECT_EQ(diagnostics.ProgressiveRawPrimitiveEntitiesPublished, 1u);
-    EXPECT_EQ(diagnostics.ProgressivePresentationBindingsCreated, 1u);
+    EXPECT_EQ(diagnostics.GeometryPresentationRecipesCreated, 1u);
     EXPECT_EQ(diagnostics.ProgressiveUvAtlasJobsQueued, 1u);
     EXPECT_EQ(diagnostics.ProgressiveNormalJobsQueued, 0u);
     EXPECT_EQ(diagnostics.ProgressiveTextureBakeJobsQueued, 2u);
 
     const ECS::EntityHandle entity = state->Record.Primitives[0].Entity;
     ASSERT_TRUE(fx.Scene.IsValid(entity));
-    ASSERT_TRUE(fx.Scene.Raw().all_of<Runtime::ProgressivePresentationBindings>(entity));
+    ASSERT_TRUE(fx.Scene.Raw().all_of<Runtime::GeometryPresentationRecipe>(entity));
     const auto jobSnapshot = jobs.SnapshotAll();
     ASSERT_EQ(jobSnapshot.size(), 3u);
     EXPECT_EQ(jobSnapshot[0].DebugName, "generate mesh uv atlas");
@@ -842,24 +842,47 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstPublishesNormalsA
     EXPECT_EQ(normalBake->State, Runtime::JobState::Published);
 
     auto& bindings =
-        fx.Scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
-    const Runtime::ProgressivePresentationBinding* presentation =
-        Runtime::FindPresentationBinding(bindings, "mesh.surface");
+        fx.Scene.Raw().get<Runtime::GeometryPresentationRecipe>(entity);
+    const Runtime::GeometryPresentationBindingRecipe* presentation =
+        Runtime::FindGeometryPresentationBinding(bindings, "mesh.surface");
     ASSERT_NE(presentation, nullptr);
-    const Runtime::ProgressiveSlotBinding* normal =
-        Runtime::FindSlotBinding(*presentation,
-                                 Runtime::ProgressiveSlotSemantic::Normal);
+    const Runtime::GeometryPresentationSlotRecipe* normal =
+        Runtime::FindGeometryPresentationSlot(*presentation,
+                                 Runtime::GeometryPresentationSlotSemantic::Normal);
     ASSERT_NE(normal, nullptr);
-    EXPECT_EQ(normal->Readiness, Runtime::ProgressiveReadinessState::Ready);
-    EXPECT_TRUE(normal->GeneratedTexture.IsValid());
-    EXPECT_NE(normal->LastDiagnostic.find("without upload"), std::string::npos);
-    const Runtime::ProgressiveSlotBinding* albedo =
-        Runtime::FindSlotBinding(*presentation,
-                                 Runtime::ProgressiveSlotSemantic::Albedo);
+    EXPECT_EQ(normal->SourceKind,
+              Runtime::GeometryPresentationSourceKind::PropertyBake);
+    const Runtime::GeometryPresentationSlotRecipe* albedo =
+        Runtime::FindGeometryPresentationSlot(*presentation,
+                                 Runtime::GeometryPresentationSlotSemantic::Albedo);
     ASSERT_NE(albedo, nullptr);
-    EXPECT_EQ(albedo->Readiness, Runtime::ProgressiveReadinessState::Ready);
-    EXPECT_TRUE(albedo->GeneratedTexture.IsValid());
-    EXPECT_NE(albedo->LastDiagnostic.find("without upload"), std::string::npos);
+    EXPECT_EQ(albedo->SourceKind,
+              Runtime::GeometryPresentationSourceKind::PropertyBake);
+
+    const auto& runtimeState =
+        fx.Scene.Raw().get<Runtime::GeometryPresentationRuntimeState>(entity);
+    const Runtime::GeometryPresentationSlotStatus* normalStatus =
+        Runtime::FindGeometryPresentationSlotStatus(
+            runtimeState,
+            "mesh.surface",
+            Runtime::GeometryPresentationSlotSemantic::Normal);
+    ASSERT_NE(normalStatus, nullptr);
+    EXPECT_EQ(normalStatus->Readiness,
+              Runtime::GeometryPresentationReadiness::Ready);
+    EXPECT_TRUE(normalStatus->GeneratedTexture.IsValid());
+    EXPECT_NE(normalStatus->Diagnostic.find("without upload"),
+              std::string::npos);
+    const Runtime::GeometryPresentationSlotStatus* albedoStatus =
+        Runtime::FindGeometryPresentationSlotStatus(
+            runtimeState,
+            "mesh.surface",
+            Runtime::GeometryPresentationSlotSemantic::Albedo);
+    ASSERT_NE(albedoStatus, nullptr);
+    EXPECT_EQ(albedoStatus->Readiness,
+              Runtime::GeometryPresentationReadiness::Ready);
+    EXPECT_TRUE(albedoStatus->GeneratedTexture.IsValid());
+    EXPECT_NE(albedoStatus->Diagnostic.find("without upload"),
+              std::string::npos);
 }
 
 TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpaceNormalBakeWhenInputsReady)
@@ -925,17 +948,29 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpace
               Graphics::MaterialNormalTextureSpace::TangentSpaceNormal);
 
     auto& bindings =
-        fx.Scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
-    const Runtime::ProgressivePresentationBinding* presentation =
-        Runtime::FindPresentationBinding(bindings, "mesh.surface");
+        fx.Scene.Raw().get<Runtime::GeometryPresentationRecipe>(entity);
+    const Runtime::GeometryPresentationBindingRecipe* presentation =
+        Runtime::FindGeometryPresentationBinding(bindings, "mesh.surface");
     ASSERT_NE(presentation, nullptr);
-    const Runtime::ProgressiveSlotBinding* normal =
-        Runtime::FindSlotBinding(*presentation,
-                                 Runtime::ProgressiveSlotSemantic::Normal);
+    const Runtime::GeometryPresentationSlotRecipe* normal =
+        Runtime::FindGeometryPresentationSlot(*presentation,
+                                 Runtime::GeometryPresentationSlotSemantic::Normal);
     ASSERT_NE(normal, nullptr);
-    EXPECT_EQ(normal->Readiness, Runtime::ProgressiveReadinessState::Pending);
-    EXPECT_FALSE(normal->GeneratedTexture.IsValid());
-    EXPECT_NE(normal->LastDiagnostic.find("queued object-space normal GPU bake request"),
+    EXPECT_EQ(normal->SourceKind,
+              Runtime::GeometryPresentationSourceKind::PropertyBake);
+    const auto& runtimeState =
+        fx.Scene.Raw().get<Runtime::GeometryPresentationRuntimeState>(entity);
+    const Runtime::GeometryPresentationSlotStatus* normalStatus =
+        Runtime::FindGeometryPresentationSlotStatus(
+            runtimeState,
+            "mesh.surface",
+            Runtime::GeometryPresentationSlotSemantic::Normal);
+    ASSERT_NE(normalStatus, nullptr);
+    EXPECT_EQ(normalStatus->Readiness,
+              Runtime::GeometryPresentationReadiness::Pending);
+    EXPECT_FALSE(normalStatus->GeneratedTexture.IsValid());
+    EXPECT_NE(normalStatus->Diagnostic.find(
+                  "queued object-space normal GPU bake request"),
               std::string::npos);
 }
 
@@ -1009,17 +1044,29 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesObjectSpace
     EXPECT_EQ(normalBakeQueue.PendingCount(), 1u);
 
     auto& bindings =
-        fx.Scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
-    const Runtime::ProgressivePresentationBinding* presentation =
-        Runtime::FindPresentationBinding(bindings, "mesh.surface");
+        fx.Scene.Raw().get<Runtime::GeometryPresentationRecipe>(entity);
+    const Runtime::GeometryPresentationBindingRecipe* presentation =
+        Runtime::FindGeometryPresentationBinding(bindings, "mesh.surface");
     ASSERT_NE(presentation, nullptr);
-    const Runtime::ProgressiveSlotBinding* normal =
-        Runtime::FindSlotBinding(*presentation,
-                                 Runtime::ProgressiveSlotSemantic::Normal);
+    const Runtime::GeometryPresentationSlotRecipe* normal =
+        Runtime::FindGeometryPresentationSlot(*presentation,
+                                 Runtime::GeometryPresentationSlotSemantic::Normal);
     ASSERT_NE(normal, nullptr);
-    EXPECT_EQ(normal->Readiness, Runtime::ProgressiveReadinessState::Pending);
-    EXPECT_FALSE(normal->GeneratedTexture.IsValid());
-    EXPECT_NE(normal->LastDiagnostic.find("queued object-space normal GPU bake request"),
+    EXPECT_EQ(normal->SourceKind,
+              Runtime::GeometryPresentationSourceKind::PropertyBake);
+    const auto& runtimeState =
+        fx.Scene.Raw().get<Runtime::GeometryPresentationRuntimeState>(entity);
+    const Runtime::GeometryPresentationSlotStatus* normalStatus =
+        Runtime::FindGeometryPresentationSlotStatus(
+            runtimeState,
+            "mesh.surface",
+            Runtime::GeometryPresentationSlotSemantic::Normal);
+    ASSERT_NE(normalStatus, nullptr);
+    EXPECT_EQ(normalStatus->Readiness,
+              Runtime::GeometryPresentationReadiness::Pending);
+    EXPECT_FALSE(normalStatus->GeneratedTexture.IsValid());
+    EXPECT_NE(normalStatus->Diagnostic.find(
+                  "queued object-space normal GPU bake request"),
               std::string::npos);
 }
 
@@ -1085,17 +1132,29 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstDoesNotCpuFallbac
               Graphics::MaterialNormalTextureSpace::TangentSpaceNormal);
 
     auto& bindings =
-        fx.Scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
-    const Runtime::ProgressivePresentationBinding* presentation =
-        Runtime::FindPresentationBinding(bindings, "mesh.surface");
+        fx.Scene.Raw().get<Runtime::GeometryPresentationRecipe>(entity);
+    const Runtime::GeometryPresentationBindingRecipe* presentation =
+        Runtime::FindGeometryPresentationBinding(bindings, "mesh.surface");
     ASSERT_NE(presentation, nullptr);
-    const Runtime::ProgressiveSlotBinding* normal =
-        Runtime::FindSlotBinding(*presentation,
-                                 Runtime::ProgressiveSlotSemantic::Normal);
+    const Runtime::GeometryPresentationSlotRecipe* normal =
+        Runtime::FindGeometryPresentationSlot(*presentation,
+                                 Runtime::GeometryPresentationSlotSemantic::Normal);
     ASSERT_NE(normal, nullptr);
-    EXPECT_EQ(normal->Readiness, Runtime::ProgressiveReadinessState::Pending);
-    EXPECT_FALSE(normal->GeneratedTexture.IsValid());
-    EXPECT_NE(normal->LastDiagnostic.find("no CPU fallback"), std::string::npos);
+    EXPECT_EQ(normal->SourceKind,
+              Runtime::GeometryPresentationSourceKind::PropertyBake);
+    const auto& runtimeState =
+        fx.Scene.Raw().get<Runtime::GeometryPresentationRuntimeState>(entity);
+    const Runtime::GeometryPresentationSlotStatus* normalStatus =
+        Runtime::FindGeometryPresentationSlotStatus(
+            runtimeState,
+            "mesh.surface",
+            Runtime::GeometryPresentationSlotSemantic::Normal);
+    ASSERT_NE(normalStatus, nullptr);
+    EXPECT_EQ(normalStatus->Readiness,
+              Runtime::GeometryPresentationReadiness::Pending);
+    EXPECT_FALSE(normalStatus->GeneratedTexture.IsValid());
+    EXPECT_NE(normalStatus->Diagnostic.find("no CPU fallback"),
+              std::string::npos);
 }
 
 TEST(RuntimeAssetModelSceneHandoff, ReadyModelSceneEventMaterializesRecordAndOwnsGeneratedEntities)
@@ -1404,7 +1463,7 @@ TEST(RuntimeAssetModelSceneHandoff,
     EXPECT_EQ(pending.front().Target.BindingEpoch, 17u);
     EXPECT_TRUE(pending.front().Target.PresentationKey.empty());
     EXPECT_EQ(
-        pending.front().Target.ExpectedProgressiveBindingGeneration,
+        pending.front().Target.ExpectedRecipeGeneration,
         0u);
     EXPECT_EQ(pending.front().Identity->Width, options.GeneratedTextureWidth);
     EXPECT_EQ(pending.front().Identity->Height, options.GeneratedTextureHeight);

@@ -53,8 +53,8 @@ import Extrinsic.Runtime.GraphGeometryPacker;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.MeshGeometryPacker;
 import Extrinsic.Runtime.PointCloudGeometryPacker;
-import Extrinsic.Runtime.ProgressivePresentationExtraction;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
@@ -1265,9 +1265,9 @@ namespace Extrinsic::Runtime
 
     namespace
     {
-        [[nodiscard]] bool AssignProgressiveTextureBinding(
+        [[nodiscard]] bool AssignGeometryPresentationTextureBinding(
             Graphics::MaterialTextureAssetBindings& bindings,
-            const ProgressiveSlotExtraction& slot)
+            const GeometryPresentationSlotSnapshot& slot)
         {
             if (!slot.TextureReady || !slot.TextureAsset.IsValid())
             {
@@ -1276,8 +1276,8 @@ namespace Extrinsic::Runtime
 
             switch (slot.Semantic)
             {
-            case ProgressiveSlotSemantic::Albedo:
-            case ProgressiveSlotSemantic::ScalarField:
+            case GeometryPresentationSlotSemantic::Albedo:
+            case GeometryPresentationSlotSemantic::ScalarField:
                 if (bindings.Albedo != slot.TextureAsset)
                 {
                     bindings.AlbedoInterpretation = Graphics::
@@ -1289,7 +1289,7 @@ namespace Extrinsic::Runtime
                 }
                 bindings.Albedo = slot.TextureAsset;
                 return true;
-            case ProgressiveSlotSemantic::Normal:
+            case GeometryPresentationSlotSemantic::Normal:
             {
                 const bool preserveInterpretation =
                     bindings.Normal == slot.TextureAsset;
@@ -1297,15 +1297,15 @@ namespace Extrinsic::Runtime
                 if (!preserveInterpretation)
                 {
                     bindings.NormalSpace =
-                        (slot.SourceKind == ProgressiveSlotSourceKind::GeneratedTextureAsset ||
-                         slot.SourceKind == ProgressiveSlotSourceKind::PropertyBake)
+                        (slot.SourceKind == GeometryPresentationSourceKind::GeneratedTextureAsset ||
+                         slot.SourceKind == GeometryPresentationSourceKind::PropertyBake)
                             ? Graphics::MaterialNormalTextureSpace::ObjectSpaceNormal
                             : Graphics::MaterialNormalTextureSpace::TangentSpaceNormal;
                 }
                 return true;
             }
-            case ProgressiveSlotSemantic::Roughness:
-            case ProgressiveSlotSemantic::Metallic:
+            case GeometryPresentationSlotSemantic::Roughness:
+            case GeometryPresentationSlotSemantic::Metallic:
                 if (bindings.MetallicRoughness != slot.TextureAsset)
                 {
                     bindings.RoughnessFromRed = false;
@@ -1313,21 +1313,21 @@ namespace Extrinsic::Runtime
                 }
                 bindings.MetallicRoughness = slot.TextureAsset;
                 return true;
-            case ProgressiveSlotSemantic::Displacement:
-            case ProgressiveSlotSemantic::PointColor:
-            case ProgressiveSlotSemantic::PointScalarField:
-            case ProgressiveSlotSemantic::PointSize:
-            case ProgressiveSlotSemantic::PointNormalOrientation:
-            case ProgressiveSlotSemantic::LineColor:
-            case ProgressiveSlotSemantic::LineScalarField:
-            case ProgressiveSlotSemantic::LineWidth:
+            case GeometryPresentationSlotSemantic::Displacement:
+            case GeometryPresentationSlotSemantic::PointColor:
+            case GeometryPresentationSlotSemantic::PointScalarField:
+            case GeometryPresentationSlotSemantic::PointSize:
+            case GeometryPresentationSlotSemantic::PointNormalOrientation:
+            case GeometryPresentationSlotSemantic::LineColor:
+            case GeometryPresentationSlotSemantic::LineScalarField:
+            case GeometryPresentationSlotSemantic::LineWidth:
                 return false;
             }
             return false;
         }
     }
 
-    void RenderExtractionCache::State::ApplyProgressivePresentationBindings(
+    void RenderExtractionCache::State::ApplyGeometryPresentation(
         entt::registry& registry,
         const entt::entity entity,
         const std::uint32_t stableId,
@@ -1337,24 +1337,31 @@ namespace Extrinsic::Runtime
         Graphics::GpuAssetCache* gpuAssets,
         RuntimeRenderExtractionStats& stats)
     {
-        const auto* bindings = registry.try_get<ProgressivePresentationBindings>(entity);
-        if (bindings == nullptr)
+        const auto* recipe = registry.try_get<GeometryPresentationRecipe>(entity);
+        if (recipe == nullptr)
         {
             return;
         }
 
-        const ProgressivePresentationExtractionSnapshot snapshot =
-            BuildProgressivePresentationSnapshot(view, *bindings);
-        ++stats.ProgressivePresentationEntityCount;
-        stats.ProgressivePresentationLaneCount += snapshot.Stats.LaneCount;
-        stats.ProgressivePresentationSlotCount += snapshot.Stats.SlotCount;
-        stats.ProgressiveDefaultSlotCount += snapshot.Stats.DefaultSlotCount;
-        stats.ProgressiveReadyTextureSlotCount += snapshot.Stats.ReadyTextureSlotCount;
-        stats.ProgressivePropertyBufferReadyCount += snapshot.Stats.PropertyBufferReadyCount;
-        stats.ProgressivePendingSlotCount += snapshot.Stats.PendingSlotCount;
-        stats.ProgressiveUnsupportedSlotCount += snapshot.Stats.UnsupportedSlotCount;
-        stats.ProgressivePreviousOutputRetainedCount += snapshot.Stats.PreviousOutputRetainedCount;
-        stats.ProgressiveDiagnosticCount += snapshot.Stats.DiagnosticCount;
+        const auto* runtimeState =
+            registry.try_get<GeometryPresentationRuntimeState>(entity);
+        const GeometryPresentationSnapshot snapshot =
+            BuildGeometryPresentationSnapshot(
+                view,
+                *recipe,
+                runtimeState != nullptr
+                    ? *runtimeState
+                    : GeometryPresentationRuntimeState{});
+        ++stats.GeometryPresentationEntityCount;
+        stats.GeometryPresentationLaneCount += snapshot.Stats.LaneCount;
+        stats.GeometryPresentationSlotCount += snapshot.Stats.SlotCount;
+        stats.GeometryPresentationDefaultSlotCount += snapshot.Stats.DefaultSlotCount;
+        stats.GeometryPresentationReadyTextureSlotCount += snapshot.Stats.ReadyTextureSlotCount;
+        stats.GeometryPresentationPropertyBufferReadyCount += snapshot.Stats.PropertyBufferReadyCount;
+        stats.GeometryPresentationPendingSlotCount += snapshot.Stats.PendingSlotCount;
+        stats.GeometryPresentationUnsupportedSlotCount += snapshot.Stats.UnsupportedSlotCount;
+        stats.GeometryPresentationPreviousOutputRetainedCount += snapshot.Stats.PreviousOutputRetainedCount;
+        stats.GeometryPresentationDiagnosticCount += snapshot.Stats.DiagnosticCount;
 
         Graphics::MaterialTextureAssetBindings textureBindings{};
         if (const auto direct = m_MaterialTextureBindings.find(stableId);
@@ -1370,10 +1377,10 @@ namespace Extrinsic::Runtime
             textureBindings.Normal.IsValid() ||
             textureBindings.MetallicRoughness.IsValid() ||
             textureBindings.Emissive.IsValid();
-        for (const ProgressiveSlotExtraction& slot : snapshot.Slots)
+        for (const GeometryPresentationSlotSnapshot& slot : snapshot.Slots)
         {
             hasTextureBinding =
-                AssignProgressiveTextureBinding(textureBindings, slot) || hasTextureBinding;
+                AssignGeometryPresentationTextureBinding(textureBindings, slot) || hasTextureBinding;
         }
 
         if (!hasTextureBinding)
@@ -1383,7 +1390,7 @@ namespace Extrinsic::Runtime
 
         if (gpuAssets == nullptr || !sidecar.Material.Lease.IsValid())
         {
-            ++stats.ProgressiveMaterialTextureBindingResolveFailureCount;
+            ++stats.GeometryPresentationMaterialTextureBindingResolveFailureCount;
             return;
         }
 
@@ -1397,11 +1404,11 @@ namespace Extrinsic::Runtime
             sidecar.Material.EffectiveSlot =
                 renderer.GetMaterialSystem().GetMaterialSlot(
                     sidecar.Material.Lease.GetHandle());
-            ++stats.ProgressiveMaterialTextureBindingResolveCount;
+            ++stats.GeometryPresentationMaterialTextureBindingResolveCount;
         }
         else
         {
-            ++stats.ProgressiveMaterialTextureBindingResolveFailureCount;
+            ++stats.GeometryPresentationMaterialTextureBindingResolveFailureCount;
         }
     }
 
@@ -1615,7 +1622,7 @@ namespace Extrinsic::Runtime
                 availability.Sources.ProvenanceDomain == GS::Domain::Graph &&
                 (edgeLane.Ready() || pointLane.Ready());
             sourceViewThisFrame = view;
-            ApplyProgressivePresentationBindings(registry,
+            ApplyGeometryPresentation(registry,
                                                  entity,
                                                  stableId,
                                                  view,

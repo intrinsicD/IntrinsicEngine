@@ -1851,6 +1851,65 @@ TEST(RuntimeEngineLayering, RetiredSpatialDebugRegistryHasNoProductionSurface)
     EXPECT_NE(rendererInterface.find("SpatialDebugBounds"), std::string::npos);
 }
 
+// RUNTIME-193 — one general geometry-presentation recipe and snapshot path.
+TEST(RuntimeEngineLayering,
+     RetiredProgressivePresentationModulesAndSymbolsStayDeleted)
+{
+    const std::filesystem::path root = RepoRoot();
+    EXPECT_FALSE(std::filesystem::exists(
+        root / "src/runtime/Runtime.ProgressiveRenderData.cppm"));
+    EXPECT_FALSE(std::filesystem::exists(
+        root / "src/runtime/Runtime.ProgressiveRenderData.cpp"));
+    EXPECT_FALSE(std::filesystem::exists(
+        root / "src/runtime/Runtime.ProgressivePresentationExtraction.cppm"));
+    EXPECT_FALSE(std::filesystem::exists(
+        root / "src/runtime/Runtime.ProgressivePresentationExtraction.cpp"));
+
+    const std::array<std::string_view, 5u> retiredSymbols{
+        "Extrinsic.Runtime.ProgressiveRenderData",
+        "Extrinsic.Runtime.ProgressivePresentationExtraction",
+        "ProgressivePresentationBindings",
+        "ProgressivePresentationSnapshot",
+        "BuildProgressivePresentationSnapshot",
+    };
+    const std::filesystem::path sourceRoot = root / "src";
+    for (const auto& entry :
+         std::filesystem::recursive_directory_iterator(sourceRoot))
+    {
+        if (!entry.is_regular_file())
+            continue;
+        const std::string extension = entry.path().extension().string();
+        if (extension != ".cpp" && extension != ".cppm" &&
+            extension != ".h" && extension != ".hpp")
+        {
+            continue;
+        }
+
+        const std::string content = ReadFile(entry.path());
+        for (const std::string_view retired : retiredSymbols)
+        {
+            EXPECT_EQ(content.find(retired), std::string::npos)
+                << entry.path().string() << " still names " << retired;
+        }
+    }
+
+    const std::string runtimeCMake =
+        ReadFile(root / "src/runtime/CMakeLists.txt");
+    EXPECT_EQ(runtimeCMake.find("Runtime.ProgressiveRenderData"),
+              std::string::npos);
+    EXPECT_EQ(runtimeCMake.find("Runtime.ProgressivePresentationExtraction"),
+              std::string::npos);
+
+    const std::string presentation =
+        ReadFile(root / "src/runtime/Runtime.GeometryPresentation.cppm");
+    EXPECT_NE(presentation.find("struct GeometryPresentationRecipe"),
+              std::string::npos);
+    EXPECT_NE(presentation.find("struct GeometryPresentationRuntimeState"),
+              std::string::npos);
+    EXPECT_NE(presentation.find("struct GeometryPresentationSnapshot"),
+              std::string::npos);
+}
+
 // RUNTIME-192 — one canonical geometry-property vocabulary.
 //
 // Bake, presentation, visualization, and selected-analysis each used to mirror
@@ -1861,8 +1920,8 @@ TEST(RuntimeEngineLayering, RetiredSpatialDebugRegistryHasNoProductionSurface)
 TEST(RuntimeEngineLayering, NoDuplicateGeometryPropertyVocabularyRemains)
 {
     const std::array<std::filesystem::path, 6> sources{
-        RepoRoot() / "src/runtime/Runtime.ProgressiveRenderData.cppm",
-        RepoRoot() / "src/runtime/Runtime.ProgressiveRenderData.cpp",
+        RepoRoot() / "src/runtime/Runtime.GeometryPresentation.cppm",
+        RepoRoot() / "src/runtime/Runtime.GeometryPresentation.cpp",
         RepoRoot() / "src/runtime/Runtime.SandboxEditorFacades.cppm",
         RepoRoot() / "src/runtime/Runtime.SandboxEditorFacades.cpp",
         RepoRoot() / "src/runtime/Runtime.SelectedMeshTextureBake.cppm",

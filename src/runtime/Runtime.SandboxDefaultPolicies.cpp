@@ -41,7 +41,7 @@ import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.WorldHandle;
@@ -149,8 +149,8 @@ namespace Extrinsic::Runtime
                     .Entity = entity,
                     .StableEntityId = stableId,
                     .PresentationKey = {},
-                    .Semantic = ProgressiveSlotSemantic::Normal,
-                    .ExpectedProgressiveBindingGeneration = 0u,
+                    .Semantic = GeometryPresentationSlotSemantic::Normal,
+                    .ExpectedRecipeGeneration = 0u,
                 },
                 bakeOptions);
         }

@@ -25,7 +25,7 @@ export namespace Extrinsic::Runtime
         StaleCompletion,
         StaleScene,
         StaleGeometry,
-        StaleProgressiveState,
+        StalePresentationState,
     };
 
     struct RuntimeObjectSpaceNormalBakeBindingContext

@@ -6778,3 +6778,35 @@ tree:
       passed; the service-routed benchmark passed strict validation and makes
       no performance-improvement claim.
     status: resolved
+  - id: N285
+    type: experiment
+    title: "Converge general geometry presentation on one recipe/state/snapshot path"
+    provenance: ai-executed
+    timestamp: "2026-07-28T04:33+02:00"
+    evidence:
+      - "tasks/done/RUNTIME-193-general-geometry-presentation-recipe.md"
+      - "src/runtime/Runtime.GeometryPresentation.cppm"
+      - "src/runtime/Runtime.GeometryPresentation.cpp"
+      - "src/runtime/Runtime.SceneSerialization.cpp"
+      - "src/runtime/Runtime.RenderExtraction.cpp"
+      - "src/runtime/Runtime.ObjectSpaceNormalBakeBinding.cpp"
+      - "tests/contract/runtime/Test.GeometryPresentation.cpp"
+      - "tests/contract/runtime/Test.RuntimeSceneSerialization.cpp"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp"
+      - "focused CPU presentation/serialization/extraction/bake cohort: 118/118"
+      - "retired-symbol structural ratchet: 1/1"
+      - "complete CPU-supported selector: 4214 passed plus one expected GLFW/LSan self-skip"
+      - "ASan+UBSan promoted-Vulkan geometry-presentation smoke: 1/1"
+      - "NVIDIA GeForce RTX 3050, driver 590.48.01"
+    result: >
+      Mesh, graph, point-cloud, composition, and procedural presentation now
+      share one authored GeometryPresentationRecipe, one runtime-only state
+      sidecar, and one copied GeometryPresentationSnapshot projection. Scene
+      documents persist only authored intent and accept the old wire key on
+      read; render extraction, generated-texture completion, material binding,
+      asset handoff, and Sandbox models use the same generation-qualified path.
+      The two progressive-named general modules and their dedicated tests are
+      absent. CPU contracts and an actual promoted-Vulkan operational-frame
+      smoke passed; no performance claim is made.
+    status: resolved

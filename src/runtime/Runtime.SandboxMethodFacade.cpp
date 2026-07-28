@@ -65,8 +65,8 @@ import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressivePoissonGpuBackend;
-import Extrinsic.Runtime.ProgressivePresentationExtraction;
-import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RegistrationAlignment;
 import Extrinsic.Runtime.RenderExtraction;
@@ -1153,7 +1153,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorJobIdentity identity{
                 .EntityId = command.StableEntityId,
                 .Scope = ToProgressivePoissonJobScope(source),
-                .OutputSemantic = ProgressiveSlotSemantic::PointScalarField,
+                .OutputSemantic = GeometryPresentationSlotSemantic::PointScalarField,
                 .OutputName = ProgressivePoissonOutputName(command.Config),
             };
             JobDesc desc{

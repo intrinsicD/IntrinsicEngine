@@ -126,7 +126,10 @@ graphics:
   immutable overlay, visualization, camera/pick/gizmo, debug, ImGui, and
   present snapshots before renderer submission. Extraction must preserve stable
   ordering keys so graphics sees deterministic packet spans rather than live ECS
-  views.
+  views. Geometry presentation follows the same boundary: runtime projects the
+  authored `GeometryPresentationRecipe` plus runtime-only status into a copied
+  `GeometryPresentationSnapshot`; graphics never receives either ECS component
+  or a live property/job/asset-service reference.
 - **Graphics owns:** packet validation, GPU upload/descriptor translation,
   render-graph pass scheduling, selection-outline lane participation from packet
   flags, ImGui draw-data summary consumption, and the single present finalizer

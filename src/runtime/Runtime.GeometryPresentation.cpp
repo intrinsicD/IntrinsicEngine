@@ -324,6 +324,28 @@ namespace Extrinsic::Runtime
         return false;
     }
 
+    bool TryParseGeometryRenderLane(
+        const std::string_view value,
+        GeometryRenderLane& out) noexcept
+    {
+        if (value == "Surface")
+        {
+            out = GeometryRenderLane::Surface;
+            return true;
+        }
+        if (value == "Edges")
+        {
+            out = GeometryRenderLane::Edges;
+            return true;
+        }
+        if (value == "Points")
+        {
+            out = GeometryRenderLane::Points;
+            return true;
+        }
+        return false;
+    }
+
     bool TryParseGeometryPresentationKind(
         const std::string_view value,
         GeometryPresentationKind& out) noexcept
@@ -652,7 +674,9 @@ namespace Extrinsic::Runtime
                 case GeometryPresentationSourceKind::GeneratedTextureAsset:
                     ResolveGeneratedTexture(
                         slot,
-                        sourceSlot.TextureAsset,
+                        status != nullptr && status->GeneratedTexture.IsValid()
+                            ? status->GeneratedTexture
+                            : sourceSlot.TextureAsset,
                         hasStatus);
                     break;
 
