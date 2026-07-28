@@ -63,7 +63,7 @@ import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
-import Extrinsic.Runtime.MeshPrimitiveViewPacker;
+import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.GeometryPresentation;

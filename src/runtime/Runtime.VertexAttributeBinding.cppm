@@ -89,8 +89,8 @@ export namespace Extrinsic::Runtime
 
     // Resolve a vec3 channel (Position / Normal / Tangent) into `out`. `out` must
     // hold at least `vertexCount` elements. With `Normalize`, finite vectors are
-    // renormalized and zero-length vectors fall back; this reproduces the mesh
-    // packer's normalize-or-default-normal behavior when `Fallback = {0,0,1,_}`.
+    // renormalized and zero-length vectors fall back; this preserves the mesh
+    // plan builder's normalize-or-default-normal behavior when `Fallback = {0,0,1,_}`.
     [[nodiscard]] AttributeBindResult ResolveVec3Channel(
         const Geometry::PropertySet& properties,
         const VertexAttributeBinding& binding,
@@ -98,7 +98,7 @@ export namespace Extrinsic::Runtime
         std::span<glm::vec3> out);
 
     // Resolve a vec2 channel (Texcoord) into `out`. Non-finite source elements
-    // fall back to `Fallback.xy`; reproduces the packer's finite-or-zero UV.
+    // fall back to `Fallback.xy`; this preserves finite-or-zero UV behavior.
     [[nodiscard]] AttributeBindResult ResolveVec2Channel(
         const Geometry::PropertySet& properties,
         const VertexAttributeBinding& binding,

@@ -8,12 +8,18 @@ module;
 #include <span>
 #include <vector>
 
-module Extrinsic.Runtime.ProceduralGeometryPacker;
+module Extrinsic.Runtime.GeometryPlanBuilders;
+
+import Extrinsic.Graphics.GeometryResidency;
+import Extrinsic.Graphics.GpuWorld;
 
 namespace Extrinsic::Runtime
 {
     namespace
     {
+        constexpr std::uint64_t kFnvOffset64 = 14695981039346656037ull;
+        constexpr std::uint64_t kFnvPrime64 = 1099511628211ull;
+
         constexpr std::array<ProceduralVertex, 3> kTriangleVertices{{
             {-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f},
             { 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f},
@@ -48,12 +54,28 @@ namespace Extrinsic::Runtime
             desc.LineIndices = std::span<const std::uint32_t>{outBuffer.LineIndices};
             desc.VertexCount = static_cast<std::uint32_t>(kTriangleVertices.size());
             desc.LocalBounds = {};
-            desc.DebugName = DebugNameFor(ProceduralGeometryKind::Triangle);
+            desc.DebugName = DebugNameForProceduralGeometryKind(
+                ProceduralGeometryKind::Triangle);
             return desc;
         }
     }
 
-    const char* DebugNameFor(ProceduralGeometryKind kind) noexcept
+    std::uint64_t HashProceduralGeometryParams(
+        const ProceduralGeometryParams& params) noexcept
+    {
+        std::uint64_t hash = kFnvOffset64;
+        unsigned char bytes[sizeof(ProceduralGeometryParams)];
+        std::memcpy(bytes, &params, sizeof(ProceduralGeometryParams));
+        for (const unsigned char byte : bytes)
+        {
+            hash ^= static_cast<std::uint64_t>(byte);
+            hash *= kFnvPrime64;
+        }
+        return hash;
+    }
+
+    const char* DebugNameForProceduralGeometryKind(
+        const ProceduralGeometryKind kind) noexcept
     {
         switch (kind)
         {
@@ -70,16 +92,27 @@ namespace Extrinsic::Runtime
         LineIndices.clear();
     }
 
-    std::optional<Extrinsic::Graphics::GpuWorld::GeometryUploadDesc> Pack(
-        ProceduralGeometryKind kind,
+    std::optional<Graphics::GeometryUploadPlan> BuildProceduralGeometryPlan(
+        const ProceduralGeometryKind kind,
         const ProceduralGeometryParams& params,
+        const GeometryPlanBuildRequest& request,
         ProceduralGeometryPackBuffer& outBuffer)
     {
+        std::optional<Graphics::GpuWorld::GeometryUploadDesc> upload{};
         switch (kind)
         {
-            case ProceduralGeometryKind::Triangle:
-                return PackTriangle(params, outBuffer);
+        case ProceduralGeometryKind::Triangle:
+            upload = PackTriangle(params, outBuffer);
+            break;
         }
-        return std::nullopt;
+        if (!upload.has_value())
+            return std::nullopt;
+        return Graphics::MakeGeometryUploadPlan(
+            request.Key,
+            request.Generation,
+            *upload,
+            request.UpdateClass,
+            request.UpdateChannels,
+            request.StorageHint);
     }
 }

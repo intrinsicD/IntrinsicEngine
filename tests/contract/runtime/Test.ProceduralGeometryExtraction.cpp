@@ -4,6 +4,8 @@
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
 
+#include "GeometryResidencyFingerprint.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Components.AssetInstance;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
@@ -72,7 +74,6 @@ TEST(ProceduralGeometryExtraction, SingleRenderableProducesOneInstanceAndOneGeom
 
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
     const EntityHandle entity = MakeProceduralRenderable(scene);
-    (void)entity;
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(scene,
@@ -93,6 +94,39 @@ TEST(ProceduralGeometryExtraction, SingleRenderableProducesOneInstanceAndOneGeom
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
     EXPECT_EQ(gpuWorld.GetLiveInstanceCount(), 1u);
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+
+    const auto sidecar = extraction.FindRenderableSidecarForTest(
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
+    ASSERT_TRUE(sidecar.has_value());
+    Extrinsic::Graphics::GpuGeometryResidencyView residency{};
+    ASSERT_TRUE(gpuWorld.TryGetGeometryResidencyView(
+        sidecar->Geometry, residency));
+    EXPECT_EQ(residency.VertexCount, 3u);
+    EXPECT_EQ(residency.SurfaceIndexCount, 3u);
+    EXPECT_EQ(residency.Record.LineIndexCount, 0u);
+    EXPECT_EQ(residency.PositionByteCount, sizeof(float) * 9u);
+    EXPECT_EQ(residency.TexcoordByteCount, sizeof(float) * 6u);
+    EXPECT_EQ(residency.NormalByteCount, sizeof(float) * 9u);
+    EXPECT_EQ(residency.PositionFingerprint,
+              Extrinsic::Tests::GeometryFloat32Fingerprint(
+                  {-0.5f, -0.5f, 0.0f,
+                    0.5f, -0.5f, 0.0f,
+                    0.0f,  0.5f, 0.0f}));
+    EXPECT_EQ(residency.TexcoordFingerprint,
+              Extrinsic::Tests::GeometryFloat32Fingerprint(
+                  {0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f}));
+    EXPECT_EQ(residency.NormalFingerprint,
+              Extrinsic::Tests::GeometryFloat32Fingerprint(
+                  {0.0f, 0.0f, 1.0f,
+                   0.0f, 0.0f, 1.0f,
+                   0.0f, 0.0f, 1.0f}));
+    EXPECT_EQ(residency.SurfaceIndexFingerprint,
+              Extrinsic::Tests::GeometryUint32Fingerprint({0u, 1u, 2u}));
+    // RUNTIME-197 carries the static preference in the plan but does not alter
+    // GpuWorld's existing upload executor; the operational residency remains
+    // SoA until a separate storage-lane task promotes that planner decision.
+    EXPECT_EQ(residency.StorageLane,
+              Extrinsic::Graphics::GpuWorld::GeometryStorageLane::UniformSoA);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
@@ -150,9 +184,7 @@ TEST(ProceduralGeometryExtraction, GpuWorldReportsBoundGeometryForProceduralInst
     ASSERT_TRUE(view.has_value());
     EXPECT_TRUE(view->Instance.IsValid());
     EXPECT_TRUE(view->Geometry.IsValid());
-    ASSERT_TRUE(view->ProceduralKey.has_value());
-    EXPECT_EQ(view->ProceduralKey->Kind,
-              Extrinsic::ECS::Components::ProceduralGeometryKind::Triangle);
+    EXPECT_TRUE(view->HasProceduralResidency);
     EXPECT_FALSE(view->HasSourceAsset);
 
     const auto bound = gpuWorld.GetInstanceGeometry(view->Instance);
@@ -261,7 +293,7 @@ TEST(ProceduralGeometryExtraction, EntityDestructionRetiresGeometryAfterDeferred
     constexpr std::uint64_t baseFrame = 200u;
     for (std::uint32_t i = 0; i <= framesInFlight; ++i)
     {
-        extraction.TickProceduralGeometry(baseFrame + i, framesInFlight, engine.GetRenderer());
+        extraction.TickGeometryResidency(baseFrame + i, framesInFlight, engine.GetRenderer());
         if (i < framesInFlight)
         {
             EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
@@ -307,7 +339,7 @@ TEST(ProceduralGeometryExtraction, RecreateProceduralEntityCancelsRetireAndKeeps
     ASSERT_EQ(stats.ProceduralGeometryFreeRetires, 0u);
 
     // Anchor the deadline so the resurrection is observably inside the window.
-    extraction.TickProceduralGeometry(300u, /*framesInFlight=*/3u, engine.GetRenderer());
+    extraction.TickGeometryResidency(300u, /*framesInFlight=*/3u, engine.GetRenderer());
 
     // Resurrect: a fresh entity with the same procedural params.
     const EntityHandle second = MakeProceduralRenderable(scene);
@@ -327,7 +359,7 @@ TEST(ProceduralGeometryExtraction, RecreateProceduralEntityCancelsRetireAndKeeps
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
     for (std::uint32_t i = 0; i < 5u; ++i)
     {
-        extraction.TickProceduralGeometry(310u + i, 3u, engine.GetRenderer());
+        extraction.TickGeometryResidency(310u + i, 3u, engine.GetRenderer());
     }
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 

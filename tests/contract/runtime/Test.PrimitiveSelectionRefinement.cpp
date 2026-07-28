@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -7,7 +8,7 @@
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.SelectionSystem;
-import Extrinsic.Runtime.MeshGeometryPacker;
+import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Geometry.Properties;
 
@@ -20,10 +21,9 @@ using Extrinsic::ECS::Components::GeometrySources::Nodes;
 using Extrinsic::ECS::Components::GeometrySources::Vertices;
 using Extrinsic::Graphics::EncodeSelectionId;
 using Extrinsic::Graphics::SelectionPrimitiveDomain;
-using Extrinsic::Runtime::BuildSurfaceTriangleFaceMap;
-using Extrinsic::Runtime::MeshPackBuffer;
-using Extrinsic::Runtime::MeshPackStatus;
-using Extrinsic::Runtime::PackMesh;
+using Extrinsic::Runtime::BuildMeshSurfaceTriangleFaceMap;
+using Extrinsic::Runtime::BuildMeshSurfaceTriangleTopology;
+using Extrinsic::Runtime::MeshSurfaceTopologyStatus;
 using Extrinsic::Runtime::kInvalidPrimitiveIndex;
 using Extrinsic::Runtime::PrimitiveRefineRequest;
 using Extrinsic::Runtime::PrimitiveRefineStatus;
@@ -377,21 +377,150 @@ TEST(PrimitiveSelectionRefinement, MeshFaceHintMapsTrianglePayloadToFaceRow)
     }
 }
 
-TEST(PrimitiveSelectionRefinement, SurfaceTriangleFaceMapMatchesPackMeshEmission)
+TEST(PrimitiveSelectionRefinement, SurfaceTriangleFaceMapMatchesCanonicalTopology)
 {
     const MeshQuadTriScratch mesh;
 
     std::vector<std::uint32_t> triangleToFace;
-    ASSERT_EQ(BuildSurfaceTriangleFaceMap(mesh.View(), triangleToFace), MeshPackStatus::Success);
+    ASSERT_EQ(BuildMeshSurfaceTriangleFaceMap(mesh.View(), triangleToFace),
+              MeshSurfaceTopologyStatus::Success);
     EXPECT_EQ(triangleToFace, (std::vector<std::uint32_t>{0u, 0u, 1u}));
 
-    // The map must have exactly one entry per triangle PackMesh emits, so a
-    // gl_PrimitiveID can never index outside it.
-    MeshPackBuffer buffer{};
-    const auto pack = PackMesh(mesh.View(), buffer);
-    ASSERT_EQ(pack.Status, MeshPackStatus::Success);
-    ASSERT_TRUE(pack.Upload.has_value());
-    EXPECT_EQ(pack.Upload->SurfaceIndices.size(), triangleToFace.size() * 3u);
+    std::vector<std::uint32_t> surfaceIndices;
+    std::vector<std::uint32_t> topologyFaceMap;
+    ASSERT_EQ(BuildMeshSurfaceTriangleTopology(
+                  mesh.View(), surfaceIndices, topologyFaceMap),
+              MeshSurfaceTopologyStatus::Success);
+    EXPECT_EQ(topologyFaceMap, triangleToFace);
+    EXPECT_EQ(surfaceIndices.size(), triangleToFace.size() * 3u);
+}
+
+TEST(MeshSurfaceTopology, CorruptRingVariantsFailClosedAndClearOutputs)
+{
+    enum class Corruption : std::uint8_t
+    {
+        FaceHalfedgeOutOfRange,
+        TargetOutOfRange,
+        BrokenNext,
+        NonClosingNext,
+        MixedFaceOwners,
+    };
+
+    constexpr Corruption cases[]{
+        Corruption::FaceHalfedgeOutOfRange,
+        Corruption::TargetOutOfRange,
+        Corruption::BrokenNext,
+        Corruption::NonClosingNext,
+        Corruption::MixedFaceOwners,
+    };
+    constexpr std::uint32_t invalid =
+        std::numeric_limits<std::uint32_t>::max();
+
+    for (const Corruption corruption : cases)
+    {
+        MeshScratch mesh;
+        auto faceHalfedge = mesh.FaceSource.Properties.Get<std::uint32_t>(
+            pn::kFaceHalfedge);
+        auto toVertex = mesh.HalfedgeSource.Properties.Get<std::uint32_t>(
+            pn::kHalfedgeToVertex);
+        auto next = mesh.HalfedgeSource.Properties.Get<std::uint32_t>(
+            pn::kHalfedgeNext);
+        auto halfedgeFace = mesh.HalfedgeSource.Properties.Get<std::uint32_t>(
+            pn::kHalfedgeFace);
+        ASSERT_TRUE(faceHalfedge);
+        ASSERT_TRUE(toVertex);
+        ASSERT_TRUE(next);
+        ASSERT_TRUE(halfedgeFace);
+
+        switch (corruption)
+        {
+        case Corruption::FaceHalfedgeOutOfRange:
+            faceHalfedge.Vector()[0] = 99u;
+            break;
+        case Corruption::TargetOutOfRange:
+            toVertex.Vector()[0] = 42u;
+            break;
+        case Corruption::BrokenNext:
+            next.Vector()[0] = invalid;
+            break;
+        case Corruption::NonClosingNext:
+            next.Vector()[1] = 1u;
+            break;
+        case Corruption::MixedFaceOwners:
+            halfedgeFace.Vector()[1] = 5u;
+            break;
+        }
+
+        std::vector<std::uint32_t> surfaceIndices{99u};
+        std::vector<std::uint32_t> triangleToFace{99u};
+        EXPECT_EQ(BuildMeshSurfaceTriangleTopology(
+                      mesh.View(), surfaceIndices, triangleToFace),
+                  MeshSurfaceTopologyStatus::InvalidTopology)
+            << "corruption " << static_cast<unsigned>(corruption);
+        EXPECT_TRUE(surfaceIndices.empty());
+        EXPECT_TRUE(triangleToFace.empty());
+    }
+}
+
+TEST(MeshSurfaceTopology, MissingOwnershipPropertyFailsClosed)
+{
+    MeshScratch mesh;
+    auto& registry = mesh.HalfedgeSource.Properties.Registry();
+    const auto property = registry.Find(pn::kHalfedgeFace);
+    ASSERT_TRUE(property.has_value());
+    ASSERT_TRUE(registry.Remove(*property));
+
+    std::vector<std::uint32_t> surfaceIndices{99u};
+    std::vector<std::uint32_t> triangleToFace{99u};
+    EXPECT_EQ(BuildMeshSurfaceTriangleTopology(
+                  mesh.View(), surfaceIndices, triangleToFace),
+              MeshSurfaceTopologyStatus::MissingHalfedgeTopology);
+    EXPECT_TRUE(surfaceIndices.empty());
+    EXPECT_TRUE(triangleToFace.empty());
+}
+
+TEST(MeshSurfaceTopology, DeletedFaceSlotsAreSkipped)
+{
+    constexpr std::uint32_t invalid =
+        std::numeric_limits<std::uint32_t>::max();
+    MeshQuadTriScratch mesh;
+    mesh.FaceSource.NumDeleted = 1u;
+    auto halfedgeFace = mesh.HalfedgeSource.Properties.Get<std::uint32_t>(
+        pn::kHalfedgeFace);
+    ASSERT_TRUE(halfedgeFace);
+    halfedgeFace.Vector()[4] = invalid;
+    halfedgeFace.Vector()[5] = invalid;
+    halfedgeFace.Vector()[6] = invalid;
+
+    std::vector<std::uint32_t> surfaceIndices;
+    std::vector<std::uint32_t> triangleToFace;
+    ASSERT_EQ(BuildMeshSurfaceTriangleTopology(
+                  mesh.View(), surfaceIndices, triangleToFace),
+              MeshSurfaceTopologyStatus::Success);
+    EXPECT_EQ(surfaceIndices,
+              (std::vector<std::uint32_t>{1u, 2u, 3u, 1u, 3u, 0u}));
+    EXPECT_EQ(triangleToFace, (std::vector<std::uint32_t>{0u, 0u}));
+}
+
+TEST(MeshSurfaceTopology, AllDeletedFacesAreDegenerate)
+{
+    constexpr std::uint32_t invalid =
+        std::numeric_limits<std::uint32_t>::max();
+    MeshScratch mesh;
+    mesh.FaceSource.NumDeleted = 1u;
+    auto halfedgeFace = mesh.HalfedgeSource.Properties.Get<std::uint32_t>(
+        pn::kHalfedgeFace);
+    ASSERT_TRUE(halfedgeFace);
+    for (std::uint32_t& face : halfedgeFace.Vector())
+        face = invalid;
+
+    std::vector<std::uint32_t> surfaceIndices{99u};
+    std::vector<std::uint32_t> triangleToFace{99u};
+    EXPECT_EQ(BuildMeshSurfaceTriangleTopology(
+                  mesh.View(), surfaceIndices, triangleToFace),
+              MeshSurfaceTopologyStatus::DegenerateAllFaces);
+    EXPECT_TRUE(surfaceIndices.empty());
+    EXPECT_TRUE(triangleToFace.empty());
 }
 
 // ---- Graph -----------------------------------------------------------------

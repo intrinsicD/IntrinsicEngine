@@ -172,7 +172,7 @@ TEST(RenderExtractionContract, FailedMeshPackPublishesNoDrawCandidate)
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
     raw.emplace<G::RenderSurface>(entity);
 
-    // Mesh-domain sources without `v:position`: the packer reports
+    // Mesh-domain sources without `v:position`: the plan builder reports
     // MissingPositions and the entity must not publish a draw candidate.
     (void)raw.emplace<gs::Vertices>(entity);
     (void)raw.emplace<gs::Edges>(entity);

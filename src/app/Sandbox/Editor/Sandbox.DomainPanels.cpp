@@ -348,7 +348,7 @@ void DrawVertexChannelBindingTargets(
 
     const char *channelName = DebugNameForVertexChannel(target.Channel);
     const std::string currentLabel = target.HasBinding
-                                         ? target.Binding.SourceProperty
+                                         ? target.Binding.Property.Name
                                          : std::string{"Default"};
     ImGui::Text("%s", channelName);
     ImGui::SameLine();
@@ -370,7 +370,7 @@ void DrawVertexChannelBindingTargets(
            target.Options) {
         const bool selected =
             target.HasBinding &&
-            target.Binding.SourceProperty == option.PropertyName;
+            target.Binding.Property.Name == option.PropertyName;
         if (!option.Compatible)
           ImGui::BeginDisabled();
         const std::string label =

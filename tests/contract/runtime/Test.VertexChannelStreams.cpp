@@ -1,6 +1,7 @@
 // Contract tests for the CPU SoA vertex channel substrate (RUNTIME-122 Slice A,
 // ADR-0022). Proves the per-channel streams interleave into the exact AoS vertex
-// byte layout the current packers emit. CPU-only; no GPU/RHI dependency.
+// byte layout the private mesh plan builder emits. CPU-only; no GPU/RHI
+// dependency.
 
 #include <cstdint>
 #include <cstring>
@@ -13,11 +14,9 @@
 
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelStreams;
-import Extrinsic.Runtime.MeshGeometryPacker;
 
 using Extrinsic::Runtime::InterleaveToAoS;
 using Extrinsic::Runtime::MakeTightLayout;
-using Extrinsic::Runtime::MeshVertex;
 using Extrinsic::Runtime::SetChannelVec2;
 using Extrinsic::Runtime::SetChannelVec3;
 using Extrinsic::Runtime::VertexChannel;
@@ -26,8 +25,21 @@ using Extrinsic::Runtime::VertexLayout;
 
 namespace
 {
+    struct MeshVertex
+    {
+        float Px;
+        float Py;
+        float Pz;
+        float U;
+        float V;
+        float Nx;
+        float Ny;
+        float Nz;
+    };
+    static_assert(sizeof(MeshVertex) == 32u);
+
     // The interleaved MeshVertex layout: position (12B) @0, texcoord (8B) @12,
-    // normal (12B) @20, stride 32 — matches Runtime.MeshGeometryPacker::MeshVertex.
+    // normal (12B) @20, stride 32 — matches the runtime mesh upload plan.
     VertexLayout MeshLayout()
     {
         const std::pair<VertexChannel, std::uint32_t> channels[] = {

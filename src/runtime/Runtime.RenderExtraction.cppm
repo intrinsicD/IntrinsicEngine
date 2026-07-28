@@ -19,8 +19,6 @@ import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 export import Extrinsic.Runtime.GeometryAvailability;
-import Extrinsic.Runtime.MeshPrimitiveViewPacker;
-import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.WorldHandle;
 export import Extrinsic.Runtime.VisualizationAdapters;
@@ -102,7 +100,8 @@ export namespace Extrinsic::Runtime
         // destruction, eligibility flip away from mesh, or dirty
         // full reupload superseding an older handle; partial channel uploads
         // keep the resident handle. The actual free runs through the
-        // `framesInFlight` deferred-retire window driven by `TickMeshGeometry`,
+        // `framesInFlight` deferred-retire window driven by
+        // `TickGeometryResidency`,
         // which surfaces `FreeRetires` as a per-frame delta on the next
         // `ExtractAndSubmit` (mirroring `ProceduralGeometryFreeRetires`).
         std::uint32_t MeshGeometryUploads{0};
@@ -136,7 +135,8 @@ export namespace Extrinsic::Runtime
         // destruction, eligibility flip away from graph, or full dirty
         // reupload superseding an older handle); partial channel uploads keep
         // the resident handle. The actual free runs through the
-        // `framesInFlight` deferred-retire window driven by `TickGraphGeometry`,
+        // `framesInFlight` deferred-retire window driven by
+        // `TickGeometryResidency`,
         // which surfaces `FreeRetires` as a per-frame delta on the next
         // `ExtractAndSubmit` (mirroring `MeshGeometryFreeRetires`).
         std::uint32_t GraphGeometryUploads{0};
@@ -169,7 +169,7 @@ export namespace Extrinsic::Runtime
         // destruction, eligibility flip away from point-cloud, or full dirty
         // reupload superseding an older handle); partial channel uploads keep
         // the resident handle. The actual free runs through the `framesInFlight`
-        // deferred-retire window driven by `TickPointCloudGeometry`, which
+        // deferred-retire window driven by `TickGeometryResidency`, which
         // surfaces `FreeRetires` as a per-frame delta on the next
         // `ExtractAndSubmit` (mirroring `GraphGeometryFreeRetires`).
         std::uint32_t PointCloudGeometryUploads{0};
@@ -201,9 +201,9 @@ export namespace Extrinsic::Runtime
         // endpoints in their own counters, and folds every other rejection into
         // `FailedPack`; the vertex view has no edge topology, so only
         // `MissingPositions` and `FailedPack` apply. Both views share one
-        // `framesInFlight` deferred-retire queue driven by
-        // `TickMeshPrimitiveViewGeometry`, which surfaces the per-tick free
-        // delta as the shared `MeshPrimitiveViewFreeRetires`.
+        // common `framesInFlight` deferred-retire window driven by
+        // `TickGeometryResidency`, which surfaces the per-tick free delta as
+        // the shared `MeshPrimitiveViewFreeRetires`.
         std::uint32_t MeshEdgeViewUploads{0};
         std::uint32_t MeshEdgeViewReuseHits{0};
         std::uint32_t MeshEdgeViewReuploads{0};
@@ -363,61 +363,6 @@ export namespace Extrinsic::Runtime
                                    std::uint32_t framesInFlight,
                                    Graphics::IRenderer& renderer);
 
-        // Transitional wrappers retained only while domain contract tests move
-        // to `TickGeometryResidency`; all delegate to the one coordinator.
-        // Maintenance-phase hook called by Engine::RunFrame after
-        // ExtractAndSubmit and Renderer::Present.  Drives the deferred-retire
-        // window of the procedural geometry cache using the same frame
-        // counter and framesInFlight that the runtime hands to
-        // `Graphics::GpuAssetCache::Tick`.
-        void TickProceduralGeometry(std::uint64_t currentFrame,
-                                    std::uint32_t framesInFlight,
-                                    Graphics::IRenderer& renderer);
-
-        // RUNTIME-085 Slice C — drives the deferred-retire window of the
-        // runtime-owned mesh-residency retire queue, mirroring
-        // `TickProceduralGeometry`. Handles enqueued by entity destruction,
-        // eligibility flip, or full dirty reupload are freed via
-        // `GpuWorld::FreeGeometry` once `framesInFlight` ticks have elapsed
-        // since the release tick. Subsequent `ExtractAndSubmit` calls surface
-        // the per-tick delta as `MeshGeometryFreeRetires`.
-        void TickMeshGeometry(std::uint64_t currentFrame,
-                              std::uint32_t framesInFlight,
-                              Graphics::IRenderer& renderer);
-
-        // RUNTIME-086 Slices B/C — drives the deferred-retire window of the
-        // runtime-owned graph-residency retire queue, mirroring
-        // `TickMeshGeometry`. Handles enqueued by entity destruction,
-        // eligibility flip, or full dirty reupload are freed via
-        // `GpuWorld::FreeGeometry` once `framesInFlight` ticks have elapsed
-        // since the release tick. Subsequent `ExtractAndSubmit` calls surface
-        // the per-tick delta as `GraphGeometryFreeRetires`.
-        void TickGraphGeometry(std::uint64_t currentFrame,
-                               std::uint32_t framesInFlight,
-                               Graphics::IRenderer& renderer);
-
-        // RUNTIME-087 — drives the deferred-retire window of the runtime-owned
-        // point-cloud-residency retire queue, mirroring `TickGraphGeometry`.
-        // Handles enqueued by entity destruction, eligibility flip, or full
-        // dirty reupload are freed via `GpuWorld::FreeGeometry` once
-        // `framesInFlight` ticks have elapsed since the release tick. Subsequent
-        // `ExtractAndSubmit` calls surface the per-tick delta as
-        // `PointCloudGeometryFreeRetires`.
-        void TickPointCloudGeometry(std::uint64_t currentFrame,
-                                    std::uint32_t framesInFlight,
-                                    Graphics::IRenderer& renderer);
-
-        // RUNTIME-088 Slice B — drives the deferred-retire window of the
-        // runtime-owned mesh-primitive-view residency retire queue, mirroring
-        // `TickMeshGeometry`. Edge and vertex view geometry handles enqueued by
-        // view disable, parent eligibility flip, dirty reupload, entity
-        // destruction, or shutdown are freed via `GpuWorld::FreeGeometry` once
-        // `framesInFlight` ticks have elapsed. Subsequent `ExtractAndSubmit`
-        // calls surface the per-tick delta as `MeshPrimitiveViewFreeRetires`.
-        void TickMeshPrimitiveViewGeometry(std::uint64_t currentFrame,
-                                           std::uint32_t framesInFlight,
-                                           Graphics::IRenderer& renderer);
-
         // ASSETIO-007 — data-only texture binding surface for renderables
         // whose material sidecar is owned by extraction. Callers key bindings
         // by stable render id; extraction resolves the AssetIds through the
@@ -438,14 +383,14 @@ export namespace Extrinsic::Runtime
         {
             Graphics::GpuInstanceHandle Instance{};
             Graphics::GpuGeometryHandle Geometry{};
-            std::optional<ProceduralGeometryKey> ProceduralKey{};
+            bool HasProceduralResidency{false};
             bool HasSourceAsset = false;
             std::uint32_t GeometrySlot = 0;
             std::uint32_t GeometryGeneration = 0;
             // RUNTIME-085 Slice B — runtime-authored mesh-source residency.
-            // `MeshGeometry` is the handle the cache owns and frees on
-            // retirement; it is distinct from the procedural cache's
-            // refcounted handle and from any asset-backed geometry that
+            // `MeshGeometry` is the handle the unified coordinator owns and
+            // frees on retirement; it is distinct from any shared procedural
+            // residency and from any asset-backed geometry that
             // `GpuSlot.SourceAsset` may later wire in.
             Graphics::GpuGeometryHandle MeshGeometry{};
             bool HasMeshResidency = false;
@@ -514,8 +459,6 @@ export namespace Extrinsic::Runtime
 
         [[nodiscard]] std::optional<GpuRenderableAvailabilityView>
             FindGpuRenderableAvailability(std::uint32_t stableEntityId) const noexcept;
-
-        [[nodiscard]] const ProceduralGeometryCache& GetProceduralGeometryCacheForTest() const noexcept;
 
         enum class VisualizationAdapterBindingKind : std::uint8_t
         {

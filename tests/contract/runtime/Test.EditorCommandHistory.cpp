@@ -14,7 +14,7 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.MeshPrimitiveViewPacker;
+import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.SelectionController;
 
 namespace Runtime = Extrinsic::Runtime;

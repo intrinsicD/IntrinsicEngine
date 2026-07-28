@@ -11,10 +11,11 @@ module;
 
 #include <glm/glm.hpp>
 
-module Extrinsic.Runtime.MeshPrimitiveViewPacker;
+module Extrinsic.Runtime.GeometryPlanBuilders;
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.GeometryResidency;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelStreams;
 import Geometry.Properties;
@@ -27,11 +28,12 @@ namespace Extrinsic::Runtime
         constexpr const char* kVertexViewDebugName = "Runtime.MeshVertexView";
         constexpr std::uint32_t kInvalidIndex = std::numeric_limits<std::uint32_t>::max();
 
-        [[nodiscard]] MeshPrimitiveViewResult Failure(MeshPrimitiveViewStatus status,
-                                                      MeshPrimitiveViewBuffer& outBuffer) noexcept
+        [[nodiscard]] MeshPrimitiveViewPlanBuildResult Failure(
+            MeshPrimitiveViewStatus status,
+            MeshPrimitiveViewBuffer& outBuffer) noexcept
         {
             outBuffer.Clear();
-            return MeshPrimitiveViewResult{status, std::nullopt};
+            return MeshPrimitiveViewPlanBuildResult{status, std::nullopt};
         }
 
         [[nodiscard]] bool IsFinite(const glm::vec3& p) noexcept
@@ -342,8 +344,9 @@ namespace Extrinsic::Runtime
         LineIndices.clear();
     }
 
-    MeshPrimitiveViewResult PackMeshEdgeView(
+    MeshPrimitiveViewPlanBuildResult BuildMeshEdgeViewPlan(
         const ECS::Components::GeometrySources::ConstSourceView& view,
+        const GeometryPlanBuildRequest& request,
         MeshPrimitiveViewBuffer& outBuffer)
     {
         outBuffer.Clear();
@@ -436,11 +439,21 @@ namespace Extrinsic::Runtime
         FillLocalSphere(desc, minP, maxP);
         desc.DebugName = kEdgeViewDebugName;
 
-        return MeshPrimitiveViewResult{MeshPrimitiveViewStatus::Success, desc};
+        return MeshPrimitiveViewPlanBuildResult{
+            MeshPrimitiveViewStatus::Success,
+            Graphics::MakeGeometryUploadPlan(
+                request.Key,
+                request.Generation,
+                desc,
+                request.UpdateClass,
+                request.UpdateChannels,
+                request.StorageHint),
+        };
     }
 
-    MeshPrimitiveViewResult PackMeshVertexView(
+    MeshPrimitiveViewPlanBuildResult BuildMeshVertexViewPlan(
         const ECS::Components::GeometrySources::ConstSourceView& view,
+        const GeometryPlanBuildRequest& request,
         MeshPrimitiveViewBuffer& outBuffer)
     {
         outBuffer.Clear();
@@ -470,6 +483,15 @@ namespace Extrinsic::Runtime
         FillLocalSphere(desc, minP, maxP);
         desc.DebugName = kVertexViewDebugName;
 
-        return MeshPrimitiveViewResult{MeshPrimitiveViewStatus::Success, desc};
+        return MeshPrimitiveViewPlanBuildResult{
+            MeshPrimitiveViewStatus::Success,
+            Graphics::MakeGeometryUploadPlan(
+                request.Key,
+                request.Generation,
+                desc,
+                request.UpdateClass,
+                request.UpdateChannels,
+                request.StorageHint),
+        };
     }
 }

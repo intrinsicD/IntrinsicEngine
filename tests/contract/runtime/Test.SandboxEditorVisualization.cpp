@@ -73,7 +73,7 @@ import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
-import Extrinsic.Runtime.MeshPrimitiveViewPacker;
+import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
@@ -411,6 +411,7 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPo
         [&](const ECS::EntityHandle entity,
             const Runtime::SandboxEditorDomainWindowKind windowKind,
             const Runtime::SandboxEditorPropertyCatalogDomain catalogDomain,
+            const Runtime::GeometryElementDomain geometryDomain,
             Geometry::PropertySet& properties,
             const std::size_t expectedCount)
         {
@@ -463,9 +464,11 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPo
                 registry.Raw().try_get<Runtime::VertexChannelBindingSet>(entity);
             ASSERT_NE(bindings, nullptr);
             EXPECT_TRUE(bindings->Normal.Enabled);
-            EXPECT_EQ(bindings->Normal.SourceType,
-                      Runtime::AttributeSourceType::Vec3);
-            EXPECT_EQ(bindings->Normal.SourceProperty, "v:custom_normal");
+            EXPECT_EQ(bindings->Normal.Property.Domain,
+                      geometryDomain);
+            EXPECT_EQ(bindings->Normal.Property.ValueKind,
+                      Geometry::PropertyValueKind::Vec3);
+            EXPECT_EQ(bindings->Normal.Property.Name, "v:custom_normal");
             EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(entity));
             EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(entity));
 
@@ -489,7 +492,7 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPo
                 Runtime::VertexChannel::Normal);
             ASSERT_NE(domainTarget, nullptr);
             EXPECT_TRUE(domainTarget->HasBinding);
-            EXPECT_EQ(domainTarget->Binding.SourceProperty, "v:custom_normal");
+            EXPECT_EQ(domainTarget->Binding.Property.Name, "v:custom_normal");
         };
 
     const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
@@ -497,6 +500,7 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPo
     exercise(mesh,
              Runtime::SandboxEditorDomainWindowKind::Mesh,
              Runtime::SandboxEditorPropertyCatalogDomain::MeshVertices,
+             Runtime::GeometryElementDomain::MeshVertex,
              registry.Raw().get<GS::Vertices>(mesh).Properties,
              3u);
 
@@ -505,6 +509,7 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPo
     exercise(graph,
              Runtime::SandboxEditorDomainWindowKind::Graph,
              Runtime::SandboxEditorPropertyCatalogDomain::GraphVertices,
+             Runtime::GeometryElementDomain::GraphNode,
              registry.Raw().get<GS::Nodes>(graph).Properties,
              3u);
 
@@ -519,6 +524,7 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPo
     exercise(cloud,
              Runtime::SandboxEditorDomainWindowKind::PointCloud,
              Runtime::SandboxEditorPropertyCatalogDomain::PointCloudPoints,
+             Runtime::GeometryElementDomain::PointCloudPoint,
              registry.Raw().get<GS::Vertices>(cloud).Properties,
              3u);
 }
@@ -572,8 +578,11 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandBindsColorAndDisablesCleanly)
         registry.Raw().try_get<Runtime::VertexChannelBindingSet>(mesh);
     ASSERT_NE(bindings, nullptr);
     EXPECT_TRUE(bindings->Color.Enabled);
-    EXPECT_EQ(bindings->Color.SourceType, Runtime::AttributeSourceType::Vec4);
-    EXPECT_EQ(bindings->Color.SourceProperty, "v:paint");
+    EXPECT_EQ(bindings->Color.Property.Domain,
+              Runtime::GeometryElementDomain::MeshVertex);
+    EXPECT_EQ(bindings->Color.Property.ValueKind,
+              Geometry::PropertyValueKind::Vec4);
+    EXPECT_EQ(bindings->Color.Property.Name, "v:paint");
     EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexColors>(mesh));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
 

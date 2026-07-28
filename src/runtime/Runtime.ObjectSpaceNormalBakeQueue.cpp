@@ -19,9 +19,10 @@ module Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Asset.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
+import Extrinsic.Graphics.GeometryResidency;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
-import Extrinsic.Runtime.MeshGeometryPacker;
+import Extrinsic.Runtime.GeometryPlanBuilders;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.WorldHandle;
@@ -315,13 +316,11 @@ namespace Extrinsic::Runtime
         FailRequestBuild(
             const RuntimeObjectSpaceNormalBakeRequestBuildStatus status,
             std::string diagnostic,
-            const MeshPackStatus packStatus = MeshPackStatus::WrongDomain,
             const RuntimeObjectSpaceNormalBakeIdentityBuildStatus identityStatus =
                 RuntimeObjectSpaceNormalBakeIdentityBuildStatus::EmptyInput)
         {
             return RuntimeObjectSpaceNormalBakeRequestBuildResult{
                 .Status = status,
-                .PackStatus = packStatus,
                 .IdentityStatus = identityStatus,
                 .Diagnostic = std::move(diagnostic),
             };
@@ -575,22 +574,30 @@ namespace Extrinsic::Runtime
         }
 
         MeshPackBuffer packed{};
-        const MeshPackResult pack =
-            PackMesh(view, channelBindings, packed);
+        const MeshPlanBuildResult pack = BuildMeshGeometryPlan(
+            view,
+            channelBindings,
+            GeometryPlanBuildRequest{
+                .Key = Graphics::GeometryResidencyKey{
+                    .Namespace = 1u,
+                    .Identity = target.StableEntityId,
+                },
+                .Generation = 1u,
+            },
+            packed);
         if (pack.Status != MeshPackStatus::Success ||
-            !pack.Upload.has_value())
+            !pack.Plan.has_value())
         {
             return FailRequestBuild(
                 RuntimeObjectSpaceNormalBakeRequestBuildStatus::
-                    MeshPackRejected,
+                    MeshPlanRejected,
                 std::string{
-                    "object-space normal bake mesh packing failed: "} +
-                    DebugNameForMeshPackStatus(pack.Status),
-                pack.Status);
+                    "object-space normal bake mesh plan build failed: "} +
+                    DebugNameForMeshPackStatus(pack.Status));
         }
 
-        const Graphics::GpuWorld::GeometryUploadDesc& upload =
-            *pack.Upload;
+        const Graphics::GpuWorld::GeometryUploadDesc upload =
+            pack.Plan->UploadDesc();
         const RuntimeObjectSpaceNormalBakeIdentityBuildResult identity =
             BuildRuntimeObjectSpaceNormalBakeIdentity(
                 RuntimeObjectSpaceNormalBakeIdentityInput{
@@ -611,14 +618,12 @@ namespace Extrinsic::Runtime
                 RuntimeObjectSpaceNormalBakeRequestBuildStatus::
                     IdentityRejected,
                 identity.Diagnostic,
-                pack.Status,
                 identity.Status);
         }
 
         return RuntimeObjectSpaceNormalBakeRequestBuildResult{
             .Status =
                 RuntimeObjectSpaceNormalBakeRequestBuildStatus::Success,
-            .PackStatus = pack.Status,
             .IdentityStatus = identity.Status,
             .Request =
                 RuntimeObjectSpaceNormalBakeRequest{

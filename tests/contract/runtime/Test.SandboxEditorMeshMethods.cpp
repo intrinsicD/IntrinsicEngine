@@ -73,7 +73,7 @@ import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
-import Extrinsic.Runtime.MeshPrimitiveViewPacker;
+import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;

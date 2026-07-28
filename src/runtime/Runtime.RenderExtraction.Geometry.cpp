@@ -40,12 +40,7 @@ import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.GeometryAvailability;
-import Extrinsic.Runtime.GraphGeometryPacker;
-import Extrinsic.Runtime.MeshGeometryPacker;
-import Extrinsic.Runtime.MeshPrimitiveViewPacker;
-import Extrinsic.Runtime.PointCloudGeometryPacker;
-import Extrinsic.Runtime.ProceduralGeometry;
-import Extrinsic.Runtime.ProceduralGeometryPacker;
+import Extrinsic.Runtime.GeometryPlanBuilders;
 import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.VisualizationAdapters;
 import Extrinsic.Runtime.VertexChannelBindings;
@@ -122,7 +117,7 @@ namespace Extrinsic::Runtime
                 RenderExtractionGeometryResidencyKind::Mesh,
                 stableId);
 
-        // Fail-closed release for a dirty-reupload pack/upload failure. When the
+        // Fail-closed release for a dirty plan/reconcile failure. When the
         // entity already has a valid upload and a later dirty update makes the
         // source unrenderable (empty / non-finite positions, broken topology),
         // the stale geometry must not keep rendering authoritative-but-invalid
@@ -167,9 +162,24 @@ namespace Extrinsic::Runtime
             DiagnoseRenderExtractionMeshTexcoordFallback(view);
         const auto* channelBindings =
             registry.try_get<VertexChannelBindingSet>(entity);
-        MeshPackResult packResult =
-            PackMesh(view, channelBindings, m_MeshPack);
-        if (packResult.Status != MeshPackStatus::Success)
+        const bool partialPreferred =
+            hadResidency && dirty && !dirtyPlan.RequiresFullUpload;
+        MeshPlanBuildResult packResult = BuildMeshGeometryPlan(
+            view,
+            channelBindings,
+            GeometryPlanBuildRequest{
+                .Key = residencyKey,
+                .Generation = IssueGeometryPlanGeneration(),
+                .UpdateClass = partialPreferred
+                    ? Graphics::GeometryUploadUpdateClass::PartialPreferred
+                    : Graphics::GeometryUploadUpdateClass::FullReplacement,
+                .UpdateChannels = partialPreferred
+                    ? dirtyPlan.Channels
+                    : Graphics::GpuWorld::GeometryChannelUpdateMask{},
+            },
+            m_MeshPack);
+        if (packResult.Status != MeshPackStatus::Success
+            || !packResult.Plan.has_value())
         {
             switch (packResult.Status)
             {
@@ -204,21 +214,8 @@ namespace Extrinsic::Runtime
             ++stats.MeshGeometryNonFiniteTexcoords;
         }
 
-        const bool partialPreferred =
-            hadResidency && dirty && !dirtyPlan.RequiresFullUpload;
-        const Graphics::GeometryUploadPlan plan =
-            Graphics::MakeGeometryUploadPlan(
-                residencyKey,
-                IssueGeometryPlanGeneration(),
-                *packResult.Upload,
-                partialPreferred
-                    ? Graphics::GeometryUploadUpdateClass::PartialPreferred
-                    : Graphics::GeometryUploadUpdateClass::FullReplacement,
-                partialPreferred
-                    ? dirtyPlan.Channels
-                    : Graphics::GpuWorld::GeometryChannelUpdateMask{});
         const Graphics::GeometryResidencyResult residency =
-            EnsureGeometryResidency(renderer).Reconcile(plan);
+            EnsureGeometryResidency(renderer).Reconcile(*packResult.Plan);
         if (!residency.Succeeded())
         {
             ++stats.MeshGeometryFailedPack;
@@ -285,8 +282,8 @@ namespace Extrinsic::Runtime
         namespace D = ECS::Components::DirtyTags;
         namespace G = Graphics::Components;
 
-        // The render hints select the lanes: `RenderEdges` packs edge line
-        // indices, `RenderPoints` packs the node point lane. Both share the
+        // The render hints select the lanes: `RenderEdges` requests edge line
+        // indices, `RenderPoints` requests the node point lane. Both share the
         // single node-position vertex buffer (one handle per graph entity).
         const bool wantLines = registry.all_of<G::RenderEdges>(entity);
         const bool wantPoints = registry.all_of<G::RenderPoints>(entity);
@@ -307,7 +304,7 @@ namespace Extrinsic::Runtime
             && (sidecar.GraphPackedLines != wantLines
                 || sidecar.GraphPackedPoints != wantPoints);
 
-        // Fail-closed release for a dirty-reupload pack/upload failure — see the
+        // Fail-closed release for a dirty plan/reconcile failure — see the
         // mesh bridge for the rationale. The caller's eligibility-flip release
         // cannot cover this because the entity is still graph-domain. Clears the
         // packed-lane flags alongside the handle so a later fresh upload re-sets
@@ -345,13 +342,27 @@ namespace Extrinsic::Runtime
 
         const auto* channelBindings =
             registry.try_get<VertexChannelBindingSet>(entity);
-        GraphPackResult packResult = PackGraph(
+        const bool partialPreferred =
+            hadResidency && dirty && !dirtyPlan.RequiresFullUpload
+            && !lanesChanged;
+        GraphPlanBuildResult packResult = BuildGraphGeometryPlan(
             view,
             wantLines,
             wantPoints,
             channelBindings,
+            GeometryPlanBuildRequest{
+                .Key = residencyKey,
+                .Generation = IssueGeometryPlanGeneration(),
+                .UpdateClass = partialPreferred
+                    ? Graphics::GeometryUploadUpdateClass::PartialPreferred
+                    : Graphics::GeometryUploadUpdateClass::FullReplacement,
+                .UpdateChannels = partialPreferred
+                    ? dirtyPlan.Channels
+                    : Graphics::GpuWorld::GeometryChannelUpdateMask{},
+            },
             m_GraphPack);
-        if (packResult.Status != GraphPackStatus::Success)
+        if (packResult.Status != GraphPackStatus::Success
+            || !packResult.Plan.has_value())
         {
             switch (packResult.Status)
             {
@@ -375,22 +386,8 @@ namespace Extrinsic::Runtime
             return false;
         }
 
-        const bool partialPreferred =
-            hadResidency && dirty && !dirtyPlan.RequiresFullUpload
-            && !lanesChanged;
-        const Graphics::GeometryUploadPlan plan =
-            Graphics::MakeGeometryUploadPlan(
-                residencyKey,
-                IssueGeometryPlanGeneration(),
-                *packResult.Upload,
-                partialPreferred
-                    ? Graphics::GeometryUploadUpdateClass::PartialPreferred
-                    : Graphics::GeometryUploadUpdateClass::FullReplacement,
-                partialPreferred
-                    ? dirtyPlan.Channels
-                    : Graphics::GpuWorld::GeometryChannelUpdateMask{});
         const Graphics::GeometryResidencyResult residency =
-            EnsureGeometryResidency(renderer).Reconcile(plan);
+            EnsureGeometryResidency(renderer).Reconcile(*packResult.Plan);
         if (!residency.Succeeded())
         {
             ++stats.GraphGeometryFailedPack;
@@ -459,7 +456,7 @@ namespace Extrinsic::Runtime
                 stableId);
 
         // Fail-closed release for an unsupported-size-source or dirty-reupload
-        // pack/upload failure — see the mesh bridge for the rationale. The
+        // plan/reconcile failure — see the mesh bridge for the rationale. The
         // caller's eligibility-flip release cannot cover this because the entity
         // is still point-cloud-domain, so this is the only place such a failure
         // can release a previously-resident cloud.
@@ -518,9 +515,25 @@ namespace Extrinsic::Runtime
 
         const auto* channelBindings =
             registry.try_get<VertexChannelBindingSet>(entity);
-        PointCloudPackResult packResult =
-            PackCloud(view, channelBindings, m_PointCloudPack);
-        if (packResult.Status != PointCloudPackStatus::Success)
+        const bool partialPreferred =
+            hadResidency && dirty && !dirtyPlan.RequiresFullUpload;
+        PointCloudPlanBuildResult packResult =
+            BuildPointCloudGeometryPlan(
+                view,
+                channelBindings,
+                GeometryPlanBuildRequest{
+                    .Key = residencyKey,
+                    .Generation = IssueGeometryPlanGeneration(),
+                    .UpdateClass = partialPreferred
+                        ? Graphics::GeometryUploadUpdateClass::PartialPreferred
+                        : Graphics::GeometryUploadUpdateClass::FullReplacement,
+                    .UpdateChannels = partialPreferred
+                        ? dirtyPlan.Channels
+                        : Graphics::GpuWorld::GeometryChannelUpdateMask{},
+                },
+                m_PointCloudPack);
+        if (packResult.Status != PointCloudPackStatus::Success
+            || !packResult.Plan.has_value())
         {
             switch (packResult.Status)
             {
@@ -543,21 +556,8 @@ namespace Extrinsic::Runtime
             return false;
         }
 
-        const bool partialPreferred =
-            hadResidency && dirty && !dirtyPlan.RequiresFullUpload;
-        const Graphics::GeometryUploadPlan plan =
-            Graphics::MakeGeometryUploadPlan(
-                residencyKey,
-                IssueGeometryPlanGeneration(),
-                *packResult.Upload,
-                partialPreferred
-                    ? Graphics::GeometryUploadUpdateClass::PartialPreferred
-                    : Graphics::GeometryUploadUpdateClass::FullReplacement,
-                partialPreferred
-                    ? dirtyPlan.Channels
-                    : Graphics::GpuWorld::GeometryChannelUpdateMask{});
         const Graphics::GeometryResidencyResult residency =
-            EnsureGeometryResidency(renderer).Reconcile(plan);
+            EnsureGeometryResidency(renderer).Reconcile(*packResult.Plan);
         if (!residency.Succeeded())
         {
             ++stats.PointCloudGeometryFailedPack;
@@ -701,13 +701,17 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        // Pack (first upload, or parent-dirty reupload). The shared scratch
-        // buffer is reused serially; the returned descriptor views into it, so
-        // upload happens before the next view packs.
-        const MeshPrimitiveViewResult packResult = isEdge
-            ? PackMeshEdgeView(view, m_MeshPrimitiveViewPack)
-            : PackMeshVertexView(view, m_MeshPrimitiveViewPack);
-        if (packResult.Status != MeshPrimitiveViewStatus::Success)
+        // Build an owning plan for the first upload or parent-dirty reupload.
+        // The domain-specific topology conversion stays private to runtime.
+        const GeometryPlanBuildRequest request{
+            .Key = residencyKey,
+            .Generation = IssueGeometryPlanGeneration(),
+        };
+        const MeshPrimitiveViewPlanBuildResult packResult = isEdge
+            ? BuildMeshEdgeViewPlan(view, request, m_MeshPrimitiveViewPack)
+            : BuildMeshVertexViewPlan(view, request, m_MeshPrimitiveViewPack);
+        if (packResult.Status != MeshPrimitiveViewStatus::Success
+            || !packResult.Plan.has_value())
         {
             switch (packResult.Status)
             {
@@ -774,13 +778,8 @@ namespace Extrinsic::Runtime
             ++stats.AllocatedInstanceCount;
         }
 
-        const Graphics::GeometryUploadPlan plan =
-            Graphics::MakeGeometryUploadPlan(
-                residencyKey,
-                IssueGeometryPlanGeneration(),
-                *packResult.Upload);
         const Graphics::GeometryResidencyResult residency =
-            EnsureGeometryResidency(renderer).Reconcile(plan);
+            EnsureGeometryResidency(renderer).Reconcile(*packResult.Plan);
         if (!residency.Succeeded())
         {
             if (isEdge)
@@ -853,7 +852,8 @@ namespace Extrinsic::Runtime
         return RenderableSidecarView{
             .Instance = it->second.Instance,
             .Geometry = it->second.Geometry,
-            .ProceduralKey = it->second.ProceduralKey,
+            .HasProceduralResidency =
+                it->second.ProceduralKey.has_value(),
             .HasSourceAsset = it->second.GpuSlot.HasSourceAsset(),
             .GeometrySlot = it->second.GpuSlot.GeometrySlot,
             .GeometryGeneration = it->second.GpuSlot.GeometryGeneration,
@@ -974,13 +974,6 @@ namespace Extrinsic::Runtime
         return view;
     }
 
-    const ProceduralGeometryCache&
-    RenderExtractionCache::State::GetProceduralGeometryCacheForTest()
-        const noexcept
-    {
-        return m_ProceduralGeometry;
-    }
-
     void RenderExtractionCache::State::SetMaterialTextureAssetBindings(
         const std::uint32_t stableEntityId,
         Graphics::MaterialTextureAssetBindings bindings)
@@ -1018,29 +1011,29 @@ namespace Extrinsic::Runtime
         Graphics::IRenderer& renderer,
         RuntimeRenderExtractionStats& stats)
     {
-        const bool packerSupportsKind =
+        const bool builderSupportsKind =
             ref.Kind ==
             ECS::Components::ProceduralGeometryKind::Triangle;
-        if (!packerSupportsKind)
+        if (!builderSupportsKind)
         {
             ++stats.ProceduralGeometryMissingPacker;
             return false;
         }
 
-        const ProceduralGeometryKey key =
-            MakeProceduralGeometryKey(ref.Kind, ref.Params);
+        const std::uint64_t paramsHash =
+            HashProceduralGeometryParams(ref.Params);
         const std::uint64_t residencyIdentity =
-            key.ParamsHash == 0u ? 1u : key.ParamsHash;
+            paramsHash == 0u ? 1u : paramsHash;
         const Graphics::GeometryResidencyKey residencyKey =
             BuildRenderExtractionGeometryResidencyKey(
                 RenderExtractionGeometryResidencyKind::Procedural,
                 residencyIdentity,
-                static_cast<std::uint32_t>(key.Kind) + 1u);
+                static_cast<std::uint32_t>(ref.Kind) + 1u);
 
         // A sidecar already owns exactly one reference. Rebinding the same
         // procedural source every frame must not acquire repeatedly.
         if (sidecar.ProceduralKey.has_value()
-            && *sidecar.ProceduralKey == key)
+            && *sidecar.ProceduralKey == residencyKey)
         {
             const auto resident =
                 EnsureGeometryResidency(renderer).Find(residencyKey);
@@ -1058,21 +1051,27 @@ namespace Extrinsic::Runtime
         }
 
         if (sidecar.ProceduralKey.has_value()
-            && *sidecar.ProceduralKey != key)
+            && *sidecar.ProceduralKey != residencyKey)
         {
-            const ProceduralGeometryKey previous = *sidecar.ProceduralKey;
-            (void)ReleaseGeometryResidency(
-                BuildRenderExtractionGeometryResidencyKey(
-                    RenderExtractionGeometryResidencyKind::Procedural,
-                    previous.ParamsHash == 0u ? 1u : previous.ParamsHash,
-                    static_cast<std::uint32_t>(previous.Kind) + 1u));
+            (void)ReleaseGeometryResidency(*sidecar.ProceduralKey);
             ++stats.ProceduralGeometryReleases;
             sidecar.ProceduralKey.reset();
         }
 
-        const std::optional<Graphics::GpuWorld::GeometryUploadDesc> packed =
-            Pack(ref.Kind, ref.Params, m_ProceduralPack);
-        if (!packed.has_value())
+        const std::optional<Graphics::GeometryUploadPlan> plan =
+            BuildProceduralGeometryPlan(
+                ref.Kind,
+                ref.Params,
+                GeometryPlanBuildRequest{
+                    .Key = residencyKey,
+                    .Generation = residencyIdentity,
+                    .UpdateClass = Graphics::GeometryUploadUpdateClass::
+                        FullReplacement,
+                    .StorageHint = Graphics::GpuWorld::GeometryStorageHint::
+                        StaticPreferInterleavedAoS,
+                },
+                m_ProceduralPack);
+        if (!plan.has_value())
         {
             ++stats.ProceduralGeometryInvalidParams;
             return false;
@@ -1081,16 +1080,8 @@ namespace Extrinsic::Runtime
         Graphics::GeometryResidencyCoordinator& coordinator =
             EnsureGeometryResidency(renderer);
         const Graphics::GeometryResidencyStats before = coordinator.Stats();
-        const Graphics::GeometryUploadPlan plan =
-            Graphics::MakeGeometryUploadPlan(
-                residencyKey,
-                residencyIdentity,
-                *packed,
-                Graphics::GeometryUploadUpdateClass::FullReplacement,
-                {},
-                Graphics::GpuWorld::GeometryStorageHint::StaticPreferInterleavedAoS);
         const Graphics::GeometryResidencyResult residency =
-            coordinator.Acquire(plan);
+            coordinator.Acquire(*plan);
         if (!residency.Succeeded())
         {
             if (residency.Status ==
@@ -1118,7 +1109,7 @@ namespace Extrinsic::Runtime
                 - before.RetireCancellations);
 
         sidecar.Geometry = residency.Handle;
-        sidecar.ProceduralKey = key;
+        sidecar.ProceduralKey = residencyKey;
         sidecar.GpuSlot.SetGeometryHandle(residency.Handle);
         sidecar.GpuSlot.ClearSourceAsset();
         renderer.GetGpuWorld().SetInstanceGeometry(
@@ -1228,13 +1219,8 @@ namespace Extrinsic::Runtime
 
             if (it->second.ProceduralKey.has_value())
             {
-                const ProceduralGeometryKey key =
-                    *it->second.ProceduralKey;
                 (void)ReleaseGeometryResidency(
-                    BuildRenderExtractionGeometryResidencyKey(
-                        RenderExtractionGeometryResidencyKind::Procedural,
-                        key.ParamsHash == 0u ? 1u : key.ParamsHash,
-                        static_cast<std::uint32_t>(key.Kind) + 1u));
+                    *it->second.ProceduralKey);
                 ++stats.ProceduralGeometryReleases;
             }
             if (it->second.MeshGeometry.IsValid())

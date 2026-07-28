@@ -1966,3 +1966,98 @@ TEST(RuntimeEngineLayering, NoDuplicateGeometryPropertyVocabularyRemains)
     EXPECT_NE(serialization.find("kPropertyValueKindWire"), std::string::npos);
     EXPECT_NE(serialization.find("kPropertyDomainWire"), std::string::npos);
 }
+
+// RUNTIME-197 — one graphics-owned upload-plan/residency lifecycle. Runtime
+// keeps typed topology adapters private and exposes only truthful topology and
+// authoring value modules.
+TEST(RuntimeEngineLayering,
+     RetiredGeometryPackerAndLifecycleSurfacesStayDeleted)
+{
+    const std::filesystem::path root = RepoRoot();
+    const std::array<std::filesystem::path, 17u> retiredFiles{
+        root / "src/runtime/Runtime.MeshGeometryPacker.cppm",
+        root / "src/runtime/Runtime.MeshGeometryPacker.cpp",
+        root / "src/runtime/Runtime.GraphGeometryPacker.cppm",
+        root / "src/runtime/Runtime.GraphGeometryPacker.cpp",
+        root / "src/runtime/Runtime.PointCloudGeometryPacker.cppm",
+        root / "src/runtime/Runtime.PointCloudGeometryPacker.cpp",
+        root / "src/runtime/Runtime.ProceduralGeometryPacker.cppm",
+        root / "src/runtime/Runtime.ProceduralGeometryPacker.cpp",
+        root / "src/runtime/Runtime.MeshPrimitiveViewPacker.cppm",
+        root / "src/runtime/Runtime.MeshPrimitiveViewPacker.cpp",
+        root / "src/runtime/Runtime.ProceduralGeometry.cppm",
+        root / "src/runtime/Runtime.ProceduralGeometry.cpp",
+        root / "tests/contract/runtime/Test.MeshGeometryPacker.cpp",
+        root / "tests/contract/runtime/Test.GraphGeometryPacker.cpp",
+        root / "tests/contract/runtime/Test.PointCloudGeometryPacker.cpp",
+        root / "tests/contract/runtime/Test.MeshPrimitiveViewPacker.cpp",
+        root / "tests/contract/runtime/Test.ProceduralGeometryCache.cpp",
+    };
+    for (const auto& path : retiredFiles)
+        EXPECT_FALSE(std::filesystem::exists(path)) << path.string();
+
+    const std::array<std::string_view, 12u> retiredSymbols{
+        "Extrinsic.Runtime.MeshGeometryPacker",
+        "Extrinsic.Runtime.GraphGeometryPacker",
+        "Extrinsic.Runtime.PointCloudGeometryPacker",
+        "Extrinsic.Runtime.ProceduralGeometryPacker",
+        "Extrinsic.Runtime.MeshPrimitiveViewPacker",
+        "ProceduralGeometryCache",
+        "GetProceduralGeometryCacheForTest",
+        "TickProceduralGeometry",
+        "TickMeshGeometry",
+        "TickGraphGeometry",
+        "TickPointCloudGeometry",
+        "TickMeshPrimitiveViewGeometry",
+    };
+    const std::filesystem::path runtimeRoot = root / "src/runtime";
+    for (const auto& entry :
+         std::filesystem::recursive_directory_iterator(runtimeRoot))
+    {
+        if (!entry.is_regular_file())
+            continue;
+        const std::string extension = entry.path().extension().string();
+        if (extension != ".cpp" && extension != ".cppm")
+            continue;
+
+        const std::string content = ReadFile(entry.path());
+        for (const std::string_view retired : retiredSymbols)
+        {
+            EXPECT_EQ(content.find(retired), std::string::npos)
+                << entry.path().string() << " still names " << retired;
+        }
+        EXPECT_EQ(content.find(".UploadGeometry("), std::string::npos)
+            << entry.path().string();
+        EXPECT_EQ(content.find(".UpdateGeometryChannels("), std::string::npos)
+            << entry.path().string();
+        EXPECT_EQ(content.find(".FreeGeometry("), std::string::npos)
+            << entry.path().string();
+    }
+
+    const std::string runtimeCMake =
+        ReadFile(root / "src/runtime/CMakeLists.txt");
+    const std::size_t privateModules = runtimeCMake.find(
+        "FILE_SET render_extraction_impl TYPE CXX_MODULES FILES");
+    const std::size_t privateBuilders =
+        runtimeCMake.find("Runtime.GeometryPlanBuilders.cppm");
+    ASSERT_NE(privateModules, std::string::npos);
+    ASSERT_NE(privateBuilders, std::string::npos);
+    EXPECT_LT(privateModules, privateBuilders);
+    EXPECT_NE(runtimeCMake.find("Runtime.MeshSurfaceTopology.cppm"),
+              std::string::npos);
+    EXPECT_NE(runtimeCMake.find("Runtime.MeshPrimitiveView.cppm"),
+              std::string::npos);
+
+    const std::string extraction =
+        ReadFile(root / "src/runtime/Runtime.RenderExtraction.cppm");
+    EXPECT_EQ(CountOccurrences(extraction, "void TickGeometryResidency("), 1u);
+
+    const std::string channelBindings =
+        ReadFile(root / "src/runtime/Runtime.VertexChannelBindings.cppm");
+    EXPECT_NE(channelBindings.find("GeometryPropertyRef Property"),
+              std::string::npos);
+    EXPECT_EQ(channelBindings.find("AttributeSourceType SourceType"),
+              std::string::npos);
+    EXPECT_EQ(channelBindings.find("std::string SourceProperty"),
+              std::string::npos);
+}

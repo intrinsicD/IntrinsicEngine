@@ -101,7 +101,7 @@ import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
-import Extrinsic.Runtime.MeshGeometryPacker;
+import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -5048,19 +5048,19 @@ SnapshotRuntime129LiveBakeMesh(
 
     std::vector<std::uint32_t> surfaceIndices{};
     std::vector<std::uint32_t> triangleToFace{};
-    const RT::MeshPackStatus topologyStatus =
-        RT::BuildSurfaceTriangleTopology(
+    const RT::MeshSurfaceTopologyStatus topologyStatus =
+        RT::BuildMeshSurfaceTriangleTopology(
             view,
             surfaceIndices,
             triangleToFace);
-    if (topologyStatus != RT::MeshPackStatus::Success ||
+    if (topologyStatus != RT::MeshSurfaceTopologyStatus::Success ||
         surfaceIndices.empty() ||
         surfaceIndices.size() % 3u != 0u)
     {
         snapshot.Diagnostic =
             std::string{
                 "target canonical topology could not be reconstructed: "} +
-            RT::DebugNameForMeshPackStatus(topologyStatus);
+            RT::DebugNameForMeshSurfaceTopologyStatus(topologyStatus);
         return snapshot;
     }
 

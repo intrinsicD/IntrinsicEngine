@@ -265,8 +265,6 @@ if(TARGET ExtrinsicRuntime)
         Test.ImGuiAdapterEngineWiring.cpp
         Test.MeshGeometryExtraction.cpp
         Test.MeshAttributeTextureBake.cpp
-        Test.MeshGeometryPacker.cpp
-        Test.MeshPrimitiveViewPacker.cpp
         Test.MeshPrimitiveViewExtraction.cpp
         Test.ObjectSpaceNormalBakeService.cpp
         Test.ObjectSpaceNormalBakeQueue.cpp
@@ -277,15 +275,12 @@ if(TARGET ExtrinsicRuntime)
         Test.GizmoInteraction.cpp
         Test.GizmoInteractionEngineWiring.cpp
         Test.GraphGeometryExtraction.cpp
-        Test.GraphGeometryPacker.cpp
         Test.GeometryAvailability.cpp
         Test.GeometryPresentation.cpp
         Test.PointCloudGeometryExtraction.cpp
-        Test.PointCloudGeometryPacker.cpp
         Test.ParameterizationFacade.cpp
         Test.PrimitiveSelectionRefinement.cpp
         Test.PrimitiveSelectionRefinementWiring.cpp
-        Test.ProceduralGeometryCache.cpp
         Test.ProceduralGeometryExtraction.cpp
         Test.CameraModule.cpp
         Test.RuntimeCameraControllers.cpp

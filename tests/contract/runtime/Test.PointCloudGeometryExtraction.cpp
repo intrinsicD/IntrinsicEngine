@@ -7,6 +7,8 @@
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
 
+#include "GeometryResidencyFingerprint.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
@@ -135,7 +137,7 @@ TEST(PointCloudGeometryExtraction, CloudUploadsOnceAndBindsInstanceGeometry)
     EXPECT_FALSE(view->HasMeshResidency);
     EXPECT_FALSE(view->HasGraphResidency);
     EXPECT_EQ(view->PointCloudGeometry, view->Geometry);
-    EXPECT_FALSE(view->ProceduralKey.has_value());
+    EXPECT_FALSE(view->HasProceduralResidency);
     EXPECT_FALSE(view->HasSourceAsset);
     EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->Instance), view->Geometry);
 
@@ -154,6 +156,27 @@ TEST(PointCloudGeometryExtraction, CloudUploadsOnceAndBindsInstanceGeometry)
     EXPECT_FALSE(gpuAvailability->HasPositionsBuffer);
     EXPECT_FALSE(gpuAvailability->HasEdgesBuffer);
     EXPECT_FALSE(gpuAvailability->HasSizesBuffer);
+
+    Extrinsic::Graphics::GpuGeometryResidencyView residency{};
+    ASSERT_TRUE(gpuWorld.TryGetGeometryResidencyView(
+        view->PointCloudGeometry, residency));
+    EXPECT_EQ(residency.VertexCount, 3u);
+    EXPECT_EQ(residency.SurfaceIndexCount, 0u);
+    EXPECT_EQ(residency.Record.LineIndexCount, 0u);
+    EXPECT_EQ(residency.PositionByteCount, sizeof(float) * 9u);
+    EXPECT_EQ(residency.TexcoordByteCount, sizeof(float) * 6u);
+    EXPECT_EQ(residency.NormalByteCount, 0u);
+    EXPECT_EQ(residency.PositionFingerprint,
+              Extrinsic::Tests::GeometryFloat32Fingerprint(
+                  {0.0f, 0.0f, 0.0f,
+                   1.0f, 0.0f, 0.0f,
+                   0.0f, 1.0f, 0.0f}));
+    EXPECT_EQ(residency.TexcoordFingerprint,
+              Extrinsic::Tests::GeometryFloat32Fingerprint(
+                  {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}));
+    EXPECT_EQ(residency.NormalFingerprint, 0u);
+    EXPECT_EQ(residency.StorageLane,
+              Extrinsic::Graphics::GpuWorld::GeometryStorageLane::UniformSoA);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
@@ -298,7 +321,7 @@ TEST(PointCloudGeometryExtraction, EntityDestructionRetiresPointCloudGeometryAft
     EXPECT_EQ(stats.PointCloudGeometryReleases, 1u);
     EXPECT_EQ(stats.PointCloudGeometryFreeRetires, 0u);
     // Release is deferred through the framesInFlight window; the upload is
-    // still live until TickPointCloudGeometry fires past the deadline.
+    // still live until TickGeometryResidency fires past the deadline.
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
     EXPECT_EQ(gpuWorld.GetLiveInstanceCount(), 0u);
 
@@ -306,7 +329,7 @@ TEST(PointCloudGeometryExtraction, EntityDestructionRetiresPointCloudGeometryAft
     constexpr std::uint64_t baseFrame = 200u;
     for (std::uint32_t i = 0; i <= framesInFlight; ++i)
     {
-        extraction.TickPointCloudGeometry(baseFrame + i, framesInFlight, engine.GetRenderer());
+        extraction.TickGeometryResidency(baseFrame + i, framesInFlight, engine.GetRenderer());
         if (i < framesInFlight)
         {
             EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
@@ -411,7 +434,7 @@ TEST(PointCloudGeometryExtraction, ProceduralRefPreemptsPointCloudPathOnSameEnti
         Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasPointCloudResidency);
-    EXPECT_TRUE(view->ProceduralKey.has_value());
+    EXPECT_TRUE(view->HasProceduralResidency);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
@@ -561,7 +584,7 @@ TEST(PointCloudGeometryExtraction, AddingProceduralRefAfterUploadReleasesPointCl
         Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasPointCloudResidency);
-    ASSERT_TRUE(view->ProceduralKey.has_value());
+    ASSERT_TRUE(view->HasProceduralResidency);
     // Instance bound to the procedural handle, not the queued point-cloud slot.
     EXPECT_TRUE(view->Geometry.IsValid());
     EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->Instance), view->Geometry);
@@ -573,7 +596,7 @@ TEST(PointCloudGeometryExtraction, AddingProceduralRefAfterUploadReleasesPointCl
     constexpr std::uint64_t baseFrame = 400u;
     for (std::uint32_t i = 0; i <= framesInFlight; ++i)
     {
-        extraction.TickPointCloudGeometry(baseFrame + i, framesInFlight, engine.GetRenderer());
+        extraction.TickGeometryResidency(baseFrame + i, framesInFlight, engine.GetRenderer());
     }
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
     stats = extraction.ExtractAndSubmit(scene,
@@ -638,7 +661,7 @@ TEST(PointCloudGeometryExtraction, LosingPointHintReleasesPointCloudResidency)
     constexpr std::uint64_t baseFrame = 600u;
     for (std::uint32_t i = 0; i <= framesInFlight; ++i)
     {
-        extraction.TickPointCloudGeometry(baseFrame + i, framesInFlight, engine.GetRenderer());
+        extraction.TickGeometryResidency(baseFrame + i, framesInFlight, engine.GetRenderer());
     }
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 0u);
 
@@ -731,7 +754,7 @@ namespace
     {
         for (std::uint32_t i = 0; i <= framesInFlight; ++i)
         {
-            extraction.TickPointCloudGeometry(baseFrame + i, framesInFlight, renderer);
+            extraction.TickGeometryResidency(baseFrame + i, framesInFlight, renderer);
         }
     }
 }
@@ -934,7 +957,7 @@ TEST(PointCloudGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPrese
     ASSERT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 
     // Corrupt a point position to non-finite, then mark vertex positions dirty
-    // so the next PackCloud returns NonFinitePosition.
+    // so the next point-cloud plan build returns NonFinitePosition.
     auto& vertices = raw.get<gs::Vertices>(entity);
     SetPositions(vertices, {
         {0.0f, 0.0f, 0.0f},

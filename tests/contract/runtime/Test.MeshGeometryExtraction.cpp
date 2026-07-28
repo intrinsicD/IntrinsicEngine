@@ -10,6 +10,8 @@
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
 
+#include "GeometryResidencyFingerprint.hpp"
+
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Components.AssetInstance;
@@ -230,9 +232,36 @@ TEST(MeshGeometryExtraction, SingleMeshEntityUploadsOnceAndBindsInstanceGeometry
     EXPECT_TRUE(view->Geometry.IsValid());
     EXPECT_TRUE(view->HasMeshResidency);
     EXPECT_EQ(view->MeshGeometry, view->Geometry);
-    EXPECT_FALSE(view->ProceduralKey.has_value());
+    EXPECT_FALSE(view->HasProceduralResidency);
     EXPECT_FALSE(view->HasSourceAsset);
     EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->Instance), view->Geometry);
+
+    Extrinsic::Graphics::GpuGeometryResidencyView residency{};
+    ASSERT_TRUE(gpuWorld.TryGetGeometryResidencyView(
+        view->MeshGeometry, residency));
+    EXPECT_EQ(residency.VertexCount, 3u);
+    EXPECT_EQ(residency.SurfaceIndexCount, 3u);
+    EXPECT_EQ(residency.Record.LineIndexCount, 0u);
+    EXPECT_EQ(residency.PositionByteCount, sizeof(float) * 9u);
+    EXPECT_EQ(residency.TexcoordByteCount, sizeof(float) * 6u);
+    EXPECT_EQ(residency.NormalByteCount, sizeof(float) * 9u);
+    EXPECT_EQ(residency.PositionFingerprint,
+              Extrinsic::Tests::GeometryFloat32Fingerprint(
+                  {0.0f, 0.0f, 0.0f,
+                   1.0f, 0.0f, 0.0f,
+                   0.0f, 1.0f, 0.0f}));
+    EXPECT_EQ(residency.TexcoordFingerprint,
+              Extrinsic::Tests::GeometryFloat32Fingerprint(
+                  {0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f}));
+    EXPECT_EQ(residency.NormalFingerprint,
+              Extrinsic::Tests::GeometryFloat32Fingerprint(
+                  {0.0f, 0.0f, 1.0f,
+                   0.0f, 0.0f, 1.0f,
+                   0.0f, 0.0f, 1.0f}));
+    EXPECT_EQ(residency.SurfaceIndexFingerprint,
+              Extrinsic::Tests::GeometryUint32Fingerprint({1u, 2u, 0u}));
+    EXPECT_EQ(residency.StorageLane,
+              Extrinsic::Graphics::GpuWorld::GeometryStorageLane::UniformSoA);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
@@ -530,8 +559,8 @@ TEST(MeshGeometryExtraction, TwoMeshEntitiesAllocateIndependentMeshUploads)
                                                     engine.GetRenderer(),
                                                     &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
 
-    // Slice B does not share mesh uploads across entities; that is the
-    // procedural cache's pattern, not the runtime mesh bridge's.
+    // Mesh residency remains per entity; procedural plans may intentionally
+    // share a stable residency key.
     EXPECT_EQ(stats.CandidateRenderableCount, 2u);
     EXPECT_EQ(stats.AllocatedInstanceCount, 2u);
     EXPECT_EQ(stats.MeshGeometryUploads, 2u);
@@ -570,9 +599,9 @@ TEST(MeshGeometryExtraction, EntityDestructionRetiresMeshGeometryAfterDeferredWi
     EXPECT_EQ(stats.FreedInstanceCount, 1u);
     EXPECT_EQ(stats.MeshGeometryReleases, 1u);
     EXPECT_EQ(stats.MeshGeometryFreeRetires, 0u);
-    // Slice C — release is deferred through the same framesInFlight
-    // window the procedural cache uses; the upload is still live until
-    // TickMeshGeometry fires past the deadline.
+    // Release is deferred through the coordinator's framesInFlight window;
+    // the upload is still live until
+    // TickGeometryResidency fires past the deadline.
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
     EXPECT_EQ(gpuWorld.GetLiveInstanceCount(), 0u);
 
@@ -580,7 +609,7 @@ TEST(MeshGeometryExtraction, EntityDestructionRetiresMeshGeometryAfterDeferredWi
     constexpr std::uint64_t baseFrame = 200u;
     for (std::uint32_t i = 0; i <= framesInFlight; ++i)
     {
-        extraction.TickMeshGeometry(baseFrame + i, framesInFlight, engine.GetRenderer());
+        extraction.TickGeometryResidency(baseFrame + i, framesInFlight, engine.GetRenderer());
         if (i < framesInFlight)
         {
             EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
@@ -656,7 +685,7 @@ TEST(MeshGeometryExtraction, ProceduralRefPreemptsMeshPathOnSameEntity)
         Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasMeshResidency);
-    EXPECT_TRUE(view->ProceduralKey.has_value());
+    EXPECT_TRUE(view->HasProceduralResidency);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
@@ -711,7 +740,7 @@ TEST(MeshGeometryExtraction, MissingPositionsIncrementsMissingPositionsCounter)
     raw.emplace<G::RenderSurface>(entity);
 
     // Mesh-domain GeometrySources but the Vertices PropertySet carries no
-    // `v:position` — the packer must report `MissingPositions` and the
+    // `v:position` — the plan builder must report `MissingPositions` and the
     // extraction layer must fold that into the dedicated counter rather
     // than the generic `FailedPack`.
     auto& vertices = raw.emplace<gs::Vertices>(entity);
@@ -885,7 +914,7 @@ TEST(MeshGeometryExtraction, DegenerateAllFacesIncrementsFailedPackCounter)
                  /*next*/     {1u, 2u, 0u},
                  /*face*/     {0u, 0u, 0u});
     auto& faces = raw.emplace<gs::Faces>(entity);
-    // Every face slot points at an invalid halfedge sentinel → packer
+    // Every face slot points at an invalid halfedge sentinel → the mesh adapter
     // walks no rings and returns `DegenerateAllFaces`, which Slice B
     // folds into the generic `FailedPack` bucket.
     SetFaces(faces, {kInvalidIndex, kInvalidIndex});
@@ -943,12 +972,12 @@ TEST(MeshGeometryExtraction, AddingProceduralRefAfterMeshUploadReleasesMeshResid
         Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasMeshResidency);
-    ASSERT_TRUE(view->ProceduralKey.has_value());
+    ASSERT_TRUE(view->HasProceduralResidency);
     // Instance is bound to the procedural handle, not the queued mesh slot.
     EXPECT_TRUE(view->Geometry.IsValid());
     EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->Instance), view->Geometry);
     // Slice C — the old mesh slot is queued for deferred retire and
-    // remains live until TickMeshGeometry fires past the deadline. So
+    // remains live until TickGeometryResidency fires past the deadline. So
     // both the procedural slot AND the queued mesh slot are live now.
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 2u);
 
@@ -956,7 +985,7 @@ TEST(MeshGeometryExtraction, AddingProceduralRefAfterMeshUploadReleasesMeshResid
     constexpr std::uint64_t baseFrame = 400u;
     for (std::uint32_t i = 0; i <= framesInFlight; ++i)
     {
-        extraction.TickMeshGeometry(baseFrame + i, framesInFlight, engine.GetRenderer());
+        extraction.TickGeometryResidency(baseFrame + i, framesInFlight, engine.GetRenderer());
     }
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
     stats = extraction.ExtractAndSubmit(scene,
@@ -1008,7 +1037,7 @@ TEST(MeshGeometryExtraction, AddingAssetSourceAfterMeshUploadReleasesMeshResiden
     EXPECT_FALSE(view->HasMeshResidency);
     // Slice C — the instance is explicitly detached from the queued
     // mesh slot, but the slot itself is still live until
-    // TickMeshGeometry fires past the deadline.
+    // TickGeometryResidency fires past the deadline.
     EXPECT_FALSE(gpuWorld.GetInstanceGeometry(view->Instance).IsValid());
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 
@@ -1016,7 +1045,7 @@ TEST(MeshGeometryExtraction, AddingAssetSourceAfterMeshUploadReleasesMeshResiden
     constexpr std::uint64_t baseFrame = 500u;
     for (std::uint32_t i = 0; i <= framesInFlight; ++i)
     {
-        extraction.TickMeshGeometry(baseFrame + i, framesInFlight, engine.GetRenderer());
+        extraction.TickGeometryResidency(baseFrame + i, framesInFlight, engine.GetRenderer());
     }
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 0u);
     stats = extraction.ExtractAndSubmit(scene,
@@ -1076,7 +1105,7 @@ TEST(MeshGeometryExtraction, LosingMeshDomainTopologyReleasesMeshResidency)
     constexpr std::uint64_t baseFrame = 600u;
     for (std::uint32_t i = 0; i <= framesInFlight; ++i)
     {
-        extraction.TickMeshGeometry(baseFrame + i, framesInFlight, engine.GetRenderer());
+        extraction.TickGeometryResidency(baseFrame + i, framesInFlight, engine.GetRenderer());
     }
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 0u);
 
@@ -1133,7 +1162,7 @@ namespace
     {
         for (std::uint32_t i = 0; i <= framesInFlight; ++i)
         {
-            extraction.TickMeshGeometry(baseFrame + i, framesInFlight, renderer);
+            extraction.TickGeometryResidency(baseFrame + i, framesInFlight, renderer);
         }
     }
 }

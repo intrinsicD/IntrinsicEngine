@@ -49,15 +49,10 @@ import Extrinsic.Graphics.Component.Material;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.RHI.Types;
-import Extrinsic.Runtime.GraphGeometryPacker;
+import Extrinsic.Runtime.GeometryPlanBuilders;
 import Extrinsic.Runtime.GeometryAvailability;
-import Extrinsic.Runtime.MeshGeometryPacker;
-import Extrinsic.Runtime.PointCloudGeometryPacker;
-import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.StableEntityLookup;
-import Extrinsic.Runtime.ProceduralGeometry;
-import Extrinsic.Runtime.ProceduralGeometryPacker;
 import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.VisualizationAdapters;
 import Extrinsic.Runtime.VertexChannelBindings;
@@ -102,46 +97,6 @@ namespace Extrinsic::Runtime
     void RenderExtractionCache::Shutdown(Graphics::IRenderer& renderer)
     {
         m_State->Shutdown(renderer);
-    }
-
-    void RenderExtractionCache::TickProceduralGeometry(
-        const std::uint64_t currentFrame,
-        const std::uint32_t framesInFlight,
-        Graphics::IRenderer& renderer)
-    {
-        m_State->TickGeometryResidency(currentFrame, framesInFlight, renderer);
-    }
-
-    void RenderExtractionCache::TickMeshGeometry(
-        const std::uint64_t currentFrame,
-        const std::uint32_t framesInFlight,
-        Graphics::IRenderer& renderer)
-    {
-        m_State->TickGeometryResidency(currentFrame, framesInFlight, renderer);
-    }
-
-    void RenderExtractionCache::TickGraphGeometry(
-        const std::uint64_t currentFrame,
-        const std::uint32_t framesInFlight,
-        Graphics::IRenderer& renderer)
-    {
-        m_State->TickGeometryResidency(currentFrame, framesInFlight, renderer);
-    }
-
-    void RenderExtractionCache::TickPointCloudGeometry(
-        const std::uint64_t currentFrame,
-        const std::uint32_t framesInFlight,
-        Graphics::IRenderer& renderer)
-    {
-        m_State->TickGeometryResidency(currentFrame, framesInFlight, renderer);
-    }
-
-    void RenderExtractionCache::TickMeshPrimitiveViewGeometry(
-        const std::uint64_t currentFrame,
-        const std::uint32_t framesInFlight,
-        Graphics::IRenderer& renderer)
-    {
-        m_State->TickGeometryResidency(currentFrame, framesInFlight, renderer);
     }
 
     void RenderExtractionCache::TickGeometryResidency(
@@ -205,12 +160,6 @@ namespace Extrinsic::Runtime
         const std::uint32_t stableEntityId) const noexcept
     {
         return m_State->FindGpuRenderableAvailability(stableEntityId);
-    }
-
-    const ProceduralGeometryCache&
-    RenderExtractionCache::GetProceduralGeometryCacheForTest() const noexcept
-    {
-        return m_State->GetProceduralGeometryCacheForTest();
     }
 
     void RenderExtractionCache::RegisterVisualizationAdapter(
@@ -1785,12 +1734,7 @@ namespace Extrinsic::Runtime
         // binding is no longer authoritative or fails closed.
         if (!proceduralBound && sidecar->ProceduralKey.has_value())
         {
-            const ProceduralGeometryKey key = *sidecar->ProceduralKey;
-            (void)ReleaseGeometryResidency(
-                BuildRenderExtractionGeometryResidencyKey(
-                    RenderExtractionGeometryResidencyKind::Procedural,
-                    key.ParamsHash == 0u ? 1u : key.ParamsHash,
-                    static_cast<std::uint32_t>(key.Kind) + 1u));
+            (void)ReleaseGeometryResidency(*sidecar->ProceduralKey);
             sidecar->ProceduralKey.reset();
             ++stats.ProceduralGeometryReleases;
             if (!meshBoundThisFrame && !graphBoundThisFrame
@@ -1809,8 +1753,8 @@ namespace Extrinsic::Runtime
         // frame but the entity no longer selects the mesh source this
         // frame (gained `ProceduralGeometryRef` / `AssetInstance::Source`,
         // or lost mesh-domain `GeometrySources` topology), enqueue the
-        // cached upload for the same `framesInFlight` deferred-retire
-        // window the procedural cache uses and increment
+        // resident upload for the coordinator's `framesInFlight`
+        // deferred-retire window and increment
         // `MeshGeometryReleases`. When no other path re-bound the
         // instance this frame, detach the instance from the queued
         // mesh slot explicitly so the instance does not observe a
@@ -1850,7 +1794,7 @@ namespace Extrinsic::Runtime
         // RUNTIME-086 Slice B — graph-residency eligibility flip, mirroring
         // the mesh release above. Fires when a previously-uploaded graph
         // entity gains a procedural/asset source, loses graph-domain
-        // topology, or flips to mesh domain. A transient pack failure on a
+        // topology, or flips to mesh domain. A transient plan-build failure on a
         // still-graph-domain entity does NOT release (old residency stays
         // bound), matching the dirty-reupload fail-closed contract.
         const bool stillGraphAttached =
@@ -1879,7 +1823,7 @@ namespace Extrinsic::Runtime
         // the mesh/graph releases above. Fires when a previously-uploaded
         // point-cloud entity gains a procedural/asset source, loses
         // point-cloud-domain topology, or flips to mesh/graph domain. A
-        // transient pack failure on a still-point-cloud-domain entity does
+        // transient plan-build failure on a still-point-cloud-domain entity does
         // NOT release (old residency stays bound), matching the
         // dirty-reupload fail-closed contract.
         const bool stillPointCloudAttached =
@@ -2207,31 +2151,23 @@ namespace Extrinsic::Runtime
             m_ProceduralFreeRetires - m_PrevProceduralFreeRetires;
         m_PrevProceduralFreeRetires = m_ProceduralFreeRetires;
 
-        // RUNTIME-085 Slice C — mesh deferred-retire FreeRetires delta is
-        // surfaced via the same release/tick cadence the procedural cache
-        // uses. The releases-this-frame counter is folded inline
-        // (`stats.MeshGeometryReleases` is bumped on each enqueue or
-        // reupload), so only the actual-free count needs the snapshot
-        // diff here.
+        // Domain releases are recorded inline at coordinator calls; only the
+        // actual-free totals need snapshot diffs after the common maintenance
+        // tick.
         stats.MeshGeometryFreeRetires =
             m_MeshFreeRetires - m_PrevMeshFreeRetires;
         m_PrevMeshFreeRetires = m_MeshFreeRetires;
 
-        // RUNTIME-086 Slice B — graph deferred-retire FreeRetires delta,
-        // mirroring the mesh accounting above.
         stats.GraphGeometryFreeRetires =
             m_GraphFreeRetires - m_PrevGraphFreeRetires;
         m_PrevGraphFreeRetires = m_GraphFreeRetires;
 
-        // RUNTIME-087 — point-cloud deferred-retire FreeRetires delta,
-        // mirroring the graph accounting above.
         stats.PointCloudGeometryFreeRetires =
             m_PointCloudFreeRetires - m_PrevPointCloudFreeRetires;
         m_PrevPointCloudFreeRetires = m_PointCloudFreeRetires;
 
-        // RUNTIME-088 Slice B — mesh-primitive-view deferred-retire FreeRetires
-        // delta, mirroring the per-domain accounting above. Edge and vertex
-        // view frees share this one counter (one retire queue, one tick).
+        // Edge and vertex view frees share one diagnostic counter because both
+        // use the mesh-primitive-view namespace in the common coordinator.
         stats.MeshPrimitiveViewFreeRetires =
             m_MeshPrimitiveViewFreeRetires - m_PrevMeshPrimitiveViewFreeRetires;
         m_PrevMeshPrimitiveViewFreeRetires = m_MeshPrimitiveViewFreeRetires;

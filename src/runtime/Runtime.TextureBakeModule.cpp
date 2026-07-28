@@ -45,7 +45,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
-import Extrinsic.Runtime.MeshGeometryPacker;
+import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeService;
 import Extrinsic.Runtime.GeometryPresentation;
@@ -714,17 +714,17 @@ namespace Extrinsic::Runtime
             }
 
             std::vector<std::uint32_t> triangleToFace{};
-            const MeshPackStatus topology = BuildSurfaceTriangleTopology(
+            const MeshSurfaceTopologyStatus topology = BuildMeshSurfaceTriangleTopology(
                 view,
                 prepared.SurfaceIndices,
                 triangleToFace);
-            if (topology != MeshPackStatus::Success ||
+            if (topology != MeshSurfaceTopologyStatus::Success ||
                 prepared.SurfaceIndices.empty() ||
                 (prepared.SurfaceIndices.size() % 3u) != 0u)
             {
                 return PrepareFailure(
                     SelectedMeshTextureBakeStatus::BakeFailed,
-                    DebugNameForMeshPackStatus(topology));
+                    DebugNameForMeshSurfaceTopologyStatus(topology));
             }
             prepared.SurfaceIndexFingerprint =
                 FingerprintIndices(prepared.SurfaceIndices);

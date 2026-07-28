@@ -11,10 +11,12 @@ module;
 
 #include <glm/glm.hpp>
 
-module Extrinsic.Runtime.GraphGeometryPacker;
+module Extrinsic.Runtime.GeometryPlanBuilders;
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.GeometryResidency;
+import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.VertexChannelStreams;
@@ -26,10 +28,12 @@ namespace Extrinsic::Runtime
     {
         constexpr const char* kGraphDebugName = "Runtime.Graph";
 
-        [[nodiscard]] GraphPackResult Failure(GraphPackStatus status, GraphPackBuffer& outBuffer) noexcept
+        [[nodiscard]] GraphPlanBuildResult Failure(
+            GraphPackStatus status,
+            GraphPackBuffer& outBuffer) noexcept
         {
             outBuffer.Clear();
-            return GraphPackResult{status, std::nullopt};
+            return GraphPlanBuildResult{status, std::nullopt};
         }
 
         [[nodiscard]] bool IsFinite(const glm::vec3& p) noexcept
@@ -62,20 +66,23 @@ namespace Extrinsic::Runtime
         LineIndices.clear();
     }
 
-    GraphPackResult PackGraph(
+    GraphPlanBuildResult BuildGraphGeometryPlan(
         const ECS::Components::GeometrySources::ConstSourceView& view,
         const bool wantLines,
         const bool wantPoints,
+        const GeometryPlanBuildRequest& request,
         GraphPackBuffer& outBuffer)
     {
-        return PackGraph(view, wantLines, wantPoints, nullptr, outBuffer);
+        return BuildGraphGeometryPlan(
+            view, wantLines, wantPoints, nullptr, request, outBuffer);
     }
 
-    GraphPackResult PackGraph(
+    GraphPlanBuildResult BuildGraphGeometryPlan(
         const ECS::Components::GeometrySources::ConstSourceView& view,
         const bool wantLines,
         const bool wantPoints,
         const VertexChannelBindingSet* channelBindings,
+        const GeometryPlanBuildRequest& request,
         GraphPackBuffer& outBuffer)
     {
         outBuffer.Clear();
@@ -176,11 +183,19 @@ namespace Extrinsic::Runtime
             std::span<const glm::vec2>{texcoords.data(), texcoords.size()});
         if (channelBindings != nullptr && IsVertexChannelBindingEnabled(channelBindings->Normal))
         {
+            const std::optional<AttributeSourceType> sourceType =
+                channelBindings->Normal.Property.Domain ==
+                        GeometryElementDomain::GraphNode
+                    ? ToAttributeSourceType(
+                          channelBindings->Normal.Property.ValueKind)
+                    : std::nullopt;
             std::vector<glm::vec3> normals(nodeCount);
             const VertexAttributeBinding normalBinding{
                 .Channel = VertexChannel::Normal,
-                .SourceType = channelBindings->Normal.SourceType,
-                .SourceProperty = std::string_view{channelBindings->Normal.SourceProperty},
+                .SourceType = sourceType.value_or(AttributeSourceType::Vec3),
+                .SourceProperty = sourceType == AttributeSourceType::Vec3
+                    ? std::string_view{channelBindings->Normal.Property.Name}
+                    : std::string_view{},
                 .AllowFallback = false,
                 .Normalize = true,
                 .Fallback = glm::vec4{0.0f, 0.0f, 1.0f, 0.0f},
@@ -201,31 +216,42 @@ namespace Extrinsic::Runtime
         }
         if (channelBindings != nullptr && IsVertexChannelBindingEnabled(channelBindings->Color))
         {
-            outBuffer.PackedColors.resize(nodeCount);
-            const VertexAttributeBinding colorBinding{
-                .Channel = VertexChannel::Color,
-                .SourceType = channelBindings->Color.SourceType,
-                .SourceProperty = std::string_view{channelBindings->Color.SourceProperty},
-                .AllowFallback = false,
-                .Normalize = false,
-                .Fallback = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
-            };
-            const AttributeBindResult colorResult =
-                ResolveColorChannelPackedUnorm8(
-                    view.NodeSource->Properties,
-                    colorBinding,
-                    nodeCountU32,
-                    outBuffer.PackedColors);
-            if (colorResult.Ok())
+            const std::optional<AttributeSourceType> sourceType =
+                channelBindings->Color.Property.Domain ==
+                        GeometryElementDomain::GraphNode
+                    ? ToAttributeSourceType(
+                          channelBindings->Color.Property.ValueKind)
+                    : std::nullopt;
+            if (sourceType == AttributeSourceType::Vec3 ||
+                sourceType == AttributeSourceType::Vec4)
             {
-                SetChannelPackedUnorm8(
-                    outBuffer.Channels,
-                    VertexChannel::Color,
-                    std::span<const std::uint32_t>{outBuffer.PackedColors});
-            }
-            else
-            {
-                outBuffer.PackedColors.clear();
+                outBuffer.PackedColors.resize(nodeCount);
+                const VertexAttributeBinding colorBinding{
+                    .Channel = VertexChannel::Color,
+                    .SourceType = *sourceType,
+                    .SourceProperty = std::string_view{
+                        channelBindings->Color.Property.Name},
+                    .AllowFallback = false,
+                    .Normalize = false,
+                    .Fallback = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
+                };
+                const AttributeBindResult colorResult =
+                    ResolveColorChannelPackedUnorm8(
+                        view.NodeSource->Properties,
+                        colorBinding,
+                        nodeCountU32,
+                        outBuffer.PackedColors);
+                if (colorResult.Ok())
+                {
+                    SetChannelPackedUnorm8(
+                        outBuffer.Channels,
+                        VertexChannel::Color,
+                        std::span<const std::uint32_t>{outBuffer.PackedColors});
+                }
+                else
+                {
+                    outBuffer.PackedColors.clear();
+                }
             }
         }
 
@@ -252,6 +278,15 @@ namespace Extrinsic::Runtime
         desc.LocalBounds.LocalSphere = glm::vec4{center, radius};
         desc.DebugName = kGraphDebugName;
 
-        return GraphPackResult{GraphPackStatus::Success, desc};
+        return GraphPlanBuildResult{
+            GraphPackStatus::Success,
+            Graphics::MakeGeometryUploadPlan(
+                request.Key,
+                request.Generation,
+                desc,
+                request.UpdateClass,
+                request.UpdateChannels,
+                request.StorageHint),
+        };
     }
 }

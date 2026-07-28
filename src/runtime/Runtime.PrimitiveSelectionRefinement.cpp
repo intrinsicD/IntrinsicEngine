@@ -16,7 +16,7 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.SelectionSystem;
-import Extrinsic.Runtime.MeshGeometryPacker;
+import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.Properties;
 
@@ -365,13 +365,13 @@ namespace Extrinsic::Runtime
                         return Reject(view, request, PrimitiveRefineStatus::MissingGeometrySource);
                     }
                     // A `Face` selection-id payload is the GPU per-draw triangle
-                    // index (`gl_PrimitiveID`), not a face row: `PackMesh`
+                    // index (`gl_PrimitiveID`), not a face row: surface extraction
                     // fan-triangulates each n-gon ring to (n - 2) triangles, so
                     // we must invert that emission order to recover the face.
-                    // `BuildSurfaceTriangleFaceMap` shares `PackMesh`'s walk, so
-                    // the table matches the surface draw exactly.
+                    // `BuildMeshSurfaceTriangleFaceMap` is the shared canonical
+                    // walk, so the table matches the surface draw exactly.
                     std::vector<std::uint32_t> triangleToFace;
-                    if (BuildSurfaceTriangleFaceMap(view, triangleToFace) != MeshPackStatus::Success)
+                    if (BuildMeshSurfaceTriangleFaceMap(view, triangleToFace) != MeshSurfaceTopologyStatus::Success)
                     {
                         return Reject(view, request, PrimitiveRefineStatus::InvalidPrimitivePayload);
                     }

@@ -34,7 +34,7 @@ import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
-import Extrinsic.Runtime.MeshPrimitiveViewPacker;
+import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.EcsSystemBundle;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxEditorFacades;

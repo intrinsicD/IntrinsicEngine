@@ -63,13 +63,9 @@ target_sources(${target_name}
         Gizmos/Runtime.GizmoFrameService.cppm
         Gizmos/Runtime.GizmoInteraction.cppm
         ImGui/Runtime.ImGuiAdapter.cppm
-        Runtime.GraphGeometryPacker.cppm
-        Runtime.MeshGeometryPacker.cppm
-        Runtime.MeshPrimitiveViewPacker.cppm
-        Runtime.PointCloudGeometryPacker.cppm
+        Runtime.MeshPrimitiveView.cppm
+        Runtime.MeshSurfaceTopology.cppm
         Runtime.PrimitiveSelectionRefinement.cppm
-        Runtime.ProceduralGeometry.cppm
-        Runtime.ProceduralGeometryPacker.cppm
         Runtime.ReferenceScene.cppm
         Runtime.RenderRecipeActivation.cppm
         Runtime.RenderExtraction.cppm
@@ -84,6 +80,7 @@ target_sources(${target_name}
         Visualization/Runtime.VisualizationAdapters.cppm
         PRIVATE
         FILE_SET render_extraction_impl TYPE CXX_MODULES FILES
+        Runtime.GeometryPlanBuilders.cppm
         Runtime.RenderExtraction.Internal.cpp
         PRIVATE
         Runtime.AsyncWorkModule.cpp
@@ -144,13 +141,13 @@ target_sources(${target_name}
         Gizmos/Runtime.GizmoFrameService.cpp
         Gizmos/Runtime.GizmoInteraction.cpp
         ImGui/Runtime.ImGuiAdapter.cpp
-        Runtime.GraphGeometryPacker.cpp
-        Runtime.MeshGeometryPacker.cpp
-        Runtime.MeshPrimitiveViewPacker.cpp
-        Runtime.PointCloudGeometryPacker.cpp
+        Runtime.GeometryPlanBuilders.Graph.cpp
+        Runtime.GeometryPlanBuilders.Mesh.cpp
+        Runtime.GeometryPlanBuilders.MeshPrimitiveView.cpp
+        Runtime.GeometryPlanBuilders.PointCloud.cpp
+        Runtime.GeometryPlanBuilders.Procedural.cpp
+        Runtime.MeshSurfaceTopology.cpp
         Runtime.PrimitiveSelectionRefinement.cpp
-        Runtime.ProceduralGeometry.cpp
-        Runtime.ProceduralGeometryPacker.cpp
         Runtime.ReferenceScene.cpp
         Runtime.RenderRecipeActivation.cpp
         Runtime.RenderExtraction.cpp

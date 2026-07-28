@@ -74,7 +74,7 @@ import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
-import Extrinsic.Runtime.MeshPrimitiveViewPacker;
+import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -1958,8 +1958,7 @@ namespace Extrinsic::Runtime
             const VertexChannelSourceBinding& rhs) noexcept
         {
             return lhs.Enabled == rhs.Enabled &&
-                   lhs.SourceType == rhs.SourceType &&
-                   lhs.SourceProperty == rhs.SourceProperty;
+                   lhs.Property == rhs.Property;
         }
 
         void MarkVertexChannelDirty(entt::registry& raw,
@@ -2014,13 +2013,24 @@ namespace Extrinsic::Runtime
             {
                 model.HasBinding = true;
                 model.Binding = *binding;
-                model.Resolver = EvaluateVertexChannelBinding(
-                    *properties,
-                    channel,
-                    binding->SourceProperty,
-                    binding->SourceType,
-                    expectedCount,
-                    modelBuildStats);
+                const std::optional<AttributeSourceType> sourceType =
+                    binding->Property.Domain ==
+                            ToGeometryElementDomain(domain)
+                        ? ToAttributeSourceType(
+                              binding->Property.ValueKind)
+                        : std::nullopt;
+                model.Resolver = sourceType.has_value()
+                    ? EvaluateVertexChannelBinding(
+                          *properties,
+                          channel,
+                          binding->Property.Name,
+                          *sourceType,
+                          expectedCount,
+                          modelBuildStats)
+                    : AttributeBindResult{
+                          .Status = AttributeBindStatus::TypeMismatch,
+                          .FullyPopulated = false,
+                      };
                 model.Diagnostic =
                     BuildVertexChannelResolverDiagnostic(model.Resolver);
             }
@@ -13684,8 +13694,11 @@ namespace Extrinsic::Runtime
 
         const VertexChannelSourceBinding next{
             .Enabled = true,
-            .SourceType = *sourceType,
-            .SourceProperty = command.PropertyName,
+            .Property = GeometryPropertyRef{
+                .Domain = ToGeometryElementDomain(*domain),
+                .Name = command.PropertyName,
+                .ValueKind = valueKind,
+            },
         };
         if (current != nullptr &&
             SameVertexChannelSourceBinding(*target, next))

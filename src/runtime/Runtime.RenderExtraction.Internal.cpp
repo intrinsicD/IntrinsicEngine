@@ -36,12 +36,7 @@ import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.GeometryAvailability;
-import Extrinsic.Runtime.GraphGeometryPacker;
-import Extrinsic.Runtime.MeshGeometryPacker;
-import Extrinsic.Runtime.MeshPrimitiveViewPacker;
-import Extrinsic.Runtime.PointCloudGeometryPacker;
-import Extrinsic.Runtime.ProceduralGeometry;
-import Extrinsic.Runtime.ProceduralGeometryPacker;
+import Extrinsic.Runtime.GeometryPlanBuilders;
 import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.VisualizationAdapters;
 import Extrinsic.Runtime.WorldHandle;
@@ -163,9 +158,6 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::optional<GpuRenderableAvailabilityView>
             FindGpuRenderableAvailability(
                 std::uint32_t stableEntityId) const noexcept;
-        [[nodiscard]] const ProceduralGeometryCache&
-            GetProceduralGeometryCacheForTest() const noexcept;
-
         void RegisterVisualizationAdapter(
             std::uint64_t key,
             std::unique_ptr<IVisualizationAdapter> adapter);
@@ -195,7 +187,7 @@ namespace Extrinsic::Runtime
                 VisualizationOverrides{};
             bool HasVisualizationOverrides{false};
             Graphics::GpuGeometryHandle Geometry{};
-            std::optional<ProceduralGeometryKey> ProceduralKey{};
+            std::optional<Graphics::GeometryResidencyKey> ProceduralKey{};
             Graphics::GpuGeometryHandle MeshGeometry{};
             Graphics::GpuGeometryHandle GraphGeometry{};
             bool GraphPackedLines{false};
@@ -333,9 +325,7 @@ namespace Extrinsic::Runtime
             m_GeometryResidency{};
         Graphics::GpuWorld* m_GeometryResidencyWorld{nullptr};
         std::uint64_t m_NextGeometryPlanGeneration{1u};
-        ProceduralGeometryCache m_ProceduralGeometry{};
         ProceduralGeometryPackBuffer m_ProceduralPack{};
-        ProceduralGeometryCacheStats m_PrevProceduralStats{};
         std::uint32_t m_ProceduralFreeRetires{0};
         std::uint32_t m_PrevProceduralFreeRetires{0};
         MeshPackBuffer m_MeshPack{};

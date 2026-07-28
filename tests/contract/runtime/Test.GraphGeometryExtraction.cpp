@@ -7,6 +7,8 @@
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
 
+#include "GeometryResidencyFingerprint.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Components.AssetInstance;
 import Extrinsic.ECS.Components.GeometrySources;
@@ -189,9 +191,30 @@ TEST(GraphGeometryExtraction, LineGraphUploadsOnceAndBindsInstanceGeometry)
     EXPECT_TRUE(view->HasGraphResidency);
     EXPECT_FALSE(view->HasMeshResidency);
     EXPECT_EQ(view->GraphGeometry, view->Geometry);
-    EXPECT_FALSE(view->ProceduralKey.has_value());
+    EXPECT_FALSE(view->HasProceduralResidency);
     EXPECT_FALSE(view->HasSourceAsset);
     EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->Instance), view->Geometry);
+
+    Extrinsic::Graphics::GpuGeometryResidencyView residency{};
+    ASSERT_TRUE(gpuWorld.TryGetGeometryResidencyView(
+        view->GraphGeometry, residency));
+    EXPECT_EQ(residency.VertexCount, 3u);
+    EXPECT_EQ(residency.SurfaceIndexCount, 0u);
+    EXPECT_EQ(residency.Record.LineIndexCount, 4u);
+    EXPECT_EQ(residency.PositionByteCount, sizeof(float) * 9u);
+    EXPECT_EQ(residency.TexcoordByteCount, sizeof(float) * 6u);
+    EXPECT_EQ(residency.NormalByteCount, 0u);
+    EXPECT_EQ(residency.PositionFingerprint,
+              Extrinsic::Tests::GeometryFloat32Fingerprint(
+                  {0.0f, 0.0f, 0.0f,
+                   1.0f, 0.0f, 0.0f,
+                   0.0f, 1.0f, 0.0f}));
+    EXPECT_EQ(residency.TexcoordFingerprint,
+              Extrinsic::Tests::GeometryFloat32Fingerprint(
+                  {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}));
+    EXPECT_EQ(residency.NormalFingerprint, 0u);
+    EXPECT_EQ(residency.StorageLane,
+              Extrinsic::Graphics::GpuWorld::GeometryStorageLane::UniformSoA);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
@@ -426,7 +449,7 @@ TEST(GraphGeometryExtraction, EntityDestructionRetiresGraphGeometryAfterDeferred
     EXPECT_EQ(stats.GraphGeometryReleases, 1u);
     EXPECT_EQ(stats.GraphGeometryFreeRetires, 0u);
     // Release is deferred through the framesInFlight window; the upload is
-    // still live until TickGraphGeometry fires past the deadline.
+    // still live until TickGeometryResidency fires past the deadline.
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
     EXPECT_EQ(gpuWorld.GetLiveInstanceCount(), 0u);
 
@@ -434,7 +457,7 @@ TEST(GraphGeometryExtraction, EntityDestructionRetiresGraphGeometryAfterDeferred
     constexpr std::uint64_t baseFrame = 200u;
     for (std::uint32_t i = 0; i <= framesInFlight; ++i)
     {
-        extraction.TickGraphGeometry(baseFrame + i, framesInFlight, engine.GetRenderer());
+        extraction.TickGeometryResidency(baseFrame + i, framesInFlight, engine.GetRenderer());
         if (i < framesInFlight)
         {
             EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
@@ -508,7 +531,7 @@ TEST(GraphGeometryExtraction, ProceduralRefPreemptsGraphPathOnSameEntity)
         Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasGraphResidency);
-    EXPECT_TRUE(view->ProceduralKey.has_value());
+    EXPECT_TRUE(view->HasProceduralResidency);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
@@ -595,7 +618,7 @@ TEST(GraphGeometryExtraction, SurfaceOnlyGraphEntityFailsClosedAsFailedPack)
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
     // A graph-domain entity with only a surface hint requests neither lane,
-    // so PackGraph returns NoRenderLane → folded into FailedPack.
+    // so the graph plan builder returns NoRenderLane → folded into FailedPack.
     raw.emplace<G::RenderSurface>(entity);
     AttachLineGraphSources(scene, entity);
 
@@ -654,7 +677,7 @@ TEST(GraphGeometryExtraction, AddingProceduralRefAfterGraphUploadReleasesGraphRe
         Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasGraphResidency);
-    ASSERT_TRUE(view->ProceduralKey.has_value());
+    ASSERT_TRUE(view->HasProceduralResidency);
     // Instance bound to the procedural handle, not the queued graph slot.
     EXPECT_TRUE(view->Geometry.IsValid());
     EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->Instance), view->Geometry);
@@ -666,7 +689,7 @@ TEST(GraphGeometryExtraction, AddingProceduralRefAfterGraphUploadReleasesGraphRe
     constexpr std::uint64_t baseFrame = 400u;
     for (std::uint32_t i = 0; i <= framesInFlight; ++i)
     {
-        extraction.TickGraphGeometry(baseFrame + i, framesInFlight, engine.GetRenderer());
+        extraction.TickGeometryResidency(baseFrame + i, framesInFlight, engine.GetRenderer());
     }
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
     stats = extraction.ExtractAndSubmit(scene,
@@ -727,7 +750,7 @@ TEST(GraphGeometryExtraction, LosingGraphHintReleasesGraphResidency)
     constexpr std::uint64_t baseFrame = 600u;
     for (std::uint32_t i = 0; i <= framesInFlight; ++i)
     {
-        extraction.TickGraphGeometry(baseFrame + i, framesInFlight, engine.GetRenderer());
+        extraction.TickGeometryResidency(baseFrame + i, framesInFlight, engine.GetRenderer());
     }
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 0u);
 
@@ -868,7 +891,7 @@ namespace
     {
         for (std::uint32_t i = 0; i <= framesInFlight; ++i)
         {
-            extraction.TickGraphGeometry(baseFrame + i, framesInFlight, renderer);
+            extraction.TickGeometryResidency(baseFrame + i, framesInFlight, renderer);
         }
     }
 }
@@ -1020,7 +1043,7 @@ TEST(GraphGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesD
     ASSERT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 
     // Corrupt a node position to non-finite, then mark vertex positions dirty so
-    // the next PackGraph returns NonFinitePosition (folded into FailedPack).
+    // the next graph plan build returns NonFinitePosition (folded into FailedPack).
     auto& nodes = raw.get<gs::Nodes>(entity);
     auto pos = nodes.Properties.GetOrAdd<glm::vec3>(std::string{pn::kPosition}, glm::vec3(0.0f));
     pos.Vector() = {

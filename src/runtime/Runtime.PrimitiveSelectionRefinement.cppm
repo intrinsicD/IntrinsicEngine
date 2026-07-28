@@ -70,7 +70,7 @@ export namespace Extrinsic::Runtime
         // only: it is validated against authoritative CPU geometry. The payload
         // semantics follow the ID pass — a `Face` payload is the per-draw surface
         // triangle index (`gl_PrimitiveID`), which refinement maps back to a face
-        // row through the mesh packer's surface-triangle table because n-gon
+        // row through the canonical mesh surface-triangle table because n-gon
         // faces fan-triangulate to multiple GPU triangles.
         Extrinsic::Graphics::EncodedSelectionId Hint{};
 

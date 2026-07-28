@@ -28,7 +28,7 @@ import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EngineConfigControl;
-import Extrinsic.Runtime.MeshGeometryPacker;
+import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.SandboxConfigSections;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.HalfedgeMesh;
@@ -855,10 +855,10 @@ namespace Extrinsic::Runtime
 
         std::vector<std::uint32_t> fingerprintSurfaceIndices{};
         std::vector<std::uint32_t> fingerprintTriangleFaces{};
-        if (BuildSurfaceTriangleTopology(
+        if (BuildMeshSurfaceTriangleTopology(
                 view,
                 fingerprintSurfaceIndices,
-                fingerprintTriangleFaces) == MeshPackStatus::Success)
+                fingerprintTriangleFaces) == MeshSurfaceTopologyStatus::Success)
         {
             const auto positions = view.VertexSource->Properties.Get<glm::vec3>(
                 GS::PropertyNames::kPosition);
@@ -1060,14 +1060,14 @@ namespace Extrinsic::Runtime
 
         std::vector<std::uint32_t> surfaceIndices{};
         std::vector<std::uint32_t> triangleFaces{};
-        const MeshPackStatus topologyStatus = BuildSurfaceTriangleTopology(
+        const MeshSurfaceTopologyStatus topologyStatus = BuildMeshSurfaceTriangleTopology(
             view,
             surfaceIndices,
             triangleFaces);
-        if (topologyStatus != MeshPackStatus::Success)
+        if (topologyStatus != MeshSurfaceTopologyStatus::Success)
         {
             model.Message = "UV view topology is unavailable (";
-            model.Message += DebugNameForMeshPackStatus(topologyStatus);
+            model.Message += DebugNameForMeshSurfaceTopologyStatus(topologyStatus);
             model.Message += ").";
             return model;
         }

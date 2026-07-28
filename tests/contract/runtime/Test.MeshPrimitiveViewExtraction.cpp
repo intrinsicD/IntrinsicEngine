@@ -7,6 +7,8 @@
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
 
+#include "GeometryResidencyFingerprint.hpp"
+
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.DirtyTags;
@@ -23,7 +25,7 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.GeometryAvailability;
-import Extrinsic.Runtime.MeshPrimitiveViewPacker;
+import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.Properties;
@@ -113,8 +115,8 @@ namespace
     // Attach a single-triangle mesh `GeometrySources` whose `Edges` PropertySet
     // carries explicit `(e:v0, e:v1)` endpoints. The halfedge/face wiring mirrors
     // `Test.MeshGeometryExtraction.cpp` so `BuildConstView` resolves
-    // `Domain::Mesh` and the surface packer emits faces, while the explicit edges
-    // let `PackMeshEdgeView` derive a three-edge line list.
+    // `Domain::Mesh` and the surface plan emits faces, while the explicit edges
+    // let the primitive-view adapter derive a three-edge line list.
     void AttachTriangleMeshWithEdges(Registry& scene, EntityHandle entity)
     {
         auto& raw = scene.Raw();
@@ -140,7 +142,7 @@ namespace
         SetFaces(faces, {0u});
     }
 
-    // Same as above but without explicit edges: the edge-view packer derives
+    // Same as above but without explicit edges: the primitive-view adapter derives
     // wireframe lines from halfedge/face topology.
     void AttachTriangleMeshWithoutEdges(Registry& scene, EntityHandle entity)
     {
@@ -230,8 +232,8 @@ namespace
     {
         for (std::uint32_t i = 0; i <= framesInFlight; ++i)
         {
-            extraction.TickMeshGeometry(baseFrame + i, framesInFlight, renderer);
-            extraction.TickMeshPrimitiveViewGeometry(baseFrame + i, framesInFlight, renderer);
+            extraction.TickGeometryResidency(
+                baseFrame + i, framesInFlight, renderer);
         }
     }
 }
@@ -284,6 +286,27 @@ TEST(MeshPrimitiveViewExtraction, EnableEdgeViewUploadsSeparateEdgeRenderable)
     EXPECT_FLOAT_EQ(config.UniformColor.g, 0.02f);
     EXPECT_FLOAT_EQ(config.UniformColor.b, 0.02f);
     EXPECT_FLOAT_EQ(config.UniformColor.a, 1.0f);
+
+    Extrinsic::Graphics::GpuGeometryResidencyView residency{};
+    ASSERT_TRUE(gpuWorld.TryGetGeometryResidencyView(
+        view->MeshEdgeViewGeometry, residency));
+    EXPECT_EQ(residency.VertexCount, 3u);
+    EXPECT_EQ(residency.SurfaceIndexCount, 0u);
+    EXPECT_EQ(residency.Record.LineIndexCount, 6u);
+    EXPECT_EQ(residency.PositionByteCount, sizeof(float) * 9u);
+    EXPECT_EQ(residency.TexcoordByteCount, sizeof(float) * 6u);
+    EXPECT_EQ(residency.NormalByteCount, 0u);
+    EXPECT_EQ(residency.PositionFingerprint,
+              Extrinsic::Tests::GeometryFloat32Fingerprint(
+                  {0.0f, 0.0f, 0.0f,
+                   1.0f, 0.0f, 0.0f,
+                   0.0f, 1.0f, 0.0f}));
+    EXPECT_EQ(residency.TexcoordFingerprint,
+              Extrinsic::Tests::GeometryFloat32Fingerprint(
+                  {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}));
+    EXPECT_EQ(residency.NormalFingerprint, 0u);
+    EXPECT_EQ(residency.StorageLane,
+              Extrinsic::Graphics::GpuWorld::GeometryStorageLane::UniformSoA);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

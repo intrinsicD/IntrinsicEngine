@@ -15,7 +15,6 @@ import Extrinsic.Asset.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
-import Extrinsic.Runtime.MeshGeometryPacker;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.WorldHandle;
@@ -146,7 +145,7 @@ export namespace Extrinsic::Runtime
     {
         Success,
         InvalidTarget,
-        MeshPackRejected,
+        MeshPlanRejected,
         IdentityRejected,
     };
 
@@ -154,7 +153,6 @@ export namespace Extrinsic::Runtime
     {
         RuntimeObjectSpaceNormalBakeRequestBuildStatus Status{
             RuntimeObjectSpaceNormalBakeRequestBuildStatus::InvalidTarget};
-        MeshPackStatus PackStatus{MeshPackStatus::WrongDomain};
         RuntimeObjectSpaceNormalBakeIdentityBuildStatus IdentityStatus{
             RuntimeObjectSpaceNormalBakeIdentityBuildStatus::EmptyInput};
         std::optional<RuntimeObjectSpaceNormalBakeRequest> Request{};

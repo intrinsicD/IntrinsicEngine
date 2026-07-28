@@ -1496,8 +1496,11 @@ namespace Extrinsic::Runtime
             if (normalProperty != GS::PropertyNames::kNormal)
             {
                 channelBindings.Normal.Enabled = true;
-                channelBindings.Normal.SourceProperty =
-                    std::string{normalProperty};
+                channelBindings.Normal.Property = GeometryPropertyRef{
+                    .Domain = GeometryElementDomain::MeshVertex,
+                    .Name = std::string{normalProperty},
+                    .ValueKind = Geometry::PropertyValueKind::Vec3,
+                };
                 channelBindingsPtr = &channelBindings;
             }
 
