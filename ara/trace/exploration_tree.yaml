@@ -6848,3 +6848,38 @@ tree:
       contracts and explicit operational Vulkan coverage for every live lane
       passed; no storage-policy or performance claim is made.
     status: resolved
+  - id: N287
+    type: experiment
+    title: "Retire runtime visualization adapters in favor of closed recipes"
+    provenance: ai-executed
+    timestamp: "2026-07-28T11:05+02:00"
+    also_depends_on: [N285, N286]
+    evidence:
+      - "tasks/done/RUNTIME-198-data-driven-visualization-recipes.md"
+      - "src/runtime/Visualization/Runtime.VisualizationRecipes.cppm"
+      - "src/runtime/Visualization/Runtime.VisualizationRecipes.cpp"
+      - "src/runtime/Runtime.RenderExtraction.Recipes.cpp"
+      - "src/runtime/Runtime.RenderExtraction.cpp"
+      - "tests/contract/runtime/Test.VisualizationRecipes.cpp"
+      - "tests/integration/runtime/Test.RuntimeRenderExtraction.cpp"
+      - "tests/integration/graphics/Test.VisualizationOverlaySurfaceGpuSmoke.cpp"
+      - "focused CPU visualization/extraction selector: 95/95"
+      - "complete CPU-supported selector: 4124 selected with zero failures and one expected self-skip"
+      - "focused ASan visualization/extraction selector: 45/45"
+      - "complete UBSan CPU selector: 2778 selected with zero failures and one expected self-skip"
+      - "ASan+UBSan promoted-Vulkan visualization selector: 2/2"
+      - "retired adapter/registry/opaque-key symbol scan: empty"
+      - "BUG-122 records four unrelated complete-ASan failures already on origin/main"
+      - "NVIDIA GeForce RTX 3050, driver 590.48.01"
+    result: >
+      Runtime visualization now uses one closed copied recipe variant and pure
+      typed encoders for every supported packet lane. Scalar/color config,
+      geometry-presentation property buffers, and explicit recipes converge
+      during copied extraction; Htex recreation remains a separate typed
+      JobService operation. The adapter interface, six wrappers, registry/map,
+      opaque bindings, registration surface, adapter-only statistics, and 22
+      wrapper/registry-only contracts are absent. CPU, focused sanitizer, and
+      two actual-Vulkan readback smokes passed. The complete ASan selector
+      remains truthfully red only for four pre-existing test-lifetime defects
+      owned by BUG-122; no performance claim is made.
+    status: resolved

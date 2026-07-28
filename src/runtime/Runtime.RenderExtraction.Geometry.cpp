@@ -42,7 +42,7 @@ import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.GeometryPlanBuilders;
 import Extrinsic.Runtime.RenderWorldPool;
-import Extrinsic.Runtime.VisualizationAdapters;
+import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.WorldHandle;
 

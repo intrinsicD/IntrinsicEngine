@@ -320,7 +320,7 @@ if(TARGET ExtrinsicRuntime)
         Test.VertexChannelStreams.cpp
         Test.RenderWorldPool.cpp
         Test.RenderWorldPoolEngineWiring.cpp
-        Test.VisualizationAdapters.cpp
+        Test.VisualizationRecipes.cpp
     )
     intrinsic_resolve_test_sources(_runtime_contract_test_sources
         SEARCH_DIRS contract/runtime

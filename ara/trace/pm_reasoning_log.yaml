@@ -1093,3 +1093,10 @@ entries:
       - "Kept the evidence scope explicit: no performance claim, no renderer-selection unification, and no Progressive Poisson compute/public parity claim."
       - "Treated the unrelated full WorkflowConcurrency failures as existing BUG-120 evidence rather than a new dead end; the task-relevant Vulkan ratchet passed."
       - "Kept O09, O13, O38, O57, and O58 unpromoted and non-stale: this turn revisits but does not close Progressive Poisson compute parity, does not select a runtime-directory move, and supplies no closure for header priority or model-training interpretation."
+  - turn: "2026-07-28_001#1"
+    notes:
+      - "Bound the already-recorded RUNTIME-196, RUNTIME-193, RUNTIME-197, and RUNTIME-198 experiments N284-N287 and observations O66-O69 into today's session rather than duplicating exploration or staging IDs."
+      - "Recorded C11-C14 as crystallized through artifact commitment because the retired tasks, production code, contracts, and operational Vulkan fixtures depend on each exact convergence and deletion boundary."
+      - "Kept every claim scoped to lifecycle/capability evidence and made no performance claim; RUNTIME-198's focused ASan, complete UBSan, and Vulkan cohorts passed while BUG-122 fail-closed the unrelated complete-ASan defects already on origin/main."
+      - "Honored the user's terminal condition after RUNTIME-198 and did not begin RUNTIME-200 or the separate BUG-122 repair."
+      - "Kept O09, O13, O38, O57, and O58 unpromoted and non-stale: none received affirmation, empirical resolution, artifact commitment, contradiction, or three newly idle session-days in this turn."

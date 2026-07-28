@@ -404,6 +404,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.WorldRegistry` | `src/runtime/Runtime.WorldRegistry.cppm` | `runtime` |
 | `Extrinsic.Runtime.SceneDocumentModule` | `src/runtime/Scene/Runtime.SceneDocumentModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.SceneInteractionModule` | `src/runtime/Scene/Runtime.SceneInteractionModule.cppm` | `runtime` |
-| `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
+| `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
 Total modules: **379**

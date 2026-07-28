@@ -8,6 +8,10 @@ maturity_target: Retired
 
 ## Status
 
+- Retired on 2026-07-28 at `Retired` after the recipe path replaced every live
+  adapter consumer and the adapter/registry/opaque-binding surface was deleted.
+- Retirement commit reference: this commit plus intake/activation commit
+  `89d28729`, Slice A commit `50f56e29`, and Slice B commit `6171fad6`.
 - Promoted to active on 2026-07-28 after `RUNTIME-192`, `RUNTIME-193`,
   `RUNTIME-194`, and `RUNTIME-197` retired the property, presentation, work,
   and residency prerequisites.
@@ -36,6 +40,25 @@ maturity_target: Retired
   precedence over both. Focused Clang 23 coverage passes 12 extraction/
   presentation cases plus four lifecycle/editor contracts; production source
   scans find no adapter registration or binding call site.
+- Slice C renamed the surviving module to `Runtime.VisualizationRecipes`,
+  renamed the private extraction implementation to
+  `Runtime.RenderExtraction.Recipes.cpp`, and deleted the adapter interface,
+  registry, owned map, opaque bindings, registration forwarding, six concrete
+  wrappers, adapter-only statistics, and 22 wrapper/registry-only contracts.
+  Eight recipe contracts retain the supported alternatives, deterministic
+  range handling, owning encoded batches, closed recipe identity, and the
+  separately typed Htex job operation.
+- Final verification passed the 95-case focused CPU visualization/extraction
+  selector, all 4,124 selected default CPU tests with one expected GLFW/LSan
+  self-skip, the 45-case focused ASan selector, all 2,778 selected UBSan tests
+  with the expected LSan-only self-skip, and both promoted-Vulkan visualization
+  readback smokes on an NVIDIA GeForce RTX 3050 with driver 590.48.01. The
+  complete ASan selector exposed four pre-existing `origin/main` runtime-asset
+  test-lifetime defects; they are unrelated to this slice and are recorded
+  fail-closed under `BUG-122` rather than hidden or quarantined.
+- The final retired-symbol scan is empty outside the deliberate negative
+  source assertion. Strict layering, test-layout, root-hygiene, ARA, task,
+  docs-link, generated-inventory, and whitespace checks close the task.
 
 ## Goal
 
@@ -122,7 +145,7 @@ maturity_target: Retired
 - [x] Move Htex/atlas regeneration out of adapter encoding and onto the
       canonical typed `JobService` operation; recipes encode only current
       copied metadata/results.
-- [ ] Delete `IVisualizationAdapter`,
+- [x] Delete `IVisualizationAdapter`,
       `VisualizationAdapterRegistry`, adapter binding keys,
       `RegisterVisualizationAdapter`/`UnregisterVisualizationAdapter`, and
       concrete wrapper classes after parity.
@@ -134,17 +157,17 @@ maturity_target: Retired
       output.
 - [x] Render-extraction parity tests preserve packet bytes/counts, property
       residency requests, cache invalidation, and visualization statistics.
-- [ ] Existing Vulkan visualization smokes run through recipes.
-- [ ] Source scans prove no production registry/adapter interface or opaque
+- [x] Existing Vulkan visualization smokes run through recipes.
+- [x] Source scans prove no production registry/adapter interface or opaque
       visualization key remains.
 
 ## Docs
 
-- [ ] Update visualization/runtime extraction docs with recipe alternatives,
+- [x] Update visualization/runtime extraction docs with recipe alternatives,
       pure encoding, and material/visualization separation.
-- [ ] Regenerate the module inventory and remove old adapter registration
+- [x] Regenerate the module inventory and remove old adapter registration
       instructions.
-- [ ] Refresh task indexes, session brief, and retirement records.
+- [x] Refresh task indexes, session brief, and retirement records.
 
 ## Acceptance criteria
 
@@ -152,7 +175,7 @@ maturity_target: Retired
       pure encoders using canonical property references.
 - [x] No production lifetime depends on an adapter object or opaque registry
       key.
-- [ ] The old adapter interface, registry, wrappers, and extraction
+- [x] The old adapter interface, registry, wrappers, and extraction
       registration surface are deleted after parity.
 
 ## Verification
@@ -177,5 +200,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Maturity
 
-- Target: `Retired`; pure CPU packet parity and operational Vulkan coverage
-  must precede removal of the adapter/registry family.
+- Retired on 2026-07-28 after pure CPU packet parity, focused ASan coverage,
+  complete UBSan coverage, operational Vulkan readback, retired-symbol scans,
+  and deletion of the adapter/registry family. No visualization performance
+  claim is made.

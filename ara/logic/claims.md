@@ -328,3 +328,39 @@
 - **Tags**: runtime, graphics, geometry, residency, extraction, Vulkan,
   retirement
 - **From staging**: O68
+
+## C14: Runtime visualization has one closed recipe and pure encoding path
+- **Statement**: Production scalar, color, label, vector-field, isoline,
+  curvature-direction, and supported Htex metadata visualization intent is
+  represented by the closed `VisualizationRecipe` value and encoded by pure
+  typed functions into the existing graphics packet/property-residency seams.
+  `VisualizationConfig`, `GeometryPresentationRecipe`, and explicit copied
+  recipes converge during runtime extraction; Htex recreation is a separate
+  typed `JobService` operation. The former adapter interface, concrete
+  wrappers, registry/map, opaque binding keys, registration forwarding, and
+  wrapper-only tests are absent.
+- **Status**: supported — CPU/Null and focused ASan contracts, complete UBSan
+  CPU coverage, plus ASan+UBSan promoted Vulkan readback on NVIDIA GeForce RTX
+  3050, driver 590.48.01; the unrelated complete-ASan red gate is recorded by
+  BUG-122 and no performance claim is made
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A production visualization path bypasses the
+  closed recipe/pure encoder, reintroduces an adapter lifetime, registry,
+  opaque key, or registration surface; encoding schedules background work;
+  supported inputs lose deterministic validation or packet/residency parity;
+  or either operational Vulkan visualization readback fails.
+- **Proof**: [tasks/done/RUNTIME-198-data-driven-visualization-recipes.md,
+  src/runtime/Visualization/Runtime.VisualizationRecipes.cppm,
+  src/runtime/Visualization/Runtime.VisualizationRecipes.cpp,
+  src/runtime/Runtime.RenderExtraction.Recipes.cpp,
+  src/runtime/Runtime.RenderExtraction.cpp,
+  tests/contract/runtime/Test.VisualizationRecipes.cpp,
+  tests/integration/runtime/Test.RuntimeRenderExtraction.cpp,
+  tests/integration/graphics/Test.VisualizationOverlaySurfaceGpuSmoke.cpp,
+  docs/adr/0009-visualization-packets-and-overlay-upload.md,
+  docs/api/generated/module_inventory.md]
+- **Dependencies**: [C12, C13]
+- **Tags**: runtime, graphics, visualization, recipes, extraction, Vulkan,
+  retirement
+- **From staging**: O69

@@ -18,9 +18,8 @@ module;
 
 #include <glm/glm.hpp>
 
-module Extrinsic.Runtime.VisualizationAdapters;
+module Extrinsic.Runtime.VisualizationRecipes;
 
-import Extrinsic.ECS.Components.GeometrySources;
 import Geometry.Properties;
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Runtime.GeometryAvailability;
@@ -31,6 +30,32 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
+        struct VisualizationEncodingOptions
+        {
+            std::string SourceName{};
+            std::string OutputName{};
+            Graphics::VisualizationAttributeDomain Domain{
+                Graphics::VisualizationAttributeDomain::Vertex};
+            std::uint64_t BufferBDA{0u};
+            std::uint64_t ColorBufferBDA{0u};
+            std::uint64_t PositionBufferBDA{0u};
+            std::uint64_t VectorBufferBDA{0u};
+            std::string PropertyBufferSourceKey{};
+            std::string PositionBufferSourceKey{};
+            std::string VectorBufferSourceKey{};
+            std::uint64_t DirtyStamp{0u};
+            bool AutoRange{true};
+            float RangeMin{0.0f};
+            float RangeMax{1.0f};
+            Graphics::Colormap::Type Colormap{Graphics::Colormap::Type::Viridis};
+            std::uint32_t IsoValueCount{0u};
+            float LineWidth{1.0f};
+            glm::vec4 OverlayColor{0.0f, 0.0f, 0.0f, 1.0f};
+            float VectorScale{1.0f};
+            glm::vec4 VectorColor{1.0f};
+            bool DepthTested{true};
+        };
+
         [[nodiscard]] bool IsFinite(const float value) noexcept
         {
             return std::isfinite(value);
@@ -97,7 +122,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] VisualizationRecipeStatus ToRecipeStatus(
-            const VisualizationAdapterStats& stats) noexcept
+            const VisualizationEncodingDiagnostics& stats) noexcept
         {
             if (stats.PacketAppendCount != 0u)
                 return VisualizationRecipeStatus::Encoded;
@@ -149,7 +174,7 @@ namespace Extrinsic::Runtime
         }
 
         void AppendPropertyBuffer(
-            VisualizationAdapterBatch& out,
+            VisualizationEncodingBatch& out,
             const std::string& sourceKey,
             const Graphics::VisualizationAttributeDomain domain,
             const Graphics::VisualizationValueType valueType,
@@ -204,7 +229,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool ComputeRange(std::span<const T> values,
                                         float& minOut,
                                         float& maxOut,
-                                        VisualizationAdapterStats& stats)
+                                        VisualizationEncodingDiagnostics& stats)
         {
             if (values.empty())
             {
@@ -272,9 +297,9 @@ namespace Extrinsic::Runtime
 
         template <typename T>
         bool AppendScalarPacket(const Geometry::ConstProperty<T>& property,
-                                VisualizationAdapterBatch& out,
-                                const VisualizationAdapterOptions& options,
-                                VisualizationAdapterStats& stats)
+                                VisualizationEncodingBatch& out,
+                                const VisualizationEncodingOptions& options,
+                                VisualizationEncodingDiagnostics& stats)
         {
             const std::span<const T> values = property.Span();
             if (values.empty())
@@ -349,7 +374,7 @@ namespace Extrinsic::Runtime
 
         template <typename T>
         [[nodiscard]] bool ValidateSourceSpan(std::span<const T> values,
-                                              VisualizationAdapterStats& stats) noexcept
+                                              VisualizationEncodingDiagnostics& stats) noexcept
         {
             if (values.empty())
             {
@@ -374,7 +399,7 @@ namespace Extrinsic::Runtime
 
         template <typename T>
         [[nodiscard]] bool ValidateFiniteScalarSource(std::span<const T> values,
-                                                      VisualizationAdapterStats& stats) noexcept
+                                                      VisualizationEncodingDiagnostics& stats) noexcept
         {
             if (values.empty())
             {
@@ -401,9 +426,9 @@ namespace Extrinsic::Runtime
         }
 
         bool AppendColorPacket(const Geometry::ConstProperty<glm::vec4>& property,
-                               VisualizationAdapterBatch& out,
-                               const VisualizationAdapterOptions& options,
-                               VisualizationAdapterStats& stats)
+                               VisualizationEncodingBatch& out,
+                               const VisualizationEncodingOptions& options,
+                               VisualizationEncodingDiagnostics& stats)
         {
             const std::span<const glm::vec4> values = property.Span();
             if (!ValidateSourceSpan(values, stats))
@@ -440,9 +465,9 @@ namespace Extrinsic::Runtime
 
         template <typename T>
         bool AppendIsolinePacket(const Geometry::ConstProperty<T>& property,
-                                 VisualizationAdapterBatch& out,
-                                 const VisualizationAdapterOptions& options,
-                                 VisualizationAdapterStats& stats)
+                                 VisualizationEncodingBatch& out,
+                                 const VisualizationEncodingOptions& options,
+                                 VisualizationEncodingDiagnostics& stats)
         {
             const std::span<const T> values = property.Span();
             if (!ValidateFiniteScalarSource(values, stats))
@@ -509,9 +534,9 @@ namespace Extrinsic::Runtime
         }
 
         bool AppendVectorFieldPacket(const Geometry::ConstProperty<glm::vec3>& property,
-                                     VisualizationAdapterBatch& out,
-                                     const VisualizationAdapterOptions& options,
-                                     VisualizationAdapterStats& stats)
+                                     VisualizationEncodingBatch& out,
+                                     const VisualizationEncodingOptions& options,
+                                     VisualizationEncodingDiagnostics& stats)
         {
             const std::span<const glm::vec3> values = property.Span();
             if (!ValidateSourceSpan(values, stats))
@@ -566,86 +591,124 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        [[nodiscard]] std::string PacketName(
-            const VisualizationAdapterOptions& options)
+        void EncodeScalarProperty(
+            const Geometry::ConstPropertySet& properties,
+            VisualizationEncodingBatch& out,
+            const VisualizationEncodingOptions& options,
+            VisualizationEncodingDiagnostics& diagnostics)
         {
-            return options.OutputName.empty() ? options.SourceName : options.OutputName;
+            if (options.SourceName.empty())
+            {
+                ++diagnostics.MissingSourceCount;
+                return;
+            }
+
+            if (const auto property = properties.Get<float>(options.SourceName);
+                property.IsValid())
+            {
+                (void)AppendScalarPacket(property, out, options, diagnostics);
+                return;
+            }
+            if (const auto property = properties.Get<double>(options.SourceName);
+                property.IsValid())
+            {
+                (void)AppendScalarPacket(property, out, options, diagnostics);
+                return;
+            }
+
+            if (properties.Exists(options.SourceName))
+                ++diagnostics.UnsupportedSourceTypeCount;
+            else
+                ++diagnostics.MissingSourceCount;
         }
 
-        [[nodiscard]] std::string CurvatureDirectionName(
-            const std::string& configured,
-            const std::string_view fallback)
+        void EncodeColorProperty(
+            const Geometry::ConstPropertySet& properties,
+            VisualizationEncodingBatch& out,
+            const VisualizationEncodingOptions& options,
+            VisualizationEncodingDiagnostics& diagnostics)
         {
-            return configured.empty() ? std::string{fallback} : configured;
+            if (options.SourceName.empty())
+            {
+                ++diagnostics.MissingSourceCount;
+                return;
+            }
+
+            if (const auto property = properties.Get<glm::vec4>(options.SourceName);
+                property.IsValid())
+            {
+                (void)AppendColorPacket(property, out, options, diagnostics);
+                return;
+            }
+
+            if (properties.Exists(options.SourceName))
+                ++diagnostics.UnsupportedSourceTypeCount;
+            else
+                ++diagnostics.MissingSourceCount;
         }
 
-        [[nodiscard]] std::string CurvatureDirectionPacketName(
-            const VisualizationAdapterOptions& options,
-            const std::string_view suffix)
+        void EncodeVectorProperty(
+            const Geometry::ConstPropertySet& properties,
+            VisualizationEncodingBatch& out,
+            const VisualizationEncodingOptions& options,
+            VisualizationEncodingDiagnostics& diagnostics)
         {
-            const std::string base = PacketName(options);
-            if (base.empty())
-                return std::string{suffix};
-            std::string name = base;
-            name += ".";
-            name += suffix;
-            return name;
+            if (options.SourceName.empty())
+            {
+                ++diagnostics.MissingSourceCount;
+                return;
+            }
+
+            if (const auto property = properties.Get<glm::vec3>(options.SourceName);
+                property.IsValid())
+            {
+                (void)AppendVectorFieldPacket(property, out, options, diagnostics);
+                return;
+            }
+
+            if (properties.Exists(options.SourceName))
+                ++diagnostics.UnsupportedSourceTypeCount;
+            else
+                ++diagnostics.MissingSourceCount;
         }
 
-        [[nodiscard]] std::string FragmentSourceAttributeName(
-            const VisualizationAdapterOptions& options)
+        void EncodeIsolineProperty(
+            const Geometry::ConstPropertySet& properties,
+            VisualizationEncodingBatch& out,
+            const VisualizationEncodingOptions& options,
+            VisualizationEncodingDiagnostics& diagnostics)
         {
-            return options.SourceAttributeName.empty()
-                ? options.SourceName
-                : options.SourceAttributeName;
+            if (options.SourceName.empty())
+            {
+                ++diagnostics.MissingSourceCount;
+                return;
+            }
+
+            if (const auto property = properties.Get<float>(options.SourceName);
+                property.IsValid())
+            {
+                (void)AppendIsolinePacket(property, out, options, diagnostics);
+                return;
+            }
+            if (const auto property = properties.Get<double>(options.SourceName);
+                property.IsValid())
+            {
+                (void)AppendIsolinePacket(property, out, options, diagnostics);
+                return;
+            }
+
+            if (properties.Exists(options.SourceName))
+                ++diagnostics.UnsupportedSourceTypeCount;
+            else
+                ++diagnostics.MissingSourceCount;
         }
 
-        [[nodiscard]] bool ValidAtlasDimensions(
-            const VisualizationAdapterOptions& options) noexcept
-        {
-            return options.AtlasWidth > 0u && options.AtlasHeight > 0u;
-        }
-
-        // Scheduling receipt for an Htex regeneration request. The adapter is
-        // CPU-contracted: it proves the request was accepted and scheduled, and
-        // deliberately does not run a regeneration algorithm, so the job body
-        // only carries the caller's payload token forward.
+        // Scheduling receipt for an HTEX regeneration request. Encoding is
+        // side-effect free; scheduling remains a separate typed operation.
         struct HtexRecreateScheduled
         {
             std::uint64_t PayloadToken{0u};
         };
-
-        [[nodiscard]] bool ScheduleHtexRecreate(
-            JobService* jobs,
-            const WorldHandle world,
-            const std::string& packetName,
-            const VisualizationAdapterOptions& options,
-            VisualizationAdapterStats& stats)
-        {
-            if (jobs == nullptr)
-            {
-                ++stats.InvalidResourceCount;
-                return false;
-            }
-
-            const VisualizationHtexRecreateResult scheduled =
-                ScheduleVisualizationHtexRecreate(
-                    *jobs,
-                    VisualizationHtexRecreateRequest{
-                        .DebugName = packetName,
-                        .World = world,
-                        .PayloadToken = options.HtexRecreatePayloadToken,
-                    });
-            if (!scheduled.Scheduled())
-            {
-                ++stats.InvalidResourceCount;
-                return false;
-            }
-
-            ++stats.HtexRecreateScheduledCount;
-            stats.LastHtexRecreateTask = scheduled.Task;
-            return true;
-        }
     }
 
     std::string_view ToString(const VisualizationRecipeStatus status) noexcept
@@ -873,8 +936,8 @@ namespace Extrinsic::Runtime
 
         const auto appendPropertyRecipe = [&result, &resolveSource](
             const GeometryPropertyRef& source,
-            VisualizationAdapterOptions options,
-            const auto& adapterFactory) -> bool
+            VisualizationEncodingOptions options,
+            const auto& encodeProperty) -> bool
         {
             const std::optional<Graphics::VisualizationAttributeDomain> domain =
                 ToVisualizationDomain(source.Domain);
@@ -890,8 +953,10 @@ namespace Extrinsic::Runtime
 
             options.SourceName = source.Name;
             options.Domain = *domain;
-            adapterFactory(Geometry::ConstPropertySet{*properties})
-                .Append(result.Batch, options, result.Diagnostics);
+            encodeProperty(Geometry::ConstPropertySet{*properties},
+                           result.Batch,
+                           options,
+                           result.Diagnostics);
             result.Status = ToRecipeStatus(result.Diagnostics);
             return result.Succeeded();
         };
@@ -908,7 +973,7 @@ namespace Extrinsic::Runtime
                 {
                     (void)appendPropertyRecipe(
                         authored.Source,
-                        VisualizationAdapterOptions{
+                        VisualizationEncodingOptions{
                             .OutputName = authored.OutputName,
                             .BufferBDA = authored.BufferBDA,
                             .PropertyBufferSourceKey = authored.BufferSourceKey,
@@ -918,26 +983,20 @@ namespace Extrinsic::Runtime
                             .RangeMax = authored.RangeMax,
                             .Colormap = authored.Colormap,
                         },
-                        [](Geometry::ConstPropertySet properties)
-                        {
-                            return PropertyScalarAdapter{std::move(properties)};
-                        });
+                        EncodeScalarProperty);
                 }
                 else if constexpr (std::is_same_v<Recipe, ColorVisualizationRecipe> ||
                                    std::is_same_v<Recipe, LabelVisualizationRecipe>)
                 {
                     (void)appendPropertyRecipe(
                         authored.Source,
-                        VisualizationAdapterOptions{
+                        VisualizationEncodingOptions{
                             .OutputName = authored.OutputName,
                             .ColorBufferBDA = authored.BufferBDA,
                             .PropertyBufferSourceKey = authored.BufferSourceKey,
                             .DirtyStamp = authored.DirtyStamp,
                         },
-                        [](Geometry::ConstPropertySet properties)
-                        {
-                            return KMeansLabelAdapter{std::move(properties)};
-                        });
+                        EncodeColorProperty);
                 }
                 else if constexpr (std::is_same_v<Recipe, VectorFieldVisualizationRecipe>)
                 {
@@ -985,9 +1044,10 @@ namespace Extrinsic::Runtime
                         return;
                     }
 
-                    VectorFieldAdapter{Geometry::ConstPropertySet{*properties}}.Append(
+                    EncodeVectorProperty(
+                        Geometry::ConstPropertySet{*properties},
                         result.Batch,
-                        VisualizationAdapterOptions{
+                        VisualizationEncodingOptions{
                             .SourceName = authored.Source.Name,
                             .OutputName = authored.OutputName,
                             .Domain = *domain,
@@ -1010,7 +1070,7 @@ namespace Extrinsic::Runtime
                 {
                     (void)appendPropertyRecipe(
                         authored.Source,
-                        VisualizationAdapterOptions{
+                        VisualizationEncodingOptions{
                             .OutputName = authored.OutputName,
                             .BufferBDA = authored.BufferBDA,
                             .PropertyBufferSourceKey = authored.BufferSourceKey,
@@ -1023,10 +1083,7 @@ namespace Extrinsic::Runtime
                             .OverlayColor = authored.Color,
                             .DepthTested = authored.DepthTested,
                         },
-                        [](Geometry::ConstPropertySet properties)
-                        {
-                            return IsolineAdapter{std::move(properties)};
-                        });
+                        EncodeIsolineProperty);
                 }
                 else if constexpr (std::is_same_v<Recipe, HtexPreviewVisualizationRecipe>)
                 {
@@ -1144,7 +1201,7 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    void VisualizationAdapterBatch::Clear() noexcept
+    void VisualizationEncodingBatch::Clear() noexcept
     {
         PropertyBuffers.clear();
         PropertyBufferPayloads.clear();
@@ -1157,7 +1214,7 @@ namespace Extrinsic::Runtime
         FragmentBakeAtlases.clear();
     }
 
-    void VisualizationAdapterBatch::Append(VisualizationAdapterBatch&& other)
+    void VisualizationEncodingBatch::Append(VisualizationEncodingBatch&& other)
     {
         PropertyBufferPayloads.insert(
             PropertyBufferPayloads.end(),
@@ -1194,7 +1251,7 @@ namespace Extrinsic::Runtime
             std::make_move_iterator(other.FragmentBakeAtlases.end()));
     }
 
-    Graphics::VisualizationPacketBatch VisualizationAdapterBatch::AsPacketBatch(
+    Graphics::VisualizationPacketBatch VisualizationEncodingBatch::AsPacketBatch(
         const bool enforceDomain,
         const Graphics::VisualizationAttributeDomain expectedDomain) const noexcept
     {
@@ -1212,439 +1269,4 @@ namespace Extrinsic::Runtime
         };
     }
 
-    PropertyScalarAdapter::PropertyScalarAdapter(
-        Geometry::ConstPropertySet properties) noexcept
-        : m_Properties(std::move(properties))
-    {
-    }
-
-    void PropertyScalarAdapter::Append(VisualizationAdapterBatch& out,
-                                       const VisualizationAdapterOptions& options,
-                                       VisualizationAdapterStats& stats) const
-    {
-        ++stats.AdapterInvocationCount;
-
-        if (options.SourceName.empty())
-        {
-            ++stats.MissingSourceCount;
-            return;
-        }
-
-        if (const auto floatProperty = m_Properties.Get<float>(options.SourceName);
-            floatProperty.IsValid())
-        {
-            (void)AppendScalarPacket(floatProperty, out, options, stats);
-            return;
-        }
-
-        if (const auto doubleProperty = m_Properties.Get<double>(options.SourceName);
-            doubleProperty.IsValid())
-        {
-            (void)AppendScalarPacket(doubleProperty, out, options, stats);
-            return;
-        }
-
-        if (m_Properties.Exists(options.SourceName))
-        {
-            ++stats.UnsupportedSourceTypeCount;
-        }
-        else
-        {
-            ++stats.MissingSourceCount;
-        }
-    }
-
-    KMeansLabelAdapter::KMeansLabelAdapter(
-        Geometry::ConstPropertySet properties) noexcept
-        : m_Properties(std::move(properties))
-    {
-    }
-
-    void KMeansLabelAdapter::Append(VisualizationAdapterBatch& out,
-                                    const VisualizationAdapterOptions& options,
-                                    VisualizationAdapterStats& stats) const
-    {
-        ++stats.AdapterInvocationCount;
-
-        if (options.SourceName.empty())
-        {
-            ++stats.MissingSourceCount;
-            return;
-        }
-
-        if (const auto colors = m_Properties.Get<glm::vec4>(options.SourceName);
-            colors.IsValid())
-        {
-            (void)AppendColorPacket(colors, out, options, stats);
-            return;
-        }
-
-        if (m_Properties.Exists(options.SourceName))
-        {
-            ++stats.UnsupportedSourceTypeCount;
-        }
-        else
-        {
-            ++stats.MissingSourceCount;
-        }
-    }
-
-    VectorFieldAdapter::VectorFieldAdapter(
-        Geometry::ConstPropertySet properties) noexcept
-        : m_Properties(std::move(properties))
-    {
-    }
-
-    void VectorFieldAdapter::Append(VisualizationAdapterBatch& out,
-                                    const VisualizationAdapterOptions& options,
-                                    VisualizationAdapterStats& stats) const
-    {
-        ++stats.AdapterInvocationCount;
-
-        if (options.SourceName.empty())
-        {
-            ++stats.MissingSourceCount;
-            return;
-        }
-
-        if (const auto vectors = m_Properties.Get<glm::vec3>(options.SourceName);
-            vectors.IsValid())
-        {
-            (void)AppendVectorFieldPacket(vectors, out, options, stats);
-            return;
-        }
-
-        if (m_Properties.Exists(options.SourceName))
-        {
-            ++stats.UnsupportedSourceTypeCount;
-        }
-        else
-        {
-            ++stats.MissingSourceCount;
-        }
-    }
-
-    CurvatureVisualizationAdapter::CurvatureVisualizationAdapter(
-        Geometry::ConstPropertySet properties) noexcept
-        : m_Properties(std::move(properties))
-    {
-    }
-
-    void CurvatureVisualizationAdapter::Append(
-        VisualizationAdapterBatch& out,
-        const VisualizationAdapterOptions& options,
-        VisualizationAdapterStats& stats) const
-    {
-        namespace GS = Extrinsic::ECS::Components::GeometrySources;
-
-        ++stats.AdapterInvocationCount;
-
-        if (options.SourceName.empty())
-        {
-            ++stats.MissingSourceCount;
-            return;
-        }
-
-        std::optional<std::size_t> scalarCount{};
-        bool scalarAppended = false;
-        if (const auto floatProperty = m_Properties.Get<float>(options.SourceName);
-            floatProperty.IsValid())
-        {
-            scalarCount = floatProperty.Span().size();
-            scalarAppended = AppendScalarPacket(floatProperty, out, options, stats);
-        }
-        else if (const auto doubleProperty =
-                     m_Properties.Get<double>(options.SourceName);
-                 doubleProperty.IsValid())
-        {
-            scalarCount = doubleProperty.Span().size();
-            scalarAppended = AppendScalarPacket(doubleProperty, out, options, stats);
-        }
-        else
-        {
-            if (m_Properties.Exists(options.SourceName))
-                ++stats.UnsupportedSourceTypeCount;
-            else
-                ++stats.MissingSourceCount;
-            return;
-        }
-
-        if (!scalarAppended || !options.EmitPrincipalDirections)
-            return;
-
-        struct DirectionRequest
-        {
-            std::string SourceName{};
-            std::string Suffix{};
-            Geometry::ConstProperty<glm::vec3> Property{};
-        };
-
-        std::vector<DirectionRequest> directions{};
-        directions.reserve(2u);
-        const auto prepareDirection =
-            [&](std::string sourceName,
-                std::string suffix) -> bool
-            {
-                if (sourceName.empty())
-                {
-                    ++stats.MissingSourceCount;
-                    return false;
-                }
-
-                const auto vectors = m_Properties.Get<glm::vec3>(sourceName);
-                if (!vectors.IsValid())
-                {
-                    if (m_Properties.Exists(sourceName))
-                        ++stats.UnsupportedSourceTypeCount;
-                    else
-                        ++stats.MissingSourceCount;
-                    return false;
-                }
-                if (scalarCount.has_value() &&
-                    vectors.Span().size() != *scalarCount)
-                {
-                    ++stats.InvalidResourceCount;
-                    return false;
-                }
-
-                directions.push_back(DirectionRequest{
-                    .SourceName = std::move(sourceName),
-                    .Suffix = std::move(suffix),
-                    .Property = vectors,
-                });
-                return true;
-            };
-
-        bool directionsValid = true;
-        if (options.EmitPrincipalDirection1)
-        {
-            directionsValid = prepareDirection(
-                CurvatureDirectionName(
-                    options.PrincipalDirection1SourceName,
-                    GS::PropertyNames::kPrincipalDir1),
-                "principal_dir1") &&
-                directionsValid;
-        }
-        if (options.EmitPrincipalDirection2)
-        {
-            directionsValid = prepareDirection(
-                CurvatureDirectionName(
-                    options.PrincipalDirection2SourceName,
-                    GS::PropertyNames::kPrincipalDir2),
-                "principal_dir2") &&
-                directionsValid;
-        }
-        if (!directionsValid)
-            return;
-
-        for (const DirectionRequest& direction : directions)
-        {
-                VisualizationAdapterOptions directionOptions = options;
-                directionOptions.SourceName = direction.SourceName;
-                directionOptions.OutputName =
-                    CurvatureDirectionPacketName(options, direction.Suffix);
-                directionOptions.PropertyBufferSourceKey.clear();
-                directionOptions.VectorBufferSourceKey =
-                    directionOptions.OutputName;
-                directionOptions.VectorBufferBDA = 0u;
-                (void)AppendVectorFieldPacket(
-                    direction.Property,
-                    out,
-                    directionOptions,
-                    stats);
-        }
-    }
-
-    IsolineAdapter::IsolineAdapter(
-        Geometry::ConstPropertySet properties) noexcept
-        : m_Properties(std::move(properties))
-    {
-    }
-
-    void IsolineAdapter::Append(VisualizationAdapterBatch& out,
-                                const VisualizationAdapterOptions& options,
-                                VisualizationAdapterStats& stats) const
-    {
-        ++stats.AdapterInvocationCount;
-
-        if (options.SourceName.empty())
-        {
-            ++stats.MissingSourceCount;
-            return;
-        }
-
-        if (const auto floatProperty = m_Properties.Get<float>(options.SourceName);
-            floatProperty.IsValid())
-        {
-            (void)AppendIsolinePacket(floatProperty, out, options, stats);
-            return;
-        }
-
-        if (const auto doubleProperty = m_Properties.Get<double>(options.SourceName);
-            doubleProperty.IsValid())
-        {
-            (void)AppendIsolinePacket(doubleProperty, out, options, stats);
-            return;
-        }
-
-        if (m_Properties.Exists(options.SourceName))
-        {
-            ++stats.UnsupportedSourceTypeCount;
-        }
-        else
-        {
-            ++stats.MissingSourceCount;
-        }
-    }
-
-    HtexMetadataAdapter::HtexMetadataAdapter(
-        JobService* jobs,
-        const WorldHandle world) noexcept
-        : m_Jobs(jobs)
-        , m_World(world)
-    {
-    }
-
-    void HtexMetadataAdapter::Append(VisualizationAdapterBatch& out,
-                                     const VisualizationAdapterOptions& options,
-                                     VisualizationAdapterStats& stats) const
-    {
-        ++stats.AdapterInvocationCount;
-
-        if (!options.EmitHtexPreview && !options.EmitFragmentBake)
-        {
-            ++stats.MissingSourceCount;
-            return;
-        }
-
-        const std::string name = PacketName(options);
-        Graphics::HtexPatchPreviewAtlasPacket htexPacket{};
-        bool hasHtexPacket = false;
-        if (options.EmitHtexPreview)
-        {
-            if (name.empty() || options.PatchCount == 0u ||
-                !ValidAtlasDimensions(options))
-            {
-                ++stats.InvalidResourceCount;
-                return;
-            }
-
-            htexPacket = Graphics::HtexPatchPreviewAtlasPacket{
-                .Name = name,
-                .PatchCount = options.PatchCount,
-                .AtlasWidth = options.AtlasWidth,
-                .AtlasHeight = options.AtlasHeight,
-            };
-            hasHtexPacket = true;
-        }
-
-        Graphics::FragmentBakeAtlasPacket bakePacket{};
-        bool hasBakePacket = false;
-        if (options.EmitFragmentBake)
-        {
-            const std::string sourceAttribute =
-                FragmentSourceAttributeName(options);
-            if (name.empty() || sourceAttribute.empty() ||
-                options.FaceCount == 0u || !ValidAtlasDimensions(options))
-            {
-                ++stats.InvalidResourceCount;
-                return;
-            }
-
-            switch (options.FragmentBakeMapping)
-            {
-            case Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords:
-                if (!options.MeshHasTexcoords ||
-                    options.TexcoordBufferBDA == 0u)
-                {
-                    ++stats.MissingTexcoordCount;
-                    return;
-                }
-                break;
-            case Graphics::VisualizationFragmentBakeMapping::ExistingHtex:
-                break;
-            case Graphics::VisualizationFragmentBakeMapping::RecreateHtex:
-                if (!ScheduleHtexRecreate(
-                        m_Jobs, m_World, name, options, stats))
-                    return;
-                break;
-            default:
-                ++stats.InvalidResourceCount;
-                return;
-            }
-
-            bakePacket = Graphics::FragmentBakeAtlasPacket{
-                .Name = name,
-                .SourceAttributeName = sourceAttribute,
-                .Mapping = options.FragmentBakeMapping,
-                .MeshHasTexcoords = options.MeshHasTexcoords,
-                .FaceCount = options.FaceCount,
-                .AtlasWidth = options.AtlasWidth,
-                .AtlasHeight = options.AtlasHeight,
-                .TexcoordBufferBDA = options.TexcoordBufferBDA,
-                .AtlasTextureAsset = options.AtlasTextureAsset,
-                .GeneratedTextureSemantic =
-                    options.GeneratedTextureSemantic,
-                .TexcoordProvenance =
-                    options.FragmentBakeMapping ==
-                            Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords
-                        ? Graphics::VisualizationTexcoordProvenance::RuntimeResolved
-                        : Graphics::VisualizationTexcoordProvenance::Unknown,
-                .TexcoordDirtyStamp = options.DirtyStamp,
-                .SourceAttributeDirtyStamp =
-                    options.SourceAttributeDirtyStamp,
-            };
-            hasBakePacket = true;
-        }
-
-        if (hasHtexPacket)
-        {
-            out.HtexAtlases.push_back(std::move(htexPacket));
-            ++stats.PacketAppendCount;
-        }
-        if (hasBakePacket)
-        {
-            out.FragmentBakeAtlases.push_back(std::move(bakePacket));
-            ++stats.PacketAppendCount;
-        }
-    }
-
-    void VisualizationAdapterRegistry::Register(
-        const Key key,
-        const IVisualizationAdapter& adapter)
-    {
-        m_Adapters.insert_or_assign(key, &adapter);
-    }
-
-    bool VisualizationAdapterRegistry::Unregister(const Key key) noexcept
-    {
-        return m_Adapters.erase(key) != 0u;
-    }
-
-    const IVisualizationAdapter* VisualizationAdapterRegistry::Find(
-        const Key key) const noexcept
-    {
-        const auto it = m_Adapters.find(key);
-        return it != m_Adapters.end() ? it->second : nullptr;
-    }
-
-    bool VisualizationAdapterRegistry::Contains(const Key key) const noexcept
-    {
-        return Find(key) != nullptr;
-    }
-
-    std::size_t VisualizationAdapterRegistry::Size() const noexcept
-    {
-        return m_Adapters.size();
-    }
-
-    bool VisualizationAdapterRegistry::Empty() const noexcept
-    {
-        return m_Adapters.empty();
-    }
-
-    void VisualizationAdapterRegistry::Clear() noexcept
-    {
-        m_Adapters.clear();
-    }
 }

@@ -124,7 +124,7 @@ Runtime owns **both** fallback initialization and upload scheduling.
 **Texture-typed asset bridges** live in the planned umbrella module `Extrinsic.Runtime.AssetBridges.Texture`, mirroring:
 
 - The `Extrinsic.Runtime.SpatialDebugAdapters` pattern from [ADR-0008](0008-spatial-debug-visualizer-adapters.md).
-- The `Extrinsic.Runtime.VisualizationAdapters` pattern from [ADR-0009](0009-visualization-packets-and-overlay-upload.md).
+- The `Extrinsic.Runtime.VisualizationRecipes` pattern from [ADR-0009](0009-visualization-packets-and-overlay-upload.md).
 
 Bridges:
 

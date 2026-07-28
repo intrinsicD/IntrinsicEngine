@@ -38,7 +38,7 @@ import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.GeometryPlanBuilders;
 import Extrinsic.Runtime.RenderWorldPool;
-import Extrinsic.Runtime.VisualizationAdapters;
+import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.WorldHandle;
 
 // Single non-exported implementation-partition unit for the cache state shared by
@@ -332,7 +332,7 @@ namespace Extrinsic::Runtime
         {
             std::unordered_map<std::uint32_t, VisualizationRecipe> Recipes{};
             std::uint64_t RecipeRevision{0u};
-            VisualizationAdapterBatch Batch{};
+            VisualizationEncodingBatch Batch{};
         };
         std::unique_ptr<VisualizationRecipeState> m_VisualizationState{};
 

@@ -971,3 +971,26 @@ observations:
     promoted_to: "logic/claims.md:C13"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O69
+    timestamp: "2026-07-28T11:05+02:00"
+    provenance: ai-executed
+    content: >
+      Production visualization intent can converge through one closed copied
+      recipe variant and pure typed encoders into the existing graphics packet
+      and property-residency seams without an adapter interface, registry,
+      opaque key, or per-entity adapter lifetime.
+    context: >
+      RUNTIME-198 closure combines 95 focused CPU visualization/extraction
+      cases, a zero-result retired-symbol scan, 4,124 selected default CPU
+      cases with zero failures, 45 focused ASan cases, 2,778 selected UBSan
+      cases with zero failures, and two ASan+UBSan promoted-Vulkan visualization
+      readback smokes on an NVIDIA GeForce RTX 3050 with driver 590.48.01. Four
+      unrelated complete-ASan runtime-asset test-lifetime failures already on
+      origin/main are recorded under BUG-122. This is a lifecycle/capability
+      claim, not a performance claim.
+    potential_type: claim
+    bound_to: [N287]
+    promoted: true
+    promoted_to: "logic/claims.md:C14"
+    crystallized_via: artifact-commitment
+    stale: false

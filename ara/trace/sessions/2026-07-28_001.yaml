@@ -1,0 +1,120 @@
+session:
+  id: "2026-07-28_001"
+  date: "2026-07-28"
+  started: "2026-07-28T02:23+02:00"
+  last_turn: "2026-07-28T11:13+02:00"
+  turn_count: 1
+  summary: "Retired RUNTIME-196, RUNTIME-193, RUNTIME-197, and RUNTIME-198, converging clustering, geometry presentation/residency, and visualization recipes with complete CPU and operational Vulkan evidence."
+
+events_logged:
+  - turn: 1
+    type: experiment
+    id: "N284"
+    routing: direct
+    provenance: ai-executed
+    summary: "Converged every production K-Means caller on ClusteringService and passed CPU plus operational Vulkan parity."
+  - turn: 1
+    type: claim
+    id: "O66"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the one-operation runtime K-Means path as C11 through artifact commitment."
+  - turn: 1
+    type: experiment
+    id: "N285"
+    routing: direct
+    provenance: ai-executed
+    summary: "Converged general geometry presentation on one authored recipe, runtime sidecar, and copied snapshot."
+  - turn: 1
+    type: claim
+    id: "O67"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the unified geometry-presentation lifecycle as C12 through artifact commitment."
+  - turn: 1
+    type: experiment
+    id: "N286"
+    routing: direct
+    provenance: ai-executed
+    summary: "Converged all six runtime geometry lanes on one upload-plan and residency lifecycle."
+  - turn: 1
+    type: claim
+    id: "O68"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the one geometry upload/residency lifecycle as C13 through artifact commitment."
+  - turn: 1
+    type: experiment
+    id: "N287"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired visualization adapters after CPU, focused sanitizer, and operational Vulkan recipe evidence."
+  - turn: 1
+    type: claim
+    id: "O69"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the closed visualization recipe and pure encoding path as C14 through artifact commitment."
+
+ai_actions:
+  - turn: 1
+    action: "Completed, verified, documented, and retired RUNTIME-196 so ClusteringService is the sole typed K-Means operation across CPU, Vulkan, config, UI, and benchmark callers."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm"
+      - "src/runtime/Modules/Clustering/Runtime.ClusteringGpuBackend.cppm"
+      - "tests/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp"
+      - "tasks/done/RUNTIME-196-canonical-clustering-service-path.md"
+  - turn: 1
+    action: "Completed, verified, documented, and retired RUNTIME-193 after every general geometry domain adopted one presentation recipe/state/snapshot path."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.GeometryPresentation.cppm"
+      - "src/runtime/Runtime.RenderExtraction.cpp"
+      - "tests/contract/runtime/Test.GeometryPresentation.cpp"
+      - "tasks/done/RUNTIME-193-general-geometry-presentation-recipe.md"
+  - turn: 1
+    action: "Completed, verified, documented, and retired RUNTIME-197 after all six runtime geometry lanes adopted the graphics-owned residency coordinator."
+    provenance: ai-executed
+    files_changed:
+      - "src/graphics/renderer/Graphics.GeometryResidency.cppm"
+      - "src/runtime/Runtime.GeometryPlanBuilders.cppm"
+      - "tests/contract/graphics/Test.GeometryResidency.cpp"
+      - "tasks/done/RUNTIME-197-unified-geometry-upload-residency-coordinator.md"
+  - turn: 1
+    action: "Completed, verified, documented, and retired RUNTIME-198; deleted the visualization adapter/registry/opaque-binding family, retained closed recipes and pure encoding, and recorded unrelated full-ASan test-lifetime failures as BUG-122."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Visualization/Runtime.VisualizationRecipes.cppm"
+      - "src/runtime/Runtime.RenderExtraction.Recipes.cpp"
+      - "tests/contract/runtime/Test.VisualizationRecipes.cpp"
+      - "tasks/done/RUNTIME-198-data-driven-visualization-recipes.md"
+      - "tasks/backlog/bugs/BUG-122-runtime-asset-asan-test-lifetimes.md"
+
+claims_touched:
+  - id: C11
+    action: crystallized
+    turn: 1
+  - id: C12
+    action: crystallized
+    turn: 1
+  - id: C13
+    action: crystallized
+    turn: 1
+  - id: C14
+    action: crystallized
+    turn: 1
+
+key_context:
+  - turn: 1
+    excerpt: "The user directed continuation of the active runtime cleanup chain, then explicitly required stopping after RUNTIME-198 and integrating the completed work into remote main."
+  - turn: 1
+    excerpt: "Every capability claim is bounded to exact CPU and operational Vulkan evidence; no performance claim is made, and BUG-122 owns the unrelated complete-ASan failures already present on origin/main."
+
+open_threads:
+  - "BUG-122 owns the four pre-existing runtime-asset ASan test-lifetime defects; no fix was mixed into RUNTIME-198."
+  - "RUNTIME-200 remains open in the runtime consolidation backlog; the user explicitly stopped the chain before starting it."
+  - "METHOD-014 and O38 continue to own unproven Progressive Poisson compute/public parity."
+  - "N273, O57, and O58 remain open for a separately selected mechanical runtime-directory reorganization."
+
+ai_suggestions_pending: []

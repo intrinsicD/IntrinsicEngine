@@ -930,7 +930,7 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
         ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxDefaultPolicies.cpp");
     const auto visualization =
         ReadFile(RepoRoot() /
-                 "src/runtime/Visualization/Runtime.VisualizationAdapters.cpp");
+                 "src/runtime/Visualization/Runtime.VisualizationRecipes.cpp");
     const auto modelHandoff =
         ReadFile(RepoRoot() / "src/runtime/Runtime.AssetModelSceneHandoff.cpp");
     const auto selectedBake =
@@ -959,7 +959,7 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     EXPECT_EQ(CountOccurrences(sandboxPolicies, "JobDesc{"), 1u);
     EXPECT_EQ(CountOccurrences(sandboxPolicies, ".Scope = world"), 1u);
     EXPECT_EQ(CountOccurrences(visualization, "JobDesc{"), 1u);
-    EXPECT_EQ(CountOccurrences(visualization, ".Scope = world"), 1u);
+    EXPECT_EQ(CountOccurrences(visualization, ".Scope = request.World"), 1u);
 
     EXPECT_EQ(CountOccurrences(modelHandoff, "JobDesc "), 4u);
     EXPECT_EQ(CountOccurrences(modelHandoff, ".Scope = "), 4u);

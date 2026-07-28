@@ -686,7 +686,7 @@ shadow-caster tags, collider/rigid-body descriptors, spatial-debug bindings, and
 asset-instance source references are counted in `SceneSerializationStats` but
 not materialized on load. Presentation readiness, generated outputs,
 diagnostics, and generations are likewise runtime-only. Renderer/RHI resources,
-GPU handles, adapter bindings, camera controller state, and editor document
+GPU handles, transient per-entity visualization recipes, camera controller state, and editor document
 history are runtime/graphics/editor state and are not scene-file contents.
 
 ## Physics Bridge

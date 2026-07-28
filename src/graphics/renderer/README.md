@@ -1558,7 +1558,7 @@ Concretely:
   follows. Concrete camera controllers (orbit, fly, free-look,
   top-down) live as runtime modules under the planned umbrella
   module name `Extrinsic.Runtime.CameraControllers`, mirroring the
-  `Extrinsic.Runtime.VisualizationAdapters`
+  `Extrinsic.Runtime.VisualizationRecipes`
   pattern from `GRAPHICS-014Q`, and the
   `Extrinsic.Runtime.AssetBridges.Texture` pattern from
   `GRAPHICS-015Q`. Controllers read platform input deltas through
@@ -1656,7 +1656,7 @@ Concretely:
   and Htex atlas descriptors while leaving texture residency and geometry
   algorithm generation to later graphics-assets/runtime/geometry owners.
   `GRAPHICS-084` adds the selected property-buffer residency seam for current
-  promoted visualization adapters: `VisualizationPropertyBufferUploadDescriptor`
+  visualization recipes: `VisualizationPropertyBufferUploadDescriptor`
   carries source key, domain, value type, element count, stride, dirty stamp,
   and copied bytes; `VisualizationPropertyBufferResidency` validates those
   descriptors, rejects unsupported/zero/non-finite/stale inputs, uploads or
@@ -1677,14 +1677,16 @@ Concretely:
   `RuntimeRenderSnapshotBatch` visualization packet spans
   (`VisualizationAttributeBuffers`, `VisualizationScalars`,
   `VisualizationColors`, `VisualizationVectorFields`, `VisualizationIsolines`,
-  `VisualizationHtexAtlases`, `VisualizationFragmentBakeAtlases`); concrete
-  producer adapters live under the `Extrinsic.Runtime.VisualizationAdapters`
-  umbrella. Editor/app code provides user-facing surfaces (selected
+  `VisualizationHtexAtlases`, `VisualizationFragmentBakeAtlases`). Closed
+  recipe values and the pure encoder live in
+  `Extrinsic.Runtime.VisualizationRecipes`. Editor/app code provides user-facing
+  surfaces (selected
   attribute, colormap, scalar range, isoline parameters, vector-field
-  scale/color, Htex regeneration request) and funnels them into the runtime
-  adapter as pre-filter inputs; graphics never imports geometry algorithm
-  modules or live ECS ownership. Runtime/extraction performs no packet
-  filtering — every authored packet flows through
+  scale/color, Htex regeneration request) and authors the matching copied
+  recipe inputs; graphics never imports geometry algorithm modules or live ECS
+  ownership. Runtime rejects recipes whose source properties or metadata cannot
+  produce a packet, but does not duplicate graphics packet revalidation. Every
+  encoded packet flows through
   `IRenderer::SubmitRuntimeSnapshots()`; validation is centralized in
   `ValidateVisualizationPackets(...)` invoked by the renderer at snapshot
   extraction time, rejected records are dropped from the consumed

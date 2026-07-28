@@ -54,7 +54,7 @@ import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.RenderWorldPool;
-import Extrinsic.Runtime.VisualizationAdapters;
+import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.Properties;
@@ -1889,7 +1889,7 @@ namespace Extrinsic::Runtime
                             configs[i]);
                         scalar.has_value())
                     {
-                        ++stats.VisualizationAdapterScalarConfigsObserved;
+                        ++stats.VisualizationRecipeScalarConfigsObserved;
                         AppendVisualizationRecipe(
                             *availabilityThisFrame, *scalar, stats);
                     }

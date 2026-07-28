@@ -31,9 +31,6 @@ cleanup slice:
 
 #### Open tasks
 
-- [`RUNTIME-198` — Data-driven visualization recipes](../../active/RUNTIME-198-data-driven-visualization-recipes.md)
-  replaces the zero-production-registration adapter interface/registry with a
-  closed recipe variant and pure packet encoders.
 - [`RUNTIME-200` — Staged asset-import and materialization recipe](RUNTIME-200-staged-asset-import-materialization-recipe.md)
   unifies route/decode/materialize/author/postprocess/residency/completion and
   deletes the role callback/IO bridge/monolithic handoff paths after workflow
@@ -50,6 +47,9 @@ cleanup slice:
 
 #### Retired prerequisites and completed paths
 
+- [`RUNTIME-198` — Data-driven visualization recipes](../../done/RUNTIME-198-data-driven-visualization-recipes.md)
+  replaced the zero-production-registration adapter interface/registry with a
+  closed recipe variant and pure packet encoders.
 - [`RUNTIME-197` — Unified geometry upload and residency coordinator](../../done/RUNTIME-197-unified-geometry-upload-residency-coordinator.md)
   retired five public packers, the procedural cache, and per-domain lifecycle
   queues after all six live geometry lanes converged on private typed plan

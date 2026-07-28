@@ -65,12 +65,12 @@ Crucially, most of the spine for this already exists; the foundation should
   `VertexLayout` / `VertexChannelStreams` substrate; per-channel GPU residency
   (RUNTIME-122 Slice B) and single-channel partial uploads (RUNTIME-124) are
   open. This is the upload-side mechanism for "stream just the normals".
-- **Dimension-match validation + visualization adapters (have, scoped).**
+- **Dimension-match validation + visualization recipe encoding (have, scoped).**
   GRAPHICS-084 validates `ElementCount × stride == bytes` and stride-matches a
-  declared `ValueType`, with `Domain {Vertex,Edge,Face,Instance}` and adapters
-  (scalar / color / vector-field / isoline) that turn a property into a
-  renderable buffer (`Graphics.VisualizationPackets.cppm`,
-  `Runtime.VisualizationAdapters.cppm`). This is exactly the "dimensions must
+  declared `ValueType`, with `Domain {Vertex,Edge,Face,Instance}` and closed
+  recipes (scalar / color / vector-field / isoline) that encode a property as
+  a renderable buffer (`Graphics.VisualizationPackets.cppm`,
+  `Runtime.VisualizationRecipes.cppm`). This is exactly the "dimensions must
   match" rule and the "normals → color / vector-field" derivation — but today
   only for the visualization path, not a general property↔buffer-range binding.
 

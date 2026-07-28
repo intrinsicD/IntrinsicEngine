@@ -21,7 +21,7 @@ import Extrinsic.Graphics.Component.GpuSceneSlot;
 export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.WorldHandle;
-export import Extrinsic.Runtime.VisualizationAdapters;
+export import Extrinsic.Runtime.VisualizationRecipes;
 
 export namespace Extrinsic::Runtime
 {
@@ -220,26 +220,24 @@ export namespace Extrinsic::Runtime
         std::uint32_t MeshVertexViewMissingPositions{0};
         std::uint32_t MeshPrimitiveViewFreeRetires{0};
 
-        // RUNTIME-198 Slice B — typed visualization recipe encoding counters.
-        // The compatibility names are retained until Slice C performs the
-        // mechanical stats rename; every value now comes from pure recipe
-        // encoding, never adapter lookup or object dispatch.
-        std::uint32_t VisualizationAdapterScalarConfigsObserved{0};
-        std::uint32_t VisualizationAdapterBindingsMissing{0};
-        std::uint32_t VisualizationAdapterMissingAdapterCount{0};
-        std::uint32_t VisualizationAdapterInvokedCount{0};
-        std::uint32_t VisualizationAdapterPacketAppendCount{0};
-        std::uint32_t VisualizationAdapterMissingSourceCount{0};
-        std::uint32_t VisualizationAdapterUnsupportedSourceTypeCount{0};
-        std::uint32_t VisualizationAdapterEmptySourceCount{0};
-        std::uint32_t VisualizationAdapterInvalidBufferCount{0};
-        std::uint32_t VisualizationAdapterInvalidRangeCount{0};
-        std::uint32_t VisualizationAdapterNonFiniteValueCount{0};
-        std::uint32_t VisualizationAdapterElementCountOverflowCount{0};
-        std::uint32_t VisualizationAdapterManualRangeCount{0};
-        std::uint32_t VisualizationAdapterFlatAutoRangeExpandedCount{0};
-        std::uint32_t VisualizationAdapterRobustAutoRangeClampedCount{0};
-        std::uint64_t VisualizationAdapterScalarValueScanCount{0};
+        // Typed visualization recipe encoding counters. Every value comes
+        // from closed recipe data and pure encoding, never object dispatch.
+        std::uint32_t VisualizationRecipeScalarConfigsObserved{0};
+        std::uint32_t VisualizationRecipeEncodeCount{0};
+        std::uint32_t VisualizationRecipePacketAppendCount{0};
+        std::uint32_t VisualizationRecipeMissingSourceCount{0};
+        std::uint32_t VisualizationRecipeUnsupportedSourceTypeCount{0};
+        std::uint32_t VisualizationRecipeEmptySourceCount{0};
+        std::uint32_t VisualizationRecipeInvalidBufferCount{0};
+        std::uint32_t VisualizationRecipeInvalidResourceCount{0};
+        std::uint32_t VisualizationRecipeMissingTexcoordCount{0};
+        std::uint32_t VisualizationRecipeInvalidRangeCount{0};
+        std::uint32_t VisualizationRecipeNonFiniteValueCount{0};
+        std::uint32_t VisualizationRecipeElementCountOverflowCount{0};
+        std::uint32_t VisualizationRecipeManualRangeCount{0};
+        std::uint32_t VisualizationRecipeFlatAutoRangeExpandedCount{0};
+        std::uint32_t VisualizationRecipeRobustAutoRangeClampedCount{0};
+        std::uint64_t VisualizationRecipeScalarValueScanCount{0};
         std::uint32_t VisualizationRecipeEmptyCount{0};
         std::uint32_t VisualizationRecipeUnsupportedDomainCount{0};
         std::uint32_t VisualizationRecipeElementCountMismatchCount{0};

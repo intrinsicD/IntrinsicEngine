@@ -5936,3 +5936,24 @@ and the shutdown LeakSanitizer contract. Strict layering, test-layout, task-
 policy, docs-link, root-hygiene, ARA, generated-inventory, and whitespace
 checks close the evidence; C13 records the lifecycle/capability scope without
 a performance claim.
+
+[`RUNTIME-198`](RUNTIME-198-data-driven-visualization-recipes.md) — data-driven
+visualization convergence retired on 2026-07-28 at `Retired`. Scalar, color,
+label, vector-field, isoline, curvature-direction, and supported Htex metadata
+intent now use one closed copied `VisualizationRecipe` and pure typed encoders
+that emit the existing graphics packets and property-residency requests.
+Scalar/color config, geometry-presentation property buffers, and explicit
+recipes converge during extraction; Htex recreation remains a separate typed
+`JobService` operation. The adapter interface, six concrete wrappers,
+registry/map, opaque bindings, registration forwarding, adapter-only
+statistics, and 22 wrapper/registry-only tests are deleted. Focused CPU
+coverage passed 95/95; the complete CPU-supported selector passed all 4,124
+selected cases with one expected GLFW/LSan self-skip; focused ASan passed
+45/45; complete UBSan passed all 2,778 selected cases with the expected
+LSan-only self-skip; and both ASan+UBSan promoted-Vulkan visualization
+readbacks passed on an NVIDIA GeForce RTX 3050 with driver 590.48.01. Four
+unrelated complete-ASan runtime-asset test-lifetime defects already present on
+`origin/main` remain fail-closed under `BUG-122`; no gate was weakened or
+quarantined. Strict retired-symbol, layering, test-layout, task-policy,
+docs-link, root-hygiene, ARA, generated-inventory, and whitespace checks close
+the evidence; C14 records the capability scope without a performance claim.

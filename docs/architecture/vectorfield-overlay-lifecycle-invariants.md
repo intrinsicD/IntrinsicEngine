@@ -4,16 +4,17 @@ This note defines the single-source invariants for vector-field/overlay paths.
 The legacy path was `OverlayEntityFactory -> ECS tags/components -> lifecycle
 systems -> render extraction`; `RUNTIME-104` retired that child-entity producer
 for current promoted workflows. The promoted vector-field path is
-`Runtime.VisualizationAdapters -> Graphics.VisualizationPackets -> renderer
+`Runtime.VisualizationRecipes -> Graphics.VisualizationPackets -> renderer
 visualization-overlay pass` and creates no child ECS entity.
 
 ## Invariant A — Authoritative geometry ownership
 
 - Current promoted workflows keep source geometry/property ownership in
-  runtime/editor/app-owned `GeometrySources` or adapter input data.
-- `VectorFieldAdapter` emits immutable `VectorFieldOverlayPacket` records from
-  caller-owned buffers; it does not create child `Graph` entities or store
-  graphics/RHI handles in ECS.
+  `GeometrySources`; runtime/editor/app code authors copied recipe data.
+- `VectorFieldVisualizationRecipe` identifies canonical vector/position
+  properties and immutable packet metadata. Pure recipe encoding emits a
+  `VectorFieldOverlayPacket`; it creates no child `Graph` entity and stores no
+  graphics/RHI handle in ECS.
 - Lifecycle systems may stage/refresh GPU views, but must not invent ownership
   absent source component data.
 
@@ -27,7 +28,7 @@ attached before the next lifecycle pass:
 
 No lifecycle pass should assume clean state after replacement without explicit
 clear by sync system. Packet-only vector-field overlays carry the current
-adapter inputs for the frame rather than maintaining an independent dirty stamp.
+copied recipe for the frame rather than maintaining an independent dirty stamp.
 
 ## Invariant C — Parent/child destruction closure
 
@@ -57,7 +58,7 @@ runtime selection snapshot and graphics outline lanes.
 
 ## Invariant E — Extraction determinism
 
-Given the same ECS snapshot and runtime adapter bindings, extraction emits
+Given the same ECS snapshot and copied per-entity visualization recipes, extraction emits
 identical overlay draw packets independent of entity iteration order.
 
 This requires stable per-entity ordering keys and no hidden mutable global

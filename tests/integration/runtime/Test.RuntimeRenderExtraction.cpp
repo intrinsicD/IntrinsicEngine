@@ -40,7 +40,7 @@ import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.VisualizationAdapters;
+import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.AABB;
 import Geometry.Plane;
@@ -677,11 +677,11 @@ TEST(RuntimeRenderExtraction, VisualizationScalarRecipeReachesRenderWorld)
     const auto stats = fixture.Extract(scene);
     const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
 
-    EXPECT_EQ(stats.VisualizationAdapterInvokedCount, 1u);
-    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 1u);
+    EXPECT_EQ(stats.VisualizationRecipeEncodeCount, 1u);
+    EXPECT_EQ(stats.VisualizationRecipePacketAppendCount, 1u);
     EXPECT_EQ(stats.VisualizationScalarPacketCount, 1u);
-    EXPECT_EQ(stats.VisualizationAdapterInvalidBufferCount, 0u);
-    EXPECT_EQ(stats.VisualizationAdapterScalarValueScanCount, 3u);
+    EXPECT_EQ(stats.VisualizationRecipeInvalidBufferCount, 0u);
+    EXPECT_EQ(stats.VisualizationRecipeScalarValueScanCount, 3u);
 
     ASSERT_EQ(world.Visualization.Scalars.size(), 1u);
     const Graphics::ScalarAttributePacket& packet = world.Visualization.Scalars.front();
@@ -709,9 +709,9 @@ TEST(RuntimeRenderExtraction, VisualizationScalarConfigMissingSourceFailsClosed)
     const auto stats = fixture.Extract(scene);
     const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
 
-    EXPECT_EQ(stats.VisualizationAdapterScalarConfigsObserved, 1u);
-    EXPECT_EQ(stats.VisualizationAdapterInvokedCount, 1u);
-    EXPECT_EQ(stats.VisualizationAdapterMissingSourceCount, 1u);
+    EXPECT_EQ(stats.VisualizationRecipeScalarConfigsObserved, 1u);
+    EXPECT_EQ(stats.VisualizationRecipeEncodeCount, 1u);
+    EXPECT_EQ(stats.VisualizationRecipeMissingSourceCount, 1u);
     EXPECT_EQ(stats.VisualizationScalarPacketCount, 0u);
     EXPECT_TRUE(world.Visualization.Scalars.empty());
     EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 0u);
@@ -742,11 +742,11 @@ TEST(RuntimeRenderExtraction, VisualizationScalarRecipeMissingBdaUploadsProperty
     const auto stats = fixture.Extract(scene);
     const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
 
-    EXPECT_EQ(stats.VisualizationAdapterInvokedCount, 1u);
-    EXPECT_EQ(stats.VisualizationAdapterInvalidBufferCount, 0u);
-    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 1u);
+    EXPECT_EQ(stats.VisualizationRecipeEncodeCount, 1u);
+    EXPECT_EQ(stats.VisualizationRecipeInvalidBufferCount, 0u);
+    EXPECT_EQ(stats.VisualizationRecipePacketAppendCount, 1u);
     EXPECT_EQ(stats.VisualizationScalarPacketCount, 1u);
-    EXPECT_EQ(stats.VisualizationAdapterScalarValueScanCount, 3u);
+    EXPECT_EQ(stats.VisualizationRecipeScalarValueScanCount, 3u);
     ASSERT_EQ(world.Visualization.Scalars.size(), 1u);
     EXPECT_NE(world.Visualization.Scalars.front().ScalarBufferBDA, 0u);
     EXPECT_EQ(world.Visualization.Scalars.front().SourceBufferKey,
@@ -773,9 +773,9 @@ TEST(RuntimeRenderExtraction, VisualizationPropertyBufferKeysAreStableIdScoped)
     const auto stats = fixture.Extract(scene);
     const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
 
-    EXPECT_EQ(stats.VisualizationAdapterInvokedCount, 2u);
-    EXPECT_EQ(stats.VisualizationAdapterInvalidBufferCount, 0u);
-    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 2u);
+    EXPECT_EQ(stats.VisualizationRecipeEncodeCount, 2u);
+    EXPECT_EQ(stats.VisualizationRecipeInvalidBufferCount, 0u);
+    EXPECT_EQ(stats.VisualizationRecipePacketAppendCount, 2u);
     EXPECT_EQ(stats.VisualizationScalarPacketCount, 2u);
     ASSERT_EQ(world.Visualization.Scalars.size(), 2u);
     EXPECT_NE(world.Visualization.Scalars[0].SourceBufferKey,
@@ -803,10 +803,10 @@ TEST(RuntimeRenderExtraction, MeshColorVisualizationPropertyBufferUploadsFromGeo
     const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
 
     EXPECT_EQ(stats.MeshGeometryUploads, 1u);
-    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 1u);
+    EXPECT_EQ(stats.VisualizationRecipePacketAppendCount, 1u);
     EXPECT_EQ(stats.VisualizationColorPacketCount, 1u);
-    EXPECT_EQ(stats.VisualizationAdapterMissingSourceCount, 0u);
-    EXPECT_EQ(stats.VisualizationAdapterUnsupportedSourceTypeCount, 0u);
+    EXPECT_EQ(stats.VisualizationRecipeMissingSourceCount, 0u);
+    EXPECT_EQ(stats.VisualizationRecipeUnsupportedSourceTypeCount, 0u);
 
     ASSERT_EQ(world.Visualization.Colors.size(), 1u);
     const Graphics::ColorAttributePacket& packet = world.Visualization.Colors.front();
@@ -854,11 +854,11 @@ TEST(RuntimeRenderExtraction, PointCloudVisualizationPropertyBuffersUploadFromGe
     const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
 
     EXPECT_EQ(stats.PointCloudGeometryUploads, 2u);
-    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 2u);
+    EXPECT_EQ(stats.VisualizationRecipePacketAppendCount, 2u);
     EXPECT_EQ(stats.VisualizationScalarPacketCount, 1u);
     EXPECT_EQ(stats.VisualizationColorPacketCount, 1u);
-    EXPECT_EQ(stats.VisualizationAdapterMissingSourceCount, 0u);
-    EXPECT_EQ(stats.VisualizationAdapterUnsupportedSourceTypeCount, 0u);
+    EXPECT_EQ(stats.VisualizationRecipeMissingSourceCount, 0u);
+    EXPECT_EQ(stats.VisualizationRecipeUnsupportedSourceTypeCount, 0u);
 
     ASSERT_EQ(world.Visualization.Scalars.size(), 1u);
     const Graphics::ScalarAttributePacket& scalarPacket =
@@ -1184,7 +1184,7 @@ TEST(RuntimeRenderExtraction, MeshScalarDegenerateManualRangeIsSanitizedInPrepar
 
     const auto stats = fixture.Extract(scene);
     Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
-    EXPECT_EQ(stats.VisualizationAdapterInvalidRangeCount, 1u);
+    EXPECT_EQ(stats.VisualizationRecipeInvalidRangeCount, 1u);
     EXPECT_EQ(world.Visualization.Scalars.size(), 0u);
 
     fixture.Renderer->PrepareFrame(world);
@@ -1255,11 +1255,11 @@ TEST(RuntimeRenderExtraction, GraphVisualizationPropertyBuffersUploadFromNodeAnd
     const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
 
     EXPECT_EQ(stats.GraphGeometryUploads, 4u);
-    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 4u);
+    EXPECT_EQ(stats.VisualizationRecipePacketAppendCount, 4u);
     EXPECT_EQ(stats.VisualizationScalarPacketCount, 2u);
     EXPECT_EQ(stats.VisualizationColorPacketCount, 2u);
-    EXPECT_EQ(stats.VisualizationAdapterMissingSourceCount, 0u);
-    EXPECT_EQ(stats.VisualizationAdapterUnsupportedSourceTypeCount, 0u);
+    EXPECT_EQ(stats.VisualizationRecipeMissingSourceCount, 0u);
+    EXPECT_EQ(stats.VisualizationRecipeUnsupportedSourceTypeCount, 0u);
 
     const auto findScalar =
         [&](const std::string& name) -> const Graphics::ScalarAttributePacket*
@@ -1422,8 +1422,8 @@ TEST(RuntimeRenderExtraction, GeometryPresentationPropertyBuffersProjectToVisual
     EXPECT_EQ(stats.GeometryPresentationLaneCount, 2u);
     EXPECT_EQ(stats.GeometryPresentationSlotCount, 2u);
     EXPECT_EQ(stats.GeometryPresentationPropertyBufferReadyCount, 2u);
-    EXPECT_EQ(stats.VisualizationAdapterInvokedCount, 2u);
-    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 2u);
+    EXPECT_EQ(stats.VisualizationRecipeEncodeCount, 2u);
+    EXPECT_EQ(stats.VisualizationRecipePacketAppendCount, 2u);
     EXPECT_EQ(stats.VisualizationScalarPacketCount, 1u);
     EXPECT_EQ(stats.VisualizationColorPacketCount, 1u);
 
@@ -1555,10 +1555,10 @@ TEST(RuntimeRenderExtraction, MeshColorVisualizationPropertyBufferFailsClosed)
     const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
 
     EXPECT_EQ(stats.MeshGeometryUploads, 2u);
-    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 0u);
+    EXPECT_EQ(stats.VisualizationRecipePacketAppendCount, 0u);
     EXPECT_EQ(stats.VisualizationColorPacketCount, 0u);
-    EXPECT_EQ(stats.VisualizationAdapterMissingSourceCount, 1u);
-    EXPECT_EQ(stats.VisualizationAdapterUnsupportedSourceTypeCount, 1u);
+    EXPECT_EQ(stats.VisualizationRecipeMissingSourceCount, 1u);
+    EXPECT_EQ(stats.VisualizationRecipeUnsupportedSourceTypeCount, 1u);
     EXPECT_TRUE(world.Visualization.Colors.empty());
     EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.InputBufferCount, 0u);
     EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 0u);
@@ -1654,14 +1654,14 @@ TEST(RuntimeRenderExtraction, VisualizationNonScalarRecipesReachRenderWorld)
 
     EXPECT_EQ(scene.Raw().storage<entt::entity>().size(),
               entityCountBeforeExtraction);
-    EXPECT_EQ(stats.VisualizationAdapterInvokedCount, 5u);
-    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 5u);
+    EXPECT_EQ(stats.VisualizationRecipeEncodeCount, 5u);
+    EXPECT_EQ(stats.VisualizationRecipePacketAppendCount, 5u);
     EXPECT_EQ(stats.VisualizationColorPacketCount, 1u);
     EXPECT_EQ(stats.VisualizationVectorFieldPacketCount, 1u);
     EXPECT_EQ(stats.VisualizationIsolinePacketCount, 1u);
     EXPECT_EQ(stats.VisualizationHtexAtlasPacketCount, 1u);
     EXPECT_EQ(stats.VisualizationFragmentBakeAtlasPacketCount, 1u);
-    EXPECT_EQ(stats.VisualizationAdapterScalarValueScanCount, 6u);
+    EXPECT_EQ(stats.VisualizationRecipeScalarValueScanCount, 6u);
 
     ASSERT_EQ(world.Visualization.Colors.size(), 1u);
     EXPECT_EQ(world.Visualization.Colors.front().Name, "v:kmeans_color");
@@ -1754,9 +1754,10 @@ TEST(RuntimeRenderExtraction, VisualizationNonScalarRecipeFailuresAreCounted)
     const auto stats = fixture.Extract(scene);
     const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
 
-    EXPECT_EQ(stats.VisualizationAdapterInvokedCount, 3u);
-    EXPECT_EQ(stats.VisualizationAdapterMissingSourceCount, 3u);
-    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 0u);
+    EXPECT_EQ(stats.VisualizationRecipeEncodeCount, 3u);
+    EXPECT_EQ(stats.VisualizationRecipeMissingSourceCount, 2u);
+    EXPECT_EQ(stats.VisualizationRecipeMissingTexcoordCount, 1u);
+    EXPECT_EQ(stats.VisualizationRecipePacketAppendCount, 0u);
     EXPECT_EQ(stats.VisualizationColorPacketCount, 0u);
     EXPECT_EQ(stats.VisualizationVectorFieldPacketCount, 0u);
     EXPECT_EQ(stats.VisualizationIsolinePacketCount, 0u);

@@ -77,7 +77,7 @@ target_sources(${target_name}
         Runtime.VertexAttributeBinding.cppm
         Runtime.VertexChannelBindings.cppm
         Runtime.VertexChannelStreams.cppm
-        Visualization/Runtime.VisualizationAdapters.cppm
+        Visualization/Runtime.VisualizationRecipes.cppm
         PRIVATE
         FILE_SET render_extraction_impl TYPE CXX_MODULES FILES
         Runtime.GeometryPlanBuilders.cppm
@@ -151,7 +151,7 @@ target_sources(${target_name}
         Runtime.ReferenceScene.cpp
         Runtime.RenderRecipeActivation.cpp
         Runtime.RenderExtraction.cpp
-        Runtime.RenderExtraction.Adapters.cpp
+        Runtime.RenderExtraction.Recipes.cpp
         Runtime.RenderExtraction.Geometry.cpp
         Runtime.RenderExtractionService.cpp
         Runtime.RenderWorldPool.cpp
@@ -161,7 +161,7 @@ target_sources(${target_name}
         Runtime.TextureBakeModule.cpp
         Runtime.VertexAttributeBinding.cpp
         Runtime.VertexChannelStreams.cpp
-        Visualization/Runtime.VisualizationAdapters.cpp
+        Visualization/Runtime.VisualizationRecipes.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

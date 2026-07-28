@@ -37,7 +37,7 @@ import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.GeometryPlanBuilders;
 import Extrinsic.Runtime.RenderWorldPool;
-import Extrinsic.Runtime.VisualizationAdapters;
+import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.WorldHandle;
 
 namespace Extrinsic::Runtime
@@ -49,34 +49,36 @@ namespace Extrinsic::Runtime
     {
         VisualizationEncodingResult encoded =
             EncodeVisualizationRecipe(availability, recipe);
-        const VisualizationAdapterStats& diagnostics = encoded.Diagnostics;
+        const VisualizationEncodingDiagnostics& diagnostics = encoded.Diagnostics;
 
-        ++stats.VisualizationAdapterInvokedCount;
-        stats.VisualizationAdapterPacketAppendCount +=
+        ++stats.VisualizationRecipeEncodeCount;
+        stats.VisualizationRecipePacketAppendCount +=
             diagnostics.PacketAppendCount;
-        stats.VisualizationAdapterMissingSourceCount +=
-            diagnostics.MissingSourceCount
-            + diagnostics.MissingTexcoordCount;
-        stats.VisualizationAdapterUnsupportedSourceTypeCount +=
+        stats.VisualizationRecipeMissingSourceCount +=
+            diagnostics.MissingSourceCount;
+        stats.VisualizationRecipeUnsupportedSourceTypeCount +=
             diagnostics.UnsupportedSourceTypeCount;
-        stats.VisualizationAdapterEmptySourceCount +=
+        stats.VisualizationRecipeEmptySourceCount +=
             diagnostics.EmptySourceCount;
-        stats.VisualizationAdapterInvalidBufferCount +=
-            diagnostics.InvalidBufferCount
-            + diagnostics.InvalidResourceCount;
-        stats.VisualizationAdapterInvalidRangeCount +=
+        stats.VisualizationRecipeInvalidBufferCount +=
+            diagnostics.InvalidBufferCount;
+        stats.VisualizationRecipeInvalidResourceCount +=
+            diagnostics.InvalidResourceCount;
+        stats.VisualizationRecipeMissingTexcoordCount +=
+            diagnostics.MissingTexcoordCount;
+        stats.VisualizationRecipeInvalidRangeCount +=
             diagnostics.InvalidRangeCount;
-        stats.VisualizationAdapterNonFiniteValueCount +=
+        stats.VisualizationRecipeNonFiniteValueCount +=
             diagnostics.NonFiniteValueCount;
-        stats.VisualizationAdapterElementCountOverflowCount +=
+        stats.VisualizationRecipeElementCountOverflowCount +=
             diagnostics.ElementCountOverflowCount;
-        stats.VisualizationAdapterManualRangeCount +=
+        stats.VisualizationRecipeManualRangeCount +=
             diagnostics.ManualRangeCount;
-        stats.VisualizationAdapterFlatAutoRangeExpandedCount +=
+        stats.VisualizationRecipeFlatAutoRangeExpandedCount +=
             diagnostics.FlatAutoRangeExpandedCount;
-        stats.VisualizationAdapterRobustAutoRangeClampedCount +=
+        stats.VisualizationRecipeRobustAutoRangeClampedCount +=
             diagnostics.RobustAutoRangeClampedCount;
-        stats.VisualizationAdapterScalarValueScanCount +=
+        stats.VisualizationRecipeScalarValueScanCount +=
             diagnostics.ScalarValueScanCount;
 
         switch (encoded.Status)
@@ -92,39 +94,39 @@ namespace Extrinsic::Runtime
             break;
         case VisualizationRecipeStatus::MissingSource:
             if (diagnostics.MissingSourceCount == 0u)
-                ++stats.VisualizationAdapterMissingSourceCount;
+                ++stats.VisualizationRecipeMissingSourceCount;
             break;
         case VisualizationRecipeStatus::UnsupportedSourceType:
             if (diagnostics.UnsupportedSourceTypeCount == 0u)
-                ++stats.VisualizationAdapterUnsupportedSourceTypeCount;
+                ++stats.VisualizationRecipeUnsupportedSourceTypeCount;
             break;
         case VisualizationRecipeStatus::EmptySource:
             if (diagnostics.EmptySourceCount == 0u)
-                ++stats.VisualizationAdapterEmptySourceCount;
+                ++stats.VisualizationRecipeEmptySourceCount;
             break;
         case VisualizationRecipeStatus::InvalidBuffer:
             if (diagnostics.InvalidBufferCount == 0u)
-                ++stats.VisualizationAdapterInvalidBufferCount;
+                ++stats.VisualizationRecipeInvalidBufferCount;
             break;
         case VisualizationRecipeStatus::InvalidResource:
             if (diagnostics.InvalidResourceCount == 0u)
-                ++stats.VisualizationAdapterInvalidBufferCount;
+                ++stats.VisualizationRecipeInvalidResourceCount;
             break;
         case VisualizationRecipeStatus::MissingTexcoord:
             if (diagnostics.MissingTexcoordCount == 0u)
-                ++stats.VisualizationAdapterMissingSourceCount;
+                ++stats.VisualizationRecipeMissingTexcoordCount;
             break;
         case VisualizationRecipeStatus::InvalidRange:
             if (diagnostics.InvalidRangeCount == 0u)
-                ++stats.VisualizationAdapterInvalidRangeCount;
+                ++stats.VisualizationRecipeInvalidRangeCount;
             break;
         case VisualizationRecipeStatus::NonFiniteValue:
             if (diagnostics.NonFiniteValueCount == 0u)
-                ++stats.VisualizationAdapterNonFiniteValueCount;
+                ++stats.VisualizationRecipeNonFiniteValueCount;
             break;
         case VisualizationRecipeStatus::ElementCountOverflow:
             if (diagnostics.ElementCountOverflowCount == 0u)
-                ++stats.VisualizationAdapterElementCountOverflowCount;
+                ++stats.VisualizationRecipeElementCountOverflowCount;
             break;
         case VisualizationRecipeStatus::Encoded:
             break;

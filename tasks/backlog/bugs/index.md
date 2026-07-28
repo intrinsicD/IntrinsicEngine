@@ -5,6 +5,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-122` — Runtime asset ASan tests retain expired callback and snapshot state](BUG-122-runtime-asset-asan-test-lifetimes.md):
+  one shutdown test lets a queued hook retain loop-local synchronization state,
+  while three progressive model-scene tests retain pointers into temporary
+  `SnapshotAll()` vectors. The required serial ASan gate reports one
+  stack-use-after-scope and three heap-use-after-free failures on
+  `origin/main`; repair the test lifetimes without weakening their semantics or
+  changing production contracts absent an independent repro.
 - [`BUG-121` — GLM anonymous-union copy-assignment fails to compile through a C++23 module boundary](BUG-121-glm-anonymous-union-module-copy-assign.md):
   `clang++-20` rejects `glm/detail/type_vec3.hpp`'s `union { T x, r, s; }` when the implicit copy
   assignment for `glm::vec<3,float>` is first required in a TU that reaches the type through
