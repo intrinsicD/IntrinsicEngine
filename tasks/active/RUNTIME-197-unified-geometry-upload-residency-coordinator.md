@@ -6,6 +6,23 @@ maturity_target: Retired
 ---
 # RUNTIME-197 — Unified geometry upload and residency coordinator
 
+## Status
+
+- Promoted to active on 2026-07-28 after `RUNTIME-192` retired the duplicate
+  property vocabularies and `RUNTIME-193` retired the progressive-named
+  presentation path.
+- Intake census found five exported packer modules (about 2,100 interface and
+  implementation lines), four domain-specific retirement queues in
+  `RenderExtractionCache::State`, and a separate procedural cache owning the
+  same generation/reuse/retirement concerns. The existing graphics
+  `GpuWorld` already owns allocation, upload/update, handle invalidation, and
+  slot reuse, so this task must compose with it rather than introduce another
+  device or allocator service.
+- Shared mesh surface-topology helpers and mesh primitive-view settings have
+  legitimate production consumers outside extraction. Slice B will move them
+  into truthful value/function modules before deleting the packer modules;
+  only topology-to-byte-plan builders become private extraction details.
+
 ## Goal
 
 - Replace the mesh/graph/point-cloud/procedural packer families and their
@@ -37,6 +54,32 @@ maturity_target: Retired
   contract, resolves ECS/geometry snapshots into plans, and submits them from
   existing extraction/asset-workflow owners. Graphics never imports runtime or
   ECS, and no app service is introduced.
+
+## Right-sizing decision
+
+- **Elements:** the five exported packer modules, four extraction retirement
+  queues, procedural cache, and per-domain generation/reupload branches
+  trigger the role-fragmentation and parallel-lifecycle heuristics. The typed
+  topology conversions are real; their surrounding GPU ownership is repeated.
+- **Simpler alternative:** retain `GpuWorld` as the sole allocator/uploader and
+  add one concrete graphics `GeometryResidencyCoordinator` composed with it.
+  The coordinator owns copied `GeometryUploadPlan` bytes, stable graphics-only
+  keys, generation publication, partial/full replacement, reference counts,
+  and frame-safe retirement. Runtime keeps private free plan builders and maps
+  coordinator outcomes into the existing per-domain extraction diagnostics.
+  Add no interface, factory, registry, service locator, or second device path.
+- **Layer boundary:** `GeometryPropertyRef` remains runtime vocabulary because
+  graphics cannot import runtime. Runtime-side channel bindings use the
+  canonical property reference, resolve it against copied geometry snapshots,
+  and submit only resolved bytes plus graphics-owned format/update metadata.
+- **Blast radius:** renderer/runtime modules and CMake, extraction sidecars,
+  scene/editor channel-binding DTOs, packer contracts, Vulkan acceptance
+  coverage, runtime/graphics residency docs, task records, and the generated
+  module inventory. The allocator contract and frame recipe are unchanged.
+- **Reintroduction trigger:** split another residency owner only if a second
+  independently scheduled GPU world with different lifetime semantics exists.
+  Another topology domain, UI, test, or storage lane remains plan data handled
+  by this coordinator.
 
 ## Slice plan
 

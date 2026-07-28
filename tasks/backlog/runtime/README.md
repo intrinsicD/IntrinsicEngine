@@ -31,10 +31,7 @@ cleanup slice:
 
 #### Open tasks
 
-- [`RUNTIME-193` — General geometry-presentation recipe](../../active/RUNTIME-193-general-geometry-presentation-recipe.md)
-  replaces the generally used progressive-named presentation modules with one
-  desired-state recipe plus copied operational snapshot.
-- [`RUNTIME-197` — Unified geometry upload and residency coordinator](RUNTIME-197-unified-geometry-upload-residency-coordinator.md)
+- [`RUNTIME-197` — Unified geometry upload and residency coordinator](../../active/RUNTIME-197-unified-geometry-upload-residency-coordinator.md)
   centralizes upload/reupload/generation/retirement while retaining only small
   private typed topology plan builders.
 - [`RUNTIME-198` — Data-driven visualization recipes](RUNTIME-198-data-driven-visualization-recipes.md)
@@ -55,6 +52,10 @@ cleanup slice:
   their owner-level behavior tests are in place.
 
 #### Retired prerequisites and completed paths
+
+- `RUNTIME-193` retired the progressive-named general presentation modules;
+  one authored geometry-presentation recipe, runtime-only state sidecar, and
+  copied extraction snapshot now serve every production geometry domain.
 
 - [`RUNTIME-194` — Consolidate runtime work execution](../../done/RUNTIME-194-consolidate-runtime-work-execution.md)
   retired the duplicate streaming/derived-job systems; the kernel-owned
