@@ -3854,7 +3854,8 @@ TEST(SandboxEditorUi, AttachedEngineContextWiresTextureBakeModule)
     EXPECT_EQ(
         pipeline.GetTextureBakeServiceForTest(),
         &textureBake);
-    EXPECT_TRUE(textureBake.Available());
+    EXPECT_FALSE(textureBake.Available())
+        << "The wired service must remain fail-closed on the Null device.";
 
     Runtime::SandboxEditorSession session{};
     session.Attach(engine.Worlds(), engine.Services());

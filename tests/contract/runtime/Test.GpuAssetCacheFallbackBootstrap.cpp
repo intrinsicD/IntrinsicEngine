@@ -7,6 +7,7 @@ import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.SceneDocumentModule;
+import Extrinsic.Runtime.TextureBakeModule;
 
 // RUNTIME-070: contract surface around the
 // `AssetWorkflowModule::OnRegister()` → fallback texture bootstrap
@@ -46,6 +47,12 @@ TEST(GpuAssetCacheFallbackBootstrap, NullDeviceLeavesFallbackUnreadyDeterministi
         Extrinsic::Runtime::AssetWorkflowModule>();
     engine.Initialize();
 
+    EXPECT_EQ(
+        engine.Services()
+            .Find<Extrinsic::Runtime::TextureBakeService>(),
+        nullptr)
+        << "AssetWorkflowModule must remain usable when the app-composed "
+           "texture-bake module is absent.";
     const auto diagnostics = RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine).GetDiagnostics();
     EXPECT_FALSE(diagnostics.FallbackTextureReady)
         << "Null device must not back the fallback texture; bootstrap is "

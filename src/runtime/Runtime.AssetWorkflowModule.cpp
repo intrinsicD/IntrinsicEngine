@@ -1003,14 +1003,9 @@ namespace Extrinsic::Runtime
         auto history =
             setup.Services().Require<EditorCommandHistory>(
                 Name());
-        auto textureBake =
-            setup.Services().Require<TextureBakeService>(
-                Name());
-        if (!history.has_value() || !textureBake.has_value())
+        if (!history.has_value())
         {
-            const Core::ErrorCode error = !history.has_value()
-                ? history.error()
-                : textureBake.error();
+            const Core::ErrorCode error = history.error();
             m_Impl->RollBack(
                 *this,
                 &setup.Events(),
@@ -1025,7 +1020,8 @@ namespace Extrinsic::Runtime
         state.History = &history->get();
         state.Selection =
             setup.Services().Find<SelectionController>();
-        state.TextureBake = &textureBake->get();
+        state.TextureBake =
+            setup.Services().Find<TextureBakeService>();
         state.AcceptingCallbacks = true;
 
         const std::weak_ptr<Impl::State> weakState =
