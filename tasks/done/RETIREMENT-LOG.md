@@ -8,6 +8,27 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`RUNTIME-191`](RUNTIME-191-unified-property-texture-bake-pipeline.md) — unified
+property-to-texture baking retired on 2026-07-28 at `Retired`.
+`Runtime.TextureBakeModule`, `TextureBakeService`, and
+`Graphics.PropertyTextureBake` now form one canonical request/result,
+lifecycle, bounded GPU participant, and recorder path for editor, agent,
+model-scene, and direct-import callers. Callers prepare named properties and
+atomically reconcile completed output assets; the baker owns no consumer,
+material, presentation, visualization, or normal-space semantics. The
+selected-mesh, CPU mesh-attribute, and specialized object-space-normal
+runtime/graphics modules, three shaders, obsolete tests, and CMake entries are
+deleted, and Null/non-operational composition has no CPU fallback. A full-gate
+regression found and fixed an accidental mandatory dependency on the optional
+app-composed bake service. The focused retirement set passed 30/30; the default
+CPU selector covered 4,042 cases with zero failures; and both exact ASan+UBSan
+promoted-Vulkan import/reconciliation readbacks passed on an NVIDIA GeForce RTX
+4090 with driver 580.159.04. Strict repository validators passed and the module
+inventory now contains 372 modules. An unrelated scene-save terminal-event
+race reproduced during verification is preserved as `BUG-123`; no gate was
+weakened. ARA C15 binds the bounded capability claim to the surviving source,
+tests, task, and inventory.
+
 [`RUNTIME-195`](RUNTIME-195-unified-gpu-result-readback.md) — unified GPU-result
 readback retired on 2026-07-27 at `Retired`. The existing
 `Graphics.GpuTransfer` now carries one logical compute result as an ordered,

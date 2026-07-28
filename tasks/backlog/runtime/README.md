@@ -7,21 +7,6 @@ another backlog directory.
 
 ## Runtime backlog tasks
 
-### Unified property-to-texture pipeline
-
-- [`RUNTIME-191` — Unify property-to-texture baking and retire specialized paths](../../active/RUNTIME-191-unified-property-texture-bake-pipeline.md)
-  follows `RUNTIME-192`'s canonical property reference and completes the
-  narrower `RUNTIME-190` migration. It makes
-  `TextureBakeModule`/`TextureBakeService` the one production surface for
-  editor, agent, import, and default-policy bakes; callers prepare named source
-  properties first and process/bind the returned output after completion. The
-  bake request contains no normal-space, material, visualization, or consumer
-  semantics. The task preserves
-  the specialized path's lifetime, residency, cache-generation,
-  padding/dilation, and stale-result guarantees while deleting the
-  selected-mesh, CPU mesh-attribute, and object-space-normal parallel
-  pipelines at `Retired` maturity.
-
 ### Runtime abstraction consolidation (seeded 2026-07-24)
 
 The source-complete runtime surface audit re-gated `REVIEW-003`. Each task
@@ -91,17 +76,17 @@ cleanup slice:
   deleted the test-only `Runtime.MethodFigureExport` module; the census found
   no benchmark/tool consumer, so no serializer needed relocation.
 
-### GPU property texture baking (retired 2026-07-21)
+### GPU property texture baking (retired 2026-07-28)
 
 - [`RUNTIME-190` — GPU property texture bake runtime module](../../done/RUNTIME-190-gpu-property-texture-bake-module.md)
-  consolidates interactive texture baking into an app-composed
-  `TextureBakeModule`. It owns the generalized UV-raster GPU participant and
-  the retained import-time object-space-normal producer, while
-  `AssetWorkflowModule` remains the asset/cache/import owner and borrows that
-  producer. The retired operational slice covers raw-first scalar/vector
-  storage, explicit encoded RGBA, vertex/face/nearest-edge domains, named
-  replace/rename/remove asset lifecycle, multi-consumer material/presentation
-  bindings, and render-time scalar colormaps with no interactive CPU fallback.
+  introduced the app-composed module and generalized interactive path.
+- [`RUNTIME-191` — Unified property texture bake pipeline](../../done/RUNTIME-191-unified-property-texture-bake-pipeline.md)
+  completed the consolidation: editor, agent, model-scene, and direct-import
+  callers use one canonical `TextureBakeService`, one
+  `Graphics.PropertyTextureBake` recorder, and one GPU participant. Callers own
+  property preparation and material/presentation reconciliation. The selected-
+  mesh, CPU mesh-attribute, and specialized object-normal modules, shaders, and
+  tests are deleted; Null/non-operational composition has no CPU fallback.
 
 ### Main-loop non-blocking and composition-root cleanup (seeded 2026-07-03)
 
@@ -225,11 +210,11 @@ paired frame bracket through runtime-module hooks.
 `RUNTIME-160` is retired; the renderer frame-command hook token,
 `JobService::RecordGpuQueueFrameCommands(...)` delegation, and GPU-participant
 shutdown sequencing now live behind `Extrinsic.Runtime.JobServiceGpuQueueBridge`.
-`RUNTIME-161` is retired; object-space normal bake GPU-queue ownership,
-ready-frame dependency setup, JobService participant registration, queue
-diagnostics access, and shutdown dependency clearing now live behind
-`Extrinsic.Runtime.ObjectSpaceNormalBakeService`; retired `RUNTIME-129`
-subsequently closed the production Vulkan work inside that owner.
+`RUNTIME-161` is retired; it originally extracted object-space-normal GPU queue
+ownership and shutdown sequencing from Engine. Retired `RUNTIME-129` closed
+that production Vulkan path, and retired `RUNTIME-191` subsequently absorbed
+its guarantees into the canonical property-texture participant and deleted
+the extracted specialized service.
 `RUNTIME-162` is retired; transform-gizmo frame state, selected-entity scratch,
 gizmo/selection pointer interlock, and transform-gizmo packet building now live
 behind `Extrinsic.Runtime.GizmoFrameService` while preserving the public Engine
@@ -766,10 +751,10 @@ split; narratives live in the retirement log.
   (done, 2026-07-09, `Operational`): object-space normal bake GPU-queue
   ownership, dependency setup, ready-frame callback construction, JobService
   participant registration, diagnostics access, pending-count access, and
-  dependency clearing now live in
-  `Extrinsic.Runtime.ObjectSpaceNormalBakeService`. Retired `RUNTIME-129`
-  subsequently supplied the production Vulkan plan-provider and
-  `gpu;vulkan` smoke closure.
+  dependency clearing were extracted from Engine. Retired `RUNTIME-129`
+  supplied the production Vulkan plan-provider and smoke closure; retired
+  `RUNTIME-191` later consolidated that behavior into the canonical
+  property-texture participant and deleted the specialized module.
 - [RUNTIME-162 — Extract gizmo frame service out of Engine](../../archive/RUNTIME-162-extract-gizmo-frame-service.md)
   (done, 2026-07-09, `Operational`): transform-gizmo interaction state, undo
   storage, selected-entity scratch, gizmo/selection pointer interlock, and

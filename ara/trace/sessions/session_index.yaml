@@ -167,3 +167,10 @@ sessions:
     events_count: 8
     claims_touched: [C11, C12, C13, C14]
     open_threads: 4
+  - id: "2026-07-28_002"
+    date: "2026-07-28"
+    summary: "Retired RUNTIME-191 after converging property-to-texture baking on one caller-owned runtime/graphics lifecycle with complete CPU and exact operational Vulkan evidence."
+    turn_count: 1
+    events_count: 2
+    claims_touched: [C15]
+    open_threads: 2

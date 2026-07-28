@@ -75,7 +75,6 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Material;
-import Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.CommandContext;
@@ -4684,6 +4683,7 @@ namespace
 {
 constexpr std::uint32_t kRuntime129BakeExtent = 64u;
 constexpr std::uint32_t kRuntime129PixelBytes = 4u;
+constexpr std::uint32_t kRuntime129BakePadding = 4u;
 constexpr std::uint32_t kRuntime129MaxFrames = 72u;
 
 class Runtime129ObjectSpaceNormalBakeApp final : public Intrinsic::Tests::RuntimeTestModule
@@ -5012,12 +5012,21 @@ FindRuntime129Residency(
 
 struct Runtime129LiveBakeMesh
 {
-    std::vector<
-        Extrinsic::Graphics::ObjectSpaceNormalTextureBakeVertex>
-        Vertices{};
-    std::vector<
-        Extrinsic::Graphics::ObjectSpaceNormalTextureBakeTriangle>
-        Triangles{};
+    struct Vertex
+    {
+        glm::vec2 Uv{0.0f};
+        glm::vec3 Normal{0.0f, 0.0f, 1.0f};
+    };
+
+    struct Triangle
+    {
+        std::uint32_t A{0u};
+        std::uint32_t B{0u};
+        std::uint32_t C{0u};
+    };
+
+    std::vector<Vertex> Vertices{};
+    std::vector<Triangle> Triangles{};
     std::string Diagnostic{};
 
     [[nodiscard]] bool Succeeded() const noexcept
@@ -5026,6 +5035,71 @@ struct Runtime129LiveBakeMesh
                Diagnostic.empty();
     }
 };
+
+struct Runtime129CoverageSample
+{
+    bool Covered{false};
+    glm::vec3 Barycentric{0.0f};
+};
+
+[[nodiscard]] glm::vec3 Runtime129Barycentric(
+    const glm::vec2 a,
+    const glm::vec2 b,
+    const glm::vec2 c,
+    const glm::vec2 point) noexcept
+{
+    const float denominator =
+        ((b.y - c.y) * (a.x - c.x)) +
+        ((c.x - b.x) * (a.y - c.y));
+    if (std::abs(denominator) <= 1.0e-10f)
+        return glm::vec3{-1.0f};
+
+    const float w0 =
+        (((b.y - c.y) * (point.x - c.x)) +
+         ((c.x - b.x) * (point.y - c.y))) /
+        denominator;
+    const float w1 =
+        (((c.y - a.y) * (point.x - c.x)) +
+         ((a.x - c.x) * (point.y - c.y))) /
+        denominator;
+    return glm::vec3{w0, w1, 1.0f - w0 - w1};
+}
+
+[[nodiscard]] Runtime129CoverageSample SampleRuntime129Coverage(
+    const Runtime129LiveBakeMesh& mesh,
+    const std::uint32_t x,
+    const std::uint32_t y) noexcept
+{
+    constexpr float epsilon = 1.0e-4f;
+    const glm::vec2 uv{
+        (static_cast<float>(x) + 0.5f) /
+            static_cast<float>(kRuntime129BakeExtent),
+        (static_cast<float>(y) + 0.5f) /
+            static_cast<float>(kRuntime129BakeExtent),
+    };
+    for (const Runtime129LiveBakeMesh::Triangle triangle :
+         mesh.Triangles)
+    {
+        const glm::vec3 barycentric = Runtime129Barycentric(
+            mesh.Vertices[triangle.A].Uv,
+            mesh.Vertices[triangle.B].Uv,
+            mesh.Vertices[triangle.C].Uv,
+            uv);
+        if (barycentric.x >= -epsilon &&
+            barycentric.y >= -epsilon &&
+            barycentric.z >= -epsilon &&
+            barycentric.x <= 1.0f + epsilon &&
+            barycentric.y <= 1.0f + epsilon &&
+            barycentric.z <= 1.0f + epsilon)
+        {
+            return Runtime129CoverageSample{
+                .Covered = true,
+                .Barycentric = barycentric,
+            };
+        }
+    }
+    return {};
+}
 
 [[nodiscard]] Runtime129LiveBakeMesh
 SnapshotRuntime129LiveBakeMesh(
@@ -5081,11 +5155,10 @@ SnapshotRuntime129LiveBakeMesh(
          ++index)
     {
         snapshot.Vertices.push_back(
-            Extrinsic::Graphics::
-                ObjectSpaceNormalTextureBakeVertex{
-                    .Uv = texcoords.Vector()[index],
-                    .Normal = normals.Vector()[index],
-                });
+            Runtime129LiveBakeMesh::Vertex{
+                .Uv = texcoords.Vector()[index],
+                .Normal = normals.Vector()[index],
+            });
     }
 
     snapshot.Triangles.reserve(surfaceIndices.size() / 3u);
@@ -5107,12 +5180,11 @@ SnapshotRuntime129LiveBakeMesh(
             return snapshot;
         }
         snapshot.Triangles.push_back(
-            Extrinsic::Graphics::
-                ObjectSpaceNormalTextureBakeTriangle{
-                    .A = a,
-                    .B = b,
-                    .C = c,
-                });
+            Runtime129LiveBakeMesh::Triangle{
+                .A = a,
+                .B = b,
+                .C = c,
+            });
     }
     return snapshot;
 }
@@ -5460,43 +5532,22 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
 
     ASSERT_TRUE(targetBakeMesh.Succeeded())
         << targetBakeMesh.Diagnostic;
-    using BakeVertex =
-        Extrinsic::Graphics::ObjectSpaceNormalTextureBakeVertex;
-    using BakeTriangle =
-        Extrinsic::Graphics::ObjectSpaceNormalTextureBakeTriangle;
-    for (const BakeVertex& vertex : targetBakeMesh.Vertices)
+    for (const Runtime129LiveBakeMesh::Vertex& vertex :
+         targetBakeMesh.Vertices)
     {
         EXPECT_NEAR(vertex.Normal.x, 1.0f, 1.0e-5f);
         EXPECT_NEAR(vertex.Normal.y, 0.0f, 1.0e-5f);
         EXPECT_NEAR(vertex.Normal.z, 0.0f, 1.0e-5f);
     }
 
-    const Extrinsic::Graphics::
-        ObjectSpaceNormalTextureBakeOptions bakeOptions{
-            .Width = kRuntime129BakeExtent,
-            .Height = kRuntime129BakeExtent,
-            .PaddingTexels = 4u,
-        };
-    const auto resolvedOptions =
-        Extrinsic::Graphics::
-            ResolveObjectSpaceNormalTextureBakeOptions(
-                bakeOptions);
     const auto sampleAt =
         [&](const std::uint32_t x,
             const std::uint32_t y)
         {
-            return Extrinsic::Graphics::
-                SampleObjectSpaceNormalTextureBakeAtUv(
-                    std::span<const BakeVertex>{
-                        targetBakeMesh.Vertices},
-                    std::span<const BakeTriangle>{
-                        targetBakeMesh.Triangles},
-                    Extrinsic::Graphics::
-                        UvForObjectSpaceNormalBakeTexelCenter(
-                            x,
-                            y,
-                            resolvedOptions),
-                    bakeOptions);
+            return SampleRuntime129Coverage(
+                targetBakeMesh,
+                x,
+                y);
         };
 
     const Extrinsic::Core::Extent2D bakeExtent{
@@ -5529,7 +5580,6 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
     std::optional<Runtime129Texel> coveredTexel{};
     float bestInteriorScore =
         std::numeric_limits<float>::lowest();
-    std::uint32_t unexpectedCpuSamples = 0u;
     for (std::uint32_t y = 0u;
          y < kRuntime129BakeExtent;
          ++y)
@@ -5539,7 +5589,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
              ++x)
         {
             const auto sample = sampleAt(x, y);
-            if (sample.Succeeded())
+            if (sample.Covered)
             {
                 cpuCoverage[
                     static_cast<std::size_t>(y) *
@@ -5561,17 +5611,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
                     bestInteriorScore = interiorScore;
                 }
             }
-            else if (
-                sample.Status !=
-                Extrinsic::Graphics::
-                    ObjectSpaceNormalTextureBakeStatus::
-                        NoContainingTriangle)
-            {
-                ++unexpectedCpuSamples;
-            }
         }
     }
-    ASSERT_EQ(unexpectedCpuSamples, 0u);
     ASSERT_TRUE(coveredTexel.has_value());
     ASSERT_FALSE(cpuCovered.empty());
 
@@ -5620,7 +5661,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
                 distanceToCpuCoverage(x, y);
             const RgbaPixel pixel = readAt(x, y);
             if (distance >= 1u &&
-                distance <= bakeOptions.PaddingTexels &&
+                distance <= kRuntime129BakePadding &&
                 pixel.A >= 251u &&
                 (!gutterTexel.has_value() ||
                  distance > gutterTexel->Distance))
@@ -5631,7 +5672,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
                     .Distance = distance,
                 };
             }
-            if (distance > bakeOptions.PaddingTexels &&
+            if (distance > kRuntime129BakePadding &&
                 (!farTexel.has_value() ||
                  distance > farTexel->Distance))
             {
@@ -5646,7 +5687,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
     ASSERT_TRUE(gutterTexel.has_value())
         << "No GPU-covered texel existed outside the live CPU raster footprint.";
     ASSERT_TRUE(farTexel.has_value());
-    EXPECT_EQ(gutterTexel->Distance, bakeOptions.PaddingTexels)
+    EXPECT_EQ(gutterTexel->Distance, kRuntime129BakePadding)
         << "The selected dilation witness did not reach the requested four-texel "
            "gutter.";
 

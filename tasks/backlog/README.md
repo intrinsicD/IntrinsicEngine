@@ -168,17 +168,6 @@ still open. `UI-031` is retired and consumes the visibility-gated model-build
 slice for the domain-window information-architecture cleanup; the broader async
 cache/job pipeline remains owned by `RUNTIME-138`.
 
-[`RUNTIME-191`](../active/RUNTIME-191-unified-property-texture-bake-pipeline.md)
-is the explicit property-to-texture consolidation follow-up to the narrower
-retired `RUNTIME-190` scope and depends on `RUNTIME-192`'s canonical property
-reference. It replaces the remaining selected-mesh,
-mesh-attribute CPU, and object-space-normal production paths with one
-`TextureBakeModule` service and GPU participant. Normal/color/other special
-meaning, normal space, and material/visualization consumers are caller-owned
-property preparation or result processing, never bake request data or a
-parallel bake service; the task stays open through `ParityProven` until the
-legacy modules are deleted at `Retired` maturity.
-
 The 2026-07-24 source-complete runtime surface audit opened the dependency-
 ordered `RUNTIME-192..204` remediation set and `PHYSICS-004`, re-gating
 `REVIEW-003`. It consolidates canonical property/presentation/work/readback/
@@ -364,8 +353,7 @@ Open members (kernel-seam priority set first):
 - [`architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md`](architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md)
   (one-shot post-convergence admission gate; re-gated by the 2026-07-24 runtime
   surface remediation set).
-- [`RUNTIME-191`](../active/RUNTIME-191-unified-property-texture-bake-pipeline.md)
-  and the dependency-ordered
+- The dependency-ordered
   [`RUNTIME-192..204` runtime consolidation set](runtime/README.md).
 - [`physics/PHYSICS-004-operational-runtime-physics-module.md`](physics/PHYSICS-004-operational-runtime-physics-module.md).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).

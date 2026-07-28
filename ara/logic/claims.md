@@ -277,7 +277,8 @@
   src/runtime/Runtime.GeometryPresentation.cpp,
   src/runtime/Runtime.SceneSerialization.cpp,
   src/runtime/Runtime.RenderExtraction.cpp,
-  src/runtime/Runtime.ObjectSpaceNormalBakeBinding.cpp,
+  src/runtime/Runtime.AssetWorkflowModule.cpp,
+  tasks/done/RUNTIME-191-unified-property-texture-bake-pipeline.md,
   tests/contract/runtime/Test.GeometryPresentation.cpp,
   tests/contract/runtime/Test.RuntimeSceneSerialization.cpp,
   tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
@@ -364,3 +365,37 @@
 - **Tags**: runtime, graphics, visualization, recipes, extraction, Vulkan,
   retirement
 - **From staging**: O69
+
+## C15: Runtime property-to-texture baking has one production GPU lifecycle
+- **Statement**: Production mesh surface property-to-texture requests use one
+  canonical `TextureBakeService` request/result vocabulary, one
+  `Runtime.TextureBakeModule` lifecycle, one bounded `JobService` GPU
+  participant, and one `Graphics.PropertyTextureBake` recorder. Callers prepare
+  named source properties and reconcile completed output assets; the baker
+  owns no material, presentation, visualization, normal-space, or consumer
+  semantics. The selected-mesh, CPU mesh-attribute, and specialized
+  object-space-normal runtime/graphics modules and shaders are absent.
+- **Status**: supported — CPU/Null contracts plus ASan+UBSan promoted Vulkan
+  readback on NVIDIA GeForce RTX 4090, driver 580.159.04; no performance claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A live editor, agent, import, or default-policy
+  request bypasses `TextureBakeService`; runtime registers multiple
+  property-texture GPU participants; the baker regains consumer semantics or a
+  live CPU fallback; a retired module/shader/vocabulary returns; or either
+  exact promoted-Vulkan import/reconciliation readback fails.
+- **Proof**: [tasks/done/RUNTIME-191-unified-property-texture-bake-pipeline.md,
+  src/runtime/Runtime.TextureBakeModule.cppm,
+  src/runtime/Runtime.TextureBakeModule.cpp,
+  src/runtime/Runtime.AssetWorkflowModule.cpp,
+  src/graphics/renderer/Graphics.PropertyTextureBake.cppm,
+  src/graphics/renderer/Graphics.PropertyTextureBake.cpp,
+  tests/contract/runtime/Test.TextureBakeModule.cpp,
+  tests/contract/runtime/Test.AssetWorkflowModule.cpp,
+  tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
+  tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp,
+  docs/api/generated/module_inventory.md]
+- **Dependencies**: [C12]
+- **Tags**: runtime, graphics, property texture bake, Vulkan, parity,
+  retirement
+- **From staging**: O70

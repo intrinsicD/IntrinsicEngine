@@ -72,9 +72,7 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.InputActions;
-import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveView;
-import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
@@ -84,7 +82,6 @@ import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.VertexAttributeBinding;
@@ -3980,66 +3977,6 @@ TEST(SandboxEditorUi, UnavailableTextureBakeModuleHasNoCpuFallback)
             .get<Runtime::GeometryPresentationRuntimeState>(mesh)
             .RecipeGeneration,
         7u);
-}
-TEST(SandboxEditorUi, QueueBackedNormalBakeRejectsNoncanonicalOrMissingChannels)
-{
-    ECS::Scene::Registry registry;
-    Tests::MockDevice bakeDevice;
-    Runtime::RuntimeObjectSpaceNormalBakeQueue queue;
-
-    const ECS::EntityHandle mesh = registry.Create();
-    AddTriangleMeshSource(registry, mesh);
-    auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
-    SetNormals(vertices);
-    vertices.Properties
-        .GetOrAdd<glm::vec2>("v:secondary_texcoord", glm::vec2{0.0f})
-        .Vector() = {
-            glm::vec2{0.0f, 0.0f},
-            glm::vec2{1.0f, 0.0f},
-            glm::vec2{0.0f, 1.0f},
-        };
-    AttachGeometryPresentation(registry, mesh);
-
-    Runtime::SelectedMeshTextureBakeRequest request{};
-    request.StableEntityId =
-        Runtime::SelectionController::ToStableEntityId(mesh);
-    request.SourceDomain =
-        Runtime::GeometryElementDomain::MeshVertex;
-    request.SourcePropertyName = "v:normal";
-    request.ExpectedValueKind =
-        Geometry::PropertyValueKind::Vec3;
-    request.Encoder = Runtime::MeshAttributeTextureBakeEncoder::Normal;
-    request.TexcoordPropertyName = "v:secondary_texcoord";
-    request.Width = 64u;
-    request.Height = 64u;
-    request.TargetPresentationKey = "mesh.surface";
-    request.TargetSemantic = Runtime::GeometryPresentationSlotSemantic::Normal;
-    request.GeneratedKey = "normal";
-
-    const Runtime::SelectedMeshTextureBakeContext context{
-        .Scene = &registry,
-        .BindingEpoch = 47u,
-        .ObjectSpaceNormalBakeQueue = &queue,
-        .ObjectSpaceNormalBakeDevice = &bakeDevice,
-    };
-    const Runtime::SelectedMeshTextureBakeResult noncanonicalTexcoord =
-        Runtime::ApplySelectedMeshTextureBakeCommand(context, request);
-    EXPECT_EQ(
-        noncanonicalTexcoord.Status,
-        Runtime::SelectedMeshTextureBakeStatus::MissingTexcoords);
-    EXPECT_NE(
-        noncanonicalTexcoord.Diagnostic.find("canonical v:texcoord"),
-        std::string::npos);
-    EXPECT_EQ(queue.PendingCount(), 0u);
-
-    request.TexcoordPropertyName = "v:texcoord";
-    request.SourcePropertyName = "v:nonresident_normal";
-    const Runtime::SelectedMeshTextureBakeResult missingNormal =
-        Runtime::ApplySelectedMeshTextureBakeCommand(context, request);
-    EXPECT_EQ(
-        missingNormal.Status,
-        Runtime::SelectedMeshTextureBakeStatus::MissingProperty);
-    EXPECT_EQ(queue.PendingCount(), 0u);
 }
 TEST(SandboxEditorUi, TextureBakeModuleAvailabilityPrecedesAssetCreation)
 {

@@ -284,11 +284,9 @@ TEST(RuntimeEngineLayering,
         ReadFile(
             RepoRoot() /
             "src/runtime/Runtime.TextureBakeModule.cpp");
-    const auto serviceInterface =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.ObjectSpaceNormalBakeService.cppm");
-    const auto serviceImpl =
-        ReadFile(RepoRoot() / "src/runtime/Runtime.ObjectSpaceNormalBakeService.cpp");
     const auto runtimeCMake = ReadFile(RepoRoot() / "src/runtime/CMakeLists.txt");
+    const auto graphicsCMake =
+        ReadFile(RepoRoot() / "src/graphics/renderer/CMakeLists.txt");
     const auto moduleInventory =
         ReadFile(RepoRoot() / "docs/api/generated/module_inventory.md");
 
@@ -383,42 +381,42 @@ TEST(RuntimeEngineLayering,
         textureBakeInterface.find(
             "TextureBakeProducerContext"),
         std::string::npos);
-    EXPECT_NE(serviceInterface.find("export module Extrinsic.Runtime.ObjectSpaceNormalBakeService"),
-              std::string::npos);
-    EXPECT_NE(serviceInterface.find("export import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue"),
-              std::string::npos);
-    EXPECT_EQ(serviceInterface.find("import Extrinsic.Runtime.ObjectSpaceNormalBakeGpuQueue"),
-              std::string::npos);
-    EXPECT_EQ(serviceInterface.find("RuntimeObjectSpaceNormalBakeGpuQueue"),
-              std::string::npos);
-    EXPECT_NE(serviceInterface.find("struct Impl;"), std::string::npos);
-    EXPECT_NE(serviceInterface.find("std::unique_ptr<Impl> m_Impl"),
-              std::string::npos);
-    EXPECT_NE(serviceImpl.find("struct ObjectSpaceNormalBakeService::Impl"),
-              std::string::npos);
-    EXPECT_NE(serviceImpl.find("MakeGpuQueueParticipantDesc()"),
-              std::string::npos);
-    const auto readyFrameDefinition =
-        serviceImpl.find("ObjectSpaceNormalBakeReadyFrame(");
-    ASSERT_NE(readyFrameDefinition, std::string::npos);
-    EXPECT_NE(serviceImpl.find("ObjectSpaceNormalBakeReadyFrame(",
-                               readyFrameDefinition + 1u),
-              std::string::npos);
-    EXPECT_EQ(serviceImpl.find("device->GetGlobalFrameNumber() + 1u"),
-              std::string::npos);
-    EXPECT_NE(serviceImpl.find("jobs.RegisterGpuQueueParticipant("),
-              std::string::npos);
-    EXPECT_FALSE(std::filesystem::exists(
-        RepoRoot() / "src/runtime/Runtime.ObjectSpaceNormalBakeGpuQueue.cppm"));
-    EXPECT_FALSE(std::filesystem::exists(
-        RepoRoot() / "src/runtime/Runtime.ObjectSpaceNormalBakeGpuQueue.cpp"));
-    EXPECT_EQ(runtimeCMake.find("Runtime.ObjectSpaceNormalBakeGpuQueue"),
-              std::string::npos);
+    const std::array retiredFiles{
+        "src/runtime/Runtime.SelectedMeshTextureBake.cppm",
+        "src/runtime/Runtime.SelectedMeshTextureBake.cpp",
+        "src/runtime/Runtime.MeshAttributeTextureBake.cppm",
+        "src/runtime/Runtime.MeshAttributeTextureBake.cpp",
+        "src/runtime/Runtime.ObjectSpaceNormalBakeBinding.cppm",
+        "src/runtime/Runtime.ObjectSpaceNormalBakeBinding.cpp",
+        "src/runtime/Runtime.ObjectSpaceNormalBakeQueue.cppm",
+        "src/runtime/Runtime.ObjectSpaceNormalBakeQueue.cpp",
+        "src/runtime/Runtime.ObjectSpaceNormalBakeService.cppm",
+        "src/runtime/Runtime.ObjectSpaceNormalBakeService.cpp",
+        "src/runtime/Runtime.ObjectSpaceNormalBakeSubmission.cppm",
+        "src/runtime/Runtime.ObjectSpaceNormalBakeSubmission.cpp",
+        "src/graphics/renderer/Graphics.ObjectSpaceNormalTextureBake.cppm",
+        "src/graphics/renderer/Graphics.ObjectSpaceNormalTextureBake.cpp",
+    };
+    for (const std::string_view retired : retiredFiles)
+    {
+        const std::string filename =
+            std::filesystem::path{retired}.filename().string();
+        EXPECT_FALSE(std::filesystem::exists(RepoRoot() / retired))
+            << retired;
+        EXPECT_EQ(runtimeCMake.find(filename), std::string::npos)
+            << retired;
+        EXPECT_EQ(graphicsCMake.find(filename), std::string::npos)
+            << retired;
+    }
     EXPECT_NE(runtimeCMake.find("Runtime.TextureBakeModule.cppm"),
               std::string::npos);
     EXPECT_NE(runtimeCMake.find("Runtime.TextureBakeModule.cpp"),
               std::string::npos);
-    EXPECT_EQ(moduleInventory.find("Extrinsic.Runtime.ObjectSpaceNormalBakeGpuQueue"),
+    EXPECT_EQ(moduleInventory.find("ObjectSpaceNormalBake"),
+              std::string::npos);
+    EXPECT_EQ(moduleInventory.find("MeshAttributeTextureBake"),
+              std::string::npos);
+    EXPECT_EQ(moduleInventory.find("SelectedMeshTextureBake"),
               std::string::npos);
     EXPECT_NE(moduleInventory.find("Extrinsic.Runtime.TextureBakeModule`"),
               std::string::npos);
@@ -951,9 +949,6 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
                  "src/runtime/Visualization/Runtime.VisualizationRecipes.cpp");
     const auto modelHandoff =
         ReadFile(RepoRoot() / "src/runtime/Runtime.AssetModelSceneHandoff.cpp");
-    const auto selectedBake =
-        ReadFile(RepoRoot() /
-                 "src/runtime/Runtime.SelectedMeshTextureBake.cpp");
     const auto methodFacade =
         ReadFile(RepoRoot() / "src/runtime/Runtime.SandboxMethodFacade.cpp");
     const auto clusteringModule = ReadFile(
@@ -974,15 +969,13 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     // designator rather than MakeCpuJobDesc's positional scope argument.
     EXPECT_EQ(CountOccurrences(sceneDocument, "JobDesc{"), 2u);
     EXPECT_EQ(CountOccurrences(sceneDocument, ".Scope = world"), 2u);
-    EXPECT_EQ(CountOccurrences(sandboxPolicies, "JobDesc{"), 1u);
-    EXPECT_EQ(CountOccurrences(sandboxPolicies, ".Scope = world"), 1u);
+    EXPECT_EQ(CountOccurrences(sandboxPolicies, "JobDesc{"), 2u);
+    EXPECT_EQ(CountOccurrences(sandboxPolicies, ".Scope = world"), 2u);
     EXPECT_EQ(CountOccurrences(visualization, "JobDesc{"), 1u);
     EXPECT_EQ(CountOccurrences(visualization, ".Scope = request.World"), 1u);
 
-    EXPECT_EQ(CountOccurrences(modelHandoff, "JobDesc "), 5u);
-    EXPECT_EQ(CountOccurrences(modelHandoff, ".Scope = "), 5u);
-    EXPECT_EQ(CountOccurrences(selectedBake, "JobDesc desc"), 1u);
-    EXPECT_EQ(CountOccurrences(selectedBake, ".Scope = context.World"), 1u);
+    EXPECT_EQ(CountOccurrences(modelHandoff, "JobDesc "), 3u);
+    EXPECT_EQ(CountOccurrences(modelHandoff, ".Scope = "), 3u);
     EXPECT_EQ(CountOccurrences(methodFacade, "JobDesc desc{"), 1u);
     EXPECT_EQ(CountOccurrences(methodFacade, ".Scope = context.World"), 1u);
     EXPECT_EQ(
@@ -1937,12 +1930,11 @@ TEST(RuntimeEngineLayering,
 // cannot reappear.
 TEST(RuntimeEngineLayering, NoDuplicateGeometryPropertyVocabularyRemains)
 {
-    const std::array<std::filesystem::path, 6> sources{
+    const std::array<std::filesystem::path, 5> sources{
         RepoRoot() / "src/runtime/Runtime.GeometryPresentation.cppm",
         RepoRoot() / "src/runtime/Runtime.GeometryPresentation.cpp",
         RepoRoot() / "src/runtime/Runtime.SandboxEditorFacades.cppm",
         RepoRoot() / "src/runtime/Runtime.SandboxEditorFacades.cpp",
-        RepoRoot() / "src/runtime/Runtime.SelectedMeshTextureBake.cppm",
         RepoRoot() / "src/runtime/Runtime.TextureBakeModule.cpp",
     };
 

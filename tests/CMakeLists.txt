@@ -264,11 +264,7 @@ if(TARGET ExtrinsicRuntime)
         Test.ImGuiAdapter.cpp
         Test.ImGuiAdapterEngineWiring.cpp
         Test.MeshGeometryExtraction.cpp
-        Test.MeshAttributeTextureBake.cpp
         Test.MeshPrimitiveViewExtraction.cpp
-        Test.ObjectSpaceNormalBakeService.cpp
-        Test.ObjectSpaceNormalBakeQueue.cpp
-        Test.ObjectSpaceNormalBakeSubmission.cpp
         Test.ProgressivePoissonGpuBackend.cpp
         Test.RenderArtifactPublication.cpp
         Test.RenderExtractionContract.cpp
@@ -310,7 +306,7 @@ if(TARGET ExtrinsicRuntime)
         Test.SandboxEditorMeshMethods.cpp
         Test.SandboxEditorVisualization.cpp
         Test.SandboxEditorSessionLifecycle.cpp
-        Test.SelectedMeshTextureBake.cpp
+        Test.TextureBakeModule.cpp
         Test.SelectionController.cpp
         Test.SelectionReadbackCorrelation.cpp
         Test.SelectionSnapshotExtraction.cpp
@@ -706,7 +702,6 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
         Test.DefaultRecipeSurfaceGpuSmoke.cpp
         Test.HzbOcclusionConservatismGpuSmoke.cpp
         Test.ImGuiSurfaceGpuSmoke.cpp
-        Test.ObjectSpaceNormalTextureBakeGpuSmoke.cpp
         Test.TransientDebugSurfaceGpuSmoke.cpp
         Test.UvViewGpuSmoke.cpp
         Test.VisualizationOverlaySurfaceGpuSmoke.cpp
@@ -864,7 +859,6 @@ intrinsic_test_object_lib(GraphicsAssetsUnitTestObjs
 set(_graphics_contract_test_files
     Test.GpuTransferFacade.cpp
     Test.MinimalTriangleAcceptance.cpp
-    Test.ObjectSpaceNormalTextureBake.cpp
     Test.PropertyTextureBake.cpp
     Test.RHI.CommandContextBarriers.cpp
     Test.RendererRhiBoundary.cpp

@@ -6883,3 +6883,36 @@ tree:
       remains truthfully red only for four pre-existing test-lifetime defects
       owned by BUG-122; no performance claim is made.
     status: resolved
+  - id: N288
+    type: experiment
+    title: "Converge property-to-texture baking on one runtime and graphics path"
+    provenance: ai-executed
+    timestamp: "2026-07-28T15:59+02:00"
+    also_depends_on: [N285]
+    evidence:
+      - "tasks/done/RUNTIME-191-unified-property-texture-bake-pipeline.md"
+      - "src/runtime/Runtime.TextureBakeModule.cppm"
+      - "src/runtime/Runtime.TextureBakeModule.cpp"
+      - "src/runtime/Runtime.AssetWorkflowModule.cpp"
+      - "src/graphics/renderer/Graphics.PropertyTextureBake.cppm"
+      - "src/graphics/renderer/Graphics.PropertyTextureBake.cpp"
+      - "tests/contract/runtime/Test.TextureBakeModule.cpp"
+      - "tests/contract/runtime/Test.AssetWorkflowModule.cpp"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp"
+      - "focused runtime/import/workflow/structural selector: 30/30"
+      - "complete CPU-supported selector: 4042 selected with zero failures"
+      - "ASan+UBSan promoted-Vulkan exact bake/readback selector: 2/2"
+      - "retired specialized-module source scan: empty"
+      - "generated module inventory: 372 modules"
+      - "NVIDIA GeForce RTX 4090, driver 580.159.04"
+    result: >
+      Editor, agent, model-scene, and direct-import callers now submit the same
+      canonical PropertyTextureBake request to one TextureBakeService and one
+      bounded GPU participant. AssetWorkflow and Sandbox callers reconcile
+      completed assets without bake-owned consumers; Null/non-operational
+      composition remains fail-closed. The selected-mesh, mesh-attribute CPU,
+      and object-space-normal runtime/graphics modules, shaders, CMake entries,
+      and obsolete tests are absent. CPU contracts and both exact promoted-
+      Vulkan readbacks passed; no performance claim is made.
+    status: resolved

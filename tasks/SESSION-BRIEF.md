@@ -8,14 +8,14 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-191` — Unify property-to-texture baking and retire specialized paths (tasks/active/RUNTIME-191-unified-property-texture-bake-pipeline.md)
+- none
 
 ## Theme B — Rendering modernization
 
 - blocked by `REVIEW-003`: `ASSETIO-009` — Loss-aware MaterialX subset import (tasks/backlog/assets/ASSETIO-009-loss-aware-materialx-subset-import.md)
 - blocked by `REVIEW-003`: `GEOM-066` — meshoptimizer v1.2 geometry oracle and adoption evidence (tasks/backlog/geometry/GEOM-066-meshoptimizer-v1-2-geometry-oracle.md)
 - blocked by `REVIEW-003`: `GEOM-067` — Memory-aware BVH and merged-node evidence (tasks/backlog/geometry/GEOM-067-memory-aware-bvh-merged-node-evidence.md)
-- blocked by `RUNTIME-191`: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/rendering/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
+- unblocked: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/rendering/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
 - blocked by `REVIEW-003`: `GRAPHICS-123` — Slang single-kernel gradient pilot (tasks/backlog/rendering/GRAPHICS-123-slang-single-kernel-gradient-pilot.md)
 - blocked by `REVIEW-003`: `GRAPHICS-124` — Slughorn world-space vector annotation proof (tasks/backlog/rendering/GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md)
 - blocked by `REVIEW-003`: `GRAPHICS-125` — Memory-priced cluster hierarchy evidence (tasks/backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md)
@@ -52,6 +52,7 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-109` — Voxel downsampling invalid-input and deterministic-cell ordering (tasks/backlog/bugs/BUG-109-voxel-downsample-invalid-input-ordering.md)
 - unblocked: `BUG-110` — Implicit smoothing applies boundary pins after rather than during solve (tasks/backlog/bugs/BUG-110-implicit-smoothing-boundary-dirichlet-solve.md)
 - unblocked: `BUG-118` — GLFW X11 input-method LeakSanitizer recurrence (tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md)
+- unblocked: `BUG-123` — Retired queued scene save intermittently loses its terminal event (tasks/backlog/bugs/BUG-123-retired-scene-save-terminal-event-race.md)
 
 ## Theme I — Research method implementation
 

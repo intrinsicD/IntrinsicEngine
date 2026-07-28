@@ -24,15 +24,9 @@ target_sources(${target_name}
         Modules/Clustering/Runtime.ClusteringModule.cppm
         Modules/Clustering/Runtime.ClusteringGpuBackend.cppm
         Runtime.GeometryPresentation.cppm
-        Runtime.MeshAttributeTextureBake.cppm
-        Runtime.ObjectSpaceNormalBakeBinding.cppm
-        Runtime.ObjectSpaceNormalBakeQueue.cppm
-        Runtime.ObjectSpaceNormalBakeService.cppm
-        Runtime.ObjectSpaceNormalBakeSubmission.cppm
         Runtime.ProgressivePoissonGpuBackend.cppm
         Runtime.RenderArtifactPublication.cppm
         Runtime.SandboxConfigSections.cppm
-        Runtime.SelectedMeshTextureBake.cppm
         Runtime.EcsSystemBundle.cppm
         Runtime.EditorCommandHistory.cppm
         Editor/Runtime.EditorPropertyWidgets.cppm
@@ -100,16 +94,10 @@ target_sources(${target_name}
         Modules/Clustering/Runtime.ClusteringGpuBackend.cpp
         Modules/Clustering/Runtime.ClusteringGpuState.cpp
         Runtime.GeometryPresentation.cpp
-        Runtime.MeshAttributeTextureBake.cpp
-        Runtime.ObjectSpaceNormalBakeBinding.cpp
-        Runtime.ObjectSpaceNormalBakeQueue.cpp
-        Runtime.ObjectSpaceNormalBakeService.cpp
-        Runtime.ObjectSpaceNormalBakeSubmission.cpp
         Runtime.ProgressivePoissonGpuBackend.cpp
         Runtime.RenderArtifactPublication.cpp
         Runtime.SandboxDefaultPolicies.cpp
         Runtime.SandboxConfigSections.cpp
-        Runtime.SelectedMeshTextureBake.cpp
         Runtime.EcsSystemBundle.cpp
         Runtime.EditorCommandHistory.cpp
         Editor/Runtime.EditorPropertyWidgets.cpp

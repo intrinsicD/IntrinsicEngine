@@ -994,3 +994,27 @@ observations:
     promoted_to: "logic/claims.md:C14"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O70
+    timestamp: "2026-07-28T15:59+02:00"
+    provenance: ai-executed
+    content: >
+      Production surface-property texture baking can use one canonical runtime
+      service/lifecycle and one graphics recorder/GPU participant while
+      keeping property preparation and output reconciliation caller-owned and
+      deleting the selected-mesh, CPU mesh-attribute, and specialized
+      object-normal paths.
+    context: >
+      RUNTIME-191 closure combines 30 focused runtime/import/workflow/
+      structural cases, a complete CPU-supported selector with 4,042 selected
+      cases and zero failures, and two exact ASan+UBSan promoted-Vulkan
+      import/reconciliation readback smokes on an NVIDIA GeForce RTX 4090 with
+      driver 580.159.04. The module inventory contains 372 modules and the
+      retired-symbol source scan is empty. BUG-123 records an unrelated
+      scene-save terminal-event race exposed during an earlier full-gate run.
+      This is a lifecycle/capability claim, not a performance claim.
+    potential_type: claim
+    bound_to: [N288]
+    promoted: true
+    promoted_to: "logic/claims.md:C15"
+    crystallized_via: artifact-commitment
+    stale: false

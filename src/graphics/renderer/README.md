@@ -344,7 +344,6 @@ into graphics public contracts.
 - `Extrinsic.Graphics.GpuWorld`
 - `Extrinsic.Graphics.Material`
 - `Extrinsic.Graphics.MaterialSystem`
-- `Extrinsic.Graphics.ObjectSpaceNormalTextureBake`
 - `Extrinsic.Graphics.PropertyTextureBake`
 - `Extrinsic.Graphics.ColormapSystem`
 - `Extrinsic.Graphics.VisualizationPackets`
@@ -1926,53 +1925,7 @@ Concretely:
   If `InitializeFallbackTexture()` fails, `FallbackTextureReady = false`
   and `GetViewOrFallback()` returns `GpuAssetFallbackReason::Unavailable`,
   letting material code fall back to factor-only shading deterministically.
-- `Extrinsic.Graphics.ObjectSpaceNormalTextureBake` owns the graphics-side
-  object-space normal bake contract introduced by `GRAPHICS-104`. The
-  backend-neutral helpers validate finite atlas UVs, count-matched finite
-  normals, triangle indices, the `ObjectSpaceNormal` mode, and resolution clamp
-  policy; `TangentSpaceNormal` is reserved and rejected. The graphics-owned plan
-  API packages resolved index-buffer/texcoord-BDA/normal-BDA geometry, generated
-  `AssetId`, resolved extent/padding, sampler policy, frame-readiness metadata,
-  and a stale-completion key into a `GpuProducedTextureRequest` plus command
-  record template. Shared index buffers remain bound at byte offset zero;
-  `FirstIndex` selects the requested surface slice, while the indexed draw's
-  vertex offset remains zero because the texcoord and normal BDAs already
-  address the selected allocation's local channel arrays. The GPU recorder then
-  binds a caller-provided raster pipeline, index buffer, texcoord/normal BDAs,
-  and output texture; it sets
-  viewport and scissor to the exact target texture extent, clears to encoded
-  `+Z` with alpha `0`, rasterizes UV triangles by mapping UV to clip space,
-  writes normalized object-space normals with alpha `1`, and transitions to the
-  requested final texture layout. Padded requests are submittable when callers
-  provide graphics-owned dilation resources: a fullscreen pipeline using
-  `post_fullscreen.vert` + `object_space_normal_dilate.frag` and a same-extent
-  sampled/color-target scratch texture. The recorder binds the output and
-  scratch textures into the reserved sampled bridge slots 4 and 5, then
-  ping-pongs one fullscreen dilation pass per requested padding texel so the
-  final result lands back in the output texture. Each dilation pass preserves
-  covered alpha-one texels and fills alpha-zero gutter texels from covered
-  8-neighbors; far uncovered texels remain encoded `+Z` alpha `0`. Missing or
-  non-operational dilation resources still fail closed with
-  `DilationUnavailable`/`InvalidArgument`, and there is no CPU dilation
-  fallback. The bake shader uses the same vertical orientation as the CPU
-  texel-center sampling contract so a point addressed by mesh UV samples the
-  same baked texel on Vulkan. The recorder always consumes a caller-provided
-  already-open `RHI::ICommandContext`; it does not begin/end a frame, submit a
-  queue, acquire a swapchain image, or present. The production
-  `RUNTIME-129` provider records through the existing runtime-frame hook,
-  requests `TransferSrc` in addition to the required sampled/color-target
-  usage for acceptance readback, finishes the output in `ShaderReadOnly`, and
-  retains one raster pipeline plus bounded extent-keyed dilation leases rather
-  than creating resources per frame. Runtime owns identity/provenance,
-  live-residency revalidation, stale completion rejection, material merging,
-  and scene/shutdown lifetime; this graphics surface does not import ECS,
-  runtime, live `AssetService`, or Vulkan handles.
-  Managed uniform-SoA channel starts obey the physical-storage-buffer
-  alignment declared by the shaders: `RG32_FLOAT` texcoords begin at an
-  eight-byte-aligned BDA and `RGB32_FLOAT` normals at a four-byte-aligned BDA.
-  The graphics plan/recorder and runtime residency validation reject
-  misaligned addresses before command recording.
-- `Extrinsic.Graphics.PropertyTextureBake` is the generalized graphics-owned
+- `Extrinsic.Graphics.PropertyTextureBake` is the sole graphics-owned
   UV-raster surface used by `Runtime.TextureBakeModule`. Its backend-neutral
   descriptor carries an already-open command context, caller-owned pipeline,
   output and managed index handles, texcoord/property/index BDAs, surface index
@@ -1987,10 +1940,16 @@ Concretely:
   `RG32_FLOAT`, or `RGBA32_FLOAT` for raw scalar/vector data and `RGBA8_UNORM`
   for explicit encoded output. Uncovered texels clear to alpha zero; normal
   output clears to encoded `+Z`, while other output clears to zero. The recorder
-  validates handles, BDAs, triangulation, extent, range, and required colormap,
-  then records barriers/render pass/draw/final layout only—it does not acquire,
-  submit, present, inspect ECS, or access live assets, and no `Vk*` type crosses
-  the graphics/RHI/runtime surfaces.
+  validates handles, BDA alignment, triangulation, extent, range, and required
+  colormap. Encoded-RGBA output may provide one same-extent sampled/color-target
+  scratch texture and a generic dilation pipeline; the recorder ping-pongs one
+  fullscreen eight-neighbor dilation pass per padding texel while preserving
+  covered alpha-one texels. Missing dilation resources fail closed and no CPU
+  dilation fallback exists. It records barriers, render passes, draws, and the
+  final layout only—it does not acquire, submit, present, inspect ECS, or access
+  live assets, and no `Vk*` type crosses the graphics/RHI/runtime surfaces.
+  Normal, color, scalar, label, and vector sources differ only through property
+  data and encoding values; there is no specialized normal recorder or shader.
 - `Extrinsic.Graphics.ComputeParallelPrimitives` owns the generic
   scan/compaction primitive contract introduced by `GRAPHICS-108`. It exports
   deterministic CPU reference helpers for `uint32` exclusive/inclusive
