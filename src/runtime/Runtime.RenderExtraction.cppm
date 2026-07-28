@@ -356,6 +356,15 @@ export namespace Extrinsic::Runtime
         void ClearSceneState(Graphics::IRenderer& renderer);
         void Shutdown(Graphics::IRenderer& renderer);
 
+        // One maintenance hook for every runtime-authored geometry lane.
+        // Graphics returns freed keys; runtime maps the private namespaces
+        // back into the existing per-domain diagnostics.
+        void TickGeometryResidency(std::uint64_t currentFrame,
+                                   std::uint32_t framesInFlight,
+                                   Graphics::IRenderer& renderer);
+
+        // Transitional wrappers retained only while domain contract tests move
+        // to `TickGeometryResidency`; all delegate to the one coordinator.
         // Maintenance-phase hook called by Engine::RunFrame after
         // ExtractAndSubmit and Renderer::Present.  Drives the deferred-retire
         // window of the procedural geometry cache using the same frame

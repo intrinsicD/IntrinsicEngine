@@ -255,21 +255,11 @@ namespace Extrinsic::Runtime
 
             const std::uint64_t currentFrame = Device.GetGlobalFrameNumber();
             const std::uint32_t framesInFlight = Device.GetFramesInFlight();
-            // GRAPHICS-030C: drive the procedural geometry cache's
-            // deferred-retire window with the same CPU frame counter and
-            // framesInFlight the asset cache uses. Final FreeGeometry calls
-            // fall through to GpuWorld here.
-            Extraction.TickProceduralGeometry(currentFrame, framesInFlight, Renderer);
-            // RUNTIME-085 Slice C — mirror the same window for the
-            // runtime-owned mesh-residency retire queue.
-            Extraction.TickMeshGeometry(currentFrame, framesInFlight, Renderer);
-            // RUNTIME-086 Slice B — and for the graph-residency queue.
-            Extraction.TickGraphGeometry(currentFrame, framesInFlight, Renderer);
-            // RUNTIME-087 — and for the point-cloud-residency queue.
-            Extraction.TickPointCloudGeometry(currentFrame, framesInFlight, Renderer);
-            // RUNTIME-088 Slice B — and for the mesh edge/vertex primitive
-            // view residency queue (one queue for both view lanes).
-            Extraction.TickMeshPrimitiveViewGeometry(currentFrame, framesInFlight, Renderer);
+            // RUNTIME-197: one graphics-owned coordinator drives every
+            // runtime-authored geometry lane through the same frame-safe
+            // retirement window.
+            Extraction.TickGeometryResidency(
+                currentFrame, framesInFlight, Renderer);
         }
     };
 

@@ -253,11 +253,14 @@ namespace Extrinsic::Graphics
             return true;
         }
 
-        void QueueReplacement(const GpuGeometryHandle handle)
+        void QueueReplacement(
+            const GeometryResidencyKey key,
+            const GpuGeometryHandle handle)
         {
             if (handle.IsValid())
             {
                 Retire.push_back(RetireRecord{
+                    .Key = key,
                     .Handle = handle,
                     .OwnsEntry = false,
                 });
@@ -278,8 +281,9 @@ namespace Extrinsic::Graphics
             }
 
             const GpuWorld::GeometryUploadDesc upload = plan.UploadDesc();
-            result.StoragePlan =
+            const GpuWorld::GeometryStoragePlan proposedStoragePlan =
                 GpuWorld::PlanGeometryStorage(upload, plan.StorageHint);
+            result.StoragePlan = proposedStoragePlan;
 
             auto found = Entries.find(plan.Key);
             if (found == Entries.end())
@@ -352,7 +356,8 @@ namespace Extrinsic::Graphics
                 if (update.Succeeded())
                 {
                     entry.Generation = plan.Generation;
-                    entry.StoragePlan = result.StoragePlan;
+                    entry.StoragePlan = proposedStoragePlan;
+                    result.StoragePlan = proposedStoragePlan;
                     result.Status = GeometryResidencyStatus::PartiallyUpdated;
                     result.Handle = entry.Handle;
                     result.Diagnostic = "updated resident channels";
@@ -372,10 +377,11 @@ namespace Extrinsic::Graphics
             }
 
             const GpuGeometryHandle retiring = entry.Handle;
-            QueueReplacement(retiring);
+            QueueReplacement(plan.Key, retiring);
             entry.Handle = replacement;
             entry.Generation = plan.Generation;
-            entry.StoragePlan = result.StoragePlan;
+            entry.StoragePlan = proposedStoragePlan;
+            result.StoragePlan = proposedStoragePlan;
             entry.PendingRetire = false;
             if (entry.RefCount == 0u)
             {
@@ -446,10 +452,11 @@ namespace Extrinsic::Graphics
         return entry.RefCount == 0u;
     }
 
-    void GeometryResidencyCoordinator::Tick(
+    GeometryResidencyTickResult GeometryResidencyCoordinator::Tick(
         const std::uint64_t currentFrame,
         const std::uint32_t framesInFlight)
     {
+        GeometryResidencyTickResult result{};
         const std::uint64_t deadline =
             SaturatingDeadline(currentFrame, framesInFlight);
         for (auto& record : m_Impl->Retire)
@@ -486,9 +493,11 @@ namespace Extrinsic::Graphics
             {
                 m_Impl->World->FreeGeometry(it->Handle);
                 ++m_Impl->Counters.FreeRetires;
+                result.FreedKeys.push_back(it->Key);
             }
             it = m_Impl->Retire.erase(it);
         }
+        return result;
     }
 
     void GeometryResidencyCoordinator::Shutdown()

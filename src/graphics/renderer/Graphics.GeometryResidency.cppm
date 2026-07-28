@@ -174,6 +174,14 @@ export namespace Extrinsic::Graphics
         bool PendingRetire = false;
     };
 
+    struct GeometryResidencyTickResult
+    {
+        // One key per GpuWorld handle actually freed this tick. A full
+        // replacement and a last-owner release both report through this same
+        // graphics-only identity stream.
+        std::vector<GeometryResidencyKey> FreedKeys{};
+    };
+
     // One concrete lifecycle owner composed with the existing GpuWorld. It
     // does not allocate buffers itself and is intentionally not an interface,
     // service, factory, or registry.
@@ -197,7 +205,9 @@ export namespace Extrinsic::Graphics
 
         // Drop one owner. The last release enters frame-safe retirement.
         [[nodiscard]] bool Release(GeometryResidencyKey key);
-        void Tick(std::uint64_t currentFrame, std::uint32_t framesInFlight);
+        [[nodiscard]] GeometryResidencyTickResult Tick(
+            std::uint64_t currentFrame,
+            std::uint32_t framesInFlight);
         void Shutdown();
 
         [[nodiscard]] std::optional<GeometryResidencyView> Find(

@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
@@ -23,6 +24,7 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Graphics.GeometryResidency;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Material;
@@ -51,9 +53,60 @@ import Extrinsic.Runtime.WorldHandle;
 
 namespace Extrinsic::Runtime
 {
+    Graphics::GeometryResidencyKey BuildRenderExtractionGeometryResidencyKey(
+        const RenderExtractionGeometryResidencyKind kind,
+        const std::uint64_t identity,
+        const std::uint32_t lane) noexcept
+    {
+        return Graphics::GeometryResidencyKey{
+            .Namespace = static_cast<std::uint64_t>(kind),
+            .Identity = identity,
+            .Lane = lane,
+        };
+    }
+
+    Graphics::GeometryResidencyCoordinator&
+    RenderExtractionCache::State::EnsureGeometryResidency(
+        Graphics::IRenderer& renderer)
+    {
+        Graphics::GpuWorld& world = renderer.GetGpuWorld();
+        if (m_GeometryResidency == nullptr ||
+            m_GeometryResidencyWorld != &world)
+        {
+            if (m_GeometryResidency != nullptr)
+            {
+                m_GeometryResidency->Shutdown();
+            }
+            m_GeometryResidency =
+                std::make_unique<Graphics::GeometryResidencyCoordinator>(world);
+            m_GeometryResidencyWorld = &world;
+        }
+        return *m_GeometryResidency;
+    }
+
+    std::uint64_t
+    RenderExtractionCache::State::IssueGeometryPlanGeneration() noexcept
+    {
+        const std::uint64_t generation = m_NextGeometryPlanGeneration;
+        if (m_NextGeometryPlanGeneration !=
+            std::numeric_limits<std::uint64_t>::max())
+        {
+            ++m_NextGeometryPlanGeneration;
+        }
+        return generation;
+    }
+
+    bool RenderExtractionCache::State::ReleaseGeometryResidency(
+        const Graphics::GeometryResidencyKey key)
+    {
+        return m_GeometryResidency != nullptr &&
+            m_GeometryResidency->Release(key);
+    }
+
     bool RenderExtractionCache::State::BindMeshGeometry(
         entt::registry& registry,
         entt::entity entity,
+        const std::uint32_t stableId,
         const ECS::Components::GeometrySources::ConstSourceView& view,
         RenderableSidecar& sidecar,
         Graphics::IRenderer& renderer,
@@ -64,6 +117,10 @@ namespace Extrinsic::Runtime
             BuildRenderExtractionMeshGeometryDirtyPlan(registry, entity);
         const bool dirty = dirtyPlan.Dirty;
         const bool hadResidency = sidecar.MeshGeometry.IsValid();
+        const Graphics::GeometryResidencyKey residencyKey =
+            BuildRenderExtractionGeometryResidencyKey(
+                RenderExtractionGeometryResidencyKind::Mesh,
+                stableId);
 
         // Fail-closed release for a dirty-reupload pack/upload failure. When the
         // entity already has a valid upload and a later dirty update makes the
@@ -82,7 +139,7 @@ namespace Extrinsic::Runtime
             {
                 return;
             }
-            EnqueueMeshRetire(sidecar.MeshGeometry);
+            (void)ReleaseGeometryResidency(residencyKey);
             renderer.GetGpuWorld().SetInstanceGeometry(
                 sidecar.Instance,
                 Graphics::GpuGeometryHandle{});
@@ -147,58 +204,48 @@ namespace Extrinsic::Runtime
             ++stats.MeshGeometryNonFiniteTexcoords;
         }
 
-        if (hadResidency && dirty && !dirtyPlan.RequiresFullUpload)
-        {
-            const Graphics::GpuWorld::GeometryChannelUpdateResult update =
-                renderer.GetGpuWorld().UpdateGeometryChannels(
-                    sidecar.MeshGeometry,
-                    *packResult.Upload,
-                    dirtyPlan.Channels);
-            if (update.Succeeded())
-            {
-                ++stats.MeshGeometryReuploads;
-                ++stats.MeshGeometryPartialUploads;
-                registry.remove<D::GpuDirty,
-                                D::DirtyVertexPositions,
-                                D::DirtyVertexAttributes,
-                                D::DirtyVertexTexcoords,
-                                D::DirtyVertexNormals,
-                                D::DirtyVertexColors,
-                                D::DirtyFaceTopology,
-                                D::DirtyEdgeTopology>(entity);
-                sidecar.Geometry = sidecar.MeshGeometry;
-                sidecar.GpuSlot.SetGeometryHandle(sidecar.MeshGeometry);
-                sidecar.GpuSlot.ClearSourceAsset();
-                renderer.GetGpuWorld().SetInstanceGeometry(
-                    sidecar.Instance,
-                    sidecar.MeshGeometry);
-                return true;
-            }
-        }
-
-        const Graphics::GpuGeometryHandle handle =
-            renderer.GetGpuWorld().UploadGeometry(*packResult.Upload);
-        if (!handle.IsValid())
+        const bool partialPreferred =
+            hadResidency && dirty && !dirtyPlan.RequiresFullUpload;
+        const Graphics::GeometryUploadPlan plan =
+            Graphics::MakeGeometryUploadPlan(
+                residencyKey,
+                IssueGeometryPlanGeneration(),
+                *packResult.Upload,
+                partialPreferred
+                    ? Graphics::GeometryUploadUpdateClass::PartialPreferred
+                    : Graphics::GeometryUploadUpdateClass::FullReplacement,
+                partialPreferred
+                    ? dirtyPlan.Channels
+                    : Graphics::GpuWorld::GeometryChannelUpdateMask{});
+        const Graphics::GeometryResidencyResult residency =
+            EnsureGeometryResidency(renderer).Reconcile(plan);
+        if (!residency.Succeeded())
         {
             ++stats.MeshGeometryFailedPack;
             releaseStaleResidency();
             return false;
         }
 
-        if (hadResidency)
+        if (residency.Status ==
+            Graphics::GeometryResidencyStatus::PartiallyUpdated)
         {
-            // Dirty reupload: queue the prior handle for the same
-            // `framesInFlight` deferred-retire window the procedural cache
-            // uses, then swap to the new handle. The new
-            // `SetInstanceGeometry` below detaches the instance from the
-            // old slot before the slot is freed.
-            EnqueueMeshRetire(sidecar.MeshGeometry);
+            ++stats.MeshGeometryReuploads;
+            ++stats.MeshGeometryPartialUploads;
+        }
+        else if (residency.Status ==
+                 Graphics::GeometryResidencyStatus::FullyReuploaded)
+        {
             ++stats.MeshGeometryReuploads;
             ++stats.MeshGeometryReleases;
         }
-        else
+        else if (residency.Status ==
+                 Graphics::GeometryResidencyStatus::Uploaded)
         {
             ++stats.MeshGeometryUploads;
+        }
+        else
+        {
+            ++stats.MeshGeometryReuseHits;
         }
 
         // Drain the dirty tags consumed by this (re)upload. Tags are
@@ -217,17 +264,19 @@ namespace Extrinsic::Runtime
                             D::DirtyEdgeTopology>(entity);
         }
 
-        sidecar.MeshGeometry = handle;
-        sidecar.Geometry = handle;
-        sidecar.GpuSlot.SetGeometryHandle(handle);
+        sidecar.MeshGeometry = residency.Handle;
+        sidecar.Geometry = residency.Handle;
+        sidecar.GpuSlot.SetGeometryHandle(residency.Handle);
         sidecar.GpuSlot.ClearSourceAsset();
-        renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, handle);
+        renderer.GetGpuWorld().SetInstanceGeometry(
+            sidecar.Instance, residency.Handle);
         return true;
     }
 
     bool RenderExtractionCache::State::BindGraphGeometry(
         entt::registry& registry,
         entt::entity entity,
+        const std::uint32_t stableId,
         const ECS::Components::GeometrySources::ConstSourceView& view,
         RenderableSidecar& sidecar,
         Graphics::IRenderer& renderer,
@@ -246,6 +295,10 @@ namespace Extrinsic::Runtime
             BuildRenderExtractionGraphGeometryDirtyPlan(registry, entity);
         const bool dirty = dirtyPlan.Dirty;
         const bool hadResidency = sidecar.GraphGeometry.IsValid();
+        const Graphics::GeometryResidencyKey residencyKey =
+            BuildRenderExtractionGeometryResidencyKey(
+                RenderExtractionGeometryResidencyKind::Graph,
+                stableId);
         // A change in requested render lanes repacks: the cached upload was
         // packed for a specific lane mask, and the line lane in particular
         // changes the packed line indices. Without this, gaining/losing a
@@ -264,7 +317,7 @@ namespace Extrinsic::Runtime
             {
                 return;
             }
-            EnqueueGraphRetire(sidecar.GraphGeometry);
+            (void)ReleaseGeometryResidency(residencyKey);
             ReleaseGraphPointLaneInstance(sidecar, renderer, stats);
             renderer.GetGpuWorld().SetInstanceGeometry(
                 sidecar.Instance,
@@ -322,57 +375,49 @@ namespace Extrinsic::Runtime
             return false;
         }
 
-        if (hadResidency && dirty && !dirtyPlan.RequiresFullUpload
-            && !lanesChanged)
-        {
-            const Graphics::GpuWorld::GeometryChannelUpdateResult update =
-                renderer.GetGpuWorld().UpdateGeometryChannels(
-                    sidecar.GraphGeometry,
-                    *packResult.Upload,
-                    dirtyPlan.Channels);
-            if (update.Succeeded())
-            {
-                ++stats.GraphGeometryReuploads;
-                ++stats.GraphGeometryPartialUploads;
-                registry.remove<D::GpuDirty,
-                                D::DirtyVertexPositions,
-                                D::DirtyVertexAttributes,
-                                D::DirtyVertexTexcoords,
-                                D::DirtyVertexNormals,
-                                D::DirtyVertexColors,
-                                D::DirtyEdgeTopology>(entity);
-                sidecar.Geometry = sidecar.GraphGeometry;
-                sidecar.GpuSlot.SetGeometryHandle(sidecar.GraphGeometry);
-                sidecar.GpuSlot.ClearSourceAsset();
-                renderer.GetGpuWorld().SetInstanceGeometry(
-                    sidecar.Instance,
-                    sidecar.GraphGeometry);
-                return true;
-            }
-        }
-
-        const Graphics::GpuGeometryHandle handle =
-            renderer.GetGpuWorld().UploadGeometry(*packResult.Upload);
-        if (!handle.IsValid())
+        const bool partialPreferred =
+            hadResidency && dirty && !dirtyPlan.RequiresFullUpload
+            && !lanesChanged;
+        const Graphics::GeometryUploadPlan plan =
+            Graphics::MakeGeometryUploadPlan(
+                residencyKey,
+                IssueGeometryPlanGeneration(),
+                *packResult.Upload,
+                partialPreferred
+                    ? Graphics::GeometryUploadUpdateClass::PartialPreferred
+                    : Graphics::GeometryUploadUpdateClass::FullReplacement,
+                partialPreferred
+                    ? dirtyPlan.Channels
+                    : Graphics::GpuWorld::GeometryChannelUpdateMask{});
+        const Graphics::GeometryResidencyResult residency =
+            EnsureGeometryResidency(renderer).Reconcile(plan);
+        if (!residency.Succeeded())
         {
             ++stats.GraphGeometryFailedPack;
             releaseStaleResidency();
             return false;
         }
 
-        if (hadResidency)
+        if (residency.Status ==
+            Graphics::GeometryResidencyStatus::PartiallyUpdated)
         {
-            // Dirty reupload: queue the prior handle for the same
-            // `framesInFlight` deferred-retire window, then swap. The new
-            // `SetInstanceGeometry` below detaches the instance from the old
-            // slot before it is freed.
-            EnqueueGraphRetire(sidecar.GraphGeometry);
+            ++stats.GraphGeometryReuploads;
+            ++stats.GraphGeometryPartialUploads;
+        }
+        else if (residency.Status ==
+                 Graphics::GeometryResidencyStatus::FullyReuploaded)
+        {
             ++stats.GraphGeometryReuploads;
             ++stats.GraphGeometryReleases;
         }
-        else
+        else if (residency.Status ==
+                 Graphics::GeometryResidencyStatus::Uploaded)
         {
             ++stats.GraphGeometryUploads;
+        }
+        else
+        {
+            ++stats.GraphGeometryReuseHits;
         }
 
         if (dirty)
@@ -386,19 +431,21 @@ namespace Extrinsic::Runtime
                             D::DirtyEdgeTopology>(entity);
         }
 
-        sidecar.GraphGeometry = handle;
+        sidecar.GraphGeometry = residency.Handle;
         sidecar.GraphPackedLines = wantLines;
         sidecar.GraphPackedPoints = wantPoints;
-        sidecar.Geometry = handle;
-        sidecar.GpuSlot.SetGeometryHandle(handle);
+        sidecar.Geometry = residency.Handle;
+        sidecar.GpuSlot.SetGeometryHandle(residency.Handle);
         sidecar.GpuSlot.ClearSourceAsset();
-        renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, handle);
+        renderer.GetGpuWorld().SetInstanceGeometry(
+            sidecar.Instance, residency.Handle);
         return true;
     }
 
     bool RenderExtractionCache::State::BindPointCloudGeometry(
         entt::registry& registry,
         entt::entity entity,
+        const std::uint32_t stableId,
         const ECS::Components::GeometrySources::ConstSourceView& view,
         RenderableSidecar& sidecar,
         Graphics::IRenderer& renderer,
@@ -406,6 +453,10 @@ namespace Extrinsic::Runtime
     {
         namespace D = ECS::Components::DirtyTags;
         namespace G = Graphics::Components;
+        const Graphics::GeometryResidencyKey residencyKey =
+            BuildRenderExtractionGeometryResidencyKey(
+                RenderExtractionGeometryResidencyKind::PointCloud,
+                stableId);
 
         // Fail-closed release for an unsupported-size-source or dirty-reupload
         // pack/upload failure — see the mesh bridge for the rationale. The
@@ -417,7 +468,7 @@ namespace Extrinsic::Runtime
             {
                 return;
             }
-            EnqueuePointCloudRetire(sidecar.PointCloudGeometry);
+            (void)ReleaseGeometryResidency(residencyKey);
             renderer.GetGpuWorld().SetInstanceGeometry(
                 sidecar.Instance,
                 Graphics::GpuGeometryHandle{});
@@ -492,56 +543,48 @@ namespace Extrinsic::Runtime
             return false;
         }
 
-        if (hadResidency && dirty && !dirtyPlan.RequiresFullUpload)
-        {
-            const Graphics::GpuWorld::GeometryChannelUpdateResult update =
-                renderer.GetGpuWorld().UpdateGeometryChannels(
-                    sidecar.PointCloudGeometry,
-                    *packResult.Upload,
-                    dirtyPlan.Channels);
-            if (update.Succeeded())
-            {
-                ++stats.PointCloudGeometryReuploads;
-                ++stats.PointCloudGeometryPartialUploads;
-                registry.remove<D::GpuDirty,
-                                D::DirtyVertexPositions,
-                                D::DirtyVertexAttributes,
-                                D::DirtyVertexTexcoords,
-                                D::DirtyVertexNormals,
-                                D::DirtyVertexColors>(entity);
-                sidecar.Geometry = sidecar.PointCloudGeometry;
-                sidecar.GpuSlot.SetGeometryHandle(
-                    sidecar.PointCloudGeometry);
-                sidecar.GpuSlot.ClearSourceAsset();
-                renderer.GetGpuWorld().SetInstanceGeometry(
-                    sidecar.Instance,
-                    sidecar.PointCloudGeometry);
-                return true;
-            }
-        }
-
-        const Graphics::GpuGeometryHandle handle =
-            renderer.GetGpuWorld().UploadGeometry(*packResult.Upload);
-        if (!handle.IsValid())
+        const bool partialPreferred =
+            hadResidency && dirty && !dirtyPlan.RequiresFullUpload;
+        const Graphics::GeometryUploadPlan plan =
+            Graphics::MakeGeometryUploadPlan(
+                residencyKey,
+                IssueGeometryPlanGeneration(),
+                *packResult.Upload,
+                partialPreferred
+                    ? Graphics::GeometryUploadUpdateClass::PartialPreferred
+                    : Graphics::GeometryUploadUpdateClass::FullReplacement,
+                partialPreferred
+                    ? dirtyPlan.Channels
+                    : Graphics::GpuWorld::GeometryChannelUpdateMask{});
+        const Graphics::GeometryResidencyResult residency =
+            EnsureGeometryResidency(renderer).Reconcile(plan);
+        if (!residency.Succeeded())
         {
             ++stats.PointCloudGeometryFailedPack;
             releaseStaleResidency();
             return false;
         }
 
-        if (hadResidency)
+        if (residency.Status ==
+            Graphics::GeometryResidencyStatus::PartiallyUpdated)
         {
-            // Dirty reupload: queue the prior handle for the same
-            // `framesInFlight` deferred-retire window, then swap. The new
-            // `SetInstanceGeometry` below detaches the instance from the old
-            // slot before it is freed.
-            EnqueuePointCloudRetire(sidecar.PointCloudGeometry);
+            ++stats.PointCloudGeometryReuploads;
+            ++stats.PointCloudGeometryPartialUploads;
+        }
+        else if (residency.Status ==
+                 Graphics::GeometryResidencyStatus::FullyReuploaded)
+        {
             ++stats.PointCloudGeometryReuploads;
             ++stats.PointCloudGeometryReleases;
         }
-        else
+        else if (residency.Status ==
+                 Graphics::GeometryResidencyStatus::Uploaded)
         {
             ++stats.PointCloudGeometryUploads;
+        }
+        else
+        {
+            ++stats.PointCloudGeometryReuseHits;
         }
 
         if (dirty)
@@ -554,11 +597,12 @@ namespace Extrinsic::Runtime
                             D::DirtyVertexColors>(entity);
         }
 
-        sidecar.PointCloudGeometry = handle;
-        sidecar.Geometry = handle;
-        sidecar.GpuSlot.SetGeometryHandle(handle);
+        sidecar.PointCloudGeometry = residency.Handle;
+        sidecar.Geometry = residency.Handle;
+        sidecar.GpuSlot.SetGeometryHandle(residency.Handle);
         sidecar.GpuSlot.ClearSourceAsset();
-        renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, handle);
+        renderer.GetGpuWorld().SetInstanceGeometry(
+            sidecar.Instance, residency.Handle);
         return true;
     }
 
@@ -587,11 +631,17 @@ namespace Extrinsic::Runtime
             isEdge
                 ? sidecar.MeshEdgeViewGeometry
                 : sidecar.MeshVertexViewGeometry;
+        const Graphics::GeometryResidencyKey residencyKey =
+            BuildRenderExtractionGeometryResidencyKey(
+                RenderExtractionGeometryResidencyKind::MeshPrimitiveView,
+                stableId,
+                isEdge ? 1u : 2u);
 
         // Disabled (or parent no longer resident): release any existing view.
         if (!desired)
         {
-            ReleaseMeshPrimitiveView(kind, sidecar, renderer, stats);
+            ReleaseMeshPrimitiveView(
+                kind, stableId, sidecar, renderer, stats);
             return false;
         }
 
@@ -600,7 +650,8 @@ namespace Extrinsic::Runtime
                 || !std::holds_alternative<float>(points->SizeSource)))
         {
             ++stats.MeshVertexViewFailedPack;
-            ReleaseMeshPrimitiveView(kind, sidecar, renderer, stats);
+            ReleaseMeshPrimitiveView(
+                kind, stableId, sidecar, renderer, stats);
             return false;
         }
 
@@ -694,13 +745,43 @@ namespace Extrinsic::Runtime
             // keep rendering. The parent surface owns its own fail-closed path;
             // a missing/invalid edge view simply disappears until the source
             // recovers on a later dirty frame.
-            ReleaseMeshPrimitiveView(kind, sidecar, renderer, stats);
+            ReleaseMeshPrimitiveView(
+                kind, stableId, sidecar, renderer, stats);
             return false;
         }
 
-        const Graphics::GpuGeometryHandle handle =
-            renderer.GetGpuWorld().UploadGeometry(*packResult.Upload);
-        if (!handle.IsValid())
+        // Ensure the view has its own instance. Allocated lazily on first
+        // upload and kept until the view is released. Allocate before
+        // publishing the plan so an exhausted instance pool cannot create an
+        // unowned geometry allocation.
+        if (!instance.IsValid())
+        {
+            instance = renderer.GetGpuWorld().AllocateInstance(stableId);
+            if (!instance.IsValid())
+            {
+                if (isEdge)
+                {
+                    ++stats.MeshEdgeViewFailedPack;
+                }
+                else
+                {
+                    ++stats.MeshVertexViewFailedPack;
+                }
+                ReleaseMeshPrimitiveView(
+                    kind, stableId, sidecar, renderer, stats);
+                return false;
+            }
+            ++stats.AllocatedInstanceCount;
+        }
+
+        const Graphics::GeometryUploadPlan plan =
+            Graphics::MakeGeometryUploadPlan(
+                residencyKey,
+                IssueGeometryPlanGeneration(),
+                *packResult.Upload);
+        const Graphics::GeometryResidencyResult residency =
+            EnsureGeometryResidency(renderer).Reconcile(plan);
+        if (!residency.Succeeded())
         {
             if (isEdge)
             {
@@ -710,39 +791,14 @@ namespace Extrinsic::Runtime
             {
                 ++stats.MeshVertexViewFailedPack;
             }
-            ReleaseMeshPrimitiveView(kind, sidecar, renderer, stats);
+            ReleaseMeshPrimitiveView(
+                kind, stableId, sidecar, renderer, stats);
             return false;
         }
 
-        // Ensure the view has its own instance. Allocated lazily on first
-        // upload and kept until the view is released. If the instance pool is
-        // exhausted, free the just-uploaded geometry to avoid a leak and bail.
-        if (!instance.IsValid())
+        if (residency.Status ==
+            Graphics::GeometryResidencyStatus::FullyReuploaded)
         {
-            instance = renderer.GetGpuWorld().AllocateInstance(stableId);
-            if (!instance.IsValid())
-            {
-                renderer.GetGpuWorld().FreeGeometry(handle);
-                if (isEdge)
-                {
-                    ++stats.MeshEdgeViewFailedPack;
-                }
-                else
-                {
-                    ++stats.MeshVertexViewFailedPack;
-                }
-                ReleaseMeshPrimitiveView(kind, sidecar, renderer, stats);
-                return false;
-            }
-            ++stats.AllocatedInstanceCount;
-        }
-
-        if (hadView)
-        {
-            // Parent-dirty reupload: queue the prior view handle for deferred
-            // retire, then swap. The `SetInstanceGeometry` below rebinds the
-            // existing view instance to the fresh upload.
-            EnqueueMeshPrimitiveViewRetire(geometry);
             if (isEdge)
             {
                 ++stats.MeshEdgeViewReuploads;
@@ -754,7 +810,8 @@ namespace Extrinsic::Runtime
                 ++stats.MeshVertexViewReleases;
             }
         }
-        else
+        else if (residency.Status ==
+                 Graphics::GeometryResidencyStatus::Uploaded)
         {
             if (isEdge)
             {
@@ -765,9 +822,21 @@ namespace Extrinsic::Runtime
                 ++stats.MeshVertexViewUploads;
             }
         }
+        else
+        {
+            if (isEdge)
+            {
+                ++stats.MeshEdgeViewReuseHits;
+            }
+            else
+            {
+                ++stats.MeshVertexViewReuseHits;
+            }
+        }
 
-        geometry = handle;
-        renderer.GetGpuWorld().SetInstanceGeometry(instance, handle);
+        geometry = residency.Handle;
+        renderer.GetGpuWorld().SetInstanceGeometry(
+            instance, residency.Handle);
         submitTransform();
         return true;
     }
@@ -960,56 +1029,101 @@ namespace Extrinsic::Runtime
 
         const ProceduralGeometryKey key =
             MakeProceduralGeometryKey(ref.Kind, ref.Params);
+        const std::uint64_t residencyIdentity =
+            key.ParamsHash == 0u ? 1u : key.ParamsHash;
+        const Graphics::GeometryResidencyKey residencyKey =
+            BuildRenderExtractionGeometryResidencyKey(
+                RenderExtractionGeometryResidencyKind::Procedural,
+                residencyIdentity,
+                static_cast<std::uint32_t>(key.Kind) + 1u);
 
-        Graphics::GpuWorld::GeometryUploadDesc desc{};
-        const ProceduralGeometryCacheEntry* existing =
-            m_ProceduralGeometry.Find(key);
-        if (existing == nullptr)
+        // A sidecar already owns exactly one reference. Rebinding the same
+        // procedural source every frame must not acquire repeatedly.
+        if (sidecar.ProceduralKey.has_value()
+            && *sidecar.ProceduralKey == key)
         {
-            std::optional<Graphics::GpuWorld::GeometryUploadDesc> packed =
-                Pack(ref.Kind, ref.Params, m_ProceduralPack);
-            if (!packed.has_value())
+            const auto resident =
+                EnsureGeometryResidency(renderer).Find(residencyKey);
+            if (resident.has_value() && resident->RefCount > 0u)
             {
-                ++stats.ProceduralGeometryInvalidParams;
-                return false;
+                ++stats.ProceduralGeometryReuseHits;
+                sidecar.Geometry = resident->Handle;
+                sidecar.GpuSlot.SetGeometryHandle(resident->Handle);
+                sidecar.GpuSlot.ClearSourceAsset();
+                renderer.GetGpuWorld().SetInstanceGeometry(
+                    sidecar.Instance,
+                    resident->Handle);
+                return true;
             }
-            desc = *packed;
         }
 
-        const auto preUploads = m_ProceduralGeometry.Stats().Uploads;
-        const auto preReuse = m_ProceduralGeometry.Stats().ReuseHits;
-
-        ProceduralGeometryCache::UploadFn upload =
-            [&renderer](
-                const Graphics::GpuWorld::GeometryUploadDesc& uploadDesc)
-            {
-                return renderer.GetGpuWorld().UploadGeometry(uploadDesc);
-            };
-
-        const Graphics::GpuGeometryHandle handle =
-            m_ProceduralGeometry.EnsureResident(key, desc, upload);
-        if (!handle.IsValid())
+        if (sidecar.ProceduralKey.has_value()
+            && *sidecar.ProceduralKey != key)
         {
-            ++stats.ProceduralGeometryFailedPack;
+            const ProceduralGeometryKey previous = *sidecar.ProceduralKey;
+            (void)ReleaseGeometryResidency(
+                BuildRenderExtractionGeometryResidencyKey(
+                    RenderExtractionGeometryResidencyKind::Procedural,
+                    previous.ParamsHash == 0u ? 1u : previous.ParamsHash,
+                    static_cast<std::uint32_t>(previous.Kind) + 1u));
+            ++stats.ProceduralGeometryReleases;
+            sidecar.ProceduralKey.reset();
+        }
+
+        const std::optional<Graphics::GpuWorld::GeometryUploadDesc> packed =
+            Pack(ref.Kind, ref.Params, m_ProceduralPack);
+        if (!packed.has_value())
+        {
+            ++stats.ProceduralGeometryInvalidParams;
             return false;
         }
 
-        if (m_ProceduralGeometry.Stats().Uploads > preUploads)
+        Graphics::GeometryResidencyCoordinator& coordinator =
+            EnsureGeometryResidency(renderer);
+        const Graphics::GeometryResidencyStats before = coordinator.Stats();
+        const Graphics::GeometryUploadPlan plan =
+            Graphics::MakeGeometryUploadPlan(
+                residencyKey,
+                residencyIdentity,
+                *packed,
+                Graphics::GeometryUploadUpdateClass::FullReplacement,
+                {},
+                Graphics::GpuWorld::GeometryStorageHint::StaticPreferInterleavedAoS);
+        const Graphics::GeometryResidencyResult residency =
+            coordinator.Acquire(plan);
+        if (!residency.Succeeded())
+        {
+            if (residency.Status ==
+                Graphics::GeometryResidencyStatus::RefCountSaturated)
+            {
+                ++stats.ProceduralGeometryRefCountSaturated;
+            }
+            else
+            {
+                ++stats.ProceduralGeometryFailedPack;
+            }
+            return false;
+        }
+        if (residency.Status == Graphics::GeometryResidencyStatus::Uploaded)
         {
             ++stats.ProceduralGeometryUploads;
         }
-        if (m_ProceduralGeometry.Stats().ReuseHits > preReuse)
+        else
         {
             ++stats.ProceduralGeometryReuseHits;
         }
+        stats.ProceduralGeometryRetireCancellations +=
+            static_cast<std::uint32_t>(
+                coordinator.Stats().RetireCancellations
+                - before.RetireCancellations);
 
-        sidecar.Geometry = handle;
+        sidecar.Geometry = residency.Handle;
         sidecar.ProceduralKey = key;
-        sidecar.GpuSlot.SetGeometryHandle(handle);
+        sidecar.GpuSlot.SetGeometryHandle(residency.Handle);
         sidecar.GpuSlot.ClearSourceAsset();
         renderer.GetGpuWorld().SetInstanceGeometry(
             sidecar.Instance,
-            handle);
+            residency.Handle);
         return true;
     }
 
@@ -1056,48 +1170,9 @@ namespace Extrinsic::Runtime
         ++stats.FreedInstanceCount;
     }
 
-    void RenderExtractionCache::State::EnqueueMeshRetire(
-        const Graphics::GpuGeometryHandle handle)
-    {
-        if (handle.IsValid())
-        {
-            m_MeshRetire.push_back(
-                GeometryRetireRecord{handle, 0, false});
-        }
-    }
-
-    void RenderExtractionCache::State::EnqueueGraphRetire(
-        const Graphics::GpuGeometryHandle handle)
-    {
-        if (handle.IsValid())
-        {
-            m_GraphRetire.push_back(
-                GeometryRetireRecord{handle, 0, false});
-        }
-    }
-
-    void RenderExtractionCache::State::EnqueuePointCloudRetire(
-        const Graphics::GpuGeometryHandle handle)
-    {
-        if (handle.IsValid())
-        {
-            m_PointCloudRetire.push_back(
-                GeometryRetireRecord{handle, 0, false});
-        }
-    }
-
-    void RenderExtractionCache::State::EnqueueMeshPrimitiveViewRetire(
-        const Graphics::GpuGeometryHandle handle)
-    {
-        if (handle.IsValid())
-        {
-            m_MeshPrimitiveViewRetire.push_back(
-                GeometryRetireRecord{handle, 0, false});
-        }
-    }
-
     void RenderExtractionCache::State::ReleaseMeshPrimitiveView(
         const MeshPrimitiveViewKind kind,
+        const std::uint32_t stableId,
         RenderableSidecar& sidecar,
         Graphics::IRenderer& renderer,
         RuntimeRenderExtractionStats& stats)
@@ -1114,7 +1189,11 @@ namespace Extrinsic::Runtime
 
         if (geometry.IsValid())
         {
-            EnqueueMeshPrimitiveViewRetire(geometry);
+            (void)ReleaseGeometryResidency(
+                BuildRenderExtractionGeometryResidencyKey(
+                    RenderExtractionGeometryResidencyKind::MeshPrimitiveView,
+                    stableId,
+                    isEdge ? 1u : 2u));
             geometry = {};
             if (isEdge)
             {
@@ -1149,17 +1228,29 @@ namespace Extrinsic::Runtime
 
             if (it->second.ProceduralKey.has_value())
             {
-                m_ProceduralGeometry.Release(
-                    *it->second.ProceduralKey);
+                const ProceduralGeometryKey key =
+                    *it->second.ProceduralKey;
+                (void)ReleaseGeometryResidency(
+                    BuildRenderExtractionGeometryResidencyKey(
+                        RenderExtractionGeometryResidencyKind::Procedural,
+                        key.ParamsHash == 0u ? 1u : key.ParamsHash,
+                        static_cast<std::uint32_t>(key.Kind) + 1u));
+                ++stats.ProceduralGeometryReleases;
             }
             if (it->second.MeshGeometry.IsValid())
             {
-                EnqueueMeshRetire(it->second.MeshGeometry);
+                (void)ReleaseGeometryResidency(
+                    BuildRenderExtractionGeometryResidencyKey(
+                        RenderExtractionGeometryResidencyKind::Mesh,
+                        it->first));
                 ++stats.MeshGeometryReleases;
             }
             if (it->second.GraphGeometry.IsValid())
             {
-                EnqueueGraphRetire(it->second.GraphGeometry);
+                (void)ReleaseGeometryResidency(
+                    BuildRenderExtractionGeometryResidencyKey(
+                        RenderExtractionGeometryResidencyKind::Graph,
+                        it->first));
                 ++stats.GraphGeometryReleases;
             }
             ReleaseGraphPointLaneInstance(
@@ -1168,17 +1259,21 @@ namespace Extrinsic::Runtime
                 stats);
             if (it->second.PointCloudGeometry.IsValid())
             {
-                EnqueuePointCloudRetire(
-                    it->second.PointCloudGeometry);
+                (void)ReleaseGeometryResidency(
+                    BuildRenderExtractionGeometryResidencyKey(
+                        RenderExtractionGeometryResidencyKind::PointCloud,
+                        it->first));
                 ++stats.PointCloudGeometryReleases;
             }
             ReleaseMeshPrimitiveView(
                 MeshPrimitiveViewKind::Edge,
+                it->first,
                 it->second,
                 renderer,
                 stats);
             ReleaseMeshPrimitiveView(
                 MeshPrimitiveViewKind::Vertex,
+                it->first,
                 it->second,
                 renderer,
                 stats);
@@ -1190,156 +1285,34 @@ namespace Extrinsic::Runtime
         }
     }
 
-    void RenderExtractionCache::State::TickProceduralGeometry(
+    void RenderExtractionCache::State::TickGeometryResidency(
         const std::uint64_t currentFrame,
         const std::uint32_t framesInFlight,
         Graphics::IRenderer& renderer)
     {
-        m_ProceduralGeometry.Tick(
-            currentFrame,
-            framesInFlight,
-            [&renderer](const Graphics::GpuGeometryHandle handle)
-            {
-                renderer.GetGpuWorld().FreeGeometry(handle);
-            });
-    }
-
-    void RenderExtractionCache::State::TickMeshGeometry(
-        const std::uint64_t currentFrame,
-        const std::uint32_t framesInFlight,
-        Graphics::IRenderer& renderer)
-    {
-        const std::uint64_t deadline =
-            currentFrame + std::uint64_t{framesInFlight};
-        for (auto& record : m_MeshRetire)
+        const Graphics::GeometryResidencyTickResult retired =
+            EnsureGeometryResidency(renderer).Tick(
+                currentFrame, framesInFlight);
+        for (const Graphics::GeometryResidencyKey key : retired.FreedKeys)
         {
-            if (!record.DeadlineSet)
+            switch (static_cast<RenderExtractionGeometryResidencyKind>(
+                key.Namespace))
             {
-                record.Deadline = deadline;
-                record.DeadlineSet = true;
-            }
-        }
-
-        auto it = m_MeshRetire.begin();
-        while (it != m_MeshRetire.end())
-        {
-            if (it->DeadlineSet && it->Deadline <= currentFrame)
-            {
-                if (it->Handle.IsValid())
-                {
-                    renderer.GetGpuWorld().FreeGeometry(it->Handle);
-                    ++m_MeshFreeRetires;
-                }
-                it = m_MeshRetire.erase(it);
-            }
-            else
-            {
-                ++it;
-            }
-        }
-    }
-
-    void RenderExtractionCache::State::TickGraphGeometry(
-        const std::uint64_t currentFrame,
-        const std::uint32_t framesInFlight,
-        Graphics::IRenderer& renderer)
-    {
-        const std::uint64_t deadline =
-            currentFrame + std::uint64_t{framesInFlight};
-        for (auto& record : m_GraphRetire)
-        {
-            if (!record.DeadlineSet)
-            {
-                record.Deadline = deadline;
-                record.DeadlineSet = true;
-            }
-        }
-
-        auto it = m_GraphRetire.begin();
-        while (it != m_GraphRetire.end())
-        {
-            if (it->DeadlineSet && it->Deadline <= currentFrame)
-            {
-                if (it->Handle.IsValid())
-                {
-                    renderer.GetGpuWorld().FreeGeometry(it->Handle);
-                    ++m_GraphFreeRetires;
-                }
-                it = m_GraphRetire.erase(it);
-            }
-            else
-            {
-                ++it;
-            }
-        }
-    }
-
-    void RenderExtractionCache::State::TickPointCloudGeometry(
-        const std::uint64_t currentFrame,
-        const std::uint32_t framesInFlight,
-        Graphics::IRenderer& renderer)
-    {
-        const std::uint64_t deadline =
-            currentFrame + std::uint64_t{framesInFlight};
-        for (auto& record : m_PointCloudRetire)
-        {
-            if (!record.DeadlineSet)
-            {
-                record.Deadline = deadline;
-                record.DeadlineSet = true;
-            }
-        }
-
-        auto it = m_PointCloudRetire.begin();
-        while (it != m_PointCloudRetire.end())
-        {
-            if (it->DeadlineSet && it->Deadline <= currentFrame)
-            {
-                if (it->Handle.IsValid())
-                {
-                    renderer.GetGpuWorld().FreeGeometry(it->Handle);
-                    ++m_PointCloudFreeRetires;
-                }
-                it = m_PointCloudRetire.erase(it);
-            }
-            else
-            {
-                ++it;
-            }
-        }
-    }
-
-    void RenderExtractionCache::State::TickMeshPrimitiveViewGeometry(
-        const std::uint64_t currentFrame,
-        const std::uint32_t framesInFlight,
-        Graphics::IRenderer& renderer)
-    {
-        const std::uint64_t deadline =
-            currentFrame + std::uint64_t{framesInFlight};
-        for (auto& record : m_MeshPrimitiveViewRetire)
-        {
-            if (!record.DeadlineSet)
-            {
-                record.Deadline = deadline;
-                record.DeadlineSet = true;
-            }
-        }
-
-        auto it = m_MeshPrimitiveViewRetire.begin();
-        while (it != m_MeshPrimitiveViewRetire.end())
-        {
-            if (it->DeadlineSet && it->Deadline <= currentFrame)
-            {
-                if (it->Handle.IsValid())
-                {
-                    renderer.GetGpuWorld().FreeGeometry(it->Handle);
-                    ++m_MeshPrimitiveViewFreeRetires;
-                }
-                it = m_MeshPrimitiveViewRetire.erase(it);
-            }
-            else
-            {
-                ++it;
+            case RenderExtractionGeometryResidencyKind::Mesh:
+                ++m_MeshFreeRetires;
+                break;
+            case RenderExtractionGeometryResidencyKind::Graph:
+                ++m_GraphFreeRetires;
+                break;
+            case RenderExtractionGeometryResidencyKind::PointCloud:
+                ++m_PointCloudFreeRetires;
+                break;
+            case RenderExtractionGeometryResidencyKind::Procedural:
+                ++m_ProceduralFreeRetires;
+                break;
+            case RenderExtractionGeometryResidencyKind::MeshPrimitiveView:
+                ++m_MeshPrimitiveViewFreeRetires;
+                break;
             }
         }
     }

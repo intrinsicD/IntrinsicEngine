@@ -146,9 +146,11 @@ TEST(GeometryResidencyContract, ReconcileCoversReuseStalePartialAndFullReplaceme
     EXPECT_EQ(replaced.RetiringHandle, initial.Handle);
     EXPECT_EQ(fixture.World.GetLiveGeometryCount(), 2u);
 
-    fixture.Coordinator.Tick(10u, 2u);
+    EXPECT_TRUE(fixture.Coordinator.Tick(10u, 2u).FreedKeys.empty());
     EXPECT_EQ(fixture.World.GetLiveGeometryCount(), 2u);
-    fixture.Coordinator.Tick(12u, 2u);
+    const auto replacementRetire = fixture.Coordinator.Tick(12u, 2u);
+    ASSERT_EQ(replacementRetire.FreedKeys.size(), 1u);
+    EXPECT_EQ(replacementRetire.FreedKeys.front(), key);
     EXPECT_EQ(fixture.World.GetLiveGeometryCount(), 1u);
 
     const auto& stats = fixture.Coordinator.Stats();
@@ -176,7 +178,7 @@ TEST(GeometryResidencyContract, SharedAcquireReleaseAndResurrectionUseOneRetireP
     EXPECT_FALSE(fixture.Coordinator.Release(key));
     EXPECT_TRUE(fixture.Coordinator.Release(key));
     EXPECT_EQ(fixture.Coordinator.PendingRetireCount(), 1u);
-    fixture.Coordinator.Tick(100u, 3u);
+    EXPECT_TRUE(fixture.Coordinator.Tick(100u, 3u).FreedKeys.empty());
 
     const auto resurrected = fixture.Coordinator.Acquire(plan);
     EXPECT_EQ(resurrected.Status, Graphics::GeometryResidencyStatus::Reused);
@@ -185,8 +187,10 @@ TEST(GeometryResidencyContract, SharedAcquireReleaseAndResurrectionUseOneRetireP
     EXPECT_EQ(fixture.Coordinator.Stats().RetireCancellations, 1u);
 
     EXPECT_TRUE(fixture.Coordinator.Release(key));
-    fixture.Coordinator.Tick(200u, 1u);
-    fixture.Coordinator.Tick(201u, 1u);
+    EXPECT_TRUE(fixture.Coordinator.Tick(200u, 1u).FreedKeys.empty());
+    const auto finalRetire = fixture.Coordinator.Tick(201u, 1u);
+    ASSERT_EQ(finalRetire.FreedKeys.size(), 1u);
+    EXPECT_EQ(finalRetire.FreedKeys.front(), key);
     EXPECT_FALSE(fixture.Coordinator.Find(key).has_value());
     EXPECT_EQ(fixture.World.GetLiveGeometryCount(), 0u);
 }

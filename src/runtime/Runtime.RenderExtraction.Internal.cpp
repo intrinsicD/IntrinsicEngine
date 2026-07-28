@@ -20,6 +20,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Graphics.GeometryResidency;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Material;
@@ -52,6 +53,21 @@ import Extrinsic.Runtime.WorldHandle;
 
 namespace Extrinsic::Runtime
 {
+    enum class RenderExtractionGeometryResidencyKind : std::uint64_t
+    {
+        Mesh = 1u,
+        Graph = 2u,
+        PointCloud = 3u,
+        Procedural = 4u,
+        MeshPrimitiveView = 5u,
+    };
+
+    [[nodiscard]] Graphics::GeometryResidencyKey
+        BuildRenderExtractionGeometryResidencyKey(
+            RenderExtractionGeometryResidencyKind kind,
+            std::uint64_t identity,
+            std::uint32_t lane = 0u) noexcept;
+
     struct RenderExtractionGeometryDirtyPlan
     {
         bool Dirty = false;
@@ -124,21 +140,9 @@ namespace Extrinsic::Runtime
         void ClearSceneState(Graphics::IRenderer& renderer);
         void Shutdown(Graphics::IRenderer& renderer);
 
-        void TickProceduralGeometry(std::uint64_t currentFrame,
-                                    std::uint32_t framesInFlight,
-                                    Graphics::IRenderer& renderer);
-        void TickMeshGeometry(std::uint64_t currentFrame,
-                              std::uint32_t framesInFlight,
-                              Graphics::IRenderer& renderer);
-        void TickGraphGeometry(std::uint64_t currentFrame,
-                               std::uint32_t framesInFlight,
-                               Graphics::IRenderer& renderer);
-        void TickPointCloudGeometry(std::uint64_t currentFrame,
-                                    std::uint32_t framesInFlight,
-                                    Graphics::IRenderer& renderer);
-        void TickMeshPrimitiveViewGeometry(std::uint64_t currentFrame,
-                                           std::uint32_t framesInFlight,
-                                           Graphics::IRenderer& renderer);
+        void TickGeometryResidency(std::uint64_t currentFrame,
+                                   std::uint32_t framesInFlight,
+                                   Graphics::IRenderer& renderer);
 
         void SetMaterialTextureAssetBindings(
             std::uint32_t stableEntityId,
@@ -210,13 +214,6 @@ namespace Extrinsic::Runtime
             Vertex,
         };
 
-        struct GeometryRetireRecord
-        {
-            Graphics::GpuGeometryHandle Handle{};
-            std::uint64_t Deadline = 0;
-            bool DeadlineSet = false;
-        };
-
         [[nodiscard]] RenderableSidecar* EnsureRenderable(
             std::uint32_t stableId,
             Graphics::IRenderer& renderer,
@@ -249,6 +246,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool BindMeshGeometry(
             entt::registry& registry,
             entt::entity entity,
+            std::uint32_t stableId,
             const ECS::Components::GeometrySources::ConstSourceView& view,
             RenderableSidecar& sidecar,
             Graphics::IRenderer& renderer,
@@ -256,6 +254,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool BindGraphGeometry(
             entt::registry& registry,
             entt::entity entity,
+            std::uint32_t stableId,
             const ECS::Components::GeometrySources::ConstSourceView& view,
             RenderableSidecar& sidecar,
             Graphics::IRenderer& renderer,
@@ -272,6 +271,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool BindPointCloudGeometry(
             entt::registry& registry,
             entt::entity entity,
+            std::uint32_t stableId,
             const ECS::Components::GeometrySources::ConstSourceView& view,
             RenderableSidecar& sidecar,
             Graphics::IRenderer& renderer,
@@ -293,6 +293,7 @@ namespace Extrinsic::Runtime
             RuntimeRenderExtractionStats& stats);
         void ReleaseMeshPrimitiveView(
             MeshPrimitiveViewKind kind,
+            std::uint32_t stableId,
             RenderableSidecar& sidecar,
             Graphics::IRenderer& renderer,
             RuntimeRenderExtractionStats& stats);
@@ -317,38 +318,40 @@ namespace Extrinsic::Runtime
             std::uint32_t runtimeSnapshotStorageSlot,
             RuntimeRenderExtractionStats& stats);
 
-        void EnqueueMeshRetire(Graphics::GpuGeometryHandle handle);
-        void EnqueueGraphRetire(Graphics::GpuGeometryHandle handle);
-        void EnqueuePointCloudRetire(Graphics::GpuGeometryHandle handle);
-        void EnqueueMeshPrimitiveViewRetire(
-            Graphics::GpuGeometryHandle handle);
+        [[nodiscard]] Graphics::GeometryResidencyCoordinator&
+            EnsureGeometryResidency(Graphics::IRenderer& renderer);
+        [[nodiscard]] std::uint64_t IssueGeometryPlanGeneration() noexcept;
+        [[nodiscard]] bool ReleaseGeometryResidency(
+            Graphics::GeometryResidencyKey key);
 
         std::unordered_map<std::uint32_t, RenderableSidecar> m_Renderables{};
         std::unordered_set<std::uint32_t> m_LiveRenderableKeys{};
         std::vector<Graphics::TransformSyncRecord> m_Transforms{};
         std::vector<Graphics::VisualizationSyncRecord> m_Visualizations{};
         std::vector<Graphics::LightSnapshot> m_Lights{};
+        std::unique_ptr<Graphics::GeometryResidencyCoordinator>
+            m_GeometryResidency{};
+        Graphics::GpuWorld* m_GeometryResidencyWorld{nullptr};
+        std::uint64_t m_NextGeometryPlanGeneration{1u};
         ProceduralGeometryCache m_ProceduralGeometry{};
         ProceduralGeometryPackBuffer m_ProceduralPack{};
         ProceduralGeometryCacheStats m_PrevProceduralStats{};
+        std::uint32_t m_ProceduralFreeRetires{0};
+        std::uint32_t m_PrevProceduralFreeRetires{0};
         MeshPackBuffer m_MeshPack{};
 
-        std::vector<GeometryRetireRecord> m_MeshRetire{};
         std::uint32_t m_MeshFreeRetires{0};
         std::uint32_t m_PrevMeshFreeRetires{0};
 
         GraphPackBuffer m_GraphPack{};
-        std::vector<GeometryRetireRecord> m_GraphRetire{};
         std::uint32_t m_GraphFreeRetires{0};
         std::uint32_t m_PrevGraphFreeRetires{0};
 
         PointCloudPackBuffer m_PointCloudPack{};
-        std::vector<GeometryRetireRecord> m_PointCloudRetire{};
         std::uint32_t m_PointCloudFreeRetires{0};
         std::uint32_t m_PrevPointCloudFreeRetires{0};
 
         MeshPrimitiveViewBuffer m_MeshPrimitiveViewPack{};
-        std::vector<GeometryRetireRecord> m_MeshPrimitiveViewRetire{};
         std::uint32_t m_MeshPrimitiveViewFreeRetires{0};
         std::uint32_t m_PrevMeshPrimitiveViewFreeRetires{0};
         std::unordered_map<

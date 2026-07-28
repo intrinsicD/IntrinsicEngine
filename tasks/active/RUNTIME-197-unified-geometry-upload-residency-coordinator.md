@@ -32,6 +32,14 @@ maturity_target: Retired
   and hard shutdown. It introduces no device, allocator, interface, factory,
   registry, or app service. The focused target builds and all 5 coordinator
   contracts pass; the old runtime packer/lifecycle paths remain until Slice B.
+- Slice B completed on 2026-07-28. Mesh, graph, point-cloud, procedural, and
+  mesh edge/vertex-view extraction now submit copied plans through the one
+  coordinator. Runtime no longer calls geometry upload/update/free directly,
+  owns no per-domain retire queues, and ticks one maintenance path per frame;
+  hard scene teardown collapses through coordinator shutdown. The focused
+  build and all 106 coordinator plus domain extraction contracts pass. The
+  exported packer/cache modules remain only as topology builders and an unused
+  compatibility surface pending Slice C deletion.
 
 ## Goal
 

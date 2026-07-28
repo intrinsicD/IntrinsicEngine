@@ -109,10 +109,7 @@ namespace Extrinsic::Runtime
         const std::uint32_t framesInFlight,
         Graphics::IRenderer& renderer)
     {
-        m_State->TickProceduralGeometry(
-            currentFrame,
-            framesInFlight,
-            renderer);
+        m_State->TickGeometryResidency(currentFrame, framesInFlight, renderer);
     }
 
     void RenderExtractionCache::TickMeshGeometry(
@@ -120,7 +117,7 @@ namespace Extrinsic::Runtime
         const std::uint32_t framesInFlight,
         Graphics::IRenderer& renderer)
     {
-        m_State->TickMeshGeometry(currentFrame, framesInFlight, renderer);
+        m_State->TickGeometryResidency(currentFrame, framesInFlight, renderer);
     }
 
     void RenderExtractionCache::TickGraphGeometry(
@@ -128,7 +125,7 @@ namespace Extrinsic::Runtime
         const std::uint32_t framesInFlight,
         Graphics::IRenderer& renderer)
     {
-        m_State->TickGraphGeometry(currentFrame, framesInFlight, renderer);
+        m_State->TickGeometryResidency(currentFrame, framesInFlight, renderer);
     }
 
     void RenderExtractionCache::TickPointCloudGeometry(
@@ -136,10 +133,7 @@ namespace Extrinsic::Runtime
         const std::uint32_t framesInFlight,
         Graphics::IRenderer& renderer)
     {
-        m_State->TickPointCloudGeometry(
-            currentFrame,
-            framesInFlight,
-            renderer);
+        m_State->TickGeometryResidency(currentFrame, framesInFlight, renderer);
     }
 
     void RenderExtractionCache::TickMeshPrimitiveViewGeometry(
@@ -147,10 +141,15 @@ namespace Extrinsic::Runtime
         const std::uint32_t framesInFlight,
         Graphics::IRenderer& renderer)
     {
-        m_State->TickMeshPrimitiveViewGeometry(
-            currentFrame,
-            framesInFlight,
-            renderer);
+        m_State->TickGeometryResidency(currentFrame, framesInFlight, renderer);
+    }
+
+    void RenderExtractionCache::TickGeometryResidency(
+        const std::uint64_t currentFrame,
+        const std::uint32_t framesInFlight,
+        Graphics::IRenderer& renderer)
+    {
+        m_State->TickGeometryResidency(currentFrame, framesInFlight, renderer);
     }
 
     void RenderExtractionCache::SetMaterialTextureAssetBindings(
@@ -1668,6 +1667,7 @@ namespace Extrinsic::Runtime
                 {
                     meshBoundThisFrame = BindMeshGeometry(registry,
                                                           entity,
+                                                          stableId,
                                                           view,
                                                           *sidecar,
                                                           renderer,
@@ -1731,10 +1731,12 @@ namespace Extrinsic::Runtime
                 else
                 {
                     ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Edge,
+                                             stableId,
                                              *sidecar,
                                              renderer,
                                              stats);
                     ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Vertex,
+                                             stableId,
                                              *sidecar,
                                              renderer,
                                              stats);
@@ -1745,6 +1747,7 @@ namespace Extrinsic::Runtime
                 graphDomainThisFrame = true;
                 graphBoundThisFrame = BindGraphGeometry(registry,
                                                         entity,
+                                                        stableId,
                                                         view,
                                                         *sidecar,
                                                         renderer,
@@ -1761,6 +1764,7 @@ namespace Extrinsic::Runtime
                     // have no faces/edges to draw from a cloud.
                     pointCloudBoundThisFrame = BindPointCloudGeometry(registry,
                                                                       entity,
+                                                                      stableId,
                                                                       view,
                                                                       *sidecar,
                                                                       renderer,
@@ -1773,6 +1777,31 @@ namespace Extrinsic::Runtime
                     // or creating stale residency.
                     ++stats.PointCloudGeometryFailedPack;
                 }
+            }
+        }
+
+        // Shared procedural residency is one reference per renderable, not
+        // one reference per extraction. Drop that ownership when procedural
+        // binding is no longer authoritative or fails closed.
+        if (!proceduralBound && sidecar->ProceduralKey.has_value())
+        {
+            const ProceduralGeometryKey key = *sidecar->ProceduralKey;
+            (void)ReleaseGeometryResidency(
+                BuildRenderExtractionGeometryResidencyKey(
+                    RenderExtractionGeometryResidencyKind::Procedural,
+                    key.ParamsHash == 0u ? 1u : key.ParamsHash,
+                    static_cast<std::uint32_t>(key.Kind) + 1u));
+            sidecar->ProceduralKey.reset();
+            ++stats.ProceduralGeometryReleases;
+            if (!meshBoundThisFrame && !graphBoundThisFrame
+                && !pointCloudBoundThisFrame)
+            {
+                renderer.GetGpuWorld().SetInstanceGeometry(
+                    sidecar->Instance,
+                    Graphics::GpuGeometryHandle{});
+                sidecar->Geometry = {};
+                sidecar->GpuSlot.SetGeometryHandle(
+                    Graphics::GpuGeometryHandle{});
             }
         }
 
@@ -1797,7 +1826,10 @@ namespace Extrinsic::Runtime
             meshSurfaceLaneReadyThisFrame;
         if (!stillMeshAttached && sidecar->MeshGeometry.IsValid())
         {
-            EnqueueMeshRetire(sidecar->MeshGeometry);
+            (void)ReleaseGeometryResidency(
+                BuildRenderExtractionGeometryResidencyKey(
+                    RenderExtractionGeometryResidencyKind::Mesh,
+                    stableId));
             const bool replacementBoundThisFrame =
                 proceduralBound || graphBoundThisFrame || pointCloudBoundThisFrame;
             // Only detach if nothing else re-bound the instance this frame
@@ -1827,7 +1859,10 @@ namespace Extrinsic::Runtime
             graphLaneReadyThisFrame;
         if (!stillGraphAttached && sidecar->GraphGeometry.IsValid())
         {
-            EnqueueGraphRetire(sidecar->GraphGeometry);
+            (void)ReleaseGeometryResidency(
+                BuildRenderExtractionGeometryResidencyKey(
+                    RenderExtractionGeometryResidencyKind::Graph,
+                    stableId));
             ReleaseGraphPointLaneInstance(*sidecar, renderer, stats);
             if (!proceduralBound && !meshBoundThisFrame && !pointCloudBoundThisFrame)
             {
@@ -1853,7 +1888,10 @@ namespace Extrinsic::Runtime
             pointCloudResidencyDesiredThisFrame;
         if (!stillPointCloudAttached && sidecar->PointCloudGeometry.IsValid())
         {
-            EnqueuePointCloudRetire(sidecar->PointCloudGeometry);
+            (void)ReleaseGeometryResidency(
+                BuildRenderExtractionGeometryResidencyKey(
+                    RenderExtractionGeometryResidencyKind::PointCloud,
+                    stableId));
             if (!proceduralBound && !meshBoundThisFrame && !graphBoundThisFrame)
             {
                 renderer.GetGpuWorld().SetInstanceGeometry(sidecar->Instance,
@@ -1871,8 +1909,10 @@ namespace Extrinsic::Runtime
         // resident mesh; this covers the parent-level flips.
         if (!meshViewsResident)
         {
-            ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Edge, *sidecar, renderer, stats);
-            ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Vertex, *sidecar, renderer, stats);
+            ReleaseMeshPrimitiveView(
+                MeshPrimitiveViewKind::Edge, stableId, *sidecar, renderer, stats);
+            ReleaseMeshPrimitiveView(
+                MeshPrimitiveViewKind::Vertex, stableId, *sidecar, renderer, stats);
         }
 
         if (!proceduralBound && assetSource != nullptr)
@@ -2160,21 +2200,12 @@ namespace Extrinsic::Runtime
         stats.SubmittedVisualizationCount = static_cast<std::uint32_t>(m_Visualizations.size());
         stats.SubmittedLightCount = static_cast<std::uint32_t>(m_Lights.size());
 
-        // Per-tick deltas vs the cache snapshot recorded at the end of the
-        // previous ExtractAndSubmit.  This captures both within-extraction
-        // changes (Release/EnsureResident) and out-of-extraction Tick
-        // increments (FreeRetires) that ran in the maintenance phase between
-        // frames.
-        const auto postCacheStats = m_ProceduralGeometry.Stats();
-        stats.ProceduralGeometryReleases =
-            postCacheStats.Releases - m_PrevProceduralStats.Releases;
+        // Releases, reuse, and retire cancellations are recorded inline at
+        // coordinator calls. Actual frees happen during the maintenance tick
+        // between extractions, so publish that counter as a per-frame delta.
         stats.ProceduralGeometryFreeRetires =
-            postCacheStats.FreeRetires - m_PrevProceduralStats.FreeRetires;
-        stats.ProceduralGeometryRetireCancellations =
-            postCacheStats.RetireCancellations - m_PrevProceduralStats.RetireCancellations;
-        stats.ProceduralGeometryRefCountSaturated =
-            postCacheStats.RefCountSaturated - m_PrevProceduralStats.RefCountSaturated;
-        m_PrevProceduralStats = postCacheStats;
+            m_ProceduralFreeRetires - m_PrevProceduralFreeRetires;
+        m_PrevProceduralFreeRetires = m_ProceduralFreeRetires;
 
         // RUNTIME-085 Slice C — mesh deferred-retire FreeRetires delta is
         // surfaced via the same release/tick cadence the procedural cache
@@ -2245,31 +2276,23 @@ namespace Extrinsic::Runtime
         {
             if (sidecar.ProceduralKey.has_value())
             {
-                m_ProceduralGeometry.Release(*sidecar.ProceduralKey);
+                ++stats.ProceduralGeometryReleases;
             }
             if (sidecar.MeshGeometry.IsValid())
             {
-                renderer.GetGpuWorld().FreeGeometry(sidecar.MeshGeometry);
                 ++stats.MeshGeometryReleases;
             }
             if (sidecar.GraphGeometry.IsValid())
             {
-                renderer.GetGpuWorld().FreeGeometry(sidecar.GraphGeometry);
                 ++stats.GraphGeometryReleases;
             }
             ReleaseGraphPointLaneInstance(sidecar, renderer, stats);
             if (sidecar.PointCloudGeometry.IsValid())
             {
-                renderer.GetGpuWorld().FreeGeometry(sidecar.PointCloudGeometry);
                 ++stats.PointCloudGeometryReleases;
             }
-            // RUNTIME-088 Slice B — hard teardown of the edge/vertex view
-            // sidecars: free geometry directly (the deferred window is collapsed
-            // at shutdown) and free their own instances.
             if (sidecar.MeshEdgeViewGeometry.IsValid())
             {
-                renderer.GetGpuWorld().FreeGeometry(sidecar.MeshEdgeViewGeometry);
-                sidecar.MeshEdgeViewGeometry = {};
                 ++stats.MeshEdgeViewReleases;
             }
             if (sidecar.MeshEdgeViewInstance.IsValid())
@@ -2280,8 +2303,6 @@ namespace Extrinsic::Runtime
             }
             if (sidecar.MeshVertexViewGeometry.IsValid())
             {
-                renderer.GetGpuWorld().FreeGeometry(sidecar.MeshVertexViewGeometry);
-                sidecar.MeshVertexViewGeometry = {};
                 ++stats.MeshVertexViewReleases;
             }
             if (sidecar.MeshVertexViewInstance.IsValid())
@@ -2296,64 +2317,19 @@ namespace Extrinsic::Runtime
         m_Renderables.clear();
         m_LiveRenderableKeys.clear();
 
-        // Scene replacement is a hard boundary. Collapse procedural deferred
-        // retirement immediately so no previous-scene handles or retire deltas
-        // leak into the next scene's first extraction.
-        m_ProceduralGeometry.Tick(
-            std::numeric_limits<std::uint64_t>::max(),
-            0u,
-            [&renderer](Graphics::GpuGeometryHandle handle)
-            {
-                renderer.GetGpuWorld().FreeGeometry(handle);
-            });
-        m_PrevProceduralStats = m_ProceduralGeometry.Stats();
-
-        // RUNTIME-085 Slice C — drain any pending mesh deferred-retire
-        // records inline. Scene reset is a hard teardown, so the
-        // `framesInFlight` window is collapsed and handles are freed directly
-        // rather than waiting on `TickMeshGeometry`.
-        for (auto& rec : m_MeshRetire)
+        // Scene replacement is a hard boundary. The coordinator is the sole
+        // owner of current and pending geometry handles, so one shutdown
+        // collapses every domain's deferred-retire window without duplicate
+        // per-domain drains.
+        if (m_GeometryResidency != nullptr)
         {
-            if (rec.Handle.IsValid())
-            {
-                renderer.GetGpuWorld().FreeGeometry(rec.Handle);
-            }
+            m_GeometryResidency->Shutdown();
+            m_GeometryResidency.reset();
+            m_GeometryResidencyWorld = nullptr;
         }
-        m_MeshRetire.clear();
-
-        // RUNTIME-086 Slice B — drain the graph deferred-retire queue inline,
-        // mirroring the mesh teardown above.
-        for (auto& rec : m_GraphRetire)
-        {
-            if (rec.Handle.IsValid())
-            {
-                renderer.GetGpuWorld().FreeGeometry(rec.Handle);
-            }
-        }
-        m_GraphRetire.clear();
-
-        // RUNTIME-087 — drain the point-cloud deferred-retire queue inline,
-        // mirroring the graph teardown above.
-        for (auto& rec : m_PointCloudRetire)
-        {
-            if (rec.Handle.IsValid())
-            {
-                renderer.GetGpuWorld().FreeGeometry(rec.Handle);
-            }
-        }
-        m_PointCloudRetire.clear();
-
-        // RUNTIME-088 Slice B — drain the mesh-primitive-view deferred-retire
-        // queue inline and drop the cache-owned view settings.
-        for (auto& rec : m_MeshPrimitiveViewRetire)
-        {
-            if (rec.Handle.IsValid())
-            {
-                renderer.GetGpuWorld().FreeGeometry(rec.Handle);
-            }
-        }
-        m_MeshPrimitiveViewRetire.clear();
+        m_NextGeometryPlanGeneration = 1u;
         m_MaterialTextureBindings.clear();
+        m_PrevProceduralFreeRetires = m_ProceduralFreeRetires;
         m_PrevMeshFreeRetires = m_MeshFreeRetires;
         m_PrevGraphFreeRetires = m_GraphFreeRetires;
         m_PrevPointCloudFreeRetires = m_PointCloudFreeRetires;
