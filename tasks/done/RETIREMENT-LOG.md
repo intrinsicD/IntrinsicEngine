@@ -5919,3 +5919,20 @@ NVIDIA GeForce RTX 3050 with driver 590.48.01. Strict layering, test-layout,
 task-policy, docs-link, root-hygiene, ARA, generated-inventory, and whitespace
 checks close the evidence; C12 records the capability scope without a
 performance claim.
+
+[`RUNTIME-197`](RUNTIME-197-unified-geometry-upload-residency-coordinator.md) —
+unified geometry upload/residency convergence retired on 2026-07-28 at
+`Retired`. Mesh, graph, point-cloud, procedural, mesh-edge, and mesh-vertex
+lanes now build owning graphics-only upload plans through private typed runtime
+adapters and reconcile through one `GeometryResidencyCoordinator`. The five
+public packer modules, procedural cache, four per-domain retirement queues,
+forwarding maintenance ticks, and wrapper-only tests are deleted; shared mesh
+topology and primitive-view values remain in truthful narrow modules. Focused
+CPU coverage passed 133/133, the complete CPU-supported selector passed
+4,137/4,137 plus the expected GLFW/LSan self-skip, and the ASan+UBSan promoted-
+Vulkan selector passed 49/49 on an NVIDIA GeForce RTX 3050 with driver
+590.48.01, including explicit operational coverage for all six geometry lanes
+and the shutdown LeakSanitizer contract. Strict layering, test-layout, task-
+policy, docs-link, root-hygiene, ARA, generated-inventory, and whitespace
+checks close the evidence; C13 records the lifecycle/capability scope without
+a performance claim.

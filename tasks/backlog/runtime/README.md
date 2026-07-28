@@ -31,9 +31,6 @@ cleanup slice:
 
 #### Open tasks
 
-- [`RUNTIME-197` — Unified geometry upload and residency coordinator](../../active/RUNTIME-197-unified-geometry-upload-residency-coordinator.md)
-  centralizes upload/reupload/generation/retirement while retaining only small
-  private typed topology plan builders.
 - [`RUNTIME-198` — Data-driven visualization recipes](RUNTIME-198-data-driven-visualization-recipes.md)
   replaces the zero-production-registration adapter interface/registry with a
   closed recipe variant and pure packet encoders.
@@ -53,6 +50,10 @@ cleanup slice:
 
 #### Retired prerequisites and completed paths
 
+- [`RUNTIME-197` — Unified geometry upload and residency coordinator](../../done/RUNTIME-197-unified-geometry-upload-residency-coordinator.md)
+  retired five public packers, the procedural cache, and per-domain lifecycle
+  queues after all six live geometry lanes converged on private typed plan
+  builders plus one graphics-owned residency coordinator.
 - `RUNTIME-193` retired the progressive-named general presentation modules;
   one authored geometry-presentation recipe, runtime-only state sidecar, and
   copied extraction snapshot now serve every production geometry domain.

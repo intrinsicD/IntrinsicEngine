@@ -15,12 +15,12 @@ Root scanned: `src`
 | `geometry` | 103 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 71 |
+| `graphics/renderer` | 72 |
 | `graphics/rhi` | 20 |
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 73 |
+| `runtime` | 70 |
 
 ## Modules
 
@@ -239,6 +239,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.DeferredSystem` | `src/graphics/renderer/Graphics.DeferredSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.ForwardSystem` | `src/graphics/renderer/Graphics.ForwardSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.FrameRecipe` | `src/graphics/renderer/Graphics.FrameRecipe.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.GeometryResidency` | `src/graphics/renderer/Graphics.GeometryResidency.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.GpuScene` | `src/graphics/renderer/Graphics.GpuScene.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.GpuTransfer` | `src/graphics/renderer/Graphics.GpuTransfer.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.GpuWorld` | `src/graphics/renderer/Graphics.GpuWorld.cppm` | `graphics/renderer` |
@@ -363,15 +364,15 @@ Root scanned: `src`
 | `Extrinsic.Runtime.EngineConfigControl` | `src/runtime/Runtime.EngineConfigControl.cppm` | `runtime` |
 | `Extrinsic.Runtime.FramePacingDiagnostics` | `src/runtime/Runtime.FramePacingDiagnostics.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryAvailability` | `src/runtime/Runtime.GeometryAvailability.cppm` | `runtime` |
+| `Extrinsic.Runtime.GeometryPlanBuilders` | `src/runtime/Runtime.GeometryPlanBuilders.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryPresentation` | `src/runtime/Runtime.GeometryPresentation.cppm` | `runtime` |
-| `Extrinsic.Runtime.GraphGeometryPacker` | `src/runtime/Runtime.GraphGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.InputActions` | `src/runtime/Runtime.InputActions.cppm` | `runtime` |
 | `Extrinsic.Runtime.JobService` | `src/runtime/Runtime.JobService.cppm` | `runtime` |
 | `Extrinsic.Runtime.JobServiceGpuQueueBridge` | `src/runtime/Runtime.JobServiceGpuQueueBridge.cppm` | `runtime` |
 | `Extrinsic.Runtime.KernelEvents` | `src/runtime/Runtime.KernelEvents.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshAttributeTextureBake` | `src/runtime/Runtime.MeshAttributeTextureBake.cppm` | `runtime` |
-| `Extrinsic.Runtime.MeshGeometryPacker` | `src/runtime/Runtime.MeshGeometryPacker.cppm` | `runtime` |
-| `Extrinsic.Runtime.MeshPrimitiveViewPacker` | `src/runtime/Runtime.MeshPrimitiveViewPacker.cppm` | `runtime` |
+| `Extrinsic.Runtime.MeshPrimitiveView` | `src/runtime/Runtime.MeshPrimitiveView.cppm` | `runtime` |
+| `Extrinsic.Runtime.MeshSurfaceTopology` | `src/runtime/Runtime.MeshSurfaceTopology.cppm` | `runtime` |
 | `Extrinsic.Runtime.Module` | `src/runtime/Runtime.Module.cppm` | `runtime` |
 | `Extrinsic.Runtime.ModuleSchedule` | `src/runtime/Runtime.ModuleSchedule.cppm` | `runtime` |
 | `Extrinsic.Runtime.ObjectSpaceNormalBakeBinding` | `src/runtime/Runtime.ObjectSpaceNormalBakeBinding.cppm` | `runtime` |
@@ -379,10 +380,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.ObjectSpaceNormalBakeService` | `src/runtime/Runtime.ObjectSpaceNormalBakeService.cppm` | `runtime` |
 | `Extrinsic.Runtime.ObjectSpaceNormalBakeSubmission` | `src/runtime/Runtime.ObjectSpaceNormalBakeSubmission.cppm` | `runtime` |
 | `Extrinsic.Runtime.PhysicsBridge` | `src/runtime/Runtime.PhysicsBridge.cppm` | `runtime` |
-| `Extrinsic.Runtime.PointCloudGeometryPacker` | `src/runtime/Runtime.PointCloudGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.PrimitiveSelectionRefinement` | `src/runtime/Runtime.PrimitiveSelectionRefinement.cppm` | `runtime` |
-| `Extrinsic.Runtime.ProceduralGeometry` | `src/runtime/Runtime.ProceduralGeometry.cppm` | `runtime` |
-| `Extrinsic.Runtime.ProceduralGeometryPacker` | `src/runtime/Runtime.ProceduralGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonGpuBackend` | `src/runtime/Runtime.ProgressivePoissonGpuBackend.cppm` | `runtime` |
 | `Extrinsic.Runtime.ReferenceScene` | `src/runtime/Runtime.ReferenceScene.cppm` | `runtime` |
 | `Extrinsic.Runtime.RegistrationAlignment` | `src/runtime/Runtime.RegistrationAlignment.cppm` | `runtime` |
@@ -408,4 +406,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SceneInteractionModule` | `src/runtime/Scene/Runtime.SceneInteractionModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **381**
+Total modules: **379**

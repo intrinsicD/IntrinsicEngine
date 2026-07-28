@@ -287,3 +287,44 @@
 - **Tags**: runtime, geometry presentation, serialization, extraction, Vulkan,
   retirement
 - **From staging**: O67
+
+## C13: Runtime-authored geometry has one upload and residency lifecycle
+- **Statement**: Mesh, graph, point-cloud, procedural, mesh-edge, and
+  mesh-vertex extraction build owning graphics-only `GeometryUploadPlan`
+  values through private typed runtime adapters and reconcile them through one
+  `GeometryResidencyCoordinator`. Runtime retains ECS, topology, and canonical
+  `GeometryPropertyRef` ownership but does not directly upload, partially
+  update, or free geometry. The five public packer modules, procedural cache,
+  per-domain retirement queues, forwarding ticks, and wrapper-only tests are
+  absent; only truthful mesh-topology and primitive-view value modules remain.
+- **Status**: supported — CPU/Null contracts plus ASan+UBSan promoted Vulkan on
+  NVIDIA GeForce RTX 3050, driver 590.48.01; no storage-policy or performance
+  claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A live geometry lane bypasses the shared plan or
+  coordinator; runtime directly calls geometry upload, channel update, or free;
+  a retired packer/cache/retirement owner returns; a typed adapter leaks ECS or
+  runtime state into graphics; exact payload, generation, update, sharing, or
+  deferred-retirement contracts fail; or any of the six lanes fails the
+  operational Vulkan fixtures.
+- **Proof**: [tasks/done/RUNTIME-197-unified-geometry-upload-residency-coordinator.md,
+  src/graphics/renderer/Graphics.GeometryResidency.cppm,
+  src/graphics/renderer/Graphics.GeometryResidency.cpp,
+  src/runtime/Runtime.GeometryPlanBuilders.cppm,
+  src/runtime/Runtime.RenderExtraction.Geometry.cpp,
+  src/runtime/Runtime.MeshSurfaceTopology.cppm,
+  src/runtime/Runtime.MeshPrimitiveView.cppm,
+  tests/contract/graphics/Test.GeometryResidency.cpp,
+  tests/contract/runtime/Test.RuntimeEngineLayering.cpp,
+  tests/contract/runtime/Test.MeshGeometryExtraction.cpp,
+  tests/contract/runtime/Test.GraphGeometryExtraction.cpp,
+  tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp,
+  tests/contract/runtime/Test.ProceduralGeometryExtraction.cpp,
+  tests/contract/runtime/Test.MeshPrimitiveViewExtraction.cpp,
+  tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp,
+  docs/api/generated/module_inventory.md]
+- **Dependencies**: [C12]
+- **Tags**: runtime, graphics, geometry, residency, extraction, Vulkan,
+  retirement
+- **From staging**: O68

@@ -56,16 +56,12 @@ startup/shutdown.
 | `Extrinsic.Runtime.PhysicsBridge` | Runtime-owned ECS-to-physics bridge added by `PHYSICS-001`. Exports `PhysicsBridgeFixedStepConfig`, `PhysicsBridgeDiagnostics`, and `PhysicsBridge`, which owns an `Extrinsic.Physics.World`, a `StableId -> BodyHandle` sidecar, descriptor synchronization from ECS collider/rigid-body authoring, fixed-step accumulator stepping, and dynamic-body transform writeback with `Transform::IsDirtyTag` / `Transform::WorldUpdatedTag` stamping. The bridge keeps handles out of ECS, skips static/kinematic writeback with diagnostics, and deliberately does not route contact events until `PHYSICS-002` exposes contact records. |
 | `Extrinsic.Runtime.CameraControllers` | Runtime-owned camera controller behavior and exact published registry surface. Exports `CameraFocusTarget`, `ICameraController`, `OrbitCameraController`, `FlyCameraController`, `FreeLookCameraController`, `TopDownCameraController`, `CreateCameraController()`, `CameraControllerSlot`, and `CameraControllerRegistry`. `ICameraController::Focus(...)` performs one-shot centering/framing of imported or selected geometry without making UI own camera state. Controllers consume `Extrinsic.Platform.Input::Context`, use `Core::Extent2D` for viewport dimensions, and produce immutable `Graphics::CameraViewInput` for renderer extraction. `TopDownCameraController` seeds from the input view focus point, not the input position XZ, so the default reference triangle remains centered when starting in or switching to top-down mode. The registry is bound to exactly one valid `WorldHandle`: `ResetForWorld` always clears slots, poses, transitions, and seed even for equal handle bits; `SetWorldSeed` rejects invalid/unbound/wrong-world writes; an invalid reset is the shutdown state; and away/back never resurrects state. GRAPHICS-040A keeps the base `CameraViewInput` ABI stable; graphics-side temporal jitter is selected through `BuildTemporalCameraViewSnapshot(...)`, which accepts the rendered-frame index explicitly, while GRAPHICS-040C maps the renderer AA selector to TAA/external reconstruction without adding runtime camera authority. |
 | `Extrinsic.Runtime.CameraModule` | Optional app-composed camera owner from `RUNTIME-180`. On registration it binds the active world, publishes the exact `CameraControllerRegistry`, subscribes to `ActiveWorldChanged` and `WorldWillBeDestroyed`, and contributes one typed viewport-input hook. The hook rechecks the active handle before reading config or seed, lazily creates the configured main controller, suppresses motion while editor capture owns viewport input, writes the immutable camera view, and consumes the one-shot transition. Shutdown unsubscribes, withdraws the exact borrowed registry, and resets it invalid. Omitting the module publishes no service and produces no fallback camera, while generic input actions, import selection, editor non-camera behavior, and app-owned reference content remain operational. |
-| `Extrinsic.Runtime.ProceduralGeometry` | Procedural-geometry descriptor surface (`ProceduralGeometryKey`, key hash, `ProceduralGeometryCache` value type with `EnsureResident` / `Release` / `Tick` / `Find`). Reuses the `ProceduralGeometryKind` enum and POD `ProceduralGeometryParams` defined in `Extrinsic.ECS.Component.ProceduralGeometryRef`. `EnsureResident(key, uploadDesc, uploadFn)` either invokes the injected upload functor exactly once on a new key or hits an existing entry and increments a `std::uint32_t` refcount; `Release(key)` decrements and enqueues the entry into a deferred retire queue on the refcount-zero transition; `Tick(currentFrame, framesInFlight, freeFn)` anchors retire deadlines (`currentFrame + framesInFlight`) and calls `freeFn` on entries whose deadline has been reached, mirroring `Graphics::GpuAssetCache::Tick` semantics. Resurrecting a key inside the retire window cancels the queued free and reuses the bit-identical `GpuGeometryHandle`. N entities sharing `(Kind, Hash(Params))` share one `GpuGeometryHandle`. No live ECS, no graphics imports beyond the existing `Extrinsic.Graphics.GpuWorld` value-type edge. This procedural path remains available for explicit procedural fixtures and callers; the default reference/sandbox triangle now uses mesh-domain `GeometrySources`. |
-| `Extrinsic.Runtime.ProceduralGeometryPacker` | Per-kind packer `Pack(kind, params, scratch) -> std::optional<GeometryUploadDesc>` consuming a runtime-owned `ProceduralGeometryPackBuffer` reused across ticks. Triangle is the only in-scope packer for Impl-A; the surface vertex layout is `{pos.xyz, uv, normal.xyz}` (32 bytes/vertex) matching the promoted mesh surface layout consumed by surface/depth/face-selection shaders. Cube / Quad / Sphere / LineStrip extend the enum + packer table without cache or extraction lifecycle changes. |
-| `Extrinsic.Runtime.MeshGeometryPacker` | Runtime-authored mesh `GeometrySources` → `GpuWorld::GeometryUploadDesc` packer (`RUNTIME-085` Slice A). Exports `MeshVertex` (32-byte `{pos.xyz, uv, normal.xyz}` surface layout matching `ProceduralVertex`), `MeshPackBuffer` (caller-owned scratch reused across ticks), `MeshPackStatus` (`Success`, `WrongDomain`, `MissingPositions`, `MissingHalfedgeTopology`, `MissingFaceTopology`, `EmptyMesh`, `InvalidTopology`, `NonFinitePosition`, `MissingTexcoords`, `NonFiniteTexcoord`, `DegenerateAllFaces`), `MeshPackResult`, `PackMesh(ConstSourceView, MeshPackBuffer&)`, and `DebugNameForMeshPackStatus()`. `PackMesh` validates `v:position`, `h:to_vertex`, `h:next`, `h:face`, and `f:halfedge`; `v:texcoord` is optional and uses deterministic zero-U/V fallback when absent, type/count-mismatched, or non-finite; for each face slot it consults `h:face` on the first ring halfedge to decide ownership and skips slots whose ring no longer claims the face — this is required because `ECS::Components::GeometrySources::PopulateFromMesh` writes `f:halfedge` for every face slot via `mesh.Halfedge(fh)`, but `Geometry::HalfedgeMesh::DeleteFace` invalidates only `h:face` on the ring's halfedges, leaving the deleted face's `f:halfedge` pointing at a still-walkable ring that must not be fan-triangulated. For live slots the ring is walked (step-capped at `halfedgeCount` so a malformed `h:next` cycle fails closed rather than spinning) and fan-triangulated from the first ring vertex; a mid-ring halfedge whose `h:face` disagrees with the current face fails closed as `InvalidTopology`. Vertex bytes are written in input order so emitted surface indices index directly into the source `Vertices` PropertySet; `MeshVertex::U/V` uses finite `v:texcoord` values when available and deterministic zeroes for missing, count-mismatched, or non-finite entries; the legacy `MissingTexcoords` and `NonFiniteTexcoord` status names remain compatibility diagnostics rather than current hard failures. `MeshVertex::Nx/Ny/Nz` is populated from count-matched finite `v:normal` when present and otherwise uses a deterministic +Z default; UV fields are never used for normal encoding. `LocalBounds.LocalSphere` is filled from the local AABB midpoint and half-diagonal so culling/transform sync has a deterministic non-empty local bound; `WorldSphere`/`WorldAabb*` remain zero — runtime extraction overwrites them with the per-frame world transform via `ExtractBounds`. Also exports `BuildSurfaceTriangleFaceMap(ConstSourceView, std::vector<std::uint32_t>&)` (`RUNTIME-093`), the inverse of the surface picking payload, and `BuildSurfaceTriangleTopology(ConstSourceView, surfaceIndices, triangleToFace)` (`GRAPHICS-122`), the read-only canonical surface triangle list plus its face inverse used by UV-view diagnostics. Both replay the same internal `ProduceFaceRing` walk as `PackMesh`, so runtime consumers cannot drift from the GPU surface triangle / `gl_PrimitiveID` order when n-gons fan-triangulate. |
-| `Extrinsic.Runtime.MeshPrimitiveViewPacker` | Runtime-authored derivation of optional mesh edge and vertex render views from authoritative mesh `GeometrySources` (`RUNTIME-088`, component-driven by `RUNTIME-106`). `PackMeshEdgeView(...)` and `PackMeshVertexView(...)` build caller-owned upload buffers with deterministic bounds and validation. Runtime extraction activates these lanes only from persistent ECS `RenderEdges` / `RenderPoints` authoring components. `RUNTIME-188` deleted the zero-consumer `Runtime.MeshPrimitiveViewControls`, the Engine Set/Clear/Get facade, and the unused extraction settings cache; the packer, component-driven sidecars, Sandbox command/history authoring, and scene serialization remain operational. |
-| `Extrinsic.Runtime.GraphGeometryPacker` | Runtime-authored graph `GeometrySources` → `GpuWorld::GeometryUploadDesc` packer (`RUNTIME-086` Slice A). Exports `GraphVertex` (20-byte `{pos.xyz, neutral uv}` retained line/point layout), `GraphPackBuffer` (caller-owned scratch reused across ticks), `GraphPackStatus` (`Success`, `WrongDomain`, `NoRenderLane`, `MissingNodes`, `EmptyGraph`, `MissingEdgeTopology`, `InvalidEdge`, `NonFinitePosition`), `GraphPackResult`, `PackGraph(ConstSourceView, wantLines, wantPoints, GraphPackBuffer&)`, and `DebugNameForGraphPackStatus()`. `PackGraph` reads node positions (`v:position` on `Nodes`) into one shared vertex buffer in input order so edge endpoints index directly into it; the point lane (`wantPoints`) draws the vertex buffer directly, the line lane (`wantLines`) emits a line-list `LineIndices` of validated `(e:v0, e:v1)` endpoint pairs (a graph with zero edges is valid and yields no line indices). UV fields are written as neutral zeroes and are never used for normal encoding. Deleted node/edge rows are packed in place (no compaction) in this slice. `LocalBounds.LocalSphere` is filled from the node AABB midpoint and half-diagonal; `WorldSphere`/`WorldAabb*` remain zero — runtime extraction overwrites them via `ExtractBounds`. One `GpuGeometryHandle` per graph entity carries both lanes, matching the canonical single-renderable-instance contract. `Runtime.RenderExtraction` integration, `GraphGeometry*` diagnostics counters, eligibility-flip releases, dirty-domain reupload, and the `TickGraphGeometry` deferred-retire window landed in `RUNTIME-086` Slices B + C — see the residency prose below. |
-| `Extrinsic.Runtime.PointCloudGeometryPacker` | Runtime-authored point-cloud `GeometrySources` → `GpuWorld::GeometryUploadDesc` packer (`RUNTIME-087`). Exports `PointCloudVertex` (20-byte `{pos.xyz, neutral uv}` retained point layout matching `GraphVertex`), `PointCloudPackBuffer` (caller-owned scratch reused across ticks), `PointCloudPackStatus` (`Success`, `WrongDomain`, `MissingPositions`, `EmptyCloud`, `NonFinitePosition`), `PointCloudPackResult`, `PackCloud(ConstSourceView, PointCloudPackBuffer&)`, and `DebugNameForPointCloudPackStatus()`. `PackCloud` reads point positions (`v:position` on `Vertices`) into one vertex buffer in input order; the retained point pipeline draws the vertex buffer directly so no index buffer is emitted (`SurfaceIndices`/`LineIndices` stay empty). UV fields are written as neutral zeroes and are never used for normal encoding. Deleted vertex rows are packed in place (no compaction) in this slice. `LocalBounds.LocalSphere` is filled from the point AABB midpoint and half-diagonal; `WorldSphere`/`WorldAabb*` remain zero — runtime extraction overwrites them via `ExtractBounds`. One `GpuGeometryHandle` per cloud entity, matching the canonical single-renderable-instance contract. `Runtime.RenderExtraction` integration, `PointCloudGeometry*` diagnostics counters, eligibility-flip releases, dirty-domain reupload, and the `TickPointCloudGeometry` deferred-retire window also land in `RUNTIME-087` — see the residency prose below. |
+| `Extrinsic.Runtime.MeshSurfaceTopology` | Truthful topology-only surface for canonical mesh fan triangulation and triangle-to-face mapping. It validates bounded halfedge rings, skips deleted face slots whose rings no longer claim them, and fails closed on malformed or mixed-owner topology. Extraction, selection refinement, UV diagnostics, and GPU acceptance use this one triangle order without exposing upload buffers or residency state. |
+| `Extrinsic.Runtime.MeshPrimitiveView` | Data-only mesh edge/vertex-view settings and render-mode values retained for editor/session consumers. Upload-plan construction is private to `ExtrinsicRuntime`; no public primitive-view packer or lifecycle owner remains. |
 | `Extrinsic.Runtime.PrimitiveSelectionRefinement` | Runtime-owned pure CPU refinement that validates a graphics `EncodedSelectionId` hint against authoritative mesh, graph, or point-cloud `GeometrySources`, maps it to a face/edge/vertex/point result, and can use a captured pick ray/depth context for the fail-closed CPU fallback. `SceneInteractionModule` owns the production `SelectionReadbackState`, captures world/epoch-qualified contexts, drains completed readbacks, and exposes the newest editor-facing refined result; graphics produces only the encoded hint and never owns the cache or live ECS interaction state. |
 | `Extrinsic.Runtime.ReferenceScene` | Plain app-invoked reference-content seam (GRAPHICS-029A/B, simplified by `RUNTIME-180`). Exports only the data records `ReferenceSceneEntity` / `ReferenceScenePopulation` plus `BootstrapReferenceScene(selector, scene)` and `TeardownReferenceScene(scene, population) noexcept`. The triangle implementation is private: bootstrap creates one ordinary visible/selectable mesh-domain `ReferenceTriangle` with durable `StableId`, `RenderSurface`, white `VisualizationConfig`, and an optional camera seed. Sandbox owns the exactly-once initial-world policy and retains `{WorldHandle, population}` so teardown mutates only the original live world; a retired original world is a safe no-op. The content path does not require `CameraModule`. |
 | `Extrinsic.Runtime.SelectionReadback` | Runtime-owned selection readback bridge from `RUNTIME-157`, owned in production by `SceneInteractionModule`. Each bounded context record carries sequence, world, interaction epoch, and optional camera-derived refinement context even when the camera is invalid. Pending drain threads the sequence into graphics; completed FIFO drain rejects zero/unknown/wrong-world/wrong-epoch results before controller mutation or refinement. `ClearSceneState()` drops every context and advances the editor-facing refined-result generation. The exact interaction module, not Engine, exposes the latest refined primitive and generation. |
-| `Extrinsic.Runtime.RenderExtraction` | Runtime-owned ECS-to-graphics extraction cache and snapshot handoff. Its exported class holds one opaque implementation object; persistent sidecars, scratch buffers, deferred-retire queues, and adapter state have exactly one definition in the non-exported `:Internal` implementation partition (`Runtime.RenderExtraction.Internal.cpp`), outside the primary module interface. Ordinary primary-module implementation units import that partition and split base extraction/submission (`Runtime.RenderExtraction.cpp`), geometry residency/retirement (`Runtime.RenderExtraction.Geometry.cpp`), and visualization/spatial adapters (`Runtime.RenderExtraction.Adapters.cpp`) without adding a public subsystem seam or changing ownership. Extraction uses `Extrinsic.Runtime.GeometryAvailability` for `GeometrySources` lane eligibility before invoking mesh, graph, point-cloud, or primitive-view packers. The cache reuses its per-frame live-renderable-key scratch set across `ExtractAndSubmit()` calls before retiring missing sidecars, avoiding fresh steady-state set allocation while preserving the same renderer-visible output. `RenderExtractionCache::FindGpuRenderableAvailability(...)` exposes a read-only `GpuRenderableAvailabilityView` keyed by stable entity id, with independent surface, edge, and point lane residency plus canonical named-buffer facts; ECS remains CPU authoring state and stores no GPU handles or renderer sidecars. |
+| `Extrinsic.Runtime.RenderExtraction` | Runtime-owned ECS-to-graphics extraction and snapshot handoff. Its exported class holds one opaque implementation object; persistent sidecars, scratch buffers, adapter state, and the one graphics residency coordinator have exactly one definition in the non-exported `:Internal` implementation partition (`Runtime.RenderExtraction.Internal.cpp`), outside the primary module interface. Ordinary primary-module implementation units split base extraction/submission (`Runtime.RenderExtraction.cpp`), private typed plan construction and unified residency submission (`Runtime.RenderExtraction.Geometry.cpp`), and visualization adapters (`Runtime.RenderExtraction.Adapters.cpp`) without adding a public subsystem seam. Extraction uses `Extrinsic.Runtime.GeometryAvailability` for `GeometrySources` lane eligibility, builds owning `Graphics::GeometryUploadPlan` values through private adapters, and drives one `TickGeometryResidency` maintenance hook. The cache reuses its per-frame live-renderable-key scratch set across `ExtractAndSubmit()` calls before retiring missing sidecars, avoiding fresh steady-state set allocation while preserving the same renderer-visible output. `RenderExtractionCache::FindGpuRenderableAvailability(...)` exposes a read-only `GpuRenderableAvailabilityView` keyed by stable entity id, with independent surface, edge, and point lane residency plus canonical named-buffer facts; ECS remains CPU authoring state and stores no GPU handles or renderer sidecars. |
 | `Extrinsic.Runtime.RenderWorldPool` | Runtime-owned multi-buffer slot-lifecycle pool for pipelined frames (`GRAPHICS-036A`, first implementation child of the retired `GRAPHICS-036` planning slice; the planning slice named it `GRAPHICS-036-Impl-A`). Exports `RenderWorldPoolDiagnostics` (the three `GRAPHICS-036` decision-7 counters: `PipelineStallCount`, `ExtractionSkipCount`, `LastConsumedFrameAge`) and the `RenderWorldPool` value type. Implements the producer/consumer slot state machine the planning slice calls "atomic swap primitives + reclamation queue": the producer (extraction) calls `AcquireBack(frameIndex)` for a free slot, writes the snapshot, and `PublishFront(slot)` (release store of a single `std::atomic` front index plus a monotonic publish-sequence bump); the consumer (renderer) calls `AcquireFront(frameIndex)` (acquire load, per-slot atomic refcount increment) and `ReleaseFront(slot)`. Buffer count defaults to 3 (triple-buffer with reclamation, decision 1), clamps to `[1, 4]`, and collapses to in-place synchronous reuse at 1. Reclamation (decision 4) returns a slot to the free list only once its refcount is zero and it is no longer the published front, drained at the start of each `AcquireBack`. Back-pressure (decision 5): producer-faster overwrites the still-unpublished back slot (`ExtractionSkipCount`); consumer-faster reuses the current front when no new publish-sequence is observed (`PipelineStallCount`), so a synchronous pool that re-publishes the same slot index every frame is never mistaken for a stall. When the producer outruns the consumer so far that every slot is a published front still held in flight (no free slot and no unpublished back), `AcquireBack` fails closed — it returns `kInvalidSlot` (still counting `ExtractionSkipCount`) so the extraction is skipped and the previous front stays current, rather than overwrite storage an in-flight frame still references. The module imports nothing from graphics/ECS/platform — it manages only slot indices and atomics, introducing no new dependency edge. `GRAPHICS-036D` extends the CPU contract to the pipelined integration path: the renderer retains per-slot snapshot storage keyed by the pool slot, and `RenderConfig::SynchronousExtraction = false` consumes `AcquirePreviousFront` to prove render-N-1 without stalls/skips while synchronous mode remains the default. `GRAPHICS-036B` surfaces the pool's three counters read-only on `RuntimeRenderExtractionStats` (`RenderWorldPipelineStallCount`, `RenderWorldExtractionSkipCount`, `RenderWorldFrameAgeFrames`) via the pure `MirrorRenderWorldPoolDiagnostics(pool, stats)` free function in `Extrinsic.Runtime.RenderExtraction`. |
 | `Extrinsic.Runtime.SelectionController` | Runtime/editor selection authority (`RUNTIME-089`), published exactly by `SceneInteractionModule` in production. It coalesces hover/click requests, assigns monotonically increasing sequences, tracks bounded in-flight intent, applies Replace/Add/Toggle semantics, mirrors selected/hovered ECS tags, and maintains copied render-id buffers. Sequence-aware hit/no-hit overloads return false without mutation for unknown or evicted records; standalone no-sequence convenience calls retain their direct-drive behavior. Context-capacity eviction explicitly discards the matching controller record. The controller resolves render ids through the module-owned `StableEntityLookup`, while standalone use can retain the validated decode fallback. `ClearSceneState()` removes tags, pending/in-flight state, and world-bound snapshots without resetting the sequence counter. |
 | `Extrinsic.Runtime.StableEntityLookup` | Runtime-owned scene-local lookup sidecar (`RUNTIME-092`, event-driven wiring from `RUNTIME-145`), owned in production by `SceneInteractionModule`. It maps durable ECS `StableId` values to live entities and separately decodes/validates transient render ids, with deterministic duplicate winners and stale/missing diagnostics. `StableEntityLookupSceneBinding` maintains construct/update/destroy hooks for the one bound registry. The interaction module disconnects and clears it before replacement or rebind, rebuilds it afterward, and exposes stable-id resolution plus read-only diagnostics without publishing the raw mutable binding. |
@@ -915,7 +911,7 @@ reinitialize cannot make a stale participant handle valid again:
   binding disconnects and clears; `AfterReplace` rebuilds it against the same
   rebound registry and publishes an empty interaction snapshot.
 - `RenderExtractionCache::ClearSceneState(...)` frees scene-owned renderable
-  instances/geometry, collapses deferred retire queues, clears mesh
+  instances/geometry, hard-shuts the unified geometry residency owner, clears mesh
   edge/vertex sidecars, visualization adapter bindings, transient batches, and
   submits an empty snapshot while preserving registered adapters.
 - `PhysicsBridge::Clear()` is the physics-side reset contract: it clears the
@@ -1107,8 +1103,17 @@ execution should request `Core::Config::WindowBackend::Null` explicitly.
 13. Render execute.
 14. End frame + present.
 15. Maintenance: transfer retirement, streaming drain/apply/pump, asset
-    residency tick (`AssetService::Tick`, `GpuAssetCache::Tick`, and pending
-    model-scene material binding re-resolution), `RenderExtractionCache::TickProceduralGeometry` (procedural geometry deferred-retire window), `RenderExtractionCache::TickMeshGeometry` (runtime-owned mesh-residency deferred-retire window), and `RenderExtractionCache::TickGraphGeometry` (runtime-owned graph-residency deferred-retire window), `RenderExtractionCache::TickPointCloudGeometry` (runtime-owned point-cloud-residency deferred-retire window), `RenderExtractionCache::TickMeshPrimitiveViewGeometry` (runtime-owned mesh edge/vertex primitive-view deferred-retire window), and `JobService` terminal-record reaping. The module `Maintenance` hook then drains **all** completed pick readbacks (`SelectionSystem::PopPickResult()` FIFO). It accepts only a known nonzero sequence issued for the current world and interaction epoch, applies the exact controller intent, and refines the primitive with the issuing-frame context. Unknown, evicted, old-world, and old-epoch results cannot mutate selection or refined output. The exact `SceneInteractionModule` exposes the latest refined result; graphics only produces the hint.
+    residency (`AssetService::Tick`, `GpuAssetCache::Tick`, and pending
+    model-scene material binding re-resolution), one
+    `RenderExtractionCache::TickGeometryResidency` call for every runtime-authored
+    geometry lane, and `JobService` terminal-record reaping. The module
+    `Maintenance` hook then drains **all** completed pick readbacks
+    (`SelectionSystem::PopPickResult()` FIFO). It accepts only a known nonzero
+    sequence issued for the current world and interaction epoch, applies the
+    exact controller intent, and refines the primitive with the issuing-frame
+    context. Unknown, evicted, old-world, and old-epoch results cannot mutate
+    selection or refined output. The exact `SceneInteractionModule` exposes the
+    latest refined result; graphics only produces the hint.
     After the readback drain the Engine-private `RenderExtractionService` releases the
     `RenderWorldPool` snapshot reference acquired in phase 6 at frame retire;
     this is the current front in synchronous mode and the previous front in
@@ -1412,8 +1417,8 @@ For direct mesh imports that stay on the runtime-authored `GeometrySources`
 residency lane, extraction also accepts data-only
 `Graphics::MaterialTextureAssetBindings` keyed by stable render id. The default
 post-import processor resolves finite UVs/normals on the streaming lane and,
-on main-thread apply, builds a versioned identity from the exact bytes that
-`MeshGeometryPacker` will upload: packed positions, fan-triangulated index
+on main-thread apply, builds a versioned identity from the exact bytes that the
+private mesh plan builder submits: packed positions, fan-triangulated index
 order, resolved UVs/normals, counts, and resolved bake options. The target's
 world/epoch, raw entity handle, stable render id, and presentation generation
 remain separate from reusable content. Model-scene progressive and
@@ -1475,344 +1480,84 @@ GpuUploading -> Ready/Failed`; `Ready` entries bind shared `GpuGeometryHandle`
 values through `GpuWorld::SetInstanceGeometry`, generation rebinds acknowledge
 GRAPHICS-023D only after a successful replacement bind, and refcount-zero
 entries retire through a future asset-geometry maintenance tick adjacent to the
-existing `GpuAssetCache::Tick` / geometry-cache ticks. Failed assets use a
+existing asset and unified geometry maintenance hooks. Failed assets use a
 visible missing-mesh placeholder plus the GRAPHICS-031 default debug material
 once the implementation child lands; until then the bridge is not implemented.
 
-`RenderExtractionCache` also owns the procedural-source residency bridge
-(GRAPHICS-030B) and the runtime-authored mesh `GeometrySources` residency bridge
-(RUNTIME-085). The cache retains the live-renderable-key scratch set between
-extractions and clears it at frame start / scene reset, so missing-sidecar
-retirement no longer allocates a new `unordered_set` on every steady-state
-frame. When a renderable candidate carries
-`ECS::Components::ProceduralGeometryRef`, `ExtractAndSubmit()` derives the
-`ProceduralGeometryKey` from `(Kind, Hash(Params))`, drives
-`ProceduralGeometryCache::EnsureResident(key, desc, upload)` against the
-runtime-owned `ProceduralGeometryPackBuffer` scratch and `GpuWorld::UploadGeometry`,
-and on success calls `GpuWorld::SetInstanceGeometry(instance, geometry)`,
-records the resolved key in the sidecar, and applies the procedural-source
-sentinel rule by calling `GpuSceneSlot::ClearSourceAsset()` (per GRAPHICS-030
-Decision 5). The packer is only invoked on a cache miss; cache hits do
-refcount-only work. If a renderable also carries a non-default
-`AssetInstance::Source`, the procedural path is skipped for that entity and
-`ProceduralAndAssetSourceConflict` is incremented while the existing asset
-observation continues. Retired or shutdown sidecars call
-`ProceduralGeometryCache::Release(key)`.
+### Unified geometry upload and residency (`RUNTIME-197`)
 
-When a renderable candidate has no `ProceduralGeometryRef` and no
-`AssetInstance::Source` attached, `ExtractAndSubmit()` then builds an
-`ECS::Components::GeometrySources::ConstSourceView` for the entity (RUNTIME-085
-Slice B). If `BuildConstView` resolves `Domain::Mesh`, the cache routes the view
-through `Extrinsic.Runtime.MeshGeometryPacker::PackMesh` against a runtime-owned
-`MeshPackBuffer` scratch reused across ticks, calls
-`GpuWorld::UploadGeometry(desc)`, records the resulting `GpuGeometryHandle` in a
-new sidecar-owned `MeshGeometry` field (distinct from `ProceduralKey` /
-`HasSourceAsset`), calls `GpuWorld::SetInstanceGeometry(instance, geometry)`,
-and clears the slot's source-asset sentinel. The mesh packer also resolves a
-count-matched vertex `v:color` property into the optional
-`GeometryUploadDesc::PackedVertexColors` stream using
-`ResolveColorChannelPackedUnorm8`; the active deferred GpuScene path consumes
-that stream through `GpuGeometryRecord::ColorBufferBDA` in the default-recipe
-GpuScene surface/GBuffer shader pair, while missing or unmatched colors leave
-material shading unchanged. Subsequent clean extractions for the same entity
-short-circuit through the `MeshGeometry` handle and increment
-`MeshGeometryReuseHits` without re-packing. Subsequent dirty extractions
-(`DirtyVertexPositions` / `DirtyVertexAttributes` / `DirtyFaceTopology` /
-`DirtyEdgeTopology` / `GpuDirty` any-of tag set on the entity by an ECS
-producer) repack the mesh, upload a fresh
-`GpuGeometryHandle`, swap the instance binding via `SetInstanceGeometry`,
-enqueue the prior handle into the same `framesInFlight` deferred-retire window
-the procedural cache uses, drain the dirty tags from the entity, and increment
-`MeshGeometryReuploads` + `MeshGeometryReleases` (RUNTIME-085 Slice C). The bridge
-is fail-closed: `MeshPackStatus::MissingPositions`, `InvalidTopology`,
-`MissingTexcoords`, and `NonFiniteTexcoord` each have their own counters; every
-other non-`Success` status (`MissingHalfedgeTopology`, `MissingFaceTopology`,
-`EmptyMesh`, `NonFinitePosition`, `DegenerateAllFaces`, `WrongDomain`) folds
-into `MeshGeometryFailedPack`. A failed pack does not bind stale geometry,
-leaves the slot's source-asset sentinel cleared, and does not allocate a
-`GpuGeometryHandle`.
+`RenderExtractionCache` owns live ECS queries, typed topology adaptation, and
+entity-to-instance sidecars; it no longer owns a GPU geometry allocator, cache,
+or retire queue per domain. The private `Extrinsic.Runtime.GeometryPlanBuilders`
+module is registered only in `ExtrinsicRuntime`'s private CMake module set. Its
+free functions translate mesh, graph, point-cloud, procedural, mesh-edge, and
+mesh-vertex inputs into owning `Graphics::GeometryUploadPlan` values. Each plan
+contains a graphics-only stable key and generation, copied vertex/index/channel
+bytes, fixed formats, an update class and channel mask, a storage hint, bounds,
+and a debug name. The copy never borrows ECS property or topology storage.
 
-#### Vertex attribute binding (`RUNTIME-120`)
+Optional normal and color authoring uses the canonical runtime
+`GeometryPropertyRef` (`domain`, `name`, `value kind`). Editor commands, config
+state, and imported-scene handoff persist that identity; the private adapters
+validate the expected domain/value kind, resolve it against the current
+`GeometrySources` snapshot, and send only resolved bytes to graphics. No ECS,
+property-set, or topology type crosses into `src/graphics/*`.
 
-`Extrinsic.Runtime.VertexAttributeBinding` is the reusable, GPU-agnostic helper
-that maps a named geometry property to a logical vertex channel (position /
-normal / texcoord / color / tangent / custom) with fail-closed diagnostics. A
-`VertexAttributeBinding` names the source property, its element type, a fallback
-value, and per-channel policy (renormalize vec3, allow fallback); the
-`ResolveVec3Channel` / `ResolveVec2Channel` / `ResolveColorChannelPackedUnorm8`
-entry points return an `AttributeBindResult` carrying a precise
-`AttributeBindStatus` (`Bound` / `EmptyBinding` / `PropertyMissing` /
-`TypeMismatch` / `CountMismatch`) plus source/fallback/non-finite counters. The
-mesh packer resolves its normal, texcoord, and default `v:color` channels
-through this helper, so the normalize-or-`+Z`, finite-or-zero, and packed-unorm8
-color behavior is centralized rather than inlined per packer. This is the
-structural vertex stream and is distinct from the graphics-layer
-`VisualizationConfig` sci-vis colormap overlays.
+All plans enter the concrete graphics-owned
+`GeometryResidencyCoordinator`, composed with the existing `GpuWorld`.
+Entity-unique mesh, graph, point-cloud, edge-view, and vertex-view keys use
+`Reconcile`; the procedural `(Kind, Hash(Params))` identity uses `Acquire` so
+identical entities share one handle and reference count. The coordinator owns
+validation, stale-generation rejection, same-generation reuse, in-place partial
+channel updates, full-replacement fallback, retire cancellation, frame-safe
+free, and hard shutdown. Runtime performs no direct `UploadGeometry`,
+`UpdateGeometryChannels`, or `FreeGeometry` call. Maintenance invokes exactly
+one `RenderExtractionCache::TickGeometryResidency` per frame and maps the freed
+key namespace back into the existing per-domain diagnostic counters.
 
-`Extrinsic.Runtime.VertexChannelBindings` adds the data-only
-`VertexChannelBindingSet` ECS component (`RUNTIME-123`). It persists optional
-normal/color source overrides as property names plus `AttributeSourceType` and
-is consumed only by runtime packers/extraction. With no binding component the
-mesh packer keeps the canonical defaults (`v:normal` with +Z fallback and
-optional `v:color` autodetect). With an enabled binding, mesh, graph, and
-point-cloud packers resolve the selected vertex-domain property through the same
-resolver and publish the resulting `NormalBytes` / `PackedVertexColors` spans
-into `GpuWorld::GeometryUploadDesc`. Invalid optional bindings fail closed for
-that channel without calling graphics/RHI code from the editor path.
+The domain adapters remain deliberately typed and private:
 
-`Extrinsic.Runtime.VertexChannelStreams` is the CPU Structure-of-Arrays
-substrate for that work (ADR-0022): a `VertexLayout` (ordered channels, offsets,
-stride) plus per-channel SoA byte buffers. Mesh, graph, point-cloud, and mesh
-primitive-view packers
-still fill their compatibility `PackedVertexBytes` scratch, but their
-`GeometryUploadDesc` also points at position/texcoord/normal/color channel
-spans. `GpuWorld` uploads those spans into per-channel sub-ranges of the managed
-vertex buffer, and active GpuScene shaders fetch from the per-channel BDAs in
-`GpuGeometryRecord`. Per ADR-0022 the engine commits to uniform SoA storage with
-per-channel dirty streaming (one vertex layout, one shader fetch path); the AoS
-fast lane for static geometry is deferred to the profile-gated `RUNTIME-125`.
-`RUNTIME-124` maps `DirtyVertexPositions`, `DirtyVertexTexcoords`,
-`DirtyVertexNormals`, and `DirtyVertexColors` to in-place
-`GpuWorld::UpdateGeometryChannels(...)` writes, with legacy
-`DirtyVertexAttributes` treated as a broad texcoord/normal/color channel signal.
-Topology, lane-mask, coarse `GpuDirty`, and vertex-count changes fall back to a
-full `GpuWorld::UploadGeometry(...)` replacement.
-A dirty-reupload pack failure releases the prior residency (fail-closed: the
-stale upload is queued for the deferred-retire window, the instance is detached,
-and `MeshGeometryReleases` increments) so invalid source data does not keep
-rendering the last-good frame; the dirty tags are left set so the entity
-re-attempts and uploads fresh once the input recovers.
-Mesh-source residency does not share `GpuGeometryHandle`s across entities — each
-mesh entity owns its own upload. If a previously-uploaded entity stops selecting
-the mesh source on a later frame (it gained `ProceduralGeometryRef` or
-`AssetInstance::Source`, or it lost mesh-domain `GeometrySources` topology so
-`BuildConstView` no longer resolves `Domain::Mesh`), the cache enqueues the
-cached upload into the mesh-residency retire queue, increments
-`MeshGeometryReleases`, and — when no other path re-bound the instance this
-frame — calls `SetInstanceGeometry(instance, {})` to detach the instance from the
-queued (still live, but doomed) slot so the renderer never observes a dangling
-binding during the retire window. `RetireMissingRenderables` and `Shutdown` route
-the runtime-owned mesh upload through the same queue and increment
-`MeshGeometryReleases` (Shutdown then drains the queue inline because hard
-teardown collapses the deferred window). When `Release` brings the refcount to
-zero the entry is appended to an in-cache retire queue but the underlying
-`GpuGeometryHandle` is **not** freed inline; it is freed by
-`ProceduralGeometryCache::Tick(currentFrame, framesInFlight, freeFn)` after
-`framesInFlight` ticks have elapsed since the release tick, mirroring the
-`Graphics::GpuAssetCache::Tick` deferred-retire window (GRAPHICS-030C
-Decision 4). `Engine::RunFrame()` drives the service-owned procedural cache from
-the maintenance phase alongside `GpuAssetCache::Tick` via
-`RenderExtractionCache::TickProceduralGeometry(currentFrame, framesInFlight,
-renderer)`, which closes over `GpuWorld::FreeGeometry`. The runtime mesh-
-residency retire queue is driven from the same maintenance phase by
-`RenderExtractionCache::TickMeshGeometry(currentFrame, framesInFlight, renderer)`,
-which uses the same anchor-on-first-observation/free-on-deadline semantics; the
-per-tick free-count delta surfaces as `MeshGeometryFreeRetires` on the next
-`ExtractAndSubmit` call, mirroring `ProceduralGeometryFreeRetires`. If an entity is
-re-attached to the same `(Kind, Hash(Params))` inside the retire window,
-`EnsureResident` resurrects the queued entry (cancelling the pending free),
-returns the bit-identical `GpuGeometryHandle`, and increments
-`ProceduralGeometryRetireCancellations`. Refcount saturation
-(`UINT32_MAX`) is fail-closed: increments past the cap reject and bump
-`ProceduralGeometryRefCountSaturated` instead of overflowing. The counter
-fields on `RuntimeRenderExtractionStats` are
-`ProceduralRenderablesEnumerated`, `ProceduralGeometryUploads`,
-`ProceduralGeometryReuseHits`, `ProceduralGeometryFailedPack`,
-`ProceduralGeometryMissingPacker`, `ProceduralGeometryInvalidParams`,
-`ProceduralAndAssetSourceConflict`, `ProceduralAndRenderableSourceConflict`
-(reserved for future asset-backed renderable conflict detection in
-GRAPHICS-034), and the per-tick deltas of the cache's retire counters:
-`ProceduralGeometryReleases`, `ProceduralGeometryFreeRetires`,
-`ProceduralGeometryRetireCancellations`, and
-`ProceduralGeometryRefCountSaturated`. The mesh-source residency bridge adds
-`MeshGeometryUploads`, `MeshGeometryReuseHits`, `MeshGeometryReuploads`,
-`MeshGeometryFailedPack`, `MeshGeometryMissingPositions`,
-`MeshGeometryInvalidTopology`, `MeshGeometryMissingTexcoords`,
-`MeshGeometryNonFiniteTexcoords`, `MeshGeometryReleases`, and
-`MeshGeometryFreeRetires` (RUNTIME-085 Slices B + C). `Uploads` counts first-time
-per-entity uploads, `ReuseHits` counts clean-frame rebinds, `Reuploads` counts
-dirty-frame repack-and-replace events (a Reupload also increments `Releases`
-because the prior handle is queued for retire), and `FreeRetires` is the per-
-tick delta of actual `GpuWorld::FreeGeometry` calls fired by `TickMeshGeometry`
-once the `framesInFlight` window elapses.
+- Mesh surface plans use `Extrinsic.Runtime.MeshSurfaceTopology` as the one
+  public topology-only truth for bounded ring validation, deleted-face skipping,
+  fan triangulation, and triangle-to-face order. Finite UVs are preserved with a
+  deterministic zero fallback; finite normals are normalized with a +Z
+  fallback; optional color becomes packed unorm8. Selection refinement, UV
+  diagnostics, normal-bake identity, extraction, and GPU acceptance consume the
+  same topology order.
+- Graph plans keep node positions in one geometry shared by independently
+  submitted line and point instances. Requested-lane changes rebuild the plan
+  because the line-index payload changes.
+- Point-cloud plans carry positions without indices and remain valid only for a
+  point lane with a uniform size source; unsupported surface/edge lanes or named
+  per-point size sources fail closed.
+- Mesh edge/vertex-view plans use separate residency keys and retained instances
+  over the authoritative mesh source. Edge topology is explicit when available
+  and otherwise derives from the canonical surface topology; a failed view does
+  not disturb the surface or sibling view.
+- Procedural triangle plans retain content-addressed sharing, source-conflict
+  diagnostics, refcount saturation protection, and resurrection inside the
+  deferred-retire window without a separate procedural cache or test seam.
 
-When `BuildConstView` resolves `Domain::Graph` instead (a graph entity carrying
-`RenderEdges` and/or `RenderPoints`), `ExtractAndSubmit()` routes the view
-through `Extrinsic.Runtime.GraphGeometryPacker::PackGraph(view, wantLines,
-wantPoints, GraphPackBuffer&)` against a runtime-owned `GraphPackBuffer` scratch,
-where `wantLines`/`wantPoints` are derived from the `RenderEdges`/`RenderPoints`
-hints (RUNTIME-086 Slice B). Node positions form one shared vertex buffer; the
-point lane draws it directly and the line lane indexes it via validated
-`(e:v0, e:v1)` pairs, so a graph entity owns exactly one `GpuGeometryHandle`
-recorded in a sidecar-owned `GraphGeometry` field (distinct from `MeshGeometry`;
-mesh and graph domains are mutually exclusive per entity). When both lanes are
-enabled, extraction binds the line and point lanes to separate retained
-instances that share the graph geometry handle, which lets the edge and point
-lanes consume independent effective visualization configs from
-`VisualizationLaneOverrides` while preserving one geometry upload. Clean
-re-extractions hit `GraphGeometryReuseHits`; dirty re-extractions
-(`DirtyVertexPositions` /
-`DirtyVertexAttributes` / `DirtyEdgeTopology` / `GpuDirty` any-of tag set on the
-entity) repack, upload a fresh handle, enqueue the prior handle into a
-graph-residency deferred-retire queue, drain the dirty tags, and increment
-`GraphGeometryReuploads` + `GraphGeometryReleases` (RUNTIME-086 Slice C). The
-sidecar also records the render-lane mask (`RenderEdges` / `RenderPoints`) the
-resident upload was packed for; a change in requested lanes — e.g. a points-only
-graph that later gains `RenderEdges` — repacks through the same reupload path
-even when no geometry dirty tag is set, because the line lane's presence changes
-the packed line indices. The
-bridge is fail-closed: `GraphPackStatus::MissingNodes`/`EmptyGraph` fold into
-`GraphGeometryMissingNodes`, `InvalidEdge` into `GraphGeometryInvalidEdges`, and
-every other non-`Success` status (`WrongDomain`, `NoRenderLane`,
-`MissingEdgeTopology`, `NonFinitePosition`) into `GraphGeometryFailedPack`; a
-first-attempt failed pack binds no stale geometry, and a dirty-reupload failure
-releases the prior residency (queued for the deferred-retire window, instance
-detached, `GraphGeometryReleases` incremented) so invalid node data does not keep
-rendering, while the dirty tags stay set for later recovery. Eligibility flips
-(the entity gains a procedural/asset source or loses graph-domain topology),
-`RetireMissingRenderables`,
-and `Shutdown` route the graph upload through the same deferred-retire window,
-incrementing `GraphGeometryReleases`; the per-tick free-count delta surfaces as
-`GraphGeometryFreeRetires` on the next `ExtractAndSubmit`. The retire queue is
-driven from the maintenance phase by `RenderExtractionCache::TickGraphGeometry`,
-mirroring `TickMeshGeometry`. The graph counter fields on
-`RuntimeRenderExtractionStats` are `GraphGeometryUploads`,
-`GraphGeometryReuseHits`, `GraphGeometryReuploads`, `GraphGeometryFailedPack`,
-`GraphGeometryMissingNodes`, `GraphGeometryInvalidEdges`, `GraphGeometryReleases`,
-and `GraphGeometryFreeRetires` (RUNTIME-086 Slices B + C).
+Dirty vertex-channel tags request `PartialPreferred`; topology, lane-mask,
+coarse dirty, vertex-count, or unsupported partial changes fall back to full
+replacement through the coordinator. A failed dirty plan or rejected upload
+releases stale residency and leaves the dirty signal available for recovery.
+The existing `*FailedPack` statistic field names remain compatibility
+observability only; they do not imply a public packer or a second lifecycle.
 
-When `BuildConstView` resolves `Domain::PointCloud` (a vertices-only entity, no
-edge/halfedge/face/node topology) **and** the entity carries `RenderPoints`,
-`ExtractAndSubmit()` routes the view through
-`Extrinsic.Runtime.PointCloudGeometryPacker::PackCloud(view, PointCloudPackBuffer&)`
-against a runtime-owned scratch buffer (RUNTIME-087). A point cloud is only a
-renderable through the `RenderPoints` hint — `RenderSurface`/`RenderEdges` have
-no faces/edges to draw from a cloud — so a point-cloud-domain entity without
-`RenderPoints` is not bound (and any prior point-cloud residency is released by
-the eligibility-flip path), which is why a mesh that loses its topology back to
-a bare vertex set is not silently re-bound as points. Point positions form the
-vertex buffer (no index buffer), so a cloud entity owns exactly one
-`GpuGeometryHandle` recorded in a sidecar-owned `PointCloudGeometry` field
-(distinct from `MeshGeometry`/`GraphGeometry`; the three domains are mutually
-exclusive per entity). Only a uniform screen-space point size (the `float`
-alternative of `RenderPoints::SizeSource`) is supported in this slice; a
-per-point size buffer (the `std::string` alternative) requires a per-point
-size upload that is not implemented here and fails closed into
-`PointCloudGeometryFailedPack` rather than uploading mis-sized geometry. The
-runtime extraction record also forwards the retained `RenderPoints` component
-to graphics synchronization so a uniform point size and render type are copied into
-`GpuEntityConfig::Point.PointSize` / `Point.PointMode` for retained point passes. Clean
-re-extractions hit `PointCloudGeometryReuseHits`; dirty re-extractions
-(`DirtyVertexPositions` / `DirtyVertexAttributes` / `GpuDirty` any-of tag set on
-the entity — a cloud has no edge/face topology) repack, upload a fresh handle,
-enqueue the prior handle into a point-cloud-residency deferred-retire queue,
-drain the dirty tags, and increment `PointCloudGeometryReuploads` +
-`PointCloudGeometryReleases`. The bridge is fail-closed:
-`PointCloudPackStatus::MissingPositions`/`EmptyCloud` fold into
-`PointCloudGeometryMissingPositions`, `NonFinitePosition` into
-`PointCloudGeometryInvalidPoints`, and `WrongDomain`, unsupported
-`RenderSurface`/`RenderEdges` requests, plus the unsupported size-source variant
-fold into `PointCloudGeometryFailedPack`; a first-attempt failed pack binds no
-stale geometry, and a dirty-reupload failure — or a resident cloud switching to
-an unsupported per-point size source or unsupported non-point lane — releases the
-prior residency (queued for the deferred-retire window, instance detached,
-`PointCloudGeometryReleases` incremented) so invalid point data does not keep
-rendering, while the dirty tags stay set for later recovery. Eligibility flips
-(the entity gains a procedural/asset source, loses point-cloud-domain topology,
-drops `RenderPoints`, or flips to mesh/graph domain), `RetireMissingRenderables`,
-and `Shutdown` route the point-cloud upload through the same deferred-retire window, incrementing
-`PointCloudGeometryReleases`; the per-tick free-count delta surfaces as
-`PointCloudGeometryFreeRetires` on the next `ExtractAndSubmit`. The retire queue
-is driven from the maintenance phase by
-`RenderExtractionCache::TickPointCloudGeometry`, mirroring `TickGraphGeometry`.
-The point-cloud counter fields on `RuntimeRenderExtractionStats` are
-`PointCloudGeometryUploads`, `PointCloudGeometryReuseHits`,
-`PointCloudGeometryReuploads`, `PointCloudGeometryFailedPack`,
-`PointCloudGeometryMissingPositions`, `PointCloudGeometryInvalidPoints`,
-`PointCloudGeometryReleases`, and `PointCloudGeometryFreeRetires` (RUNTIME-087).
+`GeometryUploadPlan::StorageHint` is planning data, not an operational AoS
+switch. The coordinator records the proposed `PlanGeometryStorage(...)` result,
+but its upload executor remains `GpuWorld::UploadGeometry`, whose live
+`GpuGeometryResidencyView` is currently `UniformSoA`. Static procedural plans
+may therefore report a `StaticInterleavedAoS` preference while the actual
+allocation remains SoA; RUNTIME-197 intentionally does not change that policy.
 
-On top of the mesh-domain residency bridge, a mesh entity composes render lanes
-by component presence (RUNTIME-106): `RenderSurface` requests filled triangles,
-`RenderEdges` requests mesh wireframe/edge lines, and `RenderPoints` requests
-vertex points. Surface rendering still uses `BindMeshGeometry` and owns the
-surface `MeshGeometry` handle. Edge and vertex rendering use the RUNTIME-088
-runtime-sidecar implementation, but the desired state and point configuration now
-come from ECS components rather than `MeshPrimitiveViewSettings`.
-
-Each requested edge/vertex lane is derived from the *same* authoritative mesh
-`GeometrySources` via `Extrinsic.Runtime.MeshPrimitiveViewPacker::PackMeshEdgeView`
-or `PackMeshVertexView` against one shared cache-owned `MeshPrimitiveViewBuffer`
-scratch, uploaded to its **own** `GpuWorld` instance + `GpuGeometryHandle`
-recorded in the parent sidecar (`MeshEdgeViewInstance`/`MeshEdgeViewGeometry`,
-`MeshVertexViewInstance`/`MeshVertexViewGeometry`), and re-submitted to
-`m_Transforms` every frame as an extra `GpuRender_Line | GpuRender_Unlit` or
-`GpuRender_Point | GpuRender_Unlit` lane carrying the parent entity transform,
-bounds, and material slot. Surface residency is not a prerequisite: a mesh with
-only `RenderEdges`, only `RenderPoints`, or all three render components produces
-the requested independent retained lanes over one mesh data source, with no ECS
-storage of graphics handles and no mesh-topology traversal pushed into
-`src/graphics/*`. The edge and vertex lanes consume their effective
-visualization config from `VisualizationLaneOverrides::Edges` /
-`VisualizationLaneOverrides::Points` when present, otherwise falling back to
-the entity default `VisualizationConfig`; uniform colors are copied into their
-retained `GpuEntityConfig::UniformColor` records independently of the surface
-lane. The vertex lane writes `GpuEntityConfig::Point.PointSize` from a
-uniform screen-space pixel `RenderPoints::SizeSource` and `Point.PointMode` from
-`RenderPoints::Type` on every submitted frame so flat, surfel, and
-impostor-sphere changes apply without forcing a geometry reupload.
-
-The edge/vertex lanes repack on the same coalesced mesh dirty signal the surface
-uses (`GpuDirty` / `DirtyVertexPositions` / `DirtyVertexAttributes` /
-`DirtyFaceTopology` / `DirtyEdgeTopology`, snapshotted before any surface upload
-drains the tags), so a
-vertex-position edit updates both views' geometry and an edge-topology edit
-updates the edge view's line indices. A repack enqueues the prior view handle
-into a shared mesh-primitive-view deferred-retire queue and increments
-`Mesh{Edge,Vertex}ViewReuploads` + `Mesh{Edge,Vertex}ViewReleases`. The bridge is
-fail-closed per lane: the edge view folds `MissingPositions`/`EmptyMesh` into
-`MeshEdgeViewMissingPositions`, reports `MissingEdgeTopology` only when neither
-explicit edges nor derivable surface topology are available, reports out-of-range
-explicit endpoints or malformed derived rings in `MeshEdgeViewInvalidEdges`, and
-folds `WrongDomain`/`NonFinitePosition` into `MeshEdgeViewFailedPack`; the vertex
-view uses `MeshVertexViewMissingPositions` and `MeshVertexViewFailedPack`,
-including the unsupported named/per-point size-source case. A failed view pack
-drops just that view (its instance freed, its geometry queued for retire) without
-disturbing the surface mesh or the other view, and reappears on a later dirty
-frame once the source recovers. Removing the matching render component, flipping
-away from mesh-domain data, procedural/asset take-over, `RetireMissingRenderables`,
-and `Shutdown` release the view sidecars. Edge and vertex view handles share one
-retire queue driven from the maintenance phase by
-`RenderExtractionCache::TickMeshPrimitiveViewGeometry`, mirroring
-`TickMeshGeometry`; the per-tick free-count delta surfaces as the shared
-`MeshPrimitiveViewFreeRetires`. The mesh-primitive-view counter fields on
-`RuntimeRenderExtractionStats` are `MeshEdgeViewUploads`,
-`MeshEdgeViewReuseHits`, `MeshEdgeViewReuploads`, `MeshEdgeViewReleases`,
-`MeshEdgeViewFailedPack`, `MeshEdgeViewMissingPositions`,
-`MeshEdgeViewMissingEdgeTopology`, `MeshEdgeViewInvalidEdges`,
-`MeshVertexViewUploads`, `MeshVertexViewReuseHits`, `MeshVertexViewReuploads`,
-`MeshVertexViewReleases`, `MeshVertexViewFailedPack`,
-`MeshVertexViewMissingPositions`, and `MeshPrimitiveViewFreeRetires`. BUG-028 and
-RUNTIME-106 add CPU/null regression proof for UI command routing, component-driven
-sidecar extraction, point config propagation, and GLSL mode selection; broader
-file-backed GPU screenshot proof remains owned by the working-sandbox acceptance
-lane.
-
-`FindRenderableSidecarForTest(stableId)` returns a `RenderableSidecarView`
-exposing the per-entity `Instance`, currently bound `Geometry`,
-`ProceduralKey`, source-asset and geometry-slot metadata, the mesh-
-residency fields (`MeshGeometry` handle + `HasMeshResidency` flag), the
-graph-residency fields (`GraphGeometry` handle + `HasGraphResidency` flag), the
-point-cloud-residency fields (`PointCloudGeometry` handle +
-`HasPointCloudResidency` flag), and the mesh-primitive-view sidecar fields
-(`MeshEdgeViewInstance`/`MeshEdgeViewGeometry` + `HasMeshEdgeView`,
-`MeshVertexViewInstance`/`MeshVertexViewGeometry` + `HasMeshVertexView`) so
-`contract;runtime` mesh-, graph-, point-cloud-, and mesh-primitive-view-extraction
-tests can confirm the residency path picked the right slot without exposing the
-private sidecar layout.
-`GetProceduralGeometryCacheForTest()` is a read-only test seam used by the
-`contract;runtime` procedural-geometry tests; `PrimeRefCountForTest` on the
-cache is a test-only refcount setter that lets saturation coverage exercise
-the rejection path without `2^32` `EnsureResident` calls.
+`FindRenderableSidecarForTest(stableId)` exposes handles and boolean residency
+facts for procedural, mesh, graph, point-cloud, mesh-edge, and mesh-vertex lanes
+without exposing coordinator keys, plan-builder scratch, reference counts, or
+retire queues. Payload/layout parity is asserted through
+`GpuWorld::TryGetGeometryResidencyView(...)` fingerprints and counts; lifecycle
+contracts target `GeometryResidencyCoordinator` directly.
 
 `ImGuiAdapterDiagnostics` exposes the GRAPHICS-114 overlay-transport byte
 counters alongside the existing draw-list counts: `LastFrameFontAtlasCopyBytes`

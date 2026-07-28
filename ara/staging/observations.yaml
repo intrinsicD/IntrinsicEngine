@@ -949,3 +949,25 @@ observations:
     promoted_to: "logic/claims.md:C12"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O68
+    timestamp: "2026-07-28T07:05+02:00"
+    provenance: ai-executed
+    content: >
+      Runtime-authored mesh, graph, point-cloud, procedural, mesh-edge, and
+      mesh-vertex geometry can share one owning graphics upload-plan shape and
+      one residency lifecycle while retaining typed, private topology adapters
+      and canonical runtime property references.
+    context: >
+      RUNTIME-197 closure combines 133 focused CPU residency/domain/structural
+      contracts, the complete CPU-supported selector with 4,137 passes and one
+      expected GLFW/LSan self-skip, and the complete 49-case ASan+UBSan
+      promoted-Vulkan selector on an NVIDIA GeForce RTX 3050 with driver
+      590.48.01. The two runtime smokes explicitly cover every live geometry
+      lane. This is a lifecycle/capability claim, not a storage-policy or
+      performance claim.
+    potential_type: claim
+    bound_to: [N286]
+    promoted: true
+    promoted_to: "logic/claims.md:C13"
+    crystallized_via: artifact-commitment
+    stale: false

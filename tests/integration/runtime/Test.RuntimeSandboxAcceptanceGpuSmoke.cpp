@@ -60,6 +60,7 @@ import Extrinsic.ECS.Component.Culling.Local;
 import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.MetaData;
+import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
@@ -102,7 +103,6 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshSurfaceTopology;
-import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
@@ -530,13 +530,24 @@ EntityHandle MakePointCloud(Registry& scene)
     return entity;
 }
 
-// Compose one mesh + one graph + one point cloud onto the scene the reference
-// config already populated (which owns the active frame camera).
+EntityHandle MakeProceduralTriangle(Registry& scene)
+{
+    const EntityHandle entity = scene.Create();
+    StampCommon(scene, entity, "AcceptanceProceduralTriangle", 104u);
+    auto& raw = scene.Raw();
+    raw.emplace<G::RenderSurface>(entity);
+    raw.emplace<ECSC::ProceduralGeometryRef>(entity);
+    return entity;
+}
+
+// Compose one mesh, graph, point cloud, and explicit procedural triangle onto
+// the scene used by the operational acceptance frame.
 void SeedAcceptanceScene(Registry& scene)
 {
     (void)MakeMesh(scene);
     (void)MakeGraph(scene);
     (void)MakePointCloud(scene);
+    (void)MakeProceduralTriangle(scene);
 }
 
 [[nodiscard]] GeometryPresentationFixture MakeMeshGeometryPresentation(
@@ -1550,9 +1561,9 @@ private:
 };
 } // namespace
 
-// The working-sandbox acceptance scene (one mesh, one graph, one point cloud)
-// reaches the canonical default-recipe present on an operational
-// promoted-Vulkan device, with no canonical pass falling through the
+// The working-sandbox acceptance scene (mesh, graph, point cloud, and
+// procedural triangle) reaches the canonical default-recipe present on an
+// operational promoted-Vulkan device, with no canonical pass falling through the
 // `SkippedUnavailable` branch and the Vulkan fallback counters stable across
 // the bounded run.
 TEST(RuntimeSandboxAcceptanceGpuSmoke, AcceptanceSceneReachesOperationalDefaultRecipePresent)
@@ -1606,14 +1617,11 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, AcceptanceSceneReachesOperationalDefaultR
             << "operational device. pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
     }
 
-    // Each acceptance family resided on the operational path, asserted per
-    // family rather than by a total live count. The reference triangle from
-    // CreateReferenceEngineConfig() rides the separate `Procedural` residency
-    // lane, so these mesh/graph/point-cloud lane counters exclude it: if any one
-    // acceptance family stopped extracting or uploading, its (upload + reuse)
-    // total stays 0 and this gate fails -- a total-count check would instead be
-    // satisfied by the reference triangle plus the two surviving families. Every
-    // resident, non-dirty family increments its own lane's reuse hit on each
+    // Each explicit acceptance family resided on the operational path,
+    // asserted per family rather than by a total live count. If any one family
+    // stopped extracting or uploading, its (upload + reuse) total stays zero
+    // and this gate fails. Every resident, non-dirty family increments its own
+    // lane's reuse hit on each
     // steady-state extraction (Runtime.RenderExtraction.cpp), so the last frame's
     // stats carry one reuse (or, on the first frame, one upload) per family.
     const auto& ex = RequiredEngineService<RT::RenderExtractionCache>(engine).GetLastStats();
@@ -1625,9 +1633,14 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, AcceptanceSceneReachesOperationalDefaultR
     EXPECT_GE(ex.PointCloudGeometryUploads + ex.PointCloudGeometryReuseHits, 1u)
         << "Acceptance point-cloud family did not reside on the operational "
            "point-cloud lane.";
+    EXPECT_GE(ex.ProceduralGeometryUploads + ex.ProceduralGeometryReuseHits, 1u)
+        << "Acceptance procedural family did not reside through the unified "
+           "operational residency path.";
     EXPECT_EQ(ex.MeshGeometryFailedPack, 0u) << "Acceptance mesh lane reported a failed pack.";
     EXPECT_EQ(ex.GraphGeometryFailedPack, 0u) << "Acceptance graph lane reported a failed pack.";
     EXPECT_EQ(ex.PointCloudGeometryFailedPack, 0u) << "Acceptance point-cloud lane reported a failed pack.";
+    EXPECT_EQ(ex.ProceduralGeometryFailedPack, 0u)
+        << "Acceptance procedural lane reported a plan failure.";
 
     EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
         << "Vulkan fallback counters incremented across operational sandbox "

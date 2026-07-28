@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-197` — Unified geometry upload and residency coordinator (tasks/active/RUNTIME-197-unified-geometry-upload-residency-coordinator.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -20,8 +20,8 @@ the authoritative open/unblocked view.
 - blocked by `REVIEW-003`: `GRAPHICS-124` — Slughorn world-space vector annotation proof (tasks/backlog/rendering/GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md)
 - blocked by `REVIEW-003`: `GRAPHICS-125` — Memory-priced cluster hierarchy evidence (tasks/backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md)
 - blocked by `REVIEW-003`: `GRAPHICS-126` — Bandwidth-priced frame-recipe trace model (tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
-- blocked by `RUNTIME-197`: `RUNTIME-139` — Static AoS storage and shader operational path (tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md)
-- blocked by `RUNTIME-197`: `RUNTIME-198` — Data-driven visualization recipes (tasks/backlog/runtime/RUNTIME-198-data-driven-visualization-recipes.md)
+- unblocked: `RUNTIME-139` — Static AoS storage and shader operational path (tasks/backlog/runtime/RUNTIME-139-static-aos-storage-shader-operational.md)
+- unblocked: `RUNTIME-198` — Data-driven visualization recipes (tasks/backlog/runtime/RUNTIME-198-data-driven-visualization-recipes.md)
 
 ## Theme C — Physics readiness
 

@@ -8,6 +8,12 @@ maturity_target: Retired
 
 ## Status
 
+- Retired on 2026-07-28 at `Retired` after all six live geometry lanes
+  converged on one graphics-owned upload-plan/residency lifecycle and the five
+  exported packers, procedural cache, per-domain retirement queues, and
+  forwarding tests were deleted.
+- Retirement commit reference: this commit plus Slice A commit `05a65541`,
+  Slice B commit `11561026`, and Slice C code/test commit `da5e521c`.
 - Promoted to active on 2026-07-28 after `RUNTIME-192` retired the duplicate
   property vocabularies and `RUNTIME-193` retired the progressive-named
   presentation path.
@@ -19,9 +25,9 @@ maturity_target: Retired
   slot reuse, so this task must compose with it rather than introduce another
   device or allocator service.
 - Shared mesh surface-topology helpers and mesh primitive-view settings have
-  legitimate production consumers outside extraction. Slice B will move them
-  into truthful value/function modules before deleting the packer modules;
-  only topology-to-byte-plan builders become private extraction details.
+  legitimate production consumers outside extraction. Slice C moved them into
+  truthful value/function modules before deleting the packer modules; only
+  topology-to-byte-plan builders remain private extraction details.
 - Slice A completed on 2026-07-28. The new graphics-owned
   `GeometryUploadPlan` is an owning copy with stable graphics-only identity,
   generation, fixed stream formats, update class/channels, storage hint, and
@@ -40,6 +46,18 @@ maturity_target: Retired
   build and all 106 coordinator plus domain extraction contracts pass. The
   exported packer/cache modules remain only as topology builders and an unused
   compatibility surface pending Slice C deletion.
+- Slice C completed on 2026-07-28. Shared mesh topology and primitive-view
+  values moved to truthful public modules; all five topology-to-plan adapters
+  are private implementation units. Exact CPU payload/layout fingerprints and
+  structural absence ratchets cover every domain. The focused coordinator and
+  extraction cohort passed 133/133, the complete CPU-supported selector passed
+  4,137 cases with zero failures plus the expected GLFW/LSan self-skip, and the
+  ASan+UBSan promoted-Vulkan selector passed 49/49 on an NVIDIA GeForce RTX
+  3050 with driver 590.48.01. Its two runtime smokes explicitly cover mesh,
+  graph, point-cloud, procedural, edge, and vertex lanes. Strict layering,
+  test layout, task policy, docs links, root hygiene, ARA, whitespace, and the
+  379-module generated inventory close the evidence; C13 records the
+  lifecycle/capability scope without a performance claim.
 
 ## Goal
 
@@ -112,49 +130,49 @@ maturity_target: Retired
 
 ## Required changes
 
-- [ ] Define a graphics-owned backend-neutral `GeometryUploadPlan` describing
+- [x] Define a graphics-owned backend-neutral `GeometryUploadPlan` describing
       stable geometry identity/generation, vertex/index/property byte ranges,
       formats, update class, storage-lane requirements, and deterministic
       diagnostics; it contains no ECS/runtime types.
-- [ ] Implement one graphics residency coordinator for allocation, initial
+- [x] Implement one graphics residency coordinator for allocation, initial
       upload, partial/full reupload, generation publication, stats, and
       frame-safe retirement, driven by runtime-submitted copied plans.
-- [ ] Keep mesh, graph, point-cloud, procedural, and primitive-view topology
+- [x] Keep mesh, graph, point-cloud, procedural, and primitive-view topology
       conversion as small private free functions that only build plans.
-- [ ] Use `GeometryPropertyRef` for optional property streams instead of
+- [x] Use `GeometryPropertyRef` for optional property streams instead of
       packer-specific attribute identity.
-- [ ] Preserve geometry-specific validation, shared-index slices, dirty-range
+- [x] Preserve geometry-specific validation, shared-index slices, dirty-range
       semantics, stable render identity, and graphics snapshot boundaries.
-- [ ] Migrate all production callers and then delete the exported packer
+- [x] Migrate all production callers and then delete the exported packer
       modules plus their duplicated caches, sidecars, retire queues, and
       forwarding tests.
 
 ## Tests
 
-- [ ] Table-driven CPU contracts cover plan validation and lifecycle parity for
+- [x] Table-driven CPU contracts cover plan validation and lifecycle parity for
       every domain, initial upload, partial/full update, generation change,
       stale plan, and deferred retirement.
-- [ ] Existing domain extraction/render contracts run through the coordinator
+- [x] Existing domain extraction/render contracts run through the coordinator
       and preserve exact buffer/layout/topology results.
-- [ ] Opt-in Vulkan smokes cover at least one representative of each live
+- [x] Opt-in Vulkan smokes cover at least one representative of each live
       geometry lane through the unified residency path.
-- [ ] Structural tests prove old public packer modules and per-domain
+- [x] Structural tests prove old public packer modules and per-domain
       lifecycle owners are gone.
 
 ## Docs
 
-- [ ] Update runtime extraction and renderer residency docs with the
+- [x] Update runtime extraction and renderer residency docs with the
       plan/coordinator boundary and private typed adapters.
-- [ ] Regenerate module inventory and update storage-lane documentation.
-- [ ] Refresh task indexes, session brief, and retirement records.
+- [x] Regenerate module inventory and update storage-lane documentation.
+- [x] Refresh task indexes, session brief, and retirement records.
 
 ## Acceptance criteria
 
-- [ ] Every geometry domain publishes the same lower-layer upload-plan shape
+- [x] Every geometry domain publishes the same lower-layer upload-plan shape
       and uses one graphics allocation/update/retire lifecycle.
-- [ ] Domain-specific topology code remains typed and private; no live ECS
+- [x] Domain-specific topology code remains typed and private; no live ECS
       knowledge enters graphics.
-- [ ] Public packer modules and duplicated lifecycle state are deleted after
+- [x] Public packer modules and duplicated lifecycle state are deleted after
       CPU and Vulkan parity.
 
 ## Verification
@@ -171,6 +189,17 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
 
+Results on 2026-07-28:
+
+- focused coordinator/domain extraction/structural cohort: 133/133 passed;
+- complete CPU-supported selector: 4,137/4,137 passed plus the expected
+  `GlfwLifecycleLsan` self-skip;
+- ASan+UBSan promoted-Vulkan `gpu` + `vulkan` selector: 49/49 passed on an
+  NVIDIA GeForce RTX 3050 with driver 590.48.01, including both six-lane
+  runtime residency smokes and the shutdown LeakSanitizer contract;
+- strict layering, test-layout, task-policy, docs-link, root-hygiene, ARA,
+  module-inventory, and whitespace checks passed.
+
 ## Forbidden changes
 
 - A domain-erased geometry blob, public packer registry, or new residency
@@ -180,5 +209,20 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Maturity
 
-- Target: `Retired`; contract parity precedes domain-by-domain adoption, actual
-  Vulkan proof, and deletion of the old packer/lifecycle family.
+- Retired at `Retired`; contract parity preceded domain-by-domain adoption,
+  actual Vulkan proof, and deletion of the old packer/lifecycle family.
+
+## Clean-workshop review
+
+- Rows 1-2: **pass** — strict module/CMake layering is clean; graphics owns
+  only copied upload-plan values and residency, while runtime retains ECS and
+  typed topology extraction.
+- Row 3: **pass** — the public graphics contract contains no ECS/runtime type,
+  and the five domain plan builders are a private runtime partition.
+- Rows 4-6: **pass / n/a** — one coordinator replaces repeated lifecycle state;
+  no renderer member family, pass-order branch, or recipe edge was added.
+- Row 7: **pass** — retirement follows exact CPU layout/lifecycle contracts and
+  operational Vulkan coverage for every live lane, so no scaffold/parity
+  follow-up is owed.
+- Row 8: **pass** — no allowlist entry, temporary exception, compatibility
+  packer, cache, or forwarding tick remains.

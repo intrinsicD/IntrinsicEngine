@@ -6810,3 +6810,41 @@ tree:
       absent. CPU contracts and an actual promoted-Vulkan operational-frame
       smoke passed; no performance claim is made.
     status: resolved
+  - id: N286
+    type: experiment
+    title: "Converge runtime-authored geometry on one upload/residency lifecycle"
+    provenance: ai-executed
+    timestamp: "2026-07-28T07:05+02:00"
+    also_depends_on: [N285]
+    evidence:
+      - "tasks/done/RUNTIME-197-unified-geometry-upload-residency-coordinator.md"
+      - "src/graphics/renderer/Graphics.GeometryResidency.cppm"
+      - "src/graphics/renderer/Graphics.GeometryResidency.cpp"
+      - "src/runtime/Runtime.GeometryPlanBuilders.cppm"
+      - "src/runtime/Runtime.RenderExtraction.Geometry.cpp"
+      - "src/runtime/Runtime.MeshSurfaceTopology.cppm"
+      - "src/runtime/Runtime.MeshPrimitiveView.cppm"
+      - "tests/contract/graphics/Test.GeometryResidency.cpp"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "tests/contract/runtime/Test.MeshGeometryExtraction.cpp"
+      - "tests/contract/runtime/Test.GraphGeometryExtraction.cpp"
+      - "tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp"
+      - "tests/contract/runtime/Test.ProceduralGeometryExtraction.cpp"
+      - "tests/contract/runtime/Test.MeshPrimitiveViewExtraction.cpp"
+      - "tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp"
+      - "focused CPU residency/domain/structural cohort: 133/133"
+      - "complete CPU-supported selector: 4137 passed plus one expected GLFW/LSan self-skip"
+      - "ASan+UBSan promoted-Vulkan gpu+vulkan selector: 49/49"
+      - "NVIDIA GeForce RTX 3050, driver 590.48.01"
+    result: >
+      Mesh, graph, point-cloud, procedural, mesh-edge, and mesh-vertex
+      extraction now build owning Graphics.GeometryUploadPlan values through
+      private typed runtime adapters and reconcile them through one graphics-
+      owned GeometryResidencyCoordinator. Runtime retains canonical property
+      references and topology ownership but no longer calls geometry upload,
+      partial update, or free directly. The five exported packer modules,
+      procedural cache, per-domain retirement queues, forwarding maintenance
+      ticks, and wrapper-only tests are absent. Exact CPU payload/lifecycle
+      contracts and explicit operational Vulkan coverage for every live lane
+      passed; no storage-policy or performance claim is made.
+    status: resolved

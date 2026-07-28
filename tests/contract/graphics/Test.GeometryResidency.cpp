@@ -60,11 +60,16 @@ namespace
         const Graphics::GpuWorld::GeometryChannelUpdateMask channels = {})
     {
         const Graphics::GpuWorld::GeometryUploadDesc desc{
+            .PackedVertexBytes = {},
             .PositionBytes = std::as_bytes(std::span<const glm::vec3>{kPositions}),
+            .TexcoordBytes = {},
             .NormalBytes = std::as_bytes(std::span<const glm::vec3>{kNormals}),
             .SurfaceIndices = kIndices,
+            .LineIndices = {},
             .VertexCount = 3u,
+            .LocalBounds = {},
             .DebugName = "geometry-residency-contract",
+            .PackedVertexColors = {},
         };
         return Graphics::MakeGeometryUploadPlan(
             key, generation, desc, updateClass, channels);
@@ -216,10 +221,16 @@ TEST(GeometryResidencyContract, CopiedPlanDoesNotBorrowSubmissionStorage)
 {
     std::array<glm::vec3, 3> positions = kPositions;
     const Graphics::GpuWorld::GeometryUploadDesc desc{
+        .PackedVertexBytes = {},
         .PositionBytes = std::as_bytes(std::span<const glm::vec3>{positions}),
+        .TexcoordBytes = {},
+        .NormalBytes = {},
         .SurfaceIndices = kIndices,
+        .LineIndices = {},
         .VertexCount = 3u,
+        .LocalBounds = {},
         .DebugName = "copied-plan",
+        .PackedVertexColors = {},
     };
     const auto plan = Graphics::MakeGeometryUploadPlan({5u, 13u, 0u}, 1u, desc);
     const std::byte first = plan.PositionBytes.front();

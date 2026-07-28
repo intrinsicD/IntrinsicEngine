@@ -12,7 +12,11 @@ Graphics is organized into explicit sublayers:
 - Graphics consumes immutable/snapshot data from higher-level systems.
 - Graphics must not depend on live ECS ownership structures.
 - Graphics-owned GPU handles, slots, leases, and backend resource IDs must not be stored in canonical `src/ecs` components.
-- Runtime owns ECS-to-graphics extraction and any sidecar/cache mappings from ECS entities, asset IDs, or geometry source handles to graphics GPU handles.
+- Runtime owns ECS-to-graphics extraction and entity/asset sidecars. Private
+  runtime adapters translate typed topology into owning graphics-only
+  `GeometryUploadPlan` values; the graphics-owned
+  `GeometryResidencyCoordinator` maps their stable keys to `GpuWorld` handles
+  and owns the common update/retire lifecycle without importing ECS.
 - Runtime extraction is implemented by `Extrinsic.Runtime.RenderExtraction`, which queries live ECS, maintains entity-to-graphics sidecars outside canonical ECS components, and submits `RuntimeRenderSnapshotBatch` records through `IRenderer::SubmitRuntimeSnapshots()`.
 - Frame pipelining is runtime-owned: `Engine` drives a runtime-side `Extrinsic.Runtime.RenderWorldPool` (`GRAPHICS-036A`) around extraction — the producer acquires/publishes a back slot, the synchronous consumer acquires/releases the current front, and the opt-in pipelined consumer acquires/releases the previous front for sim-N / render-N-1 — sized from the core-owned `RenderConfig::SynchronousExtraction` flag (default `true` -> one logical buffer, behavior-preserving; otherwise triple-buffered). The pool manages only slot indices and atomics and introduces no graphics dependency edge. The renderer retains one snapshot-storage copy per pool slot, keyed by the `storageSlot` passed through `SubmitRuntimeSnapshots(..., storageSlot)` and `ExtractRenderWorld(..., storageSlot)`, so extraction-N writes a different retained copy from render-N-1. `GRAPHICS-036C` wires the lifecycle into `Engine::RunFrame` and mirrors the pool's three diagnostics counters onto the extraction stats; `GRAPHICS-036D` proves the opt-in render-N-1 path under `integration;runtime;graphics` CPU/null coverage. The production default remains synchronous.
 - `graphics/rhi` is platform-neutral and depends on `core` only. `RHI::IDevice::Initialize` takes a `RHI::DeviceCreateDesc` (render config + framebuffer extent + opaque native window handle); runtime composition fills it from its live `Platform::IWindow` so neither RHI nor concrete backends (Vulkan, Null) import `Extrinsic.Platform.*`. Backends that need a native surface (Vulkan/GLFW) cast `NativeWindowHandle` to their platform-native type; backends that don't (Null) consume only `InitialFramebufferExtent`. See `ARCH-005` / `WORKSHOP-002` (2026-05-17) for the boundary fix that retired the previous `graphics/rhi -> platform` edge.
@@ -123,7 +127,17 @@ The bridge owner is `runtime`: `Extrinsic.Runtime.RenderExtraction` queries live
 
 ## Procedural-source residency bridge
 
-See [ADR-0014 — Procedural-source residency bridge](../adr/0014-procedural-source-residency-bridge.md) for the closed `Extrinsic.Runtime.ProceduralGeometry` descriptor surface, the `Runtime::ProceduralGeometryCache` shape (content-addressed `(Kind, Hash(Params))` key, `EnsureResident`/`Release` refcount, deferred-retire queue mirroring `GpuAssetCache::Tick`), the CPU-only `ECS::Components::ProceduralGeometryRef` link with `ecs → core` enforcement, the locked `RenderExtractionCache::ExtractAndSubmit()` ordering, and the exhaustive fail-closed `RuntimeRenderExtractionStats` counter set. Asset-backed mesh residency is the separate runtime-owned contract recorded by [`GRAPHICS-034`](../../tasks/archive/GRAPHICS-034-asset-backed-mesh-residency-bridge.md).
+The CPU-only `ECS::Components::ProceduralGeometryRef` retains the `ecs -> core`
+boundary and content-addressed `(Kind, Hash(Params))` sharing rule from
+[ADR-0014 — Procedural-source residency bridge](../adr/0014-procedural-source-residency-bridge.md).
+RUNTIME-197 supersedes that ADR's cache/packer mechanism: a private runtime
+adapter submits an owning `GeometryUploadPlan` through
+`GeometryResidencyCoordinator::Acquire`, and the same graphics-owned lifecycle
+used by mesh, graph, point-cloud, and primitive-view plans owns the reference
+count, resurrection, and frame-safe retirement. Runtime invokes one
+`TickGeometryResidency` maintenance hook and maps coordinator outcomes into its
+domain diagnostics. Asset-backed mesh residency remains the separate contract
+recorded by [`GRAPHICS-034`](../../tasks/archive/GRAPHICS-034-asset-backed-mesh-residency-bridge.md).
 
 ## Asset-backed mesh residency bridge
 

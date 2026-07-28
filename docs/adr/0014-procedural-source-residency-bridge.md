@@ -1,9 +1,16 @@
 # ADR 0014 — Procedural-Source Residency Bridge
 
-- **Status:** Accepted
+- **Status:** Superseded in part by
+  [`RUNTIME-197`](../../tasks/done/RUNTIME-197-unified-geometry-upload-residency-coordinator.md).
+  The procedural identity, sharing, conflict, and source-asset-sentinel
+  decisions remain accepted; the runtime-owned cache, public packer module,
+  direct `GpuWorld` lifecycle, and dedicated maintenance tick described below
+  are retained as historical implementation rationale only.
 - **Date:** 2026-05-17
-- **Owners:** Runtime extraction (`Runtime::ProceduralGeometryCache`, packers), ECS (CPU-only `ProceduralGeometryRef` component), Graphics (`GpuWorld` upload seam only)
-- **Related tasks:** [`tasks/done/GRAPHICS-030`](../../tasks/archive/GRAPHICS-030-runtime-geometry-residency-bridge.md), [`GRAPHICS-030A`](../../tasks/archive/GRAPHICS-030A-procedural-geometry-descriptor-cache.md), [`GRAPHICS-030B`](../../tasks/archive/GRAPHICS-030B-extraction-procedural-geometry-binding.md), [`GRAPHICS-030C`](../../tasks/archive/GRAPHICS-030C-procedural-geometry-retire-ordering.md)
+- **Owners:** Runtime extraction (private procedural plan adapter), ECS
+  (CPU-only `ProceduralGeometryRef` component), Graphics
+  (`GeometryResidencyCoordinator` composed with `GpuWorld`)
+- **Related tasks:** [`tasks/done/GRAPHICS-030`](../../tasks/archive/GRAPHICS-030-runtime-geometry-residency-bridge.md), [`GRAPHICS-030A`](../../tasks/archive/GRAPHICS-030A-procedural-geometry-descriptor-cache.md), [`GRAPHICS-030B`](../../tasks/archive/GRAPHICS-030B-extraction-procedural-geometry-binding.md), [`GRAPHICS-030C`](../../tasks/archive/GRAPHICS-030C-procedural-geometry-retire-ordering.md), [`RUNTIME-197`](../../tasks/done/RUNTIME-197-unified-geometry-upload-residency-coordinator.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`src/runtime/README.md`](../../src/runtime/README.md)
 - **Supersedes:** none. Extracted from the `## Procedural-source residency bridge` section in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/archive/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0013](0013-ecs-renderable-residency-bridge.md) records the parent ECS renderable residency bridge contract; this ADR records the procedural-geometry first slice that lands ahead of the asset-backed mesh residency path.

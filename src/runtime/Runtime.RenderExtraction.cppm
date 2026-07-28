@@ -350,9 +350,10 @@ export namespace Extrinsic::Runtime
         void SubmitSceneInteractionSnapshot(
             const RuntimeSceneInteractionRenderSnapshot& snapshot);
         // Scene replacement boundary: free scene-owned renderable sidecars,
-        // collapse deferred retire queues, clear per-entity extraction settings
-        // and bindings, and submit an empty snapshot. Adapter registrations stay
-        // live because they are runtime/editor resources, not scene contents.
+        // hard-shutdown unified geometry residency, clear per-entity extraction
+        // settings and bindings, and submit an empty snapshot. Adapter
+        // registrations stay live because they are runtime/editor resources,
+        // not scene contents.
         void ClearSceneState(Graphics::IRenderer& renderer);
         void Shutdown(Graphics::IRenderer& renderer);
 
@@ -395,8 +396,8 @@ export namespace Extrinsic::Runtime
             Graphics::GpuGeometryHandle MeshGeometry{};
             bool HasMeshResidency = false;
             // RUNTIME-086 Slice B — runtime-authored graph-source residency.
-            // `GraphGeometry` is the single handle the cache owns and frees on
-            // retirement for a graph-domain entity (node positions as the
+            // `GraphGeometry` is the single handle the coordinator owns and
+            // retires for a graph-domain entity (node positions as the
             // shared vertex buffer, optional edge line indices); distinct from
             // `MeshGeometry` so the two domain bridges never alias.
             Graphics::GpuGeometryHandle GraphGeometry{};
@@ -404,7 +405,7 @@ export namespace Extrinsic::Runtime
             Graphics::GpuInstanceHandle GraphPointLaneInstance{};
             bool HasGraphPointLaneInstance = false;
             // RUNTIME-087 — runtime-authored point-cloud-source residency. The
-            // single handle the cache owns and frees on retirement for a
+            // single handle the coordinator owns and retires for a
             // point-cloud-domain entity (point positions as the vertex buffer);
             // distinct from `MeshGeometry`/`GraphGeometry` so the three domain
             // bridges never alias.

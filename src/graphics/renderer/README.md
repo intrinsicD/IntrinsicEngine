@@ -1791,8 +1791,9 @@ Concretely:
   segment ID for edge-domain values. No CPU-baked line/point color buffer is
   introduced.
 - Runtime-authored mesh `v:color` uses a separate structural vertex-color path:
-  `MeshGeometryPacker` resolves count-matched `v:color` into packed unorm8
-  colors, `GpuWorld::GeometryUploadDesc` carries per-channel vertex spans, and
+  the private runtime mesh plan builder resolves count-matched `v:color` into
+  packed unorm8 colors, `GeometryUploadPlan` owns the resolved channel bytes,
+  and
   `GpuWorld` stores position/texcoord/normal/color as separate sub-ranges in the
   managed vertex buffer. Active GpuScene shaders fetch the corresponding
   `GpuGeometryRecord::VertexBufferBDA`, `TexcoordBufferBDA`,
@@ -1828,12 +1829,14 @@ Concretely:
   preserve content identity. Free or stale handles fail and clear the output.
 - `GpuWorld::PlanGeometryStorage(...)` and
   `GpuWorld::PlanGeometryStoragePromotion(...)` are RUNTIME-125's planning-only
-  contract for the optional static AoS fast lane. The current live storage path
-  remains uniform SoA: static surface geometry with complete position/UV/normal
-  data can be classified as `StaticInterleavedAoS`, but no AoS buffer is
-  allocated and no shader variant is selected in this slice. The first
-  streaming channel edit from that planned lane produces a full SoA promotion
-  and rebind plan.
+  contract for the optional static AoS fast lane. `GeometryUploadPlan` carries
+  the hint and `GeometryResidencyCoordinator` reports/stores the proposed plan,
+  but the coordinator delegates execution to the existing
+  `GpuWorld::UploadGeometry(...)` path. The current live allocation and
+  `TryGetGeometryResidencyView(...)` therefore remain `UniformSoA`: complete
+  static surface data can be classified as `StaticInterleavedAoS`, but no AoS
+  buffer is allocated and no shader variant is selected. Changing that
+  operational policy requires a separate storage-lane task and proof.
 - `Graphics.FrameRecipe` imports explicit cull bucket resources for surface,
   line, and point lanes. `LinePass` consumes
   `Cull.LineQuads.NonIndexedArgs` / `Cull.LineQuads.Count`; the indexed
@@ -2522,6 +2525,17 @@ Concretely:
   truthfully advertise equivalent separate bake-readable channels or produce
   the deterministic unsupported-lane result; it must not expose interleaved
   addresses as tightly packed SoA.
+- `Extrinsic.Graphics.GeometryResidency` is the one runtime-authored geometry
+  lifecycle above `GpuWorld`. Its owning `GeometryUploadPlan` contains a
+  graphics-only stable key, generation, copied vertex/index/channel bytes,
+  fixed formats, update class/channel mask, storage hint, bounds, and debug
+  name. `ValidateGeometryUploadPlan(...)` rejects invalid plans
+  deterministically. The concrete `GeometryResidencyCoordinator` composes with
+  `GpuWorld` for unique reconciliation, shared acquisition, stale-generation
+  rejection, partial-channel update with full-replacement fallback,
+  reference-counted resurrection, frame-safe retirement, and hard shutdown.
+  It is deliberately not an interface, factory, registry, device, allocator,
+  or app service, and it imports no ECS/runtime types.
 - Per
   [`GRAPHICS-028`](../../../tasks/archive/GRAPHICS-028-ecs-renderable-residency-bridge.md),
   renderable ECS residency is a runtime-owned bridge. `Runtime.RenderExtraction`
@@ -2534,24 +2548,18 @@ Concretely:
   `Graphics.GpuAssetCache` or query live asset state. Graphics render passes
   consume only submitted snapshots/views and never query live ECS or runtime
   sidecar state. ECS dirty tags remain CPU-only semantics; runtime maps them to
-  `GpuWorld::GeometryUploadDesc` uploads, `GpuSceneSlot::NamedBuffers`, or
-  per-instance updates according to the active domain packer.
+  copied `GeometryUploadPlan` values, `GpuSceneSlot::NamedBuffers`, or
+  per-instance updates through private typed topology adapters.
 - Per
-  [`GRAPHICS-030`](../../../tasks/archive/GRAPHICS-030-runtime-geometry-residency-bridge.md),
-  the procedural-source first slice of that bridge keeps `GpuWorld`
-  domain-agnostic: a runtime-owned `ProceduralGeometryCache` (lives on
-  `RenderExtractionCache`) deduplicates `(Kind, Hash(Params))` keys, the
-  per-kind packer in `Extrinsic.Runtime.ProceduralGeometryPacker` produces
-  the existing `GpuWorld::GeometryUploadDesc`, and refcount-zero entries
-  defer `GpuWorld::FreeGeometry()` until `framesInFlight` ticks have
-  elapsed (matched to `Graphics::GpuAssetCache::Tick(currentFrame,
-  framesInFlight)`). Procedural sources never participate in
-  `GpuAssetCache` generation tracking — `GpuSceneSlot::SourceAsset` stays
-  default-constructed, and the existing `HasSourceAsset()` check is the
-  GRAPHICS-023C/D observation discriminator. That slice added no
-  graphics-module surface; the later read-only
-  `TryGetGeometryResidencyView(...)` contract reports retained allocation
-  facts without moving procedural residency ownership out of runtime.
+  [`GRAPHICS-030`](../../../tasks/archive/GRAPHICS-030-runtime-geometry-residency-bridge.md)
+  and its RUNTIME-197 consolidation, procedural sources still deduplicate by a
+  stable `(Kind, Hash(Params))` identity and never participate in
+  `GpuAssetCache` generation tracking. Runtime's private procedural adapter
+  submits that identity through `GeometryResidencyCoordinator::Acquire`; the
+  same coordinator that owns mesh, graph, point-cloud, and primitive-view
+  residency owns its reference count, resurrection, and deferred retirement.
+  `GpuSceneSlot::SourceAsset` remains default-constructed, so
+  `HasSourceAsset()` stays the GRAPHICS-023C/D observation discriminator.
 - Per
   [`GRAPHICS-034`](../../../tasks/archive/GRAPHICS-034-asset-backed-mesh-residency-bridge.md),
   asset-backed mesh residency is also runtime-owned. Runtime normalizes
