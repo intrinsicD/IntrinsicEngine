@@ -101,7 +101,6 @@ import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
-import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -111,7 +110,6 @@ import Extrinsic.Runtime.SandboxEditorFacades;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Sandbox.ConfigSections;
@@ -5724,7 +5722,7 @@ MakeRuntime190PresentationBindings()
     };
 }
 
-[[nodiscard]] const RT::BakedPropertyTextureRecord*
+[[nodiscard]] const RT::PropertyTextureBakeRecord*
 FindRuntime190Record(
     const RT::TextureBakeSnapshot& snapshot,
     const std::string_view outputName)
@@ -5732,7 +5730,7 @@ FindRuntime190Record(
     const auto found = std::ranges::find(
         snapshot.Textures,
         outputName,
-        &RT::BakedPropertyTextureRecord::OutputName);
+        &RT::PropertyTextureBakeRecord::OutputName);
     return found != snapshot.Textures.end() ? &*found : nullptr;
 }
 
@@ -6002,17 +6000,17 @@ private:
         };
     }
 
-    [[nodiscard]] std::vector<RT::BakedPropertyTextureConsumer>
+    [[nodiscard]] std::vector<RT::TextureBakeConsumerBinding>
     Consumers(const Extrinsic::Graphics::Colormap::Type colormap) const
     {
         return {
-            RT::BakedPropertyTextureConsumer{
+            RT::TextureBakeConsumerBinding{
                 .PresentationKey =
                     std::string{kRuntime190Presentation},
                 .Semantic = RT::GeometryPresentationSlotSemantic::Albedo,
                 .Colormap = colormap,
             },
-            RT::BakedPropertyTextureConsumer{
+            RT::TextureBakeConsumerBinding{
                 .PresentationKey =
                     std::string{kRuntime190Presentation},
                 .Semantic =
@@ -6037,14 +6035,14 @@ private:
             Geometry::PropertyValueKind::Float;
         command.PropertyName = "v:runtime190_scalar";
         command.RangePolicy =
-            RT::MeshAttributeTextureBakeRangePolicy::Manual;
+            RT::PropertyTextureBakeRangePolicy::Manual;
         command.RangeMin = 0.0f;
         command.RangeMax = 1.0f;
         command.Width = kRuntime190BakeExtent;
         command.Height = kRuntime190BakeExtent;
         command.OutputName = std::string{kRuntime190VertexOutput};
         command.Storage =
-            RT::SelectedMeshTextureBakeStorage::RawFloat;
+            RT::PropertyTextureBakeStorage::RawFloat;
         command.Consumers = Consumers(colormap);
         command.BindGeneratedTexture = true;
         return command;
@@ -6063,12 +6061,12 @@ private:
             Geometry::PropertyValueKind::Vec4;
         command.PropertyName = std::move(property);
         command.Encoder =
-            RT::MeshAttributeTextureBakeEncoder::RgbaColor;
+            RT::PropertyTextureBakeEncoding::RgbaColor;
         command.Width = kRuntime190BakeExtent;
         command.Height = kRuntime190BakeExtent;
         command.OutputName = std::move(output);
         command.Storage =
-            RT::SelectedMeshTextureBakeStorage::EncodedRgba;
+            RT::PropertyTextureBakeStorage::EncodedRgba;
         command.BindGeneratedTexture = false;
         return command;
     }
@@ -6173,7 +6171,7 @@ private:
             return false;
         }
 
-        const std::vector<RT::BakedPropertyTextureConsumer> inferno =
+        const std::vector<RT::TextureBakeConsumerBinding> inferno =
             Consumers(Extrinsic::Graphics::Colormap::Type::Inferno);
         const RT::TextureBakeMutationResult changed =
             m_TextureBake->SetConsumers(
@@ -6219,13 +6217,13 @@ private:
 
         const RT::TextureBakeSnapshot snapshot =
             m_TextureBake->Snapshot(m_StableEntityId);
-        const RT::BakedPropertyTextureRecord* savedEdge =
+        const RT::PropertyTextureBakeRecord* savedEdge =
             FindRuntime190Record(snapshot, kRuntime190SavedEdgeOutput);
-        const RT::BakedPropertyTextureRecord* newEdge =
+        const RT::PropertyTextureBakeRecord* newEdge =
             FindRuntime190Record(snapshot, kRuntime190EdgeOutput);
         if (savedEdge == nullptr || newEdge == nullptr ||
-            savedEdge->State != RT::BakedPropertyTextureState::Ready ||
-            newEdge->State != RT::BakedPropertyTextureState::Ready)
+            savedEdge->State != RT::PropertyTextureBakeOutputState::Ready ||
+            newEdge->State != RT::PropertyTextureBakeOutputState::Ready)
         {
             return false;
         }
@@ -6332,7 +6330,7 @@ private:
 
     [[nodiscard]] bool CopyReadyTexture(
         Extrinsic::RHI::ICommandContext& commands,
-        const RT::BakedPropertyTextureRecord& record,
+        const RT::PropertyTextureBakeRecord& record,
         const Extrinsic::RHI::Format expectedFormat,
         const Extrinsic::RHI::BufferHandle readback,
         std::uint64_t& generation)
@@ -6391,16 +6389,16 @@ private:
             m_TextureBake->Snapshot(m_StableEntityId);
         if (!InitialReadbacksRecorded)
         {
-            const RT::BakedPropertyTextureRecord* vertex =
+            const RT::PropertyTextureBakeRecord* vertex =
                 FindRuntime190Record(snapshot, kRuntime190VertexOutput);
-            const RT::BakedPropertyTextureRecord* face =
+            const RT::PropertyTextureBakeRecord* face =
                 FindRuntime190Record(snapshot, kRuntime190FaceOutput);
-            const RT::BakedPropertyTextureRecord* edge =
+            const RT::PropertyTextureBakeRecord* edge =
                 FindRuntime190Record(snapshot, kRuntime190EdgeOutput);
             if (vertex == nullptr || face == nullptr || edge == nullptr ||
-                vertex->State != RT::BakedPropertyTextureState::Ready ||
-                face->State != RT::BakedPropertyTextureState::Ready ||
-                edge->State != RT::BakedPropertyTextureState::Ready)
+                vertex->State != RT::PropertyTextureBakeOutputState::Ready ||
+                face->State != RT::PropertyTextureBakeOutputState::Ready ||
+                edge->State != RT::PropertyTextureBakeOutputState::Ready)
             {
                 return;
             }
@@ -6436,10 +6434,10 @@ private:
         {
             return;
         }
-        const RT::BakedPropertyTextureRecord* vertex =
+        const RT::PropertyTextureBakeRecord* vertex =
             FindRuntime190Record(snapshot, kRuntime190VertexOutput);
         if (vertex == nullptr ||
-            vertex->State != RT::BakedPropertyTextureState::Ready)
+            vertex->State != RT::PropertyTextureBakeOutputState::Ready)
         {
             return;
         }

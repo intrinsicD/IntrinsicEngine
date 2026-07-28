@@ -432,137 +432,137 @@ namespace
     }
 }
 
-TEST(RuntimeSelectedMeshTextureBake, RepresentationDefaultsPreserveRawScalarData)
+TEST(RuntimeTextureBakeModule, RepresentationDefaultsPreserveRawScalarData)
 {
-    const std::vector<Runtime::BakedPropertyTextureConsumer> consumers{
-        Runtime::BakedPropertyTextureConsumer{
+    const std::vector<Runtime::TextureBakeConsumerBinding> consumers{
+        Runtime::TextureBakeConsumerBinding{
             .PresentationKey = "mesh.surface",
             .Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo,
         },
-        Runtime::BakedPropertyTextureConsumer{
+        Runtime::TextureBakeConsumerBinding{
             .PresentationKey = "mesh.surface",
             .Semantic = Runtime::GeometryPresentationSlotSemantic::ScalarField,
         },
     };
-    const Runtime::BakedPropertyTextureRepresentation representation =
-        Runtime::ResolveBakedPropertyTextureRepresentation(
+    const Runtime::PropertyTextureBakeRepresentation representation =
+        Runtime::ResolvePropertyTextureBakeRepresentation(
             Geometry::PropertyValueKind::Float,
-            Runtime::SelectedMeshTextureBakeStorage::Auto,
-            Runtime::MeshAttributeTextureBakeEncoder::Auto,
+            Runtime::PropertyTextureBakeStorage::Auto,
+            Runtime::PropertyTextureBakeEncoding::Auto,
             consumers);
 
     EXPECT_EQ(
         representation.Storage,
-        Runtime::SelectedMeshTextureBakeStorage::RawFloat);
+        Runtime::PropertyTextureBakeStorage::RawFloat);
     EXPECT_EQ(
-        representation.Encoder,
-        Runtime::MeshAttributeTextureBakeEncoder::LinearScalar);
-    EXPECT_TRUE(Runtime::IsBakedPropertyTextureConsumerCompatible(
+        representation.Encoding,
+        Runtime::PropertyTextureBakeEncoding::LinearScalar);
+    EXPECT_TRUE(Runtime::IsPropertyTextureBakeConsumerCompatible(
         consumers[0],
         Geometry::PropertyValueKind::Float,
         representation.Storage,
-        representation.Encoder));
-    EXPECT_TRUE(Runtime::IsBakedPropertyTextureConsumerCompatible(
+        representation.Encoding));
+    EXPECT_TRUE(Runtime::IsPropertyTextureBakeConsumerCompatible(
         consumers[1],
         Geometry::PropertyValueKind::Float,
         representation.Storage,
-        representation.Encoder));
+        representation.Encoding));
 }
 
-TEST(RuntimeSelectedMeshTextureBake, NormalAndLabelDefaultsChooseEncodedStorage)
+TEST(RuntimeTextureBakeModule, NormalAndLabelDefaultsChooseEncodedStorage)
 {
-    const std::vector<Runtime::BakedPropertyTextureConsumer> normalConsumer{
-        Runtime::BakedPropertyTextureConsumer{
+    const std::vector<Runtime::TextureBakeConsumerBinding> normalConsumer{
+        Runtime::TextureBakeConsumerBinding{
             .PresentationKey = "mesh.surface",
             .Semantic = Runtime::GeometryPresentationSlotSemantic::Normal,
         },
     };
-    const auto normal = Runtime::ResolveBakedPropertyTextureRepresentation(
+    const auto normal = Runtime::ResolvePropertyTextureBakeRepresentation(
         Geometry::PropertyValueKind::Vec3,
-        Runtime::SelectedMeshTextureBakeStorage::Auto,
-        Runtime::MeshAttributeTextureBakeEncoder::Auto,
+        Runtime::PropertyTextureBakeStorage::Auto,
+        Runtime::PropertyTextureBakeEncoding::Auto,
         normalConsumer);
     EXPECT_EQ(
         normal.Storage,
-        Runtime::SelectedMeshTextureBakeStorage::EncodedRgba);
+        Runtime::PropertyTextureBakeStorage::EncodedRgba);
     EXPECT_EQ(
-        normal.Encoder,
-        Runtime::MeshAttributeTextureBakeEncoder::Normal);
-    EXPECT_TRUE(Runtime::IsBakedPropertyTextureConsumerCompatible(
+        normal.Encoding,
+        Runtime::PropertyTextureBakeEncoding::Normal);
+    EXPECT_TRUE(Runtime::IsPropertyTextureBakeConsumerCompatible(
         normalConsumer.front(),
         Geometry::PropertyValueKind::Vec3,
         normal.Storage,
-        normal.Encoder));
+        normal.Encoding));
 
-    const std::vector<Runtime::BakedPropertyTextureConsumer> albedoConsumer{
-        Runtime::BakedPropertyTextureConsumer{
+    const std::vector<Runtime::TextureBakeConsumerBinding> albedoConsumer{
+        Runtime::TextureBakeConsumerBinding{
             .PresentationKey = "mesh.surface",
             .Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo,
         },
     };
-    const auto label = Runtime::ResolveBakedPropertyTextureRepresentation(
+    const auto label = Runtime::ResolvePropertyTextureBakeRepresentation(
         Geometry::PropertyValueKind::UInt32,
-        Runtime::SelectedMeshTextureBakeStorage::Auto,
-        Runtime::MeshAttributeTextureBakeEncoder::Auto,
+        Runtime::PropertyTextureBakeStorage::Auto,
+        Runtime::PropertyTextureBakeEncoding::Auto,
         albedoConsumer);
     EXPECT_EQ(
         label.Storage,
-        Runtime::SelectedMeshTextureBakeStorage::EncodedRgba);
+        Runtime::PropertyTextureBakeStorage::EncodedRgba);
     EXPECT_EQ(
-        label.Encoder,
-        Runtime::MeshAttributeTextureBakeEncoder::LabelPalette);
+        label.Encoding,
+        Runtime::PropertyTextureBakeEncoding::LabelPalette);
 }
 
-TEST(RuntimeSelectedMeshTextureBake,
+TEST(RuntimeTextureBakeModule,
      RepresentationMatrixRejectsEncodersThatDoNotMatchStorageAndValueType)
 {
-    using Runtime::IsBakedPropertyTextureRepresentationCompatible;
-    using Runtime::MeshAttributeTextureBakeEncoder;
-    using Runtime::SelectedMeshTextureBakeStorage;
+    using Runtime::IsPropertyTextureBakeRepresentationCompatible;
+    using Runtime::PropertyTextureBakeEncoding;
+    using Runtime::PropertyTextureBakeStorage;
 
-    EXPECT_TRUE(IsBakedPropertyTextureRepresentationCompatible(
+    EXPECT_TRUE(IsPropertyTextureBakeRepresentationCompatible(
         Geometry::PropertyValueKind::Float,
-        SelectedMeshTextureBakeStorage::RawFloat,
-        MeshAttributeTextureBakeEncoder::LinearScalar));
-    EXPECT_FALSE(IsBakedPropertyTextureRepresentationCompatible(
+        PropertyTextureBakeStorage::RawFloat,
+        PropertyTextureBakeEncoding::LinearScalar));
+    EXPECT_FALSE(IsPropertyTextureBakeRepresentationCompatible(
         Geometry::PropertyValueKind::Float,
-        SelectedMeshTextureBakeStorage::RawFloat,
-        MeshAttributeTextureBakeEncoder::Normal));
-    EXPECT_TRUE(IsBakedPropertyTextureRepresentationCompatible(
+        PropertyTextureBakeStorage::RawFloat,
+        PropertyTextureBakeEncoding::Normal));
+    EXPECT_TRUE(IsPropertyTextureBakeRepresentationCompatible(
         Geometry::PropertyValueKind::Float,
-        SelectedMeshTextureBakeStorage::EncodedRgba,
-        MeshAttributeTextureBakeEncoder::ScalarColormap));
-    EXPECT_FALSE(IsBakedPropertyTextureRepresentationCompatible(
+        PropertyTextureBakeStorage::EncodedRgba,
+        PropertyTextureBakeEncoding::ScalarColormap));
+    EXPECT_FALSE(IsPropertyTextureBakeRepresentationCompatible(
         Geometry::PropertyValueKind::UInt32,
-        SelectedMeshTextureBakeStorage::RawFloat,
-        MeshAttributeTextureBakeEncoder::LabelPalette));
-    EXPECT_TRUE(IsBakedPropertyTextureRepresentationCompatible(
+        PropertyTextureBakeStorage::RawFloat,
+        PropertyTextureBakeEncoding::LabelPalette));
+    EXPECT_TRUE(IsPropertyTextureBakeRepresentationCompatible(
         Geometry::PropertyValueKind::UInt32,
-        SelectedMeshTextureBakeStorage::EncodedRgba,
-        MeshAttributeTextureBakeEncoder::LabelPalette));
-    EXPECT_TRUE(IsBakedPropertyTextureRepresentationCompatible(
+        PropertyTextureBakeStorage::EncodedRgba,
+        PropertyTextureBakeEncoding::LabelPalette));
+    EXPECT_TRUE(IsPropertyTextureBakeRepresentationCompatible(
         Geometry::PropertyValueKind::Vec3,
-        SelectedMeshTextureBakeStorage::EncodedRgba,
-        MeshAttributeTextureBakeEncoder::Normal));
-    EXPECT_FALSE(IsBakedPropertyTextureRepresentationCompatible(
+        PropertyTextureBakeStorage::EncodedRgba,
+        PropertyTextureBakeEncoding::Normal));
+    EXPECT_FALSE(IsPropertyTextureBakeRepresentationCompatible(
         Geometry::PropertyValueKind::Vec4,
-        SelectedMeshTextureBakeStorage::EncodedRgba,
-        MeshAttributeTextureBakeEncoder::Normal));
-    EXPECT_FALSE(IsBakedPropertyTextureRepresentationCompatible(
+        PropertyTextureBakeStorage::EncodedRgba,
+        PropertyTextureBakeEncoding::Normal));
+    EXPECT_FALSE(IsPropertyTextureBakeRepresentationCompatible(
         Geometry::PropertyValueKind::Vec3,
-        SelectedMeshTextureBakeStorage::Auto,
-        MeshAttributeTextureBakeEncoder::Vector3));
+        PropertyTextureBakeStorage::Auto,
+        PropertyTextureBakeEncoding::Vector3));
 }
 
-TEST(RuntimeSelectedMeshTextureBake, ModuleServiceFailsClosedWithoutGpuComposition)
+TEST(RuntimeTextureBakeModule, ServiceFailsClosedWithoutGpuComposition)
 {
     Runtime::TextureBakeService service{};
     EXPECT_FALSE(service.Available());
-    const Runtime::SelectedMeshTextureBakeResult result =
-        service.Bake(Runtime::SelectedMeshTextureBakeRequest{});
+    const Runtime::PropertyTextureBakeResult result =
+        service.Bake(Runtime::PropertyTextureBakeRequest{});
     EXPECT_EQ(
         result.Status,
-        Runtime::SelectedMeshTextureBakeStatus::NonOperationalBackend);
+        Runtime::PropertyTextureBakeStatus::NonOperationalBackend);
 }
 
 TEST(RuntimeSelectedMeshTextureBake, BuildsVertexNormalBakeRequest)

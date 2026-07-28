@@ -11,9 +11,9 @@ maturity_target: Retired
 - Promoted to active on 2026-07-28 after `RUNTIME-190` and `RUNTIME-192`
   retired the generalized GPU texture-bake owner and canonical geometry-
   property vocabulary prerequisites.
-- Owner: Codex. Branch: `main`. Next verification: land Slice A's canonical
-  property request/result vocabulary and run the focused headless
-  `TextureBake` contract selector before changing either GPU participant.
+- Owner: Codex. Branch: `main`. Next implementation: Slice B's one-participant
+  migration, beginning with canonical padding/dilation and specialized
+  object-normal producer adoption.
 - Intake census found 12,662 lines across the generalized runtime/graphics
   bake modules and the selected-mesh, CPU mesh-attribute, and object-space-
   normal families. Production currently registers two JobService GPU
@@ -24,6 +24,29 @@ maturity_target: Retired
   `Runtime.TextureBakeModule` without changing GPU recording or deleting
   compatibility modules. Slices B/C own semantic adoption and parity; Slice D
   remains a separate mechanical deletion.
+- Slice A completed on 2026-07-28: `Runtime.TextureBakeModule` now exports the
+  canonical property/texcoord request, result/status, representation, output
+  record, and diagnostics vocabulary. `TextureBakeService`, Sandbox facades
+  and panels, bake snapshots, and active-world catalog tests use those types;
+  consumer bindings are carried in a separate transitional snapshot rather
+  than the canonical bake DTOs. The old selected-mesh direct command remains
+  isolated for compatibility tests and Slice D deletion.
+- Slice A verification: `cmake --build --preset ci --target IntrinsicTests
+  --parallel 4` passed; the focused runtime selector covering canonical
+  representation/service, Sandbox bake commands, asset-workflow lifecycle,
+  object-normal lifecycle compatibility, and legacy selected-mesh
+  compatibility passed 51/51. The default CPU-supported selector passed
+  4,124/4,124. Strict task policy, task-state links, session-brief freshness,
+  test layout, ARA claims, and source layering checks passed; documentation
+  links and diff-whitespace checks also passed. Root hygiene reported only the
+  existing non-fatal `.agents/` warning.
+- Slice A clean-workshop review: rows 1-3 pass; rows 4-6 are not applicable
+  because this slice adds no renderer member, frame pass, or recipe edge; row
+  7 passes because Slices B-D remain the explicit operational/parity/retirement
+  gates; row 8 passes because the transitional consumer and specialized
+  producer surfaces name this active task and their Slice C/D removal points.
+  No dependency edge, CMake link, module-composition order, or allowlist entry
+  changed.
 
 ## Goal
 
@@ -171,7 +194,7 @@ maturity_target: Retired
 
 ## Required changes
 
-- [ ] Export one plain `PropertyTextureBakeRequest` /
+- [x] Export one plain `PropertyTextureBakeRequest` /
       `PropertyTextureBakeResult` family from `Runtime.TextureBakeModule`,
       covering source entity/world, one canonical `GeometryPropertyRef`, UV /
       topology raster mapping, expected source/property generations, storage

@@ -23,12 +23,10 @@ import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
-import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.SandboxEditorFacades;
-import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.TextureBakeModule;
 
 namespace Extrinsic::Sandbox::Editor
@@ -70,23 +68,23 @@ namespace Extrinsic::Sandbox::Editor
                 GeometryPresentationSlotSemantic::ScalarField,
             }};
 
-        inline constexpr std::array<MeshAttributeTextureBakeEncoder, 8>
+        inline constexpr std::array<PropertyTextureBakeEncoding, 8>
             kTextureBakeEncoders{{
-                MeshAttributeTextureBakeEncoder::Auto,
-                MeshAttributeTextureBakeEncoder::RgbaColor,
-                MeshAttributeTextureBakeEncoder::Normal,
-                MeshAttributeTextureBakeEncoder::ScalarColormap,
-                MeshAttributeTextureBakeEncoder::LinearScalar,
-                MeshAttributeTextureBakeEncoder::LabelPalette,
-                MeshAttributeTextureBakeEncoder::Vector2,
-                MeshAttributeTextureBakeEncoder::Vector3,
+                PropertyTextureBakeEncoding::Auto,
+                PropertyTextureBakeEncoding::RgbaColor,
+                PropertyTextureBakeEncoding::Normal,
+                PropertyTextureBakeEncoding::ScalarColormap,
+                PropertyTextureBakeEncoding::LinearScalar,
+                PropertyTextureBakeEncoding::LabelPalette,
+                PropertyTextureBakeEncoding::Vector2,
+                PropertyTextureBakeEncoding::Vector3,
             }};
 
-        inline constexpr std::array<SelectedMeshTextureBakeStorage, 3>
+        inline constexpr std::array<PropertyTextureBakeStorage, 3>
             kTextureBakeStorageModes{{
-                SelectedMeshTextureBakeStorage::Auto,
-                SelectedMeshTextureBakeStorage::RawFloat,
-                SelectedMeshTextureBakeStorage::EncodedRgba,
+                PropertyTextureBakeStorage::Auto,
+                PropertyTextureBakeStorage::RawFloat,
+                PropertyTextureBakeStorage::EncodedRgba,
             }};
 
         inline constexpr std::array<const char*, 3>
@@ -103,18 +101,18 @@ namespace Extrinsic::Sandbox::Editor
             "object space", "world space"}};
 
         [[nodiscard]] const char* DebugNameForTextureBakeEncoder(
-            const MeshAttributeTextureBakeEncoder encoder) noexcept
+            const PropertyTextureBakeEncoding encoder) noexcept
         {
             switch (encoder)
             {
-            case MeshAttributeTextureBakeEncoder::Auto: return "auto";
-            case MeshAttributeTextureBakeEncoder::LinearScalar: return "linear scalar";
-            case MeshAttributeTextureBakeEncoder::ScalarColormap: return "scalar colormap";
-            case MeshAttributeTextureBakeEncoder::LabelPalette: return "label palette";
-            case MeshAttributeTextureBakeEncoder::Vector2: return "vector2";
-            case MeshAttributeTextureBakeEncoder::Vector3: return "vector3";
-            case MeshAttributeTextureBakeEncoder::Normal: return "normal";
-            case MeshAttributeTextureBakeEncoder::RgbaColor: return "rgba color";
+            case PropertyTextureBakeEncoding::Auto: return "auto";
+            case PropertyTextureBakeEncoding::LinearScalar: return "linear scalar";
+            case PropertyTextureBakeEncoding::ScalarColormap: return "scalar colormap";
+            case PropertyTextureBakeEncoding::LabelPalette: return "label palette";
+            case PropertyTextureBakeEncoding::Vector2: return "vector2";
+            case PropertyTextureBakeEncoding::Vector3: return "vector3";
+            case PropertyTextureBakeEncoding::Normal: return "normal";
+            case PropertyTextureBakeEncoding::RgbaColor: return "rgba color";
             }
             return "unknown";
         }
@@ -138,6 +136,20 @@ namespace Extrinsic::Sandbox::Editor
             bool* UvForceRegenerate{nullptr};
             bool* UvPreserveAuthored{nullptr};
         };
+
+        [[nodiscard]] std::span<const TextureBakeConsumerBinding>
+            TextureBakeConsumersFor(
+                const SandboxEditorTextureBakeControlsModel& model,
+                const std::string_view outputName)
+        {
+            const auto found = std::ranges::find(
+                model.TextureBakeConsumerBindings,
+                outputName,
+                &TextureBakeConsumerSnapshot::OutputName);
+            if (found == model.TextureBakeConsumerBindings.end())
+                return {};
+            return found->Consumers;
+        }
 
         struct BuiltinWindowSpec
         {
@@ -908,26 +920,26 @@ namespace Extrinsic::Sandbox::Editor
                 {
                     if (selectedSource == nullptr)
                         return false;
-                    const std::array<BakedPropertyTextureConsumer, 1> consumer{{
-                        BakedPropertyTextureConsumer{
+                    const std::array<TextureBakeConsumerBinding, 1> consumer{{
+                        TextureBakeConsumerBinding{
                             .PresentationKey = "mesh.surface",
                             .Semantic = semantic,
                             .Colormap = static_cast<ColormapType>(colormapIndex),
                         },
                     }};
-                    const BakedPropertyTextureRepresentation representation =
-                        ResolveBakedPropertyTextureRepresentation(
+                    const PropertyTextureBakeRepresentation representation =
+                        ResolvePropertyTextureBakeRepresentation(
                             selectedSource->ResolvedExpectedValueKind(),
                             kTextureBakeStorageModes[
                                 static_cast<std::size_t>(storageIndex)],
                             kTextureBakeEncoders[
                                 static_cast<std::size_t>(encoderIndex)],
                             consumer);
-                    return IsBakedPropertyTextureConsumerCompatible(
+                    return IsPropertyTextureBakeConsumerCompatible(
                         consumer.front(),
                         selectedSource->ResolvedExpectedValueKind(),
                         representation.Storage,
-                        representation.Encoder);
+                        representation.Encoding);
                 };
 
             if (ImGui::BeginCombo(
@@ -987,7 +999,7 @@ namespace Extrinsic::Sandbox::Editor
             const auto makeConsumer =
                 [colormapIndex](const GeometryPresentationSlotSemantic semantic)
                 {
-                    return BakedPropertyTextureConsumer{
+                    return TextureBakeConsumerBinding{
                         .PresentationKey = "mesh.surface",
                         .Semantic = semantic,
                         .Colormap = static_cast<ColormapType>(colormapIndex),
@@ -995,12 +1007,12 @@ namespace Extrinsic::Sandbox::Editor
                 };
             const auto consumersCompatible =
                 [selectedSource, storageIndex, encoderIndex](
-                    const std::vector<BakedPropertyTextureConsumer>& values)
+                    const std::vector<TextureBakeConsumerBinding>& values)
                 {
                     if (selectedSource == nullptr)
                         return false;
-                    const BakedPropertyTextureRepresentation representation =
-                        ResolveBakedPropertyTextureRepresentation(
+                    const PropertyTextureBakeRepresentation representation =
+                        ResolvePropertyTextureBakeRepresentation(
                             selectedSource->ResolvedExpectedValueKind(),
                             kTextureBakeStorageModes[
                                 static_cast<std::size_t>(storageIndex)],
@@ -1009,17 +1021,17 @@ namespace Extrinsic::Sandbox::Editor
                             values);
                     return std::ranges::all_of(
                         values,
-                        [&](const BakedPropertyTextureConsumer& consumer)
+                        [&](const TextureBakeConsumerBinding& consumer)
                         {
-                            return IsBakedPropertyTextureConsumerCompatible(
+                            return IsPropertyTextureBakeConsumerCompatible(
                                 consumer,
                                 selectedSource->ResolvedExpectedValueKind(),
                                 representation.Storage,
-                                representation.Encoder);
+                                representation.Encoding);
                         });
                 };
 
-            std::vector<BakedPropertyTextureConsumer> consumers{
+            std::vector<TextureBakeConsumerBinding> consumers{
                 makeConsumer(kTextureBakeTargetSemantics[
                     static_cast<std::size_t>(semanticIndex)])};
             for (std::size_t i = 0u;
@@ -1047,7 +1059,7 @@ namespace Extrinsic::Sandbox::Editor
                 const std::uint32_t bit =
                     1u << static_cast<std::uint32_t>(i);
                 bool selected = (additionalConsumerMask & bit) != 0u;
-                std::vector<BakedPropertyTextureConsumer> candidate = consumers;
+                std::vector<TextureBakeConsumerBinding> candidate = consumers;
                 if (!selected)
                     candidate.push_back(makeConsumer(semantic));
                 const bool compatible = consumersCompatible(candidate);
@@ -1056,7 +1068,7 @@ namespace Extrinsic::Sandbox::Editor
                     additionalConsumerMask &= ~bit;
                     std::erase_if(
                         consumers,
-                        [semantic](const BakedPropertyTextureConsumer& consumer)
+                        [semantic](const TextureBakeConsumerBinding& consumer)
                         {
                             return consumer.Semantic == semantic;
                         });
@@ -1079,7 +1091,7 @@ namespace Extrinsic::Sandbox::Editor
                         std::erase_if(
                             consumers,
                             [semantic](
-                                const BakedPropertyTextureConsumer& consumer)
+                                const TextureBakeConsumerBinding& consumer)
                             {
                                 return consumer.Semantic == semantic;
                             });
@@ -1091,7 +1103,7 @@ namespace Extrinsic::Sandbox::Editor
 
             const bool hasNormalConsumer = std::ranges::any_of(
                 consumers,
-                [](const BakedPropertyTextureConsumer& consumer)
+                [](const TextureBakeConsumerBinding& consumer)
                 {
                     return consumer.Semantic == GeometryPresentationSlotSemantic::Normal;
                 });
@@ -1138,8 +1150,8 @@ namespace Extrinsic::Sandbox::Editor
                         .EncodingColormap =
                             static_cast<ColormapType>(colormapIndex),
                         .NormalSpace = normalSpaceIndex == 1
-                            ? BakedPropertyNormalSpace::World
-                            : BakedPropertyNormalSpace::Object,
+                            ? PropertyTextureNormalSpace::World
+                            : PropertyTextureNormalSpace::Object,
                         .Consumers = consumers,
                         .BindGeneratedTexture = true,
                     });
@@ -1160,7 +1172,7 @@ namespace Extrinsic::Sandbox::Editor
             static std::string renameTarget{};
             static std::array<char, 128> renameBuffer{};
             static std::string mutationDiagnostic{};
-            for (const BakedPropertyTextureRecord& record :
+            for (const PropertyTextureBakeRecord& record :
                  model.BakedTextures)
             {
                 ImGui::PushID(record.OutputName.c_str());
@@ -1169,16 +1181,16 @@ namespace Extrinsic::Sandbox::Editor
                         ImGuiTreeNodeFlags_DefaultOpen))
                 {
                     const char* stateName = "pending";
-                    if (record.State == BakedPropertyTextureState::Ready)
+                    if (record.State == PropertyTextureBakeOutputState::Ready)
                         stateName = "ready";
-                    else if (record.State == BakedPropertyTextureState::Failed)
+                    else if (record.State == PropertyTextureBakeOutputState::Failed)
                         stateName = "failed";
                     const char* storageName =
                         record.Storage ==
-                                SelectedMeshTextureBakeStorage::RawFloat
+                                PropertyTextureBakeStorage::RawFloat
                             ? "raw float"
                             : record.Storage ==
-                                      SelectedMeshTextureBakeStorage::EncodedRgba
+                                      PropertyTextureBakeStorage::EncodedRgba
                                   ? "encoded RGBA"
                                   : "auto";
                     ImGui::Text(
@@ -1189,11 +1201,11 @@ namespace Extrinsic::Sandbox::Editor
                         record.Height);
                     ImGui::Text(
                         "Source: %s  range=[%.6g, %.6g]",
-                        record.SourcePropertyName.c_str(),
+                        record.Source.Name.c_str(),
                         record.RangeMin,
                         record.RangeMax);
-                    if (record.Encoder ==
-                        MeshAttributeTextureBakeEncoder::ScalarColormap)
+                    if (record.Encoding ==
+                        PropertyTextureBakeEncoding::ScalarColormap)
                     {
                         const std::size_t mapIndex = std::min<std::size_t>(
                             static_cast<std::size_t>(record.EncodingColormap),
@@ -1201,12 +1213,23 @@ namespace Extrinsic::Sandbox::Editor
                         ImGui::Text("Baked colormap: %s",
                                     kColormapNames[mapIndex]);
                     }
-                    if (record.Encoder ==
-                        MeshAttributeTextureBakeEncoder::Normal)
+                    const std::span<const TextureBakeConsumerBinding>
+                        existingConsumers =
+                            TextureBakeConsumersFor(
+                                model,
+                                record.OutputName);
+                    if (record.Encoding ==
+                        PropertyTextureBakeEncoding::Normal)
                     {
+                        const auto normalConsumer = std::ranges::find(
+                            existingConsumers,
+                            GeometryPresentationSlotSemantic::Normal,
+                            &TextureBakeConsumerBinding::Semantic);
                         ImGui::Text(
                             "Normal space: %s",
-                            record.NormalSpace == BakedPropertyNormalSpace::World
+                            normalConsumer != existingConsumers.end() &&
+                                    normalConsumer->NormalSpace ==
+                                        PropertyTextureNormalSpace::World
                                 ? "world"
                                 : "object");
                     }
@@ -1254,8 +1277,9 @@ namespace Extrinsic::Sandbox::Editor
                         mutationDiagnostic = result.Diagnostic;
                     }
 
-                    std::vector<BakedPropertyTextureConsumer> nextConsumers =
-                        record.Consumers;
+                    std::vector<TextureBakeConsumerBinding> nextConsumers{
+                        existingConsumers.begin(),
+                        existingConsumers.end()};
                     bool consumersChanged = false;
                     for (std::size_t i = 0u;
                          i < kTextureBakeTargetSemantics.size();
@@ -1267,20 +1291,20 @@ namespace Extrinsic::Sandbox::Editor
                             nextConsumers.begin(),
                             nextConsumers.end(),
                             [semantic](
-                                const BakedPropertyTextureConsumer& consumer)
+                                const TextureBakeConsumerBinding& consumer)
                             {
                                 return consumer.Semantic == semantic;
                             });
                         bool enabled = found != nextConsumers.end();
                         const bool compatible =
-                            IsBakedPropertyTextureConsumerCompatible(
-                                BakedPropertyTextureConsumer{
+                            IsPropertyTextureBakeConsumerCompatible(
+                                TextureBakeConsumerBinding{
                                     .PresentationKey = "mesh.surface",
                                     .Semantic = semantic,
                                 },
-                                record.ValueKind,
+                                record.Source.ValueKind,
                                 record.Storage,
-                                record.Encoder);
+                                record.Encoding);
                         const std::string label{
                             "Consume as " + std::string(ToString(semantic))};
                         const bool disableConsumer = !compatible && !enabled;
@@ -1292,7 +1316,7 @@ namespace Extrinsic::Sandbox::Editor
                             if (enabled)
                             {
                                 nextConsumers.push_back(
-                                    BakedPropertyTextureConsumer{
+                                    TextureBakeConsumerBinding{
                                         .PresentationKey = "mesh.surface",
                                         .Semantic = semantic,
                                         .Colormap = static_cast<ColormapType>(
@@ -1304,7 +1328,7 @@ namespace Extrinsic::Sandbox::Editor
                                 std::erase_if(
                                     nextConsumers,
                                     [semantic](
-                                        const BakedPropertyTextureConsumer&
+                                        const TextureBakeConsumerBinding&
                                             consumer)
                                     {
                                         return consumer.Semantic == semantic;
@@ -1317,15 +1341,15 @@ namespace Extrinsic::Sandbox::Editor
 
                     const bool rawScalar =
                         record.Storage ==
-                            SelectedMeshTextureBakeStorage::RawFloat &&
-                        (record.ValueKind ==
+                            PropertyTextureBakeStorage::RawFloat &&
+                        (record.Source.ValueKind ==
                              Geometry::PropertyValueKind::Float ||
-                         record.ValueKind ==
+                         record.Source.ValueKind ==
                              Geometry::PropertyValueKind::Double);
                     if (rawScalar)
                     {
                         int recordColormap = 0;
-                        for (const BakedPropertyTextureConsumer& consumer :
+                        for (const TextureBakeConsumerBinding& consumer :
                              nextConsumers)
                         {
                             if (consumer.Semantic ==
@@ -1349,7 +1373,7 @@ namespace Extrinsic::Sandbox::Editor
                                 static_cast<int>(kColormapNames.size())))
                         {
                             consumersChanged = true;
-                            for (BakedPropertyTextureConsumer& consumer :
+                            for (TextureBakeConsumerBinding& consumer :
                                  nextConsumers)
                             {
                                 if (consumer.Semantic ==

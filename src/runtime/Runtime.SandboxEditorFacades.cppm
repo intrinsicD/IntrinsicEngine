@@ -46,7 +46,6 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -57,7 +56,6 @@ import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.SceneSerialization;
-import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldHandle;
@@ -1447,13 +1445,14 @@ export namespace Extrinsic::Runtime
         std::string DisabledReason{};
         GeometryPresentationSlotSemantic DefaultTargetSemantic{
             GeometryPresentationSlotSemantic::Albedo};
-        MeshAttributeTextureBakeEncoder DefaultEncoder{
-            MeshAttributeTextureBakeEncoder::Auto};
+        PropertyTextureBakeEncoding DefaultEncoder{
+            PropertyTextureBakeEncoding::Auto};
         std::uint32_t DefaultWidth{64u};
         std::uint32_t DefaultHeight{64u};
         SandboxEditorUvDiagnosticsModel Uv{};
         std::vector<SandboxEditorTextureBakeSourceRow> Sources{};
-        std::vector<BakedPropertyTextureRecord> BakedTextures{};
+        std::vector<PropertyTextureBakeRecord> BakedTextures{};
+        std::vector<TextureBakeConsumerSnapshot> TextureBakeConsumerBindings{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
@@ -2716,31 +2715,31 @@ export namespace Extrinsic::Runtime
         GeometryElementDomain SourceDomain{GeometryElementDomain::MeshVertex};
         GeometryPropertyValueKindFilter ExpectedValueKind{};
         std::string PropertyName{};
-        MeshAttributeTextureBakeEncoder Encoder{
-            MeshAttributeTextureBakeEncoder::Auto};
-        MeshAttributeTextureBakeRangePolicy RangePolicy{
-            MeshAttributeTextureBakeRangePolicy::AutoFinite};
+        PropertyTextureBakeEncoding Encoder{
+            PropertyTextureBakeEncoding::Auto};
+        PropertyTextureBakeRangePolicy RangePolicy{
+            PropertyTextureBakeRangePolicy::AutoFinite};
         float RangeMin{0.0f};
         float RangeMax{1.0f};
         std::uint32_t Width{64u};
         std::uint32_t Height{64u};
         std::string GeneratedKey{};
         std::string OutputName{};
-        SelectedMeshTextureBakeStorage Storage{
-            SelectedMeshTextureBakeStorage::Auto};
+        PropertyTextureBakeStorage Storage{
+            PropertyTextureBakeStorage::Auto};
         Graphics::Colormap::Type EncodingColormap{
             Graphics::Colormap::Type::Viridis};
-        BakedPropertyNormalSpace NormalSpace{
-            BakedPropertyNormalSpace::Object};
-        std::vector<BakedPropertyTextureConsumer> Consumers{};
+        PropertyTextureNormalSpace NormalSpace{
+            PropertyTextureNormalSpace::Object};
+        std::vector<TextureBakeConsumerBinding> Consumers{};
         bool BindGeneratedTexture{true};
     };
 
     struct SandboxEditorTextureBakeCommandResult
     {
         SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
-        SelectedMeshTextureBakeStatus BakeStatus{
-            SelectedMeshTextureBakeStatus::Success};
+        PropertyTextureBakeStatus BakeStatus{
+            PropertyTextureBakeStatus::Success};
         Assets::AssetId GeneratedTexture{};
         // The selected-mesh bake runs on `JobService`.
         JobToken Job{};

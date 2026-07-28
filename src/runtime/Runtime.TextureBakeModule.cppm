@@ -1,36 +1,251 @@
 module;
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
 export module Extrinsic.Runtime.TextureBakeModule;
 
+import Extrinsic.Asset.Registry;
+import Extrinsic.Asset.Service;
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeQueue;
 import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.WorldHandle;
+import Geometry.Properties;
 
 namespace Extrinsic::Runtime
 {
+    export enum class PropertyTextureBakeStatus : std::uint8_t
+    {
+        Success,
+        Scheduled,
+        NonOperationalBackend,
+        MissingScene,
+        MissingAssetService,
+        StaleEntity,
+        NonMeshSource,
+        InvalidResolution,
+        InvalidPadding,
+        InvalidRange,
+        MissingProperty,
+        UnsupportedPropertyType,
+        MismatchedPropertyCount,
+        UnsupportedSourceDomain,
+        MissingTexcoords,
+        NonFiniteTexcoord,
+        NonFinitePropertyValue,
+        DegenerateAllTriangles,
+        DegenerateUvTriangles,
+        ZeroCoverageBake,
+        BakeFailed,
+        AssetLoadFailed,
+        CommandFailed,
+        JobSubmitFailed,
+        StaleCompletion,
+    };
+
+    export enum class PropertyTextureBakeExecutionMode : std::uint8_t
+    {
+        PropertyRasterGpu,
+    };
+
+    export enum class PropertyTextureBakeStorage : std::uint8_t
+    {
+        Auto,
+        RawFloat,
+        EncodedRgba,
+    };
+
+    export enum class PropertyTextureBakeEncoding : std::uint8_t
+    {
+        Auto,
+        ScalarColormap,
+        LinearScalar,
+        LabelPalette,
+        Vector2,
+        Vector3,
+        Normal,
+        RgbaColor,
+    };
+
+    export enum class PropertyTextureBakeRangePolicy : std::uint8_t
+    {
+        AutoFinite,
+        Manual,
+    };
+
+    export enum class PropertyTextureBakeOutputState : std::uint8_t
+    {
+        Pending,
+        Ready,
+        Failed,
+    };
+
+    export struct PropertyTextureBakeRepresentation
+    {
+        PropertyTextureBakeStorage Storage{
+            PropertyTextureBakeStorage::RawFloat};
+        PropertyTextureBakeEncoding Encoding{
+            PropertyTextureBakeEncoding::Auto};
+    };
+
+    export [[nodiscard]] PropertyTextureBakeRepresentation
+        ResolvePropertyTextureBakeRepresentation(
+            Geometry::PropertyValueKind valueKind,
+            PropertyTextureBakeStorage requestedStorage,
+            PropertyTextureBakeEncoding requestedEncoding) noexcept;
+
+    export [[nodiscard]] bool IsPropertyTextureBakeRepresentationCompatible(
+        Geometry::PropertyValueKind valueKind,
+        PropertyTextureBakeStorage storage,
+        PropertyTextureBakeEncoding encoding) noexcept;
+
+    export struct PropertyTextureBakeRequest
+    {
+        WorldHandle World{DefaultWorldHandle};
+        std::uint32_t StableEntityId{0u};
+        GeometryPropertyRef Source{};
+        GeometryPropertyRef Texcoords{
+            .Domain = GeometryElementDomain::MeshVertex,
+            .Name = "v:texcoord",
+            .ValueKind = Geometry::PropertyValueKind::Vec2,
+        };
+        std::uint64_t ExpectedSourceGeneration{0u};
+        std::uint64_t ExpectedPropertyGeneration{0u};
+        PropertyTextureBakeStorage Storage{
+            PropertyTextureBakeStorage::Auto};
+        PropertyTextureBakeEncoding Encoding{
+            PropertyTextureBakeEncoding::Auto};
+        PropertyTextureBakeRangePolicy RangePolicy{
+            PropertyTextureBakeRangePolicy::AutoFinite};
+        float RangeMin{0.0f};
+        float RangeMax{1.0f};
+        Graphics::Colormap::Type EncodingColormap{
+            Graphics::Colormap::Type::Viridis};
+        std::uint32_t Width{64u};
+        std::uint32_t Height{64u};
+        std::uint32_t PaddingTexels{0u};
+        std::string OutputName{};
+        Assets::AssetId ExistingGeneratedTexture{};
+    };
+
+    export struct PropertyTextureBakeResult
+    {
+        PropertyTextureBakeStatus Status{
+            PropertyTextureBakeStatus::Success};
+        PropertyTextureBakeExecutionMode ExecutionMode{
+            PropertyTextureBakeExecutionMode::PropertyRasterGpu};
+        PropertyTextureBakeOutputState State{
+            PropertyTextureBakeOutputState::Pending};
+        Assets::AssetId GeneratedTexture{};
+        JobToken Job{};
+        std::uint64_t Generation{0u};
+        std::uint64_t SourceGeneration{0u};
+        std::string GeneratedAssetPath{};
+        std::string OutputName{};
+        std::string Diagnostic{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == PropertyTextureBakeStatus::Success ||
+                   Status == PropertyTextureBakeStatus::Scheduled;
+        }
+    };
+
+    export struct PropertyTextureBakeRecord
+    {
+        std::string OutputName{};
+        GeometryPropertyRef Source{};
+        GeometryPropertyRef Texcoords{};
+        PropertyTextureBakeStorage Storage{
+            PropertyTextureBakeStorage::Auto};
+        PropertyTextureBakeEncoding Encoding{
+            PropertyTextureBakeEncoding::Auto};
+        Graphics::Colormap::Type EncodingColormap{
+            Graphics::Colormap::Type::Viridis};
+        Assets::AssetId Texture{};
+        std::size_t ExpectedElementCount{0u};
+        std::uint64_t SourceGeneration{0u};
+        std::uint64_t PropertyGeneration{0u};
+        float RangeMin{0.0f};
+        float RangeMax{1.0f};
+        std::uint32_t Width{0u};
+        std::uint32_t Height{0u};
+        std::uint32_t PaddingTexels{0u};
+        std::uint64_t Generation{0u};
+        PropertyTextureBakeOutputState State{
+            PropertyTextureBakeOutputState::Pending};
+        std::string Diagnostic{};
+    };
+
+    export struct PropertyTextureBakeOutputs
+    {
+        std::vector<PropertyTextureBakeRecord> Records{};
+        std::uint64_t Generation{1u};
+    };
+
+    export [[nodiscard]] const char* DebugNameForPropertyTextureBakeStatus(
+        PropertyTextureBakeStatus status) noexcept;
+
+    // Transitional caller-owned binding vocabulary. It is deliberately
+    // separate from PropertyTextureBakeRequest/Result and is removed in
+    // RUNTIME-191 Slice C once every caller processes generic output records.
+    export enum class PropertyTextureNormalSpace : std::uint8_t
+    {
+        Object,
+        World,
+    };
+
+    export struct TextureBakeConsumerBinding
+    {
+        std::string PresentationKey{};
+        GeometryPresentationSlotSemantic Semantic{
+            GeometryPresentationSlotSemantic::Albedo};
+        Graphics::Colormap::Type Colormap{
+            Graphics::Colormap::Type::Viridis};
+        PropertyTextureNormalSpace NormalSpace{
+            PropertyTextureNormalSpace::Object};
+    };
+
+    export [[nodiscard]] PropertyTextureBakeRepresentation
+        ResolvePropertyTextureBakeRepresentation(
+            Geometry::PropertyValueKind valueKind,
+            PropertyTextureBakeStorage requestedStorage,
+            PropertyTextureBakeEncoding requestedEncoding,
+            std::span<const TextureBakeConsumerBinding> consumers) noexcept;
+
+    export [[nodiscard]] bool IsPropertyTextureBakeConsumerCompatible(
+        const TextureBakeConsumerBinding& consumer,
+        Geometry::PropertyValueKind valueKind,
+        PropertyTextureBakeStorage storage,
+        PropertyTextureBakeEncoding encoding) noexcept;
+
+    export struct TextureBakeBindingChanged
+    {
+        WorldHandle World{};
+        std::uint64_t BindingEpoch{0u};
+    };
+
     export struct TextureBakeProducerContext
     {
         RuntimeObjectSpaceNormalBakeQueue* Queue{};
         WorldHandle World{};
         std::uint64_t BindingEpoch{0u};
         const RHI::IDevice* Device{};
-        // Main-thread deferred producers lock this token immediately before
-        // dereferencing Queue. Target changes and shutdown invalidate it.
         std::weak_ptr<void> Lifetime{};
 
         [[nodiscard]] bool IsValid() const noexcept
@@ -41,12 +256,6 @@ namespace Extrinsic::Runtime
                    Device != nullptr &&
                    !Lifetime.expired();
         }
-    };
-
-    export struct TextureBakeBindingChanged
-    {
-        WorldHandle World{};
-        std::uint64_t BindingEpoch{0u};
     };
 
     export struct TextureBakeModuleStats
@@ -72,7 +281,8 @@ namespace Extrinsic::Runtime
 
     export struct TextureBakeMutationResult
     {
-        TextureBakeMutationStatus Status{TextureBakeMutationStatus::Success};
+        TextureBakeMutationStatus Status{
+            TextureBakeMutationStatus::Success};
         std::string Diagnostic{};
 
         [[nodiscard]] bool Succeeded() const noexcept
@@ -85,12 +295,19 @@ namespace Extrinsic::Runtime
     {
         std::uint32_t StableEntityId{0u};
         std::string OutputName{};
-        std::vector<BakedPropertyTextureConsumer> Consumers{};
+        std::vector<TextureBakeConsumerBinding> Consumers{};
+    };
+
+    export struct TextureBakeConsumerSnapshot
+    {
+        std::string OutputName{};
+        std::vector<TextureBakeConsumerBinding> Consumers{};
     };
 
     export struct TextureBakeSnapshot
     {
-        std::vector<BakedPropertyTextureRecord> Textures{};
+        std::vector<PropertyTextureBakeRecord> Textures{};
+        std::vector<TextureBakeConsumerSnapshot> ConsumerBindings{};
         bool GpuOperational{false};
         std::string Diagnostic{};
     };
@@ -105,9 +322,10 @@ namespace Extrinsic::Runtime
         TextureBakeService& operator=(const TextureBakeService&) = delete;
 
         [[nodiscard]] bool Available() const noexcept;
-        [[nodiscard]] SelectedMeshTextureBakeResult Bake(
-            const SelectedMeshTextureBakeRequest& request);
-        [[nodiscard]] TextureBakeProducerContext ProducerContext() const noexcept;
+        [[nodiscard]] PropertyTextureBakeResult Bake(
+            const PropertyTextureBakeRequest& request);
+        [[nodiscard]] TextureBakeProducerContext
+            ProducerContext() const noexcept;
         [[nodiscard]] TextureBakeModuleStats Stats() const noexcept;
         [[nodiscard]] TextureBakeSnapshot Snapshot(
             std::uint32_t stableEntityId) const;
@@ -125,7 +343,12 @@ namespace Extrinsic::Runtime
         friend class TextureBakeModule;
 
         void Bind(
-            SelectedMeshTextureBakeContext context,
+            ECS::Scene::Registry* scene,
+            WorldHandle world,
+            std::uint64_t bindingEpoch,
+            Assets::AssetService* assets,
+            EditorCommandHistory* history,
+            JobService* jobs,
             RuntimeObjectSpaceNormalBakeQueue* queue,
             RHI::IDevice* device,
             Graphics::GpuAssetCache* gpuAssets,

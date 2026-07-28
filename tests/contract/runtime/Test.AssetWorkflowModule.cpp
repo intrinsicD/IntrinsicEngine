@@ -53,7 +53,6 @@ import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.TextureBakeModule;
@@ -1393,14 +1392,14 @@ TEST(AssetWorkflowModule,
         });
     ASSERT_TRUE(retainedTexture.has_value());
     const ECS::EntityHandle retainedEntity = initialScene->Create();
-    initialScene->Raw().emplace<Runtime::BakedPropertyTextures>(
+    initialScene->Raw().emplace<Runtime::PropertyTextureBakeOutputs>(
         retainedEntity,
-        Runtime::BakedPropertyTextures{
+        Runtime::PropertyTextureBakeOutputs{
             .Records = {
-                Runtime::BakedPropertyTextureRecord{
+                Runtime::PropertyTextureBakeRecord{
                     .OutputName = "inactive-world-retained",
                     .Texture = *retainedTexture,
-                    .State = Runtime::BakedPropertyTextureState::Ready,
+                    .State = Runtime::PropertyTextureBakeOutputState::Ready,
                     .Diagnostic = "ready",
                 },
             },
@@ -1472,7 +1471,7 @@ TEST(AssetWorkflowModule,
     ASSERT_EQ(restored.Textures.size(), 1u);
     EXPECT_EQ(
         restored.Textures.front().State,
-        Runtime::BakedPropertyTextureState::Ready);
+        Runtime::PropertyTextureBakeOutputState::Ready);
     EXPECT_TRUE(assets->IsAlive(*retainedTexture));
 
     ASSERT_TRUE(harness.Worlds.RequestSetActiveWorld(away).has_value());

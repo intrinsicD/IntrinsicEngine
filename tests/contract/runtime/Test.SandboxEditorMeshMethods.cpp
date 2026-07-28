@@ -3819,7 +3819,7 @@ TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRequireRuntimeModule)
                 .SourceDomain = Runtime::GeometryElementDomain::MeshVertex,
                 .ExpectedValueKind = Geometry::PropertyValueKind::Vec4,
                 .PropertyName = "v:paint",
-                .Encoder = Runtime::MeshAttributeTextureBakeEncoder::RgbaColor,
+                .Encoder = Runtime::PropertyTextureBakeEncoding::RgbaColor,
                 .Width = 4u,
                 .Height = 4u,
                 .GeneratedKey = "paint",
@@ -3830,7 +3830,7 @@ TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRequireRuntimeModule)
         result.Status,
         Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
     EXPECT_EQ(result.BakeStatus,
-              Runtime::SelectedMeshTextureBakeStatus::NonOperationalBackend);
+              Runtime::PropertyTextureBakeStatus::NonOperationalBackend);
     EXPECT_FALSE(result.GeneratedTexture.IsValid());
     EXPECT_FALSE(result.BoundGeneratedTexture);
     EXPECT_FALSE(history.IsDirty());
@@ -3910,7 +3910,7 @@ TEST(SandboxEditorUi, TextureBakeFacadeDoesNotBypassUnavailableRuntimeModule)
                 .ExpectedValueKind =
                     Geometry::PropertyValueKind::Vec3,
                 .PropertyName = "v:normal",
-                .Encoder = Runtime::MeshAttributeTextureBakeEncoder::Normal,
+                .Encoder = Runtime::PropertyTextureBakeEncoding::Normal,
                 .Width = 64u,
                 .Height = 64u,
                 .GeneratedKey = "normal",
@@ -3922,7 +3922,7 @@ TEST(SandboxEditorUi, TextureBakeFacadeDoesNotBypassUnavailableRuntimeModule)
         Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
     EXPECT_EQ(
         result.BakeStatus,
-        Runtime::SelectedMeshTextureBakeStatus::NonOperationalBackend);
+        Runtime::PropertyTextureBakeStatus::NonOperationalBackend);
     EXPECT_FALSE(result.Scheduled);
     EXPECT_FALSE(result.GeneratedTexture.IsValid());
     EXPECT_FALSE(result.BoundGeneratedTexture);
@@ -3964,7 +3964,7 @@ TEST(SandboxEditorUi, UnavailableTextureBakeModuleHasNoCpuFallback)
                 .ExpectedValueKind =
                     Geometry::PropertyValueKind::Vec3,
                 .PropertyName = "v:normal",
-                .Encoder = Runtime::MeshAttributeTextureBakeEncoder::Normal,
+                .Encoder = Runtime::PropertyTextureBakeEncoding::Normal,
                 .Width = 64u,
                 .Height = 64u,
                 .GeneratedKey = "normal",
@@ -3976,7 +3976,7 @@ TEST(SandboxEditorUi, UnavailableTextureBakeModuleHasNoCpuFallback)
         Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
     EXPECT_EQ(
         result.BakeStatus,
-        Runtime::SelectedMeshTextureBakeStatus::NonOperationalBackend);
+        Runtime::PropertyTextureBakeStatus::NonOperationalBackend);
     EXPECT_FALSE(result.Scheduled);
     EXPECT_FALSE(result.BoundGeneratedTexture);
     EXPECT_NE(result.Diagnostic.find("operational GPU"), std::string::npos);
@@ -4082,7 +4082,7 @@ TEST(SandboxEditorUi, TextureBakeModuleAvailabilityPrecedesAssetCreation)
                     Geometry::PropertyValueKind::Vec4,
                 .PropertyName = "v:paint",
                 .Encoder =
-                    Runtime::MeshAttributeTextureBakeEncoder::RgbaColor,
+                    Runtime::PropertyTextureBakeEncoding::RgbaColor,
                 .Width = 4u,
                 .Height = 4u,
                 .GeneratedKey = "paint",
@@ -4094,7 +4094,7 @@ TEST(SandboxEditorUi, TextureBakeModuleAvailabilityPrecedesAssetCreation)
         Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
     EXPECT_EQ(
         result.BakeStatus,
-        Runtime::SelectedMeshTextureBakeStatus::NonOperationalBackend);
+        Runtime::PropertyTextureBakeStatus::NonOperationalBackend);
 }
 TEST(SandboxEditorUi, TextureBakeRequiresOperationalGpuBackend)
 {
@@ -4147,7 +4147,7 @@ TEST(SandboxEditorUi, TextureBakeRequiresOperationalGpuBackend)
                 .SourceDomain = Runtime::GeometryElementDomain::MeshVertex,
                 .ExpectedValueKind = Geometry::PropertyValueKind::Vec4,
                 .PropertyName = "v:paint",
-                .Encoder = Runtime::MeshAttributeTextureBakeEncoder::RgbaColor,
+                .Encoder = Runtime::PropertyTextureBakeEncoding::RgbaColor,
                 .Width = 4u,
                 .Height = 4u,
                 .GeneratedKey = "paint",
@@ -4157,7 +4157,7 @@ TEST(SandboxEditorUi, TextureBakeRequiresOperationalGpuBackend)
     EXPECT_EQ(result.Status,
               Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
     EXPECT_EQ(result.BakeStatus,
-              Runtime::SelectedMeshTextureBakeStatus::NonOperationalBackend);
+              Runtime::PropertyTextureBakeStatus::NonOperationalBackend);
     EXPECT_NE(result.Diagnostic.find("operational GPU"), std::string::npos);
 }
 

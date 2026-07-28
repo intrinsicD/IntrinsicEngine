@@ -73,7 +73,6 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 import Extrinsic.Runtime.GeometryPresentation;
@@ -85,7 +84,6 @@ import Extrinsic.Runtime.SandboxConfigSections;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SceneSerialization;
-import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.TextureBakeModule;
@@ -4134,6 +4132,8 @@ namespace Extrinsic::Runtime
                 TextureBakeSnapshot snapshot =
                     context.TextureBake->Snapshot(stableEntityId);
                 model.BakedTextures = std::move(snapshot.Textures);
+                model.TextureBakeConsumerBindings =
+                    std::move(snapshot.ConsumerBindings);
             }
 
             model.Sources.reserve(catalog.Rows.size());
@@ -13815,7 +13815,7 @@ namespace Extrinsic::Runtime
         {
             return SandboxEditorTextureBakeCommandResult{
                 .Status = SandboxEditorCommandStatus::MissingScene,
-                .BakeStatus = SelectedMeshTextureBakeStatus::MissingScene,
+                .BakeStatus = PropertyTextureBakeStatus::MissingScene,
                 .Diagnostic = "Scene registry is unavailable.",
             };
         }
@@ -13824,7 +13824,7 @@ namespace Extrinsic::Runtime
             return SandboxEditorTextureBakeCommandResult{
                 .Status = SandboxEditorCommandStatus::AssetImportFailed,
                 .BakeStatus =
-                    SelectedMeshTextureBakeStatus::NonOperationalBackend,
+                    PropertyTextureBakeStatus::NonOperationalBackend,
                 .Diagnostic = "Texture-bake runtime module is unavailable.",
             };
         }
@@ -13833,7 +13833,7 @@ namespace Extrinsic::Runtime
             return SandboxEditorTextureBakeCommandResult{
                 .Status = SandboxEditorCommandStatus::InvalidVisualizationProperty,
                 .BakeStatus =
-                    SelectedMeshTextureBakeStatus::NonOperationalBackend,
+                    PropertyTextureBakeStatus::NonOperationalBackend,
                 .Diagnostic =
                     "Texture baking requires an operational GPU runtime module.",
             };
@@ -13845,38 +13845,81 @@ namespace Extrinsic::Runtime
             return SandboxEditorTextureBakeCommandResult{
                 .Status = SandboxEditorCommandStatus::InvalidVisualizationProperty,
                 .BakeStatus = command.PropertyName.empty()
-                    ? SelectedMeshTextureBakeStatus::MissingProperty
-                    : SelectedMeshTextureBakeStatus::InvalidResolution,
+                    ? PropertyTextureBakeStatus::MissingProperty
+                    : PropertyTextureBakeStatus::InvalidResolution,
                 .Diagnostic = "Texture bake command has invalid parameters.",
             };
         }
 
-        SelectedMeshTextureBakeRequest request{};
+        std::vector<TextureBakeConsumerBinding> consumers =
+            command.Consumers;
+        if (consumers.empty() && command.BindGeneratedTexture)
+        {
+            consumers.push_back(TextureBakeConsumerBinding{
+                .PresentationKey = command.PresentationKey,
+                .Semantic = command.TargetSemantic,
+                .Colormap = command.EncodingColormap,
+                .NormalSpace = command.NormalSpace,
+            });
+        }
+        for (TextureBakeConsumerBinding& consumer : consumers)
+        {
+            if (consumer.Semantic ==
+                GeometryPresentationSlotSemantic::Normal)
+            {
+                consumer.NormalSpace = command.NormalSpace;
+            }
+        }
+
+        PropertyTextureBakeStorage storage = command.Storage;
+        PropertyTextureBakeEncoding encoding = command.Encoder;
+        const bool normalConsumer = std::ranges::any_of(
+            consumers,
+            [](const TextureBakeConsumerBinding& consumer)
+            {
+                return consumer.Semantic ==
+                    GeometryPresentationSlotSemantic::Normal;
+            });
+        if (normalConsumer)
+        {
+            if (storage == PropertyTextureBakeStorage::Auto)
+                storage = PropertyTextureBakeStorage::EncodedRgba;
+            if (encoding == PropertyTextureBakeEncoding::Auto)
+                encoding = PropertyTextureBakeEncoding::Normal;
+        }
+        else if (command.ExpectedValueKind.has_value())
+        {
+            const PropertyTextureBakeRepresentation representation =
+                ResolvePropertyTextureBakeRepresentation(
+                    *command.ExpectedValueKind,
+                    storage,
+                    encoding);
+            storage = representation.Storage;
+            encoding = representation.Encoding;
+        }
+
+        PropertyTextureBakeRequest request{};
+        request.World = context.World;
         request.StableEntityId = command.StableEntityId;
-        request.SourceDomain = command.SourceDomain;
-        request.SourcePropertyName = command.PropertyName;
-        request.ExpectedValueKind = command.ExpectedValueKind;
-        request.Encoder = command.Encoder;
+        request.Source = GeometryPropertyRef{
+            .Domain = command.SourceDomain,
+            .Name = command.PropertyName,
+            .ValueKind = command.ExpectedValueKind.value_or(
+                Geometry::PropertyValueKind::Unknown),
+        };
+        request.Encoding = encoding;
         request.RangePolicy = command.RangePolicy;
         request.RangeMin = command.RangeMin;
         request.RangeMax = command.RangeMax;
         request.Width = command.Width;
         request.Height = command.Height;
-        request.TargetPresentationKey = command.PresentationKey;
-        request.TargetSemantic = command.TargetSemantic;
-        request.GeneratedKey = command.GeneratedKey.empty()
-            ? command.PropertyName
-            : command.GeneratedKey;
         request.OutputName = command.OutputName.empty()
             ? command.PropertyName
             : command.OutputName;
-        request.Storage = command.Storage;
+        request.Storage = storage;
         request.EncodingColormap = command.EncodingColormap;
-        request.NormalSpace = command.NormalSpace;
-        request.Consumers = command.Consumers;
-        request.BindGeneratedTexture = command.BindGeneratedTexture;
 
-        const SelectedMeshTextureBakeResult bake =
+        const PropertyTextureBakeResult bake =
             context.TextureBake->Bake(request);
 
         SandboxEditorCommandStatus status =
@@ -13885,47 +13928,68 @@ namespace Extrinsic::Runtime
         {
             switch (bake.Status)
             {
-            case SelectedMeshTextureBakeStatus::MissingScene:
+            case PropertyTextureBakeStatus::MissingScene:
                 status = SandboxEditorCommandStatus::MissingScene;
                 break;
-            case SelectedMeshTextureBakeStatus::MissingAssetService:
-            case SelectedMeshTextureBakeStatus::AssetLoadFailed:
+            case PropertyTextureBakeStatus::MissingAssetService:
+            case PropertyTextureBakeStatus::AssetLoadFailed:
                 status = SandboxEditorCommandStatus::AssetImportFailed;
                 break;
-            case SelectedMeshTextureBakeStatus::StaleEntity:
+            case PropertyTextureBakeStatus::StaleEntity:
                 status = SandboxEditorCommandStatus::StaleEntity;
                 break;
-            case SelectedMeshTextureBakeStatus::NonMeshSelection:
-            case SelectedMeshTextureBakeStatus::UnsupportedSourceDomain:
+            case PropertyTextureBakeStatus::NonMeshSource:
+            case PropertyTextureBakeStatus::UnsupportedSourceDomain:
                 status = SandboxEditorCommandStatus::UnsupportedGeometryDomain;
                 break;
-            case SelectedMeshTextureBakeStatus::CommandFailed:
+            case PropertyTextureBakeStatus::CommandFailed:
                 status = SandboxEditorCommandStatus::GeometryProcessingFailed;
                 break;
-            case SelectedMeshTextureBakeStatus::Success:
-            case SelectedMeshTextureBakeStatus::Scheduled:
-            case SelectedMeshTextureBakeStatus::NonOperationalBackend:
-            case SelectedMeshTextureBakeStatus::MissingGeometryPresentationRecipe:
-            case SelectedMeshTextureBakeStatus::MissingPresentation:
-            case SelectedMeshTextureBakeStatus::MissingSlot:
-            case SelectedMeshTextureBakeStatus::UnsupportedTargetSemantic:
-            case SelectedMeshTextureBakeStatus::IncompatibleTargetSlot:
-            case SelectedMeshTextureBakeStatus::InvalidResolution:
-            case SelectedMeshTextureBakeStatus::InvalidRange:
-            case SelectedMeshTextureBakeStatus::MissingProperty:
-            case SelectedMeshTextureBakeStatus::UnsupportedPropertyType:
-            case SelectedMeshTextureBakeStatus::MismatchedPropertyCount:
-            case SelectedMeshTextureBakeStatus::MissingTexcoords:
-            case SelectedMeshTextureBakeStatus::NonFiniteTexcoord:
-            case SelectedMeshTextureBakeStatus::NonFinitePropertyValue:
-            case SelectedMeshTextureBakeStatus::DegenerateAllTriangles:
-            case SelectedMeshTextureBakeStatus::DegenerateUvTriangles:
-            case SelectedMeshTextureBakeStatus::ZeroCoverageBake:
-            case SelectedMeshTextureBakeStatus::BakeFailed:
-            case SelectedMeshTextureBakeStatus::JobSubmitFailed:
-            case SelectedMeshTextureBakeStatus::StaleCompletion:
+            case PropertyTextureBakeStatus::Success:
+            case PropertyTextureBakeStatus::Scheduled:
+            case PropertyTextureBakeStatus::NonOperationalBackend:
+            case PropertyTextureBakeStatus::InvalidResolution:
+            case PropertyTextureBakeStatus::InvalidPadding:
+            case PropertyTextureBakeStatus::InvalidRange:
+            case PropertyTextureBakeStatus::MissingProperty:
+            case PropertyTextureBakeStatus::UnsupportedPropertyType:
+            case PropertyTextureBakeStatus::MismatchedPropertyCount:
+            case PropertyTextureBakeStatus::MissingTexcoords:
+            case PropertyTextureBakeStatus::NonFiniteTexcoord:
+            case PropertyTextureBakeStatus::NonFinitePropertyValue:
+            case PropertyTextureBakeStatus::DegenerateAllTriangles:
+            case PropertyTextureBakeStatus::DegenerateUvTriangles:
+            case PropertyTextureBakeStatus::ZeroCoverageBake:
+            case PropertyTextureBakeStatus::BakeFailed:
+            case PropertyTextureBakeStatus::JobSubmitFailed:
+            case PropertyTextureBakeStatus::StaleCompletion:
                 status = SandboxEditorCommandStatus::InvalidVisualizationProperty;
                 break;
+            }
+        }
+        if (status == SandboxEditorCommandStatus::Applied &&
+            !consumers.empty())
+        {
+            const TextureBakeMutationResult bound =
+                context.TextureBake->SetConsumers(
+                    TextureBakeConsumerUpdateRequest{
+                        .StableEntityId = command.StableEntityId,
+                        .OutputName = bake.OutputName,
+                        .Consumers = std::move(consumers),
+                    });
+            if (!bound.Succeeded())
+            {
+                (void)context.TextureBake->Remove(
+                    command.StableEntityId,
+                    bake.OutputName);
+                return SandboxEditorTextureBakeCommandResult{
+                    .Status = SandboxEditorCommandStatus::
+                        InvalidVisualizationProperty,
+                    .BakeStatus =
+                        PropertyTextureBakeStatus::CommandFailed,
+                    .OutputName = bake.OutputName,
+                    .Diagnostic = bound.Diagnostic,
+                };
             }
         }
 
@@ -13934,8 +13998,8 @@ namespace Extrinsic::Runtime
             .BakeStatus = bake.Status,
             .GeneratedTexture = bake.GeneratedTexture,
             .Job = bake.Job,
-            .Scheduled = bake.Status == SelectedMeshTextureBakeStatus::Scheduled,
-            .BoundGeneratedTexture = bake.BoundGeneratedTexture,
+            .Scheduled = bake.Status == PropertyTextureBakeStatus::Scheduled,
+            .BoundGeneratedTexture = false,
             .GeneratedAssetPath = bake.GeneratedAssetPath,
             .OutputName = bake.OutputName,
             .Diagnostic = bake.Diagnostic,

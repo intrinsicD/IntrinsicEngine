@@ -44,7 +44,6 @@ import Extrinsic.RHI.PipelineManager;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.ObjectSpaceNormalBakeService;
@@ -83,10 +82,10 @@ namespace Extrinsic::Runtime
             return fingerprint == 0u ? 1u : fingerprint;
         }
 
-        [[nodiscard]] SelectedMeshTextureBakeResult UnavailableBakeResult()
+        [[nodiscard]] PropertyTextureBakeResult UnavailableBakeResult()
         {
-            return SelectedMeshTextureBakeResult{
-                .Status = SelectedMeshTextureBakeStatus::NonOperationalBackend,
+            return PropertyTextureBakeResult{
+                .Status = PropertyTextureBakeStatus::NonOperationalBackend,
                 .Diagnostic = "texture-bake module is unavailable",
             };
         }
@@ -142,7 +141,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] GeometryPresentationBindingRecipe* FindPresentation(
             GeometryPresentationRecipe& bindings,
-            const BakedPropertyTextureConsumer& consumer) noexcept
+            const TextureBakeConsumerBinding& consumer) noexcept
         {
             if (!consumer.PresentationKey.empty())
                 return FindGeometryPresentationBinding(
@@ -159,7 +158,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] const GeometryPresentationBindingRecipe* FindPresentation(
             const GeometryPresentationRecipe& bindings,
-            const BakedPropertyTextureConsumer& consumer) noexcept
+            const TextureBakeConsumerBinding& consumer) noexcept
         {
             if (!consumer.PresentationKey.empty())
                 return FindGeometryPresentationBinding(
@@ -174,21 +173,6 @@ namespace Extrinsic::Runtime
             return nullptr;
         }
 
-        [[nodiscard]] std::vector<BakedPropertyTextureConsumer>
-        ConsumersForRequest(const SelectedMeshTextureBakeRequest& request)
-        {
-            if (!request.Consumers.empty())
-                return request.Consumers;
-            if (!request.BindGeneratedTexture)
-                return {};
-            return {
-                BakedPropertyTextureConsumer{
-                    .PresentationKey = request.TargetPresentationKey,
-                    .Semantic = request.TargetSemantic,
-                },
-            };
-        }
-
         [[nodiscard]] bool IsScalar(
             const Geometry::PropertyValueKind kind) noexcept
         {
@@ -196,35 +180,35 @@ namespace Extrinsic::Runtime
                    kind == Geometry::PropertyValueKind::Double;
         }
 
-        [[nodiscard]] SelectedMeshTextureBakeStatus StatusForResolution(
+        [[nodiscard]] PropertyTextureBakeStatus StatusForResolution(
             const GeometryPropertyResolutionStatus status) noexcept
         {
             switch (status)
             {
             case GeometryPropertyResolutionStatus::Resolved:
-                return SelectedMeshTextureBakeStatus::Success;
+                return PropertyTextureBakeStatus::Success;
             case GeometryPropertyResolutionStatus::MissingName:
             case GeometryPropertyResolutionStatus::MissingProperty:
-                return SelectedMeshTextureBakeStatus::MissingProperty;
+                return PropertyTextureBakeStatus::MissingProperty;
             case GeometryPropertyResolutionStatus::ValueKindMismatch:
-                return SelectedMeshTextureBakeStatus::UnsupportedPropertyType;
+                return PropertyTextureBakeStatus::UnsupportedPropertyType;
             case GeometryPropertyResolutionStatus::ElementCountMismatch:
-                return SelectedMeshTextureBakeStatus::MismatchedPropertyCount;
+                return PropertyTextureBakeStatus::MismatchedPropertyCount;
             case GeometryPropertyResolutionStatus::UnsupportedDomain:
-                return SelectedMeshTextureBakeStatus::UnsupportedSourceDomain;
+                return PropertyTextureBakeStatus::UnsupportedSourceDomain;
             case GeometryPropertyResolutionStatus::NonFiniteValues:
-                return SelectedMeshTextureBakeStatus::NonFinitePropertyValue;
+                return PropertyTextureBakeStatus::NonFinitePropertyValue;
             }
-            return SelectedMeshTextureBakeStatus::UnsupportedPropertyType;
+            return PropertyTextureBakeStatus::UnsupportedPropertyType;
         }
 
         [[nodiscard]] bool ConsumerCompatible(
-            const BakedPropertyTextureConsumer& consumer,
+            const TextureBakeConsumerBinding& consumer,
             const Geometry::PropertyValueKind valueKind,
-            const SelectedMeshTextureBakeStorage storage,
-            const MeshAttributeTextureBakeEncoder encoder) noexcept
+            const PropertyTextureBakeStorage storage,
+            const PropertyTextureBakeEncoding encoder) noexcept
         {
-            return IsBakedPropertyTextureConsumerCompatible(
+            return IsPropertyTextureBakeConsumerCompatible(
                 consumer,
                 valueKind,
                 storage,
@@ -242,14 +226,12 @@ namespace Extrinsic::Runtime
             std::string TexcoordPropertyName{};
             Geometry::PropertyValueKind ValueKind{
                 Geometry::PropertyValueKind::Unknown};
-            SelectedMeshTextureBakeStorage Storage{
-                SelectedMeshTextureBakeStorage::Auto};
-            MeshAttributeTextureBakeEncoder Encoder{
-                MeshAttributeTextureBakeEncoder::Auto};
+            PropertyTextureBakeStorage Storage{
+                PropertyTextureBakeStorage::Auto};
+            PropertyTextureBakeEncoding Encoder{
+                PropertyTextureBakeEncoding::Auto};
             Graphics::Colormap::Type EncodingColormap{
                 Graphics::Colormap::Type::Viridis};
-            BakedPropertyNormalSpace NormalSpace{
-                BakedPropertyNormalSpace::Object};
             float RangeMin{0.0f};
             float RangeMax{1.0f};
             std::uint32_t Width{0u};
@@ -260,18 +242,16 @@ namespace Extrinsic::Runtime
 
         struct PreparedPropertyBake
         {
-            SelectedMeshTextureBakeStatus Status{
-                SelectedMeshTextureBakeStatus::Success};
+            PropertyTextureBakeStatus Status{
+                PropertyTextureBakeStatus::Success};
             Geometry::PropertyValueKind ValueKind{
                 Geometry::PropertyValueKind::Unknown};
-            SelectedMeshTextureBakeStorage Storage{
-                SelectedMeshTextureBakeStorage::RawFloat};
-            MeshAttributeTextureBakeEncoder Encoder{
-                MeshAttributeTextureBakeEncoder::Auto};
+            PropertyTextureBakeStorage Storage{
+                PropertyTextureBakeStorage::RawFloat};
+            PropertyTextureBakeEncoding Encoder{
+                PropertyTextureBakeEncoding::Auto};
             Graphics::Colormap::Type EncodingColormap{
                 Graphics::Colormap::Type::Viridis};
-            BakedPropertyNormalSpace NormalSpace{
-                BakedPropertyNormalSpace::Object};
             Graphics::PropertyTextureBakeDomain Domain{
                 Graphics::PropertyTextureBakeDomain::Vertex};
             Graphics::PropertyTextureBakeValueKind GpuValueKind{
@@ -283,7 +263,6 @@ namespace Extrinsic::Runtime
             std::vector<glm::vec4> Values{};
             std::vector<std::uint32_t> SurfaceIndices{};
             std::uint64_t SurfaceIndexFingerprint{0u};
-            std::vector<BakedPropertyTextureConsumer> Consumers{};
             std::size_t ExpectedElementCount{0u};
             std::uint64_t SourceGeneration{0u};
             float RangeMin{0.0f};
@@ -293,12 +272,23 @@ namespace Extrinsic::Runtime
 
             [[nodiscard]] bool Succeeded() const noexcept
             {
-                return Status == SelectedMeshTextureBakeStatus::Success;
+                return Status == PropertyTextureBakeStatus::Success;
             }
         };
 
+        struct PropertyTextureConsumerRecord
+        {
+            std::string OutputName{};
+            std::vector<TextureBakeConsumerBinding> Consumers{};
+        };
+
+        struct PropertyTextureConsumerBindings
+        {
+            std::vector<PropertyTextureConsumerRecord> Records{};
+        };
+
         [[nodiscard]] PreparedPropertyBake PrepareFailure(
-            const SelectedMeshTextureBakeStatus status,
+            const PropertyTextureBakeStatus status,
             std::string diagnostic)
         {
             return PreparedPropertyBake{
@@ -395,8 +385,327 @@ namespace Extrinsic::Runtime
         }
     }
 
+    PropertyTextureBakeRepresentation ResolvePropertyTextureBakeRepresentation(
+        const Geometry::PropertyValueKind valueKind,
+        const PropertyTextureBakeStorage requestedStorage,
+        const PropertyTextureBakeEncoding requestedEncoding) noexcept
+    {
+        PropertyTextureBakeRepresentation representation{
+            .Storage = requestedStorage,
+            .Encoding = requestedEncoding,
+        };
+        if (representation.Storage == PropertyTextureBakeStorage::Auto)
+        {
+            representation.Storage =
+                valueKind == Geometry::PropertyValueKind::UInt32
+                ? PropertyTextureBakeStorage::EncodedRgba
+                : PropertyTextureBakeStorage::RawFloat;
+        }
+        if (representation.Encoding != PropertyTextureBakeEncoding::Auto)
+            return representation;
+
+        switch (valueKind)
+        {
+        case Geometry::PropertyValueKind::Float:
+        case Geometry::PropertyValueKind::Double:
+            representation.Encoding =
+                PropertyTextureBakeEncoding::LinearScalar;
+            break;
+        case Geometry::PropertyValueKind::UInt32:
+            representation.Encoding =
+                PropertyTextureBakeEncoding::LabelPalette;
+            break;
+        case Geometry::PropertyValueKind::Vec2:
+            representation.Encoding =
+                PropertyTextureBakeEncoding::Vector2;
+            break;
+        case Geometry::PropertyValueKind::Vec3:
+            representation.Encoding =
+                PropertyTextureBakeEncoding::Vector3;
+            break;
+        case Geometry::PropertyValueKind::Vec4:
+            representation.Encoding =
+                PropertyTextureBakeEncoding::RgbaColor;
+            break;
+        case Geometry::PropertyValueKind::Unknown:
+        case Geometry::PropertyValueKind::Bool:
+        case Geometry::PropertyValueKind::Int32:
+        case Geometry::PropertyValueKind::UInt64:
+            break;
+        }
+        return representation;
+    }
+
+    bool IsPropertyTextureBakeRepresentationCompatible(
+        const Geometry::PropertyValueKind valueKind,
+        const PropertyTextureBakeStorage storage,
+        const PropertyTextureBakeEncoding encoding) noexcept
+    {
+        if (storage == PropertyTextureBakeStorage::Auto ||
+            encoding == PropertyTextureBakeEncoding::Auto)
+        {
+            return false;
+        }
+
+        if (storage == PropertyTextureBakeStorage::RawFloat)
+        {
+            switch (valueKind)
+            {
+            case Geometry::PropertyValueKind::Float:
+            case Geometry::PropertyValueKind::Double:
+                return encoding ==
+                    PropertyTextureBakeEncoding::LinearScalar;
+            case Geometry::PropertyValueKind::Vec2:
+                return encoding == PropertyTextureBakeEncoding::Vector2;
+            case Geometry::PropertyValueKind::Vec3:
+                return encoding == PropertyTextureBakeEncoding::Vector3;
+            case Geometry::PropertyValueKind::Vec4:
+                return encoding == PropertyTextureBakeEncoding::RgbaColor;
+            case Geometry::PropertyValueKind::UInt32:
+            case Geometry::PropertyValueKind::Unknown:
+            case Geometry::PropertyValueKind::Bool:
+            case Geometry::PropertyValueKind::Int32:
+            case Geometry::PropertyValueKind::UInt64:
+                return false;
+            }
+        }
+
+        if (storage != PropertyTextureBakeStorage::EncodedRgba)
+            return false;
+        switch (valueKind)
+        {
+        case Geometry::PropertyValueKind::Float:
+        case Geometry::PropertyValueKind::Double:
+            return encoding ==
+                       PropertyTextureBakeEncoding::LinearScalar ||
+                   encoding ==
+                       PropertyTextureBakeEncoding::ScalarColormap;
+        case Geometry::PropertyValueKind::UInt32:
+            return encoding ==
+                PropertyTextureBakeEncoding::LabelPalette;
+        case Geometry::PropertyValueKind::Vec2:
+            return encoding == PropertyTextureBakeEncoding::Vector2 ||
+                   encoding == PropertyTextureBakeEncoding::RgbaColor;
+        case Geometry::PropertyValueKind::Vec3:
+            return encoding == PropertyTextureBakeEncoding::Vector3 ||
+                   encoding == PropertyTextureBakeEncoding::RgbaColor ||
+                   encoding == PropertyTextureBakeEncoding::Normal;
+        case Geometry::PropertyValueKind::Vec4:
+            return encoding == PropertyTextureBakeEncoding::RgbaColor;
+        case Geometry::PropertyValueKind::Unknown:
+        case Geometry::PropertyValueKind::Bool:
+        case Geometry::PropertyValueKind::Int32:
+        case Geometry::PropertyValueKind::UInt64:
+            return false;
+        }
+        return false;
+    }
+
+    PropertyTextureBakeRepresentation ResolvePropertyTextureBakeRepresentation(
+        const Geometry::PropertyValueKind valueKind,
+        const PropertyTextureBakeStorage requestedStorage,
+        const PropertyTextureBakeEncoding requestedEncoding,
+        const std::span<const TextureBakeConsumerBinding> consumers) noexcept
+    {
+        PropertyTextureBakeStorage storage = requestedStorage;
+        PropertyTextureBakeEncoding encoding = requestedEncoding;
+        const bool hasNormalConsumer = std::ranges::any_of(
+            consumers,
+            [](const TextureBakeConsumerBinding& consumer)
+            {
+                return consumer.Semantic ==
+                    GeometryPresentationSlotSemantic::Normal;
+            });
+        const bool hasLinearPbrConsumer = std::ranges::any_of(
+            consumers,
+            [](const TextureBakeConsumerBinding& consumer)
+            {
+                return consumer.Semantic ==
+                           GeometryPresentationSlotSemantic::Roughness ||
+                       consumer.Semantic ==
+                           GeometryPresentationSlotSemantic::Metallic;
+            });
+
+        if (storage == PropertyTextureBakeStorage::Auto)
+        {
+            storage = hasNormalConsumer ||
+                              valueKind ==
+                                  Geometry::PropertyValueKind::UInt32
+                ? PropertyTextureBakeStorage::EncodedRgba
+                : PropertyTextureBakeStorage::RawFloat;
+        }
+        if (encoding == PropertyTextureBakeEncoding::Auto)
+        {
+            if (hasNormalConsumer)
+            {
+                encoding = PropertyTextureBakeEncoding::Normal;
+            }
+            else if (hasLinearPbrConsumer &&
+                     IsScalar(valueKind))
+            {
+                encoding =
+                    PropertyTextureBakeEncoding::LinearScalar;
+            }
+        }
+        return ResolvePropertyTextureBakeRepresentation(
+            valueKind,
+            storage,
+            encoding);
+    }
+
+    bool IsPropertyTextureBakeConsumerCompatible(
+        const TextureBakeConsumerBinding& consumer,
+        const Geometry::PropertyValueKind valueKind,
+        const PropertyTextureBakeStorage storage,
+        const PropertyTextureBakeEncoding encoding) noexcept
+    {
+        if (!IsPropertyTextureBakeRepresentationCompatible(
+                valueKind,
+                storage,
+                encoding))
+        {
+            return false;
+        }
+        const bool raw = storage == PropertyTextureBakeStorage::RawFloat;
+        const bool scalar = IsScalar(valueKind);
+        switch (consumer.Semantic)
+        {
+        case GeometryPresentationSlotSemantic::Normal:
+            return valueKind == Geometry::PropertyValueKind::Vec3 &&
+                   storage == PropertyTextureBakeStorage::EncodedRgba &&
+                   encoding == PropertyTextureBakeEncoding::Normal;
+        case GeometryPresentationSlotSemantic::Roughness:
+        case GeometryPresentationSlotSemantic::Metallic:
+            return scalar &&
+                   (raw ||
+                    encoding ==
+                        PropertyTextureBakeEncoding::LinearScalar);
+        case GeometryPresentationSlotSemantic::ScalarField:
+            return (scalar &&
+                    (raw ||
+                     encoding ==
+                         PropertyTextureBakeEncoding::LinearScalar ||
+                     encoding ==
+                         PropertyTextureBakeEncoding::ScalarColormap)) ||
+                   (valueKind == Geometry::PropertyValueKind::UInt32 &&
+                    !raw &&
+                    encoding ==
+                        PropertyTextureBakeEncoding::LabelPalette);
+        case GeometryPresentationSlotSemantic::Albedo:
+            if (scalar)
+            {
+                return raw ||
+                       encoding ==
+                           PropertyTextureBakeEncoding::LinearScalar ||
+                       encoding ==
+                           PropertyTextureBakeEncoding::ScalarColormap;
+            }
+            if (valueKind == Geometry::PropertyValueKind::UInt32)
+            {
+                return !raw &&
+                       encoding ==
+                           PropertyTextureBakeEncoding::LabelPalette;
+            }
+            if (valueKind == Geometry::PropertyValueKind::Vec2)
+            {
+                return raw ||
+                       encoding == PropertyTextureBakeEncoding::Vector2 ||
+                       encoding == PropertyTextureBakeEncoding::RgbaColor;
+            }
+            if (valueKind == Geometry::PropertyValueKind::Vec3)
+            {
+                return raw ||
+                       encoding == PropertyTextureBakeEncoding::Vector3 ||
+                       encoding == PropertyTextureBakeEncoding::RgbaColor ||
+                       encoding == PropertyTextureBakeEncoding::Normal;
+            }
+            return valueKind == Geometry::PropertyValueKind::Vec4 &&
+                   (raw ||
+                    encoding == PropertyTextureBakeEncoding::RgbaColor);
+        case GeometryPresentationSlotSemantic::Displacement:
+        case GeometryPresentationSlotSemantic::PointColor:
+        case GeometryPresentationSlotSemantic::PointScalarField:
+        case GeometryPresentationSlotSemantic::PointSize:
+        case GeometryPresentationSlotSemantic::PointNormalOrientation:
+        case GeometryPresentationSlotSemantic::LineColor:
+        case GeometryPresentationSlotSemantic::LineScalarField:
+        case GeometryPresentationSlotSemantic::LineWidth:
+            return false;
+        }
+        return false;
+    }
+
+    const char* DebugNameForPropertyTextureBakeStatus(
+        const PropertyTextureBakeStatus status) noexcept
+    {
+        switch (status)
+        {
+        case PropertyTextureBakeStatus::Success:
+            return "PropertyTextureBake.Success";
+        case PropertyTextureBakeStatus::Scheduled:
+            return "PropertyTextureBake.Scheduled";
+        case PropertyTextureBakeStatus::NonOperationalBackend:
+            return "PropertyTextureBake.NonOperationalBackend";
+        case PropertyTextureBakeStatus::MissingScene:
+            return "PropertyTextureBake.MissingScene";
+        case PropertyTextureBakeStatus::MissingAssetService:
+            return "PropertyTextureBake.MissingAssetService";
+        case PropertyTextureBakeStatus::StaleEntity:
+            return "PropertyTextureBake.StaleEntity";
+        case PropertyTextureBakeStatus::NonMeshSource:
+            return "PropertyTextureBake.NonMeshSource";
+        case PropertyTextureBakeStatus::InvalidResolution:
+            return "PropertyTextureBake.InvalidResolution";
+        case PropertyTextureBakeStatus::InvalidPadding:
+            return "PropertyTextureBake.InvalidPadding";
+        case PropertyTextureBakeStatus::InvalidRange:
+            return "PropertyTextureBake.InvalidRange";
+        case PropertyTextureBakeStatus::MissingProperty:
+            return "PropertyTextureBake.MissingProperty";
+        case PropertyTextureBakeStatus::UnsupportedPropertyType:
+            return "PropertyTextureBake.UnsupportedPropertyType";
+        case PropertyTextureBakeStatus::MismatchedPropertyCount:
+            return "PropertyTextureBake.MismatchedPropertyCount";
+        case PropertyTextureBakeStatus::UnsupportedSourceDomain:
+            return "PropertyTextureBake.UnsupportedSourceDomain";
+        case PropertyTextureBakeStatus::MissingTexcoords:
+            return "PropertyTextureBake.MissingTexcoords";
+        case PropertyTextureBakeStatus::NonFiniteTexcoord:
+            return "PropertyTextureBake.NonFiniteTexcoord";
+        case PropertyTextureBakeStatus::NonFinitePropertyValue:
+            return "PropertyTextureBake.NonFinitePropertyValue";
+        case PropertyTextureBakeStatus::DegenerateAllTriangles:
+            return "PropertyTextureBake.DegenerateAllTriangles";
+        case PropertyTextureBakeStatus::DegenerateUvTriangles:
+            return "PropertyTextureBake.DegenerateUvTriangles";
+        case PropertyTextureBakeStatus::ZeroCoverageBake:
+            return "PropertyTextureBake.ZeroCoverageBake";
+        case PropertyTextureBakeStatus::BakeFailed:
+            return "PropertyTextureBake.BakeFailed";
+        case PropertyTextureBakeStatus::AssetLoadFailed:
+            return "PropertyTextureBake.AssetLoadFailed";
+        case PropertyTextureBakeStatus::CommandFailed:
+            return "PropertyTextureBake.CommandFailed";
+        case PropertyTextureBakeStatus::JobSubmitFailed:
+            return "PropertyTextureBake.JobSubmitFailed";
+        case PropertyTextureBakeStatus::StaleCompletion:
+            return "PropertyTextureBake.StaleCompletion";
+        }
+        return "PropertyTextureBake.Unknown";
+    }
+
     struct TextureBakeService::Impl
     {
+        struct BoundContext
+        {
+            ECS::Scene::Registry* Scene{};
+            WorldHandle World{DefaultWorldHandle};
+            std::uint64_t BindingEpoch{0u};
+            Assets::AssetService* AssetService{};
+            EditorCommandHistory* CommandHistory{};
+            JobService* Jobs{};
+        };
+
         enum class WorkPhase : std::uint8_t
         {
             Queued,
@@ -414,7 +723,7 @@ namespace Extrinsic::Runtime
             std::string OutputName{};
             Assets::AssetId Asset{};
             std::uint64_t RecordGeneration{0u};
-            SelectedMeshTextureBakeRequest Request{};
+            PropertyTextureBakeRequest Request{};
             PreparedPropertyBake Prepared{};
             std::uint32_t Width{0u};
             std::uint32_t Height{0u};
@@ -431,7 +740,7 @@ namespace Extrinsic::Runtime
             std::optional<RHI::PipelineManager::PipelineLease> Lease{};
         };
 
-        SelectedMeshTextureBakeContext Context{};
+        BoundContext Context{};
         RuntimeObjectSpaceNormalBakeQueue* LegacyQueue{};
         RHI::IDevice* Device{};
         Graphics::GpuAssetCache* GpuAssets{};
@@ -456,7 +765,7 @@ namespace Extrinsic::Runtime
                    Device->IsOperational();
         }
 
-        [[nodiscard]] BakedPropertyTextureRecord* FindRecord(
+        [[nodiscard]] PropertyTextureBakeRecord* FindRecord(
             ECS::EntityHandle entity,
             const std::string_view outputName) noexcept
         {
@@ -466,23 +775,67 @@ namespace Extrinsic::Runtime
                 return nullptr;
             }
             auto* catalog = Context.Scene->Raw()
-                .try_get<BakedPropertyTextures>(entity);
+                .try_get<PropertyTextureBakeOutputs>(entity);
             if (catalog == nullptr)
                 return nullptr;
             const auto found = std::ranges::find(
                 catalog->Records,
                 outputName,
-                &BakedPropertyTextureRecord::OutputName);
+                &PropertyTextureBakeRecord::OutputName);
             return found != catalog->Records.end()
                 ? &*found
                 : nullptr;
         }
 
-        [[nodiscard]] const BakedPropertyTextureRecord* FindRecord(
+        [[nodiscard]] const PropertyTextureBakeRecord* FindRecord(
             const ECS::EntityHandle entity,
             const std::string_view outputName) const noexcept
         {
             return const_cast<Impl*>(this)->FindRecord(entity, outputName);
+        }
+
+        [[nodiscard]] PropertyTextureConsumerRecord* FindConsumerRecord(
+            const ECS::EntityHandle entity,
+            const std::string_view outputName) noexcept
+        {
+            if (Context.Scene == nullptr ||
+                entity == ECS::InvalidEntityHandle)
+            {
+                return nullptr;
+            }
+            auto* bindings = Context.Scene->Raw()
+                .try_get<PropertyTextureConsumerBindings>(entity);
+            if (bindings == nullptr)
+                return nullptr;
+            const auto found = std::ranges::find(
+                bindings->Records,
+                outputName,
+                &PropertyTextureConsumerRecord::OutputName);
+            return found != bindings->Records.end()
+                ? &*found
+                : nullptr;
+        }
+
+        [[nodiscard]] const PropertyTextureConsumerRecord* FindConsumerRecord(
+            const ECS::EntityHandle entity,
+            const std::string_view outputName) const noexcept
+        {
+            return const_cast<Impl*>(this)->FindConsumerRecord(
+                entity,
+                outputName);
+        }
+
+        [[nodiscard]] std::span<const TextureBakeConsumerBinding>
+        ConsumersFor(
+            const ECS::EntityHandle entity,
+            const std::string_view outputName) const noexcept
+        {
+            const PropertyTextureConsumerRecord* record =
+                FindConsumerRecord(entity, outputName);
+            return record != nullptr
+                ? std::span<const TextureBakeConsumerBinding>{
+                      record->Consumers}
+                : std::span<const TextureBakeConsumerBinding>{};
         }
 
         [[nodiscard]] bool AssetOwnedByAnotherRecord(
@@ -493,10 +846,10 @@ namespace Extrinsic::Runtime
             if (!asset.IsValid() || Context.Scene == nullptr)
                 return false;
 
-            auto view = Context.Scene->Raw().view<BakedPropertyTextures>();
+            auto view = Context.Scene->Raw().view<PropertyTextureBakeOutputs>();
             for (auto&& [owner, catalog] : view.each())
             {
-                for (const BakedPropertyTextureRecord& record :
+                for (const PropertyTextureBakeRecord& record :
                      catalog.Records)
                 {
                     if (owner == entity && record.OutputName == outputName)
@@ -553,40 +906,64 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] PreparedPropertyBake Prepare(
-            const SelectedMeshTextureBakeRequest& request) const
+            const PropertyTextureBakeRequest& request) const
         {
             if (Context.Scene == nullptr)
             {
                 return PrepareFailure(
-                    SelectedMeshTextureBakeStatus::MissingScene,
+                    PropertyTextureBakeStatus::MissingScene,
                     "texture bake has no active scene");
+            }
+            if (!request.World.IsValid() ||
+                request.World != Context.World)
+            {
+                return PrepareFailure(
+                    PropertyTextureBakeStatus::MissingScene,
+                    "texture bake request does not target the active world");
             }
 
             if (request.Width == 0u || request.Height == 0u ||
                 request.Width > 8192u || request.Height > 8192u)
             {
                 return PrepareFailure(
-                    SelectedMeshTextureBakeStatus::InvalidResolution,
+                    PropertyTextureBakeStatus::InvalidResolution,
                     "texture bake extent must be within [1, 8192]");
             }
-            if (request.SourcePropertyName.empty())
+            if (request.PaddingTexels > 32u)
             {
                 return PrepareFailure(
-                    SelectedMeshTextureBakeStatus::MissingProperty,
+                    PropertyTextureBakeStatus::InvalidPadding,
+                    "texture bake padding must be within [0, 32]");
+            }
+            if (request.PaddingTexels != 0u)
+            {
+                return PrepareFailure(
+                    PropertyTextureBakeStatus::InvalidPadding,
+                    "texture bake padding requires the unified dilation producer from RUNTIME-191 Slice B");
+            }
+            if (!request.Source.HasName())
+            {
+                return PrepareFailure(
+                    PropertyTextureBakeStatus::MissingProperty,
                     "texture bake source property name must not be empty");
+            }
+            if (request.Texcoords.Domain !=
+                    GeometryElementDomain::MeshVertex ||
+                !request.Texcoords.HasName() ||
+                (request.Texcoords.ValueKind !=
+                     Geometry::PropertyValueKind::Unknown &&
+                 request.Texcoords.ValueKind !=
+                     Geometry::PropertyValueKind::Vec2))
+            {
+                return PrepareFailure(
+                    PropertyTextureBakeStatus::MissingTexcoords,
+                    "texture bake texcoords must reference a mesh-vertex vec2 property");
             }
             if (request.EncodingColormap >= Graphics::Colormap::Type::Count)
             {
                 return PrepareFailure(
-                    SelectedMeshTextureBakeStatus::CommandFailed,
+                    PropertyTextureBakeStatus::CommandFailed,
                     "texture bake colormap is invalid");
-            }
-            if (request.NormalSpace != BakedPropertyNormalSpace::Object &&
-                request.NormalSpace != BakedPropertyNormalSpace::World)
-            {
-                return PrepareFailure(
-                    SelectedMeshTextureBakeStatus::CommandFailed,
-                    "texture bake normal space is invalid");
             }
 
             const ECS::EntityHandle entity = ResolveEntity(
@@ -595,7 +972,7 @@ namespace Extrinsic::Runtime
             if (entity == ECS::InvalidEntityHandle)
             {
                 return PrepareFailure(
-                    SelectedMeshTextureBakeStatus::StaleEntity,
+                    PropertyTextureBakeStatus::StaleEntity,
                     "texture bake entity is stale");
             }
 
@@ -608,20 +985,20 @@ namespace Extrinsic::Runtime
                 view.FaceSource == nullptr)
             {
                 return PrepareFailure(
-                    SelectedMeshTextureBakeStatus::NonMeshSelection,
+                    PropertyTextureBakeStatus::NonMeshSource,
                     "texture bake requires complete mesh topology");
             }
 
             const Geometry::ConstPropertySet vertexProperties{
                 view.VertexSource->Properties};
             const auto texcoords = vertexProperties.Get<glm::vec2>(
-                request.TexcoordPropertyName);
+                request.Texcoords.Name);
             if (!texcoords.IsValid() ||
                 texcoords.Vector().size() !=
                     view.VertexSource->Properties.Size())
             {
                 return PrepareFailure(
-                    SelectedMeshTextureBakeStatus::MissingTexcoords,
+                    PropertyTextureBakeStatus::MissingTexcoords,
                     "texture bake requires one vec2 atlas coordinate per vertex");
             }
             for (const glm::vec2 uv : texcoords.Vector())
@@ -629,7 +1006,7 @@ namespace Extrinsic::Runtime
                 if (!Finite(uv))
                 {
                     return PrepareFailure(
-                        SelectedMeshTextureBakeStatus::NonFiniteTexcoord,
+                        PropertyTextureBakeStatus::NonFiniteTexcoord,
                         "texture bake atlas coordinates must be finite");
                 }
                 if (uv.x < -kAtlasEpsilon || uv.y < -kAtlasEpsilon ||
@@ -637,41 +1014,36 @@ namespace Extrinsic::Runtime
                     uv.y > 1.0f + kAtlasEpsilon)
                 {
                     return PrepareFailure(
-                        SelectedMeshTextureBakeStatus::MissingTexcoords,
+                        PropertyTextureBakeStatus::MissingTexcoords,
                         "texture bake coordinates are not a normalized atlas");
                 }
             }
 
             PreparedPropertyBake prepared{};
             prepared.OutputName = request.OutputName.empty()
-                ? request.SourcePropertyName
+                ? request.Source.Name
                 : request.OutputName;
             if (prepared.OutputName.empty())
             {
                 return PrepareFailure(
-                    SelectedMeshTextureBakeStatus::CommandFailed,
+                    PropertyTextureBakeStatus::CommandFailed,
                     "texture bake output name must not be empty");
             }
-            prepared.Consumers = ConsumersForRequest(request);
             prepared.Texcoords = texcoords.Vector();
-            prepared.SourceGeneration = request.SourceGeneration;
+            prepared.SourceGeneration =
+                request.ExpectedSourceGeneration;
 
             const GeometryEntityAvailability availability =
                 BuildGeometryAvailability(view);
             prepared.ExpectedElementCount = ResolveGeometryElementCount(
-                availability, request.SourceDomain);
+                availability, request.Source.Domain);
             const GeometryPropertyResolution resolution =
                 ResolveGeometryProperty(
                     availability,
-                    GeometryPropertyRef{
-                        .Domain = request.SourceDomain,
-                        .Name = request.SourcePropertyName,
-                        .ValueKind = request.ExpectedValueKind.value_or(
-                            Geometry::PropertyValueKind::Unknown),
-                    },
+                    request.Source,
                     prepared.ExpectedElementCount,
                     true,
-                    request.SourceGeneration);
+                    request.ExpectedSourceGeneration);
             if (!resolution.Resolved())
             {
                 return PrepareFailure(
@@ -679,25 +1051,33 @@ namespace Extrinsic::Runtime
                     std::string{ToString(resolution.Status)});
             }
             prepared.ValueKind = resolution.ResolvedValueKind;
+            if (request.ExpectedPropertyGeneration != 0u &&
+                request.ExpectedPropertyGeneration !=
+                    resolution.ObservedSourceGeneration)
+            {
+                return PrepareFailure(
+                    PropertyTextureBakeStatus::StaleCompletion,
+                    "texture bake property generation is stale");
+            }
 
             const Geometry::PropertySet* propertySet =
                 ResolveGeometryPropertySet(
-                    availability, request.SourceDomain);
+                    availability, request.Source.Domain);
             if (propertySet == nullptr ||
                 !CopyPropertyValues(
                     Geometry::ConstPropertySet{*propertySet},
-                    request.SourcePropertyName,
+                    request.Source.Name,
                     prepared.ValueKind,
                     prepared.Values))
             {
                 return PrepareFailure(
-                    SelectedMeshTextureBakeStatus::MissingProperty,
+                    PropertyTextureBakeStatus::MissingProperty,
                     "texture bake source property is missing or has changed type");
             }
             if (prepared.Values.size() != prepared.ExpectedElementCount)
             {
                 return PrepareFailure(
-                    SelectedMeshTextureBakeStatus::MismatchedPropertyCount,
+                    PropertyTextureBakeStatus::MismatchedPropertyCount,
                     "texture bake source property count changed during preparation");
             }
             if (prepared.ValueKind != Geometry::PropertyValueKind::UInt32 &&
@@ -709,7 +1089,7 @@ namespace Extrinsic::Runtime
                     }))
             {
                 return PrepareFailure(
-                    SelectedMeshTextureBakeStatus::NonFinitePropertyValue,
+                    PropertyTextureBakeStatus::NonFinitePropertyValue,
                     "texture bake source property contains a non-finite value");
             }
 
@@ -723,7 +1103,7 @@ namespace Extrinsic::Runtime
                 (prepared.SurfaceIndices.size() % 3u) != 0u)
             {
                 return PrepareFailure(
-                    SelectedMeshTextureBakeStatus::BakeFailed,
+                    PropertyTextureBakeStatus::BakeFailed,
                     DebugNameForMeshSurfaceTopologyStatus(topology));
             }
             prepared.SurfaceIndexFingerprint =
@@ -741,7 +1121,7 @@ namespace Extrinsic::Runtime
                     c >= texcoords.Vector().size())
                 {
                     return PrepareFailure(
-                        SelectedMeshTextureBakeStatus::BakeFailed,
+                        PropertyTextureBakeStatus::BakeFailed,
                         "texture bake topology references an invalid vertex");
                 }
                 const float area = std::abs(Cross2(
@@ -750,12 +1130,12 @@ namespace Extrinsic::Runtime
                 if (area <= kUvAreaEpsilon)
                 {
                     return PrepareFailure(
-                        SelectedMeshTextureBakeStatus::DegenerateUvTriangles,
+                        PropertyTextureBakeStatus::DegenerateUvTriangles,
                         "texture bake atlas contains a degenerate UV triangle");
                 }
             }
 
-            switch (request.SourceDomain)
+            switch (request.Source.Domain)
             {
             case GeometryElementDomain::MeshVertex:
                 prepared.Domain = Graphics::PropertyTextureBakeDomain::Vertex;
@@ -770,7 +1150,7 @@ namespace Extrinsic::Runtime
                     if (face >= prepared.Values.size())
                     {
                         return PrepareFailure(
-                            SelectedMeshTextureBakeStatus::MismatchedPropertyCount,
+                            PropertyTextureBakeStatus::MismatchedPropertyCount,
                             "texture bake face map exceeds the property buffer");
                     }
                     expanded.push_back(prepared.Values[face]);
@@ -793,7 +1173,7 @@ namespace Extrinsic::Runtime
                     edgeV1.Vector().size() != prepared.Values.size())
                 {
                     return PrepareFailure(
-                        SelectedMeshTextureBakeStatus::BakeFailed,
+                        PropertyTextureBakeStatus::BakeFailed,
                         "nearest-edge bake requires canonical edge endpoints");
                 }
                 std::unordered_map<std::uint64_t, std::uint32_t> edgeRows{};
@@ -831,7 +1211,7 @@ namespace Extrinsic::Runtime
                         if (found == edgeRows.end())
                         {
                             return PrepareFailure(
-                                SelectedMeshTextureBakeStatus::BakeFailed,
+                                PropertyTextureBakeStatus::BakeFailed,
                                 "nearest-edge bake could not resolve a triangle edge");
                         }
                         expanded.push_back(prepared.Values[found->second]);
@@ -846,7 +1226,7 @@ namespace Extrinsic::Runtime
             case GeometryElementDomain::GraphEdge:
             case GeometryElementDomain::PointCloudPoint:
                 return PrepareFailure(
-                    SelectedMeshTextureBakeStatus::UnsupportedSourceDomain,
+                    PropertyTextureBakeStatus::UnsupportedSourceDomain,
                     "texture bake supports mesh vertex, edge, and face properties");
             }
 
@@ -878,30 +1258,28 @@ namespace Extrinsic::Runtime
             case Geometry::PropertyValueKind::Int32:
             case Geometry::PropertyValueKind::UInt64:
                 return PrepareFailure(
-                    SelectedMeshTextureBakeStatus::UnsupportedPropertyType,
+                    PropertyTextureBakeStatus::UnsupportedPropertyType,
                     "texture bake property type is not GPU-rasterizable");
             }
 
-            const BakedPropertyTextureRepresentation representation =
-                ResolveBakedPropertyTextureRepresentation(
+            const PropertyTextureBakeRepresentation representation =
+                ResolvePropertyTextureBakeRepresentation(
                     prepared.ValueKind,
                     request.Storage,
-                    request.Encoder,
-                    prepared.Consumers);
+                    request.Encoding);
             prepared.Storage = representation.Storage;
-            prepared.Encoder = representation.Encoder;
+            prepared.Encoder = representation.Encoding;
             prepared.EncodingColormap = request.EncodingColormap;
-            prepared.NormalSpace = request.NormalSpace;
-            if (!IsBakedPropertyTextureRepresentationCompatible(
+            if (!IsPropertyTextureBakeRepresentationCompatible(
                     prepared.ValueKind,
                     prepared.Storage,
                     prepared.Encoder))
             {
                 return PrepareFailure(
-                    SelectedMeshTextureBakeStatus::UnsupportedPropertyType,
+                    PropertyTextureBakeStatus::UnsupportedPropertyType,
                     "texture bake encoder is incompatible with the selected property type and storage");
             }
-            if (prepared.Storage == SelectedMeshTextureBakeStorage::RawFloat)
+            if (prepared.Storage == PropertyTextureBakeStorage::RawFloat)
             {
                 prepared.GpuEncoding =
                     Graphics::PropertyTextureBakeEncoding::Raw;
@@ -931,29 +1309,29 @@ namespace Extrinsic::Runtime
                 prepared.Format = RHI::Format::RGBA8_UNORM;
                 switch (prepared.Encoder)
                 {
-                case MeshAttributeTextureBakeEncoder::Normal:
+                case PropertyTextureBakeEncoding::Normal:
                     prepared.GpuEncoding =
                         Graphics::PropertyTextureBakeEncoding::Normal;
                     break;
-                case MeshAttributeTextureBakeEncoder::ScalarColormap:
+                case PropertyTextureBakeEncoding::ScalarColormap:
                     prepared.GpuEncoding =
                         Graphics::PropertyTextureBakeEncoding::ScalarColormap;
                     break;
-                case MeshAttributeTextureBakeEncoder::LabelPalette:
+                case PropertyTextureBakeEncoding::LabelPalette:
                     prepared.GpuEncoding =
                         Graphics::PropertyTextureBakeEncoding::LabelPalette;
                     break;
-                case MeshAttributeTextureBakeEncoder::RgbaColor:
-                case MeshAttributeTextureBakeEncoder::Vector2:
-                case MeshAttributeTextureBakeEncoder::Vector3:
+                case PropertyTextureBakeEncoding::RgbaColor:
+                case PropertyTextureBakeEncoding::Vector2:
+                case PropertyTextureBakeEncoding::Vector3:
                     prepared.GpuEncoding =
                         Graphics::PropertyTextureBakeEncoding::RgbaColor;
                     break;
-                case MeshAttributeTextureBakeEncoder::LinearScalar:
+                case PropertyTextureBakeEncoding::LinearScalar:
                     prepared.GpuEncoding =
                         Graphics::PropertyTextureBakeEncoding::LinearScalar;
                     break;
-                case MeshAttributeTextureBakeEncoder::Auto:
+                case PropertyTextureBakeEncoding::Auto:
                     break;
                 }
             }
@@ -963,7 +1341,7 @@ namespace Extrinsic::Runtime
             if (IsScalar(prepared.ValueKind))
             {
                 if (request.RangePolicy ==
-                    MeshAttributeTextureBakeRangePolicy::AutoFinite)
+                    PropertyTextureBakeRangePolicy::AutoFinite)
                 {
                     prepared.RangeMin = std::numeric_limits<float>::infinity();
                     prepared.RangeMax = -std::numeric_limits<float>::infinity();
@@ -988,7 +1366,7 @@ namespace Extrinsic::Runtime
                     prepared.RangeMin >= prepared.RangeMax)
                 {
                     return PrepareFailure(
-                        SelectedMeshTextureBakeStatus::InvalidRange,
+                        PropertyTextureBakeStatus::InvalidRange,
                         "texture bake scalar range is invalid");
                 }
             }
@@ -998,44 +1376,12 @@ namespace Extrinsic::Runtime
                 prepared.RangeMax = 1.0f;
             }
 
-            for (const BakedPropertyTextureConsumer& consumer :
-                 prepared.Consumers)
-            {
-                if (!ConsumerCompatible(
-                        consumer,
-                        prepared.ValueKind,
-                        prepared.Storage,
-                        prepared.Encoder))
-                {
-                    return PrepareFailure(
-                        SelectedMeshTextureBakeStatus::IncompatibleTargetSlot,
-                        "texture bake output is incompatible with a selected consumer");
-                }
-            }
-            std::optional<Graphics::Colormap::Type> scalarColormap{};
-            for (const BakedPropertyTextureConsumer& consumer :
-                 prepared.Consumers)
-            {
-                if (consumer.Semantic != GeometryPresentationSlotSemantic::Albedo &&
-                    consumer.Semantic != GeometryPresentationSlotSemantic::ScalarField)
-                {
-                    continue;
-                }
-                if (scalarColormap.has_value() &&
-                    *scalarColormap != consumer.Colormap)
-                {
-                    return PrepareFailure(
-                        SelectedMeshTextureBakeStatus::IncompatibleTargetSlot,
-                        "one scalar texture cannot use different colormaps in the same surface material");
-                }
-                scalarColormap = consumer.Colormap;
-            }
             return prepared;
         }
 
         [[nodiscard]] bool ValidateConsumerSlots(
             const ECS::EntityHandle entity,
-            std::vector<BakedPropertyTextureConsumer>& consumers,
+            std::vector<TextureBakeConsumerBinding>& consumers,
             std::string& diagnostic) const
         {
             if (consumers.empty())
@@ -1052,7 +1398,7 @@ namespace Extrinsic::Runtime
                 diagnostic = "texture bake consumers require progressive presentation bindings";
                 return false;
             }
-            for (BakedPropertyTextureConsumer& consumer : consumers)
+            for (TextureBakeConsumerBinding& consumer : consumers)
             {
                 if (consumer.Colormap >= Graphics::Colormap::Type::Count)
                 {
@@ -1119,16 +1465,16 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] static bool SameConsumerSlot(
-            const BakedPropertyTextureConsumer& lhs,
-            const BakedPropertyTextureConsumer& rhs) noexcept
+            const TextureBakeConsumerBinding& lhs,
+            const TextureBakeConsumerBinding& rhs) noexcept
         {
             return lhs.PresentationKey == rhs.PresentationKey &&
                    lhs.Semantic == rhs.Semantic;
         }
 
         [[nodiscard]] static bool SameConsumerChannel(
-            const BakedPropertyTextureConsumer& lhs,
-            const BakedPropertyTextureConsumer& rhs) noexcept
+            const TextureBakeConsumerBinding& lhs,
+            const TextureBakeConsumerBinding& rhs) noexcept
         {
             // MaterialTextureAssetBindings is currently one effective
             // per-renderable snapshot, not one snapshot per progressive
@@ -1141,23 +1487,24 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool ValidateConsumerOwnership(
             const ECS::EntityHandle entity,
             const std::string_view outputName,
-            const std::span<const BakedPropertyTextureConsumer> consumers,
+            const std::span<const TextureBakeConsumerBinding> consumers,
             std::string& diagnostic) const
         {
             if (Context.Scene == nullptr)
                 return false;
-            const auto* catalog = Context.Scene->Raw()
-                .try_get<BakedPropertyTextures>(entity);
-            if (catalog == nullptr)
+            const auto* bindings = Context.Scene->Raw()
+                .try_get<PropertyTextureConsumerBindings>(entity);
+            if (bindings == nullptr)
                 return true;
-            for (const BakedPropertyTextureRecord& record : catalog->Records)
+            for (const PropertyTextureConsumerRecord& record :
+                 bindings->Records)
             {
                 if (record.OutputName == outputName)
                     continue;
-                for (const BakedPropertyTextureConsumer& existing :
+                for (const TextureBakeConsumerBinding& existing :
                     record.Consumers)
                 {
-                    for (const BakedPropertyTextureConsumer& candidate :
+                    for (const TextureBakeConsumerBinding& candidate :
                          consumers)
                     {
                         if (ConsumerChannel(existing.Semantic) ==
@@ -1183,7 +1530,8 @@ namespace Extrinsic::Runtime
 
         void UpdateSlots(
             const ECS::EntityHandle entity,
-            const BakedPropertyTextureRecord& record,
+            const PropertyTextureBakeRecord& record,
+            const std::span<const TextureBakeConsumerBinding> consumers,
             const SlotUpdate update)
         {
             if (Context.Scene == nullptr)
@@ -1202,8 +1550,8 @@ namespace Extrinsic::Runtime
             }
 
             bool recipeChanged = false;
-            for (const BakedPropertyTextureConsumer& consumer :
-                 record.Consumers)
+            for (const TextureBakeConsumerBinding& consumer :
+                 consumers)
             {
                 GeometryPresentationBindingRecipe* presentation =
                     FindPresentation(*recipe, consumer);
@@ -1215,9 +1563,9 @@ namespace Extrinsic::Runtime
                     continue;
 
                 const GeometryPropertyRef property{
-                    .Domain = record.SourceDomain,
-                    .Name = record.SourcePropertyName,
-                    .ValueKind = record.ValueKind,
+                    .Domain = record.Source.Domain,
+                    .Name = record.Source.Name,
+                    .ValueKind = record.Source.ValueKind,
                 };
                 const GeometryPresentationSourceKind sourceKind =
                     update == SlotUpdate::Pending ||
@@ -1286,9 +1634,22 @@ namespace Extrinsic::Runtime
                 AdvanceGeneration(runtimeState->RecipeGeneration);
         }
 
+        void UpdateSlots(
+            const ECS::EntityHandle entity,
+            const PropertyTextureBakeRecord& record,
+            const SlotUpdate update)
+        {
+            UpdateSlots(
+                entity,
+                record,
+                ConsumersFor(entity, record.OutputName),
+                update);
+        }
+
         void ApplyMaterialConsumers(
             const ECS::EntityHandle entity,
-            const BakedPropertyTextureRecord& record,
+            const PropertyTextureBakeRecord& record,
+            const std::span<const TextureBakeConsumerBinding> consumers,
             const bool bind)
         {
             if (Extraction == nullptr)
@@ -1298,15 +1659,15 @@ namespace Extrinsic::Runtime
                     SelectionController::ToStableEntityId(entity))
                     .value_or(Graphics::MaterialTextureAssetBindings{});
             const bool hasRoughnessConsumer = std::ranges::any_of(
-                record.Consumers,
-                [](const BakedPropertyTextureConsumer& consumer)
+                consumers,
+                [](const TextureBakeConsumerBinding& consumer)
                 {
                     return consumer.Semantic ==
                         GeometryPresentationSlotSemantic::Roughness;
                 });
             const bool hasMetallicConsumer = std::ranges::any_of(
-                record.Consumers,
-                [](const BakedPropertyTextureConsumer& consumer)
+                consumers,
+                [](const TextureBakeConsumerBinding& consumer)
                 {
                     return consumer.Semantic ==
                         GeometryPresentationSlotSemantic::Metallic;
@@ -1326,8 +1687,8 @@ namespace Extrinsic::Runtime
                     material.MetallicFromRed = false;
                 }
             }
-            for (const BakedPropertyTextureConsumer& consumer :
-                 record.Consumers)
+            for (const TextureBakeConsumerBinding& consumer :
+                 consumers)
             {
                 switch (consumer.Semantic)
                 {
@@ -1337,9 +1698,9 @@ namespace Extrinsic::Runtime
                     {
                         material.Albedo = record.Texture;
                         const bool rawScalar =
-                            IsScalar(record.ValueKind) &&
+                            IsScalar(record.Source.ValueKind) &&
                             record.Storage ==
-                                SelectedMeshTextureBakeStorage::RawFloat;
+                                PropertyTextureBakeStorage::RawFloat;
                         material.AlbedoInterpretation = rawScalar
                             ? Graphics::MaterialAlbedoTextureInterpretation::Scalar
                             : Graphics::MaterialAlbedoTextureInterpretation::Color;
@@ -1359,8 +1720,8 @@ namespace Extrinsic::Runtime
                     {
                         material.Normal = record.Texture;
                         material.NormalSpace =
-                            record.NormalSpace ==
-                                BakedPropertyNormalSpace::World
+                            consumer.NormalSpace ==
+                                PropertyTextureNormalSpace::World
                             ? Graphics::MaterialNormalTextureSpace::
                                   WorldSpaceNormal
                             : Graphics::MaterialNormalTextureSpace::
@@ -1390,6 +1751,18 @@ namespace Extrinsic::Runtime
             Extraction->SetMaterialTextureAssetBindings(
                 SelectionController::ToStableEntityId(entity),
                 material);
+        }
+
+        void ApplyMaterialConsumers(
+            const ECS::EntityHandle entity,
+            const PropertyTextureBakeRecord& record,
+            const bool bind)
+        {
+            ApplyMaterialConsumers(
+                entity,
+                record,
+                ConsumersFor(entity, record.OutputName),
+                bind);
         }
 
         void CancelWork(
@@ -1454,13 +1827,13 @@ namespace Extrinsic::Runtime
                 });
         }
 
-        [[nodiscard]] SelectedMeshTextureBakeResult Schedule(
-            const SelectedMeshTextureBakeRequest& request)
+        [[nodiscard]] PropertyTextureBakeResult Schedule(
+            const PropertyTextureBakeRequest& request)
         {
             PreparedPropertyBake prepared = Prepare(request);
             if (!prepared.Succeeded())
             {
-                return SelectedMeshTextureBakeResult{
+                return PropertyTextureBakeResult{
                     .Status = prepared.Status,
                     .OutputName = std::move(prepared.OutputName),
                     .Diagnostic = std::move(prepared.Diagnostic),
@@ -1472,46 +1845,26 @@ namespace Extrinsic::Runtime
                 request.StableEntityId);
             if (entity == ECS::InvalidEntityHandle)
             {
-                return SelectedMeshTextureBakeResult{
-                    .Status = SelectedMeshTextureBakeStatus::StaleEntity,
+                return PropertyTextureBakeResult{
+                    .Status = PropertyTextureBakeStatus::StaleEntity,
                     .Diagnostic = "texture bake entity is stale",
                 };
             }
 
-            std::string consumerDiagnostic{};
-            if (!ValidateConsumerSlots(
-                    entity,
-                    prepared.Consumers,
-                    consumerDiagnostic))
-            {
-                return SelectedMeshTextureBakeResult{
-                    .Status = SelectedMeshTextureBakeStatus::IncompatibleTargetSlot,
-                    .OutputName = prepared.OutputName,
-                    .Diagnostic = std::move(consumerDiagnostic),
-                };
-            }
-
             auto& catalog = Context.Scene->Raw()
-                .get_or_emplace<BakedPropertyTextures>(entity);
+                .get_or_emplace<PropertyTextureBakeOutputs>(entity);
             auto found = std::ranges::find(
                 catalog.Records,
                 prepared.OutputName,
-                &BakedPropertyTextureRecord::OutputName);
+                &PropertyTextureBakeRecord::OutputName);
             const bool replacing = found != catalog.Records.end();
-            const std::optional<BakedPropertyTextureRecord> previous =
-                replacing
-                ? std::optional<BakedPropertyTextureRecord>{*found}
-                : std::nullopt;
-            const bool previousOutputRetained =
-                replacing &&
-                found->State == BakedPropertyTextureState::Ready;
             if (replacing &&
-                (found->SourceDomain != request.SourceDomain ||
-                 found->SourcePropertyName != request.SourcePropertyName ||
-                 found->TexcoordPropertyName != request.TexcoordPropertyName))
+                (found->Source.Domain != request.Source.Domain ||
+                 found->Source.Name != request.Source.Name ||
+                 found->Texcoords != request.Texcoords))
             {
-                return SelectedMeshTextureBakeResult{
-                    .Status = SelectedMeshTextureBakeStatus::CommandFailed,
+                return PropertyTextureBakeResult{
+                    .Status = PropertyTextureBakeStatus::CommandFailed,
                     .OutputName = prepared.OutputName,
                     .Diagnostic =
                         "output name already belongs to another property texture; rename it first",
@@ -1524,40 +1877,26 @@ namespace Extrinsic::Runtime
                     entity,
                     prepared.OutputName))
             {
-                return SelectedMeshTextureBakeResult{
-                    .Status = SelectedMeshTextureBakeStatus::CommandFailed,
+                return PropertyTextureBakeResult{
+                    .Status = PropertyTextureBakeStatus::CommandFailed,
                     .OutputName = prepared.OutputName,
                     .Diagnostic =
                         "existing generated texture is owned by another bake record",
                 };
             }
-            if (!ValidateConsumerOwnership(
-                    entity,
-                    prepared.OutputName,
-                    prepared.Consumers,
-                    consumerDiagnostic))
-            {
-                return SelectedMeshTextureBakeResult{
-                    .Status = SelectedMeshTextureBakeStatus::IncompatibleTargetSlot,
-                    .OutputName = prepared.OutputName,
-                    .Diagnostic = std::move(consumerDiagnostic),
-                };
-            }
-
             std::uint64_t serial = NextAssetSerial++;
             if (serial == 0u)
                 serial = NextAssetSerial++;
             const GeneratedPropertyTextureMetadata metadata{
                 .StableEntityId = request.StableEntityId,
                 .OutputName = prepared.OutputName,
-                .SourceDomain = request.SourceDomain,
-                .SourcePropertyName = request.SourcePropertyName,
-                .TexcoordPropertyName = request.TexcoordPropertyName,
+                .SourceDomain = request.Source.Domain,
+                .SourcePropertyName = request.Source.Name,
+                .TexcoordPropertyName = request.Texcoords.Name,
                 .ValueKind = prepared.ValueKind,
                 .Storage = prepared.Storage,
                 .Encoder = prepared.Encoder,
                 .EncodingColormap = prepared.EncodingColormap,
-                .NormalSpace = prepared.NormalSpace,
                 .RangeMin = prepared.RangeMin,
                 .RangeMax = prepared.RangeMax,
                 .Width = request.Width,
@@ -1574,81 +1913,42 @@ namespace Extrinsic::Runtime
             auto asset = CreateOrReloadAsset(existing, metadata);
             if (!asset.has_value())
             {
-                return SelectedMeshTextureBakeResult{
-                    .Status = SelectedMeshTextureBakeStatus::AssetLoadFailed,
+                return PropertyTextureBakeResult{
+                    .Status = PropertyTextureBakeStatus::AssetLoadFailed,
                     .OutputName = prepared.OutputName,
                     .Diagnostic = "failed to create generated property texture asset",
                 };
             }
             CancelWork(entity, prepared.OutputName);
 
-            BakedPropertyTextureRecord record{
+            PropertyTextureBakeRecord record{
                 .OutputName = prepared.OutputName,
-                .SourceDomain = request.SourceDomain,
-                .SourcePropertyName = request.SourcePropertyName,
-                .ValueKind = prepared.ValueKind,
-                .TexcoordPropertyName = request.TexcoordPropertyName,
+                .Source = GeometryPropertyRef{
+                    .Domain = request.Source.Domain,
+                    .Name = request.Source.Name,
+                    .ValueKind = prepared.ValueKind,
+                },
+                .Texcoords = request.Texcoords,
                 .Storage = prepared.Storage,
-                .Encoder = prepared.Encoder,
+                .Encoding = prepared.Encoder,
                 .EncodingColormap = prepared.EncodingColormap,
-                .NormalSpace = prepared.NormalSpace,
                 .Texture = *asset,
-                .Consumers = prepared.Consumers,
                 .ExpectedElementCount = prepared.ExpectedElementCount,
                 .SourceGeneration = prepared.SourceGeneration,
+                .PropertyGeneration =
+                    request.ExpectedPropertyGeneration,
                 .RangeMin = prepared.RangeMin,
                 .RangeMax = prepared.RangeMax,
                 .Width = request.Width,
                 .Height = request.Height,
+                .PaddingTexels = request.PaddingTexels,
                 .Generation = replacing ? found->Generation : 1u,
-                .State = BakedPropertyTextureState::Pending,
+                .State = PropertyTextureBakeOutputState::Pending,
                 .Diagnostic = "GPU property texture bake pending",
             };
             if (replacing)
             {
                 AdvanceGeneration(record.Generation);
-                BakedPropertyTextureRecord removedSlots = *previous;
-                std::erase_if(
-                    removedSlots.Consumers,
-                    [&record](const BakedPropertyTextureConsumer& oldConsumer)
-                    {
-                        return std::ranges::any_of(
-                            record.Consumers,
-                            [&oldConsumer](
-                                const BakedPropertyTextureConsumer& newConsumer)
-                            {
-                                return SameConsumerSlot(
-                                    oldConsumer,
-                                    newConsumer);
-                            });
-                    });
-                if (!removedSlots.Consumers.empty())
-                {
-                    UpdateSlots(
-                        entity,
-                        removedSlots,
-                        SlotUpdate::PropertyBuffer);
-                }
-
-                BakedPropertyTextureRecord removedChannels = *previous;
-                std::erase_if(
-                    removedChannels.Consumers,
-                    [&record](const BakedPropertyTextureConsumer& oldConsumer)
-                    {
-                        return std::ranges::any_of(
-                            record.Consumers,
-                            [&oldConsumer](
-                                const BakedPropertyTextureConsumer& newConsumer)
-                            {
-                                return SameConsumerChannel(
-                                    oldConsumer,
-                                    newConsumer);
-                            });
-                    });
-                if (!removedChannels.Consumers.empty())
-                {
-                    ApplyMaterialConsumers(entity, removedChannels, false);
-                }
                 *found = record;
             }
             else
@@ -1656,7 +1956,21 @@ namespace Extrinsic::Runtime
                 catalog.Records.push_back(record);
             }
             AdvanceGeneration(catalog.Generation);
-            UpdateSlots(entity, record, SlotUpdate::Pending);
+            const std::span<const TextureBakeConsumerBinding> consumers =
+                ConsumersFor(entity, record.OutputName);
+            if (!consumers.empty())
+            {
+                UpdateSlots(
+                    entity,
+                    record,
+                    consumers,
+                    SlotUpdate::Pending);
+                ApplyMaterialConsumers(
+                    entity,
+                    record,
+                    consumers,
+                    false);
+            }
 
             WorkItems.push_back(Work{
                 .World = Context.World,
@@ -1672,14 +1986,14 @@ namespace Extrinsic::Runtime
                 .Height = request.Height,
             });
 
-            return SelectedMeshTextureBakeResult{
-                .Status = SelectedMeshTextureBakeStatus::Scheduled,
-                .GeneratedTexture = record.Texture,
+            return PropertyTextureBakeResult{
+                .Status = PropertyTextureBakeStatus::Scheduled,
                 .ExecutionMode =
-                    SelectedMeshTextureBakeExecutionMode::PropertyRasterGpu,
-                .BoundGeneratedTexture = false,
-                .PreviousOutputRetained = previousOutputRetained,
-                .RecipeGeneration = record.Generation,
+                    PropertyTextureBakeExecutionMode::PropertyRasterGpu,
+                .State = PropertyTextureBakeOutputState::Pending,
+                .GeneratedTexture = record.Texture,
+                .Generation = record.Generation,
+                .SourceGeneration = record.SourceGeneration,
                 .OutputName = record.OutputName,
                 .Diagnostic = "GPU property texture bake scheduled",
             };
@@ -1726,12 +2040,12 @@ namespace Extrinsic::Runtime
                     work.Asset,
                     work.CacheGeneration);
             }
-            if (BakedPropertyTextureRecord* record =
+            if (PropertyTextureBakeRecord* record =
                     FindRecord(work.Entity, work.OutputName);
                 record != nullptr &&
                 record->Generation == work.RecordGeneration)
             {
-                record->State = BakedPropertyTextureState::Failed;
+                record->State = PropertyTextureBakeOutputState::Failed;
                 record->Diagnostic = std::move(diagnostic);
                 UpdateSlots(work.Entity, *record, SlotUpdate::Failed);
             }
@@ -1755,7 +2069,7 @@ namespace Extrinsic::Runtime
                     MarkFailed(work, "property texture bake target became stale");
                     continue;
                 }
-                const BakedPropertyTextureRecord* record =
+                const PropertyTextureBakeRecord* record =
                     FindRecord(work.Entity, work.OutputName);
                 if (record == nullptr ||
                     record->Generation != work.RecordGeneration ||
@@ -2034,7 +2348,7 @@ namespace Extrinsic::Runtime
                     continue;
                 }
 
-                BakedPropertyTextureRecord* record =
+                PropertyTextureBakeRecord* record =
                     FindRecord(work.Entity, work.OutputName);
                 const auto view = GpuAssets->GetView(work.Asset);
                 bool geometryCurrent = false;
@@ -2069,14 +2383,14 @@ namespace Extrinsic::Runtime
                     view->Generation == work.CacheGeneration &&
                     sourceCurrent)
                 {
-                    record->State = BakedPropertyTextureState::Ready;
+                    record->State = PropertyTextureBakeOutputState::Ready;
                     record->Diagnostic = "GPU property texture bake ready";
                     UpdateSlots(work.Entity, *record, SlotUpdate::Ready);
                     ApplyMaterialConsumers(work.Entity, *record, true);
                 }
                 else if (current)
                 {
-                    record->State = BakedPropertyTextureState::Failed;
+                    record->State = PropertyTextureBakeOutputState::Failed;
                     record->Diagnostic = sourceCurrent
                         ? "GPU property texture bake completion became stale"
                         : std::move(sourceDiagnostic);
@@ -2131,12 +2445,12 @@ namespace Extrinsic::Runtime
                         work.Asset,
                         work.CacheGeneration);
                 }
-                if (BakedPropertyTextureRecord* record =
+                if (PropertyTextureBakeRecord* record =
                         FindRecord(work.Entity, work.OutputName);
                     record != nullptr &&
                     record->Generation == work.RecordGeneration)
                 {
-                    record->State = BakedPropertyTextureState::Failed;
+                    record->State = PropertyTextureBakeOutputState::Failed;
                     record->Diagnostic =
                         "GPU property texture bake cancelled because its scene binding was detached";
                     UpdateSlots(work.Entity, *record, SlotUpdate::Failed);
@@ -2150,10 +2464,10 @@ namespace Extrinsic::Runtime
                 Context.BindingEpoch == bindingEpoch &&
                 Context.Scene != nullptr)
             {
-                auto view = Context.Scene->Raw().view<BakedPropertyTextures>();
+                auto view = Context.Scene->Raw().view<PropertyTextureBakeOutputs>();
                 for (auto&& [entity, catalog] : view.each())
                 {
-                    for (const BakedPropertyTextureRecord& record :
+                    for (const PropertyTextureBakeRecord& record :
                          catalog.Records)
                     {
                         ApplyMaterialConsumers(entity, record, false);
@@ -2169,17 +2483,17 @@ namespace Extrinsic::Runtime
             if (Context.Scene == nullptr || Context.AssetService == nullptr)
                 return;
 
-            auto view = Context.Scene->Raw().view<BakedPropertyTextures>();
+            auto view = Context.Scene->Raw().view<PropertyTextureBakeOutputs>();
             for (auto&& [entity, catalog] : view.each())
             {
-                for (BakedPropertyTextureRecord& record : catalog.Records)
+                for (PropertyTextureBakeRecord& record : catalog.Records)
                 {
-                    if (record.State != BakedPropertyTextureState::Ready)
+                    if (record.State != PropertyTextureBakeOutputState::Ready)
                         continue;
                     if (!record.Texture.IsValid() ||
                         !Context.AssetService->IsAlive(record.Texture))
                     {
-                        record.State = BakedPropertyTextureState::Failed;
+                        record.State = PropertyTextureBakeOutputState::Failed;
                         record.Diagnostic =
                             "baked property texture asset is no longer alive";
                         UpdateSlots(entity, record, SlotUpdate::Failed);
@@ -2193,11 +2507,11 @@ namespace Extrinsic::Runtime
 
         void DestroySceneAssets(ECS::Scene::Registry& scene)
         {
-            auto view = scene.Raw().view<BakedPropertyTextures>();
+            auto view = scene.Raw().view<PropertyTextureBakeOutputs>();
             for (auto&& [entity, catalog] : view.each())
             {
                 (void)entity;
-                for (const BakedPropertyTextureRecord& record : catalog.Records)
+                for (const PropertyTextureBakeRecord& record : catalog.Records)
                     (void)DestroyAsset(record.Texture);
             }
         }
@@ -2259,12 +2573,12 @@ namespace Extrinsic::Runtime
             if (entity == ECS::InvalidEntityHandle)
                 return {TextureBakeMutationStatus::StaleEntity, "entity is stale"};
             auto* catalog = Context.Scene->Raw()
-                .try_get<BakedPropertyTextures>(entity);
+                .try_get<PropertyTextureBakeOutputs>(entity);
             if (catalog == nullptr)
                 return {TextureBakeMutationStatus::MissingTexture, "baked texture was not found"};
             if (std::ranges::any_of(
                     catalog->Records,
-                    [newName](const BakedPropertyTextureRecord& record)
+                    [newName](const PropertyTextureBakeRecord& record)
                     {
                         return record.OutputName == newName;
                     }))
@@ -2274,7 +2588,7 @@ namespace Extrinsic::Runtime
             auto found = std::ranges::find(
                 catalog->Records,
                 currentName,
-                &BakedPropertyTextureRecord::OutputName);
+                &PropertyTextureBakeRecord::OutputName);
             if (found == catalog->Records.end())
                 return {TextureBakeMutationStatus::MissingTexture, "baked texture was not found"};
             const std::string oldName = found->OutputName;
@@ -2289,6 +2603,11 @@ namespace Extrinsic::Runtime
                     work.Request.OutputName = found->OutputName;
                     work.RecordGeneration = found->Generation;
                 }
+            }
+            if (PropertyTextureConsumerRecord* bindings =
+                    FindConsumerRecord(entity, oldName))
+            {
+                bindings->OutputName = found->OutputName;
             }
             return {TextureBakeMutationStatus::Success, "baked texture renamed"};
         }
@@ -2305,17 +2624,17 @@ namespace Extrinsic::Runtime
             if (entity == ECS::InvalidEntityHandle)
                 return {TextureBakeMutationStatus::StaleEntity, "entity is stale"};
             auto* catalog = Context.Scene->Raw()
-                .try_get<BakedPropertyTextures>(entity);
+                .try_get<PropertyTextureBakeOutputs>(entity);
             if (catalog == nullptr)
                 return {TextureBakeMutationStatus::MissingTexture, "baked texture was not found"};
             auto found = std::ranges::find(
                 catalog->Records,
                 outputName,
-                &BakedPropertyTextureRecord::OutputName);
+                &PropertyTextureBakeRecord::OutputName);
             if (found == catalog->Records.end())
                 return {TextureBakeMutationStatus::MissingTexture, "baked texture was not found"};
 
-            const BakedPropertyTextureRecord removed = *found;
+            const PropertyTextureBakeRecord removed = *found;
             if (!DestroyAsset(removed.Texture))
             {
                 return {
@@ -2324,8 +2643,25 @@ namespace Extrinsic::Runtime
                 };
             }
             CancelWork(entity, removed.OutputName);
-            ApplyMaterialConsumers(entity, removed, false);
-            UpdateSlots(entity, removed, SlotUpdate::PropertyBuffer);
+            const std::span<const TextureBakeConsumerBinding> consumers =
+                ConsumersFor(entity, removed.OutputName);
+            ApplyMaterialConsumers(entity, removed, consumers, false);
+            UpdateSlots(
+                entity,
+                removed,
+                consumers,
+                SlotUpdate::PropertyBuffer);
+            if (auto* bindings = Context.Scene->Raw()
+                    .try_get<PropertyTextureConsumerBindings>(entity))
+            {
+                std::erase_if(
+                    bindings->Records,
+                    [outputName](
+                        const PropertyTextureConsumerRecord& binding)
+                    {
+                        return binding.OutputName == outputName;
+                    });
+            }
             catalog->Records.erase(found);
             AdvanceGeneration(catalog->Generation);
             return {TextureBakeMutationStatus::Success, "baked texture removed"};
@@ -2341,19 +2677,19 @@ namespace Extrinsic::Runtime
                 request.StableEntityId);
             if (entity == ECS::InvalidEntityHandle)
                 return {TextureBakeMutationStatus::StaleEntity, "entity is stale"};
-            BakedPropertyTextureRecord* record =
+            PropertyTextureBakeRecord* record =
                 FindRecord(entity, request.OutputName);
             if (record == nullptr)
                 return {TextureBakeMutationStatus::MissingTexture, "baked texture was not found"};
-            std::vector<BakedPropertyTextureConsumer> nextConsumers =
+            std::vector<TextureBakeConsumerBinding> nextConsumers =
                 request.Consumers;
-            for (const BakedPropertyTextureConsumer& consumer : nextConsumers)
+            for (const TextureBakeConsumerBinding& consumer : nextConsumers)
             {
                 if (!ConsumerCompatible(
                         consumer,
-                        record->ValueKind,
+                        record->Source.ValueKind,
                         record->Storage,
-                        record->Encoder))
+                        record->Encoding))
                 {
                     return {
                         TextureBakeMutationStatus::IncompatibleConsumer,
@@ -2362,7 +2698,7 @@ namespace Extrinsic::Runtime
                 }
             }
             std::optional<Graphics::Colormap::Type> scalarColormap{};
-            for (const BakedPropertyTextureConsumer& consumer :
+            for (const TextureBakeConsumerBinding& consumer :
                  nextConsumers)
             {
                 if (consumer.Semantic != GeometryPresentationSlotSemantic::Albedo &&
@@ -2394,38 +2730,49 @@ namespace Extrinsic::Runtime
                 };
             }
 
-            const BakedPropertyTextureRecord before = *record;
-            ApplyMaterialConsumers(entity, before, false);
-            UpdateSlots(entity, before, SlotUpdate::PropertyBuffer);
-            record->Consumers = std::move(nextConsumers);
-            AdvanceGeneration(record->Generation);
-            if (record->State == BakedPropertyTextureState::Ready)
+            const std::vector<TextureBakeConsumerBinding> beforeConsumers =
+                [&]()
+                {
+                    const auto current =
+                        ConsumersFor(entity, record->OutputName);
+                    return std::vector<TextureBakeConsumerBinding>{
+                        current.begin(),
+                        current.end()};
+                }();
+            ApplyMaterialConsumers(
+                entity,
+                *record,
+                beforeConsumers,
+                false);
+            UpdateSlots(
+                entity,
+                *record,
+                beforeConsumers,
+                SlotUpdate::PropertyBuffer);
+            auto& bindings = Context.Scene->Raw()
+                .get_or_emplace<PropertyTextureConsumerBindings>(entity);
+            PropertyTextureConsumerRecord* binding =
+                FindConsumerRecord(entity, record->OutputName);
+            if (binding == nullptr)
+            {
+                bindings.Records.push_back(PropertyTextureConsumerRecord{
+                    .OutputName = record->OutputName,
+                });
+                binding = &bindings.Records.back();
+            }
+            binding->Consumers = std::move(nextConsumers);
+            if (record->State == PropertyTextureBakeOutputState::Ready)
             {
                 UpdateSlots(entity, *record, SlotUpdate::Ready);
                 ApplyMaterialConsumers(entity, *record, true);
             }
-            else if (record->State == BakedPropertyTextureState::Pending)
+            else if (record->State == PropertyTextureBakeOutputState::Pending)
             {
                 UpdateSlots(entity, *record, SlotUpdate::Pending);
             }
             else
             {
                 UpdateSlots(entity, *record, SlotUpdate::Failed);
-            }
-            if (auto* catalog = Context.Scene->Raw()
-                    .try_get<BakedPropertyTextures>(entity))
-            {
-                AdvanceGeneration(catalog->Generation);
-            }
-            for (Work& work : WorkItems)
-            {
-                if (work.Entity == entity &&
-                    work.OutputName == record->OutputName)
-                {
-                    work.Prepared.Consumers = record->Consumers;
-                    work.Request.Consumers = record->Consumers;
-                    work.RecordGeneration = record->Generation;
-                }
             }
             return {TextureBakeMutationStatus::Success, "texture consumers updated"};
         }
@@ -2443,8 +2790,8 @@ namespace Extrinsic::Runtime
         return m_Impl && m_Impl->Available();
     }
 
-    SelectedMeshTextureBakeResult TextureBakeService::Bake(
-        const SelectedMeshTextureBakeRequest& request)
+    PropertyTextureBakeResult TextureBakeService::Bake(
+        const PropertyTextureBakeRequest& request)
     {
         if (!m_Impl)
             return UnavailableBakeResult();
@@ -2456,7 +2803,7 @@ namespace Extrinsic::Runtime
                 ++m_Impl->Stats->BakeRequestsRejected;
             return UnavailableBakeResult();
         }
-        SelectedMeshTextureBakeResult result = m_Impl->Schedule(request);
+        PropertyTextureBakeResult result = m_Impl->Schedule(request);
         if (m_Impl->Stats != nullptr)
         {
             if (result.Succeeded())
@@ -2507,9 +2854,23 @@ namespace Extrinsic::Runtime
             return snapshot;
         }
         if (const auto* catalog = m_Impl->Context.Scene->Raw()
-                .try_get<BakedPropertyTextures>(entity))
+                .try_get<PropertyTextureBakeOutputs>(entity))
         {
             snapshot.Textures = catalog->Records;
+        }
+        if (const auto* bindings = m_Impl->Context.Scene->Raw()
+                .try_get<PropertyTextureConsumerBindings>(entity))
+        {
+            snapshot.ConsumerBindings.reserve(bindings->Records.size());
+            for (const PropertyTextureConsumerRecord& binding :
+                 bindings->Records)
+            {
+                snapshot.ConsumerBindings.push_back(
+                    TextureBakeConsumerSnapshot{
+                        .OutputName = binding.OutputName,
+                        .Consumers = binding.Consumers,
+                    });
+            }
         }
         return snapshot;
     }
@@ -2548,7 +2909,12 @@ namespace Extrinsic::Runtime
     }
 
     void TextureBakeService::Bind(
-        SelectedMeshTextureBakeContext context,
+        ECS::Scene::Registry* const scene,
+        const WorldHandle world,
+        const std::uint64_t bindingEpoch,
+        Assets::AssetService* const assets,
+        EditorCommandHistory* const history,
+        JobService* const jobs,
         RuntimeObjectSpaceNormalBakeQueue* const queue,
         RHI::IDevice* const device,
         Graphics::GpuAssetCache* const gpuAssets,
@@ -2558,15 +2924,20 @@ namespace Extrinsic::Runtime
     {
         if (!m_Impl)
             return;
-        m_Impl->Context = context;
+        m_Impl->Context = Impl::BoundContext{
+            .Scene = scene,
+            .World = world,
+            .BindingEpoch = bindingEpoch,
+            .AssetService = assets,
+            .CommandHistory = history,
+            .Jobs = jobs,
+        };
         m_Impl->LegacyQueue = queue;
         m_Impl->Device = device;
         m_Impl->GpuAssets = gpuAssets;
         m_Impl->Renderer = renderer;
         m_Impl->Extraction = extraction;
         m_Impl->Stats = stats;
-        m_Impl->Context.ObjectSpaceNormalBakeQueue = queue;
-        m_Impl->Context.ObjectSpaceNormalBakeDevice = device;
     }
 
     void TextureBakeService::SetTarget(
@@ -2967,9 +3338,12 @@ namespace Extrinsic::Runtime
             .Device = state.Device,
         });
         state.Service.Bind(
-            SelectedMeshTextureBakeContext{
-                .AssetService = state.Assets,
-            },
+            nullptr,
+            {},
+            0u,
+            state.Assets,
+            nullptr,
+            state.Jobs,
             &state.Bake.Queue(),
             state.Device,
             state.GpuAssets,
