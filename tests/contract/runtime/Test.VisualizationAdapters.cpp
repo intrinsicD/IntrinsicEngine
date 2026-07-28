@@ -20,6 +20,7 @@ import Extrinsic.Runtime.VisualizationAdapters;
 namespace Assets = Extrinsic::Assets;
 namespace G = Extrinsic::Graphics;
 namespace R = Extrinsic::Runtime;
+namespace GS = Extrinsic::ECS::Components::GeometrySources;
 namespace PN = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
 
 namespace
@@ -131,6 +132,364 @@ namespace
 
         return properties;
     }
+
+    struct RecipeSourceFixture
+    {
+        GS::Vertices Vertices{};
+        GS::Faces Faces{};
+        R::GeometryEntityAvailability Availability{};
+
+        RecipeSourceFixture()
+        {
+            Vertices.Properties = MakeScalarProperties();
+            Faces.Properties = MakeScalarProperties();
+            Availability = R::BuildGeometryAvailability(GS::ConstSourceView{
+                .ActiveDomain = GS::Domain::Mesh,
+                .HasMeshTopologyMarker = true,
+                .VertexSource = &Vertices,
+                .FaceSource = &Faces,
+            });
+        }
+
+        RecipeSourceFixture(const RecipeSourceFixture&) = delete;
+        RecipeSourceFixture& operator=(const RecipeSourceFixture&) = delete;
+    };
+}
+
+TEST(VisualizationRecipes, EncodesScalarColorAndLabelProperties)
+{
+    RecipeSourceFixture source{};
+
+    const R::VisualizationEncodingResult scalar = R::EncodeVisualizationRecipe(
+        source.Availability,
+        R::VisualizationRecipe{.Data = R::ScalarVisualizationRecipe{
+            .Source = {
+                .Domain = R::GeometryElementDomain::MeshFace,
+                .Name = "curvature",
+                .ValueKind = Geometry::PropertyValueKind::Float,
+            },
+            .OutputName = "curvature_faces",
+            .BufferSourceKey = "curvature.upload",
+            .DirtyStamp = 17u,
+            .Colormap = G::Colormap::Type::Plasma,
+        }});
+    ASSERT_TRUE(scalar.Succeeded());
+    EXPECT_EQ(scalar.Status, R::VisualizationRecipeStatus::Encoded);
+    ASSERT_EQ(scalar.Batch.Scalars.size(), 1u);
+    ASSERT_EQ(scalar.Batch.PropertyBuffers.size(), 1u);
+    EXPECT_EQ(scalar.Batch.Scalars.front().Name, "curvature_faces");
+    EXPECT_EQ(scalar.Batch.Scalars.front().SourceBufferKey,
+              "curvature.upload");
+    EXPECT_EQ(scalar.Batch.Scalars.front().Domain,
+              G::VisualizationAttributeDomain::Face);
+    EXPECT_EQ(scalar.Batch.Scalars.front().Colormap,
+              G::Colormap::Type::Plasma);
+    EXPECT_EQ(scalar.Batch.PropertyBuffers.front().DirtyStamp, 17u);
+
+    const R::VisualizationEncodingResult color = R::EncodeVisualizationRecipe(
+        source.Availability,
+        R::VisualizationRecipe{.Data = R::ColorVisualizationRecipe{
+            .Source = {
+                .Domain = R::GeometryElementDomain::MeshVertex,
+                .Name = "v:kmeans_color",
+                .ValueKind = Geometry::PropertyValueKind::Vec4,
+            },
+            .OutputName = "cluster_color",
+            .BufferBDA = 0xC010u,
+        }});
+    ASSERT_TRUE(color.Succeeded());
+    ASSERT_EQ(color.Batch.Colors.size(), 1u);
+    EXPECT_EQ(color.Batch.Colors.front().Name, "cluster_color");
+    EXPECT_EQ(color.Batch.Colors.front().Domain,
+              G::VisualizationAttributeDomain::Vertex);
+    EXPECT_EQ(color.Batch.Colors.front().ColorBufferBDA, 0xC010u);
+    EXPECT_TRUE(color.Batch.PropertyBuffers.empty());
+
+    const R::VisualizationEncodingResult labels = R::EncodeVisualizationRecipe(
+        source.Availability,
+        R::VisualizationRecipe{.Data = R::LabelVisualizationRecipe{
+            .Source = {
+                .Domain = R::GeometryElementDomain::MeshVertex,
+                .Name = "v:kmeans_color",
+                .ValueKind = Geometry::PropertyValueKind::Vec4,
+            },
+            .OutputName = "cluster_labels",
+            .BufferSourceKey = "cluster_labels.upload",
+            .DirtyStamp = 21u,
+        }});
+    ASSERT_TRUE(labels.Succeeded());
+    ASSERT_EQ(labels.Batch.Colors.size(), 1u);
+    ASSERT_EQ(labels.Batch.PropertyBuffers.size(), 1u);
+    EXPECT_EQ(labels.Batch.Colors.front().Name, "cluster_labels");
+    EXPECT_EQ(labels.Batch.PropertyBuffers.front().ValueType,
+              G::VisualizationValueType::RgbaFloat4);
+    EXPECT_EQ(labels.Batch.PropertyBuffers.front().DirtyStamp, 21u);
+}
+
+TEST(VisualizationRecipes, EncodesVectorAndIsolineProperties)
+{
+    RecipeSourceFixture source{};
+
+    const R::VisualizationEncodingResult vector = R::EncodeVisualizationRecipe(
+        source.Availability,
+        R::VisualizationRecipe{.Data = R::VectorFieldVisualizationRecipe{
+            .Source = {
+                .Domain = R::GeometryElementDomain::MeshVertex,
+                .Name = "velocity",
+                .ValueKind = Geometry::PropertyValueKind::Vec3,
+            },
+            .PositionSource = {
+                .Domain = R::GeometryElementDomain::MeshVertex,
+                .Name = std::string{PN::kPosition},
+                .ValueKind = Geometry::PropertyValueKind::Vec3,
+            },
+            .OutputName = "velocity_glyphs",
+            .VectorBufferSourceKey = "velocity.upload",
+            .DirtyStamp = 33u,
+            .Scale = 2.5f,
+            .Color = glm::vec4{0.25f, 0.5f, 0.75f, 1.0f},
+            .DepthTested = false,
+        }});
+    ASSERT_TRUE(vector.Succeeded());
+    ASSERT_EQ(vector.Batch.VectorFields.size(), 1u);
+    ASSERT_EQ(vector.Batch.PropertyBuffers.size(), 1u);
+    const G::VectorFieldOverlayPacket& vectorPacket =
+        vector.Batch.VectorFields.front();
+    EXPECT_EQ(vectorPacket.PositionBufferSourceKey, PN::kPosition);
+    EXPECT_EQ(vectorPacket.VectorBufferSourceKey, "velocity.upload");
+    EXPECT_FLOAT_EQ(vectorPacket.Scale, 2.5f);
+    EXPECT_FALSE(vectorPacket.DepthTested);
+
+    const R::VisualizationEncodingResult isoline = R::EncodeVisualizationRecipe(
+        source.Availability,
+        R::VisualizationRecipe{.Data = R::IsolineVisualizationRecipe{
+            .Source = {
+                .Domain = R::GeometryElementDomain::MeshFace,
+                .Name = "heat",
+                .ValueKind = Geometry::PropertyValueKind::Double,
+            },
+            .OutputName = "heat_isolines",
+            .BufferSourceKey = "heat.upload",
+            .DirtyStamp = 34u,
+            .AutoRange = false,
+            .RangeMin = 0.0f,
+            .RangeMax = 20.0f,
+            .IsoValueCount = 5u,
+            .LineWidth = 1.5f,
+            .Color = glm::vec4{1.0f, 0.5f, 0.0f, 1.0f},
+            .DepthTested = false,
+        }});
+    ASSERT_TRUE(isoline.Succeeded());
+    ASSERT_EQ(isoline.Batch.Isolines.size(), 1u);
+    ASSERT_EQ(isoline.Batch.PropertyBuffers.size(), 1u);
+    const G::IsolineOverlayPacket& isolinePacket =
+        isoline.Batch.Isolines.front();
+    EXPECT_EQ(isolinePacket.Domain, G::VisualizationAttributeDomain::Face);
+    EXPECT_EQ(isolinePacket.IsoValueCount, 5u);
+    EXPECT_FLOAT_EQ(isolinePacket.RangeMin, 0.0f);
+    EXPECT_FLOAT_EQ(isolinePacket.RangeMax, 20.0f);
+    EXPECT_FALSE(isolinePacket.DepthTested);
+}
+
+TEST(VisualizationRecipes, EncodesAtlasMetadataWithoutSchedulingWork)
+{
+    RecipeSourceFixture source{};
+
+    const R::VisualizationEncodingResult preview = R::EncodeVisualizationRecipe(
+        source.Availability,
+        R::VisualizationRecipe{.Data = R::HtexPreviewVisualizationRecipe{
+            .Name = "htex.preview",
+            .PatchCount = 8u,
+            .AtlasWidth = 512u,
+            .AtlasHeight = 256u,
+        }});
+    ASSERT_TRUE(preview.Succeeded());
+    ASSERT_EQ(preview.Batch.HtexAtlases.size(), 1u);
+    EXPECT_EQ(preview.Batch.HtexAtlases.front().PatchCount, 8u);
+
+    const R::VisualizationEncodingResult bake = R::EncodeVisualizationRecipe(
+        source.Availability,
+        R::VisualizationRecipe{.Data = R::FragmentBakeVisualizationRecipe{
+            .Name = "curvature.bake",
+            .Source = {
+                .Domain = R::GeometryElementDomain::MeshFace,
+                .Name = "curvature",
+                .ValueKind = Geometry::PropertyValueKind::Float,
+            },
+            .Mapping = G::VisualizationFragmentBakeMapping::ExistingTexcoords,
+            .MeshHasTexcoords = true,
+            .FaceCount = 4u,
+            .AtlasWidth = 64u,
+            .AtlasHeight = 32u,
+            .TexcoordBufferSourceKey = "mesh.texcoords",
+            .AtlasTextureAsset = Assets::AssetId{90u, 2u},
+            .GeneratedTextureSemantic =
+                G::VisualizationGeneratedTextureSemantic::ScalarAttribute,
+            .TexcoordDirtyStamp = 41u,
+            .SourceAttributeDirtyStamp = 42u,
+        }});
+    ASSERT_TRUE(bake.Succeeded());
+    ASSERT_EQ(bake.Batch.FragmentBakeAtlases.size(), 1u);
+    const G::FragmentBakeAtlasPacket& packet =
+        bake.Batch.FragmentBakeAtlases.front();
+    EXPECT_EQ(packet.SourceAttributeName, "curvature");
+    EXPECT_EQ(packet.TexcoordBufferSourceKey, "mesh.texcoords");
+    EXPECT_EQ(packet.TexcoordProvenance,
+              G::VisualizationTexcoordProvenance::RuntimeResolved);
+    EXPECT_EQ(packet.TexcoordDirtyStamp, 41u);
+    EXPECT_EQ(packet.SourceAttributeDirtyStamp, 42u);
+
+    const R::VisualizationEncodingResult recreate =
+        R::EncodeVisualizationRecipe(
+            source.Availability,
+            R::VisualizationRecipe{.Data = R::FragmentBakeVisualizationRecipe{
+                .Name = "curvature.recreate",
+                .Source = {
+                    .Domain = R::GeometryElementDomain::MeshFace,
+                    .Name = "curvature",
+                    .ValueKind = Geometry::PropertyValueKind::Float,
+                },
+                .Mapping =
+                    G::VisualizationFragmentBakeMapping::RecreateHtex,
+                .FaceCount = 4u,
+                .AtlasWidth = 64u,
+                .AtlasHeight = 64u,
+            }});
+    ASSERT_TRUE(recreate.Succeeded());
+    ASSERT_EQ(recreate.Batch.FragmentBakeAtlases.size(), 1u);
+    EXPECT_EQ(recreate.Diagnostics.HtexRecreateScheduledCount, 0u);
+    EXPECT_FALSE(recreate.Diagnostics.LastHtexRecreateTask.IsValid());
+}
+
+TEST(VisualizationRecipes, ReportsDeterministicFailureStatusAndEmptyOutput)
+{
+    RecipeSourceFixture source{};
+
+    const R::VisualizationEncodingResult empty =
+        R::EncodeVisualizationRecipe(source.Availability, {});
+    EXPECT_EQ(empty.Status, R::VisualizationRecipeStatus::EmptyRecipe);
+    EXPECT_EQ(R::ToString(empty.Status), "EmptyRecipe");
+    EXPECT_EQ(empty.Diagnostics.PacketAppendCount, 0u);
+
+    const R::VisualizationEncodingResult missing = R::EncodeVisualizationRecipe(
+        source.Availability,
+        R::VisualizationRecipe{.Data = R::ScalarVisualizationRecipe{
+            .Source = {
+                .Domain = R::GeometryElementDomain::MeshVertex,
+                .Name = "missing",
+            },
+        }});
+    EXPECT_EQ(missing.Status, R::VisualizationRecipeStatus::MissingSource);
+    EXPECT_EQ(R::ToString(missing.Status), "MissingSource");
+    EXPECT_TRUE(missing.Batch.Scalars.empty());
+
+    const R::VisualizationEncodingResult wrongType =
+        R::EncodeVisualizationRecipe(
+            source.Availability,
+            R::VisualizationRecipe{.Data = R::ScalarVisualizationRecipe{
+                .Source = {
+                    .Domain = R::GeometryElementDomain::MeshVertex,
+                    .Name = "velocity",
+                },
+            }});
+    EXPECT_EQ(wrongType.Status,
+              R::VisualizationRecipeStatus::UnsupportedSourceType);
+    EXPECT_TRUE(wrongType.Batch.Scalars.empty());
+
+    const R::VisualizationEncodingResult badRange =
+        R::EncodeVisualizationRecipe(
+            source.Availability,
+            R::VisualizationRecipe{.Data = R::IsolineVisualizationRecipe{
+                .Source = {
+                    .Domain = R::GeometryElementDomain::MeshFace,
+                    .Name = "heat",
+                },
+                .AutoRange = false,
+                .RangeMin = 1.0f,
+                .RangeMax = 1.0f,
+                .IsoValueCount = 4u,
+            }});
+    EXPECT_EQ(badRange.Status, R::VisualizationRecipeStatus::InvalidRange);
+    EXPECT_TRUE(badRange.Batch.Isolines.empty());
+
+    const R::VisualizationEncodingResult wrongPositionType =
+        R::EncodeVisualizationRecipe(
+            source.Availability,
+            R::VisualizationRecipe{.Data = R::VectorFieldVisualizationRecipe{
+                .Source = {
+                    .Domain = R::GeometryElementDomain::MeshVertex,
+                    .Name = "velocity",
+                },
+                .PositionSource = {
+                    .Domain = R::GeometryElementDomain::MeshVertex,
+                    .Name = "curvature",
+                },
+            }});
+    EXPECT_EQ(wrongPositionType.Status,
+              R::VisualizationRecipeStatus::UnsupportedSourceType);
+    EXPECT_TRUE(wrongPositionType.Batch.VectorFields.empty());
+
+    source.Faces.Properties.Resize(2u);
+    const R::VisualizationEncodingResult stalePosition =
+        R::EncodeVisualizationRecipe(
+            source.Availability,
+            R::VisualizationRecipe{.Data = R::VectorFieldVisualizationRecipe{
+                .Source = {
+                    .Domain = R::GeometryElementDomain::MeshVertex,
+                    .Name = "velocity",
+                },
+                .PositionSource = {
+                    .Domain = R::GeometryElementDomain::MeshFace,
+                    .Name = std::string{PN::kPosition},
+                },
+            }});
+    EXPECT_EQ(stalePosition.Status,
+              R::VisualizationRecipeStatus::ElementCountMismatch);
+    EXPECT_EQ(R::ToString(stalePosition.Status), "ElementCountMismatch");
+    EXPECT_TRUE(stalePosition.Batch.VectorFields.empty());
+
+    const R::VisualizationEncodingResult missingTexcoords =
+        R::EncodeVisualizationRecipe(
+            source.Availability,
+            R::VisualizationRecipe{.Data = R::FragmentBakeVisualizationRecipe{
+                .Name = "missing.uv",
+                .Source = {
+                    .Domain = R::GeometryElementDomain::MeshVertex,
+                    .Name = "curvature",
+                },
+                .Mapping =
+                    G::VisualizationFragmentBakeMapping::ExistingTexcoords,
+                .FaceCount = 4u,
+                .AtlasWidth = 32u,
+                .AtlasHeight = 32u,
+            }});
+    EXPECT_EQ(missingTexcoords.Status,
+              R::VisualizationRecipeStatus::MissingTexcoord);
+    EXPECT_TRUE(missingTexcoords.Batch.FragmentBakeAtlases.empty());
+}
+
+TEST(VisualizationRecipes, HtexRecreateIsASeparateTypedJobOperation)
+{
+    SchedulerScope scheduler{1};
+    R::JobService jobs{};
+    R::KernelEventBus events{};
+
+    const R::VisualizationHtexRecreateResult scheduled =
+        R::ScheduleVisualizationHtexRecreate(
+            jobs,
+            R::VisualizationHtexRecreateRequest{
+                .DebugName = "curvature",
+                .PayloadToken = 77u,
+            });
+    ASSERT_TRUE(scheduled.Scheduled());
+    EXPECT_TRUE(scheduled.Diagnostic.empty());
+
+    ASSERT_TRUE(WaitUntil([&]
+    {
+        (void)jobs.DrainCompletions(events);
+        return jobs.IsComplete(scheduled.Task);
+    }));
+    EXPECT_EQ(jobs.GetState(scheduled.Task), R::JobState::Published);
 }
 
 TEST(VisualizationAdapters, PropertyScalarAdapterAppendsFloatScalarPacket)

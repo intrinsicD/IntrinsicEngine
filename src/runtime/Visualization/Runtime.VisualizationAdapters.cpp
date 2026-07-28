@@ -10,7 +10,9 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -20,6 +22,7 @@ module Extrinsic.Runtime.VisualizationAdapters;
 import Extrinsic.ECS.Components.GeometrySources;
 import Geometry.Properties;
 import Extrinsic.Graphics.VisualizationPackets;
+import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 
@@ -47,6 +50,75 @@ namespace Extrinsic::Runtime
                                       const float maxValue) noexcept
         {
             return IsFinite(minValue) && IsFinite(maxValue) && minValue < maxValue;
+        }
+
+        [[nodiscard]] std::optional<Graphics::VisualizationAttributeDomain>
+            ToVisualizationDomain(const GeometryElementDomain domain) noexcept
+        {
+            switch (domain)
+            {
+            case GeometryElementDomain::MeshVertex:
+            case GeometryElementDomain::GraphNode:
+            case GeometryElementDomain::PointCloudPoint:
+                return Graphics::VisualizationAttributeDomain::Vertex;
+            case GeometryElementDomain::MeshEdge:
+            case GeometryElementDomain::GraphEdge:
+                return Graphics::VisualizationAttributeDomain::Edge;
+            case GeometryElementDomain::MeshFace:
+                return Graphics::VisualizationAttributeDomain::Face;
+            case GeometryElementDomain::MeshHalfedge:
+            case GeometryElementDomain::Unknown:
+                return std::nullopt;
+            }
+            return std::nullopt;
+        }
+
+        [[nodiscard]] VisualizationRecipeStatus ToRecipeStatus(
+            const GeometryPropertyResolutionStatus status) noexcept
+        {
+            switch (status)
+            {
+            case GeometryPropertyResolutionStatus::Resolved:
+                return VisualizationRecipeStatus::Encoded;
+            case GeometryPropertyResolutionStatus::UnsupportedDomain:
+                return VisualizationRecipeStatus::UnsupportedDomain;
+            case GeometryPropertyResolutionStatus::MissingName:
+            case GeometryPropertyResolutionStatus::MissingProperty:
+                return VisualizationRecipeStatus::MissingSource;
+            case GeometryPropertyResolutionStatus::ValueKindMismatch:
+                return VisualizationRecipeStatus::UnsupportedSourceType;
+            case GeometryPropertyResolutionStatus::ElementCountMismatch:
+                return VisualizationRecipeStatus::ElementCountMismatch;
+            case GeometryPropertyResolutionStatus::NonFiniteValues:
+                return VisualizationRecipeStatus::NonFiniteValue;
+            }
+            return VisualizationRecipeStatus::InvalidResource;
+        }
+
+        [[nodiscard]] VisualizationRecipeStatus ToRecipeStatus(
+            const VisualizationAdapterStats& stats) noexcept
+        {
+            if (stats.PacketAppendCount != 0u)
+                return VisualizationRecipeStatus::Encoded;
+            if (stats.MissingSourceCount != 0u)
+                return VisualizationRecipeStatus::MissingSource;
+            if (stats.UnsupportedSourceTypeCount != 0u)
+                return VisualizationRecipeStatus::UnsupportedSourceType;
+            if (stats.EmptySourceCount != 0u)
+                return VisualizationRecipeStatus::EmptySource;
+            if (stats.InvalidBufferCount != 0u)
+                return VisualizationRecipeStatus::InvalidBuffer;
+            if (stats.InvalidResourceCount != 0u)
+                return VisualizationRecipeStatus::InvalidResource;
+            if (stats.MissingTexcoordCount != 0u)
+                return VisualizationRecipeStatus::MissingTexcoord;
+            if (stats.InvalidRangeCount != 0u)
+                return VisualizationRecipeStatus::InvalidRange;
+            if (stats.NonFiniteValueCount != 0u)
+                return VisualizationRecipeStatus::NonFiniteValue;
+            if (stats.ElementCountOverflowCount != 0u)
+                return VisualizationRecipeStatus::ElementCountOverflow;
+            return VisualizationRecipeStatus::InvalidResource;
         }
 
         template <typename T>
@@ -555,40 +627,368 @@ namespace Extrinsic::Runtime
                 return false;
             }
 
-            const JobToken token = jobs->Submit(JobDesc{
-                .DebugName = packetName.empty()
-                    ? std::string{"Visualization.HtexRecreate"}
-                    : std::string{"Visualization.HtexRecreate."} + packetName,
-                .Scope = world,
-                .EstimatedCost = 1u,
-                .Work = [payloadToken = options.HtexRecreatePayloadToken](
-                            const JobCancellation&)
-                {
-                    return JobResultEnvelope::Make<HtexRecreateScheduled>(
-                        HtexRecreateScheduled{.PayloadToken = payloadToken});
-                },
-                .PublishCompletion = [](KernelEventBus& events,
-                                        const JobResultEnvelope& result) -> bool
-                {
-                    const HtexRecreateScheduled* payload =
-                        result.TryGet<HtexRecreateScheduled>();
-                    if (payload == nullptr)
-                        return false;
-                    events.Publish(*payload);
-                    return true;
-                },
-            });
-
-            if (!token.IsValid())
+            const VisualizationHtexRecreateResult scheduled =
+                ScheduleVisualizationHtexRecreate(
+                    *jobs,
+                    VisualizationHtexRecreateRequest{
+                        .DebugName = packetName,
+                        .World = world,
+                        .PayloadToken = options.HtexRecreatePayloadToken,
+                    });
+            if (!scheduled.Scheduled())
             {
                 ++stats.InvalidResourceCount;
                 return false;
             }
 
             ++stats.HtexRecreateScheduledCount;
-            stats.LastHtexRecreateTask = token;
+            stats.LastHtexRecreateTask = scheduled.Task;
             return true;
         }
+    }
+
+    std::string_view ToString(const VisualizationRecipeStatus status) noexcept
+    {
+        switch (status)
+        {
+        case VisualizationRecipeStatus::Encoded: return "Encoded";
+        case VisualizationRecipeStatus::EmptyRecipe: return "EmptyRecipe";
+        case VisualizationRecipeStatus::UnsupportedDomain: return "UnsupportedDomain";
+        case VisualizationRecipeStatus::MissingSource: return "MissingSource";
+        case VisualizationRecipeStatus::UnsupportedSourceType: return "UnsupportedSourceType";
+        case VisualizationRecipeStatus::EmptySource: return "EmptySource";
+        case VisualizationRecipeStatus::InvalidBuffer: return "InvalidBuffer";
+        case VisualizationRecipeStatus::InvalidResource: return "InvalidResource";
+        case VisualizationRecipeStatus::MissingTexcoord: return "MissingTexcoord";
+        case VisualizationRecipeStatus::InvalidRange: return "InvalidRange";
+        case VisualizationRecipeStatus::NonFiniteValue: return "NonFiniteValue";
+        case VisualizationRecipeStatus::ElementCountMismatch: return "ElementCountMismatch";
+        case VisualizationRecipeStatus::ElementCountOverflow: return "ElementCountOverflow";
+        }
+        return "InvalidResource";
+    }
+
+    VisualizationEncodingResult EncodeVisualizationRecipe(
+        const GeometryEntityAvailability& availability,
+        const VisualizationRecipe& recipe)
+    {
+        VisualizationEncodingResult result{};
+
+        const auto resolveSource = [&availability, &result](
+            const GeometryPropertyRef& source,
+            const std::optional<std::size_t> expectedElementCount = std::nullopt,
+            const GeometryPropertyValueKindFilter requiredValueKind = std::nullopt)
+            -> const Geometry::PropertySet*
+        {
+            if (requiredValueKind.has_value() &&
+                source.ValueKind != Geometry::PropertyValueKind::Unknown &&
+                source.ValueKind != *requiredValueKind)
+            {
+                result.Status =
+                    VisualizationRecipeStatus::UnsupportedSourceType;
+                return nullptr;
+            }
+
+            const GeometryPropertyResolution resolution = requiredValueKind
+                ? ResolveGeometryProperty(
+                      availability,
+                      source.Domain,
+                      source.Name,
+                      requiredValueKind,
+                      expectedElementCount,
+                      /*requireFiniteValues=*/false)
+                : ResolveGeometryProperty(
+                      availability,
+                      source,
+                      expectedElementCount,
+                      /*requireFiniteValues=*/false);
+            if (!resolution.Resolved())
+            {
+                result.Status = ToRecipeStatus(resolution.Status);
+                return nullptr;
+            }
+
+            const Geometry::PropertySet* properties =
+                ResolveGeometryPropertySet(availability, source.Domain);
+            if (properties == nullptr)
+            {
+                result.Status = VisualizationRecipeStatus::UnsupportedDomain;
+                return nullptr;
+            }
+            return properties;
+        };
+
+        const auto appendPropertyRecipe = [&result, &resolveSource](
+            const GeometryPropertyRef& source,
+            VisualizationAdapterOptions options,
+            const auto& adapterFactory) -> bool
+        {
+            const std::optional<Graphics::VisualizationAttributeDomain> domain =
+                ToVisualizationDomain(source.Domain);
+            if (!domain.has_value())
+            {
+                result.Status = VisualizationRecipeStatus::UnsupportedDomain;
+                return false;
+            }
+
+            const Geometry::PropertySet* properties = resolveSource(source);
+            if (properties == nullptr)
+                return false;
+
+            options.SourceName = source.Name;
+            options.Domain = *domain;
+            adapterFactory(Geometry::ConstPropertySet{*properties})
+                .Append(result.Batch, options, result.Diagnostics);
+            result.Status = ToRecipeStatus(result.Diagnostics);
+            return result.Succeeded();
+        };
+
+        std::visit(
+            [&](const auto& authored)
+            {
+                using Recipe = std::decay_t<decltype(authored)>;
+                if constexpr (std::is_same_v<Recipe, std::monostate>)
+                {
+                    result.Status = VisualizationRecipeStatus::EmptyRecipe;
+                }
+                else if constexpr (std::is_same_v<Recipe, ScalarVisualizationRecipe>)
+                {
+                    (void)appendPropertyRecipe(
+                        authored.Source,
+                        VisualizationAdapterOptions{
+                            .OutputName = authored.OutputName,
+                            .BufferBDA = authored.BufferBDA,
+                            .PropertyBufferSourceKey = authored.BufferSourceKey,
+                            .DirtyStamp = authored.DirtyStamp,
+                            .AutoRange = authored.AutoRange,
+                            .RangeMin = authored.RangeMin,
+                            .RangeMax = authored.RangeMax,
+                            .Colormap = authored.Colormap,
+                        },
+                        [](Geometry::ConstPropertySet properties)
+                        {
+                            return PropertyScalarAdapter{std::move(properties)};
+                        });
+                }
+                else if constexpr (std::is_same_v<Recipe, ColorVisualizationRecipe> ||
+                                   std::is_same_v<Recipe, LabelVisualizationRecipe>)
+                {
+                    (void)appendPropertyRecipe(
+                        authored.Source,
+                        VisualizationAdapterOptions{
+                            .OutputName = authored.OutputName,
+                            .ColorBufferBDA = authored.BufferBDA,
+                            .PropertyBufferSourceKey = authored.BufferSourceKey,
+                            .DirtyStamp = authored.DirtyStamp,
+                        },
+                        [](Geometry::ConstPropertySet properties)
+                        {
+                            return KMeansLabelAdapter{std::move(properties)};
+                        });
+                }
+                else if constexpr (std::is_same_v<Recipe, VectorFieldVisualizationRecipe>)
+                {
+                    const std::optional<Graphics::VisualizationAttributeDomain> domain =
+                        ToVisualizationDomain(authored.Source.Domain);
+                    if (!domain.has_value())
+                    {
+                        result.Status = VisualizationRecipeStatus::UnsupportedDomain;
+                        return;
+                    }
+                    if (authored.Source.ValueKind !=
+                            Geometry::PropertyValueKind::Unknown &&
+                        authored.Source.ValueKind !=
+                            Geometry::PropertyValueKind::Vec3)
+                    {
+                        result.Status =
+                            VisualizationRecipeStatus::UnsupportedSourceType;
+                        return;
+                    }
+
+                    const GeometryPropertyResolution vectorResolution =
+                        ResolveGeometryProperty(
+                            availability,
+                            authored.Source.Domain,
+                            authored.Source.Name,
+                            Geometry::PropertyValueKind::Vec3);
+                    if (!vectorResolution.Resolved())
+                    {
+                        result.Status = ToRecipeStatus(vectorResolution.Status);
+                        return;
+                    }
+                    if (resolveSource(
+                            authored.PositionSource,
+                            vectorResolution.ElementCount,
+                            Geometry::PropertyValueKind::Vec3) == nullptr)
+                    {
+                        return;
+                    }
+                    const Geometry::PropertySet* properties =
+                        ResolveGeometryPropertySet(
+                            availability, authored.Source.Domain);
+                    if (properties == nullptr)
+                    {
+                        result.Status = VisualizationRecipeStatus::UnsupportedDomain;
+                        return;
+                    }
+
+                    VectorFieldAdapter{Geometry::ConstPropertySet{*properties}}.Append(
+                        result.Batch,
+                        VisualizationAdapterOptions{
+                            .SourceName = authored.Source.Name,
+                            .OutputName = authored.OutputName,
+                            .Domain = *domain,
+                            .PositionBufferBDA = authored.PositionBufferBDA,
+                            .VectorBufferBDA = authored.VectorBufferBDA,
+                            .PositionBufferSourceKey =
+                                authored.PositionBufferSourceKey.empty()
+                                    ? authored.PositionSource.Name
+                                    : authored.PositionBufferSourceKey,
+                            .VectorBufferSourceKey = authored.VectorBufferSourceKey,
+                            .DirtyStamp = authored.DirtyStamp,
+                            .VectorScale = authored.Scale,
+                            .VectorColor = authored.Color,
+                            .DepthTested = authored.DepthTested,
+                        },
+                        result.Diagnostics);
+                    result.Status = ToRecipeStatus(result.Diagnostics);
+                }
+                else if constexpr (std::is_same_v<Recipe, IsolineVisualizationRecipe>)
+                {
+                    (void)appendPropertyRecipe(
+                        authored.Source,
+                        VisualizationAdapterOptions{
+                            .OutputName = authored.OutputName,
+                            .BufferBDA = authored.BufferBDA,
+                            .PropertyBufferSourceKey = authored.BufferSourceKey,
+                            .DirtyStamp = authored.DirtyStamp,
+                            .AutoRange = authored.AutoRange,
+                            .RangeMin = authored.RangeMin,
+                            .RangeMax = authored.RangeMax,
+                            .IsoValueCount = authored.IsoValueCount,
+                            .LineWidth = authored.LineWidth,
+                            .OverlayColor = authored.Color,
+                            .DepthTested = authored.DepthTested,
+                        },
+                        [](Geometry::ConstPropertySet properties)
+                        {
+                            return IsolineAdapter{std::move(properties)};
+                        });
+                }
+                else if constexpr (std::is_same_v<Recipe, HtexPreviewVisualizationRecipe>)
+                {
+                    if (authored.Name.empty() || authored.PatchCount == 0u ||
+                        authored.AtlasWidth == 0u || authored.AtlasHeight == 0u)
+                    {
+                        result.Status = VisualizationRecipeStatus::InvalidResource;
+                        ++result.Diagnostics.InvalidResourceCount;
+                        return;
+                    }
+                    result.Batch.HtexAtlases.push_back(
+                        Graphics::HtexPatchPreviewAtlasPacket{
+                            .Name = authored.Name,
+                            .PatchCount = authored.PatchCount,
+                            .AtlasWidth = authored.AtlasWidth,
+                            .AtlasHeight = authored.AtlasHeight,
+                        });
+                    ++result.Diagnostics.PacketAppendCount;
+                    result.Status = VisualizationRecipeStatus::Encoded;
+                }
+                else if constexpr (std::is_same_v<Recipe, FragmentBakeVisualizationRecipe>)
+                {
+                    if (authored.Name.empty() || authored.FaceCount == 0u ||
+                        authored.AtlasWidth == 0u || authored.AtlasHeight == 0u)
+                    {
+                        result.Status = VisualizationRecipeStatus::InvalidResource;
+                        ++result.Diagnostics.InvalidResourceCount;
+                        return;
+                    }
+                    if (resolveSource(authored.Source) == nullptr)
+                        return;
+
+                    switch (authored.Mapping)
+                    {
+                    case Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords:
+                        if (!authored.MeshHasTexcoords ||
+                            (authored.TexcoordBufferBDA == 0u &&
+                             authored.TexcoordBufferSourceKey.empty()))
+                        {
+                            result.Status = VisualizationRecipeStatus::MissingTexcoord;
+                            ++result.Diagnostics.MissingTexcoordCount;
+                            return;
+                        }
+                        break;
+                    case Graphics::VisualizationFragmentBakeMapping::ExistingHtex:
+                    case Graphics::VisualizationFragmentBakeMapping::RecreateHtex:
+                        break;
+                    default:
+                        result.Status = VisualizationRecipeStatus::InvalidResource;
+                        ++result.Diagnostics.InvalidResourceCount;
+                        return;
+                    }
+
+                    result.Batch.FragmentBakeAtlases.push_back(
+                        Graphics::FragmentBakeAtlasPacket{
+                            .Name = authored.Name,
+                            .SourceAttributeName = authored.Source.Name,
+                            .TexcoordBufferSourceKey =
+                                authored.TexcoordBufferSourceKey,
+                            .Mapping = authored.Mapping,
+                            .MeshHasTexcoords = authored.MeshHasTexcoords,
+                            .FaceCount = authored.FaceCount,
+                            .AtlasWidth = authored.AtlasWidth,
+                            .AtlasHeight = authored.AtlasHeight,
+                            .TexcoordBufferBDA = authored.TexcoordBufferBDA,
+                            .AtlasTextureAsset = authored.AtlasTextureAsset,
+                            .GeneratedTextureSemantic =
+                                authored.GeneratedTextureSemantic,
+                            .TexcoordProvenance =
+                                authored.Mapping == Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords
+                                    ? Graphics::VisualizationTexcoordProvenance::RuntimeResolved
+                                    : Graphics::VisualizationTexcoordProvenance::Unknown,
+                            .TexcoordDirtyStamp = authored.TexcoordDirtyStamp,
+                            .SourceAttributeDirtyStamp =
+                                authored.SourceAttributeDirtyStamp,
+                        });
+                    ++result.Diagnostics.PacketAppendCount;
+                    result.Status = VisualizationRecipeStatus::Encoded;
+                }
+            },
+            recipe.Data);
+
+        return result;
+    }
+
+    VisualizationHtexRecreateResult ScheduleVisualizationHtexRecreate(
+        JobService& jobs,
+        const VisualizationHtexRecreateRequest& request)
+    {
+        VisualizationHtexRecreateResult result{};
+        result.Task = jobs.Submit(JobDesc{
+            .DebugName = request.DebugName.empty()
+                ? std::string{"Visualization.HtexRecreate"}
+                : std::string{"Visualization.HtexRecreate."} + request.DebugName,
+            .Scope = request.World,
+            .EstimatedCost = 1u,
+            .Work = [payloadToken = request.PayloadToken](const JobCancellation&)
+            {
+                return JobResultEnvelope::Make<HtexRecreateScheduled>(
+                    HtexRecreateScheduled{.PayloadToken = payloadToken});
+            },
+            .PublishCompletion = [](KernelEventBus& events,
+                                    const JobResultEnvelope& envelope) -> bool
+            {
+                const HtexRecreateScheduled* payload =
+                    envelope.TryGet<HtexRecreateScheduled>();
+                if (payload == nullptr)
+                    return false;
+                events.Publish(*payload);
+                return true;
+            },
+        });
+        if (!result.Task.IsValid())
+            result.Diagnostic = "JobService rejected visualization HTEX recreate request";
+        return result;
     }
 
     void VisualizationAdapterBatch::Clear() noexcept

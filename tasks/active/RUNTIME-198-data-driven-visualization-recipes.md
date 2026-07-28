@@ -23,6 +23,11 @@ maturity_target: Retired
   existing values plus an optional closed per-entity recipe directly into the
   existing graphics packet/residency seam, not introduce another persisted
   visualization schema or service.
+- Slice A landed a closed seven-alternative `VisualizationRecipe`, canonical
+  property resolution, deterministic encoding statuses, owning packet/payload
+  results, and a separate typed `ScheduleVisualizationHtexRecreate` operation.
+  The encoder never schedules background work. Five new recipe contracts and
+  the 22 existing adapter parity contracts pass in the Clang 23 `ci` tree.
 
 ## Goal
 
@@ -97,16 +102,16 @@ maturity_target: Retired
 
 ## Required changes
 
-- [ ] Define `VisualizationRecipe` as plain data with a typed alternative for
+- [x] Define `VisualizationRecipe` as plain data with a typed alternative for
       each supported visualization and `GeometryPropertyRef` for source fields.
-- [ ] Implement pure encoders returning packet batches and deterministic
+- [x] Implement pure encoders returning packet batches and deterministic
       diagnostics; keep allocation/residency in the existing common owners.
 - [ ] Project recipes directly from `GeometryPresentationRecipe` during copied
       runtime extraction without borrowed adapter/source pointers.
 - [ ] Migrate scalar/color/K-Means/vector/isoline/Htex/fragment-preview
       production paths and preserve their ranges, colormaps, budgets, stamps,
       and rejection diagnostics.
-- [ ] Move Htex/atlas regeneration out of adapter encoding and onto the
+- [x] Move Htex/atlas regeneration out of adapter encoding and onto the
       canonical typed `JobService` operation; recipes encode only current
       copied metadata/results.
 - [ ] Delete `IVisualizationAdapter`,
@@ -116,7 +121,7 @@ maturity_target: Retired
 
 ## Tests
 
-- [ ] Pure encoder tests cover every recipe alternative, valid packets,
+- [x] Pure encoder tests cover every recipe alternative, valid packets,
       malformed/missing/stale properties, deterministic diagnostics, and empty
       output.
 - [ ] Render-extraction parity tests preserve packet bytes/counts, property
