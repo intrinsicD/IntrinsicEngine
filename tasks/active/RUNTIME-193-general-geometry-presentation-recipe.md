@@ -6,6 +6,21 @@ maturity_target: Retired
 ---
 # RUNTIME-193 — General geometry-presentation recipe
 
+## Status
+
+- Promoted to active on 2026-07-28 after `RUNTIME-192` retired the duplicate
+  property vocabularies and left `GeometryPropertyRef` as the canonical stable
+  property identity.
+- Intake census found two public modules with 44 direct module imports across
+  24 production and 20 test files. The generally used
+  `ProgressivePresentationBindings` component currently combines authored
+  choices with readiness, diagnostics, generated outputs, expected counts,
+  and source/binding generations; scene serialization persists several of
+  those runtime observations.
+- Slice A is in progress: introduce the neutral authored recipe and copied,
+  generation-qualified operational snapshot in one cohesive runtime module
+  before migrating or deleting the proven path.
+
 ## Goal
 
 - Replace the progressive-named but generally used render-data and extraction
@@ -33,6 +48,30 @@ maturity_target: Retired
   must not leak into the serialized recipe.
 - The general recipe is the glue between authored scene intent and the
   renderer-facing copied snapshot; graphics remains unaware of ECS/runtime.
+
+## Right-sizing decision
+
+- **Elements:** the two `Progressive*` modules trigger the misleading-name,
+  role-fragmentation, and mixed-persistence heuristics. Their data is consumed
+  by every geometry domain, while one ECS record mixes serializable intent
+  with transient result state and a second public module only projects that
+  record into another copy.
+- **Simpler alternative:** replace both modules with one
+  `Extrinsic.Runtime.GeometryPresentation` module. Keep plain recipe, runtime
+  status, and copied snapshot records plus free validation/projection helpers;
+  use `GeometryPropertyRef` directly and add no interface, registry, service,
+  factory, or feature-specific pipeline. Scene documents write only the recipe
+  and accept the legacy wire object on read for compatibility.
+- **Blast radius:** 24 production and 20 test files spanning scene
+  serialization, asset/model handoff, texture-bake result binding, render
+  extraction, Sandbox models/commands, the promoted Vulkan acceptance smoke,
+  runtime/test CMake registration, architecture docs, and the generated module
+  inventory. Mechanical naming migration stays separate from the semantic
+  recipe/status split in reviewable commits.
+- **Reintroduction trigger:** split projection into another public module only
+  if a second independently versioned target needs the projection ABI without
+  the recipe vocabulary. A second geometry domain or UI remains data handled
+  by the same free projection functions.
 
 ## Slice plan
 

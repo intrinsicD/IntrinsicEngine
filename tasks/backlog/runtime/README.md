@@ -31,7 +31,7 @@ cleanup slice:
 
 #### Open tasks
 
-- [`RUNTIME-193` — General geometry-presentation recipe](RUNTIME-193-general-geometry-presentation-recipe.md)
+- [`RUNTIME-193` — General geometry-presentation recipe](../../active/RUNTIME-193-general-geometry-presentation-recipe.md)
   replaces the generally used progressive-named presentation modules with one
   desired-state recipe plus copied operational snapshot.
 - [`RUNTIME-197` — Unified geometry upload and residency coordinator](RUNTIME-197-unified-geometry-upload-residency-coordinator.md)

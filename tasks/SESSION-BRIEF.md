@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `RUNTIME-193` — General geometry-presentation recipe (tasks/active/RUNTIME-193-general-geometry-presentation-recipe.md)
 
 ## Theme B — Rendering modernization
 
@@ -38,7 +38,6 @@ the authoritative open/unblocked view.
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RUNTIME-138` — Nonblocking selected-entity editor cache pipeline (tasks/backlog/runtime/RUNTIME-138-nonblocking-selected-entity-editor-cache-pipeline.md)
 - unblocked: `RUNTIME-191` — Unify property-to-texture baking and retire specialized paths (tasks/backlog/runtime/RUNTIME-191-unified-property-texture-bake-pipeline.md)
-- unblocked: `RUNTIME-193` — General geometry-presentation recipe (tasks/backlog/runtime/RUNTIME-193-general-geometry-presentation-recipe.md)
 - blocked by `BUG-095`: `RUNTIME-200` — Staged asset-import and materialization recipe (tasks/backlog/runtime/RUNTIME-200-staged-asset-import-materialization-recipe.md)
 - blocked by `RUNTIME-193`: `RUNTIME-201` — Unified editor mutation and history transaction (tasks/backlog/runtime/RUNTIME-201-unified-editor-mutation-history-transaction.md)
 - blocked by `RUNTIME-138`: `RUNTIME-202` — Retire the Sandbox runtime facade and localize feature models (tasks/backlog/runtime/RUNTIME-202-retire-sandbox-runtime-facade.md)
