@@ -1784,7 +1784,7 @@ TEST(SandboxEditorUi, GeometryPresentationSlotCommandsUseCommandHistory)
         registry.Raw()
             .get<Runtime::GeometryPresentationRuntimeState>(mesh)
             .RecipeGeneration,
-        7u);
+        9u);
 
     EXPECT_EQ(Runtime::ApplySandboxEditorGeometryPresentationSlotPropertyCommand(
                   context,
@@ -1804,7 +1804,7 @@ TEST(SandboxEditorUi, GeometryPresentationSlotCommandsUseCommandHistory)
         registry.Raw().get<Runtime::GeometryPresentationRecipe>(mesh);
     const auto& propertyRuntimeState =
         registry.Raw().get<Runtime::GeometryPresentationRuntimeState>(mesh);
-    EXPECT_EQ(propertyRuntimeState.RecipeGeneration, 8u);
+    EXPECT_EQ(propertyRuntimeState.RecipeGeneration, 10u);
     presentation = Runtime::FindGeometryPresentationBinding(propertyBindings, "mesh.surface");
     ASSERT_NE(presentation, nullptr);
     albedo =
@@ -1837,4 +1837,90 @@ TEST(SandboxEditorUi, GeometryPresentationSlotCommandsUseCommandHistory)
                       .PropertyName = "v:temperature",
                   }),
               Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
+
+    Runtime::SandboxEditorContext directContext = context;
+    directContext.CommandHistory = nullptr;
+    EXPECT_EQ(Runtime::ApplySandboxEditorGeometryPresentationSlotDefaultCommand(
+                  directContext,
+                  Runtime::SandboxEditorGeometryPresentationSlotDefaultCommand{
+                      .StableEntityId = stableId,
+                      .PresentationKey = "mesh.surface",
+                      .Semantic =
+                          Runtime::GeometryPresentationSlotSemantic::Albedo,
+                      .Value = newColor,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    EXPECT_EQ(
+        registry.Raw()
+            .get<Runtime::GeometryPresentationRuntimeState>(mesh)
+            .RecipeGeneration,
+        11u);
+}
+
+TEST(SandboxEditorUi,
+     GeometryPresentationHistoryRejectsInterveningGenerationWithoutMutation)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    const ECS::EntityHandle mesh =
+        MakeSelectable(registry, "GeometryPresentationStaleHistory");
+    AddTriangleMeshSource(registry, mesh);
+    registry.Raw().emplace<Runtime::GeometryPresentationRecipe>(
+        mesh,
+        MakeGeometryPresentationRecipe());
+    registry.Raw().emplace<Runtime::GeometryPresentationRuntimeState>(
+        mesh,
+        MakeGeometryPresentationRuntimeState());
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    const Runtime::GeometryPresentationDefaultValue authored{
+        .Kind = Geometry::PropertyValueKind::Vec4,
+        .Vector = glm::vec4{0.9f, 0.1f, 0.2f, 1.0f},
+    };
+    EXPECT_EQ(Runtime::ApplySandboxEditorGeometryPresentationSlotDefaultCommand(
+                  context,
+                  Runtime::SandboxEditorGeometryPresentationSlotDefaultCommand{
+                      .StableEntityId = stableId,
+                      .PresentationKey = "mesh.surface",
+                      .Semantic =
+                          Runtime::GeometryPresentationSlotSemantic::Albedo,
+                      .Value = authored,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    EXPECT_EQ(
+        registry.Raw()
+            .get<Runtime::GeometryPresentationRuntimeState>(mesh)
+            .RecipeGeneration,
+        8u);
+    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
+        history.Snapshot();
+
+    auto& recipe =
+        registry.Raw().get<Runtime::GeometryPresentationRecipe>(mesh);
+    auto* presentation =
+        Runtime::FindGeometryPresentationBinding(recipe, "mesh.surface");
+    ASSERT_NE(presentation, nullptr);
+    auto* albedo =
+        Runtime::FindGeometryPresentationSlot(
+            *presentation,
+            Runtime::GeometryPresentationSlotSemantic::Albedo);
+    ASSERT_NE(albedo, nullptr);
+    const glm::vec4 intervening{0.3f, 0.4f, 0.5f, 1.0f};
+    albedo->UniformDefault.Vector = intervening;
+    auto& runtime =
+        registry.Raw().get<Runtime::GeometryPresentationRuntimeState>(mesh);
+    ++runtime.RecipeGeneration;
+
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(albedo->UniformDefault.Vector, intervening);
+    EXPECT_EQ(runtime.RecipeGeneration, 9u);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
 }

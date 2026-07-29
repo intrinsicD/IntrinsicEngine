@@ -219,9 +219,12 @@ values into one generic `EditorCommandHistory` record. Every initial apply,
 undo, and redo validates before publishing; rejection leaves both feature state
 and the history cursor unchanged. Direct/ICP transforms, coalesced gizmo
 transforms, and default or lane-targeted visualization config edits use this
-shape. The public history module therefore owns history mechanics rather than
-transform or visualization component DTOs; remaining feature migrations are
-tracked by `RUNTIME-201`.
+shape. Geometry-presentation slot edits additionally validate and monotonically
+advance the presentation recipe generation on apply, undo, and redo instead of
+restoring a captured generation and admitting an ABA stale-output match. The
+public history module therefore owns history mechanics rather than transform
+or visualization component DTOs; remaining feature migrations are tracked by
+`RUNTIME-201`.
 
 `Extrinsic.Runtime.CameraModule` is the optional app-composed global viewport
 owner. During registration it binds `WorldRegistry::ActiveWorld()`, publishes

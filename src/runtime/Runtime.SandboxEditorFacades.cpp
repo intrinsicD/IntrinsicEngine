@@ -2803,6 +2803,13 @@ namespace Extrinsic::Runtime
             GeometryPresentationRuntimeState Runtime{};
         };
 
+        struct GeometryPresentationMutationIdentity
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{};
+            std::uint32_t StableEntityId{0u};
+        };
+
         [[nodiscard]] EditorCommandHistoryStatus ApplyGeometryPresentationState(
             ECS::Scene::Registry* scene,
             const std::uint32_t stableEntityId,
@@ -2817,13 +2824,31 @@ namespace Extrinsic::Runtime
             if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
                 return EditorCommandHistoryStatus::StaleEntity;
 
+            const auto* currentRuntime =
+                raw.try_get<GeometryPresentationRuntimeState>(entity);
+            GeometryPresentationRuntimeState runtime = state.Runtime;
+            runtime.RecipeGeneration = currentRuntime != nullptr
+                ? currentRuntime->RecipeGeneration
+                : GeometryPresentationRuntimeState{}.RecipeGeneration;
             raw.emplace_or_replace<GeometryPresentationRecipe>(
                 entity,
                 state.Recipe);
             raw.emplace_or_replace<GeometryPresentationRuntimeState>(
                 entity,
-                state.Runtime);
+                std::move(runtime));
             return EditorCommandHistoryStatus::Applied;
+        }
+
+        [[nodiscard]] std::uint64_t StampGeometryPresentationGeneration(
+            ECS::Scene::Registry& scene,
+            const std::uint32_t stableEntityId)
+        {
+            entt::registry& raw = scene.Raw();
+            const ECS::EntityHandle entity =
+                SelectionController::ToEntityHandle(stableEntityId);
+            auto& runtime =
+                raw.get<GeometryPresentationRuntimeState>(entity);
+            return ++runtime.RecipeGeneration;
         }
 
         struct GeometryPresentationSlotLookup
@@ -2904,37 +2929,90 @@ namespace Extrinsic::Runtime
         {
             if (context.CommandHistory != nullptr)
             {
-                ECS::Scene::Registry* scene = context.Scene;
+                const std::uint64_t expectedGeneration =
+                    before.Runtime.RecipeGeneration;
                 const EditorCommandHistoryResult result =
-                    context.CommandHistory->Execute(
-                        EditorCommandRecord{
-                            .Label = "Change Geometry Presentation",
-                            .Redo =
-                                [scene, stableEntityId, after]()
-                                {
-                                    return ApplyGeometryPresentationState(
-                                        scene,
-                                        stableEntityId,
-                                        after);
-                                },
-                            .Undo =
-                                [scene, stableEntityId, before]()
-                                {
-                                    return ApplyGeometryPresentationState(
-                                        scene,
-                                        stableEntityId,
-                                        before);
-                                },
-                            .Dirtying = true,
+                    Internal::ExecuteUndoableEntityMutation(
+                        *context.CommandHistory,
+                        "Change Geometry Presentation",
+                        GeometryPresentationMutationIdentity{
+                            .Scene = context.Scene,
+                            .World = context.World,
+                            .StableEntityId = stableEntityId,
+                        },
+                        expectedGeneration,
+                        std::move(before),
+                        std::move(after),
+                        [](
+                            const GeometryPresentationMutationIdentity& identity,
+                            const std::uint64_t expectedGeneration,
+                            const GeometryPresentationEditorState&)
+                        {
+                            if (identity.Scene == nullptr ||
+                                !identity.World.IsValid())
+                            {
+                                return EditorCommandHistoryStatus::MissingScene;
+                            }
+
+                            entt::registry& raw = identity.Scene->Raw();
+                            const ECS::EntityHandle entity =
+                                SelectionController::ToEntityHandle(
+                                    identity.StableEntityId);
+                            if (entity == ECS::InvalidEntityHandle ||
+                                !raw.valid(entity))
+                            {
+                                return EditorCommandHistoryStatus::StaleEntity;
+                            }
+                            if (!raw.all_of<GeometryPresentationRecipe>(entity))
+                            {
+                                return EditorCommandHistoryStatus::
+                                    UnsupportedOperation;
+                            }
+
+                            const auto* runtime =
+                                raw.try_get<GeometryPresentationRuntimeState>(
+                                    entity);
+                            const std::uint64_t currentGeneration =
+                                runtime != nullptr
+                                    ? runtime->RecipeGeneration
+                                    : GeometryPresentationRuntimeState{}
+                                          .RecipeGeneration;
+                            return currentGeneration == expectedGeneration
+                                ? EditorCommandHistoryStatus::Applied
+                                : EditorCommandHistoryStatus::StaleEntity;
+                        },
+                        [](
+                            const GeometryPresentationMutationIdentity& identity,
+                            const GeometryPresentationEditorState& target)
+                        {
+                            return ApplyGeometryPresentationState(
+                                identity.Scene,
+                                identity.StableEntityId,
+                                target);
+                        },
+                        [](
+                            const GeometryPresentationMutationIdentity& identity,
+                            const std::uint64_t,
+                            const GeometryPresentationEditorState&)
+                        {
+                            return StampGeometryPresentationGeneration(
+                                *identity.Scene,
+                                identity.StableEntityId);
                         });
                 return ToSandboxEditorCommandStatus(result.Status);
             }
 
-            return ToSandboxEditorCommandStatus(
+            const EditorCommandHistoryStatus applied =
                 ApplyGeometryPresentationState(
                     context.Scene,
                     stableEntityId,
-                    after));
+                    after);
+            if (applied != EditorCommandHistoryStatus::Applied)
+                return ToSandboxEditorCommandStatus(applied);
+            (void)StampGeometryPresentationGeneration(
+                *context.Scene,
+                stableEntityId);
+            return SandboxEditorCommandStatus::Applied;
         }
 
         [[nodiscard]] bool PropertySourceKindAllowedForGeometryPresentationSlotCommand(
@@ -13866,7 +13944,6 @@ namespace Extrinsic::Runtime
             slot.Semantic,
             GeometryPresentationReadiness::DefaultValue,
             GeometryPresentationProvenance::UniformDefault);
-        ++after.Runtime.RecipeGeneration;
 
         return InvalidateSelectedModelCacheIfApplied(
             context,
@@ -13964,7 +14041,6 @@ namespace Extrinsic::Runtime
             slot.Semantic,
             nextReadiness,
             nextProvenance);
-        ++after.Runtime.RecipeGeneration;
 
         return InvalidateSelectedModelCacheIfApplied(
             context,

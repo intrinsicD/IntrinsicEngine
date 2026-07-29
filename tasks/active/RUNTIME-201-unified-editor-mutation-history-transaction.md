@@ -26,7 +26,8 @@ maturity_target: Retired
 - Status: in progress; owner `Codex`; branch
   `codex/runtime-201-unified-editor-mutation`; Slice A is complete. Slice B has
   migrated direct transform edits and synchronous/asynchronous ICP transform
-  publication, gizmo drag commit, and default/lane visualization-config edits.
+  publication, gizmo drag commit, default/lane visualization-config edits, and
+  geometry-presentation slot authoring.
   `GizmoUndoStack` and the now-unused public transform/visualization history
   adapters are deleted; the next owner-scoped adoption is geometry/property
   mutation. The next verification step is that feature's stale-generation/undo
@@ -67,9 +68,9 @@ maturity_target: Retired
 - **Slice B — feature adoption (in progress).** Direct transform edits,
   synchronous/asynchronous ICP transform publication, and coalesced gizmo drag
   commit use the internal transaction as of 2026-07-29. Entity-default and
-  lane-targeted visualization-config edits now use the same transaction.
-  Migrate geometry, remaining presentation, clustering, parameterization,
-  import postprocess, and destructive conversion commits.
+  lane-targeted visualization-config plus geometry-presentation slot edits now
+  use the same transaction. Migrate geometry/property, clustering,
+  parameterization, import postprocess, and destructive conversion commits.
 - **Slice C — cleanup (in progress).** `GizmoUndoStack` was deleted with gizmo
   adoption. The unused public transform and visualization adapter DTOs/builders
   were deleted after their owners adopted the transaction. Move remaining
@@ -191,6 +192,20 @@ Visualization-history convergence verification completed on 2026-07-29:
 - `python3 tools/repo/check_test_layout.py --root . --strict`
 - `python3 tools/docs/check_doc_links.py --root .`
 - `python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main --head-ref HEAD --strict`
+- `python3 tools/repo/check_root_hygiene.py --root .`
+- `python3 tools/agents/check_task_policy.py --root . --strict`
+- `python3 tools/agents/check_task_state_links.py --root . --strict`
+- `python3 tools/agents/generate_session_brief.py --check`
+
+Geometry-presentation history convergence verification completed on 2026-07-29:
+
+- `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
+- `cmake --build --preset ci --target IntrinsicTests`
+- `ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\.GeometryPresentation(SlotCommandsUseCommandHistory|HistoryRejectsInterveningGenerationWithoutMutation)$' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120`
+- `ctest --test-dir build/ci --output-on-failure -R 'GeometryPresentation|EditorCommandHistory|Mutation' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180`
+- `python3 tools/repo/check_layering.py --root src --strict`
+- `python3 tools/repo/check_test_layout.py --root . --strict`
+- `python3 tools/docs/check_doc_links.py --root .`
 - `python3 tools/repo/check_root_hygiene.py --root .`
 - `python3 tools/agents/check_task_policy.py --root . --strict`
 - `python3 tools/agents/check_task_state_links.py --root . --strict`

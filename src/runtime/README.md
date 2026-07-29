@@ -704,10 +704,15 @@ uniform default colors; compatible-first property choices with incompatible
 entries disabled and explained; readiness and diagnostics; per-entity
 derived-job rows from an injected `DerivedJobQueueSnapshot`; and aggregate child
 summaries for composition entities. Slot default and source-property commands
-route through `EditorCommandHistory` when available and mutate only the
+route through the shared generation-validated editor transaction when history
+is available. Apply, undo, and redo require the expected
+`GeometryPresentationRuntimeState::RecipeGeneration` and stamp a fresh
+monotonic generation, so an intervening bake/output or authoring mutation
+cannot be overwritten through an ABA generation restore. They mutate only the
 authored `GeometryPresentationRecipe`; readiness, diagnostics, and generated
-outputs remain in `GeometryPresentationRuntimeState`. UI code does not run geometry algorithms,
-texture bakes, asset IO, worker jobs, or graphics uploads, and it does not
+outputs remain in `GeometryPresentationRuntimeState`. UI code does not run
+geometry algorithms, texture bakes, asset IO, worker jobs, or graphics uploads,
+and it does not
 implicitly copy transient selection/highlight overlays into authored
 properties.
 
