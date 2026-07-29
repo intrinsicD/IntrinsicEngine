@@ -6998,3 +6998,48 @@ tree:
       fixed-revision review and the pre-existing BUG-120 gate; no performance,
       identity, or scientific-correctness claim is made.
     status: resolved
+  - id: N293
+    type: decision
+    title: "Commit PROC-028 and integrate it into local main"
+    provenance: user
+    timestamp: "2026-07-30T00:33+02:00"
+    also_depends_on: [N291, N292]
+    choice: >
+      Move the PROC-028 worktree out of ephemeral storage, commit every
+      task-scoped change in its canonical repository-relative folder, and
+      merge the resulting commits into local main.
+    alternatives:
+      - "Leave the implementation uncommitted in the /tmp worktree."
+      - "Commit the feature branch but leave local main unchanged."
+      - "Overwrite the unrelated dirty primary checkout while switching it to main."
+    evidence:
+      - "tasks/active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md"
+      - "tasks/evidence/PROC-028/handoff.jsonl"
+      - "N292"
+    status: resolved
+  - id: N294
+    type: experiment
+    title: "Relocate, commit, and fast-forward PROC-028"
+    provenance: ai-executed
+    timestamp: "2026-07-30T00:33+02:00"
+    also_depends_on: [N292, N293]
+    evidence:
+      - "implementation commit f4adcea4948f6b9b7c81967c9b8e0709479beb2d"
+      - "evidence-binding commit a03ad02f6c4ac084e41957e58ecef91063c7dc9b"
+      - "tasks/evidence/PROC-028/report.yaml"
+      - "tasks/evidence/PROC-028/handoff.jsonl"
+      - "tasks/evidence/PROC-028/reviews.jsonl"
+      - "post-merge task/evidence/ARA/benchmark/docs validation: zero errors"
+      - "focused workflow and benchmark regressions: 85/85"
+      - "pre-existing BUG-120 remains one explicit warning"
+    result: >
+      The live worktree moved from /tmp to
+      /home/alex/Documents/IntrinsicEngine-proc-028, its atomic claim and task
+      metadata were rebound, and every PROC-028 file was committed in its
+      canonical relative folder. Local main fast-forwarded cleanly through
+      a03ad02f in /home/alex/Documents/IntrinsicEngine-main. The unrelated
+      codex/runtime-201-unified-editor-mutation primary checkout retained all
+      of its pre-existing tracked and untracked changes. Remote origin/main
+      was fetched but not pushed. PROC-028 remains active for independent
+      fixed-revision review and BUG-120.
+    status: resolved

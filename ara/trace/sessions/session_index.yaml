@@ -181,3 +181,10 @@ sessions:
     events_count: 9
     claims_touched: []
     open_threads: 2
+  - id: "2026-07-30_001"
+    date: "2026-07-30"
+    summary: "Relocated PROC-028 to stable storage, committed its complete canonical surface, and fast-forwarded local main while preserving the unrelated dirty RUNTIME-201 checkout."
+    turn_count: 1
+    events_count: 2
+    claims_touched: []
+    open_threads: 3

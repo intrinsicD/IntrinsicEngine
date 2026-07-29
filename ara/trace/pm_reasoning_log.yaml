@@ -1107,3 +1107,10 @@ entries:
       - "Did not create a capability or performance claim merely because workflow tooling exists; N292 records bounded implementation/test facts and explicitly retains independent review plus BUG-120 as open gates."
       - "Treated the byte-identical-origin Test.WorkflowConcurrency failures as existing BUG-120 evidence rather than a new dead end or a reason to weaken PROC-028's strict CI wiring."
       - "Kept O09, O13, O38, O57, and O58 unpromoted and non-stale because they were referenced in the immediately preceding session and this workflow task supplies no closure or contradiction for their topics."
+  - turn: "2026-07-30_001#1"
+    notes:
+      - "Routed the user's commit-and-main-integration direction as decision N293 and the relocation/commit/fast-forward result as experiment N294."
+      - "Recorded the exact implementation and evidence-binding commits, stable worktree paths, post-merge zero-error structural result, and preservation of the unrelated dirty RUNTIME-201 checkout."
+      - "Did not stage or crystallize a generalized observation: this turn integrated the already-selected A17 workflow architecture and introduced no new process claim."
+      - "Kept PROC-028 active and made no independent-review claim; BUG-120 and a distinct fixed-revision review remain explicit open threads."
+      - "Kept O09, O13, O38, O57, and O58 unpromoted and non-stale because they were referenced yesterday and this integration supplies no closure or contradiction for their topics."
