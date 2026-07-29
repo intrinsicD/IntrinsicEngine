@@ -227,8 +227,13 @@ mesh-denoise publisher validates both geometry metadata and the exact live
 validates that source plus the exact mean, Gaussian, and principal-direction
 property snapshots it owns. Remesh, subdivide, and simplify publication
 validate geometry metadata plus the complete canonical position/connectivity
-state, including before queued output may publish. These owners stamp their
-normal deferred geometry dirty tags only after publication. The public history
+state, including before queued output may publish. UV regeneration uses the
+same transaction mechanics with its owner-specific semantic source snapshot:
+exact live positions, edge/halfedge/face connectivity, and known vertex/face
+property values are revalidated before queued publication and every history
+transition. Its apply stamp requests the required full GPU rebuild only after
+the regenerated topology is published; the other mesh owners stamp their
+normal deferred geometry dirty tags after publication. The public history
 module therefore owns history mechanics rather than transform or visualization
 component DTOs; remaining feature migrations are tracked by `RUNTIME-201`.
 

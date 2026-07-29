@@ -29,9 +29,9 @@ maturity_target: Retired
   publication, gizmo drag commit, default/lane visualization-config edits, and
   geometry-presentation slot authoring plus synchronous/asynchronous mesh
   denoise position, mesh-curvature property, and remesh/subdivide/simplify
-  topology publication.
+  topology publication and UV-regeneration topology/property publication.
   `GizmoUndoStack` and the now-unused public transform/visualization history
-  adapters are deleted; the next owner-scoped adoption is UV topology
+  adapters are deleted; the next owner-scoped adoption is point-cloud
   replacement. The next verification step is that feature's
   stale-generation/undo contract plus the focused
   `EditorCommandHistory|Mutation` run.
@@ -74,9 +74,10 @@ maturity_target: Retired
   lane-targeted visualization-config plus geometry-presentation slot edits now
   use the same transaction. Mesh denoise and curvature are the first
   geometry-property owners migrated; remesh, subdivide, and simplify share the
-  migrated mesh-topology owner. Migrate the remaining geometry/property,
-  clustering, parameterization, import postprocess, and destructive conversion
-  commits.
+  migrated mesh-topology owner, while UV regeneration supplies its semantic
+  source snapshot and full-GPU dirty policy to the same mechanics. Migrate the
+  remaining geometry/property, clustering, parameterization, import
+  postprocess, and destructive conversion commits.
 - **Slice C — cleanup (in progress).** `GizmoUndoStack` was deleted with gizmo
   adoption. The unused public transform and visualization adapter DTOs/builders
   were deleted after their owners adopted the transaction. Move remaining
@@ -117,7 +118,7 @@ maturity_target: Retired
       presentation/material, async method completion, import enrichment, and
       domain conversion through the same helper. Transform/gizmo,
       presentation, and sync/async denoise/curvature property plus mesh
-      topology coverage is complete.
+      topology/UV-regeneration coverage is complete.
 - [x] Gizmo drag coalescing and exact transform restoration remain covered
       through `EditorCommandHistory`.
 - [ ] Structural tests prove no second undo stack, CommandBus history hook, or
@@ -257,6 +258,20 @@ Mesh-topology replacement history convergence verification completed on
 - `cmake --build --preset ci --target IntrinsicTests`
 - `ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\.Mesh(Remesh|Subdivide|Simplify)' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180`
 - `ctest --test-dir build/ci --output-on-failure -R 'Mesh(Remesh|Subdivide|Simplify)|EditorCommandHistory|Mutation' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180`
+- `python3 tools/repo/check_layering.py --root src --strict`
+- `python3 tools/repo/check_test_layout.py --root . --strict`
+- `python3 tools/docs/check_doc_links.py --root .`
+- `python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main --head-ref HEAD --strict`
+- `python3 tools/repo/check_root_hygiene.py --root .`
+- `python3 tools/agents/check_task_policy.py --root . --strict`
+- `python3 tools/agents/check_task_state_links.py --root . --strict`
+- `python3 tools/agents/generate_session_brief.py --check`
+
+UV-regeneration history convergence verification completed on 2026-07-29:
+
+- `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
+- `ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\.(UvRegeneration|Mesh(Remesh|Subdivide|Simplify))' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+- `ctest --test-dir build/ci --output-on-failure -R 'UvRegeneration|Mesh(Remesh|Subdivide|Simplify)|EditorCommandHistory|Mutation' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 180`
 - `python3 tools/repo/check_layering.py --root src --strict`
 - `python3 tools/repo/check_test_layout.py --root . --strict`
 - `python3 tools/docs/check_doc_links.py --root .`

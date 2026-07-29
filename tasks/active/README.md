@@ -15,8 +15,9 @@ Each active task should include:
   is in progress on `codex/runtime-201-unified-editor-mutation`; Slice A's
   internal transaction helper and atomicity/staleness contracts are complete,
   direct/ICP transform publication and coalesced gizmo drag commit now use it,
-  `GizmoUndoStack` is deleted, and geometry/property mutation is the next
-  owner-scoped adoption.
+  `GizmoUndoStack` is deleted, migrated mesh property/topology owners include
+  UV regeneration, and point-cloud replacement is the next owner-scoped
+  adoption.
 
 ## History
 
