@@ -1,0 +1,63 @@
+session:
+  id: "2026-07-29_002"
+  date: "2026-07-29"
+  started: "2026-07-29T14:07+02:00"
+  last_turn: "2026-07-29T14:07+02:00"
+  turn_count: 1
+  summary: "Recovered the completed RUNTIME-201 retirement trace after converging editor mutations on one validated history transaction with complete CPU evidence."
+
+events_logged:
+  - turn: 1
+    type: experiment
+    id: "N295"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired RUNTIME-201 after one transaction/history owner passed 89 focused and 4,059 complete CPU-supported cases."
+  - turn: 1
+    type: claim
+    id: "O76"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the CPU-scoped single editor-mutation transaction capability as C16."
+
+ai_actions:
+  - turn: 1
+    action: "Completed RUNTIME-201 owner migrations and cleanup, added exact stale/undo/redo plus structural contracts, classified import as dirty-only lifecycle, passed focused and complete CPU gates, retired the task, and recorded the bounded capability claim."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.EditorMutation.Internal.hpp"
+      - "src/runtime/Runtime.EditorCommandHistory.cppm"
+      - "src/runtime/Runtime.SandboxEditorFacades.cpp"
+      - "src/runtime/Runtime.SandboxMethodFacade.cpp"
+      - "src/runtime/Runtime.SandboxParameterizationFacade.cpp"
+      - "src/runtime/Gizmos/Runtime.GizmoInteraction.cpp"
+      - "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp"
+      - "tests/contract/runtime/Test.EditorCommandHistory.cpp"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorVisualization.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp"
+      - "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp"
+      - "docs/architecture/runtime.md"
+      - "src/runtime/README.md"
+      - "tasks/done/RUNTIME-201-unified-editor-mutation-history-transaction.md"
+      - "ara/logic/claims.md"
+      - "ara/staging/observations.yaml"
+
+claims_touched:
+  - id: C16
+    action: crystallized
+    turn: 1
+
+key_context:
+  - turn: 1
+    excerpt: "This historical turn was recovered from stash 6cc63b35 after its implementation and C16/O76 records had already entered main through the RUNTIME-201 merge."
+  - turn: 1
+    excerpt: "Import creation, authoring, and enrichment remain a non-undoable dirty-only lifecycle; BUG-095 and RUNTIME-200 own their separate follow-up work."
+
+open_threads:
+  - "RUNTIME-200 remains the next runtime abstraction-consolidation task."
+  - "METHOD-014 and O38 continue to own unproven Progressive Poisson compute/public Vulkan parity."
+  - "N273, O57, and O58 remain open for a separately selected mechanical runtime-directory reorganization."
+
+ai_suggestions_pending: []

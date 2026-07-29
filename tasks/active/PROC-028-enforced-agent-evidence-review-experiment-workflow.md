@@ -6,21 +6,25 @@ workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
 owner: "Codex"
-branch: "codex/proc-028-enforced-agent-workflow"
-worktree: "/home/alex/Documents/IntrinsicEngine-proc-028"
-claimed_at: "2026-07-29T22:27:54Z"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-07-29T23:07:43Z"
 ---
 # PROC-028 — Enforce agent evidence, review, and experiment custody
 
 ## Status
 
-- Implementation complete on `codex/proc-028-enforced-agent-workflow`;
-  owner: Codex.
-- Isolated worktree: `/home/alex/Documents/IntrinsicEngine-proc-028`.
+- Implementation and the fixed-revision evidence-validation repair are
+  integrated on local `main`; owner: Codex.
+- The implementation claim was released after integration. The task is paused
+  without a live writer in the canonical
+  `/home/alex/Documents/IntrinsicEngine` worktree.
 - Focused workflow/benchmark regressions, strict touched structural gates,
   `ci` configuration, `IntrinsicTests`, `IntrinsicBenchmarks`, strict generated
   benchmark validation, and the complete default CPU-supported CTest selector
-  pass locally.
+  pass locally. The post-integration workflow regression bundle passes 90/90;
+  the combined main tree passes the 89-case RUNTIME-201 selector and all 4,059
+  CPU-supported cases with one expected GLFW/LSan self-skip.
 - Retirement remains blocked on a distinct fixed-revision independent review
   and on pre-existing `BUG-120`: `Test.WorkflowConcurrency.py`, already wired
   into `ci-docs`, fails against byte-identical `origin/main` sources because

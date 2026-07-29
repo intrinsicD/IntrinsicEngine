@@ -7043,3 +7043,92 @@ tree:
       was fetched but not pushed. PROC-028 remains active for independent
       fixed-revision review and BUG-120.
     status: resolved
+  - id: N295
+    type: experiment
+    title: "Retire runtime editor mutations onto one validated history transaction"
+    provenance: ai-executed
+    timestamp: "2026-07-29T14:07+02:00"
+    also_depends_on: [N104, N106, N107]
+    evidence:
+      - "tasks/done/RUNTIME-201-unified-editor-mutation-history-transaction.md"
+      - "src/runtime/Runtime.EditorMutation.Internal.hpp"
+      - "src/runtime/Runtime.EditorCommandHistory.cppm"
+      - "src/runtime/Runtime.SandboxEditorFacades.cpp"
+      - "src/runtime/Runtime.SandboxMethodFacade.cpp"
+      - "src/runtime/Runtime.SandboxParameterizationFacade.cpp"
+      - "src/runtime/Gizmos/Runtime.GizmoInteraction.cpp"
+      - "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp"
+      - "tests/contract/runtime/Test.EditorCommandHistory.cpp"
+      - "tests/contract/runtime/Test.RuntimeEngineLayering.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorVisualization.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp"
+      - "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp"
+      - "focused CPU history/mutation selector: 89/89"
+      - "complete CPU-supported selector: 4059/4059 plus one expected GLFW/LeakSanitizer self-skip"
+      - "strict layering, test-layout, docs, task, ARA, inventory, whitespace, and clean-workshop checks"
+      - "commits ecd484d7 through 061e037c"
+      - "recovered from pre-main-consolidation stash 6cc63b35c70458bcdcf15c956731b0a660a37729"
+    result: >
+      Every undoable production runtime entity and geometry edit now enters
+      one include-only generation-validated transaction and the single
+      EditorCommandHistory while feature owners retain exact typed
+      before/after state, validation, apply, and dirty policy. Direct and
+      queued transform, gizmo, visualization/presentation, geometry,
+      parameterization, normal/channel, clustering, and Progressive Poisson
+      workflows have exact stale rejection and undo/redo coverage. Import
+      creation, authoring, and enrichment remain a documented dirty-only
+      lifecycle. The gizmo stack, CommandBus inverse hook, and mutation-
+      specific history adapters are absent. CPU contracts and structural
+      gates passed; no GPU/Vulkan or performance claim is made.
+    status: resolved
+  - id: N296
+    type: decision
+    title: "Consolidate PROC-028 and completed runtime cleanup on canonical main"
+    provenance: user
+    timestamp: "2026-07-30T01:02+02:00"
+    also_depends_on: [N293, N294, N295]
+    choice: >
+      Put the complete PROC-028 workflow and its fixed-revision validator
+      repair on main first, merge the already-completed RUNTIME-201 history
+      second, and leave one canonical main worktree ready for a restarted
+      runtime-cleanup agent.
+    alternatives:
+      - "Keep separate IntrinsicEngine-main and IntrinsicEngine-proc-028 worktrees."
+      - "Resume runtime cleanup before the repaired workflow reaches main."
+      - "Discard or overwrite the dirty RUNTIME-201 checkout during consolidation."
+    evidence:
+      - "commit e800ede9"
+      - "commit 37895297"
+      - "merge commit 26d50449"
+      - "git worktree list: /home/alex/Documents/IntrinsicEngine on main"
+    status: resolved
+  - id: N297
+    type: experiment
+    title: "Exercise fixed-revision evidence across subsequent runtime integration"
+    provenance: ai-executed
+    timestamp: "2026-07-30T01:02+02:00"
+    also_depends_on: [N292, N295, N296]
+    evidence:
+      - "tools/agents/workflow_evidence.py"
+      - "tests/regression/tooling/Test.WorkflowEvidence.py"
+      - "docs/agent/workflow-evidence.md"
+      - "source-surface fixed-revision repair commit e800ede9"
+      - "artifact fixed-revision repair commit b1c2d7b3"
+      - "clean evidence-binding commit 37895297"
+      - "PROC-first runtime merge commit 26d50449"
+      - "workflow and benchmark regression bundle: 90/90"
+      - "post-merge focused runtime selector: 89/89"
+      - "post-merge complete CPU-supported selector: 4059/4059 plus one expected GLFW/LeakSanitizer self-skip"
+      - "post-merge strict task, evidence, ARA, docs, layering, test-layout, and root-hygiene gates: zero errors"
+    result: >
+      The first attempted follow-on merge exposed that clean workflow reports
+      were incorrectly validated against the current worktree instead of their
+      recorded base and head revisions. The repair now resolves clean report
+      paths, hashes, and diffs at that fixed revision while dirty reports
+      remain bound to the current worktree; five regressions cover source
+      surfaces and referenced artifacts across both contracts. After rebinding
+      the evidence, RUNTIME-201 merged after PROC and the combined tree passed
+      all recorded gates. PROC-028 remains active only for distinct
+      independent review and BUG-120; no push was performed.
+    status: resolved
