@@ -78,6 +78,10 @@ The receipt records exact argv, repository-relative working directory,
 timestamps, duration, exit code, required/optional status, and hashed stdout
 and stderr logs. Labels are non-overwriting.
 
+Command stdout/stderr logs are preserved as raw hash-bound bytes.
+`tasks/evidence/.gitattributes` marks them as binary so Git does not normalize
+line endings or reinterpret captured tool whitespace.
+
 Generate the report after task checkboxes and the review surface are final:
 
 ```bash

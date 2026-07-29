@@ -8,7 +8,7 @@ evidence: required
 owner: "Codex"
 branch: "main"
 worktree: "/home/alex/Documents/IntrinsicEngine"
-claimed_at: "2026-07-29T23:07:43Z"
+claimed_at: "2026-07-29T23:11:03Z"
 ---
 # PROC-028 — Enforce agent evidence, review, and experiment custody
 
