@@ -21,6 +21,13 @@ from `tasks/backlog/` (see `docs/agent/prompt/prompt.md`); in that case record
 the owner/branch in the task file while it is being worked so concurrent
 sessions do not pick it up.
 
+New or changed tasks use workflow schema v1 from the templates. Untouched
+pre-policy task hashes are prospectively grandfathered; historical tasks are
+not backfilled. Active work uses one writer per worktree and an atomic
+Git-common-dir claim (`tools/agents/task_claim.py`). Completion evidence and
+risk profiles are defined in
+[`docs/agent/workflow-evidence.md`](../docs/agent/workflow-evidence.md).
+
 The generated [`SESSION-BRIEF.md`](SESSION-BRIEF.md) is the authoritative
 open/unblocked view of this tree; regenerate it with
 `python3 tools/agents/generate_session_brief.py` after opening, retiring, or
@@ -73,7 +80,8 @@ Recently archived trackers:
 ## Required task shape
 
 All new task files should be based on templates in `tasks/templates/` and
-must start with YAML front-matter (`id`, `theme`, `depends_on`; see
+must start with YAML front-matter (`id`, `theme`, `depends_on`, workflow
+profile/evidence, and ownership fields; see
 [`docs/agent/task-format.md`](../docs/agent/task-format.md)) followed by:
 
 - Goal

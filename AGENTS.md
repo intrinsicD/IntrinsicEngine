@@ -279,6 +279,12 @@ For each change:
 ## 8. Benchmarking protocol
 
 - Benchmarks must use declared manifests and stable IDs.
+- Canonical result schema v2 keeps stable `benchmark_id` separate from
+  append-only `run_id`/`attempt_id`, binds the exact manifest hash, resolved
+  params/warmup/thresholds, and source state, and recomputes gate disposition.
+- `"local-dev"`, dirty, historical, or unverified source is non-claim-eligible;
+  claim eligibility is explicit and requires a clean exact commit or an
+  approved sealed snapshot/diff identity.
 - Distinguish smoke checks from heavy/nightly runs.
 - Record metrics and diagnostics in machine-readable output.
 - Do not claim performance wins without baseline comparison.
@@ -353,12 +359,22 @@ Every task execution should follow this sequence:
 3. Write or update task file.
     - Base new task files on `tasks/templates/`; do not create long-lived root-level planning checklists once work
       belongs in `tasks/backlog/`, `tasks/active/`, or `tasks/done/`.
+    - New/changed tasks enroll in workflow schema v1. Use one writer per
+      worktree and acquire the Git-common-dir task claim before substantive
+      edits; parallel coding uses separate branches/worktrees.
 4. Implement the smallest useful patch.
 5. Add or update tests.
 6. Add or update docs.
 7. Run verification.
 8. Update generated inventories.
 9. Self-review against PR checklist.
+
+Before retiring an enrolled task, validate its generated completion report.
+`high-risk` and higher profiles additionally require a durable handoff and an
+accepted independent fixed-surface review. `claim-grade` and `protected`
+profiles add the frozen experiment/authorization custody defined in
+`docs/agent/workflow-evidence.md`. Historical tasks are not backfilled; the
+prospective inventory deterministically enrolls new or changed open work.
 
 The generated `tasks/SESSION-BRIEF.md` is the authoritative open/unblocked
 view of the task tree (derived from task front-matter); consult it before
@@ -379,6 +395,8 @@ Before commit/PR, verify:
 - Docs and task records are synchronized.
 - Temporary compatibility shims are tracked with removal follow-up.
 - Mechanical moves and semantic edits are not mixed.
+- Enrolled completion evidence matches the final source surface and profile;
+  high-risk acceptance is independent and revision-bound.
 
 ## 13. Temporary migration exceptions
 
@@ -403,6 +421,7 @@ Read this `AGENTS.md` file at the start of every session/task; it is the authori
 | `docs/agent/prompt/prompt.md`                 | Starting a generic (non-task-specific) session: work selection, slice picking, verification bundles, commit/PR hygiene, anti-patterns, and multi-task loop-mode policy (default stop condition, checkpoint pushes).      |
 | `docs/architecture/index.md`                  | Designing subsystem architecture, algorithm backend splits, config/command control surfaces, recipe/frame composition, or deciding which canonical architecture doc or ADR governs a change.                           |
 | `docs/agent/task-format.md`                   | Creating, promoting, retiring, or materially updating files under `tasks/`.                                                                                                                                             |
+| `docs/agent/workflow-evidence.md`             | Selecting an enrolled workflow profile; claiming worktrees/tasks; generating completion evidence; or running high-risk, claim-grade, or protected custody.                                                              |
 | `docs/agent/review-checklist.md`              | Before committing or reporting completion for any non-trivial change.                                                                                                                                                   |
 | `docs/agent/architecture-review-checklist.md` | Changing dependency boundaries, module ownership, source layout, runtime wiring, or architecture docs.                                                                                                                  |
 | `docs/agent/method-workflow.md`               | Implementing or modifying paper/method work under `methods/` or method-backed integrations.                                                                                                                             |

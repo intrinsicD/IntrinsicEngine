@@ -89,5 +89,11 @@ usually do, because both assert observed behavior.
   spirit: supersede, do not erase.
 - Recording a benchmark number in a claim without the manifest and baseline the benchmarking
   protocol requires (`AGENTS.md` §8, `docs/agent/benchmark-workflow.md`).
+- Treating a generated task report, canonical benchmark result, or accepted
+  bundle audit as automatic claim authorization. Claim eligibility is explicit;
+  claim-grade work also owes its frozen protocol, source/data/config seals,
+  independent audit, and this ledger row.
+- Hiding failed cells, excluded rows, abandoned attempts, or superseded
+  protocols while presenting only the successful confirmation path.
 - Treating green CPU CI as evidence for GPU or Vulkan behavior. Those are distinct evidence
   classes; say which one a claim rests on.

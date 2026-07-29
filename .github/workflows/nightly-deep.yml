@@ -145,12 +145,20 @@ jobs:
             --build-dir build/ci \
             --targets IntrinsicBenchmarkSmoke
           mkdir -p build/ci/benchmark/nightly
-          build/ci/bin/IntrinsicBenchmarkSmoke build/ci/benchmark/nightly/smoke_result.json
+          python3 tools/benchmark/run_and_seal.py \
+            --executable build/ci/bin/IntrinsicBenchmarkSmoke \
+            --output build/ci/benchmark/nightly/smoke_result.json \
+            --manifests-root benchmarks \
+            --run-id "nightly-${GITHUB_RUN_ID}" \
+            --attempt-id "attempt-${GITHUB_RUN_ATTEMPT}"
           python3 tools/ci/check_prerequisites.py path \
             --path build/ci/benchmark \
             --kind dir \
             --producer-target IntrinsicBenchmarks
-          python3 tools/benchmark/validate_benchmark_results.py --root build/ci/benchmark
+          python3 tools/benchmark/validate_benchmark_results.py \
+            --root build/ci/benchmark \
+            --manifests-root benchmarks \
+            --strict
 
       - name: Report audit cadence status (non-blocking)
         if: always()

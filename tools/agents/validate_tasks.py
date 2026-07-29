@@ -8,6 +8,8 @@ Use --strict to fail with exit code 1 when findings are present.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import re
 import sys
 from dataclasses import dataclass
@@ -41,6 +43,18 @@ ACTIONABLE_TODO_SECTIONS = [
 # carry a reduced section set. Retirement rules (closed todos, completion
 # date, commit/PR reference) apply unchanged.
 MICRO_TEMPLATE_RE = re.compile(r"^template:\s*micro\s*$", re.MULTILINE)
+WORKFLOW_SCHEMA_VERSION = 1
+WORKFLOW_PROFILES = {
+    "micro",
+    "standard",
+    "high-risk",
+    "claim-grade",
+    "protected",
+}
+WORKFLOW_EVIDENCE_VALUES = {"required", "not_applicable"}
+WORKFLOW_LEGACY_INVENTORY = (
+    Path(__file__).resolve().with_name("workflow_legacy_tasks.json")
+)
 
 REQUIRED_SECTIONS_MICRO = [
     "Goal",
@@ -242,9 +256,15 @@ def validate_task(parsed: ParsedTask, mode: str) -> list[Finding]:
     )
 
     if not parsed.task_id:
-        findings.append(Finding("error", rel_path, "missing task header with ID (`# <ID> — <title>`)."))
+        findings.append(
+            Finding(
+                "error", rel_path, "missing task header with ID (`# <ID> — <title>`)."
+            )
+        )
 
-    missing_sections = [name for name in required_sections if name not in parsed.sections]
+    missing_sections = [
+        name for name in required_sections if name not in parsed.sections
+    ]
     if missing_sections:
         findings.append(
             Finding(
@@ -259,7 +279,11 @@ def validate_task(parsed: ParsedTask, mode: str) -> list[Finding]:
     is_done = "done" in path_parts
 
     if is_active and "Acceptance criteria" not in parsed.sections:
-        findings.append(Finding("error", rel_path, "active task must include `## Acceptance criteria`."))
+        findings.append(
+            Finding(
+                "error", rel_path, "active task must include `## Acceptance criteria`."
+            )
+        )
 
     for section in actionable_sections:
         body = parsed.section_bodies.get(section, "")
@@ -346,12 +370,60 @@ def validate_front_matter(
         )
         return findings
 
+    class UniqueKeyLoader(yaml.SafeLoader):
+        """Safe YAML loader which rejects duplicate mapping keys."""
+
+    def construct_unique_mapping(loader, node, deep=False):
+        mapping = {}
+        for key_node, value_node in node.value:
+            key = loader.construct_object(key_node, deep=deep)
+            if key in mapping:
+                raise yaml.constructor.ConstructorError(
+                    "while constructing a mapping",
+                    node.start_mark,
+                    f"found duplicate key {key!r}",
+                    key_node.start_mark,
+                )
+            mapping[key] = loader.construct_object(value_node, deep=deep)
+        return mapping
+
+    UniqueKeyLoader.add_constructor(
+        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+        construct_unique_mapping,
+    )
+
+    legacy_hashes: dict[str, str] = {}
+    if WORKFLOW_LEGACY_INVENTORY.is_file():
+        try:
+            inventory = json.loads(
+                WORKFLOW_LEGACY_INVENTORY.read_text(encoding="utf-8")
+            )
+            if (
+                isinstance(inventory, dict)
+                and inventory.get("schema_version") == 1
+                and isinstance(inventory.get("tasks"), dict)
+            ):
+                legacy_hashes = inventory["tasks"]
+            else:
+                raise ValueError("expected schema_version 1 and a tasks mapping")
+        except (json.JSONDecodeError, OSError, ValueError) as exc:
+            findings.append(
+                Finding(
+                    "error",
+                    WORKFLOW_LEGACY_INVENTORY,
+                    f"workflow legacy inventory is invalid: {exc}",
+                )
+            )
+
+    tasks_root = _tasks_root(parsed_tasks)
+
     for parsed in parsed_tasks:
         path_parts = {p.lower() for p in parsed.path.parts}
-        if "done" in path_parts:
-            continue
+        micro = is_micro_task(parsed)
 
         if parsed.front_matter is None:
+            if "done" in path_parts:
+                continue
             findings.append(
                 Finding(
                     "error",
@@ -363,12 +435,16 @@ def validate_front_matter(
             continue
 
         try:
-            data = yaml.safe_load(parsed.front_matter)
+            data = yaml.load(parsed.front_matter, Loader=UniqueKeyLoader)
         except yaml.YAMLError as exc:
-            findings.append(Finding("error", parsed.path, f"front-matter is not valid YAML: {exc}"))
+            findings.append(
+                Finding("error", parsed.path, f"front-matter is not valid YAML: {exc}")
+            )
             continue
         if not isinstance(data, dict):
-            findings.append(Finding("error", parsed.path, "front-matter must be a YAML mapping."))
+            findings.append(
+                Finding("error", parsed.path, "front-matter must be a YAML mapping.")
+            )
             continue
 
         fm_id = data.get("id")
@@ -381,16 +457,27 @@ def validate_front_matter(
                 )
             )
 
+        if "done" in path_parts and "workflow_schema" not in data:
+            continue
+
         theme = data.get("theme")
         if not isinstance(theme, str) or not theme.strip():
             findings.append(
-                Finding("error", parsed.path, "front-matter `theme` must be a non-empty string.")
+                Finding(
+                    "error",
+                    parsed.path,
+                    "front-matter `theme` must be a non-empty string.",
+                )
             )
 
         depends_on = data.get("depends_on")
         if not isinstance(depends_on, list):
             findings.append(
-                Finding("error", parsed.path, "front-matter `depends_on` must be a list (may be empty).")
+                Finding(
+                    "error",
+                    parsed.path,
+                    "front-matter `depends_on` must be a list (may be empty).",
+                )
             )
         else:
             for dep in depends_on:
@@ -404,10 +491,178 @@ def validate_front_matter(
                         )
                     )
 
+        workflow_schema = data.get("workflow_schema")
+        if workflow_schema is None:
+            if "done" not in path_parts:
+                rel = _task_inventory_path(parsed.path, tasks_root)
+                expected_hash = legacy_hashes.get(rel)
+                actual_hash = hashlib.sha256(parsed.path.read_bytes()).hexdigest()
+                if expected_hash != actual_hash:
+                    findings.append(
+                        Finding(
+                            "error",
+                            parsed.path,
+                            "new or changed open task is outside the prospective "
+                            "workflow inventory and must declare `workflow_schema: 1`; "
+                            "untouched historical tasks alone are grandfathered.",
+                        )
+                    )
+            continue
+
+        if workflow_schema != WORKFLOW_SCHEMA_VERSION:
+            findings.append(
+                Finding(
+                    "error",
+                    parsed.path,
+                    f"front-matter `workflow_schema` must equal "
+                    f"{WORKFLOW_SCHEMA_VERSION}.",
+                )
+            )
+            continue
+
+        profile = data.get("workflow_profile")
+        if profile not in WORKFLOW_PROFILES:
+            findings.append(
+                Finding(
+                    "error",
+                    parsed.path,
+                    "front-matter `workflow_profile` must be one of: "
+                    + ", ".join(sorted(WORKFLOW_PROFILES))
+                    + ".",
+                )
+            )
+
+        evidence = data.get("evidence")
+        if evidence not in WORKFLOW_EVIDENCE_VALUES:
+            findings.append(
+                Finding(
+                    "error",
+                    parsed.path,
+                    "front-matter `evidence` must be `required` or `not_applicable`.",
+                )
+            )
+
+        if micro and profile != "micro":
+            findings.append(
+                Finding(
+                    "error",
+                    parsed.path,
+                    "`template: micro` requires `workflow_profile: micro`.",
+                )
+            )
+        if not micro and profile == "micro":
+            findings.append(
+                Finding(
+                    "error",
+                    parsed.path,
+                    "`workflow_profile: micro` requires `template: micro`.",
+                )
+            )
+
+        skip_reason = data.get("evidence_skip_reason")
+        if profile == "micro":
+            if evidence != "not_applicable":
+                findings.append(
+                    Finding(
+                        "error",
+                        parsed.path,
+                        "micro tasks must use `evidence: not_applicable`.",
+                    )
+                )
+            if not isinstance(skip_reason, str) or not skip_reason.strip():
+                findings.append(
+                    Finding(
+                        "error",
+                        parsed.path,
+                        "micro evidence exemption requires a non-empty "
+                        "`evidence_skip_reason`.",
+                    )
+                )
+        elif evidence != "required":
+            findings.append(
+                Finding(
+                    "error",
+                    parsed.path,
+                    "standard and higher profiles require `evidence: required`.",
+                )
+            )
+
+        for key in ("owner", "branch", "worktree"):
+            value = data.get(key)
+            if "active" in path_parts:
+                if not isinstance(value, str) or not value.strip():
+                    findings.append(
+                        Finding(
+                            "error",
+                            parsed.path,
+                            f"active workflow task requires non-empty `{key}`.",
+                        )
+                    )
+            elif value is not None and (
+                not isinstance(value, str) or not value.strip()
+            ):
+                findings.append(
+                    Finding(
+                        "error",
+                        parsed.path,
+                        f"front-matter `{key}` must be null or a non-empty string.",
+                    )
+                )
+
+        claimed_at = data.get("claimed_at")
+        if "active" in path_parts:
+            if claimed_at is None or not _is_timestamp_like(claimed_at):
+                findings.append(
+                    Finding(
+                        "error",
+                        parsed.path,
+                        "active workflow task requires ISO-8601 `claimed_at`.",
+                    )
+                )
+        elif claimed_at is not None and not _is_timestamp_like(claimed_at):
+            findings.append(
+                Finding(
+                    "error",
+                    parsed.path,
+                    "front-matter `claimed_at` must be null or an ISO-8601 timestamp.",
+                )
+            )
+
     return findings
 
 
-def validate_id_uniqueness(parsed_tasks: list[ParsedTask], tasks_root: Path) -> list[Finding]:
+def _tasks_root(parsed_tasks: list[ParsedTask]) -> Path:
+    if not parsed_tasks:
+        return Path("tasks")
+    path = parsed_tasks[0].path.resolve()
+    for parent in (path, *path.parents):
+        if parent.name == "tasks":
+            return parent
+    return path.parent
+
+
+def _task_inventory_path(path: Path, tasks_root: Path) -> str:
+    try:
+        return path.resolve().relative_to(tasks_root.resolve()).as_posix()
+    except ValueError:
+        return path.resolve().as_posix()
+
+
+def _is_timestamp_like(value: object) -> bool:
+    if not isinstance(value, str) or "T" not in value:
+        return False
+    try:
+        from datetime import datetime
+
+        datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return True
+
+
+def validate_id_uniqueness(
+    parsed_tasks: list[ParsedTask], tasks_root: Path
+) -> list[Finding]:
     findings: list[Finding] = []
     by_id: dict[str, list[ParsedTask]] = {}
     for parsed in parsed_tasks:
@@ -442,8 +697,14 @@ def validate_id_uniqueness(parsed_tasks: list[ParsedTask], tasks_root: Path) -> 
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Validate structured task markdown files.")
-    parser.add_argument("--root", default="tasks", help="Path to the tasks root directory (default: tasks).")
+    parser = argparse.ArgumentParser(
+        description="Validate structured task markdown files."
+    )
+    parser.add_argument(
+        "--root",
+        default="tasks",
+        help="Path to the tasks root directory (default: tasks).",
+    )
     parser.add_argument(
         "--strict",
         action="store_true",
@@ -490,7 +751,9 @@ def main() -> int:
             display = finding.path
         print(f"[{finding.level.upper()}] {display}: {finding.message}")
 
-    print(f"Validated {len(files)} task file(s); findings: {len(findings)}; mode: {mode}.")
+    print(
+        f"Validated {len(files)} task file(s); findings: {len(findings)}; mode: {mode}."
+    )
 
     if args.strict and findings:
         return 1

@@ -6916,3 +6916,85 @@ tree:
       and obsolete tests are absent. CPU contracts and both exact promoted-
       Vulkan readbacks passed; no performance claim is made.
     status: resolved
+  - id: N289
+    type: question
+    title: "Which donor agent workflows are genuinely absent from IntrinsicEngine?"
+    provenance: user
+    timestamp: "2026-07-29T20:14+02:00"
+    description: >
+      Compare agent-kit, realtime-gs, structsplat, and prospect against
+      IntrinsicEngine's existing task, review, benchmark, method, ARA, and CI
+      authorities; retain only missing controls that improve IntrinsicEngine,
+      and right-size them as repository-native workflow rather than importing
+      a donor framework.
+    status: resolved
+  - id: N290
+    type: experiment
+    title: "Audit four donor repositories against IntrinsicEngine workflow"
+    provenance: ai-executed
+    timestamp: "2026-07-29T20:14+02:00"
+    evidence:
+      - "tasks/active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md"
+      - "AGENTS.md"
+      - "docs/agent/task-format.md"
+      - "docs/agent/review-checklist.md"
+      - "docs/agent/benchmark-workflow.md"
+      - "docs/agent/ara-evidence-policy.md"
+    result: >
+      The comparison retained nine gaps: generated task evidence, strict
+      source/manifest-bound benchmark results, fixed-revision independent
+      review, durable handoff, frozen claim-grade protocols, immutable
+      append-only run custody, result-free prospective authorization for
+      protected attempts, portable audited result bundles, and atomic
+      concurrent ownership. Existing IntrinsicEngine task, method, benchmark,
+      ARA, skill, documentation, and CI authorities remain canonical.
+    status: resolved
+  - id: N291
+    type: decision
+    title: "Implement the donor audit as one repository-native workflow task"
+    provenance: user
+    timestamp: "2026-07-29T20:14+02:00"
+    also_depends_on: [N289, N290]
+    choice: >
+      Keep all nine retained gaps in PROC-028 and implement them as cumulative
+      plain-file workflow profiles integrated with existing validators and CI.
+    alternatives:
+      - "Split the gaps into unrelated long-lived tasks."
+      - "Transplant a donor agent framework or external orchestration service."
+      - "Leave the audit as an unimplemented planning document."
+    evidence:
+      - "tasks/active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md"
+      - "N290"
+    status: resolved
+  - id: N292
+    type: experiment
+    title: "Implement and exercise the enforced agent workflow"
+    provenance: ai-executed
+    timestamp: "2026-07-29T20:14+02:00"
+    also_depends_on: [N290, N291]
+    evidence:
+      - "tools/agents/workflow_evidence.py"
+      - "tools/agents/experiment_custody.py"
+      - "tools/agents/task_claim.py"
+      - "tools/agents/validate_tasks.py"
+      - "tools/benchmark/validate_benchmark_results.py"
+      - "tools/benchmark/seal_benchmark_results.py"
+      - "tests/regression/tooling/Test.WorkflowEvidence.py"
+      - "tests/regression/tooling/Test.ExperimentCustody.py"
+      - "tests/regression/tooling/Test.TaskClaim.py"
+      - "tests/regression/tooling/Test_BenchmarkResultValidator.py"
+      - "focused workflow and benchmark regressions: 85/85"
+      - "generated native benchmark smoke results validated: 25/25"
+      - "complete CPU-supported selector: 4042 selected with zero failures and one expected self-skip"
+      - "BUG-120 records unrelated Test.WorkflowConcurrency drift reproduced against origin/main"
+    result: >
+      PROC-028 now supplies cumulative micro, standard, high-risk, claim-grade,
+      and protected profiles using versioned YAML/JSON/JSONL artifacts; strict
+      generated task evidence; source/manifest-bound benchmark results;
+      revision-bound review and handoff; frozen protocol/run/bundle custody;
+      result-free protected authorization; and Git-common-dir atomic task/path
+      claims. The implementation uses existing task, benchmark, ARA, docs, and
+      CI authorities. The task remains active for a genuinely distinct
+      fixed-revision review and the pre-existing BUG-120 gate; no performance,
+      identity, or scientific-correctness claim is made.
+    status: resolved

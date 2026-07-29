@@ -24,6 +24,10 @@ Each manifest **must** contain the following top-level fields:
 - `metrics` (non-empty list of strings)
 - `thresholds` (mapping/object)
 
+The canonical result copies and hashes the exact resolved manifest. Changing
+params, metrics, warmup, or thresholds therefore invalidates an old result's
+binding rather than silently reinterpreting it.
+
 ## ID and naming rules
 
 - `benchmark_id` must be a non-empty string using dotted namespace style.
@@ -49,8 +53,26 @@ The validator currently accepts the following metric names:
 - `sample_count`
 - `warm_population_count`
 - `cold_population_statistics`
+- `avgFrameTimeMs`
+- `p99FrameTimeMs`
+- `avgFPS`
+- `totalFrames`
 
 Additional metrics can be added in a dedicated schema update task.
+
+## Threshold naming
+
+Each numeric gate ends in `_max` or `_min` and contains exactly one declared
+metric name. Examples:
+
+- `smoke_runtime_ms_max` maps to `runtime_ms <= limit`.
+- `throughput_items_per_sec_min` maps to
+  `throughput_items_per_sec >= limit`.
+- `priority_inversion_quality_error_l2_max` maps to
+  `quality_error_l2 <= limit`.
+
+The result sealer computes the disposition; producers do not choose a passed
+status independently of these gates.
 
 ## Placeholders
 
@@ -68,7 +90,10 @@ Placeholders are accepted in `method` and `dataset` values to support staged rol
 benchmark_id: geometry.example.small
 method: geometry.example
 dataset: builtin.triangle_mesh.small
-params: {}
+params:
+  intent: smoke
+  warmup_iterations: 1
+  measured_iterations: 8
 metrics:
   - runtime_ms
   - memory_peak_bytes

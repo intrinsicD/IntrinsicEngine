@@ -12,8 +12,12 @@ Benchmarking in IntrinsicEngine exists to validate both **correctness** and **pe
 
 ## Core principles
 
-1. Every benchmark uses a stable `benchmark_id`.
+1. Every definition uses a stable `benchmark_id`; executions use distinct,
+   append-only `run_id`/`attempt_id`.
 2. Every benchmark declares method, dataset, metrics, and thresholds where relevant.
-3. Every execution emits schema-valid JSON results.
+3. Every execution is sealed as schema-v2 JSON against the exact manifest,
+   source state, resolved params/warmup, and recomputed thresholds.
 4. Performance claims must reference a baseline comparison.
 5. Heavy workloads must be isolated from PR-fast CI.
+6. Claim eligibility is explicit; local, dirty, historical, and unverified
+   results remain diagnostic evidence only.

@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.28)
 
 set(INTRINSIC_BENCHMARK_ROOT "${CMAKE_CURRENT_SOURCE_DIR}" CACHE INTERNAL "Intrinsic benchmark root")
 include(${CMAKE_SOURCE_DIR}/cmake/CompileShaders.cmake)
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
 find_program(INTRINSIC_BENCHMARK_LLVM_SYMBOLIZER
     NAMES llvm-symbolizer llvm-symbolizer-18 llvm-symbolizer-19 llvm-symbolizer-20 llvm-symbolizer-21 llvm-symbolizer-22
@@ -76,7 +77,13 @@ set(INTRINSIC_BENCHMARK_SMOKE_OUTPUT
 
 add_custom_target(IntrinsicBenchmarks
     COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_BINARY_DIR}/benchmark"
-    COMMAND $<TARGET_FILE:IntrinsicBenchmarkSmoke> ${INTRINSIC_BENCHMARK_SMOKE_OUTPUT}
+    COMMAND ${Python3_EXECUTABLE}
+        "${CMAKE_SOURCE_DIR}/tools/benchmark/run_and_seal.py"
+        --executable $<TARGET_FILE:IntrinsicBenchmarkSmoke>
+        --output ${INTRINSIC_BENCHMARK_SMOKE_OUTPUT}
+        --manifests-root "${CMAKE_SOURCE_DIR}/benchmarks"
+        --run-id "cmake-smoke"
+        --attempt-id "attempt-001"
     DEPENDS IntrinsicBenchmarkSmoke
     COMMENT "Running benchmark smoke scaffold"
 )
@@ -117,7 +124,13 @@ if(BUILD_TESTING)
 
     add_test(
         NAME IntrinsicBenchmarkSmoke.Run
-        COMMAND $<TARGET_FILE:IntrinsicBenchmarkSmoke> "${_intrinsic_bench_smoke_test_dir}"
+        COMMAND ${Python3_EXECUTABLE}
+            "${CMAKE_SOURCE_DIR}/tools/benchmark/run_and_seal.py"
+            --executable $<TARGET_FILE:IntrinsicBenchmarkSmoke>
+            --output "${_intrinsic_bench_smoke_test_dir}"
+            --manifests-root "${CMAKE_SOURCE_DIR}/benchmarks"
+            --run-id "ctest-smoke"
+            --attempt-id "attempt-001"
     )
     set_tests_properties(IntrinsicBenchmarkSmoke.Run PROPERTIES
         LABELS "benchmark;core;geometry;graphics;physics;slow"
@@ -126,7 +139,6 @@ if(BUILD_TESTING)
         FIXTURES_SETUP IntrinsicBenchmarkSmoke
     )
 
-    find_package(Python3 COMPONENTS Interpreter QUIET)
     if(Python3_Interpreter_FOUND)
         add_test(
             NAME IntrinsicBenchmarkSmoke.Validate
@@ -153,8 +165,13 @@ if(BUILD_TESTING)
 
         add_test(
             NAME IntrinsicKMeansGpuBenchmarkSmoke.Run
-            COMMAND $<TARGET_FILE:IntrinsicKMeansGpuBenchmarkSmoke>
-                "${_intrinsic_kmeans_gpu_bench_dir}"
+            COMMAND ${Python3_EXECUTABLE}
+                "${CMAKE_SOURCE_DIR}/tools/benchmark/run_and_seal.py"
+                --executable $<TARGET_FILE:IntrinsicKMeansGpuBenchmarkSmoke>
+                --output "${_intrinsic_kmeans_gpu_bench_dir}"
+                --manifests-root "${CMAKE_SOURCE_DIR}/benchmarks"
+                --run-id "ctest-kmeans-gpu-smoke"
+                --attempt-id "attempt-001"
         )
         set_tests_properties(IntrinsicKMeansGpuBenchmarkSmoke.Run PROPERTIES
             ENVIRONMENT "${_intrinsic_benchmark_test_env}"

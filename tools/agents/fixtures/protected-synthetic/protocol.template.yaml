@@ -1,0 +1,59 @@
+schema_version: 1
+task_id: __TASK_ID__
+protocol_id: synthetic-protected-v1
+profile: protected
+state: ready
+question: Does the synthetic score remain bounded?
+hypothesis: Mean synthetic score is at most two.
+claim_boundary: Synthetic fixture only; no real protected evidence.
+evidence_phase: confirmation
+claim_eligible: false
+datasets:
+  - id: synthetic-screen
+    path: __SCREEN_PATH__
+    sha256: __SCREEN_SHA256__
+    split: screen
+  - id: synthetic-confirm
+    path: __CONFIRM_PATH__
+    sha256: __CONFIRM_SHA256__
+    split: confirm
+disjoint_splits:
+  - left: screen
+    right: confirm
+    method: Separate checked-in synthetic files.
+seeds: [7, 11]
+input_policy: Use only the declared synthetic rows.
+comparators:
+  - id: constant-baseline
+    budget: 2
+primary_metrics:
+  - name: score
+    direction: minimize
+    unit: synthetic-points
+    statistical_unit: row
+statistical_tests:
+  - name: descriptive-mean
+    alpha: null
+killing_gates:
+  - metric: score
+    operator: <=
+    threshold: 2.0
+screening_confirmation_policy: No retuning after confirmation begins.
+resources:
+  cpu_threads: 1
+  gpu: false
+command: [python3, run_synthetic.py]
+expected_artifacts: [raw_rows.jsonl, bundle.yaml]
+blockers: []
+source:
+  revision: __SOURCE_REVISION__
+  clean: false
+config:
+  path: __CONFIG_PATH__
+  sha256: __CONFIG_SHA256__
+environment:
+  path: __ENVIRONMENT_PATH__
+  sha256: __ENVIRONMENT_SHA256__
+implementation:
+  - path: __IMPLEMENTATION_PATH__
+    sha256: __IMPLEMENTATION_SHA256__

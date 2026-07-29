@@ -2,6 +2,13 @@
 id: <REVIEW-ID>
 theme: <theme letter from tasks/backlog/README.md, or `none`>
 depends_on: []
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
 ---
 # <REVIEW-ID> — <Review task title>
 

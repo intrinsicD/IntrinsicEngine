@@ -1,98 +1,191 @@
-# Benchmark Result JSON Schema
+# Benchmark result JSON schema
 
-This document defines the canonical JSON payload emitted by IntrinsicEngine benchmark runners.
-It is the required interchange format for local runs, CI artifacts, and report ingestion.
+Canonical benchmark results use `schema_version: 2`. Raw native producers may
+emit the legacy minimum temporarily inside one invocation, but
+`tools/benchmark/run_and_seal.py` seals them before validation or artifact
+publication.
 
-## Required top-level fields
+## Identity
 
-Every benchmark result JSON object **must** include:
+- `benchmark_id` is the stable definition/history join key and must resolve to
+  exactly one manifest.
+- `run_id` identifies one initialized execution population.
+- `attempt_id` identifies an attempt within that run.
 
-- `benchmark_id` (string): Stable benchmark identifier, e.g. `geometry.example.small`.
-- `method` (string): Method identifier used by the run, e.g. `geometry.example`.
-- `backend` (string): Executing backend, e.g. `cpu_reference`, `cpu_optimized`, `gpu_vulkan_compute`.
-- `dataset` (string): Dataset identifier, e.g. `builtin.triangle_mesh.small`.
-- `commit` (string): Source revision identifier (typically a git SHA).
-- `metrics` (object): Key/value map of measured metrics.
-- `diagnostics` (object): Key/value map of non-metric runtime diagnostics.
-- `status` (string): Run status.
+The validator's uniqueness key is
+`(benchmark_id, run_id, attempt_id)`. Repeating a stable benchmark ID with a
+new run/attempt is valid. Reusing the tuple is invalid. A retry receives a new
+attempt ID; failed attempts stay present. `supersedes` may point from a new
+result to older identities, but never deletes them. Aggregates use a distinct
+stable benchmark manifest and may list member identities in `aggregation`.
 
-## Status values
+Disposable local CMake smoke output may reuse a fixed run ID because its build
+directory is explicitly recreated and it is never claim evidence. Durable and
+official output uses a fresh non-overwriting run root.
 
-Allowed `status` values:
+## Required fields
 
-- `passed`
-- `failed`
-- `skipped`
-- `error`
+Every canonical object contains:
 
-## Recommended optional fields
+- `schema_version`: integer `2`.
+- `benchmark_id`, `run_id`, `attempt_id`: identities described above.
+- `method`, `backend`, `dataset`: execution binding; method and dataset must
+  exactly match the manifest.
+- `commit`: compatibility alias equal to `source.revision`.
+- `source`: revision and source-state binding.
+- `claim_eligible`: explicit boolean, false by default.
+- `manifest`: repository-relative path and SHA-256 of the exact manifest.
+- `resolved_params`: exact copy of manifest `params`.
+- `config_digest`: SHA-256 of canonical JSON for `resolved_params`.
+- `warmup_policy`: the manifest's resolved warmup/measured fields.
+- `metrics`: exactly the top-level metric names declared by the manifest.
+- `diagnostics`: non-metric runtime context.
+- `thresholds`: exact copy of manifest thresholds.
+- `threshold_disposition`: validator-recomputable observed/limit/operator/pass
+  records.
+- `execution_status`: raw producer state.
+- `status`: state recomputed from execution plus thresholds.
 
-These fields are optional but recommended for reportability and reproducibility:
+Optional reporting fields include `timestamp_utc`, `runner`, `host`, `notes`,
+`supersedes`, and `aggregation`.
 
-- `timestamp_utc` (string): ISO-8601 timestamp.
-- `runner` (string): Runner ID or workflow name.
-- `host` (string): Machine/runner identifier.
-- `notes` (string): Short additional context.
+## Source and claim eligibility
 
-## CI gate timing profile
+Allowed source states are:
 
-The stable `ci.gate-latency.github-ubuntu-24.04.v1` profile uses
-`backend: external_baseline`, method `ci.gate-latency`, and dataset
-`github.hosted.ubuntu_24_04.x86_64`. Its metrics are
-`configure_time_ms`, `build_time_ms`, `test_time_ms`, and `total_time_ms`.
-The measured total is the sum of those phases, not whole-job time.
+- `clean_commit`: exact 40-lowercase-hex revision.
+- `dirty_worktree`: includes `local-dev`; never claim eligible.
+- `sealed_snapshot`: uncommitted source with both approved
+  `snapshot_sha256` and `diff_sha256`.
+- `historical_aggregate`: retained historical population; not a new claim run.
+- `unverified_commit`: commit-shaped provenance without clean-state custody.
 
-Gate, preset, compiler, sanitizer, runner image, cold/warm cache state, selected
-test count, Ninja command-edge count, ccache hit/miss counts, ccache cache size,
-ccache error count, vcpkg cache state, phase return codes, and unavailable
-counter flags belong in `diagnostics`. The configured graph identity is the
-five-field tuple `extrinsic_platform`, `extrinsic_backend`,
-`intrinsic_platform_backend`, `intrinsic_headless_no_glfw`, and
-`intrinsic_platform_backend_selected`. `build_configuration_available` is true
-only when all five values were read from the configured `CMakeCache.txt`;
-explicit missing or incomplete cache input records
-`build_configuration_errors` and produces status `error`. Cold and warm
-results are different populations for baseline comparison.
+`claim_eligible: true` is valid only for an exact `clean_commit` or an approved
+`sealed_snapshot` carrying both hashes. Merely adding a report, setting status
+to passed, or using a commit-shaped string does not authorize a claim.
+Claim-grade use also owes the frozen protocol, bundle, independent audit, and
+ARA claim policy.
 
-When a gate requires ccache telemetry, `ccache_stats_required` is true and
-`ccache_stats_health` is `healthy`, `invalid`, or `errors_reported`.
-Missing/malformed required stats produce result status `error`; a valid payload
-with a nonzero ccache error count produces status `failed`. Optional gates use
-`not_requested` with `ccache_stats_available=false` rather than fabricating
-zero-valued available counters.
+## Metrics and JSON strictness
 
-The multi-run baseline report uses the distinct ID
-`ci.gate-latency.github-ubuntu-24.04.v1.aggregate-baseline`. It links back to
-the per-run profile through `diagnostics.source_benchmark_id` and reports
-population/sample counts plus grouped cold-population statistics. Consumers
-must not interpret those aggregates as one gate invocation.
+JSON is RFC-strict: duplicate object keys, `NaN`, `Infinity`, and `-Infinity`
+are rejected at load time. Every metric leaf, including nested dict/list
+families, is a finite integer or float. Booleans are not numeric metrics.
+Capability flags belong in `diagnostics`.
 
-## Metric value constraints
+The result metric-name set must exactly equal the manifest declaration; an
+undeclared extra metric is an error rather than silently ignored evidence.
 
-Within `metrics`:
+## Thresholds and status
 
-- values should be numeric (`int` or `float`) where possible.
-- boolean flags are allowed for explicit capability markers.
-- nested objects are allowed only for grouped metric families.
+Manifest threshold names end in `_max` or `_min` and contain one declared
+metric name, for example `smoke_runtime_ms_max` or
+`throughput_items_per_sec_min`. The canonical sealer maps each threshold,
+copies its limit, records the observed metric, and computes `passed`.
+
+`status` is not trusted:
+
+- `error` and `skipped` remain those execution states.
+- raw `failed` remains failed.
+- raw `passed` becomes failed if any declared threshold fails.
+- only raw passed plus every gate passed becomes canonical passed.
+
+The validator recomputes the complete disposition and status.
+
+## Commands
+
+Seal raw producer output:
+
+```bash
+python3 tools/benchmark/seal_benchmark_results.py \
+  --root build/ci/benchmark/IntrinsicBenchmarkSmoke \
+  --manifests-root benchmarks \
+  --run-id run-20260729-001 \
+  --attempt-id attempt-001 \
+  --replace
+```
+
+Run a native producer and seal it in one step:
+
+```bash
+python3 tools/benchmark/run_and_seal.py \
+  --executable build/ci/bin/IntrinsicBenchmarkSmoke \
+  --output build/ci/benchmark/IntrinsicBenchmarkSmoke/result.json \
+  --manifests-root benchmarks \
+  --run-id run-20260729-001
+```
+
+Validate:
+
+```bash
+python3 tools/benchmark/validate_benchmark_results.py \
+  --root build/ci/benchmark \
+  --manifests-root benchmarks \
+  --strict
+```
 
 ## Example
 
 ```json
 {
+  "schema_version": 2,
   "benchmark_id": "geometry.example.small",
+  "run_id": "run-20260729-001",
+  "attempt_id": "attempt-001",
   "method": "geometry.example",
   "backend": "cpu_reference",
   "dataset": "builtin.triangle_mesh.small",
-  "commit": "abcdef1234567890",
+  "commit": "0000000000000000000000000000000000000000",
+  "source": {
+    "revision": "0000000000000000000000000000000000000000",
+    "state": "unverified_commit"
+  },
+  "claim_eligible": false,
+  "manifest": {
+    "path": "benchmarks/datasets/manifests/geometry_example_small.yaml",
+    "sha256": "3b3facd2b2d355f92e2959c779834896c051e3ffbc4372a6c6bb77e9981eaff2"
+  },
+  "resolved_params": {
+    "intent": "smoke",
+    "warmup_iterations": 1,
+    "measured_iterations": 8
+  },
+  "config_digest": "143720a539c0474f31b2af8f749bebb94e8d65a0784684d18d771afd1def2536",
+  "warmup_policy": {
+    "warmup_iterations": 1,
+    "measured_iterations": 8
+  },
   "metrics": {
-    "runtime_ms": 1.25,
-    "memory_peak_bytes": 24576,
+    "runtime_ms": 1.8,
+    "memory_peak_bytes": 28672,
     "quality_error_l2": 0.0
   },
   "diagnostics": {
-    "iterations": 12,
-    "warmup_runs": 1
+    "runner": "IntrinsicBenchmarkSmoke"
   },
+  "thresholds": {
+    "smoke_runtime_ms_max": 200,
+    "quality_error_l2_max": 0.0
+  },
+  "threshold_disposition": [
+    {
+      "threshold": "smoke_runtime_ms_max",
+      "metric": "runtime_ms",
+      "operator": "<=",
+      "limit": 200,
+      "observed": 1.8,
+      "passed": true
+    },
+    {
+      "threshold": "quality_error_l2_max",
+      "metric": "quality_error_l2",
+      "operator": "<=",
+      "limit": 0.0,
+      "observed": 0.0,
+      "passed": true
+    }
+  ],
+  "execution_status": "passed",
   "status": "passed"
 }
 ```

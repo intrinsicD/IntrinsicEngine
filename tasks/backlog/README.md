@@ -407,6 +407,13 @@ control surface" proposal was dropped (all members had retired); the `I` letter
 instead names the research/method implementation theme created by the retired
 `PROC-024` (see Theme I above and the retirement log).
 
+Open `PROC-028` is the single explicitly batched workflow-hardening member. It
+implements the already accepted generated task-evidence decisions and closes
+the bounded review, benchmark-result, claim-grade experiment, protected-run,
+portable-bundle, and concurrent-ownership gaps recorded by the 2026-07-29
+four-repository audit. It is process/tooling/docs/CI-policy work only and may
+not modify engine source.
+
 The CI-latency track is also Theme H because fast, trustworthy agent feedback is
 workflow infrastructure. `CI-003` is retired after capturing the 2026-07-09
 hosted-run measurements and compile hotspots and adding machine-readable

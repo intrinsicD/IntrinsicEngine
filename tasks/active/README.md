@@ -11,9 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-- None. `RUNTIME-187` and its `ARCH-014` umbrella retired on 2026-07-23 after
-  the exact `12/0/0/5` Engine boundary and full CPU/sanitizer/Vulkan matrix
-  passed.
+- [`PROC-028` — Enforce agent evidence, review, and experiment custody](PROC-028-enforced-agent-evidence-review-experiment-workflow.md)
+  is in progress on `codex/proc-028-enforced-agent-workflow` in an isolated
+  worktree. Next gate: focused workflow and benchmark Python regressions after
+  Slices A and B.
 
 ## History
 

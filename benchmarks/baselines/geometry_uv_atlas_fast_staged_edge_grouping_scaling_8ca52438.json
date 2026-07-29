@@ -1,9 +1,55 @@
 {
+  "schema_version": 2,
   "benchmark_id": "geometry.uv_atlas.fast_staged_edge_grouping.scaling",
+  "run_id": "baseline-8ca52438-edge-grouping",
+  "attempt_id": "attempt-001",
   "method": "geometry.uv_atlas.fast_staged_edge_grouping",
   "backend": "cpu_optimized",
   "dataset": "builtin.uv_atlas_edge_grouping_grid_pair_v1",
-  "commit": "8ca52438-clean-detached-ci-vulkan-asan-ubsan",
+  "commit": "8ca524387a92ea444b63fb28cac723ca4c9feebb",
+  "source": {
+    "revision": "8ca524387a92ea444b63fb28cac723ca4c9feebb",
+    "state": "unverified_commit"
+  },
+  "claim_eligible": false,
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/geometry_uv_atlas_fast_staged_edge_grouping_scaling.yaml",
+    "sha256": "962fb130b3ba9cf86feb9668d83ee82150729c28ffb3a50d6992077837b1eac8"
+  },
+  "resolved_params": {
+    "fixture_generator": "indexed_planar_grid",
+    "small_grid_side": 16,
+    "large_grid_side": 32,
+    "small_face_count": 512,
+    "large_face_count": 2048,
+    "resolution": 256,
+    "padding": 2,
+    "warmup_pairs": 1,
+    "measured_pairs": 5,
+    "timing_statistic": "median_alternating_pair_runtime",
+    "measurement_order": "alternating_small_large_large_small",
+    "baseline_snapshot": "benchmarks/baselines/geometry_uv_atlas_fast_staged_edge_grouping_scaling_8ca52438.json",
+    "baseline_commit": "8ca52438",
+    "baseline_large_median_runtime_ms": 1031.8958949999999,
+    "baseline_normalized_runtime_scaling_factor": 1.7267393198597933,
+    "baseline_output_vertex_count": 1089,
+    "baseline_output_face_count": 2048,
+    "baseline_chart_count": 1,
+    "baseline_seam_count": 0,
+    "baseline_boundary_seam_count": 128,
+    "baseline_uv_min": [0.0078125, 0.0078125],
+    "baseline_uv_max": [0.9921875596046448, 0.9176806807518005],
+    "baseline_mean_conformal_distortion": 1.1827855110050354,
+    "baseline_max_stretch": 0.7054570258921236,
+    "baseline_flipped_element_count": 0,
+    "baseline_output_signature": "5684639256857304174",
+    "adoption_claim": false
+  },
+  "config_digest": "b6a304aebdb5c5211911830451216e8bb3b41376e659fa8533a17fbd3a2f7505",
+  "warmup_policy": {
+    "warmup_pairs": 1,
+    "measured_pairs": 5
+  },
   "metrics": {
     "runtime_ms": 1031.89589499999988220,
     "throughput_items_per_sec": 1984.69633412002303885,
@@ -107,5 +153,28 @@
     "deterministic_topology": true,
     "performance_claim": false
   },
+  "thresholds": {
+    "smoke_runtime_ms_max": 5000,
+    "quality_error_l2_max": 1e-12
+  },
+  "threshold_disposition": [
+    {
+      "threshold": "smoke_runtime_ms_max",
+      "metric": "runtime_ms",
+      "operator": "<=",
+      "limit": 5000,
+      "observed": 1031.8958949999999,
+      "passed": true
+    },
+    {
+      "threshold": "quality_error_l2_max",
+      "metric": "quality_error_l2",
+      "operator": "<=",
+      "limit": 1e-12,
+      "observed": 0.0,
+      "passed": true
+    }
+  ],
+  "execution_status": "passed",
   "status": "passed"
 }

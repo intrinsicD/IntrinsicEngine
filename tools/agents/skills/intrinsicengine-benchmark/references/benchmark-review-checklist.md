@@ -15,6 +15,13 @@ Use this checklist when reviewing benchmark-related changes to avoid unreliable 
 - [ ] Runner emits benchmark result JSON with required schema fields.
 - [ ] Result JSON validates with `tools/benchmark/validate_benchmark_results.py`.
 - [ ] Benchmark manifest validates with `tools/benchmark/validate_benchmark_manifests.py`.
+- [ ] Result schema v2 binds the exact manifest hash, resolved params,
+      config digest, warmup policy, source state, and declared thresholds.
+- [ ] Metric leaves are finite numeric values; booleans and undeclared metric
+      names are rejected.
+- [ ] Reported status equals the recomputed execution/threshold disposition.
+- [ ] Stable benchmark ID is not used as execution identity; run/attempt
+      tuples are distinct and failed retries remain visible.
 
 ## 3. CI and execution policy
 
@@ -27,6 +34,11 @@ Use this checklist when reviewing benchmark-related changes to avoid unreliable 
 - [ ] Quality/error metric is included when relevant (not runtime-only claims).
 - [ ] Reported comparisons identify backend and dataset context.
 - [ ] Any performance claim references baseline comparison and measurement conditions.
+- [ ] Dirty, local, historical, or unverified source is explicitly
+      non-claim-eligible.
+- [ ] Claim-grade evidence has a frozen protocol, portable raw-result bundle,
+      independent recomputation audit, and ARA claim row; a green smoke result
+      is not promoted by itself.
 
 ## 5. Documentation and traceability
 

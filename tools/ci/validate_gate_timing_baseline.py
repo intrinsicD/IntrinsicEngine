@@ -10,7 +10,7 @@ import re
 import statistics
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 SOURCE_BENCHMARK_ID = "ci.gate-latency.github-ubuntu-24.04.v1"
 BENCHMARK_ID = f"{SOURCE_BENCHMARK_ID}.aggregate-baseline"
 METHOD = "ci.gate-latency"

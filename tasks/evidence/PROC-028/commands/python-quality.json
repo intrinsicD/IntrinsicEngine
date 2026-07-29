@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "set -euo pipefail\ngit diff --check\npython3 -m compileall -q tools/agents tools/benchmark\nruff format --check tools/agents/workflow_evidence.py tools/agents/experiment_custody.py tools/agents/task_claim.py tools/agents/validate_tasks.py tools/benchmark/validate_benchmark_results.py tools/benchmark/seal_benchmark_results.py tools/benchmark/run_and_seal.py tools/benchmark/check_perf_regression.py tests/regression/tooling/Test.ValidateTasks.py tests/regression/tooling/Test.WorkflowEvidence.py tests/regression/tooling/Test.ExperimentCustody.py tests/regression/tooling/Test.TaskClaim.py tests/regression/tooling/Test_BenchmarkResultValidator.py tests/regression/tooling/Test.BenchmarkComparison.py\nruff check tools/agents/workflow_evidence.py tools/agents/experiment_custody.py tools/agents/task_claim.py tools/agents/validate_tasks.py tools/benchmark/validate_benchmark_results.py tools/benchmark/seal_benchmark_results.py tools/benchmark/run_and_seal.py tools/benchmark/check_perf_regression.py tests/regression/tooling/Test.ValidateTasks.py tests/regression/tooling/Test.WorkflowEvidence.py tests/regression/tooling/Test.ExperimentCustody.py tests/regression/tooling/Test.TaskClaim.py tests/regression/tooling/Test_BenchmarkResultValidator.py tests/regression/tooling/Test.BenchmarkComparison.py"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'set -euo pipefail\ngit diff --check\npython3 -m compileall -q tools/agents tools/benchmark\nruff format --check tools/agents/workflow_evidence.py tools/agents/experiment_custody.py tools/agents/task_claim.py tools/agents/validate_tasks.py tools/benchmark/validate_benchmark_results.py tools/benchmark/seal_benchmark_results.py tools/benchmark/run_and_seal.py tools/benchmark/check_perf_regression.py tests/regression/tooling/Test.ValidateTasks.py tests/regression/tooling/Test.WorkflowEvidence.py tests/regression/tooling/Test.ExperimentCustody.py tests/regression/tooling/Test.TaskClaim.py tests/regression/tooling/Test_BenchmarkResultValidator.py tests/regression/tooling/Test.BenchmarkComparison.py\nruff check tools/agents/workflow_evidence.py tools/agents/experiment_custody.py tools/agents/task_claim.py tools/agents/validate_tasks.py tools/benchmark/validate_benchmark_results.py tools/benchmark/seal_benchmark_results.py tools/benchmark/run_and_seal.py tools/benchmark/check_perf_regression.py tests/regression/tooling/Test.ValidateTasks.py tests/regression/tooling/Test.WorkflowEvidence.py tests/regression/tooling/Test.ExperimentCustody.py tests/regression/tooling/Test.TaskClaim.py tests/regression/tooling/Test_BenchmarkResultValidator.py tests/regression/tooling/Test.BenchmarkComparison.py'",
+  "cwd": ".",
+  "duration_ms": 47,
+  "exit_code": 0,
+  "finished_at": "2026-07-29T18:19:26Z",
+  "label": "python-quality",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-29T18:19:26Z",
+  "stderr_path": "tasks/evidence/PROC-028/commands/python-quality.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-028/commands/python-quality.stdout.log",
+  "stdout_sha256": "772c68539ff75b91e4c57b8bef129e1f93f491a6f21c3b2722b3e79cb330d813",
+  "task_id": "PROC-028"
+}

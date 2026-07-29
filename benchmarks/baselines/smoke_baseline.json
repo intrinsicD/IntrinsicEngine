@@ -1,9 +1,24 @@
 {
+  "schema_version": 2,
   "benchmark_id": "geometry.example.smoke",
+  "run_id": "baseline-geometry-example-smoke",
+  "attempt_id": "attempt-001",
   "method": "geometry.example",
   "backend": "cpu_reference",
   "dataset": "builtin.triangle_mesh.small",
   "commit": "baseline",
+  "source": {
+    "revision": "baseline",
+    "state": "historical_aggregate"
+  },
+  "claim_eligible": false,
+  "manifest": {
+    "path": "benchmarks/datasets/manifests/builtin_smoke.yaml",
+    "sha256": "b21304836b0d2519592065bf2523b1b08f26f004c6ebaf5c83d0d8ba5fdf8aa2"
+  },
+  "resolved_params": {},
+  "config_digest": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "warmup_policy": {},
   "metrics": {
     "runtime_ms": 0.10,
     "quality_error_l2": 0.0
@@ -12,5 +27,19 @@
     "baseline": true,
     "profile": "smoke"
   },
+  "thresholds": {
+    "smoke_runtime_ms_max": 200
+  },
+  "threshold_disposition": [
+    {
+      "threshold": "smoke_runtime_ms_max",
+      "metric": "runtime_ms",
+      "operator": "<=",
+      "limit": 200,
+      "observed": 0.1,
+      "passed": true
+    }
+  ],
+  "execution_status": "passed",
   "status": "passed"
 }

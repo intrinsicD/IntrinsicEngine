@@ -3,6 +3,14 @@ id: <TASK-ID>
 theme: <theme letter from tasks/backlog/README.md, or `none`>
 depends_on: []
 template: micro
+workflow_schema: 1
+workflow_profile: micro
+evidence: not_applicable
+evidence_skip_reason: <why a full completion report is disproportionate>
+owner:
+branch:
+worktree:
+claimed_at:
 ---
 # <TASK-ID> — <Task title>
 

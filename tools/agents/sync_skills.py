@@ -30,6 +30,7 @@ REFERENCE_MAP = {
     "docs/agent/prompt/prompt.md": "intrinsicengine-core/references/session-onboarding.md",
     "docs/agent/task-format.md": "intrinsicengine-task-workflow/references/task-format.md",
     "docs/agent/task-maturity.md": "intrinsicengine-task-workflow/references/task-maturity.md",
+    "docs/agent/workflow-evidence.md": "intrinsicengine-task-workflow/references/workflow-evidence.md",
     "tasks/templates/task.md": "intrinsicengine-task-workflow/references/task-template.md",
     "docs/agent/review-checklist.md": "intrinsicengine-review/references/review-checklist.md",
     "docs/agent/architecture-review-checklist.md": "intrinsicengine-review/references/architecture-review-checklist.md",

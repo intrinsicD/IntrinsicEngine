@@ -114,7 +114,8 @@ pattern as the KMeans Vulkan smoke.
    `IntrinsicBenchmarkSmoke` target.
 3. Add a manifest under `manifests/<name>.yaml` that mirrors the constants
    from the header.
-4. Extend the runner so it calls the new workload and emits its result JSON.
+4. Extend the native producer so it emits raw metrics/diagnostics; the
+   `run_and_seal.py` pipeline binds and seals canonical schema-v2 JSON.
 5. Run the verification commands below.
 
 ## Running the smoke benchmark
@@ -124,7 +125,8 @@ cmake --preset ci
 cmake --build --preset ci --target IntrinsicBenchmarkSmoke
 cmake --build --preset ci --target IntrinsicBenchmarks
 python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
-python3 tools/benchmark/validate_benchmark_results.py    --root build/ci/benchmark --strict
+python3 tools/benchmark/validate_benchmark_results.py \
+  --root build/ci/benchmark --manifests-root benchmarks --strict
 ```
 
 The CTest registrations under the default CPU gate (label `benchmark`)

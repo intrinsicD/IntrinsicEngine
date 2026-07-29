@@ -46,7 +46,22 @@ Read the chosen task file completely before touching code. Treat it as the sourc
 
 If you intend to land more than one slice, promote the task into `tasks/active/` with status, owner, branch, and next verification step (see `docs/agent/task-format.md` or `intrinsicengine-task-workflow`). Single-slice patches may stay in `tasks/backlog/` while you work them.
 
-**Claiming.** Whichever directory the task sits in, record the owner and branch in the task file (a `Status`/`Context` line is enough) in your first commit that touches it. That record is the claim signal for concurrent sessions: skim it before picking a task, and treat a task with a fresh owner/branch line as taken. Historical duplicate-ID collisions (`BUG-021`/`BUG-022` ×2, `HARDEN-065` ×3) came from concurrent sessions skipping this step.
+**Claiming.** Use one writer per worktree. Parallel coding uses separate
+branches/worktrees. Promote multi-slice work and acquire its Git-common-dir
+claim before substantive edits:
+
+```bash
+python3 tools/agents/task_claim.py acquire \
+  --task-id <TASK-ID> --owner <label> [--path <explicit-overlap-root>]
+```
+
+The CLI rejects duplicate task ownership, a second writer in one worktree, and
+explicit ancestor/descendant path overlap, then mirrors
+owner/branch/worktree/time into task front-matter. A task claim is normally
+enough; path claims are conditional for unusually broad cross-worktree
+surfaces. Diagnose with `status`, release with the owning label, and recover
+only an expired claim with an actor and reason. Labels are cooperative routing
+metadata, not authentication. See `docs/agent/workflow-evidence.md`.
 
 # Implement the smallest robust slice
 
@@ -84,6 +99,8 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 Docs/task-only changes:
 ```
 python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/workflow_evidence.py validate --root .
+python3 tools/agents/experiment_custody.py validate --root .
 python3 tools/agents/check_task_state_links.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 python3 tools/agents/generate_session_brief.py --check   # when tasks/ changed
@@ -112,6 +129,8 @@ Apply `docs/agent/review-checklist.md` (or the `intrinsicengine-review` skill if
 - tests/docs/task records/generated inventories synchronized,
 - verification commands actually ran in this session,
 - temporary shims tracked with removal task IDs.
+- enrolled retirement evidence complete for the selected profile, with any
+  high-risk acceptance independent and bound to the final digest.
 
 # When CI fails
 

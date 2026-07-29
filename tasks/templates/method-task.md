@@ -2,6 +2,13 @@
 id: <METHOD-ID>
 theme: <theme letter from tasks/backlog/README.md, or `none`>
 depends_on: []
+workflow_schema: 1
+workflow_profile: claim-grade
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
 ---
 # <METHOD-ID> — <Method task title>
 
@@ -53,4 +60,3 @@ docs/agent/task-maturity.md:
 Record the intended endpoint in an optional `## Maturity` section when the
 method task stops earlier than reference parity.
 -->
-

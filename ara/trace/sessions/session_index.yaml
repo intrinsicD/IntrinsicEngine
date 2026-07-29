@@ -174,3 +174,10 @@ sessions:
     events_count: 2
     claims_touched: [C15]
     open_threads: 2
+  - id: "2026-07-29_001"
+    date: "2026-07-29"
+    summary: "Implemented PROC-028's repository-native evidence, review, experiment-custody, strict benchmark-result, and concurrent-ownership workflow; retirement remains gated by independent review and BUG-120."
+    turn_count: 1
+    events_count: 9
+    claims_touched: []
+    open_threads: 2

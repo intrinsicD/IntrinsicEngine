@@ -13,6 +13,13 @@ test-only additions) may use the reduced **micro template** instead — see
 id: <TASK-ID>
 theme: <theme letter, or `none`>
 depends_on: []
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
 ---
 # <TASK-ID> <Title>
 
@@ -69,11 +76,27 @@ feeds the generated `tasks/SESSION-BRIEF.md`:
 - `maturity_target` (optional) — intended stop-state per
   [`task-maturity.md`](task-maturity.md).
 - `template: micro` (optional) — marks a micro task (see §"Micro tasks").
+- `workflow_schema` (required for new/changed tasks) — currently `1`.
+- `workflow_profile` — `micro`, `standard`, `high-risk`, `claim-grade`, or
+  `protected`; profiles are cumulative.
+- `evidence` — `required` except for `micro`, which uses `not_applicable`.
+- `evidence_skip_reason` — required for the micro exemption.
+- `owner`, `branch`, `worktree`, `claimed_at` — null while a backlog task is
+  unclaimed and non-empty ISO-8601 ownership metadata in `tasks/active/`.
 
 `tools/agents/validate_tasks.py --strict` enforces the schema for open tasks;
-retired tasks under `tasks/done/` are exempt. After opening, retiring, or
-re-gating a task, regenerate the session brief with
+enrolled retired tasks retain the workflow fields. Exact hashes in
+`tools/agents/workflow_legacy_tasks.json` grandfather only untouched open
+tasks that predate `PROC-028`; a new, renamed, promoted, or edited task must
+enroll. Historical done/archive tasks are not backfilled. See
+[`workflow-evidence.md`](workflow-evidence.md) for profile triggers and
+evidence custody. After opening, retiring, or re-gating a task, regenerate the session brief with
 `python3 tools/agents/generate_session_brief.py`.
+
+The general, bug, and review templates default to `standard`; authors promote
+the profile when a trigger applies. The method template defaults to
+`claim-grade` because its lifecycle is designed to support scientific
+correctness/parity evidence.
 
 ## Micro tasks
 
@@ -87,8 +110,10 @@ doc/link sweeps, config toggles, test-only additions. They are **not**
 allowed for work that changes dependency boundaries, module ownership,
 public module surfaces (`.cppm`), methods/benchmarks, or anything with an
 ambiguous maturity stop-state — that work uses the full template (or the
-method/bug/review variants). Retirement rules are unchanged: checkboxes
-closed, completion date, commit/PR reference, retirement-log entry.
+method/bug/review variants). They set `workflow_profile: micro`,
+`evidence: not_applicable`, and a concrete `evidence_skip_reason`; they do not
+inherit high-risk, claim-grade, or protected custody. Retirement rules
+otherwise remain unchanged.
 
 ## Optional `## Control surfaces` and `## Backends` fields
 
@@ -125,25 +150,30 @@ When a task completes:
 1. Mark all checkbox todos `- [x]` (unresolved work moves to a follow-up
    task) and add a completion note with the date (`YYYY-MM-DD`) and a
    commit/PR reference.
-2. `git mv` the file to `tasks/done/`.
-3. Append a short retirement narrative (what landed, maturity, what remains
-   owned elsewhere) to the top of
-   [`tasks/done/RETIREMENT-LOG.md`](../../tasks/done/RETIREMENT-LOG.md).
-   Do **not** add it to `tasks/active/README.md` or the backlog README —
-   those indexes describe current state only, and
-   `tools/agents/check_task_state_links.py` rejects links into `tasks/done/`
-   from them.
-4. Remove the task's entry from the open-member lists in
-   `tasks/backlog/README.md` and update its category README. Category
-   READMEs may keep retired entries, but only under a history-marked
-   heading (one whose text contains retired/history/closed/completed/
-   resolved/verified/done — e.g. `## Retired`); open lists cite retired
-   tasks as plain code spans, not links. `check_task_state_links.py`
-   enforces this for `tasks/backlog/*/README.md` and
-   `tasks/backlog/bugs/index.md`; sections that interleave done
-   prerequisites with open work by design (the rendering dependency DAG)
-   opt out with a `<!-- state-link-guard: allow-done-links -->` comment
-   directly below their heading.
+2. `git mv` the file to `tasks/done/`. Remove it from open-member lists,
+   update its category README, append a short narrative (what landed,
+   maturity, what remains owned elsewhere) to the top of
+   [`tasks/done/RETIREMENT-LOG.md`](../../tasks/done/RETIREMENT-LOG.md), and
+   regenerate `tasks/SESSION-BRIEF.md`. Do **not** leave a done-task link in
+   `tasks/active/README.md` or an open backlog section.
+3. For enrolled non-micro work, generate the final
+   `tasks/evidence/<TASK-ID>/report.yaml` after the retirement surface is
+   stable. `high-risk` and higher profiles also require the final handoff and
+   accepted independent review bound to that exact content digest. Run:
+
+   ```bash
+   python3 tools/agents/workflow_evidence.py validate \
+     --root . --require-complete <TASK-ID>
+   ```
+
+   If review requests a revision, change the source, regenerate the report,
+   append a new handoff/review round, and validate again.
+
+Category READMEs may keep retired entries only under a history-marked heading
+(retired/history/closed/completed/resolved/verified/done). Open lists cite
+retired tasks as plain code spans, not links. `check_task_state_links.py`
+enforces this for task indexes; explicitly mixed dependency-DAG sections keep
+their existing state-link-guard comment.
 
 Retired files stay in `tasks/done/` short-term; they are periodically swept
 to `tasks/archive/` (frozen read-only history — see

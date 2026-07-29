@@ -6,13 +6,19 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "benchmark"))
+
+from seal_benchmark_results import canonicalize  # noqa: E402
+from validate_benchmark_results import load_manifests  # noqa: E402
 
 BENCHMARK_ID = "ci.gate-latency.github-ubuntu-24.04.v1"
 METHOD_ID = "ci.gate-latency"
 DATASET_ID = "github.hosted.ubuntu_24_04.x86_64"
-RESULT_SCHEMA_VERSION = 1
+RESULT_SCHEMA_VERSION = 2
 PHASE_NAMES = ("configure", "build", "test")
 CCACHE_STATS_SCHEMA_VERSION = 1
 CCACHE_SUMMARY_FIELDS = (
@@ -364,13 +370,14 @@ def main() -> int:
     if args.job_url:
         diagnostics["job_url"] = args.job_url
 
-    result: dict[str, object] = {
+    timestamp_utc = args.timestamp_utc or _timestamp_utc()
+    raw_result: dict[str, object] = {
         "benchmark_id": BENCHMARK_ID,
         "method": METHOD_ID,
         "backend": "external_baseline",
         "dataset": DATASET_ID,
         "commit": args.commit,
-        "timestamp_utc": args.timestamp_utc or _timestamp_utc(),
+        "timestamp_utc": timestamp_utc,
         "runner": args.gate,
         "metrics": {
             "configure_time_ms": phase_times_ms["configure"],
@@ -381,6 +388,28 @@ def main() -> int:
         "diagnostics": diagnostics,
         "status": status,
     }
+    manifests_root = Path(__file__).resolve().parents[2] / "benchmarks"
+    manifests = load_manifests(manifests_root)
+    manifest_path, manifest = manifests[BENCHMARK_ID]
+    run_token = (
+        timestamp_utc.replace("-", "")
+        .replace(":", "")
+        .replace(".", "")
+        .replace("+", "")
+    )
+    result = canonicalize(
+        raw_result,
+        manifest_path=manifest_path,
+        manifest=manifest,
+        manifests_root=manifests_root,
+        run_id=f"{args.gate}-{args.commit[:12]}-{run_token}",
+        attempt_id=f"attempt-{os.environ.get('GITHUB_RUN_ATTEMPT', '1')}",
+        source_state="clean_commit",
+        source_revision=args.commit,
+        claim_eligible=False,
+        snapshot_sha256=None,
+        diff_sha256=None,
+    )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(

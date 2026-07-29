@@ -205,3 +205,20 @@
   tasks/done/RUNTIME-187-finalize-domain-free-engine-surface.md,
   commit 982c72ae, N277]
 - **From staging**: O08
+
+## A17: Agent Workflow Is One Repository-Native Cumulative Profile Model
+- **Decision**: IntrinsicEngine extends its existing task, review, benchmark,
+  method, ARA, documentation, skill, and CI authorities with cumulative
+  `micro`, `standard`, `high-risk`, `claim-grade`, and `protected` workflow
+  profiles. Plain versioned YAML, JSON, and JSONL artifacts plus small Python
+  CLIs provide evidence, review, handoff, experiment custody, and ownership;
+  no donor framework, parallel state engine, daemon, or external service owns
+  the lifecycle.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N290, N291, N292,
+  tasks/active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md,
+  docs/agent/workflow-evidence.md, tools/agents/workflow_evidence.py,
+  tools/agents/experiment_custody.py, tools/agents/task_claim.py,
+  .github/workflows/ci-docs.yml]
+- **From staging**: O75

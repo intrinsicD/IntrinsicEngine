@@ -52,6 +52,13 @@ task state or dependencies change; CI rejects a stale copy. That makes the
 picker view a reproducible projection of the task graph, not a hand-maintained
 status report.
 
+New or changed tasks also select the cumulative `micro`, `standard`,
+`high-risk`, `claim-grade`, or `protected` workflow profile. The
+[workflow evidence contract](workflow-evidence.md) uses Git-common-dir claims,
+generated command/report evidence, fixed-surface review, and experiment
+custody in proportion to that profile. Untouched pre-policy task hashes remain
+grandfathered; historical tasks are not rewritten.
+
 ## Convergence Instead of a Flat Queue
 
 The [backlog convergence map](../../tasks/backlog/README.md) groups tasks by
@@ -102,7 +109,7 @@ monolithic linter:
 
 | Validator family | What it protects | Entry points |
 | --- | --- | --- |
-| Task and agent policy | Task shape, unique IDs, dependency resolution, lifecycle links, maturity follow-ups, generated session state, and skill mirrors. | [`tools/agents/`](../../tools/agents/README.md) |
+| Task and agent policy | Task shape, unique IDs, dependency resolution, lifecycle links, maturity follow-ups, generated session state, task evidence/experiment custody, concurrent claims, and skill mirrors. | [`tools/agents/`](../../tools/agents/README.md) |
 | Documentation | Relative-link integrity and changed-file documentation synchronization. | [`tools/docs/`](../../tools/docs/README.md) |
 | Repository structure | Layer imports and CMake edges, root hygiene, test layout, allowlist quality, and module inventory. | [`tools/repo/`](../../tools/repo/README.md) |
 | Methods and benchmarks | Method manifests, benchmark manifests, result schemas, and comparable evidence identities. | [Method workflow](method-workflow.md) and [benchmark workflow](benchmark-workflow.md) |

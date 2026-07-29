@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "VCPKG_BINARY_SOURCES='clear;files,/home/alex/Documents/IntrinsicEngine/external/vcpkg-bincache,readwrite' cmake --preset ci"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'VCPKG_BINARY_SOURCES='\"'\"'clear;files,/home/alex/Documents/IntrinsicEngine/external/vcpkg-bincache,readwrite'\"'\"' cmake --preset ci'",
+  "cwd": ".",
+  "duration_ms": 2418,
+  "exit_code": 0,
+  "finished_at": "2026-07-29T18:19:38Z",
+  "label": "configure-ci",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-29T18:19:36Z",
+  "stderr_path": "tasks/evidence/PROC-028/commands/configure-ci.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-028/commands/configure-ci.stdout.log",
+  "stdout_sha256": "2e5f13db8a4af95a02baa67968292c12fd245f38928b24bc9c726eb07f2adea4",
+  "task_id": "PROC-028"
+}

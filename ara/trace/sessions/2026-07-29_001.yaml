@@ -1,0 +1,95 @@
+session:
+  id: "2026-07-29_001"
+  date: "2026-07-29"
+  started: "2026-07-29T20:14+02:00"
+  last_turn: "2026-07-29T20:14+02:00"
+  turn_count: 1
+  summary: "Implemented PROC-028's repository-native evidence, review, experiment-custody, strict benchmark-result, and concurrent-ownership workflow; retirement remains gated by independent review and BUG-120."
+
+events_logged:
+  - turn: 1
+    type: question
+    id: "N289"
+    routing: direct
+    provenance: user
+    summary: "Bound the four-repository comparison to genuinely missing IntrinsicEngine workflow controls."
+  - turn: 1
+    type: experiment
+    id: "N290"
+    routing: direct
+    provenance: ai-executed
+    summary: "The donor audit retained nine gaps while preserving every existing IntrinsicEngine authority."
+  - turn: 1
+    type: decision
+    id: "N291"
+    routing: direct
+    provenance: user
+    summary: "Kept all nine gaps in one right-sized repository-native implementation task."
+  - turn: 1
+    type: experiment
+    id: "N292"
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented all six slices and exercised 85 focused regressions, 25 generated benchmark results, and the 4,042-case CPU selector."
+  - turn: 1
+    type: constraint
+    id: "O71"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized prospective cumulative workflow profiles as K24 through artifact commitment."
+  - turn: 1
+    type: constraint
+    id: "O72"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized result-free protected authorization and one-shot consumption as K25."
+  - turn: 1
+    type: heuristic
+    id: "O73"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized strict manifest/source/run-bound benchmark sealing as H12."
+  - turn: 1
+    type: heuristic
+    id: "O74"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized worktree-first atomic ownership claims as H13."
+  - turn: 1
+    type: architecture
+    id: "O75"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the cumulative repository-native workflow architecture as A17."
+
+ai_actions:
+  - turn: 1
+    action: "Implemented and documented task evidence, revision-bound review and handoff, claim/protected experiment custody, strict benchmark-result sealing and comparison, and Git-common-dir task/path claims; added adversarial regressions and CI wiring."
+    provenance: ai-executed
+    files_changed:
+      - "tools/agents/workflow_evidence.py"
+      - "tools/agents/experiment_custody.py"
+      - "tools/agents/task_claim.py"
+      - "tools/agents/validate_tasks.py"
+      - "tools/benchmark/validate_benchmark_results.py"
+      - "tools/benchmark/seal_benchmark_results.py"
+      - "docs/agent/workflow-evidence.md"
+      - "tests/regression/tooling/Test.WorkflowEvidence.py"
+      - "tests/regression/tooling/Test.ExperimentCustody.py"
+      - "tests/regression/tooling/Test.TaskClaim.py"
+      - "tests/regression/tooling/Test_BenchmarkResultValidator.py"
+      - "tasks/active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "The user first required one task for all genuinely missing donor workflow parts, then explicitly directed implementation of that task."
+  - turn: 1
+    excerpt: "The task stays active: cooperative labels are not authenticated identity, and a self-review cannot stand in for its required distinct fixed-revision review."
+
+open_threads:
+  - "A distinct reviewer must inspect the fixed revision and append a terminal accepted review before PROC-028 can retire."
+  - "BUG-120 must restore the pre-existing Test.WorkflowConcurrency gate already wired into ci-docs."
+
+ai_suggestions_pending: []

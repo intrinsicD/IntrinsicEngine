@@ -1018,3 +1018,94 @@ observations:
     promoted_to: "logic/claims.md:C15"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O71
+    timestamp: "2026-07-29T20:14+02:00"
+    provenance: ai-suggested
+    content: >
+      Workflow evidence requirements must be prospective, cumulative, and
+      profile-triggered: routine work must not inherit review or experiment
+      ceremony, while a higher-risk profile may only add requirements and may
+      not infer claim eligibility from the presence of an artifact.
+    context: >
+      PROC-028 implements this boundary in task schema version 1, templates,
+      deterministic open-task grandfather inventory, task validation, evidence
+      generation, and strict CI integration.
+    potential_type: constraint
+    bound_to: [N290, N291, N292]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K24"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O72
+    timestamp: "2026-07-29T20:14+02:00"
+    provenance: ai-suggested
+    content: >
+      A scientifically single-use protected attempt requires result-free
+      prospective review and separate launch authorization bound to exact
+      protocol and implementation digests; starting, failing, or completing
+      atomically consumes the attempt and remains visible.
+    context: >
+      PROC-028 implements and adversarially tests this boundary with a
+      repository-contained synthetic protected fixture that accesses no real
+      held-out evidence.
+    potential_type: constraint
+    bound_to: [N290, N292]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K25"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O73
+    timestamp: "2026-07-29T20:14+02:00"
+    provenance: ai-suggested
+    content: >
+      Persisted benchmark results should be parsed strictly, derive threshold
+      disposition from declared metrics and gates, bind exact manifest/source/
+      configuration identities, and retain stable benchmark identity separately
+      from append-only run and attempt identities.
+    context: >
+      PROC-028 migrates checked-in schema-v2 results and producers, replaces
+      textual performance-result extraction, and exercises one existing smoke
+      through strict result, portable bundle, replay/view receipt, and audit
+      without creating a performance claim.
+    potential_type: heuristic
+    bound_to: [N290, N292]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H12"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O74
+    timestamp: "2026-07-29T20:14+02:00"
+    provenance: ai-suggested
+    content: >
+      Concurrent coding ownership should begin with separate worktrees and one
+      atomic task claim in the Git common directory; optional path claims are a
+      bounded cross-worktree collision check, not an always-on orchestration
+      service.
+    context: >
+      PROC-028 implements bounded leases, overlap diagnostics, tracked task
+      metadata mirroring, release/recovery history, and temporary-repository
+      regressions while preserving the routine one-agent path.
+    potential_type: heuristic
+    bound_to: [N290, N291, N292]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H13"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O75
+    timestamp: "2026-07-29T20:14+02:00"
+    provenance: ai-suggested
+    content: >
+      IntrinsicEngine's agent workflow should remain one cumulative repository-
+      native profile model layered over the existing task, review, benchmark,
+      method, ARA, documentation, skill, and CI authorities rather than a
+      parallel donor framework or external state engine.
+    context: >
+      The user selected one batched implementation task, and PROC-028's plain
+      YAML/JSON/JSONL tools and strict workflow integration now commit the
+      repository to that architecture.
+    potential_type: architecture
+    bound_to: [N290, N291, N292]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A17"
+    crystallized_via: artifact-commitment
+    stale: false

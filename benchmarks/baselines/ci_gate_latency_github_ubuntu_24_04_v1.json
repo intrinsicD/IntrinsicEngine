@@ -1,10 +1,36 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "benchmark_id": "ci.gate-latency.github-ubuntu-24.04.v1.aggregate-baseline",
+  "run_id": "ci-gate-aggregate-20260709",
+  "attempt_id": "attempt-001",
   "method": "ci.gate-latency",
   "backend": "external_baseline",
   "dataset": "github.hosted.ubuntu_24_04.x86_64",
   "commit": "historical-multi-commit",
+  "source": {
+    "revision": "historical-multi-commit",
+    "state": "historical_aggregate"
+  },
+  "claim_eligible": false,
+  "manifest": {
+    "path": "benchmarks/ci/manifests/ci_gate_latency_github_ubuntu_24_04_v1_aggregate_baseline.yaml",
+    "sha256": "8ecadacfeee391ebc81f296dd73adad28c1a70d190ad82c0f28eed3185ef314e"
+  },
+  "resolved_params": {
+    "intent": "performance",
+    "report_kind": "aggregate_baseline",
+    "source_benchmark_id": "ci.gate-latency.github-ubuntu-24.04.v1",
+    "runner_platform": "github-hosted",
+    "runner_image": "ubuntu-24.04",
+    "architecture": "x86_64",
+    "compile_cache_state": "cold",
+    "vcpkg_cache_state": "warm",
+    "percentile_method": "nearest_rank",
+    "minimum_samples_per_population": 5
+  },
+  "config_digest": "9eae334a0fb824e277b31dd5ef9d19ba8b15d6530286a53db2a595af1c7d4a31",
+  "warmup_policy": {},
+  "execution_status": "passed",
   "status": "passed",
   "timestamp_utc": "2026-07-09T20:45:00Z",
   "runner": "github-actions",
@@ -578,5 +604,7 @@
       ]
     }
     ]
-  }
+  },
+  "thresholds": {},
+  "threshold_disposition": []
 }

@@ -22,9 +22,18 @@ This directory owns IntrinsicEngine benchmark infrastructure and benchmark artif
 - `reports/`: generated benchmark reports and summaries.
 - `runners/`: benchmark runner binaries and orchestration helpers.
 
+Canonical JSON results use schema v2: stable benchmark identity is separate
+from append-only run/attempt identity, and every result binds the exact
+manifest, resolved params/warmup/thresholds, source state, and recomputed gate
+disposition. Checked-in examples and baselines are non-claim-eligible unless a
+claim-grade protocol says otherwise.
+
 ## Build integration
 
 - Benchmark scaffolding is wired through `benchmarks/CMakeLists.txt`.
+- Native smoke producers run through
+  `tools/benchmark/run_and_seal.py`; raw output is sealed before strict
+  validation or artifact publication.
 - The optimized `ci-release` lane owns the 25-result monolithic
   `IntrinsicBenchmarkSmoke` population, including the Core scheduler probe
   and the two TaskGraph replay-lifecycle workloads.

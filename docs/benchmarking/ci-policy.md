@@ -1068,6 +1068,11 @@ retains its full confidence result and timing artifact.
 ## Failure policy
 
 - Schema validation failures are hard failures.
+- Benchmark producers pass raw output through
+  `tools/benchmark/run_and_seal.py`; the canonical sealer binds schema-v2
+  results to the exact manifest, run/attempt identity, resolved configuration,
+  threshold disposition, and source state before strict validation. CI must not
+  promote an unsealed producer JSON file.
 - Missing benchmark result roots are reported as blocked prerequisite failures;
   run the benchmark producer target before treating validation as actionable.
 - Smoke threshold regressions fail PR-fast once enabled in strict mode.

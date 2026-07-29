@@ -6,6 +6,16 @@ Agent workflow and task policy tooling.
 
 - `check_task_policy.py` validates required task directories, rejects legacy root planning files, and delegates strict structured-task checks. Runs strict in `ci-docs.yml`; `check_todo_active_only.sh` is a thin compatibility wrapper for it.
 - `validate_tasks.py` validates task IDs, required sections, completion metadata for `tasks/done/`, and checkbox todos in actionable sections. Invoked by `check_task_policy.py`.
+- `workflow_evidence.py` records exact command receipts, generates completion
+  reports from task/Git/artifact facts, appends high-risk handoff/review
+  records, and validates enrolled retirement evidence.
+- `experiment_custody.py` freezes claim-grade protocols, initializes
+  non-overwriting runs, journals cells, builds/audits portable bundles, and
+  enforces protected prospective authorization and one-shot attempts. Its
+  benchmark-result input routes canonical schema-v2 payloads through the same
+  bundle/audit custody without granting claim eligibility.
+- `task_claim.py` atomically coordinates task and optional path claims through
+  the Git common directory shared by worktrees; no daemon is involved.
 - `check_task_maturity_followups.py` validates that open backend-facing `CPUContracted` maturity closures name an operational owner or explicitly state that no operational follow-up is owed. Invoked by `check_task_policy.py`.
 - `check_task_state_links.py` validates that task links and nearby lifecycle status claims agree with the actual `tasks/backlog/`, `tasks/active/`, and `tasks/done/` location of the referenced task ID. Runs strict in `ci-docs.yml`.
 - `check_codex_config.py` validates `.codex/config.yaml` stays meaningful and policy-light (delegating authority to `AGENTS.md` rather than duplicating it). Runs strict in `ci-docs.yml`.
@@ -19,3 +29,5 @@ Agent workflow and task policy tooling.
 ## Supporting directories
 
 - `skills/` is the physical skill-mirror root written by `sync_skills.py`; `.claude/skills` and `.codex/skills` symlink to it. Edit the canonical `docs/agent/*` sources, never the mirror.
+- `fixtures/protected-synthetic/` is the result-free public fixture used by
+  protected-custody regressions.

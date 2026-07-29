@@ -212,7 +212,7 @@ The retired legacy stack covered CSM for the directional light: shadow atlas, de
 
 ### Benchmarking & Profiling (**retired legacy MVP; promoted parity tracked**)
 
-The retired legacy stack had GPU timestamp queries per major render pass via `RHI::GpuProfiler`, CPU per-system timings via `RenderGraph` instrumentation, and a deterministic benchmark runner (`Core::Benchmark::BenchmarkRunner`) with JSON output. The Performance panel showed per-pass GPU+CPU timings. Headless benchmark mode (`--benchmark <frames> --out file.json`) ran a fixed frame count and exited. Threshold-based regression checking via `tools/benchmark/check_perf_regression.sh` supports avg/p99 frame time and min FPS gates.
+The retired legacy stack had GPU timestamp queries per major render pass via `RHI::GpuProfiler`, CPU per-system timings via `RenderGraph` instrumentation, and a deterministic benchmark runner (`Core::Benchmark::BenchmarkRunner`) with JSON output. The Performance panel showed per-pass GPU+CPU timings. Headless benchmark mode (`--benchmark <frames> --out file.json`) ran a fixed frame count and exited. Schema-aware regression checking via `tools/benchmark/check_perf_regression.py` (with the `.sh` compatibility entry point) supports avg/p99 frame time and min FPS gates after canonical result validation.
 
 Long-horizon additions: GPU-driven pass culling profiling, multi-scene benchmark suites, historical regression tracking with baseline storage.
 

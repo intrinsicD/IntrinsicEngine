@@ -47,10 +47,15 @@
   - <!-- N/A is acceptable with a short reason -->
 
 ## Agent self-review
+- Workflow profile:
+- Evidence report:
+- Fixed reviewed revision/content digest (high-risk+):
 - [ ] Scope matches one task (or approved batch).
 - [ ] Mechanical and semantic changes are not mixed.
 - [ ] Build/test/docs/tooling updates are synchronized for touched scope.
 - [ ] I reviewed diff for accidental unrelated changes.
+- [ ] Enrolled completion evidence validates; self-review is not presented as
+      independent acceptance.
 
 ## Temporary shims
 - [ ] No temporary shim introduced.

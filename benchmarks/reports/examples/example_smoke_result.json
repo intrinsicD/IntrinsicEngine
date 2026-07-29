@@ -1,9 +1,31 @@
 {
+  "schema_version": 2,
   "benchmark_id": "geometry.example.small",
+  "run_id": "example-smoke-v1",
+  "attempt_id": "attempt-001",
   "method": "geometry.example",
   "backend": "cpu_reference",
   "dataset": "builtin.triangle_mesh.small",
   "commit": "0000000000000000000000000000000000000000",
+  "source": {
+    "revision": "0000000000000000000000000000000000000000",
+    "state": "unverified_commit"
+  },
+  "claim_eligible": false,
+  "manifest": {
+    "path": "benchmarks/datasets/manifests/geometry_example_small.yaml",
+    "sha256": "3b3facd2b2d355f92e2959c779834896c051e3ffbc4372a6c6bb77e9981eaff2"
+  },
+  "resolved_params": {
+    "intent": "smoke",
+    "warmup_iterations": 1,
+    "measured_iterations": 8
+  },
+  "config_digest": "143720a539c0474f31b2af8f749bebb94e8d65a0784684d18d771afd1def2536",
+  "warmup_policy": {
+    "warmup_iterations": 1,
+    "measured_iterations": 8
+  },
   "metrics": {
     "runtime_ms": 1.8,
     "memory_peak_bytes": 28672,
@@ -13,5 +35,28 @@
     "warmup_runs": 1,
     "iterations": 8
   },
+  "thresholds": {
+    "smoke_runtime_ms_max": 200,
+    "quality_error_l2_max": 0.0
+  },
+  "threshold_disposition": [
+    {
+      "threshold": "smoke_runtime_ms_max",
+      "metric": "runtime_ms",
+      "operator": "<=",
+      "limit": 200,
+      "observed": 1.8,
+      "passed": true
+    },
+    {
+      "threshold": "quality_error_l2_max",
+      "metric": "quality_error_l2",
+      "operator": "<=",
+      "limit": 0.0,
+      "observed": 0.0,
+      "passed": true
+    }
+  ],
+  "execution_status": "passed",
   "status": "passed"
 }

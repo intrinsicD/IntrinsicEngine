@@ -300,3 +300,35 @@
 - **Evidence**: [tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp,
   src/runtime/Runtime.Engine.cppm, commit 982c72ae, N276, N277]
 - **From staging**: O60
+
+## K24: Workflow Profiles Add Requirements Prospectively and Cumulatively
+- **Constraint**: Task workflow schema version 1 assigns `micro`, `standard`,
+  `high-risk`, `claim-grade`, or `protected` profiles with cumulative
+  requirements. Routine work does not inherit review or experiment custody;
+  higher profiles may only add gates, evidence artifacts never imply claim
+  eligibility, and migration applies deterministically to new or materially
+  changed open tasks without backfilling retired history.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [tools/agents/validate_tasks.py,
+  tools/agents/workflow_legacy_tasks.json,
+  tools/agents/workflow_evidence.py, tasks/templates/task.md,
+  tasks/templates/task-micro.md, docs/agent/workflow-evidence.md,
+  tests/regression/tooling/Test.ValidateTasks.py,
+  tests/regression/tooling/Test.WorkflowEvidence.py, N290, N292]
+- **From staging**: O71
+
+## K25: Protected Attempts Require Result-Free Authorization Before Consumption
+- **Constraint**: A protected single-use attempt starts only after prospective
+  review and separate launch authorization bind the exact protocol and
+  implementation digests with zero protected interactions or private draws.
+  Any relevant digest change invalidates both records. Atomic `started`,
+  `failed`, and `completed` consumption states all spend the attempt and remain
+  append-only; none authorizes a retry under the same identity.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [tools/agents/experiment_custody.py,
+  tools/agents/fixtures/protected-synthetic/README.md,
+  tests/regression/tooling/Test.ExperimentCustody.py,
+  docs/agent/workflow-evidence.md, N290, N292]
+- **From staging**: O72

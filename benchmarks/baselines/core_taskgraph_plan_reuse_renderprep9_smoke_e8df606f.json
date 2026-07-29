@@ -1,9 +1,39 @@
 {
+  "schema_version": 2,
   "benchmark_id": "core.taskgraph_plan_reuse.renderprep9.smoke",
+  "run_id": "baseline-e8df606f-renderprep9",
+  "attempt_id": "attempt-001",
   "method": "core.taskgraph_plan_reuse",
   "backend": "cpu_optimized",
   "dataset": "builtin.synthetic_taskgraph.render_prep_9.v1",
   "commit": "e8df606f794dc8a77aa03e962fa8f834705effb0",
+  "source": {
+    "revision": "e8df606f794dc8a77aa03e962fa8f834705effb0",
+    "state": "unverified_commit"
+  },
+  "claim_eligible": false,
+  "manifest": {
+    "path": "benchmarks/core/manifests/core_taskgraph_plan_reuse_renderprep9_smoke.yaml",
+    "sha256": "970a53b8df0e88f3fb1a548387a23d3b026e14c33ed51be3781d8ccbe186997e"
+  },
+  "resolved_params": {
+    "intent": "smoke",
+    "graph_shape": "linear_resource_chain",
+    "pass_count": 9,
+    "resource_count": 9,
+    "edge_count": 8,
+    "warmup_batches": 3,
+    "measured_batches": 9,
+    "epochs_per_batch": 512,
+    "timing_statistic": "median_per_epoch_runtime_ms",
+    "timed_scope": "registration_compile_reset_for_replay",
+    "throughput_item": "graph_epoch"
+  },
+  "config_digest": "e49e7d54c60b1b4a4613370281adb1ffb73bbb4abef76706a360efccf96f8c30",
+  "warmup_policy": {
+    "warmup_batches": 3,
+    "measured_batches": 9
+  },
   "metrics": {
     "runtime_ms": 0.002624,
     "throughput_items_per_sec": 381169.624950,
@@ -31,5 +61,37 @@
     "callback_rebind_checksum": 9452821555824480147,
     "failure_count": 0
   },
+  "thresholds": {
+    "smoke_runtime_ms_max": 10,
+    "throughput_items_per_sec_min": 1,
+    "quality_error_l2_max": 0.0
+  },
+  "threshold_disposition": [
+    {
+      "threshold": "smoke_runtime_ms_max",
+      "metric": "runtime_ms",
+      "operator": "<=",
+      "limit": 10,
+      "observed": 0.002624,
+      "passed": true
+    },
+    {
+      "threshold": "throughput_items_per_sec_min",
+      "metric": "throughput_items_per_sec",
+      "operator": ">=",
+      "limit": 1,
+      "observed": 381169.62495,
+      "passed": true
+    },
+    {
+      "threshold": "quality_error_l2_max",
+      "metric": "quality_error_l2",
+      "operator": "<=",
+      "limit": 0.0,
+      "observed": 0.0,
+      "passed": true
+    }
+  ],
+  "execution_status": "passed",
   "status": "passed"
 }

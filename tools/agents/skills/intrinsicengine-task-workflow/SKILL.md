@@ -216,10 +216,15 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 # Full task validator
 python3 tools/agents/validate_tasks.py --root tasks --strict
+
+# Prospective enrolled-task evidence
+python3 tools/agents/workflow_evidence.py validate --root .
 ```
 
 The validator enforces the nine required sections; the optional `## Maturity`
-section is not validator-enforced.
+section is not validator-enforced. New or materially changed open tasks use the
+prospective workflow profile and evidence fields described in
+`references/workflow-evidence.md`.
 
 ## References
 
@@ -229,5 +234,9 @@ section is not validator-enforced.
   `Scaffolded` closure rule with both forms of follow-up, vocabulary mapping
   for older docs. Read this when deciding what maturity level a slice closes
   at, or when reviewing a `Scaffolded`/`CPUContracted` retirement.
+- `references/workflow-evidence.md` — workflow profiles, atomic task claims,
+  generated command/report evidence, high-risk handoff/review, claim-grade
+  experiment custody, and protected attempt controls. Read this for any task
+  enrolled with `workflow_schema`.
 - `references/task-template.md` — the bare template to copy when creating a
   new task file.

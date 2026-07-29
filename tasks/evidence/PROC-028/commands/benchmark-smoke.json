@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "set -euo pipefail\ncmake --build --preset ci --target IntrinsicBenchmarks\npython3 tools/benchmark/validate_benchmark_results.py --root build/ci/benchmark/IntrinsicBenchmarkSmoke --manifests-root benchmarks --strict"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'set -euo pipefail\ncmake --build --preset ci --target IntrinsicBenchmarks\npython3 tools/benchmark/validate_benchmark_results.py --root build/ci/benchmark/IntrinsicBenchmarkSmoke --manifests-root benchmarks --strict'",
+  "cwd": ".",
+  "duration_ms": 6682,
+  "exit_code": 0,
+  "finished_at": "2026-07-29T18:20:04Z",
+  "label": "benchmark-smoke",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-29T18:19:57Z",
+  "stderr_path": "tasks/evidence/PROC-028/commands/benchmark-smoke.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-028/commands/benchmark-smoke.stdout.log",
+  "stdout_sha256": "6d1b7d454d5ee0b67b56374a1c3fadaa863d820231387e95593cfc0a5317c779",
+  "task_id": "PROC-028"
+}

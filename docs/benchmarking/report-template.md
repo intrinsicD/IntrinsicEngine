@@ -4,11 +4,16 @@ Use this template for benchmark result summaries attached to tasks/PRs.
 
 ## Metadata
 
-- Benchmark run ID:
+- Stable benchmark ID:
+- Run ID:
+- Attempt ID:
 - Date:
 - Commit:
 - Runner environment (CPU/GPU/OS):
 - Workflow (PR-fast / nightly / local):
+- Source state / claim eligibility:
+- Exact manifest path / SHA-256:
+- Config digest / warmup policy:
 
 ## Scope
 
@@ -21,12 +26,15 @@ Use this template for benchmark result summaries attached to tasks/PRs.
 - Key metrics:
 - Baseline comparison:
 - Threshold status (pass/fail):
+- Failed/abandoned attempts retained:
 
 ## Diagnostics
 
 - Warnings/anomalies:
 - Numerical quality notes:
 - Repro steps/command:
+- Portable bundle / raw rows / audit receipt:
+- Replay/view smoke receipts:
 
 ## Follow-up
 

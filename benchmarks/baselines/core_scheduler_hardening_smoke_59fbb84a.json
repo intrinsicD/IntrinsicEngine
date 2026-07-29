@@ -1,9 +1,42 @@
 {
+  "schema_version": 2,
   "benchmark_id": "core.scheduler_hardening.smoke",
+  "run_id": "baseline-59fbb84a",
+  "attempt_id": "attempt-001",
   "method": "core.scheduler_hardening",
   "backend": "cpu_optimized",
   "dataset": "builtin.synthetic_scheduler_contention.v1",
   "commit": "59fbb84a905df42710940e7169442eabb3a83894",
+  "source": {
+    "revision": "59fbb84a905df42710940e7169442eabb3a83894",
+    "state": "unverified_commit"
+  },
+  "claim_eligible": false,
+  "manifest": {
+    "path": "benchmarks/core/manifests/core_scheduler_hardening_smoke.yaml",
+    "sha256": "005b369bd11f71464fee286b908ec3ec72d48936ec932a6e0153b2e8f676921e"
+  },
+  "resolved_params": {
+    "intent": "smoke",
+    "dispatch_worker_request": 4,
+    "dispatch_task_count": 8192,
+    "priority_worker_request": 1,
+    "priority_low_task_count": 64,
+    "priority_high_task_count": 16,
+    "priority_registration_order": "low_then_high",
+    "wait_registry_thread_count": 8,
+    "wait_registry_operations_per_thread": 4096,
+    "warmup_iterations": 3,
+    "measured_iterations": 9,
+    "timing_statistic": "median",
+    "baseline_production_commit": "59fbb84a905df42710940e7169442eabb3a83894",
+    "worker_wake_notification_probe": "unavailable_in_baseline_public_stats"
+  },
+  "config_digest": "4da29b2c9faeae557a7623a63a4162e976a007d71e7babbaa0e6b84fa343fbc8",
+  "warmup_policy": {
+    "warmup_iterations": 3,
+    "measured_iterations": 9
+  },
   "metrics": {
     "runtime_ms": 2.159489,
     "throughput_items_per_sec": 3793490.033985,
@@ -36,5 +69,37 @@
     "worker_wake_notification_telemetry_available": false,
     "worker_wake_evidence": "candidate_stats_and_contract_tests"
   },
+  "thresholds": {
+    "smoke_runtime_ms_max": 1000,
+    "throughput_items_per_sec_min": 1,
+    "priority_inversion_quality_error_l2_max": 0.0
+  },
+  "threshold_disposition": [
+    {
+      "threshold": "smoke_runtime_ms_max",
+      "metric": "runtime_ms",
+      "operator": "<=",
+      "limit": 1000,
+      "observed": 2.159489,
+      "passed": true
+    },
+    {
+      "threshold": "throughput_items_per_sec_min",
+      "metric": "throughput_items_per_sec",
+      "operator": ">=",
+      "limit": 1,
+      "observed": 3793490.033985,
+      "passed": true
+    },
+    {
+      "threshold": "priority_inversion_quality_error_l2_max",
+      "metric": "quality_error_l2",
+      "operator": "<=",
+      "limit": 0.0,
+      "observed": 16.0,
+      "passed": false
+    }
+  ],
+  "execution_status": "failed",
   "status": "failed"
 }

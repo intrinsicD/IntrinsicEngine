@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicTests",
+  "cwd": ".",
+  "duration_ms": 11264,
+  "exit_code": 0,
+  "finished_at": "2026-07-29T18:19:52Z",
+  "label": "build-intrinsic-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-07-29T18:19:41Z",
+  "stderr_path": "tasks/evidence/PROC-028/commands/build-intrinsic-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-028/commands/build-intrinsic-tests.stdout.log",
+  "stdout_sha256": "a64b282ae73a3f01af5d90f8930d4c29ee3f31ecc546ba1ef58149279a309d32",
+  "task_id": "PROC-028"
+}

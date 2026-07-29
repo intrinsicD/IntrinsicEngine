@@ -38,6 +38,10 @@ ALLOWED_METRICS = {
     "sample_count",
     "warm_population_count",
     "cold_population_statistics",
+    "avgFrameTimeMs",
+    "p99FrameTimeMs",
+    "avgFPS",
+    "totalFrames",
 }
 
 

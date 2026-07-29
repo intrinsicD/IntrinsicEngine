@@ -15,7 +15,11 @@ map.
 
 ## Tasks
 
-No process tasks are currently open.
+- [PROC-028 — Enforce agent evidence, review, and experiment custody](../../active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md):
+  one explicitly batched, risk-tiered workflow task covering generated
+  completion evidence, strict benchmark results, independent high-risk review,
+  durable handoff, claim-grade/protected experiment custody, audited portable
+  bundles, and concurrent ownership.
 
 `PROC-012` (resolve the duplicate `GEOM-027` ID by renumbering the
 control-surface/KMeans backend-seam task to `GEOM-052`) is retired; see the
@@ -24,6 +28,10 @@ retirement log.
 ## Convergence
 
 - These tasks anchor **Theme H — Agentic workflow hardening**.
+- Active `PROC-028` is the only open process member. It implements the already
+  accepted `N123..N125` evidence-report decisions and the bounded
+  `N290`/`O71..O75` cross-repository workflow findings without replacing the
+  existing task, ARA, benchmark, or CI authorities.
 - CI latency order: retired `CI-003` establishes telemetry/cancellation and
   retired `CI-004` establishes label-derived test build aggregates; retired
   `CI-007` establishes the bounded module-safe `pr-fast` ccache policy;

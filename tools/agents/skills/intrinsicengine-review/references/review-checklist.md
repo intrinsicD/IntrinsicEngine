@@ -7,6 +7,27 @@ Use this checklist before commit and PR creation.
 - [ ] Change maps to exactly one task (unless batching explicitly allowed).
 - [ ] Owning subsystem/layer is identified.
 - [ ] Mechanical moves and semantic edits are not mixed.
+- [ ] Enrolled task profile matches the risk trigger; owner/branch/worktree
+      metadata mirrors a live Git-common-dir claim.
+- [ ] Parallel writers used separate worktrees; explicit path claims do not
+      overlap.
+
+## Evidence and review custody
+
+- [ ] `standard` and higher completion has a generated, current
+      `tasks/evidence/<TASK-ID>/report.yaml`, successful required command
+      receipts, and every acceptance criterion disposed.
+- [ ] Skipped checks have bounded reasons; failed required commands and
+      residual blocking findings are not presented as completion.
+- [ ] `high-risk` and higher work has a final handoff plus accepted independent
+      review bound to the exact final commit/content digest. Self-review
+      remains provisional and labels are not treated as authentication.
+- [ ] `claim-grade` work has a frozen protocol, sealed non-overwriting run,
+      visible cell failures/missing results, portable bundle, and independent
+      recomputation audit.
+- [ ] `protected` work has result-free prospective review, separate launch
+      authorization, current protocol/implementation digests, and one-shot
+      attempt consumption.
 
 ## Maturity and closure
 
@@ -101,5 +122,6 @@ Use this checklist before commit and PR creation.
 
 
 Related: `docs/agent/architecture-review-checklist.md`,
+`docs/agent/workflow-evidence.md`,
 `docs/agent/clean-workshop-review.md` (drift/decomposition scorecard),
 `docs/agent/drift-audit-checklist.md` (whole-tree state audit).

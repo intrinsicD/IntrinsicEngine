@@ -163,3 +163,37 @@
   tasks/done/ARCH-014-kernel-convergence-tracking.md,
   commit 982c72ae, N277]
 - **From staging**: O59
+
+## H12: Seal Benchmark Meaning Before Comparing Results
+- **Rationale**: Parse persisted results with duplicate-key and finite-number
+  rejection, bind the exact manifest/source/configuration and declared metric
+  set, and recompute threshold disposition before accepting a status. Keep the
+  stable benchmark definition ID separate from append-only run and attempt IDs
+  so retries and supersession remain visible instead of overwriting history.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Sensitivity**: high
+- **Code ref**: [tools/benchmark/validate_benchmark_results.py,
+  tools/benchmark/seal_benchmark_results.py,
+  tools/benchmark/run_and_seal.py,
+  tools/benchmark/check_perf_regression.py,
+  tests/regression/tooling/Test_BenchmarkResultValidator.py,
+  tests/regression/tooling/Test.BenchmarkComparison.py,
+  docs/benchmarking/result-json-schema.md, N290, N292]
+- **From staging**: O73
+
+## H13: Claim Work Before Parallel Editing
+- **Rationale**: Separate branches and worktrees eliminate shared-index and
+  shared-file writes by default; one atomic task claim in the Git common
+  directory then makes ownership and bounded lease state visible across those
+  worktrees. Optional path claims catch explicit cross-task overlap without
+  introducing a daemon, server, or mandatory registry for routine work.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Sensitivity**: medium
+- **Code ref**: [tools/agents/task_claim.py,
+  tests/regression/tooling/Test.TaskClaim.py,
+  docs/agent/workflow-evidence.md,
+  tasks/active/PROC-028-enforced-agent-evidence-review-experiment-workflow.md,
+  N290, N291, N292]
+- **From staging**: O74
