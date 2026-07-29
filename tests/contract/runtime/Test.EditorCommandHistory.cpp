@@ -1,6 +1,8 @@
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -16,6 +18,8 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.SelectionController;
+
+#include "Runtime.EditorMutation.Internal.hpp"
 
 namespace Runtime = Extrinsic::Runtime;
 namespace ECS = Extrinsic::ECS;
@@ -49,6 +53,86 @@ namespace
     [[nodiscard]] ECS::EntityHandle CreateEntity(ECS::Scene::Registry& registry)
     {
         return registry.Create();
+    }
+
+    struct TestMutationIdentity
+    {
+        std::uint64_t World{0u};
+        std::uint32_t Entity{0u};
+
+        bool operator==(const TestMutationIdentity&) const = default;
+    };
+
+    struct TestMutationGenerations
+    {
+        std::uint64_t Binding{0u};
+        std::uint64_t Source{0u};
+
+        bool operator==(const TestMutationGenerations&) const = default;
+    };
+
+    struct TestMutationState
+    {
+        int Value{0};
+    };
+
+    struct TestMutationStore
+    {
+        TestMutationIdentity Identity{.World = 7u, .Entity = 19u};
+        TestMutationGenerations Generations{.Binding = 3u, .Source = 11u};
+        int Value{4};
+        std::uint32_t ApplyCount{0u};
+        std::uint32_t DirtyStampCount{0u};
+        std::optional<Runtime::EditorCommandHistoryStatus> ValidationFailure{};
+        bool FailApply{false};
+    };
+
+    [[nodiscard]] Runtime::EditorCommandHistoryResult ExecuteTestMutation(
+        Runtime::EditorCommandHistory& history,
+        TestMutationStore& store,
+        const TestMutationIdentity identity,
+        const TestMutationGenerations expected,
+        const TestMutationState before,
+        const TestMutationState after)
+    {
+        return Runtime::Internal::ExecuteUndoableEntityMutation(
+            history,
+            "Mutate Test Entity",
+            identity,
+            expected,
+            before,
+            after,
+            [&store](
+                const TestMutationIdentity& candidateIdentity,
+                const TestMutationGenerations& candidateGenerations,
+                const TestMutationState&)
+            {
+                if (store.ValidationFailure.has_value())
+                    return *store.ValidationFailure;
+                return candidateIdentity == store.Identity &&
+                               candidateGenerations == store.Generations
+                           ? Runtime::EditorCommandHistoryStatus::Applied
+                           : Runtime::EditorCommandHistoryStatus::StaleEntity;
+            },
+            [&store](
+                const TestMutationIdentity&,
+                const TestMutationState& target)
+            {
+                if (store.FailApply)
+                    return Runtime::EditorCommandHistoryStatus::CommandFailed;
+                store.Value = target.Value;
+                ++store.ApplyCount;
+                return Runtime::EditorCommandHistoryStatus::Applied;
+            },
+            [&store](
+                const TestMutationIdentity&,
+                const TestMutationGenerations&,
+                const TestMutationState&)
+            {
+                ++store.Generations.Source;
+                ++store.DirtyStampCount;
+                return store.Generations;
+            });
     }
 }
 
@@ -93,6 +177,154 @@ TEST(EditorCommandHistory, ExecuteRecordUndoRedoCapacityAndDirtyState)
     history.ResetDocument("loaded.extrinsic.json");
     EXPECT_FALSE(history.IsDirty());
     EXPECT_EQ(history.Snapshot().ActivePath, "loaded.extrinsic.json");
+}
+
+TEST(EditorCommandHistory,
+     UndoableEntityMutationRevalidatesAndTracksGenerationsAcrossUndoRedo)
+{
+    Runtime::EditorCommandHistory history;
+    TestMutationStore store;
+
+    const Runtime::EditorCommandHistoryResult applied =
+        ExecuteTestMutation(
+            history,
+            store,
+            store.Identity,
+            store.Generations,
+            TestMutationState{.Value = 4},
+            TestMutationState{.Value = 9});
+
+    ASSERT_TRUE(applied.Succeeded());
+    EXPECT_EQ(applied.Status, Runtime::EditorCommandHistoryStatus::Applied);
+    EXPECT_EQ(store.Value, 9);
+    EXPECT_EQ(store.ApplyCount, 1u);
+    EXPECT_EQ(store.DirtyStampCount, 1u);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.Snapshot().UndoLabel, "Mutate Test Entity");
+
+    const Runtime::EditorCommandHistoryResult undone = history.Undo();
+    ASSERT_TRUE(undone.Succeeded());
+    EXPECT_EQ(undone.Status, Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(store.Value, 4);
+    EXPECT_EQ(store.ApplyCount, 2u);
+    EXPECT_EQ(store.DirtyStampCount, 2u);
+    EXPECT_EQ(history.UndoCount(), 0u);
+    EXPECT_EQ(history.RedoCount(), 1u);
+
+    const Runtime::EditorCommandHistoryResult redone = history.Redo();
+    ASSERT_TRUE(redone.Succeeded());
+    EXPECT_EQ(redone.Status, Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_EQ(store.Value, 9);
+    EXPECT_EQ(store.ApplyCount, 3u);
+    EXPECT_EQ(store.DirtyStampCount, 3u);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+}
+
+TEST(EditorCommandHistory,
+     UndoableEntityMutationRejectsStaleIdentityWithoutMutationOrHistory)
+{
+    Runtime::EditorCommandHistory history;
+    TestMutationStore store;
+    const TestMutationIdentity staleIdentity{
+        .World = store.Identity.World + 1u,
+        .Entity = store.Identity.Entity,
+    };
+
+    const Runtime::EditorCommandHistoryResult rejected =
+        ExecuteTestMutation(
+            history,
+            store,
+            staleIdentity,
+            store.Generations,
+            TestMutationState{.Value = 4},
+            TestMutationState{.Value = 9});
+
+    EXPECT_EQ(rejected.Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(store.Value, 4);
+    EXPECT_EQ(store.ApplyCount, 0u);
+    EXPECT_EQ(store.DirtyStampCount, 0u);
+    EXPECT_EQ(history.UndoCount(), 0u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, 0u);
+}
+
+TEST(EditorCommandHistory,
+     UndoableEntityMutationRejectsStaleGenerationWithoutMutationOrHistory)
+{
+    Runtime::EditorCommandHistory history;
+    TestMutationStore store;
+    TestMutationGenerations staleGenerations = store.Generations;
+    ++staleGenerations.Source;
+
+    const Runtime::EditorCommandHistoryResult rejected =
+        ExecuteTestMutation(
+            history,
+            store,
+            store.Identity,
+            staleGenerations,
+            TestMutationState{.Value = 4},
+            TestMutationState{.Value = 9});
+
+    EXPECT_EQ(rejected.Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_EQ(store.Value, 4);
+    EXPECT_EQ(store.ApplyCount, 0u);
+    EXPECT_EQ(store.DirtyStampCount, 0u);
+    EXPECT_EQ(history.UndoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, 0u);
+}
+
+TEST(EditorCommandHistory,
+     UndoableEntityMutationValidationFailurePublishesNoMutationOrHistory)
+{
+    Runtime::EditorCommandHistory history;
+    TestMutationStore store;
+    store.ValidationFailure =
+        Runtime::EditorCommandHistoryStatus::UnsupportedOperation;
+
+    const Runtime::EditorCommandHistoryResult rejected =
+        ExecuteTestMutation(
+            history,
+            store,
+            store.Identity,
+            store.Generations,
+            TestMutationState{.Value = 4},
+            TestMutationState{.Value = 9});
+
+    EXPECT_EQ(
+        rejected.Status,
+        Runtime::EditorCommandHistoryStatus::UnsupportedOperation);
+    EXPECT_EQ(store.Value, 4);
+    EXPECT_EQ(store.ApplyCount, 0u);
+    EXPECT_EQ(store.DirtyStampCount, 0u);
+    EXPECT_EQ(history.UndoCount(), 0u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, 0u);
+}
+
+TEST(EditorCommandHistory,
+     UndoableEntityMutationApplyFailurePublishesNoPartialStateOrHistory)
+{
+    Runtime::EditorCommandHistory history;
+    TestMutationStore store;
+    store.FailApply = true;
+
+    const Runtime::EditorCommandHistoryResult rejected =
+        ExecuteTestMutation(
+            history,
+            store,
+            store.Identity,
+            store.Generations,
+            TestMutationState{.Value = 4},
+            TestMutationState{.Value = 9});
+
+    EXPECT_EQ(rejected.Status, Runtime::EditorCommandHistoryStatus::CommandFailed);
+    EXPECT_EQ(store.Value, 4);
+    EXPECT_EQ(store.ApplyCount, 0u);
+    EXPECT_EQ(store.DirtyStampCount, 0u);
+    EXPECT_EQ(history.UndoCount(), 0u);
+    EXPECT_EQ(history.RedoCount(), 0u);
+    EXPECT_EQ(history.Snapshot().Revision, 0u);
 }
 
 TEST(EditorCommandHistory, TransformAdapterAppliesUndoRedoAndRejectsStaleEntity)

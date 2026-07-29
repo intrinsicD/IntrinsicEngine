@@ -24,9 +24,10 @@ maturity_target: Retired
 ## Context
 
 - Status: in progress; owner `Codex`; branch
-  `codex/runtime-201-unified-editor-mutation`; Slice A is the current slice and
-  its next verification step is the focused `EditorCommandHistory|Mutation`
-  contract run.
+  `codex/runtime-201-unified-editor-mutation`; Slice A is complete and Slice B
+  feature adoption is next. The next verification step is the first
+  owner-scoped adoption contract plus the focused
+  `EditorCommandHistory|Mutation` run.
 - `EditorCommandHistory` is already the durable editor undo/redo owner but also
   contains feature-specific builders. Geometry/method facades duplicate
   snapshot/validate/apply/dirty/history rules, gizmo drag commits use a
@@ -55,7 +56,8 @@ maturity_target: Retired
 
 ## Slice plan
 
-- **Slice A — transaction helper.** Add an implementation/internal
+- **Slice A — transaction helper (complete 2026-07-29).** Add an
+  implementation/internal
   `ExecuteUndoableEntityMutation<TState>` shape and focused atomicity/staleness
   contracts without a new public service.
 - **Slice B — feature adoption.** Migrate transform/gizmo, geometry,
@@ -67,7 +69,7 @@ maturity_target: Retired
 
 ## Required changes
 
-- [ ] Define one internal mutation helper taking stable entity/world identity,
+- [x] Define one internal mutation helper taking stable entity/world identity,
       expected generations, typed before/after state, pure validation, atomic
       apply, dirty stamping, and deterministic undo/redo callbacks.
 - [ ] Fail closed without mutation/history on stale entity, source/property/
@@ -86,7 +88,7 @@ maturity_target: Retired
 
 ## Tests
 
-- [ ] Generic contracts cover success, failed validation, stale generation,
+- [x] Generic contracts cover success, failed validation, stale generation,
       apply failure, exact one-entry commit, deterministic undo/redo, and no
       partial mutation.
 - [ ] Feature matrix covers transform/gizmo, topology/property,
@@ -125,6 +127,15 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
 
+Slice A verification completed on 2026-07-29:
+
+- `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
+- `ctest --test-dir build/ci --output-on-failure -R '^EditorCommandHistory\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+- `python3 tools/repo/check_layering.py --root src --strict`
+- `python3 tools/agents/check_task_policy.py --root . --strict`
+- `python3 tools/agents/check_task_state_links.py --root . --strict`
+- `python3 tools/agents/generate_session_brief.py --check`
+
 ## Forbidden changes
 
 - A second history service/stack, app-owned snapshot, or generic serialized
@@ -137,3 +148,5 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 - Target: `Retired`; common atomicity contracts and all real workflow
   migrations must pass before the parallel history mechanisms are removed.
+- Slice A establishes only the internal transaction contract; production
+  feature adoption and all parallel-history removals remain open.
