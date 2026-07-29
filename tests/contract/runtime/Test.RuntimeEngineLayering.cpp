@@ -576,6 +576,89 @@ TEST(RuntimeEngineLayering,
               std::string::npos);
 }
 
+// RUNTIME-201 — EditorCommandHistory is the only production undo/redo owner.
+// Entity mutation owners construct records through the internal transaction;
+// selection's non-dirty compatibility adapter and the generic compound helper
+// remain deliberately outside that entity-mutation contract.
+TEST(RuntimeEngineLayering,
+     UnifiedEditorMutationHistoryHasNoParallelProductionSurface)
+{
+    const std::filesystem::path root = RepoRoot();
+    const auto historyInterface =
+        ReadFile(root / "src/runtime/Runtime.EditorCommandHistory.cppm");
+    const auto mutationHelper =
+        ReadFile(root / "src/runtime/Runtime.EditorMutation.Internal.hpp");
+
+    EXPECT_NE(historyInterface.find("class EditorCommandHistory"),
+              std::string::npos);
+    EXPECT_NE(mutationHelper.find("return history.Execute("),
+              std::string::npos);
+
+    constexpr std::array retiredProductionSymbols{
+        std::string_view{"GizmoUndoStack"},
+        std::string_view{"CommandHistoryHook"},
+        std::string_view{"CommandHistoryRecord"},
+        std::string_view{"SetHistoryHook"},
+        std::string_view{"RecordInverse"},
+        std::string_view{"MakeTransformEditCommand"},
+        std::string_view{"MakeVisualizationConfigCommand"},
+        std::string_view{"MakePrimitiveViewSettingsCommand"},
+        std::string_view{"MakeSpatialDebugBindingCommand"},
+    };
+    constexpr std::array retiredHistoryAdapterTypes{
+        std::string_view{"EditorTransformEditCommand"},
+        std::string_view{"EditorVisualizationConfigCommand"},
+        std::string_view{"EditorPrimitiveViewSettingsCommand"},
+        std::string_view{"EditorSpatialDebugBindingCommand"},
+    };
+    for (const std::string_view retired : retiredProductionSymbols)
+        EXPECT_EQ(historyInterface.find(retired), std::string::npos) << retired;
+    for (const std::string_view retired : retiredHistoryAdapterTypes)
+        EXPECT_EQ(historyInterface.find(retired), std::string::npos) << retired;
+
+    const std::filesystem::path runtimeRoot = root / "src/runtime";
+    for (const auto& entry :
+         std::filesystem::recursive_directory_iterator(runtimeRoot))
+    {
+        if (!entry.is_regular_file())
+            continue;
+
+        const std::string extension = entry.path().extension().string();
+        if (extension != ".cpp" && extension != ".cppm" &&
+            extension != ".hpp")
+        {
+            continue;
+        }
+
+        const bool isHistoryOwner =
+            entry.path().filename() == "Runtime.EditorCommandHistory.cpp" ||
+            entry.path().filename() == "Runtime.EditorCommandHistory.cppm";
+        const bool isMutationHelper =
+            entry.path().filename() == "Runtime.EditorMutation.Internal.hpp";
+        const std::string content = ReadFile(entry.path());
+
+        if (!isHistoryOwner)
+        {
+            EXPECT_EQ(content.find("m_UndoStack"), std::string::npos)
+                << entry.path();
+            EXPECT_EQ(content.find("m_RedoStack"), std::string::npos)
+                << entry.path();
+        }
+        if (!isHistoryOwner && !isMutationHelper)
+        {
+            EXPECT_EQ(content.find("EditorCommandRecord{"),
+                      std::string::npos)
+                << entry.path();
+        }
+
+        for (const std::string_view retired : retiredProductionSymbols)
+        {
+            EXPECT_EQ(content.find(retired), std::string::npos)
+                << entry.path() << ": " << retired;
+        }
+    }
+}
+
 TEST(RuntimeEngineLayering, RunFrameCarriesDataOnlyFrameContext)
 {
     const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
