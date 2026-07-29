@@ -35,22 +35,6 @@ namespace Extrinsic::Runtime
         m_Handlers[type] = HandlerRecord{std::move(handler), typeName};
     }
 
-    void CommandBus::RecordInverse(CommandEnvelope inverse)
-    {
-        if (!m_Draining)
-        {
-            Core::Log::Error(
-                "[CommandBus] RecordInverse called outside of a drain; ignored.");
-            return;
-        }
-        m_RecordedInverse = std::move(inverse);
-    }
-
-    void CommandBus::SetHistoryHook(CommandHistoryHook hook)
-    {
-        m_HistoryHook = std::move(hook);
-    }
-
     std::size_t CommandBus::DiscardPending()
     {
         std::vector<PendingCommand> dropped;
@@ -143,8 +127,6 @@ namespace Extrinsic::Runtime
                 .Worlds = services.Worlds,
                 .Correlation = pending.Correlation,
             };
-            m_RecordedInverse = CommandEnvelope{};
-
             const CommandOutcome outcome =
                 record.Handler(context, pending.Envelope.m_Payload.get());
 
@@ -160,14 +142,6 @@ namespace Extrinsic::Runtime
             }
 
             m_Stats.Executed += 1;
-            if (m_HistoryHook && m_RecordedInverse.IsValid())
-            {
-                m_HistoryHook(CommandHistoryRecord{
-                    record.TypeName,
-                    pending.Correlation,
-                    std::move(m_RecordedInverse)});
-                m_RecordedInverse = CommandEnvelope{};
-            }
         }
     }
 }

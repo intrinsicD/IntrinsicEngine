@@ -33,10 +33,9 @@ maturity_target: Retired
   point-cloud outlier replacement, parameterization UV publication, plus
   generic render-hint and primitive-view component edits.
   `GizmoUndoStack` and the now-unused public transform/visualization history
-  adapters are deleted together with the primitive-view compatibility builder;
-  the next cleanup is the unused CommandBus inverse hook plus a production
-  mutation census. The next verification step is the CommandBus contract suite
-  and a zero-consumer structural scan.
+  adapters are deleted together with the primitive-view compatibility builder
+  and the unused CommandBus inverse-history hook. The next cleanup is the final
+  production mutation census.
 - At task intake, `EditorCommandHistory` was already the durable editor
   undo/redo owner but also contained feature-specific builders. Geometry/method
   facades still duplicate snapshot/validate/apply/dirty/history rules; gizmo
@@ -87,9 +86,10 @@ maturity_target: Retired
 - **Slice C — cleanup (in progress).** `GizmoUndoStack` was deleted with gizmo
   adoption. The unused public transform and visualization adapter DTOs/builders
   were deleted after their owners adopted the transaction; render-hint adoption
-  also deleted the primitive-view history builder. Delete the CommandBus
-  inverse-history API, duplicate apply paths, and compatibility tests after the
-  final production mutation census.
+  also deleted the primitive-view history builder. The CommandBus
+  inverse-history API and its compatibility tests are deleted. Delete any
+  remaining duplicate apply paths found by the final production mutation
+  census.
 
 ## Required changes
 
@@ -113,7 +113,8 @@ maturity_target: Retired
 - [ ] Delete `GizmoUndoStack`, feature-specific builders from
       `EditorCommandHistory`, and `CommandBus::SetHistoryHook` /
       `RecordInverse` after production adoption and parity. Gizmo plus the
-      transform/visualization/primitive-view builders are complete.
+      transform/visualization/primitive-view builders and CommandBus hook are
+      complete.
 
 ## Tests
 
@@ -333,6 +334,12 @@ Render-hint history convergence verification completed on 2026-07-29:
 - `python3 tools/agents/check_task_policy.py --root . --strict`
 - `python3 tools/agents/check_task_state_links.py --root . --strict`
 - `python3 tools/agents/generate_session_brief.py --check`
+
+CommandBus inverse-history cleanup verification completed on 2026-07-29:
+
+- `cmake --build --preset ci --target IntrinsicRuntimeContractTests`
+- `ctest --test-dir build/ci --output-on-failure -R '^RuntimeCommandBus\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+- `rg -n 'RecordInverse|SetHistoryHook|CommandHistoryRecord|CommandHistoryHook' . --glob '!build/**' --glob '!tasks/archive/**' --glob '!tasks/done/**' --glob '!ara/**'`
 
 ## Forbidden changes
 

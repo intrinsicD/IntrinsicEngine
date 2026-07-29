@@ -171,10 +171,11 @@ root must update the relevant `docs/architecture/*` doc set in the same PR per
   (done, 2026-07-08, `CPUContracted`, PR #1010): first ADR-0024 kernel seam.
   `Extrinsic.Runtime.CommandBus` ships plain-data commands with correlation
   IDs, thread-safe enqueue, a single pre-sim drain in `Engine::RunFrame()`,
-  fail-closed missing-handler diagnostics, a history-hook seam with
-  re-enqueueable inverse envelopes, `DiscardPending()` on shutdown, and the
-  built-in `QuitRequested` command. No-RTTI/no-exceptions compliant via
-  `Core::TypeToken` type identity. `Operational` owned by `ARCH-012`.
+  fail-closed missing-handler diagnostics, `DiscardPending()` on shutdown, and
+  the built-in `QuitRequested` command. No-RTTI/no-exceptions compliant via
+  `Core::TypeToken` type identity. `RUNTIME-201` later retired the unused
+  inverse-envelope/history-hook seam in favor of the editor mutation
+  transaction. `Operational` owned by `ARCH-012`.
 
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
