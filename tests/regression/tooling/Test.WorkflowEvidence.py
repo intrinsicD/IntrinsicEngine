@@ -294,6 +294,43 @@ class WorkflowEvidenceTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("content hash mismatch", result.stdout)
 
+    def test_clean_fixed_revision_artifact_survives_later_change(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = self.fixture(tmp)
+            fixture.receipt()
+            fixture.generate()
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "implementation and initial evidence")
+            fixture.generate(replace=True)
+            git(fixture.repo, "add", str(fixture.report))
+            git(fixture.repo, "commit", "-qm", "bind fixed revision evidence")
+
+            fixture.artifact.write_text("later task content\n", encoding="utf-8")
+            git(fixture.repo, "add", str(fixture.artifact))
+            git(fixture.repo, "commit", "-qm", "update shared artifact later")
+            result = fixture.validate()
+
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_clean_fixed_revision_rejects_recorded_artifact_hash_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = self.fixture(tmp)
+            fixture.receipt()
+            fixture.generate()
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "implementation and initial evidence")
+            fixture.generate(replace=True)
+
+            report = yaml.safe_load(fixture.report.read_text(encoding="utf-8"))
+            report["artifacts"][0]["sha256"] = "0" * 64
+            fixture.report.write_text(
+                yaml.safe_dump(report, sort_keys=False), encoding="utf-8"
+            )
+            result = fixture.validate()
+
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("artifact hash mismatch", result.stdout)
+
     def test_dirty_report_remains_bound_to_current_worktree(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             fixture = self.fixture(tmp)

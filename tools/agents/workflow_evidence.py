@@ -1081,9 +1081,24 @@ def validate_report(
         entry = _require_mapping(value, f"artifacts[{index}]", findings)
         try:
             path = resolve_repo_path(repo_root, entry.get("path"))
-            if not path.is_file():
-                raise ValueError(f"artifact is missing: {entry.get('path')}")
-            if sha256_file(path) != entry.get("sha256"):
+            if clean_head is not None:
+                actual_hash = sha256_at_revision(
+                    repo_root, clean_head, entry.get("path")
+                )
+                missing_detail = (
+                    f"artifact is missing at fixed revision: {entry.get('path')}"
+                )
+            elif dirty is True:
+                actual_hash = sha256_file(path) if path.is_file() else None
+                missing_detail = f"artifact is missing: {entry.get('path')}"
+            else:
+                actual_hash = entry.get("sha256")
+                missing_detail = (
+                    f"artifact revision state is invalid: {entry.get('path')}"
+                )
+            if actual_hash is None:
+                raise ValueError(missing_detail)
+            if actual_hash != entry.get("sha256"):
                 raise ValueError(f"artifact hash mismatch: {entry.get('path')}")
         except ValueError as exc:
             findings.append(Finding("error", f"artifacts[{index}]", str(exc)))
